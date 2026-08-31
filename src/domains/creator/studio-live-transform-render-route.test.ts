@@ -8,7 +8,7 @@ import {
 /** A stroke comfortably inside every route: thick enough, long enough, densely sampled. */
 const SAFE = {
   strokeWidth: 8,
-  strokeDistance: 100,
+  strokeDistance: 60,
   pointCount: 40,
   isPerfectFamily: true,
 } as const;
@@ -18,6 +18,17 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     for (const scale of [0.5, 0.9, 1, 1.1, 1.7]) {
       expect(studioLiveTransformRouteSurvivesScale(SAFE, scale), `${scale}`).toBe(true);
     }
+  });
+
+  it("refuses the retained shortcut when the renderer requires an exact model draft", () => {
+    expect(studioLiveTransformRouteSurvivesScale({
+      ...SAFE,
+      retainedAffinePolicy: "model-draft-only",
+    }, 1)).toBe(false);
+    expect(studioLiveTransformRouteSurvivesScale({
+      ...SAFE,
+      retainedAffinePolicy: "model-draft-only",
+    }, 2)).toBe(false);
   });
 
   it("refuses a scale that drives the stroke under the renderer's 1px diameter floor", () => {
@@ -61,6 +72,25 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
   it("refuses a scale that crosses the 180px sparse-long cutoff", () => {
     expect(studioLiveTransformRouteSurvivesScale({ ...SAFE, strokeDistance: 100 }, 2)).toBe(false);
     expect(studioLiveTransformRouteSurvivesScale({ ...SAFE, strokeDistance: 200 }, 0.5)).toBe(false);
+  });
+
+  it("refuses a scale that can cross the 120px degenerate-outline fallback", () => {
+    // Legacy perfect strokes do not carry a captured outline contract. StudioDrawNode falls back
+    // from a short/degenerate outline to a Line only while strokeDistance is under 120px. The
+    // outline length itself is renderer output, so the retained preflight conservatively guards
+    // the distance threshold for every legacy perfect stroke.
+    expect(
+      studioLiveTransformRouteSurvivesScale(
+        { strokeWidth: 8, strokeDistance: 100, pointCount: 2, isPerfectFamily: true },
+        1.5,
+      ),
+    ).toBe(false);
+    expect(
+      studioLiveTransformRouteSurvivesScale(
+        { strokeWidth: 8, strokeDistance: 150, pointCount: 2, isPerfectFamily: true },
+        0.5,
+      ),
+    ).toBe(false);
   });
 
   it("refuses a scale that flips the sparse-spacing predicate on its non-linear floor", () => {
@@ -209,6 +239,7 @@ describe("studioLiveTransformRouteOfPoints", () => {
       strokeWidth: 5,
       strokeDistance: 5,
       pointCount: 2,
+      pathLength: 5,
     });
   });
 
@@ -217,6 +248,11 @@ describe("studioLiveTransformRouteOfPoints", () => {
       strokeWidth: 3,
       strokeDistance: 0,
       pointCount: 0,
+      pathLength: 0,
     });
+  });
+
+  it("captures centreline travel once for exact-draft admission", () => {
+    expect(studioLiveTransformRouteOfPoints([0, 0, 3, 4, 6, 8], 2).pathLength).toBe(10);
   });
 });

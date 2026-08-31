@@ -332,18 +332,36 @@ function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageE
 // 래스터한다 — 콘텐츠가 쌓일수록 스트로크가 점점 무거워지던 원인.
 export const StudioDrawNode = memo(function StudioDrawNode({
   el,
-  activeDraft = false,
+  activeDraft: legacyActiveDraft = false,
+  exposeSceneIdentity = true,
   paperSurface,
+  renderPurpose,
 }: {
   el: DrawEl;
   /** 활성 수채 초안은 움직이는 종점 pigment를 영구 station으로 굳히지 않는다. */
   activeDraft?: boolean;
+  /** False for renderer-local preview copies that must never be found as document wrappers. */
+  exposeSceneIdentity?: boolean;
   /** Retained document strokes re-plan when the selected paper changes. */
   paperSurface?: StudioPaperSurfaceSettings;
+  /**
+   * Transform drafts use settled geometry but must not start document-owned background bakes,
+   * populate committed caches or write diagnostics on every animation frame.
+   */
+  renderPurpose?: "document" | "drawing-draft" | "transform-draft";
 }) {
+  const resolvedRenderPurpose = renderPurpose
+    ?? (legacyActiveDraft ? "drawing-draft" : "document");
+  const activeDraft = resolvedRenderPurpose === "drawing-draft";
+  const durableDocumentRender = resolvedRenderPurpose === "document";
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
-  const patternImage = usePatternFillImage(el.pattern);
+  // A transform draft is a renderer-local copy of an already-resolved stroke. It must not start
+  // an asynchronous asset load merely because a legacy/freehand element carries a stale pattern
+  // field that its render route does not consume.
+  const patternImage = usePatternFillImage(
+    resolvedRenderPurpose === "transform-draft" ? undefined : el.pattern,
+  );
   // Opt-in living-ink settled bake (2026-08-14 stall fix): the whole-stroke fluid solve is far
   // over the 33ms chunk budget, so committed bake-lane strokes render their byte-identical base
   // wash immediately and a time-sliced background job bakes the bloom. This generation counter
@@ -429,22 +447,26 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const oilDraftPlannersRetained = activeDraft
     && symmetricVariations.length <= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
   // 보관 베드를 놓는 지점은 둘이다. 캡 포화 오일 획은 카피당 ~27k 런 객체를 들고 있어서, 그리기가
-  // 끝난 뒤에도 붙들고 있으면 수십만 객체가 살아 있게 된다.
+  // 끝난 뒤에도 붙들고 있으면 수십만 객체가 살아 있게 된다. 변형 초안은 동일한 DrawEl id를
+  // 재사용하는 renderer-local 복사본일 뿐 이 슬롯의 소유자가 아니므로 전역 초안 상태를 건드리지
+  // 않는다.
   //
   //  1. 초안이 끝나면 이 요소가 activeDraft=false 로 다시 그려진다 — 가장 흔한 종료 경로다.
   //  2. 그 렌더가 아예 오지 않는 종료 경로(제스처 취소, 미리보기 레이어 제거, 캔버스 언마운트)는
-  //     아래 정리가 유일한 해제 지점이다. 의존성이 el.id 뿐이라 activeDraft 가 켜질 때는 돌지
-  //     않으므로, 방금 렌더가 채운 슬롯을 지우지 않는다.
+  //     실제 drawing-draft 소유자가 설치한 아래 정리가 유일한 해제 지점이다.
   //
   // 두 해제 모두 다른 초안이 이미 자리를 차지했으면 no-op 이라 순서에 안전하다.
-  if (!activeDraft) {
+  if (durableDocumentRender) {
     releaseStudioOilRibbonDraftPlanners(el.id);
     releaseOilBrushDabDraftPlanners(el.id);
   }
-  useEffect(() => () => {
-    releaseStudioOilRibbonDraftPlanners(el.id);
-    releaseOilBrushDabDraftPlanners(el.id);
-  }, [el.id]);
+  useEffect(() => {
+    if (!activeDraft) return undefined;
+    return () => {
+      releaseStudioOilRibbonDraftPlanners(el.id);
+      releaseOilBrushDabDraftPlanners(el.id);
+    };
+  }, [activeDraft, el.id]);
   const dynamicBrushPlanResult = dynamicBrushId
     ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
@@ -472,7 +494,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 렌더 본문 부수효과는 react-compiler 계약 위반이라 커밋 후 이펙트에서 기록한다.
   useEffect(() => {
     if (
-      activeDraft
+      !durableDocumentRender
       || kind !== "freehand"
       || el.mode === "eraser"
       || (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
@@ -499,7 +521,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
       perfectProfile: perfectProfile !== null,
     };
   }, [
-    activeDraft,
+    durableDocumentRender,
     dynamicBrushId,
     dynamicBrushPlanResult,
     dynamicCoverageMarkPlan,
@@ -511,7 +533,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
   return (
     <Group
-      studioElementId={el.id}
+      studioElementId={exposeSceneIdentity ? el.id : undefined}
       globalCompositeOperation={isEraserOperation ? "destination-out" : undefined}
       listening={false}
     >
@@ -1218,7 +1240,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const legacyMarks = dynamicCoverageAndLegacyMarkPlan?.legacyMarks ?? [];
             // 브라우저 감사 진단(플래그 게이트): 커밋 sceneFunc이 실제로 택한 분기와 커버리지
             // 렌더 결과를 남긴다 — 계획은 풍부한데 커밋 픽셀이 희미한 실측 모순의 최종 판별점.
-            const commitRenderDebugEnabled = !activeDraft
+            const commitRenderDebugEnabled = durableDocumentRender
               && (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
                 .__studioDynamicSealDebugEnabled === true;
             const recordCommitRenderDebug = (
@@ -1263,7 +1285,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       {
                         activeDraft,
                         opacity,
-                        ...(!activeDraft
+                        ...(durableDocumentRender
                           ? { committedCacheKey: el.id }
                           : {}),
                       },
@@ -1287,7 +1309,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (perfectProfile && el.mode !== "eraser") {
-            const debug = typeof globalThis !== "undefined"
+            const debug = durableDocumentRender
+              && typeof globalThis !== "undefined"
               && (globalThis as { __debugPerfectInk?: boolean }).__debugPerfectInk;
             if (debug) {
               console.log(
@@ -1751,7 +1774,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 ?? laneWatercolorMaterial?.livingInkBakeProgramId)
               : undefined;
             const livingInkBakeProgram =
-              !activeDraft && livingInkBakeProgramId
+              durableDocumentRender && livingInkBakeProgramId
                 ? resolveStudioLivingInkSettledBakeProgram(livingInkBakeProgramId)
                 : null;
             let dabs: readonly StudioBrushAliasWatercolorDab[];
@@ -2494,7 +2517,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 sceneFunc={(context) => {
                   // brush--gpu-bristle 레인만 GPU 강모 오버레이를 시도한다. 아직 카탈로그에 없는
                   // id 라 기존 유화 브러시는 전부 바이트 동일 경로를 그대로 탄다(증분 2에서 등록).
-                  const gpuBristle = studioGpuBristleOilRequest(el.id, brush, dabs, opacity, stroke);
+                  const gpuBristle = durableDocumentRender
+                    ? studioGpuBristleOilRequest(el.id, brush, dabs, opacity, stroke)
+                    : null;
                   if (gpuBristle) {
                     const overlay = requestStudioGpuBristleOverlay(
                       gpuBristle,

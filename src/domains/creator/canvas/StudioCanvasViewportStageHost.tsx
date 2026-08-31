@@ -1,4 +1,10 @@
-import { Profiler, Suspense } from "react";
+import {
+  Profiler,
+  Suspense,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Stage, Layer, Rect, Shape } from "react-konva/lib/ReactKonvaCore";
 
 import { drawLiveFreehandDraftToContext } from "../brush/studio-draw-rendering";
@@ -6,6 +12,7 @@ import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "../render/studio-ra
 import { CANVAS_W } from "../studio-assets";
 import { studioBackgroundGradientColorStops } from "../studio-background-gradient-color-stops";
 import { vignetteCss } from "../studio-page-grade";
+import { createStudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import {
   StudioRasterCrdtSurface,
   StudioRemoteCursorOverlay,
@@ -124,6 +131,7 @@ export function StudioCanvasViewportStageHost({
     clearAdvancedFillTapGesture,
     commitCanvasSelectionResize,
     commitEditText,
+    finalizeCanvasSelectionResize,
     hideBrushCursor,
     hideFilterMaskCursor,
     hideHealCloneCursors,
@@ -169,6 +177,46 @@ export function StudioCanvasViewportStageHost({
     selectionLockState,
     singleDrawFreeScale,
   } = interaction;
+  const liveTransformDraftScope = `${masterEditMode ? "master" : "page"}:${activePage.id}`;
+  const [liveTransformDraftStore] = useState(() =>
+    createStudioLiveTransformDraftStore()
+  );
+  // Select only the terminal handoff generation. Active exact frames keep returning null, so the
+  // Stage host does not re-render with every pointer frame; the isolated draft node remains the
+  // only hot subscriber. A handoff transition itself must wake this owner, even when the durable
+  // `elements` render happened synchronously before renderer settlement.
+  const liveTransformHandoffRevision = useSyncExternalStore(
+    liveTransformDraftStore.subscribe,
+    () => {
+      const snapshot = liveTransformDraftStore.getSnapshot();
+      return snapshot?.phase === "handoff" ? snapshot.revision : null;
+    },
+    () => null,
+  );
+
+  // Pointer-up retains the exact terminal draft until this authoritative render is committed.
+  // useLayoutEffect releases the hidden source before paint, preventing both source flash and a
+  // duplicate preview frame while React hands renderer authority back to the document Layer.
+  useLayoutEffect(() => {
+    liveTransformDraftStore.acknowledgeAuthoritative(
+      liveTransformDraftScope,
+      elements,
+    );
+  }, [
+    elements,
+    liveTransformDraftScope,
+    liveTransformDraftStore,
+    liveTransformHandoffRevision,
+  ]);
+
+  // A terminal draft belongs to exactly one page/master surface. The draft node also filters by
+  // scope during render, while this layout cleanup restores the old hidden source before paint.
+  useLayoutEffect(
+    () => () => {
+      liveTransformDraftStore.releaseScope(liveTransformDraftScope);
+    },
+    [liveTransformDraftScope, liveTransformDraftStore],
+  );
 
   const documentLayerProps: StudioCanvasViewportDocumentLayerProps = {
     activeGroupId: viewport.activeGroupId,
@@ -303,11 +351,14 @@ export function StudioCanvasViewportStageHost({
     liveDraftVisualRef: viewport.liveDraftVisualRef,
     liveDynamicBrushOverlayRenderer: viewport.liveDynamicBrushOverlayRenderer,
     liveInkOverlayRendererRef: viewport.liveInkOverlayRendererRef,
+    liveTransformDraftStore,
+    liveTransformDraftScope,
     liveRetainedMediaOverlayRenderer: viewport.liveRetainedMediaOverlayRenderer,
     liveStampOverlayRenderer: viewport.liveStampOverlayRenderer,
     liveWetInkOverlayRenderer: viewport.liveWetInkOverlayRenderer,
     livingInkOverlayVisibleRef: viewport.livingInkOverlayVisibleRef,
     lowDensityEraserActive: interaction.lowDensityEraserActive,
+    paperSurfaceForLiveTransform: live.paperSurfaceForPreview,
     marqueeRectNodeRef: viewport.marqueeRectNodeRef,
     masterEditMode: viewport.masterEditMode,
     moveVanishingPointById: viewport.stableHandlers.moveVanishingPointById,
@@ -596,7 +647,7 @@ export function StudioCanvasViewportStageHost({
                 activeGroupId,
                 activeSurfaceReviewLocked,
                 beginCanvasSelectionResize,
-                cancelCanvasSelectionResize,
+                cancelCanvasSelectionResize: finalizeCanvasSelectionResize,
                 canvasSelectionResizeCancelSignal: viewport.canvasSelectionResizeCancelSignal,
                 canvasH,
                 canvasSelectionEls,
@@ -615,12 +666,18 @@ export function StudioCanvasViewportStageHost({
                 selectionLockState,
                 singleDrawFreeScale,
                 singleObjectDragLayerRef: interaction.singleObjectDragLayerRef,
+                liveTransformDraftStore,
+                liveTransformDraftScope,
                 tool,
                 trRef,
               })}
               {/* 지우개 다이렉트 라이브 초안: destination-out 으로 메인 레이어 콘텐츠를 직접 실시간 소거 */}
               {tool === "draw" && (
                 <Shape
+                  // This carrier is visible to Konva but paints only while the draw tool is active.
+                  // The explicit promise keeps select-mode transform z-order preflight from
+                  // classifying an empty draft carrier as authored artwork above the stroke.
+                  studioLiveTransformZOrderExempt
                   sceneFunc={(context) => {
                     const el = liveDraftVisualRef.current;
                     if (!el || !liveDraftDirectRef.current || el.mode !== "eraser") return;

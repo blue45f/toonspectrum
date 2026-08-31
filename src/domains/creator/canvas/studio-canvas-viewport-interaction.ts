@@ -111,17 +111,19 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
   } = stableHandlers;
   const singleObjectDragLayerRef = useRef<Konva.Layer>(null);
   const singleObjectDragSessionRef = useRef<StudioSingleObjectDragLayerSession | null>(null);
-  function restoreSingleObjectDragLayer(): void {
+  function restoreSingleObjectDragLayer(): boolean {
     const session = singleObjectDragSessionRef.current;
-    singleObjectDragSessionRef.current = null;
-    restoreStudioSingleObjectDragLayer(session);
+    if (!session) return true;
+    const restored = restoreStudioSingleObjectDragLayer(session);
+    if (restored) singleObjectDragSessionRef.current = null;
+    return restored;
   }
 
   function patchElementAfterDragRestore(id: string, patch: Partial<El>): void {
     if (singleObjectDragSessionRef.current?.elementId === id) {
       // Child dragend runs before the Stage dragend bubble. Restore the React-owned parent first so
       // a synchronous external-store/CRDT commit can never reconcile an imperatively lifted node.
-      restoreSingleObjectDragLayer();
+      if (!restoreSingleObjectDragLayer()) return;
     }
     patchEl(id, patch);
   }
@@ -131,7 +133,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     // node first so document mutation/reconciliation always starts from the authoritative Layer;
     // Stage drag-end remains the fallback for cancelled/no-op gestures.
     if (singleObjectDragSessionRef.current?.elementId === id) {
-      restoreSingleObjectDragLayer();
+      if (!restoreSingleObjectDragLayer()) return;
     }
     patchElFromPage(id, patch);
   }
@@ -139,7 +141,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
   function beginSingleObjectDragLayer(
     event: Konva.KonvaEventObject<DragEvent>,
   ): void {
-    restoreSingleObjectDragLayer();
+    if (!restoreSingleObjectDragLayer()) return;
     if (!event.target.isDragging()) return;
     const selectedElement = selected?.id === selectedId ? selected : null;
     singleObjectDragSessionRef.current = beginStudioSingleObjectDragLayer({
@@ -162,7 +164,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
   }
 
   function finishSingleObjectDragLayer(): void {
-    restoreSingleObjectDragLayer();
+    if (!restoreSingleObjectDragLayer()) return;
     onStageDragEnd();
   }
 

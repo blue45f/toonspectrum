@@ -28,9 +28,9 @@
  */
 import { MAX_COORDINATE, MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
 
+import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { SHAPE_PARAM_RANGES } from "./studio-stroke-shapes";
-
 
 import type { DrawEl } from "../studio-element-model";
 
@@ -58,6 +58,45 @@ export function studioDrawShapeIsBoundsDerived(kind: unknown): boolean {
     || kind === "polygon";
 }
 
+/**
+ * Whether the retained calligraphy renderer actually consumes stored orientation samples.
+ *
+ * Mouse/CRDT materialization may populate zero-filled arrays, but the renderer normalizes those
+ * to `hasTilt:false` and zero twist. A disabled nib ignores even non-zero samples, and the
+ * single-sample tap route ignores all stylus channels. Keeping this predicate beside the commit
+ * planner lets preview eligibility and brush-tip rotation share the exact same semantic gate.
+ */
+export function studioDrawHasEffectivePerSampleOrientation(el: DrawEl): boolean {
+  if (el.points.length <= 2) return false;
+  if (resolveStudioBrushRuntimeContract(el.brush)?.engine !== "calligraphy-segments") {
+    return false;
+  }
+  const tip = resolveStudioCalligraphyRenderTip(el.brush, el.brushTip);
+  // The user-adjustable `calligraphy` brush has no catalogue profile when old documents omitted
+  // brushTip; buildCalligraphySegments then sanitizes undefined to its tilt-enabled default.
+  if ((tip?.tiltEnabled ?? true) !== true) return false;
+  const sampleCount = Math.min(
+    Math.floor(el.points.length / 2),
+    Math.max(el.tiltXs?.length ?? 0, el.tiltYs?.length ?? 0, el.twists?.length ?? 0),
+  );
+  for (let index = 0; index < sampleCount; index += 1) {
+    const tiltX = el.tiltXs?.[index] ?? 0;
+    const tiltY = el.tiltYs?.[index] ?? 0;
+    const twist = el.twists?.[index] ?? 0;
+    // Match normalizeCalligraphyStylusInput: malformed axes fall back independently, so one
+    // finite non-zero axis still constitutes effective tilt rather than being masked by its peer.
+    const safeTiltX = Number.isFinite(tiltX) ? tiltX : 0;
+    const safeTiltY = Number.isFinite(tiltY) ? tiltY : 0;
+    if (
+      Math.hypot(safeTiltX, safeTiltY) > Number.EPSILON
+      || (Number.isFinite(twist) && twist > Number.EPSILON)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface StudioDrawObjectTransformBounds {
   readonly x: number;
   readonly y: number;
@@ -82,6 +121,18 @@ export interface StudioDrawObjectTransformInput {
   /** Clockwise rotation in degrees about the target box origin. Konva's `rotation()` convention. */
   readonly rotationDeg?: number;
   readonly strokeWidthPolicy?: StudioDrawObjectStrokeWidthPolicy;
+}
+
+/** One point traversal produces both the durable candidate and the bounds its readers need. */
+export interface StudioDrawObjectTransformPlan {
+  readonly element: DrawEl;
+  /** Exact `elBounds(element)` result, without scanning the transformed points a second time. */
+  readonly bounds: {
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+  };
 }
 
 /** Axis scale factors, exposed so callers can warn about (or reject) a non-uniform gesture. */
@@ -183,11 +234,11 @@ export function studioDrawObjectTransformScale(
  * its area. Callers that need to surface that trade-off can read `uniform` from
  * `studioDrawObjectTransformScale`.
  *
- * @returns the transformed element, or `null` if any input or result is not finite.
+ * @returns the transformed element and its exact point bounds, or `null` for invalid input/result.
  */
-export function planStudioDrawObjectTransform(
+export function planStudioDrawObjectTransformWithBounds(
   input: StudioDrawObjectTransformInput
-): DrawEl | null {
+): StudioDrawObjectTransformPlan | null {
   const { el, sourceBounds, targetBounds } = input;
   const requestedRotationDeg = input.rotationDeg ?? 0;
   const strokeWidthPolicy = input.strokeWidthPolicy ?? "scale";
@@ -237,12 +288,21 @@ export function planStudioDrawObjectTransform(
   };
 
   const points = new Array<number>(el.points.length);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
   for (let index = 0; index + 1 < el.points.length; index += 2) {
     const mapped = mapPoint(el.points[index]!, el.points[index + 1]!);
     if (!mapped) return null;
     points[index] = mapped.x;
     points[index + 1] = mapped.y;
+    if (mapped.x < minX) minX = mapped.x;
+    if (mapped.x > maxX) maxX = mapped.x;
+    if (mapped.y < minY) minY = mapped.y;
+    if (mapped.y > maxY) maxY = mapped.y;
   }
+  const bounds = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 
   const widthFactor = strokeWidthPolicy === "scale" ? scale.uniformEquivalent : 1;
   const strokeWidth = el.strokeWidth * widthFactor;
@@ -324,10 +384,7 @@ export function planStudioDrawObjectTransform(
   // have half its nib turned by this rotation and half left alone -- the commit would distort the
   // stroke rather than rotate it. Excluding these strokes from the preview does not help here:
   // this is the commit path, which runs whether or not a preview did.
-  const hasPerSampleOrientation =
-    (el.tiltXs !== undefined && el.tiltXs.length > 0)
-    || (el.tiltYs !== undefined && el.tiltYs.length > 0)
-    || (el.twists !== undefined && el.twists.length > 0);
+  const hasPerSampleOrientation = studioDrawHasEffectivePerSampleOrientation(el);
   // Pre-nib-table documents carry no `brushTip` at all, and StudioDrawNode recovers one for them
   // from the catalogue (`resolveStudioCalligraphyRenderTip`) before building the ribbon. Skipping
   // those would leave the recovered nib at its catalogue angle through every rotation while the
@@ -372,16 +429,26 @@ export function planStudioDrawObjectTransform(
     && points.length === el.points.length
     && points.every((value, index) => value === el.points[index])
   ) {
-    return el;
+    return { element: el, bounds };
   }
 
   return {
-    ...el,
-    points,
-    strokeWidth,
-    ...(brushTip !== undefined ? { brushTip } : {}),
-    ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
-    ...(shapeParams !== undefined ? { shapeParams } : {}),
-    ...(symmetry !== undefined ? { symmetry } : {}),
+    element: {
+      ...el,
+      points,
+      strokeWidth,
+      ...(brushTip !== undefined ? { brushTip } : {}),
+      ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
+      ...(shapeParams !== undefined ? { shapeParams } : {}),
+      ...(symmetry !== undefined ? { symmetry } : {}),
+    },
+    bounds,
   };
+}
+
+/** Compatibility projection for durable callers that only need the transformed element. */
+export function planStudioDrawObjectTransform(
+  input: StudioDrawObjectTransformInput,
+): DrawEl | null {
+  return planStudioDrawObjectTransformWithBounds(input)?.element ?? null;
 }

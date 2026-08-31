@@ -254,6 +254,79 @@ function clampTo(raw: unknown, min: number, max: number, fallback: number): numb
   return Math.min(max, Math.max(min, raw));
 }
 
+const STUDIO_PERFECT_FREEHAND_MIN_SIZE = 0.5;
+const STUDIO_PERFECT_FREEHAND_MAX_SIZE = 400;
+const STUDIO_PERFECT_FREEHAND_FALLBACK_SIZE = 6;
+const STUDIO_PERFECT_FREEHAND_MAX_COMPACT_DOT_FLOOR = 3;
+
+function studioPerfectFreehandClampedSize(strokeWidth: unknown): number {
+  return clampTo(
+    strokeWidth,
+    STUDIO_PERFECT_FREEHAND_MIN_SIZE,
+    STUDIO_PERFECT_FREEHAND_MAX_SIZE,
+    STUDIO_PERFECT_FREEHAND_FALLBACK_SIZE,
+  );
+}
+
+/**
+ * Largest distance from the centre line that the retained perfect-freehand renderer can paint.
+ * The pinned v1 profiles and dynamic-size branch keep thinning in [-1, 1] and pressure in [0, 1],
+ * so perfect-freehand's radius expression never exceeds its clamped `size` option. StudioDrawNode
+ * bypasses that planner for compact legacy taps and floors their radius at 3px for perfect-ink
+ * (1.4px for other perfect profiles); its short-stroke Line fallback also floors endpoint dots at
+ * 2px. The 3px maximum therefore bounds every perfect route without changing the planner's size.
+ */
+export function studioPerfectFreehandMaximumPaintRadius(strokeWidth: unknown): number {
+  return Math.max(
+    STUDIO_PERFECT_FREEHAND_MAX_COMPACT_DOT_FLOOR,
+    studioPerfectFreehandClampedSize(strokeWidth),
+  );
+}
+
+export interface StudioPerfectFreehandWorkUpperBound {
+  readonly strokePointCount: number;
+  readonly outlinePointCount: number;
+  readonly outlineCoordinateScalars: number;
+  /** Numeric coordinate fields serialized into the M/Q path data. */
+  readonly pathCoordinateScalars: number;
+  /** M + one Q per outline point + Z. */
+  readonly pathCommands: number;
+}
+
+/**
+ * O(1) renderer-expanded work bound for the pinned `perfect-freehand@1.2.3:getStroke` algorithm.
+ *
+ * `getStrokePoints` expands exactly two source points to five and otherwise cannot increase the
+ * source count. `getStrokeOutlinePoints` can append 14 points to each side at a sharp turn (28 per
+ * stroke point), then at most 13 start-cap plus 29 end-cap points. Studio's path adapter emits one
+ * quadratic command with four numeric coordinate fields per outline point. These constants come
+ * from the dependency's loop structure, not a benchmark-tuned sample threshold; the regression
+ * test compares real adversarial outlines against this bound so a package upgrade must revisit it.
+ */
+export function studioPerfectFreehandWorkUpperBound(
+  sourcePointCount: number,
+): StudioPerfectFreehandWorkUpperBound | null {
+  if (!Number.isSafeInteger(sourcePointCount) || sourcePointCount < 0) return null;
+  if (sourcePointCount === 0) {
+    return {
+      strokePointCount: 0,
+      outlinePointCount: 0,
+      outlineCoordinateScalars: 0,
+      pathCoordinateScalars: 0,
+      pathCommands: 0,
+    };
+  }
+  const strokePointCount = Math.max(sourcePointCount, 5);
+  const outlinePointCount = 28 * strokePointCount + 42;
+  return {
+    strokePointCount,
+    outlinePointCount,
+    outlineCoordinateScalars: outlinePointCount * 2,
+    pathCoordinateScalars: 2 + outlinePointCount * 4,
+    pathCommands: outlinePointCount + 2,
+  };
+}
+
 /**
  * 프로필 + 브러시 굵기 → getStroke 옵션. easing은 기본값(결정적)을 쓰고, 하드웨어 필압
  * 배열이 없을 때만 속도 기반 시뮬레이션을 켠다(입력 좌표만의 함수라 역시 결정적).
@@ -264,7 +337,7 @@ export function studioPerfectFreehandStrokeOptions(
   hasPressures: boolean,
   segmentLength?: number
 ): StrokeOptions {
-  const size = clampTo(strokeWidth, 0.5, 400, 6);
+  const size = studioPerfectFreehandClampedSize(strokeWidth);
   const safeShortLength = size * 1.4;
   const measured = segmentLength !== undefined;
   const usableLength = measured && Number.isFinite(segmentLength) && segmentLength > 0
@@ -386,7 +459,7 @@ export function buildStudioPerfectFreehandOutline(
   // (radius / size)이 어긋나지 않는다(studioPerfectFreehandStrokeOptions 와 같은 클램프).
   const sizeDynamics = input.profile.sizeDynamics;
   const hasSizeDynamics = sizeDynamics !== undefined && sizeDynamics.length > 0;
-  const baseSizePx = clampTo(input.strokeWidth, 0.5, 400, 6);
+  const baseSizePx = studioPerfectFreehandClampedSize(input.strokeWidth);
 
   const strokePoints: number[][] = [];
   for (let index = 0; index < pointCount; index++) {

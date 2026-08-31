@@ -1013,6 +1013,15 @@ export interface BrushReleasePressureSampleInput extends BrushPressureSampleInpu
 }
 
 const CALLIGRAPHY_MIN_ROUNDNESS = 0.08;
+const CALLIGRAPHY_MIN_BASE_WIDTH = 0.25;
+const CALLIGRAPHY_MAX_BASE_WIDTH = 2_048;
+const CALLIGRAPHY_MIN_SEGMENT_WIDTH = 0.05;
+const CALLIGRAPHY_MAX_SEGMENT_WIDTH = 4_096;
+const CALLIGRAPHY_MIN_PRESSURE_SCALE = 0.35;
+const CALLIGRAPHY_PRESSURE_SCALE_RANGE = 0.9;
+const CALLIGRAPHY_TAP_MIN_RADIUS = 0.35;
+const CALLIGRAPHY_TAP_MIN_PRESSURE_SCALE = 0.3;
+const CALLIGRAPHY_TAP_PRESSURE_SCALE_RANGE = 1.4;
 const DEFAULT_CALLIGRAPHY_SETTINGS: CalligraphyTipSettings = {
   tiltEnabled: true,
   angleDeg: 45,
@@ -1029,6 +1038,51 @@ function clamp(value: number, min: number, max: number): number {
 
 function clamp01(value: number): number {
   return clamp(value, 0, 1);
+}
+
+/**
+ * Largest document-pixel radius that the retained calligraphy renderer can paint for a selected
+ * renderer diameter and source-point route.
+ *
+ * A one-point calligraphy mark takes StudioDrawNode's generic-dot Ellipse route, whose major
+ * radius is `max(0.35, effectiveDiameter * (0.3 + pressure * 1.4) / 2)`. Alias pressure profiles
+ * can exceed 1, so the compiler supplies the renderer's mapped maximum instead of assuming a
+ * normalized source pressure. Multi-point ribbons use `calligraphySegmentStep`: it multiplies the
+ * clamped base width by at most `0.35 + 1 * 0.9`, then by the same elliptical projection that
+ * `studio-calligraphy-ribbon` divides out when recovering the nib's major radius. Its 0.05px width
+ * floor can dominate only at the 0.08 roundness floor, yielding 0.05 / 2 / 0.08 = 0.3125px.
+ */
+export function studioCalligraphyMaximumNibRadius(
+  baseWidth: unknown,
+  sourcePointCount: number,
+  maximumTapPressure = 1,
+): number {
+  if (!Number.isSafeInteger(sourcePointCount) || sourcePointCount <= 1) {
+    const safeTapBaseWidth = Math.max(0, finiteNumber(baseWidth, 1));
+    const safeMaximumTapPressure = Math.max(0, finiteNumber(maximumTapPressure, 1));
+    return Math.max(
+      CALLIGRAPHY_TAP_MIN_RADIUS,
+      safeTapBaseWidth
+        * (
+          CALLIGRAPHY_TAP_MIN_PRESSURE_SCALE
+          + safeMaximumTapPressure * CALLIGRAPHY_TAP_PRESSURE_SCALE_RANGE
+        )
+        / 2,
+    );
+  }
+  const safeBaseWidth = clamp(
+    finiteNumber(baseWidth, 1),
+    CALLIGRAPHY_MIN_BASE_WIDTH,
+    CALLIGRAPHY_MAX_BASE_WIDTH,
+  );
+  const pressureRadius = safeBaseWidth
+    * (CALLIGRAPHY_MIN_PRESSURE_SCALE + CALLIGRAPHY_PRESSURE_SCALE_RANGE)
+    / 2;
+  const widthFloorRadius = CALLIGRAPHY_MIN_SEGMENT_WIDTH / 2 / CALLIGRAPHY_MIN_ROUNDNESS;
+  return Math.min(
+    CALLIGRAPHY_MAX_SEGMENT_WIDTH / 2,
+    Math.max(widthFloorRadius, pressureRadius),
+  );
 }
 
 /**
@@ -1313,8 +1367,13 @@ function calligraphySegmentStep(
   const sin = Math.sin(relativeTravelAngle);
   const cos = Math.cos(relativeTravelAngle);
   const ellipticalProjection = Math.sqrt(sin * sin + roundness * roundness * cos * cos);
-  const pressureScale = 0.35 + pressure * 0.9;
-  const width = clamp(safeBaseWidth * pressureScale * ellipticalProjection, 0.05, 4096);
+  const pressureScale = CALLIGRAPHY_MIN_PRESSURE_SCALE
+    + pressure * CALLIGRAPHY_PRESSURE_SCALE_RANGE;
+  const width = clamp(
+    safeBaseWidth * pressureScale * ellipticalProjection,
+    CALLIGRAPHY_MIN_SEGMENT_WIDTH,
+    CALLIGRAPHY_MAX_SEGMENT_WIDTH,
+  );
 
   return { segment: { x0, y0, x1, y1, width, tipAngleRad, roundness }, travelAngle };
 }
@@ -1334,7 +1393,11 @@ export function buildCalligraphySegments(
   const pointCount = Math.floor(smoothedPoints.length / 2);
   if (pointCount < 2) return [];
 
-  const safeBaseWidth = clamp(finiteNumber(baseWidth, 1), 0.25, 2048);
+  const safeBaseWidth = clamp(
+    finiteNumber(baseWidth, 1),
+    CALLIGRAPHY_MIN_BASE_WIDTH,
+    CALLIGRAPHY_MAX_BASE_WIDTH,
+  );
   const safeSettings = sanitizeCalligraphyTipSettings(settings);
   const fallbackTipAngle = (safeSettings.angleDeg * Math.PI) / 180;
   const segments: CalligraphySegment[] = [];
@@ -1436,7 +1499,11 @@ export function createStudioIncrementalCalligraphySegmentBuilder(
   baseWidth: number,
   settings: Partial<CalligraphyTipSettings> | null | undefined
 ): StudioIncrementalCalligraphySegmentBuilder {
-  const safeBaseWidth = clamp(finiteNumber(baseWidth, 1), 0.25, 2048);
+  const safeBaseWidth = clamp(
+    finiteNumber(baseWidth, 1),
+    CALLIGRAPHY_MIN_BASE_WIDTH,
+    CALLIGRAPHY_MAX_BASE_WIDTH,
+  );
   const safeSettings = sanitizeCalligraphyTipSettings(settings);
   const fallbackTipAngle = (safeSettings.angleDeg * Math.PI) / 180;
   const segments: CalligraphySegment[] = [];

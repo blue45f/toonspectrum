@@ -118,6 +118,17 @@ describe("studioLiveTransformTargetBounds", () => {
 });
 
 describe("studioLiveTransformCommittedClip", () => {
+  it("accepts exact planner bounds without re-transforming the source points", () => {
+    expect(
+      studioLiveTransformCommittedClip({
+        targetBounds: { x: 900, y: 900, width: 10, height: 10 },
+        rotationDeg: 0,
+        transformedBounds: { x: 40, y: 40, w: 20, h: 20 },
+        elements: ELEMENTS,
+      }),
+    ).toEqual({ x: 0, y: 0, width: 200, height: 200 });
+  });
+
   it("clips a stroke whose transformed centre lands inside the panel", () => {
     expect(
       studioLiveTransformCommittedClip({

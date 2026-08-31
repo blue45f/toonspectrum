@@ -42,12 +42,64 @@ export interface StudioCalligraphyRibbonPlan {
   readonly acceptedSegmentCount: number;
 }
 
+/** Renderer-expanded work facts derivable from source length without planning the ribbon. */
+export interface StudioCalligraphyRibbonWorkUpperBound {
+  readonly acceptedSegmentCount: number;
+  /** Final compound-outline coordinate scalars materialized by the planner. */
+  readonly outlineCoordinateScalars: number;
+  /** Canvas path operations emitted by StudioDrawNode, including beginPath/fill. */
+  readonly canvasPathCommands: number;
+}
+
 const COORDINATE_LIMIT = 1_000_000;
 const WIDTH_LIMIT = 4_096;
 const POINT_EPSILON = 1e-6;
 const CONTINUITY_EPSILON = 1e-4;
 const NIB_FOOTPRINT_STEPS = 32;
 const GEOMETRY_QUANTIZATION = 10_000;
+
+/**
+ * O(1) upper bound for `planStudioCalligraphyRibbon` plus StudioDrawNode's Canvas path emission.
+ *
+ * For each accepted source segment, `sweptSegmentOutline` has at most 32 + 2 vertices and the two
+ * explicit terminal footprints have 32 vertices each. `compoundOutline` adds a two-scalar anchor
+ * after its first polygon and a four-scalar bridge after every later polygon. A contiguous run is
+ * therefore `208 * segments - 2` final coordinate scalars. Splitting every segment into its own
+ * run is smaller in geometry (206 scalars each) but larger in Canvas work: one moveTo, 102 lineTo,
+ * closePath and two moveTo/arc pairs = 108 commands per segment, plus the shared beginPath/fill.
+ *
+ * `buildCalligraphySegments` creates at most `sourcePointCount - 1` segments and normalization can
+ * only discard them, so the bound is conservative for zero-length and malformed source samples.
+ */
+export function studioCalligraphyRibbonWorkUpperBound(
+  sourcePointCount: number,
+): StudioCalligraphyRibbonWorkUpperBound | null {
+  if (!Number.isSafeInteger(sourcePointCount) || sourcePointCount < 0) return null;
+  const acceptedSegmentCount = Math.max(0, sourcePointCount - 1);
+  if (acceptedSegmentCount === 0) {
+    // The retained calligraphy branch may emit one fallback arc instead of a ribbon.
+    return {
+      acceptedSegmentCount,
+      outlineCoordinateScalars: 0,
+      canvasPathCommands: 3,
+    };
+  }
+  const sweptHullCoordinateScalars = (NIB_FOOTPRINT_STEPS + 2) * 2;
+  const footprintCoordinateScalars = NIB_FOOTPRINT_STEPS * 2;
+  const firstSegmentCoordinateScalars = sweptHullCoordinateScalars + 2
+    + 2 * (footprintCoordinateScalars + 4);
+  const laterSegmentCoordinateScalars = sweptHullCoordinateScalars + 4
+    + 2 * (footprintCoordinateScalars + 4);
+  const outlineCoordinateScalars = firstSegmentCoordinateScalars
+    + (acceptedSegmentCount - 1) * laterSegmentCoordinateScalars;
+  const singleSegmentRunVertices = firstSegmentCoordinateScalars / 2;
+  const commandsPerSingleSegmentRun = singleSegmentRunVertices + 5;
+  return {
+    acceptedSegmentCount,
+    outlineCoordinateScalars,
+    canvasPathCommands: commandsPerSingleSegmentRun * acceptedSegmentCount + 2,
+  };
+}
 
 function finiteCoordinate(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;

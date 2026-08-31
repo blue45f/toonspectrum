@@ -78,11 +78,14 @@ export interface StudioCanvasViewportHandlers {
   beginCanvasSelectionResize: (
     sourceBounds: StudioGroupUniformResizeBounds
   ) => boolean;
+  /** Request renderer-owned cancellation; this must not release the page/CRDT writer lease. */
   cancelCanvasSelectionResize: () => void;
+  /** Commit-port finalizer, called only after renderer close/settlement acknowledges completion. */
+  finalizeCanvasSelectionResize: () => void;
   commitCanvasSelectionResize: (
     targetBounds: StudioGroupUniformResizeBounds,
     rotationDeg: number
-  ) => void;
+  ) => boolean;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
   onWebGpuFrameRequest: (request: StudioWebGpuSurfaceFrameRequest) => void;

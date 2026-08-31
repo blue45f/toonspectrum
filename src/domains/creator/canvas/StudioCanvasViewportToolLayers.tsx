@@ -5,6 +5,7 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { drawLiveFreehandDraftToContext } from "../brush/studio-draw-rendering";
 import { StudioBrushCursor } from "../brush/StudioBrushCursor";
+import { StudioLiveTransformDraftNode } from "../StudioLiveTransformDraftNode";
 import { CANVAS_W } from "../studio-assets";
 import { StudioDraftPreviewLayers } from "../StudioDraftPreviewLayers";
 
@@ -17,6 +18,8 @@ import type {
   StudioCanvasViewportProps,
 } from "./StudioCanvasViewportTypes";
 import type Konva from "konva";
+import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
+import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 
 export interface StudioCanvasViewportToolLayersProps {
   activeSurfaceReviewLocked: StudioCanvasViewportProps["activeSurfaceReviewLocked"];
@@ -81,11 +84,14 @@ export interface StudioCanvasViewportToolLayersProps {
   liveDraftVisualRef: StudioCanvasViewportProps["liveDraftVisualRef"];
   liveDynamicBrushOverlayRenderer: StudioCanvasViewportProps["liveDynamicBrushOverlayRenderer"];
   liveInkOverlayRendererRef: StudioCanvasViewportProps["liveInkOverlayRendererRef"];
+  liveTransformDraftStore: StudioLiveTransformDraftStore;
+  liveTransformDraftScope: string;
   liveRetainedMediaOverlayRenderer: StudioCanvasViewportProps["liveRetainedMediaOverlayRenderer"];
   liveStampOverlayRenderer: StudioCanvasViewportProps["liveStampOverlayRenderer"];
   liveWetInkOverlayRenderer: StudioCanvasViewportProps["liveWetInkOverlayRenderer"];
   livingInkOverlayVisibleRef: StudioCanvasViewportProps["livingInkOverlayVisibleRef"];
   lowDensityEraserActive: boolean;
+  paperSurfaceForLiveTransform: StudioPaperSurfaceSettings;
   marqueeRectNodeRef: StudioCanvasViewportProps["marqueeRectNodeRef"];
   masterEditMode: StudioCanvasViewportProps["masterEditMode"];
   moveVanishingPointById: StudioCanvasViewportHandlers["moveVanishingPointById"];
@@ -218,11 +224,14 @@ export function StudioCanvasViewportToolLayers({
   liveDraftVisualRef,
   liveDynamicBrushOverlayRenderer,
   liveInkOverlayRendererRef,
+  liveTransformDraftStore,
+  liveTransformDraftScope,
   liveRetainedMediaOverlayRenderer,
   liveStampOverlayRenderer,
   liveWetInkOverlayRenderer,
   livingInkOverlayVisibleRef,
   lowDensityEraserActive,
+  paperSurfaceForLiveTransform,
   marqueeRectNodeRef,
   masterEditMode,
   moveVanishingPointById,
@@ -294,7 +303,13 @@ export function StudioCanvasViewportToolLayers({
             <Layer
               ref={singleObjectDragLayerRef}
               name="studio-single-object-drag-layer"
-            />
+            >
+              <StudioLiveTransformDraftNode
+                store={liveTransformDraftStore}
+                scope={liveTransformDraftScope}
+                paperSurface={paperSurfaceForLiveTransform}
+              />
+            </Layer>
             {/* 라이브 프리핸드 초안은 전용 레이어에서만 다시 그린다: 포인터 프레임마다 메인
                 레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
                 일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.

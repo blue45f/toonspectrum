@@ -27,6 +27,7 @@ import {
   type Page,
 } from "playwright";
 
+import { planStudioDrawObjectTransform } from "../src/domains/creator/brush/studio-draw-object-transform";
 import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 
 import {
@@ -42,6 +43,8 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
+import type { DrawEl, TextEl } from "../src/domains/creator/studio-element-model";
+
 const SCRATCH =
   process.env.TOONSPECTRUM_GROUP_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
@@ -54,6 +57,9 @@ const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 /** The guest `/studio` draft this verifier authors — the document key Studio persists under. */
 const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-group-verifier-cleaned";
+/** Deliberately distinct from Transformer chrome/shadows so backing-canvas pixels are attributable. */
+const LIVE_DRAW_STROKE = "#0b9b6d";
+const FIXTURE_TEXT_FILL = "#16100c";
 /**
  * Every locator below names a Korean control ("텍스트 추가", "복구하기", "3개 선택", …).
  * Studio localizes its chrome from the browser locale (`lib/i18n.ts` seeds the store with
@@ -140,9 +146,57 @@ interface KonvaElementTransformState {
   scaleY: number;
 }
 
+interface StudioHistoryDiagnostics {
+  entryCount: number;
+  undoDepth: number;
+}
+
+interface SingleDrawLiveTransformState {
+  presentation: "exact-draft" | "retained-affine" | "none";
+  proxyBounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  proxyRotation: number | null;
+  draftChildCount: number;
+  /** Pixels read from the already-painted native SceneCanvas, never from `node.toCanvas()`. */
+  backingPixelCount: number;
+  draftBounds: { x: number; y: number; width: number; height: number } | null;
+  wrapper: {
+    visible: boolean;
+    active: boolean;
+    x: number;
+    y: number;
+    scaleX: number;
+    scaleY: number;
+    rotation: number;
+    offsetX: number;
+    offsetY: number;
+    layerName: string;
+  } | null;
+  proxyLayerName: string | null;
+  transformerLayerName: string | null;
+  parkedChromeCount: number;
+}
+
 interface DesktopEvidence {
   fixtureIds: string[];
   fixtureTypes: string[];
+  singleDrawLivePresentation: "exact-draft" | "retained-affine";
+  singleDrawTerminalLivePresentation: "exact-draft" | "retained-affine";
+  singleDrawLiveBackingPixelsObserved: boolean;
+  singleDrawLiveBackingPixelsReplaced: boolean;
+  singleDrawLiveBackingPixelsMatchedProxy: boolean;
+  singleDrawLivePresentationMoved: boolean;
+  singleDrawLiveAutosaveUnchanged: boolean;
+  singleDrawLiveHistoryUnchanged: boolean;
+  singleDrawTransformHistoryEntryDelta: number;
+  singleDrawTransformUndoDepthDelta: number;
+  singleDrawPlannerGeometryMatched: boolean;
+  singleDrawRendererCleanupComplete: boolean;
+  singleDrawUndoRestoredInitial: boolean;
   groupId: string;
   groupName: string | null;
   firstDragDelta: ScreenPoint;
@@ -506,6 +560,125 @@ async function waitForSnapshot(
   throw new Error(
     `${description}; latest autosave=${JSON.stringify(summary)}`
     + (readError ? `; last durable read error=${readError}` : ""),
+  );
+}
+
+async function readStudioHistoryDiagnostics(
+  page: Page,
+): Promise<StudioHistoryDiagnostics> {
+  const editor = page.locator('[data-studio-editor="true"]').first();
+  const [rawEntryCount, rawUndoDepth] = await Promise.all([
+    editor.getAttribute("data-studio-history-entry-count"),
+    editor.getAttribute("data-studio-history-undo-depth"),
+  ]);
+  const entryCount = Number(rawEntryCount);
+  const undoDepth = Number(rawUndoDepth);
+  invariant(
+    Number.isInteger(entryCount) && entryCount >= 1,
+    `invalid Studio history entry count ${String(rawEntryCount)}`,
+  );
+  invariant(
+    Number.isInteger(undoDepth) && undoDepth >= 0,
+    `invalid Studio history undo depth ${String(rawUndoDepth)}`,
+  );
+  return { entryCount, undoDepth };
+}
+
+async function waitForStudioHistoryDiagnostics(
+  page: Page,
+  expected: StudioHistoryDiagnostics,
+  description: string,
+  timeoutMs = 4_000,
+): Promise<StudioHistoryDiagnostics> {
+  const startedAt = Date.now();
+  let latest: StudioHistoryDiagnostics | null = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    latest = await readStudioHistoryDiagnostics(page);
+    if (
+      latest.entryCount === expected.entryCount
+      && latest.undoDepth === expected.undoDepth
+    ) {
+      return latest;
+    }
+    await page.waitForTimeout(50);
+  }
+  throw new Error(
+    `${description}; expected=${JSON.stringify(expected)}, latest=${JSON.stringify(latest)}`,
+  );
+}
+
+function rawElementById<T extends { readonly id: string }>(
+  snapshot: PersistedSnapshot,
+  id: string,
+): T {
+  const payload = JSON.parse(snapshot.raw) as {
+    currentPageId?: unknown;
+    pagesList?: Array<{ id?: unknown; elements?: unknown[] }>;
+  };
+  const pageRecord =
+    payload.pagesList?.find((candidate) => candidate.id === payload.currentPageId)
+    ?? payload.pagesList?.[0];
+  const element = pageRecord?.elements?.find((candidate) =>
+    Boolean(candidate)
+    && typeof candidate === "object"
+    && !Array.isArray(candidate)
+    && (candidate as { id?: unknown }).id === id
+  );
+  invariant(element, `raw autosave no longer contains fixture element ${id}`);
+  return element as T;
+}
+
+function canonicalJson(value: unknown): string {
+  const normalize = (candidate: unknown): unknown => {
+    if (Array.isArray(candidate)) return candidate.map(normalize);
+    if (!candidate || typeof candidate !== "object") return candidate;
+    return Object.fromEntries(
+      Object.entries(candidate as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, normalize(item)]),
+    );
+  };
+  return JSON.stringify(normalize(value));
+}
+
+function drawPlannerGeometryMatches(expected: DrawEl, actual: DrawEl): boolean {
+  return expected.id === actual.id
+    && expected.type === actual.type
+    && expected.points.length === actual.points.length
+    && expected.points.every(
+      (value, index) => Math.abs(value - actual.points[index]!) <= POSITION_TOLERANCE,
+    )
+    && Math.abs(expected.strokeWidth - actual.strokeWidth) <= POSITION_TOLERANCE
+    && sameOptionalNumber(
+      expected.sampleSpacing ?? null,
+      actual.sampleSpacing ?? null,
+      POSITION_TOLERANCE,
+    )
+    && canonicalJson(expected.shapeParams) === canonicalJson(actual.shapeParams)
+    && canonicalJson(expected.symmetry) === canonicalJson(actual.symmetry)
+    && canonicalJson(expected.brushTip) === canonicalJson(actual.brushTip);
+}
+
+function assertDrawPlannerGeometry(expected: DrawEl, actual: DrawEl): void {
+  invariant(
+    drawPlannerGeometryMatches(expected, actual),
+    "single-draw transform did not persist the planner-equivalent geometry; "
+      + `expected=${canonicalJson({
+        points: expected.points,
+        strokeWidth: expected.strokeWidth,
+        sampleSpacing: expected.sampleSpacing,
+        shapeParams: expected.shapeParams,
+        symmetry: expected.symmetry,
+        brushTip: expected.brushTip,
+      })}, actual=${canonicalJson({
+        points: actual.points,
+        strokeWidth: actual.strokeWidth,
+        sampleSpacing: actual.sampleSpacing,
+        shapeParams: actual.shapeParams,
+        symmetry: actual.symmetry,
+        brushTip: actual.brushTip,
+      })}`,
   );
 }
 
@@ -1110,7 +1283,10 @@ async function groupResizeHandleState(
         point: null,
       };
     }
-    const documentPoint = anchor.getAbsolutePosition(stage);
+    // Konva Transformer computes its anchor rect from the attached node's absolute transform and
+    // its own getAbsoluteTransform override returns that already-projected transform. Applying the
+    // Stage transform again would double zoom/pan/rotation and miss the real hit-canvas anchor.
+    const contentPoint = anchor.getAbsolutePosition();
     const bounds = content.getBoundingClientRect();
     return {
       transformerPresent: true,
@@ -1118,11 +1294,9 @@ async function groupResizeHandleState(
       attachedNodeCount,
       cornerName: anchor.name(),
       point: {
-        // `getAbsolutePosition(stage)` already includes every transformed canvas child between
-        // the anchor and Stage, so it is expressed in the Konva content's CSS-pixel space. Applying
-        // Stage's transform again would double the current zoom/pan.
-        x: bounds.left + documentPoint.x,
-        y: bounds.top + documentPoint.y,
+        // Konva absolute position is local to the Stage content element; only cross the DOM offset.
+        x: bounds.left + contentPoint.x,
+        y: bounds.top + contentPoint.y,
       },
     };
   }, preferredCorner);
@@ -1132,11 +1306,12 @@ async function waitForGroupResizeHandle(
   page: Page,
   visibleState: boolean,
   timeoutMs = 6_000,
+  preferredCorner = "bottom-right",
 ): Promise<GroupResizeHandleState> {
   const startedAt = Date.now();
   let latest: GroupResizeHandleState | null = null;
   while (Date.now() - startedAt < timeoutMs) {
-    latest = await groupResizeHandleState(page);
+    latest = await groupResizeHandleState(page, preferredCorner);
     const settled =
       visibleState
         ? latest.transformerPresent
@@ -1147,12 +1322,417 @@ async function waitForGroupResizeHandle(
           && !latest.transformerVisible
           && latest.attachedNodeCount === 0
           && latest.point === null;
-    if (settled) return latest;
+    if (settled) {
+      if (!visibleState) return latest;
+      // Transformer geometry and its hit canvas are drawn by separate Konva passes. After a
+      // React/z-order update the visible anchor can lead the hit graph by one batchDraw; only hand
+      // a coordinate to the trusted mouse gesture once the real browser hit target is ready.
+      const hit = await konvaElementHitAt(page, latest.point!);
+      const pointerAddressable = hit.ancestry.some((entry) => entry.includes("_anchor"))
+        && hit.ancestry.some((entry) =>
+          entry.includes("studio-group-uniform-resize-transformer")
+        );
+      if (pointerAddressable) return latest;
+    }
     await page.waitForTimeout(80);
   }
   throw new Error(
     `group resize handle did not become ${visibleState ? "visible" : "hidden"}; `
-      + `latest=${JSON.stringify(latest)}`,
+      + `corner=${preferredCorner}; latest=${JSON.stringify(latest)}`,
+  );
+}
+
+async function singleDrawLiveTransformState(
+  page: Page,
+  drawId: string,
+  expectedStroke: string | null = null,
+): Promise<SingleDrawLiveTransformState> {
+  return page.evaluate(({ elementId, expectedStroke }) => {
+    interface BrowserKonvaRect extends BrowserKonvaNode {
+      x: () => number;
+      y: () => number;
+      width: () => number;
+      height: () => number;
+      scaleX: () => number;
+      scaleY: () => number;
+      rotation: () => number;
+      getLayer: () => BrowserKonvaNode | null;
+    }
+    interface BrowserKonvaNode {
+      attrs?: Record<string, unknown>;
+      getAttr: (name: string) => unknown;
+      getChildren?: () => BrowserKonvaNode[];
+      getClientRect?: (options?: Record<string, unknown>) => {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      getCanvas?: () => {
+        _canvas?: HTMLCanvasElement;
+        getPixelRatio?: () => number;
+      };
+      getLayer: () => BrowserKonvaNode | null;
+      getNativeCanvasElement?: () => HTMLCanvasElement;
+      getParent: () => BrowserKonvaNode | null;
+      hide: () => void;
+      isVisible: () => boolean;
+      name: () => string;
+      offsetX: () => number;
+      offsetY: () => number;
+      rotation: () => number;
+      scaleX: () => number;
+      scaleY: () => number;
+      show: () => void;
+      visible: (value?: boolean) => boolean | BrowserKonvaNode;
+      x: () => number;
+      y: () => number;
+    }
+    interface BrowserKonvaStage extends BrowserKonvaNode {
+      container: () => HTMLElement;
+      find: (predicate: (node: BrowserKonvaNode) => boolean) => BrowserKonvaNode[];
+      findOne: (selector: string) => BrowserKonvaNode | undefined;
+    }
+    const runtime = (window as typeof window & {
+      Konva?: { stages?: BrowserKonvaStage[] };
+    }).Konva;
+    const stage = runtime?.stages?.find((candidate) => {
+      const content = candidate.container().querySelector<HTMLElement>(".konvajs-content");
+      const bounds = content?.getBoundingClientRect();
+      return content?.isConnected === true
+        && bounds !== undefined
+        && bounds.width > 0
+        && bounds.height > 0;
+    });
+    if (!stage) {
+      return {
+        presentation: "none" as const,
+        proxyBounds: null,
+        proxyRotation: null,
+        draftChildCount: 0,
+        backingPixelCount: 0,
+        draftBounds: null,
+        wrapper: null,
+        proxyLayerName: null,
+        transformerLayerName: null,
+        parkedChromeCount: 0,
+      };
+    }
+
+    let wrapper: BrowserKonvaNode | null = null;
+    let wrapperDepth = Number.POSITIVE_INFINITY;
+    for (const candidate of stage.find(
+      (node) => node.getAttr("studioElementId") === elementId,
+    )) {
+      let candidateDepth = 0;
+      let current = candidate.getParent();
+      while (current) {
+        candidateDepth += 1;
+        current = current.getParent();
+      }
+      if (candidateDepth < wrapperDepth) {
+        wrapper = candidate;
+        wrapperDepth = candidateDepth;
+      }
+    }
+    const proxy = stage.findOne(".studio-group-uniform-resize-proxy") as
+      | BrowserKonvaRect
+      | undefined;
+    const transformer = stage.findOne(".studio-group-uniform-resize-transformer");
+    const draftRoot = stage.findOne(".studio-live-transform-draft-root");
+    const draftChildCount = draftRoot?.getChildren?.().length ?? 0;
+    // Causal ink is painted by a custom Konva Shape sceneFunc. Such a Shape can have a perfectly
+    // visible raster while reporting a zero client rect because it has no declarative width or
+    // height attrs. Read the Layer's ALREADY-PAINTED native SceneCanvas. `node.toCanvas()` would
+    // execute the scene graph again into a fresh offscreen target and could pass even when the
+    // browser-facing backing canvas never received the synchronous live frame.
+    const layer = proxy?.getLayer() ?? transformer?.getLayer() ?? draftRoot?.getLayer() ?? null;
+    let draftBounds: SingleDrawLiveTransformState["draftBounds"] = null;
+    let backingPixelCount = 0;
+    const sceneCanvas = layer?.getNativeCanvasElement?.()
+      ?? layer?.getCanvas?.()?._canvas
+      ?? null;
+    if (expectedStroke && sceneCanvas) {
+      const colorProbe = document.createElement("canvas");
+      colorProbe.width = 1;
+      colorProbe.height = 1;
+      const colorContext = colorProbe.getContext("2d", { willReadFrequently: true });
+      if (colorContext) {
+        colorContext.clearRect(0, 0, 1, 1);
+        colorContext.fillStyle = expectedStroke;
+        colorContext.fillRect(0, 0, 1, 1);
+        const expected = colorContext.getImageData(0, 0, 1, 1).data;
+        const context = sceneCanvas.getContext("2d", { willReadFrequently: true });
+        const pixels = context?.getImageData(0, 0, sceneCanvas.width, sceneCanvas.height).data;
+        if (pixels) {
+          let minX = sceneCanvas.width;
+          let minY = sceneCanvas.height;
+          let maxX = -1;
+          let maxY = -1;
+          for (let y = 0; y < sceneCanvas.height; y += 1) {
+            for (let x = 0; x < sceneCanvas.width; x += 1) {
+              const offset = (y * sceneCanvas.width + x) * 4;
+              const alpha = pixels[offset + 3]!;
+              if (alpha <= 8) continue;
+              const distance = Math.abs(pixels[offset]! - expected[0]!)
+                + Math.abs(pixels[offset + 1]! - expected[1]!)
+                + Math.abs(pixels[offset + 2]! - expected[2]!);
+              // The fixture uses a sentinel green distinct from Transformer chrome/shadows and
+              // has hundreds of solid interior pixels, so antialias fringes are not needed.
+              if (distance > 24) continue;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+              backingPixelCount += 1;
+            }
+          }
+          if (backingPixelCount > 24 && maxX >= minX && maxY >= minY) {
+            const pixelRatio = layer?.getCanvas?.()?.getPixelRatio?.() ?? 1;
+            draftBounds = {
+              x: minX / pixelRatio,
+              y: minY / pixelRatio,
+              width: (maxX - minX + 1) / pixelRatio,
+              height: (maxY - minY + 1) / pixelRatio,
+            };
+          }
+        }
+      }
+    }
+    const parked = stage.getAttr("studioLiveTransformParkedChrome");
+    const parkedChromeCount = parked instanceof Set ? parked.size : 0;
+    const wrapperState = wrapper
+      ? {
+          visible: wrapper.visible() !== false,
+          active: wrapper.getAttr("studioLiveTransformPreviewActive") === true,
+          x: wrapper.x(),
+          y: wrapper.y(),
+          scaleX: wrapper.scaleX(),
+          scaleY: wrapper.scaleY(),
+          rotation: wrapper.rotation(),
+          offsetX: wrapper.offsetX(),
+          offsetY: wrapper.offsetY(),
+          layerName: wrapper.getLayer()?.name() ?? "",
+        }
+      : null;
+    const wrapperNeutral = !wrapperState
+      || (
+        Math.abs(wrapperState.x) <= 1e-6
+        && Math.abs(wrapperState.y) <= 1e-6
+        && Math.abs(wrapperState.scaleX - 1) <= 1e-6
+        && Math.abs(wrapperState.scaleY - 1) <= 1e-6
+        && Math.abs(wrapperState.rotation) <= 1e-6
+        && Math.abs(wrapperState.offsetX) <= 1e-6
+        && Math.abs(wrapperState.offsetY) <= 1e-6
+      );
+    const presentation =
+      draftChildCount > 0 && draftBounds && wrapperState && !wrapperState.visible
+        ? "exact-draft" as const
+        : wrapperState?.active === true && wrapperState.visible && !wrapperNeutral
+          ? "retained-affine" as const
+          : "none" as const;
+    return {
+      presentation,
+      proxyBounds: proxy
+        ? {
+            x: proxy.x(),
+            y: proxy.y(),
+            width: proxy.width() * proxy.scaleX(),
+            height: proxy.height() * proxy.scaleY(),
+          }
+        : null,
+      proxyRotation: proxy?.rotation() ?? null,
+      draftChildCount,
+      backingPixelCount,
+      draftBounds,
+      wrapper: wrapperState,
+      proxyLayerName: proxy?.getLayer()?.name() ?? null,
+      transformerLayerName: transformer?.getLayer()?.name() ?? null,
+      parkedChromeCount,
+    };
+  }, { elementId: drawId, expectedStroke });
+}
+
+async function waitForSingleDrawLiveTransformState(
+  page: Page,
+  drawId: string,
+  description: string,
+  predicate: (state: SingleDrawLiveTransformState) => boolean,
+  timeoutMs = 4_000,
+  expectedStroke: string | null = null,
+): Promise<SingleDrawLiveTransformState> {
+  const startedAt = Date.now();
+  let latest: SingleDrawLiveTransformState | null = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    latest = await singleDrawLiveTransformState(page, drawId, expectedStroke);
+    if (predicate(latest)) return latest;
+    await page.waitForTimeout(50);
+  }
+  const scene = await page.evaluate((elementId) => {
+    interface DiagnosticNode {
+      getAttr: (name: string) => unknown;
+      getChildren?: () => DiagnosticNode[];
+      getClassName: () => string;
+      getLayer: () => DiagnosticNode | null;
+      getParent: () => DiagnosticNode | null;
+      isCached: () => boolean;
+      name: () => string;
+      opacity: () => number;
+      visible: () => boolean;
+      zIndex: () => number;
+    }
+    interface DiagnosticStage extends DiagnosticNode {
+      container: () => HTMLElement;
+      find: (predicate: (node: DiagnosticNode) => boolean) => DiagnosticNode[];
+      findOne: (selector: string) => DiagnosticNode | undefined;
+    }
+    const runtime = (window as typeof window & {
+      Konva?: { stages?: DiagnosticStage[] };
+    }).Konva;
+    const stage = runtime?.stages?.find((candidate) =>
+      candidate.container().querySelector(".konvajs-content")?.isConnected === true
+    );
+    if (!stage) return { missing: "stage" };
+    const wrapper = stage.find(
+      (node) => node.getAttr("studioElementId") === elementId,
+    )[0];
+    if (!wrapper) return { missing: "wrapper" };
+    const layer = wrapper.getLayer();
+    const dragLayer = stage.findOne(".studio-single-object-drag-layer");
+    const proxy = stage.findOne(".studio-group-uniform-resize-proxy");
+    const transformer = stage.findOne(".studio-group-uniform-resize-transformer");
+    return {
+      wrapper: {
+        className: wrapper.getClassName(),
+        name: wrapper.name(),
+        elementId: wrapper.getAttr("studioElementId") ?? null,
+        exempt: wrapper.getAttr("studioLiveTransformZOrderExempt") === true,
+        composite: wrapper.getAttr("globalCompositeOperation") ?? null,
+        visible: wrapper.visible(),
+        opacity: wrapper.opacity(),
+        cached: wrapper.isCached(),
+        zIndex: wrapper.zIndex(),
+      },
+      parentIsLayer: wrapper.getParent() === layer,
+      layerName: layer?.name() ?? null,
+      dragLayerName: dragLayer?.name() ?? null,
+      proxyLayerName: proxy?.getLayer()?.name() ?? null,
+      transformerLayerName: transformer?.getLayer()?.name() ?? null,
+      layerChildren: layer?.getChildren?.().map((node) => ({
+        className: node.getClassName(),
+        name: node.name(),
+        elementId: node.getAttr("studioElementId") ?? null,
+        exempt: node.getAttr("studioLiveTransformZOrderExempt") === true,
+        composite: node.getAttr("globalCompositeOperation") ?? null,
+        visible: node.visible(),
+        opacity: node.opacity(),
+        cached: node.isCached(),
+        zIndex: node.zIndex(),
+      })) ?? [],
+    };
+  }, drawId);
+  throw new Error(
+    `${description}; latest=${JSON.stringify(latest)}; scene=${JSON.stringify(scene)}`,
+  );
+}
+
+function didSingleDrawLivePresentationMove(
+  previous: SingleDrawLiveTransformState,
+  next: SingleDrawLiveTransformState,
+): boolean {
+  if (previous.presentation !== next.presentation) return true;
+  if (next.presentation === "exact-draft") {
+    const left = previous.draftBounds;
+    const right = next.draftBounds;
+    return Boolean(
+      left
+      && right
+      && (
+        Math.abs(left.x - right.x) > 0.5
+        || Math.abs(left.y - right.y) > 0.5
+        || Math.abs(left.width - right.width) > 0.5
+        || Math.abs(left.height - right.height) > 0.5
+      ),
+    );
+  }
+  if (next.presentation === "retained-affine") {
+    const left = previous.wrapper;
+    const right = next.wrapper;
+    return Boolean(
+      left
+      && right
+      && (
+        Math.abs(left.x - right.x) > 0.5
+        || Math.abs(left.y - right.y) > 0.5
+        || Math.abs(left.scaleX - right.scaleX) > 0.005
+        || Math.abs(left.scaleY - right.scaleY) > 0.005
+        || Math.abs(left.rotation - right.rotation) > 0.1
+      ),
+    );
+  }
+  return false;
+}
+
+function singleDrawLivePixelsTrackProxy(
+  source: SingleDrawLiveTransformState,
+  next: SingleDrawLiveTransformState,
+): boolean {
+  if (!source.proxyBounds || !source.draftBounds || !next.proxyBounds || !next.draftBounds) {
+    return false;
+  }
+  const proxyWidthRatio = next.proxyBounds.width / source.proxyBounds.width;
+  const pixelWidthRatio = next.draftBounds.width / source.draftBounds.width;
+  const proxyHeightRatio = next.proxyBounds.height / source.proxyBounds.height;
+  const pixelHeightRatio = next.draftBounds.height / source.draftBounds.height;
+  const proxyDeltaX = (next.proxyBounds.x - source.proxyBounds.x) / source.proxyBounds.width;
+  const pixelDeltaX = (next.draftBounds.x - source.draftBounds.x) / source.draftBounds.width;
+  const proxyDeltaY = (next.proxyBounds.y - source.proxyBounds.y) / source.proxyBounds.height;
+  const pixelDeltaY = (next.draftBounds.y - source.draftBounds.y) / source.draftBounds.height;
+  // The exact renderer scales centerline X by the proxy ratio and stroke width by the geometric
+  // mean, so their raster AABBs are close but not identical under this non-uniform gesture. All
+  // four bbox axes still have to track; matching width alone can hide a stalled/misplaced raster.
+  return Number.isFinite(proxyWidthRatio)
+    && Number.isFinite(pixelWidthRatio)
+    && Number.isFinite(proxyHeightRatio)
+    && Number.isFinite(pixelHeightRatio)
+    && Number.isFinite(proxyDeltaX)
+    && Number.isFinite(pixelDeltaX)
+    && Number.isFinite(proxyDeltaY)
+    && Number.isFinite(pixelDeltaY)
+    && Math.abs(proxyWidthRatio - pixelWidthRatio) <= 0.12
+    && Math.abs(proxyHeightRatio - pixelHeightRatio) <= 0.18
+    && Math.abs(proxyDeltaX - pixelDeltaX) <= 0.18
+    && Math.abs(proxyDeltaY - pixelDeltaY) <= 0.18;
+}
+
+async function waitForSingleDrawRendererCleanup(
+  page: Page,
+  drawId: string,
+  description: string,
+): Promise<void> {
+  await waitForSingleDrawLiveTransformState(
+    page,
+    drawId,
+    description,
+    (state) => {
+      const wrapper = state.wrapper;
+      return state.presentation === "none"
+        && state.draftChildCount === 0
+        && state.parkedChromeCount === 0
+        && wrapper !== null
+        && wrapper.visible
+        && !wrapper.active
+        && Math.abs(wrapper.x) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.y) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.scaleX - 1) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.scaleY - 1) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.rotation) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.offsetX) <= POSITION_TOLERANCE
+        && Math.abs(wrapper.offsetY) <= POSITION_TOLERANCE
+        && wrapper.layerName !== "studio-single-object-drag-layer"
+        && state.proxyLayerName !== "studio-single-object-drag-layer"
+        && state.transformerLayerName !== "studio-single-object-drag-layer";
+    },
   );
 }
 
@@ -1307,6 +1887,10 @@ async function createMixedFixture(
 ): Promise<{ drawPath: ScreenPoint[]; initial: PersistedSnapshot }> {
   await page.keyboard.press("b");
   await page.locator('[data-studio-draw-options="true"]').waitFor({ state: "visible" });
+  const primaryColor = await visible(
+    page.locator('input[type="color"][aria-label^="주 색 선택"]'),
+  );
+  await primaryColor.fill(LIVE_DRAW_STROKE);
   const stage = page.locator(".konvajs-content").first();
   const stageBox = await stage.boundingBox();
   const viewport = page.viewportSize();
@@ -1316,8 +1900,12 @@ async function createMixedFixture(
   const right = Math.min(stageBox.x + stageBox.width - 70, viewport.width * 0.69);
   const top = Math.max(stageBox.y + 90, viewport.height * 0.2);
   invariant(right - left >= 300, "visible canvas is too narrow for the group fixture");
+  // Keep enough horizontal ink on both desktop layouts for the later top-left resize to remove
+  // a large, measurable portion of the native SceneCanvas footprint. A short fixture can still
+  // exercise selection, but cannot prove that a stale source raster was actually cleared.
+  const drawSpan = Math.min(280, right - left - 80);
   const drawPath = Array.from({ length: 9 }, (_, index) => ({
-    x: left + 20 + index * 18,
+    x: left + 20 + index * (drawSpan / 8),
     y: top + 42 + Math.sin((index / 8) * Math.PI) * 18,
   }));
   await assertCanvasPoint(page, drawPath[0]!, "draw fixture start");
@@ -1332,6 +1920,13 @@ async function createMixedFixture(
       && snapshot.elements[0].points.length >= 4,
   );
 
+  // Text insertion inherits Studio's primary colour. Reset it so the native SceneCanvas sentinel
+  // scan can attribute every green pixel to the draw fixture instead of unioning a distant glyph.
+  await primaryColor.fill(FIXTURE_TEXT_FILL);
+  invariant(
+    (await primaryColor.inputValue()).toLowerCase() === FIXTURE_TEXT_FILL,
+    "fixture primary colour did not leave the draw pixel sentinel",
+  );
   const addText = await visible(
     page.getByRole("button", { name: "텍스트 추가", exact: true }),
   );
@@ -1372,6 +1967,13 @@ async function createMixedFixture(
         && JSON.stringify(types) === JSON.stringify(["draw", "image", "text"]);
     },
   );
+  const textElement = initial.elements.find((element) => element.type === "text");
+  invariant(textElement, "the mixed fixture has no text member");
+  const textSourceRaw = rawElementById<TextEl>(initial, textElement.id);
+  invariant(
+    textSourceRaw.fill.toLowerCase() !== LIVE_DRAW_STROKE,
+    "text fixture contaminated the draw-only SceneCanvas pixel sentinel",
+  );
   return { drawPath, initial };
 }
 
@@ -1393,6 +1995,338 @@ async function runDesktopGroupAudit(
     const fixtureIds = initial.elements.map((element) => element.id);
     const fixtureTypes = initial.elements.map((element) => element.type).sort();
     invariant(fixtureIds.length === 3, "mixed fixture did not contain exactly three elements");
+    const stage = page.locator(".konvajs-content").first();
+    const drawElement = initial.elements.find((element) => element.type === "draw");
+    invariant(drawElement, "the mixed fixture has no draw member");
+    const drawDocumentPoints = Array.from(
+      { length: Math.floor(drawElement.points.length / 2) },
+      (_, index) => ({
+        x: drawElement.points[index * 2]!,
+        y: drawElement.points[index * 2 + 1]!,
+      }),
+    );
+
+    // Before grouping, exercise the single-stroke free Transformer with a trusted mouse gesture.
+    // A horizontal-only side/corner drag is deliberately non-uniform: the retained Konva subtree
+    // cannot match the planner's geometric-mean nib scaling there, so the exact model-draft root is
+    // the preferred presentation. Throughout the held pointer the durable document and history
+    // diagnostics must stay frozen; mouseup is the sole model/history boundary.
+    await activateSelectionTool(page);
+    await page.waitForTimeout(KONVA_DOUBLE_CLICK_WINDOW_MS + 40);
+    const singleDrawScreenPoints = await konvaDocumentPointsToScreen(page, drawDocumentPoints);
+    invariant(
+      singleDrawScreenPoints.length === drawDocumentPoints.length,
+      "could not project the ungrouped draw fixture for its live-transform gate",
+    );
+    const singleDrawSelectionPoint =
+      singleDrawScreenPoints[Math.floor(singleDrawScreenPoints.length / 2)]!;
+    const singleDrawHit = await konvaElementHitAt(page, singleDrawSelectionPoint);
+    invariant(
+      singleDrawHit.elementId === drawElement.id,
+      `single-draw selection did not hit the fixture: ${JSON.stringify(singleDrawHit)}`,
+    );
+    await page.mouse.click(singleDrawSelectionPoint.x, singleDrawSelectionPoint.y);
+    await waitForWholeGroupSelection(page, 1);
+
+    // Exact drafts use an isolated Layer and therefore deliberately fail closed when authored
+    // artwork paints above the selected stroke: lifting it would invert occlusion until mouseup.
+    // Exercise the positive live path at a z-order where its composition preflight is truthful.
+    const bringSingleDrawFront = await visible(
+      page.getByRole("button", { name: "맨 앞으로", exact: true }),
+    );
+    await bringSingleDrawFront.click();
+    await waitForSnapshot(
+      page,
+      "single-draw fixture did not move to the front for the live-transform composition gate",
+      (snapshot) => snapshot.elements.at(-1)?.id === drawElement.id,
+    );
+
+    const singleDrawResizeHandle = await waitForGroupResizeHandle(
+      page,
+      true,
+      6_000,
+      "top-left",
+    );
+    invariant(
+      singleDrawResizeHandle.point
+        && singleDrawResizeHandle.cornerName?.split(/\s+/u).includes("top-left") === true,
+      `the single draw Transformer has no top-left anchor: `
+        + JSON.stringify(singleDrawResizeHandle),
+    );
+    const singleDrawResizeHit = await konvaElementHitAt(
+      page,
+      singleDrawResizeHandle.point,
+    );
+    invariant(
+      singleDrawResizeHit.ancestry.some((entry) => entry.includes("_anchor"))
+        && singleDrawResizeHit.ancestry.some((entry) =>
+          entry.includes("studio-group-uniform-resize-transformer")
+        ),
+      `the single draw resize anchor is not pointer-addressable: `
+        + JSON.stringify({ singleDrawResizeHandle, singleDrawResizeHit }),
+    );
+    const singleDrawSourceRaw = rawElementById<DrawEl>(initial, drawElement.id);
+    invariant(
+      singleDrawSourceRaw.type === "draw" && singleDrawSourceRaw.points.length >= 4,
+      "the raw single-draw source is not a transformable DrawEl",
+    );
+    invariant(
+      singleDrawSourceRaw.stroke.toLowerCase() === LIVE_DRAW_STROKE,
+      `single-draw fixture lost its pixel sentinel: ${singleDrawSourceRaw.stroke}`,
+    );
+    const singleDrawSourceScene = await singleDrawLiveTransformState(
+      page,
+      drawElement.id,
+      singleDrawSourceRaw.stroke,
+    );
+    invariant(
+      singleDrawSourceScene.proxyBounds
+        && singleDrawSourceScene.proxyRotation !== null
+        && singleDrawSourceScene.draftBounds
+        && singleDrawSourceScene.backingPixelCount > 24,
+      `the single draw transform proxy has no source pose: `
+        + JSON.stringify(singleDrawSourceScene),
+    );
+    const singleDrawSourceBounds = singleDrawSourceScene.proxyBounds;
+    if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
+      log(`single-draw source=${JSON.stringify({
+        brush: singleDrawSourceRaw.brush,
+        brushCatalogId: singleDrawSourceRaw.brushCatalogId,
+        kind: singleDrawSourceRaw.kind,
+        sampleSpacing: singleDrawSourceRaw.sampleSpacing,
+        symmetry: singleDrawSourceRaw.symmetry,
+        tiltSamples: singleDrawSourceRaw.tiltXs?.length ?? 0,
+        twistSamples: singleDrawSourceRaw.twists?.length ?? 0,
+      })}`);
+    }
+    const singleDrawHistoryBefore = await readStudioHistoryDiagnostics(page);
+    const singleDrawStageBox = await stage.boundingBox();
+    invariant(singleDrawStageBox, "could not measure the stage for single-draw resize");
+    const singleDrawScreenRight = Math.max(...singleDrawScreenPoints.map((point) => point.x));
+    const singleDrawShrinkCapacity =
+      singleDrawScreenRight - singleDrawResizeHandle.point.x - 36;
+    invariant(
+      singleDrawShrinkCapacity >= 48,
+      `the draw fixture is too narrow for a stale-pixel-detecting live resize: `
+        + JSON.stringify({ singleDrawResizeHandle, singleDrawStageBox }),
+    );
+    // Move the top-left anchor rightward while extending it slightly upward: X shrinks and moves,
+    // Y grows and moves. The old source raster then extends beyond the terminal exact draft; if
+    // drawScene fails to clear the backing canvas, its pixel bounds cannot track all four axes.
+    const singleDrawFinalDelta = Math.min(72, singleDrawShrinkCapacity);
+    const singleDrawFirstTarget = {
+      x: singleDrawResizeHandle.point.x + singleDrawFinalDelta * 0.55,
+      // A tiny vertical component makes Konva's corner-anchor drag unmistakable while the much
+      // larger horizontal delta still produces a strongly non-uniform scale.
+      y: singleDrawResizeHandle.point.y - 4,
+    };
+    const singleDrawFinalTarget = {
+      x: singleDrawResizeHandle.point.x + singleDrawFinalDelta,
+      y: singleDrawResizeHandle.point.y - 8,
+    };
+    await assertCanvasPoint(page, singleDrawResizeHandle.point, "single draw resize start");
+    await assertCanvasPoint(page, singleDrawFirstTarget, "single draw first live target");
+    await assertCanvasPoint(page, singleDrawFinalTarget, "single draw final live target");
+
+    let singleDrawPointerHeld = false;
+    let singleDrawFirstLiveState: SingleDrawLiveTransformState | null = null;
+    let singleDrawTerminalState: SingleDrawLiveTransformState | null = null;
+    let singleDrawLivePresentationMoved = false;
+    let singleDrawLiveAutosaveUnchanged = false;
+    let singleDrawLiveHistoryUnchanged = false;
+    try {
+      await page.mouse.move(
+        singleDrawResizeHandle.point.x,
+        singleDrawResizeHandle.point.y,
+      );
+      await page.mouse.down();
+      singleDrawPointerHeld = true;
+      await page.mouse.move(singleDrawFirstTarget.x, singleDrawFirstTarget.y, { steps: 10 });
+      singleDrawFirstLiveState = await waitForSingleDrawLiveTransformState(
+        page,
+        drawElement.id,
+        "single draw never produced a live presentation while the pointer was held",
+        (state) => state.presentation !== "none",
+        4_000,
+        singleDrawSourceRaw.stroke,
+      );
+      // The chosen corner gesture changes width much more than height, so parity requires the
+      // exact model draft. The state reader still understands retained-affine presentations for
+      // uniform or route-stable gestures, keeping this verifier compatible with both strategies.
+      invariant(
+        singleDrawFirstLiveState.presentation === "exact-draft",
+        `non-uniform single-draw resize did not prefer the exact draft root: `
+          + JSON.stringify(singleDrawFirstLiveState),
+      );
+
+      await page.mouse.move(singleDrawFinalTarget.x, singleDrawFinalTarget.y, { steps: 10 });
+      const previousLiveState = singleDrawFirstLiveState;
+      singleDrawTerminalState = await waitForSingleDrawLiveTransformState(
+        page,
+        drawElement.id,
+        "single draw live presentation did not follow the second held-pointer move",
+        (state) =>
+          state.presentation === "exact-draft"
+          && didSingleDrawLivePresentationMove(previousLiveState, state)
+          && singleDrawLivePixelsTrackProxy(singleDrawSourceScene, state),
+        4_000,
+        singleDrawSourceRaw.stroke,
+      );
+      singleDrawLivePresentationMoved = true;
+
+      const duringSingleDrawTransform = await waitForSnapshot(
+        page,
+        "single-draw held preview changed durable autosave geometry",
+        (snapshot) =>
+          fixtureIds.every((id) => snapshot.elements.some((element) => element.id === id))
+          && sameGeometry(initial, snapshot, fixtureIds),
+        2_500,
+      );
+      singleDrawLiveAutosaveUnchanged = sameGeometry(
+        initial,
+        duringSingleDrawTransform,
+        fixtureIds,
+      );
+      const singleDrawHistoryDuring = await readStudioHistoryDiagnostics(page);
+      singleDrawLiveHistoryUnchanged =
+        singleDrawHistoryDuring.entryCount === singleDrawHistoryBefore.entryCount
+        && singleDrawHistoryDuring.undoDepth === singleDrawHistoryBefore.undoDepth;
+      invariant(
+        singleDrawLiveHistoryUnchanged,
+        "single-draw held preview inserted history before mouseup: "
+          + JSON.stringify({
+            before: singleDrawHistoryBefore,
+            during: singleDrawHistoryDuring,
+          }),
+      );
+      const liveScreenshot = join(SCRATCH, "studio-single-draw-live-transform.png");
+      await stage.screenshot({ path: liveScreenshot, animations: "disabled" });
+      screenshots.push(liveScreenshot);
+      await page.mouse.up();
+      singleDrawPointerHeld = false;
+    } finally {
+      if (singleDrawPointerHeld) {
+        await page.mouse.up().catch(() => undefined);
+      }
+      await page.mouse.move(4, 4).catch(() => undefined);
+    }
+    invariant(
+      singleDrawFirstLiveState?.presentation === "exact-draft"
+        && singleDrawTerminalState?.presentation === "exact-draft"
+        && singleDrawTerminalState?.proxyBounds
+        && singleDrawTerminalState.proxyRotation !== null,
+      "single-draw live-transform terminal pose was not captured",
+    );
+    const singleDrawLivePresentation = singleDrawFirstLiveState.presentation;
+    const singleDrawTerminalLivePresentation = singleDrawTerminalState.presentation;
+    const singleDrawLiveBackingPixelsObserved =
+      singleDrawFirstLiveState.backingPixelCount > 24
+      && singleDrawTerminalState.backingPixelCount > 24;
+    invariant(
+      singleDrawLiveBackingPixelsObserved,
+      "single-draw live pixels were absent from the browser-facing Konva SceneCanvas",
+    );
+    const singleDrawLiveBackingPixelsReplaced = Boolean(
+      singleDrawTerminalState.draftBounds
+      && singleDrawSourceScene.draftBounds
+      && singleDrawTerminalState.draftBounds.width
+        <= singleDrawSourceScene.draftBounds.width * 0.8,
+    );
+    invariant(
+      singleDrawLiveBackingPixelsReplaced,
+      "single-draw live SceneCanvas retained stale source pixels after an exact shrink: "
+        + JSON.stringify({
+          source: singleDrawSourceScene.draftBounds,
+          terminal: singleDrawTerminalState.draftBounds,
+        }),
+    );
+    const singleDrawLiveBackingPixelsMatchedProxy = singleDrawLivePixelsTrackProxy(
+      singleDrawSourceScene,
+      singleDrawTerminalState,
+    );
+    invariant(
+      singleDrawLiveBackingPixelsMatchedProxy,
+      "single-draw live SceneCanvas pixels did not track the terminal Transformer proxy",
+    );
+    const singleDrawScaleX =
+      singleDrawTerminalState.proxyBounds.width / singleDrawSourceBounds.width;
+    const singleDrawScaleY =
+      singleDrawTerminalState.proxyBounds.height / singleDrawSourceBounds.height;
+    invariant(
+      Math.abs(singleDrawScaleX - singleDrawScaleY) >= 0.03,
+      `single-draw trusted pointer did not produce a material non-uniform transform: `
+        + JSON.stringify({ singleDrawScaleX, singleDrawScaleY }),
+    );
+    const expectedSingleDraw = planStudioDrawObjectTransform({
+      el: singleDrawSourceRaw,
+      sourceBounds: singleDrawSourceBounds,
+      targetBounds: singleDrawTerminalState.proxyBounds,
+      rotationDeg: singleDrawTerminalState.proxyRotation,
+    });
+    invariant(
+      expectedSingleDraw && expectedSingleDraw !== singleDrawSourceRaw,
+      "single-draw browser gesture did not produce a material planner transform",
+    );
+    const singleDrawHistoryAfter = await waitForStudioHistoryDiagnostics(
+      page,
+      {
+        entryCount: singleDrawHistoryBefore.entryCount + 1,
+        undoDepth: singleDrawHistoryBefore.undoDepth + 1,
+      },
+      "single-draw mouseup did not create exactly one history step",
+    );
+    const singleDrawTransformHistoryEntryDelta =
+      singleDrawHistoryAfter.entryCount - singleDrawHistoryBefore.entryCount;
+    const singleDrawTransformUndoDepthDelta =
+      singleDrawHistoryAfter.undoDepth - singleDrawHistoryBefore.undoDepth;
+    const singleDrawTransformed = await waitForSnapshot(
+      page,
+      "single-draw mouseup did not persist planner-equivalent geometry",
+      (snapshot) => drawPlannerGeometryMatches(
+        expectedSingleDraw,
+        rawElementById<DrawEl>(snapshot, drawElement.id),
+      ),
+    );
+    assertDrawPlannerGeometry(
+      expectedSingleDraw,
+      rawElementById<DrawEl>(singleDrawTransformed, drawElement.id),
+    );
+    const singleDrawPlannerGeometryMatched = true;
+    await waitForSingleDrawRendererCleanup(
+      page,
+      drawElement.id,
+      "single-draw mouseup left a hidden draft or renderer transform behind",
+    );
+    const singleDrawRendererCleanupComplete = true;
+
+    const singleDrawUndo = await visible(
+      page.getByRole("button", { name: "실행취소", exact: true }),
+    );
+    invariant(!await singleDrawUndo.isDisabled(), "Undo is disabled after single-draw resize");
+    await singleDrawUndo.click();
+    const singleDrawUndone = await waitForSnapshot(
+      page,
+      "single-draw Undo did not restore the pre-transform mixed fixture",
+      (snapshot) => sameGeometry(initial, snapshot, fixtureIds),
+    );
+    const singleDrawUndoRestoredInitial = sameGeometry(
+      initial,
+      singleDrawUndone,
+      fixtureIds,
+    );
+    await waitForStudioHistoryDiagnostics(
+      page,
+      {
+        entryCount: singleDrawHistoryBefore.entryCount + 1,
+        undoDepth: singleDrawHistoryBefore.undoDepth,
+      },
+      "single-draw Undo did not restore the pre-transform history depth",
+    );
+    await waitForSingleDrawRendererCleanup(
+      page,
+      drawElement.id,
+      "single-draw Undo left a draft or renderer transform behind",
+    );
 
     await activateSelectionTool(page);
     await page.keyboard.press("Meta+A");
@@ -1454,7 +2388,6 @@ async function runDesktopGroupAudit(
 
     await openLayerNavigator(page);
     await waitForGroupLayerState(page, "all");
-    const stage = page.locator(".konvajs-content").first();
     // Keep the locator stable while the attribute changes between all/none/partial.
     const groupLayer = page.locator("[data-studio-layer-group-selection]").first();
     const groupLayerRow = groupLayer.locator(':scope > [role="treeitem"]');
@@ -1494,15 +2427,6 @@ async function runDesktopGroupAudit(
     // leave one child selected merely because the pointer landed on that child. Reuse the
     // deliberately distant draw fixture so the additive modifier reaches Konva's native event
     // without image loading or alpha-hit timing entering the assertion.
-    const drawElement = initial.elements.find((element) => element.type === "draw");
-    invariant(drawElement, "the mixed fixture has no draw member");
-    const drawDocumentPoints = Array.from(
-      { length: Math.floor(drawElement.points.length / 2) },
-      (_, index) => ({
-        x: drawElement.points[index * 2]!,
-        y: drawElement.points[index * 2 + 1]!,
-      }),
-    );
     const drawScreenPoints = await konvaDocumentPointsToScreen(page, drawDocumentPoints);
     invariant(
       drawScreenPoints.length === drawDocumentPoints.length,
@@ -1880,6 +2804,19 @@ async function runDesktopGroupAudit(
       evidence: {
         fixtureIds,
         fixtureTypes,
+        singleDrawLivePresentation,
+        singleDrawTerminalLivePresentation,
+        singleDrawLiveBackingPixelsObserved,
+        singleDrawLiveBackingPixelsReplaced,
+        singleDrawLiveBackingPixelsMatchedProxy,
+        singleDrawLivePresentationMoved,
+        singleDrawLiveAutosaveUnchanged,
+        singleDrawLiveHistoryUnchanged,
+        singleDrawTransformHistoryEntryDelta,
+        singleDrawTransformUndoDepthDelta,
+        singleDrawPlannerGeometryMatched,
+        singleDrawRendererCleanupComplete,
+        singleDrawUndoRestoredInitial,
         groupId,
         groupName,
         firstDragDelta,
