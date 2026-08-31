@@ -4,7 +4,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenuShell } from "./auth/auth-menu-shell";
 import { ToonSpectrumMark } from "./visual-marks";
@@ -50,6 +50,8 @@ function matchesMobileNavigationViewport() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 }
 
+const DESKTOP_NAVIGATION_QUERY = "(min-width: 1360px)";
+
 function useMobileNavigationViewport() {
   const [isMobile, setIsMobile] = useState(matchesMobileNavigationViewport);
 
@@ -87,31 +89,31 @@ export function SiteHeader() {
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
 
+  // 수동으로 메뉴를 닫은 뒤에는 모달 배경의 inert 해제가 반영된 다음 호출 버튼으로 돌아간다.
+  // 라우트 이동에 따른 자동 닫힘은 ScrollToTop이 본문 포커스를 소유하므로 이 경로를 쓰지 않는다.
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
+  }, []);
+
   // 라우트 이동 시 오버플로 메뉴 닫기
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
 
-  // 열렸을 때: Esc 닫기 + 배경 스크롤 잠금 + 첫 포커스 이동
+  // CSS swaps the overflow trigger/dialog for the desktop navigation at 1360px. Close the
+  // stateful modal at the same boundary so its focus trap, inert background, and scroll lock are
+  // cleaned up instead of remaining attached to a display:none dialog. This automatic path does
+  // not restore focus to the trigger because that trigger is hidden at the new breakpoint.
   useEffect(() => {
-    if (!menuOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+    const desktopNavigation = window.matchMedia(DESKTOP_NAVIGATION_QUERY);
+    const closeAtDesktop = () => {
+      if (desktopNavigation.matches) setMenuOpen(false);
     };
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [menuOpen]);
-
-  // 닫힐 때 트리거로 포커스 복귀
-  const closeMenu = () => {
-    setMenuOpen(false);
-    triggerRef.current?.focus();
-  };
+    closeAtDesktop();
+    desktopNavigation.addEventListener("change", closeAtDesktop);
+    return () => desktopNavigation.removeEventListener("change", closeAtDesktop);
+  }, []);
 
   return (
     <>

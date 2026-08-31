@@ -105,6 +105,17 @@ describe("creator marketplace distributed persistence boundary", () => {
     expect(repositorySource).not.toContain("ilike(");
   });
 
+  it("uses a deterministic relevance keyset without inventing popularity", () => {
+    expect(repositorySource).toContain("relevanceScoreExpression");
+    expect(repositorySource).toContain("then 1200 else 0");
+    expect(repositorySource).toContain("then 800 else 0");
+    expect(repositorySource).toContain("desc(relevanceScore)");
+    expect(repositorySource).toContain("input.cursor.relevanceScore");
+    expect(repositorySource).toContain("desc(creatorMarketplaceResources.createdAt)");
+    expect(repositorySource).toContain("desc(creatorMarketplaceResources.id)");
+    expect(repositorySource).not.toMatch(/installCount|rating|popularityScore/u);
+  });
+
   it("keeps anonymous public search ungated instead of persisting a spoofable identity", () => {
     expect(controllerSource).toContain("sound privacy-preserving actor");
     expect(controllerSource).toContain("Volumetric protection belongs at the trusted edge");

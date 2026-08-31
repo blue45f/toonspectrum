@@ -138,6 +138,120 @@ describe("api/og.js SSRF and SSR Meta Injection", () => {
     );
   });
 
+  it("injects crawler-safe market resource metadata from the canonical API", async () => {
+    const resourceId = "123e4567-e89b-42d3-a456-426614174000";
+    const req = {
+      query: { marketResourceId: resourceId },
+      headers: {
+        "user-agent": "facebookexternalhit/1.1",
+        host: "attacker.invalid",
+        "x-forwarded-host": "metadata.internal",
+      },
+    };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: resourceId,
+        name: "먹선 </script><script>alert(1)</script>",
+        description: "웹툰 펜선용 브러시",
+        kind: "brush",
+        resourceVersion: "1.2.0",
+        license: "cc-by-4.0",
+        tags: ["잉크", "선화"],
+        publisher: { id: "publisher", name: "김작가" },
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-30T00:00:00.000Z",
+      }),
+    });
+    let sentContent = "";
+    const res = {
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnValue({
+        send: (content: string) => {
+          sentContent = content;
+        },
+      }),
+    };
+
+    await ogHandler(req, res);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `https://test-canonical.com/api/creator/marketplace/resources/${resourceId}`,
+      expect.objectContaining({ headers: { Accept: "application/json" } }),
+    );
+    expect(String(mockFetch.mock.calls[0]?.[0])).not.toContain("attacker.invalid");
+    expect(sentContent).toContain(
+      `href="https://test-canonical.com/market/resource/${resourceId}"`,
+    );
+    expect(sentContent).toContain('<meta property="og:type" content="article" />');
+    expect(sentContent).toContain("먹선 &lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(sentContent).not.toContain("</script><script>alert(1)</script>");
+
+    const scripts = [...sentContent.matchAll(
+      /<script type="application\/ld\+json">(.*?)<\/script>/gu,
+    )];
+    const routeGraph = JSON.parse(scripts.at(-1)?.[1] ?? "null");
+    expect(routeGraph["@graph"][0]).toMatchObject({
+      "@type": "CreativeWork",
+      version: "1.2.0",
+      isAccessibleForFree: true,
+      author: { "@type": "Person", name: "김작가" },
+      license: "https://creativecommons.org/licenses/by/4.0/",
+    });
+    expect(routeGraph["@graph"][1]["@type"]).toBe("BreadcrumbList");
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+  });
+
+  it("injects crawler-safe static metadata for the market discovery route", async () => {
+    const req = {
+      query: { marketPage: "browse" },
+      headers: { "user-agent": "Googlebot/2.1" },
+    };
+    let sentContent = "";
+    const res = {
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnValue({
+        send: (content: string) => {
+          sentContent = content;
+        },
+      }),
+    };
+
+    await ogHandler(req, res);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(sentContent).toContain("<title>마켓 탐색 · 툰스펙트럼</title>");
+    expect(sentContent).toContain(
+      'href="https://test-canonical.com/market/browse"',
+    );
+    expect(sentContent).toContain('"@type":"SearchResultsPage"');
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "public, max-age=300, s-maxage=86400",
+    );
+  });
+
+  it("does not fetch or cache malformed market resource identifiers", async () => {
+    const req = {
+      query: { marketResourceId: "../../metadata" },
+      headers: { "user-agent": "Twitterbot/1.0" },
+    };
+    const send = vi.fn();
+    const res = {
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnValue({ send }),
+    };
+
+    await ogHandler(req, res);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+    expect(send).toHaveBeenCalledOnce();
+  });
+
   it("handles fetch failures gracefully by falling back to default template with no-store cache", async () => {
     const req = {
       query: { slug: "missing-webtoon" },

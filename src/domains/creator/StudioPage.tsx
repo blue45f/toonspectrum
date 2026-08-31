@@ -847,6 +847,7 @@ import {
   releaseStudioMarketplaceDeepLinkLifecycleSoon,
   retainStudioMarketplaceDeepLinkLifecycle,
 } from "./studio-marketplace-deep-link";
+import type { StudioCreatorPackDefinition } from "./studio-creator-pack-catalog";
 import {
   beginNodeDrag,
   decimateStrokeHandles,
@@ -858,6 +859,7 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
+import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 import {
   parseStudioObjectInsertDragPayload,
   resolveStudioObjectInsertOpenSeed,
@@ -1891,6 +1893,14 @@ function StudioCuttoonEditor({
    * 보이게 만들지 않고 알리기 위한 별도 채널이다.
    */
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [studioMarketplaceCloudSyncRetry, setStudioMarketplaceCloudSyncRetry] = useState<{
+    readonly record: CreatorMarketplaceResourceRecord;
+    readonly pack: StudioCreatorPackDefinition;
+    readonly issue: string;
+  } | null>(null);
+  const [studioMarketplaceCloudSyncRetryPending, setStudioMarketplaceCloudSyncRetryPending] =
+    useState(false);
+  const studioMarketplaceCloudSyncRetryControllerRef = useRef<AbortController | null>(null);
   // 확장 블렌드(포토샵 전용 10모드) — 라이브 합성 불가(Konva 백드롭 미지원)라 "아래와 병합" bake 전용.
   // 엔진은 lazy 청크에 남기려고 기본값을 리터럴로 초기화한다(type-only import).
   const [extendedBlendMode, setExtendedBlendMode] = useState<StudioExtendedBlendModeId>("linear-dodge");
@@ -17522,6 +17532,69 @@ const puppetWarpArmed =
       );
     };
   }, []);
+  useEffect(() => () => {
+    studioMarketplaceCloudSyncRetryControllerRef.current?.abort();
+    studioMarketplaceCloudSyncRetryControllerRef.current = null;
+  }, []);
+  const retryStudioMarketplaceCloudSync = async () => {
+    const retry = studioMarketplaceCloudSyncRetry;
+    if (!retry || studioMarketplaceCloudSyncRetryPending) return;
+    if (!studioHasAuthenticatedSession) {
+      setError("계정 설치 확인을 다시 동기화하려면 로그인해 주세요. 로컬 설치는 유지됩니다.");
+      return;
+    }
+    studioMarketplaceCloudSyncRetryControllerRef.current?.abort();
+    const controller = new AbortController();
+    studioMarketplaceCloudSyncRetryControllerRef.current = controller;
+    setStudioMarketplaceCloudSyncRetryPending(true);
+    setError(null);
+    setStatusNotice("현재 기기의 정확한 설치와 계정 라이브러리를 다시 확인하고 있어요…");
+    try {
+      const [
+        { inspectStudioCreatorPackInstallStateProduct },
+        { browserStudioCreatorPackStorage },
+        { synchronizeStudioCommunityMarketplaceInstalledPack },
+      ] = await Promise.all([
+        import("./studio-creator-pack-product-runtime"),
+        import("./studio-creator-pack-runtime"),
+        import("./studio-community-marketplace-cloud-sync"),
+      ]);
+      if (controller.signal.aborted) return;
+      const localState = await inspectStudioCreatorPackInstallStateProduct(
+        retry.pack,
+        {
+          storage: browserStudioCreatorPackStorage(),
+          signal: controller.signal,
+          isInstallCurrent: () => !controller.signal.aborted,
+        },
+      );
+      if (controller.signal.aborted) return;
+      if (localState !== "installed") {
+        throw new Error("현재 기기에서 이 정확한 패키지 설치를 더 이상 확인할 수 없습니다.");
+      }
+      const synchronized = await synchronizeStudioCommunityMarketplaceInstalledPack(
+        retry.record,
+        retry.pack,
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return;
+      setStudioMarketplaceCloudSyncRetry(null);
+      setStatusNotice(`${retry.record.name} · ${synchronized.message}`);
+    } catch (caught: unknown) {
+      if (controller.signal.aborted) return;
+      const issue = caught instanceof Error && caught.message.trim()
+        ? caught.message
+        : "계정 라이브러리 설치 확인을 동기화하지 못했습니다.";
+      setStudioMarketplaceCloudSyncRetry({ ...retry, issue });
+      setStatusNotice(null);
+      setError(`${retry.record.name} · 로컬 설치는 유지됩니다. 계정 설치 확인 실패: ${issue}`);
+    } finally {
+      if (studioMarketplaceCloudSyncRetryControllerRef.current === controller) {
+        studioMarketplaceCloudSyncRetryControllerRef.current = null;
+        setStudioMarketplaceCloudSyncRetryPending(false);
+      }
+    }
+  };
   const openAssetMarketDeepLink = useEffectEvent(async () => {
     const installResourceId = params.get("installMarketResource");
     if (params.get("assetMarket") === "community" || installResourceId) {
@@ -17529,6 +17602,10 @@ const puppetWarpArmed =
       setAssetTab("community");
     }
     if (!installResourceId) return;
+    studioMarketplaceCloudSyncRetryControllerRef.current?.abort();
+    studioMarketplaceCloudSyncRetryControllerRef.current = null;
+    setStudioMarketplaceCloudSyncRetryPending(false);
+    setStudioMarketplaceCloudSyncRetry(null);
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = activePage.id;
     const targetMasterEditMode = masterEditMode;
@@ -17570,21 +17647,60 @@ const puppetWarpArmed =
                 resolveStudioCreatorBundledCatalogTarget,
               },
               { createStudioOriginalFreeAssetRecord },
+              { getProductStudioMarketplaceRuntimeCompatibility },
+              { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
               import("@/src/infrastructure/creator-marketplace-client"),
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
               import("./studio-original-free-asset-packs"),
+              import("./studio-marketplace-runtime-compatibility"),
+              import("./studio-community-marketplace-cloud-sync"),
             ]);
             const storage = browserStudioCreatorPackStorage();
+            const compatibilityContext =
+              await getProductStudioMarketplaceRuntimeCompatibility();
             return {
               loadResource: getCreatorMarketplaceResource,
-              projectPack: projectCreatorMarketplaceRecordToStudioPack,
+              projectPack: (record) =>
+                projectCreatorMarketplaceRecordToStudioPack(
+                  record,
+                  compatibilityContext,
+                ),
               installPack: (pack, guard) => installStudioCreatorPackProduct(pack, {
                 storage,
                 isInstallCurrent: guard.isCurrent,
               }),
+              synchronizeInstalledPack: async (record, pack, guard) => {
+                if (!studioHasAuthenticatedSession) {
+                  return {
+                    status: "skipped" as const,
+                    message: "로그인하지 않아 계정 라이브러리에는 기록하지 않았습니다.",
+                  };
+                }
+                guard.assertCurrent();
+                try {
+                  const synchronized =
+                    await synchronizeStudioCommunityMarketplaceInstalledPack(
+                      record,
+                      pack,
+                    );
+                  guard.assertCurrent();
+                  setStudioMarketplaceCloudSyncRetry(null);
+                  return {
+                    status: "synchronized" as const,
+                    message: synchronized.message,
+                  };
+                } catch (caught: unknown) {
+                  guard.assertCurrent();
+                  const issue = caught instanceof Error && caught.message.trim()
+                    ? caught.message
+                    : "계정 라이브러리 설치 확인을 동기화하지 못했습니다.";
+                  setStudioMarketplaceCloudSyncRetry({ record, pack, issue });
+                  throw caught;
+                }
+              },
               openBundledPackCatalog: (pack) => {
                 const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
                 if (resolution.status === "unsupported") {
@@ -17607,7 +17723,11 @@ const puppetWarpArmed =
                   message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
                 };
               },
-              projectAssets: projectCreatorMarketplaceRecordToAssets,
+              projectAssets: (record) =>
+                projectCreatorMarketplaceRecordToAssets(
+                  record,
+                  compatibilityContext,
+                ),
               insertAsset: (projectedAsset) => {
                 if (!isStudioPasteScopeCurrent({
                   mutationAllowed: canApplyStudioMutation(mutationTicket),
@@ -32099,6 +32219,15 @@ function clearSelectionForEdit() {
       studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
       studioRootRef={studioRootRef}
       studioSfx={studioSfx}
+      studioMarketplaceCloudSyncRetry={studioMarketplaceCloudSyncRetry}
+      studioMarketplaceCloudSyncRetryPending={studioMarketplaceCloudSyncRetryPending}
+      retryStudioMarketplaceCloudSync={retryStudioMarketplaceCloudSync}
+      dismissStudioMarketplaceCloudSyncRetry={() => {
+        studioMarketplaceCloudSyncRetryControllerRef.current?.abort();
+        studioMarketplaceCloudSyncRetryControllerRef.current = null;
+        setStudioMarketplaceCloudSyncRetryPending(false);
+        setStudioMarketplaceCloudSyncRetry(null);
+      }}
       studioStatusNotice={statusNotice}
       studioStickerAssetsError={studioStickerAssetsError}
       studioStickerAssetsLoaded={studioStickerAssetsLoaded}

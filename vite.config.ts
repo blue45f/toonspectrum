@@ -428,6 +428,16 @@ export default defineConfig(({ mode }) => ({
             return "studio-workspaces";
           }
           if (
+            id.endsWith("/lib/sha256-portable.ts")
+            || id.endsWith("/src/domains/creator/studio-sha256.ts")
+          ) {
+            // The Studio entry is a compatibility-only re-export and the portable implementation
+            // is dependency-free. Co-locate the unconditional pair so Studio/BG3D do not pay a
+            // second request, while every non-Studio consumer still receives only this small hash
+            // implementation rather than any product runtime.
+            return "studio-sha256";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-selection-tools.ts")
             || id.endsWith("/src/domains/creator/studio-magic-wand.ts")
             || id.endsWith("/src/domains/creator/studio-alpha-lock.ts")

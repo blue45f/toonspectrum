@@ -211,7 +211,12 @@ jobs:
           DROP TABLE IF EXISTS
             "creator_work_asset_storage_reference",
             "creator_asset_storage_object",
+            "creator_marketplace_library_item",
+            "creator_marketplace_package_moderation",
+            "creator_marketplace_package_moderation_decision",
             "creator_marketplace_publish_gate",
+            "creator_marketplace_resource_report_gate",
+            "creator_marketplace_resource_report",
             "creator_marketplace_resource",
             "creator_draft_collaboration_room"
           CASCADE;

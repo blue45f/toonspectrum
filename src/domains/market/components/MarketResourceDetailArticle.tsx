@@ -1,5 +1,5 @@
 import { Cpu, Download, FileJson, Link2, ShieldCheck, Sparkles, Upload } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   formatMarketByteSize,
@@ -10,22 +10,35 @@ import {
 import {
   brushPreviewData,
   filterPreviewData,
-  palettePreviewColors,
+  palettePreviewData,
   recipePreviewData,
   templatePreviewData,
 } from "../models/market-preview";
 
+import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
+import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
+import { MarketAssetRecipePreview } from "./MarketAssetRecipePreview";
 import { MarketBrushPreview } from "./MarketBrushPreview";
 import { MarketFilterPreview } from "./MarketFilterPreview";
 import { MarketPalettePreview } from "./MarketPalettePreview";
 import { MarketResourceCard } from "./MarketResourceCard";
+import { MarketResourceReleaseHistory } from "./MarketResourceReleaseHistory";
 import { MarketScene3dPreview } from "./MarketScene3dPreview";
 import { MarketTemplatePreview } from "./MarketTemplatePreview";
 import { StaleNoticeBar } from "./StaleNoticeBar";
 
+import type { CreatorMarketplaceInstallReceipt } from "@/lib/creator-marketplace-install-receipt";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import {
+  CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT,
+  CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+  isCreatorMarketplaceInstallReceiptKind,
+  readCreatorMarketplaceInstallReceipt,
+  resolveCreatorMarketplaceInstallReceiptState,
+} from "@/lib/creator-marketplace-install-receipt";
+import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
 import Link from "@/src/compat/router-link";
 
 const ENGINE_LABELS: Record<string, string> = {
@@ -45,7 +58,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   return (
     <div className="flex items-start justify-between gap-3 py-2.5">
       <dt className="shrink-0 text-xs text-fg-3">{label}</dt>
-      <dd className="text-right text-xs font-medium text-fg">{children}</dd>
+      <dd className="min-w-0 max-w-full text-right text-xs font-medium text-fg">{children}</dd>
     </div>
   );
 }
@@ -97,6 +110,68 @@ function ShareLinkButton() {
   );
 }
 
+interface InstallReceiptSnapshot {
+  readonly logicalPackId: string;
+  readonly receipt: CreatorMarketplaceInstallReceipt | null;
+}
+
+function readInstallReceiptSnapshot(
+  record: CreatorMarketplaceResourceRecord,
+): InstallReceiptSnapshot {
+  const logicalPackId = creatorMarketplaceStudioPackId(record);
+  return {
+    logicalPackId,
+    receipt: isCreatorMarketplaceInstallReceiptKind(record.kind)
+      ? readCreatorMarketplaceInstallReceipt(logicalPackId)
+      : null,
+  };
+}
+
+function useInstallReceiptSnapshot(
+  record: CreatorMarketplaceResourceRecord,
+): InstallReceiptSnapshot {
+  const logicalPackId = creatorMarketplaceStudioPackId(record);
+  const [snapshot, setSnapshot] = useState<InstallReceiptSnapshot>(() =>
+    readInstallReceiptSnapshot(record));
+  const activeSnapshot = snapshot.logicalPackId === logicalPackId
+    ? snapshot
+    : readInstallReceiptSnapshot(record);
+
+  useEffect(() => {
+    if (!isCreatorMarketplaceInstallReceiptKind(record.kind)) return undefined;
+    const refresh = () => setSnapshot(readInstallReceiptSnapshot(record));
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.key === null
+        || event.key === CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY
+      ) refresh();
+    };
+    const onReceipt = (event: Event) => {
+      const eventPackId = (event as CustomEvent<{ logicalPackId?: unknown }>).detail
+        ?.logicalPackId;
+      if (eventPackId === undefined || eventPackId === logicalPackId) refresh();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT, onReceipt);
+    window.addEventListener("pageshow", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT, onReceipt);
+      window.removeEventListener("pageshow", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [logicalPackId, record]);
+
+  return activeSnapshot;
+}
+
 function downloadMetadataSnapshot(record: CreatorMarketplaceResourceRecord): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -126,11 +201,36 @@ export function MarketResourceDetailArticle({
   const kind = marketKindMeta(record.kind);
   const license = marketLicenseMeta(record.license);
   const KindIcon = kind.icon;
-  const paletteColors = palettePreviewColors(record);
+  const palettePreviews = palettePreviewData(record);
   const brushPreviews = brushPreviewData(record);
   const filterPreviews = filterPreviewData(record);
   const templatePreviews = templatePreviewData(record);
   const recipePreviews = recipePreviewData(record);
+  const previewItems: readonly { readonly name: string }[] | null = record.kind === "palette"
+    ? palettePreviews
+    : record.kind === "brush"
+      ? brushPreviews
+      : record.kind === "filter"
+        ? filterPreviews
+        : record.kind === "template"
+          ? templatePreviews
+          : recipePreviews;
+  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState(0);
+  const safePreviewIndex = Math.min(selectedPreviewIndex, Math.max(0, (previewItems?.length ?? 1) - 1));
+  const selectedPalette = palettePreviews?.[safePreviewIndex];
+  const selectedBrush = brushPreviews?.[safePreviewIndex];
+  const selectedFilter = filterPreviews?.[safePreviewIndex];
+  const selectedTemplate = templatePreviews?.[safePreviewIndex];
+  const selectedRecipe = recipePreviews?.[safePreviewIndex];
+  const installReceiptSnapshot = useInstallReceiptSnapshot(record);
+  const installReceiptState = resolveCreatorMarketplaceInstallReceiptState(
+    record,
+    installReceiptSnapshot.receipt,
+  );
+
+  useEffect(() => {
+    setSelectedPreviewIndex(0);
+  }, [record.id]);
   const isDirectAsset = record.kind === "asset";
   const studioActionLabel = isDirectAsset
     ? "스튜디오 캔버스에 에셋 삽입"
@@ -138,7 +238,11 @@ export function MarketResourceDetailArticle({
       ? "장면 템플릿 카탈로그 열기"
       : record.kind === "3d-preset"
         ? "3D 배경 카탈로그 열기"
-        : "스튜디오에 리소스 팩 설치";
+        : installReceiptState === "update-available"
+          ? `스튜디오에서 v${record.resourceVersion}로 업데이트`
+          : installReceiptState === "installed-current"
+            ? "스튜디오에서 설치 상태 확인"
+            : "스튜디오에 리소스 팩 설치";
   const studioActionSummary = isDirectAsset
     ? "Studio 커뮤니티 마켓을 열고 지원되는 첫 에셋을 현재 캔버스에 삽입합니다."
     : record.kind === "template"
@@ -192,26 +296,105 @@ export function MarketResourceDetailArticle({
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
-          {/* Dynamic Interactive Previews by Kind */}
-          {paletteColors ? (
-            <MarketPalettePreview colors={paletteColors} paletteName={record.name} />
-          ) : null}
+          {/* Every valid pack entry remains inspectable; selection never changes install policy. */}
+          {previewItems && previewItems.length > 0 ? (
+            <section aria-label="패키지 미리보기">
+              {previewItems.length > 1 ? (
+                <div className="mb-2.5 rounded-xl border border-line bg-panel/60 p-2.5">
+                  <div
+                    role="tablist"
+                    aria-label="미리볼 패키지 항목"
+                    className="flex max-w-full gap-1.5 overflow-x-auto pb-1"
+                  >
+                    {previewItems.map((item, index) => (
+                      <button
+                        key={`${item.name}-${index}`}
+                        id={`market-preview-tab-${index}`}
+                        type="button"
+                        role="tab"
+                        aria-controls="market-preview-panel"
+                        aria-selected={safePreviewIndex === index}
+                        tabIndex={safePreviewIndex === index ? 0 : -1}
+                        onClick={() => setSelectedPreviewIndex(index)}
+                        onKeyDown={(event) => {
+                          let nextIndex: number | null = null;
+                          if (event.key === "ArrowRight") {
+                            nextIndex = (index + 1) % previewItems.length;
+                          } else if (event.key === "ArrowLeft") {
+                            nextIndex = (index - 1 + previewItems.length) % previewItems.length;
+                          } else if (event.key === "Home") {
+                            nextIndex = 0;
+                          } else if (event.key === "End") {
+                            nextIndex = previewItems.length - 1;
+                          }
+                          if (nextIndex === null) return;
+                          event.preventDefault();
+                          setSelectedPreviewIndex(nextIndex);
+                          const tabList = event.currentTarget.closest('[role="tablist"]');
+                          const tabs = tabList?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                          tabs?.[nextIndex]?.focus();
+                        }}
+                        className={`min-h-9 shrink-0 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 ${
+                          safePreviewIndex === index
+                            ? "border-accent bg-accent text-on-accent"
+                            : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    선택은 상세 미리보기만 바꾸며 Studio 동작은 패키지 적용 정책을 따릅니다.
+                  </p>
+                </div>
+              ) : null}
 
-          {brushPreviews && brushPreviews[0] ? (
-            <MarketBrushPreview brush={brushPreviews[0]} />
-          ) : null}
+              <div
+                id="market-preview-panel"
+                role={previewItems.length > 1 ? "tabpanel" : undefined}
+                aria-labelledby={previewItems.length > 1 ? `market-preview-tab-${safePreviewIndex}` : undefined}
+                tabIndex={previewItems.length > 1 ? 0 : undefined}
+              >
+                {selectedPalette ? (
+                  <MarketPalettePreview
+                    key={`palette-${safePreviewIndex}`}
+                    colors={selectedPalette.colors}
+                    paletteName={selectedPalette.name}
+                  />
+                ) : null}
 
-          {filterPreviews && filterPreviews[0] ? (
-            <MarketFilterPreview filter={filterPreviews[0]} />
-          ) : null}
+                {selectedBrush ? (
+                  <MarketBrushPreview key={`brush-${safePreviewIndex}`} brush={selectedBrush} />
+                ) : null}
 
-          {templatePreviews && templatePreviews[0] ? (
-            <MarketTemplatePreview template={templatePreviews[0]} />
-          ) : null}
+                {selectedFilter ? (
+                  <MarketFilterPreview key={`filter-${safePreviewIndex}`} filter={selectedFilter} />
+                ) : null}
 
-          {record.kind === "3d-preset" && recipePreviews && recipePreviews[0] ? (
-            <MarketScene3dPreview recipe={recipePreviews[0]} />
-          ) : null}
+                {selectedTemplate ? (
+                  <MarketTemplatePreview key={`template-${safePreviewIndex}`} template={selectedTemplate} />
+                ) : null}
+
+                {record.kind === "asset" && selectedRecipe ? (
+                  <MarketAssetRecipePreview key={`asset-${safePreviewIndex}`} recipe={selectedRecipe} />
+                ) : null}
+
+                {record.kind === "3d-preset" && selectedRecipe ? (
+                  <MarketScene3dPreview key={`3d-${safePreviewIndex}`} recipe={selectedRecipe} />
+                ) : null}
+              </div>
+            </section>
+          ) : (
+            <section className="rounded-xl border border-line bg-card p-5" aria-labelledby="market-preview-unavailable-heading">
+              <h2 id="market-preview-unavailable-heading" className="text-sm font-semibold text-fg">
+                웹 미리보기 없음
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-fg-2">
+                이 패키지는 웹에서 재현할 수 있는 미리보기 데이터가 없어요. 실제 결과는 Studio에서 확인해 주세요.
+              </p>
+            </section>
+          )}
 
           {/* Contents Section */}
           <section aria-labelledby="market-entries-heading">
@@ -242,6 +425,8 @@ export function MarketResourceDetailArticle({
               ))}
             </ul>
           </section>
+
+          <MarketResourceReleaseHistory resourceId={record.id} />
 
           {/* Tags */}
           {record.tags.length > 0 ? (
@@ -278,8 +463,33 @@ export function MarketResourceDetailArticle({
           ) : null}
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="flex flex-col gap-2 rounded-xl border border-line bg-card p-4">
+            <CreatorMarketplaceCloudLibraryAction record={record} />
+            {isCreatorMarketplaceInstallReceiptKind(record.kind) ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="rounded-lg border border-line bg-panel px-3 py-2.5 text-left"
+              >
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
+                  <ShieldCheck
+                    className={installReceiptState === "installed-current"
+                      ? "h-3.5 w-3.5 text-good"
+                      : "h-3.5 w-3.5 text-fg-3"}
+                    aria-hidden="true"
+                  />
+                  {installReceiptState === "installed-current"
+                    ? `이 기기·브라우저에 v${record.resourceVersion} 설치 확인됨`
+                    : installReceiptState === "update-available"
+                      ? `업데이트 가능 · 설치 v${installReceiptSnapshot.receipt?.packageVersion} → 마켓 v${record.resourceVersion}`
+                      : "이 기기·브라우저에서 확인된 설치 영수증 없음"}
+                </p>
+                <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                  성공한 Studio 설치가 이 브라우저에 남긴 로컬 기록만 표시합니다. 계정 소유권이나 클라우드 동기화 상태가 아닙니다.
+                </p>
+              </div>
+            ) : null}
             <Link
               href={`/studio?installMarketResource=${record.id}&assetMarket=community`}
               className={buttonClass({ variant: "solid", size: "md", className: "w-full" })}
@@ -299,9 +509,10 @@ export function MarketResourceDetailArticle({
               href={`/market/browse?kind=${record.kind}`}
               className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
             >
-              이 리소스와 비슷한 것 더 보기
+              같은 종류의 리소스 더 보기
             </Link>
             <ShareLinkButton />
+            <CreatorMarketplaceReportAction record={record} />
             <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
               {studioActionSummary}
             </p>
@@ -309,23 +520,35 @@ export function MarketResourceDetailArticle({
 
           <dl className="divide-y divide-line rounded-xl border border-line bg-card px-4 py-1">
             <MetaRow label="배급자">
-              {record.publisher.avatar ? (
-                <img
-                  src={record.publisher.avatar}
-                  alt=""
-                  className="mr-1.5 inline-block h-4 w-4 rounded-full object-cover"
-                  loading="lazy"
-                />
-              ) : null}
-              <Link
-                href={`/market/browse?publisher=${encodeURIComponent(record.publisher.id)}`}
-                className="inline-flex min-h-6 items-center underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
-              >
-                {record.publisher.name}
-              </Link>
+              <span className="flex max-w-full flex-col items-end gap-0.5">
+                <span className="inline-flex max-w-full items-center">
+                  {record.publisher.avatar ? (
+                    <img
+                      src={record.publisher.avatar}
+                      alt=""
+                      className="mr-1.5 inline-block h-4 w-4 rounded-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <Link
+                    href={`/u/${encodeURIComponent(record.publisher.id)}`}
+                    className="inline-flex min-h-6 max-w-full items-center break-all underline decoration-line-strong underline-offset-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
+                  >
+                    {record.publisher.name}
+                  </Link>
+                </span>
+                <Link
+                  href={`/market/browse?publisher=${encodeURIComponent(record.publisher.id)}`}
+                  className="inline-flex min-h-6 items-center text-[0.68rem] font-normal text-fg-3 underline decoration-line-strong underline-offset-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
+                >
+                  이 배급자의 마켓 리소스
+                </Link>
+              </span>
             </MetaRow>
             <MetaRow label="패키지 ID">
-              <span className="font-mono text-[0.68rem] text-fg-2">{record.packageId}</span>
+              <span className="block max-w-full break-all font-mono text-[0.68rem] text-fg-2">
+                {record.packageId}
+              </span>
             </MetaRow>
             <MetaRow label="버전">
               <span className="numeral tnum">v{record.resourceVersion}</span>
@@ -405,7 +628,7 @@ export function MarketResourceDetailArticle({
               배급자가 직접 만든 리소스입니다.
             </div>
           )}
-        </aside>
+        </div>
       </div>
     </article>
   );

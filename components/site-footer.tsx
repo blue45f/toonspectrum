@@ -60,7 +60,7 @@ export function SiteFooter() {
   return (
     <footer
       data-site-chrome="footer"
-      className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25"
+      className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25 pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0"
     >
       {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
       <span
@@ -87,7 +87,7 @@ export function SiteFooter() {
             key={col.titleKey}
             className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4"
           >
-            <h4 className="eyebrow text-fg-3">{t(col.titleKey)}</h4>
+            <h2 className="eyebrow text-fg-3">{t(col.titleKey)}</h2>
             {col.links.map((l) => (
               <Link
                 key={l.href}

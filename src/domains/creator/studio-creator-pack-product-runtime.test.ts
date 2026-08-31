@@ -13,7 +13,10 @@ import {
   STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
   type StudioCreatorPackStorage,
 } from "./studio-creator-filter-preset-reader";
-import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
+import {
+  STUDIO_CREATOR_PACK_CATALOG,
+  type StudioCreatorPackDefinition,
+} from "./studio-creator-pack-catalog";
 import {
   STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
   StudioCreatorPackInstallStaleError,
@@ -34,6 +37,11 @@ import {
   createStudioPaletteSqliteRepository,
   type StudioPaletteSqliteRepository,
 } from "./studio-palette-sqlite-repository";
+
+import {
+  CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+  type CreatorMarketplaceInstallReceiptStorage,
+} from "@/lib/creator-marketplace-install-receipt";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];
@@ -157,7 +165,151 @@ function faultingDatabase(
   });
 }
 
+function communityRelease(
+  pack: StudioCreatorPackDefinition,
+  version = "1.0.0",
+  fingerprint = "d".repeat(64),
+): StudioCreatorPackDefinition {
+  return {
+    ...pack,
+    metadata: {
+      ...pack.metadata,
+      id: `community:${"c".repeat(64)}`,
+      version,
+      packageFingerprint: fingerprint,
+    },
+  };
+}
+
+function tracedInstallReceiptStorage(events: string[]): CreatorMarketplaceInstallReceiptStorage & {
+  readonly values: Map<string, string>;
+} {
+  const values = new Map<string, string>();
+  return {
+    values,
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      events.push("receipt-write");
+      values.set(key, value);
+    },
+    removeItem: (key) => {
+      events.push("receipt-remove");
+      values.delete(key);
+    },
+  };
+}
+
 describe("Creator Pack product SQLite authority", () => {
+  it("publishes the lightweight Market receipt only after install/update commits and removes it after uninstall", async () => {
+    const database = await openDatabase();
+    const product = await openProductFilterLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const source = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "filter",
+    )!;
+    const firstRelease = communityRelease(source);
+    const events: string[] = [];
+    const installReceiptStorage = tracedInstallReceiptStorage(events);
+    const tracedProduct: ProductFilterLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (presets) => {
+          const result = await product.repository.putMany(presets);
+          events.push("product-install-commit");
+          return result;
+        },
+        deleteMany: async (ids) => {
+          const result = await product.repository.deleteMany(ids);
+          events.push("product-uninstall-commit");
+          return result;
+        },
+      },
+    };
+    const options = {
+      acquireFilterRepository: () => Promise.resolve(tracedProduct),
+      installReceiptStorage,
+    };
+
+    expect((await installStudioCreatorPackProduct(firstRelease, options)).status)
+      .toBe("installed");
+    expect(events).toEqual(["product-install-commit", "receipt-write"]);
+    expect(installReceiptStorage.values.get(
+      CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+    )).toContain('"packageVersion":"1.0.0"');
+
+    events.length = 0;
+    const nextRelease = communityRelease(source, "1.1.0", "e".repeat(64));
+    expect((await installStudioCreatorPackProduct(nextRelease, options)).status)
+      .toBe("installed");
+    expect(events).toEqual(["product-install-commit", "receipt-write"]);
+    expect(installReceiptStorage.values.get(
+      CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+    )).toContain('"packageVersion":"1.1.0"');
+
+    events.length = 0;
+    expect((await uninstallStudioCreatorPackProduct(nextRelease, options)).status)
+      .toBe("uninstalled");
+    expect(events).toEqual(["product-uninstall-commit", "receipt-remove"]);
+    expect(installReceiptStorage.values.has(
+      CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
+    )).toBe(false);
+  });
+
+  it("does not publish a Market receipt for failed, conflicting, bundled, or stale installs", async () => {
+    const database = await openDatabase();
+    const product = await openProductFilterLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const filter = communityRelease(STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "filter",
+    )!);
+    const events: string[] = [];
+    const installReceiptStorage = tracedInstallReceiptStorage(events);
+
+    const failedProduct: ProductFilterLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async () => {
+          throw new Error("injected install rollback");
+        },
+      },
+    };
+    expect((await installStudioCreatorPackProduct(filter, {
+      acquireFilterRepository: () => Promise.resolve(failedProduct),
+      installReceiptStorage,
+    })).status).toBe("storage-error");
+    expect(events).toEqual([]);
+
+    await expect(installStudioCreatorPackProduct(filter, {
+      acquireFilterRepository: () => Promise.resolve(product),
+      installReceiptStorage,
+      isInstallCurrent: () => false,
+    })).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(events).toEqual([]);
+
+    const bundled = communityRelease(STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.entries.every((entry) => entry.delivery.mode === "builtin-ref"),
+    )!);
+    expect((await installStudioCreatorPackProduct(bundled, {
+      installReceiptStorage,
+    })).status).toBe("bundled");
+    expect(events).toEqual([]);
+
+    expect((await installStudioCreatorPackProduct(filter, {
+      acquireFilterRepository: () => Promise.resolve(product),
+      installReceiptStorage: null,
+    })).status).toBe("installed");
+    const conflicting = communityRelease(filter, "1.0.0", "f".repeat(64));
+    expect((await installStudioCreatorPackProduct(conflicting, {
+      acquireFilterRepository: () => Promise.resolve(product),
+      installReceiptStorage,
+    })).status).toBe("conflict");
+    expect(events).toEqual([]);
+  });
+
   it("installs and removes brush packs through the uncapped SQLite catalog", async () => {
     const database = await openDatabase();
     const storage = storageWithOldData();
@@ -179,6 +331,24 @@ describe("Creator Pack product SQLite authority", () => {
     };
 
     expect(await inspectStudioCreatorPackInstallStateProduct(pack, options)).toBe("available");
+    await database.kvSet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+      JSON.stringify({
+        version: 1,
+        packageId: pack.metadata.id,
+        packageVersion: pack.metadata.version,
+        packageFingerprint: pack.metadata.packageFingerprint,
+        kind: "brush",
+        updatedAt: 6_999,
+      }),
+    );
+    expect(await inspectStudioCreatorPackInstallStateProduct(pack, options))
+      .toBe("repair-required");
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
     const installed = await installStudioCreatorPackProduct(pack, options);
     expect(installed.status).toBe("installed");
     expect(installed.message).toContain("OPFS SQLite");

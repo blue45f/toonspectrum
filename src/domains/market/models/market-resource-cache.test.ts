@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 
 import {
   MARKET_CACHE_MAX_AGE_MS,
+  MARKET_CACHE_MAX_ENTRIES,
+  MARKET_CACHE_MAX_KEY_CHARACTERS,
   readCachedMarketPage,
   readCachedMarketResource,
   removeCachedMarketResource,
@@ -118,6 +120,7 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 describe("market-resource-cache", () => {
@@ -162,6 +165,24 @@ describe("market-resource-cache", () => {
     });
   });
 
+  it("removes an older page when a successful response becomes empty", () => {
+    writeCachedMarketPage("delisted", {
+      items: [record],
+      hasMore: false,
+      nextCursor: null,
+    });
+    expect(readCachedMarketPage("delisted")?.items).toHaveLength(1);
+
+    writeCachedMarketPage("delisted", {
+      items: [],
+      hasMore: false,
+      nextCursor: null,
+    });
+
+    expect(readCachedMarketPage("delisted")).toBeNull();
+    expect(localStorage.getItem("toonspectrum.market.page.v1:delisted")).toBeNull();
+  });
+
   it("does not revive a stored cursor when the cached page declared no next page", () => {
     localStorage.setItem(
       "toonspectrum.market.page.v1:inconsistent-read",
@@ -203,15 +224,18 @@ describe("market-resource-cache", () => {
   });
 
   it("returns null when every record is invalid", () => {
+    const key = 'toonspectrum.market.page.v1:{"limit":8}';
     localStorage.setItem(
-      'toonspectrum.market.page.v1:{"limit":8}',
+      key,
       JSON.stringify({ savedAt: new Date().toISOString(), items: [{ garbage: true }], hasMore: false })
     );
     expect(readCachedMarketPage('{"limit":8}')).toBeNull();
+    expect(localStorage.getItem(key)).toBeNull();
   });
 
   it("skips writing payloads beyond the size cap", () => {
     const huge = { ...record, name: "x".repeat(400_000) };
+    writeCachedMarketPage("huge", { items: [record], hasMore: false, nextCursor: null });
     writeCachedMarketPage("huge", { items: [huge], hasMore: false, nextCursor: null });
     expect(readCachedMarketPage("huge")).toBeNull();
   });
@@ -260,5 +284,80 @@ describe("market-resource-cache", () => {
 
     expect(readCachedMarketResource(record.id, nowMs)).toBeNull();
     expect(localStorage.getItem(resourceKey)).toBeNull();
+  });
+
+  it("sweeps expired, corrupt, and overlong market keys without deleting unrelated storage", () => {
+    const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(nowMs);
+    const expiredPageKey = "toonspectrum.market.page.v1:expired-other-query";
+    const corruptResourceKey = "toonspectrum.resource.v1:corrupt";
+    const overlongMarketKey = `toonspectrum.market.page.v1:${"x".repeat(
+      MARKET_CACHE_MAX_KEY_CHARACTERS
+    )}`;
+    const unrelatedKey = "toonspectrum.studio.unsaved.v1";
+    localStorage.setItem(expiredPageKey, JSON.stringify({
+      savedAt: new Date(nowMs - MARKET_CACHE_MAX_AGE_MS - 1).toISOString(),
+      items: [record],
+    }));
+    localStorage.setItem(corruptResourceKey, "{broken");
+    localStorage.setItem(overlongMarketKey, JSON.stringify({
+      savedAt: new Date(nowMs).toISOString(),
+    }));
+    localStorage.setItem(unrelatedKey, "keep-me");
+
+    writeCachedMarketPage("fresh-query", {
+      items: [record],
+      hasMore: false,
+      nextCursor: null,
+    });
+
+    expect(localStorage.getItem(expiredPageKey)).toBeNull();
+    expect(localStorage.getItem(corruptResourceKey)).toBeNull();
+    expect(localStorage.getItem(overlongMarketKey)).toBeNull();
+    expect(localStorage.getItem(unrelatedKey)).toBe("keep-me");
+    expect(readCachedMarketPage("fresh-query", nowMs)?.items).toHaveLength(1);
+  });
+
+  it("keeps a deterministic recent-save cap across page and detail cache namespaces", () => {
+    const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(nowMs);
+    const oldestKey = "toonspectrum.market.page.v1:page-00";
+    localStorage.setItem("unrelated.market.test", "keep-me");
+
+    for (let index = 0; index < MARKET_CACHE_MAX_ENTRIES; index += 1) {
+      const prefix = index % 2 === 0
+        ? "toonspectrum.market.page.v1:page-"
+        : "toonspectrum.resource.v1:resource-";
+      localStorage.setItem(
+        `${prefix}${String(index).padStart(2, "0")}`,
+        JSON.stringify({
+          savedAt: new Date(nowMs - (MARKET_CACHE_MAX_ENTRIES - index) * 1_000)
+            .toISOString(),
+          items: [record],
+          record,
+          hasMore: false,
+          nextCursor: null,
+        })
+      );
+    }
+
+    writeCachedMarketPage("newest", {
+      items: [record],
+      hasMore: false,
+      nextCursor: null,
+    });
+
+    const marketKeys = Array.from({ length: localStorage.length }, (_, index) =>
+      localStorage.key(index)
+    ).filter((key): key is string => Boolean(
+      key?.startsWith("toonspectrum.market.page.v1:")
+      || key?.startsWith("toonspectrum.resource.v1:")
+    ));
+    expect(marketKeys).toHaveLength(MARKET_CACHE_MAX_ENTRIES);
+    expect(localStorage.getItem(oldestKey)).toBeNull();
+    expect(localStorage.getItem("toonspectrum.market.page.v1:newest")).not.toBeNull();
+    expect(localStorage.getItem("unrelated.market.test")).toBe("keep-me");
   });
 });

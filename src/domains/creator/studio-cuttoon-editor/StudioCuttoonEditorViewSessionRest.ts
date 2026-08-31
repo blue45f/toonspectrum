@@ -439,6 +439,10 @@ export type StudioCuttoonEditorViewSessionRest = {
   studioRevisionProjectGenerationRef: any;
   studioRootRef: any;
   studioSfx: any;
+  studioMarketplaceCloudSyncRetry: any;
+  studioMarketplaceCloudSyncRetryPending: any;
+  retryStudioMarketplaceCloudSync: any;
+  dismissStudioMarketplaceCloudSyncRetry: any;
   studioStatusNotice: any;
   studioStickerAssetsError: any;
   studioStickerAssetsLoaded: any;

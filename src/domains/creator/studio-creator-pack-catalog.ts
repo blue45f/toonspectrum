@@ -51,10 +51,19 @@ export interface StudioCreatorRuntimeBudget {
   readonly textures?: number;
 }
 
+/** Exact server identity used only for safe migration of pre-logical-id community installs. */
+export interface StudioCreatorPackMarketplaceSource {
+  readonly schema: "creator-marketplace-resource-v1";
+  readonly releaseId: string;
+  readonly publisherId: string;
+  readonly packageId: string;
+}
+
 export interface StudioCreatorPackDefinition {
   readonly metadata: StudioMarketplacePackage;
   readonly resourceKind: Exclude<CreatorMarketplaceResourceKind, "asset">;
   readonly entries: readonly StudioCreatorPackEntry[];
+  readonly marketplaceSource?: StudioCreatorPackMarketplaceSource;
   readonly runtimeDescriptor: {
     readonly engines: readonly ("canvas2d" | "webgl2" | "webgpu" | "three")[];
     readonly budget: StudioCreatorRuntimeBudget;

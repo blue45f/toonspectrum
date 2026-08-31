@@ -22,6 +22,14 @@ const studioPageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const studioChromeSource = readFileSync(
+  new URL("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx", import.meta.url),
+  "utf8",
+);
+const deepLinkSource = readFileSync(
+  new URL("./studio-marketplace-deep-link.ts", import.meta.url),
+  "utf8",
+);
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -47,18 +55,25 @@ function dependencies(options: {
   kind?: CreatorMarketplaceResourceRecord["kind"];
   load?: CreatorMarketplaceResourceRecord | null;
   projection?: "installable" | "unsupported";
+  projectionReason?: string;
   installStatus?: "installed" | "already-installed" | "bundled" | "conflict" | "storage-error";
   bundledCatalogStatus?: "opened" | "unsupported";
+  accountSync?: "synchronized" | "skipped" | "failure";
   assets?: readonly string[];
   inserted?: boolean;
 } = {}) {
   const loaded = options.load === undefined
     ? record(options.kind)
     : options.load;
+  const accountSync = options.accountSync;
   return {
     loadResource: vi.fn(async () => loaded),
     projectPack: vi.fn(() => options.projection === "unsupported"
-      ? { status: "unsupported" as const, pack: null, reason: "호환되지 않는 엔진입니다." }
+      ? {
+          status: "unsupported" as const,
+          pack: null,
+          reason: options.projectionReason ?? "호환되지 않는 엔진입니다.",
+        }
       : { status: "installable" as const, pack: "pack-1", reason: null }),
     installPack: vi.fn(async (
       _pack: string,
@@ -69,6 +84,23 @@ function dependencies(options: {
         ? "같은 버전에 다른 내용이 있습니다."
         : "1개 항목을 로컬 SQL 카탈로그에 설치했습니다.",
     })),
+    ...(accountSync ? {
+      synchronizeInstalledPack: vi.fn(async () => {
+        if (accountSync === "failure") {
+          throw new Error("계정 라이브러리 API 연결이 끊겼습니다.");
+        }
+        const result: Readonly<{
+          status: "synchronized" | "skipped";
+          message: string;
+        }> = {
+          status: accountSync,
+          message: accountSync === "synchronized"
+            ? "이 계정에 실제 Studio 설치를 확인했습니다."
+            : "로그인하지 않아 계정 라이브러리에는 기록하지 않았습니다.",
+        };
+        return result;
+      }),
+    } : {}),
     openBundledPackCatalog: vi.fn(async () => options.bundledCatalogStatus === "unsupported"
       ? {
           status: "unsupported" as const,
@@ -87,6 +119,23 @@ function dependencies(options: {
 }
 
 describe("Studio marketplace deep link", () => {
+  it("keeps strict cloud schemas behind the lazy synchronizer boundary", async () => {
+    expect(deepLinkSource).not.toContain(
+      'from "@/lib/creator-marketplace-cloud-library-contract"',
+    );
+    const deps = dependencies({ kind: "template", accountSync: "synchronized" });
+    const synchronizeInstalledPack = deps.synchronizeInstalledPack;
+    if (!synchronizeInstalledPack) {
+      throw new Error("expected account sync test dependency");
+    }
+
+    const result = await applyStudioMarketplaceDeepLink("template-1", deps);
+
+    expect(result.status).toBe("success");
+    expect(result.accountSync).toBeUndefined();
+    expect(synchronizeInstalledPack).not.toHaveBeenCalled();
+  });
+
   it("captures the editor scope before loading and rejects a stale asset before render-local insertion", () => {
     const start = studioPageSource.indexOf(
       "const openAssetMarketDeepLink = useEffectEvent(async () => {",
@@ -110,6 +159,54 @@ describe("Studio marketplace deep link", () => {
     expect(handler).toContain("currentPageId: currentPageIdRef.current");
     expect(handler).toContain("currentMasterEditMode: masterEditModeRef.current");
     expect(insertIndex).toBeGreaterThan(guardIndex);
+  });
+
+  it("wires authenticated post-install account sync and an explicit local-safe retry surface", () => {
+    const handlerStart = studioPageSource.indexOf(
+      "const openAssetMarketDeepLink = useEffectEvent(async () => {",
+    );
+    const handlerEnd = studioPageSource.indexOf("// 마운트 직후가 아니라", handlerStart);
+    const handler = studioPageSource.slice(handlerStart, handlerEnd);
+
+    expect(handler).toContain("synchronizeStudioCommunityMarketplaceInstalledPack");
+    expect(handler).toContain("if (!studioHasAuthenticatedSession)");
+    expect(handler.indexOf("installPack:")).toBeLessThan(
+      handler.indexOf("synchronizeInstalledPack:"),
+    );
+    expect(handler).toContain("setStudioMarketplaceCloudSyncRetry({ record, pack, issue })");
+    expect(studioPageSource).toContain("const retryStudioMarketplaceCloudSync = async () =>");
+    expect(studioPageSource).toContain("inspectStudioCreatorPackInstallStateProduct(");
+    expect(studioPageSource).toContain('if (localState !== "installed")');
+    expect(studioChromeSource).toContain("계정 설치 확인 다시 시도");
+    expect(studioChromeSource).toContain("studioMarketplaceCloudSyncRetryPending");
+    expect(studioChromeSource).toContain('role="alert"');
+    expect(studioChromeSource).toContain("min-h-11");
+    expect(studioChromeSource).toContain("marketplaceCloudSyncFocusRestoreRef");
+    expect(studioChromeSource).toContain("marketplaceCloudSyncRetryButtonRef");
+    expect(studioChromeSource).toContain("marketplaceCloudSyncStatusRef");
+    const retryButtonStart = studioChromeSource.indexOf(
+      "ref={marketplaceCloudSyncRetryButtonRef}",
+    );
+    const retryButtonEnd = studioChromeSource.indexOf(
+      "계정 설치 확인 다시 시도",
+      retryButtonStart,
+    );
+    expect(retryButtonStart).toBeGreaterThan(-1);
+    expect(retryButtonEnd).toBeGreaterThan(retryButtonStart);
+    const statusDismissStart = studioChromeSource.lastIndexOf(
+      "<button",
+      studioChromeSource.indexOf("data-studio-status-notice-dismiss"),
+    );
+    const statusDismissEnd = studioChromeSource.indexOf(
+      "</button>",
+      statusDismissStart,
+    );
+    expect(
+      studioChromeSource.slice(statusDismissStart, statusDismissEnd),
+    ).not.toContain("marketplaceCloudSyncRetryButtonRef");
+    expect(studioChromeSource).toContain("active === request.origin");
+    expect(studioChromeSource).toContain("studioMarketplaceCloudSyncRetry\n      ? marketplaceCloudSyncRetryButtonRef.current\n      : marketplaceCloudSyncStatusRef.current");
+    expect(studioChromeSource).toContain("tabIndex={-1}");
   });
 
   it("does not reach render-local insertion when the document changes during resource loading", async () => {
@@ -162,6 +259,72 @@ describe("Studio marketplace deep link", () => {
       }),
     );
     expect(deps.openBundledPackCatalog).not.toHaveBeenCalled();
+  });
+
+  it("synchronizes the account library only after a durable local install", async () => {
+    const deps = dependencies({ accountSync: "synchronized" });
+    const synchronizeInstalledPack = deps.synchronizeInstalledPack;
+    if (!synchronizeInstalledPack) {
+      throw new Error("expected account synchronization dependency");
+    }
+    const result = await applyStudioMarketplaceDeepLink("resource-1", deps);
+
+    expect(result).toMatchObject({
+      status: "success",
+      accountSync: { status: "synchronized" },
+    });
+    expect(result.message).toContain("실제 Studio 설치를 확인");
+    expect(synchronizeInstalledPack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "resource-1", kind: "brush" }),
+      "pack-1",
+      expect.objectContaining({ assertCurrent: expect.any(Function) }),
+    );
+    expect(deps.installPack.mock.invocationCallOrder[0])
+      .toBeLessThan(synchronizeInstalledPack.mock.invocationCallOrder[0]!);
+  });
+
+  it("keeps the committed local install and exposes retry-required when cloud sync fails", async () => {
+    const deps = dependencies({ accountSync: "failure" });
+    const result = await applyStudioMarketplaceDeepLink("resource-1", deps);
+
+    expect(result).toMatchObject({
+      status: "success",
+      accountSync: {
+        status: "retry-required",
+        message: "계정 라이브러리 API 연결이 끊겼습니다.",
+      },
+    });
+    expect(result.message).toContain("로컬 설치는 유지");
+    expect(result.message).toContain("재시도");
+    expect(deps.installPack).toHaveBeenCalledOnce();
+  });
+
+  it("does not publish a late cloud result after the deep-link operation becomes stale", async () => {
+    const pendingSync = deferred<{
+      status: "synchronized";
+      message: string;
+    }>();
+    const deps = dependencies({ accountSync: "synchronized" });
+    const synchronizeInstalledPack = deps.synchronizeInstalledPack;
+    if (!synchronizeInstalledPack) {
+      throw new Error("expected account synchronization dependency");
+    }
+    synchronizeInstalledPack.mockImplementationOnce(() => pendingSync.promise);
+    let current = true;
+
+    const execution = applyStudioMarketplaceDeepLink("resource-1", deps, {
+      isCurrent: () => current,
+    });
+    await vi.waitFor(() => {
+      expect(synchronizeInstalledPack).toHaveBeenCalledOnce();
+    });
+    current = false;
+    pendingSync.resolve({
+      status: "synchronized",
+      message: "이 계정에 실제 Studio 설치를 확인했습니다.",
+    });
+
+    await expect(execution).resolves.toMatchObject({ status: "stale" });
   });
 
   it.each(["unmount", "new-operation"] as const)(
@@ -289,6 +452,22 @@ describe("Studio marketplace deep link", () => {
     expect(unsupported.message).toContain("호환되지 않는 엔진");
     expect(conflict).toMatchObject({ status: "error" });
     expect(conflict.message).toContain("같은 버전에 다른 내용");
+  });
+
+  it("preserves the compatibility evaluator recovery reason without invoking the installer", async () => {
+    const deps = dependencies({
+      projection: "unsupported",
+      projectionReason:
+        "이 리소스는 Studio 2.0.0 이상이 필요합니다. 현재 버전은 1.4.3입니다. Studio를 업데이트한 뒤 다시 시도해 주세요.",
+    });
+
+    const result = await applyStudioMarketplaceDeepLink("future-resource", deps);
+
+    expect(result).toMatchObject({ status: "error" });
+    expect(result.message).toContain("Studio 2.0.0 이상");
+    expect(result.message).toContain("현재 버전은 1.4.3");
+    expect(result.message).toContain("업데이트한 뒤 다시 시도");
+    expect(deps.installPack).not.toHaveBeenCalled();
   });
 
   it("inserts a verified asset and rejects empty or locked projections", async () => {

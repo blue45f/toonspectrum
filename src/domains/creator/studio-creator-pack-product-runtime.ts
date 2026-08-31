@@ -22,6 +22,14 @@ import {
   type StudioFilterPackValues,
 } from "./filter/studio-filter-pack";
 import {
+  migrateStudioCommunityPackLegacyIdentity,
+  parseStudioCreatorPackSqliteReceipt as parseReceipt,
+  serializeStudioCreatorPackSqliteReceipt,
+  studioCreatorPackReceiptKey as receiptKey,
+  STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+  type StudioCreatorPackSqliteReceipt,
+} from "./studio-community-pack-legacy-migration";
+import {
   browserStudioCreatorPackStorage,
   inspectStudioCreatorPackInstallState,
   installStudioCreatorPack,
@@ -42,11 +50,27 @@ import {
 import type { StudioCreatorPackDefinition } from "./studio-creator-pack-catalog";
 import type { StudioLocalDatabase } from "./studio-local-database";
 import type { StudioNamedPalette } from "./studio-palette-library";
+import type {
+  CreatorMarketplaceResourceIdentity,
+  CreatorMarketplaceResourceRecord,
+} from "@/lib/creator-marketplace-resource-contract";
 
-export const STUDIO_CREATOR_PACK_SQLITE_NAMESPACE = "studio-creator-pack-v12";
+import {
+  isCreatorMarketplaceInstallReceiptKind,
+  removeCreatorMarketplaceInstallReceipt,
+  writeCreatorMarketplaceInstallReceipt,
+  type CreatorMarketplaceInstallReceiptStorage,
+} from "@/lib/creator-marketplace-install-receipt";
+
+export { STUDIO_CREATOR_PACK_SQLITE_NAMESPACE } from "./studio-community-pack-legacy-migration";
 
 export interface StudioCreatorPackProductRuntimeOptions {
   readonly storage?: StudioCreatorPackStorage | null;
+  /**
+   * A small same-browser hint for Market detail pages. It is never an install authority and is
+   * mutated only after the product repository has conclusively committed or removed the pack.
+   */
+  readonly installReceiptStorage?: CreatorMarketplaceInstallReceiptStorage | null;
   readonly acquireFilterRepository?: () => Promise<ProductFilterLibraryRepository>;
   readonly acquireBrushRepository?: () => Promise<ProductBrushLibraryRepository>;
   readonly acquirePaletteRepository?: () =>
@@ -54,6 +78,17 @@ export interface StudioCreatorPackProductRuntimeOptions {
     | Promise<StudioPaletteSqliteRepository>;
   readonly acquireDatabase?: () => Promise<StudioLocalDatabase>;
   readonly now?: () => number;
+  /** Exact public record loader used only for verified release-scoped id migration. */
+  readonly loadCreatorMarketplaceResource?: (
+    id: string,
+    signal?: AbortSignal,
+  ) => Promise<CreatorMarketplaceResourceRecord>;
+  /** Payload-free identity loader runs before any public manifest fetch. */
+  readonly loadCreatorMarketplaceResourceIdentity?: (
+    id: string,
+    signal?: AbortSignal,
+  ) => Promise<CreatorMarketplaceResourceIdentity>;
+  readonly signal?: AbortSignal;
   /**
    * 딥링크 installer가 화면 생명주기와 operation 세대를 live로 전달하는 취소 경계다.
    * 저장소 획득/조회 await 뒤 실제 영속 mutation을 시작하기 직전에 다시 확인한다.
@@ -92,15 +127,6 @@ async function withCreatorPackMutationLock<T>(
   }
 }
 
-interface StudioCreatorPackSqliteReceipt {
-  readonly version: 1;
-  readonly packageId: string;
-  readonly packageVersion: string;
-  readonly packageFingerprint: string;
-  readonly kind: "brush" | "palette";
-  readonly updatedAt: number;
-}
-
 function runtimeItemId(packageId: string, entryId: string): string {
   return `creator-pack:${packageId}:${entryId}`;
 }
@@ -130,43 +156,6 @@ async function localDatabase(options: StudioCreatorPackProductRuntimeOptions) {
   return (options.acquireDatabase ?? acquireStudioLocalDatabase)();
 }
 
-function receiptKey(kind: StudioCreatorPackSqliteReceipt["kind"], packageId: string): string {
-  return `${kind}:${packageId}`;
-}
-
-function parseReceipt(
-  raw: string | null,
-  kind: StudioCreatorPackSqliteReceipt["kind"],
-): StudioCreatorPackSqliteReceipt | null {
-  if (raw === null) return null;
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch (error) {
-    throw new Error("Creator Pack SQLite receipt is corrupt", { cause: error });
-  }
-  if (
-    !value
-    || typeof value !== "object"
-    || Array.isArray(value)
-  ) {
-    throw new Error("Creator Pack SQLite receipt is corrupt");
-  }
-  const receipt = value as Partial<StudioCreatorPackSqliteReceipt>;
-  if (
-    receipt.version !== 1
-    || typeof receipt.packageId !== "string"
-    || typeof receipt.packageVersion !== "string"
-    || typeof receipt.packageFingerprint !== "string"
-    || receipt.kind !== kind
-    || typeof receipt.updatedAt !== "number"
-    || !Number.isFinite(receipt.updatedAt)
-  ) {
-    throw new Error("Creator Pack SQLite receipt has an unsupported shape");
-  }
-  return receipt as StudioCreatorPackSqliteReceipt;
-}
-
 async function loadBrushReceipt(
   packageId: string,
   options: StudioCreatorPackProductRuntimeOptions,
@@ -183,7 +172,7 @@ async function loadBrushReceipt(
 }
 
 function assertInstallCurrent(options: StudioCreatorPackProductRuntimeOptions): void {
-  if (options.isInstallCurrent?.() === false) {
+  if (options.signal?.aborted || options.isInstallCurrent?.() === false) {
     throw new StudioCreatorPackInstallStaleError();
   }
 }
@@ -321,14 +310,13 @@ async function restorePaletteInstallSnapshot(
 }
 
 function brushReceipt(pack: StudioCreatorPackDefinition, now: number): string {
-  return JSON.stringify({
-    version: 1,
+  return serializeStudioCreatorPackSqliteReceipt({
     packageId: pack.metadata.id,
     packageVersion: pack.metadata.version,
     packageFingerprint: pack.metadata.packageFingerprint,
     kind: "brush",
     updatedAt: now,
-  } satisfies StudioCreatorPackSqliteReceipt);
+  });
 }
 
 async function saveBrushReceipt(
@@ -346,14 +334,13 @@ async function saveBrushReceipt(
 }
 
 function paletteReceipt(pack: StudioCreatorPackDefinition, now: number): string {
-  return JSON.stringify({
-    version: 1,
+  return serializeStudioCreatorPackSqliteReceipt({
     packageId: pack.metadata.id,
     packageVersion: pack.metadata.version,
     packageFingerprint: pack.metadata.packageFingerprint,
     kind: "palette",
     updatedAt: now,
-  } satisfies StudioCreatorPackSqliteReceipt);
+  });
 }
 
 async function loadPaletteReceipt(
@@ -431,7 +418,7 @@ function paletteMatchesEntry(
  * never from the legacy localStorage package marker. Other resource kinds retain their existing
  * builtin-reference runtime.
  */
-export async function inspectStudioCreatorPackInstallStateProduct(
+async function inspectStudioCreatorPackInstallStateProductUnlocked(
   pack: StudioCreatorPackDefinition,
   options: StudioCreatorPackProductRuntimeOptions = {},
 ): Promise<StudioCreatorPackInstallState> {
@@ -447,9 +434,9 @@ export async function inspectStudioCreatorPackInstallStateProduct(
   if (pack.metadata.kind === "brush") {
     const current = await currentBrushes(pack, options);
     const installedCount = current.filter((brush) => brush !== null).length;
-    if (installedCount === 0) return "available";
-    if (installedCount !== pack.entries.length) return "repair-required";
     const receipt = await loadBrushReceipt(pack.metadata.id, options);
+    if (installedCount === 0) return receipt ? "repair-required" : "available";
+    if (installedCount !== pack.entries.length) return "repair-required";
     if (!receipt) return "repair-required";
     const versionOrder = compareStudioMarketplaceVersions(
       receipt.packageVersion,
@@ -524,6 +511,37 @@ export async function inspectStudioCreatorPackInstallStateProduct(
     return "conflict";
   }
   return "update";
+}
+
+async function migrateLegacyIdentity(
+  pack: StudioCreatorPackDefinition,
+  options: StudioCreatorPackProductRuntimeOptions,
+) {
+  return migrateStudioCommunityPackLegacyIdentity(pack, {
+    acquireBrushRepository: () => brushRepository(options),
+    acquireFilterRepository: () => filterRepository(options),
+    acquirePaletteRepository: () => paletteRepository(options),
+    acquireDatabase: () => localDatabase(options),
+    loadResource: options.loadCreatorMarketplaceResource,
+    loadResourceIdentity: options.loadCreatorMarketplaceResourceIdentity,
+    installReceiptStorage: options.installReceiptStorage,
+    signal: options.signal,
+    now: options.now,
+    assertCurrent: () => assertInstallCurrent(options),
+  });
+}
+
+export async function inspectStudioCreatorPackInstallStateProduct(
+  pack: StudioCreatorPackDefinition,
+  options: StudioCreatorPackProductRuntimeOptions = {},
+): Promise<StudioCreatorPackInstallState> {
+  return withCreatorPackMutationLock(pack.metadata.id, async () => {
+    const migration = await migrateLegacyIdentity(pack, options);
+    if (migration.status === "conflict" || migration.status === "repair-required") {
+      return migration.status;
+    }
+    return inspectStudioCreatorPackInstallStateProductUnlocked(pack, options);
+  });
 }
 
 function filterPresetFromEntry(
@@ -656,7 +674,7 @@ async function installStudioCreatorPackProductUnlocked(
   }
   if (pack.metadata.kind === "brush") {
     try {
-      const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+      const state = await inspectStudioCreatorPackInstallStateProductUnlocked(pack, options);
       assertInstallCurrent(options);
       if (state === "installed") {
         return {
@@ -729,7 +747,7 @@ async function installStudioCreatorPackProductUnlocked(
   }
   if (pack.metadata.kind === "palette") {
     try {
-      const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+      const state = await inspectStudioCreatorPackInstallStateProductUnlocked(pack, options);
       assertInstallCurrent(options);
       if (state === "installed") {
         return {
@@ -800,7 +818,7 @@ async function installStudioCreatorPackProductUnlocked(
     }
   }
   try {
-    const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+    const state = await inspectStudioCreatorPackInstallStateProductUnlocked(pack, options);
     assertInstallCurrent(options);
     if (state === "installed") {
       return {
@@ -863,7 +881,34 @@ export async function installStudioCreatorPackProduct(
   assertInstallCurrent(options);
   return withCreatorPackMutationLock(pack.metadata.id, async () => {
     assertInstallCurrent(options);
-    return installStudioCreatorPackProductUnlocked(pack, options);
+    let migration;
+    try {
+      migration = await migrateLegacyIdentity(pack, options);
+    } catch (error) {
+      return errorResult("레거시 Creator Pack 이전", error);
+    }
+    if (migration.status === "conflict" || migration.status === "repair-required") {
+      return {
+        status: "conflict",
+        installedCount: 0,
+        message: migration.reason,
+      };
+    }
+    const result = await installStudioCreatorPackProductUnlocked(pack, options);
+    if (
+      result.status === "installed"
+      && isCreatorMarketplaceInstallReceiptKind(pack.metadata.kind)
+    ) {
+      const now = (options.now ?? Date.now)();
+      writeCreatorMarketplaceInstallReceipt({
+        logicalPackId: pack.metadata.id,
+        packageVersion: pack.metadata.version,
+        packageFingerprint: pack.metadata.packageFingerprint,
+        kind: pack.metadata.kind,
+        installedAt: now,
+      }, options.installReceiptStorage, now);
+    }
+    return result;
   });
 }
 
@@ -973,6 +1018,32 @@ export async function uninstallStudioCreatorPackProduct(
 ): Promise<StudioCreatorPackInstallResult> {
   return withCreatorPackMutationLock(
     pack.metadata.id,
-    () => uninstallStudioCreatorPackProductUnlocked(pack, options),
+    async () => {
+      let migration;
+      try {
+        migration = await migrateLegacyIdentity(pack, options);
+      } catch (error) {
+        return errorResult("레거시 Creator Pack 이전", error);
+      }
+      if (migration.status === "conflict" || migration.status === "repair-required") {
+        return {
+          status: "conflict",
+          installedCount: 0,
+          message: migration.reason,
+        };
+      }
+      const result = await uninstallStudioCreatorPackProductUnlocked(pack, options);
+      if (
+        result.status === "uninstalled"
+        || result.status === "already-uninstalled"
+      ) {
+        removeCreatorMarketplaceInstallReceipt(
+          pack.metadata.id,
+          options.installReceiptStorage,
+          (options.now ?? Date.now)(),
+        );
+      }
+      return result;
+    },
   );
 }

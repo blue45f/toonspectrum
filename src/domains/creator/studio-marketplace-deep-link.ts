@@ -1,9 +1,15 @@
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
+export type StudioMarketplaceDeepLinkAccountSync = Readonly<{
+  status: "synchronized" | "skipped" | "retry-required";
+  message: string;
+}>;
+
 export type StudioMarketplaceDeepLinkResult = Readonly<{
   status: "success" | "error" | "stale";
   message: string;
   resourceId: string;
+  accountSync?: StudioMarketplaceDeepLinkAccountSync;
 }>;
 
 export interface StudioMarketplaceInstallLocationSnapshot<TState = unknown> {
@@ -73,6 +79,14 @@ export interface StudioMarketplaceDeepLinkDependencies<TPack, TAsset> {
     pack: TPack,
     guard: StudioMarketplaceInstallGuard,
   ) => Promise<InstallResult>;
+  readonly synchronizeInstalledPack?: (
+    record: CreatorMarketplaceResourceRecord,
+    pack: TPack,
+    guard: StudioMarketplaceInstallGuard,
+  ) => Promise<Readonly<{
+    status: "synchronized" | "skipped";
+    message: string;
+  }>>;
   readonly openBundledPackCatalog: (
     pack: TPack,
     record: CreatorMarketplaceResourceRecord,
@@ -97,6 +111,14 @@ const SUCCESSFUL_INSTALL_STATUSES = new Set<InstallResult["status"]>([
   "already-installed",
   "bundled",
 ]);
+
+function isAccountConfirmableKind(
+  kind: CreatorMarketplaceResourceRecord["kind"],
+): boolean {
+  // Keep this eager deep-link coordinator independent of the strict cloud-library schema graph.
+  // The dynamically loaded synchronizer validates the same closed set again before any request.
+  return kind === "brush" || kind === "filter" || kind === "palette";
+}
 
 function caughtMessage(caught: unknown): string {
   if (
@@ -274,6 +296,40 @@ export async function applyStudioMarketplaceDeepLink<TPack, TAsset>(
         message: `“${record.name}” · ${catalogResult.message}`,
         resourceId: normalizedResourceId,
       };
+    }
+
+    if (
+      dependencies.synchronizeInstalledPack
+      && isAccountConfirmableKind(record.kind)
+    ) {
+      try {
+        const accountSync = await dependencies.synchronizeInstalledPack(
+          record,
+          projection.pack,
+          installGuard,
+        );
+        if (!isCurrent()) return staleResult(normalizedResourceId);
+        return {
+          status: "success",
+          message: `“${record.name}” · ${installResult.message} ${accountSync.message} 자산 메뉴의 커뮤니티 목록에서 상태를 확인할 수 있어요.`,
+          resourceId: normalizedResourceId,
+          accountSync,
+        };
+      } catch (caught) {
+        if (caught instanceof StudioMarketplaceStaleInstallError || !isCurrent()) {
+          return staleResult(normalizedResourceId);
+        }
+        const syncIssue = caughtMessage(caught);
+        return {
+          status: "success",
+          message: `“${record.name}” · ${installResult.message} 로컬 설치는 유지되지만 계정 설치 확인은 동기화하지 못했어요. 아래 재시도로 계정 기록만 다시 맞출 수 있습니다.`,
+          resourceId: normalizedResourceId,
+          accountSync: {
+            status: "retry-required",
+            message: syncIssue,
+          },
+        };
+      }
     }
 
     return {

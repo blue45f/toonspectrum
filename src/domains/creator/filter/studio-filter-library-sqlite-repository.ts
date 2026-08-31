@@ -86,6 +86,10 @@ export interface ProductFilterLibraryRepository {
   readonly compareAndRestoreInstallSnapshot?: (
     entries: readonly StudioFilterLibraryInstallCompareAndRestoreEntry[],
   ) => Promise<StudioSqlCompareAndRestoreResult>;
+  /** Migration CAS seam: inserts only rows that are still absent, never overwriting newer edits. */
+  readonly insertMissingInstallSnapshot?: (
+    presets: readonly StudioFilterLibraryPreset[],
+  ) => Promise<number>;
 }
 
 export interface StudioFilterLibraryInstallCompareAndRestoreEntry {
@@ -807,6 +811,10 @@ export async function openProductFilterLibraryRepository(
         expected: studioFilterPresetToSqlRecord(entry.expected),
         restore: entry.restore === null ? null : studioFilterPresetToSqlRecord(entry.restore),
       }))),
+    insertMissingInstallSnapshot: (presets) =>
+      sql.insertMissingFilterLibraryRecords(
+        presets.map(studioFilterPresetToSqlRecord),
+      ),
   };
 }
 

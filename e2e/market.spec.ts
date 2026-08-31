@@ -4,6 +4,11 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "../lib/creator-marketplace-resource-contract";
 
+import type {
+  CreatorMarketplaceResourceKind,
+  CreatorMarketplaceResourceRecord,
+} from "../lib/creator-marketplace-resource-contract";
+
 /**
  * 창작 마켓 E2E 테스트 — 공개 라우트, 인터랙티브 프리뷰(브러시, 팔레트, 필터, 템플릿, 3D), 스튜디오 딥링크 연동을 철저히 검증한다.
  */
@@ -16,6 +21,107 @@ const KIND_HREFS = [
   "/market/browse?kind=3d-preset",
   "/market/browse?kind=asset",
 ];
+
+function mockBuiltinResource(input: {
+  readonly id: string;
+  readonly kind: Extract<CreatorMarketplaceResourceKind, "asset" | "template" | "3d-preset">;
+  readonly packageId: string;
+  readonly name: string;
+  readonly description: string;
+  readonly entries: readonly { readonly name: string; readonly runtimeRef: string }[];
+}): CreatorMarketplaceResourceRecord {
+  return {
+    schemaVersion: 1,
+    id: input.id,
+    packageId: input.packageId,
+    name: input.name,
+    description: input.description,
+    tags: [input.kind, "e2e"],
+    kind: input.kind,
+    resourceVersion: "1.2.0",
+    minimumStudioVersion: "1.0.0",
+    license: "cc0-1.0",
+    attributionText: "",
+    containsAi: false,
+    provenance: { origin: "original", authoredByPublisher: true },
+    compatibility: {
+      engines: input.kind === "3d-preset" ? ["webgl2", "three"] : ["canvas2d"],
+    },
+    entries: input.entries.map((entry, index) => ({
+      id: `${input.kind}/e2e-${index + 1}`,
+      kind: input.kind,
+      name: entry.name,
+      delivery: {
+        mode: "builtin-ref",
+        runtimeRef: entry.runtimeRef,
+        byteSize: 0,
+        sha256: String(index + 1).repeat(64),
+      },
+    })),
+    manifestHash: "f".repeat(64),
+    manifestByteSize: 768,
+    publisher: {
+      id: "123e4567-e89b-42d3-a456-426614174299",
+      name: "E2E 검증 작가",
+      avatar: null,
+    },
+    createdAt: "2026-08-25T00:00:00.000Z",
+    updatedAt: "2026-08-30T00:00:00.000Z",
+    isOwner: false,
+    access: "free",
+  };
+}
+
+async function routeMarketDetail(
+  page: import("@playwright/test").Page,
+  record: CreatorMarketplaceResourceRecord,
+): Promise<void> {
+  await page.route(
+    /\/api\/creator\/marketplace\/resources(?:\?.*)?$/u,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [], limit: 5, hasMore: false, nextCursor: null }),
+    }),
+  );
+  await page.route(
+    new RegExp(`/creator/marketplace/resources/history/${record.id}(?:\\?.*)?$`),
+    (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        packageId: record.packageId,
+        anchor: {
+          id: record.id,
+          resourceVersion: record.resourceVersion,
+          listed: true,
+        },
+        items: [{
+          id: record.id,
+          releaseOrdinal: 2,
+          name: record.name,
+          resourceVersion: record.resourceVersion,
+          minimumStudioVersion: record.minimumStudioVersion,
+          releaseNotes: "E2E 공개 릴리스 노트",
+          manifestHash: record.manifestHash,
+          createdAt: record.createdAt,
+          selected: true,
+        }],
+        limit: 8,
+        hasMore: false,
+        nextCursor: null,
+      }),
+    }),
+  );
+  await page.route(
+    new RegExp(`/creator/marketplace/resources/${record.id}(?:\\?.*)?$`),
+    (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(record),
+    }),
+  );
+}
 
 test("마켓 홈은 카테고리 6종과 CTA를 렌더링한다", async ({ page }) => {
   await page.goto("/market");
@@ -70,7 +176,12 @@ test("배급자·검색·종류·라이선스 조건을 API에 전달하고 한 
   );
   await expect(page.getByRole("heading", { name: "마켓 탐색" })).toBeVisible();
   await expect(page.getByLabel("마켓 리소스 검색")).toHaveValue("잉크");
-  const publisherFilter = page.getByRole("button", { name: "배급자 필터 제거" });
+  await expect(page.getByRole("combobox", { name: "정렬 기준" })).toHaveValue(
+    "relevance",
+  );
+  const publisherFilter = page.getByRole("button", {
+    name: "배급자: 선택한 배급자 필터 제거",
+  });
   await expect(publisherFilter).toContainText("선택한 배급자");
   await expect(publisherFilter).not.toContainText(publisherId);
   await expect(
@@ -85,18 +196,26 @@ test("배급자·검색·종류·라이선스 조건을 API에 전달하고 한 
   expect(filteredRequest.searchParams.get("tag")).toBe("lineart");
   expect(filteredRequest.searchParams.get("kind")).toBe("brush");
   expect(filteredRequest.searchParams.get("license")).toBe("cc0-1.0");
+  expect(filteredRequest.searchParams.get("sort")).toBe("relevance");
+
+  const requestCountBeforeSort = observedRequests.length;
+  await page.getByRole("combobox", { name: "정렬 기준" }).selectOption("newest");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("newest");
+  await expect.poll(() => observedRequests.length).toBeGreaterThan(requestCountBeforeSort);
+  expect(observedRequests.at(-1)?.searchParams.get("sort")).toBe("newest");
 
   const requestCountBeforeReset = observedRequests.length;
   await page.getByRole("button", { name: "조건 초기화", exact: true }).click();
   await expect(page).toHaveURL(/\/market\/browse$/u);
   await expect(page.getByLabel("마켓 리소스 검색")).toHaveValue("");
-  await expect(page.getByRole("button", { name: "배급자 필터 제거" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /배급자: .* 필터 제거/u })).toHaveCount(0);
   await expect.poll(() => observedRequests.length).toBeGreaterThan(requestCountBeforeReset);
 
   const resetRequest = observedRequests.at(-1)!;
   for (const parameter of ["publisher", "search", "tag", "kind", "license"]) {
     expect(resetRequest.searchParams.has(parameter)).toBe(false);
   }
+  expect(resetRequest.searchParams.get("sort")).toBe("newest");
 });
 
 test("마켓 홈에서 선택한 종류 조건은 브라우저 뒤로·앞으로 이동 후 복원된다", async ({ page }) => {
@@ -357,6 +476,96 @@ test("리소스 상세 페이지에서 필터 전후 슬라이더를 렌더링�
   await expect(page.getByRole("group", { name: "필터 적용 예시와 원본 일러스트 비교" })).toBeVisible();
   await expect(page.getByText("실제 Studio 렌더가 아닌", { exact: false })).toBeVisible();
   await expect(page.getByLabel("필터 전후 비교 슬라이더")).toBeVisible();
+});
+
+test("에셋 상세는 비어 있는 표지 대신 실제 Studio 적용 정보를 공개한다", async ({ page }) => {
+  const record = mockBuiltinResource({
+    id: "623e4567-e89b-42d3-a456-426614174001",
+    kind: "asset",
+    packageId: "e2e/asset/cafe-tray-set",
+    name: "카페 트레이 소품 세트",
+    description: "Studio 내장 에셋 적용 경계를 검증합니다.",
+    entries: [{ name: "카페 트레이", runtimeRef: "studio-asset:cafe-tray-set" }],
+  });
+  await routeMarketDetail(page, record);
+
+  await page.goto(`/market/resource/${record.id}`);
+
+  await expect(page.getByRole("heading", { name: record.name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "에셋 적용 정보 · 카페 트레이" })).toBeVisible();
+  await expect(page.getByText("studio-asset:cafe-tray-set")).toBeVisible();
+  await expect(page.getByRole("link", { name: "스튜디오 캔버스에 에셋 삽입" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "버전 및 릴리스 노트" })).toBeVisible();
+  await expect(page.getByText("E2E 공개 릴리스 노트")).toBeVisible();
+  await expect(page.getByRole("link", { name: `v${record.resourceVersion}` })).toHaveAttribute(
+    "href",
+    `/market/resource/${record.id}`,
+  );
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    new RegExp(`/market/resource/${record.id}$`),
+  );
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", new RegExp(record.name));
+});
+
+test("다중 템플릿 상세는 키보드 탭 이동으로 모든 패키지 항목을 미리본다", async ({ page }) => {
+  const record = mockBuiltinResource({
+    id: "623e4567-e89b-42d3-a456-426614174002",
+    kind: "template",
+    packageId: "e2e/template/story-layouts",
+    name: "스토리 레이아웃 묶음",
+    description: "여러 장면 템플릿을 빠짐없이 검증합니다.",
+    entries: [
+      { name: "세로 스크롤", runtimeRef: "studio-scene-template:vertical-story" },
+      { name: "두 번째 4컷", runtimeRef: "studio-scene-template:4cut-story" },
+    ],
+  });
+  await routeMarketDetail(page, record);
+
+  await page.goto(`/market/resource/${record.id}`);
+
+  const tabs = page.getByRole("tablist", { name: "미리볼 패키지 항목" });
+  const firstTab = tabs.getByRole("tab", { name: "세로 스크롤" });
+  const secondTab = tabs.getByRole("tab", { name: "두 번째 4컷" });
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
+  await firstTab.focus();
+  await firstTab.press("ArrowRight");
+  await expect(secondTab).toBeFocused();
+  await expect(secondTab).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { name: "템플릿 참고 레이아웃 (두 번째 4컷)" }),
+  ).toBeVisible();
+  await expect(page.getByText("ID: studio-scene-template:4cut-story")).toBeVisible();
+});
+
+test("모바일 3D 상세는 긴 recipe와 package ID에서도 수평 오버플로가 없다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const longSegment = "procedural-city-block-with-lighting-and-camera-".repeat(2);
+  const record = mockBuiltinResource({
+    id: "623e4567-e89b-42d3-a456-426614174003",
+    kind: "3d-preset",
+    packageId: `e2e/3d/${longSegment}`,
+    name: "절차형 도시 블록",
+    description: "긴 식별자의 모바일 상세 레이아웃을 검증합니다.",
+    entries: [{
+      name: "도시 블록과 카메라",
+      runtimeRef: `studio-bg3d-preset:${longSegment}`,
+    }],
+  });
+  await routeMarketDetail(page, record);
+
+  await page.goto(`/market/resource/${record.id}`);
+
+  await expect(
+    page.getByRole("heading", { name: "3D 프리셋 참고 일러스트 (도시 블록과 카메라)" }),
+  ).toBeVisible();
+  await expect(page.getByText(`레시피: studio-bg3d-preset:${longSegment}`)).toBeVisible();
+  const overflow = await page.evaluate(() => ({
+    body: document.body.scrollWidth - window.innerWidth,
+    document: document.documentElement.scrollWidth - window.innerWidth,
+  }));
+  expect(overflow.body).toBeLessThanOrEqual(0);
+  expect(overflow.document).toBeLessThanOrEqual(0);
 });
 
 test("스튜디오 마켓 딥링크 진입 시 커뮤니티 탭이 활성화된다", async ({ page }) => {

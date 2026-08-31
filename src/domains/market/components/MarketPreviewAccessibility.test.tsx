@@ -114,9 +114,10 @@ describe("market interactive preview accessibility", () => {
   });
 
   it("labels scene and template visuals as illustrations without unsupported apply claims", () => {
+    const longRecipeId = `background/${"mobile-overflow-segment-".repeat(8)}`;
     render(
       <>
-        <MarketScene3dPreview recipe={{ name: "작업실", recipeId: "room/studio" }} />
+        <MarketScene3dPreview recipe={{ name: "작업실", recipeId: longRecipeId }} />
         <MarketTemplatePreview template={{ name: "세로 흐름", templateId: "webtoon-scroll" }} />
       </>,
     );
@@ -125,6 +126,9 @@ describe("market interactive preview accessibility", () => {
     expect(screen.getByText(/실제 Studio 렌더 결과가 아닙니다/u)).toBeTruthy();
     expect(screen.getByRole("region", { name: "템플릿 참고 레이아웃 (세로 흐름)" })).toBeTruthy();
     expect(screen.getByText(/실제 Studio 적용 결과와 다를 수 있습니다/u)).toBeTruthy();
+    const recipeBadge = screen.getByText((content) => content.includes(longRecipeId));
+    expect(recipeBadge.className).toContain("max-w-full");
+    expect(recipeBadge.className).toContain("break-all");
     expect(document.body.textContent).not.toContain("실시간 렌더링 및 카메라 회전");
     expect(document.body.textContent).not.toContain("1클릭으로 해당 컷 가이드와 여백을 자동 설정");
   });

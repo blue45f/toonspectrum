@@ -42,8 +42,16 @@ const EXPECTED_SPECIAL_CAPABILITIES = Object.freeze([
   "commentActivityReanchorReady",
   "commentMutationMessageNullable",
   "commentMutationReanchorReady",
+  "marketplaceCloudLibraryAclReady",
+  "marketplaceCloudLibraryTriggerReady",
+  "marketplacePackageModerationAclReady",
+  "marketplacePackageModerationTriggerReady",
   "marketplacePublishGateAclReady",
+  "marketplaceReportAclReady",
+  "marketplaceReportGateAclReady",
   "marketplaceResourceAclReady",
+  "marketplaceResourceLifecycleTriggerReady",
+  "marketplaceResourceTimestampPrecisionReady",
   "marketplaceSearchGenerated",
   "marketplaceSearchIndexReady",
   "marketplaceTagIndexReady",
@@ -415,6 +423,232 @@ BEGIN
       'runtime role lacks the exact creator marketplace privileges';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('createdAt', 'timestamp(3) with time zone'),
+      ('updatedAt', 'timestamp(3) with time zone')
+    ) AS expected_timestamp("name", "type")
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_attribute AS timestamp_attribute
+      WHERE timestamp_attribute.attrelid =
+        to_regclass('public.creator_marketplace_resource')
+        AND timestamp_attribute.attname = expected_timestamp."name"
+        AND pg_catalog.format_type(
+          timestamp_attribute.atttypid,
+          timestamp_attribute.atttypmod
+        ) = expected_timestamp."type"
+        AND timestamp_attribute.attnum > 0
+        AND NOT timestamp_attribute.attisdropped
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'creator marketplace resource timestamp precision capability is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS lifecycle_trigger
+    JOIN pg_catalog.pg_proc AS lifecycle_function
+      ON lifecycle_function.oid = lifecycle_trigger.tgfoid
+    WHERE lifecycle_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_resource')
+      AND lifecycle_trigger.tgname =
+        'creator_marketplace_resource_lifecycle_update'
+      AND NOT lifecycle_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+        LIKE '%creator_marketplace_resource_relist_non_head%'
+      AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+        LIKE '%creator_marketplace_resource_delist_non_head%'
+      AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+        LIKE '%creator_marketplace_resource_hidden_legacy%'
+      AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+        LIKE '%creator_marketplace_resource_lifecycle_timestamp_required%'
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS release_trigger
+    JOIN pg_catalog.pg_proc AS release_function
+      ON release_function.oid = release_trigger.tgfoid
+    WHERE release_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_resource')
+      AND release_trigger.tgname =
+        'creator_marketplace_resource_immutable_release'
+      AND NOT release_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(release_function.oid)
+        LIKE '%creator_marketplace_package_moderated%'
+  ) THEN
+    RAISE EXCEPTION
+      'creator marketplace lifecycle trigger capability is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS insert_trigger
+    JOIN pg_catalog.pg_proc AS insert_function
+      ON insert_function.oid = insert_trigger.tgfoid
+    WHERE insert_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_library_item')
+      AND insert_trigger.tgname = 'creator_marketplace_library_insert_guard'
+      AND NOT insert_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(insert_function.oid)
+        LIKE '%creator_marketplace_package_moderation%'
+      AND pg_catalog.pg_get_functiondef(insert_function.oid)
+        LIKE '%creator_marketplace_library_package_available%'
+      AND pg_catalog.pg_get_functiondef(insert_function.oid)
+        LIKE '%publisher_status%'
+      AND pg_catalog.pg_get_functiondef(insert_function.oid)
+        LIKE '%release."delistedAt" IS NULL%'
+      AND pg_catalog.pg_get_functiondef(insert_function.oid)
+        NOT LIKE '%release."hidden"%'
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS package_update_trigger
+    JOIN pg_catalog.pg_proc AS package_update_function
+      ON package_update_function.oid = package_update_trigger.tgfoid
+    WHERE package_update_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_library_item')
+      AND package_update_trigger.tgname =
+        'creator_marketplace_library_000_package_update_guard'
+      AND NOT package_update_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+        LIKE '%creator_marketplace_library_package_moderated%'
+      AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+        LIKE '%creator_marketplace_library_package_available%'
+      AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+        LIKE '%exact_release_listed%'
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS monotonic_trigger
+    WHERE monotonic_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_library_item')
+      AND monotonic_trigger.tgname = 'creator_marketplace_library_update_guard'
+      AND NOT monotonic_trigger.tgisinternal
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS cleanup_trigger
+    JOIN pg_catalog.pg_proc AS cleanup_function
+      ON cleanup_function.oid = cleanup_trigger.tgfoid
+    WHERE cleanup_trigger.tgrelid = to_regclass('public."user"')
+      AND cleanup_trigger.tgname =
+        'creator_marketplace_library_soft_delete_cleanup'
+      AND NOT cleanup_trigger.tgisinternal
+      AND cleanup_function.prosecdef
+      AND cleanup_function.proconfig @>
+        ARRAY['search_path=pg_catalog, public']::text[]
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS kind_trigger
+    JOIN pg_catalog.pg_proc AS kind_function
+      ON kind_function.oid = kind_trigger.tgfoid
+    WHERE kind_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_resource')
+      AND kind_trigger.tgname =
+        'creator_marketplace_resource_package_kind_continuity'
+      AND NOT kind_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(kind_function.oid)
+        LIKE '%pg_advisory_xact_lock%'
+  ) THEN
+    RAISE EXCEPTION
+      'creator marketplace cloud-library trigger capability is missing';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('creator_marketplace_package_moderation_decision_insert_guard'),
+      ('creator_marketplace_package_moderation_decision_update_guard'),
+      ('creator_marketplace_package_moderation_state_guard'),
+      ('creator_marketplace_package_decision_coupling_from_decision'),
+      ('creator_marketplace_package_decision_coupling_from_state'),
+      ('creator_marketplace_resource_report_package_insert_guard')
+    ) AS expected_trigger("name")
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_trigger AS actual_trigger
+      WHERE actual_trigger.tgname = expected_trigger."name"
+        AND NOT actual_trigger.tgisinternal
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'creator marketplace package-moderation trigger capability is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_attribute AS report_epoch_attribute
+    WHERE report_epoch_attribute.attrelid =
+      to_regclass('public.creator_marketplace_resource_report')
+      AND report_epoch_attribute.attname = 'packageReportEpoch'
+      AND pg_catalog.format_type(
+        report_epoch_attribute.atttypid,
+        report_epoch_attribute.atttypmod
+      ) = 'integer'
+      AND report_epoch_attribute.attnum > 0
+      AND NOT report_epoch_attribute.attisdropped
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_class AS report_epoch_index
+    JOIN pg_catalog.pg_index AS report_epoch_index_definition
+      ON report_epoch_index_definition.indexrelid = report_epoch_index.oid
+    WHERE report_epoch_index.relname = pg_catalog.left(
+      'creator_marketplace_resource_report_package_epoch_reporter_v3_unique',
+      pg_catalog.current_setting('max_identifier_length')::integer
+    )
+      AND report_epoch_index.relkind = 'i'
+      AND report_epoch_index_definition.indrelid =
+        to_regclass('public.creator_marketplace_resource_report')
+      AND report_epoch_index_definition.indisunique
+      AND report_epoch_index_definition.indisvalid
+      AND report_epoch_index_definition.indisready
+      AND report_epoch_index_definition.indnkeyatts = 5
+      AND report_epoch_index_definition.indnatts = 5
+      AND report_epoch_index_definition.indexprs IS NULL
+      AND ARRAY(
+        SELECT indexed_attribute.attname::text
+        FROM unnest(report_epoch_index_definition.indkey)
+          WITH ORDINALITY AS indexed_key("attnum", "ordinal")
+        JOIN pg_catalog.pg_attribute AS indexed_attribute
+          ON indexed_attribute.attrelid = report_epoch_index_definition.indrelid
+         AND indexed_attribute.attnum = indexed_key."attnum"
+        WHERE indexed_key."ordinal" <=
+          report_epoch_index_definition.indnkeyatts
+        ORDER BY indexed_key."ordinal"
+      ) = ARRAY[
+        'packagePublisherIdSnapshot',
+        'packageIdSnapshot',
+        'packageModerationRevision',
+        'packageReportEpoch',
+        'reporterKeyHash'
+      ]::text[]
+      AND pg_catalog.pg_get_expr(
+        report_epoch_index_definition.indpred,
+        report_epoch_index_definition.indrelid,
+        true
+      ) = '(evidence ->> ''schemaVersion''::text) = ''3''::text'
+  ) OR NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger AS report_insert_trigger
+    JOIN pg_catalog.pg_proc AS report_insert_function
+      ON report_insert_function.oid = report_insert_trigger.tgfoid
+    WHERE report_insert_trigger.tgrelid =
+      to_regclass('public.creator_marketplace_resource_report')
+      AND report_insert_trigger.tgname =
+        'creator_marketplace_resource_report_package_insert_guard'
+      AND NOT report_insert_trigger.tgisinternal
+      AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+        LIKE '%package_report_epoch%'
+      AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+        LIKE '%"packageReportEpoch"%'
+      AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+        LIKE '%"releaseOrdinal"%'
+      AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+        LIKE '%schemaVersion%3%'
+  ) THEN
+    RAISE EXCEPTION
+      'creator marketplace report epoch capability is missing';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM pg_catalog.pg_attribute AS attribute
@@ -468,7 +702,7 @@ BEGIN
         index_state.indpred,
         index_state.indrelid,
         true
-      ) = 'hidden = false'
+      ) = '"delistedAt" IS NULL'
       AND EXISTS (
         SELECT 1
         FROM pg_catalog.pg_depend AS extension_dependency
@@ -528,7 +762,7 @@ BEGIN
         index_state.indpred,
         index_state.indrelid,
         true
-      ) = 'hidden = false'
+      ) = '"delistedAt" IS NULL'
   ) THEN
     RAISE EXCEPTION 'marketplace JSONB tag index capability is missing';
   END IF;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   brushPreviewData,
   filterPreviewData,
+  palettePreviewData,
   palettePreviewColors,
   recipePreviewData,
   templatePreviewData,
@@ -70,6 +71,54 @@ describe("market-preview", () => {
   it("returns null for non-palette in palettePreviewColors", () => {
     const record = makeBaseRecord({ kind: "brush" });
     expect(palettePreviewColors(record)).toBeNull();
+  });
+
+  it("preserves every valid palette entry for package-level preview selection", () => {
+    const record = makeBaseRecord({
+      kind: "palette",
+      entries: [
+        {
+          id: "palette-day",
+          name: "낮 장면",
+          kind: "palette",
+          delivery: {
+            mode: "portable-json",
+            mediaType: "application/vnd.toonspectrum.palette+json",
+            payload: {
+              schemaVersion: 1,
+              resourceKind: "palette",
+              runtime: "studio-palette-v1",
+              definition: { colors: ["#112233", "#445566"] },
+            },
+            byteSize: 90,
+            sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          },
+        },
+        {
+          id: "palette-night",
+          name: "밤 장면",
+          kind: "palette",
+          delivery: {
+            mode: "portable-json",
+            mediaType: "application/vnd.toonspectrum.palette+json",
+            payload: {
+              schemaVersion: 1,
+              resourceKind: "palette",
+              runtime: "studio-palette-v1",
+              definition: { colors: ["#0f172a", "#334155"] },
+            },
+            byteSize: 90,
+            sha256: "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          },
+        },
+      ],
+    });
+
+    expect(palettePreviewData(record)).toEqual([
+      { name: "낮 장면", colors: ["#112233", "#445566"] },
+      { name: "밤 장면", colors: ["#0f172a", "#334155"] },
+    ]);
+    expect(palettePreviewColors(record)).toEqual(["#112233", "#445566"]);
   });
 
   it("returns null when palette colors are missing or not lowercase #rrggbb", () => {
@@ -244,6 +293,7 @@ describe("market-preview", () => {
     const _recipe = makeBaseRecord({ kind: "3d-preset" });
 
     expect(palettePreviewColors(brush)).toBeNull();
+    expect(palettePreviewData(brush)).toBeNull();
     expect(brushPreviewData(palette)).toBeNull();
     expect(filterPreviewData(brush)).toBeNull();
     expect(templatePreviewData(filter)).toBeNull();

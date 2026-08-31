@@ -52,6 +52,27 @@ describe("toonstudio.cloud production domain", () => {
     }
   });
 
+  it("routes creator-market resource detail crawlers through the metadata handler", () => {
+    const config = JSON.parse(read("vercel.json")) as {
+      rewrites?: Array<{ source?: string; destination?: string }>;
+    };
+
+    expect(config.rewrites).toEqual(expect.arrayContaining([
+      {
+        source: "/market",
+        destination: "/api/og?marketPage=home",
+      },
+      {
+        source: "/market/browse",
+        destination: "/api/og?marketPage=browse",
+      },
+      {
+        source: "/market/resource/:resourceId",
+        destination: "/api/og?marketResourceId=:resourceId",
+      },
+    ]));
+  });
+
   it("keeps full API origins canonical while Render stays a least-privilege realtime host", () => {
     const deployment = read("deploy/oci/.env.example");
     const production = read(".env.production.example");

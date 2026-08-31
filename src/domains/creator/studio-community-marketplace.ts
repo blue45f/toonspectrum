@@ -7,10 +7,14 @@ import {
 } from "./brush/studio-brush-library";
 import {
   STUDIO_MARKETPLACE_PACKAGE_SCHEMA,
+  evaluateStudioMarketplaceCompatibility,
   type StudioMarketplaceLicense,
   type StudioMarketplaceOrigin,
   type StudioMarketplacePackage,
 } from "./studio-marketplace-packages";
+import {
+  STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
+} from "./studio-marketplace-runtime-compatibility";
 import {
   findStudioOriginalFreeAsset,
   type StudioOriginalFreeAsset,
@@ -18,6 +22,7 @@ import {
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
+import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioCreatorPackDefinition,
@@ -31,11 +36,17 @@ import type {
 import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceJsonValue,
+  CreatorMarketplaceResourceEngine,
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceManifest,
   CreatorMarketplaceResourceRecord,
 } from "@/lib/creator-marketplace-resource-contract";
 
+import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+import {
+  isCreatorMarketplaceSemver,
+  normalizeCreatorMarketplaceLegacySemver,
+} from "@/lib/creator-marketplace-semver";
 import {
   createCreatorMarketplacePortableDelivery,
 } from "@/src/infrastructure/creator-marketplace-client";
@@ -120,6 +131,13 @@ export interface StudioCommunityAssetProjection {
   readonly reason: string | null;
 }
 
+export interface StudioCommunityMarketplaceCompatibilityContext {
+  /** Authoritative compatibility version; omit until the Studio build publishes one. */
+  readonly currentStudioVersion?: string | null;
+  /** Trustworthy measured engine snapshot; omit rather than guessing from browser identity. */
+  readonly supportedEngines?: readonly CreatorMarketplaceResourceEngine[] | null;
+}
+
 export type StudioCommunityShareCandidateKind = "brush" | "filter" | "palette";
 
 export interface StudioCommunityShareCandidate {
@@ -131,11 +149,20 @@ export interface StudioCommunityShareCandidate {
 
 export interface StudioCommunityPublishOptions {
   readonly description?: string;
+  readonly releaseNotes?: string;
+  readonly resourceVersion: string;
   readonly license: CreatorMarketplaceResourceLicense;
   readonly attributionText?: string;
   readonly containsAi: boolean;
   readonly creatorOwnsRights: boolean;
   readonly recognizableMarketplaceDerivative: boolean;
+  readonly resolvedIdentity?: StudioCommunityShareCandidateIdentity;
+}
+
+export interface StudioCommunityShareCandidateIdentity {
+  readonly scheme: "legacy" | "v2";
+  readonly packageId: string;
+  readonly entryId: string;
 }
 
 function licenseForRecord(
@@ -178,10 +205,6 @@ function portableDefinition(
     return null;
   }
   return entry.delivery.payload.definition;
-}
-
-function stableCommunityId(record: CreatorMarketplaceResourceRecord): string {
-  return `community:${record.id}`;
 }
 
 function projectEntry(
@@ -260,11 +283,13 @@ function projectEntry(
 function metadataForRecord(
   record: CreatorMarketplaceResourceRecord,
   kind: StudioCreatorPackKind,
+  normalizedResourceVersion: string,
+  normalizedMinimumStudioVersion: string,
 ): StudioMarketplacePackage {
   const format = FORMAT_BY_KIND[kind];
   return Object.freeze({
     schema: STUDIO_MARKETPLACE_PACKAGE_SCHEMA,
-    id: stableCommunityId(record),
+    id: creatorMarketplaceStudioPackId(record),
     name: record.name,
     summary: record.description || `${record.publisher.name}님의 공유 리소스`,
     category: `community-${kind}`,
@@ -278,10 +303,10 @@ function metadataForRecord(
       name: record.publisher.name,
       verified: false,
     }),
-    version: record.resourceVersion,
+    version: normalizedResourceVersion,
     packageFingerprint: record.manifestHash,
     compatibility: Object.freeze({
-      studioVersion: record.minimumStudioVersion,
+      studioVersion: normalizedMinimumStudioVersion,
       renderer: Object.freeze(rendererForRecord(record)),
       devices: Object.freeze(["desktop", "tablet", "mobile"] as const),
       formats: Object.freeze([format]),
@@ -296,7 +321,7 @@ function metadataForRecord(
       tags: Object.freeze([...record.tags]),
     }))),
     changelog: Object.freeze([{
-      version: record.resourceVersion,
+      version: normalizedResourceVersion,
       releasedAt: record.updatedAt,
       changes: Object.freeze(["커뮤니티 공유 버전"]),
     }]),
@@ -314,6 +339,7 @@ function metadataForRecord(
 
 export function projectCreatorMarketplaceRecordToStudioPack(
   record: CreatorMarketplaceResourceRecord,
+  compatibilityContext: StudioCommunityMarketplaceCompatibilityContext = {},
 ): StudioCommunityPackProjection {
   if (!COMMUNITY_INSTALLABLE_KINDS.has(record.kind as StudioCreatorPackKind)) {
     return {
@@ -322,7 +348,47 @@ export function projectCreatorMarketplaceRecordToStudioPack(
       reason: "2D 에셋은 이 카드에서 바로 삽입하며 로컬 팩 설치 대상이 아닙니다.",
     };
   }
+  const normalizedMinimumStudioVersion = normalizeCreatorMarketplaceLegacySemver(
+    record.minimumStudioVersion,
+  );
+  if (!normalizedMinimumStudioVersion) {
+    return {
+      status: "unsupported",
+      pack: null,
+      reason: "이 리소스의 최소 Studio 버전을 안전하게 해석할 수 없습니다.",
+    };
+  }
+  const compatibility = evaluateStudioMarketplaceCompatibility({
+    minimumStudioVersion: normalizedMinimumStudioVersion,
+    currentStudioVersion: compatibilityContext.currentStudioVersion,
+    declaredEngines: record.compatibility.engines,
+    supportedEngines: compatibilityContext.supportedEngines,
+  });
+  const productContextSupplied = "currentStudioVersion" in compatibilityContext
+    || "supportedEngines" in compatibilityContext;
+  if (
+    compatibility.status === "unsupported"
+    || (productContextSupplied && compatibility.status === "unverified")
+  ) {
+    return {
+      status: "unsupported",
+      pack: null,
+      reason: compatibility.reason,
+    };
+  }
+  // An omitted context remains an explicit test/legacy seam. Product callers pass at least one
+  // context field and therefore fail closed above when either authority could not be measured.
   const kind = record.kind as StudioCreatorPackKind;
+  const normalizedResourceVersion = normalizeCreatorMarketplaceLegacySemver(
+    record.resourceVersion,
+  );
+  if (!normalizedResourceVersion) {
+    return {
+      status: "unsupported",
+      pack: null,
+      reason: "이 리소스의 릴리스 버전을 안전하게 해석할 수 없습니다.",
+    };
+  }
   const entries = record.entries.map((entry) => projectEntry(kind, entry));
   if (entries.some((entry) => entry === null)) {
     return {
@@ -332,9 +398,20 @@ export function projectCreatorMarketplaceRecordToStudioPack(
     };
   }
   const pack: StudioCreatorPackDefinition = Object.freeze({
-    metadata: metadataForRecord(record, kind),
+    metadata: metadataForRecord(
+      record,
+      kind,
+      normalizedResourceVersion,
+      normalizedMinimumStudioVersion,
+    ),
     resourceKind: kind,
     entries: Object.freeze(entries as StudioCreatorPackEntry[]),
+    marketplaceSource: Object.freeze({
+      schema: "creator-marketplace-resource-v1",
+      releaseId: record.id,
+      publisherId: record.publisher.id,
+      packageId: record.packageId,
+    }),
     runtimeDescriptor: Object.freeze({
       engines: Object.freeze([...record.compatibility.engines]),
       budget: Object.freeze({
@@ -366,6 +443,7 @@ function originalAssetIdFromEntry(
 
 export function projectCreatorMarketplaceRecordToAssets(
   record: CreatorMarketplaceResourceRecord,
+  compatibilityContext: StudioCommunityMarketplaceCompatibilityContext = {},
 ): StudioCommunityAssetProjection {
   if (record.kind !== "asset") {
     return {
@@ -374,6 +452,35 @@ export function projectCreatorMarketplaceRecordToAssets(
       reason: "2D 에셋 패키지가 아닙니다.",
     };
   }
+  const normalizedMinimumStudioVersion = normalizeCreatorMarketplaceLegacySemver(
+    record.minimumStudioVersion,
+  );
+  if (!normalizedMinimumStudioVersion) {
+    return {
+      assets: [],
+      unsupportedCount: record.entries.length,
+      reason: "이 리소스의 최소 Studio 버전을 안전하게 해석할 수 없습니다.",
+    };
+  }
+  const compatibility = evaluateStudioMarketplaceCompatibility({
+    minimumStudioVersion: normalizedMinimumStudioVersion,
+    currentStudioVersion: compatibilityContext.currentStudioVersion,
+    declaredEngines: record.compatibility.engines,
+    supportedEngines: compatibilityContext.supportedEngines,
+  });
+  const productContextSupplied = "currentStudioVersion" in compatibilityContext
+    || "supportedEngines" in compatibilityContext;
+  if (
+    compatibility.status === "unsupported"
+    || (productContextSupplied && compatibility.status === "unverified")
+  ) {
+    return {
+      assets: [],
+      unsupportedCount: record.entries.length,
+      reason: compatibility.reason,
+    };
+  }
+  // See the pack projection above: product calls never guess a missing runtime authority.
   const assets: StudioOriginalFreeAsset[] = [];
   let unsupportedCount = 0;
   for (const entry of record.entries) {
@@ -487,6 +594,62 @@ function hashText(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
+/** Stable logical package identity for every release published from one local candidate. */
+export function studioCommunityShareCandidateLegacyPackageId(
+  candidate: Pick<StudioCommunityShareCandidate, "id" | "kind">,
+): string {
+  return `community/${candidate.kind}/${hashText(`${candidate.kind}:${candidate.id}`)}`;
+}
+
+export function studioCommunityShareCandidateLegacyIdentity(
+  candidate: Pick<StudioCommunityShareCandidate, "id" | "kind">,
+): StudioCommunityShareCandidateIdentity {
+  const suffix = hashText(`${candidate.kind}:${candidate.id}`);
+  return {
+    scheme: "legacy",
+    packageId: `community/${candidate.kind}/${suffix}`,
+    entryId: `${candidate.kind}/${suffix}`,
+  };
+}
+
+/** Collision-resistant identity used for candidates that have never been published before. */
+export function studioCommunityShareCandidateIdentity(
+  candidate: Pick<StudioCommunityShareCandidate, "id" | "kind">,
+): StudioCommunityShareCandidateIdentity {
+  const digest = sha256HexPortable(
+    new TextEncoder().encode(`${candidate.kind}\0${candidate.id}`),
+  );
+  const suffix = `v2-${digest}`;
+  return {
+    scheme: "v2",
+    packageId: `community/${candidate.kind}/${suffix}`,
+    entryId: `${candidate.kind}/${suffix}`,
+  };
+}
+
+export function studioCommunityShareCandidatePackageId(
+  candidate: Pick<StudioCommunityShareCandidate, "id" | "kind">,
+): string {
+  return studioCommunityShareCandidateIdentity(candidate).packageId;
+}
+
+function resolveStudioCommunityShareCandidateIdentity(
+  candidate: Pick<StudioCommunityShareCandidate, "id" | "kind">,
+  requested: StudioCommunityShareCandidateIdentity | undefined,
+): StudioCommunityShareCandidateIdentity {
+  const v2 = studioCommunityShareCandidateIdentity(candidate);
+  const legacy = studioCommunityShareCandidateLegacyIdentity(candidate);
+  const identity = requested ?? v2;
+  const expected = identity.scheme === "legacy" ? legacy : v2;
+  if (
+    identity.packageId !== expected.packageId
+    || identity.entryId !== expected.entryId
+  ) {
+    throw new Error("게시 후보와 일치하지 않는 package identity입니다.");
+  }
+  return expected;
+}
+
 export async function createStudioCommunityPublishManifest(
   candidate: StudioCommunityShareCandidate,
   options: StudioCommunityPublishOptions,
@@ -502,20 +665,31 @@ export async function createStudioCommunityPublishManifest(
   if (options.recognizableMarketplaceDerivative) {
     throw new Error("다른 마켓 상품의 복제·식별 가능한 변형은 공유할 수 없습니다.");
   }
+  const resourceVersion = options.resourceVersion.trim();
+  if (!isCreatorMarketplaceSemver(resourceVersion)) {
+    throw new Error(
+      "릴리스 버전은 1.2.3 형식의 정확한 SemVer여야 합니다. 숫자 prerelease에는 선행 0을 사용할 수 없습니다.",
+    );
+  }
   const delivery = await createCreatorMarketplacePortableDelivery(
     candidate.kind,
     candidate.definition,
   );
-  const suffix = hashText(`${candidate.kind}:${candidate.id}`);
+  const identity = resolveStudioCommunityShareCandidateIdentity(
+    candidate,
+    options.resolvedIdentity,
+  );
+  const releaseNotes = options.releaseNotes?.trim();
   const attributionText = options.attributionText?.trim() ?? "";
   return {
     schemaVersion: 1,
-    packageId: `community/${candidate.kind}/${suffix}`,
+    packageId: identity.packageId,
     name: candidate.name.slice(0, 80),
     description: (options.description?.trim() ?? "").slice(0, 1_000),
+    ...(releaseNotes ? { releaseNotes } : {}),
     kind: candidate.kind,
-    resourceVersion: "1.0.0",
-    minimumStudioVersion: "1.0.0",
+    resourceVersion,
+    minimumStudioVersion: STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
     tags: [candidate.kind, "community"],
     license: options.license,
     attributionText,
@@ -524,7 +698,7 @@ export async function createStudioCommunityPublishManifest(
     provenance: { origin: "original", authoredByPublisher: true },
     compatibility: { engines: ["canvas2d"] },
     entries: [{
-      id: `${candidate.kind}/${suffix}`,
+      id: identity.entryId,
       kind: candidate.kind,
       name: candidate.name.slice(0, 80),
       delivery,

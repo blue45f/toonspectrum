@@ -31,6 +31,15 @@
   "rewrites": [
     { "source": "/api/cover", "destination": "/api/index" },
     { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
+    { "source": "/market", "destination": "/api/og?marketPage=home" },
+    {
+      "source": "/market/browse",
+      "destination": "/api/og?marketPage=browse"
+    },
+    {
+      "source": "/market/resource/:resourceId",
+      "destination": "/api/og?marketResourceId=:resourceId"
+    },
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

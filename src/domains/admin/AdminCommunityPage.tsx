@@ -5,6 +5,7 @@ import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import { adminFetch, type AdminApiError } from "./components/admin-client";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
+import { CreatorMarketplaceModerationBoard } from "./components/CreatorMarketplaceModerationBoard";
 
 import type { FanCafeScopeFilter } from "@/lib/types";
 import type { SharedAssetModerationQueueItem } from "@/src/infrastructure/creator-client";
@@ -66,6 +67,7 @@ export function AdminCommunityPage() {
       <AdminGateFallback gate={gate} />
       {gate.kind === "admin" && uid && (
         <div className="space-y-10">
+          <CreatorMarketplaceModerationBoard />
           <AssetModerationBoard />
           <ModerationBoard uid={uid} />
         </div>
@@ -320,6 +322,7 @@ function ModerationBoard({ uid }: { uid: string }) {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
+            aria-label={t("admin.community.searchPostPlaceholder")}
             placeholder={t("admin.community.searchPostPlaceholder")}
             className="h-7 w-56 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
           />

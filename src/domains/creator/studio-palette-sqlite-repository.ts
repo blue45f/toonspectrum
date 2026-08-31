@@ -16,7 +16,11 @@ import type { StudioNamedPalette } from "./studio-palette-library";
 export const STUDIO_PALETTE_SQLITE_NAMESPACE = "studio-named-palettes-v12";
 export const STUDIO_PALETTE_SQLITE_KEY = "library-v1";
 
-export type StudioPaletteSqliteRepositoryErrorCode = "invalid" | "limit" | "unavailable";
+export type StudioPaletteSqliteRepositoryErrorCode =
+  | "invalid"
+  | "limit"
+  | "conflict"
+  | "unavailable";
 
 export class StudioPaletteSqliteRepositoryError extends Error {
   readonly code: StudioPaletteSqliteRepositoryErrorCode;
@@ -58,6 +62,14 @@ export interface StudioPaletteSqliteBatchInput {
    * every write and restores the exact prior values before releasing the queue on failure.
    */
   readonly sidecars?: readonly StudioPaletteSqliteSidecarMutation[];
+  /** Exact precondition checked inside the repository mutation queue before any write. */
+  readonly expected?: {
+    readonly items?: readonly {
+      readonly id: string;
+      readonly value: StudioNamedPalette | null;
+    }[];
+    readonly sidecars?: readonly StudioPaletteSqliteSidecarMutation[];
+  };
   /** Live lifecycle/operation checkpoint evaluated after queued reads and around each write. */
   readonly assertCurrent?: () => void;
 }
@@ -100,11 +112,18 @@ function assertBatchInput(input: StudioPaletteSqliteBatchInput): void {
   const upsertIds = input.upsert?.map((palette) => palette.id) ?? [];
   const deleteIds = input.deleteIds ?? [];
   const sidecarKeys = input.sidecars?.map(({ namespace, key }) => `${namespace}\u0000${key}`) ?? [];
+  const expectedItemIds = input.expected?.items?.map(({ id }) => id) ?? [];
+  const expectedSidecarKeys = input.expected?.sidecars
+    ?.map(({ namespace, key }) => `${namespace}\u0000${key}`) ?? [];
   if (
     new Set(upsertIds).size !== upsertIds.length
     || new Set(deleteIds).size !== deleteIds.length
     || new Set(sidecarKeys).size !== sidecarKeys.length
+    || new Set(expectedItemIds).size !== expectedItemIds.length
+    || new Set(expectedSidecarKeys).size !== expectedSidecarKeys.length
     || upsertIds.some((id) => deleteIds.includes(id))
+    || input.expected?.items?.some(({ id, value }) =>
+      id.length === 0 || (value !== null && value.id !== id))
     || input.sidecars?.some(({ namespace, key }) =>
       namespace.length === 0
       || key.length === 0
@@ -118,6 +137,19 @@ function assertBatchInput(input: StudioPaletteSqliteBatchInput): void {
       "팔레트 SQLite batch에 중복되거나 충돌하는 항목이 있습니다.",
     );
   }
+}
+
+function samePalette(
+  left: StudioNamedPalette | null,
+  right: StudioNamedPalette | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return left.id === right.id
+    && left.name === right.name
+    && left.createdAt === right.createdAt
+    && left.updatedAt === right.updatedAt
+    && left.colors.length === right.colors.length
+    && left.colors.every((color, index) => color === right.colors[index]);
 }
 
 export function createStudioPaletteSqliteRepository(
@@ -222,11 +254,34 @@ export function createStudioPaletteSqliteRepository(
             ? []
             : parseCanonicalStudioPaletteLibrary(previousLibraryRaw);
           const sidecars = input.sidecars ?? [];
-          const previousSidecars = await Promise.all(sidecars.map(async ({ namespace, key }) => ({
+          const sidecarsToRead = new Map<string, { namespace: string; key: string }>();
+          for (const { namespace, key } of [
+            ...sidecars,
+            ...(input.expected?.sidecars ?? []),
+          ]) {
+            sidecarsToRead.set(`${namespace}\u0000${key}`, { namespace, key });
+          }
+          const previousSidecars = await Promise.all([...sidecarsToRead.values()].map(async ({ namespace, key }) => ({
             namespace,
             key,
             raw: await database.kvGet(namespace, key),
           })));
+          const previousById = new Map(previousItems.map((palette) => [palette.id, palette]));
+          const previousSidecarByKey = new Map(previousSidecars.map((sidecar) => [
+            `${sidecar.namespace}\u0000${sidecar.key}`,
+            sidecar.raw,
+          ]));
+          if (
+            input.expected?.items?.some(({ id, value }) =>
+              !samePalette(previousById.get(id) ?? null, value))
+            || input.expected?.sidecars?.some(({ namespace, key, value }) =>
+              previousSidecarByKey.get(`${namespace}\u0000${key}`) !== value)
+          ) {
+            throw new StudioPaletteSqliteRepositoryError(
+              "conflict",
+              "팔레트 SQLite batch의 예상 이전 상태가 현재 값과 일치하지 않습니다.",
+            );
+          }
           const deleteIds = new Set(input.deleteIds ?? []);
           let next = previousItems.filter((palette) => !deleteIds.has(palette.id));
           for (const palette of [...(input.upsert ?? [])].reverse()) {
