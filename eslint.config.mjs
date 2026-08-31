@@ -22,6 +22,9 @@ export default defineConfig(
     // 커밋되진 않지만, eslint 기본 스캔은 gitignore 를 안 따라가므로 이 안에 있는 이 저장소의
     // 사본까지 전부 다시 스캔해버린다 — vitest.config.ts 의 동일 제외와 같은 이유).
     '**/.claude/worktrees/**',
+    '**/.codex/**',
+    '**/.remember/**',
+    '**/scratch/**',
   ]),
 
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).
