@@ -90,7 +90,15 @@ export interface StudioBg3dTemplateInstanceSummary {
   readonly sourceAvailable: boolean;
 }
 
-const TEMPLATE_DELETE_ALL_CONFIRM_ID = "__all__";
+type StudioBg3dTemplatePendingDelete =
+  | { readonly kind: "instance"; readonly id: string }
+  | { readonly kind: "all"; readonly membershipSignature: string };
+
+function templateInstanceMembershipSignature(
+  instances: readonly StudioBg3dTemplateInstanceSummary[],
+): string {
+  return JSON.stringify(instances.map((instance) => instance.id).sort());
+}
 
 export function StudioBg3dSceneTemplatePanel({
   templates,
@@ -112,7 +120,9 @@ export function StudioBg3dSceneTemplatePanel({
   onDeleteAllTemplateInstances,
 }: StudioBg3dSceneTemplatePanelProps) {
   const visibleTemplates = templates.filter((t) => activeCategory === null || t.category === activeCategory);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<StudioBg3dTemplatePendingDelete | null>(null);
+  const templateMembershipSignature = templateInstanceMembershipSignature(templateInstances);
   const organizationDisabled = organizationDisabledReason !== null;
   const allArrangeAvailable = templateInstances.length > 0 &&
     templateInstances.every((instance) => instance.lockedNodeCount === 0);
@@ -121,19 +131,22 @@ export function StudioBg3dSceneTemplatePanel({
 
   useEffect(() => {
     if (
-      pendingDeleteId !== null &&
-      pendingDeleteId !== TEMPLATE_DELETE_ALL_CONFIRM_ID &&
-      !templateInstances.some((instance) => instance.id === pendingDeleteId)
+      pendingDelete !== null &&
+      (
+        pendingDelete.kind === "all"
+          ? pendingDelete.membershipSignature !== templateMembershipSignature
+          : !templateInstances.some((instance) => instance.id === pendingDelete.id)
+      )
     ) {
-      setPendingDeleteId(null);
+      setPendingDelete(null);
     }
-  }, [pendingDeleteId, templateInstances]);
+  }, [pendingDelete, templateInstances, templateMembershipSignature]);
 
   const runInstanceAction = (
     action: (instanceId: string) => void,
     instanceId: string,
   ) => {
-    setPendingDeleteId(null);
+    setPendingDelete(null);
     action(instanceId);
   };
 
@@ -226,7 +239,7 @@ export function StudioBg3dSceneTemplatePanel({
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                 disabled={organizationDisabled}
-                onClick={() => { setPendingDeleteId(null); onSelectAllTemplateInstances(); }}
+                onClick={() => { setPendingDelete(null); onSelectAllTemplateInstances(); }}
               >
                 <Layers size={13} aria-hidden />
                 전체 선택
@@ -236,7 +249,7 @@ export function StudioBg3dSceneTemplatePanel({
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                 disabled={organizationDisabled || !allArrangeAvailable}
                 title={!allArrangeAvailable ? "잠긴 템플릿 객체의 잠금을 먼저 해제해 주세요." : undefined}
-                onClick={() => { setPendingDeleteId(null); onArrangeAllTemplateInstances(); }}
+                onClick={() => { setPendingDelete(null); onArrangeAllTemplateInstances(); }}
               >
                 <Move size={13} aria-hidden />
                 바닥 · 간격 정돈
@@ -246,7 +259,7 @@ export function StudioBg3dSceneTemplatePanel({
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                 disabled={organizationDisabled || !allResetAvailable}
                 title={!allResetAvailable ? "원본을 찾을 수 없거나 잠긴 템플릿이 있습니다." : undefined}
-                onClick={() => { setPendingDeleteId(null); onResetAllTemplateInstances(); }}
+                onClick={() => { setPendingDelete(null); onResetAllTemplateInstances(); }}
               >
                 <RotateCcw size={13} aria-hidden />
                 전체 원래 배치
@@ -255,28 +268,39 @@ export function StudioBg3dSceneTemplatePanel({
                 type="button"
                 className={cx(
                   "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-2 text-[0.66rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9",
-                  pendingDeleteId === TEMPLATE_DELETE_ALL_CONFIRM_ID
+                  pendingDelete?.kind === "all"
+                    && pendingDelete.membershipSignature === templateMembershipSignature
                     ? "border-danger/60 bg-danger/10 text-danger"
                     : "border-line bg-card text-fg-2 hover:border-danger/50 hover:text-danger",
                 )}
                 disabled={organizationDisabled}
                 onClick={() => {
-                  if (pendingDeleteId === TEMPLATE_DELETE_ALL_CONFIRM_ID) {
-                    setPendingDeleteId(null);
+                  if (
+                    pendingDelete?.kind === "all"
+                    && pendingDelete.membershipSignature === templateMembershipSignature
+                  ) {
+                    setPendingDelete(null);
                     onDeleteAllTemplateInstances();
                     return;
                   }
-                  setPendingDeleteId(TEMPLATE_DELETE_ALL_CONFIRM_ID);
+                  setPendingDelete({
+                    kind: "all",
+                    membershipSignature: templateMembershipSignature,
+                  });
                 }}
               >
                 <Trash2 size={13} aria-hidden />
-                {pendingDeleteId === TEMPLATE_DELETE_ALL_CONFIRM_ID ? "전체 삭제 확인" : "전체 삭제"}
+                {pendingDelete?.kind === "all"
+                  && pendingDelete.membershipSignature === templateMembershipSignature
+                  ? "전체 삭제 확인"
+                  : "전체 삭제"}
               </button>
             </div>
 
             <div className="space-y-2" aria-label="추가된 템플릿 묶음">
               {templateInstances.map((instance) => {
-                const confirmingDelete = pendingDeleteId === instance.id;
+                const confirmingDelete = pendingDelete?.kind === "instance"
+                  && pendingDelete.id === instance.id;
                 const resetUnavailableReason = instance.lockedNodeCount > 0
                   ? `잠긴 객체 ${instance.lockedNodeCount}개의 잠금을 먼저 해제해 주세요.`
                   : !instance.sourceAvailable
@@ -342,11 +366,11 @@ export function StudioBg3dSceneTemplatePanel({
                         disabled={organizationDisabled}
                         onClick={() => {
                           if (confirmingDelete) {
-                            setPendingDeleteId(null);
+                            setPendingDelete(null);
                             onDeleteTemplateInstance(instance.id);
                             return;
                           }
-                          setPendingDeleteId(instance.id);
+                          setPendingDelete({ kind: "instance", id: instance.id });
                         }}
                       >
                         <Trash2 size={12} aria-hidden />

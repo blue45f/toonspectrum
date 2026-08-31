@@ -120,6 +120,47 @@ describe("StudioBg3dSceneTemplatePanel organizer", () => {
     expect(view.props.onDeleteAllTemplateInstances).toHaveBeenCalledOnce();
   });
 
+  it("requires a fresh delete-all confirmation when template membership changes", () => {
+    const view = renderPanel({ templateInstances: [summary("one")] });
+    let allActions = screen.getByRole("group", { name: "모든 템플릿 정리" });
+
+    fireEvent.click(within(allActions).getByRole("button", { name: "전체 삭제" }));
+    expect(within(allActions).getByRole("button", { name: "전체 삭제 확인" })).toBeTruthy();
+
+    view.rerender(
+      <StudioBg3dSceneTemplatePanel
+        {...view.props}
+        templateInstances={[summary("one"), summary("two")]}
+      />,
+    );
+    allActions = screen.getByRole("group", { name: "모든 템플릿 정리" });
+    fireEvent.click(within(allActions).getByRole("button", { name: "전체 삭제" }));
+    expect(view.props.onDeleteAllTemplateInstances).not.toHaveBeenCalled();
+    fireEvent.click(within(allActions).getByRole("button", { name: "전체 삭제 확인" }));
+    expect(view.props.onDeleteAllTemplateInstances).toHaveBeenCalledOnce();
+  });
+
+  it("does not carry delete-all confirmation through an empty instance set", () => {
+    const view = renderPanel({ templateInstances: [summary("one")] });
+    const allActions = screen.getByRole("group", { name: "모든 템플릿 정리" });
+
+    fireEvent.click(within(allActions).getByRole("button", { name: "전체 삭제" }));
+    view.rerender(
+      <StudioBg3dSceneTemplatePanel {...view.props} templateInstances={[]} />,
+    );
+    view.rerender(
+      <StudioBg3dSceneTemplatePanel
+        {...view.props}
+        templateInstances={[summary("later")]}
+      />,
+    );
+
+    const laterActions = screen.getByRole("group", { name: "모든 템플릿 정리" });
+    fireEvent.click(within(laterActions).getByRole("button", { name: "전체 삭제" }));
+    expect(view.props.onDeleteAllTemplateInstances).not.toHaveBeenCalled();
+    expect(within(laterActions).getByRole("button", { name: "전체 삭제 확인" })).toBeTruthy();
+  });
+
   it("disables mutations while another editor operation owns the scene", () => {
     renderPanel({
       templateInstances: [summary("one")],

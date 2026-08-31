@@ -15,15 +15,53 @@ export type StudioBg3dTemplateOrganizerCommand =
   | "delete-one"
   | "delete-all";
 
+export interface StudioBg3dTemplateOrganizerCommandRequest {
+  readonly command: StudioBg3dTemplateOrganizerCommand;
+  readonly targetInstanceIds: readonly string[];
+  /** Complete, sorted membership at the confirmation/click boundary. */
+  readonly membershipInstanceIds: readonly string[];
+  /** Exact modal-session ticket; object identity, not only its numeric epoch, is authoritative. */
+  readonly session: object;
+  /** Incremented after every committed primitives/models/document transition. */
+  readonly sceneEpoch: number;
+}
+
+const STALE_ORGANIZER_COMMAND_MESSAGE =
+  "장면 또는 템플릿 구성이 변경되어 정리 작업을 취소했습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.";
+
+function sameStringList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function currentMembershipInstanceIds(h: any): readonly string[] {
+  const instances: readonly any[] = h.templateInstances ?? [];
+  return instances.map((instance: any) => instance.id).sort();
+}
+
+function requestOwnsCurrentSession(
+  h: any,
+  request: StudioBg3dTemplateOrganizerCommandRequest,
+): boolean {
+  return h.modalAssetSessionRef?.current === request.session &&
+    h.isModalAssetSessionCurrent?.(request.session) === true;
+}
+
+function requestMatchesCurrentScene(
+  h: any,
+  request: StudioBg3dTemplateOrganizerCommandRequest,
+): boolean {
+  return h.ltInsertSceneEpochRef?.current === request.sceneEpoch &&
+    sameStringList(currentMembershipInstanceIds(h), request.membershipInstanceIds);
+}
+
 function resolveInstances(
   h: any,
-  command: StudioBg3dTemplateOrganizerCommand,
-  instanceId?: string,
-): readonly any[] {
+  targetInstanceIds: readonly string[],
+): readonly any[] | null {
   const instances: readonly any[] = h.templateInstances ?? [];
-  if (command.endsWith("-all")) return instances;
-  const instance = instances.find((candidate: any) => candidate.id === instanceId);
-  return instance ? [instance] : [];
+  const instanceById = new Map(instances.map((instance: any) => [instance.id, instance]));
+  const resolved = targetInstanceIds.map((id) => instanceById.get(id));
+  return resolved.every(Boolean) ? resolved : null;
 }
 
 function resolveSource(h: any, instance: any): any {
@@ -52,9 +90,7 @@ function arrange(h: any, instances: readonly any[]): void {
   const boundsByNodeId = new Map();
   for (const instance of instances) {
     for (const node of instance.nodes) {
-      const bounds = h.readStudioBg3dObjectWorldBounds(
-        h.primitiveObjectsRef.current.get(node.id),
-      );
+      const bounds = h.readStudioBg3dTemplateNodeWorldBounds(node.id);
       if (bounds) boundsByNodeId.set(node.id, bounds);
     }
   }
@@ -226,16 +262,26 @@ function remove(h: any, instances: readonly any[]): void {
 
 export function runStudioBg3dTemplateOrganizerCommand(
   h: any,
-  command: StudioBg3dTemplateOrganizerCommand,
-  instanceId?: string,
+  request: StudioBg3dTemplateOrganizerCommandRequest,
 ): void {
+  // A stale session must be completely silent: writing even an error into a reopened editor would
+  // let a command from the previous scene mutate the new session. Within the same session, report a
+  // scene/membership race but never reinterpret `-all` against the latest, unconfirmed membership.
+  if (!requestOwnsCurrentSession(h, request)) return;
+  if (!requestMatchesCurrentScene(h, request)) {
+    h.setError(STALE_ORGANIZER_COMMAND_MESSAGE);
+    return;
+  }
   if (h.templateOrganizationBlockedReason) {
     h.setError(h.templateOrganizationBlockedReason);
     return;
   }
-  const instances = resolveInstances(h, command, instanceId);
-  if (instances.length === 0) return;
-  if (command.startsWith("arrange-")) arrange(h, instances);
-  else if (command.startsWith("reset-")) reset(h, instances);
+  const instances = resolveInstances(h, request.targetInstanceIds);
+  if (!instances || instances.length === 0) {
+    h.setError(STALE_ORGANIZER_COMMAND_MESSAGE);
+    return;
+  }
+  if (request.command.startsWith("arrange-")) arrange(h, instances);
+  else if (request.command.startsWith("reset-")) reset(h, instances);
   else remove(h, instances);
 }

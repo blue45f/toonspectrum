@@ -227,7 +227,11 @@ export function planStudioBg3dTemplateInstanceReset(input: {
     }
     updates.push(Object.freeze({
       nodeId: instanceNode.id,
-      position: Object.freeze([...source.position] as [number, number, number]),
+      position: Object.freeze((source.parentOrdinal === null
+        ? source.position.map((component, axis) =>
+            component + input.instance.baselineOffset[axis]!
+          )
+        : [...source.position]) as [number, number, number]),
       rotation: Object.freeze([...source.rotation] as [number, number, number]),
       scale: Object.freeze([...source.scale] as [number, number, number]),
     }));

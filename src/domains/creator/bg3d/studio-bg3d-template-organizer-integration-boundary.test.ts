@@ -61,11 +61,18 @@ describe("Studio BG3D template organizer integration boundary", () => {
 
     expect(organizerHost).toContain('import("./studio-bg3d-template-organizer-runtime")');
     expect(organizerRuntimeSource).toContain("planStudioBg3dTemplateInstanceArrangement({");
+    expect(organizerRuntimeSource).toContain("h.readStudioBg3dTemplateNodeWorldBounds(node.id)");
+    expect(organizerHost).toContain("h.readStudioBg3dTemplateNodeWorldBounds = (nodeId: string)");
+    expect(organizerHost).toContain("readStudioBg3dTemplateStaticModelWorldBounds(");
     expect(organizerRuntimeSource).toContain("planStudioBg3dTemplateInstanceReset({");
     expect(organizerRuntimeSource).toContain("planStudioBg3dSceneEntityRemoval({");
     expect(organizerRuntimeSource.match(/commitImmediateHistoryTransition\(/gu)).toHaveLength(3);
     expect(organizerRuntimeSource.match(/physicsRuntimeSourceRef\.current =/gu)).toHaveLength(2);
     expect(organizerRuntimeSource).toContain("commitSceneEntityRemoval(plan)");
+    expect(organizerHost).toContain("membershipInstanceIds: Object.freeze(");
+    expect(organizerHost).toContain("sceneEpoch: ltInsertSceneEpochRef.current");
+    expect(organizerRuntimeSource).toContain("requestOwnsCurrentSession(h, request)");
+    expect(organizerRuntimeSource).toContain("requestMatchesCurrentScene(h, request)");
   });
 
   it("keeps hierarchy transforms and duplicates root-driven with remapped provenance", () => {
@@ -76,9 +83,12 @@ describe("Studio BG3D template organizer integration boundary", () => {
 
     expect(placementSource).toContain("orderStudioBg3dHierarchySelectionRootsFirst(insertedEntities)");
     expect(transformSource).toContain("hasStudioBg3dSelectedAncestor(");
-    expect(transformSource).toContain("p.id !== firstSelectedId && hasSelectedAncestor(p)");
-    expect(transformSource).toContain("m.id !== firstSelectedId && hasSelectedAncestor(m)");
+    expect(transformSource).toContain("(ancestor) => !isBgObjectTransformBlocked(ancestor)");
+    expect(transformSource).toContain("p.id !== firstSelectedId && hasSelectedTransformDriverAncestor(p)");
+    expect(transformSource).toContain("m.id !== firstSelectedId && hasSelectedTransformDriverAncestor(m)");
     expect(duplicate).toContain("allocateStudioBg3dTemplateInstanceNodeIds({");
+    expect(duplicate).toContain("instance.baselineOffset[0] + 0.4");
+    expect(duplicate).toContain("instance.baselineOffset[2] + 0.4");
     expect(duplicate).toContain("taggedCloneIdBySourceId");
     expect(duplicate).toContain("resolveStudioBg3dDuplicateHierarchyPatch({ source, clone, cloneIdBySourceId })");
   });

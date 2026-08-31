@@ -319,11 +319,12 @@ export function attachStudioBg3dEditorTransformHost(h) {
     const initialFirst = dragInitialFirstTransformRef.current;
     if (!firstObj || !initialFirst) return;
     firstObj.updateWorldMatrix(true, false);
-    const hasSelectedAncestor = (item: BgPrimitive | BgCustomModelInstance) =>
+    const hasSelectedTransformDriverAncestor = (item: BgPrimitive | BgCustomModelInstance) =>
       hasStudioBg3dSelectedAncestor(
         item,
         selectedIds,
         (id) => primitiveById.get(id) ?? customModelById.get(id),
+        (ancestor) => !isBgObjectTransformBlocked(ancestor),
       );
 
     const patchTransform = (item: BgPrimitive | BgCustomModelInstance, isFirst: boolean) => {
@@ -374,7 +375,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
       if (
         !selectedIds.has(p.id) ||
         isBgObjectTransformBlocked(p) ||
-        p.id !== firstSelectedId && hasSelectedAncestor(p)
+        p.id !== firstSelectedId && hasSelectedTransformDriverAncestor(p)
       ) return p;
       return patchTransform(p, p.id === firstSelectedId) as BgPrimitive;
     }));
@@ -383,7 +384,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
       if (
         !selectedIds.has(m.id) ||
         isBgObjectTransformBlocked(m) ||
-        m.id !== firstSelectedId && hasSelectedAncestor(m)
+        m.id !== firstSelectedId && hasSelectedTransformDriverAncestor(m)
       ) return m;
       return patchTransform(m, m.id === firstSelectedId) as BgCustomModelInstance;
     }));

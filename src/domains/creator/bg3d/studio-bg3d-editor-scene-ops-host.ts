@@ -12,6 +12,7 @@ import {
   resolveStudioBg3dDuplicateHierarchyPatch,
   resolveStudioBg3dTemplateSourceByKey,
 } from "./studio-bg3d-template-instance";
+import { readStudioBg3dTemplateStaticModelWorldBounds } from "./studio-bg3d-template-organizer-bounds";
 
 export function attachStudioBg3dEditorSceneOpsHost(h) {
   const {
@@ -645,6 +646,11 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
         sourceKind: instance.sourceKind,
         sourceId: source.id,
         insertionOffset: instance.insertionOffset,
+        baselineOffset: [
+          instance.baselineOffset[0] + 0.4,
+          instance.baselineOffset[1],
+          instance.baselineOffset[2] + 0.4,
+        ],
         nodeCount: instance.nodes.length,
         occupiedNodeIds,
         createSeed: () => generateId(),
@@ -761,13 +767,36 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
 
   const runTemplateOrganizerCommand = (command, instanceId?: string) => {
     if (h.templateOrganizerActionPending) return;
+    const targetInstanceIds = command.endsWith("-all")
+      ? templateInstances.map((instance) => instance.id)
+      : instanceId && templateInstanceById.has(instanceId)
+        ? [instanceId]
+        : [];
+    if (targetInstanceIds.length === 0) return;
+    const session = modalAssetSessionRef.current;
+    if (!session || !isModalAssetSessionCurrent(session)) return;
+    const request = Object.freeze({
+      command,
+      targetInstanceIds: Object.freeze([...targetInstanceIds]),
+      membershipInstanceIds: Object.freeze(
+        templateInstances.map((instance) => instance.id).sort(),
+      ),
+      session,
+      sceneEpoch: ltInsertSceneEpochRef.current,
+    });
+    const requestStillOwnsCurrentScene = () =>
+      modalAssetSessionRef.current === session &&
+      isModalAssetSessionCurrent(session) &&
+      ltInsertSceneEpochRef.current === request.sceneEpoch;
     h.templateOrganizerActionPending = true;
     void import("./studio-bg3d-template-organizer-runtime")
       .then(({ runStudioBg3dTemplateOrganizerCommand }) => {
-        runStudioBg3dTemplateOrganizerCommand(h, command, instanceId);
+        runStudioBg3dTemplateOrganizerCommand(h, request);
       })
       .catch(() => {
-        setError("템플릿 정리 도구를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        if (requestStillOwnsCurrentScene()) {
+          setError("템플릿 정리 도구를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
       })
       .finally(() => {
         h.templateOrganizerActionPending = false;
@@ -787,7 +816,23 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
   h.selectTemplateInstances = selectTemplateInstances;
   h.resolveTemplateInstanceSource = resolveTemplateInstanceSource;
   h.instantiateSceneTemplate = instantiateSceneTemplate;
-  h.readStudioBg3dObjectWorldBounds = readStudioBg3dObjectWorldBounds;
+  h.readStudioBg3dTemplateNodeWorldBounds = (nodeId: string) => {
+    const renderedBounds = readStudioBg3dObjectWorldBounds(
+      primitiveObjectsRef.current.get(nodeId),
+    );
+    if (renderedBounds) return renderedBounds;
+    // Static GPU batches intentionally omit one Object3D per model. The verified cache root plus
+    // the document transform still gives the organizer a deterministic world AABB, so grounding
+    // and arrange-all do not depend on selection temporarily disabling batching.
+    const model = physicsRuntimeSourceRef.current.customModels.find(
+      (candidate) => candidate.id === nodeId,
+    );
+    if (!model) return null;
+    return readStudioBg3dTemplateStaticModelWorldBounds(
+      modelRootCacheRef.current.get(model.modelId)?.root,
+      model,
+    );
+  };
   h.createStudioBg3dHistorySnapshot = createStudioBg3dHistorySnapshot;
   h.planStudioBg3dSceneEntityRemoval = planStudioBg3dSceneEntityRemoval;
   h.templateInstanceSummaries = templateInstanceSummaries;

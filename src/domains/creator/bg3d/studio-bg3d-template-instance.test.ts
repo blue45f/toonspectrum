@@ -54,6 +54,41 @@ describe("studio-bg3d-template-instance", () => {
       (id) => byId.get(id),
     )).toBe(true);
 
+    const lockedParent = {
+      id: "locked-parent",
+      parentId: null,
+      position: [0, 0, 0] as const,
+      locked: true,
+    };
+    const editableChild = {
+      id: "editable-child",
+      parentId: lockedParent.id,
+      position: [0, 1, 0] as const,
+      locked: false,
+    };
+    const otherDriver = {
+      id: "other-driver",
+      parentId: null,
+      position: [3, 0, 0] as const,
+      locked: false,
+    };
+    const transformEntities = new Map(
+      [lockedParent, editableChild, otherDriver].map((candidate) => [candidate.id, candidate]),
+    );
+    expect(hasStudioBg3dSelectedAncestor(
+      editableChild,
+      new Set([otherDriver.id, lockedParent.id, editableChild.id]),
+      (id) => transformEntities.get(id),
+      (ancestor) => ancestor.locked !== true,
+    )).toBe(false);
+    transformEntities.set(lockedParent.id, { ...lockedParent, locked: false });
+    expect(hasStudioBg3dSelectedAncestor(
+      editableChild,
+      new Set([otherDriver.id, lockedParent.id, editableChild.id]),
+      (id) => transformEntities.get(id),
+      (ancestor) => ancestor.locked !== true,
+    )).toBe(true);
+
     expect(resolveStudioBg3dDuplicateHierarchyPatch({
       source: entities[0]!,
       clone: { ...entities[0]!, id: "child-copy", position: [0.4, 1, 0] },
@@ -86,9 +121,37 @@ describe("studio-bg3d-template-instance", () => {
       sourceKind: "catalog",
       sourceKey: hashStudioBg3dTemplateSourceId("classroom"),
       insertionOffset: 17,
+      baselineOffset: [0, 0, 0],
       ordinal: 2,
     });
     expect(parseStudioBg3dTemplateInstanceNodeId("ordinary-node")).toBeNull();
+  });
+
+  it("persists a duplicate baseline without changing the source insertion offset", () => {
+    const duplicate = allocateStudioBg3dTemplateInstanceNodeIds({
+      sourceKind: "catalog",
+      sourceId: "classroom",
+      insertionOffset: 17,
+      baselineOffset: [0.4, 0, 0.4],
+      nodeCount: 2,
+      occupiedNodeIds: new Set(),
+      createSeed: () => "duplicate-baseline",
+    });
+
+    expect(duplicate).not.toBeNull();
+    expect(duplicate?.nodeIds.every((id) => id.length <= 80)).toBe(true);
+    expect(parseStudioBg3dTemplateInstanceNodeId(duplicate!.nodeIds[0]!)).toMatchObject({
+      insertionOffset: 17,
+      baselineOffset: [0.4, 0, 0.4],
+      ordinal: 0,
+    });
+    expect(collectStudioBg3dTemplateInstances([
+      { id: duplicate!.nodeIds[0]!, parentId: null, locked: false },
+      { id: duplicate!.nodeIds[1]!, parentId: duplicate!.nodeIds[0]!, locked: false },
+    ], [])[0]).toMatchObject({
+      insertionOffset: 17,
+      baselineOffset: [0.4, 0, 0.4],
+    });
   });
 
   it("collects roots and surviving ordinals without guessing ordinary scene nodes", () => {
@@ -230,6 +293,18 @@ describe("studio-bg3d-template-instance", () => {
       ok: true,
       updates: [
         { nodeId: ids[0], position: [1, 2, 3], rotation: [0, 0.5, 0], scale: [2, 2, 2] },
+        { nodeId: ids[1], position: [0, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      ],
+    });
+
+    expect(planStudioBg3dTemplateInstanceReset({
+      instance: { ...instance, baselineOffset: [0.4, 0, 0.4] },
+      entitiesById: entities,
+      sourceNodes,
+    })).toEqual({
+      ok: true,
+      updates: [
+        { nodeId: ids[0], position: [1.4, 2, 3.4], rotation: [0, 0.5, 0], scale: [2, 2, 2] },
         { nodeId: ids[1], position: [0, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
       ],
     });
