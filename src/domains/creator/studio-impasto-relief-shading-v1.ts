@@ -388,16 +388,47 @@ export function computeStudioImpastoReliefShading(
     return out;
   }
 
+  // A cell whose Sobel sums both vanish has the flat normal (0, 0, 1), so `shade` is `flatShade`
+  // and the quotient is exactly one. Writing that directly skips the whole BRDF for it. It is the
+  // common case by a wide margin: a stroke tile is mostly paper, and the interior of thick paint
+  // is flat too — before this, an entirely empty tile cost the same 246ns per cell as a full one.
+  const flatValue = 1 > maxMultiplier ? maxMultiplier : 1;
+
   for (let y = fromY; y < toY; y += 1) {
+    // CLAMP_TO_EDGE can only bind on the tile's own border, so everything inside it reads the
+    // three rows straight out of the buffer instead of re-deriving the bounds on all eight taps.
+    const rowInterior = y > 0 && y + 1 < height;
+    const aboveRow = (y - 1) * width;
+    const middleRow = y * width;
+    const belowRow = (y + 1) * width;
     for (let x = fromX; x < toX; x += 1) {
-      const topLeft = heightAt(heights, width, height, x - 1, y - 1, scale);
-      const top = heightAt(heights, width, height, x, y - 1, scale);
-      const topRight = heightAt(heights, width, height, x + 1, y - 1, scale);
-      const left = heightAt(heights, width, height, x - 1, y, scale);
-      const right = heightAt(heights, width, height, x + 1, y, scale);
-      const bottomLeft = heightAt(heights, width, height, x - 1, y + 1, scale);
-      const bottom = heightAt(heights, width, height, x, y + 1, scale);
-      const bottomRight = heightAt(heights, width, height, x + 1, y + 1, scale);
+      let topLeft: number;
+      let top: number;
+      let topRight: number;
+      let left: number;
+      let right: number;
+      let bottomLeft: number;
+      let bottom: number;
+      let bottomRight: number;
+      if (rowInterior && x > 0 && x + 1 < width) {
+        topLeft = heights[aboveRow + x - 1]! * scale;
+        top = heights[aboveRow + x]! * scale;
+        topRight = heights[aboveRow + x + 1]! * scale;
+        left = heights[middleRow + x - 1]! * scale;
+        right = heights[middleRow + x + 1]! * scale;
+        bottomLeft = heights[belowRow + x - 1]! * scale;
+        bottom = heights[belowRow + x]! * scale;
+        bottomRight = heights[belowRow + x + 1]! * scale;
+      } else {
+        topLeft = heightAt(heights, width, height, x - 1, y - 1, scale);
+        top = heightAt(heights, width, height, x, y - 1, scale);
+        topRight = heightAt(heights, width, height, x + 1, y - 1, scale);
+        left = heightAt(heights, width, height, x - 1, y, scale);
+        right = heightAt(heights, width, height, x + 1, y, scale);
+        bottomLeft = heightAt(heights, width, height, x - 1, y + 1, scale);
+        bottom = heightAt(heights, width, height, x, y + 1, scale);
+        bottomRight = heightAt(heights, width, height, x + 1, y + 1, scale);
+      }
 
       // painting.frag computeGradient (Sobel), re-labelled for image space
       // (rows grow downward): gradient = (−8·∂h/∂x, −8·∂h/∂y).
@@ -405,6 +436,11 @@ export function computeStudioImpastoReliefShading(
         topLeft - topRight + 2 * left - 2 * right + bottomLeft - bottomRight;
       const gradientY =
         topLeft + 2 * top + topRight - bottomLeft - 2 * bottom - bottomRight;
+
+      if (gradientX === 0 && gradientY === 0) {
+        out[middleRow + x] = flatValue;
+        continue;
+      }
 
       const normalLength = Math.sqrt(
         gradientX * gradientX
@@ -418,7 +454,7 @@ export function computeStudioImpastoReliefShading(
         resolved,
       );
       const value = shade / flatShade;
-      out[y * width + x] =
+      out[middleRow + x] =
         value < 0 ? 0 : value > maxMultiplier ? maxMultiplier : value;
     }
   }
