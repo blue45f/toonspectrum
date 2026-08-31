@@ -9,7 +9,8 @@
  *
  * Material planning is deliberately shared with the committed bounded-flow renderer. If the
  * current tip/grain/dual/layer/flow combination cannot produce a bounded mark plan, this renderer
- * clears only its active surface and reports a fail-closed retained-renderer fallback.
+ * reports an explicit rejection while retaining the accepted source/pixels for the host's
+ * explicit cancellation or next-operation decision.
  */
 
 import {
@@ -117,17 +118,43 @@ export interface StudioLiveDynamicBrushOverlayCanvases {
   readonly settledCanvas: HTMLCanvasElement;
 }
 
-export type StudioLiveDynamicBrushFallbackReason =
-  | "unsupported-style"
+export type StudioLiveDynamicBrushUnavailableReason =
   | "surface-unavailable"
   | "surface-budget"
+  | "surface-render";
+
+export type StudioLiveDynamicBrushRejectedReason =
+  | "unsupported-style"
   | "stroke-identity"
   | "source-prefix"
   | "invalid-sample"
   | "dab-budget"
   | "mark-budget"
-  | "material-plan"
-  | "surface-render";
+  | "material-plan";
+
+export type StudioLiveDynamicBrushFailureReason =
+  | StudioLiveDynamicBrushUnavailableReason
+  | StudioLiveDynamicBrushRejectedReason;
+
+export type StudioLiveDynamicBrushOperationFailure =
+  | {
+      readonly status: "unavailable";
+      readonly reason: StudioLiveDynamicBrushUnavailableReason;
+    }
+  | {
+      readonly status: "rejected";
+      readonly reason: StudioLiveDynamicBrushRejectedReason;
+    };
+
+function dynamicBrushOperationFailure(
+  reason: StudioLiveDynamicBrushFailureReason,
+): StudioLiveDynamicBrushOperationFailure {
+  return reason === "surface-unavailable"
+    || reason === "surface-budget"
+    || reason === "surface-render"
+    ? { status: "unavailable", reason }
+    : { status: "rejected", reason };
+}
 
 export type StudioLiveDynamicBrushBeginResult =
   | {
@@ -135,10 +162,7 @@ export type StudioLiveDynamicBrushBeginResult =
       readonly dabCount: number;
       readonly markCount: number;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveDynamicBrushFallbackReason;
-    };
+  | StudioLiveDynamicBrushOperationFailure;
 
 export type StudioLiveDynamicBrushAppendResult =
   | {
@@ -148,10 +172,7 @@ export type StudioLiveDynamicBrushAppendResult =
       readonly appendedMarks: number;
       readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveDynamicBrushFallbackReason;
-    };
+  | StudioLiveDynamicBrushOperationFailure;
 
 export type StudioLiveDynamicBrushEndResult =
   | {
@@ -160,10 +181,7 @@ export type StudioLiveDynamicBrushEndResult =
       readonly markCount: number;
       readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveDynamicBrushFallbackReason;
-    };
+  | StudioLiveDynamicBrushOperationFailure;
 
 interface DynamicSourceSample {
   readonly x: number;
@@ -977,7 +995,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private dpr = 1;
   private active: ActiveDynamicStroke | null = null;
   private settled: SettledDynamicStroke[] = [];
-  private fallbackReason: StudioLiveDynamicBrushFallbackReason | null = null;
+  private lastFailureReason: StudioLiveDynamicBrushFailureReason | null = null;
   private pendingFirstDab: StudioDynamicBrushDab | null = null;
   private pendingFirstDabRaf = 0;
   private pendingBeginElement: DrawEl | null = null;
@@ -1052,8 +1070,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     return this.settled.length;
   }
 
-  get lastFallbackReason(): StudioLiveDynamicBrushFallbackReason | null {
-    return this.fallbackReason;
+  get lastOperationFailureReason(): StudioLiveDynamicBrushFailureReason | null {
+    return this.lastFailureReason;
   }
 
   get backingPixelCount(): number {
@@ -1064,18 +1082,14 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   begin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
     if (!studioLiveDynamicBrushOverlaySupportsElement(element)) {
-      return {
-        status: "fallback",
-        reason: "unsupported-style",
-      };
+      return dynamicBrushOperationFailure("unsupported-style");
     }
     this.restoreCoverageBackingStore();
     if (!this.surfaceReady()) {
       this.parkCoverageBackingStoreIfIdle();
-      return {
-        status: "fallback",
-        reason: this.surfaceUsable ? "surface-unavailable" : "surface-budget",
-      };
+      return dynamicBrushOperationFailure(
+        this.surfaceUsable ? "surface-unavailable" : "surface-budget",
+      );
     }
     this.paintContactFromElement(element);
     if (this.canDeferFirstDabRaster()) {
@@ -1087,24 +1101,26 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         this.pendingBeginElement = null;
         if (pending) {
           const result = this.finishBegin(pending);
-          if (result.status === "fallback") this.parkCoverageBackingStoreIfIdle();
+          if (result.status !== "started") {
+            this.lastFailureReason = result.reason;
+            this.parkCoverageBackingStoreIfIdle();
+          }
         }
       });
       return { status: "started", dabCount: 0, markCount: 0 };
     }
     const result = this.finishBegin(element);
-    if (result.status === "fallback") this.parkCoverageBackingStoreIfIdle();
+    if (result.status !== "started") this.parkCoverageBackingStoreIfIdle();
     return result;
   }
 
   private finishBegin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
     const style = styleFromElement(element);
-    if (!style) return { status: "fallback", reason: "unsupported-style" };
+    if (!style) return dynamicBrushOperationFailure("unsupported-style");
     if (!this.surfaceReady()) {
-      return {
-        status: "fallback",
-        reason: this.surfaceUsable ? "surface-unavailable" : "surface-budget",
-      };
+      return dynamicBrushOperationFailure(
+        this.surfaceUsable ? "surface-unavailable" : "surface-budget",
+      );
     }
 
     if (this.active) {
@@ -1112,7 +1128,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       this.replay();
     }
     const first = sourceSampleAt(element, 0, style.dynamics.fallbackPressure);
-    if (!first) return { status: "fallback", reason: "invalid-sample" };
+    if (!first) return dynamicBrushOperationFailure("invalid-sample");
     this.paintImmediateContact(style, first);
 
     const source: DynamicStrokeSource = {
@@ -1138,12 +1154,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
             STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
           );
     if (causalBegin && !causalBegin.ok) {
-      return {
-        status: "fallback",
-        reason: causalBegin.reason === "dab-budget"
-          ? "dab-budget"
-          : "material-plan",
-      };
+      return dynamicBrushOperationFailure(
+        causalBegin.reason === "dab-budget" ? "dab-budget" : "material-plan",
+      );
     }
     const active: ActiveDynamicStroke = {
       style,
@@ -1175,11 +1188,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         });
       } else {
         const rendered = this.appendDabs(active, [causalBegin.dab]);
-        if (rendered.status === "fallback") return rendered;
+        if (rendered.status === "unavailable" || rendered.status === "rejected") return rendered;
         initialMarkCount = rendered.appendedMarks;
       }
     }
-    this.fallbackReason = null;
+    this.lastFailureReason = null;
     return {
       status: "started",
       dabCount: 1,
@@ -1192,6 +1205,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * are never read or planned again on pointermove.
    */
   appendFrom(element: DrawEl): StudioLiveDynamicBrushAppendResult {
+    if (this.lastFailureReason) {
+      return dynamicBrushOperationFailure(this.lastFailureReason);
+    }
     if (!this.active && this.pendingBeginElement) {
       const pending = this.pendingBeginElement;
       this.pendingBeginElement = null;
@@ -1201,17 +1217,15 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       }
       const started = this.finishBegin(pending);
       if (started.status !== "started") {
+        this.lastFailureReason = started.reason;
         this.parkCoverageBackingStoreIfIdle();
-        return { status: "fallback", reason: started.reason };
+        return started;
       }
     }
     const active = this.active;
     if (!active) {
       this.parkCoverageBackingStoreIfIdle();
-      return {
-        status: "fallback",
-        reason: this.fallbackReason ?? "surface-unavailable",
-      };
+      return dynamicBrushOperationFailure("surface-unavailable");
     }
     if (!styleIdentityMatches(element, active.style)) {
       return this.failActive("stroke-identity");
@@ -1338,12 +1352,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           : {}),
       };
     };
-    if (appended.status === "fallback") {
-      recordSealDebug(`append-fallback:${appended.reason}`);
+    if (appended.status === "unavailable" || appended.status === "rejected") {
+      recordSealDebug(`append-${appended.status}:${appended.reason}`);
       return appended;
     }
     const active = this.active;
-    if (!active) return { status: "fallback", reason: "surface-unavailable" };
+    if (!active) return dynamicBrushOperationFailure("surface-unavailable");
     if (!this.surfaceReady()) {
       return this.failActive(
         this.surfaceUsable ? "surface-unavailable" : "surface-budget",
@@ -1460,8 +1474,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   resetActive(): boolean {
-    if (!this.active) return false;
+    const hadOperation = this.active !== null
+      || this.pendingBeginElement !== null
+      || this.lastFailureReason !== null;
+    if (!hadOperation) return false;
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.clearActiveRect();
     this.parkCoverageBackingStoreIfIdle();
     return true;
@@ -1469,6 +1487,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   clear(): void {
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.settled = [];
     this.clearActiveRect();
     this.clearSettledRect();
@@ -1878,13 +1897,16 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       const [replacement, ...suffix] = planned.dabs;
       if (!replacement) return this.failActive("material-plan");
       const replacementResult = this.appendDabs(active, [replacement]);
-      if (replacementResult.status === "fallback") return replacementResult;
+      if (
+        replacementResult.status === "unavailable"
+        || replacementResult.status === "rejected"
+      ) return replacementResult;
       replacementDabs = replacementResult.appendedDabs;
       replacementMarks = replacementResult.appendedMarks;
       appendedDabs = suffix;
     }
     const rendered = this.appendDabs(active, appendedDabs);
-    if (rendered.status === "fallback") return rendered;
+    if (rendered.status === "unavailable" || rendered.status === "rejected") return rendered;
     const totalAcceptedDabs = replacementDabs + rendered.appendedDabs;
     return {
       status: totalAcceptedDabs > 0 || replacementMarks > 0
@@ -2317,7 +2339,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         || !this.drawMarksToActive(exact.marks)
         || !this.flattenActiveToSettled(stroke.style.opacity)
       ) {
-        this.fallbackReason = "surface-render";
+        this.lastFailureReason = "surface-render";
         // 이 경로는 failActive 를 거치지 않는 조용한 전량 클리어다 — 브레드크럼 없이는
         // 커밋 영수증 릴리스와 구분되지 않았던 실측 교훈.
         this.recordReleaseDebug("replay-settled-failed", {
@@ -2348,27 +2370,22 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.lastAcceptedCausalDab = dryMediaAccumulator
       ? exact.lastDab
       : undefined;
+    this.lastFailureReason = null;
   }
 
   private failActive(
-    reason: StudioLiveDynamicBrushFallbackReason,
-  ): {
-    readonly status: "fallback";
-    readonly reason: StudioLiveDynamicBrushFallbackReason;
-  } {
-    this.fallbackReason = reason;
-    // 브라우저 감사 진단 브레드크럼: fail-closed 클리어는 화면에서 원인을 남기지 않으므로,
-    // 마지막 폴백 사유를 전역에 기록해 하니스가 실패 프레임에서 읽을 수 있게 한다.
+    reason: StudioLiveDynamicBrushFailureReason,
+  ): StudioLiveDynamicBrushOperationFailure {
+    this.lastFailureReason = reason;
+    // 브라우저 감사 진단 브레드크럼: 명시적 거부/사용 불가 상태는 호스트가 다음 동작을
+    // 선택할 때까지 마지막으로 수락된 소스와 픽셀을 유지한다.
     (globalThis as {
       __studioDynamicOverlayDebug?: {
-        lastFailure: StudioLiveDynamicBrushFallbackReason;
+        lastFailure: StudioLiveDynamicBrushFailureReason;
         at: number;
       };
     }).__studioDynamicOverlayDebug = { lastFailure: reason, at: performance.now() };
-    this.resetActiveState();
-    this.clearActiveRect();
-    this.parkCoverageBackingStoreIfIdle();
-    return { status: "fallback", reason };
+    return dynamicBrushOperationFailure(reason);
   }
 
   private resetActiveState(): void {
@@ -2635,7 +2652,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       if (canvas.height !== 1) canvas.height = 1;
     }
     // A mock canvas or an already-minimal real canvas may not observe a dimension mutation.
-    // Explicitly clear all three authorities so no stale live/settled pixel can survive fallback.
+    // Explicitly clear all three bitmaps after the provider releases their backing stores. The
+    // retained source arrays remain available for an explicit later rebuild.
     this.clearActiveRect();
     this.clearSettledRect();
   }

@@ -445,12 +445,23 @@ export function bindStudioCuttoonStagePointersDownPixel(
         }
         return true;
       }
+      const magneticLassoResolution = pixelTool === "lasso" || pixelTool === "poly-lasso"
+        ? currentMagneticLassoField(pixelTarget)
+        : { status: "ordinary", field: null };
+      if (magneticLassoResolution.status === "rejected") {
+        setError(
+          `선택한 자석 올가미를 시작할 수 없습니다. ${magneticLassoResolution.reason} `
+          + "일반 올가미로 자동 전환하지 않습니다. 옵션을 끄거나 준비 후 다시 시도하세요.",
+        );
+        return true;
+      }
+      const magneticLassoField = magneticLassoResolution.field;
       // 다각형 올가미 — 클릭마다 꼭짓점. 시작점 근처 재클릭·더블클릭으로 닫기(드래그 세션 아님).
       if (pixelTool === "poly-lasso") {
         const raw = canvasPointToNormalized(pos.x, pos.y, frame);
-        // 자석이 켜지고 휘도장이 로드됐으면 클릭 꼭짓점도 가까운 가장자리로 끌어당긴다.
-        const magneticField = currentMagneticLassoField();
-        const p = magneticField ? snapLassoPointToEdge(raw, magneticField) : raw;
+        const p = magneticLassoField
+          ? snapLassoPointToEdge(raw, magneticLassoField)
+          : raw;
         const existing = polyLassoSessionRef.current;
         const detail = "detail" in e.evt ? e.evt.detail : 1;
         if (existing && (detail >= 2 || polyLassoCloseToStart(existing, p))) {
@@ -492,7 +503,7 @@ export function bindStudioCuttoonStagePointersDownPixel(
         drag,
         operation: effectiveCombine,
         pointerId,
-        magneticField: currentMagneticLassoField(),
+        magneticField: magneticLassoField,
       };
       const captureTarget = stagePointerEvent.target instanceof Element
         ? stagePointerEvent.target

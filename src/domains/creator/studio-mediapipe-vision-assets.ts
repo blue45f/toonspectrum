@@ -7,6 +7,10 @@
  */
 
 export type StudioMediaPipeVisionWasmVariant = "simd" | "nosimd";
+export type StudioMediaPipeVisionDelegate = "GPU" | "CPU";
+export type StudioMediaPipeVisionProviderSelection =
+  | "product-default-gpu"
+  | "explicit-before-execution";
 
 export interface StudioMediaPipeVisionWasmFileset {
   readonly wasmLoaderPath: string;
@@ -16,8 +20,9 @@ export interface StudioMediaPipeVisionWasmFileset {
 export interface StudioMediaPipeVisionWasmSelection {
   readonly variant: StudioMediaPipeVisionWasmVariant;
   readonly fileset: StudioMediaPipeVisionWasmFileset;
-  /** SIMD 지원 환경이었지만 로컬 SIMD 자산 해석이 실패해 호환 경로를 썼는지 여부. */
-  readonly compatibilityFallback: boolean;
+  readonly selectionSource: "simd-capability-probe";
+  /** The selected variant is loaded exactly once; a failed load never changes this tuple. */
+  readonly attemptedVariants: readonly [StudioMediaPipeVisionWasmVariant];
 }
 
 export type StudioMediaPipeVisionFilesetLoader = () => Promise<
@@ -78,44 +83,43 @@ async function loadBundledNoSimdFileset(): Promise<StudioMediaPipeVisionWasmFile
   });
 }
 
-/** SIMD를 우선하되 URL wrapper 해석 실패 시 bounded non-SIMD 호환 자산으로 폴백한다. */
+/** Probe once, select one variant before loading, and fail closed if either step fails. */
 export async function resolveStudioMediaPipeVisionWasmFileset(
   options: StudioMediaPipeVisionAssetResolverOptions,
 ): Promise<StudioMediaPipeVisionWasmSelection> {
   const loadSimd = options.loadSimd ?? loadBundledSimdFileset;
   const loadNoSimd = options.loadNoSimd ?? loadBundledNoSimdFileset;
-  const causes: unknown[] = [];
-  let simdSupported = false;
+  let simdSupported: boolean;
   try {
     simdSupported = await options.isSimdSupported();
   } catch (cause) {
-    // Capability probe 실패는 기능 전체 실패가 아니다. 가장 넓은 호환 자산으로 진행한다.
-    causes.push(cause);
+    throw namedAssetError(
+      "Studio가 MediaPipe Vision SIMD 지원 여부를 확인하지 못했습니다.",
+      [cause],
+    );
+  }
+  if (typeof simdSupported !== "boolean") {
+    throw namedAssetError(
+      "Studio가 잘못된 MediaPipe Vision SIMD capability 결과를 받았습니다.",
+      [new TypeError("MediaPipe Vision SIMD capability must be boolean.")],
+    );
   }
 
-  if (simdSupported) {
-    try {
-      return Object.freeze({
-        variant: "simd",
-        fileset: assertLocalFileset(await loadSimd()),
-        compatibilityFallback: false,
-      });
-    } catch (cause) {
-      causes.push(cause);
-    }
-  }
-
+  const variant: StudioMediaPipeVisionWasmVariant = simdSupported ? "simd" : "nosimd";
+  const loadSelected = variant === "simd" ? loadSimd : loadNoSimd;
   try {
     return Object.freeze({
-      variant: "nosimd",
-      fileset: assertLocalFileset(await loadNoSimd()),
-      compatibilityFallback: simdSupported,
+      variant,
+      fileset: assertLocalFileset(await loadSelected()),
+      selectionSource: "simd-capability-probe",
+      attemptedVariants: Object.freeze([variant]) as readonly [
+        StudioMediaPipeVisionWasmVariant,
+      ],
     });
   } catch (cause) {
-    causes.push(cause);
     throw namedAssetError(
-      "Studio의 로컬 MediaPipe Vision WASM 자산을 불러오지 못했습니다.",
-      causes,
+      `Studio의 선택된 ${variant} MediaPipe Vision WASM 자산을 불러오지 못했습니다.`,
+      [cause],
     );
   }
 }

@@ -40,7 +40,6 @@ function descriptor(overrides: Partial<ProviderDescriptor>): ProviderDescriptor 
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 16,
-    fallbackProviderId: null,
     knownIssues: [],
     ...overrides,
   };
@@ -90,7 +89,7 @@ function strokeRequest(
   return {
     surfaceId: "main",
     mode: "interactive",
-    primaryCandidates: ["surface-owner"],
+    primaryOwnerId: "surface-owner",
     islands: [
       {
         islandId: "lineart",
@@ -288,7 +287,7 @@ describe("planWithCostShadow — authority and fail-closed behavior", () => {
     const request: CostShadowPlanRequest = {
       surfaceId: "main",
       mode: "interactive",
-      primaryCandidates: ["surface-owner"],
+      primaryOwnerId: "surface-owner",
       islands: [
         {
           islandId: "impossible",
@@ -318,7 +317,7 @@ describe("planWithCostShadow — authority and fail-closed behavior", () => {
     const shadow = planWithCostShadow(registry, {
       surfaceId: "main",
       mode: "interactive",
-      primaryCandidates: ["surface-owner"],
+      primaryOwnerId: "surface-owner",
       islands: [
         {
           islandId: "tie",
@@ -537,7 +536,7 @@ describe("planWithCostShadow — targeted disagreements (promotion evidence)", (
     const shadow = planWithCostShadow(registry, {
       surfaceId: "main",
       mode: "interactive",
-      primaryCandidates: ["surface-owner"],
+      primaryOwnerId: "surface-owner",
       islands: [
         {
           islandId: "fill",

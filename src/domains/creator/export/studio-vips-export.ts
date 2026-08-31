@@ -11,7 +11,7 @@
 // - wasm-vips 는 반드시 dynamic import() 로만 로드한다(번들 게이트가 정적 import 를 잡는다).
 // - final/export 레인 전용 — preview 경로에서 호출 금지(descriptor 와 동일).
 // - 조용한 손실 금지: 크기 드리프트·버퍼 불일치·로드 실패는 전부 명시적 throw.
-//   폴백 결정(canvaskit 재시도 등)은 호출자 몫이다.
+//   호출자도 같은 내보내기를 다른 provider로 재실행하지 않는다.
 
 export const STUDIO_VIPS_EXPORT_REVISION = 1 as const;
 
@@ -27,7 +27,7 @@ export const STUDIO_VIPS_EXPORT_LICENSE = "LGPL-2.1-or-later" as const;
 export const STUDIO_VIPS_EXPORT_ATTRIBUTION = "libvips / wasm-vips" as const;
 
 /**
- * 단일 인코어 표면(CanvasKit 레인)의 한 변 상한.
+ * 단일 인코어 표면(Canvas2D 슬라이스 합성 레인)의 한 변 상한.
  * 근거: WebGL/WebGPU maxTextureDimension 보수 기준선 8192(이 레포의
  * studio-bg3d-glb-validation.ts 텍스처 상한과 동일)이며, out-of-core provider 의
  * 타일 렌더 예산 maxTileRenderPixels(67,108,864 = 8192²)와 같은 축.
@@ -54,8 +54,8 @@ export const STUDIO_VIPS_EXPORT_MAX_INPUT_PIXELS = 268_435_456 as const;
 export const STUDIO_VIPS_EXPORT_MAX_PYRAMID_LEVELS = 32 as const;
 
 /**
- * wasm-vips 로드/초기화 실패. 원인(cause)을 보존해 전달하며, 폴백 결정은
- * 호출자(플래너/오케스트레이션)가 내린다 — 이 모듈은 절대 조용히 대체하지 않는다.
+ * wasm-vips 로드/초기화 실패. 원인(cause)을 보존해 전달하며, 이 모듈과 호출자 모두
+ * 같은 내보내기를 다른 provider로 조용히 대체하지 않는다.
  */
 export class VipsUnavailableError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -127,7 +127,7 @@ export const STUDIO_VIPS_EXPORT_DEFAULT_LIMITS: StudioVipsExportLimits =
     maxInputPixels: STUDIO_VIPS_EXPORT_MAX_INPUT_PIXELS,
   });
 
-export type StudioVipsExportRouteId = "canvaskit" | "vips" | "out-of-core";
+export type StudioVipsExportRouteId = "canvas2d" | "vips" | "out-of-core";
 
 export interface StudioVipsExportRoute {
   readonly route: StudioVipsExportRouteId;
@@ -397,7 +397,7 @@ export async function exportPyramid(
 
 /**
  * 최종 내보내기 라우팅 판정.
- * - "canvaskit": 단일 인코어 표면 예산(edge ≤ 8192, 면적 ≤ 8192²) 안 — vips 불필요.
+ * - "canvas2d": 단일 인코어 표면 예산(edge ≤ 8192, 면적 ≤ 8192²) 안 — vips 불필요.
  * - "vips": 인코어 표면 예산 초과 && 입력 ≤ 16384² px — 이 모듈이 소유.
  * - "out-of-core": 입력 > 16384² px(1GiB RGBA) — 타일 기반 provider 가 소유.
  */
@@ -433,10 +433,10 @@ export function planVipsExportRoute(
     };
   }
   return {
-    route: "canvaskit",
+    route: "canvas2d",
     reason:
       `${width}x${height} fits the single in-core surface budget; the `
-      + "CanvasKit final lane keeps ownership.",
+      + "Canvas2D slice-composition lane keeps ownership.",
   };
 }
 

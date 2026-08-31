@@ -287,15 +287,21 @@ describe("Studio BG3D runtime topology policy", () => {
     })).toMatchObject({ ok: true, primaryRuntimeId: "three-webgpu", diagnostics: [] });
   });
 
-  it("records an unavailable preference and still plans the default primary", () => {
+  it("fails closed when the explicitly selected primary is unavailable", () => {
     const plan = planStudioBg3dRuntimeTopology({
       ...baseRequest,
       availableRuntimeIds: ["three-webgl", "three-webgpu"],
       webgpuSupported: false,
       preferredPrimaryRuntimeId: "three-webgpu",
     });
-    expect(plan).toMatchObject({ ok: true, primaryRuntimeId: "three-webgl" });
+    expect(plan).toMatchObject({
+      ok: false,
+      primaryRuntimeId: null,
+      specialists: [],
+      totalActivationGzipBytes: 0,
+    });
     expect(plan.diagnostics).toContain("preferred-runtime-unavailable");
+    expect(plan.diagnostics).toContain("no-primary-runtime");
   });
 
   it("fails closed for malformed requests and unavailable primary capabilities", () => {

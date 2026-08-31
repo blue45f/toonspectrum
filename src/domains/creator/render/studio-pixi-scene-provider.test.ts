@@ -245,12 +245,12 @@ describe("Studio Pixi scene provider", () => {
   it("owns a transparent canvas and covers init, DPR resize, render, and idempotent destroy", async () => {
     const fixture = fakeRuntime("webgpu");
     const provider = await createStudioPixiSceneProvider({
+      renderer: "webgpu",
       width: 720,
       height: 1_280,
       dpr: 2,
       ownerDocument: document,
       loadRuntime: async () => fixture.runtime,
-      webGpuApiAvailable: () => true,
     });
     const application = fixture.applications[0];
     const root = application.stage.children[0];
@@ -263,7 +263,7 @@ describe("Studio Pixi scene provider", () => {
       autoDensity: true,
       backgroundAlpha: 0,
       autoStart: false,
-      preference: ["webgpu", "webgl"],
+      preference: ["webgpu"],
       powerPreference: "high-performance",
     });
     expect(provider.canvas.dataset.studioSceneOverlay).toBe(
@@ -284,8 +284,11 @@ describe("Studio Pixi scene provider", () => {
     expect(root.scale.set).toHaveBeenCalledWith(1, 1);
     expect(root.rotation).toBe(0);
     expect(provider.receipt).toMatchObject({
+      selectedRenderer: "webgpu",
+      attemptedRenderer: "webgpu",
       activeRenderer: "webgpu",
-      fallback: null,
+      attemptCount: 1,
+      failureIsolation: "fail-closed",
       surface: {
         ownership: "exclusive-dedicated-overlay",
         contextSharing: "forbidden",
@@ -342,6 +345,7 @@ describe("Studio Pixi scene provider", () => {
   it("upserts all selectable shapes with stable labels, custom hit areas, and deterministic tie ordering", async () => {
     const fixture = fakeRuntime("webgpu");
     const provider = await createStudioPixiSceneProvider({
+      renderer: "webgpu",
       width: 500,
       height: 500,
       dpr: 1,
@@ -420,6 +424,7 @@ describe("Studio Pixi scene provider", () => {
   it("returns a renderer-neutral topmost hit and excludes hidden or non-selectable overlays", async () => {
     const fixture = fakeRuntime("webgpu");
     const provider = await createStudioPixiSceneProvider({
+      renderer: "webgpu",
       width: 200,
       height: 200,
       dpr: 1,
@@ -486,45 +491,53 @@ describe("Studio Pixi scene provider", () => {
     expect(provider.hitTest({ x: Number.NaN, y: 10 })).toBeNull();
   });
 
-  it.each([
-    [false, "webgpu-api-unavailable"],
-    [true, "provider-webgpu-candidate-unavailable"],
-  ] as const)(
-    "records why WebGL was selected when WebGPU API availability is %s",
-    async (webGpuAvailable, expectedReason) => {
-      const fixture = fakeRuntime("webgl");
-      const provider = await createStudioPixiSceneProvider({
+  it("runs an explicitly selected WebGL operation without treating it as a WebGPU fallback", async () => {
+    const fixture = fakeRuntime("webgl");
+    const provider = await createStudioPixiSceneProvider({
+      renderer: "webgl",
+      width: 100,
+      height: 100,
+      dpr: 1,
+      ownerDocument: document,
+      loadRuntime: async () => fixture.runtime,
+    });
+
+    expect(fixture.applications[0]!.initOptions!.preference).toEqual(["webgl"]);
+    expect(provider.receipt).toEqual({
+      providerId: "pixi",
+      selectedRenderer: "webgl",
+      attemptedRenderer: "webgl",
+      activeRenderer: "webgl",
+      attemptCount: 1,
+      failureIsolation: "fail-closed",
+      surface: {
+        ownership: "exclusive-dedicated-overlay",
+        contextSharing: "forbidden",
+        background: "transparent",
+      },
+    });
+  });
+
+  it("rejects a renderer that differs from the selected operation instead of accepting substitution", async () => {
+    const fixture = fakeRuntime("webgl");
+    await expect(
+      createStudioPixiSceneProvider({
+        renderer: "webgpu",
         width: 100,
         height: 100,
         dpr: 1,
         ownerDocument: document,
         loadRuntime: async () => fixture.runtime,
-        webGpuApiAvailable: () => webGpuAvailable,
-      });
-
-      expect(provider.receipt).toEqual({
-        providerId: "pixi",
-        requestedRenderer: "webgpu",
-        attemptedRendererOrder: ["webgpu", "webgl"],
-        activeRenderer: "webgl",
-        fallback: {
-          from: "webgpu",
-          to: "webgl",
-          reason: expectedReason,
-        },
-        surface: {
-          ownership: "exclusive-dedicated-overlay",
-          contextSharing: "forbidden",
-          background: "transparent",
-        },
-      });
-    },
-  );
+      }),
+    ).rejects.toThrow(/automatic renderer substitution is forbidden/u);
+    expect(fixture.applications[0].destroy).toHaveBeenCalledTimes(1);
+  });
 
   it("fails closed before mutation for malformed input and rejects non-GPU renderers", async () => {
     const lazyLoader = vi.fn(async () => fakeRuntime("webgpu").runtime);
     await expect(
       createStudioPixiSceneProvider({
+        renderer: "webgpu",
         width: 0,
         height: 100,
         dpr: 1,
@@ -536,6 +549,7 @@ describe("Studio Pixi scene provider", () => {
 
     const fixture = fakeRuntime("webgpu");
     const provider = await createStudioPixiSceneProvider({
+      renderer: "webgpu",
       width: 100,
       height: 100,
       dpr: 1,
@@ -560,6 +574,7 @@ describe("Studio Pixi scene provider", () => {
     const canvasFixture = fakeRuntime("canvas");
     await expect(
       createStudioPixiSceneProvider({
+        renderer: "webgpu",
         width: 100,
         height: 100,
         dpr: 1,
@@ -576,6 +591,7 @@ describe("Studio Pixi scene provider", () => {
 
     await expect(
       createStudioPixiSceneProvider({
+        renderer: "webgpu",
         width: 100,
         height: 100,
         dpr: 1,

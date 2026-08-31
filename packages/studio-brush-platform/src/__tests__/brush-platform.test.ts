@@ -199,7 +199,7 @@ describe("provider registration + planner routing", () => {
     const plan = planner.plan({
       surfaceId: "studio-main",
       mode: "interactive",
-      primaryCandidates: ["hokusai-natural-media"],
+      primaryOwnerId: "hokusai-natural-media",
       islands: [
         {
           islandId: "inking",
@@ -221,16 +221,14 @@ describe("provider registration + planner routing", () => {
     ]);
   });
 
-  it("keeps the Hokusai natural-media lane fail-closed without a texture-substituting fallback", () => {
+  it("keeps the Hokusai natural-media lane fail-closed without a fallback contract", () => {
     // V17.1: no texture-equivalence certification exists for a Skia rendition of Hokusai
     // natural-media output, so the descriptor must not advertise a fallback provider — a
     // device-incapable host hides natural-media brushes instead of silently substituting
     // texture. Restoring a fallback requires a checked-in equivalence certification.
-    expect(hokusaiProviderDescriptor.fallbackProviderId).toBeNull();
+    expect(hokusaiProviderDescriptor).not.toHaveProperty("fallbackProviderId");
     const registry = new EngineCapabilityRegistry();
     registerBrushPlatformProviders(registry);
-    expect(registry.fallbackChain("hokusai-natural-media")).toEqual([
-      "hokusai-natural-media",
-    ]);
+    expect(registry).not.toHaveProperty("fallbackChain");
   });
 });

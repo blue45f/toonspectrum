@@ -42,10 +42,20 @@ export interface StudioHybridDccGlbExportWorkerLike {
 export interface StudioHybridDccGlbExportBatchOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
-  /** Test/integration seam. Supplying it always selects the Worker path. */
-  readonly workerFactory?: () => StudioHybridDccGlbExportWorkerLike;
-  /** Defaults to true only when the host has no Worker API (SSR/Node). */
-  readonly allowSynchronousFallback?: boolean;
+  /** Selected once before export starts. Omission selects the product Worker. */
+  readonly executionBackend?: StudioHybridDccGlbExportExecutionBackend;
+  /** Test/integration seam for the already-selected Worker backend. */
+  readonly workerFactory?: () => StudioHybridDccGlbExportWorkerLike | null;
+}
+
+export type StudioHybridDccGlbExportExecutionBackend = "worker" | "direct";
+
+export interface StudioHybridDccGlbExportBatchOutcome {
+  readonly execution: StudioHybridDccGlbExportExecutionBackend;
+  readonly selectedExecutionBackend: StudioHybridDccGlbExportExecutionBackend;
+  readonly attemptedExecutionBackends:
+    readonly [StudioHybridDccGlbExportExecutionBackend];
+  readonly results: readonly StudioHybridDccMeshGlbExportResult[];
 }
 
 export type StudioHybridDccGlbExportClientErrorCode =
@@ -80,7 +90,8 @@ function takeRequestId(): number {
   return requestId;
 }
 
-function defaultWorkerFactory(): StudioHybridDccGlbExportWorkerLike {
+function defaultWorkerFactory(): StudioHybridDccGlbExportWorkerLike | null {
+  if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-hybrid-dcc-glb-export.worker.ts", import.meta.url), {
     type: "module",
     name: "studio-hybrid-dcc-glb-export",
@@ -90,18 +101,6 @@ function defaultWorkerFactory(): StudioHybridDccGlbExportWorkerLike {
 function boundedTimeout(value: number | undefined): number {
   if (!Number.isFinite(value)) return STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_TIMEOUT_MS;
   return Math.max(100, Math.min(300_000, Math.floor(value as number)));
-}
-
-function hasGlobalWorker(): boolean {
-  return typeof Worker === "function";
-}
-
-function isNodeEnvironment(): boolean {
-  if (typeof window !== "undefined") return false;
-  const processValue = (globalThis as {
-    readonly process?: { readonly versions?: { readonly node?: unknown } };
-  }).process;
-  return typeof processValue?.versions?.node === "string" && processValue.versions.node.length > 0;
 }
 
 function requestFor(
@@ -156,7 +155,7 @@ async function exportSynchronously(
 ): Promise<readonly StudioHybridDccMeshGlbExportResult[]> {
   await Promise.resolve();
   if (signal?.aborted) throw new StudioHybridDccGlbExportClientError("aborted");
-  const { exportStudioHybridDccMeshGlb } = await import( "./studio-hybrid-dcc-glb-export");
+  const { exportStudioHybridDccMeshGlb } = await import("./studio-hybrid-dcc-glb-export");
   const results: StudioHybridDccMeshGlbExportResult[] = [];
   let totalByteLength = 0;
   for (const payload of request.payloads) {
@@ -179,8 +178,8 @@ async function exportSynchronously(
 /**
  * Exports one worker-protocol window (≤ MAX_BATCH) from editable Geometry Authority inputs.
  *
- * Browsers always use a fresh one-shot module Worker. A synchronous implementation is loaded only
- * when the host has no Worker API (for SSR/Node), never as a silent recovery from Worker/CSP faults.
+ * The caller-selected backend remains authoritative for the entire window. Worker construction,
+ * post, protocol, timeout, or runtime failure is terminal and never replays the export directly.
  */
 function exportStudioHybridDccGlbBatchWindow(
   inputs: readonly StudioHybridDccMeshGlbExportInput[],
@@ -197,11 +196,7 @@ function exportStudioHybridDccGlbBatchWindow(
   if (!request) {
     return Promise.reject(new StudioHybridDccGlbExportClientError("invalid-input"));
   }
-  if (
-    options.workerFactory === undefined
-    && !hasGlobalWorker()
-    && (options.allowSynchronousFallback ?? isNodeEnvironment())
-  ) {
+  if (options.executionBackend === "direct") {
     return exportSynchronously(request, options.signal);
   }
 
@@ -314,13 +309,25 @@ function exportStudioHybridDccGlbBatchWindow(
 export async function exportStudioHybridDccGlbBatch(
   inputs: readonly StudioHybridDccMeshGlbExportInput[],
   options: StudioHybridDccGlbExportBatchOptions = {},
-): Promise<readonly StudioHybridDccMeshGlbExportResult[]> {
+): Promise<StudioHybridDccGlbExportBatchOutcome> {
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("studio-hybrid-dcc-glb-export:invalid-execution-backend");
+  }
+  const selectedOptions: StudioHybridDccGlbExportBatchOptions = {
+    ...options,
+    executionBackend,
+  };
   if (options.signal?.aborted) {
     throw new StudioHybridDccGlbExportClientError("aborted");
   }
-  if (inputs.length === 0) return [];
+  if (inputs.length === 0) return exportOutcome(executionBackend, []);
   if (inputs.length <= STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH) {
-    return exportStudioHybridDccGlbBatchWindow(inputs, options);
+    const results = await exportStudioHybridDccGlbBatchWindow(
+      inputs,
+      selectedOptions,
+    );
+    return exportOutcome(executionBackend, results);
   }
 
   const results: StudioHybridDccMeshGlbExportResult[] = [];
@@ -336,8 +343,25 @@ export async function exportStudioHybridDccGlbBatch(
       offset,
       offset + STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH,
     );
-    const windowResults = await exportStudioHybridDccGlbBatchWindow(windowInputs, options);
+    const windowResults = await exportStudioHybridDccGlbBatchWindow(
+      windowInputs,
+      selectedOptions,
+    );
     results.push(...windowResults);
   }
-  return results;
+  return exportOutcome(executionBackend, results);
+}
+
+function exportOutcome(
+  executionBackend: StudioHybridDccGlbExportExecutionBackend,
+  results: readonly StudioHybridDccMeshGlbExportResult[],
+): StudioHybridDccGlbExportBatchOutcome {
+  return Object.freeze({
+    execution: executionBackend,
+    selectedExecutionBackend: executionBackend,
+    attemptedExecutionBackends: Object.freeze([
+      executionBackend,
+    ]) as readonly [StudioHybridDccGlbExportExecutionBackend],
+    results: Object.freeze([...results]),
+  });
 }

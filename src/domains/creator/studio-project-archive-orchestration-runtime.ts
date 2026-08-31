@@ -474,6 +474,7 @@ export function createStudioProjectArchiveOrchestration({
         ],
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+        crc32ExecutionMode: "worker",
       });
       const downloadVrmFingerprint = JSON.stringify(
         collectStudioVrmProjectArchiveReferences(currentStudioProjectSnapshot()).map(

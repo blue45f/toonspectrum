@@ -60,7 +60,7 @@ async function repack(
   update(entries);
   return buildStudioPackageArchiveBytes(
     [...entries].map(([path, data]) => ({ path, data })),
-    { allowLargeDirectFallbackInHeadless: true }
+    { crc32ExecutionMode: "direct-headless" }
   );
 }
 

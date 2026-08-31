@@ -210,7 +210,8 @@ describe("StudioWebGpuEngine", () => {
     ));
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameInvalid: () => events.push("invalid"),
       onFrameReady,
@@ -249,7 +250,8 @@ describe("StudioWebGpuEngine", () => {
     });
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameInvalid: () => {
         events.push(`invalid:${gpuSurface.width}:${fallback.canvas.width}`);
@@ -300,7 +302,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameInvalid = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameInvalid,
       onFrameReady,
@@ -345,7 +348,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -376,7 +380,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -434,7 +439,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -455,7 +461,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -514,13 +521,18 @@ describe("StudioWebGpuEngine", () => {
     expect(legacy.dabs[0]?.radius).toBe(5);
   });
 
-  it("renders normal and erase strokes through the silent Canvas2D fallback", async () => {
+  it("renders normal and erase strokes only through an explicit Canvas2D selection", async () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
+    const gpu = {
+      requestAdapter: vi.fn(),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
-      gpu: null,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
+      gpu,
     });
 
     engine.resize({
@@ -536,6 +548,7 @@ describe("StudioWebGpuEngine", () => {
     ]);
 
     await expect(engine.initialize()).resolves.toBe("canvas2d");
+    expect(gpu.requestAdapter).not.toHaveBeenCalled();
     expect(fallback.canvas.width).toBe(200);
     expect(fallback.canvas.height).toBe(160);
     expect(fallback.arcs.length).toBeGreaterThan(4);
@@ -548,12 +561,40 @@ describe("StudioWebGpuEngine", () => {
     expect(fallback.clearRect).toHaveBeenLastCalledWith(0, 0, 200, 160);
   });
 
+  it("keeps default WebGPU unavailable when initialization fails without drawing Canvas2D", async () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const canvas2d = fakeCanvas2d();
+    const onBackendChange = vi.fn();
+    const onFrameInvalid = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      canvas2dCanvas: canvas2d.canvas,
+      gpu: null,
+      onBackendChange,
+      onFrameInvalid,
+    });
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "webgpu:unavailable");
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+
+    expect(engine.getBackend()).toBe("webgpu");
+    expect(engine.isBackendAvailable()).toBe(false);
+    expect(onBackendChange).toHaveBeenCalledTimes(1);
+    expect(onBackendChange).toHaveBeenCalledWith("webgpu");
+    expect(onFrameInvalid).toHaveBeenCalled();
+    expect(canvas2d.arcs).toHaveLength(0);
+    expect(gpuSurface.style.visibility).toBe("hidden");
+    expect(canvas2d.canvas.style.visibility).toBe("hidden");
+  });
+
   it("uses CSS size times DPR while preserving aspect ratio under the device texture limit", () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
 
@@ -576,7 +617,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const initial = stroke({ points: [0, 0, 20, 0], pressures: [0.5, 0.6] });
@@ -611,7 +653,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const tap = stroke({ points: [2, 3], pressures: [0.5] });
@@ -668,7 +711,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const initial = [
@@ -725,7 +769,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -784,7 +829,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     engine.resize({ logicalWidth: 100, logicalHeight: 80 });
@@ -839,7 +885,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
@@ -885,7 +932,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const initial = stroke({ points: [0, 0, 10, 0], pressures: [0.4, 0.6] });
@@ -913,7 +961,8 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const completed = stroke({ id: "completed", points: [0, 0, 10, 0] });
@@ -947,7 +996,8 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
       onFrameReady,
     });
@@ -979,12 +1029,13 @@ describe("StudioWebGpuEngine", () => {
     }));
   });
 
-  it("incrementally destination-outs a newly appended eraser on the Canvas2D fallback", () => {
+  it("incrementally destination-outs a newly appended eraser on explicit Canvas2D", () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
+      selectedBackend: "canvas2d",
       gpu: null,
     });
     const ink = stroke({ id: "ink", orderKey: "a" });
@@ -1012,7 +1063,7 @@ describe("StudioWebGpuEngine", () => {
     );
   });
 
-  it("creates premultiplied normal/erase pipelines, renders dabs, and falls back on device loss", async () => {
+  it("creates WebGPU pipelines and becomes unavailable without switching on device loss", async () => {
     const lost = deferred<GPUDeviceLostInfo>();
     const fake = fakeGpuDevice(lost.promise);
     const context = {
@@ -1029,13 +1080,15 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const onBackendChange = vi.fn();
     const onDeviceLost = vi.fn();
+    const onFrameInvalid = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: gpuSurface,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
       gpu,
       autoRecover: false,
       onBackendChange,
       onDeviceLost,
+      onFrameInvalid,
     });
     engine.resize({ logicalWidth: 100, logicalHeight: 80, cssWidth: 100, cssHeight: 80, dpr: 2 });
     expect(engine.replaceStrokeFeedJournalBaseline([
@@ -1087,10 +1140,14 @@ describe("StudioWebGpuEngine", () => {
     const lossInfo = { reason: "unknown", message: "test loss" } as GPUDeviceLostInfo;
     lost.resolve(lossInfo);
     await vi.waitFor(() => expect(onDeviceLost).toHaveBeenCalledWith(lossInfo));
-    expect(engine.getBackend()).toBe("canvas2d");
-    expect(onBackendChange).toHaveBeenLastCalledWith("canvas2d");
-    expect(fallback.arcs.length).toBeGreaterThan(0);
-    expect(fallback.arcs.some(({ x, y }) => x === 50 && y === 12)).toBe(true);
+    expect(engine.getBackend()).toBe("webgpu");
+    expect(engine.isBackendAvailable()).toBe(false);
+    expect(onBackendChange).toHaveBeenCalledTimes(1);
+    expect(onBackendChange).toHaveBeenCalledWith("webgpu");
+    expect(onFrameInvalid).toHaveBeenCalled();
+    expect(fallback.arcs).toHaveLength(0);
+    expect(gpuSurface.style.visibility).toBe("hidden");
+    expect(fallback.canvas.style.visibility).toBe("hidden");
     expect(context.unconfigure).toHaveBeenCalled();
 
     engine.dispose();
@@ -1140,7 +1197,7 @@ describe("StudioWebGpuEngine", () => {
 
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       retainReadbackSnapshot: false,
     });
@@ -1191,7 +1248,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
     });
 
@@ -1209,7 +1266,7 @@ describe("StudioWebGpuEngine", () => {
     engine.dispose();
   });
 
-  it("starts recovered-device rendering without waiting for a hung lost-device flight", async () => {
+  it("recovers the same provider without replaying the failed operation", async () => {
     const firstLost = deferred<GPUDeviceLostInfo>();
     const firstSubmission = deferred<void>();
     const first = fakeGpuDevice(firstLost.promise, () => firstSubmission.promise);
@@ -1236,7 +1293,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1253,23 +1310,18 @@ describe("StudioWebGpuEngine", () => {
 
     firstLost.resolve({ reason: "unknown", message: "hung submission" } as GPUDeviceLostInfo);
     await vi.waitFor(() => expect(adapter.requestDevice).toHaveBeenCalledTimes(2));
-    // Tile rendering and presentation are submitted back-to-back, then share one completion fence.
-    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(engine.isBackendAvailable()).toBe(true));
+    // Reacquiring WebGPU does not replay or continue the operation that failed on the lost device.
+    expect(second.device.queue.submit).not.toHaveBeenCalled();
 
     // A late completion from the lost device must not clear the recovered device's flight lock.
     firstSubmission.resolve(undefined);
     await Promise.resolve();
     await Promise.resolve();
     engine.render(latestStrokes, "recover:latest");
-    // The recovered device can pipeline one newer presentation without waiting on its first fence.
-    expect(second.device.queue.submit).toHaveBeenCalledTimes(4);
+    expect(second.device.queue.submit).toHaveBeenCalledTimes(2);
 
     secondSubmissions[0]!.resolve(undefined);
-    expect(onFrameReady).not.toHaveBeenCalledWith(expect.objectContaining({
-      requestId: "recover:latest",
-    }));
-    secondSubmissions[1]!.resolve(undefined);
-
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       requestId: "recover:latest",
       backend: "webgpu",
@@ -1294,7 +1346,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       autoRecover: false,
     });
@@ -1305,7 +1357,8 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.textures[0]?.destroy).not.toHaveBeenCalled();
 
     lost.resolve({ reason: "unknown", message: "hung presentation" } as GPUDeviceLostInfo);
-    await vi.waitFor(() => expect(engine.getBackend()).toBe("canvas2d"));
+    await vi.waitFor(() => expect(engine.isBackendAvailable()).toBe(false));
+    expect(engine.getBackend()).toBe("webgpu");
 
     // The queue promise intentionally remains pending: device-loss cleanup, not eventual render
     // completion, must release this unpublished copy-on-write surface.
@@ -1334,7 +1387,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
     });
 
@@ -1369,7 +1422,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1439,7 +1492,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1505,7 +1558,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1582,7 +1635,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       retainReadbackSnapshot: false,
       onFrameReady,
@@ -1659,7 +1712,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1751,7 +1804,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1830,7 +1883,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       retainReadbackSnapshot: false,
       onFrameReady,
@@ -1877,7 +1930,7 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: gpuCanvas,
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
       gpu,
       onFrameInvalid,
       onFrameReady,
@@ -1953,7 +2006,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -1997,7 +2050,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2043,7 +2096,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2078,7 +2131,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2145,7 +2198,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2196,7 +2249,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2248,7 +2301,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       autoRecover: false,
       onFrameReady,
@@ -2265,7 +2318,8 @@ describe("StudioWebGpuEngine", () => {
     await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
 
     lost.resolve({ reason: "unknown", message: "lost during capture" } as GPUDeviceLostInfo);
-    await vi.waitFor(() => expect(engine.getBackend()).toBe("canvas2d"));
+    await vi.waitFor(() => expect(engine.isBackendAvailable()).toBe(false));
+    expect(engine.getBackend()).toBe("webgpu");
     readbackSubmission.resolve(undefined);
 
     await expect(capture).resolves.toEqual({ status: "rejected", reason: "device-lost" });
@@ -2289,7 +2343,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2366,7 +2420,7 @@ describe("StudioWebGpuEngine", () => {
     const fallback = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(null),
-      fallbackCanvas: fallback.canvas,
+      canvas2dCanvas: fallback.canvas,
       gpu,
     });
 
@@ -2375,7 +2429,8 @@ describe("StudioWebGpuEngine", () => {
     engine.dispose();
     requestDevice.resolve(fake.device);
 
-    await expect(initialization).resolves.toBe("canvas2d");
+    await expect(initialization).resolves.toBe("webgpu");
+    expect(engine.isBackendAvailable()).toBe(false);
     expect(fake.device.destroy).toHaveBeenCalledTimes(1);
   });
 
@@ -2396,7 +2451,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameInvalid = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
       onFrameInvalid,
@@ -2441,7 +2496,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2496,7 +2551,7 @@ describe("StudioWebGpuEngine", () => {
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
       onFrameReady,
     });
@@ -2547,9 +2602,11 @@ describe("StudioWebGpuEngine", () => {
       getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
     } as unknown as GPU;
     const onFrameReady = vi.fn();
+    const gpuSurface = fakeGpuCanvas(context);
+    const canvas2d = fakeCanvas2d();
     const engine = new StudioWebGpuEngine({
-      canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas: gpuSurface,
+      canvas2dCanvas: canvas2d.canvas,
       gpu,
       onFrameReady,
     });
@@ -2563,9 +2620,13 @@ describe("StudioWebGpuEngine", () => {
       points: [Number.NaN, Number.NaN, Number.POSITIVE_INFINITY, 0],
     }))).toBe(false);
     engine.render([stroke({ points: [] })], "invalid:empty");
-    await vi.waitFor(() => expect(engine.getBackend()).toBe("canvas2d"));
+    await vi.waitFor(() => expect(engine.isBackendAvailable()).toBe(false));
 
     expect(onFrameReady).not.toHaveBeenCalled();
+    expect(engine.getBackend()).toBe("webgpu");
+    expect(canvas2d.arcs).toHaveLength(0);
+    expect(gpuSurface.style.visibility).toBe("hidden");
+    expect(canvas2d.canvas.style.visibility).toBe("hidden");
   });
 
   it("keeps initialize idempotent once a live WebGPU device is installed", async () => {
@@ -2583,7 +2644,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
     });
 
@@ -2613,7 +2674,7 @@ describe("StudioWebGpuEngine", () => {
     } as unknown as GPU;
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
     });
 
@@ -2633,7 +2694,7 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.device.destroy).not.toHaveBeenCalled();
   });
 
-  it("releases a failed single-flight initialization so a later adapter retry can recover", async () => {
+  it("allows a later adapter retry without replaying the initialization-failed operation", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const fake = fakeGpuDevice(neverLost);
     const context = {
@@ -2652,18 +2713,25 @@ describe("StudioWebGpuEngine", () => {
       }),
       getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
     } as unknown as GPU;
+    const onFrameReady = vi.fn();
     const engine = new StudioWebGpuEngine({
       canvas: fakeGpuCanvas(context),
-      fallbackCanvas: fakeCanvas2d().canvas,
+      canvas2dCanvas: fakeCanvas2d().canvas,
       gpu,
+      onFrameReady,
     });
 
-    await expect(engine.initialize()).resolves.toBe("canvas2d");
+    engine.render([stroke({ id: "failed-initialization" })], "init:failed-operation");
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+    expect(engine.isBackendAvailable()).toBe(false);
     await expect(engine.initialize()).resolves.toBe("webgpu");
 
     expect(gpu.requestAdapter).toHaveBeenCalledTimes(2);
     expect(adapter.requestDevice).toHaveBeenCalledTimes(1);
     expect(engine.getBackend()).toBe("webgpu");
+    expect(engine.isBackendAvailable()).toBe(true);
+    expect(fake.device.queue.submit).not.toHaveBeenCalled();
+    expect(onFrameReady).not.toHaveBeenCalled();
   });
 });
 

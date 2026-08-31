@@ -7,8 +7,8 @@ import {
 } from "./studio-quickshape";
 import {
   applyStudioSmartShapeBrushEffect,
-  stripStudioSmartShapeBrushEffect,
-  type StudioSmartShapeBrushEffectFallbackReason,
+  resolveStudioSmartShapeBrushEffectAvailability,
+  type StudioSmartShapeBrushEffectUnavailableReason,
 } from "./studio-smart-shape-brush-effect";
 
 import type { DrawEl } from "./studio-element-model";
@@ -31,14 +31,18 @@ export interface StudioQuickShapeReleaseSnapshot {
 }
 
 export type StudioQuickShapeReleaseTransition = "none" | "promoted" | "already-converted";
-export type StudioQuickShapeBrushEffectStatus = "not-requested" | "not-applicable" | "applied" | "fallback";
+export type StudioQuickShapeBrushEffectStatus =
+  | "not-requested"
+  | "not-applicable"
+  | "applied"
+  | "rejected";
 
 export interface StudioQuickShapeReleaseResult {
   readonly stroke: DrawEl;
   readonly transition: StudioQuickShapeReleaseTransition;
   readonly announcementKind: QuickShapeKind | null;
   readonly brushEffectStatus: StudioQuickShapeBrushEffectStatus;
-  readonly brushEffectFallbackReason: StudioSmartShapeBrushEffectFallbackReason | null;
+  readonly brushEffectRejectionReason: StudioSmartShapeBrushEffectUnavailableReason | null;
 }
 
 function legacyPlainPromotion(
@@ -91,20 +95,21 @@ function noChange(
     transition: "none",
     announcementKind: null,
     brushEffectStatus: requested ? "not-applicable" : "not-requested",
-    brushEffectFallbackReason: null,
+    brushEffectRejectionReason: null,
   };
 }
 
-function withRequestedEffect(
-  geometricStroke: DrawEl,
-  sourceStroke: DrawEl | null | undefined,
-) {
-  const effect = applyStudioSmartShapeBrushEffect(geometricStroke, sourceStroke);
+function rejected(
+  stroke: DrawEl,
+  reason: StudioSmartShapeBrushEffectUnavailableReason,
+): StudioQuickShapeReleaseResult {
   return {
-    stroke: effect.stroke,
-    brushEffectStatus: effect.status,
-    brushEffectFallbackReason: effect.status === "fallback" ? effect.reason : null,
-  } as const;
+    stroke,
+    transition: "none",
+    announcementKind: null,
+    brushEffectStatus: "rejected",
+    brushEffectRejectionReason: reason,
+  };
 }
 
 /** Pure recognition/promotion boundary shared by live-converted and release-recognized shapes. */
@@ -131,18 +136,32 @@ export function planStudioQuickShapeRelease(
     );
     if (!promoted) return noChange(stroke, effectRequested);
 
-    const geometric = legacyPlainPromotion(stroke, promoted);
-    const effect = effectRequested
-      ? withRequestedEffect(geometric, snapshot.brushEffectSource ?? stroke)
-      : {
-          stroke: geometric,
-          brushEffectStatus: "not-requested" as const,
-          brushEffectFallbackReason: null,
-        };
+    if (effectRequested) {
+      const source = snapshot.brushEffectSource ?? stroke;
+      const availability = resolveStudioSmartShapeBrushEffectAvailability(source);
+      if (availability.status === "unavailable") {
+        return rejected(stroke, availability.reason);
+      }
+      const effect = applyStudioSmartShapeBrushEffect(
+        legacyPlainPromotion(stroke, promoted),
+        source,
+      );
+      if (effect.status === "unavailable") return rejected(stroke, effect.reason);
+      return {
+        stroke: effect.stroke,
+        transition: "promoted",
+        announcementKind: promoted.kind,
+        brushEffectStatus: "applied",
+        brushEffectRejectionReason: null,
+      };
+    }
+
     return {
-      ...effect,
+      stroke: legacyPlainPromotion(stroke, promoted),
       transition: "promoted",
       announcementKind: promoted.kind,
+      brushEffectStatus: "not-requested",
+      brushEffectRejectionReason: null,
     };
   }
 
@@ -153,29 +172,36 @@ export function planStudioQuickShapeRelease(
     && stroke.kind !== "freehand"
     && snapshot.converted
   ) {
-    const effect = effectRequested
-      ? withRequestedEffect(stroke, snapshot.brushEffectSource)
-      : {
-          stroke,
-          brushEffectStatus: "not-requested" as const,
-          brushEffectFallbackReason: null,
-        };
+    if (effectRequested) {
+      const effect = applyStudioSmartShapeBrushEffect(stroke, snapshot.brushEffectSource);
+      if (effect.status === "unavailable") {
+        return rejected(snapshot.brushEffectSource ?? stroke, effect.reason);
+      }
+      return {
+        stroke: effect.stroke,
+        transition: "already-converted",
+        announcementKind: stroke.kind as QuickShapeKind,
+        brushEffectStatus: "applied",
+        brushEffectRejectionReason: null,
+      };
+    }
     return {
-      ...effect,
+      stroke,
       transition: "already-converted",
       announcementKind: stroke.kind as QuickShapeKind,
+      brushEffectStatus: "not-requested",
+      brushEffectRejectionReason: null,
     };
   }
 
-  // A malformed future converted shape should not retain effect metadata after an explicit request.
+  // A malformed future converted shape cannot start a different provider implicitly.
   if (effectRequested && snapshot.converted) {
-    return {
-      stroke: stripStudioSmartShapeBrushEffect(stroke),
-      transition: "none",
-      announcementKind: null,
-      brushEffectStatus: "fallback",
-      brushEffectFallbackReason: "invalid-geometry",
-    };
+    const source = snapshot.brushEffectSource;
+    const availability = resolveStudioSmartShapeBrushEffectAvailability(source);
+    return rejected(
+      source ?? stroke,
+      availability.status === "unavailable" ? availability.reason : "invalid-geometry",
+    );
   }
   return noChange(stroke, effectRequested);
 }

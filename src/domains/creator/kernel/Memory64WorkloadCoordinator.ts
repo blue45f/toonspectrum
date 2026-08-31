@@ -20,6 +20,7 @@ import {
   probeWasmMemory64Capability,
   WASM_MEMORY64_ACCELERATOR_POLICY,
   type WasmMemory64CapabilityReceipt,
+  type WasmExactMemoryRuntime,
   type WasmScratchAllocationReceipt,
   type WasmScratchAllocationRequest,
   type WasmScratchBackpressureReceipt,
@@ -63,6 +64,8 @@ export interface Memory64WorkloadAllocationPort {
 }
 
 export interface Memory64WorkloadCoordinatorOptions {
+  /** Exact runtime selected before this coordinator accepts any operation. */
+  readonly selectedRuntime?: WasmExactMemoryRuntime;
   /** Test/embedding seam. It is invoked exactly once for one coordinator. */
   readonly capabilityProbe?: () => WasmMemory64CapabilityReceipt;
   /** Used by the default one-probe allocator; omitted resolves the global host. */
@@ -79,23 +82,6 @@ export interface Memory64WorkloadAttemptReceipt {
   readonly plan: WasmScratchWorkingSetPlan;
   readonly allocation: WasmScratchAllocationReceipt;
 }
-
-export type Memory64WorkloadFallbackReceipt =
-  | {
-      readonly kind: "capability-fallback";
-      readonly reason: "memory64-unavailable";
-      readonly nextRuntime: "memory32-fallback";
-    }
-  | {
-      readonly kind: "minimum-window-fallback";
-      readonly reason: "memory64-allocation-failed";
-      readonly nextRuntime: "memory32-fallback";
-      /** The exact receipt that authorized crossing the fallback boundary. */
-      readonly allocation: Extract<
-        WasmScratchAllocationReceipt,
-        { readonly status: "fallback" }
-      >;
-    };
 
 export interface Memory64WorkloadOpfsSpillReceipt {
   readonly disposition: "not-required" | "available" | "required";
@@ -119,9 +105,9 @@ export interface Memory64WorkloadLease {
 
 export interface Memory64WorkloadAllocatedReceipt {
   readonly ok: true;
-  readonly status: "allocated" | "feature-preserved-fallback";
+  readonly status: "allocated";
   readonly workload: WasmScratchWorkload;
-  readonly selectedRuntime: "memory64" | "memory32-fallback";
+  readonly selectedRuntime: WasmExactMemoryRuntime;
   readonly capability: WasmMemory64CapabilityReceipt;
   readonly plan: WasmScratchWorkingSetPlan;
   readonly allocation: Extract<
@@ -129,7 +115,6 @@ export interface Memory64WorkloadAllocatedReceipt {
     { readonly status: "allocated" }
   >;
   readonly attempts: readonly Memory64WorkloadAttemptReceipt[];
-  readonly fallback: Memory64WorkloadFallbackReceipt | null;
   readonly opfsSpill: Memory64WorkloadOpfsSpillReceipt;
   readonly lease: Memory64WorkloadLease;
   readonly readsCanonicalProjectBytes: false;
@@ -144,11 +129,10 @@ export interface Memory64WorkloadBackpressureReceipt {
   readonly workload: WasmScratchWorkload | null;
   readonly selectedRuntime:
     | "memory64"
-    | "memory32-fallback"
+    | "memory32-requested"
     | "unavailable";
   readonly capability: WasmMemory64CapabilityReceipt;
   readonly attempts: readonly Memory64WorkloadAttemptReceipt[];
-  readonly fallback: Memory64WorkloadFallbackReceipt | null;
   /** Exact planner/allocation receipt; no failure or recommended action is erased. */
   readonly terminal:
     | WasmScratchBackpressureReceipt
@@ -204,10 +188,6 @@ export type Memory64CrossRealmAckReceipt =
       readonly runtime: Memory64CrossRealmRuntime;
       readonly residentBytes: bigint;
       readonly residentPages: bigint;
-      readonly fallbackReason:
-        | "memory64-unavailable"
-        | "memory64-worker-allocation-failed"
-        | null;
       readonly authority: "main-realm-memory64-workload-coordinator";
     }>
   | Readonly<{
@@ -327,29 +307,8 @@ function invalidRequestReceipt(
 function normalizeCapability(
   capability: WasmMemory64CapabilityReceipt,
 ): WasmScratchCapabilitySelection {
-  if (capability.isMemory64Supported) {
-    return Object.freeze({
-      selectedRuntime: "memory64",
-      isMemory32FallbackSupported:
-        capability.isMemory32FallbackSupported,
-    });
-  }
-  if (capability.isMemory32FallbackSupported) {
-    return Object.freeze({
-      selectedRuntime: "memory32-fallback",
-      isMemory32FallbackSupported: true,
-    });
-  }
   return Object.freeze({
-    selectedRuntime: "unavailable",
-    isMemory32FallbackSupported: false,
-  });
-}
-
-function memory32Capability(): WasmScratchCapabilitySelection {
-  return Object.freeze({
-    selectedRuntime: "memory32-fallback",
-    isMemory32FallbackSupported: true,
+    selectedRuntime: capability.selectedRuntime,
   });
 }
 
@@ -380,7 +339,7 @@ function createDefaultAllocationPort(
         addressType: request.addressType,
         selection: request.addressType === "i64"
           ? "memory64"
-          : "memory32-fallback",
+          : "memory32-requested",
         maximumPages: request.maximumPages,
       });
     },
@@ -435,8 +394,7 @@ function sameCrossRealmToken(
     && left.reservationId === right.reservationId
     && left.nonce === right.nonce
     && left.workload === right.workload
-    && left.preferredRuntime === right.preferredRuntime
-    && left.memory32FallbackAllowed === right.memory32FallbackAllowed
+    && left.selectedRuntime === right.selectedRuntime
     && left.authorizedResidentBytes === right.authorizedResidentBytes
     && left.authorizedResidentPages === right.authorizedResidentPages
     && left.minimumResidentPages === right.minimumResidentPages
@@ -486,6 +444,7 @@ export class Memory64WorkloadCoordinator {
       options.capabilityProbe
       ?? (() => probeWasmMemory64Capability({
         webAssembly: options.webAssembly,
+        selectedRuntime: options.selectedRuntime ?? "memory64",
       }))
     )();
     this.allocationPort = options.allocationPort
@@ -542,7 +501,6 @@ export class Memory64WorkloadCoordinator {
         terminal,
         normalizeCapability(this.capability),
         [],
-        null,
       );
     }
 
@@ -554,16 +512,8 @@ export class Memory64WorkloadCoordinator {
         : { objectDigest: requestRecord.source.objectDigest }),
     });
     const attempts: Memory64WorkloadAttemptReceipt[] = [];
-    let capability = normalizeCapability(this.capability);
+    const capability = normalizeCapability(this.capability);
     let preferredChunkBytes = request.preferredChunkBytes;
-    let fallback: Memory64WorkloadFallbackReceipt | null =
-      capability.selectedRuntime === "memory32-fallback"
-        ? Object.freeze({
-            kind: "capability-fallback",
-            reason: "memory64-unavailable",
-            nextRuntime: "memory32-fallback",
-          })
-        : null;
 
     while (true) {
       const plan = planWasmScratchWorkingSet(
@@ -586,7 +536,6 @@ export class Memory64WorkloadCoordinator {
           plan,
           capability,
           attempts,
-          fallback,
         );
       }
 
@@ -608,21 +557,7 @@ export class Memory64WorkloadCoordinator {
           allocatedRuntime,
           source,
           attempts,
-          fallback,
         );
-      }
-
-      if (allocation.status === "fallback") {
-        fallback = Object.freeze({
-          kind: "minimum-window-fallback",
-          reason: allocation.reason,
-          nextRuntime: allocation.nextRuntime,
-          allocation,
-        });
-        capability = memory32Capability();
-        preferredChunkBytes =
-          allocation.recommendedPages * STUDIO_WASM_PAGE_BYTES;
-        continue;
       }
 
       if (
@@ -638,7 +573,6 @@ export class Memory64WorkloadCoordinator {
         allocation,
         capability,
         attempts,
-        fallback,
       );
     }
   }
@@ -665,7 +599,6 @@ export class Memory64WorkloadCoordinator {
         invalidRequestReceipt(workload),
         capability,
         [],
-        null,
       );
     }
 
@@ -674,7 +607,7 @@ export class Memory64WorkloadCoordinator {
       reserveActiveResidentBytes(request.budget, this.activeResidentBytesValue),
       request,
     );
-    if (!plan.ok) return this.backpressure(plan, capability, [], null);
+    if (!plan.ok) return this.backpressure(plan, capability, []);
 
     const now = this.now();
     const deadline = now + this.crossRealmAcknowledgementTimeoutMs;
@@ -690,8 +623,7 @@ export class Memory64WorkloadCoordinator {
       reservationId,
       nonce,
       workload: plan.workload,
-      preferredRuntime: plan.runtime,
-      memory32FallbackAllowed: plan.memory32FallbackAvailable,
+      selectedRuntime: plan.runtime,
       authorizedResidentBytes: plan.workingSetBytes.toString(),
       authorizedResidentPages: plan.workingSetPages.toString(),
       minimumResidentPages: plan.minimumWorkingSetPages.toString(),
@@ -769,11 +701,7 @@ export class Memory64WorkloadCoordinator {
     const authorizedBytes = BigInt(token.authorizedResidentBytes);
     const authorizedPages = BigInt(token.authorizedResidentPages);
     const minimumPages = BigInt(token.minimumResidentPages);
-    const runtimeAllowed = acknowledgement.runtime === token.preferredRuntime
-      || (
-        acknowledgement.runtime === "memory32-fallback"
-        && token.memory32FallbackAllowed
-      );
+    const runtimeAllowed = acknowledgement.runtime === token.selectedRuntime;
     const addressMatchesRuntime = acknowledgement.runtime === "memory64"
       ? acknowledgement.addressType === "i64"
       : acknowledgement.addressType === "i32";
@@ -804,11 +732,6 @@ export class Memory64WorkloadCoordinator {
       runtime: acknowledgement.runtime,
       residentBytes,
       residentPages,
-      fallbackReason: token.preferredRuntime === "memory32-fallback"
-        ? "memory64-unavailable"
-        : acknowledgement.runtime === "memory32-fallback"
-          ? "memory64-worker-allocation-failed"
-          : null,
       authority: "main-realm-memory64-workload-coordinator",
     });
   }
@@ -865,7 +788,6 @@ export class Memory64WorkloadCoordinator {
     runtime: StudioWasmLinearMemoryRuntime,
     source: Memory64PagedWorkloadSource,
     attempts: readonly Memory64WorkloadAttemptReceipt[],
-    fallback: Memory64WorkloadFallbackReceipt | null,
   ): Memory64WorkloadAllocatedReceipt {
     const leaseId = `epoch16-wasm-${this.nextLeaseId.toString()}`;
     this.nextLeaseId += BigInt(1);
@@ -887,16 +809,13 @@ export class Memory64WorkloadCoordinator {
     });
     return Object.freeze({
       ok: true,
-      status: plan.runtime === "memory64"
-        ? "allocated"
-        : "feature-preserved-fallback",
+      status: "allocated",
       workload: plan.workload,
       selectedRuntime: plan.runtime,
       capability: this.capability,
       plan,
       allocation,
       attempts: freezeAttempts(attempts),
-      fallback,
       opfsSpill: spillReceipt("continue-in-wasm"),
       lease,
       readsCanonicalProjectBytes: false,
@@ -910,7 +829,6 @@ export class Memory64WorkloadCoordinator {
     terminal: Memory64WorkloadBackpressureReceipt["terminal"],
     capability: WasmScratchCapabilitySelection,
     attempts: readonly Memory64WorkloadAttemptReceipt[],
-    fallback: Memory64WorkloadFallbackReceipt | null,
   ): Memory64WorkloadBackpressureReceipt {
     return Object.freeze({
       ok: false,
@@ -922,7 +840,6 @@ export class Memory64WorkloadCoordinator {
       selectedRuntime: selectedRuntime(capability),
       capability: this.capability,
       attempts: freezeAttempts(attempts),
-      fallback,
       terminal,
       opfsSpill: spillReceipt(terminal.action),
       readsCanonicalProjectBytes: false,

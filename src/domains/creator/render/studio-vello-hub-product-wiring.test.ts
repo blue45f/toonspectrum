@@ -11,6 +11,10 @@ const canvasTargetSource = readFileSync(
   new URL("./studio-vello-hub-canvas-target.ts", import.meta.url),
   "utf8",
 );
+const hubSource = readFileSync(
+  new URL("./studio-vello-hub.ts", import.meta.url),
+  "utf8",
+);
 const verifierSource = readFileSync(
   new URL("../../../../scripts/verify-studio-vello-candidate.mts", import.meta.url),
   "utf8",
@@ -24,8 +28,12 @@ describe("VelloHub /studio product wiring", () => {
     expect(viewportSource).toContain("<StudioRenderSurface");
     expect(viewportSource).toContain("elements={elements}");
     expect(viewportSource).toContain(
-      "documentTransform={pixiSceneDocumentTransform}",
+      "documentTransform={velloSceneDocumentTransform}",
     );
+    expect(viewportSource).toContain("sceneRevision={velloSceneRevision}");
+    expect(viewportSource).toContain("enabled={velloDocumentSurfaceEnabled}");
+    expect(viewportSource).toContain("width={stageViewLayout.width}");
+    expect(viewportSource).toContain("height={stageViewLayout.height}");
     expect(viewportSource).toContain("isPenDown={readVelloHubPenDown}");
     expect(viewportSource).toContain("() => drawingRef.current !== null");
     expect(viewportSource).toContain(
@@ -33,10 +41,13 @@ describe("VelloHub /studio product wiring", () => {
     );
   });
 
-  it("keeps one selection-island owner and enables Pixi only on explicit fallback", () => {
+  it("keeps one document owner and enables Pixi only at the explicit legacy boundary", () => {
     expect(viewportSource).toContain(
-      '!velloHubCapability.enabled\n              || velloHubAuthority.status === "fallback"',
+      '!velloHubCapability.enabled\n              || velloHubAuthority.status === "legacy"',
     );
+    expect(viewportSource).toContain('velloHubAuthority.status === "unavailable"');
+    expect(viewportSource).toContain('data-studio-vello-unavailable="true"');
+    expect(viewportSource).toContain("같은 작업을 다른 엔진으로 재실행하지 않았습니다");
     expect(canvasTargetSource).toContain(
       'dataset.studioVelloHubPrimary = "true"',
     );
@@ -53,10 +64,31 @@ describe("VelloHub /studio product wiring", () => {
     expect(canvasTargetSource).toContain('canvas.style.pointerEvents = "none"');
     expect(viewportSource).toContain("data-studio-frame-graph-document");
     expect(viewportSource).toContain("frameGraphOwnsDocumentPixels");
+    expect(viewportSource).toContain("velloEligibleDocumentIds");
+    expect(viewportSource).toContain('name="studio-konva-document-shadow"');
+    expect(viewportSource).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(viewportSource).toContain(
+      "velloHubAuthority.sceneRevision === velloSceneRevision",
+    );
+    expect(viewportSource).not.toContain(
+      'canvas.style.opacity = frameGraphOwnsDocumentPixels ? "0" : "1"',
+    );
     expect(viewportSource).toContain("<Stage");
     expect(viewportSource).toContain("onPointerDown={onStageDown}");
     expect(viewportSource).toContain("onPointerMove={onStageMove}");
     expect(viewportSource).toContain("onPointerUp={onStageUp}");
+  });
+
+  it("keeps CPU/comparison as explicit QA APIs and schedules no product shadow work", () => {
+    expect(hubSource).toContain("async renderReference(");
+    expect(hubSource).toContain("async compareToReferenceForQa(");
+    expect(hubSource).toContain('referenceOnly: true');
+    expect(hubSource).not.toContain("scheduleClassicShadow");
+    expect(hubSource).not.toContain("runClassicShadow");
+    expect(hubSource).not.toContain("flushShadowWork");
+    expect(hubSource).not.toContain("recoverGpuIslandToCpu");
+    expect(hubSource).not.toContain("forceCpu");
+    expect(hubSource).not.toContain("onUnrecoverableFallback");
   });
 
   it("verifies the bounded product seam instead of enforcing blanket research-only", () => {

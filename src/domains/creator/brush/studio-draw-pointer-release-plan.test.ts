@@ -295,7 +295,7 @@ describe("planStudioDrawPointerRelease", () => {
     expect(result.quickShapeTransition).toBe("promoted");
     expect(result.quickShapeAnnouncementKind).toBe("line");
     expect(result.quickShapeBrushEffectStatus).toBe("applied");
-    expect(result.quickShapeBrushEffectFallbackReason).toBeNull();
+    expect(result.quickShapeBrushEffectRejectionReason).toBeNull();
     expect(result.stroke.kind).toBe("freehand");
     expect(result.stroke.brush).toBe("neon");
     expect(result.stroke.points).toHaveLength(4);
@@ -317,7 +317,7 @@ describe("planStudioDrawPointerRelease", () => {
       source: stroke({ brush: "watercolor", watercolorPipeline: "causal-walker-v2" }),
       reason: "causal-watercolor",
     },
-  ] as const)("falls back to the stable geometric node for $label QuickShape", ({ source, reason }) => {
+  ] as const)("rejects $label QuickShape promotion and preserves its source stroke", ({ source, reason }) => {
     const result = plan({
       stroke: source,
       quickShape: {
@@ -328,13 +328,17 @@ describe("planStudioDrawPointerRelease", () => {
       },
     });
 
-    expect(result.quickShapeTransition).toBe("promoted");
-    expect(result.quickShapeBrushEffectStatus).toBe("fallback");
-    expect(result.quickShapeBrushEffectFallbackReason).toBe(reason);
-    expect(result.stroke.kind).not.toBe("freehand");
-    expect(result.stroke.brush).toBeUndefined();
-    expect(result.stroke.stampPipeline).toBeUndefined();
-    expect(result.stroke.watercolorPipeline).toBeUndefined();
+    expect(result.quickShapeTransition).toBe("none");
+    expect(result.quickShapeAnnouncementKind).toBeNull();
+    expect(result.quickShapeBrushEffectStatus).toBe("rejected");
+    expect(result.quickShapeBrushEffectRejectionReason).toBe(reason);
+    expect(result.stroke).toBe(source);
+    expect(result.stroke.kind).toBe("freehand");
+    expect(result.stroke.brush).toBe(source.brush);
+    expect(result.stroke.stampPipeline).toBe(source.stampPipeline);
+    expect(result.stroke.watercolorPipeline).toBe(source.watercolorPipeline);
+    expect(result.postCorrectionApplied).toBe(false);
+    expect(result.commitMode).toBe("immediate");
   });
 
   it("trims dwell jitter before release promotion", () => {
@@ -425,12 +429,45 @@ describe("planStudioDrawPointerRelease", () => {
       },
     });
 
-    expect(result.quickShapeTransition).toBe("already-converted");
-    expect(result.quickShapeBrushEffectStatus).toBe("fallback");
-    expect(result.quickShapeBrushEffectFallbackReason).toBe("missing-source");
+    expect(result.quickShapeTransition).toBe("none");
+    expect(result.quickShapeAnnouncementKind).toBeNull();
+    expect(result.quickShapeBrushEffectStatus).toBe("rejected");
+    expect(result.quickShapeBrushEffectRejectionReason).toBe("missing-source");
+    expect(result.stroke).toBe(converted);
     expect(result.stroke.kind).toBe("rect");
-    expect(result.stroke.brushCatalogId).toBeUndefined();
-    expect(result.stroke.stampPipeline).toBeUndefined();
+    expect(result.stroke.brushCatalogId).toBe("stale-brush");
+    expect(result.stroke.stampPipeline).toBe("causal-walker-v2");
+    expect(result.commitMode).toBe("immediate");
+  });
+
+  it("restores the captured source when a live-converted selected effect is unavailable", () => {
+    const original = stroke({
+      brush: "ink-brush",
+      stampPipeline: "causal-walker-v2",
+    });
+    const converted = stroke({
+      kind: "rect",
+      points: [10, 20, 90, 70],
+      brush: undefined,
+      pressures: undefined,
+    });
+    const result = plan({
+      stroke: converted,
+      quickShape: {
+        active: true,
+        converted: true,
+        brushEffectMode: "selected-brush",
+        brushEffectSource: original,
+      },
+      postCorrection: { strength: 10 },
+    });
+
+    expect(result.quickShapeTransition).toBe("none");
+    expect(result.quickShapeBrushEffectStatus).toBe("rejected");
+    expect(result.quickShapeBrushEffectRejectionReason).toBe("causal-stamp");
+    expect(result.stroke).toBe(original);
+    expect(result.postCorrectionApplied).toBe(false);
+    expect(result.commitMode).toBe("immediate");
   });
 
   it("never promotes or announces an eraser QuickShape gesture", () => {

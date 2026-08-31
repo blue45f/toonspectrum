@@ -674,7 +674,12 @@ export function bindStudioCuttoonStagePointersDownDraw(
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       advancedRulerSnapRef.current = null;
-      beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin);
+      if (!beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin)) {
+        // The selected renderer failed admission. Do not commit or publish the draft through a
+        // different surface; cleanup leaves the previous document frame intact.
+        discardDrawingPointerSession();
+        return;
+      }
       drawingCrdtPublisherRef.current.cancel();
       drawingCrdtStrokeActiveRef.current = false;
       const crdtDocument = studioCrdtDocumentRef.current;

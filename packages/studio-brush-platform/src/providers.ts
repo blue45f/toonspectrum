@@ -47,7 +47,6 @@ export const perfectFreehandProviderDescriptor: ProviderDescriptor =
     finalQuality: "production",
     determinism: "bit-exact",
     memoryEstimateMb: 1,
-    fallbackProviderId: null,
     knownIssues: [],
   });
 
@@ -73,7 +72,7 @@ export const googleInkMeshProviderDescriptor: ProviderDescriptor =
     limitations: [
       "no flow/opacity dynamics, stamp/image tips, hardness or jitter — unsupported program dimensions surface as compile warnings, never silently dropped",
       "consumes pre-modeled input (ink stroke modeler); the JS stabilizer does not apply on this lane",
-      "no fallback provider — hosts without the ink WASM module hide mesh brushes (BrushProviderRequiredError) instead of substituting outline geometry",
+      "hosts without the ink WASM module hide mesh brushes (BrushProviderRequiredError) instead of substituting outline geometry",
     ],
     previewQuality: "production",
     finalQuality: "production",
@@ -83,9 +82,7 @@ export const googleInkMeshProviderDescriptor: ProviderDescriptor =
     // certification exists for a perfect-freehand rendition of Google Ink mesh
     // output, so `compileMeshBrush` throws BrushProviderRequiredError when the
     // ink WASM provider is unavailable and the brush is hidden — never
-    // silently re-rendered with different stroke geometry. Restore a fallback
-    // only together with a checked-in visual-equivalence certification.
-    fallbackProviderId: null,
+    // silently re-rendered with different stroke geometry.
     knownIssues: [],
   });
 
@@ -107,18 +104,15 @@ export const hokusaiProviderDescriptor: ProviderDescriptor =
     limitations: [
       "tile output composites through the raster surface owner — no direct surface ownership",
       "libmypaint parity lab pending for the full .myb corpus (matrix E11/E12 gate)",
-      "no fallback provider — device-incapable hosts hide natural-media brushes instead of substituting texture",
+      "device-incapable hosts hide natural-media brushes instead of substituting texture",
     ],
     previewQuality: "production",
     finalQuality: "production",
     determinism: "bit-exact",
     memoryEstimateMb: 24,
-    // V17.1 fail-closed policy: the former "skia-canvaskit" fallback is removed because no
-    // texture-equivalence certification exists for a Skia rendition of Hokusai natural-media
-    // output (사용자 지시 3: a brush must never silently render with a different texture — a
-    // device that cannot run this provider hides the brush rather than substituting). Restore a
-    // fallback only together with a checked-in texture-equivalence certification.
-    fallbackProviderId: null,
+    // V17.1 fail-closed policy: no texture-equivalence certification exists for
+    // a Skia rendition of Hokusai output. A device that cannot run this provider
+    // hides the brush rather than substituting another texture engine.
     knownIssues: [],
   });
 
@@ -128,7 +122,7 @@ const perfectFreehandBootstrap = declareTrustedBootstrapProvider(
     classification: "checked-in-production-baseline",
     source: "packages/studio-brush-platform/src/providers.ts",
     owner: "studio-brush-platform",
-    justification: "checked-in pressure-outline baseline used by the vector brush fallback",
+    justification: "checked-in pressure-outline baseline for explicit vector brush plans",
   },
 );
 const googleInkMeshBootstrap = declareTrustedBootstrapProvider(

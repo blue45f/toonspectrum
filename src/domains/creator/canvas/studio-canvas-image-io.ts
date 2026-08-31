@@ -153,7 +153,11 @@ async function loadOpenRasterFileForCanvas(
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { decodeStudioRasterInterchangeAsync } = await import( "../render/studio-raster-interchange-worker-client");
-  const decoded = await decodeStudioRasterInterchangeAsync(bytes, format);
+  const decoded = await decodeStudioRasterInterchangeAsync(
+    bytes,
+    format,
+    { executionMode: "worker" },
+  );
   const converted = studioRasterBitmapToCanvasDataUrl(decoded.decoded.bitmap);
   return { ...converted, isAnimatedGif: false };
 }

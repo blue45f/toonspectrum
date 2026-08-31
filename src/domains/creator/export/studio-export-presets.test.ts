@@ -346,8 +346,15 @@ class FakeCanvas {
     return this.ctx;
   }
 
-  toBlob(callback: (blob: Blob | null) => void): void {
-    callback(new Blob([new Uint8Array(this.blobBytes)]));
+  toBlob(callback: (blob: Blob | null) => void, type = "image/png"): void {
+    const prefix = type === "image/jpeg"
+      ? Uint8Array.of(0xff, 0xd8, 0xff)
+      : type === "image/webp"
+        ? new TextEncoder().encode("RIFF0000WEBP")
+        : Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    const bytes = new Uint8Array(Math.max(this.blobBytes, prefix.byteLength));
+    bytes.set(prefix);
+    callback(new Blob([bytes], { type }));
   }
 }
 
@@ -496,9 +503,9 @@ describe("exportPresetSlices", () => {
           const fake = new FakeCanvas(w, h);
           created.push(fake);
           const originalToBlob = fake.toBlob.bind(fake);
-          fake.toBlob = (callback) => {
+          fake.toBlob = (callback, type) => {
             clock += encodeCostMs; // 합성·인코딩에 실제로 흘러간 시간
-            originalToBlob(callback);
+            originalToBlob(callback, type);
           };
           return asCanvas(fake);
         },

@@ -19,7 +19,7 @@ import {
 import { isStudioImmediateFreehandCommit } from "./studio-draw-completion";
 
 import type { DrawEl } from "../studio-element-model";
-import type { StudioSmartShapeBrushEffectFallbackReason } from "../studio-smart-shape-brush-effect";
+import type { StudioSmartShapeBrushEffectUnavailableReason } from "../studio-smart-shape-brush-effect";
 
 export type StudioDrawReleaseShapeKind = Exclude<
   NonNullable<DrawEl["kind"]>,
@@ -64,7 +64,7 @@ export interface StudioDrawPointerReleasePlan {
   readonly quickShapeTransition: StudioDrawReleaseQuickShapeTransition;
   readonly quickShapeAnnouncementKind: StudioDrawReleaseShapeKind | null;
   readonly quickShapeBrushEffectStatus: StudioQuickShapeBrushEffectStatus;
-  readonly quickShapeBrushEffectFallbackReason: StudioSmartShapeBrushEffectFallbackReason | null;
+  readonly quickShapeBrushEffectRejectionReason: StudioSmartShapeBrushEffectUnavailableReason | null;
   readonly postCorrectionApplied: boolean;
   readonly commitMode: "immediate" | "deferred";
 }
@@ -83,6 +83,7 @@ export function planStudioDrawPointerRelease(
   if (
     (stroke.kind ?? "freehand") === "freehand"
     && quickShape.brushEffectStatus !== "applied"
+    && quickShape.brushEffectStatus !== "rejected"
     && !isStudioPixelPencilRenderMode(stroke.brush)
     && input.postCorrection.strength > 0
     && stroke.stampPipeline !== "causal-walker-v2"
@@ -107,8 +108,10 @@ export function planStudioDrawPointerRelease(
     // Taps and short flicks must become undo/autosave-authoritative in the pointerup task.
     && !isStudioImmediateFreehandCommit(stroke)
     // The live direct surface still contains the pre-snap gesture/primitive, not the rebuilt
-    // brush outline. Commit it synchronously so an incorrect preview is never preserved.
+    // brush outline. Applied effects and rejected promotions both commit synchronously: the latter
+    // restores the exact pre-promotion source instead of preserving a geometric substitute.
     && quickShape.brushEffectStatus !== "applied"
+    && quickShape.brushEffectStatus !== "rejected"
     // Direct drafts may defer only while their Canvas/WebGPU pixels can survive the handoff.
     && canKeepDeferredInkVisible;
 
@@ -117,7 +120,7 @@ export function planStudioDrawPointerRelease(
     quickShapeTransition: quickShape.transition,
     quickShapeAnnouncementKind: quickShape.announcementKind,
     quickShapeBrushEffectStatus: quickShape.brushEffectStatus,
-    quickShapeBrushEffectFallbackReason: quickShape.brushEffectFallbackReason,
+    quickShapeBrushEffectRejectionReason: quickShape.brushEffectRejectionReason,
     postCorrectionApplied,
     commitMode: deferred ? "deferred" : "immediate",
   };

@@ -29,7 +29,9 @@ export type StudioSvgExportWorkerFactory = () => StudioSvgExportWorkerLike | nul
 
 export interface StudioSvgExportWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Selected exactly once before the export starts. Omission selects the product Worker. */
+  executionBackend?: "worker" | "direct";
+  /** Test/runtime seam. A null/throwing factory makes the selected Worker unavailable. */
   workerFactory?: StudioSvgExportWorkerFactory | null;
   /** Product default is 30 seconds; injectable only to keep timeout tests deterministic. */
   runTimeoutMs?: number;
@@ -326,13 +328,12 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
-async function runSvgExportDirect(
+export async function runStudioSvgExportDirect(
   input: SvgExportPageInput,
   signal: AbortSignal | undefined,
 ): Promise<StudioSvgExportWorkerClientResult> {
   throwIfAborted(signal);
-  // Match the short-lived module worker: a CSP/Worker fallback must not downgrade outline brushes
-  // to a uniform Line merely because its dynamic chunk has not been requested on this thread yet.
+  // Match the short-lived module worker so explicitly selected direct exports retain outline parity.
   await loadStudioPerfectFreehandStroker();
   throwIfAborted(signal);
   return { execution: "direct", result: exportPageToSvg(input) };
@@ -383,9 +384,6 @@ function runSvgExportWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      void runSvgExportDirect(input, signal).then(resolve, reject);
-    });
     const postRequest = () => {
       requestPosted = true;
       runTimer = setTimeout(() => {
@@ -393,9 +391,12 @@ function runSvgExportWithWorker(
       }, runTimeoutMs);
       try {
         worker.postMessage(message, r8Transfer.buffers);
-      } catch {
+      } catch (cause) {
         requestPosted = false;
-        resolveDirectFallback();
+        finish(() => reject(new Error(
+          "SVG 내보내기 Worker에 요청을 전달하지 못했습니다.",
+          { cause },
+        )));
       }
     };
 
@@ -426,10 +427,6 @@ function runSvgExportWithWorker(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      if (!requestPosted) {
-        resolveDirectFallback();
-        return;
-      }
       const error =
         event.error instanceof Error
           ? event.error
@@ -445,27 +442,38 @@ function runSvgExportWithWorker(
     if (workerAlreadyReady) {
       postRequest();
     } else {
-      readyTimer = setTimeout(resolveDirectFallback, STUDIO_SVG_EXPORT_READY_TIMEOUT_MS);
+      readyTimer = setTimeout(() => finish(() => reject(
+        new Error("SVG 내보내기 Worker 준비 시간이 초과되었습니다."),
+      )), STUDIO_SVG_EXPORT_READY_TIMEOUT_MS);
     }
   });
 }
 
 /**
- * 벡터 SVG 직렬화를 모듈 Worker에서 실행한다. 요소 트리는 구조적 복제로 전달하고, 실제
- * 참조되는 검증된 R8 종이 질감만 private ArrayBuffer로 복사·이전한다. Worker를 못 만들면
- * (구형 브라우저·CSP) 현재 main-realm registry를 보존한 채 동일한 exporter를 직접 실행한다.
+ * 벡터 SVG 직렬화 백엔드를 작업 전에 한 번 선택한다. 제품 기본은 모듈 Worker이며,
+ * Worker 생성/준비/전송/실행 실패는 모두 terminal이다. Direct 실행은 명시적인 mode에서만
+ * 가능하고, 시작된 Worker 요청을 main realm에서 재실행하지 않는다.
  */
 export async function runStudioSvgExportWorker(
   input: SvgExportPageInput,
   options: StudioSvgExportWorkerClientOptions = {},
 ): Promise<StudioSvgExportWorkerClientResult> {
   throwIfAborted(options.signal);
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("SVG 내보내기 실행 백엔드가 올바르지 않습니다.");
+  }
+  if (executionBackend === "direct") {
+    return runStudioSvgExportDirect(input, options.signal);
+  }
   const prewarmed = options.workerFactory === undefined
     ? takeStudioSvgExportPrewarmedWorker()
     : null;
   const factory =
     options.workerFactory === undefined ? createStudioSvgExportModuleWorker : options.workerFactory;
-  if (!factory && !prewarmed) return runSvgExportDirect(input, options.signal);
+  if (!factory && !prewarmed) {
+    throw new Error("SVG 내보내기 Worker를 사용할 수 없습니다.");
+  }
 
   let worker: StudioSvgExportWorkerLike | null;
   if (prewarmed) {
@@ -473,17 +481,17 @@ export async function runStudioSvgExportWorker(
   } else {
     try {
       worker = factory?.() ?? null;
-    } catch {
-      return runSvgExportDirect(input, options.signal);
+    } catch (cause) {
+      throw new Error("SVG 내보내기 Worker를 생성하지 못했습니다.", { cause });
     }
   }
-  if (!worker) return runSvgExportDirect(input, options.signal);
+  if (!worker) throw new Error("SVG 내보내기 Worker를 사용할 수 없습니다.");
   let r8Transfer: StudioSvgExportWorkerR8Transfer;
   try {
     r8Transfer = prepareStudioSvgExportWorkerR8Transfer(input);
-  } catch {
+  } catch (cause) {
     worker.terminate();
-    return runSvgExportDirect(input, options.signal);
+    throw cause;
   }
   return runSvgExportWithWorker(
     worker,

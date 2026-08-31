@@ -8,7 +8,7 @@
  *
  * 여기서 더 나아간 점:
  *  - 실패를 **throw 하지 않는다**. `run()` 은 항상 `{ ok: true } | { ok: false, code }` 로
- *    resolve 한다 — 호출자가 catch 로 코드(예: unsupported → 메인스레드 폴백 가능)를 잃지 않게.
+ *    resolve 한다 — 호출자가 선택된 provider의 unavailable 상태와 원인을 잃지 않게 한다.
  *  - 코얼레싱·백프레셔·runId 중재는 순수 스케줄러에 위임한다(헤드리스 검증 가능).
  *
  * 핫패스 계약: 이 클라이언트는 React 상태를 전혀 건드리지 않는다. 결과는 Promise 로만 나가고,
@@ -57,7 +57,7 @@ export const STUDIO_OFFSCREEN_RASTER_STARTUP_TIMEOUT_MS = 5_000;
 export const STUDIO_OFFSCREEN_RASTER_RUN_TIMEOUT_MS = 30_000;
 
 export interface StudioOffscreenRasterSessionOptions {
-  /** 생략하면 Vite 모듈 Worker. `null` 을 주면 Worker 를 아예 만들지 않는다(폴백 강제). */
+  /** 생략하면 Vite 모듈 Worker. `null` 은 선택된 Worker provider를 명시적으로 비활성화한다. */
   readonly workerFactory?: StudioOffscreenRasterWorkerFactory | null;
   readonly policy?: StudioOffscreenQueuePolicy;
   readonly maxQueued?: number;

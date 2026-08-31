@@ -19,6 +19,7 @@ import {
   type StudioPackageArchiveSource,
 } from "./studio-package-archive";
 
+import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
 import type {
   JournalEntryIR,
   JournalStore,
@@ -158,6 +159,8 @@ export interface StudioV12RecoveryPackageOptions {
   limits?: Partial<StudioV12RecoveryPackageLimits>;
   digest?: StudioOpfsDigest | null;
   signal?: AbortSignal;
+  /** Fixed before ZIP construction. Browser product callers select `worker`. */
+  crc32ExecutionMode?: StudioCrc32ExecutionMode;
   onProgress?: (progress: {
     phase: "history" | "attachments" | "archive";
     completed: number;
@@ -935,6 +938,7 @@ export async function buildStudioV12RecoveryPackage(
     })),
   ];
   const bytes = await buildStudioPackageArchiveBytes(entries, {
+    crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
     signal: options.signal,
     limits: {
       maxFiles: limits.maxFiles,

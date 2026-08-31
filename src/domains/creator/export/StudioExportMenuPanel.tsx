@@ -498,14 +498,17 @@ export function StudioExportMenuPanel({
       const safeTitle = safeExportBaseName(exportTitle);
       if (kind === "cbz") {
         const { buildStudioCbzBlob } = await import("../studio-cbz-interchange");
-        const result = await buildStudioCbzBlob({
-          pages: pngPages.map((image) => ({ image })),
-          metadata: {
-            title: exportTitle.trim() || safeTitle,
-            count: pngPages.length,
-            format: "Webtoon",
+        const result = await buildStudioCbzBlob(
+          {
+            pages: pngPages.map((image) => ({ image })),
+            metadata: {
+              title: exportTitle.trim() || safeTitle,
+              count: pngPages.length,
+              format: "Webtoon",
+            },
           },
-        });
+          { crc32ExecutionMode: "worker" },
+        );
         downloadBlob(result.blob, `${safeTitle}.cbz`);
         setArchiveStatus({
           tone: result.warnings.length > 0 ? "warn" : "good",
@@ -518,14 +521,17 @@ export function StudioExportMenuPanel({
         const { buildStudioOpenRasterBlob } = await import("../studio-openraster-interchange");
         const canvas = canvases[0]!;
         const image = pngPages[0]!;
-        const result = await buildStudioOpenRasterBlob({
-          width: canvas.width,
-          height: canvas.height,
-          name: exportTitle.trim() || safeTitle,
-          layers: [{ name: "합성 페이지", png: image }],
-          mergedImage: image,
-          thumbnail: image,
-        });
+        const result = await buildStudioOpenRasterBlob(
+          {
+            width: canvas.width,
+            height: canvas.height,
+            name: exportTitle.trim() || safeTitle,
+            layers: [{ name: "합성 페이지", png: image }],
+            mergedImage: image,
+            thumbnail: image,
+          },
+          { crc32ExecutionMode: "worker" },
+        );
         downloadBlob(result.blob, `${safeTitle}.ora`);
         setArchiveStatus({
           tone: "warn",

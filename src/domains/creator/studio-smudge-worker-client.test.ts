@@ -100,6 +100,28 @@ afterEach(() => {
 });
 
 describe("runStudioSmudgeWorker", () => {
+  it("runs direct only when explicitly selected and rejects an unavailable Worker", async () => {
+    const directInput = request();
+    const expectedInput = structuredClone(directInput);
+    const expected = smudgeStroke(
+      expectedInput.data,
+      expectedInput.w,
+      expectedInput.h,
+      expectedInput.points,
+      expectedInput.radiusPx,
+      expectedInput.strength,
+    );
+    await expect(runStudioSmudgeWorker(directInput, {
+      executionMode: "direct",
+    })).resolves.toEqual({ execution: "direct", data: expected });
+
+    const workerInput = request();
+    await expect(runStudioSmudgeWorker(workerInput, {
+      workerFactory: null,
+    })).rejects.toMatchObject({ name: "StudioSmudgeWorkerUnavailableError" });
+    expect(workerInput.data.byteLength).toBe(workerInput.w * workerInput.h * 4);
+  });
+
   it("keeps exact direct/worker parity and terminates an explicit one-shot Worker", async () => {
     const input = request();
     const expectedInput = structuredClone(input);

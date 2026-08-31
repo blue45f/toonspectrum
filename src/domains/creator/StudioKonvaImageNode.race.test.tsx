@@ -703,11 +703,8 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
   });
 
-  it("falls back to the worker lane when the GPU chain declines the request", async () => {
+  it("keeps the selected GPU lane authoritative when its presentation declines", async () => {
     gpuHarness.eligible = true;
-    // Above the measured GPU/CPU crossover (~1140² for a one-step chain), so
-    // the size-aware lane order still puts the GPU lane at the head — that is
-    // the precondition for exercising its decline→worker fallback at all.
     render(node(imageEl({ brightness: 0.2, width: 1_600, height: 1_600 })));
     await load(imageHarness.assigned[0]!);
     await flushWorkerDebounce();
@@ -715,25 +712,19 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(gpuHarness.isEligible).toHaveBeenCalled();
     expect(gpuHarness.present).toHaveBeenCalledTimes(1);
     expect(gpuHarness.apply).not.toHaveBeenCalled();
-    expect(workerHarness.runs).toHaveLength(1);
-
-    await act(async () => resolveRun(workerHarness.runs[0]!));
-    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.filters).toBeUndefined();
   });
 
-  it("skips the GPU lane below the crossover even when the chain is eligible", async () => {
+  it("selects the eligible GPU lane before work without cost-based backend substitution", async () => {
     gpuHarness.eligible = true;
-    // 20.4×10.4: the GPU lane's ~2.4 ms submit+readback floor dwarfs the work
-    // itself, so the cost model demotes it and the worker lane runs directly.
     render(node(imageEl({ brightness: 0.2 })));
     await load(imageHarness.assigned[0]!);
     await flushWorkerDebounce();
 
     expect(gpuHarness.apply).not.toHaveBeenCalled();
-    expect(workerHarness.runs).toHaveLength(1);
-
-    await act(async () => resolveRun(workerHarness.runs[0]!));
-    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+    expect(gpuHarness.present).toHaveBeenCalledTimes(1);
+    expect(workerHarness.runs).toHaveLength(0);
   });
 
   it("preserves full-image filtering when a mask is absent or explicitly disabled", async () => {
@@ -819,11 +810,7 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(workerHarness.runs).toHaveLength(0);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(203);
-    });
-    expect(secondReadback).not.toHaveBeenCalled();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1);
+      await vi.advanceTimersByTimeAsync(220);
     });
     await flush();
 

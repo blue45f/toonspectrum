@@ -1,4 +1,3 @@
-import type { StudioCommittedInkSurfaceHandoff } from "../studio-committed-ink-handoff-coordinator";
 import type { DrawEl } from "../studio-element-model";
 
 /** One document stroke can fan out to several GPU operations when symmetry is enabled. */
@@ -6,47 +5,6 @@ export interface StudioGpuPendingDrawAuthority {
   readonly element: DrawEl;
   readonly gpuStrokeCount: number;
 }
-
-export interface StudioGpuPendingAuthorityPromotionInput {
-  readonly authorities: readonly StudioGpuPendingDrawAuthority[];
-  readonly gpuStrokeCount: number;
-  readonly handoffs: readonly StudioCommittedInkSurfaceHandoff[];
-  readonly settledDrafts: readonly DrawEl[];
-  readonly uncommittedOrderIds: readonly string[];
-}
-
-export type StudioGpuPendingAuthorityPromotionRejectionReason =
-  | "invalid-count"
-  | "authority-count-mismatch"
-  | "partial-authority-reservation"
-  | "authority-reservation-element-mismatch"
-  | "draft-reservation-element-mismatch"
-  | "draft-reservation-overflow";
-
-export type StudioGpuPendingAuthorityPromotion =
-  | {
-      readonly status: "promoted";
-      readonly settledDrafts: readonly DrawEl[];
-      readonly handoffs: readonly StudioCommittedInkSurfaceHandoff[];
-      readonly promotedElementCount: number;
-    }
-  | {
-      readonly status: "rejected";
-      readonly reason: StudioGpuPendingAuthorityPromotionRejectionReason;
-    };
-
-export type StudioGpuPendingAuthorityCanvasReconciliation =
-  | {
-      readonly status: "promoted";
-      readonly settledDrafts: readonly DrawEl[];
-      readonly handoffs: readonly StudioCommittedInkSurfaceHandoff[];
-      readonly promotedElementCount: number;
-      readonly recoveredFrom: StudioGpuPendingAuthorityPromotionRejectionReason;
-    }
-  | {
-      readonly status: "rejected";
-      readonly reason: "missing-draw-authority";
-    };
 
 export interface StudioGpuPendingAuthorityReleaseInput {
   readonly authorities: readonly StudioGpuPendingDrawAuthority[];
@@ -88,184 +46,6 @@ function authorityStrokeCount(authorities: readonly StudioGpuPendingDrawAuthorit
   return total;
 }
 
-function orderedUniqueElements(
-  elements: readonly DrawEl[],
-  order: readonly string[],
-): readonly DrawEl[] {
-  const rank = new Map(order.map((id, index) => [id, index]));
-  const seen = new Set<string>();
-  const unique = elements.filter((element) => {
-    if (seen.has(element.id)) return false;
-    seen.add(element.id);
-    return true;
-  });
-  return unique
-    .map((element, index) => ({ element, index, rank: rank.get(element.id) }))
-    .toSorted((left, right) => {
-      if (left.rank === undefined && right.rank === undefined) return left.index - right.index;
-      if (left.rank === undefined) return 1;
-      if (right.rank === undefined) return -1;
-      return left.rank - right.rank || left.index - right.index;
-    })
-    .map(({ element }) => element);
-}
-
-/**
- * Atomically converts every retained GPU authority into the settled Konva FIFO.
- *
- * Existing handoffs reserve independent draft/GPU prefixes. Rewriting only the arrays would make
- * a later draw receipt release the wrong surface, so this planner migrates those reservations too.
- * A symmetry group is indivisible: a partial reservation is rejected instead of showing only some
- * mirrored copies or double-compositing their opacity.
- */
-export function promoteStudioGpuPendingAuthority(
-  input: StudioGpuPendingAuthorityPromotionInput,
-): StudioGpuPendingAuthorityPromotion {
-  const gpuStrokeCount = normalizedCount(input.gpuStrokeCount);
-  const actualGpuStrokeCount = authorityStrokeCount(input.authorities);
-  if (gpuStrokeCount === null || actualGpuStrokeCount === null) {
-    return { status: "rejected", reason: "invalid-count" };
-  }
-  if (gpuStrokeCount !== actualGpuStrokeCount) {
-    return { status: "rejected", reason: "authority-count-mismatch" };
-  }
-
-  let authorityCursor = 0;
-  const promotedByHandoff: DrawEl[][] = [];
-  for (const handoff of input.handoffs) {
-    const target = normalizedCount(handoff.gpuSettledCount);
-    if (target === null) return { status: "rejected", reason: "invalid-count" };
-    let consumed = 0;
-    const promoted: DrawEl[] = [];
-    while (consumed < target) {
-      const authority = input.authorities[authorityCursor];
-      if (!authority || consumed + authority.gpuStrokeCount > target) {
-        return { status: "rejected", reason: "partial-authority-reservation" };
-      }
-      if (!handoff.strokeIds.includes(authority.element.id)) {
-        return { status: "rejected", reason: "authority-reservation-element-mismatch" };
-      }
-      promoted.push(authority.element);
-      consumed += authority.gpuStrokeCount;
-      authorityCursor += 1;
-    }
-    promotedByHandoff.push(promoted);
-  }
-
-  let draftCursor = 0;
-  const nextSettledDrafts: DrawEl[] = [];
-  const nextHandoffs: StudioCommittedInkSurfaceHandoff[] = [];
-  for (const [index, handoff] of input.handoffs.entries()) {
-    const reservedDraftCount = normalizedCount(handoff.draftSettledCount);
-    if (
-      reservedDraftCount === null
-      || draftCursor + reservedDraftCount > input.settledDrafts.length
-    ) {
-      return { status: "rejected", reason: "draft-reservation-overflow" };
-    }
-    const reservedDrafts = input.settledDrafts.slice(
-      draftCursor,
-      draftCursor + reservedDraftCount,
-    );
-    if (reservedDrafts.some((draft) => !handoff.strokeIds.includes(draft.id))) {
-      return { status: "rejected", reason: "draft-reservation-element-mismatch" };
-    }
-    draftCursor += reservedDraftCount;
-    const combined = orderedUniqueElements(
-      [...reservedDrafts, ...(promotedByHandoff[index] ?? [])],
-      handoff.strokeIds,
-    );
-    nextSettledDrafts.push(...combined);
-    nextHandoffs.push({
-      ...handoff,
-      draftSettledCount: combined.length,
-      gpuSettledCount: 0,
-    });
-  }
-
-  const unreservedDrafts = input.settledDrafts.slice(draftCursor);
-  const unreservedGpu = input.authorities
-    .slice(authorityCursor)
-    .map((authority) => authority.element);
-  nextSettledDrafts.push(...orderedUniqueElements(
-    [...unreservedDrafts, ...unreservedGpu],
-    input.uncommittedOrderIds,
-  ));
-
-  return {
-    status: "promoted",
-    settledDrafts: nextSettledDrafts,
-    handoffs: nextHandoffs,
-    promotedElementCount: input.authorities.length,
-  };
-}
-
-/**
- * Last-resort semantic reconciliation for a corrupt numeric surface reservation.
- *
- * The strict planner above remains the ordinary authority transition. This fallback is used only
- * when its count bookkeeping is already inconsistent and a newer physical stroke must not be
- * composited underneath the retained DOM GPU canvas. It never invents pixels: every recovered
- * Canvas item must come from an exact retained DrawEl authority. Handoff ownership is rebuilt from
- * semantic stroke ids, while unmatched drafts are retained at the tail instead of being released.
- */
-export function reconcileStudioGpuPendingAuthorityToCanvas(
-  input: StudioGpuPendingAuthorityPromotionInput,
-  recoveredFrom: StudioGpuPendingAuthorityPromotionRejectionReason,
-): StudioGpuPendingAuthorityCanvasReconciliation {
-  const retainedGpuStrokeCount = normalizedCount(input.gpuStrokeCount);
-  const recoverableGpuStrokeCount = authorityStrokeCount(input.authorities);
-  if (
-    retainedGpuStrokeCount === null
-    || recoverableGpuStrokeCount === null
-    || retainedGpuStrokeCount !== recoverableGpuStrokeCount
-  ) {
-    return { status: "rejected", reason: "missing-draw-authority" };
-  }
-
-  const combined = orderedUniqueElements(
-    [
-      ...input.settledDrafts,
-      ...input.authorities.map((authority) => authority.element),
-    ],
-    [
-      ...input.handoffs.flatMap((handoff) => handoff.strokeIds),
-      ...input.uncommittedOrderIds,
-    ],
-  );
-  const elementById = new Map(combined.map((element) => [element.id, element]));
-  const assigned = new Set<string>();
-  const settledDrafts: DrawEl[] = [];
-  const handoffs = input.handoffs.map((handoff) => {
-    const owned = orderedUniqueElements(
-      handoff.strokeIds.flatMap((strokeId) => {
-        const element = elementById.get(strokeId);
-        return element && !assigned.has(strokeId) ? [element] : [];
-      }),
-      handoff.strokeIds,
-    );
-    for (const element of owned) assigned.add(element.id);
-    settledDrafts.push(...owned);
-    return {
-      ...handoff,
-      draftSettledCount: owned.length,
-      gpuSettledCount: 0,
-    };
-  });
-  settledDrafts.push(...orderedUniqueElements(
-    combined.filter((element) => !assigned.has(element.id)),
-    input.uncommittedOrderIds,
-  ));
-
-  return {
-    status: "promoted",
-    settledDrafts,
-    handoffs,
-    promotedElementCount: input.authorities.length,
-    recoveredFrom,
-  };
-}
-
 /**
  * Releases only complete document-stroke groups after a committed main-layer draw receipt.
  *
@@ -290,7 +70,7 @@ export function releaseStudioGpuPendingAuthorityPrefix(
     && input.authorities.some((authority) => input.completeElementIds.has(authority.element.id))
   ) {
     // A zero-sized handoff cannot own an otherwise-complete GPU DrawEl. Reject without consuming
-    // it so the caller can rebuild that mismatched authority on its exact Konva fallback surface.
+    // it so the caller can reject the mismatched receipt without changing renderer authority.
     return { status: "rejected", reason: "zero-count-authority-evidence" };
   }
   let consumed = 0;

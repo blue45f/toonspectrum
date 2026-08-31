@@ -56,7 +56,7 @@ export type StudioBg3dShotBatchWorkerErrorCode =
   | "build-failed"
   | "archive-invalid";
 
-/** Stable discriminator used by the UI to permit fallback only for pre-ready startup failures. */
+/** Stable Worker failure discriminator for fail-closed batch export reporting. */
 export class StudioBg3dShotBatchWorkerError extends Error {
   constructor(readonly code: StudioBg3dShotBatchWorkerErrorCode) {
     super(`studio-bg3d-shot-batch-worker:${code}`);
@@ -70,12 +70,6 @@ export class StudioBg3dShotBatchWorkerError extends Error {
             ? "ProtocolError"
             : "WorkerError";
   }
-}
-
-export function isStudioBg3dShotBatchWorkerUnavailableError(
-  value: unknown,
-): value is StudioBg3dShotBatchWorkerError {
-  return value instanceof StudioBg3dShotBatchWorkerError && value.code === "worker-unavailable";
 }
 
 let nextRequestId = 1;

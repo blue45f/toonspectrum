@@ -18,7 +18,8 @@ import type { SceneIR } from "@toonspectrum/studio-project-model";
  *
  * Contract: WebGPU absence is an explicit error (`loadVelloGpuBrowser`) or an
  * explicit `{ supported: false }` report (`probeWebGpu`) — never a silent
- * fallback. Callers route to the vello_cpu wasm lane themselves.
+ * substitute. Callers receive the explicit failure and must not switch the
+ * active provider binding automatically.
  */
 
 type VelloGpuModule = typeof import("../../../crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js");
@@ -47,8 +48,8 @@ export interface GpuCpuComparison {
 
 const WEBGPU_MISSING_MESSAGE =
   "WebGPU is unavailable in this environment (navigator.gpu missing) — " +
-  "the vello-gpu-browser lane requires a WebGPU-capable browser; " +
-  "route this island to the vello_cpu wasm lane instead";
+  "the selected vello-gpu-browser lane requires a WebGPU-capable browser; " +
+  "the lane remains unavailable until the caller explicitly selects another provider";
 
 const FEATURE_ERROR_MARKER = "cannot render required scene features:";
 

@@ -115,10 +115,12 @@ export type {
   StudioGpuReadbackPixelRect,
 } from "./studio-webgpu-readback";
 export interface StudioWebGpuEngineOptions {
-  /** WebGPU presentation surface. It remains hidden while the Canvas2D fallback is active. */
+  /** WebGPU presentation surface. It remains hidden until WebGPU owns a valid frame receipt. */
   readonly canvas: HTMLCanvasElement;
-  /** Separate fallback surface avoids trying to request two incompatible contexts on one canvas. */
-  readonly fallbackCanvas: HTMLCanvasElement;
+  /** Canvas2D surface used only when `selectedBackend` explicitly selects Canvas2D. */
+  readonly canvas2dCanvas: HTMLCanvasElement;
+  /** Immutable provider selection. Omission deliberately selects WebGPU and never implies fallback. */
+  readonly selectedBackend?: StudioGpuBackend;
   /** Test/embedding override. `null` explicitly disables WebGPU. */
   readonly gpu?: GPU | null;
   readonly autoRecover?: boolean;
@@ -128,6 +130,7 @@ export interface StudioWebGpuEngineOptions {
    * out to avoid a full-surface texture allocation and texture-to-texture copy on every frame.
    */
   readonly retainReadbackSnapshot?: boolean;
+  /** Reports the immutable selected backend once; availability is expressed by frame invalidation. */
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
   /** Fired synchronously before pixels for an older request may no longer be trusted. */
@@ -473,7 +476,7 @@ function safeUnconfigure(context: GPUCanvasContext | null): void {
   try {
     context.unconfigure();
   } catch {
-    // Some implementations throw after device loss; fallback does not depend on unconfigure.
+    // Some implementations throw after device loss; cleanup remains complete without this call.
   }
 }
 
@@ -642,14 +645,16 @@ interface StudioGpuAuthorityFrame {
 
 export class StudioWebGpuEngine {
   private readonly canvas: HTMLCanvasElement;
-  private readonly fallbackCanvas: HTMLCanvasElement;
+  private readonly canvas2dCanvas: HTMLCanvasElement;
   private readonly options: StudioWebGpuEngineOptions;
   private readonly hasGpuOverride: boolean;
   private readonly retainReadbackSnapshot: boolean;
   private readonly strokeFeedEngineId = ++studioGpuEngineInstanceSequence;
 
-  private backend: StudioGpuBackend = "canvas2d";
-  private fallbackContext: CanvasRenderingContext2D | null = null;
+  private readonly backend: StudioGpuBackend;
+  private backendAvailable = false;
+  private presentationAvailable = false;
+  private canvas2dContext: CanvasRenderingContext2D | null = null;
   private device: GPUDevice | null = null;
   private context: GPUCanvasContext | null = null;
   private format: GPUTextureFormat | null = null;
@@ -694,6 +699,9 @@ export class StudioWebGpuEngine {
     readonly frameGeneration: number;
   } | null = null;
   private initializationPromise: Promise<StudioGpuBackend> | null = null;
+  /** Only the never-attempted startup may replay work queued while device acquisition is pending. */
+  private initializationReplayAllowed = true;
+  private pendingInitializationRender = false;
   private lifecycleGeneration = 0;
   private disposed = false;
   private suspended = false;
@@ -724,14 +732,22 @@ export class StudioWebGpuEngine {
   constructor(options: StudioWebGpuEngineOptions) {
     this.options = options;
     this.canvas = options.canvas;
-    this.fallbackCanvas = options.fallbackCanvas;
+    this.canvas2dCanvas = options.canvas2dCanvas;
+    this.backend = options.selectedBackend ?? "webgpu";
     this.hasGpuOverride = Object.prototype.hasOwnProperty.call(options, "gpu");
     this.retainReadbackSnapshot = options.retainReadbackSnapshot !== false;
-    this.setSurfaceVisibility("canvas2d");
+    if (this.backend === "canvas2d") this.ensureSelectedCanvas2d();
+    this.setSurfaceVisibility(null);
+    this.options.onBackendChange?.(this.backend);
   }
 
   public getBackend(): StudioGpuBackend {
     return this.backend;
+  }
+
+  /** Whether the immutable selected provider can currently accept render work. */
+  public isBackendAvailable(): boolean {
+    return this.backendAvailable;
   }
 
   public getPerformanceMetrics(): StudioGpuPerformanceMetrics {
@@ -745,7 +761,11 @@ export class StudioWebGpuEngine {
 
   public initialize(): Promise<StudioGpuBackend> {
     if (this.disposed) return Promise.resolve(this.backend);
-    if (this.backend === "webgpu" && this.device) return Promise.resolve(this.backend);
+    if (this.backend === "canvas2d") {
+      this.ensureSelectedCanvas2d();
+      return Promise.resolve(this.backend);
+    }
+    if (this.backendAvailable && this.device) return Promise.resolve(this.backend);
     // React remounts, eager feature warm-up and an explicit retry may all reach this boundary in
     // the same task. Adapter/device acquisition is not cancellable, so superseding an in-flight
     // request would allocate a second device only to destroy the first one when it resolves.
@@ -775,11 +795,18 @@ export class StudioWebGpuEngine {
       safeDestroyDevice(previousDevice);
     }
     const generation = ++this.lifecycleGeneration;
-    this.activateCanvas2d();
     const initialization = this.initializeWebGpu(generation)
       .then((ready) => {
+        if (!ready && !this.disposed && generation === this.lifecycleGeneration) {
+          this.markSelectedBackendUnavailable();
+        }
+        const replayInitialRequest = ready
+          && this.initializationReplayAllowed
+          && (this.pendingInitializationRender || this.lastStrokes.length === 0);
+        this.pendingInitializationRender = false;
+        this.initializationReplayAllowed = false;
         if (
-          ready
+          replayInitialRequest
           && !this.disposed
           && !this.suspended
           && generation === this.lifecycleGeneration
@@ -819,8 +846,8 @@ export class StudioWebGpuEngine {
     });
     const physicalSizeChanged = this.canvas.width !== physicalWidth ||
       this.canvas.height !== physicalHeight ||
-      this.fallbackCanvas.width !== physicalWidth ||
-      this.fallbackCanvas.height !== physicalHeight;
+      this.canvas2dCanvas.width !== physicalWidth ||
+      this.canvas2dCanvas.height !== physicalHeight;
     if (!viewportChanged && !physicalSizeChanged) {
       return { status: "unchanged", requestId, rerendered: false };
     }
@@ -833,7 +860,7 @@ export class StudioWebGpuEngine {
     const frameGeneration = this.invalidateFrameReceipt();
     this.deferredResizeInvalidation = null;
     this.viewport = nextViewport;
-    for (const surface of new Set([this.canvas, this.fallbackCanvas])) {
+    for (const surface of new Set([this.canvas, this.canvas2dCanvas])) {
       if (surface.width !== physicalWidth) surface.width = physicalWidth;
       if (surface.height !== physicalHeight) surface.height = physicalHeight;
     }
@@ -845,7 +872,10 @@ export class StudioWebGpuEngine {
     );
     // Resizing discards presentation pixels; transforms also change visible-tile selection/quads.
     this.invalidateRenderedFrame();
-    this.configureContext();
+    const contextReady = this.configureContext();
+    if (this.backend === "webgpu" && !contextReady) {
+      return { status: "resized", requestId, rerendered: false };
+    }
     if (!this.suspended && options.render !== false) {
       this.renderPreparedStrokes(this.lastStrokes, requestId, frameGeneration);
       return { status: "resized", requestId, rerendered: true };
@@ -916,7 +946,7 @@ export class StudioWebGpuEngine {
 
   /**
    * Appends only new point pairs. A stale index/count, style change, malformed suffix, or missing
-   * lineage automatically falls back to the authoritative full replacement carried by the patch.
+   * lineage uses the authoritative full replacement carried by the patch within the same backend.
    */
   public appendStrokeFeedSuffix(
     patch: StudioGpuStrokeSuffixPatch,
@@ -1044,7 +1074,7 @@ export class StudioWebGpuEngine {
     }
   }
 
-  /** Atomically appends one terminal journal symmetry group without a full fallback snapshot. */
+  /** Atomically appends one terminal journal symmetry group without a full replacement snapshot. */
   public appendStrokeFeedJournalSuffixBatch(
     patch: StudioGpuStrokeJournalSuffixBatchPatch,
     requestId = this.lastRequestId
@@ -1118,7 +1148,7 @@ export class StudioWebGpuEngine {
   ): void {
     if (this.suspended) {
       this.suspended = false;
-      this.setSurfaceVisibility(this.backend);
+      this.setSurfaceVisibility(this.presentationAvailable ? this.backend : null);
     }
     this.lastStrokes = strokeSnapshot;
     this.lastRequestId = requestId;
@@ -1130,8 +1160,11 @@ export class StudioWebGpuEngine {
           ? deferred.frameGeneration
           : this.invalidateFrameReceipt()
       );
+    if (this.backend === "canvas2d") {
+      this.renderCanvas2d(strokeSnapshot, requestId, frameGeneration);
+      return;
+    }
     if (
-      this.backend === "webgpu" &&
       this.device &&
       this.context &&
       this.normalPipeline &&
@@ -1155,7 +1188,14 @@ export class StudioWebGpuEngine {
     }
     this.pendingWebGpuRender = null;
     this.cancelActiveTileFrame();
-    this.renderCanvas2d(strokeSnapshot, requestId, frameGeneration);
+    // A WebGPU request made while its selected provider is unavailable stays rejected. The
+    // operation remains queued only as immutable input for the initial same-provider startup;
+    // it is never replayed by Canvas2D or another renderer.
+    if (this.initializationReplayAllowed) this.pendingInitializationRender = true;
+    this.markSelectedBackendUnavailable({
+      invalidateFrame: false,
+      revokeInitializationReplay: false,
+    });
   }
 
   public clear(): void {
@@ -1179,6 +1219,7 @@ export class StudioWebGpuEngine {
     if (this.suspended && !requestChanged) return;
 
     this.suspended = true;
+    this.presentationAvailable = false;
     this.supersedeWebGpuRenderFlight();
     this.destroyTileRuntime();
     this.invalidateRenderedFrame();
@@ -1189,12 +1230,12 @@ export class StudioWebGpuEngine {
     this.instanceStagingScratch = null;
     if (hadPresentation && this.backend === "canvas2d") {
       clearStudioCanvas2dDabSurface(
-        this.fallbackContext,
-        this.fallbackCanvas.width,
-        this.fallbackCanvas.height
+        this.canvas2dContext,
+        this.canvas2dCanvas.width,
+        this.canvas2dCanvas.height
       );
     }
-    this.setSurfaceVisibility(this.backend);
+    this.setSurfaceVisibility(null);
   }
 
   /**
@@ -1206,7 +1247,7 @@ export class StudioWebGpuEngine {
     if (this.disposed || !this.suspended) return false;
     safeUnconfigure(this.context);
     let released = false;
-    for (const surface of new Set([this.canvas, this.fallbackCanvas])) {
+    for (const surface of new Set([this.canvas, this.canvas2dCanvas])) {
       if (surface.width !== 1) {
         surface.width = 1;
         released = true;
@@ -1289,16 +1330,21 @@ export class StudioWebGpuEngine {
     this.context = null;
     safeDestroyDevice(device);
     clearStudioCanvas2dDabSurface(
-      this.fallbackContext,
-      this.fallbackCanvas.width,
-      this.fallbackCanvas.height
+      this.canvas2dContext,
+      this.canvas2dCanvas.width,
+      this.canvas2dCanvas.height
     );
+    this.backendAvailable = false;
+    this.presentationAvailable = false;
+    this.setSurfaceVisibility(null);
   }
 
   private isAuthorityFrameCurrent(frame: StudioGpuAuthorityFrame): boolean {
     return this.authorityFrame === frame
       && frame.generation === this.frameGeneration
       && frame.receipt.backend === this.backend
+      && this.backendAvailable
+      && this.presentationAvailable
       && frame.receipt.physicalWidth === this.canvas.width
       && frame.receipt.physicalHeight === this.canvas.height;
   }
@@ -1514,12 +1560,12 @@ export class StudioWebGpuEngine {
     area: StudioGpuReadbackArea,
     layout: StudioGpuReadbackLayout
   ): Promise<StudioGpuFrameReadbackResult> {
-    const context = this.fallbackContext;
+    const context = this.canvas2dContext;
     if (
       !context
       || frame.snapshot !== null
-      || this.fallbackCanvas.width !== frame.receipt.physicalWidth
-      || this.fallbackCanvas.height !== frame.receipt.physicalHeight
+      || this.canvas2dCanvas.width !== frame.receipt.physicalWidth
+      || this.canvas2dCanvas.height !== frame.receipt.physicalHeight
     ) {
       return { status: "rejected", reason: "frame-unavailable" };
     }
@@ -1677,6 +1723,7 @@ export class StudioWebGpuEngine {
   }
 
   private async initializeWebGpu(generation: number): Promise<boolean> {
+    if (this.backend !== "webgpu") return false;
     const gpu = this.gpu();
     if (!gpu || this.disposed || generation !== this.lifecycleGeneration) return false;
 
@@ -1684,8 +1731,8 @@ export class StudioWebGpuEngine {
     let context: GPUCanvasContext | null = null;
     try {
       // Studio's quality-first mode prefers the highest-performance adapter. Browsers retain final
-      // authority over the choice and can ignore this hint, while the existing device-loss and
-      // Canvas2D recovery path keeps a rejected/disappearing discrete adapter non-destructive.
+      // authority over the choice and can ignore this hint. A rejected/disappearing adapter marks
+      // this selected provider unavailable; it never changes the renderer selection.
       const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
       if (!adapter || this.disposed || generation !== this.lifecycleGeneration) return false;
       device = await adapter.requestDevice();
@@ -1824,14 +1871,12 @@ export class StudioWebGpuEngine {
       this.presentationBuffer = null;
       this.presentationCapacity = 0;
       this.destroyTileRuntime();
-      this.setBackend("webgpu");
-      this.configureContext();
+      this.markSelectedBackendAvailable();
       void device.lost.then((info) => this.handleDeviceLost(device!, info));
       return true;
     } catch {
       safeUnconfigure(context);
       safeDestroyDevice(device);
-      this.activateCanvas2d();
       return false;
     }
   }
@@ -1862,59 +1907,72 @@ export class StudioWebGpuEngine {
     this.presentationCapacity = 0;
     this.destroyTileRuntime();
     safeUnconfigure(this.context);
-    this.activateCanvas2d();
-    if (!this.suspended) this.render(this.lastStrokes, this.lastRequestId);
+    this.markSelectedBackendUnavailable();
     this.options.onDeviceLost?.(info);
 
     if (this.options.autoRecover === false) return;
+    // Recovery may reacquire the same selected provider, but it deliberately does not replay the
+    // failed operation. A later explicit request is required to produce a new authoritative frame.
     void this.initializeWebGpu(recoveryGeneration).then((ready) => {
-      if (
-        ready
-        && !this.disposed
-        && !this.suspended
-        && recoveryGeneration === this.lifecycleGeneration
-      ) {
-        this.render(this.lastStrokes);
+      if (!ready && !this.disposed && recoveryGeneration === this.lifecycleGeneration) {
+        this.markSelectedBackendUnavailable();
       }
     });
   }
 
-  private activateCanvas2d(): void {
-    if (!this.fallbackContext) {
-      this.fallbackContext = this.fallbackCanvas.getContext("2d");
+  private ensureSelectedCanvas2d(): CanvasRenderingContext2D | null {
+    if (this.backend !== "canvas2d") return null;
+    if (!this.canvas2dContext) {
+      this.canvas2dContext = this.canvas2dCanvas.getContext("2d");
     }
-    this.setBackend("canvas2d");
+    this.backendAvailable = this.canvas2dContext !== null;
+    if (!this.backendAvailable) this.setSurfaceVisibility(null);
+    return this.canvas2dContext;
   }
 
-  private setBackend(backend: StudioGpuBackend): void {
-    const changed = this.backend !== backend;
-    if (changed) {
-      this.cancelActiveTileFrame();
-      if (backend === "canvas2d") this.destroyTileRuntime();
-      this.invalidateRenderedFrame();
-      this.invalidateFrameReceipt();
-    }
-    this.backend = backend;
-    this.setSurfaceVisibility(backend);
-    if (changed) this.options.onBackendChange?.(backend);
+  private markSelectedBackendAvailable(): void {
+    this.backendAvailable = true;
+    this.presentationAvailable = false;
+    this.setSurfaceVisibility(null);
   }
 
-  private setSurfaceVisibility(backend: StudioGpuBackend): void {
-    if (this.canvas === this.fallbackCanvas) {
-      this.canvas.style.visibility = this.suspended ? "hidden" : "visible";
+  private markSelectedBackendUnavailable(
+    options: {
+      readonly invalidateFrame?: boolean;
+      readonly revokeInitializationReplay?: boolean;
+    } = {}
+  ): void {
+    if (options.revokeInitializationReplay !== false) {
+      this.initializationReplayAllowed = false;
+      this.pendingInitializationRender = false;
+    }
+    this.backendAvailable = false;
+    this.presentationAvailable = false;
+    this.pendingWebGpuRender = null;
+    this.cancelActiveTileFrame();
+    this.invalidateRenderedFrame();
+    if (options.invalidateFrame !== false) this.invalidateFrameReceipt();
+    else this.invalidateAuthorityFrame();
+    this.setSurfaceVisibility(null);
+  }
+
+  private setSurfaceVisibility(backend: StudioGpuBackend | null): void {
+    if (this.canvas === this.canvas2dCanvas) {
+      this.canvas.style.visibility = this.suspended || backend === null ? "hidden" : "visible";
       return;
     }
-    if (this.suspended) {
+    if (this.suspended || backend === null) {
       this.canvas.style.visibility = "hidden";
-      this.fallbackCanvas.style.visibility = "hidden";
+      this.canvas2dCanvas.style.visibility = "hidden";
       return;
     }
     this.canvas.style.visibility = backend === "webgpu" ? "visible" : "hidden";
-    this.fallbackCanvas.style.visibility = backend === "canvas2d" ? "visible" : "hidden";
+    this.canvas2dCanvas.style.visibility = backend === "canvas2d" ? "visible" : "hidden";
   }
 
-  private configureContext(): void {
-    if (!this.context || !this.device || !this.format) return;
+  private configureContext(): boolean {
+    if (this.backend === "canvas2d") return this.ensureSelectedCanvas2d() !== null;
+    if (!this.context || !this.device || !this.format) return false;
     try {
       this.context.configure({
         device: this.device,
@@ -1922,8 +1980,11 @@ export class StudioWebGpuEngine {
         alphaMode: "premultiplied",
         usage: presentationTextureUsage(this.retainReadbackSnapshot),
       });
+      return true;
     } catch {
-      // Device loss handler will switch to the already-renderable Canvas2D surface.
+      // A context failure invalidates this selected provider until an explicit same-provider retry.
+      this.markSelectedBackendUnavailable({ invalidateFrame: false });
+      return false;
     }
   }
 
@@ -2201,7 +2262,7 @@ export class StudioWebGpuEngine {
       return;
     }
     this.cancelActiveTileFrame();
-    this.renderCanvas2d(pending.strokes, pending.requestId, pending.frameGeneration);
+    this.markSelectedBackendUnavailable();
   }
 
   private async renderWebGpu(
@@ -2407,8 +2468,8 @@ export class StudioWebGpuEngine {
     } catch {
       if (runtime && token) runtime.abortFrame(token);
       if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
-      // Validation/context errors do not always resolve `device.lost`. Fail visibly-safe for this
-      // session instead of leaving a selected but blank GPU surface above the authoritative scene.
+      // Validation/context errors do not always resolve `device.lost`. Revoke this selected
+      // provider's presentation; never continue the same operation through Canvas2D.
       if (
         !this.disposed
         && frameGeneration === this.frameGeneration
@@ -2416,8 +2477,7 @@ export class StudioWebGpuEngine {
         && this.device === device
         && this.backend === "webgpu"
       ) {
-        this.activateCanvas2d();
-        this.render(strokes, requestId);
+        this.markSelectedBackendUnavailable();
       }
     } finally {
       if (presentationSnapshot) this.retireFrameSnapshot(presentationSnapshot);
@@ -2452,9 +2512,14 @@ export class StudioWebGpuEngine {
       const receipt = this.createFrameReceipt(input.strokes, input.requestId);
       const frame = this.publishAuthorityFrame(receipt, input.snapshot);
       snapshotHandled = input.snapshot !== null;
-      if (frame) this.options.onFrameReady?.(receipt);
+      if (frame) {
+        this.backendAvailable = true;
+        this.presentationAvailable = true;
+        this.setSurfaceVisibility("webgpu");
+        this.options.onFrameReady?.(receipt);
+      }
     } catch {
-      // A rejected completion fence has the same visible-safety policy as a synchronous
+      // A rejected completion fence has the same fail-closed policy as a synchronous
       // validation/context failure, but only while this exact request and device still own output.
       if (
         !this.disposed
@@ -2463,8 +2528,7 @@ export class StudioWebGpuEngine {
         && this.device === input.device
         && this.backend === "webgpu"
       ) {
-        this.activateCanvas2d();
-        this.render(input.strokes, input.requestId);
+        this.markSelectedBackendUnavailable();
       }
     } finally {
       if (input.snapshot && !snapshotHandled) this.retireFrameSnapshot(input.snapshot);
@@ -2509,14 +2573,16 @@ export class StudioWebGpuEngine {
     requestId: string,
     frameGeneration: number
   ): void {
-    this.activateCanvas2d();
-    const context = this.fallbackContext;
-    if (!context) return;
+    const context = this.ensureSelectedCanvas2d();
+    if (!context) {
+      this.markSelectedBackendUnavailable({ invalidateFrame: false });
+      return;
+    }
     const update = this.planRenderUpdate(strokes);
     renderStudioCanvas2dDabSurface({
       context,
-      surfaceWidth: this.fallbackCanvas.width,
-      surfaceHeight: this.fallbackCanvas.height,
+      surfaceWidth: this.canvas2dCanvas.width,
+      surfaceHeight: this.canvas2dCanvas.height,
       viewport: this.viewport,
       update,
     });
@@ -2530,6 +2596,8 @@ export class StudioWebGpuEngine {
     ) {
       const receipt = this.createFrameReceipt(strokes, requestId);
       if (this.publishAuthorityFrame(receipt, null)) {
+        this.presentationAvailable = true;
+        this.setSurfaceVisibility("canvas2d");
         this.options.onFrameReady?.(receipt);
       }
     }

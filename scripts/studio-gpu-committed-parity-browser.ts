@@ -392,8 +392,8 @@ function waitForReceipt(
 
 async function run(): Promise<ParityResult> {
   const gpuCanvas = document.createElement("canvas");
-  const fallbackCanvas = document.createElement("canvas");
-  document.body.append(gpuCanvas, fallbackCanvas);
+  const canvas2dCanvas = document.createElement("canvas");
+  document.body.append(gpuCanvas, canvas2dCanvas);
 
   // StudioWebGpuEngine only exposes one onFrameReady callback, set at construction. Since cases
   // render sequentially and each is awaited to completion before the next starts, at most one
@@ -401,7 +401,8 @@ async function run(): Promise<ParityResult> {
   const pendingReceipts = new Map<string, (receipt: StudioGpuFrameReceipt) => void>();
   const engine = new StudioWebGpuEngine({
     canvas: gpuCanvas,
-    fallbackCanvas,
+    canvas2dCanvas,
+    selectedBackend: "webgpu",
     retainReadbackSnapshot: true,
     autoRecover: false,
     onFrameReady: (receipt) => {

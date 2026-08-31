@@ -8,13 +8,11 @@ describe("buildStudioDocumentPresentScene", () => {
   it("puts document paths into viewport backing space and keeps owned ids", () => {
     const presented = buildStudioDocumentPresentScene({
       elements: [{
-        id: "panel",
-        type: "frame",
-        x: 10,
-        y: 10,
-        width: 40,
-        height: 20,
-        bg: "transparent",
+        id: "clean-rect",
+        type: "draw",
+        kind: "line",
+        mode: "pen",
+        points: [10, 10, 50, 30],
         stroke: "#ff0000",
         strokeWidth: 4,
       } as El],
@@ -31,7 +29,7 @@ describe("buildStudioDocumentPresentScene", () => {
         rotation: 0,
       },
     });
-    expect(presented.ownedDocumentIds).toEqual(["panel"]);
+    expect(presented.ownedDocumentIds).toEqual(["clean-rect"]);
     expect(presented.scene.width).toBe(400);
     expect(presented.scene.height).toBe(320);
     const stroke = presented.scene.nodes.find((node) => node.kind === "stroke-path");
@@ -67,6 +65,70 @@ describe("buildStudioDocumentPresentScene", () => {
           brush: "watercolor",
         },
       ] as El[],
+      documentWidth: 100,
+      documentHeight: 80,
+      viewportWidth: 200,
+      viewportHeight: 160,
+      dpr: 1,
+    });
+    expect(presented.ownedDocumentIds).toEqual([]);
+    expect(presented.scene.nodes).toEqual([]);
+  });
+
+  it("makes a clean geometric DrawEl page Vello pixel-authoritative", () => {
+    const presented = buildStudioDocumentPresentScene({
+      elements: [
+        {
+          id: "clean-ellipse",
+          type: "draw",
+          kind: "ellipse",
+          mode: "pen",
+          points: [12, 8, 72, 48],
+          stroke: "#102030",
+          strokeWidth: 4,
+          fill: "#f0a030",
+          opacity: 0.75,
+        },
+        {
+          id: "clean-arrow",
+          type: "draw",
+          kind: "arrow",
+          mode: "pen",
+          points: [16, 60, 84, 24],
+          stroke: "#0055ff",
+          strokeWidth: 3,
+        },
+      ] as El[],
+      documentWidth: 100,
+      documentHeight: 80,
+      viewportWidth: 200,
+      viewportHeight: 160,
+      dpr: 2,
+    });
+    expect(presented.ownedDocumentIds).toEqual(["clean-ellipse", "clean-arrow"]);
+    expect(presented.scene.nodes.length).toBeGreaterThan(2);
+    expect(presented.scene.nodes.every((node) => (
+      node.kind === "fill-path" || node.kind === "stroke-path"
+    ))).toBe(true);
+  });
+
+  it("keeps a dashed geometric DrawEl on the explicit legacy boundary", () => {
+    const presented = buildStudioDocumentPresentScene({
+      elements: [{
+        id: "dashed-line",
+        type: "draw",
+        kind: "line",
+        mode: "pen",
+        points: [8, 8, 72, 48],
+        stroke: "#000000",
+        strokeWidth: 2,
+        strokeStyle: {
+          dash: "dash",
+          lineCap: "round",
+          arrowStart: "none",
+          arrowEnd: "none",
+        },
+      }] as El[],
       documentWidth: 100,
       documentHeight: 80,
       viewportWidth: 200,

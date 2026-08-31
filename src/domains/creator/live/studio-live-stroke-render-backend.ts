@@ -15,7 +15,7 @@ export type StudioLiveStrokeGpuFailureReason =
   | "timeout"
   | "cancelled";
 
-export type StudioLiveStrokeCanvasFallbackReason =
+export type StudioLiveStrokeUnavailableReason =
   | StudioLiveStrokeGpuFailureReason
   | "canonical-commit-failed"
   | "canonical-commit-cancelled";
@@ -49,7 +49,7 @@ export interface StudioLiveStrokeRenderIdleSnapshot {
   readonly expectedGpuRequest: null;
   readonly acceptedGpuRequest: null;
   readonly expectedCanonicalCanvas: null;
-  readonly canvasFallbackReason: null;
+  readonly unavailableReason: null;
 }
 
 export interface StudioLiveStrokeRenderSessionSnapshot {
@@ -57,12 +57,12 @@ export interface StudioLiveStrokeRenderSessionSnapshot {
   readonly epoch: number;
   readonly strokeId: string;
   /**
-   * Immutable pointer-down choice. Failover changes `presentationBackend`, never this field, so
-   * capability updates cannot switch rasterizers during a physical contact.
+   * Immutable pointer-down choice. Runtime failure can make presentation unavailable, but it
+   * cannot switch rasterizers during a physical contact.
    */
   readonly pinnedBackend: StudioGpuBackend;
   /** Surface currently authorized to be visible. */
-  readonly presentationBackend: StudioGpuBackend;
+  readonly presentationBackend: StudioGpuBackend | null;
   /**
    * The canonical Canvas drawing remains retained for the whole session. It can be hidden only
    * after an exact GPU receipt and is released only by an exact canonical Canvas draw receipt.
@@ -73,7 +73,7 @@ export interface StudioLiveStrokeRenderSessionSnapshot {
   readonly expectedGpuRequest: StudioLiveStrokeGpuRequestToken | null;
   readonly acceptedGpuRequest: StudioLiveStrokeGpuRequestToken | null;
   readonly expectedCanonicalCanvas: StudioLiveStrokeCanonicalCanvasToken | null;
-  readonly canvasFallbackReason: StudioLiveStrokeCanvasFallbackReason | null;
+  readonly unavailableReason: StudioLiveStrokeUnavailableReason | null;
 }
 
 export type StudioLiveStrokeRenderBackendSnapshot =
@@ -101,7 +101,6 @@ export type StudioLiveStrokeRenderBackendEffect =
     }
   | { readonly type: "canvas-shadow.retain-visible" }
   | { readonly type: "canvas-shadow.retain-hidden" }
-  | { readonly type: "canvas-shadow.restore" }
   | {
       readonly type: "gpu-frame.await";
       readonly token: StudioLiveStrokeGpuRequestToken;
@@ -112,8 +111,9 @@ export type StudioLiveStrokeRenderBackendEffect =
     }
   | { readonly type: "gpu-overlay.hide" }
   | {
-      readonly type: "canvas.failover";
-      readonly reason: StudioLiveStrokeCanvasFallbackReason;
+      readonly type: "selected-engine.unavailable";
+      readonly backend: StudioGpuBackend;
+      readonly reason: StudioLiveStrokeUnavailableReason;
     }
   | {
       readonly type: "canonical-canvas.await";
@@ -132,7 +132,7 @@ export type StudioLiveStrokeRenderBackendRejectionReason =
   | "stale-stroke"
   | "backend-pinned"
   | "not-webgpu-stroke"
-  | "canvas-fallback-active"
+  | "selected-engine-unavailable"
   | "invalid-phase"
   | "invalid-gpu-receipt"
   | "stale-gpu-result"
@@ -279,7 +279,7 @@ function idleSnapshot(epoch: number): StudioLiveStrokeRenderIdleSnapshot {
     expectedGpuRequest: null,
     acceptedGpuRequest: null,
     expectedCanonicalCanvas: null,
-    canvasFallbackReason: null,
+    unavailableReason: null,
   });
 }
 
@@ -315,7 +315,7 @@ function validCanonicalTokenShape(
  * The coordinator deliberately owns no timer, React state, Canvas, or GPU resource. Integrators
  * translate its effects into the existing imperative surfaces and feed watchdog/device events
  * back with the epoch/token issued here. That separation makes every visibility decision atomic
- * and prevents a stale async result from hiding the only fail-visible Canvas copy.
+ * and prevents a stale async result from authorizing pixels from a different renderer.
  */
 export class StudioLiveStrokeRenderBackendCoordinator {
   private state: StudioLiveStrokeRenderBackendSnapshot = idleSnapshot(0);
@@ -347,19 +347,24 @@ export class StudioLiveStrokeRenderBackendCoordinator {
       epoch: previous.epoch + 1,
       strokeId: input.strokeId,
       pinnedBackend: input.backend,
-      // A WebGPU pin starts fail-visible on its Canvas shadow until an exact receipt arrives.
-      presentationBackend: "canvas2d",
+      // WebGPU starts unavailable until its own exact receipt arrives. Canvas is visible only when
+      // Canvas was explicitly selected at pointer-down; it is never an implicit standby renderer.
+      presentationBackend: input.backend === "canvas2d" ? "canvas2d" : null,
       canvasShadowRetained: true,
-      canvasShadowVisible: true,
+      canvasShadowVisible: input.backend === "canvas2d",
       gpuOverlayVisible: false,
       expectedGpuRequest: null,
       acceptedGpuRequest: null,
       expectedCanonicalCanvas: null,
-      canvasFallbackReason: null,
+      unavailableReason: null,
     });
     return this.accept("pointer-down", previous, next, [
       { type: "backend.pinned", backend: input.backend },
-      { type: "canvas-shadow.retain-visible" },
+      {
+        type: input.backend === "canvas2d"
+          ? "canvas-shadow.retain-visible"
+          : "canvas-shadow.retain-hidden",
+      },
     ]);
   }
 
@@ -405,8 +410,8 @@ export class StudioLiveStrokeRenderBackendCoordinator {
     if (previous.pinnedBackend !== "webgpu") {
       return this.reject("gpu-frame-requested", "not-webgpu-stroke", previous);
     }
-    if (previous.canvasFallbackReason !== null) {
-      return this.reject("gpu-frame-requested", "canvas-fallback-active", previous);
+    if (previous.unavailableReason !== null) {
+      return this.reject("gpu-frame-requested", "selected-engine-unavailable", previous);
     }
     if (this.gpuSequence >= Number.MAX_SAFE_INTEGER) {
       return this.reject("gpu-frame-requested", "sequence-exhausted", previous);
@@ -423,10 +428,10 @@ export class StudioLiveStrokeRenderBackendCoordinator {
     const next = sessionSnapshot({
       ...previous,
       // The shared GPU surface is mutated in place. Its last receipt cannot authorize pixels from
-      // a newer submission, so every request returns to the retained Canvas shadow until the new
-      // exact token completes.
-      presentationBackend: "canvas2d",
-      canvasShadowVisible: true,
+      // a newer submission, so presentation is unavailable until the new exact token completes.
+      // The retained Canvas geometry is document-commit evidence, not an alternate live renderer.
+      presentationBackend: null,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
       expectedGpuRequest: token,
     });
@@ -435,7 +440,7 @@ export class StudioLiveStrokeRenderBackendCoordinator {
       previous,
       next,
       [
-        { type: "canvas-shadow.restore" },
+        { type: "canvas-shadow.retain-hidden" },
         { type: "gpu-overlay.hide" },
         { type: "gpu-frame.await", token },
       ],
@@ -457,8 +462,8 @@ export class StudioLiveStrokeRenderBackendCoordinator {
     if (previous.pinnedBackend !== "webgpu") {
       return this.reject("gpu-frame-receipted", "not-webgpu-stroke", previous);
     }
-    if (previous.canvasFallbackReason !== null) {
-      return this.reject("gpu-frame-receipted", "canvas-fallback-active", previous);
+    if (previous.unavailableReason !== null) {
+      return this.reject("gpu-frame-receipted", "selected-engine-unavailable", previous);
     }
     if (input.backend !== "webgpu" || input.complete !== true) {
       return this.reject("gpu-frame-receipted", "invalid-gpu-receipt", previous);
@@ -493,8 +498,8 @@ export class StudioLiveStrokeRenderBackendCoordinator {
     if (previous.pinnedBackend !== "webgpu") {
       return this.reject("gpu-failed", "not-webgpu-stroke", previous);
     }
-    if (previous.canvasFallbackReason !== null) {
-      return this.reject("gpu-failed", "canvas-fallback-active", previous);
+    if (previous.unavailableReason !== null) {
+      return this.reject("gpu-failed", "selected-engine-unavailable", previous);
     }
     if (
       ![
@@ -526,17 +531,21 @@ export class StudioLiveStrokeRenderBackendCoordinator {
 
     const next = sessionSnapshot({
       ...previous,
-      presentationBackend: "canvas2d",
-      canvasShadowVisible: true,
+      presentationBackend: null,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
       expectedGpuRequest: null,
       acceptedGpuRequest: null,
-      canvasFallbackReason: input.reason,
+      unavailableReason: input.reason,
     });
     return this.accept("gpu-failed", previous, next, [
       { type: "gpu-overlay.hide" },
-      { type: "canvas-shadow.restore" },
-      { type: "canvas.failover", reason: input.reason },
+      { type: "canvas-shadow.retain-hidden" },
+      {
+        type: "selected-engine.unavailable",
+        backend: previous.pinnedBackend,
+        reason: input.reason,
+      },
     ]);
   }
 
@@ -550,6 +559,9 @@ export class StudioLiveStrokeRenderBackendCoordinator {
     }
     if (previous.phase !== "drawing") {
       return this.reject("pointer-up", "invalid-phase", previous);
+    }
+    if (previous.unavailableReason !== null) {
+      return this.reject("pointer-up", "selected-engine-unavailable", previous);
     }
     if (!boundedIdentity(input.canonicalCanvasRequestId)) {
       return this.reject("pointer-up", "invalid-input", previous);
@@ -654,18 +666,23 @@ export class StudioLiveStrokeRenderBackendCoordinator {
       : "canonical-commit-cancelled";
     const next = sessionSnapshot({
       ...previous,
-      presentationBackend: "canvas2d",
-      canvasShadowVisible: true,
-      gpuOverlayVisible: false,
+      // A failed canonical document draw does not invalidate the selected GPU frame. Keep the last
+      // receipted frame visible while a same-boundary retry is requested; never expose Canvas as an
+      // error-recovery renderer.
+      presentationBackend: previous.gpuOverlayVisible ? "webgpu" : null,
+      canvasShadowVisible: false,
+      gpuOverlayVisible: previous.gpuOverlayVisible,
       expectedGpuRequest: null,
-      acceptedGpuRequest: null,
       expectedCanonicalCanvas: null,
-      canvasFallbackReason: reason,
+      unavailableReason: reason,
     });
     return this.accept("canonical-canvas-receipted", previous, next, [
-      { type: "gpu-overlay.hide" },
-      { type: "canvas-shadow.restore" },
-      { type: "canvas.failover", reason },
+      { type: "canvas-shadow.retain-hidden" },
+      {
+        type: "selected-engine.unavailable",
+        backend: previous.pinnedBackend,
+        reason,
+      },
     ]);
   }
 

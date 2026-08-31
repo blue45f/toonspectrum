@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  paintStudioOilRibbonCarrier,
-  planStudioOilRibbonCarrier,
-  type StudioOilRibbonPaintContext,
-} from "../brush/studio-oil-ribbon-carrier";
 import { planOilBrushDabs } from "../studio-fx-brush";
 
 import {
@@ -103,63 +98,14 @@ afterEach(() => {
 describe("supportsStudioGpuBristleOverlay", () => {
   it("is false in an environment without WebGPU, Workers or OffscreenCanvas", () => {
     // The Node suite is exactly that environment, which is the point: with no WebGPU the lane never
-    // constructs a worker, so the cost of the fallback is zero rather than a failed handshake.
+    // constructs a worker; the selected lane reports unavailable without attempting another provider.
     expect(supportsStudioGpuBristleOverlay()).toBe(false);
   });
 });
 
-describe("requestStudioGpuBristleOverlay fallback", () => {
-  it("returns null with no WebGPU, and the CPU oil carrier still paints real geometry", () => {
+describe("requestStudioGpuBristleOverlay fail-closed", () => {
+  it("returns null with no WebGPU and leaves pixel authority unavailable", () => {
     expect(requestStudioGpuBristleOverlay(request(), () => {})).toBeNull();
-
-    // "Degrades correctly" has to mean the fallback DRAWS, not merely that nothing threw. This is
-    // the same carrier the oil branch of StudioDrawNode calls when the overlay is null.
-    const path = stations(24);
-    const dabs = planOilBrushDabs({
-      points: path.flatMap((station) => [station.x, station.y]),
-      pressures: path.map((station) => station.pressure),
-      baseWidth: 24,
-      seed: 11,
-      maxDabs: 512,
-    });
-    expect(dabs.length).toBeGreaterThan(0);
-    const carrier = planStudioOilRibbonCarrier(dabs);
-    let fills = 0;
-    let strokesDrawn = 0;
-    let vertices = 0;
-    const context: StudioOilRibbonPaintContext = {
-      fillStyle: "",
-      strokeStyle: "",
-      globalAlpha: 1,
-      globalCompositeOperation: "source-over",
-      lineCap: "butt",
-      lineJoin: "miter",
-      lineWidth: 1,
-      save() {},
-      restore() {},
-      beginPath() {},
-      fill() {
-        fills += 1;
-      },
-      stroke() {
-        strokesDrawn += 1;
-      },
-      moveTo() {
-        vertices += 1;
-      },
-      lineTo() {
-        vertices += 1;
-      },
-    };
-    paintStudioOilRibbonCarrier(context, {
-      carrier,
-      stroke: "#3b2a1a",
-      opacity: 1,
-      points: dabs.map((dab) => ({ x: dab.x, y: dab.y })),
-      radiusPx: 12,
-    });
-    expect(fills + strokesDrawn).toBeGreaterThan(0);
-    expect(vertices).toBeGreaterThan(8);
   });
 
   it("declines a surface outside the product floor without touching the worker", () => {
@@ -281,7 +227,7 @@ describe("requestStudioGpuBristleOverlay cache and prefix contract", () => {
       jobId: worker.sent[0]!.jobId,
       strokeKey: "el-1",
       reason: "impasto-relief-flat",
-      message: "임파스토 요철이 평평해 GPU 강모 레인을 쓰지 않습니다. 기존 유화 캐리어로 그립니다.",
+      message: "임파스토 요철이 평평해 선택한 GPU 강모 레인을 사용할 수 없습니다.",
       permanent: true,
     });
     expect(studioGpuBristleLaneDisabledReason()).toBe("impasto-relief-flat");

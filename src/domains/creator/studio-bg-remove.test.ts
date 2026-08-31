@@ -15,6 +15,7 @@ import {
   composeForegroundPixelAlpha,
   createStudioLocalForegroundConfidenceProvider,
   getLocalForegroundConfidenceMask,
+  getStudioLocalForegroundSegmenterRuntime,
   removeBackground,
   type StudioForegroundMaskResource,
   type StudioForegroundSegmentationResult,
@@ -122,8 +123,12 @@ function runtime(
 ): StudioLocalForegroundSegmenterRuntime {
   return {
     segmenter: { segment },
+    selectedDelegate: activeDelegate,
     activeDelegate,
-    gpuFallback: activeDelegate === "CPU",
+    providerSelection: activeDelegate === "GPU"
+      ? "product-default-gpu"
+      : "explicit-before-execution",
+    attemptedDelegates: [activeDelegate],
   };
 }
 
@@ -148,6 +153,8 @@ function mockCanvas2dContext(context: CanvasRenderingContext2D | null) {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  mediaPipeMocks.createFromOptions.mockReset();
+  mediaPipeMocks.isSimdSupported.mockReset();
 });
 
 describe("foreground pixel-alpha composition", () => {
@@ -272,9 +279,10 @@ describe("local foreground confidence provider", () => {
         providerId: "mediapipe-image-segmenter",
         execution: "local-device",
         imageUpload: false,
+        selectedDelegate: "GPU",
+        providerSelection: "product-default-gpu",
         attemptedDelegates: ["GPU"],
         activeDelegate: "GPU",
-        fallback: null,
       },
     });
     expect(extracted.confidence).toEqual(foregroundValues);
@@ -383,12 +391,8 @@ describe("MediaPipe adapter and legacy wrapper", () => {
     segment: vi.fn(),
   };
 
-  it("tries GPU once, falls back to CPU once, and publishes a local/model receipt", async () => {
+  it("fails the default GPU provider without retrying CPU", async () => {
     const images = installControlledImage({ width: 1, height: 1 });
-    const foregroundValues = new Float32Array([0.8]);
-    const foreground = maskResource(1, 1, foregroundValues);
-    const result = segmentationResult([foreground]);
-    defaultSegmenter.segment.mockReturnValue(result);
     mediaPipeMocks.isSimdSupported.mockResolvedValue(false);
     mediaPipeMocks.createFromOptions.mockImplementation(
       async (_vision: unknown, options: unknown) => {
@@ -406,11 +410,35 @@ describe("MediaPipe adapter and legacy wrapper", () => {
       "data:image/png;base64,AA==",
     );
     images[0]!.onload?.(new Event("load"));
-    const extracted = await pending;
+    await expect(pending).rejects.toThrow();
 
     expect(mediaPipeMocks.createFromOptions.mock.calls.map(([, options]) =>
       (options as { baseOptions: { delegate: string } }).baseOptions.delegate,
-    )).toEqual(["GPU", "CPU"]);
+    )).toEqual(["GPU"]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("uses CPU only through a provider selected explicitly before image work", async () => {
+    const foregroundValues = new Float32Array([0.8]);
+    const foreground = maskResource(1, 1, foregroundValues);
+    const result = segmentationResult([foreground]);
+    defaultSegmenter.segment.mockReturnValue(result);
+    mediaPipeMocks.isSimdSupported.mockResolvedValue(false);
+    mediaPipeMocks.createFromOptions.mockResolvedValue(defaultSegmenter);
+    const loadImage = vi.fn(async () => decodedImage(1, 1));
+    const provider = createStudioLocalForegroundConfidenceProvider({
+      delegate: "CPU",
+      loadImage,
+    });
+
+    const extracted = await provider.getForegroundConfidenceMask(
+      "data:image/png;base64,AA==",
+    );
+
+    expect(loadImage).toHaveBeenCalledOnce();
+    expect(mediaPipeMocks.createFromOptions.mock.calls.map(([, options]) =>
+      (options as { baseOptions: { delegate: string } }).baseOptions.delegate,
+    )).toEqual(["CPU"]);
     expect(extracted.receipt).toMatchObject({
       providerId: "mediapipe-image-segmenter",
       providerVersion: "0.10.35",
@@ -421,16 +449,12 @@ describe("MediaPipe adapter and legacy wrapper", () => {
       },
       execution: "local-device",
       imageUpload: false,
-      preferredDelegate: "GPU",
-      attemptedDelegates: ["GPU", "CPU"],
+      selectedDelegate: "CPU",
+      providerSelection: "explicit-before-execution",
+      attemptedDelegates: ["CPU"],
       activeDelegate: "CPU",
-      fallback: {
-        from: "GPU",
-        to: "CPU",
-        reason: "gpu-initialization-failed",
-      },
     });
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect("fallback" in extracted.receipt).toBe(false);
     expect(extracted.confidence).not.toBe(foregroundValues);
     expect(foreground.close).toHaveBeenCalledTimes(1);
     expect(result.close).toHaveBeenCalledTimes(1);
@@ -450,6 +474,9 @@ describe("MediaPipe adapter and legacy wrapper", () => {
 
   it("rejects an oversized decoded image before canvas and ImageData allocation", async () => {
     defaultSegmenter.segment.mockClear();
+    mediaPipeMocks.isSimdSupported.mockResolvedValue(false);
+    mediaPipeMocks.createFromOptions.mockResolvedValue(defaultSegmenter);
+    await getStudioLocalForegroundSegmenterRuntime();
     const images = installControlledImage({
       width: STUDIO_BG_REMOVE_MAX_DECODED_AXIS + 1,
       height: 1,

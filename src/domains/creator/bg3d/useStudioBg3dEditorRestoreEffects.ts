@@ -137,7 +137,7 @@ export function useStudioBg3dEditorRestoreEffects(h) {
     loadStudioBg3dBabylonSpecialistEntry, loadStudioBg3dModelThumbnailRuntime,
     LT_EXPORT_HEIGHTS, LT_TONE_MODE_LABELS, LT_TONE_PATTERN_LABELS, LT_TONE_TYPE_LABELS,
     SEMANTIC_MATERIAL_CONFIDENCE_LABELS, SEMANTIC_MATERIAL_SLOT_LABELS,
-    STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS, STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
+    STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
     TRANSFORM_MODES, VIEW_EDITOR_SECTIONS, VIEWPORT_BTN, StudioBg3dActionFooter,
     StudioBg3dDirectionalShadowLight, StudioBg3dImmersivePanel, StudioBg3dLtPanel,
     StudioBg3dMeasurementPanel, StudioBg3dMeasurementViewport, StudioBg3dPhysicsPanel,

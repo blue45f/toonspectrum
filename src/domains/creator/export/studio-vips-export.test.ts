@@ -501,8 +501,8 @@ describe("exportPyramid", () => {
 describe("canHandleExport / planVipsExportRoute", () => {
   it("keeps single in-core surfaces on canvaskit up to 8192px edges", () => {
     expect(canHandleExport(8192, 8192)).toBe(false);
-    expect(planVipsExportRoute(8192, 8192).route).toBe("canvaskit");
-    expect(planVipsExportRoute(1, 1).route).toBe("canvaskit");
+    expect(planVipsExportRoute(8192, 8192).route).toBe("canvas2d");
+    expect(planVipsExportRoute(1, 1).route).toBe("canvas2d");
   });
 
   it("owns exports past the in-core edge budget up to the 16384^2 input cap", () => {

@@ -99,7 +99,7 @@ describe("createStudioColorRangeWorkerSession", () => {
   it("uses the bounded direct path for small requests and preserves exact core output", async () => {
     const input = requestFixture();
     const expected = executeStudioColorRangeWorkerRequest(input);
-    const session = createStudioColorRangeWorkerSession({ workerFactory: null });
+    const session = createStudioColorRangeWorkerSession({ executionMode: "direct" });
 
     await expect(session.run(input)).resolves.toEqual({
       execution: "direct",
@@ -117,7 +117,7 @@ describe("createStudioColorRangeWorkerSession", () => {
       height,
       new Uint8ClampedArray(width * height * 4),
     );
-    const session = createStudioColorRangeWorkerSession({ workerFactory: null });
+    const session = createStudioColorRangeWorkerSession({ executionMode: "direct" });
 
     await expect(session.run(input)).rejects.toThrow(
       "편집 화면 멈춤을 막기 위해 메인 스레드에서 계산하지 않습니다",
@@ -231,14 +231,16 @@ describe("createStudioColorRangeWorkerSession", () => {
     session.dispose();
   });
 
-  it("uses direct fallback only before transfer and preserves post-transfer Worker failures", async () => {
+  it("keeps pre-transfer and post-transfer Worker failures terminal", async () => {
     const loadFailureWorker = new ControlledWorker();
     const smallSession = createStudioColorRangeWorkerSession({
       workerFactory: () => loadFailureWorker,
     });
     const small = smallSession.run(requestFixture());
     loadFailureWorker.emitLoadError("chunk blocked by CSP");
-    await expect(small).resolves.toMatchObject({ execution: "direct" });
+    await expect(small).rejects.toMatchObject({
+      name: "StudioColorRangeWorkerUnavailableError",
+    });
     smallSession.dispose();
 
     const executionFailureWorker = new ControlledWorker();

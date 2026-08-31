@@ -28,7 +28,7 @@ export interface StudioRasterCrdtCanvasProps {
   readonly viewport: Omit<StudioRasterTileViewport, "devicePixelRatio">;
   readonly devicePixelRatio?: number;
   readonly signal?: AbortSignal;
-  /** Show only when the owning commit simultaneously hides the exact Konva fallbacks. */
+  /** Show only when the owning commit simultaneously hides the exact Konva compatibility surfaces. */
   readonly presentationAuthorized?: boolean;
   /** Test/runtime override. Omit to use `navigator.gpu`; pass null to force Canvas2D. */
   readonly gpu?: GPU | null;
@@ -89,7 +89,7 @@ export const StudioRasterCrdtCanvas = forwardRef<
   onPresentationResult,
 }, ref) {
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvas2dCanvasRef = useRef<HTMLCanvasElement>(null);
   const presenterRef = useRef<StudioRasterTilePresenter | null>(null);
   const callbacksRef = useRef<LatestCallbacks>({
     onBackendChange,
@@ -113,11 +113,11 @@ export const StudioRasterCrdtCanvas = forwardRef<
 
   useLayoutEffect(() => {
     const gpuCanvas = gpuCanvasRef.current;
-    const fallbackCanvas = fallbackCanvasRef.current;
-    if (!gpuCanvas || !fallbackCanvas) return;
+    const canvas2dCanvas = canvas2dCanvasRef.current;
+    if (!gpuCanvas || !canvas2dCanvas) return;
     const presenter = new StudioRasterTilePresenter({
       gpuCanvas,
-      fallbackCanvas,
+      canvas2dCanvas,
       gpu,
       sha256,
       onBackendChange: (backend) => callbacksRef.current.onBackendChange?.(backend),
@@ -213,7 +213,7 @@ export const StudioRasterCrdtCanvas = forwardRef<
         }}
       />
       <canvas
-        ref={fallbackCanvasRef}
+        ref={canvas2dCanvasRef}
         width={1}
         height={1}
         style={{

@@ -149,14 +149,38 @@ function applied(requestId: number, revision = 1): StudioLivingInkExecutionAppli
 async function initialize(provider: StudioLivingInkExecutionProvider, worker: FakeWorker): Promise<void> {
   const pending = provider.initialize();
   const request = worker.messages.at(-1)!;
+  expect(request).toMatchObject({ type: "living-ink/initialize", backend: "webgl2" });
   worker.respond({ type: "living-ink/ready", version: 1, requestId: request.requestId, capabilities });
   await pending;
 }
 
 describe("StudioLivingInkExecutionProvider", () => {
+  it("rejects a Worker that answers with a backend other than the explicit selection", async () => {
+    const worker = new FakeWorker();
+    const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgpu",
+      workerFactory: () => worker,
+    });
+    const pending = provider.initialize();
+    const request = worker.messages.at(-1)!;
+    expect(request).toMatchObject({ type: "living-ink/initialize", backend: "webgpu" });
+    worker.respond({
+      type: "living-ink/ready",
+      version: 1,
+      requestId: request.requestId,
+      capabilities,
+    });
+    await expect(pending).rejects.toThrow("explicitly selected backend");
+    expect(worker.terminated).toBe(true);
+    await provider.dispose();
+  });
+
   it("applies simulation-only input without allocating a frame, then presents once explicitly", async () => {
     const worker = new FakeWorker();
-    const provider = new StudioLivingInkExecutionProvider(config, { workerFactory: () => worker });
+    const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
+      workerFactory: () => worker,
+    });
     await initialize(provider, worker);
 
     const pending = provider.apply(operation(1), { present: false });
@@ -193,7 +217,10 @@ describe("StudioLivingInkExecutionProvider", () => {
 
   it("serializes input and returns only validated caller-owned frames", async () => {
     const worker = new FakeWorker();
-    const provider = new StudioLivingInkExecutionProvider(config, { workerFactory: () => worker });
+    const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
+      workerFactory: () => worker,
+    });
     await initialize(provider, worker);
     const first = provider.apply(operation(1));
     const second = provider.apply(operation(2));
@@ -229,6 +256,7 @@ describe("StudioLivingInkExecutionProvider", () => {
     const secondWorker = new FakeWorker();
     let generation = 0;
     const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
       workerFactory: () => generation++ === 0 ? firstWorker : secondWorker,
     });
     await initialize(provider, firstWorker);
@@ -255,7 +283,10 @@ describe("StudioLivingInkExecutionProvider", () => {
 
   it("rejects historical WebGPU receipts that falsely claim a WebGL2 FBO readback", async () => {
     const worker = new FakeWorker();
-    const provider = new StudioLivingInkExecutionProvider(config, { workerFactory: () => worker });
+    const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
+      workerFactory: () => worker,
+    });
     await initialize(provider, worker);
     const pending = provider.apply(operation(1));
     await Promise.resolve();
@@ -284,6 +315,7 @@ describe("StudioLivingInkExecutionProvider", () => {
   it("posts timeout cancellation before releasing the next queued input", async () => {
     const worker = new FakeWorker();
     const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
       workerFactory: () => worker,
       requestTimeoutMilliseconds: 8,
     });
@@ -315,6 +347,7 @@ describe("StudioLivingInkExecutionProvider", () => {
     const secondWorker = new FakeWorker();
     let generation = 0;
     const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
       workerFactory: () => generation++ === 0 ? firstWorker : secondWorker,
       requestTimeoutMilliseconds: 30_000,
     });
@@ -333,6 +366,7 @@ describe("StudioLivingInkExecutionProvider", () => {
   it("seals an epoch on main-thread structured-clone failure instead of timing out", async () => {
     const worker = new FakeWorker();
     const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
       workerFactory: () => worker,
       requestTimeoutMilliseconds: 30_000,
     });
@@ -349,6 +383,7 @@ describe("StudioLivingInkExecutionProvider", () => {
   it("rejects in-flight work and terminates the Worker immediately on disposal", async () => {
     const worker = new FakeWorker();
     const provider = new StudioLivingInkExecutionProvider(config, {
+      backend: "webgl2",
       workerFactory: () => worker,
       requestTimeoutMilliseconds: 30_000,
     });

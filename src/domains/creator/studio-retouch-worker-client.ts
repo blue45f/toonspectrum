@@ -23,10 +23,13 @@ export interface StudioRetouchWorkerLike {
 }
 
 export type StudioRetouchWorkerFactory = () => StudioRetouchWorkerLike | null;
+export type StudioRetouchExecutionMode = "worker" | "direct";
 
 export interface StudioRetouchWorkerClientOptions {
   readonly signal?: AbortSignal;
-  /** `null` forces the bounded direct fallback; omitted uses the Vite module Worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  readonly executionMode?: StudioRetouchExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   readonly workerFactory?: StudioRetouchWorkerFactory | null;
   readonly readyTimeoutMilliseconds?: number;
   readonly operationTimeoutMilliseconds?: number;
@@ -61,6 +64,12 @@ function createAbortError(message = "리터치 계산을 취소했습니다."): 
 function createTimeoutError(): Error {
   const error = new Error("리터치 Worker가 제한 시간 안에 완료되지 않았습니다.");
   error.name = "TimeoutError";
+  return error;
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioRetouchWorkerUnavailableError";
   return error;
 }
 
@@ -147,13 +156,9 @@ function runRetouchWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runRetouchDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
     const onOperationTimeout = () => finish(() => reject(createTimeoutError()));
 
     const postRequest = () => {
@@ -231,7 +236,10 @@ function runRetouchWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "리터치 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       const error = event.error instanceof Error
@@ -250,7 +258,7 @@ function runRetouchWithWorker(
       postRequest();
     } else {
       readyTimer = setTimeout(
-        resolveDirectFallback,
+        () => rejectWorkerUnavailable("리터치 Worker 준비 시간이 초과되었습니다."),
         boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
       );
     }
@@ -335,17 +343,21 @@ function runRetouchWithSharedModuleWorker(
     clearSharedRetouchIdleTimer();
     if (disposeGeneration !== sharedRetouchDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    let creationError: unknown;
     if (!sharedRetouchWorker) {
       try {
         sharedRetouchWorker = createStudioRetouchModuleWorker();
-      } catch {
+      } catch (error) {
+        creationError = error;
         sharedRetouchWorker = null;
       }
       sharedRetouchWorkerReady = false;
       if (sharedRetouchWorker) sharedRetouchWorkerEpoch += 1;
     }
     const worker = sharedRetouchWorker;
-    if (!worker) return runRetouchDirect(request, options.signal);
+    if (!worker) {
+      throw createWorkerUnavailableError("리터치 Worker를 만들 수 없습니다.", creationError);
+    }
     const epoch = sharedRetouchWorkerEpoch;
     const controller = new AbortController();
     sharedRetouchFlight = { worker, epoch, controller };
@@ -388,18 +400,20 @@ export async function runStudioRetouchWorker(
 ): Promise<StudioRetouchWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafe = cloneSafeRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runRetouchDirect(cloneSafe, options.signal);
   if (options.workerFactory === undefined) {
     return runRetouchWithSharedModuleWorker(cloneSafe, options);
   }
   const factory = options.workerFactory;
-  if (!factory) return runRetouchDirect(cloneSafe, options.signal);
+  if (!factory) throw createWorkerUnavailableError("리터치 Worker를 만들 수 없습니다.");
 
   let worker: StudioRetouchWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runRetouchDirect(cloneSafe, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("리터치 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runRetouchDirect(cloneSafe, options.signal);
+  if (!worker) throw createWorkerUnavailableError("리터치 Worker를 만들 수 없습니다.");
   return runRetouchWithWorker(worker, cloneSafe, options);
 }

@@ -161,24 +161,31 @@ describe("google/ink InProgressStroke mesh delta v1", () => {
     }
   });
 
-  it("retains the single-shot fallback and reports its backend honestly", async () => {
+  it("uses the single-shot reference only when that backend is selected explicitly", async () => {
     const generator = await loadInkMeshGenerator();
     const points = fidelityStroke(96);
     const reference = generator.generateInkStrokeMesh(points);
     const session = generator.createInProgressStroke(undefined, {
-      forceSingleShotFallback: true,
+      backend: "single-shot-reference",
     });
     try {
       for (let offset = 0; offset < points.length; offset += 12) {
         session.append(points.slice(offset, offset + 12));
       }
       session.finish();
-      expect(session.backend).toBe("single-shot-fallback");
-      expect(session.metrics().backend).toBe("single-shot-fallback");
+      expect(session.backend).toBe("single-shot-reference");
+      expect(session.metrics().backend).toBe("single-shot-reference");
       expectExactMesh(session.snapshot(), reference);
     } finally {
       session.dispose();
     }
+  });
+
+  it("rejects the removed forceSingleShotFallback option instead of silently changing lanes", async () => {
+    const generator = await loadInkMeshGenerator();
+    expect(() => generator.createInProgressStroke(undefined, {
+      forceSingleShotFallback: true,
+    } as never)).toThrow(/unsupported ink-mesh session option: forceSingleShotFallback/);
   });
 
   it("reduces live payload versus full-snapshot transfer and performs no GPU readback", async () => {

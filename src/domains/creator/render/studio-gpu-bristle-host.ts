@@ -8,10 +8,9 @@
  * a `renderGeneration` counter the caller bumps in `onReady` so a React-Compiler-memoised render
  * body re-executes the call. This module copies that shape verbatim.
  *
- * `null` is not an error. `null` means "the CPU carrier paints this frame", which is the correct,
- * byte-identical-to-today behaviour. Nothing in this file can make an existing oil stroke look
- * different, because the only way it changes a pixel is by returning a bitmap, and it returns one
- * only after a GPU device, a compiled pipeline and a picture-admission proof have all succeeded.
+ * For a brush that explicitly selects this lane, `null` means pending or unavailable. The caller
+ * must preserve the source stroke and paint no substitute provider; only a proven GPU bitmap owns
+ * pixels. Non-GPU brush ids remain on their separately selected oil-carrier route.
  *
  * BUNDLE CONTRACT. This module is route-reachable (`StudioDrawNode.tsx` imports it), so it must
  * never statically value-import `studio-gpu-bristle-runtime.ts`, `studio-gpu-bristle-wgsl.ts` or
@@ -296,8 +295,9 @@ function ensureWorker(): Worker | null {
 
 /**
  * Render-safe entry. Returns the overlay when it is already known for these exact inputs, and
- * otherwise enqueues the work and returns `null` so the caller paints with the CPU carrier this
- * frame. `onReady` fires once the GPU result lands; calling again then returns it.
+ * otherwise enqueues the work and returns `null`. For a selected GPU-bristle brush, the caller must
+ * not paint a Canvas/Konva carrier while this value is null. `onReady` fires once the GPU result
+ * lands; calling again then returns it.
  *
  * `renderGeneration` exists for compiled render bodies (React Compiler): pass a counter you bump in
  * `onReady` so the memoised call site re-executes. The value itself is never read.
@@ -433,10 +433,9 @@ function parseHexRgb(hex: string): [number, number, number] {
  * Build an overlay request from the oil lane's own dab plan, or `null` when this brush does not
  * opt in.
  *
- * `dtMs` is a fixed frame step rather than a real timestamp: a retained `DrawEl` carries points and
- * pressures but no per-point clock. That is a fallback, not a derivation from the station index —
- * the contract forbids the latter because it would make a suffix solve disagree with a replay, and
- * a constant does not.
+ * `dtMs` is the retained-document canonical frame step: a retained `DrawEl` carries points and
+ * pressures but no per-point clock. It is never derived from the station index, because that would
+ * make a suffix solve disagree with a replay.
  */
 export function studioGpuBristleOilRequest(
   elementId: string,
@@ -468,7 +467,7 @@ export function studioGpuBristleOilRequest(
       x: dab.x,
       y: dab.y,
       pressure: clamp01(dab.opacity),
-      dtMs: STUDIO_GPU_BRISTLE_LIMITS.fallbackStationDtMs,
+      dtMs: STUDIO_GPU_BRISTLE_LIMITS.retainedStationDtMs,
     });
   }
   const baseRadiusPx = Math.max(1, radiusSum / dabs.length);

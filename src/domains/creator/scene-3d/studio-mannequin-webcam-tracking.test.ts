@@ -67,6 +67,28 @@ describe("studio-mannequin-webcam-tracking", () => {
     expect(assetSource).toContain("vision_wasm_nosimd_internal.js?url");
     expect(runtimeSource).toContain("modelAssetBuffer");
     expect(`${runtimeSource}\n${assetSource}`).not.toMatch(/cdn\.jsdelivr\.net|unpkg\.com/i);
+    expect(runtimeSource).not.toContain("falling back to CPU");
+    expect(runtimeSource.match(/PoseLandmarker\.createFromOptions/gu)).toHaveLength(1);
+  });
+
+  it("keeps the selected delegate in the singleton identity", async () => {
+    const cpuLandmarker: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    };
+    const cpuFactory = vi.fn(async () => cpuLandmarker);
+    const gpuFactory = vi.fn(async () => cpuLandmarker);
+
+    await expect(initStudioMannequinPoseLandmarker({
+      delegate: "CPU",
+      factory: cpuFactory,
+    })).resolves.toBe(cpuLandmarker);
+    expect(cpuFactory).toHaveBeenCalledWith(undefined, "CPU");
+    await expect(initStudioMannequinPoseLandmarker({
+      delegate: "GPU",
+      factory: gpuFactory,
+    })).rejects.toMatchObject({ name: "StudioMannequinDelegateIdentityError" });
+    expect(gpuFactory).not.toHaveBeenCalled();
   });
 
   it("dispose 직후 retry도 이전 MediaPipe 초기화가 끝나기 전에는 factory를 중첩하지 않는다", async () => {
@@ -238,6 +260,6 @@ describe("studio-mannequin-webcam-tracking", () => {
         "engine",
         Object.assign(new Error(), { name: "StudioMannequinPoseEngineCreationError" }),
       ),
-    ).toContain("그래픽 가속·CPU·호환 모드");
+    ).toContain("선택한 동작 인식 엔진");
   });
 });

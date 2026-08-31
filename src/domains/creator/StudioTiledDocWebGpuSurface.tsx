@@ -1,16 +1,18 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { resolveStudioTiledDocPrimarySurfaceOwner } from "./render/studio-tiledoc-primary-surface-owner";
 import {
   STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID,
   StudioTileDocProductIslandStore,
 } from "./render/studio-tiledoc-product-island";
 import { StudioTileDocWebGpuRuntime } from "./render/studio-tiledoc-webgpu-runtime";
-import { StudioRasterCrdtCanvas } from "./StudioRasterCrdtCanvas";
 
 import type { StudioRasterImmutableTileFrame } from "./live/studio-crdt-raster-replay-runtime";
+import type {
+  StudioRasterTilePresentationFailureReason,
+  StudioRasterTilePresentationResult,
+  StudioRasterTileViewport,
+} from "./render/studio-raster-tile-presenter";
 import type { StudioTileDocRect } from "./render/studio-tiledoc-geometry";
-import type { StudioRasterCrdtCanvasProps } from "./StudioRasterCrdtCanvas";
 import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
 
 export interface StudioTiledDocWebGpuSurfaceProps {
@@ -18,14 +20,17 @@ export interface StudioTiledDocWebGpuSurfaceProps {
   readonly generation: number;
   readonly surface: StudioRasterSurfaceSpec;
   readonly tiles: readonly StudioRasterImmutableTileFrame[];
-  readonly viewport: StudioRasterCrdtCanvasProps["viewport"];
+  readonly viewport: Omit<StudioRasterTileViewport, "devicePixelRatio">;
   readonly documentViewport: StudioTileDocRect;
   readonly signal?: AbortSignal;
   readonly presentationAuthorized?: boolean;
   readonly onFrameReady?: (generation: number) => void;
-  readonly onFrameInvalid?: StudioRasterCrdtCanvasProps["onFrameInvalid"];
-  readonly onDeviceLost?: StudioRasterCrdtCanvasProps["onDeviceLost"];
-  readonly onPresentationResult?: StudioRasterCrdtCanvasProps["onPresentationResult"];
+  readonly onFrameInvalid?: (
+    generation: number,
+    reason: StudioRasterTilePresentationFailureReason | "superseded" | "device-lost"
+  ) => void;
+  readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
+  readonly onPresentationResult?: (result: StudioRasterTilePresentationResult) => void;
 }
 
 interface LatestCallbacks {
@@ -53,8 +58,8 @@ function validDocumentViewport(rect: StudioTileDocRect): boolean {
 
 /**
  * Product surface for the committed CRDT raster island. GPU work uses StudioGpuFabric through the
- * tiledoc compositor; Canvas2D is mounted only after an explicit handoff. The wrapper, never each
- * child canvas, owns visibility so a React commit cannot expose two primary surfaces.
+ * tiledoc compositor. WebGPU is the immutable selected provider: a failed frame becomes explicitly
+ * unavailable and never re-executes the committed tiles through Canvas2D.
  */
 export function StudioTiledDocWebGpuSurface({
   className,
@@ -74,7 +79,7 @@ export function StudioTiledDocWebGpuSurface({
   const islandRef = useRef<StudioTileDocProductIslandStore | null>(null);
   const runtimeRef = useRef<StudioTileDocWebGpuRuntime | null>(null);
   const latestGenerationRef = useRef(generation);
-  const [backend, setBackend] = useState<"fallback" | "pending" | "webgpu">("pending");
+  const [backend, setBackend] = useState<"pending" | "unavailable" | "webgpu">("pending");
   const callbacksRef = useRef<LatestCallbacks>({
     onFrameReady,
     onFrameInvalid,
@@ -109,12 +114,18 @@ export function StudioTiledDocWebGpuSurface({
         setBackend("webgpu");
         callbacksRef.current.onFrameReady?.(latestGenerationRef.current);
       },
-      onCanvas2dHandoff: () => {
-        setBackend("fallback");
+      onUnavailable: () => {
+        const unavailableGeneration = latestGenerationRef.current;
+        setBackend("unavailable");
         callbacksRef.current.onFrameInvalid?.(
-          latestGenerationRef.current,
-          "presentation-failed"
+          unavailableGeneration,
+          "webgpu-unavailable"
         );
+        callbacksRef.current.onPresentationResult?.({
+          status: "rejected",
+          generation: unavailableGeneration,
+          reason: "webgpu-unavailable",
+        });
       },
       onDeviceLost: (info) => {
         setBackend("pending");
@@ -151,14 +162,18 @@ export function StudioTiledDocWebGpuSurface({
       width: documentViewportWidth,
       height: documentViewportHeight,
     })) {
-      setBackend("fallback");
+      runtime.setVisible(false);
+      setBackend("unavailable");
+      callbacksRef.current.onFrameInvalid?.(generation, "presentation-failed");
       return;
     }
     runtime.setVisible(true);
     try {
       island.reconcile(tiles);
     } catch {
-      setBackend("fallback");
+      runtime.setVisible(false);
+      setBackend("unavailable");
+      callbacksRef.current.onFrameInvalid?.(generation, "presentation-failed");
       return;
     }
     const resized = runtime.resize({
@@ -167,7 +182,7 @@ export function StudioTiledDocWebGpuSurface({
       devicePixelRatio: browserDpr(),
     });
     if (resized.status !== "resized") {
-      setBackend("fallback");
+      setBackend("unavailable");
       return;
     }
     setBackend("pending");
@@ -184,7 +199,7 @@ export function StudioTiledDocWebGpuSurface({
       layers: [{ id: STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID }],
     }).then((result) => {
       if (latestGenerationRef.current !== generation) return;
-      if (result.status === "fallback") setBackend("fallback");
+      if (result.status === "unavailable") setBackend("unavailable");
     });
     const abort = () => {
       runtime.setVisible(false);
@@ -207,25 +222,16 @@ export function StudioTiledDocWebGpuSurface({
     viewport.surfaceBounds.width,
   ]);
 
-  const owner = resolveStudioTiledDocPrimarySurfaceOwner(
-    backend,
-    presentationAuthorized
-  );
-  const localViewport: StudioRasterCrdtCanvasProps["viewport"] = {
-    ...viewport,
-    surfaceBounds: {
-      left: 0,
-      top: 0,
-      width: viewport.surfaceBounds.width,
-      height: viewport.surfaceBounds.height,
-    },
-  };
+  const owner = presentationAuthorized && backend === "webgpu"
+    ? "tiledoc-webgpu"
+    : "none";
   return (
     <div
       aria-hidden="true"
       className={className}
       data-studio-tiledoc-product-island="true"
       data-studio-primary-surface-owner={owner}
+      data-studio-tiledoc-webgpu-status={backend}
       style={{
         position: "absolute",
         left: viewport.surfaceBounds.left,
@@ -252,21 +258,6 @@ export function StudioTiledDocWebGpuSurface({
           pointerEvents: "none",
         }}
       />
-      {backend === "fallback" ? (
-        <StudioRasterCrdtCanvas
-          generation={generation}
-          surface={surface}
-          tiles={tiles}
-          viewport={localViewport}
-          signal={signal}
-          gpu={null}
-          presentationAuthorized={owner === "canvas2d-fallback"}
-          onFrameReady={callbacksRef.current.onFrameReady}
-          onFrameInvalid={callbacksRef.current.onFrameInvalid}
-          onDeviceLost={callbacksRef.current.onDeviceLost}
-          onPresentationResult={callbacksRef.current.onPresentationResult}
-        />
-      ) : null}
     </div>
   );
 }

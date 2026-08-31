@@ -6,7 +6,7 @@
  * GPU contexts, and vendor display objects never cross this boundary.
  */
 
-export const STUDIO_SCENE_PROVIDER_CONTRACT_REVISION = 1 as const;
+export const STUDIO_SCENE_PROVIDER_CONTRACT_REVISION = 2 as const;
 
 export type StudioSceneRendererKind = "webgpu" | "webgl";
 export type StudioSceneSelectableShapeKind = "rect" | "ellipse" | "polygon";
@@ -127,22 +127,14 @@ export interface StudioSceneViewportMetrics {
   readonly documentTransform?: StudioSceneDocumentTransform;
 }
 
-export type StudioSceneWebGpuFallbackReason =
-  | "webgpu-api-unavailable"
-  | "provider-webgpu-candidate-unavailable";
-
 export interface StudioSceneRendererReceipt {
   readonly providerId: string;
-  readonly requestedRenderer: "webgpu";
-  readonly attemptedRendererOrder: readonly ["webgpu", "webgl"];
+  /** Exactly one renderer is selected before provider initialization. */
+  readonly selectedRenderer: StudioSceneRendererKind;
+  readonly attemptedRenderer: StudioSceneRendererKind;
   readonly activeRenderer: StudioSceneRendererKind;
-  readonly fallback:
-    | {
-        readonly from: "webgpu";
-        readonly to: "webgl";
-        readonly reason: StudioSceneWebGpuFallbackReason;
-      }
-    | null;
+  readonly attemptCount: 1;
+  readonly failureIsolation: "fail-closed";
   readonly surface: {
     readonly ownership: "exclusive-dedicated-overlay";
     readonly contextSharing: "forbidden";

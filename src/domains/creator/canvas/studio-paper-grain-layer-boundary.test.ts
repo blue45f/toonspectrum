@@ -102,15 +102,10 @@ describe("paper grain lives on its own DOM canvas", () => {
   });
 
   it("keeps the paper rect out of the layer the Vello frame graph can take over", () => {
-    // `StudioCanvasViewport` hides ONLY `mainLayerRef`'s canvas when the frame graph owns document
-    // pixels. The paper-grain rect must therefore live in the background layer, above `bg` and
-    // before `<Layer ref={mainLayerRef}>`, or a GPU handover would blank the sheet.
+    // Vello only makes the document Group transparent after an exact frame receipt. The paper
+    // remains in the background layer so a GPU handoff cannot blank the authored sheet texture.
     const source = readFileSync(
       resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"),
-      "utf8",
-    );
-    const liveSurfaces = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/canvas/studio-canvas-viewport-live-surfaces.ts"),
       "utf8",
     );
     const paperAt = source.indexOf('name="paper-grain"');
@@ -121,8 +116,8 @@ describe("paper grain lives on its own DOM canvas", () => {
     expect(backgroundLayerAt).toBeGreaterThan(0);
     expect(paperAt).toBeGreaterThan(backgroundLayerAt);
     expect(paperAt).toBeLessThan(mainLayerAt);
-    // The hide effect targets mainLayerRef and nothing else.
-    expect(liveSurfaces).toContain("const layer = mainLayerRef.current;");
+    expect(source).toContain('name="studio-konva-document-shadow"');
+    expect(source).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
   });
 
   it("never renders through a WebGPU context — the 2d context is the only one it asks for", () => {

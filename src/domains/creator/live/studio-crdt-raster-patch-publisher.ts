@@ -820,7 +820,11 @@ export type StudioRasterPngCanvasFactory = (
   height: number
 ) => StudioRasterPngCanvas | null;
 
+export type StudioRasterBrowserPngBackend = "offscreen-canvas" | "html-canvas";
+
 export interface StudioRasterBrowserPngEncoderEnvironment {
+  /** Exact backend selected before any pixels are copied. Defaults to the Worker-safe backend. */
+  readonly backend?: StudioRasterBrowserPngBackend;
   /** `null` explicitly disables a backend; omitted selects the browser global when present. */
   readonly createOffscreenCanvas?: StudioRasterPngCanvasFactory | null;
   readonly createHtmlCanvas?: StudioRasterPngCanvasFactory | null;
@@ -885,32 +889,22 @@ async function encodeWithCanvas(
   return { bytes, mediaType: "image/png" };
 }
 
-/** Browser PNG encoder with an OffscreenCanvas-first, HTMLCanvas fallback policy. */
+/** Browser PNG encoder bound to one canvas backend for its entire lifetime. */
 export function createStudioRasterBrowserPngEncoder(
   environment: StudioRasterBrowserPngEncoderEnvironment = {}
 ): StudioRasterPatchEncoder {
-  return async (input) => {
-    const offscreenFactory = environment.createOffscreenCanvas === undefined
+  const backend = environment.backend ?? "offscreen-canvas";
+  const factory = backend === "offscreen-canvas"
+    ? environment.createOffscreenCanvas === undefined
       ? defaultOffscreenCanvasFactory()
-      : environment.createOffscreenCanvas;
-    const htmlFactory = environment.createHtmlCanvas === undefined
+      : environment.createOffscreenCanvas
+    : environment.createHtmlCanvas === undefined
       ? defaultHtmlCanvasFactory()
       : environment.createHtmlCanvas;
-    const factories = [offscreenFactory, htmlFactory].filter(
-      (factory): factory is StudioRasterPngCanvasFactory => typeof factory === "function"
-    );
-    if (factories.length === 0) {
-      fail("canvas_unavailable", "OffscreenCanvas와 HTMLCanvas를 모두 사용할 수 없습니다.");
+  return async (input) => {
+    if (typeof factory !== "function") {
+      fail("canvas_unavailable", `선택한 ${backend} PNG 백엔드를 사용할 수 없습니다.`);
     }
-    let firstFailure: unknown;
-    for (const factory of factories) {
-      try {
-        return await encodeWithCanvas(input, factory);
-      } catch (error) {
-        if (input.signal.aborted) throw abortError(input.signal);
-        firstFailure ??= error;
-      }
-    }
-    fail("png_encode_failed", "사용 가능한 캔버스 백엔드에서 PNG 인코딩에 실패했습니다.", firstFailure);
+    return encodeWithCanvas(input, factory);
   };
 }

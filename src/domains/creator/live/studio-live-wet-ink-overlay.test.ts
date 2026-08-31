@@ -248,30 +248,75 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     });
   });
 
-  it("cleans up hidden, aborted and stale-page sessions without leaving active pixels", () => {
-    const { activeCanvas, renderer } = attachedRenderer();
+  it("keeps rejected pointer-up source authoritative until an explicit reset", () => {
+    const { renderer, settledCanvas } = attachedRenderer();
+    const element = wetStroke([10, 10, 50, 20, 84, 36]);
+    expect(renderer.begin(element, { pageEpoch: "page-a" }).status).toBe("started");
+
+    expect(renderer.end(element, { pageEpoch: "page-b" })).toEqual({
+      status: "rejected",
+      reason: "stale-page",
+    });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.lastOperationFailureReason).toBe("stale-page");
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(settledCanvas.draws).toHaveLength(0);
+    expect(renderer.end(element, { pageEpoch: "page-a" })).toEqual({
+      status: "rejected",
+      reason: "stale-page",
+    });
+    expect(renderer.resetActive()).toBe(true);
+    expect(renderer.isActive).toBe(false);
+  });
+
+  it("keeps unavailable pointer-up source authoritative without creating a settled receipt", () => {
+    const { renderer, settledCanvas } = attachedRenderer();
+    const element = wetStroke([10, 10, 50, 20, 84, 36]);
+    expect(renderer.begin(element, { pageEpoch: "page-a" }).status).toBe("started");
+    renderer.attach(null);
+
+    expect(renderer.end(element, { pageEpoch: "page-a" })).toEqual({
+      status: "unavailable",
+      reason: "surface-render",
+    });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.lastOperationFailureReason).toBe("surface-render");
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(settledCanvas.draws).toHaveLength(0);
+    expect(renderer.resetActive()).toBe(true);
+    expect(renderer.isActive).toBe(false);
+  });
+
+  it("preserves the last accepted source until rejected sessions are explicitly cancelled", () => {
+    const { renderer } = attachedRenderer();
     const element = wetStroke([10, 10, 50, 20]);
     expect(renderer.begin(element, { pageEpoch: 1 }).status).toBe("started");
     expect(renderer.appendFrom(element, { pageEpoch: 2 })).toEqual({
-      status: "fallback",
+      status: "rejected",
       reason: "stale-page",
     });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.lastOperationFailureReason).toBe("stale-page");
+    expect(renderer.resetActive()).toBe(true);
     expect(renderer.isActive).toBe(false);
 
     expect(renderer.begin(element, { pageEpoch: 3 }).status).toBe("started");
     expect(renderer.appendFrom(element, {
       pageEpoch: 3,
       signal: { aborted: true },
-    })).toEqual({ status: "fallback", reason: "aborted" });
+    })).toEqual({ status: "rejected", reason: "aborted" });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.resetActive()).toBe(true);
     expect(renderer.isActive).toBe(false);
 
     expect(renderer.begin(element, { pageEpoch: 4 }).status).toBe("started");
     expect(renderer.appendFrom(element, {
       pageEpoch: 4,
       hidden: true,
-    })).toEqual({ status: "fallback", reason: "hidden" });
+    })).toEqual({ status: "rejected", reason: "hidden" });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.resetActive()).toBe(true);
     expect(renderer.isActive).toBe(false);
-    expect(activeCanvas.clears.length).toBeGreaterThan(0);
   });
 
   it("fails closed when native presentation would exceed the authoritative 4x field", () => {
@@ -282,7 +327,7 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     });
     expect(renderer.isNativeSurfaceReady).toBe(false);
     expect(renderer.begin(wetStroke([10, 10]), { pageEpoch: 1 })).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "native-scale-unsupported",
     });
   });

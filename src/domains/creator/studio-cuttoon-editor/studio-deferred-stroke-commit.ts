@@ -39,6 +39,7 @@ import type { StudioCollaborationWiringContext } from "../live/studio-collaborat
 import type { StudioLiveDynamicBrushOverlayRenderer } from "../live/studio-live-dynamic-brush-overlay";
 import type { StudioLiveInkOverlayRenderer } from "../live/studio-live-ink-overlay";
 import type { StudioLiveRetainedMediaOverlayRenderer } from "../live/studio-live-retained-media-overlay";
+import type { StudioLiveStrokeGpuFailureReason } from "../live/studio-live-stroke-render-backend";
 import type { StudioGpuLiveSourceJournalState } from "../render/studio-webgpu-live-source-journal";
 import type { StudioGpuLiveStrokePlan } from "../render/studio-webgpu-live-stroke-plan";
 import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
@@ -140,11 +141,12 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
     | (PendingStrokeCommitBatch & { timer: ReturnType<typeof setTimeout> | null })
     | null
   >;
+  readonly onSelectedGpuLiveInkUnavailable: (
+    reason: StudioLiveStrokeGpuFailureReason,
+    strokeId: string,
+  ) => void;
   readonly prepareLiveStrokeGpuSubmission: (strokeId: string) => boolean;
   readonly processCommittedInkSurfaceHandoffsRef: MutableRefObject<() => void>;
-  readonly promotePendingGpuAuthoritiesToKonva: (
-    explicitUncommittedOrderIds?: readonly string[]
-  ) => boolean;
   /**
    * StudioPage 가 라이브 배선 seam(publishStudioCrdtSceneTransitionRef)에 발행하는 것과 같은
    * 렌더의 클로저를 직접 주입한다 — 추출 전 commit 이 캡처하던 identity 그대로다.
@@ -159,7 +161,6 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
     input: StudioHistoryJournalTransitionInput
   ) => void;
   readonly registerLiveStrokeGpuRequest: (strokeId: string, requestId: string) => boolean;
-  readonly relinquishGpuLiveInkToKonva: (disableWebGpuForSession?: boolean) => boolean;
   readonly setMaster: (next: SetStateAction<DocumentMaster<El>>) => void;
   readonly setPagesHi: (next: SetStateAction<number>) => void;
   readonly setPagesHistory: (next: SetStateAction<PageState[][]>) => void;
@@ -188,7 +189,6 @@ export interface StudioDeferredStrokeCommitEngine {
     completeGpuElementIds: ReadonlySet<string>,
   ) =>
     | { readonly status: "released" }
-    | { readonly status: "promoted" }
     | { readonly status: "retained"; readonly reason: string };
   readonly scheduleCommittedInkRetainedRetry: (
     released: StudioCommittedInkSurfaceCounts,
@@ -247,14 +247,13 @@ export function createStudioDeferredStrokeCommitEngine(
     pendingGpuDrawAuthoritiesRef,
     pendingGpuStrokesRef,
     pendingStrokeCommitsRef,
+    onSelectedGpuLiveInkUnavailable,
     prepareLiveStrokeGpuSubmission,
     processCommittedInkSurfaceHandoffsRef,
-    promotePendingGpuAuthoritiesToKonva,
     publishStudioCrdtSceneTransition,
     recordStudioHistoryJournalPages,
     recordStudioHistoryTransition,
     registerLiveStrokeGpuRequest,
-    relinquishGpuLiveInkToKonva,
     setError,
     setMaster,
     setPagesHi,
@@ -649,7 +648,6 @@ export function createStudioDeferredStrokeCommitEngine(
     completeGpuElementIds: ReadonlySet<string>,
   ):
     | { readonly status: "released" }
-    | { readonly status: "promoted" }
     | { readonly status: "retained"; readonly reason: string } {
     const hasCompleteGpuAuthority = pendingGpuDrawAuthoritiesRef.current.some((authority) => (
       completeGpuElementIds.has(authority.element.id)
@@ -686,20 +684,14 @@ export function createStudioDeferredStrokeCommitEngine(
         })
       : null;
     if (releasedAuthorities?.status === "rejected") {
-      // Preserve both queues until a safe whole-DrawEl transition exists. The original handoffs
-      // are still installed when this function runs, so a successful promotion migrates their GPU
-      // reservations to the exact Konva FIFO and a later coordinator pass releases that draft.
-      // If even promotion rejects an already-corrupt count map, retain the current GPU pixels and
-      // handoffs untouched: duplicate authority is safer than losing an uncommitted suffix.
-      const promoted = relinquishGpuLiveInkToKonva(true);
-      return promoted
-        ? { status: "promoted" }
-        : { status: "retained", reason: "gpu-authority-release-rejected" };
+      // Preserve the selected-provider queues and original handoffs. An accounting mismatch cannot
+      // authorize migration to Konva; a later canonical retry or document edit may release them.
+      return { status: "retained", reason: "gpu-authority-release-rejected" };
     }
 
     let nextPendingGpuStrokes = pendingGpuStrokesRef.current;
     let acceptedRebaselineRequestId: string | null = null;
-    let promotePostContactRemainder = false;
+    let postContactRemainderBlocksRelease = false;
     if (releasedAuthorities?.status === "released") {
       nextPendingGpuStrokes = pendingGpuStrokesRef.current.slice(
         releasedAuthorities.releasedGpuStrokeCount,
@@ -723,51 +715,58 @@ export function createStudioDeferredStrokeCommitEngine(
         // A settled-prefix release changes operation indices, so pay one bounded rebaseline while
         // preserving the source journal cursor. The next pointer frame remains suffix-only.
         if (!prepareLiveStrokeGpuSubmission(activeDrawing.id)) {
-          const promoted = relinquishGpuLiveInkToKonva(true);
-          return promoted
-            ? { status: "promoted" }
-            : { status: "retained", reason: "journal-rebaseline-not-prepared" };
+          onSelectedGpuLiveInkUnavailable("request-failed", activeDrawing.id);
+          return { status: "retained", reason: "journal-rebaseline-not-prepared" };
         }
         const outcome = handle?.replacePinnedJournalBaseline(nextGpuStrokes);
         if (!outcome || outcome.status === "rejected") {
-          const promoted = relinquishGpuLiveInkToKonva(true);
-          return promoted
-            ? { status: "promoted" }
-            : { status: "retained", reason: "journal-rebaseline-rejected" };
+          onSelectedGpuLiveInkUnavailable("request-failed", activeDrawing.id);
+          return { status: "retained", reason: "journal-rebaseline-rejected" };
         }
         acceptedRebaselineRequestId = outcome.requestId;
       } else if (gpuLiveInkPinnedRef.current && activeJournal) {
-        // A non-prefix active projection cannot continue under the old operation indices. Konva
-        // still has the exact DrawEl, so fail visible instead of feeding a stale journal cursor.
-        const promoted = relinquishGpuLiveInkToKonva(true);
-        return promoted
-          ? { status: "promoted" }
-          : { status: "retained", reason: "journal-identity-mismatch" };
+        // A non-prefix active projection cannot continue under the old operation indices. Cancel
+        // that selected-provider operation and retain the original queues; do not switch renderer.
+        onSelectedGpuLiveInkUnavailable("request-failed", activeDrawing?.id ?? "active-webgpu-stroke");
+        return { status: "retained", reason: "journal-identity-mismatch" };
       } else {
-        // Pointer-up sessions cannot issue a new GPU frame by coordinator contract. Defer the
-        // remaining exact DrawEls to the atomic Canvas promotion after the released FIFO prefixes
-        // have been consumed below.
-        promotePostContactRemainder = nextGpuStrokes.length > 0;
+        // Pointer-up sessions cannot issue a new GPU frame by coordinator contract. Keep the whole
+        // selected-provider group installed until all of its canonical handoffs can release at once.
+        postContactRemainderBlocksRelease = nextGpuStrokes.length > 0;
       }
     }
 
-    // Mutate every visible FIFO only after the GPU rebaseline has accepted its replacement.
-    // A rejected rebaseline can therefore promote or retain the complete pre-release authority
-    // graph instead of leaving an already-sliced queue behind.
+    if (postContactRemainderBlocksRelease) {
+      return { status: "retained", reason: "post-contact-rebaseline-forbidden" };
+    }
+
+    // Mutate every visible FIFO only after the selected GPU has accepted its replacement.
     if (
       released.overlay > overlayRenderer.settledStrokeCount
         + retainedMediaOverlayRenderer.settledStrokeCount
         + dynamicBrushOverlayRenderer.settledStrokeCount
       || released.draft > draftPreviewStore.settledCount
     ) {
-      // Imperative GPU adapters are allowed to synchronously publish receipts while accepting a
-      // baseline. Revalidate both Canvas FIFOs after that call and before mutating either one.
-      // Promotion restores the original GPU authority graph; otherwise every original ref and
-      // handoff remains installed for the bounded retained recovery path.
-      const promoted = shouldPlanGpuRelease ? relinquishGpuLiveInkToKonva(true) : false;
-      return promoted
-        ? { status: "promoted" }
-        : { status: "retained", reason: "surface-count-before-release" };
+      // Imperative GPU adapters may synchronously publish receipts while accepting a baseline.
+      // Revalidate both canonical FIFOs and retain the entire original graph on mismatch.
+      return { status: "retained", reason: "surface-count-before-release" };
+    }
+    if (acceptedRebaselineRequestId !== null) {
+      const activeStrokeId = drawingRef.current?.id;
+      if (
+        !activeStrokeId
+        || !registerLiveStrokeGpuRequest(activeStrokeId, acceptedRebaselineRequestId)
+      ) {
+        onSelectedGpuLiveInkUnavailable(
+          "surface-lost",
+          activeStrokeId ?? "active-webgpu-stroke",
+        );
+        return { status: "retained", reason: "audit-rebaseline-rejected" };
+      }
+      gpuLiveSourceJournalFirstStrokeIndexRef.current = nextPendingGpuStrokes.length;
+      gpuLiveAcceptedRequestIdRef.current = acceptedRebaselineRequestId;
+      armGpuPinnedRequestWatchdog(acceptedRebaselineRequestId);
+      applyLiveStrokeBackendPresentationEffects();
     }
     const retainedOverlayBudget = Math.max(
       0,
@@ -793,28 +792,6 @@ export function createStudioDeferredStrokeCommitEngine(
       pendingGpuStrokesRef.current = nextPendingGpuStrokes;
       if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
       gpuLingerRafRef.current = 0;
-      if (acceptedRebaselineRequestId !== null) {
-        gpuLiveSourceJournalFirstStrokeIndexRef.current = nextPendingGpuStrokes.length;
-        const activeStrokeId = drawingRef.current?.id;
-        if (
-          !activeStrokeId
-          || !registerLiveStrokeGpuRequest(activeStrokeId, acceptedRebaselineRequestId)
-        ) {
-          const promoted = relinquishGpuLiveInkToKonva(true);
-          return promoted
-            ? { status: "promoted" }
-            : { status: "retained", reason: "audit-rebaseline-rejected" };
-        }
-        gpuLiveAcceptedRequestIdRef.current = acceptedRebaselineRequestId;
-        armGpuPinnedRequestWatchdog(acceptedRebaselineRequestId);
-        applyLiveStrokeBackendPresentationEffects();
-      }
-      if (promotePostContactRemainder) {
-        const promoted = promotePendingGpuAuthoritiesToKonva();
-        return promoted
-          ? { status: "promoted" }
-          : { status: "retained", reason: "post-contact-rebaseline-forbidden" };
-      }
       if (acceptedRebaselineRequestId === null) {
         webGpuCanvasHandleRef.current?.setPinnedVisible(false);
       }

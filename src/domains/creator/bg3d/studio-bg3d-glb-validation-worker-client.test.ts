@@ -5,11 +5,11 @@ import {
   type StudioBg3dGlbValidationOptions,
 } from "./studio-bg3d-glb-validation";
 import {
-  STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES,
+  STUDIO_BG3D_GLB_DIRECT_MAX_BYTES,
   StudioBg3dValidationWorkerClient,
   StudioBg3dValidationWorkerPool,
   disposeSharedStudioBg3dValidationWorker,
-  studioBg3dGlbRequiresValidationWorker,
+  studioBg3dGlbSupportsDirectValidation,
   validateStudioBg3dGlbOffMainThread,
   type StudioBg3dValidationWorkerLike,
 } from "./studio-bg3d-glb-validation-worker-client";
@@ -118,6 +118,8 @@ describe("StudioBg3dValidationWorkerClient", () => {
 
     await expect(pending).resolves.toEqual({
       execution: "worker",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
       result: { ok: false, code: "invalid-magic", message: "sanitized" },
     });
     expect(source).toEqual(new Uint8Array([1, 2, 3, 4]));
@@ -307,7 +309,7 @@ describe("StudioBg3dValidationWorkerClient", () => {
     client.dispose();
   });
 
-  it("honors AbortSignal while the main-thread digest fallback is in flight", async () => {
+  it("honors AbortSignal while the explicitly selected direct digest is in flight", async () => {
     const controller = new AbortController();
     let releaseDigest: ((value: Uint8Array) => void) | undefined;
     const digest = vi.fn(() => new Promise<Uint8Array>((resolve) => {
@@ -316,7 +318,7 @@ describe("StudioBg3dValidationWorkerClient", () => {
     const pending = validateStudioBg3dGlbOffMainThread(
       new Uint8Array([1, 2, 3, 4]),
       { ...OPTIONS, digest },
-      controller.signal,
+      { executionBackend: "direct", signal: controller.signal },
     );
     await vi.waitFor(() => expect(digest).toHaveBeenCalledOnce());
     controller.abort();
@@ -325,27 +327,47 @@ describe("StudioBg3dValidationWorkerClient", () => {
     releaseDigest?.(new Uint8Array(32));
   });
 
-  it("allows only bounded payloads to use the main-thread compatibility path", async () => {
-    const ceiling = STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES;
-    expect(studioBg3dGlbRequiresValidationWorker(new ArrayBuffer(ceiling))).toBe(false);
-    expect(studioBg3dGlbRequiresValidationWorker(new ArrayBuffer(ceiling + 1))).toBe(true);
+  it("allows only bounded payloads to use the explicitly selected direct backend", async () => {
+    const ceiling = STUDIO_BG3D_GLB_DIRECT_MAX_BYTES;
+    expect(studioBg3dGlbSupportsDirectValidation(new ArrayBuffer(ceiling))).toBe(true);
+    expect(studioBg3dGlbSupportsDirectValidation(new ArrayBuffer(ceiling + 1))).toBe(false);
 
     vi.stubGlobal("Worker", undefined);
     await expect(validateStudioBg3dGlbOffMainThread(
       new Uint8Array([1, 2, 3, 4]),
       OPTIONS,
-    )).resolves.toMatchObject({ execution: "main-thread" });
+    )).rejects.toMatchObject({
+      code: "worker-failed",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+      { executionBackend: "direct" },
+    )).resolves.toMatchObject({
+      execution: "direct",
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
 
     const large = new Uint8Array(ceiling + 1);
     await expect(validateStudioBg3dGlbOffMainThread(
       large,
       optionsForByteLength(large.byteLength),
-    )).rejects.toMatchObject({ code: "worker-failed" });
+      { executionBackend: "direct" },
+    )).rejects.toMatchObject({
+      code: "direct-input-too-large",
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
   });
 
-  it("falls back after Worker construction failure only for bounded payloads", async () => {
+  it("fails closed after Worker construction failure without running the direct backend", async () => {
+    let constructions = 0;
     class ThrowingWorker {
       constructor() {
+        constructions += 1;
         throw new Error("Worker construction blocked");
       }
     }
@@ -354,13 +376,76 @@ describe("StudioBg3dValidationWorkerClient", () => {
     await expect(validateStudioBg3dGlbOffMainThread(
       new Uint8Array([1, 2, 3, 4]),
       OPTIONS,
-    )).resolves.toMatchObject({ execution: "main-thread" });
+    )).rejects.toMatchObject({
+      code: "worker-failed",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
+    expect(constructions).toBe(1);
 
-    const large = new Uint8Array(STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES + 1);
     await expect(validateStudioBg3dGlbOffMainThread(
-      large,
-      optionsForByteLength(large.byteLength),
-    )).rejects.toMatchObject({ code: "worker-failed" });
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+      { executionBackend: "direct" },
+    )).resolves.toMatchObject({
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
+    expect(constructions).toBe(1);
+  });
+
+  it("keeps selected Worker post and runtime failures terminal for their requests", async () => {
+    let postConstructions = 0;
+    class ThrowingPostWorker extends FakeWorker {
+      constructor() {
+        super();
+        postConstructions += 1;
+      }
+
+      override postMessage(): void {
+        throw new Error("post blocked");
+      }
+    }
+    vi.stubGlobal("Worker", ThrowingPostWorker);
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+    )).rejects.toMatchObject({
+      code: "worker-failed",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
+    expect(postConstructions).toBe(1);
+
+    const runtimeWorkers: FakeWorker[] = [];
+    class RuntimeFailureWorker extends FakeWorker {
+      constructor() {
+        super();
+        runtimeWorkers.push(this);
+      }
+    }
+    vi.stubGlobal("Worker", RuntimeFailureWorker);
+    const runtimeFailure = validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+    );
+    runtimeWorkers[0]?.emitError();
+    await expect(runtimeFailure).rejects.toMatchObject({
+      code: "worker-failed",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
+    expect(runtimeWorkers).toHaveLength(1);
+
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+      { executionBackend: "direct" },
+    )).resolves.toMatchObject({
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
+    expect(runtimeWorkers).toHaveLength(1);
   });
 
   it("rejects a main-realm Basis capability until the validation worker can self-attest", async () => {

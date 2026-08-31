@@ -4,7 +4,6 @@ import { deflateSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES,
   disposeSharedStudioBg3dGeometryWorkerClient,
 } from "./studio-bg3d-geometry-worker-client";
 import {
@@ -24,19 +23,30 @@ import {
   STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES,
   STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES,
   STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES,
-  STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES,
+  STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES,
   STUDIO_BG3D_IMPORT_MAX_OUTPUT_TOTAL_BYTES,
   STUDIO_BG3D_IMPORT_MAX_VERTICES,
   StudioBg3dModelImportError,
   assertStudioBg3dPreExportBudgets,
-  convertStudioBg3dModelFilesToGlb,
+  convertStudioBg3dModelFilesToGlb as convertStudioBg3dModelFilesToGlbWithBackend,
   planStudioBg3dModelImports,
   type StudioBg3dImportFile,
+  type StudioBg3dModelImportOptions,
 } from "./studio-bg3d-model-import";
 import { disposeSharedStudioBg3dObjWorkerClient } from "./studio-bg3d-obj-worker-client";
 
 import type { Bg3dModelUploadSource } from "./bg3d-model-library";
 import type { Mesh, MeshStandardMaterial } from "three";
+
+function convertStudioBg3dModelFilesToGlb(
+  input: readonly StudioBg3dImportFile[],
+  options: StudioBg3dModelImportOptions = {},
+): ReturnType<typeof convertStudioBg3dModelFilesToGlbWithBackend> {
+  return convertStudioBg3dModelFilesToGlbWithBackend(input, {
+    executionBackend: "direct",
+    ...options,
+  });
+}
 
 function sourceFile(
   name: string,
@@ -2157,7 +2167,7 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     expect(new DataView(buffer).getUint32(0, true)).toBe(0x46546c67);
   });
 
-  it("uses only the explicit small-file compatibility parser when a module Worker is unavailable", async () => {
+  it("fails closed when the selected geometry Worker is unavailable and permits a separate direct task", async () => {
     vi.stubGlobal("FileReader", TestFileReader);
     vi.stubGlobal("Worker", undefined);
     const small = sourceFile("small.stl", [
@@ -2173,26 +2183,46 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     ].join("\n"));
     const large = sourceFile(
       "large.stl",
-      new Uint8Array(STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES + 1),
+      new Uint8Array(STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES + 1),
     );
 
-    await expect(convertStudioBg3dModelFilesToGlb([small])).resolves.toHaveLength(1);
+    await expect(convertStudioBg3dModelFilesToGlbWithBackend([small])).rejects.toMatchObject({
+      code: "worker-required",
+    });
+    await expect(convertStudioBg3dModelFilesToGlbWithBackend([small], {
+      executionBackend: "direct",
+    })).resolves.toHaveLength(1);
     await expect(convertStudioBg3dModelFilesToGlb([large])).rejects.toMatchObject({
       code: "worker-required",
     });
   });
 
-  it("requires the dedicated Worker for an OBJ source above the main-thread compatibility limit", async () => {
+  it("keeps OBJ Worker absence terminal and bounds the separately selected direct backend", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
     vi.stubGlobal("Worker", undefined);
+    const small = sourceFile("small.obj", [
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
     const obj = sourceFile("large.obj", [
-      `#${"x".repeat(STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES)}`,
+      `#${"x".repeat(STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES)}`,
       "v 0 0 0",
       "v 1 0 0",
       "v 0 1 0",
       "f 1 2 3",
     ].join("\n"));
 
-    await expect(convertStudioBg3dModelFilesToGlb([obj])).rejects.toMatchObject({
+    await expect(convertStudioBg3dModelFilesToGlbWithBackend([small])).rejects.toMatchObject({
+      code: "worker-required",
+    });
+    await expect(convertStudioBg3dModelFilesToGlbWithBackend([small], {
+      executionBackend: "direct",
+    })).resolves.toHaveLength(1);
+    await expect(convertStudioBg3dModelFilesToGlbWithBackend([obj], {
+      executionBackend: "direct",
+    })).rejects.toMatchObject({
       code: "worker-required",
     });
   });

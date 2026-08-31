@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioVelloHub,
+  StudioVelloHubRenderSupersededError,
   STUDIO_VELLO_CLASSIC_BACKEND_ID,
   STUDIO_VELLO_CPU_BACKEND_ID,
   type StudioVelloHubBackend,
@@ -34,7 +35,8 @@ afterEach(() => {
 /**
  * Models the browser rule that makes device loss dangerous here: a canvas that
  * has handed out a WebGPU context can never return a 2D context again, so a
- * CPU recovery frame has nowhere to land unless the target mints a new canvas.
+ * explicit CPU reference frame has nowhere to land unless the target mints a
+ * new canvas.
  */
 function stubBrowserCanvasContexts(putImageData: ReturnType<typeof vi.fn>) {
   const webgpuBound = new WeakSet<HTMLCanvasElement>();
@@ -249,10 +251,135 @@ describe("VelloHub canvas target", () => {
     expect(target.canvas.dataset.studioVelloPresentNodes).toBe("0");
     target.destroy();
   });
+
+  it("conceals retained pixels without presenting through another renderer", async () => {
+    const putImageData = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      ((kind: string) => kind === "2d" ? { putImageData } : null) as never,
+    );
+    vi.stubGlobal(
+      "ImageData",
+      class FakeImageData {
+        constructor(
+          readonly data: Uint8ClampedArray,
+          readonly width: number,
+          readonly height: number,
+        ) {}
+      },
+    );
+    const mount = document.createElement("div");
+    const target = createStudioVelloHubCanvasTarget(document, mount);
+    target.setIsland(island);
+    const frame = {
+      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
+      kind: "pixels" as const,
+      width: 8,
+      height: 8,
+      pixels: new Uint8Array(8 * 8 * 4),
+    };
+    await target.present(frame);
+
+    target.conceal();
+
+    expect(target.canvas.style.display).toBe("none");
+    expect(target.canvas.dataset.studioVelloHubPrimary).toBeUndefined();
+    expect(target.canvas.dataset.studioVelloPresentNodes).toBe("0");
+    expect(target.activeBackendId).toBeNull();
+    expect(putImageData).toHaveBeenCalledOnce();
+
+    await target.present(frame);
+    expect(target.canvas.style.display).toBe("block");
+    expect(target.activeBackendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    expect(putImageData).toHaveBeenCalledTimes(2);
+    target.destroy();
+  });
+
+  it("rejects impossible frame kind/backend pairs before exposing a canvas", async () => {
+    const mount = document.createElement("div");
+    const target = createStudioVelloHubCanvasTarget(document, mount);
+    target.setIsland(island);
+    const release = vi.fn();
+
+    await expect(target.present({
+      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
+      kind: "texture",
+      width: 8,
+      height: 8,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release,
+    } as never)).rejects.toThrow(
+      `VelloHub frame contract mismatch: texture:${STUDIO_VELLO_CPU_BACKEND_ID}`,
+    );
+    await expect(target.present({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "pixels",
+      width: 8,
+      height: 8,
+      pixels: new Uint8Array(8 * 8 * 4),
+    } as never)).rejects.toThrow(
+      `VelloHub frame contract mismatch: pixels:${STUDIO_VELLO_CLASSIC_BACKEND_ID}`,
+    );
+
+    expect(release).toHaveBeenCalledOnce();
+    expect(target.canvas.style.display).toBe("none");
+    expect(target.activeBackendId).toBeNull();
+    target.destroy();
+  });
+
+  it("keeps a parked target hidden when an invalidated product render completes late", async () => {
+    let resolveFrame!: (frame: Awaited<ReturnType<StudioVelloHubBackend["render"]>>) => void;
+    const frameFlight = new Promise<Awaited<ReturnType<StudioVelloHubBackend["render"]>>>(
+      (resolve) => {
+        resolveFrame = resolve;
+      },
+    );
+    const render = vi.fn(() => frameFlight);
+    const release = vi.fn();
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      render,
+      dispose: vi.fn(),
+    };
+    const mount = document.createElement("div");
+    const target = createStudioVelloHubCanvasTarget(document, mount);
+    target.setIsland(island);
+    const hub = new StudioVelloHub({
+      target,
+      classicBackend: backend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const pending = hub.render(island.scene);
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce());
+    hub.invalidatePendingProductRender();
+    target.park();
+    resolveFrame({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "texture",
+      width: 8,
+      height: 8,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release,
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(
+      StudioVelloHubRenderSupersededError,
+    );
+    expect(release).toHaveBeenCalledOnce();
+    expect(target.canvas.style.display).toBe("none");
+    expect(target.activeBackendId).toBeNull();
+    hub.dispose();
+    target.destroy();
+  });
 });
 
 describe("VelloHub canvas target device loss", () => {
-  it("forgets the lost device so the CPU recovery frame never touches it", async () => {
+  it("keeps an explicit CPU reference frame off the lost device", async () => {
     const putImageData = vi.fn();
     stubBrowserCanvasContexts(putImageData);
     const gpu = fakeGpuDevice();
@@ -299,7 +426,7 @@ describe("VelloHub canvas target device loss", () => {
     expect(mount.childElementCount).toBe(0);
   });
 
-  it("routes the hub device-loss recovery frame onto CPU pixels, not the destroyed device", async () => {
+  it("holds the last GPU canvas on hub device loss without creating a CPU recovery canvas", async () => {
     const putImageData = vi.fn();
     stubBrowserCanvasContexts(putImageData);
     const gpu = fakeGpuDevice();
@@ -320,20 +447,22 @@ describe("VelloHub canvas target device loss", () => {
       preferredBackend: STUDIO_VELLO_CLASSIC_BACKEND_ID,
     });
     expect(first.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-    await hub.flushShadowWork();
     const lostSurface = target.canvas;
     gpu.createTexture.mockClear();
     gpu.writeTexture.mockClear();
 
     const receipt = await hub.handleDeviceLoss("device-lost:7:destroyed");
 
-    expect(receipt?.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    expect(receipt).toBeNull();
     expect(gpu.writeTexture).not.toHaveBeenCalled();
     expect(gpu.createTexture).not.toHaveBeenCalled();
-    expect(putImageData).toHaveBeenCalledOnce();
-    expect(target.activeBackendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
-    expect(target.canvas).not.toBe(lostSurface);
+    expect(putImageData).not.toHaveBeenCalled();
+    expect(target.activeBackendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    expect(target.canvas).toBe(lostSurface);
     expect(target.canvas.dataset.studioVelloHubDeviceLost).toBe("device-lost:7:destroyed");
+    expect(target.canvas.dataset.studioVelloHubHoldReason).toBe(
+      "unavailable-device-loss:device-lost:7:destroyed",
+    );
     expect(mount.childElementCount).toBe(1);
     hub.dispose();
     target.destroy();

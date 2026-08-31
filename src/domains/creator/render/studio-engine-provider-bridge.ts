@@ -33,12 +33,12 @@ interface BackendDerivation {
   runtime: ProviderRuntime;
   license: string;
   determinism: "bit-exact" | "tolerance" | "nondeterministic";
-  fallbackProviderId: string | null;
 }
 
 /**
  * Per-backend facts the audit table does not carry (engine kind, runtime
- * substrate, license, deterministic replay class, documented fallback lane).
+ * substrate, license and deterministic replay class). Runtime failure is not
+ * represented here because a selected provider binding always fails closed.
  * Licenses follow docs/candidates/<subsystem>/license-deployment.md: first-party code is
  * "internal"; vendored engines carry their upstream license so the V11 license
  * hard gate (bundle vs isolated) applies to the real obligation.
@@ -51,152 +51,126 @@ const BACKEND_DERIVATIONS: Readonly<
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: null,
   },
   "webgpu-live-causal-ink": {
     kind: "raster-brush",
     runtime: "webgpu",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "perfect-freehand-outline": {
     kind: "stroke-geometry",
     runtime: "js",
     license: "MIT",
     determinism: "bit-exact",
-    fallbackProviderId: null,
   },
   "canvas2d-material-specialist": {
     kind: "raster-brush",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "canvas2d-dynamic-coverage": {
     kind: "raster-brush",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "canvas2d-wet-field": {
     kind: "natural-media",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-wet-ribbon",
   },
   "canvas2d-wet-ribbon": {
     kind: "natural-media",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "canvas2d-stamp-pattern": {
     kind: "raster-brush",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "deferred-raster-tool-preview": {
     kind: "raster-brush",
     runtime: "js",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: null,
   },
   "pixel-edit-worker": {
     kind: "raster-brush",
     runtime: "wasm-worker",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: null,
   },
   "canonical-webgpu-analytic": {
     kind: "raster-brush",
     runtime: "webgpu",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
   },
   "canonical-webgpu-textured": {
     kind: "raster-brush",
     runtime: "webgpu",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-material-specialist",
   },
   "canonical-webgpu-wet-specialist": {
     kind: "natural-media",
     runtime: "webgpu",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-wet-ribbon",
   },
   "professional-bristle-webgpu": {
     kind: "natural-media",
     runtime: "webgpu",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-material-specialist",
   },
   "fiber-bristle-worker": {
     kind: "natural-media",
     runtime: "wasm-worker",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-material-specialist",
   },
   "physics-particle-worker": {
     kind: "natural-media",
     runtime: "wasm-worker",
     license: "internal",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-dynamic-coverage",
   },
   "procedural-artistic-worker": {
     kind: "raster-brush",
     runtime: "wasm-worker",
     license: "LGPL-2.1-or-later",
     determinism: "nondeterministic",
-    fallbackProviderId: null,
   },
   "p5-webgl-artistic": {
     kind: "raster-brush",
     runtime: "webgl",
     license: "LGPL-2.1-or-later",
     determinism: "nondeterministic",
-    fallbackProviderId: "procedural-artistic-worker",
   },
   "paper-vector-refinement": {
     kind: "vector-renderer",
     runtime: "wasm-worker",
     license: "MIT",
     determinism: "bit-exact",
-    fallbackProviderId: null,
   },
   "canvaskit-path-specialist": {
     kind: "vector-renderer",
     runtime: "wasm",
     license: "BSD-3-Clause",
     determinism: "tolerance",
-    fallbackProviderId: null,
   },
   "hokusai-myb-worker": {
     kind: "natural-media",
     runtime: "wasm-worker",
     license: "MIT / Apache-2.0",
     determinism: "tolerance",
-    // V17.1 fail-closed policy (mirrors packages/studio-brush-platform/src/providers.ts
-    // hokusaiProviderDescriptor): no fallback provider — no texture-equivalence
-    // certification exists for a causal-ink rendition of Hokusai natural-media output,
-    // so device-incapable hosts hide natural-media brushes instead of substituting.
-    // Restore a fallback only together with a checked-in equivalence certification.
-    fallbackProviderId: null,
   },
 });
 
@@ -241,7 +215,9 @@ export function deriveStudioV11BackendDescriptors(): ProviderDescriptor[] {
       maturity: maturityFor(entry.connection),
       runtime: derivation.runtime,
       capabilities,
-      limitations: [],
+      limitations: [
+        "provider failure is terminal for this binding; no automatic backend substitution",
+      ],
       previewQuality: entry.phases.includes("live") ? "production" : "reference",
       finalQuality:
         entry.phases.includes("commit") || entry.phases.includes("settled")
@@ -249,7 +225,6 @@ export function deriveStudioV11BackendDescriptors(): ProviderDescriptor[] {
           : "preview",
       determinism: derivation.determinism,
       memoryEstimateMb: entry.asynchronous ? 24 : 4,
-      fallbackProviderId: derivation.fallbackProviderId,
       knownIssues: [entry.evidence],
     });
   });

@@ -171,10 +171,10 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(propAssetRuntimeSource).not.toMatch(/BoxGeometry|fallback cube/iu);
   });
 
-  it("preserves skinned/rigid garment assembly and material-only color or fabric updates", () => {
+  it("keeps skinned and explicitly selected rigid assembly isolated with material-only updates", () => {
     const wardrobeRuntime = sourceBetween(
       projectionSource,
-      "function StudioVrmProceduralWardrobeAttachment(",
+      "function StudioVrmSelectedWardrobeAttachment(",
       "/** base pose/tracking과 모든 소품 IK가 끝난 뒤",
     );
     const renderable = sourceBetween(
@@ -190,9 +190,18 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
 
     expect(projectionSource).toContain("buildStudioVrmSkinnedGarment({");
     expect(projectionSource).toContain("buildStudioVrmGarmentGeometry(part.shape)");
+    expect(projectionSource).toContain('mode="skinned-procedural-v1"');
+    expect(projectionSource).toContain('mode="rigid-procedural"');
+    const skinnedSelection = sourceBetween(
+      renderable,
+      'if (mode === "skinned-procedural-v1")',
+      "const groups = assembleGarmentGroups(",
+    );
+    expect(skinnedSelection).toContain("entries: []");
+    expect(skinnedSelection).not.toContain("assembleGarmentGroups(");
     expect(projectionSource).toContain("const pendingGarmentDisposals = new WeakMap");
     expect(projectionSource.match(/queueMicrotask\(/gu)).toHaveLength(2);
-    expect(renderable).toContain("}, [vrm, equip.itemId, effectiveFit, metrics]);");
+    expect(renderable).toContain("}, [vrm, equip.itemId, effectiveFit, metrics, mode]);");
     expect(renderable).not.toContain("equip.color");
     expect(renderable).not.toContain("equip.fabricId");
     expect(materialUpdate).toContain(

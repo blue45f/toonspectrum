@@ -117,7 +117,7 @@ describe("StudioReliabilityStatusRail", () => {
       reportStudioReliabilitySignal({
         channel: "gpu",
         level: "degraded",
-        title: "GPU 연결이 끊겨 CPU 렌더링으로 전환했습니다",
+        title: "GPU 연결이 끊겨 선택한 GPU 기능을 사용할 수 없습니다",
         detail: "그림은 그대로예요.",
         at: 1,
       });
@@ -129,7 +129,9 @@ describe("StudioReliabilityStatusRail", () => {
     // 실제 문제는 예전 그대로 스스로 튀어나오고, 스크린 리더에도 그대로 읽힌다.
     expect(row?.getAttribute("role")).toBe("status");
     expect(row?.getAttribute("aria-live")).toBe("polite");
-    expect(screen.getByText("GPU 연결이 끊겨 CPU 렌더링으로 전환했습니다")).toBeTruthy();
+    expect(
+      screen.getByText("GPU 연결이 끊겨 선택한 GPU 기능을 사용할 수 없습니다"),
+    ).toBeTruthy();
     expect(screen.getByText("그림은 그대로예요.")).toBeTruthy();
     expect(
       document
@@ -172,7 +174,7 @@ describe("StudioReliabilityStatusRail", () => {
     expect(banner?.getAttribute("role")).toBe("status");
     expect(screen.getByText(/그림과 문서는 그대로예요/)).toBeTruthy();
     expect(
-      screen.getByText(/GPU가 반복해서 끊겨 이번 세션 동안 CPU 렌더링을 유지합니다/),
+      screen.getByText(/GPU가 반복해서 끊겨 이번 세션의 GPU 기능을 중단했습니다/),
     ).toBeTruthy();
 
     act(() => {

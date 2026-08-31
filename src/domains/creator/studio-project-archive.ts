@@ -50,6 +50,7 @@ import type {
   StudioBg3dGlbBudgetProfiles,
   StudioBg3dGlbValidationSuccess,
 } from "./bg3d/studio-bg3d-glb-validation";
+import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
 
 /**
  * Self-contained ToonSpectrum project archive.
@@ -215,8 +216,8 @@ export interface StudioBg3dProjectArchivePlan {
 export interface StudioProjectArchiveOptions {
   limits?: Partial<StudioProjectArchiveLimits>;
   onProgress?: (progress: StudioPackageArchiveProgress) => void;
-  /** CLI/headless export only; ignored by browser runtimes. */
-  allowLargeDirectArchiveCrcInHeadless?: boolean;
+  /** Fixed before ZIP construction. Browser product callers select `worker`. */
+  crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 export interface StudioProjectArchiveManifestProject {
@@ -2316,7 +2317,7 @@ export async function buildStudioProjectArchive(
   try {
     blob = await buildStudioPackageArchiveBlob(entries, {
       mimeType: STUDIO_PROJECT_ARCHIVE_MIME,
-      allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+      crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
       limits: {
         maxFiles: limits.maxAttachments + 2,
         maxEntryBytes: Math.max(limits.maxAttachmentBytes, limits.maxProjectBytes, limits.maxManifestBytes),

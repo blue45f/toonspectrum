@@ -3,15 +3,15 @@
  *
  * 렌더 호출부는 `StudioVolumeBackend` 만 안다. 백엔드는 두 가지다:
  *
- *   · CPU 참조 백엔드 — 항상 동작하고, 정확성의 기준이다.
+ *   · CPU 참조 백엔드 — 호출자가 작업 전에 명시적으로 선택하는 정확성 기준이다.
  *   · GPU 백엔드 — 주입된 `StudioVolumeGpuRuntime` 에 **디스패치 플랜**(WGSL + 패킹된 uniform +
- *     스토리지 버퍼들)을 넘긴다. 런타임이 없거나 던지거나 미지원 옵션이면 즉시 CPU 로 폴백한다.
+ *     스토리지 버퍼들)을 넘긴다. 미지원/실패 시 같은 작업을 CPU 로 다시 실행하지 않는다.
  *
  * 이 심 덕분에 node 테스트에서 WebGPU 없이도 GPU 경로의 **계약**(uniform 바이트 레이아웃, 워크그룹
- * 개수, 폴백 규칙, 출력 디코딩)을 전부 검증할 수 있다. 실제 WebGPU 어댑터 구현은 이 모듈 밖에
+ * 개수, 실패 격리, 출력 디코딩)을 전부 검증할 수 있다. 실제 WebGPU 어댑터 구현은 이 모듈 밖에
  * 있으며, `dispatch()` 하나만 채우면 된다.
  *
- * ── GPU 경로가 지원하지 않아 CPU 로 폴백하는 조건(의도된 제약) ────────────
+ * ── GPU 경로가 fail-closed 하는 미지원 조건 ───────────────────────────────
  *   · samplesPerPixel > 1  — 셰이더는 픽셀 중심 1샘플만 쏜다(누적은 상위 레이어 몫).
  *   · backgroundDistance   — 픽셀별 깊이 클립 버퍼를 아직 바인딩하지 않는다.
  *   · 퇴화 볼륨 / 광원 0개 — 디스패치할 가치가 없다.
@@ -76,6 +76,22 @@ export interface StudioVolumeGpuRuntime {
 export interface StudioVolumeBackend {
   readonly kind: "cpu" | "gpu";
   render(request: StudioVolumeRenderRequest): Promise<StudioVolumeImage>;
+}
+
+export type StudioVolumeGpuBackendErrorCode =
+  | "runtime-unavailable"
+  | "unsupported-request"
+  | "dispatch-failed"
+  | "invalid-output";
+
+export class StudioVolumeGpuBackendError extends Error {
+  constructor(
+    readonly code: StudioVolumeGpuBackendErrorCode,
+    options?: ErrorOptions,
+  ) {
+    super(`studio-volume-gpu:${code}`, options);
+    this.name = "StudioVolumeGpuBackendError";
+  }
 }
 
 const EMPTY_FLOATS = new Float32Array(1);
@@ -262,7 +278,7 @@ export function buildStudioVolumeDispatchPlan(
   };
 }
 
-/** GPU 경로가 이 요청을 처리할 수 있는지. false 면 호출부는 CPU 로 간다. */
+/** GPU 경로가 이 요청을 완전하게 처리할 수 있는지 사전 확인한다. */
 export function canStudioVolumeUseGpu(request: StudioVolumeRenderRequest): boolean {
   if (request.prepared.degenerate) return false;
   if (request.prepared.maxDensity <= 0) return false;
@@ -327,28 +343,31 @@ export function createStudioVolumeCpuBackend(): StudioVolumeBackend {
   };
 }
 
-/**
- * GPU 백엔드. 런타임이 null 이면 곧장 CPU 백엔드를 돌려준다(호출부에 분기를 남기지 않는다).
- * dispatch 가 던지거나 길이가 안 맞으면 조용히 CPU 로 폴백한다 — 볼륨 프레임 하나 때문에
- * 스튜디오 전체가 죽으면 안 된다.
- */
+/** Exact GPU backend. CPU rendering is a separate, preselected backend. */
 export function createStudioVolumeGpuBackend(
   runtime: StudioVolumeGpuRuntime | null,
-  fallback: StudioVolumeBackend = createStudioVolumeCpuBackend()
 ): StudioVolumeBackend {
-  if (!runtime) return fallback;
+  if (!runtime) throw new StudioVolumeGpuBackendError("runtime-unavailable");
   return {
     kind: "gpu",
     async render(request) {
-      if (!canStudioVolumeUseGpu(request)) return fallback.render(request);
-      const plan = buildStudioVolumeDispatchPlan(request);
-      try {
-        const raw = await runtime.dispatch(plan);
-        if (!raw || raw.length < plan.outputFloatLength) return fallback.render(request);
-        return decodeStudioVolumeGpuOutput(raw, plan.width, plan.height);
-      } catch {
-        return fallback.render(request);
+      if (!canStudioVolumeUseGpu(request)) {
+        throw new StudioVolumeGpuBackendError("unsupported-request");
       }
+      const plan = buildStudioVolumeDispatchPlan(request);
+      let raw: Float32Array;
+      try {
+        raw = await runtime.dispatch(plan);
+      } catch (cause) {
+        throw new StudioVolumeGpuBackendError("dispatch-failed", { cause });
+      }
+      if (
+        !(raw instanceof Float32Array)
+        || raw.length !== plan.outputFloatLength
+      ) {
+        throw new StudioVolumeGpuBackendError("invalid-output");
+      }
+      return decodeStudioVolumeGpuOutput(raw, plan.width, plan.height);
     },
   };
 }

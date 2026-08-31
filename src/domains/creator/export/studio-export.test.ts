@@ -4,9 +4,12 @@ import {
   EXPORT_FORMATS,
   JPEG_QUALITY,
   MAX_CANVAS_DIM,
+  StudioRasterCodecUnavailableError,
   WEBP_QUALITY,
   canCopyImageToClipboard,
+  canvasToBlob,
   copyCanvasToClipboard,
+  detectStudioCanvasRasterMime,
   exportFormatLabel,
   exportMimeType,
   exportQuality,
@@ -44,6 +47,52 @@ describe("exportQuality", () => {
     expect(exportQuality("png")).toBeUndefined();
     expect(exportQuality("jpg")).toBe(JPEG_QUALITY);
     expect(exportQuality("webp")).toBe(WEBP_QUALITY);
+  });
+});
+
+describe("canvasToBlob exact codec", () => {
+  const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+  const jpeg = Uint8Array.of(0xff, 0xd8, 0xff, 0xe0);
+  const webp = new TextEncoder().encode("RIFF0000WEBP");
+
+  function canvasReturning(bytes: Uint8Array, actualType: string): HTMLCanvasElement {
+    return {
+      toBlob(callback: BlobCallback) {
+        callback(new Blob([bytes as unknown as BlobPart], { type: actualType }));
+      },
+    } as HTMLCanvasElement;
+  }
+
+  it("accepts PNG, JPEG, and WebP only when MIME and container magic both match", async () => {
+    await expect(canvasToBlob(canvasReturning(png, "image/png"), "image/png"))
+      .resolves.toMatchObject({ type: "image/png" });
+    await expect(canvasToBlob(canvasReturning(jpeg, "image/jpeg"), "image/jpeg"))
+      .resolves.toMatchObject({ type: "image/jpeg" });
+    await expect(canvasToBlob(canvasReturning(webp, "image/webp"), "image/webp"))
+      .resolves.toMatchObject({ type: "image/webp" });
+    expect(detectStudioCanvasRasterMime(png)).toBe("image/png");
+    expect(detectStudioCanvasRasterMime(jpeg)).toBe("image/jpeg");
+    expect(detectStudioCanvasRasterMime(webp)).toBe("image/webp");
+  });
+
+  it("rejects the browser's PNG substitution for a requested JPEG", async () => {
+    const failure = canvasToBlob(canvasReturning(png, "image/png"), "image/jpeg");
+    await expect(failure).rejects.toBeInstanceOf(StudioRasterCodecUnavailableError);
+    await expect(failure).rejects.toMatchObject({
+      requestedMime: "image/jpeg",
+      actualMime: "image/png",
+      detectedMime: "image/png",
+    });
+  });
+
+  it("rejects a matching MIME label when the encoded bytes are another container", async () => {
+    await expect(canvasToBlob(canvasReturning(png, "image/webp"), "image/webp"))
+      .rejects.toMatchObject({
+        name: "StudioRasterCodecUnavailableError",
+        requestedMime: "image/webp",
+        actualMime: "image/webp",
+        detectedMime: "image/png",
+      });
   });
 });
 

@@ -209,7 +209,7 @@ export function planStudioStampSymmetryRender(
   };
 }
 
-/** Canvas2D/Konva fallback renderer for an exact, bounded v2 stamp symmetry plan. */
+/** Canvas2D/Konva compatibility renderer for an exact, bounded v2 stamp symmetry plan. */
 export function drawStudioStampStrokeWithSymmetry(
   context: CanvasRenderingContext2D,
   style: StudioStampBrushStyle,

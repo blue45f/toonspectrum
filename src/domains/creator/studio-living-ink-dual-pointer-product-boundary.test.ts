@@ -21,15 +21,16 @@ describe("Living Ink dual-pointer + WebGPU product seams", () => {
     expect(boundary).toContain("resolveLivingInkStrokeRoute");
   });
 
-  it("Worker prefers WebGPU runtime when the adapter is available", () => {
+  it("pins one explicit Worker provider and keeps WebGPU creation fail-closed", () => {
     const worker = readFileSync(new URL("./studio-living-ink.worker.ts", import.meta.url), "utf8");
     expect(worker).toContain("tryCreateStudioLivingInkWebGpuRuntime");
-    expect(worker).toContain("createPreferredRuntime");
-    expect(worker).toContain("webgpu-offscreen-half-float");
+    expect(worker).toContain("createSelectedRuntime");
+    expect(worker).toContain("selectedBackend");
+    expect(worker).toContain("no automatic WebGL2 substitution");
+    expect(worker).not.toContain("createPreferredRuntime");
     const webgpu = readFileSync(new URL("./studio-living-ink-webgpu-runtime.ts", import.meta.url), "utf8");
     expect(webgpu).toContain("StudioLivingInkWebGpuRuntime");
-    expect(webgpu).toContain("requestAdapter");
-    expect(webgpu).toContain("requestDevice");
+    expect(webgpu).not.toContain("StudioLivingInkWebGl2Runtime");
   });
 
   it("documents dual-pointer / barrel authoring controls on the living-ink control surface", () => {

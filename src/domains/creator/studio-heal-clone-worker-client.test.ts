@@ -207,6 +207,18 @@ afterEach(() => {
 });
 
 describe("runStudioHealCloneWorker", () => {
+  it.each([
+    ["null factory", null],
+    ["throwing factory", () => { throw new Error("blocked by CSP"); }],
+  ] as const)("%s is unavailable instead of direct execution", async (_label, workerFactory) => {
+    const input = request();
+    await expect(runStudioHealCloneWorker(input, { workerFactory })).rejects.toMatchObject({
+      name: "StudioHealCloneWorkerUnavailableError",
+    });
+    expect(input.src.data.byteLength).toBe(input.src.width * input.src.height * 4);
+    expect(input.dst.data.byteLength).toBe(input.dst.width * input.dst.height * 4);
+  });
+
   it("기본 module Worker를 연속 stroke에서 재사용하고 dispose 시 한 번 종료한다", async () => {
     let worker: ApplyingWorker | null = null;
     const WorkerConstructor = vi.fn(function MockWorker() {
@@ -345,7 +357,7 @@ describe("runStudioHealCloneWorker", () => {
       hardness: 0.45,
       opacity: 0.8,
       mode: "heal",
-    }, { workerFactory: null });
+    }, { executionMode: "direct" });
 
     expect(worker.transferCount).toBe(2);
     expect(workerResult.dst).toMatchObject({ width: 13, height: 9 });
@@ -378,7 +390,7 @@ describe("runStudioHealCloneWorker", () => {
     expect(secondWorker!.terminateCount).toBe(0);
   });
 
-  it("ready timeout은 direct로 안전 폴백하고 다음 호출에서 새 Worker로 복구한다", async () => {
+  it("ready timeout은 unavailable로 실패하고 다음 호출에서 새 Worker로 복구한다", async () => {
     vi.useFakeTimers();
     let firstWorker: HangingWorker | null = null;
     let secondWorker: ApplyingWorker | null = null;
@@ -393,10 +405,12 @@ describe("runStudioHealCloneWorker", () => {
     vi.stubGlobal("Worker", WorkerConstructor);
 
     const pending = runStudioHealCloneWorker(request(), { readyTimeoutMilliseconds: 5 });
+    const rejection = expect(pending).rejects.toMatchObject({
+      name: "StudioHealCloneWorkerUnavailableError",
+    });
     await vi.advanceTimersByTimeAsync(0);
-    const fallback = expect(pending).resolves.toMatchObject({ execution: "direct" });
     await vi.advanceTimersByTimeAsync(6);
-    await fallback;
+    await rejection;
     expect(firstWorker!.terminateCount).toBe(1);
 
     const recovered = runStudioHealCloneWorker(request());

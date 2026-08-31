@@ -68,14 +68,15 @@ function sourceBetween(start: string, end: string): string {
 }
 
 describe("Studio reliability product boundary", () => {
-  it("routes the main-canvas GPU demotion to the recovery machine and the status rail", () => {
+  it("reports main-canvas GPU loss without invoking a renderer failover", () => {
     const handler = sourceBetween(
       "function onWebGpuDeviceLost()",
       "function onWebGpuFrameReady",
     );
 
-    expect(handler).toContain("failOverGpuAuthorityAfterSurfaceLoss()");
     expect(handler).toContain("announceStudioGpuDeviceLoss(");
+    expect(handler).not.toContain("failOverGpuAuthorityAfterSurfaceLoss");
+    expect(handler).not.toContain('publishStudioRenderBackend("canvas2d")');
   });
 
   it("routes autosave failure and durable-authority demotion to the user", () => {

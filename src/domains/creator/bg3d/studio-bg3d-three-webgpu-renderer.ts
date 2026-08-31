@@ -9,10 +9,10 @@
  * editor never downloads it, and a nested dynamic import would only add a round trip.
  *
  * Three's `WebGPURenderer` silently installs a WebGL2 fallback when device creation fails. That is
- * the wrong behaviour for an editor that reports its active engine to the artist and keeps a
- * per-session failure counter: a renderer advertised as WebGPU must either be WebGPU or fail. The
- * factory therefore removes the fallback hook, asserts the backend brand after `init()`, and tears
- * down any partially constructed device before rethrowing.
+ * the wrong behaviour for an editor that reports its selected engine to the artist: a renderer
+ * advertised as WebGPU must either be WebGPU or fail. The factory therefore removes the fallback
+ * hook, bounds `init()`, asserts the backend brand, and tears down any partially constructed device
+ * before rethrowing.
  */
 
 import { WebGPURenderer } from "three/webgpu";
@@ -27,6 +27,9 @@ export type StudioBg3dWebGpuRendererErrorCode =
   | "version-contract-unsupported"
   | "initialization-failed"
   | "backend-unavailable";
+
+export const STUDIO_BG3D_WEBGPU_RENDERER_INIT_TIMEOUT_MS = 10_000;
+const STUDIO_BG3D_WEBGPU_RENDERER_INIT_TIMEOUT_MAX_MS = 60_000;
 
 export class StudioBg3dWebGpuRendererError extends Error {
   readonly code: StudioBg3dWebGpuRendererErrorCode;
@@ -48,9 +51,11 @@ export interface StudioBg3dWebGpuDeviceLoss {
 export interface CreateStudioBg3dThreeWebGpuRendererOptions {
   readonly antialias?: boolean;
   readonly alpha?: boolean;
+  /** Testable upper bound for Three's adapter/device initialization. */
+  readonly initializationTimeoutMs?: number;
   /**
    * Called once if the GPU device is lost while the renderer is alive. The editor uses this to
-   * record a session failure and fall back to WebGL2 without waiting for the next frame to throw.
+   * mark the selected WebGPU engine failed without waiting for the next frame to throw.
    * A device destroyed by our own `dispose()` never reports.
    */
   readonly onDeviceLost?: (loss: StudioBg3dWebGpuDeviceLoss) => void;
@@ -102,6 +107,46 @@ function normalizeDeviceLoss(info: {
     ? info.message.slice(0, 240)
     : "WebGPU 디바이스 연결이 끊어졌습니다.";
   return Object.freeze({ reason, message });
+}
+
+function normalizeInitializationTimeoutMs(value: number | undefined): number {
+  if (!Number.isFinite(value) || (value ?? 0) <= 0) {
+    return STUDIO_BG3D_WEBGPU_RENDERER_INIT_TIMEOUT_MS;
+  }
+  return Math.min(
+    STUDIO_BG3D_WEBGPU_RENDERER_INIT_TIMEOUT_MAX_MS,
+    Math.floor(value ?? STUDIO_BG3D_WEBGPU_RENDERER_INIT_TIMEOUT_MS),
+  );
+}
+
+async function initializeRendererWithTimeout(
+  renderer: WebGPURenderer,
+  backend: ThreeWebGpuBackendLifecycle,
+  timeoutMs: number,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const initialization = Promise.resolve(renderer.init());
+  const timeoutError = new Error(`WebGPU renderer initialization timed out after ${timeoutMs}ms.`);
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+  try {
+    await Promise.race([initialization, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    // A timed-out init can still settle after its partial backend was torn down. Clean up again at
+    // that boundary so a late-created device cannot survive outside the editor's ownership.
+    if (timedOut) {
+      void initialization.then(
+        () => disposeRejectedThreeWebGpuInitialization(backend),
+        () => disposeRejectedThreeWebGpuInitialization(backend),
+      );
+    }
+  }
 }
 
 /**
@@ -158,10 +203,14 @@ export async function createStudioBg3dThreeWebGpuRenderer(
     throw new StudioBg3dWebGpuRendererError("version-contract-unsupported");
   }
   // A runtime advertised as WebGPU must fail closed instead of quietly becoming WebGL2, so the
-  // engine-selection policy — not Three — owns the fallback decision.
+  // engine-selection policy — not Three — owns the unavailable/failed decision.
   lifecycle._getFallback = null;
   try {
-    await renderer.init();
+    await initializeRendererWithTimeout(
+      renderer,
+      initializationBackend,
+      normalizeInitializationTimeoutMs(options.initializationTimeoutMs),
+    );
   } catch (error) {
     disposeRejectedThreeWebGpuInitialization(initializationBackend);
     throw new StudioBg3dWebGpuRendererError("initialization-failed", error);
@@ -174,8 +223,8 @@ export async function createStudioBg3dThreeWebGpuRenderer(
   // React Three Fiber owns the renderer it is handed and disposes it on unmount, so this runtime's
   // own `dispose()` is not the only teardown path. `GPUDevice.lost` resolves with reason
   // "destroyed" for a deliberate teardown exactly as it does for a real loss, so without this the
-  // editor would read an ordinary canvas remount as a WebGPU failure and count it against the
-  // engine. Marking disposal on the renderer's own method covers whichever caller tears it down.
+  // editor would read an ordinary canvas remount as a WebGPU failure and mark the explicit
+  // selection failed. Marking disposal on the renderer's own method covers either teardown owner.
   const rendererDispose = renderer.dispose.bind(renderer);
   Object.defineProperty(renderer, "dispose", {
     configurable: true,

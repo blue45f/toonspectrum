@@ -10,7 +10,11 @@ import type { EngineCapabilityRegistry, RegisteredProvider } from "./registry";
  * instead of conventions.
  */
 
-/** Cross-engine transport ladder, cheapest first (V11 §9.2). */
+/** Cross-engine transport cost order, cheapest first (V11 §9.2).
+ *
+ * This orders the transport chosen while building one immutable plan. It is
+ * not a retry ladder: a transport failure never advances to the next entry.
+ */
 export const COPY_COST_LADDER = [
   "same-gpu-texture",
   "encoded-command-buffer",
@@ -32,8 +36,8 @@ export interface IslandRequest {
   requiredCapabilities: Capability[];
   /** Transport available between this island's output and the primary surface. */
   availableTransports: CopyCost[];
-  /** Optional V13 provider preference (classic / hybrid / skia). */
-  preferredProviderIds?: readonly string[];
+  /** Optional exact provider binding. Missing/ineligible selections fail the plan. */
+  selectedProviderId?: string;
   /** When set, the planner scores WebGPU path-heavy providers above CPU. */
   preferAccelerator?: "webgpu" | "webgl" | "cpu";
 }
@@ -41,15 +45,14 @@ export interface IslandRequest {
 export interface SurfacePlanRequest {
   surfaceId: string;
   mode: PlanMode;
-  /** Provider that owns the surface composition (one-primary-surface rule). */
-  primaryCandidates: string[];
+  /** Exact provider that owns surface composition (one-primary-surface rule). */
+  primaryOwnerId: string;
   islands: IslandRequest[];
 }
 
 export interface PlannedIsland {
   islandId: string;
   providerId: string;
-  fallbackChain: string[];
   transport: CopyCost;
 }
 
@@ -82,12 +85,10 @@ function chooseProvider(
   island: IslandRequest,
 ): RegisteredProvider | null {
   if (candidates.length === 0) return null;
-  const preferred = island.preferredProviderIds;
-  if (preferred && preferred.length > 0) {
-    for (const id of preferred) {
-      const match = candidates.find((candidate) => candidate.descriptor.id === id);
-      if (match) return match;
-    }
+  if (island.selectedProviderId !== undefined) {
+    return candidates.find(
+      (candidate) => candidate.descriptor.id === island.selectedProviderId,
+    ) ?? null;
   }
   let best = candidates[0]!;
   let bestScore = Number.NEGATIVE_INFINITY;
@@ -123,12 +124,10 @@ export class HybridExecutionPlanner {
   plan(request: SurfacePlanRequest): SurfacePlan {
     const violations: string[] = [];
 
-    const primaryOwner = request.primaryCandidates
-      .map((id) => this.registry.get(id))
-      .find((provider): provider is RegisteredProvider => provider !== null);
+    const primaryOwner = this.registry.get(request.primaryOwnerId);
     if (!primaryOwner) {
       violations.push(
-        `no registered primary surface owner among [${request.primaryCandidates.join(", ")}]`,
+        `selected primary surface owner ${request.primaryOwnerId} is not registered`,
       );
       throw new PlanUnsatisfiableError(
         `surface ${request.surfaceId}: no primary owner`,
@@ -142,7 +141,9 @@ export class HybridExecutionPlanner {
       const chosen = chooseProvider(candidates, island);
       if (!chosen) {
         violations.push(
-          `island ${island.islandId}: no ${island.kind} provider offers [${island.requiredCapabilities.join(", ")}]`,
+          island.selectedProviderId === undefined
+            ? `island ${island.islandId}: no ${island.kind} provider offers [${island.requiredCapabilities.join(", ")}]`
+            : `island ${island.islandId}: selected provider ${island.selectedProviderId} is missing or does not offer [${island.requiredCapabilities.join(", ")}]`,
         );
         continue;
       }
@@ -156,7 +157,6 @@ export class HybridExecutionPlanner {
       islands.push({
         islandId: island.islandId,
         providerId: chosen.descriptor.id,
-        fallbackChain: this.registry.fallbackChain(chosen.descriptor.id),
         transport,
       });
     }

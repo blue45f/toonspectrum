@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   executeAndCertifyStudioFirstPartyRasterCodec,
-  STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES,
   studioFirstPartyRasterCodecCertificationScope,
   verifyStudioFirstPartyRasterCertifiedExecution,
 } from "./studio-first-party-raster-codec-certification";
@@ -152,6 +151,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -190,6 +190,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -252,6 +253,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -288,6 +290,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -327,6 +330,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -381,6 +385,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -419,6 +424,7 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
+        execution: "direct",
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
       },
@@ -460,7 +466,7 @@ describe("first-party raster codec product certification", () => {
     expect(claimed.size).toBe(1);
   });
 
-  it("prefers the dedicated Worker in auto mode and signs its exact result", async () => {
+  it("selects the dedicated Worker by default and certifies one exact attempt", async () => {
     const scope = studioFirstPartyRasterCodecCertificationScope(
       "qoi",
       "encode",
@@ -472,7 +478,6 @@ describe("first-party raster codec product certification", () => {
         format: "qoi",
         direction: "encode",
         inputBytes: INPUT,
-        execution: "auto",
         workerFactory: () => worker,
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
@@ -488,54 +493,94 @@ describe("first-party raster codec product certification", () => {
       input: { byteLength: INPUT.byteLength },
       output: { byteLength: certified.bytes.byteLength },
     });
+    expect(certified.executionProviderReceipt).toEqual({
+      schemaVersion: 1,
+      kind: "toonspectrum-codec-execution-provider-selection",
+      selectedProvider: "worker",
+      attemptedProviders: ["worker"],
+    });
+    const verified = await verifyStudioFirstPartyRasterCertifiedExecution(
+      certified,
+      { trustRoots: [root], nowEpochMs: VERIFY_AT },
+    );
+    expect(verified).toMatchObject({
+      ok: true,
+      certificate: {
+        executionProviderReceipt: {
+          selectedProvider: "worker",
+          attemptedProviders: ["worker"],
+        },
+      },
+    });
     await expect(
-      verifyStudioFirstPartyRasterCertifiedExecution(certified, {
-        trustRoots: [root],
-        nowEpochMs: VERIFY_AT,
-      }),
-    ).resolves.toMatchObject({ ok: true });
+      verifyStudioFirstPartyRasterCertifiedExecution(
+        {
+          ...certified,
+          executionProviderReceipt: {
+            schemaVersion: 1,
+            kind: "toonspectrum-codec-execution-provider-selection",
+            selectedProvider: "direct",
+            attemptedProviders: ["direct"],
+          },
+        },
+        { trustRoots: [root], nowEpochMs: VERIFY_AT },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "CERTIFIED_EXECUTION_IDENTITY_MISMATCH",
+    });
   });
 
-  it("allows auto direct fallback only for small Worker startup failures", async () => {
+  it("rejects every Worker startup/runtime failure without direct replay", async () => {
     const scope = studioFirstPartyRasterCodecCertificationScope(
       "qoi",
       "encode",
     );
     const { signer } = await credentials(scope);
-    const unavailable =
-      await executeAndCertifyStudioFirstPartyRasterCodec(
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
         {
           format: "qoi",
           direction: "encode",
           inputBytes: INPUT,
-          execution: "auto",
           workerFactory: null,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
         signer,
-      );
-    expect(unavailable.receipt.providerId).toBe(
-      "toonspectrum.raster.qoi.v1",
-    );
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
 
-    const postFailure = new CertificationFakeWorker("post-error");
-    const recovered =
-      await executeAndCertifyStudioFirstPartyRasterCodec(
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
         {
           format: "qoi",
           direction: "encode",
           inputBytes: INPUT,
-          execution: "auto",
+          workerFactory: () => {
+            throw new Error("startup failed");
+          },
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
+
+    const postFailure = new CertificationFakeWorker("post-error");
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
           workerFactory: () => postFailure,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
         signer,
-      );
-    expect(recovered.receipt.providerId).toBe(
-      "toonspectrum.raster.qoi.v1",
-    );
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_EXECUTION_FAILED" });
     expect(postFailure.terminateCount).toBe(1);
 
     const runtimeFailure = new CertificationFakeWorker("runtime-error");
@@ -545,7 +590,6 @@ describe("first-party raster codec product certification", () => {
           format: "qoi",
           direction: "encode",
           inputBytes: INPUT,
-          execution: "auto",
           workerFactory: () => runtimeFailure,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
@@ -558,25 +602,22 @@ describe("first-party raster codec product certification", () => {
     });
     expect(runtimeFailure.terminateCount).toBe(1);
 
+    const invalidFactory = vi.fn(() => new CertificationFakeWorker());
     await expect(
       executeAndCertifyStudioFirstPartyRasterCodec(
         {
           format: "qoi",
           direction: "encode",
-          inputBytes: new Uint8Array(
-            STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-              + 1,
-          ),
-          execution: "auto",
-          workerFactory: null,
+          inputBytes: INPUT,
+          execution: "auto" as never,
+          workerFactory: invalidFactory,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
         signer,
       ),
-    ).rejects.toMatchObject({
-      code: "CODEC_WORKER_REQUIRED",
-    });
+    ).rejects.toMatchObject({ code: "INVALID_EXECUTION_POLICY" });
+    expect(invalidFactory).not.toHaveBeenCalled();
   });
 
   it("keeps explicit worker fail-closed and explicit direct independent", async () => {
@@ -622,25 +663,12 @@ describe("first-party raster codec product certification", () => {
       receipt: {
         providerId: "toonspectrum.raster.qoi.v1",
       },
+      executionProviderReceipt: {
+        selectedProvider: "direct",
+        attemptedProviders: ["direct"],
+      },
     });
     expect(workerFactory).not.toHaveBeenCalled();
-
-    await expect(
-      executeAndCertifyStudioFirstPartyRasterCodec(
-        {
-          format: "qoi",
-          direction: "encode",
-          inputBytes: new Uint8Array(
-            STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-              + 1,
-          ),
-          execution: "direct",
-          issuedAt: ISSUED_AT,
-          expiresAt: EXPIRES_AT,
-        },
-        signer,
-      ),
-    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
   });
 
   it("maps AbortSignal and timeout to hard-terminated certification errors", async () => {

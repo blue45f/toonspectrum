@@ -64,27 +64,30 @@ export const capabilitySchema = z
   .regex(/^[a-z0-9]+(\.[a-z0-9-]+)+$/, "capability must be namespaced (a.b.c)");
 export type Capability = z.infer<typeof capabilitySchema>;
 
-export const providerDescriptorSchema = z.object({
-  id: z.string().min(1),
-  kind: providerKindSchema,
-  displayName: z.string().min(1),
-  version: z.string().min(1),
-  commit: z.string().optional(),
-  license: z.string().min(1),
-  attribution: z.string().default(""),
-  maturity: maturitySchema,
-  runtime: providerRuntimeSchema,
-  capabilities: z.array(capabilitySchema).min(1),
-  limitations: z.array(z.string()).default([]),
-  previewQuality: qualityTierSchema,
-  finalQuality: qualityTierSchema,
-  determinism: determinismLevelSchema,
-  /** Rough steady-state footprint used by the residency manager. */
-  memoryEstimateMb: z.number().nonnegative(),
-  /** Provider id used when this one fails or is unavailable on a device. */
-  fallbackProviderId: z.string().nullable().default(null),
-  knownIssues: z.array(z.string()).default([]),
-});
+export const providerDescriptorSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: providerKindSchema,
+    displayName: z.string().min(1),
+    version: z.string().min(1),
+    commit: z.string().optional(),
+    license: z.string().min(1),
+    attribution: z.string().default(""),
+    maturity: maturitySchema,
+    runtime: providerRuntimeSchema,
+    capabilities: z.array(capabilitySchema).min(1),
+    limitations: z.array(z.string()).default([]),
+    previewQuality: qualityTierSchema,
+    finalQuality: qualityTierSchema,
+    determinism: determinismLevelSchema,
+    /** Rough steady-state footprint used by the residency manager. */
+    memoryEstimateMb: z.number().nonnegative(),
+    knownIssues: z.array(z.string()).default([]),
+  })
+  // Provider failure is terminal for the selected execution plan. Keeping the
+  // schema strict prevents a stale or newly invented fallbackProviderId from
+  // being silently stripped and reintroduced as an out-of-band runtime rule.
+  .strict();
 export type ProviderDescriptor = z.infer<typeof providerDescriptorSchema>;
 
 /** License policy hard gate (V11 §3.1) — evaluated before any quality score. */

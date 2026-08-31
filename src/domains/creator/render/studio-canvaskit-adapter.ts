@@ -3,8 +3,9 @@
  *
  * 목적: Canvas2D 로는 원리적으로 안 되는 두 가지 — (1) 제대로 된 텍스트 셰이핑(커닝·합자·복합
  * 문자·양방향), (2) 고품질 패스 연산(베지어를 보존한 불리언, 획→패스 변환) — 을 담당할 엔진을
- * **인터페이스 뒤로 숨긴다**. 오늘은 순수 폴백이 그 자리를 채우고, canvaskit-wasm 을 넣는 날
- * 폴백 대신 어댑터 하나만 등록하면 호출부는 한 줄도 바뀌지 않는다.
+ * **인터페이스 뒤로 숨긴다**. CanvasKit은 작업 시작 전에 명시적으로 선택되고, 로드나 실행이
+ * 실패하면 unavailable로 닫힌다. 아래의 순수 JS basic-reference 구현은 레이아웃 연구·테스트에서
+ * 직접 요청할 수 있을 뿐 CanvasKit 실패 뒤 자동 실행되지 않는다.
  *
  * ── 지금 이 저장소의 실제 상태(2026-07-28 실측) ─────────────────────────────
  *  - `canvaskit-wasm@0.41.1` 과 실제 quality provider가 설치돼 있다. provider만 동적 import하고
@@ -20,20 +21,22 @@
  * ── 어댑터 계약 ─────────────────────────────────────────────────────────────
  * `StudioQualityEngine` 는 **동기** 인터페이스다(그리기 루프에서 부르므로). 비동기인 것은 엔진을
  * 얻는 과정(`resolveQualityEngine`)뿐이고, 이는 WASM 로드가 lazy 청크여야 한다는 요구에서 온다.
- * 로드가 실패하면 **던지지 않고** 폴백을 돌려준다 — 인쇄용 기능 하나 때문에 스튜디오가 죽는
- * 것은 잘못된 트레이드다(테스트가 이 경로를 잠근다).
+ * 로드가 실패하면 선택한 CanvasKit 공급자를 unavailable로 보고한다. 다른 구현을 쓰려면 다음
+ * 작업에서 호출자가 별도로 선택해야 한다.
  */
+
+import { StudioEngineUnavailableError } from "./studio-engine-failure-policy";
 
 // ---------------------------------------------------------------------------
 // 셰이핑 계약
 // ---------------------------------------------------------------------------
 
 export interface StudioShapingFeatures {
-  /** 커닝(`kern`). 폴백은 무시한다. */
+  /** 커닝(`kern`). basic-reference는 무시한다. */
   kerning?: boolean;
-  /** 표준 합자(`liga`). 폴백은 무시한다. */
+  /** 표준 합자(`liga`). basic-reference는 무시한다. */
   ligatures?: boolean;
-  /** 세로쓰기 대체(`vert`/`vrt2`). 폴백은 무시한다. */
+  /** 세로쓰기 대체(`vert`/`vrt2`). basic-reference는 무시한다. */
   vertical?: boolean;
 }
 
@@ -49,7 +52,7 @@ export interface StudioTextShapingRequest {
 }
 
 export interface StudioShapedGlyph {
-  /** 실제 셰이퍼만 채운다. 폴백은 null(글리프 id 를 알 방법이 없다). */
+  /** 실제 셰이퍼만 채운다. basic-reference는 null(글리프 id 를 알 방법이 없다). */
   glyphId: number | null;
   /** 원본 문자열에서의 코드포인트 인덱스(클러스터). */
   cluster: number;
@@ -77,7 +80,7 @@ export interface StudioShapedRun {
    * 텍스트를 아웃라인으로 굽는 대신 경고를 띄워야 한다.
    */
   shaped: boolean;
-  /** 폴백이 못 한 것들(한국어). shaped=true 면 빈 배열. */
+  /** basic-reference가 못 한 것들(한국어). shaped=true 면 빈 배열. */
   limitations: readonly string[];
 }
 
@@ -131,7 +134,7 @@ export type StudioPathOpsResult =
   | {
       ok: true;
       pathData: string;
-      /** Present for CanvasKit Worker results; optional for narrow fallback/test providers. */
+      /** Present for CanvasKit Worker results; optional for narrow reference/test providers. */
       geometry?: StudioPortablePathGeometry;
     }
   | { ok: false; reason: string };
@@ -152,7 +155,7 @@ export interface StudioQualityEngineCapabilities {
 }
 
 export interface StudioQualityEngine {
-  readonly id: "fallback" | "canvaskit";
+  readonly id: "basic-reference" | "canvaskit";
   readonly capabilities: StudioQualityEngineCapabilities;
   shapeText(request: StudioTextShapingRequest): StudioShapedRun;
   /** SVG path data 두 개를 불리언 결합. 미지원이면 `{ ok:false, reason }`. */
@@ -162,7 +165,7 @@ export interface StudioQualityEngine {
 }
 
 // ---------------------------------------------------------------------------
-// 폴백 구현 — 실제로 쓸모 있는 만큼만 하고, 못 하는 것은 못 한다고 말한다.
+// 명시적 basic-reference 구현 — 실제로 쓸모 있는 만큼만 하고 한계를 숨기지 않는다.
 // ---------------------------------------------------------------------------
 
 /**
@@ -204,32 +207,34 @@ const defaultMeasurer: StudioAdvanceMeasurer = (char, fontSizePx) => estimateAdv
 /** 줄 끝에 혼자 남으면 안 되는 문자(행두 금칙) — 닫는 괄호·구두점. */
 const NO_LINE_START = ")]}〉》」』】〕,.、。，．!?！？:;：；ㆍ·…";
 
-const FALLBACK_LIMITATIONS: readonly string[] = [
+const BASIC_REFERENCE_LIMITATIONS: readonly string[] = [
   "커닝(kern)·합자(liga) 등 OpenType 피처가 적용되지 않습니다.",
   "아랍어·데바나가리처럼 문자가 서로 결합하는 문자 체계는 올바르게 배치되지 않습니다.",
   "양방향(BiDi) 재정렬을 하지 않아 히브리어·아랍어가 섞이면 순서가 틀립니다.",
   "글리프 인덱스를 알 수 없어 PDF 임베드에는 별도 글꼴 메트릭이 필요합니다.",
 ];
 
-export interface StudioFallbackEngineOptions {
+export interface StudioBasicQualityEngineOptions {
   measureAdvance?: StudioAdvanceMeasurer;
-  /** 폰트 크기 대비 상단/하단 — 폴백 기본값은 흔한 한글 글꼴 비율(0.88 / 0.22). */
+  /** 폰트 크기 대비 상단/하단 — 기본값은 흔한 한글 글꼴 비율(0.88 / 0.22). */
   ascentRatio?: number;
   descentRatio?: number;
 }
 
 /**
- * 폴백 엔진. 셰이핑 대신 **문자 단위 배치 + 줄바꿈**만 한다.
+ * 명시적으로 요청하는 basic-reference 엔진. 셰이핑 대신 **문자 단위 배치 + 줄바꿈**만 한다.
  * 줄바꿈 규칙: 공백에서 우선 끊고, 공백이 없는 CJK 는 글자 단위로 끊되 행두 금칙 문자는
  * 앞 줄로 끌어온다. 이 정도가 "웹툰 말풍선" 용도에서 실용적인 하한선이다.
  */
-export function createFallbackQualityEngine(options: StudioFallbackEngineOptions = {}): StudioQualityEngine {
+export function createBasicQualityEngine(
+  options: StudioBasicQualityEngineOptions = {},
+): StudioQualityEngine {
   const measure = options.measureAdvance ?? defaultMeasurer;
   const ascentRatio = options.ascentRatio ?? 0.88;
   const descentRatio = options.descentRatio ?? 0.22;
 
   return {
-    id: "fallback",
+    id: "basic-reference",
     capabilities: { textShaping: false, pathBoolean: false, strokeToPath: false, fontSubsetting: false },
 
     shapeText(request: StudioTextShapingRequest): StudioShapedRun {
@@ -253,7 +258,7 @@ export function createFallbackQualityEngine(options: StudioFallbackEngineOptions
         ascentPx: size * ascentRatio,
         descentPx: size * descentRatio,
         shaped: false,
-        limitations: FALLBACK_LIMITATIONS,
+        limitations: BASIC_REFERENCE_LIMITATIONS,
       };
     },
 
@@ -365,38 +370,51 @@ export function qualityEngineLoadError(): string | null {
 }
 
 /**
- * 엔진을 얻는다. 로더가 없거나 로드가 실패하면 **폴백을 돌려준다**(절대 던지지 않는다).
- * 같은 호출이 동시에 여러 번 들어와도 로더는 한 번만 실행된다.
+ * 명시적으로 선택된 CanvasKit 엔진을 얻는다. 로더 부재·로드 실패·잘못된 provider 반환은
+ * unavailable로 닫히며 다른 엔진을 만들지 않는다. 같은 호출이 동시에 여러 번 들어와도
+ * 선택 provider의 로더는 한 번만 실행된다.
  */
-export async function resolveQualityEngine(
-  fallbackOptions?: StudioFallbackEngineOptions,
-): Promise<StudioQualityEngine> {
+export async function resolveQualityEngine(): Promise<StudioQualityEngine> {
   if (cached) return cached;
-  if (!registeredLoader) return createFallbackQualityEngine(fallbackOptions);
+  if (!registeredLoader) {
+    throw new StudioEngineUnavailableError({
+      providerId: "canvaskit",
+      stage: "initialization",
+      message: "CanvasKit quality engine loader is not registered.",
+    });
+  }
   if (!pending) {
     const loader = registeredLoader;
     pending = (async () => {
       try {
         const engine = await loader();
+        if (engine.id !== "canvaskit") {
+          throw new Error(`selected CanvasKit loader returned ${engine.id}`);
+        }
         cached = engine;
         lastLoadError = null;
         return engine;
       } catch (error) {
         lastLoadError =
           error instanceof Error
-            ? `고품질 엔진을 불러오지 못했어요(${error.message}). 기본 엔진으로 계속합니다.`
-            : "고품질 엔진을 불러오지 못했어요. 기본 엔진으로 계속합니다.";
+            ? `CanvasKit 엔진을 불러오지 못했어요(${error.message}). 선택한 엔진을 사용할 수 없습니다.`
+            : "CanvasKit 엔진을 불러오지 못했어요. 선택한 엔진을 사용할 수 없습니다.";
         pending = null;
-        return createFallbackQualityEngine(fallbackOptions);
+        throw new StudioEngineUnavailableError({
+          providerId: "canvaskit",
+          stage: "initialization",
+          message: lastLoadError,
+          cause: error,
+        });
       }
     })();
   }
   return pending;
 }
 
-/** 동기 접근 — 아직 로드되지 않았으면 폴백. 그리기 루프에서 await 없이 쓰는 경로다. */
-export function qualityEngineNow(fallbackOptions?: StudioFallbackEngineOptions): StudioQualityEngine {
-  return cached ?? createFallbackQualityEngine(fallbackOptions);
+/** 동기 접근 — 선택한 CanvasKit이 아직 준비되지 않았으면 null이며 다른 엔진을 만들지 않는다. */
+export function qualityEngineNow(): StudioQualityEngine | null {
+  return cached;
 }
 
 // ---------------------------------------------------------------------------

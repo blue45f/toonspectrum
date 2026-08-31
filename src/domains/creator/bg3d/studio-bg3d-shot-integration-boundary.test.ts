@@ -269,15 +269,11 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(handler).toContain('contactSheetFallback = "source-unavailable"');
 
     // The public ZIP manifest deliberately excludes the scoped local recovery key.
-    expect(handler).toContain("await buildStudioBg3dShotBatchArchiveInWorker(images");
-    expect(handler).toContain("await buildStudioBg3dShotBatchArchive(images");
-    expectInOrder(handler, [
-      'if (typeof Worker !== "function")',
-      "archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions)",
-      "archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions)",
-      "if (!isStudioBg3dShotBatchWorkerUnavailableError(cause)) throw cause",
-      "archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions)",
-    ]);
+    expect(handler).toContain(
+      "const archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions)",
+    );
+    expect(handler).not.toContain("buildStudioBg3dShotBatchArchive(images");
+    expect(handler).not.toContain("isStudioBg3dShotBatchWorkerUnavailableError");
     expect(handler).not.toContain('cause.code === "timeout"');
     expect(handler).not.toContain('cause.code === "worker-failed"');
     expect(handler).not.toContain('cause.code === "archive-invalid"');

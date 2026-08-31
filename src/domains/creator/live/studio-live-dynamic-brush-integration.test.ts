@@ -24,9 +24,10 @@ describe("Studio live dynamic brush integration boundary", () => {
     expect(pointerStart).toContain(
       'liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic"',
     );
-    expect(pointerStart).toContain(
-      "if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted || retainedMediaDirect)",
-    );
+    expect(pointerStart).toContain("selectedMaterialProviderOwnsHiddenDraft");
+    expect(pointerStart).toContain("|| dynamicBrushDirect");
+    expect(pointerStart).toContain("|| wetInkOverlayStarted");
+    expect(pointerStart).toContain("|| retainedMediaDirect");
     expect(pointerStart).toContain("liveDraftLayerRef.current?.drawScene()");
 
     const flush = page.slice(
@@ -34,12 +35,28 @@ describe("Studio live dynamic brush integration boundary", () => {
       page.indexOf("const flushDirectLiveDraftNow"),
     );
     expect(flush).toContain("renderer.appendFrom(next)");
-    expect(flush).toContain("draftPreviewStoreRef.current.setActive(next)");
-    expect(flush).toContain("draftPreviewDynamicLayerRef.current?.drawScene()");
+    expect(flush).toContain('outcome.status === "unavailable"');
+    expect(flush).toContain('outcome.status === "rejected"');
+    expect(flush).toContain("rejectActiveSelectedLiveSurface(");
+    expect(flush).toContain("liveDraftVisualRef.current = next");
+    expect(flush).not.toContain("draftPreviewStoreRef.current.setActive(next)");
   });
 
   it("seals exact material on the overlay until the committed-draw receipt", () => {
     const page = source("../StudioPage.tsx");
+    const finish = source("../studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts");
+    const seal = finish.indexOf("liveDynamicBrushOverlayRendererRef.current.end(finished)");
+    const reject = finish.indexOf(
+      'selectedOverlaySeal.result.status !== "settled"',
+      seal,
+    );
+    const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
+    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+    expect(seal).toBeGreaterThan(0);
+    expect(reject).toBeGreaterThan(seal);
+    expect(deferredCommit).toBeGreaterThan(reject);
+    expect(immediateCommit).toBeGreaterThan(reject);
+
     const clear = page.slice(
       page.indexOf("const clearDraftPreview ="),
       page.indexOf("const DEFERRED_STROKE_COMMIT_IDLE_MS"),
@@ -49,8 +66,8 @@ describe("Studio live dynamic brush integration boundary", () => {
       dynamicStart,
       clear.indexOf("if (wasRetainedMediaDirect)", dynamicStart),
     );
-    const seal = dynamic.indexOf("renderer.end(finalDynamicBrushStroke)");
-    expect(seal).toBeGreaterThan(0);
+    expect(dynamic).not.toContain("renderer.end(finalDynamicBrushStroke)");
+    expect(dynamic).toContain("renderer.hasSettledStrokes");
     expect(dynamic).not.toContain("draftPreviewStoreRef.current.settle(finalDynamicBrushStroke)");
     expect(dynamic).not.toContain("renderer.releaseSettledPrefix(1)");
   });

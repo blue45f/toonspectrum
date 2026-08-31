@@ -186,9 +186,9 @@ describe("Living Ink actual execution boundary", () => {
   });
 
   it("gates both shipped GPU backends instead of whichever one the launch flags selected", () => {
-    // The Worker prefers the WGSL field runtime whenever a WebGPU adapter exists, so a probe that
-    // launches one browser leaves the other shipped backend completely unverified.
+    // Each browser lane explicitly selects one provider. Launch flags only make it available.
     expect(verifier).toContain("BACKEND_LANES");
+    expect(verifier).toContain("?backend=${encodeURIComponent(lane.id)}");
     expect(verifier).toContain("--enable-unsafe-webgpu");
     expect(verifier).toContain("--use-angle=metal");
     expect(verifier).toContain("--disable-features=WebGPU");
@@ -204,15 +204,15 @@ describe("Living Ink actual execution boundary", () => {
      * Backend identity has to come from the receipt of an operation that actually ran, not from a
      * literal and not from the capability record.
      *
-     * The capability record is not a witness here: when the WGSL runtime is refused, the WebGPU
-     * factory falls back to a WebGL2 runtime and stamps `webgpu-offscreen-half-float` onto its
-     * capabilities. Reading identity from that stamp let the WGSL lane run GLSL end to end while
-     * reporting itself as the WGSL lane — two kernels had failed to compile, and an invalid
-     * pipeline drops its dispatches silently, so the lane's "near-parity" numbers were GLSL's own.
+     * The provider rejects a capability or receipt from any backend other than the query-selected
+     * one, and the receipt remains the final witness of the runtime that actually produced pixels.
      */
     expect(browserGate).toContain("lineReceiptBackend = lineFrame.receipt.backend");
     expect(browserGate).toContain('lineReceiptBackend === "webgpu-offscreen-half-float"');
     expect(browserGate).toContain("await bloomProvider.initialize()");
+    expect(browserGate).toContain("selectedProviderOptions");
+    expect(worker).toContain("createSelectedRuntime");
+    expect(worker).not.toContain("createPreferredRuntime");
     expect(verifier).not.toContain('backend !== "real-chromium-dedicated-worker-offscreen-webgl2');
   });
 

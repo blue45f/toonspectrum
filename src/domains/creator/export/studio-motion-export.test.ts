@@ -16,6 +16,7 @@ import {
   frameSpecAt,
   isMotionExportCancelled,
   loadMotionCutImages,
+  materializeExactMotionWebm,
   motionExportFileName,
   motionFramePose,
   normalizeMotionExportOptions,
@@ -237,11 +238,38 @@ describe("포즈 합성", () => {
 // ── 인코딩 스펙 ──────────────────────────────────────────────────────
 
 describe("pickMotionVideoMime", () => {
-  it("vp9 지원 시 vp9, 아니면 vp8, 최후엔 컨테이너만", () => {
+  it("작업 전 probe에서 첫 지원 MIME 하나를 확정한다", () => {
     expect(pickMotionVideoMime(() => true)).toBe(MOTION_VIDEO_MIME_CANDIDATES[0]);
     expect(pickMotionVideoMime((m) => !m.includes("vp9"))).toBe(MOTION_VIDEO_MIME_CANDIDATES[1]);
-    expect(pickMotionVideoMime((m) => !m.includes("codecs"))).toBe("video/webm");
+    expect(pickMotionVideoMime((m) => !m.includes("codecs"))).toBeNull();
     expect(pickMotionVideoMime(() => false)).toBeNull();
+  });
+
+  it("MediaRecorder codec receipt와 WebM EBML magic을 모두 exact 검증한다", async () => {
+    const webm = new Blob([
+      Uint8Array.of(0x1a, 0x45, 0xdf, 0xa3, 0x01) as unknown as BlobPart,
+    ], { type: "video/webm" });
+    await expect(materializeExactMotionWebm(
+      [webm],
+      "video/webm;codecs=vp9,opus",
+      'video/webm; codecs="vp9, opus"',
+    )).resolves.toMatchObject({ mimeType: "video/webm;codecs=vp9,opus" });
+    await expect(materializeExactMotionWebm(
+      [webm],
+      "video/webm;codecs=vp9,opus",
+      "video/webm",
+    )).rejects.toMatchObject({
+      name: "MotionExportCodecUnavailableError",
+      reason: "codec-identity",
+    });
+    await expect(materializeExactMotionWebm(
+      [new Blob(["not-webm"], { type: "video/webm" })],
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp9,opus",
+    )).rejects.toMatchObject({
+      name: "MotionExportCodecUnavailableError",
+      reason: "container-magic",
+    });
   });
 });
 
@@ -446,13 +474,20 @@ class FakeRecorder implements MotionRecorderLike {
     public stream: MotionStreamLike,
     public options: { mimeType: string; videoBitsPerSecond: number }
   ) {}
+  get mimeType() {
+    return this.options.mimeType;
+  }
   start(timesliceMs?: number) {
     this.started = timesliceMs;
   }
   stop() {
     this.stopCount += 1;
     if (this.stopCount > 1) return; // 실 레코더의 중복 stop 가드 흉내
-    this.ondataavailable?.({ data: new Blob(["chunk"], { type: "video/webm" }) });
+    this.ondataavailable?.({
+      data: new Blob([
+        Uint8Array.of(0x1a, 0x45, 0xdf, 0xa3, 0x01) as unknown as BlobPart,
+      ], { type: "video/webm" }),
+    });
     this.onstop?.();
   }
 }
@@ -528,6 +563,26 @@ async function pumpUntilDone(rig: ReturnType<typeof createFakeRig>, stepMs = 200
 }
 
 describe("startMotionExport", () => {
+  it("선택된 MediaRecorder 생성 실패 뒤 다른 codec으로 재시도하지 않는다", async () => {
+    const createRecorder = vi.fn((): MotionRecorderLike => {
+      throw new Error("selected recorder failed");
+    });
+    const isMimeSupported = vi.fn((mime: string) => mime.includes("vp9"));
+    const rig = createFakeRig({ createRecorder, isMimeSupported });
+
+    const handle = startMotionExport({
+      plan: makePlan(),
+      images: IMAGES,
+      muted: true,
+      deps: rig.deps,
+    });
+
+    await expect(handle.done).rejects.toThrow("selected recorder failed");
+    expect(createRecorder).toHaveBeenCalledTimes(1);
+    expect(isMimeSupported).toHaveBeenCalledTimes(1);
+    expect(isMimeSupported).toHaveBeenCalledWith(MOTION_VIDEO_MIME_CANDIDATES[0]);
+  });
+
   it("타임라인을 리플레이해 WebM blob으로 완료한다(진행률 단조 증가)", async () => {
     const rig = createFakeRig();
     const progresses: MotionExportProgress[] = [];

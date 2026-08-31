@@ -38,16 +38,17 @@ describe("Studio ONNX inference provider source boundary", () => {
     expect(provider).not.toMatch(/\breact\b/iu);
   });
 
-  it("records explicit WebGPU then WASM attempts and deterministic fallback reasons", () => {
+  it("binds one explicit execution provider and records fail-closed evidence", () => {
     expect(provider).toContain(
-      'STUDIO_ONNX_EXECUTION_PROVIDER_ORDER = [\n  "webgpu",\n  "wasm",',
+      'STUDIO_ONNX_EXECUTION_PROVIDERS = [\n  "webgpu",\n  "wasm",',
     );
-    expect(provider).toContain('executionProviders: ["wasm"]');
+    expect(provider).toContain(': ["wasm"],');
     expect(provider).toContain('name: "webgpu"');
-    expect(provider).toContain('"webgpu-api-unavailable"');
-    expect(provider).toContain('"webgpu-session-create-failed"');
+    expect(provider).toContain('attemptCount: 1');
+    expect(provider).toContain('failureIsolation: "fail-closed"');
+    expect(provider).not.toContain("StudioOnnxFallbackReason");
     expect(provider).toContain(
-      'activeExecutionProvider: input.activeExecutionProvider',
+      "activeExecutionProvider: input.executionProvider",
     );
   });
 

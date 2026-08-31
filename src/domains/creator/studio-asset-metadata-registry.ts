@@ -5,11 +5,11 @@ import {
 } from "@toonspectrum/studio-engine-registry";
 import {
   assertAssetCapabilitiesKnown,
-  assetMetadataIRSchema,
   canonicalJson,
   collectSceneFeatures,
   computeAssetContentDigest,
   computeAssetStructuredDigest,
+  parseAssetMetadata,
   sceneFeatureCapabilityVocabulary,
 } from "@toonspectrum/studio-project-model";
 
@@ -179,7 +179,7 @@ export class StudioAssetMetadataRegistry {
    * be matched against any engine must never enter the catalog silently.
    */
   register(candidate: unknown): AssetMetadataIR {
-    const metadata = assetMetadataIRSchema.parse(candidate);
+    const metadata = parseAssetMetadata(candidate);
     if (this.assets.has(metadata.id)) {
       throw new StudioAssetMetadataRegistryError(
         `asset already registered: ${metadata.id}`,
@@ -515,7 +515,7 @@ export function deriveAssetMetadata(
             ? []
             : [
                 rendererVariant(
-                  "stable-perfect-freehand-fallback",
+                  "stable-perfect-freehand",
                   "stable",
                   "perfect-freehand",
                   normalizedReference,
@@ -529,34 +529,31 @@ export function deriveAssetMetadata(
         visualEquivalenceReport: null,
         dependencies: [],
         previewVariants: importedPreviewVariants("stable-hokusai", null),
-        fallback: {
-          strategy: "renderer-variant",
-          rendererVariantId:
-            outlineCapabilities.length === 0
-              ? "stable-hokusai"
-              : "stable-perfect-freehand-fallback",
-          providerId:
-            outlineCapabilities.length === 0
-              ? "hokusai-natural-media"
-              : "perfect-freehand",
-          preservesNormalizedIr: true,
+        providerUnavailable: {
+          status: "unavailable",
+          retainsNormalizedIr: true,
+          nextOperation: "select-provider",
+          selectableRendererVariantIds: [
+            "stable-hokusai",
+            ...(outlineCapabilities.length === 0 ? [] : ["stable-perfect-freehand"]),
+          ],
           reason:
-            "When the natural-media lane is unavailable, retain BrushProgramIR and use the pressure-outline lane without claiming MYB visual parity.",
+            "When the selected natural-media provider is unavailable, retain BrushProgramIR and mark the asset unavailable. A later provider selection is explicit and does not claim MYB visual parity.",
           limitations:
             outlineCapabilities.length === 0
-              ? ["No independent provider fallback is currently available."]
-              : ["Natural-media mixing, texture and dab dynamics are unavailable in fallback."],
+              ? ["No independent provider option is currently available."]
+              : ["Natural-media mixing, texture and dab dynamics require explicit provider selection."],
         },
         replacementCondition: {
           summary:
-            "Replace the stable brush lane only after exact real-device strokes meet or exceed visual, pressure and fallback gates for this material.",
+            "Replace the stable brush lane only after exact real-device strokes meet or exceed visual, pressure and explicit provider-selection gates for this material.",
           requiredEvidence: [
             "visual-equivalence",
             "real-device-stroke",
             "pressure-fidelity",
             "performance",
             "memory",
-            "fallback",
+            "explicit-provider-selection",
             "soak",
           ],
         },
@@ -628,7 +625,7 @@ export function deriveAssetMetadata(
             ? []
             : [
                 rendererVariant(
-                  "stable-perfect-freehand-fallback",
+                  "stable-perfect-freehand",
                   "stable",
                   "perfect-freehand",
                   normalizedReference,
@@ -649,38 +646,21 @@ export function deriveAssetMetadata(
               : null,
           null,
         ),
-        fallback:
-          outlineCapabilities.length > 0 || hokusaiCapabilities.length > 0
-            ? {
-                strategy: "renderer-variant",
-                rendererVariantId:
-                  outlineCapabilities.length > 0
-                    ? "stable-perfect-freehand-fallback"
-                    : "stable-hokusai",
-                providerId:
-                  outlineCapabilities.length > 0
-                    ? "perfect-freehand"
-                    : "hokusai-natural-media",
-                preservesNormalizedIr: true,
-                reason:
-                  "Retain normalized BrushProgramIR and surface all KPP approximation limits when the preferred dynamics provider is unavailable.",
-                limitations: ["Fallback does not claim Krita or CSP stroke equivalence."],
-              }
-            : {
-                // Vector-mesh lane: fail closed. No geometry-equivalence
-                // certification exists for an outline rendition of ink mesh
-                // strokes, so an incapable host retains BrushProgramIR and
-                // hides the brush instead of substituting geometry.
-                strategy: "renderer-variant",
-                rendererVariantId: "stable-google-ink-mesh",
-                providerId: "google-ink-mesh",
-                preservesNormalizedIr: true,
-                reason:
-                  "The vector-mesh lane fails closed when the google-ink-mesh provider is unavailable; BrushProgramIR is retained and the brush is hidden rather than re-rendered with different geometry.",
-                limitations: [
-                  "No independent provider fallback is currently available for the vector-mesh lane.",
-                ],
-              },
+        providerUnavailable: {
+          status: "unavailable",
+          retainsNormalizedIr: true,
+          nextOperation: "select-provider",
+          selectableRendererVariantIds: [
+            ...(meshCapabilities.length === 0 ? [] : ["stable-google-ink-mesh"]),
+            ...(hokusaiCapabilities.length === 0 ? [] : ["stable-hokusai"]),
+            ...(outlineCapabilities.length === 0 ? [] : ["stable-perfect-freehand"]),
+          ],
+          reason:
+            "When the selected KPP provider is unavailable, retain BrushProgramIR and mark the asset unavailable. A later provider selection is explicit; no geometry or paint lane is substituted automatically.",
+          limitations: [
+            "An explicit provider selection does not claim Krita or CSP stroke equivalence.",
+          ],
+        },
         replacementCondition: {
           summary:
             "Replace this brush path only with real-device, pressure-fidelity and visual evidence over the same KPP corpus.",
@@ -689,7 +669,7 @@ export function deriveAssetMetadata(
             "real-device-stroke",
             "pressure-fidelity",
             "performance",
-            "fallback",
+            "explicit-provider-selection",
             "soak",
           ],
         },
@@ -752,26 +732,26 @@ export function deriveAssetMetadata(
           "stable-canvaskit",
           "studio-max-vello-gpu",
         ),
-        fallback: {
-          strategy: "renderer-variant",
-          rendererVariantId: "stable-canvaskit",
-          providerId: "skia-canvaskit",
-          preservesNormalizedIr: true,
+        providerUnavailable: {
+          status: "unavailable",
+          retainsNormalizedIr: true,
+          nextOperation: "select-provider",
+          selectableRendererVariantIds: ["stable-canvaskit", "studio-max-vello-gpu"],
           reason:
-            "If the Studio Max WebGPU path is unavailable or fails its asset-specific gate, render the same SceneIR with CanvasKit.",
+            "If the selected SVG provider is unavailable or fails its asset-specific gate, retain SceneIR and mark the asset unavailable. A later provider selection is explicit.",
           limitations: [
-            "Unsupported SVG source features remain listed in provenance and are not reconstructed by fallback.",
+            "Unsupported SVG source features remain listed in provenance and are not reconstructed by a provider selection.",
           ],
         },
         replacementCondition: {
           summary:
-            "Promote or replace the SVG renderer only after the same SceneIR passes visual equivalence, performance, memory, fallback and soak gates.",
+            "Promote or replace the SVG renderer only after the same SceneIR passes visual equivalence, performance, memory, explicit provider-selection and soak gates.",
           requiredEvidence: [
             "visual-equivalence",
             "performance",
             "memory",
             "determinism",
-            "fallback",
+            "explicit-provider-selection",
             "soak",
           ],
         },
@@ -786,5 +766,5 @@ export function deriveAssetMetadata(
       break;
     }
   }
-  return assetMetadataIRSchema.parse(candidate);
+  return parseAssetMetadata(candidate);
 }

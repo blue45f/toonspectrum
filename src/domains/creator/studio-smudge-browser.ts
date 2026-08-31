@@ -26,7 +26,7 @@ import type { SmudgePixelPoint } from "./studio-smudge";
  *   원본(비반전) 방향으로 되돌린 뒤 자연 해상도로 스케일해 smudgeStroke 에 넘긴다.
  *
  * 스탬프 블렌드 루프(smudgeStroke)는 대형 이미지·긴 스트로크에서 무거운 동기 작업이라
- * Worker로 옮긴다(Worker를 못 만드는 환경에선 클라이언트 내부에서 동일 엔진으로 동기 폴백).
+ * Worker로 옮긴다. 선택한 Worker를 사용할 수 없으면 요청을 실패로 닫고 main-thread로 재실행하지 않는다.
  */
 export async function smudgeStrokeImage(
   src: string,
@@ -67,7 +67,7 @@ export async function smudgeStrokeImage(
     points: regionPoints,
     radiusPx,
     strength,
-  }, { signal: opts?.signal });
+  }, { executionMode: "worker", signal: opts?.signal });
 
   // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
   // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>

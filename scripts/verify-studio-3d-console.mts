@@ -2748,90 +2748,152 @@ async function runMagicLayerProductionAlignmentProof(
         }
 
         const controller = new AbortController();
-        // Exercise the shipped Magic coordinator, not a specialist runtime shortcut. This path
-        // proves trusted snapshot admission, capability-gated registry dispatch, atomic backend
-        // selection, result normalization, defensive copies, and owned runtime disposal.
-        const ownedBabylonCanvases: HTMLCanvasElement[] = [];
-        let objectIdCapture: import("../src/domains/creator/bg3d/studio-bg3d-magic-object-id-capture"
+        const canonicalDocument = JSON.parse(
+          scenario.babylonCanonicalDocumentJson,
+        ) as import("../src/domains/creator/bg3d/studio-bg3d-scene-document"
+        ).StudioBg3dSceneDocument;
+        const trustedSnapshot = productionProofEntry.createStudioBg3dRuntimeSnapshot(
+          canonicalDocument,
+          new Map(),
+        );
+        type MagicBackend = import("../src/domains/creator/bg3d/studio-bg3d-magic-object-id-capture"
+        ).StudioBg3dMagicBabylonBackend;
+        type MagicCapture = import("../src/domains/creator/bg3d/studio-bg3d-magic-object-id-capture"
         ).StudioBg3dMagicObjectIdCaptureResult;
-        try {
-          const canonicalDocument = JSON.parse(
-            scenario.babylonCanonicalDocumentJson,
-          ) as import("../src/domains/creator/bg3d/studio-bg3d-scene-document"
-          ).StudioBg3dSceneDocument;
-          const trustedSnapshot = productionProofEntry.createStudioBg3dRuntimeSnapshot(
-            canonicalDocument,
-            new Map(),
-          );
-          objectIdCapture = await productionProofEntry.captureStudioBg3dMagicObjectIds({
-            snapshot: trustedSnapshot,
-            width: scenario.width,
-            height: scenario.height,
-            jobId: `magic-production-alignment-${scenario.id}`,
-            backends: ["webgpu", "webgl2"],
-            createCanvas: () => {
-              const canvas = document.createElement("canvas");
-              ownedBabylonCanvases.push(canvas);
-              return canvas;
-            },
-            createRuntime: ({ backend, canvas, capabilities, settings }) => {
-              if (!(canvas instanceof HTMLCanvasElement)) {
-                throw new Error("Magic proof received a non-DOM canvas");
-              }
-              return babylonEntry.createStudioBg3dBabylonSpecialist({
-                backend,
-                canvas,
-                capabilities,
-                onDiagnostic: backend === "webgpu"
-                  ? (diagnostic) => {
-                      console.warn(
-                        `${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`,
-                      );
-                    }
-                  : undefined,
-                settings,
-              });
-            },
-            signal: controller.signal,
-          });
-        } catch (cause) {
+
+        // Exercise the shipped Magic coordinator, not a specialist runtime shortcut. WebGPU and
+        // WebGL2 are independent, explicitly selected jobs: neither capture may create, attempt, or
+        // report the other backend.
+        async function captureObjectIdsForBackend(
+          backend: MagicBackend,
+        ): Promise<MagicCapture> {
+          const ownedBabylonCanvases: HTMLCanvasElement[] = [];
+          const createdBackends: MagicBackend[] = [];
+          try {
+            const capture = await productionProofEntry.captureStudioBg3dMagicObjectIds!({
+              snapshot: trustedSnapshot,
+              width: scenario.width,
+              height: scenario.height,
+              jobId: `magic-production-alignment-${scenario.id}-${backend}`,
+              backends: [backend],
+              createCanvas: () => {
+                const canvas = document.createElement("canvas");
+                ownedBabylonCanvases.push(canvas);
+                return canvas;
+              },
+              createRuntime: ({ backend: createdBackend, canvas, capabilities, settings }) => {
+                createdBackends.push(createdBackend);
+                if (!(canvas instanceof HTMLCanvasElement)) {
+                  throw new Error("Magic proof received a non-DOM canvas");
+                }
+                if (createdBackend !== backend) {
+                  throw new Error(
+                    `Magic ${backend} proof attempted the ${createdBackend} runtime`,
+                  );
+                }
+                return babylonEntry.createStudioBg3dBabylonSpecialist({
+                  backend: createdBackend,
+                  canvas,
+                  capabilities,
+                  onDiagnostic: createdBackend === "webgpu"
+                    ? (diagnostic) => {
+                        console.warn(
+                          `${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`,
+                        );
+                      }
+                    : undefined,
+                  settings,
+                });
+              },
+              signal: controller.signal,
+            });
+            const expectedRuntimeId = backend === "webgpu"
+              ? "babylon-webgpu-lab"
+              : "babylon-webgl-lab";
+            if (
+              capture.backend !== backend ||
+              createdBackends.length !== 1 ||
+              createdBackends[0] !== backend ||
+              capture.attempts.length !== 1 ||
+              capture.attempts[0]?.runtimeId !== expectedRuntimeId ||
+              capture.attempts[0]?.outcome !== "succeeded" ||
+              capture.width !== scenario.width ||
+              capture.height !== scenario.height ||
+              capture.objectIds.length !== scenario.width * scenario.height
+            ) {
+              throw new Error(
+                `[${scenario.id}] malformed product Magic ${backend} capture receipt`,
+              );
+            }
+            return capture;
+          } catch (cause) {
+            // Playwright transports only the outer Error reliably. Serialize bounded atomic attempt
+            // receipts here so a WebGPU device loss remains retryable without starting WebGL2.
+            throw new Error(
+              `[${scenario.id}] product Magic ${backend} object-ID capture failed: ` +
+                `${errorChain(cause)}`,
+              { cause },
+            );
+          } finally {
+            for (const canvas of ownedBabylonCanvases) canvas.remove();
+          }
+        }
+
+        if (scenarioIndex === 0) {
+          const failedRuntimeCreations: MagicBackend[] = [];
+          let selectedWebGpuRejected = false;
+          try {
+            await productionProofEntry.captureStudioBg3dMagicObjectIds!({
+              snapshot: trustedSnapshot,
+              width: 1,
+              height: 1,
+              jobId: "magic-production-fail-closed-webgpu",
+              backends: ["webgpu"],
+              createCanvas: () => document.createElement("canvas"),
+              createRuntime: ({ backend }) => {
+                failedRuntimeCreations.push(backend);
+                throw Object.assign(new Error("injected selected WebGPU initialization failure"), {
+                  code: "engine-init-failed",
+                });
+              },
+              signal: controller.signal,
+            });
+          } catch {
+            selectedWebGpuRejected = true;
+          }
+          if (
+            !selectedWebGpuRejected ||
+            failedRuntimeCreations.length !== 1 ||
+            failedRuntimeCreations[0] !== "webgpu" ||
+            failedRuntimeCreations.includes("webgl2")
+          ) {
+            throw new Error(
+              "product Magic WebGPU failure invoked WebGL2 instead of failing closed",
+            );
+          }
+        }
+
+        const webGpuObjectIdCapture = await captureObjectIdsForBackend("webgpu");
+        const webGlObjectIdCapture = await captureObjectIdsForBackend("webgl2");
+        const webGlLegendEntry = webGlObjectIdCapture.legend.find(
+          (entry) => entry.stableId === expectedStableId,
+        );
+        if (!webGlLegendEntry) {
           throw new Error(
-            `[${scenario.id}] product Magic object-ID capture failed: ${errorChain(cause)}`,
-            { cause },
+            `[${scenario.id}] selected stable ID is absent from the explicit WebGL2 legend`,
           );
-        } finally {
-          for (const canvas of ownedBabylonCanvases) canvas.remove();
         }
-        const webGpuAttempt = objectIdCapture.attempts[0];
-        if (
-          objectIdCapture.fallbackUsed &&
-          webGpuAttempt?.outcome === "failed" &&
-          (
-            webGpuAttempt.errorCode === "context-lost" ||
-            webGpuAttempt.errorCode === "device-lost"
-          )
-        ) {
-          // Playwright transports Error name/message/stack but not custom cause/code fields. Keep
-          // the authoritative GPU-loss receipt in the top-level message so the Node retry policy
-          // can distinguish this transient loss from a semantic Magic alignment failure.
+        const webGlSelectedPixelCount = webGlObjectIdCapture.objectIds.reduce(
+          (count, value) => count + (value === webGlLegendEntry.id ? 1 : 0),
+          0,
+        );
+        if (webGlSelectedPixelCount === 0) {
           throw new Error(
-            `[${scenario.id}] product Magic WebGPU attempt failed ` +
-              `[${webGpuAttempt.errorCode}] before WebGL2 fallback`,
+            `[${scenario.id}] explicit WebGL2 object-ID capture is empty`,
           );
         }
-        if (
-          objectIdCapture.backend !== "webgpu" ||
-          objectIdCapture.fallbackUsed ||
-          objectIdCapture.attempts.length !== 1 ||
-          objectIdCapture.attempts[0]?.runtimeId !== "babylon-webgpu-lab" ||
-          objectIdCapture.attempts[0]?.outcome !== "succeeded" ||
-          objectIdCapture.width !== scenario.width ||
-          objectIdCapture.height !== scenario.height ||
-          objectIdCapture.objectIds.length !== scenario.width * scenario.height
-        ) {
-          throw new Error(`[${scenario.id}] malformed product Magic capture receipt`);
-        }
-        const legendEntry = objectIdCapture.legend.find(
+
+        const legendEntry = webGpuObjectIdCapture.legend.find(
           (entry) => entry.stableId === expectedStableId,
         );
         if (!legendEntry) {
@@ -2841,7 +2903,7 @@ async function runMagicLayerProductionAlignmentProof(
         }
         const selectedObjectId = legendEntry.id;
         const babylonMask = Uint8Array.from(
-          objectIdCapture.objectIds,
+          webGpuObjectIdCapture.objectIds,
           (value) => value === selectedObjectId ? 1 : 0,
         );
         const three = statsForMask(

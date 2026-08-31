@@ -4,7 +4,6 @@ import {
 } from "../studio-background-3d-model";
 
 import {
-  STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES,
   StudioBg3dGeometryWorkerClientError,
   parseStudioBg3dGeometryInWorker,
 } from "./studio-bg3d-geometry-worker-client";
@@ -88,7 +87,7 @@ export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES = 256;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES = 64;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES = 16 * 1024 * 1024;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_DIRECTIVES = 65_536;
-export const STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES = 512 * 1024;
+export const STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES = 512 * 1024;
 const STUDIO_BG3D_IMPORT_MAX_GLTF_TABLE_ENTRIES = 65_536;
 const STUDIO_BG3D_IMPORT_MAX_RESOURCE_RECORDS = 256;
 const STUDIO_BG3D_IMPORT_MAX_MATERIAL_RECORDS = STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS;
@@ -147,6 +146,8 @@ export interface StudioBg3dImportProgress {
 export interface StudioBg3dModelImportOptions {
   readonly signal?: AbortSignal;
   readonly onProgress?: (progress: StudioBg3dImportProgress) => void;
+  /** Selected exactly once before conversion starts. Omission selects the product Worker. */
+  readonly executionBackend?: StudioBg3dModelImportExecutionBackend;
   /**
    * Optional active device profile and document-intersected budgets. Supplying neither preserves
    * the legacy absolute pre-export ceilings; supplying one without the other fails closed.
@@ -154,6 +155,8 @@ export interface StudioBg3dModelImportOptions {
   readonly profile?: StudioBg3dGlbProfile;
   readonly budgets?: StudioBg3dGlbBudgetProfiles;
 }
+
+export type StudioBg3dModelImportExecutionBackend = "worker" | "direct";
 
 export type StudioBg3dModelImportErrorCode =
   | "aborted"
@@ -232,7 +235,7 @@ const ERROR_MESSAGES: Readonly<Record<StudioBg3dModelImportErrorCode, string>> =
   "unsafe-resource-uri": "3D 모델이 로컬 선택 범위 밖의 네트워크 또는 파일 리소스를 참조합니다.",
   "unsupported-extension": "아직 변환할 수 없는 압축 또는 텍스처 확장이 포함되어 있습니다. 표준 glTF/GLB로 다시 내보내 주세요.",
   "vertex-budget-exceeded": "3D 모델의 정점 수가 가져오기 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
-  "worker-required": "큰 OBJ·STL·PLY 모델은 안전한 백그라운드 변환 Worker가 필요합니다. 최신 브라우저에서 다시 시도하거나 모델을 줄여 주세요.",
+  "worker-required": "선택한 OBJ·STL·PLY 변환 백엔드를 사용할 수 없습니다. Worker를 지원하는 최신 브라우저에서 다시 시도하거나 명시적 직접 실행 모델의 크기를 줄여 주세요.",
   "geometry-memory-too-large": "3D 모델의 디코딩된 기하 데이터가 256MiB 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
 });
 
@@ -1207,100 +1210,103 @@ async function parseGltfImport(
 
 async function preflightObjBytesForImport(
   bytes: ArrayBuffer,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<StudioBg3dObjPreflightWorkerObjResult> {
-  try {
-    return await preflightStudioBg3dObjBytesInWorker(bytes, { signal });
-  } catch (error) {
-    if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
-    if (
-      error.code !== "worker-unavailable"
-      || bytes.byteLength > STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
-    ) {
+  if (executionBackend === "worker") {
+    try {
+      return await preflightStudioBg3dObjBytesInWorker(bytes, { signal });
+    } catch (error) {
+      if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
       throw mapObjPreflightFailure(error.code);
     }
-    const {
-      StudioBg3dObjPreflightWorkerRuntimeError,
-      preflightStudioBg3dObjWorkerRequest,
-    } = await import("./studio-bg3d-obj-preflight-worker-runtime");
-    const fallbackRequest: StudioBg3dObjPreflightWorkerObjRequest = {
-      version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
-      kind: "preflight-obj",
-      requestId: 1,
-      generationId: 1,
-      sourceByteLength: bytes.byteLength,
-      bytes,
-      budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
-    };
-    try {
-      const result = preflightStudioBg3dObjWorkerRequest(fallbackRequest);
-      if (result.kind !== "obj") throw importError("parse-failed");
-      throwIfAborted(signal);
-      return result;
-    } catch (fallbackError) {
-      if (fallbackError instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
-        throw mapObjPreflightFailure(fallbackError.code);
-      }
-      throw fallbackError;
+  }
+  if (bytes.byteLength > STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES) {
+    throw importError("worker-required");
+  }
+  const {
+    StudioBg3dObjPreflightWorkerRuntimeError,
+    preflightStudioBg3dObjWorkerRequest,
+  } = await import("./studio-bg3d-obj-preflight-worker-runtime");
+  const directRequest: StudioBg3dObjPreflightWorkerObjRequest = {
+    version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
+    kind: "preflight-obj",
+    requestId: 1,
+    generationId: 1,
+    sourceByteLength: bytes.byteLength,
+    bytes,
+    budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
+  };
+  try {
+    const result = preflightStudioBg3dObjWorkerRequest(directRequest);
+    if (result.kind !== "obj") throw importError("parse-failed");
+    throwIfAborted(signal);
+    return result;
+  } catch (error) {
+    if (error instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
+      throw mapObjPreflightFailure(error.code);
     }
+    throw error;
   }
 }
 
 async function preflightMtlBytesForImport(
   materialLibraries: readonly StudioBg3dObjPreflightWorkerMtlEntry[],
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<StudioBg3dObjPreflightWorkerMtlResult> {
-  try {
-    return await preflightStudioBg3dMtlBytesInWorker(materialLibraries, { signal });
-  } catch (error) {
-    if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
-    const fallbackInputBytes = materialLibraries.reduce(
-      (total, entry) => safeAddCount(
-        total,
-        entry.sourceByteLength,
-        "material-budget-exceeded",
-      ),
-      0,
-    );
-    if (
-      error.code !== "worker-unavailable"
-      || fallbackInputBytes > STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
-    ) {
+  if (executionBackend === "worker") {
+    try {
+      return await preflightStudioBg3dMtlBytesInWorker(materialLibraries, { signal });
+    } catch (error) {
+      if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
       throw mapObjPreflightFailure(error.code);
     }
-    const {
-      StudioBg3dObjPreflightWorkerRuntimeError,
-      preflightStudioBg3dObjWorkerRequest,
-    } = await import("./studio-bg3d-obj-preflight-worker-runtime");
-    const fallbackRequest: StudioBg3dObjPreflightWorkerMtlRequest = {
-      version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
-      kind: "preflight-mtl",
-      requestId: 1,
-      generationId: 1,
-      materialLibraries,
-      budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
-    };
-    try {
-      const result = preflightStudioBg3dObjWorkerRequest(fallbackRequest);
-      if (result.kind !== "mtl") throw importError("parse-failed");
-      throwIfAborted(signal);
-      return result;
-    } catch (fallbackError) {
-      if (fallbackError instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
-        throw mapObjPreflightFailure(fallbackError.code);
-      }
-      throw fallbackError;
+  }
+  const directInputBytes = materialLibraries.reduce(
+    (total, entry) => safeAddCount(
+      total,
+      entry.sourceByteLength,
+      "material-budget-exceeded",
+    ),
+    0,
+  );
+  if (directInputBytes > STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES) {
+    throw importError("worker-required");
+  }
+  const {
+    StudioBg3dObjPreflightWorkerRuntimeError,
+    preflightStudioBg3dObjWorkerRequest,
+  } = await import("./studio-bg3d-obj-preflight-worker-runtime");
+  const directRequest: StudioBg3dObjPreflightWorkerMtlRequest = {
+    version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
+    kind: "preflight-mtl",
+    requestId: 1,
+    generationId: 1,
+    materialLibraries,
+    budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
+  };
+  try {
+    const result = preflightStudioBg3dObjWorkerRequest(directRequest);
+    if (result.kind !== "mtl") throw importError("parse-failed");
+    throwIfAborted(signal);
+    return result;
+  } catch (error) {
+    if (error instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
+      throw mapObjPreflightFailure(error.code);
     }
+    throw error;
   }
 }
 
 async function parseObjImport(
   item: StudioBg3dImportPlanItem,
   resolver: LocalResourceResolver,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
   let bytes = await readBytes(item.primary, signal);
-  const objPreflight = await preflightObjBytesForImport(bytes, signal);
+  const objPreflight = await preflightObjBytesForImport(bytes, executionBackend, signal);
   bytes = objPreflight.bytes;
   const materialLibraryReferences = objPreflight.materialLibraryReferences;
   const materialResources: Array<{
@@ -1350,7 +1356,11 @@ async function parseObjImport(
     });
   }
   if (materialLibraries.length > 0) {
-    const materialPreflight = await preflightMtlBytesForImport(materialLibraries, signal);
+    const materialPreflight = await preflightMtlBytesForImport(
+      materialLibraries,
+      executionBackend,
+      signal,
+    );
     materialLibraries = materialPreflight.materialLibraries.map((entry) => ({
       path: entry.path,
       sourceByteLength: entry.sourceByteLength,
@@ -1359,72 +1369,71 @@ async function parseObjImport(
   }
 
   const resourcePaths = resolver.canonicalResourcePaths();
-  const fallbackInputBytes = safeAddCount(
+  const directInputBytes = safeAddCount(
     bytes.byteLength,
     totalMaterialBytes,
     "material-budget-exceeded",
   );
-  const fallbackRequest: StudioBg3dObjWorkerParseRequest | null =
-    fallbackInputBytes <= STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
-      ? {
-          version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
-          kind: "parse",
-          requestId: 1,
-          generationId: 1,
-          primaryPath: item.primaryPath,
-          sourceByteLength: bytes.byteLength,
-          bytes: bytes.slice(0),
-          materialLibraries: materialLibraries.map((entry) => ({
-            path: entry.path,
-            sourceByteLength: entry.sourceByteLength,
-            bytes: entry.bytes.slice(0),
-          })),
-          resourcePaths,
-          budgets: STUDIO_BG3D_OBJ_WORKER_BUDGETS,
-        }
-      : null;
 
   let result: StudioBg3dObjWorkerCanonicalResult;
   let root: THREE.Object3D | null = null;
   try {
-    try {
-      result = await parseStudioBg3dObjInWorker({
-        primaryPath: item.primaryPath,
-        bytes,
-        materialLibraries,
-        resourcePaths,
-      }, { signal });
-    } catch (error) {
-      if (!(error instanceof StudioBg3dObjWorkerClientError)) throw error;
-      if (fallbackRequest && error.code === "worker-unavailable") {
-        const {
-          StudioBg3dObjWorkerRuntimeError,
-          parseStudioBg3dObjWorkerRequest,
-        } = await import( "./studio-bg3d-obj-worker-runtime"
-        );
-        let fallbackResult: StudioBg3dObjWorkerCanonicalResult;
-        try {
-          fallbackResult = await parseStudioBg3dObjWorkerRequest(fallbackRequest);
-        } catch (fallbackError) {
-          if (fallbackError instanceof StudioBg3dObjWorkerRuntimeError) {
-            throw mapObjWorkerFailure(fallbackError.code);
-          }
-          throw fallbackError;
-        }
-        const response = {
-          version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
-          kind: "result" as const,
-          requestId: fallbackRequest.requestId,
-          generationId: fallbackRequest.generationId,
-          result: fallbackResult,
-        };
-        if (!isStudioBg3dObjWorkerResponseForRequest(response, fallbackRequest)) {
-          throw importError("parse-failed");
-        }
-        result = response.result;
-      } else {
+    if (executionBackend === "worker") {
+      try {
+        result = await parseStudioBg3dObjInWorker({
+          primaryPath: item.primaryPath,
+          bytes,
+          materialLibraries,
+          resourcePaths,
+        }, { signal });
+      } catch (error) {
+        if (!(error instanceof StudioBg3dObjWorkerClientError)) throw error;
         throw mapObjWorkerFailure(error.code);
       }
+    } else {
+      if (directInputBytes > STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES) {
+        throw importError("worker-required");
+      }
+      const directRequest: StudioBg3dObjWorkerParseRequest = {
+        version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
+        kind: "parse",
+        requestId: 1,
+        generationId: 1,
+        primaryPath: item.primaryPath,
+        sourceByteLength: bytes.byteLength,
+        bytes: bytes.slice(0),
+        materialLibraries: materialLibraries.map((entry) => ({
+          path: entry.path,
+          sourceByteLength: entry.sourceByteLength,
+          bytes: entry.bytes.slice(0),
+        })),
+        resourcePaths,
+        budgets: STUDIO_BG3D_OBJ_WORKER_BUDGETS,
+      };
+      const {
+        StudioBg3dObjWorkerRuntimeError,
+        parseStudioBg3dObjWorkerRequest,
+      } = await import("./studio-bg3d-obj-worker-runtime");
+      let directResult: StudioBg3dObjWorkerCanonicalResult;
+      try {
+        directResult = await parseStudioBg3dObjWorkerRequest(directRequest);
+      } catch (error) {
+        if (error instanceof StudioBg3dObjWorkerRuntimeError) {
+          throw mapObjWorkerFailure(error.code);
+        }
+        throw error;
+      }
+      const response = {
+        version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
+        kind: "result" as const,
+        requestId: directRequest.requestId,
+        generationId: directRequest.generationId,
+        result: directResult,
+      };
+      if (!isStudioBg3dObjWorkerResponseForRequest(response, directRequest)) {
+        throw importError("parse-failed");
+      }
+      result = response.result;
     }
     throwIfAborted(signal);
     for (const path of result.usedResourcePaths) resolver.fileForCanonicalPath(path);
@@ -1661,48 +1670,50 @@ async function parsedImportFromCanonicalGeometry(
   }
 }
 
-async function parseWorkerGeometryImport(
+async function parseGeometryImport(
   item: StudioBg3dImportPlanItem & { readonly format: "ply" | "stl" },
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
   const bytes = await readBytes(item.primary, signal);
-  const fallbackBytes = bytes.byteLength <= STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES
-    ? bytes.slice(0)
-    : null;
+  if (executionBackend === "direct") {
+    if (bytes.byteLength > STUDIO_BG3D_IMPORT_DIRECT_MAX_BYTES) {
+      throw importError("worker-required");
+    }
+    return item.format === "stl"
+      ? parseStlOnMainThread(item, bytes, signal)
+      : parsePlyOnMainThread(item, bytes, signal);
+  }
   try {
     const payload = await parseStudioBg3dGeometryInWorker(item.format, bytes, { signal });
     throwIfAborted(signal);
     return parsedImportFromCanonicalGeometry(item, payload, signal);
   } catch (error) {
     if (!(error instanceof StudioBg3dGeometryWorkerClientError)) throw error;
-    if (
-      fallbackBytes
-      && (error.code === "worker-unavailable" || error.code === "worker-failed")
-    ) {
-      return item.format === "stl"
-        ? parseStlOnMainThread(item, fallbackBytes, signal)
-        : parsePlyOnMainThread(item, fallbackBytes, signal);
-    }
     throw mapGeometryWorkerFailure(error);
   }
 }
 
 async function parseStlImport(
   item: StudioBg3dImportPlanItem,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  return parseWorkerGeometryImport(
+  return parseGeometryImport(
     item as StudioBg3dImportPlanItem & { readonly format: "stl" },
+    executionBackend,
     signal,
   );
 }
 
 async function parsePlyImport(
   item: StudioBg3dImportPlanItem,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  return parseWorkerGeometryImport(
+  return parseGeometryImport(
     item as StudioBg3dImportPlanItem & { readonly format: "ply" },
+    executionBackend,
     signal,
   );
 }
@@ -1733,6 +1744,7 @@ async function parse3dsImport(
 async function parsePlanItem(
   item: StudioBg3dImportPlanItem,
   resolver: LocalResourceResolver,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal?: AbortSignal,
   companionDecodedImageBytes = 0,
 ): Promise<ParsedImport> {
@@ -1740,15 +1752,15 @@ async function parsePlanItem(
     case "gltf":
       return parseGltfImport(item, resolver, signal, companionDecodedImageBytes);
     case "obj":
-      return parseObjImport(item, resolver, signal);
+      return parseObjImport(item, resolver, executionBackend, signal);
     case "fbx":
       return parseFbxImport(item, resolver, signal);
     case "dae":
       return parseDaeImport(item, resolver, signal);
     case "stl":
-      return parseStlImport(item, signal);
+      return parseStlImport(item, executionBackend, signal);
     case "ply":
-      return parsePlyImport(item, signal);
+      return parsePlyImport(item, executionBackend, signal);
     case "3ds":
       return parse3dsImport(item, resolver, signal);
     case "glb":
@@ -2882,6 +2894,7 @@ async function exportParsedImportToGlb(
 async function convertPlanItem(
   item: StudioBg3dImportPlanItem,
   resources: ReadonlyMap<string, StudioBg3dImportFile>,
+  executionBackend: StudioBg3dModelImportExecutionBackend,
   signal: AbortSignal | undefined,
   companionDecodedImageBytes: number,
   preExportBudget: StudioBg3dGlbValidationBudget | undefined,
@@ -2892,7 +2905,13 @@ async function convertPlanItem(
   const resolver = new LocalResourceResolver(resources, item.primaryPath);
   let parsed: ParsedImport | null = null;
   try {
-    parsed = await parsePlanItem(item, resolver, signal, companionDecodedImageBytes);
+    parsed = await parsePlanItem(
+      item,
+      resolver,
+      executionBackend,
+      signal,
+      companionDecodedImageBytes,
+    );
     throwIfAborted(signal);
     assertStudioBg3dPreExportBudgets(parsed, signal, preExportBudget);
     throwIfAborted(signal);
@@ -2921,6 +2940,10 @@ export async function convertStudioBg3dModelFilesToGlb(
   options: StudioBg3dModelImportOptions = {},
 ): Promise<readonly Bg3dModelUploadSource[]> {
   throwIfAborted(options.signal);
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("studio-bg3d-model-import:invalid-execution-backend");
+  }
   const preExportBudget = resolvePreExportBudget(options);
   const plan = planStudioBg3dModelImports(input);
   options.onProgress?.({
@@ -2958,6 +2981,7 @@ export async function convertStudioBg3dModelFilesToGlb(
     const result = await convertPlanItem(
       item,
       plan.resources,
+      executionBackend,
       options.signal,
       companionDecodedImageBytes,
       preExportBudget,

@@ -167,84 +167,76 @@ export function allocateMemory64CrossRealmWorkerLease(
 
   const port = options.allocationPort ?? defaultAllocationPort(options.webAssembly);
   const attempts: Memory64CrossRealmWorkerAllocationAttempt[] = [];
-  const candidates: Memory64CrossRealmRuntime[] = token.preferredRuntime === "memory64"
-    ? [
-        "memory64",
-        ...(token.memory32FallbackAllowed
-          ? ["memory32-fallback" as const]
-          : []),
-      ]
-    : ["memory32-fallback"];
-
-  for (const candidate of candidates) {
-    const addressType = runtimeAddress(candidate);
-    const maximumPages = addressType === "i32"
-      ? (authorizedPages < WASM32_MAX_PAGES ? authorizedPages : WASM32_MAX_PAGES)
-      : authorizedPages;
-    if (maximumPages < minimumPages) continue;
-    for (const pages of shrinkingWindows(maximumPages, minimumPages)) {
-      try {
-        const runtime = port.allocate({ runtime: candidate, addressType, pages });
-        if (
-          runtime.addressType !== addressType
-          || runtime.currentPages !== pages
-          || runtime.currentByteLength !== pages * STUDIO_WASM_PAGE_BYTES
-        ) {
+  const candidate = token.selectedRuntime;
+  const addressType = runtimeAddress(candidate);
+  const maximumPages = addressType === "i32"
+    ? (authorizedPages < WASM32_MAX_PAGES ? authorizedPages : WASM32_MAX_PAGES)
+    : authorizedPages;
+  if (maximumPages < minimumPages) {
+    throw new RangeError("Selected Worker runtime cannot satisfy the minimum reservation");
+  }
+  for (const pages of shrinkingWindows(maximumPages, minimumPages)) {
+    try {
+      const runtime = port.allocate({ runtime: candidate, addressType, pages });
+      if (
+        runtime.addressType !== addressType
+        || runtime.currentPages !== pages
+        || runtime.currentByteLength !== pages * STUDIO_WASM_PAGE_BYTES
+      ) {
+        try {
+          port.release?.(runtime);
+        } catch {
+          // A mismatched runtime is rejected even if its cleanup hook fails.
+        }
+        throw new Error("Worker allocation port returned a mismatched runtime");
+      }
+      attempts.push(Object.freeze({
+        runtime: candidate,
+        addressType,
+        pages,
+        status: "allocated",
+        issue: null,
+      }));
+      const acknowledgement = Object.freeze({
+        kind: "epoch16-memory64/cross-realm-allocation-ack" as const,
+        version: MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
+        reservationId: token.reservationId,
+        nonce: token.nonce,
+        runtime: candidate,
+        addressType,
+        residentBytes: runtime.currentByteLength.toString(),
+        residentPages: runtime.currentPages.toString(),
+      });
+      let released = false;
+      return Object.freeze({
+        token,
+        runtime,
+        acknowledgement,
+        attempts: Object.freeze(attempts.slice()),
+        authority: "scratch-only",
+        durablePersistenceAuthority: "opfs-cas-paging",
+        release: () => {
+          if (released) return false;
+          released = true;
           try {
             port.release?.(runtime);
           } catch {
-            // A mismatched runtime is rejected even if its cleanup hook fails.
+            // The local Worker reference is relinquished exactly once regardless.
           }
-          throw new Error("Worker allocation port returned a mismatched runtime");
-        }
-        attempts.push(Object.freeze({
-          runtime: candidate,
-          addressType,
-          pages,
-          status: "allocated",
-          issue: null,
-        }));
-        const acknowledgement = Object.freeze({
-          kind: "epoch16-memory64/cross-realm-allocation-ack" as const,
-          version: MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
-          reservationId: token.reservationId,
-          nonce: token.nonce,
-          runtime: candidate,
-          addressType,
-          residentBytes: runtime.currentByteLength.toString(),
-          residentPages: runtime.currentPages.toString(),
-        });
-        let released = false;
-        return Object.freeze({
-          token,
-          runtime,
-          acknowledgement,
-          attempts: Object.freeze(attempts.slice()),
-          authority: "scratch-only",
-          durablePersistenceAuthority: "opfs-cas-paging",
-          release: () => {
-            if (released) return false;
-            released = true;
-            try {
-              port.release?.(runtime);
-            } catch {
-              // The local Worker reference is relinquished exactly once regardless.
-            }
-            return true;
-          },
-        });
-      } catch (error) {
-        attempts.push(Object.freeze({
-          runtime: candidate,
-          addressType,
-          pages,
-          status: "failed",
-          issue: issue(error),
-        }));
-      }
+          return true;
+        },
+      });
+    } catch (error) {
+      attempts.push(Object.freeze({
+        runtime: candidate,
+        addressType,
+        pages,
+        status: "failed",
+        issue: issue(error),
+      }));
     }
   }
   throw new Error(
-    `Worker could not allocate an authorized Memory64-first window after ${attempts.length} attempts`,
+    `Worker could not allocate the selected ${candidate} window after ${attempts.length} attempts`,
   );
 }

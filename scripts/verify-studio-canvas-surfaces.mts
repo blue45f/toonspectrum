@@ -174,6 +174,9 @@ export interface CanvasElementEvidence {
 export interface CanvasInventoryEvidence {
   readonly capturedAt: string;
   readonly devicePixelRatio: number;
+  readonly velloAuthority: string | null;
+  readonly frameGraphDocument: string | null;
+  readonly velloCanvasCount: number;
   readonly canvasCount: number;
   readonly canvasViewport: CanvasRectEvidence;
   readonly totalBackingPixels: number;
@@ -181,6 +184,34 @@ export interface CanvasInventoryEvidence {
   readonly effectivelyHiddenNominalRgba8Bytes: number;
   readonly effectivelyVisibleNominalRgba8Bytes: number;
   readonly canvases: readonly CanvasElementEvidence[];
+}
+
+export interface StudioCanvasVelloSurfaceReadinessInput {
+  readonly authority: string | null;
+  readonly frameGraphDocument: string | null;
+  readonly velloCanvasCount: number;
+}
+
+/**
+ * Vello is a conditional document owner, not an always-mounted bootstrap surface. Empty and
+ * explicitly incompatible documents settle on the Konva shadow without creating a Vello canvas;
+ * an active exact-revision handoff must expose exactly one frame-graph canvas.
+ */
+export function isStudioCanvasVelloSurfaceReady(
+  input: StudioCanvasVelloSurfaceReadinessInput,
+): boolean {
+  if (input.frameGraphDocument === "vello-skia") {
+    return (input.authority === "active" || input.authority === "unavailable")
+      && input.velloCanvasCount === 1;
+  }
+  return input.frameGraphDocument === "konva-shadow"
+    && (
+      input.authority === "disabled"
+      || input.authority === "idle"
+      || input.authority === "legacy"
+      || input.authority === "unavailable"
+    )
+    && input.velloCanvasCount === 0;
 }
 
 interface ReclaimedSurfaceEvidence {
@@ -698,8 +729,11 @@ async function waitForStableHydratedEditor(page: Page): Promise<void> {
     state: "visible",
     timeout: 60_000,
   });
+  await page.locator("[data-studio-vello-hub-authority]").waitFor({
+    state: "attached",
+    timeout: 60_000,
+  });
   for (const selector of [
-    'canvas[data-studio-vello-hub-surface="frame-graph"]',
     'canvas[data-studio-live-dynamic-coverage="true"]',
     'canvas[data-studio-ink-mesh-live-preview="predicted-tail-only"]',
     'canvas[data-studio-canonical-vnext-dry-media="true"]',
@@ -708,6 +742,27 @@ async function waitForStableHydratedEditor(page: Page): Promise<void> {
   ]) {
     await page.locator(selector).waitFor({ state: "attached", timeout: 60_000 });
   }
+
+  await page.waitForFunction(() => {
+    const host = document.querySelector("[data-studio-vello-hub-authority]");
+    const authority = host?.getAttribute("data-studio-vello-hub-authority") ?? null;
+    const frameGraphDocument = host?.getAttribute("data-studio-frame-graph-document") ?? null;
+    const velloCanvasCount = document.querySelectorAll(
+      'canvas[data-studio-vello-hub-surface="frame-graph"]',
+    ).length;
+    if (frameGraphDocument === "vello-skia") {
+      return (authority === "active" || authority === "unavailable")
+        && velloCanvasCount === 1;
+    }
+    return frameGraphDocument === "konva-shadow"
+      && (
+        authority === "disabled"
+        || authority === "idle"
+        || authority === "legacy"
+        || authority === "unavailable"
+      )
+      && velloCanvasCount === 0;
+  }, undefined, { timeout: 60_000 });
 
   const quickStart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickStart.isVisible({ timeout: 500 }).catch(() => false)) {
@@ -745,6 +800,7 @@ async function captureCanvasInventory(page: Page): Promise<CanvasInventoryEviden
     });
     const viewport = document.querySelector("[data-studio-canvas-viewport]");
     const viewportRect = viewport?.getBoundingClientRect() ?? new DOMRect();
+    const velloHost = document.querySelector("[data-studio-vello-hub-authority]");
     const canvases = Array.from(document.querySelectorAll<HTMLCanvasElement>("canvas"));
     const evidence = canvases.map((canvas, index): CanvasElementEvidence => {
       const dataAttributes = attributes(canvas);
@@ -763,7 +819,6 @@ async function captureCanvasInventory(page: Page): Promise<CanvasInventoryEviden
         "data-studio-hokusai-live-overlay",
         "data-studio-canonical-vnext-dry-media",
         "data-studio-vello-hub-surface",
-        "data-studio-konva-document-shadow",
         "data-studio-brush-cursor-canvas",
       ].find((key) => key in dataAttributes)
         ?? Object.keys(dataAttributes).find((key) => key.startsWith("data-studio-"));
@@ -832,6 +887,13 @@ async function captureCanvasInventory(page: Page): Promise<CanvasInventoryEviden
     return {
       capturedAt: new Date().toISOString(),
       devicePixelRatio: globalThis.devicePixelRatio,
+      velloAuthority:
+        velloHost?.getAttribute("data-studio-vello-hub-authority") ?? null,
+      frameGraphDocument:
+        velloHost?.getAttribute("data-studio-frame-graph-document") ?? null,
+      velloCanvasCount: canvases.filter(
+        (canvas) => canvas.dataset.studioVelloHubSurface === "frame-graph",
+      ).length,
       canvasCount: evidence.length,
       canvasViewport: rectEvidence(viewportRect),
       totalBackingPixels: evidence.reduce((total, canvas) => total + canvas.backingPixels, 0),
@@ -876,9 +938,7 @@ function snapshotCanvasSurfaceInventory(
       })),
     canonicalDocumentBackingSizes: [...new Set(
       inventory.canvases
-        .filter(
-          (canvas) => canvas.dataAttributes["data-studio-konva-document-shadow"] === "false",
-        )
+        .filter((canvas) => canvas.insideKonvaContent && !isBrushCursor(canvas))
         .map((canvas) => `${canvas.backingWidth}x${canvas.backingHeight}`),
     )].sort(),
   };

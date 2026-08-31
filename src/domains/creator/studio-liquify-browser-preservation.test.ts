@@ -73,7 +73,7 @@ describe("bakeLiquifyStrokeToCanvas source preservation", () => {
       3,
       0.6,
       factory,
-      { mode: "bloat" },
+      { executionMode: "direct", mode: "bloat" },
     );
 
     expect(written).toBeInstanceOf(NativeImageDataStub);
@@ -152,7 +152,7 @@ describe("bakeLiquifyStrokeToCanvas source preservation", () => {
       10,
       0.8,
       factory,
-      { mode: "bloat" },
+      { executionMode: "direct", mode: "bloat" },
     );
 
     expect(output).not.toBeNull();

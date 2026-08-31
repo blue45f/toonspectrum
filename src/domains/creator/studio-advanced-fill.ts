@@ -9,7 +9,6 @@
 import { createStudioPersistentBinaryMaskScanner } from "./render/studio-wasm-connected-components-kernel";
 import {
   createStudioPersistentMaskMorphologyExecutor,
-  STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES,
   type StudioMaskMorphologyOperation,
 } from "./render/studio-wasm-mask-morphology-kernel";
 
@@ -18,13 +17,17 @@ export const ADVANCED_FILL_MAX_CLOSE_GAP_RADIUS = 32;
 export const ADVANCED_FILL_MAX_AREA_ADJUSTMENT = 64;
 
 /**
- * Kept for the lifetime of the Advanced Fill worker/module. Large diagnostic
- * scans use an actual Memory64 kernel instead of repeating another JS pixel
- * loop for both the matched and final masks.
+ * Kept for the lifetime of the Advanced Fill worker/module. The product Worker
+ * selects stable Wasm32 before accepting a request and never changes backend
+ * after an init/run failure.
  */
-const ADVANCED_FILL_MASK_SCANNER = createStudioPersistentBinaryMaskScanner();
+const ADVANCED_FILL_MASK_SCANNER = createStudioPersistentBinaryMaskScanner({
+  backend: "wasm32",
+});
 const ADVANCED_FILL_MORPHOLOGY =
-  createStudioPersistentMaskMorphologyExecutor();
+  createStudioPersistentMaskMorphologyExecutor({
+    backend: "wasm-memory32",
+  });
 
 export type AdvancedFillRgba = readonly [red: number, green: number, blue: number, alpha: number];
 
@@ -393,13 +396,7 @@ function runAcceleratedMorphologyPass(
   operation: StudioMaskMorphologyOperation,
   outsideIsOne: boolean,
   checkpoint: Checkpoint,
-): Uint8Array | null {
-  if (
-    input.byteLength
-    < STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES
-  ) {
-    return null;
-  }
+): Uint8Array {
   checkpoint(true);
   const result = ADVANCED_FILL_MORPHOLOGY.process(
     input,
@@ -408,7 +405,11 @@ function runAcceleratedMorphologyPass(
     operation,
   );
   checkpoint(true);
-  if (!result.ok) return null;
+  if (!result.ok) {
+    throw new Error(`Advanced Fill morphology backend failed: ${result.reason}`, {
+      cause: result.cause,
+    });
+  }
 
   // The 3×3 kernel ignores samples outside the canvas. That is equivalent to
   // zero-padding for dilation and one-padding for erosion. Explicit zero-padding
@@ -437,7 +438,7 @@ function dilateSquare(
 ): Uint8Array {
   if (radius === 0) return input.slice();
   if (radius === 1) {
-    const accelerated = runAcceleratedMorphologyPass(
+    return runAcceleratedMorphologyPass(
       input,
       width,
       height,
@@ -445,7 +446,6 @@ function dilateSquare(
       false,
       checkpoint,
     );
-    if (accelerated) return accelerated;
   }
   const horizontal = new Uint8Array(input.length);
   const output = new Uint8Array(input.length);
@@ -490,7 +490,7 @@ function erodeSquare(
 ): Uint8Array {
   if (radius === 0) return input.slice();
   if (radius === 1) {
-    const accelerated = runAcceleratedMorphologyPass(
+    return runAcceleratedMorphologyPass(
       input,
       width,
       height,
@@ -498,7 +498,6 @@ function erodeSquare(
       outsideIsOne,
       checkpoint,
     );
-    if (accelerated) return accelerated;
   }
   const horizontal = new Uint8Array(input.length);
   const output = new Uint8Array(input.length);
@@ -569,60 +568,33 @@ function selectionSummary(
     height,
   });
   checkpoint?.(true);
-  if (accelerated.ok) {
-    const pixelCount = Number(accelerated.scan.foregroundPixelCount);
-    const bounds = accelerated.scan.bounds;
-    return {
-      pixelCount,
-      areaRatio: pixelCount / (width * height),
-      touchesCanvasEdge: Boolean(
-        bounds
-        && (
-          bounds.minX === 0
-          || bounds.minY === 0
-          || bounds.maxXExclusive === width
-          || bounds.maxYExclusive === height
-        )
-      ),
-      bounds: bounds
-        ? {
-            x: bounds.minX,
-            y: bounds.minY,
-            width: bounds.width,
-            height: bounds.height,
-          }
-        : null,
-    };
+  if (!accelerated.ok) {
+    throw new Error(`Advanced Fill component-scan backend failed: ${accelerated.reason}`, {
+      cause: "cause" in accelerated ? accelerated.cause : undefined,
+    });
   }
-
-  let pixelCount = 0;
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-  let touchesCanvasEdge = false;
-
-  for (let position = 0; position < mask.length; position++) {
-    checkpoint?.();
-    if (!mask[position]) continue;
-    pixelCount++;
-    const x = position % width;
-    const y = (position / width) | 0;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-    if (x === 0 || x === width - 1 || y === 0 || y === height - 1) touchesCanvasEdge = true;
-  }
-
+  const pixelCount = Number(accelerated.scan.foregroundPixelCount);
+  const bounds = accelerated.scan.bounds;
   return {
     pixelCount,
     areaRatio: pixelCount / (width * height),
-    touchesCanvasEdge,
-    bounds:
-      pixelCount === 0
-        ? null
-        : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 },
+    touchesCanvasEdge: Boolean(
+      bounds
+      && (
+        bounds.minX === 0
+        || bounds.minY === 0
+        || bounds.maxXExclusive === width
+        || bounds.maxYExclusive === height
+      )
+    ),
+    bounds: bounds
+      ? {
+          x: bounds.minX,
+          y: bounds.minY,
+          width: bounds.width,
+          height: bounds.height,
+        }
+      : null,
   };
 }
 

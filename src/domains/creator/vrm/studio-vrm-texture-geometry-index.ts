@@ -15,6 +15,7 @@ import {
   StudioVrmTextureGeometryWorkerClientError,
   buildStudioVrmTextureGeometryTopologyInWorker,
   type StudioVrmTextureGeometryFloatSource,
+  type StudioVrmTextureGeometryExecutionBackend,
   type StudioVrmTextureGeometryIndexSource,
   type StudioVrmTextureGeometryWorkerBuildOptions,
   type StudioVrmTextureGeometryWorkerFactory,
@@ -71,8 +72,9 @@ export interface StudioVrmTextureGeometryPrecomputeOptions
   extends StudioVrmTextureGeometryIndexOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  /** Selected once before precomputation. Omission selects the product Worker. */
+  readonly executionBackend?: StudioVrmTextureGeometryExecutionBackend;
   readonly workerFactory?: StudioVrmTextureGeometryWorkerFactory | null;
-  readonly allowSynchronousFallback?: boolean;
 }
 
 export type StudioVrmTextureGeometryPrecomputeErrorCode =
@@ -881,8 +883,8 @@ export async function precomputeStudioVrmTextureGeometryIndex(
   const workerOptions: StudioVrmTextureGeometryWorkerBuildOptions = {
     signal: options.signal,
     timeoutMs: options.timeoutMs,
+    executionBackend: options.executionBackend,
     workerFactory: options.workerFactory,
-    allowSynchronousFallback: options.allowSynchronousFallback,
   };
   const result = await buildStudioVrmTextureGeometryTopologyInWorker(input, workerOptions);
   throwIfPrecomputeAborted(options.signal);

@@ -37,18 +37,20 @@ describe("StudioPage smart-shape selected-brush entry boundary", () => {
     expect(stop).toContain("quickShapeBrushEffectSourceRef.current = null");
   });
 
-  it("captures the complete freehand immediately before live conversion removes brush channels", () => {
+  it("rejects unavailable selected effects before live conversion can remove brush channels", () => {
     const tick = functionSlice("runQuickShapeTick", "handleBubbleShapePointerDown");
 
     expectOrder(tick, [
       "if (!quickShapeConvertedRef.current)",
       "if (!match) return",
+      "resolveStudioSmartShapeBrushEffectAvailability(current).status === \"unavailable\"",
       "quickShapeBrushEffectSourceRef.current = structuredClone(current)",
       "let next: DrawEl = {",
       "brush: undefined",
       "pressures: undefined",
       "drawingRef.current = next",
     ]);
+    expect(tick.match(/resolveStudioSmartShapeBrushEffectAvailability\(current\)/gu)).toHaveLength(1);
     expect(tick.match(/quickShapeBrushEffectSourceRef\.current = structuredClone\(current\)/gu)).toHaveLength(1);
   });
 

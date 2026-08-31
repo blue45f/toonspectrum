@@ -22,7 +22,7 @@ import {
   type StudioIsometricPrimitiveInput,
 } from "./studio-isometric-solid";
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
 } from "./studio-project-archive";
 import {
@@ -54,6 +54,16 @@ import type {
 } from "./live/studio-crdt-document";
 import type { StudioAsset } from "./studio-asset-library";
 import type { DrawEl, El, ImageEl } from "./studio-element-model";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 const SAVED_AT = "2026-07-20T00:00:00.000Z";
 

@@ -8,7 +8,7 @@ import type { StudioColorRangeWorkerRunRequest } from "./studio-color-range-work
 import type { PixelSelection } from "./studio-selection-tools";
 
 /**
- * Single semantic source for direct fallback and module Worker execution.
+ * Single semantic source for explicitly selected direct and module Worker execution.
  *
  * The complete expensive path lives here: RGB range scan, display-axis flip, intersect
  * point-in-selection filtering, connected-component labelling, and contour extraction.

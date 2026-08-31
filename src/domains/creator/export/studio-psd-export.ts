@@ -845,7 +845,9 @@ function cropToPanel(
   cropped.width = w;
   cropped.height = h;
   const ctx = cropped.getContext("2d");
-  if (!ctx) return { canvas, dx: 0, dy: 0 };
+  if (!ctx) {
+    throw new Error("PSD 패널 크롭 표면을 만들지 못해 내보내기를 중단했어요.");
+  }
   ctx.drawImage(canvas, x0, y0, w, h, 0, 0, w, h);
   return { canvas: cropped, dx: x0, dy: y0 };
 }
@@ -872,18 +874,19 @@ function makeBackgroundLayer(width: number, height: number, background: { color:
   canvas.width = Math.max(1, Math.round(width));
   canvas.height = Math.max(1, Math.round(height));
   const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const grad = background.gradient;
-    if (grad && grad.length >= 2) {
-      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, grad[0]);
-      gradient.addColorStop(1, grad[grad.length - 1]);
-      ctx.fillStyle = gradient;
-    } else {
-      ctx.fillStyle = background.color;
-    }
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!ctx) {
+    throw new Error("PSD 배경 레이어 표면을 만들지 못해 내보내기를 중단했어요.");
   }
+  const grad = background.gradient;
+  if (grad && grad.length >= 2) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, grad[0]);
+    gradient.addColorStop(1, grad[grad.length - 1]);
+    ctx.fillStyle = gradient;
+  } else {
+    ctx.fillStyle = background.color;
+  }
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   return { name: "배경", left: 0, top: 0, canvas };
 }
 

@@ -91,13 +91,13 @@ function passingEvidence(): StudioVelloPromotionEvidence {
       postDisposeRetainedBytes: limits.maximumPostDisposeRetainedBytes,
       unboundedGrowthDetected: false,
     },
-    fallbackDeterminism: {
+    legacyCompatibility: {
       ...PASSING_EVIDENCE_IDENTITY,
       probe: "passed",
-      fallbackKind: "canonical-canvas2d-svg",
-      replayTrials: limits.minimumFallbackReplayTrials,
+      compatibilityKind: "legacy-canvas2d-svg",
+      replayTrials: limits.minimumCompatibilityReplayTrials,
       uniqueReplayHashes: 1,
-      fallbackSelectionDeterministic: true,
+      compatibilitySelectionDeclaredBeforeExecution: true,
       canvas2dHashMatchesCanonical: true,
       svgExportHashStable: true,
       canonicalReceiptVerified: true,
@@ -190,11 +190,11 @@ const HARD_GATE_FAILURES: readonly Readonly<{
     }),
   },
   {
-    id: "deterministic-canonical-fallback",
+    id: "deterministic-legacy-compatibility-boundary",
     fail: (evidence) => ({
       ...evidence,
-      fallbackDeterminism: {
-        ...evidence.fallbackDeterminism,
+      legacyCompatibility: {
+        ...evidence.legacyCompatibility,
         uniqueReplayHashes: 2,
       },
     }),
@@ -213,7 +213,7 @@ const HARD_GATE_FAILURES: readonly Readonly<{
 describe("studio Vello candidate promotion contract", () => {
   it("records the existing research provenance, potential advantages, and explicit risks", () => {
     expect(STUDIO_VELLO_CANDIDATE_CONTRACT_VERSION)
-      .toBe("studio-vello-candidate-promotion-v1");
+      .toBe("studio-vello-candidate-promotion-v2");
     expect(STUDIO_VELLO_CANDIDATE_PROVENANCE).toMatchObject({
       candidateId: "vello",
       packageName: "vello",
@@ -260,7 +260,7 @@ describe("studio Vello candidate promotion contract", () => {
       "canvas-svg-canonical-visual-parity",
       "long-stroke-latency",
       "bounded-memory",
-      "deterministic-canonical-fallback",
+      "deterministic-legacy-compatibility-boundary",
       "required-browser-support",
     ]);
     expect(STUDIO_VELLO_PROMOTION_GATES.every(({ hard }) => hard)).toBe(true);
@@ -295,7 +295,7 @@ describe("studio Vello candidate promotion contract", () => {
       visualParity: { probe: "not-run" },
       longStrokeLatency: { probe: "not-run" },
       memory: { probe: "not-run" },
-      fallbackDeterminism: { probe: "not-run" },
+      legacyCompatibility: { probe: "not-run" },
     });
     expect(STUDIO_VELLO_CURRENT_RESEARCH_EVIDENCE.upstreamMaturity
       .productionBlockers).toEqual([
@@ -524,8 +524,8 @@ describe("studio Vello candidate promotion contract", () => {
         ...evidence.memory,
         buildFingerprint: "unavailable:not-installed",
       },
-      fallbackDeterminism: {
-        ...evidence.fallbackDeterminism,
+      legacyCompatibility: {
+        ...evidence.legacyCompatibility,
         buildFingerprint: "unavailable:not-installed",
       },
       browsers: evidence.browsers.map((browser) => ({

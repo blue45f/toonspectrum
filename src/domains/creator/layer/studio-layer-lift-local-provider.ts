@@ -49,7 +49,7 @@ export interface StudioLayerLiftLocalForegroundModelIdentity {
   /** Examples: `selfie-segmenter`, a registered ONNX model ID. */
   readonly modelId: string;
   readonly modelVersion: string;
-  /** Stable execution route such as `gpu-cpu-fallback` or `webgpu-wasm-fallback`. */
+  /** Stable preselected execution route such as `gpu`, `cpu-explicit`, or `webgpu`. */
   readonly executionRoute: string;
 }
 

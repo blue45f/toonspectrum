@@ -27,11 +27,11 @@ interface IncrementalArtifact {
   workload: { points: number; measuredStrokes: number; channels: string[] };
   candidates: {
     upstreamInProgressStroke: CandidateEvidence;
-    retainedSingleShotFallback: CandidateEvidence;
+    retainedSingleShotReference: CandidateEvidence;
   };
   evidence: {
     finalMeshByteExactAcrossAllMeasuredRuns: boolean;
-    upstreamWasmToJsPayloadReductionVsFallback: number;
+    upstreamWasmToJsPayloadReductionVsSingleShotReference: number;
     gpuReadbackCount: number;
   };
 }
@@ -45,7 +45,7 @@ const artifact = JSON.parse(
 
 describe("Google Ink incremental mesh committed evidence", () => {
   it("pins real upstream WASM, all pen channels, and exact final mesh parity", () => {
-    expect(artifact.schema).toBe("toon-ink-mesh-incremental-benchmark-v1");
+    expect(artifact.schema).toBe("toon-ink-mesh-incremental-benchmark-v2");
     expect(artifact.runtime.execution).toBe(
       "real committed Emscripten WASM in Node; no mock",
     );
@@ -65,32 +65,34 @@ describe("Google Ink incremental mesh committed evidence", () => {
     ]);
 
     const incremental = artifact.candidates.upstreamInProgressStroke;
-    const fallback = artifact.candidates.retainedSingleShotFallback;
+    const reference = artifact.candidates.retainedSingleShotReference;
     expect(artifact.evidence.finalMeshByteExactAcrossAllMeasuredRuns).toBe(true);
     expect(incremental.exactFinalParityRuns).toBe(40);
-    expect(fallback.exactFinalParityRuns).toBe(40);
-    expect(incremental.finalMesh).toEqual(fallback.finalMesh);
-    expect(incremental.deltaSha256).toBe(fallback.deltaSha256);
+    expect(reference.exactFinalParityRuns).toBe(40);
+    expect(incremental.finalMesh).toEqual(reference.finalMesh);
+    expect(incremental.deltaSha256).toBe(reference.deltaSha256);
     expect(incremental.finalMesh.sha256).toMatch(/^[a-f0-9]{64}$/u);
   });
 
   it("keeps the measured incremental path faster, smaller, bounded, and readback-free", () => {
     const incremental = artifact.candidates.upstreamInProgressStroke;
-    const fallback = artifact.candidates.retainedSingleShotFallback;
-    expect(incremental.updateLatencyMs.p95).toBeLessThan(fallback.updateLatencyMs.p95);
-    expect(incremental.strokeLatencyMs.p95).toBeLessThan(fallback.strokeLatencyMs.p95);
+    const reference = artifact.candidates.retainedSingleShotReference;
+    expect(incremental.updateLatencyMs.p95).toBeLessThan(reference.updateLatencyMs.p95);
+    expect(incremental.strokeLatencyMs.p95).toBeLessThan(reference.strokeLatencyMs.p95);
     expect(incremental.metricsPerStroke.wasmToJsPayloadBytes).toBeLessThan(
-      fallback.metricsPerStroke.wasmToJsPayloadBytes,
+      reference.metricsPerStroke.wasmToJsPayloadBytes,
     );
-    expect(artifact.evidence.upstreamWasmToJsPayloadReductionVsFallback).toBeGreaterThan(0.85);
+    expect(
+      artifact.evidence.upstreamWasmToJsPayloadReductionVsSingleShotReference,
+    ).toBeGreaterThan(0.85);
     expect(incremental.metricsPerStroke.inputCount).toBe(artifact.workload.points);
     expect(incremental.metricsPerStroke.deltaPayloadBytes).toBe(
-      fallback.metricsPerStroke.deltaPayloadBytes,
+      reference.metricsPerStroke.deltaPayloadBytes,
     );
     expect(incremental.metricsPerStroke.peakTrackedVectorBytes).toBeGreaterThan(0);
     expect(incremental.metricsPerStroke.peakWasmHeapBytes).toBeGreaterThan(0);
     expect(incremental.metricsPerStroke.gpuReadbackCount).toBe(0);
-    expect(fallback.metricsPerStroke.gpuReadbackCount).toBe(0);
+    expect(reference.metricsPerStroke.gpuReadbackCount).toBe(0);
     expect(artifact.evidence.gpuReadbackCount).toBe(0);
   });
 });

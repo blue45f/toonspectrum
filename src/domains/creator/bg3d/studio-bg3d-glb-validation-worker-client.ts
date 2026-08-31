@@ -11,24 +11,28 @@ import {
 
 export const STUDIO_BG3D_GLB_WORKER_TIMEOUT_MS = 90_000;
 
-/**
- * Synchronous validation above this ceiling is deliberately unavailable. Eight MiB keeps the
- * compatibility path useful for small files without allowing a missing Worker to move a large
- * digest/container/texture preflight onto the render thread.
- */
-export const STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES = 8 * 1024 * 1024;
+/** Explicit direct validation stays bounded so callers cannot select render-thread work for a large model. */
+export const STUDIO_BG3D_GLB_DIRECT_MAX_BYTES = 8 * 1024 * 1024;
 
-/** Whether this byte payload must have a functioning validation Worker. */
-export function studioBg3dGlbRequiresValidationWorker(
+/** Whether this byte payload is eligible for the separately selected direct backend. */
+export function studioBg3dGlbSupportsDirectValidation(
   input: ArrayBuffer | Uint8Array,
 ): boolean {
-  return input.byteLength > STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES;
+  return input.byteLength <= STUDIO_BG3D_GLB_DIRECT_MAX_BYTES;
 }
 
-export type StudioBg3dGlbValidationExecution = "worker" | "main-thread";
+export type StudioBg3dGlbValidationExecutionBackend = "worker" | "direct";
+
+export interface StudioBg3dGlbValidationRunOptions {
+  /** Selected exactly once before validation starts. Omission selects the product Worker. */
+  readonly executionBackend?: StudioBg3dGlbValidationExecutionBackend;
+  readonly signal?: AbortSignal;
+}
 
 export interface StudioBg3dGlbWorkerValidationOutcome {
-  readonly execution: StudioBg3dGlbValidationExecution;
+  readonly execution: StudioBg3dGlbValidationExecutionBackend;
+  readonly selectedExecutionBackend: StudioBg3dGlbValidationExecutionBackend;
+  readonly attemptedExecutionBackends: readonly [StudioBg3dGlbValidationExecutionBackend];
   readonly result: StudioBg3dGlbValidationResult;
 }
 
@@ -81,17 +85,42 @@ type StudioBg3dWorkerTerminationReason =
   | "timeout";
 
 export class StudioBg3dValidationWorkerError extends Error {
-  constructor(readonly code:
-    | "aborted"
-    | "basis-worker-attestation-required"
-    | "disposed"
-    | "protocol"
-    | "timeout"
-    | "worker-failed"
+  readonly selectedExecutionBackend: StudioBg3dGlbValidationExecutionBackend;
+  readonly attemptedExecutionBackends: readonly [StudioBg3dGlbValidationExecutionBackend];
+
+  constructor(
+    readonly code:
+      | "aborted"
+      | "basis-worker-attestation-required"
+      | "direct-input-too-large"
+      | "direct-option-required"
+      | "disposed"
+      | "protocol"
+      | "timeout"
+      | "worker-failed",
+    executionBackend: StudioBg3dGlbValidationExecutionBackend = "worker",
   ) {
     super(`studio-bg3d-validation-worker:${code}`);
     this.name = "StudioBg3dValidationWorkerError";
+    this.selectedExecutionBackend = executionBackend;
+    this.attemptedExecutionBackends = Object.freeze([
+      executionBackend,
+    ]) as readonly [StudioBg3dGlbValidationExecutionBackend];
   }
+}
+
+function validationOutcome(
+  executionBackend: StudioBg3dGlbValidationExecutionBackend,
+  result: StudioBg3dGlbValidationResult,
+): StudioBg3dGlbWorkerValidationOutcome {
+  return Object.freeze({
+    execution: executionBackend,
+    selectedExecutionBackend: executionBackend,
+    attemptedExecutionBackends: Object.freeze([
+      executionBackend,
+    ]) as readonly [StudioBg3dGlbValidationExecutionBackend],
+    result,
+  });
 }
 
 function copyToOwnedBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
@@ -263,7 +292,7 @@ export class StudioBg3dValidationWorkerClient {
       this.#discardWorker(error, "failure");
       return;
     }
-    pending.resolve({ execution: "worker", result: response.result });
+    pending.resolve(validationOutcome("worker", response.result));
   };
 
   readonly #handleWorkerFailure = (event: WorkerErrorEventLike): void => {
@@ -367,49 +396,28 @@ function maximumBrowserValidationWorkers(): number {
   return 2;
 }
 
-function canUseBrowserWorker(options: StudioBg3dGlbValidationOptions): boolean {
-  // A same-realm runtime attestation is deliberately not structured-cloneable proof.
-  return options.digest === undefined &&
-    options.basisPayloadPreflight === undefined &&
-    options.basisRuntimeProvider === undefined &&
-    options.basisTranscoderCapability === undefined &&
-    typeof Worker === "function";
+function abortedValidationError(
+  executionBackend: StudioBg3dGlbValidationExecutionBackend = "worker",
+): StudioBg3dValidationWorkerError {
+  return new StudioBg3dValidationWorkerError("aborted", executionBackend);
 }
 
-function abortedValidationError(): StudioBg3dValidationWorkerError {
-  return new StudioBg3dValidationWorkerError("aborted");
-}
-
-function unavailableValidationWorkerError(): StudioBg3dValidationWorkerError {
-  // Keep the established public worker error contract while making the large-job branch explicit.
-  return new StudioBg3dValidationWorkerError("worker-failed");
-}
-
-function validateStudioBg3dGlbWithBoundedMainThreadFallback(
+async function validateStudioBg3dGlbDirect(
   input: ArrayBuffer | Uint8Array,
   options: StudioBg3dGlbValidationOptions,
   signal?: AbortSignal,
 ): Promise<StudioBg3dGlbWorkerValidationOutcome> {
-  if (signal?.aborted) return Promise.reject(abortedValidationError());
-  if (studioBg3dGlbRequiresValidationWorker(input)) {
-    return Promise.reject(unavailableValidationWorkerError());
+  if (signal?.aborted) throw abortedValidationError("direct");
+  if (!studioBg3dGlbSupportsDirectValidation(input)) {
+    throw new StudioBg3dValidationWorkerError("direct-input-too-large", "direct");
   }
-  return validateStudioBg3dGlbOnMainThread(input, options, signal);
-}
-
-async function validateStudioBg3dGlbOnMainThread(
-  input: ArrayBuffer | Uint8Array,
-  options: StudioBg3dGlbValidationOptions,
-  signal?: AbortSignal,
-): Promise<StudioBg3dGlbWorkerValidationOutcome> {
-  if (signal?.aborted) throw abortedValidationError();
   if (!signal) {
-    return { execution: "main-thread", result: await validateStudioBg3dGlb(input, options) };
+    return validationOutcome("direct", await validateStudioBg3dGlb(input, options));
   }
 
   let abortListener: (() => void) | undefined;
   const abortPromise = new Promise<never>((_resolve, reject) => {
-    abortListener = () => reject(abortedValidationError());
+    abortListener = () => reject(abortedValidationError("direct"));
     signal.addEventListener("abort", abortListener, { once: true });
     if (signal.aborted) abortListener();
   });
@@ -418,23 +426,31 @@ async function validateStudioBg3dGlbOnMainThread(
       validateStudioBg3dGlb(input, options),
       abortPromise,
     ]);
-    if (signal.aborted) throw abortedValidationError();
-    return { execution: "main-thread", result };
+    if (signal.aborted) throw abortedValidationError("direct");
+    return validationOutcome("direct", result);
   } finally {
     if (abortListener) signal.removeEventListener("abort", abortListener);
   }
 }
 
 /**
- * Runs the engine-neutral GLB trust boundary outside the render/UI thread when workers are
- * available. Injected digest adapters deliberately stay in-process so deterministic tests and
- * restricted runtimes preserve their exact semantics.
+ * Selects the engine-neutral GLB trust-boundary backend once, before execution. The product default
+ * is the module Worker. Worker absence, construction, post, protocol, timeout, or runtime failure is
+ * terminal for that request; the direct backend is available only through an explicit selection.
  */
 export async function validateStudioBg3dGlbOffMainThread(
   input: ArrayBuffer | Uint8Array,
   options: StudioBg3dGlbValidationOptions,
-  signal?: AbortSignal,
+  runOptions: StudioBg3dGlbValidationRunOptions = {},
 ): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+  const executionBackend = runOptions.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("studio-bg3d-validation:invalid-execution-backend");
+  }
+  if (executionBackend === "direct") {
+    return validateStudioBg3dGlbDirect(input, options, runOptions.signal);
+  }
+  if (runOptions.signal?.aborted) throw abortedValidationError();
   // Never move a potentially 100 MiB required-Basis validation job onto the UI thread merely to
   // preserve a main-realm capability. The dedicated Worker must fetch and attest its own runtime
   // before this path can be enabled.
@@ -445,8 +461,11 @@ export async function validateStudioBg3dGlbOffMainThread(
   ) {
     throw new StudioBg3dValidationWorkerError("basis-worker-attestation-required");
   }
-  if (!canUseBrowserWorker(options)) {
-    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
+  if (options.digest !== undefined) {
+    throw new StudioBg3dValidationWorkerError("direct-option-required");
+  }
+  if (typeof Worker !== "function") {
+    throw new StudioBg3dValidationWorkerError("worker-failed");
   }
   try {
     sharedPool ??= new StudioBg3dValidationWorkerPool({
@@ -454,11 +473,11 @@ export async function validateStudioBg3dGlbOffMainThread(
       maximumWorkers: maximumBrowserValidationWorkers(),
     });
   } catch {
-    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
+    throw new StudioBg3dValidationWorkerError("worker-failed");
   }
   const pool = sharedPool;
   try {
-    return await pool.validate(input, options, signal);
+    return await pool.validate(input, options, runOptions.signal);
   } catch (error) {
     const workerStarted = error instanceof StudioBg3dValidationWorkerError;
     if (
@@ -472,12 +491,12 @@ export async function validateStudioBg3dGlbOffMainThread(
     if (workerStarted) throw error;
 
     // Browser Worker construction can throw before the client establishes its typed lifecycle.
-    // Small inputs retain the compatibility path; large inputs fail closed with the existing code.
+    // It remains terminal for this request; a later request may create a new Worker realm.
     if (sharedPool === pool) {
       pool.dispose();
       sharedPool = null;
     }
-    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
+    throw new StudioBg3dValidationWorkerError("worker-failed");
   }
 }
 

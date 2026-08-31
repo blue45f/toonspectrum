@@ -69,9 +69,9 @@ describe("Living Ink product admission", () => {
     expect(replayCount).toBe(1);
   });
 
-  it("preserves the document for failed water, while ink retains its vector fallback", () => {
+  it("preserves the document for failed water and ink without provider substitution", () => {
     expect(studioLivingInkFailureDisposition("water")).toBe("preserve-document-noop");
-    expect(studioLivingInkFailureDisposition("ink")).toBe("save-vector-fallback");
+    expect(studioLivingInkFailureDisposition("ink")).toBe("preserve-document-noop");
   });
 
   it("uses one effective scope after the canonical image selection is released", () => {

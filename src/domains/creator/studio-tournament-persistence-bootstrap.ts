@@ -1,7 +1,6 @@
 import { isStudioLocalDatabaseOwnershipBusyError } from "./studio-local-database-ownership";
 import {
   getStudioTournamentRuntime,
-  peekStudioTournamentRuntime,
   type StudioRendererTournamentRuntime,
 } from "./studio-renderer-tournament-runtime";
 
@@ -88,13 +87,4 @@ const productBootstrap = createStudioTournamentPersistenceBootstrap({
 /** Starts the product SQLite/OPFS install after Studio has mounted. */
 export function bootStudioTournamentPersistence(): Promise<boolean> {
   return productBootstrap.boot();
-}
-
-/**
- * Non-creating view for pointer-down and other synchronous decisions. `null`
- * means the tournament is still pristine, so callers preserve their original
- * lane order without constructing a fallback-backed runtime.
- */
-export function peekBootedStudioTournamentRuntime(): StudioRendererTournamentRuntime | null {
-  return peekStudioTournamentRuntime();
 }

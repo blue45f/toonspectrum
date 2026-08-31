@@ -289,24 +289,6 @@ export class EngineCapabilityRegistry {
     );
   }
 
-  /**
-   * Resolves the declared fallback chain from a provider, stopping on cycles.
-   * The chain includes the starting provider first.
-   */
-  fallbackChain(id: string): string[] {
-    const chain: string[] = [];
-    const seen = new Set<string>();
-    let cursor: string | null = id;
-    while (cursor !== null && !seen.has(cursor)) {
-      const provider = this.providers.get(cursor);
-      if (!provider) break;
-      chain.push(cursor);
-      seen.add(cursor);
-      cursor = provider.descriptor.fallbackProviderId;
-    }
-    return chain;
-  }
-
   private registerAuthorized(
     descriptor: ProviderDescriptor,
     authority: ProviderRegistrationAuthority,

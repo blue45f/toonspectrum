@@ -60,6 +60,18 @@ describe("VRM V12 surface-paint product boundary", () => {
     expect(adapterSource).toContain("commitSurfaceBrushSession(this.session");
   });
 
+  it("fails closed without selecting a round-tip or alternate brush for the same operation", () => {
+    expect(toolSource).not.toContain('fallback: "round-tip"');
+    expect(toolSource).not.toContain('route: "round-tip-fallback"');
+    expect(toolSource).not.toContain("호환 라운드 브러시로 처리합니다");
+    expect(toolSource).toContain("automaticAlternateBrushSelectionAllowed: false");
+    expect(toolSource).toContain('sourceState: "preserved"');
+    expect(toolSource).toContain('lastCommit: "preserved"');
+    expect(toolSource).toContain('nextOperation: "select-provider-or-tool"');
+    expect(toolSource).toContain('status: "unavailable"');
+    expect(toolSource).toContain('status: "rejected"');
+  });
+
   it("preserves pressure and tilt IR while retaining seam-safe measured projection", () => {
     expect(toolSource).toContain("modelRawInput(");
     expect(toolSource).toContain("pressure: sample.pressure");

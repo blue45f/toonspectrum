@@ -25,6 +25,8 @@ const harness = vi.hoisted(() => {
     deferPresentation: false,
     deferDeviceCreation: false,
     failSurfaceCreates: 0,
+    failPresentations: 0,
+    snapshotDraws: 0,
     pendingDeviceResolvers: [] as Array<() => void>,
     createDevice() {
       return {
@@ -67,6 +69,8 @@ const harness = vi.hoisted(() => {
       this.deferPresentation = false;
       this.deferDeviceCreation = false;
       this.failSurfaceCreates = 0;
+      this.failPresentations = 0;
+      this.snapshotDraws = 0;
       this.pendingDeviceResolvers.length = 0;
       releasePresentation = null;
     },
@@ -97,7 +101,11 @@ vi.mock("./studio-canonical-vnext-dry-media-presentation-controller", () => ({
     async presentFinalLiveAndCommit(frame: unknown, signal?: AbortSignal) {
       await harness.waitForPresentation(signal);
       if (signal?.aborted) {
-        return { status: "retained-fallback" as const, reason: "cancelled" };
+        return { status: "unavailable" as const, reason: "cancelled" };
+      }
+      if (harness.failPresentations > 0) {
+        harness.failPresentations -= 1;
+        return { status: "unavailable" as const, reason: "runtime-rejected" };
       }
       return {
         status: "completed" as const,
@@ -194,8 +202,16 @@ beforeEach(() => {
     },
   });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-    ((contextId: string) =>
-      contextId === "webgpu" ? ({} as GPUCanvasContext) : null) as
+    ((contextId: string) => contextId === "webgpu"
+      ? ({} as GPUCanvasContext)
+      : contextId === "2d"
+        ? ({
+            clearRect: () => undefined,
+            drawImage: () => {
+              harness.snapshotDraws += 1;
+            },
+          } as unknown as CanvasRenderingContext2D)
+        : null) as
       typeof HTMLCanvasElement.prototype.getContext,
   );
 });
@@ -218,7 +234,9 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    const canvas = view.container.querySelector("canvas");
+    const canvas = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media='true']",
+    );
 
     expect(canvas?.style.visibility).toBe("hidden");
     await waitFor(() => expect(authorities.at(-1)).not.toBeNull());
@@ -226,18 +244,22 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     expect(authority).toMatchObject({
       element,
       layoutKey: baseProps.layoutKey,
+      status: "authorized",
       canonicalPlanHash: "canonical-plan-hash",
       dynamicPlanDigest: "sha256:dynamic-plan",
       sourceDabCount: 32,
       texturedDabCount: 160,
       laneCount: 5,
     });
-    expect(authority?.parityReceipt.live.texturedPlanFingerprint).toBe(
-      authority?.parityReceipt.commit.texturedPlanFingerprint,
+    expect(authority?.status).toBe("authorized");
+    if (authority?.status !== "authorized") throw new Error("authority missing");
+    expect(authority.parityReceipt.live.texturedPlanFingerprint).toBe(
+      authority.parityReceipt.commit.texturedPlanFingerprint,
     );
     expect(harness.createSurfaceCalls).toBe(1);
     expect(harness.createRuntimeCalls).toBe(1);
     expect(harness.configureCalls).toHaveLength(1);
+    expect(harness.snapshotDraws).toBe(1);
 
     view.rerender(
       <StudioCanonicalVNextDryMediaCanvas
@@ -249,7 +271,7 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     expect(canvas?.style.visibility).toBe("visible");
   });
 
-  it("revokes before resize work and never promotes a stale in-flight frame", async () => {
+  it("never promotes a stale in-flight frame after the candidate is released", async () => {
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const onAuthorityChange = (
       authority: StudioCanonicalVNextDryMediaCanvasAuthority | null,
@@ -268,7 +290,9 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    const canvas = view.container.querySelector("canvas");
+    const canvas = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media='true']",
+    );
     expect(canvas?.style.visibility).toBe("visible");
 
     harness.deferPresentation = true;
@@ -281,7 +305,10 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    expect(authorities.at(-1)).toBeNull();
+    expect(authorities.at(-1)).toMatchObject({
+      status: "authorized",
+      layoutKey: baseProps.layoutKey,
+    });
     expect(canvas?.style.visibility).toBe("hidden");
 
     view.rerender(
@@ -307,7 +334,7 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     });
   });
 
-  it("returns authority atomically and recreates resources after device loss", async () => {
+  it("keeps the last receipted WebGPU frame and never retries automatically after device loss", async () => {
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const onAuthorityChange = (
       authority: StudioCanonicalVNextDryMediaCanvasAuthority | null,
@@ -326,41 +353,80 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    const canvas = view.container.querySelector("canvas");
+    const canvas = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media='true']",
+    );
+    const snapshot = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
+    );
     expect(canvas?.style.visibility).toBe("visible");
-    const authorizationCount = authorities.filter(Boolean).length;
+    const authorizationCount = authorities.filter(
+      (authority) => authority?.status === "authorized",
+    ).length;
 
     harness.onDeviceLost?.({
       reason: "unknown",
       message: "simulated loss",
     } as GPUDeviceLostInfo);
-    expect(authorities.at(-1)).toBeNull();
-    /*
-     * The child keeps its final specialist frame until the parent applies authority=null. That
-     * parent commit restores retained Konva and hides this canvas atomically.
-     */
-    expect(canvas?.style.visibility).toBe("visible");
-    view.rerender(
-      <StudioCanonicalVNextDryMediaCanvas
-        {...baseProps}
-        visible={false}
-        onAuthorityChange={onAuthorityChange}
-      />,
-    );
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "unavailable",
+      reason: "device-lost",
+      retainsLastGoodFrame: true,
+      retryPolicy: "explicit-next-selection-only",
+    }));
     expect(canvas?.style.visibility).toBe("hidden");
-
-    await waitFor(() => {
-      expect(harness.createSurfaceCalls).toBe(2);
-      expect(authorities.filter(Boolean).length).toBeGreaterThan(
-        authorizationCount,
-      );
-    });
+    expect(snapshot?.style.visibility).toBe("visible");
+    expect(view.getByRole("alert").textContent).toContain(
+      "다른 렌더러로 자동 전환하지 않았습니다",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    expect(harness.createSurfaceCalls).toBe(1);
+    expect(authorities.filter(
+      (authority) => authority?.status === "authorized",
+    )).toHaveLength(authorizationCount);
     expect(harness.disposedSurfaces).toBe(1);
     expect(harness.disposedRuntimes).toBe(1);
     expect(harness.destroyedDevices).toBe(1);
   });
 
-  it("clears a failed initial create and retries the same element/layout with a budget", async () => {
+  it("ends a failed presentation epoch as unavailable without revealing another renderer", async () => {
+    const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
+    const view = render(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        visible
+        onAuthorityChange={(authority) => authorities.push(authority)}
+      />,
+    );
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "authorized",
+    }));
+    harness.failPresentations = 1;
+
+    view.rerender(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        layoutKey="page:layout:2"
+        onAuthorityChange={(authority) => authorities.push(authority)}
+        visible
+      />,
+    );
+
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "unavailable",
+      reason: "presentation:runtime-rejected",
+      retainsLastGoodFrame: true,
+    }));
+    expect(view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media='true']",
+    )?.style.visibility).toBe("hidden");
+    expect(view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
+    )?.style.visibility).toBe("visible");
+    expect(harness.createSurfaceCalls).toBe(1);
+  });
+
+  it("fails closed on initial create and retries only after an explicit reselection", async () => {
     harness.failSurfaceCreates = 1;
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const view = render(
@@ -370,16 +436,39 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(harness.createSurfaceCalls).toBe(2);
-      expect(authorities.at(-1)).not.toBeNull();
-    });
-    expect(harness.createRuntimeCalls).toBe(1);
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "unavailable",
+      reason: "webgpu-unavailable",
+      retainsLastGoodFrame: false,
+      retryPolicy: "explicit-next-selection-only",
+    }));
+    expect(harness.createSurfaceCalls).toBe(1);
+    expect(harness.createRuntimeCalls).toBe(0);
     expect(harness.destroyedDevices).toBe(1);
     expect(
       view.container.querySelector("canvas")?.dataset
         .studioCanonicalVnextDryMediaState,
-    ).toBe("authorized");
+    ).not.toBe("authorized");
+
+    view.rerender(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        element={null}
+        layoutKey="no-candidate"
+        onAuthorityChange={(authority) => authorities.push(authority)}
+      />,
+    );
+    view.rerender(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        onAuthorityChange={(authority) => authorities.push(authority)}
+      />,
+    );
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "authorized",
+    }));
+    expect(harness.createSurfaceCalls).toBe(2);
+    expect(harness.createRuntimeCalls).toBe(1);
   });
 
   it("does not leak a stale pending create across the StrictMode remount cycle", async () => {

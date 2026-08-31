@@ -2,7 +2,7 @@
  * Product-facing lifecycle controller for the sparse tiled-document WebGPU path.
  *
  * This is intentionally UI-agnostic. StudioPage only needs to feed resize/visibility/frame
- * requests and react to the explicit Canvas2D handoff callback. Consumer and bridge construction,
+ * requests and react to an explicit WebGPU-unavailable callback. Consumer and bridge construction,
  * requestAnimationFrame coalescing, device-loss recovery and teardown stay bounded here.
  */
 
@@ -29,13 +29,13 @@ export const STUDIO_TILEDOC_WEBGPU_RUNTIME_DEFAULT_DEVICE_RECOVERY_ATTEMPTS = 3;
 
 export type StudioTileDocWebGpuRuntimeStatus =
   | "disposed"
-  | "fallback"
   | "idle"
   | "paused"
   | "presenting"
   | "ready"
   | "recovering"
-  | "scheduled";
+  | "scheduled"
+  | "unavailable";
 
 export interface StudioTileDocWebGpuRuntimeResize {
   readonly cssWidth: number;
@@ -63,8 +63,8 @@ export interface StudioTileDocWebGpuRuntimeFrameRequest {
   readonly layers: readonly StudioTileDocCompositeLayer[];
 }
 
-export interface StudioTileDocWebGpuCanvas2dHandoff {
-  readonly kind: "studio-tiledoc-canvas2d-handoff";
+export interface StudioTileDocWebGpuUnavailable {
+  readonly kind: "studio-tiledoc-webgpu-unavailable";
   readonly reason:
     | "device-recovery-exhausted"
     | "invalid-resize"
@@ -85,10 +85,10 @@ export type StudioTileDocWebGpuRuntimeFrameResult =
       readonly presentation: Extract<StudioTileDocWebGpuPresentResult, { status: "ready" }>;
     }
   | {
-      readonly status: "fallback";
+      readonly status: "unavailable";
       readonly requestSequence: number;
       readonly frameId: string;
-      readonly handoff: StudioTileDocWebGpuCanvas2dHandoff;
+      readonly failure: StudioTileDocWebGpuUnavailable;
     }
   | {
       readonly status: "rejected";
@@ -105,7 +105,7 @@ export type StudioTileDocWebGpuRuntimeFrameResult =
 export interface StudioTileDocWebGpuRuntimeStats {
   readonly status: StudioTileDocWebGpuRuntimeStatus;
   readonly visible: boolean;
-  readonly fallbackActive: boolean;
+  readonly unavailableActive: boolean;
   readonly requestSequence: number;
   readonly pendingFrameId: string | null;
   readonly activeFrameId: string | null;
@@ -113,7 +113,7 @@ export interface StudioTileDocWebGpuRuntimeStats {
   readonly scheduledFrames: number;
   readonly presentedFrames: number;
   readonly coalescedFrames: number;
-  readonly fallbackCount: number;
+  readonly unavailableCount: number;
   readonly deviceLossCount: number;
   readonly recoveryAttempts: number;
   readonly cssWidth: number;
@@ -131,7 +131,7 @@ export interface StudioTileDocWebGpuRuntimeCallbacks {
     frameId: string,
     result: Extract<StudioTileDocWebGpuPresentResult, { status: "ready" }>
   ) => void;
-  readonly onCanvas2dHandoff?: (handoff: StudioTileDocWebGpuCanvas2dHandoff) => void;
+  readonly onUnavailable?: (failure: StudioTileDocWebGpuUnavailable) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
 }
 
@@ -283,14 +283,14 @@ export class StudioTileDocWebGpuRuntime {
   private bridge: RuntimeBridge | null = null;
   private status: StudioTileDocWebGpuRuntimeStatus = "idle";
   private visible = true;
-  private fallbackActive = false;
+  private unavailableActive = false;
   private disposed = false;
   private requestSequence = 0;
   private pending: QueuedFrame | null = null;
   private active: QueuedFrame | null = null;
   private activeAbort: AbortController | null = null;
   private lastRequest: StudioTileDocWebGpuRuntimeFrameRequest | null = null;
-  private lastHandoff: StudioTileDocWebGpuCanvas2dHandoff | null = null;
+  private lastFailure: StudioTileDocWebGpuUnavailable | null = null;
   private animationFrameHandle: number | null = null;
   private deviceLossEpoch = 0;
   private recoveryAttempts = 0;
@@ -298,7 +298,7 @@ export class StudioTileDocWebGpuRuntime {
   private scheduledFrames = 0;
   private presentedFrames = 0;
   private coalescedFrames = 0;
-  private fallbackCount = 0;
+  private unavailableCount = 0;
   private deviceLossCount = 0;
   private cssWidth = 0;
   private cssHeight = 0;
@@ -312,7 +312,7 @@ export class StudioTileDocWebGpuRuntime {
     this.callbacks = {
       onStatusChange: options.onStatusChange,
       onFrameReady: options.onFrameReady,
-      onCanvas2dHandoff: options.onCanvas2dHandoff,
+      onUnavailable: options.onUnavailable,
       onDeviceLost: options.onDeviceLost,
     };
     this.createConsumerOverride = options.createConsumer;
@@ -331,7 +331,7 @@ export class StudioTileDocWebGpuRuntime {
     return Object.freeze({
       status: this.status,
       visible: this.visible,
-      fallbackActive: this.fallbackActive,
+      unavailableActive: this.unavailableActive,
       requestSequence: this.requestSequence,
       pendingFrameId: this.pending?.request.frameId ?? null,
       activeFrameId: this.active?.request.frameId ?? null,
@@ -339,7 +339,7 @@ export class StudioTileDocWebGpuRuntime {
       scheduledFrames: this.scheduledFrames,
       presentedFrames: this.presentedFrames,
       coalescedFrames: this.coalescedFrames,
-      fallbackCount: this.fallbackCount,
+      unavailableCount: this.unavailableCount,
       deviceLossCount: this.deviceLossCount,
       recoveryAttempts: this.recoveryAttempts,
       cssWidth: this.cssWidth,
@@ -371,8 +371,8 @@ export class StudioTileDocWebGpuRuntime {
       || !finitePositive(dpr)
       || dpr > STUDIO_TILEDOC_WEBGPU_RUNTIME_MAX_DPR
     ) {
-      const handoff = this.enterFallback("invalid-resize", null, "invalid-resize");
-      this.failQueuedForHandoff(handoff);
+      const failure = this.enterUnavailable("invalid-resize", null, "invalid-resize");
+      this.failQueuedUnavailable(failure);
       return { status: "rejected", reason: "invalid-resize" };
     }
     const backingWidth = Math.max(1, Math.ceil(input.cssWidth * dpr));
@@ -382,8 +382,8 @@ export class StudioTileDocWebGpuRuntime {
       || backingHeight > STUDIO_TILEDOC_WEBGPU_RUNTIME_MAX_BACKING_DIMENSION
       || backingWidth * backingHeight > STUDIO_TILEDOC_WEBGPU_RUNTIME_MAX_BACKING_PIXELS
     ) {
-      const handoff = this.enterFallback("invalid-resize", null, "backing-size-limit");
-      this.failQueuedForHandoff(handoff);
+      const failure = this.enterUnavailable("invalid-resize", null, "backing-size-limit");
+      this.failQueuedUnavailable(failure);
       return { status: "rejected", reason: "backing-size-limit" };
     }
     const changed = this.canvas.width !== backingWidth
@@ -398,7 +398,7 @@ export class StudioTileDocWebGpuRuntime {
     this.cssWidth = input.cssWidth;
     this.cssHeight = input.cssHeight;
     this.devicePixelRatio = dpr;
-    if (changed && !this.fallbackActive && this.lastRequest && !this.pending) {
+    if (changed && !this.unavailableActive && this.lastRequest && !this.pending) {
       this.enqueueInternal(this.lastRequest);
       if (this.visible) this.scheduleAnimationFrame();
     }
@@ -436,22 +436,22 @@ export class StudioTileDocWebGpuRuntime {
     this.requestSequence = sequence;
     this.lastRequest = cloned;
     this.scheduledFrames += 1;
-    if (this.fallbackActive) {
-      const previous = this.lastHandoff;
-      const handoff = this.handoffFor(
+    if (this.unavailableActive) {
+      const previous = this.lastFailure;
+      const failure = this.failureFor(
         previous?.reason ?? "presentation-rejected",
         sequence,
         cloned.frameId,
         previous?.recoverable ?? true,
-        previous?.bridgeReason ?? "fallback-active",
+        previous?.bridgeReason ?? "unavailable-active",
         previous?.consumerReason
       );
-      this.callbacks.onCanvas2dHandoff?.(handoff);
+      this.callbacks.onUnavailable?.(failure);
       return Promise.resolve({
-        status: "fallback",
+        status: "unavailable",
         requestSequence: sequence,
         frameId: cloned.frameId,
-        handoff,
+        failure,
       });
     }
     return new Promise((resolve) => {
@@ -476,8 +476,8 @@ export class StudioTileDocWebGpuRuntime {
       this.setStatus("paused");
       return;
     }
-    if (this.fallbackActive) {
-      this.setStatus("fallback");
+    if (this.unavailableActive) {
+      this.setStatus("unavailable");
       return;
     }
     if (!this.pending && !this.active && this.lastRequest) {
@@ -486,11 +486,11 @@ export class StudioTileDocWebGpuRuntime {
     this.scheduleAnimationFrame();
   }
 
-  /** Explicitly leaves sticky Canvas2D handoff state and retries the latest retained frame. */
-  public retryWebGpu(): boolean {
-    if (this.disposed || !this.fallbackActive || !this.lastRequest) return false;
-    this.fallbackActive = false;
-    this.lastHandoff = null;
+  /** Explicitly retries the immutable WebGPU selection using the latest retained frame. */
+  public retrySelectedWebGpu(): boolean {
+    if (this.disposed || !this.unavailableActive || !this.lastRequest) return false;
+    this.unavailableActive = false;
+    this.lastFailure = null;
     this.recoveryAttempts = 0;
     this.consumer?.invalidate();
     this.bridge?.invalidate();
@@ -596,7 +596,7 @@ export class StudioTileDocWebGpuRuntime {
     if (
       this.disposed
       || !this.visible
-      || this.fallbackActive
+      || this.unavailableActive
       || this.animationFrameHandle !== null
       || this.active
       || !this.pending
@@ -620,7 +620,7 @@ export class StudioTileDocWebGpuRuntime {
     if (
       this.disposed
       || !this.visible
-      || this.fallbackActive
+      || this.unavailableActive
       || this.active
       || !this.pending
     ) {
@@ -637,16 +637,16 @@ export class StudioTileDocWebGpuRuntime {
     try {
       const runtime = this.ensureRuntime();
       if (!runtime) {
-        const handoff = this.enterFallback(
+        const failure = this.enterUnavailable(
           "runtime-error",
           queued,
           "runtime-construction-failed"
         );
         this.settle(queued, {
-          status: "fallback",
+          status: "unavailable",
           requestSequence: queued.requestSequence,
           frameId: queued.request.frameId,
-          handoff,
+          failure,
         });
         return;
       }
@@ -660,16 +660,16 @@ export class StudioTileDocWebGpuRuntime {
         this.requeuePausedFrame(queued);
         return;
       }
-      if (this.deviceLossEpoch !== lossEpoch && !this.fallbackActive) {
+      if (this.deviceLossEpoch !== lossEpoch && !this.unavailableActive) {
         this.requeueRecoveryFrame(queued);
         return;
       }
-      if (this.fallbackActive && this.lastHandoff) {
+      if (this.unavailableActive && this.lastFailure) {
         this.settle(queued, {
-          status: "fallback",
+          status: "unavailable",
           requestSequence: queued.requestSequence,
           frameId: queued.request.frameId,
-          handoff: this.lastHandoff,
+          failure: this.lastFailure,
         });
         return;
       }
@@ -687,17 +687,17 @@ export class StudioTileDocWebGpuRuntime {
         });
         return;
       }
-      const handoff = this.enterFallback(
+      const failure = this.enterUnavailable(
         "presentation-rejected",
         queued,
         result.reason,
         result.consumerReason
       );
       this.settle(queued, {
-        status: "fallback",
+        status: "unavailable",
         requestSequence: queued.requestSequence,
         frameId: queued.request.frameId,
-        handoff,
+        failure,
       });
     } catch {
       if (this.disposed) return;
@@ -705,17 +705,26 @@ export class StudioTileDocWebGpuRuntime {
         this.requeuePausedFrame(queued);
         return;
       }
-      const handoff = this.enterFallback("runtime-error", queued, "runtime-exception");
+      if (this.unavailableActive && this.lastFailure) {
+        this.settle(queued, {
+          status: "unavailable",
+          requestSequence: queued.requestSequence,
+          frameId: queued.request.frameId,
+          failure: this.lastFailure,
+        });
+        return;
+      }
+      const failure = this.enterUnavailable("runtime-error", queued, "runtime-exception");
       this.settle(queued, {
-        status: "fallback",
+        status: "unavailable",
         requestSequence: queued.requestSequence,
         frameId: queued.request.frameId,
-        handoff,
+        failure,
       });
     } finally {
       if (this.active === queued) this.active = null;
       if (this.activeAbort === controller) this.activeAbort = null;
-      if (!this.disposed && this.visible && !this.fallbackActive) {
+      if (!this.disposed && this.visible && !this.unavailableActive) {
         this.scheduleAnimationFrame();
       }
     }
@@ -757,12 +766,12 @@ export class StudioTileDocWebGpuRuntime {
     this.hideCanvas();
     this.callbacks.onDeviceLost?.(info);
     if (this.recoveryAttempts > this.maxDeviceRecoveryAttempts) {
-      const handoff = this.enterFallback(
+      const failure = this.enterUnavailable(
         "device-recovery-exhausted",
         this.active,
         "device-lost"
       );
-      this.failQueuedForHandoff(handoff);
+      this.failQueuedUnavailable(failure);
       return;
     }
     this.setStatus("recovering");
@@ -772,19 +781,19 @@ export class StudioTileDocWebGpuRuntime {
     }
   }
 
-  private enterFallback(
-    reason: StudioTileDocWebGpuCanvas2dHandoff["reason"],
+  private enterUnavailable(
+    reason: StudioTileDocWebGpuUnavailable["reason"],
     queued: QueuedFrame | null,
     bridgeReason?: string,
     consumerReason?: string
-  ): StudioTileDocWebGpuCanvas2dHandoff {
-    const wasActive = this.fallbackActive;
-    this.fallbackActive = true;
+  ): StudioTileDocWebGpuUnavailable {
+    const wasActive = this.unavailableActive;
+    this.unavailableActive = true;
     this.hideCanvas();
     this.cancelScheduledAnimationFrame();
-    this.setStatus("fallback");
-    if (!wasActive) this.fallbackCount += 1;
-    const handoff = this.handoffFor(
+    this.setStatus("unavailable");
+    if (!wasActive) this.unavailableCount += 1;
+    const failure = this.failureFor(
       reason,
       queued?.requestSequence ?? this.requestSequence,
       queued?.request.frameId ?? this.lastRequest?.frameId ?? null,
@@ -792,21 +801,21 @@ export class StudioTileDocWebGpuRuntime {
       bridgeReason,
       consumerReason
     );
-    this.lastHandoff = handoff;
-    this.callbacks.onCanvas2dHandoff?.(handoff);
-    return handoff;
+    this.lastFailure = failure;
+    this.callbacks.onUnavailable?.(failure);
+    return failure;
   }
 
-  private handoffFor(
-    reason: StudioTileDocWebGpuCanvas2dHandoff["reason"],
+  private failureFor(
+    reason: StudioTileDocWebGpuUnavailable["reason"],
     requestSequence: number,
     frameId: string | null,
     recoverable: boolean,
     bridgeReason?: string,
     consumerReason?: string
-  ): StudioTileDocWebGpuCanvas2dHandoff {
+  ): StudioTileDocWebGpuUnavailable {
     return Object.freeze({
-      kind: "studio-tiledoc-canvas2d-handoff",
+      kind: "studio-tiledoc-webgpu-unavailable",
       reason,
       requestSequence,
       frameId,
@@ -825,22 +834,22 @@ export class StudioTileDocWebGpuRuntime {
     queued.resolve?.(Object.freeze(result));
   }
 
-  private failQueuedForHandoff(handoff: StudioTileDocWebGpuCanvas2dHandoff): void {
-    this.activeAbort?.abort(new DOMException("Studio tiledoc Canvas2D handoff", "AbortError"));
+  private failQueuedUnavailable(failure: StudioTileDocWebGpuUnavailable): void {
+    this.activeAbort?.abort(new DOMException("Studio tiledoc WebGPU unavailable", "AbortError"));
     if (!this.pending) return;
     const pending = this.pending;
     this.pending = null;
     this.settle(pending, {
-      status: "fallback",
+      status: "unavailable",
       requestSequence: pending.requestSequence,
       frameId: pending.request.frameId,
-      handoff: this.handoffFor(
-        handoff.reason,
+      failure: this.failureFor(
+        failure.reason,
         pending.requestSequence,
         pending.request.frameId,
-        handoff.recoverable,
-        handoff.bridgeReason,
-        handoff.consumerReason
+        failure.recoverable,
+        failure.bridgeReason,
+        failure.consumerReason
       ),
     });
   }

@@ -50,7 +50,10 @@ function testPorts(
       };
     }),
   );
-  return { persistAttachments };
+  return {
+    glbExportExecutionBackend: "direct",
+    persistAttachments,
+  };
 }
 
 describe("Hybrid DCC → shipping BG3D handoff", () => {
@@ -590,6 +593,7 @@ describe("Hybrid DCC → shipping BG3D handoff", () => {
     let workspace = createStudioHybridDccWorkspace("hash-swap");
     workspace = workspaceAddUnitCube(workspace, "prop");
     const ports: StudioHybridDccBg3dHandoffPorts = {
+      glbExportExecutionBackend: "direct",
       persistAttachments: async (requests) => requests.map((request) => ({
         assetId: request.assetId,
         attachment: {

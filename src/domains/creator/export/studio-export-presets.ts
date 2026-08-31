@@ -375,13 +375,11 @@ export interface PresetExportResult {
   /**
    * wasm-vips 고품질 축소 레인으로 처리된 대형 페이지 수.
    * 라우팅된 페이지가 없으면 키 자체가 없다(기존 결과 shape 불변 — pristine 계약).
-   */
+  */
   vipsRoutedPages?: number;
-  /** vips 레인 폴백 시 사용자에게 표면화할 한글 품질 경고. 폴백이 없으면 키 없음. */
-  qualityWarning?: string;
 }
 
-/** 실행 결과를 한 줄 한글 안내로 — 용량 초과·vips 레인·품질 폴백 정보를 덧붙인다. */
+/** 실행 결과를 한 줄 한글 안내로 — 용량 초과·vips 레인 정보를 덧붙인다. */
 export function presetExportResultMessage(result: PresetExportResult, preset: ExportPreset): string {
   const parts = [
     `폭 ${result.targetWidth.toLocaleString()}px ${result.format.toUpperCase()} ${result.files}장으로 저장했어요.`,
@@ -394,7 +392,6 @@ export function presetExportResultMessage(result: PresetExportResult, preset: Ex
   if (result.vipsRoutedPages !== undefined && result.vipsRoutedPages > 0) {
     parts.push(`고해상 페이지 ${result.vipsRoutedPages}장은 고품질 축소(wasm-vips)로 저장했어요.`);
   }
-  if (result.qualityWarning) parts.push(result.qualityWarning);
   return parts.join(" ");
 }
 
@@ -425,7 +422,7 @@ export interface PresetSliceExportOptions {
   download?: (blob: Blob, filename: string) => void;
   /** 테스트 주입용 — 기본은 loadVipsForExport(wasm-vips 공유 캐시, dynamic import 유지). */
   loadVipsRuntime?: () => Promise<StudioVipsExportRuntime>;
-  /** 테스트 주입용 — 기본은 getImageData 픽셀 읽기(실패 시 null → 기존 경로 폴백). */
+  /** 테스트 주입용 — 기본은 getImageData 픽셀 읽기(null이면 선택된 vips 작업 실패). */
   readPageRgba?: (page: HTMLCanvasElement) => Uint8Array | null;
   /** 테스트 주입용 — 기본은 putImageData 로 리샘플 결과를 새 캔버스에 옮긴다. */
   createResampledPage?: (raster: StudioVipsRaster) => HTMLCanvasElement | null;
@@ -439,16 +436,39 @@ export interface PresetSliceExportOptions {
 // wasm-vips lanczos3 가 PSNR 27.26dB/SSIM 0.9887 로 브라우저 drawImage 상당의
 // canvaskit-linear(25.31dB/0.9834)를 이긴다. 단일 인코어 표면 예산(8192 edge /
 // 8192² area — studio-vips-export planVipsExportRoute)을 넘는 페이지만 라우팅하고,
-// 예산 안 페이지는 기존 drawImage 경로를 바이트 그대로 유지한다(pristine 계약).
-// vips 로드·리샘플 실패는 조용히 삼키지 않고 기존 경로 폴백 + 한글 경고로 표면화한다.
+// 예산 안 페이지는 작업 시작 전에 Canvas2D 경로를 선택해 바이트 그대로 유지한다
+// (pristine 계약). vips/out-of-core가 선택된 뒤에는 다른 provider로 재실행하지 않는다.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const PRESET_VIPS_LOAD_FALLBACK_WARNING =
-  "고품질 축소 엔진(wasm-vips)을 불러오지 못해 기본 축소로 저장했어요 — 대형 페이지 화질이 조금 낮을 수 있어요.";
-export const PRESET_VIPS_PAGE_FALLBACK_WARNING =
-  "일부 대형 페이지를 고품질 축소로 처리하지 못해 기본 축소로 저장했어요.";
-export const PRESET_VIPS_OUT_OF_CORE_WARNING =
-  "일부 페이지가 단일 처리 한계(16384²px)를 넘어 기본 축소로 저장했어요.";
+export type PresetVipsUnavailableStage =
+  | "out-of-core"
+  | "load"
+  | "read"
+  | "resample"
+  | "materialize";
+
+/**
+ * 선택된 대용량 내보내기 provider가 작업을 완료하지 못했다.
+ * 다른 provider로 같은 내보내기를 다시 실행하지 않도록 단계와 페이지를 보존한다.
+ */
+export class PresetVipsUnavailableError extends Error {
+  readonly stage: PresetVipsUnavailableStage;
+  readonly pageIndex: number | null;
+  override readonly cause?: unknown;
+
+  constructor(input: {
+    stage: PresetVipsUnavailableStage;
+    message: string;
+    pageIndex?: number;
+    cause?: unknown;
+  }) {
+    super(input.message);
+    this.name = "PresetVipsUnavailableError";
+    this.stage = input.stage;
+    this.pageIndex = input.pageIndex ?? null;
+    this.cause = input.cause;
+  }
+}
 
 /** vips 레인 준비 결과 — 슬라이스 합성 루프가 그대로 소비한다. */
 export interface PresetVipsPreparedPages {
@@ -458,11 +478,9 @@ export interface PresetVipsPreparedPages {
   layouts: PresetPageLayout[];
   /** wasm-vips 로 실제 리샘플된 페이지 수. */
   vipsRoutedPages: number;
-  /** 폴백/한계 경고(없으면 null) — 결과 메시지에 표면화된다. */
-  qualityWarning: string | null;
 }
 
-/** getImageData 기반 기본 픽셀 읽기 — 컨텍스트가 없으면 null(호출자가 폴백). */
+/** getImageData 기반 기본 픽셀 읽기 — 컨텍스트가 없으면 선택된 vips 작업이 실패한다. */
 function defaultReadPresetPageRgba(page: HTMLCanvasElement): Uint8Array | null {
   const ctx = page.getContext("2d", { willReadFrequently: true });
   if (!ctx) return null;
@@ -470,7 +488,7 @@ function defaultReadPresetPageRgba(page: HTMLCanvasElement): Uint8Array | null {
   return new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength);
 }
 
-/** putImageData 기반 기본 결과 캔버스 — DOM 이 없으면 null(호출자가 폴백). */
+/** putImageData 기반 기본 결과 캔버스 — DOM 이 없으면 선택된 vips 작업이 실패한다. */
 function defaultCreateResampledPresetPage(raster: StudioVipsRaster): HTMLCanvasElement | null {
   if (typeof document === "undefined" || typeof ImageData === "undefined") return null;
   const canvas = document.createElement("canvas");
@@ -489,8 +507,8 @@ function defaultCreateResampledPresetPage(raster: StudioVipsRaster): HTMLCanvasE
  * 미리 축소한다. 리샘플된 페이지의 레이아웃은 1:1 blit 이 되도록 source 크기를 결과
  * 크기로 바꿔치기하므로 슬라이스 합성의 drawImage 는 더 이상 화질을 결정하지 않는다.
  * 라우팅 대상이 하나도 없으면 wasm 로드조차 하지 않고 원본 배열 사본을 돌려준다
- * (기존 경로 바이트 불변). 로드/페이지 단위 실패는 해당 페이지만 기존 경로로 폴백하고
- * qualityWarning 으로 표면화한다 — 조용한 품질 저하 금지.
+ * (작업 전 Canvas2D 선택, 기존 경로 바이트 불변). vips 또는 out-of-core가 선택된 뒤
+ * provider가 준비/실행되지 않으면 다운로드 전에 명시적으로 실패한다.
  */
 export async function prepareVipsRoutedPresetPages(
   pages: HTMLCanvasElement[],
@@ -503,20 +521,17 @@ export async function prepareVipsRoutedPresetPages(
   // 슬라이스 합성 루프와 같은 인덱스 규약: layouts[k] ↔ pages[k].
   const drawPages = pages.slice();
   const layouts = plan.pages.slice();
-  const warnings: string[] = [];
-  const addWarning = (message: string): void => {
-    if (!warnings.includes(message)) warnings.push(message);
-  };
 
   // 라우팅 판정만 먼저 — 대상이 없으면 wasm 로드 자체가 일어나지 않는다(pristine).
   const routedIndices: number[] = [];
   layouts.forEach((layout, index) => {
     const route = planVipsExportRoute(layout.sourceWidth, layout.sourceHeight, options.vipsLimits).route;
     if (route === "out-of-core") {
-      // 단일 할당 입력 예산(16384² = 1GiB RGBA) 초과 — 타일 provider 영역이라
-      // 이 레인은 손대지 않고 기존 경로 유지 + 경고만 표면화한다.
-      addWarning(PRESET_VIPS_OUT_OF_CORE_WARNING);
-      return;
+      throw new PresetVipsUnavailableError({
+        stage: "out-of-core",
+        pageIndex: index,
+        message: `페이지 ${index + 1}은 단일 vips 처리 한계를 넘어 타일 내보내기 provider가 필요해요.`,
+      });
     }
     // vips 는 다운스케일 전용 레인 — 규격 폭이 원본 폭 이상이면 기존 경로 유지.
     if (route === "vips" && plan.targetWidth < layout.sourceWidth) routedIndices.push(index);
@@ -525,16 +540,18 @@ export async function prepareVipsRoutedPresetPages(
     drawPages,
     layouts,
     vipsRoutedPages: routed,
-    qualityWarning: warnings.length > 0 ? warnings.join(" ") : null,
   });
   if (routedIndices.length === 0) return finish(0);
 
   let runtime: StudioVipsExportRuntime;
   try {
     runtime = await (options.loadVipsRuntime ?? loadVipsForExport)();
-  } catch {
-    addWarning(PRESET_VIPS_LOAD_FALLBACK_WARNING);
-    return finish(0);
+  } catch (cause) {
+    throw new PresetVipsUnavailableError({
+      stage: "load",
+      message: "선택된 고품질 축소 엔진(wasm-vips)을 불러오지 못해 내보내기를 중단했어요.",
+      cause,
+    });
   }
 
   const readPageRgba = options.readPageRgba ?? defaultReadPresetPageRgba;
@@ -544,11 +561,18 @@ export async function prepareVipsRoutedPresetPages(
     const layout = layouts[index];
     const page = drawPages[index];
     if (!layout || !page) continue;
+    const rgba = readPageRgba(page);
+    if (!rgba) {
+      throw new PresetVipsUnavailableError({
+        stage: "read",
+        pageIndex: index,
+        message: `페이지 ${index + 1}의 픽셀을 vips 입력으로 읽지 못해 내보내기를 중단했어요.`,
+      });
+    }
+    let raster: StudioVipsRaster;
     try {
-      const rgba = readPageRgba(page);
-      if (!rgba) throw new Error("페이지 픽셀을 읽을 수 없습니다.");
       // 목표 높이는 슬라이스 계획과 동일한 반올림(layout.height) — 크기 드리프트 없음.
-      const raster = await downscaleForExport(
+      raster = await downscaleForExport(
         rgba,
         layout.sourceWidth,
         layout.sourceHeight,
@@ -556,15 +580,26 @@ export async function prepareVipsRoutedPresetPages(
         layout.height,
         { runtime }
       );
-      const resampled = createResampledPage(raster);
-      if (!resampled) throw new Error("리샘플 결과 캔버스를 만들 수 없습니다.");
-      drawPages[index] = resampled;
-      // source 크기 = 결과 크기 → planSliceDrawOps 비율 1(무손실 1:1 blit).
-      layouts[index] = { ...layout, sourceWidth: raster.width, sourceHeight: raster.height };
-      routed += 1;
-    } catch {
-      addWarning(PRESET_VIPS_PAGE_FALLBACK_WARNING);
+    } catch (cause) {
+      throw new PresetVipsUnavailableError({
+        stage: "resample",
+        pageIndex: index,
+        message: `페이지 ${index + 1}을 wasm-vips로 축소하지 못해 내보내기를 중단했어요.`,
+        cause,
+      });
     }
+    const resampled = createResampledPage(raster);
+    if (!resampled) {
+      throw new PresetVipsUnavailableError({
+        stage: "materialize",
+        pageIndex: index,
+        message: `페이지 ${index + 1}의 vips 결과를 합성 표면으로 만들지 못해 내보내기를 중단했어요.`,
+      });
+    }
+    drawPages[index] = resampled;
+    // source 크기 = 결과 크기 → planSliceDrawOps 비율 1(무손실 1:1 blit).
+    layouts[index] = { ...layout, sourceWidth: raster.width, sourceHeight: raster.height };
+    routed += 1;
   }
   return finish(routed);
 }
@@ -680,8 +715,7 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
     oversized,
     format: plan.format,
     targetWidth: plan.targetWidth,
-    // pristine 계약: 라우팅·폴백이 없으면 결과 shape 도 기존 그대로(키 부재).
+    // pristine 계약: 라우팅이 없으면 결과 shape 도 기존 그대로(키 부재).
     ...(prepared.vipsRoutedPages > 0 ? { vipsRoutedPages: prepared.vipsRoutedPages } : {}),
-    ...(prepared.qualityWarning !== null ? { qualityWarning: prepared.qualityWarning } : {}),
   };
 }

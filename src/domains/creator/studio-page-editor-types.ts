@@ -74,12 +74,6 @@ export type StudioHokusaiPinnedLiveStroke = {
   forwardedSampleCount: number;
   lastAppendedSequence: number;
   lastMaterialFrameSequence: number;
-  materialCompositeBounds: Readonly<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }> | null;
   overlayPresented: boolean;
   failed: boolean;
   finishing: boolean;

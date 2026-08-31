@@ -11,8 +11,8 @@
  * - one textured tip and procedural grain;
  * - no symmetry, dual tip, tip layers, colour jitter, masks or destructive compositing.
  *
- * Unsupported material semantics retain the existing Canvas renderer. They are never approximated
- * by a generic round-dab GPU path.
+ * Unsupported material semantics are classified before execution and remain on the explicitly selected
+ * Canvas renderer. They are never approximated by a generic round-dab GPU path.
  */
 
 import {
@@ -89,7 +89,7 @@ export type StudioCanonicalVNextDryMediaProductCompileResult =
       frame: StudioCanonicalVNextDryMediaCompiledFrame;
     }>
   | Readonly<{
-      status: "retained-fallback";
+      status: "unavailable";
       reason: StudioCanonicalVNextDryMediaProductCompileFailureReason;
       detail?: string;
     }>;
@@ -102,15 +102,15 @@ export interface StudioCanonicalVNextDryMediaProductCompileRequest {
   readonly signal?: AbortSignal;
 }
 
-function fallback(
+function unavailableResult(
   reason: StudioCanonicalVNextDryMediaProductCompileFailureReason,
   detail?: string,
 ): Extract<
   StudioCanonicalVNextDryMediaProductCompileResult,
-  { readonly status: "retained-fallback" }
+  { readonly status: "unavailable" }
 > {
   return Object.freeze({
-    status: "retained-fallback",
+    status: "unavailable",
     reason,
     ...(detail ? { detail } : {}),
   });
@@ -490,23 +490,23 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     || !positiveSafeInteger(request.sessionEpoch)
     || !positiveSafeInteger(request.strokeEpoch)
     || !positiveSafeInteger(request.commandSequence)
-  ) return fallback("invalid-input");
-  if (request.signal?.aborted) return fallback("invalid-input", "cancelled");
+  ) return unavailableResult("invalid-input");
+  if (request.signal?.aborted) return unavailableResult("invalid-input", "cancelled");
   const classification = classifyStudioDryMediaCatalogIdV1(element.brushCatalogId);
   if (classification?.kind !== "anisotropic-continuous") {
-    return fallback("ineligible-material");
+    return unavailableResult("ineligible-material");
   }
   if (element.brushCatalogId === "paint-roller") {
-    return fallback("unsupported-paint-roller");
+    return unavailableResult("unsupported-paint-roller");
   }
   if ((element.symmetry?.type ?? "none") !== "none") {
-    return fallback("unsupported-symmetry");
+    return unavailableResult("unsupported-symmetry");
   }
   if (
     element.blendMode !== undefined
       && element.blendMode !== "normal"
       && element.blendMode !== "source-over"
-  ) return fallback("unsupported-composite");
+  ) return unavailableResult("unsupported-composite");
   if (
     element.paintModel !== undefined
     && (
@@ -514,7 +514,7 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
       || (element.opacity ?? 1) !== 1
     )
   ) {
-    return fallback(
+    return unavailableResult(
       "unsupported-paint-model",
       `${element.paintModel}:${element.opacity ?? 1}`,
     );
@@ -522,22 +522,22 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
 
   const dynamicPlanResult = planStudioDynamicBrushRender(element, "dry-media", false);
   if (dynamicPlanResult.status !== "ready") {
-    return fallback("dynamic-plan-rejected", dynamicPlanResult.reason);
+    return unavailableResult("dynamic-plan-rejected", dynamicPlanResult.reason);
   }
   const dynamicPlan = dynamicPlanResult.plan;
   if (dualTipIsActive(dynamicPlan.dynamics)) {
-    return fallback("unsupported-multi-tip");
+    return unavailableResult("unsupported-multi-tip");
   }
   if (!colorDynamicsAreIdentity(dynamicPlan.dynamics)) {
-    return fallback("unsupported-color-dynamics");
+    return unavailableResult("unsupported-color-dynamics");
   }
   if (dynamicPlan.dynamics.grain.source) {
-    return fallback("unsupported-grain-source");
+    return unavailableResult("unsupported-grain-source");
   }
   if (
     dynamicPlan.materialIdentity.dryMediaPresetId !== classification.presetId
     || dynamicPlan.dabVariations.length !== 1
-  ) return fallback("ineligible-material");
+  ) return unavailableResult("ineligible-material");
 
   const variation = dynamicPlan.dabVariations[0] as StudioDryMediaDynamicDabVariation;
   const bridged = bridgeStudioDynamicDabVariationToDryMediaV1({
@@ -546,7 +546,7 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     variation,
   });
   if (!bridged.ok || !bridged.applied) {
-    return fallback(
+    return unavailableResult(
       "dynamic-plan-rejected",
       bridged.ok ? "bridge-not-applied" : bridged.reason,
     );
@@ -554,11 +554,11 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
   const sourceDabs = flattenVariation(variation);
   const materialDabs = flattenVariation(bridged.variation);
   if (sourceDabs.length < 1 || materialDabs.length < 1) {
-    return fallback("dynamic-plan-rejected", "empty-plan");
+    return unavailableResult("dynamic-plan-rejected", "empty-plan");
   }
   const laneRatio = materialDabs.length / sourceDabs.length;
   if (laneRatio !== 3 && laneRatio !== 5) {
-    return fallback("dynamic-plan-rejected", "invalid-lane-count");
+    return unavailableResult("dynamic-plan-rejected", "invalid-lane-count");
   }
 
   const projection = canonicalProjection(element, dynamicPlan.dynamics);
@@ -582,7 +582,7 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     },
   });
   if (adapted.status !== "ready") {
-    return fallback(
+    return unavailableResult(
       "canonical-adapter-rejected",
       `${adapted.reason}:${adapted.path}`,
     );
@@ -598,11 +598,11 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     })))}` as const;
   const canonicalEnvelope = bindDynamicIdentity(adapted.plan, dynamicPlanDigest);
   if (!canonicalEnvelope.ok) {
-    return fallback("canonical-envelope-rejected", canonicalEnvelope.detail);
+    return unavailableResult("canonical-envelope-rejected", canonicalEnvelope.detail);
   }
   const canonicalPlan = canonicalEnvelope.plan;
   const assetDynamics = assetLoweringDynamics(canonicalPlan);
-  if (!assetDynamics) return fallback("textured-plan-rejected", "asset-dynamics");
+  if (!assetDynamics) return unavailableResult("textured-plan-rejected", "asset-dynamics");
   const baseTextured = await buildStudioEngineWebGpuTexturedBrushPlan(
     canonicalPlan,
     assetDynamics,
@@ -610,7 +610,7 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     { mode: "rebuild", signal: request.signal },
   );
   if (baseTextured.status !== "ready") {
-    return fallback(
+    return unavailableResult(
       "textured-plan-rejected",
       `${baseTextured.status}:${"reason" in baseTextured ? baseTextured.reason : ""}`,
     );
@@ -622,9 +622,9 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     dynamicPlan.dynamics,
     materialDabs,
   );
-  if (!texturedDabs) return fallback("textured-plan-rejected", "material-dabs");
+  if (!texturedDabs) return unavailableResult("textured-plan-rejected", "material-dabs");
   const texturedPlan = rebuildTexturedPlan(baseTextured.plan, texturedDabs);
-  if (!texturedPlan) return fallback("textured-plan-rejected", "fingerprint");
+  if (!texturedPlan) return unavailableResult("textured-plan-rejected", "fingerprint");
   const frame: StudioCanonicalVNextDryMediaCompiledFrame = Object.freeze({
     kind: "studio-canonical-vnext-dry-media-compiled-frame",
     version:
@@ -636,7 +636,7 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
   });
   const quality = validateStudioCanonicalVNextDryMediaCompiledFrame(frame);
   if (quality.status !== "ready") {
-    return fallback("quality-gate-rejected", quality.reason);
+    return unavailableResult("quality-gate-rejected", quality.reason);
   }
   return Object.freeze({
     status: "ready",

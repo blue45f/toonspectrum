@@ -1,19 +1,51 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildStudioCbzBlob,
-  buildStudioCbzBytes,
+  buildStudioCbzBlob as buildStudioCbzBlobWithBackend,
+  buildStudioCbzBytes as buildStudioCbzBytesWithBackend,
   compareStudioCbzPagePaths,
   importStudioCbz,
   STUDIO_CBZ_MIME,
   StudioCbzError,
   type StudioCbzErrorCode,
 } from "./studio-cbz-interchange";
-import { buildStudioPackageArchiveBytes } from "./studio-package-archive";
+import {
+  buildStudioPackageArchiveBytes as buildStudioPackageArchiveBytesWithBackend,
+} from "./studio-package-archive";
 import { readStudioZipArchive } from "./studio-zip-reader";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function buildStudioCbzBytes(
+  input: Parameters<typeof buildStudioCbzBytesWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioCbzBytesWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioCbzBytesWithBackend> {
+  return buildStudioCbzBytesWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioCbzBlob(
+  input: Parameters<typeof buildStudioCbzBlobWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioCbzBlobWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioCbzBlobWithBackend> {
+  return buildStudioCbzBlobWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioPackageArchiveBytes(
+  entries: Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioPackageArchiveBytesWithBackend> {
+  return buildStudioPackageArchiveBytesWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function png(seed: number): Uint8Array {
   return pngWithDimensions(1, 1, seed);

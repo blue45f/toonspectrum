@@ -7,10 +7,7 @@ import {
   type StudioCrc32WorkerRunMessage,
 } from "./studio-crc32-worker-protocol";
 
-/**
- * Direct CRC remains bounded to a short metadata-sized task. Larger inputs must not silently turn
- * an unavailable Worker into a package-export main-thread stall.
- */
+/** Direct reference CRC remains bounded to a short metadata-sized task. */
 export const STUDIO_CRC32_DIRECT_MAX_BYTES = 1024 * 1024;
 
 const STUDIO_CRC32_WORKER_READY_TIMEOUT_MS = 3_000;
@@ -30,6 +27,7 @@ export interface StudioCrc32WorkerLike {
 }
 
 export type StudioCrc32WorkerFactory = () => StudioCrc32WorkerLike | null;
+export type StudioCrc32ExecutionMode = "worker" | "direct-bounded" | "direct-headless";
 
 export interface StudioCrc32WorkerRunOptions {
   signal?: AbortSignal;
@@ -51,13 +49,10 @@ export interface StudioCrc32WorkerSession {
 }
 
 export interface StudioCrc32WorkerSessionOptions {
-  /** `null` explicitly selects the bounded synchronous fallback. */
+  /** Fixed for the session before any CRC request starts. */
+  executionMode: StudioCrc32ExecutionMode;
+  /** Test/platform seam for the selected Worker mode. */
   workerFactory?: StudioCrc32WorkerFactory | null;
-  /**
-   * Headless archive builders have no editor frame to block and may opt into a full direct CRC.
-   * Browser callers stay capped even if this flag is accidentally forwarded.
-   */
-  allowLargeDirectFallbackInHeadless?: boolean;
 }
 
 interface ActiveTask {
@@ -113,13 +108,17 @@ function cloneSafeData(data: Uint8Array): Uint8Array {
   return hasDedicatedTransferableBuffer ? data : new Uint8Array(data);
 }
 
-function directUnavailableError(byteLength: number, cause?: unknown): Error {
-  const detail = cause instanceof Error && cause.message ? ` (${cause.message})` : "";
+function directUnavailableError(byteLength: number): Error {
   return new Error(
-    `CRC32 계산 Worker를 사용할 수 없습니다${detail}. `
-      + `${byteLength.toLocaleString("en-US")}바이트 입력은 편집 화면 멈춤을 막기 위해 메인 스레드에서 계산하지 않습니다. `
-      + "브라우저의 Worker/CSP 설정을 확인한 뒤 다시 시도해 주세요.",
+    `${byteLength.toLocaleString("en-US")}바이트 CRC32 입력은 선택한 direct 실행 모드의 `
+      + "메인 스레드 안전 상한을 초과했습니다.",
   );
+}
+
+function workerUnavailableError(message = "CRC32 계산 Worker를 사용할 수 없습니다."): Error {
+  const error = new Error(message);
+  error.name = "StudioCrc32WorkerError";
+  return error;
 }
 
 function runDirect(
@@ -165,16 +164,45 @@ function validWorkerResult(
  * any stale queued response.
  */
 export function createStudioCrc32WorkerSession(
-  options: StudioCrc32WorkerSessionOptions = {},
+  options: StudioCrc32WorkerSessionOptions,
 ): StudioCrc32WorkerSession {
+  if (
+    options.executionMode !== "worker"
+    && options.executionMode !== "direct-bounded"
+    && options.executionMode !== "direct-headless"
+  ) {
+    throw new TypeError("CRC32 실행 모드가 올바르지 않습니다.");
+  }
+  if (options.executionMode !== "worker") {
+    const directMaxBytes = options.executionMode === "direct-headless"
+      ? STUDIO_CRC32_WORKER_MAX_BYTES
+      : STUDIO_CRC32_DIRECT_MAX_BYTES;
+    let disposed = false;
+    return {
+      run(data, runOptions = {}) {
+        if (disposed) return Promise.reject(createAbortError());
+        try {
+          throwIfAborted(runOptions.signal);
+          assertCrc32Input(data);
+          if (
+            options.executionMode === "direct-headless"
+            && typeof globalThis.document !== "undefined"
+          ) {
+            throw new Error("direct-headless CRC32는 DOM이 없는 실행 환경에서만 사용할 수 있습니다.");
+          }
+          return Promise.resolve(runDirect(data, runOptions.signal, directMaxBytes));
+        } catch (error) {
+          return Promise.reject(error);
+        }
+      },
+      dispose() {
+        disposed = true;
+      },
+    };
+  }
   const factory = options.workerFactory === undefined
     ? createStudioCrc32ModuleWorker
     : options.workerFactory;
-  const directMaxBytes =
-    options.allowLargeDirectFallbackInHeadless === true
-    && typeof globalThis.document === "undefined"
-      ? STUDIO_CRC32_WORKER_MAX_BYTES
-      : STUDIO_CRC32_DIRECT_MAX_BYTES;
   let worker: StudioCrc32WorkerLike | null = null;
   let ready = false;
   let disposed = false;
@@ -214,20 +242,6 @@ export function createStudioCrc32WorkerSession(
     closeWorker();
     settle(task, () => task.reject(error));
   };
-  const resolveDirectOrReject = (task: ActiveTask, cause?: unknown) => {
-    closeWorker();
-    settle(task, () => {
-      try {
-        if (task.byteLength > directMaxBytes) {
-          task.reject(directUnavailableError(task.byteLength, cause));
-          return;
-        }
-        task.resolve(runDirect(task.data, task.signal, directMaxBytes));
-      } catch (error) {
-        task.reject(error);
-      }
-    });
-  };
   const postActive = () => {
     const task = active;
     if (!task || !worker || !ready || task.posted || task.settled) return;
@@ -249,7 +263,7 @@ export function createStudioCrc32WorkerSession(
         rejectAndReset(task, new Error("CRC32 Worker 계산 시간이 초과되었습니다."));
       }, STUDIO_CRC32_WORKER_RUN_TIMEOUT_MS);
     } catch (error) {
-      resolveDirectOrReject(task, error);
+      rejectAndReset(task, error);
     }
   };
   const attachWorker = (nextWorker: StudioCrc32WorkerLike) => {
@@ -297,7 +311,6 @@ export function createStudioCrc32WorkerSession(
     worker.onerror = (event) => {
       event.preventDefault?.();
       const task = active;
-      const wasPosted = task?.posted === true;
       const error = event.error instanceof Error
         ? event.error
         : new Error(event.message || "CRC32 Worker 실행 중 오류가 발생했습니다.");
@@ -305,23 +318,19 @@ export function createStudioCrc32WorkerSession(
         closeWorker();
         return;
       }
-      if (!wasPosted) {
-        resolveDirectOrReject(task, error);
-        return;
-      }
       rejectAndReset(task, error);
     };
     readyTimer = setTimeout(() => {
       const task = active;
       if (!task || ready) return;
-      resolveDirectOrReject(task, new Error("CRC32 Worker 준비 시간이 초과되었습니다."));
+      rejectAndReset(task, workerUnavailableError("CRC32 Worker 준비 시간이 초과되었습니다."));
     }, STUDIO_CRC32_WORKER_READY_TIMEOUT_MS);
   };
   const ensureWorker = () => {
     const task = active;
     if (!task || disposed) return;
     if (!factory) {
-      resolveDirectOrReject(task);
+      rejectAndReset(task, workerUnavailableError());
       return;
     }
     if (worker) {
@@ -331,12 +340,12 @@ export function createStudioCrc32WorkerSession(
     try {
       const nextWorker = factory();
       if (!nextWorker) {
-        resolveDirectOrReject(task);
+        rejectAndReset(task, workerUnavailableError());
         return;
       }
       attachWorker(nextWorker);
-    } catch (error) {
-      resolveDirectOrReject(task, error);
+    } catch {
+      rejectAndReset(task, workerUnavailableError("CRC32 Worker를 생성하지 못했습니다."));
     }
   };
 

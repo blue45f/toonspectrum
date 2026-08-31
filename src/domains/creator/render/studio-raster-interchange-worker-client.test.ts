@@ -101,7 +101,10 @@ class FakeWorker implements StudioRasterInterchangeWorkerLike {
 describe("studio raster interchange worker client", () => {
   it("copies caller pixels, transfers them after ready and returns worker output", async () => {
     const worker = new FakeWorker();
-    const promise = encodeStudioRasterInterchangeAsync("qoi", bitmap, { workerFactory: () => worker });
+    const promise = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
+      workerFactory: () => worker,
+    });
     worker.ready();
     const result = await promise;
     expect(result.execution).toBe("worker");
@@ -124,7 +127,10 @@ describe("studio raster interchange worker client", () => {
     const source = owner.subarray(2, 2 + encoded.byteLength);
     const before = [...owner];
     const worker = new FakeWorker();
-    const promise = decodeStudioRasterInterchangeAsync(source, "qoi", { workerFactory: () => worker });
+    const promise = decodeStudioRasterInterchangeAsync(source, "qoi", {
+      executionMode: "worker",
+      workerFactory: () => worker,
+    });
     worker.ready();
 
     const result = await promise;
@@ -139,14 +145,33 @@ describe("studio raster interchange worker client", () => {
     expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the direct codecs for small work when Worker is unavailable", async () => {
-    const encoded = await encodeStudioRasterInterchangeAsync("pam", bitmap, { workerFactory: null });
+  it("uses the direct codecs only when direct mode is selected before work", async () => {
+    const workerFactory = vi.fn(() => new FakeWorker());
+    const encoded = await encodeStudioRasterInterchangeAsync("pam", bitmap, {
+      executionMode: "direct",
+      workerFactory,
+    });
     expect(encoded.execution).toBe("direct");
     expect(encoded.encoded.extension).toBe(".pam");
 
-    const decoded = await decodeStudioRasterInterchangeAsync(encoded.encoded.bytes, "pam", { workerFactory: null });
+    const decoded = await decodeStudioRasterInterchangeAsync(
+      encoded.encoded.bytes,
+      "pam",
+      { executionMode: "direct" },
+    );
     expect(decoded.execution).toBe("direct");
     expect([...decoded.decoded.bitmap.data]).toEqual([...bitmap.data]);
+    expect(workerFactory).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unavailable selected Worker terminal for small work", async () => {
+    await expect(encodeStudioRasterInterchangeAsync("pam", bitmap, {
+      executionMode: "worker",
+      workerFactory: null,
+    })).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+      message: "래스터 Worker를 사용할 수 없습니다.",
+    });
   });
 
   it("fails closed instead of directly encoding over-budget RGBA", async () => {
@@ -156,7 +181,9 @@ describe("studio raster interchange worker client", () => {
     expect(large.data.byteLength).toBeGreaterThan(STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_BYTES);
     expect(width * height).toBeGreaterThan(STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_PIXELS);
 
-    await expect(encodeStudioRasterInterchangeAsync("qoi", large, { workerFactory: null })).rejects.toMatchObject({
+    await expect(encodeStudioRasterInterchangeAsync("qoi", large, {
+      executionMode: "direct",
+    })).rejects.toMatchObject({
       code: "WORKER_REQUIRED",
       message: expect.stringMatching(/Web Worker/u),
     });
@@ -166,13 +193,13 @@ describe("studio raster interchange worker client", () => {
     await expect(decodeStudioRasterInterchangeAsync(
       new Uint8Array(STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_BYTES + 1),
       undefined,
-      { workerFactory: null }
+      { executionMode: "direct" }
     )).rejects.toMatchObject({ code: "WORKER_REQUIRED" });
 
     await expect(decodeStudioRasterInterchangeAsync(
       oversizedQoiHeader(),
       "qoi",
-      { workerFactory: null }
+      { executionMode: "direct" }
     )).rejects.toMatchObject({
       code: "WORKER_REQUIRED",
       message: expect.stringMatching(/1,048,576픽셀/u),
@@ -184,6 +211,7 @@ describe("studio raster interchange worker client", () => {
     controller.abort();
     const factory = vi.fn(() => new FakeWorker());
     await expect(encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       signal: controller.signal,
       workerFactory: factory,
     })).rejects.toMatchObject({ name: "AbortError" });
@@ -194,6 +222,7 @@ describe("studio raster interchange worker client", () => {
     const controller = new AbortController();
     const worker = new FakeWorker(false);
     const pending = decodeStudioRasterInterchangeAsync(new Uint8Array([1]), undefined, {
+      executionMode: "worker",
       signal: controller.signal,
       workerFactory: () => worker,
     });
@@ -206,16 +235,21 @@ describe("studio raster interchange worker client", () => {
     expect(worker.onmessageerror).toBeNull();
   });
 
-  it("falls back for small work if a Worker never becomes ready", async () => {
+  it("fails closed if a selected Worker never becomes ready", async () => {
     vi.useFakeTimers();
     try {
       const worker = new FakeWorker(false);
       const promise = encodeStudioRasterInterchangeAsync("tga", bitmap, {
+        executionMode: "worker",
         workerFactory: () => worker,
         readyTimeoutMs: 100,
       });
+      const rejection = expect(promise).rejects.toMatchObject({
+        name: "TimeoutError",
+        message: expect.stringMatching(/준비 시간이 초과/u),
+      });
       await vi.advanceTimersByTimeAsync(100);
-      expect((await promise).execution).toBe("direct");
+      await rejection;
       expect(worker.terminate).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -234,6 +268,7 @@ describe("studio raster interchange worker client", () => {
       };
       const worker = new FakeWorker(false);
       const pending = encodeStudioRasterInterchangeAsync("qoi", large, {
+        executionMode: "worker",
         workerFactory: () => worker,
         readyTimeoutMs: 100,
         operationTimeoutMs: 5_000,
@@ -276,6 +311,7 @@ describe("studio raster interchange worker client", () => {
         new Uint8Array([1]),
         undefined,
         {
+          executionMode: "worker",
           workerFactory: () => worker,
           operationTimeoutMs:
             STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS
@@ -304,19 +340,21 @@ describe("studio raster interchange worker client", () => {
     }
   });
 
-  it("falls back only for runtime failure before ready and hides raw errors", async () => {
+  it("keeps runtime failure terminal before and after ready while hiding raw errors", async () => {
     const starting = new FakeWorker(false);
-    const fallback = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+    const startingFailure = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => starting,
     });
     starting.runtimeError("raw /private/startup-worker.js");
-    await expect(fallback).resolves.toMatchObject({
-      execution: "direct",
+    await expect(startingFailure).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
     });
     expect(starting.terminate).toHaveBeenCalledTimes(1);
 
     const running = new FakeWorker(false);
     const failed = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => running,
     });
     running.ready();
@@ -334,6 +372,7 @@ describe("studio raster interchange worker client", () => {
   it("fails closed if request transfer fails after ready", async () => {
     const worker = new FakeWorker(false, true);
     const pending = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => worker,
     });
 
@@ -350,6 +389,7 @@ describe("studio raster interchange worker client", () => {
   it("hard-terminates on message clone failures without direct fallback", async () => {
     const worker = new FakeWorker(false);
     const pending = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => worker,
     });
     worker.ready();
@@ -369,6 +409,7 @@ describe("studio raster interchange worker client", () => {
   it("fails fast for wrong request ids, operations and malformed pixels", async () => {
     const wrongIdWorker = new FakeWorker(false);
     const wrongId = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => wrongIdWorker,
     });
     wrongIdWorker.ready();
@@ -395,6 +436,7 @@ describe("studio raster interchange worker client", () => {
 
     const wrongOperationWorker = new FakeWorker(false);
     const wrongOperation = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      executionMode: "worker",
       workerFactory: () => wrongOperationWorker,
     });
     wrongOperationWorker.ready();
@@ -422,7 +464,7 @@ describe("studio raster interchange worker client", () => {
     const malformed = decodeStudioRasterInterchangeAsync(
       encodeStudioRasterInterchange("qoi", bitmap).bytes,
       "qoi",
-      { workerFactory: () => malformedWorker },
+      { executionMode: "worker", workerFactory: () => malformedWorker },
     );
     malformedWorker.ready();
     const decodeRequest = malformedWorker.postMessage.mock.calls[0]?.[0];
@@ -449,20 +491,24 @@ describe("studio raster interchange worker client", () => {
     expect(malformedWorker.terminate).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects over-budget fallback and a posted request timeout without sync work", async () => {
+  it("rejects Worker ready and operation timeouts without sync work", async () => {
     vi.useFakeTimers();
     try {
       const unavailable = new FakeWorker(false);
       const unavailablePromise = decodeStudioRasterInterchangeAsync(oversizedQoiHeader(), "qoi", {
+        executionMode: "worker",
         workerFactory: () => unavailable,
         readyTimeoutMs: 100,
       });
-      const unavailableAssertion = expect(unavailablePromise).rejects.toMatchObject({ code: "WORKER_REQUIRED" });
+      const unavailableAssertion = expect(unavailablePromise).rejects.toMatchObject({
+        name: "TimeoutError",
+      });
       await vi.advanceTimersByTimeAsync(100);
       await unavailableAssertion;
 
       const stalled = new FakeWorker(false);
       const stalledPromise = decodeStudioRasterInterchangeAsync(new Uint8Array([1]), undefined, {
+        executionMode: "worker",
         workerFactory: () => stalled,
         readyTimeoutMs: 100,
         operationTimeoutMs: 100,

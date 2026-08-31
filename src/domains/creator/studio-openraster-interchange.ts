@@ -13,6 +13,8 @@ import {
   type StudioZipReaderLimits,
 } from "./studio-zip-reader";
 
+import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
+
 /** OpenRaster 0.0.x interchange without DOM or image decoding dependencies. */
 
 export const STUDIO_OPENRASTER_MIME = "image/openraster" as const;
@@ -108,8 +110,8 @@ export interface StudioOpenRasterExportInput {
 export interface StudioOpenRasterExportOptions {
   limits?: Partial<StudioOpenRasterLimits>;
   signal?: AbortSignal;
-  /** CLI/headless export only; ignored by browser runtimes. */
-  allowLargeDirectArchiveCrcInHeadless?: boolean;
+  /** Fixed before ZIP construction. Browser product callers select `worker`. */
+  crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 export interface StudioOpenRasterImportOptions extends StudioOpenRasterExportOptions {
@@ -893,7 +895,7 @@ export async function buildStudioOpenRasterBytes(
   const limits = resolveLimits(options.limits);
   const bytes = await buildStudioPackageArchiveBytes(prepared.entries, {
     signal: options.signal,
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
     limits: {
       maxFiles: limits.maxLayers + 4,
       maxEntryBytes: Math.max(
@@ -918,7 +920,7 @@ export async function buildStudioOpenRasterBlob(
   const blob = await buildStudioPackageArchiveBlob(prepared.entries, {
     mimeType: STUDIO_OPENRASTER_MIME,
     signal: options.signal,
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
     limits: {
       maxFiles: limits.maxLayers + 4,
       maxEntryBytes: Math.max(

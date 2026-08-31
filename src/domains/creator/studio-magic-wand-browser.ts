@@ -54,16 +54,19 @@ export async function magicWandScanFromImage(
   const startY = Math.min(traceH - 1, Math.max(0, Math.round(sampleP.y * traceH)));
 
   // 플러드필+윤곽 추적(scanMagicWandRegionFromImageData)은 대형/스크린톤 이미지에서 0.5초+
-  // 걸릴 수 있는 무거운 작업이라 Worker로 옮긴다(Worker를 못 만드는 환경에선 클라이언트 내부에서
-  // 동일 엔진으로 동기 폴백).
-  const { region } = await runStudioMagicWandWorker({
-    data,
-    w: traceW,
-    h: traceH,
-    startX,
-    startY,
-    tolerance,
-  });
+  // 걸릴 수 있는 무거운 작업이라 Worker로 옮긴다. Worker를 사용할 수 없으면 선택을 실패로 닫고
+  // 동일 요청을 main-thread에서 다시 실행하지 않는다.
+  const { region } = await runStudioMagicWandWorker(
+    {
+      data,
+      w: traceW,
+      h: traceH,
+      startX,
+      startY,
+      tolerance,
+    },
+    { executionMode: "worker" },
+  );
   const displayRegion = flipMagicWandRegion(region, flipX, flipY);
   if (displayRegion.outer.length < 3) throw new Error("이 지점에서 선택할 영역을 찾지 못했어요.");
   return displayRegion;

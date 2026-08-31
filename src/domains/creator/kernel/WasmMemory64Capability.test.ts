@@ -18,15 +18,12 @@ import {
 const PAGE_BYTES = BigInt(64 * 1024);
 const MEMORY64_CAPABILITY: WasmScratchCapabilitySelection = Object.freeze({
   selectedRuntime: "memory64",
-  isMemory32FallbackSupported: true,
 });
 const MEMORY32_CAPABILITY: WasmScratchCapabilitySelection = Object.freeze({
-  selectedRuntime: "memory32-fallback",
-  isMemory32FallbackSupported: true,
+  selectedRuntime: "memory32-requested",
 });
 const UNAVAILABLE_CAPABILITY: WasmScratchCapabilitySelection = Object.freeze({
   selectedRuntime: "unavailable",
-  isMemory32FallbackSupported: false,
 });
 
 function mebibytes(value: number): bigint {
@@ -89,9 +86,10 @@ describe("WasmMemory64 capability boundary", () => {
       });
 
       expect(receipt).toMatchObject({
+        requestedRuntime: "memory64",
         selectedRuntime: "memory64",
         isMemory64Supported: true,
-        isMemory32FallbackSupported: true,
+        isMemory32ReferenceSupported: true,
         runtimeAvailableBytes: null,
         runtimeAvailablePages: null,
         memory64JsApi: {
@@ -117,15 +115,16 @@ describe("WasmMemory64 capability boundary", () => {
     },
   );
 
-  it("fails closed to memory32 for a Safari-class profile without Memory64", () => {
+  it("fails closed for a Safari-class profile without Memory64", () => {
     const receipt = probeWasmMemory64Capability({
       webAssembly: nativeHostWithoutMemory64(),
     });
 
     expect(receipt).toMatchObject({
-      selectedRuntime: "memory32-fallback",
+      requestedRuntime: "memory64",
+      selectedRuntime: "unavailable",
       isMemory64Supported: false,
-      isMemory32FallbackSupported: true,
+      isMemory32ReferenceSupported: true,
       memory64JsApi: {
         attempted: false,
         operational: false,
@@ -139,6 +138,17 @@ describe("WasmMemory64 capability boundary", () => {
     expect(receipt.moduleProbe.memory64.failureReason).toBe(
       "module-not-validated",
     );
+
+    const explicitReference = probeWasmMemory64Capability({
+      webAssembly: nativeHostWithoutMemory64(),
+      selectedRuntime: "memory32-requested",
+    });
+    expect(explicitReference).toMatchObject({
+      requestedRuntime: "memory32-requested",
+      selectedRuntime: "memory32-requested",
+      isMemory64Supported: false,
+      isMemory32ReferenceSupported: true,
+    });
   });
 
   it("rejects partial Memory64 when the binary works but the JS Memory API does not", () => {
@@ -154,7 +164,7 @@ describe("WasmMemory64 capability boundary", () => {
       maximumPages: BigInt(1),
       failureReason: "memory-construction-failed",
     });
-    expect(receipt.selectedRuntime).toBe("memory32-fallback");
+    expect(receipt.selectedRuntime).toBe("unavailable");
     expect(receipt.isMemory64Supported).toBe(false);
   });
 
@@ -164,7 +174,7 @@ describe("WasmMemory64 capability boundary", () => {
     expect(receipt).toMatchObject({
       selectedRuntime: "unavailable",
       isMemory64Supported: false,
-      isMemory32FallbackSupported: false,
+      isMemory32ReferenceSupported: false,
       runtimeAvailableBytes: null,
       runtimeAvailablePages: null,
     });
@@ -183,9 +193,9 @@ describe("WasmMemory64 capability boundary", () => {
       canonicalStateAuthority: "CreatorProjectIRV16",
       durablePersistenceAuthority: "opfs-cas-paging",
       role: "scratch-accelerator-only",
-      selectionPriority: "memory64-first",
-      memory32Role: "feature-preservation-fallback-only",
-      memory64AllocationPolicy: "retry-smaller-i64-window-before-fallback",
+      selectionPolicy: "exact-runtime-before-operation",
+      memory32Role: "explicit-reference-provider-only",
+      memory64AllocationPolicy: "retry-smaller-i64-window-then-backpressure",
       workloads: [
         "project",
         "decode",
@@ -267,7 +277,7 @@ describe("dynamic Wasm scratch working-set planning", () => {
     expect(plan.chunkCount).toBe(BigInt(16));
   });
 
-  it("keeps a logical job larger than memory32 and streams it through bounded fallback windows", () => {
+  it("keeps an explicitly selected memory32 reference job in bounded windows", () => {
     const availableBytes = gibibytes(8);
     const logicalByteLength = gibibytes(128);
     const plan = requirePlan(planWasmScratchWorkingSet(
@@ -284,9 +294,8 @@ describe("dynamic Wasm scratch working-set planning", () => {
       },
     ));
 
-    expect(plan.status).toBe("fallback");
-    expect(plan.fallbackReason).toBe("memory64-unavailable");
-    expect(plan.runtime).toBe("memory32-fallback");
+    expect(plan.status).toBe("ready");
+    expect(plan.runtime).toBe("memory32-requested");
     expect(plan.logicalByteLength).toBeGreaterThan(gibibytes(4));
     expect(plan.workingSetBytes).toBe(mebibytes(128));
     expect(plan.budget.protocolMaximumPages).toBe(BigInt(65_536));
@@ -294,7 +303,7 @@ describe("dynamic Wasm scratch working-set planning", () => {
     expect(plan.chunkCount).toBe(BigInt(1024));
   });
 
-  it("feeds a bounded fallback plan into the existing out-of-core runtime above 4 GiB", () => {
+  it("feeds an explicitly selected memory32 plan into the out-of-core reference runtime", () => {
     const plan = requirePlan(planWasmScratchWorkingSet(
       MEMORY32_CAPABILITY,
       {
@@ -309,7 +318,7 @@ describe("dynamic Wasm scratch working-set planning", () => {
       },
     ));
     const runtimeResult = createStudioWasmMemoryRuntime({
-      preferredMode: "i32",
+      selectedMode: "i32",
       initialPages: BigInt(1),
       maximumPages: plan.workingSetPages,
     });
@@ -342,7 +351,7 @@ describe("dynamic Wasm scratch working-set planning", () => {
       globalByteOffset + PAGE_BYTES,
     )).toEqual({ ok: true, address: PAGE_BYTES });
     expect(plan).toMatchObject({
-      runtime: "memory32-fallback",
+      runtime: "memory32-requested",
       logicalByteLength: gibibytes(8),
       workingSetBytes: mebibytes(1),
       materializesWholeDocument: false,
@@ -562,7 +571,7 @@ describe("Wasm scratch allocation receipts", () => {
     expect(Object.isFrozen(allocate.mock.calls[0]?.[0])).toBe(true);
   });
 
-  it("retries a smaller Memory64 window before considering compatibility fallback", () => {
+  it("returns a smaller-window backpressure receipt for the same Memory64 provider", () => {
     const plan = smallPlan();
     const receipt = attemptWasmScratchAllocation(plan, {
       allocate() {
@@ -585,7 +594,7 @@ describe("Wasm scratch allocation receipts", () => {
     });
   });
 
-  it("uses memory32 only after the minimum useful Memory64 window fails", () => {
+  it("fails closed when the minimum useful Memory64 window fails", () => {
     const plan = smallPlan(MEMORY64_CAPABILITY, BigInt(1), BigInt(1));
     const receipt = attemptWasmScratchAllocation(plan, {
       allocate() {
@@ -595,10 +604,11 @@ describe("Wasm scratch allocation receipts", () => {
 
     expect(receipt).toEqual(expect.objectContaining({
       ok: false,
-      status: "fallback",
-      reason: "memory64-allocation-failed",
-      nextRuntime: "memory32-fallback",
-      recommendedPages: BigInt(1),
+      status: "backpressure",
+      reason: "allocation-failed",
+      action: "stream-through-opfs",
+      retryRuntime: "memory64",
+      recommendedPages: BigInt(0),
     }));
   });
 
@@ -615,7 +625,7 @@ describe("Wasm scratch allocation receipts", () => {
       status: "backpressure",
       reason: "allocation-failed",
       action: "retry-smaller-working-set",
-      retryRuntime: "memory32-fallback",
+      retryRuntime: "memory32-requested",
       recommendedPages: BigInt(2),
       issue: {
         name: "Error",
@@ -637,7 +647,7 @@ describe("Wasm scratch allocation receipts", () => {
       status: "backpressure",
       reason: "allocation-failed",
       action: "stream-through-opfs",
-      retryRuntime: "memory32-fallback",
+      retryRuntime: "memory32-requested",
       recommendedPages: BigInt(0),
     }));
   });

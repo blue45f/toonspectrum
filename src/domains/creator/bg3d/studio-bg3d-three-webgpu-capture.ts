@@ -331,8 +331,8 @@ function submitDepthCapture(input: {
 
 /**
  * Builds the WebGPU capture adapter for the live editor scene. Construction is fail-closed: a
- * renderer that is not an initialized WebGPU renderer is refused so the editor can fall back
- * instead of silently producing an empty raster.
+ * renderer that is not an initialized WebGPU renderer is refused and the selected capture stays
+ * unavailable instead of silently producing an empty raster or invoking another renderer.
  */
 export function createStudioBg3dThreeWebGpuCaptureAdapter(
   input: CreateStudioBg3dThreeWebGpuCaptureAdapterInput,

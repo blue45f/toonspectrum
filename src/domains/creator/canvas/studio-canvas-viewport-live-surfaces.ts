@@ -16,8 +16,15 @@ import {
 import {
   planStudioLiveGesturePreviewRenderElements,
 } from "../live/studio-live-gesture-preview-projection";
-import { studioDocumentAllowsKonvaHide } from "../render/studio-document-scene-lower";
-import { resolveStudioVelloHubProductCapability } from "../render/studio-vello-hub";
+import {
+  documentIdsOwnedByVectorIslands,
+  lowerStudioElementsToRenderScene,
+  studioDocumentAllowsKonvaHide,
+} from "../render/studio-document-scene-lower";
+import {
+  resolveStudioVelloHubProductCapability,
+  STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+} from "../render/studio-vello-hub";
 import {
   type StudioRenderSurfaceAuthority,
 } from "../render/StudioRenderSurface";
@@ -29,6 +36,9 @@ import { planStudioCanvasStageLayout } from "../studio-view-controls";
 import {
   readStageDevicePixelRatio,
 } from "./studio-canvas-viewport-primitives";
+import {
+  resolveStudioCanonicalDryMediaViewportAuthority,
+} from "./studio-canonical-dry-media-authority";
 import {
   applyStudioStageViewportClip,
   resolveStudioStageViewportClipArmed,
@@ -53,12 +63,15 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     drawingRef,
     effScale,
     elements,
+    frameAnimOpen,
     groups,
     isExporting,
     localHiddenElementIds,
     mainLayerRef,
     marqueeIds,
     masterEditMode,
+    masterRenderEls,
+    nodeEditDraft,
     saving,
     scrollViewportStore,
     selectedId,
@@ -70,9 +83,11 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     studioLiveGesturePreviewAdapter,
     studioLiveGesturePreviewAuthoritativeElementIds,
     studioRasterHiddenOperationIds,
+    studioWorkAssetRenderPlaceholders,
     studioWorkAssetRenderProjection,
     timelapseCapturing,
     timelinePlaying,
+    timelineOpen,
     tool,
     webGpuPreviewAuthorized,
     webGpuViewportSurface,
@@ -90,6 +105,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       backendId: null,
       decision: null,
       reason: velloHubCapability.reason,
+      sceneRevision: null,
       ownedDocumentIds: [],
       visibleCanvasCount: 0,
     }));
@@ -472,6 +488,26 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       stageViewClip?.top,
     ],
   );
+  // Vello is inserted inside `.konvajs-content`, so it consumes Stage-local
+  // placement. Pixi remains a host sibling and therefore keeps the restored
+  // clip offsets above. Adaptive clips stay an explicit legacy boundary until
+  // the Vello surface can subscribe to the live scroll window and redraw it.
+  const velloSceneDocumentTransform = useMemo(
+    () => ({
+      scaleX: stageViewLayout.scaleX,
+      scaleY: stageViewLayout.scaleY,
+      offsetX: stageViewLayout.x,
+      offsetY: stageViewLayout.y,
+      rotation: stageViewLayout.rotation,
+    }),
+    [
+      stageViewLayout.scaleX,
+      stageViewLayout.scaleY,
+      stageViewLayout.x,
+      stageViewLayout.y,
+      stageViewLayout.rotation,
+    ],
+  );
   // Stable identity prevents the async Vello/Pixi selection island from rerendering when an
   // unrelated inspector or status control commits while the selected document ids are unchanged.
   const acceleratedSceneSelectedIds = useMemo(
@@ -482,33 +518,95 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     () => drawingRef.current !== null,
     [drawingRef],
   );
-  const frameGraphOwnsDocumentPixels =
-    velloHubAuthority.status === "active"
-    && velloHubAuthority.backendId !== null
-    && velloHubAuthority.backendId !== "vello-cpu"
-    && studioDocumentAllowsKonvaHide(elements, velloHubAuthority.ownedDocumentIds);
-  useLayoutEffect(() => {
-    const layer = mainLayerRef.current;
-    if (!layer) return undefined;
-    const sceneCanvas = (
-      layer as unknown as {
-        getNativeCanvasElement?: () => HTMLCanvasElement | undefined;
-        getCanvas?: () => { _canvas?: HTMLCanvasElement };
-      }
+  const velloDocumentElements = useMemo(
+    () => studioLiveGesturePreviewRenderPlan.elements.map((element) => (
+      isEffectivelyHidden(element, groups) || localHiddenElementIds.has(element.id)
+        ? { ...element, hidden: true }
+        : element
+    )),
+    [groups, localHiddenElementIds, studioLiveGesturePreviewRenderPlan.elements],
+  );
+  const velloEligibleDocumentIds = useMemo(
+    () => documentIdsOwnedByVectorIslands(lowerStudioElementsToRenderScene(velloDocumentElements, {
+      width: CANVAS_W,
+      height: canvasH,
+    })),
+    [canvasH, velloDocumentElements],
+  );
+  const velloSurfaceDpr = Math.max(1, stageDevicePixelRatio);
+  const velloBackingWidth = Math.ceil(stageViewLayout.width * velloSurfaceDpr);
+  const velloBackingHeight = Math.ceil(stageViewLayout.height * velloSurfaceDpr);
+  const velloSurfaceSizeAdmitted =
+    stageViewLayout.width > 0
+    && stageViewLayout.height > 0
+    && velloBackingWidth <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
+    && velloBackingHeight <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
+    && velloBackingWidth * velloBackingHeight
+      <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingPixelArea;
+  const velloHasExactPaintProjection =
+    !isExporting
+    && !saving
+    && !timelapseCapturing
+    && !sourceHydrationPending
+    && !collaborationDocumentUnavailable
+    && studioCrdtOperationSyncReady
+    && !masterEditMode
+    && (activePage.hideMaster || masterRenderEls.length === 0)
+    && studioFilterPreview === null
+    && studioFilterPageComposite === null
+    && advancedFillPreview === null
+    && !timelineOpen
+    && !timelinePlaying
+    && !frameAnimOpen
+    && nodeEditDraft === null
+    && studioWorkAssetRenderPlaceholders.length === 0
+    && studioRasterHiddenOperationIds.size === 0
+    && studioLiveGesturePreviewRenderPlan.previewElementIds.size === 0
+    && studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken === "[]";
+  const velloDocumentSurfaceEnabled =
+    velloHubCapability.enabled
+    && stageViewClip === null
+    && velloSurfaceSizeAdmitted
+    && velloHasExactPaintProjection
+    && tool === "select"
+    && selectedId === null
+    && marqueeIds.length === 0
+    && studioDocumentAllowsKonvaHide(
+      velloDocumentElements,
+      velloEligibleDocumentIds,
     );
-    const canvas = sceneCanvas.getNativeCanvasElement?.()
-      ?? sceneCanvas.getCanvas?.()?._canvas
-      ?? null;
-    if (!canvas) return undefined;
-    canvas.style.opacity = frameGraphOwnsDocumentPixels ? "0" : "1";
-    canvas.dataset.studioKonvaDocumentShadow = frameGraphOwnsDocumentPixels
-      ? "true"
-      : "false";
-    return () => {
-      canvas.style.opacity = "1";
-      delete canvas.dataset.studioKonvaDocumentShadow;
-    };
-  }, [frameGraphOwnsDocumentPixels, mainLayerRef]);
+  const velloSceneRevision = useMemo(
+    () => Object.freeze({
+      pageId: activePage.id,
+      documentHeight: canvasH,
+      elements: velloDocumentElements,
+      transform: velloSceneDocumentTransform,
+      dpr: velloSurfaceDpr,
+      viewportHeight: stageViewLayout.height,
+      viewportWidth: stageViewLayout.width,
+    }),
+    [
+      activePage.id,
+      canvasH,
+      velloDocumentElements,
+      velloSceneDocumentTransform,
+      velloSurfaceDpr,
+      stageViewLayout.height,
+      stageViewLayout.width,
+    ],
+  );
+  // The handoff is exact-revision and receipt-gated. During initialisation or
+  // a changed scene, Konva's already-rendered document group remains visible;
+  // no provider is re-executed as a recovery attempt. A current-revision
+  // last-good Vello frame may remain held during an explicit unavailable state.
+  const frameGraphOwnsDocumentPixels =
+    velloDocumentSurfaceEnabled
+    && velloHubAuthority.sceneRevision === velloSceneRevision
+    && velloHubAuthority.visibleCanvasCount === 1
+    && (
+      velloHubAuthority.status === "active"
+      || velloHubAuthority.status === "unavailable"
+    );
   const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
   // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
   // 다시 맞춘다. 컨테이너 transform 과 stage.x/y 는 크기가 같고 부호가 반대라, 둘 중 하나만
@@ -618,17 +716,20 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
         canvasFlipH ? 1 : 0,
       ].join(":")
     : "unavailable";
-  const canonicalDryMediaAuthorized =
-    canonicalDryMediaCanvasAuthority?.element === canonicalDryMediaCandidate
-    && canonicalDryMediaCanvasAuthority.layoutKey === canonicalDryMediaLayoutKey
-      ? canonicalDryMediaCanvasAuthority
-      : null;
+  const canonicalDryMediaViewportAuthority =
+    resolveStudioCanonicalDryMediaViewportAuthority(
+      canonicalDryMediaCanvasAuthority,
+      canonicalDryMediaCandidate,
+      canonicalDryMediaLayoutKey,
+    );
+  const canonicalDryMediaCanvasVisible =
+    canonicalDryMediaViewportAuthority.canvasVisible;
   const canonicalDryMediaHiddenElementId =
-    canonicalDryMediaAuthorized?.element.id ?? null;
+    canonicalDryMediaViewportAuthority.hiddenElementId;
 
   return {
     acceleratedSceneSelectedIds,
-    canonicalDryMediaAuthorized,
+    canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate,
     canonicalDryMediaHiddenElementId,
     canonicalDryMediaLayoutKey,
@@ -651,6 +752,11 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     suppressViewTransform,
     velloHubAuthority,
     velloHubCapability,
+    velloDocumentElements,
+    velloDocumentSurfaceEnabled,
+    velloSceneDocumentTransform,
+    velloSceneRevision,
+    velloSurfaceDpr,
   };
 }
 

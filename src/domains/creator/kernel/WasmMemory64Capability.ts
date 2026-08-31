@@ -20,9 +20,9 @@ export const WASM_MEMORY64_ACCELERATOR_POLICY = Object.freeze({
   canonicalStateAuthority: "CreatorProjectIRV16",
   durablePersistenceAuthority: "opfs-cas-paging",
   role: "scratch-accelerator-only",
-  selectionPriority: "memory64-first",
-  memory32Role: "feature-preservation-fallback-only",
-  memory64AllocationPolicy: "retry-smaller-i64-window-before-fallback",
+  selectionPolicy: "exact-runtime-before-operation",
+  memory32Role: "explicit-reference-provider-only",
+  memory64AllocationPolicy: "retry-smaller-i64-window-then-backpressure",
   workloads: Object.freeze([
     "project",
     "decode",
@@ -46,8 +46,13 @@ export type WasmScratchWorkload =
 
 export type WasmMemoryRuntimeSelection =
   | "memory64"
-  | "memory32-fallback"
+  | "memory32-requested"
   | "unavailable";
+
+export type WasmExactMemoryRuntime = Exclude<
+  WasmMemoryRuntimeSelection,
+  "unavailable"
+>;
 
 export type WasmJsApiProbeFailureReason =
   | "module-probe-failed"
@@ -66,9 +71,11 @@ export interface WasmJsApiProbeReceipt {
 }
 
 export interface WasmMemory64CapabilityReceipt {
+  /** Immutable provider requested before the capability probe begins. */
+  readonly requestedRuntime: WasmExactMemoryRuntime;
   readonly selectedRuntime: WasmMemoryRuntimeSelection;
   readonly isMemory64Supported: boolean;
-  readonly isMemory32FallbackSupported: boolean;
+  readonly isMemory32ReferenceSupported: boolean;
   /** Actual module validation/instantiation/grow evidence from the existing governor. */
   readonly moduleProbe: StudioWasm64CapabilityReport;
   /** Independent JS `WebAssembly.Memory` construction confirmation. */
@@ -81,8 +88,11 @@ export interface WasmMemory64CapabilityReceipt {
   readonly policy: typeof WASM_MEMORY64_ACCELERATOR_POLICY;
 }
 
-export type WasmMemory64CapabilityOptions =
-  StudioWasmCapabilityCheckOptions;
+export interface WasmMemory64CapabilityOptions
+  extends StudioWasmCapabilityCheckOptions {
+  /** Defaults to the product Memory64 provider; Memory32 is reference-only and explicit. */
+  readonly selectedRuntime?: WasmExactMemoryRuntime;
+}
 
 const ONE_PAGE = BigInt(1);
 const ZERO_PAGES = BigInt(0);
@@ -91,7 +101,10 @@ const WASM32_PROTOCOL_MAX_PAGES =
 const WEB_MEMORY64_PROTOCOL_MAX_PAGES =
   STUDIO_WEB_MEMORY64_ADDRESS_LIMIT_BYTES / STUDIO_WASM_PAGE_BYTES;
 
-let cachedDefaultCapability: WasmMemory64CapabilityReceipt | null = null;
+const cachedDefaultCapabilities = new Map<
+  WasmExactMemoryRuntime,
+  WasmMemory64CapabilityReceipt
+>();
 
 function skippedJsApiProbe(
   addressType: StudioWasmAddressType,
@@ -113,8 +126,7 @@ function confirmJsMemoryApi(
 ): WasmJsApiProbeReceipt {
   const runtimeResult = createStudioWasmMemoryRuntime({
     webAssembly: options.webAssembly,
-    preferredMode: addressType,
-    fallbackPolicy: "deny",
+    selectedMode: addressType,
     initialPages: ONE_PAGE,
     maximumPages: ONE_PAGE,
   });
@@ -152,19 +164,23 @@ function confirmJsMemoryApi(
  *
  * The existing governor owns the tiny Memory64/Memory32 module probes. This
  * adapter additionally confirms the JS constructor contract with a one-page
- * runtime. Hosts that implement only part of Memory64 therefore fail closed to
- * memory32. Neither probe makes a physical-memory capacity claim.
+ * runtime. The requested runtime is immutable: partial Memory64 support returns
+ * unavailable and never selects Memory32. Neither probe makes a physical-memory
+ * capacity claim.
  */
 export function probeWasmMemory64Capability(
   options: WasmMemory64CapabilityOptions = {},
 ): WasmMemory64CapabilityReceipt {
+  const requestedRuntime = options.selectedRuntime ?? "memory64";
   const usesDefaultHost = options.webAssembly === undefined;
-  if (usesDefaultHost && cachedDefaultCapability) {
-    return cachedDefaultCapability;
+  const cached = cachedDefaultCapabilities.get(requestedRuntime);
+  if (usesDefaultHost && cached) {
+    return cached;
   }
 
   const moduleProbe = checkStudioWasm64Capability({
     webAssembly: options.webAssembly,
+    selectedMode: requestedRuntime === "memory64" ? "i64" : "i32",
   });
   const memory64JsApi = moduleProbe.memory64.operational
     ? confirmJsMemoryApi("i64", options)
@@ -175,18 +191,20 @@ export function probeWasmMemory64Capability(
 
   const isMemory64Supported =
     moduleProbe.memory64.operational && memory64JsApi.operational;
-  const isMemory32FallbackSupported =
+  const isMemory32ReferenceSupported =
     moduleProbe.memory32.operational && memory32JsApi.operational;
-  const selectedRuntime: WasmMemoryRuntimeSelection = isMemory64Supported
-    ? "memory64"
-    : isMemory32FallbackSupported
-      ? "memory32-fallback"
-      : "unavailable";
+  const requestedRuntimeSupported = requestedRuntime === "memory64"
+    ? isMemory64Supported
+    : isMemory32ReferenceSupported;
+  const selectedRuntime: WasmMemoryRuntimeSelection = requestedRuntimeSupported
+    ? requestedRuntime
+    : "unavailable";
 
   const receipt = Object.freeze({
+    requestedRuntime,
     selectedRuntime,
     isMemory64Supported,
-    isMemory32FallbackSupported,
+    isMemory32ReferenceSupported,
     moduleProbe,
     memory64JsApi,
     memory32JsApi,
@@ -196,7 +214,7 @@ export function probeWasmMemory64Capability(
       STUDIO_WASM_PAGE_BYTES * BigInt(2),
     policy: WASM_MEMORY64_ACCELERATOR_POLICY,
   });
-  if (usesDefaultHost) cachedDefaultCapability = receipt;
+  if (usesDefaultHost) cachedDefaultCapabilities.set(requestedRuntime, receipt);
   return receipt;
 }
 
@@ -226,7 +244,6 @@ export interface WasmScratchWorkingSetRequest {
 
 export interface WasmScratchCapabilitySelection {
   readonly selectedRuntime: WasmMemoryRuntimeSelection;
-  readonly isMemory32FallbackSupported: boolean;
 }
 
 export interface WasmScratchResolvedBudget {
@@ -272,8 +289,7 @@ export interface WasmScratchBackpressureReceipt {
 
 export interface WasmScratchWorkingSetPlan {
   readonly ok: true;
-  readonly status: "ready" | "fallback";
-  readonly fallbackReason: "memory64-unavailable" | null;
+  readonly status: "ready";
   readonly workload: WasmScratchWorkload;
   readonly runtime: Exclude<WasmMemoryRuntimeSelection, "unavailable">;
   readonly addressType: StudioWasmAddressType;
@@ -286,7 +302,6 @@ export interface WasmScratchWorkingSetPlan {
   readonly workingSetBytes: bigint;
   readonly minimumWorkingSetPages: bigint;
   readonly budget: WasmScratchResolvedBudget;
-  readonly memory32FallbackAvailable: boolean;
   readonly readsCanonicalProjectBytes: false;
   readonly materializesWholeDocument: false;
   readonly materializesWholeJson: false;
@@ -487,12 +502,7 @@ export function planWasmScratchWorkingSet(
 
   return Object.freeze({
     ok: true,
-    status: capability.selectedRuntime === "memory64"
-      ? "ready"
-      : "fallback",
-    fallbackReason: capability.selectedRuntime === "memory64"
-      ? null
-      : "memory64-unavailable",
+    status: "ready",
     workload,
     runtime: capability.selectedRuntime,
     addressType,
@@ -505,7 +515,6 @@ export function planWasmScratchWorkingSet(
     workingSetBytes,
     minimumWorkingSetPages,
     budget: resolvedBudget,
-    memory32FallbackAvailable: capability.isMemory32FallbackSupported,
     readsCanonicalProjectBytes: false,
     materializesWholeDocument: false,
     materializesWholeJson: false,
@@ -568,15 +577,6 @@ export type WasmScratchAllocationReceipt =
     }
   | {
       readonly ok: false;
-      readonly status: "fallback";
-      readonly reason: "memory64-allocation-failed";
-      readonly nextRuntime: "memory32-fallback";
-      readonly recommendedPages: bigint;
-      readonly issue: WasmScratchAllocationIssue;
-      readonly policy: typeof WASM_MEMORY64_ACCELERATOR_POLICY;
-    }
-  | {
-      readonly ok: false;
       readonly status: "backpressure";
       readonly reason: "allocation-failed";
       readonly action: "retry-smaller-working-set" | "stream-through-opfs";
@@ -598,7 +598,7 @@ function allocationIssue(cause: unknown): WasmScratchAllocationIssue {
 
 /**
  * Runs an explicitly supplied allocator and converts OOM/device/runtime failure
- * into a fallback or backpressure receipt. The planner itself never allocates.
+ * into backpressure for the same selected runtime. The planner itself never allocates.
  */
 export function attemptWasmScratchAllocation(
   plan: WasmScratchWorkingSetPlan,
@@ -630,37 +630,14 @@ export function attemptWasmScratchAllocation(
         ? plan.minimumWorkingSetPages
         : ZERO_PAGES;
 
-    // Memory64 is the preferred performance/stability path. A transient large
-    // i64 allocation failure first shrinks the i64 resident window; memory32 is
-    // considered only after the minimum useful i64 window also fails.
-    if (plan.addressType === "i64" && recommendedPages > ZERO_PAGES) {
+    if (recommendedPages > ZERO_PAGES) {
       return Object.freeze({
         ok: false,
         status: "backpressure",
         reason: "allocation-failed",
         action: "retry-smaller-working-set",
-        retryRuntime: "memory64",
+        retryRuntime: plan.runtime,
         recommendedPages,
-        issue,
-        policy: WASM_MEMORY64_ACCELERATOR_POLICY,
-      });
-    }
-
-    const memory32RecommendedPages = minBigInt(
-      plan.workingSetPages,
-      WASM32_PROTOCOL_MAX_PAGES,
-    );
-    if (
-      plan.addressType === "i64"
-      && plan.memory32FallbackAvailable
-      && memory32RecommendedPages >= plan.minimumWorkingSetPages
-    ) {
-      return Object.freeze({
-        ok: false,
-        status: "fallback",
-        reason: "memory64-allocation-failed",
-        nextRuntime: "memory32-fallback",
-        recommendedPages: memory32RecommendedPages,
         issue,
         policy: WASM_MEMORY64_ACCELERATOR_POLICY,
       });

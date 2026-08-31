@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES,
   STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
   executeAndCertifyStudioFirstPartyWillV1DocumentCodec,
   studioFirstPartyWillV1DocumentCodecCertificationScope,
@@ -172,6 +171,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         {
           direction: "encode",
           inputBytes: await inputBytes(),
+          execution: "direct",
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
@@ -210,6 +210,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         {
           direction: "encode",
           inputBytes: await inputBytes(),
+          execution: "direct",
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
@@ -281,6 +282,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         {
           direction: "encode",
           inputBytes: source,
+          execution: "direct",
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
           providers: [substituted],
@@ -294,6 +296,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         {
           direction: "encode",
           inputBytes: source,
+          execution: "direct",
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
         },
@@ -335,7 +338,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
     expect(claimed.size).toBe(1);
   });
 
-  it("prefers the dedicated Worker and signs its exact validated result", async () => {
+  it("selects the dedicated Worker by default and certifies one exact attempt", async () => {
     const scope =
       studioFirstPartyWillV1DocumentCodecCertificationScope("encode");
     const { signer, root } = await credentials(scope);
@@ -346,7 +349,6 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         {
           direction: "encode",
           inputBytes: source,
-          execution: "auto",
           workerFactory: () => worker,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
@@ -362,64 +364,55 @@ describe("first-party WILL v1 Annex B document product certification", () => {
       input: { byteLength: source.byteLength },
       output: { byteLength: certified.bytes.byteLength },
     });
+    expect(certified.executionProviderReceipt).toEqual({
+      schemaVersion: 1,
+      kind: "toonspectrum-codec-execution-provider-selection",
+      selectedProvider: "worker",
+      attemptedProviders: ["worker"],
+    });
+    const verified =
+      await verifyStudioFirstPartyWillV1DocumentCertifiedExecution(
+        certified,
+        { trustRoots: [root], nowEpochMs: VERIFY_AT },
+      );
+    expect(verified).toMatchObject({
+      ok: true,
+      certificate: {
+        executionProviderReceipt: {
+          selectedProvider: "worker",
+          attemptedProviders: ["worker"],
+        },
+      },
+    });
     await expect(
-      verifyStudioFirstPartyWillV1DocumentCertifiedExecution(certified, {
-        trustRoots: [root],
-        nowEpochMs: VERIFY_AT,
-      }),
-    ).resolves.toMatchObject({ ok: true });
+      verifyStudioFirstPartyWillV1DocumentCertifiedExecution(
+        {
+          ...certified,
+          executionProviderReceipt: {
+            schemaVersion: 1,
+            kind: "toonspectrum-codec-execution-provider-selection",
+            selectedProvider: "direct",
+            attemptedProviders: ["direct"],
+          },
+        },
+        { trustRoots: [root], nowEpochMs: VERIFY_AT },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "CERTIFIED_EXECUTION_IDENTITY_MISMATCH",
+    });
   });
 
-  it("allows auto fallback only for small pre-execution startup failures", async () => {
+  it("rejects every Worker startup/runtime failure without direct replay", async () => {
     const scope =
       studioFirstPartyWillV1DocumentCodecCertificationScope("encode");
     const { signer } = await credentials(scope);
     const source = await inputBytes();
-    const unavailable =
-      await executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
-        {
-          direction: "encode",
-          inputBytes: source,
-          execution: "auto",
-          workerFactory: null,
-          issuedAt: ISSUED_AT,
-          expiresAt: EXPIRES_AT,
-        },
-        signer,
-      );
-    expect(unavailable.receipt.providerId).toBe(
-      "toonspectrum.will-v1-annex-b-document.v1",
-    );
-
-    const postFailure = new CertificationFakeWorker("post-error");
     await expect(
       executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
         {
           direction: "encode",
           inputBytes: source,
-          execution: "auto",
-          workerFactory: () => postFailure,
-          issuedAt: ISSUED_AT,
-          expiresAt: EXPIRES_AT,
-        },
-        signer,
-      ),
-    ).resolves.toMatchObject({
-      receipt: {
-        providerId: "toonspectrum.will-v1-annex-b-document.v1",
-      },
-    });
-    expect(postFailure.terminateCount).toBe(1);
-
-    await expect(
-      executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
-        {
-          direction: "encode",
-          inputBytes: new Uint8Array(
-            STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-              + 1,
-          ),
-          execution: "auto",
           workerFactory: null,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
@@ -427,20 +420,43 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         signer,
       ),
     ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
-  });
 
-  it("keeps execution/runtime failures fail-closed and direct mode independent", async () => {
-    const scope =
-      studioFirstPartyWillV1DocumentCodecCertificationScope("encode");
-    const { signer } = await credentials(scope);
-    const source = await inputBytes();
+    await expect(
+      executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
+        {
+          direction: "encode",
+          inputBytes: source,
+          workerFactory: () => {
+            throw new Error("startup failed");
+          },
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
+
+    const postFailure = new CertificationFakeWorker("post-error");
+    await expect(
+      executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
+        {
+          direction: "encode",
+          inputBytes: source,
+          workerFactory: () => postFailure,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_EXECUTION_FAILED" });
+    expect(postFailure.terminateCount).toBe(1);
+
     const runtimeWorker = new CertificationFakeWorker("runtime-error");
     const runtime =
       executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
         {
           direction: "encode",
           inputBytes: source,
-          execution: "auto",
           workerFactory: () => runtimeWorker,
           issuedAt: ISSUED_AT,
           expiresAt: EXPIRES_AT,
@@ -453,6 +469,28 @@ describe("first-party WILL v1 Annex B document product certification", () => {
     expect(String((error as Error).message)).not.toContain("wasm");
     expect(runtimeWorker.terminateCount).toBe(1);
 
+    const invalidFactory = vi.fn(() => new CertificationFakeWorker());
+    await expect(
+      executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
+        {
+          direction: "encode",
+          inputBytes: source,
+          execution: "auto" as never,
+          workerFactory: invalidFactory,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_EXECUTION_POLICY" });
+    expect(invalidFactory).not.toHaveBeenCalled();
+  });
+
+  it("keeps explicit worker fail-closed and explicit direct independent", async () => {
+    const scope =
+      studioFirstPartyWillV1DocumentCodecCertificationScope("encode");
+    const { signer } = await credentials(scope);
+    const source = await inputBytes();
     const factory = vi.fn(() => {
       throw new Error("must not construct");
     });
@@ -472,24 +510,12 @@ describe("first-party WILL v1 Annex B document product certification", () => {
       receipt: {
         providerId: "toonspectrum.will-v1-annex-b-document.v1",
       },
+      executionProviderReceipt: {
+        selectedProvider: "direct",
+        attemptedProviders: ["direct"],
+      },
     });
     expect(factory).not.toHaveBeenCalled();
-
-    await expect(
-      executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
-        {
-          direction: "encode",
-          inputBytes: new Uint8Array(
-            STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-              + 1,
-          ),
-          execution: "direct",
-          issuedAt: ISSUED_AT,
-          expiresAt: EXPIRES_AT,
-        },
-        signer,
-      ),
-    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
 
     await expect(
       executeAndCertifyStudioFirstPartyWillV1DocumentCodec(

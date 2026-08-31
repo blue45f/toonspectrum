@@ -38,13 +38,14 @@ import {
  * reproduces the pinned-route contract may step (c) route real strokes.
  *
  * V12 §5 (observation-only): an optional tournament probe projects the
- * renderer tournament's winner cache + kill switch onto the admitted ladder
- * via selectStudioStrokeRoute — the same pattern the filter island runs for
- * real. The probe can only be observed: legacyKind/plannedKind/agrees and the
+ * renderer tournament's winner cache + kill switch onto admitted candidates
+ * via selectStudioStrokeRoute. The probe can only be observed:
+ * legacyKind/plannedKind/agrees and the
  * planner product are computed exactly as before, with or without a probe,
  * and a pristine probe (empty cache, nothing killed) reports the admitted
- * ladder unchanged. The next cutover slice consumes this observation; no
- * component is wired here.
+ * candidates unchanged. If every candidate is killed, only the observation
+ * becomes explicitly unavailable; the authority plan remains untouched. No
+ * component may consume this evidence as an execution or retry order.
  *
  * V13 §2.5 (GPU planning, cost shadow): the authority plan is produced through
  * planWithCostShadow so a real workload fingerprint — derived from the
@@ -52,8 +53,8 @@ import {
  * feeds the observation-only cost ranking. Disagreement receipts accumulate
  * module-level (readStudioSurfaceCostShadowReceipt) as promotion evidence.
  * Fail closed: a missing or malformed probe records an absent fingerprint and
- * ranks nothing; a cost-shadow failure falls back to the legacy planner; the
- * legacy winner keeps sole routing authority either way.
+ * ranks nothing; a cost-shadow observation failure is served by the unchanged
+ * legacy planner; the legacy winner keeps sole routing authority either way.
  *
  * P-02c (full-ladder observation): the authority query is capability-narrowed
  * to the single lane the admission ladder already chose, so its cost receipt
@@ -84,7 +85,7 @@ const STROKE_LANE_RUNTIME: Readonly<
   stamp: "js", // canvas2d-stamp-pattern
   gpu: "webgpu", // canonical-webgpu-* stroke surface
   "live-ink": "js", // canvas2d-causal-ink live overlay
-  "wet-fallback": "js", // canvas2d-wet-field / wet-ribbon
+  "wet-ink": "js", // canvas2d-wet-field / wet-ribbon
   dynamic: "js", // canvas2d-dynamic-coverage
   konva: "js", // Konva canvas2d surface
 });
@@ -92,8 +93,7 @@ const STROKE_LANE_RUNTIME: Readonly<
 /** Route lanes as V11 providers, ladder order = registration order. */
 function buildShadowRegistry(): EngineCapabilityRegistry {
   const registry = new EngineCapabilityRegistry();
-  STUDIO_STROKE_SURFACE_ROUTE_PRIORITY.forEach((kind, index) => {
-    const next = STUDIO_STROKE_SURFACE_ROUTE_PRIORITY[index + 1] ?? null;
+  STUDIO_STROKE_SURFACE_ROUTE_PRIORITY.forEach((kind) => {
     const descriptor = providerDescriptorSchema.parse({
       id: `stroke-route-${kind}`,
       kind: "raster-brush",
@@ -104,12 +104,13 @@ function buildShadowRegistry(): EngineCapabilityRegistry {
       maturity: "production-baseline",
       runtime: STROKE_LANE_RUNTIME[kind],
       capabilities: [`stroke.route.${kind}`, "stroke.route.any"],
-      limitations: [],
+      limitations: [
+        "provider failure is terminal for the selected route; no automatic lane substitution",
+      ],
       previewQuality: "production",
       finalQuality: "production",
       determinism: "tolerance",
       memoryEstimateMb: 0,
-      fallbackProviderId: next === null ? null : `stroke-route-${next}`,
       knownIssues: [],
     });
     registry.registerTrustedBootstrap(
@@ -160,7 +161,7 @@ export function admittedLanes(
   if (input.stampAdmitted) lanes.push("stamp");
   if (input.gpuAdmitted) lanes.push("gpu");
   if (input.liveInkAdmitted) lanes.push("live-ink");
-  if (input.wetFallbackAdmitted) lanes.push("wet-fallback");
+  if (input.wetInkAdmitted) lanes.push("wet-ink");
   if (input.dynamicAdmitted) lanes.push("dynamic");
   lanes.push("konva");
   return lanes;
@@ -182,8 +183,9 @@ export interface StudioV11SurfacePlanShadowResult {
   agrees: boolean;
   plan: SurfacePlan;
   /**
-   * Observation-only tournament projection of the admitted ladder. Null when
-   * no probe was supplied. Never feeds back into legacyKind/plannedKind/plan.
+   * Observation-only tournament projection of admitted candidates. Null when
+   * no probe was supplied. It may be empty with `all-providers-killed`, but it
+   * never feeds back into legacyKind/plannedKind/plan.
    */
   tournament: SelectStudioStrokeRouteResult | null;
 }
@@ -446,12 +448,13 @@ export function planStudioStrokeSurfaceShadow(
   const plan = planSurfaceShadowWithCostReceipt({
     surfaceId: `shadow:${input.strokeEpoch}:${input.pointerId}:${input.strokeId}`,
     mode: "interactive",
-    primaryCandidates: [`stroke-route-${targetLane ?? "konva"}`],
+    primaryOwnerId: `stroke-route-${targetLane ?? "konva"}`,
     islands: [
       {
         islandId: "live-stroke",
         kind: "raster-brush",
         requiredCapabilities: [`stroke.route.${targetLane ?? "konva"}`],
+        selectedProviderId: `stroke-route-${targetLane ?? "konva"}`,
         availableTransports: ["same-gpu-texture", "image-bitmap"],
         ...(fingerprint === undefined ? {} : { fingerprint }),
       },

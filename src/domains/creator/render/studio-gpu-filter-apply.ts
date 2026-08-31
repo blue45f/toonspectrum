@@ -4,21 +4,23 @@
  * ping-pong 으로 커널을 연쇄 실행(중간 readback 없음) → 마지막에 한 번만 readback.
  *
  * 계약:
- *  - applyGpuFilterChain(...) === null 은 "GPU 로 처리하지 않았다"는 뜻이다 — 미지원 환경,
- *    지원 외 필터 활성, 디바이스 손실, 검증/OOM 오류 전부. 호출부는 기존 CPU 경로
- *    (Worker/Konva)를 그대로 태우면 된다. GPU 경로가 틀린 픽셀을 돌려주는 일은 없어야
- *    하므로 검증 오류는 error scope 로 감지해 null 로 강등한다(fail-closed).
+ *  - applyGpuFilterChain(...) === null 은 선택한 GPU 작업이 결과를 만들지 못했다는 뜻이다 —
+ *    미지원 환경, 지원 외 필터 활성, 디바이스 손실, 검증/OOM 오류 전부. 호출부는 마지막
+ *    정상 화면을 유지하고 unavailable 로 끝내야 하며, 같은 작업에서 Worker/Konva를 시작하면
+ *    안 된다. GPU 경로가 틀린 픽셀을 돌려주는 일은 없어야 하므로 검증 오류는 error scope 로
+ *    감지해 null 로 닫는다(fail-closed).
  *  - 체인 순서는 buildImageFilters(studio-konva-filters.ts)가 같은 필드를 적용하는 순서와
  *    동일하다: Gaussian → Morphology → Convolution → Brighten→Contrast → HSL → Levels
  *    → Curve → ColorBalance
  *    (계약 테스트가 buildImageFilters 실물과 대조한다). 인접한 LUT 스텝(밝기대비/레벨/커브)
  *    은 LUT 합성으로 한 lut3 디스패치에 융합된다 — 합성은 순차 실행과 비트 동일하므로
  *    체인 순서 의미가 보존된다.
- *  - 지원 필드 외의 보정이 하나라도 활성이면 전체를 CPU 로 넘긴다(부분 GPU 실행 금지 —
- *    중간 순서에 끼어드는 미지원 필터와 결과가 달라질 수 있기 때문).
+ *  - 지원 필드 외의 보정이 하나라도 활성이면 GPU 후보가 아니다. 호출부는 작업 시작 전에
+ *    별도 Worker provider를 선택해야 한다(부분 GPU 실행 금지 — 중간 순서에 끼어드는
+ *    미지원 필터와 결과가 달라질 수 있기 때문).
  *
  * 이 모듈은 konva 를 import 하지 않는다 — 게이트는 경량 studio-konva-filter-fields 의
- * 후보 판정(보수적: 애매하면 CPU 폴백)을 쓴다.
+ * 후보 판정(보수적: 애매하면 GPU 후보에서 제외)을 쓴다.
  */
 
 import {
@@ -78,7 +80,7 @@ import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export { createStudioGpuFilterPresentationSurface };
 
-/** GPU 경로가 담당하는 보정 필드(이 외의 활성 필드가 있으면 전체 CPU 폴백). */
+/** GPU 경로가 담당하는 보정 필드(이 외의 활성 필드가 있으면 작업 전에 다른 provider 선택). */
 export const STUDIO_GPU_FILTER_SUPPORTED_FIELDS = [
   "brightness",
   "contrast",
@@ -117,7 +119,7 @@ export interface StudioGpuFilterPlanStep {
 export type StudioGpuFilterPlan = readonly StudioGpuFilterPlanStep[];
 
 export interface StudioGpuFilterApplyOptions extends StudioGpuFilterRuntimeOptions {
-  /** Aborted work is discarded and reported as null so the CPU/current request may take over. */
+  /** Aborted work is discarded; only a newer independently selected request may take over. */
   readonly signal?: AbortSignal;
   /** Optional editor revision captured when the request starts. */
   readonly sourceRevision?: string | number;
@@ -133,7 +135,7 @@ export interface StudioGpuFilterPreviewFailure {
 export interface StudioGpuFilterPreviewOptions extends StudioGpuFilterApplyOptions {
   /** Reused by the image node so slider ticks retain one browser-owned GPU canvas. */
   readonly surface?: StudioGpuFilterPresentationSurface;
-  /** Presentation failure is observable before the caller enters its Worker/Konva fallback. */
+  /** Presentation failure is observable so the caller can retain the last good frame. */
   readonly onFailure?: (failure: StudioGpuFilterPreviewFailure) => void;
 }
 
@@ -205,7 +207,8 @@ function activeConvolution(el: ImageFilterFields) {
 /**
  * 지원 필드를 제거한 사본에 활성 보정이 남아 있으면 true — 즉 GPU 체인이 감당 못 하는
  * 필터가 켜져 있다. 경량 후보 판정(hasActiveImageFilters)은 엔진 판정보다 넓어서, 애매한
- * 값(정규화하면 항등인 객체 등)도 "활성"으로 보고 CPU 폴백시킨다 — 안전한 방향의 오탐이다.
+ * 값(정규화하면 항등인 객체 등)도 "활성"으로 보고 GPU 후보에서 제외한다 — 안전한 방향의
+ * 오탐이며, 다른 provider 선택은 작업 시작 전에만 이루어진다.
  */
 function hasUnsupportedActiveFilters(el: ImageFilterFields): boolean {
   // blurFx is a tagged union: only its premultiplied Gaussian variant has a GPU kernel.

@@ -1,10 +1,9 @@
 /**
- * Renderer-neutral, fail-closed specialist failover.
+ * Renderer-neutral, fail-closed specialist transaction.
  *
  * A capture attempt is authoritative only after one registered runtime returns a fully validated
- * result through the runtime registry. Failed attempts never contribute partial artifacts to the
- * next attempt, and candidates are always awaited sequentially so two isolated engines cannot own
- * the same capture transaction at once.
+ * result through the runtime registry. Exactly one runtime is selected before execution; a failed
+ * attempt is surfaced and is never replayed through another engine.
  */
 
 import {
@@ -19,7 +18,7 @@ import {
   type StudioBg3dRuntimeId,
 } from "./studio-bg3d-runtime-topology";
 
-export const STUDIO_BG3D_ATOMIC_FAILOVER_MAX_CANDIDATES = 4;
+export const STUDIO_BG3D_ATOMIC_SELECTED_RUNTIME_COUNT = 1;
 
 export type StudioBg3dAtomicAttemptErrorCode =
   | "adapter-not-registered"
@@ -47,16 +46,10 @@ export interface StudioBg3dAtomicSpecialistSuccess {
   readonly runtimeId: StudioBg3dRuntimeId;
   readonly result: StudioBg3dSpecialistResult;
   readonly attempts: readonly StudioBg3dAtomicSpecialistAttempt[];
-  /**
-   * True only when the authoritative result came from a later candidate. Callers must surface this
-   * fact rather than relabeling a WebGL capture as WebGPU.
-   */
-  readonly fallbackUsed: boolean;
 }
 
 export type StudioBg3dAtomicSpecialistErrorCode =
   | "aborted"
-  | "all-candidates-failed"
   | "invalid-candidates"
   | "terminal-attempt-failed";
 
@@ -88,7 +81,7 @@ export interface RunStudioBg3dAtomicSpecialistInput {
   readonly signal?: AbortSignal;
 }
 
-const FALLBACK_ELIGIBLE_CODES = new Set<StudioBg3dAtomicAttemptErrorCode>([
+const KNOWN_ATTEMPT_ERROR_CODES = new Set<StudioBg3dAtomicAttemptErrorCode>([
   "adapter-not-registered",
   "binding-load-failed",
   "capability-unavailable",
@@ -119,7 +112,7 @@ function errorCodeOf(error: unknown): string | null {
 
 function receiptCodeOf(error: unknown): StudioBg3dAtomicAttemptErrorCode {
   const code = errorCodeOf(error);
-  return code && FALLBACK_ELIGIBLE_CODES.has(code as StudioBg3dAtomicAttemptErrorCode)
+  return code && KNOWN_ATTEMPT_ERROR_CODES.has(code as StudioBg3dAtomicAttemptErrorCode)
     ? code as StudioBg3dAtomicAttemptErrorCode
     : "unknown";
 }
@@ -129,8 +122,7 @@ function validateCandidates(
 ): readonly StudioBg3dAtomicSpecialistCandidate[] {
   if (
     !Array.isArray(candidates) ||
-    candidates.length === 0 ||
-    candidates.length > STUDIO_BG3D_ATOMIC_FAILOVER_MAX_CANDIDATES
+    candidates.length !== STUDIO_BG3D_ATOMIC_SELECTED_RUNTIME_COUNT
   ) {
     throw new StudioBg3dAtomicSpecialistError("invalid-candidates");
   }
@@ -160,12 +152,8 @@ function validateCandidates(
 }
 
 /**
- * Runs one immutable request against an ordered list of equivalent specialist runtimes.
- *
- * Fallback is deliberately narrow: only explicit availability, binding, capability, initialization,
- * context-loss, renderer, or equivalent-feature/artifact failures may advance to the next
- * candidate. Invalid requests/results, disposal, unknown failures, and caller aborts are terminal
- * because retrying them could hide a contract or lifecycle defect.
+ * Runs one immutable request against the single runtime chosen before the transaction starts.
+ * Every failure is terminal for that transaction, including availability and device loss.
  */
 export async function runStudioBg3dAtomicSpecialist(
   input: RunStudioBg3dAtomicSpecialistInput,
@@ -178,74 +166,56 @@ export async function runStudioBg3dAtomicSpecialist(
   const attempts: StudioBg3dAtomicSpecialistAttempt[] = [];
   const signal = input.signal ?? new AbortController().signal;
 
-  for (let index = 0; index < candidates.length; index += 1) {
-    const candidate = candidates[index]!;
+  const candidate = candidates[0]!;
+  if (signal.aborted) {
+    throw new StudioBg3dAtomicSpecialistError("aborted", attempts);
+  }
+  try {
+    const result = await input.registry.run(
+      candidate.runtimeId,
+      input.jobId,
+      input.snapshot,
+      request,
+      signal,
+    );
     if (signal.aborted) {
+      attempts.push(Object.freeze({
+        runtimeId: candidate.runtimeId,
+        outcome: "aborted",
+      }));
       throw new StudioBg3dAtomicSpecialistError("aborted", attempts);
     }
-    try {
-      const result = await input.registry.run(
-        candidate.runtimeId,
-        input.jobId,
-        input.snapshot,
-        request,
-        signal,
-      );
-      if (signal.aborted) {
-        attempts.push(Object.freeze({
-          runtimeId: candidate.runtimeId,
-          outcome: "aborted",
-        }));
-        throw new StudioBg3dAtomicSpecialistError("aborted", attempts);
-      }
+    attempts.push(Object.freeze({
+      runtimeId: candidate.runtimeId,
+      outcome: "succeeded",
+    }));
+    return Object.freeze({
+      runtimeId: candidate.runtimeId,
+      result,
+      attempts: freezeAttempts(attempts),
+    });
+  } catch (error) {
+    if (
+      error instanceof StudioBg3dAtomicSpecialistError
+      && error.code === "aborted"
+    ) throw error;
+    const rawCode = errorCodeOf(error);
+    if (signal.aborted || rawCode === "aborted") {
       attempts.push(Object.freeze({
         runtimeId: candidate.runtimeId,
-        outcome: "succeeded",
+        outcome: "aborted",
       }));
-      return Object.freeze({
-        runtimeId: candidate.runtimeId,
-        result,
-        attempts: freezeAttempts(attempts),
-        fallbackUsed: index > 0,
-      });
-    } catch (error) {
-      if (
-        error instanceof StudioBg3dAtomicSpecialistError &&
-        error.code === "aborted"
-      ) {
-        throw error;
-      }
-      const rawCode = errorCodeOf(error);
-      if (signal.aborted || rawCode === "aborted") {
-        attempts.push(Object.freeze({
-          runtimeId: candidate.runtimeId,
-          outcome: "aborted",
-        }));
-        throw new StudioBg3dAtomicSpecialistError("aborted", attempts, error);
-      }
-      const errorCode = receiptCodeOf(error);
-      attempts.push(Object.freeze({
-        runtimeId: candidate.runtimeId,
-        outcome: "failed",
-        errorCode,
-      }));
-      if (!FALLBACK_ELIGIBLE_CODES.has(errorCode)) {
-        throw new StudioBg3dAtomicSpecialistError(
-          "terminal-attempt-failed",
-          attempts,
-          error,
-        );
-      }
-      if (index === candidates.length - 1) {
-        throw new StudioBg3dAtomicSpecialistError(
-          "all-candidates-failed",
-          attempts,
-          error,
-        );
-      }
+      throw new StudioBg3dAtomicSpecialistError("aborted", attempts, error);
     }
+    attempts.push(Object.freeze({
+      runtimeId: candidate.runtimeId,
+      outcome: "failed",
+      errorCode: receiptCodeOf(error),
+    }));
+    throw new StudioBg3dAtomicSpecialistError(
+      "terminal-attempt-failed",
+      attempts,
+      error,
+    );
   }
-
-  // validateCandidates guarantees at least one candidate; keep the impossible path fail-closed.
-  throw new StudioBg3dAtomicSpecialistError("all-candidates-failed", attempts);
 }

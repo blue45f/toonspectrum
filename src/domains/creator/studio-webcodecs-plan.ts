@@ -1,7 +1,7 @@
 /**
  * Studio WebCodecs — 내보내기 계획 해석기(경로 선택 + 타임라인 + 인코더 설정을 한 번에).
  *
- * 세 패널(모션툰·프레임 애니메이션·타임랩스)이 각자 코덱 탐지·타임라인 계산·폴백 판단을 다시
+ * 세 패널(모션툰·프레임 애니메이션·타임랩스)이 각자 코덱 탐지·타임라인 계산·선택 검증을 다시
  * 짜지 않도록, "무엇을 몇 fps로 내보낼 것인가"만 넘기면 실행 직전 상태를 통째로 돌려준다.
  *
  * 반환값 하나로 UI가 필요한 걸 전부 알 수 있다:
@@ -19,6 +19,7 @@ import {
   selectStudioVideoCodec,
   STUDIO_WEBCODECS_CODECS,
   type StudioExportPipelineDecision,
+  type StudioExportPipelineId,
   type StudioVideoEncoderProbe,
 } from "./studio-webcodecs-capability";
 import {
@@ -52,10 +53,11 @@ export interface StudioVideoExportPlanRequest {
   mode?: StudioVideoTimingMode;
   keyFrameIntervalSec?: number;
   bitrate?: number;
+  /** 실행 전에 명시적으로 고른 provider. capability 실패 뒤에는 바뀌지 않는다. */
+  selectedPipeline: StudioExportPipelineId;
   /** 기존 경로 지원 여부 — 호출부가 isMotionExportSupported() 등으로 채운다. */
   mediaRecorderSupported: boolean;
   pureEncoderSupported: boolean;
-  preferredImageFormat?: "apng" | "gif";
   disableWebCodecs?: boolean;
 }
 
@@ -121,8 +123,8 @@ export function planStudioVideoTimeline(request: StudioVideoExportPlanRequest): 
 }
 
 /**
- * 코덱을 탐지하고 실행 직전 계획을 확정한다. 브라우저에 WebCodecs가 없거나 쓸 수 있는 코덱이
- * 없으면 폴백 결정만 채워서 돌려준다 — 예외를 던지지 않는다.
+ * 실행 직전 계획을 확정한다. 선택한 provider가 없으면 unavailable 결정을 돌려주고 다른 provider로
+ * 자동 전환하지 않는다.
  */
 export async function resolveStudioVideoExportPlan(
   request: StudioVideoExportPlanRequest,
@@ -132,17 +134,17 @@ export async function resolveStudioVideoExportPlan(
   const timingMode = resolveTimingMode(request);
   const fps = normalizeExportFps(request.fps);
   const codec =
-    request.disableWebCodecs === true
+    request.selectedPipeline !== "webcodecs-webm" || request.disableWebCodecs === true
       ? null
       : await selectStudioVideoCodec(
           { width: request.width, height: request.height, fps, bitrate: request.bitrate },
           probe
         );
   const decision = selectExportPipeline({
+    selectedPipeline: request.selectedPipeline,
     webCodecsCodec: codec,
     mediaRecorderSupported: request.mediaRecorderSupported,
     pureEncoderSupported: request.pureEncoderSupported,
-    preferredImageFormat: request.preferredImageFormat,
     disableWebCodecs: request.disableWebCodecs,
   });
 
@@ -152,7 +154,7 @@ export async function resolveStudioVideoExportPlan(
     const config = buildVideoEncoderConfig(
       candidate,
       { width: request.width, height: request.height, fps, bitrate: codec.bitrate },
-      codec.hardwareAccelerated ? "prefer-hardware" : "no-preference"
+      codec.hardwarePreferenceAccepted ? "prefer-hardware" : "no-preference"
     );
     webCodecs = {
       timeline,

@@ -3,7 +3,7 @@
  *
  * This controller intentionally does not install itself in Studio. It connects the already-tested
  * shared RGBA16F presentation owner to the strict textured-brush runtime, while keeping the product
- * shell responsible for atomic fallback visibility and DrawEl persistence. The narrow boundary is
+ * shell responsible for atomic last-good visibility and DrawEl persistence. The narrow boundary is
  * useful before a host is mounted because it makes every authority transition and quality gate
  * testable without introducing a half-wired renderer into the pointer path.
  */
@@ -85,7 +85,7 @@ export type StudioCanonicalVNextDryMediaQualityRejectionReason =
   | "tangent-alignment-required"
   | "textured-tip-required";
 
-export type StudioCanonicalVNextDryMediaPresentationFallbackReason =
+export type StudioCanonicalVNextDryMediaPresentationUnavailableReason =
   | StudioCanonicalVNextDryMediaQualityRejectionReason
   | "cancelled"
   | "controller-busy"
@@ -108,7 +108,7 @@ export interface StudioCanonicalVNextDryMediaVisibleFrameReceipt {
   readonly runtime: StudioEngineWebGpuTexturedBrushReceipt;
   readonly presentation: StudioEngineWebGpuPresentationReceipt;
   readonly specialistSurfaceVisible: true;
-  readonly retainedCanvasFallback: "must-remain-recoverable";
+  readonly retainedCanvasAuthority: "recoverable-last-good";
   readonly persistentAuthority: "draw-el-vector";
   readonly rasterPromotion: "not-promoted";
 }
@@ -119,8 +119,8 @@ export type StudioCanonicalVNextDryMediaVisibleFrameResult =
       receipt: StudioCanonicalVNextDryMediaVisibleFrameReceipt;
     }>
   | Readonly<{
-      status: "retained-fallback";
-      reason: StudioCanonicalVNextDryMediaPresentationFallbackReason;
+      status: "unavailable";
+      reason: StudioCanonicalVNextDryMediaPresentationUnavailableReason;
       detail?: string;
     }>;
 
@@ -145,14 +145,14 @@ export type StudioCanonicalVNextDryMediaFinalParityResult =
         live: StudioCanonicalVNextDryMediaVisibleFrameReceipt;
         commit: StudioCanonicalVNextDryMediaVisibleFrameReceipt;
         specialistSurfaceVisible: true;
-        retainedCanvasFallback: "must-remain-recoverable";
+        retainedCanvasAuthority: "recoverable-last-good";
         persistentAuthority: "draw-el-vector";
         rasterPromotion: "not-promoted";
       }>;
     }>
   | Extract<
       StudioCanonicalVNextDryMediaVisibleFrameResult,
-      { readonly status: "retained-fallback" }
+      { readonly status: "unavailable" }
     >;
 
 function finite(value: unknown): value is number {
@@ -567,15 +567,15 @@ export function validateStudioCanonicalVNextDryMediaCompiledFrame(
   return Object.freeze({ status: "ready", fingerprint });
 }
 
-function retainedFallback(
-  reason: StudioCanonicalVNextDryMediaPresentationFallbackReason,
+function unavailableResult(
+  reason: StudioCanonicalVNextDryMediaPresentationUnavailableReason,
   detail?: string,
 ): Extract<
   StudioCanonicalVNextDryMediaVisibleFrameResult,
-  { readonly status: "retained-fallback" }
+  { readonly status: "unavailable" }
 > {
   return Object.freeze({
-    status: "retained-fallback",
+    status: "unavailable",
     reason,
     ...(detail ? { detail } : {}),
   });
@@ -695,7 +695,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
       || live.receipt.canonicalPlanHash !== commit.receipt.canonicalPlanHash
       || live.receipt.seed !== commit.receipt.seed
       || !hasSameFinalOutputLineage(live.receipt, commit.receipt)
-    ) return retainedFallback("presentation-not-authorized", "final-parity");
+    ) return unavailableResult("presentation-not-authorized", "final-parity");
     return Object.freeze({
       status: "completed",
       receipt: Object.freeze({
@@ -716,7 +716,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
         live: live.receipt,
         commit: commit.receipt,
         specialistSurfaceVisible: true,
-        retainedCanvasFallback: "must-remain-recoverable",
+        retainedCanvasAuthority: "recoverable-last-good",
         persistentAuthority: "draw-el-vector",
         rasterPromotion: "not-promoted",
       }),
@@ -728,10 +728,10 @@ export class StudioCanonicalVNextDryMediaPresentationController {
     phase: StudioCanonicalVNextDryMediaVisibleFrameReceipt["phase"],
     signal?: AbortSignal,
   ): Promise<StudioCanonicalVNextDryMediaVisibleFrameResult> {
-    if (signal?.aborted) return retainedFallback("cancelled");
-    if (this.#busy) return retainedFallback("controller-busy");
+    if (signal?.aborted) return unavailableResult("cancelled");
+    if (this.#busy) return unavailableResult("controller-busy");
     const validated = validateStudioCanonicalVNextDryMediaCompiledFrame(frame);
-    if (validated.status !== "ready") return retainedFallback(validated.reason);
+    if (validated.status !== "ready") return unavailableResult(validated.reason);
     const stats = this.#surface.stats();
     if (
       stats.status !== "ready"
@@ -740,7 +740,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
       || stats.resizeEpoch <= 0
       || stats.viewportEpoch <= 0
       || stats.flipEpoch <= 0
-    ) return retainedFallback("surface-not-ready");
+    ) return unavailableResult("surface-not-ready");
     this.#busy = true;
     let lease: StudioEngineWebGpuPresentationFrameLease | null = null;
     try {
@@ -758,7 +758,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
         sourceFrameFingerprint: validated.fingerprint,
       });
       if (begun.status !== "ready") {
-        return retainedFallback("presentation-begin-rejected", begun.reason);
+        return unavailableResult("presentation-begin-rejected", begun.reason);
       }
       lease = begun.frame;
       const rendered = await this.#runtime.execute({
@@ -770,7 +770,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
       if (rendered.status !== "completed") {
         this.#surface.abortFrame(lease);
         lease = null;
-        return retainedFallback(
+        return unavailableResult(
           signal?.aborted ? "cancelled" : "runtime-rejected",
           rendered.status === "rejected" ? rendered.reason : rendered.status,
         );
@@ -783,7 +783,7 @@ export class StudioCanonicalVNextDryMediaPresentationController {
       ) {
         this.#surface.abortFrame(lease);
         lease = null;
-        return retainedFallback("runtime-rejected", "receipt-mismatch");
+        return unavailableResult("runtime-rejected", "receipt-mismatch");
       }
       const presented = await this.#surface.presentFrame(
         lease,
@@ -798,14 +798,14 @@ export class StudioCanonicalVNextDryMediaPresentationController {
          */
         this.#surface.abortFrame(lease);
         lease = null;
-        return retainedFallback(
+        return unavailableResult(
           "presentation-rejected",
           presented.reason,
         );
       }
       lease = null;
       if (!this.#surface.authorizesVisibility(presented.receipt)) {
-        return retainedFallback("presentation-not-authorized");
+        return unavailableResult("presentation-not-authorized");
       }
       return Object.freeze({
         status: "presented",
@@ -822,14 +822,14 @@ export class StudioCanonicalVNextDryMediaPresentationController {
           runtime: rendered.receipt,
           presentation: presented.receipt,
           specialistSurfaceVisible: true,
-          retainedCanvasFallback: "must-remain-recoverable",
+          retainedCanvasAuthority: "recoverable-last-good",
           persistentAuthority: "draw-el-vector",
           rasterPromotion: "not-promoted",
         }),
       });
     } catch (error) {
       if (lease) this.#surface.abortFrame(lease);
-      return retainedFallback(
+      return unavailableResult(
         signal?.aborted ? "cancelled" : "runtime-rejected",
         error instanceof Error ? error.message : undefined,
       );

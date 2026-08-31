@@ -267,7 +267,6 @@ export function bindStudioCuttoonStagePointersFinish(
     finishPixelSelectionPointerSession,
     flushPendingStrokeCommitsRef,
     freehandObjectSnapLatchRef,
-    gpuFinalFallbackOrderIdsRef,
     gpuLiveInkPinnedRef,
     groupResizeRef,
     hokusaiLiveStrokeRef,
@@ -277,7 +276,9 @@ export function bindStudioCuttoonStagePointersFinish(
     liquifyHandledNativeEndEventsRef,
     liveDraftDirectRef,
     liveDraftVisualRef,
+    liveDynamicBrushDraftDirectRef,
     liveDynamicBrushOverlayRendererRef,
+    liveRetainedMediaDraftDirectRef,
     liveRetainedMediaOverlayRendererRef,
     liveInkOverlayRendererRef,
     liveWetInkDraftDirectRef,
@@ -298,14 +299,11 @@ export function bindStudioCuttoonStagePointersFinish(
     queueDeferredStrokeCommit,
     queueDeferredStrokePostprocess,
     quickShapeActive,
-    refreshStudioHokusaiVectorTailShadow,
     releaseBubbleShapePointerCapture,
     releaseDrawingPointerSession,
     restorePendingStrokeCommits,
     setBubbleShapeDraft,
     setError,
-    showStudioHokusaiVectorShadow,
-    showStudioLivingInkVectorShadow,
     snapshotQuickShapeTracking,
     stopFixedRateStrokePump,
     stopQuickShapeTracking,
@@ -328,7 +326,8 @@ export function bindStudioCuttoonStagePointersFinish(
     studioCrdtOperationSyncReady,
   } = h;
   const cancelCanvasGroupDrag = (...args) => api.cancelCanvasGroupDrag(...args);
-  const completeStudioLivingInkWaterNoop = (...args) => api.completeStudioLivingInkWaterNoop(...args);
+  const completeStudioLivingInkRejectedNoop = (...args) =>
+    api.completeStudioLivingInkRejectedNoop(...args);
   const finishStudioSpecialistStroke = (...args) => api.finishStudioSpecialistStroke(...args);
   const hideBrushCursor = (...args) => api.hideBrushCursor(...args);
   const queueStudioRasterDrawPromotion = (...args) => api.queueStudioRasterDrawPromotion(...args);
@@ -424,7 +423,7 @@ export function bindStudioCuttoonStagePointersFinish(
         const finished = releasePlan.stroke;
         gesturePreviewFinished = drawingGesturePreviewPublisherRef.current.end(finished);
         if (livingInkWaterNoopStrokeIdsRef.current.has(finished.id)) {
-          completeStudioLivingInkWaterNoop(
+          completeStudioLivingInkRejectedNoop(
             finished.id,
             "물리 route가 시작 전에 거부되었습니다.",
           );
@@ -439,10 +438,13 @@ export function bindStudioCuttoonStagePointersFinish(
           }).catch(() => undefined);
         }
         releaseAuthoritativeStroke = finished;
-        if (liveWetInkDraftDirectRef.current) {
-          // Pointer-up post-correction may replace geometry after the last live append. Seal the
-          // physical overlay from the exact DrawEl that will be committed, not the pre-correction
-          // pointer snapshot, so handoff digest/endpoint cannot pop.
+        if (
+          liveWetInkDraftDirectRef.current
+          || liveDynamicBrushDraftDirectRef.current
+          || liveRetainedMediaDraftDirectRef.current
+        ) {
+          // Pointer-up post-correction may replace geometry after the last live append. Keep the
+          // exact candidate source available until its selected overlay explicitly accepts seal.
           liveDraftVisualRef.current = finished;
         }
         if (releasePlan.quickShapeAnnouncementKind) {
@@ -454,18 +456,57 @@ export function bindStudioCuttoonStagePointersFinish(
           deferInkCleanup = specialistRelease === "handled-preserve-ink";
           return;
         }
-        const deferCommit = releasePlan.commitMode === "deferred";
+        const gpuPinnedAtRelease = gpuLiveInkPinnedRef.current;
+        if (
+          gpuPinnedAtRelease
+          && !settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished)
+        ) {
+          // The selected provider did not seal its exact final operation. Remove the streamed CRDT
+          // draft in the same pointer-up task; no immediate/deferred canonical or Konva path may
+          // preserve this failed stroke.
+          completedLiveStrokeBackendAudit = false;
+          discardDrawingPointerSession();
+          return;
+        }
+        const selectedOverlaySeal = liveWetInkDraftDirectRef.current
+          ? {
+              provider: "습식 매체",
+              result: liveWetInkOverlayRendererRef.current.end(finished, {
+                pageEpoch: activePage.id,
+                hidden: finished.hidden === true,
+              }),
+            }
+          : liveDynamicBrushDraftDirectRef.current
+            ? {
+                provider: "동적 브러시",
+                result: liveDynamicBrushOverlayRendererRef.current.end(finished),
+              }
+            : liveRetainedMediaDraftDirectRef.current
+              ? {
+                  provider: "리테인드 매체",
+                  result: liveRetainedMediaOverlayRendererRef.current.end(finished),
+                }
+              : null;
+        if (selectedOverlaySeal && selectedOverlaySeal.result.status !== "settled") {
+          // The immutable `finished` source remains the decision authority until this explicit
+          // cancellation. It is never queued/committed through a different renderer.
+          completedLiveStrokeBackendAudit = false;
+          setError(
+            `${selectedOverlaySeal.provider} 엔진이 획을 확정하지 못했습니다: `
+              + `${selectedOverlaySeal.result.status}/${selectedOverlaySeal.result.reason}. `
+              + "다른 렌더러를 선택한 뒤 새 획으로 다시 시도해 주세요.",
+          );
+          discardDrawingPointerSession();
+          return;
+        }
+        // WebGPU always leaves pointer-up through the receipt-gated deferred transaction. Even an
+        // otherwise immediate brush cannot commit before its asynchronous terminal frame arrives.
+        const deferCommit = releasePlan.commitMode === "deferred" || gpuPinnedAtRelease;
         if (deferCommit) {
           deferInkCleanup = true;
           if (!liveDraftDirectRef.current && finished.mode !== "eraser") {
             // 최종 형태(postCorrection·스마트도형 반영)를 settled 프리뷰로 유지한 채 커밋을 미룬다.
             draftPreviewStoreRef.current.settle(finished);
-          }
-          if (gpuLiveInkPinnedRef.current) {
-            // Publish the sealed endpoint before preserveInk releases the active draft. Without
-            // this sync, a short final stabilizer sample would exist only in the later Konva
-            // commit and visibly pop in after the deferred interval.
-            settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
           }
           queueDeferredStrokeCommit(finished);
           if (deferredPostprocessPlan) {
@@ -510,15 +551,16 @@ export function bindStudioCuttoonStagePointersFinish(
               deferInkCleanup = overlayRenderer.isActive
                 || gpuLiveInkPinnedRef.current
                 || liveDynamicBrushOverlayRendererRef.current.isActive
+                || liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes
                 || liveRetainedMediaOverlayRendererRef.current.isActive
-                || liveWetInkOverlayRendererRef.current.isActive;
-              if (gpuLiveInkPinnedRef.current) {
-                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-              }
+                || liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes
+                || liveWetInkOverlayRendererRef.current.isActive
+                || liveWetInkOverlayRendererRef.current.hasSettledStrokes;
               if (!deferInkCleanup) {
-                // The live Canvas/WebGPU surface can be briefly unavailable during initial layout,
-                // resize, or device fallback. Keep an exact settled Konva copy until the committed
-                // main-layer draw receipt arrives instead of exposing a blank handoff frame.
+                // This is the successful document-commit boundary, not renderer error recovery.
+                // Keep an exact settled Konva copy until the committed main-layer draw receipt
+                // arrives instead of exposing a blank handoff frame while the selected live
+                // surface is unavailable.
                 // Eraser dest-out remesh of the draft FIFO is a long task on an empty page.
                 if (finished.mode !== "eraser") {
                   draftPreviewStoreRef.current.settle(finished);
@@ -544,13 +586,14 @@ export function bindStudioCuttoonStagePointersFinish(
             });
             if (liveDraftDirectRef.current) {
               deferInkCleanup = true;
-              if (gpuLiveInkPinnedRef.current) {
-                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-              } else if (
+              if (
                 !overlayRenderer.isActive
                 && !liveDynamicBrushOverlayRendererRef.current.isActive
+                && !liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes
                 && !liveRetainedMediaOverlayRendererRef.current.isActive
+                && !liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes
                 && !liveWetInkOverlayRendererRef.current.isActive
+                && !liveWetInkOverlayRendererRef.current.hasSettledStrokes
                 && finished.mode !== "eraser"
               ) {
                 draftPreviewStoreRef.current.settle(finished);
@@ -646,47 +689,14 @@ export function bindStudioCuttoonStagePointersFinish(
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
       strokeObjectSnapCacheRef.current = null;
       freehandObjectSnapLatchRef.current = EMPTY_FREEHAND_OBJECT_SNAP_LATCH;
-      gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       finalizeLiveStrokeBackendAudit(
         finishingStrokeId,
         completedLiveStrokeBackendAudit && deferInkCleanup
       );
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
-      const finishingLivingInk = livingInkStrokeRef.current;
-      if (
-        deferInkCleanup
-        && finishingLivingInk?.finishing
-        && finishingLivingInk.finalDrawing
-        && !finishingLivingInk.overlayPresented
-      ) {
-        // A short contact can finish before the Worker presents even its first material frame.
-        // Restore the exact vector in the same pointer-up task and retire it only on a real frame
-        // or canonical-image receipt; otherwise the async finish window contains a blank canvas.
-        showStudioLivingInkVectorShadow(
-          finishingLivingInk.finalDrawing,
-          finishingLivingInk.pageId,
-        );
-      }
-      const finishingHokusai = hokusaiLiveStrokeRef.current;
-      if (
-        deferInkCleanup
-        && finishingHokusai?.finishing
-        && finishingHokusai.finalDrawing
-      ) {
-        if (!finishingHokusai.overlayPresented) {
-          // A fast pointer-up can outrun Hokusai's first dirty frame. Restore the exact retained
-          // vector synchronously, then relinquish it only when a real material frame owns pixels.
-          showStudioHokusaiVectorShadow(
-            finishingHokusai.finalDrawing,
-            finishingHokusai.pageId,
-          );
-        } else {
-          refreshStudioHokusaiVectorTailShadow(
-            finishingHokusai,
-            finishingHokusai.finalDrawing,
-          );
-        }
-      }
+      // Living Ink and Hokusai retain their final DrawEl only inside their selected-provider
+      // transaction. Until an exact material frame/canonical image receipt arrives, the canvas
+      // intentionally remains hidden; pointer-up never restores a Konva vector shadow.
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
       // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
       // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is

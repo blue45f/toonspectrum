@@ -670,6 +670,9 @@ describe("every stage raster read goes through a choke point", () => {
     const reads = runtimeSource.match(/\bstage\.toCanvas\(/gu) ?? [];
     expect(reads).toHaveLength(6);
     expect(runtimeSource.match(/await captureReadyStageForPage\(/gu) ?? []).toHaveLength(6);
+    expect(runtimeSource).toMatch(
+      /encodeStudioRasterInterchangeAsync\([\s\S]*?\{\s*executionMode:\s*"worker"\s*\}\s*\)/u,
+    );
     // No other Stage geometry may be consulted; `pixelRatio` is the only knob these paths turn.
     expect(runtimeSource).not.toMatch(/stage\.(width|height|x|y|scaleX|scaleY|rotation)\(/u);
   });

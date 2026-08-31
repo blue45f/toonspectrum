@@ -47,8 +47,8 @@ export type StudioCuttoonStagePointersHost = {
   cancelCanvasSelectionResize: any;
   canvasInteractionUnitIds: any;
   causalPostCorrectionStateRef: any;
-  clearStudioHokusaiVectorShadow: any;
-  clearStudioLivingInkVectorShadow: any;
+  clearStudioHokusaiRetainedDraftPixels: any;
+  clearStudioLivingInkRetainedDraftPixels: any;
   collaborationAccessRef: any;
   color: any;
   colorRangePickActive: any;
@@ -111,7 +111,6 @@ export type StudioCuttoonStagePointersHost = {
   flushPendingStrokeCommitsRef: any;
   freehandObjectSnapLatchRef: any;
   getClientPointFromKonvaEvent: any;
-  gpuFinalFallbackOrderIdsRef: any;
   gpuLiveInkPinnedRef: any;
   gpuLiveSourceJournalRef: any;
   gridSize: any;
@@ -249,7 +248,6 @@ export type StudioCuttoonStagePointersHost = {
   rebaseStudioHistoryJournal: any;
   recentColors: any;
   refreshQuickMaskTint: any;
-  refreshStudioHokusaiVectorTailShadow: any;
   releaseBubbleShapePointerCapture: any;
   releaseDrawingPointerSession: any;
   releaseLivingInkInputPointer: any;
@@ -286,8 +284,6 @@ export type StudioCuttoonStagePointersHost = {
   shapeFill: any;
   shared: any;
   showAlignmentGuides: any;
-  showStudioHokusaiVectorShadow: any;
-  showStudioLivingInkVectorShadow: any;
   smudgeActive: any;
   smudgeCursorRef: any;
   smudgeDragRef: any;

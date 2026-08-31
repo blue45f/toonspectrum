@@ -157,6 +157,7 @@ describe("planStudioAdvancedFillVectorTarget", () => {
 
     const rendered = await renderStudioAdvancedFillVectorReference(blankInput, {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: rasterizer(),
     });
     expect(rendered).toMatchObject({
@@ -252,7 +253,11 @@ describe("planStudioAdvancedFillVectorTarget", () => {
           draw("ink"),
           draw("erase-elsewhere", { mode: "eraser", points: [600, 800, 620, 820] }),
         ]),
-        { workerFactory: null, rasterize: rasterizer((svg) => svgs.push(svg)) },
+        {
+          workerFactory: null,
+          rasterExecutionBackend: "custom",
+          rasterize: rasterizer((svg) => svgs.push(svg)),
+        },
       ),
     ).resolves.toMatchObject({ elementCount: 1 });
     expect(svgs).toHaveLength(1);
@@ -334,6 +339,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
     let capturedSvg = "";
     const result = await renderStudioAdvancedFillVectorReference(input([nonDraw, line]), {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: rasterizer((svg) => {
         capturedSvg = svg;
       }),
@@ -368,6 +374,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
     await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
       signal: before.signal,
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: neverCalled,
     })).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
     expect(neverCalled).not.toHaveBeenCalled();
@@ -376,6 +383,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
     await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
       signal: during.signal,
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: async (request) => {
         during.abort();
         return { dataUrl: PNG_DATA_URL, width: request.width, height: request.height };
@@ -386,6 +394,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
   it("rejects non-PNG, wrong-size and over-budget raster outputs", async () => {
     await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: async (request) => ({
         dataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
         width: request.width,
@@ -395,6 +404,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
 
     await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: async () => ({ dataUrl: PNG_DATA_URL, width: 1, height: 1 }),
     })).rejects.toMatchObject({ code: "invalid-png-output" });
 
@@ -402,6 +412,7 @@ describe("renderStudioAdvancedFillVectorReference", () => {
       budgets: { maxPngBytes: 1 },
     }), {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: rasterizer(),
     })).rejects.toMatchObject({ code: "png-budget-exceeded" });
   });
@@ -424,6 +435,26 @@ describe("renderStudioVectorReference generic seam", () => {
     expect(prepared.result).toEqual(expected);
     expect(prepared.result.skipped).toEqual([]);
     expect(prepared.result.svg).toMatch(/<(?:path|image)\b/u);
+  });
+
+  it("pins one raster backend before work and never switches from Worker to browser-direct", async () => {
+    const prepared = await prepareStudioVectorReferenceExport({
+      width: 320,
+      height: 240,
+      elements: [draw("exact-raster-provider")],
+    }, { workerFactory: null });
+    vi.stubGlobal("Worker", undefined);
+    vi.stubGlobal("createImageBitmap", undefined);
+    vi.stubGlobal("document", undefined);
+    try {
+      await expect(renderPreparedStudioVectorReference(prepared))
+        .rejects.toThrow(/Offscreen/u);
+      await expect(renderPreparedStudioVectorReference(prepared, {
+        rasterExecutionBackend: "browser-direct",
+      })).rejects.toThrow(/브라우저/u);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("rasterizes the exact prepared export without running a second serialization phase", async () => {
@@ -451,7 +482,10 @@ describe("renderStudioVectorReference generic seam", () => {
     );
     const encode = vi.spyOn(TextEncoder.prototype, "encode");
 
-    const result = await renderPreparedStudioVectorReference(prepared, { rasterize });
+    const result = await renderPreparedStudioVectorReference(prepared, {
+      rasterExecutionBackend: "custom",
+      rasterize,
+    });
 
     expect(encode).toHaveBeenCalledOnce();
     encode.mockRestore();
@@ -494,6 +528,7 @@ describe("renderStudioVectorReference generic seam", () => {
 
     await expect(renderPreparedStudioVectorReference(prepared, {
       signal: controller.signal,
+      rasterExecutionBackend: "custom",
       rasterize,
     })).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
     expect(rasterize).not.toHaveBeenCalled();
@@ -519,6 +554,7 @@ describe("renderStudioVectorReference generic seam", () => {
       fingerprintNamespace: "filter-vector-v1",
     }, {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: rasterizer((svg) => {
         captured = svg;
       }),
@@ -540,6 +576,7 @@ describe("renderStudioVectorReference generic seam", () => {
       fingerprintNamespace: "filter-merged-copy-v1",
     }, {
       workerFactory: null,
+      rasterExecutionBackend: "custom",
       rasterize: rasterizer((svg) => {
         captured = svg;
       }),

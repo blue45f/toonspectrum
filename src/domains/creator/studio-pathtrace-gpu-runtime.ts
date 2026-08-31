@@ -5,7 +5,7 @@
  * 필름·WGSL 문자열)는 순수하며 node 테스트에서 그대로 돈다.
  *
  * 수명 규율은 studio-gpu-filter-runtime.ts 를 그대로 복제한다:
- *  - 기능 감지 실패 / adapter 없음 / 획득 예외 → `null` (호출부는 CPU 렌더러로 폴백)
+ *  - 기능 감지 실패 / adapter 없음 / 획득 예외 → `null` (선택한 WebGPU 경로 unavailable)
  *  - device lost → 런타임을 lost 로 표시하고 공유 싱글턴을 비운다
  *  - dispose 는 generation 카운터로 in-flight 획득과 경합해도 안전하다
  *  - `options.gpu` 를 주면 싱글턴을 우회한다(테스트는 fake seam, `null` 은 미지원 강제)
@@ -41,7 +41,7 @@ export interface StudioPathtraceGpuRuntimeOptions {
 
 export interface StudioPathtraceGpuRuntime {
   readonly device: GPUDevice;
-  /** true 면 이 런타임은 다시 쓸 수 없다 — 호출부는 즉시 CPU 렌더러로 폴백해야 한다. */
+  /** true 면 선택한 WebGPU 경로를 다시 쓸 수 없고 해당 작업은 unavailable이다. */
   readonly lost: boolean;
   getComputePipeline(shaderId: string, wgsl: string, entryPoint: string): GPUComputePipeline;
   /** 읽기 전용 씬 데이터(STORAGE | COPY_DST). */

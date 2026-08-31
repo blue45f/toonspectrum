@@ -47,7 +47,8 @@ function throwIfHealCloneBakeAborted(signal: AbortSignal | undefined): void {
  * buildSelectionMaskPlan 의 featherScale 관례와 동일).
  *
  * 도장 블렌드 루프(applyHealCloneDabs)는 대형 이미지·긴 스트로크에서 무거운 동기 작업이라
- * Worker로 옮긴다(Worker를 못 만드는 환경에선 클라이언트 내부에서 동일 엔진으로 동기 폴백).
+ * Worker로 옮긴다. 선택한 Worker를 사용할 수 없으면 요청을 실패로 닫고 동일한 스트로크를
+ * main-thread에서 다시 실행하지 않는다.
  * source/destination footprint를 서로 독립된 ROI로 읽고 Worker로 전송한다. 두 지점이 멀어도 사이의
  * untouched bridge 픽셀은 읽거나 복사하지 않는다. 결과 캔버스는 기존 문서/히스토리 계약을 유지하도록
  * 여전히 전체 이미지 크기지만, Worker 입출력은 두 footprint 면적에만 비례한다.
@@ -127,7 +128,7 @@ export async function bakeHealCloneStrokeToCanvas(
     hardness: brush.hardness,
     opacity: brush.opacity,
     mode,
-  }, options);
+  }, { executionMode: "worker", ...options });
 
   throwIfHealCloneBakeAborted(options.signal);
   // Worker structured clone은 typed pixel buffer를 보존하지만 ImageData prototype까지 보장하지 않는다.

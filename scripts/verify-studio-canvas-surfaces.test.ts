@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectStudioCanvasSurfaceContractFailures,
+  isStudioCanvasVelloSurfaceReady,
   resolveStudioCanvasSurfaceBudget,
   STUDIO_CANVAS_RECLAIMED_SURFACES,
   STUDIO_CANVAS_SURFACE_DPR_CASES,
@@ -110,6 +111,37 @@ function passingContract() {
 }
 
 describe("Studio canvas surface production-preview gate", () => {
+  it("waits for the route-aware Vello ownership terminal state", () => {
+    expect(isStudioCanvasVelloSurfaceReady({
+      authority: "disabled",
+      frameGraphDocument: "konva-shadow",
+      velloCanvasCount: 0,
+    })).toBe(true);
+    expect(isStudioCanvasVelloSurfaceReady({
+      authority: "legacy",
+      frameGraphDocument: "konva-shadow",
+      velloCanvasCount: 0,
+    })).toBe(true);
+    expect(isStudioCanvasVelloSurfaceReady({
+      authority: "active",
+      frameGraphDocument: "vello-skia",
+      velloCanvasCount: 1,
+    })).toBe(true);
+    expect(isStudioCanvasVelloSurfaceReady({
+      authority: "starting",
+      frameGraphDocument: "konva-shadow",
+      velloCanvasCount: 0,
+    })).toBe(false);
+    expect(isStudioCanvasVelloSurfaceReady({
+      authority: "active",
+      frameGraphDocument: "vello-skia",
+      velloCanvasCount: 0,
+    })).toBe(false);
+    expect(verifierSource).toContain("data-studio-frame-graph-document");
+    expect(verifierSource).toContain("velloCanvasCount === 1");
+    expect(verifierSource).toContain("velloCanvasCount === 0");
+  });
+
   it("keeps explicit sequential DPR and normalized allocation-pressure thresholds", () => {
     expect(STUDIO_CANVAS_SURFACE_DPR_CASES).toEqual([
       {

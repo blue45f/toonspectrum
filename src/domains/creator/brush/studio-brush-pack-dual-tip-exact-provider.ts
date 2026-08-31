@@ -1,12 +1,14 @@
 /**
  * Upper brush-pack provider boundary for exact dual-tip execution.
  *
- * The CPU f32 oracle always plans first and remains a complete fallback/save authority. WebGPU v2
- * is loaded lazily and receives the oracle's resolved packed deposition stream. Version 1
- * independent-mask plans are intentionally absent from this product route.
+ * The CPU f32 oracle may plan and validate the packed deposition stream, but it has no pixel or
+ * save authority in this WebGPU-selected provider. CPU pixel execution is exposed through a
+ * separate API that callers must select before work begins. Version 1 independent-mask plans are
+ * intentionally absent from this product route.
  */
 
 import {
+  STUDIO_DUAL_TIP_CONTRACT_ID,
   STUDIO_DUAL_TIP_PACKED_LAYOUT,
   STUDIO_DUAL_TIP_PACKED_STRIDE,
 } from "../studio-dual-brush-tip-engine";
@@ -32,13 +34,15 @@ import type {
 import type {
   StudioDynamicDualTipExactPlanV2,
   StudioDynamicDualTipExactR8AssetInputV2,
+  StudioDynamicDualTipExactWebGpuExecutionResultV2,
   StudioDynamicDualTipExactWebGpuReceiptV2,
   StudioDynamicDualTipExactWebGpuRuntimeV2,
 } from "../studio-dynamic-dual-tip-webgpu-runtime-v2";
 
-export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION = 1 as const;
-export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_REPLAY_VERSION = 1 as const;
-export const STUDIO_BRUSH_PACK_DUAL_TIP_CPU_FALLBACK_RECEIPT_VERSION = 1 as const;
+export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION = 2 as const;
+export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_REPLAY_VERSION = 2 as const;
+export const STUDIO_BRUSH_PACK_DUAL_TIP_CPU_REFERENCE_EVIDENCE_VERSION = 1 as const;
+export const STUDIO_BRUSH_PACK_DUAL_TIP_EXPLICIT_CPU_RECEIPT_VERSION = 1 as const;
 
 const MAX_REPLAY_BASE64_CODE_UNITS = 32 * 1024 * 1024;
 const MAX_REPLAY_DEPOSITIONS = 65_536;
@@ -66,7 +70,7 @@ export interface StudioBrushPackDualTipExactExecution {
   readonly porterDuff?: StudioDualTipExactPorterDuff;
 }
 
-export type StudioBrushPackDualTipCpuFallbackReason =
+export type StudioBrushPackDualTipExactUnavailableReason =
   | "webgpu-unavailable"
   | "module-load-failed"
   | "runtime-initialization-failed"
@@ -77,13 +81,16 @@ export type StudioBrushPackDualTipCpuFallbackReason =
   | "provider-failed"
   | "disposed";
 
-export interface StudioBrushPackDualTipCpuFallbackReceipt {
-  readonly kind: "studio-brush-pack-dual-tip-cpu-fallback-receipt";
-  readonly version: typeof STUDIO_BRUSH_PACK_DUAL_TIP_CPU_FALLBACK_RECEIPT_VERSION;
+export interface StudioBrushPackDualTipCpuReferenceEvidence {
+  readonly kind: "studio-brush-pack-dual-tip-cpu-reference-evidence";
+  readonly version: typeof STUDIO_BRUSH_PACK_DUAL_TIP_CPU_REFERENCE_EVIDENCE_VERSION;
   readonly providerVersion: typeof STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION;
-  readonly executionRoute: "cpu-f32-oracle";
-  readonly reason: StudioBrushPackDualTipCpuFallbackReason;
-  readonly authority: "cpu-f32-oracle";
+  readonly executionRoute: "cpu-f32-oracle-reference";
+  readonly purpose: "plan-validation-and-qa-reference";
+  readonly authority: "none";
+  readonly pixelAuthority: false;
+  readonly saveAuthority: false;
+  readonly providerSelection: "not-selected";
   readonly alphaContract: "premultiplied-linear-rgba-f32";
   readonly packedCommandContract: "gpu-wasm-ready-f32-v1";
   readonly mode: "append" | "rebuild";
@@ -93,9 +100,29 @@ export interface StudioBrushPackDualTipCpuFallbackReceipt {
   readonly stampCount: number;
   readonly width: number;
   readonly height: number;
+  readonly oracleContract: Omit<StudioDualTipReceipt, "authority">;
+  readonly complete: true;
+}
+
+export interface StudioBrushPackDualTipExplicitCpuReceipt {
+  readonly kind: "studio-brush-pack-dual-tip-explicit-cpu-receipt";
+  readonly version: typeof STUDIO_BRUSH_PACK_DUAL_TIP_EXPLICIT_CPU_RECEIPT_VERSION;
+  readonly providerVersion: typeof STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION;
+  readonly executionRoute: "cpu-f32-oracle-explicit";
+  readonly providerSelection: "explicit-before-execution";
+  readonly authority: "cpu-f32-oracle";
   readonly cpuReceipt: StudioDualTipReceipt;
   readonly complete: true;
 }
+
+export type StudioBrushPackDualTipExplicitCpuResult =
+  | Readonly<{ status: "not-configured" }>
+  | Readonly<{ status: "rejected"; reason: "cpu-oracle-rejected" }>
+  | Readonly<{
+      status: "cpu-explicit";
+      artifact: StudioDualTipArtifact;
+      receipt: StudioBrushPackDualTipExplicitCpuReceipt;
+    }>;
 
 export interface StudioBrushPackDualTipExactReplayAsset {
   readonly assetId: string;
@@ -117,8 +144,8 @@ export interface StudioBrushPackDualTipExactReplay {
   readonly primaryAsset: StudioBrushPackDualTipExactReplayAsset;
   readonly secondaryAsset: StudioBrushPackDualTipExactReplayAsset;
   readonly commands: StudioDualTipPackedCommands;
-  /** Complete CPU authority retained for GPU absence/loss and deterministic save replay. */
-  readonly cpuArtifact: StudioDualTipArtifact;
+  /** Non-authoritative planning/QA evidence; CPU pixels are never serialized into this replay. */
+  readonly cpuReferenceEvidence: StudioBrushPackDualTipCpuReferenceEvidence;
   readonly exactPlanFingerprint: `sha256:${string}`;
 }
 
@@ -127,8 +154,8 @@ export interface StudioBrushPackDualTipExactCompletionReceipt {
   readonly version: typeof STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION;
   readonly executionRoute: "webgpu-exact-packed-deposition-v2";
   readonly gpu: StudioDynamicDualTipExactWebGpuReceiptV2;
-  /** Precomputed receipt retained even when the GPU succeeds, so recovery is deterministic. */
-  readonly cpuFallback: StudioBrushPackDualTipCpuFallbackReceipt;
+  /** QA/reference evidence only. It cannot authorize pixels, save output, or recovery. */
+  readonly cpuReferenceEvidence: StudioBrushPackDualTipCpuReferenceEvidence;
   readonly replayFingerprint: `sha256:${string}`;
   readonly complete: true;
 }
@@ -142,25 +169,26 @@ export type StudioBrushPackDualTipExactProviderResult =
   | Readonly<{ status: "cancelled" }>
   | Readonly<{
       status: "webgpu-exact";
-      artifact: StudioDualTipArtifact;
       plan: StudioDynamicDualTipExactPlanV2;
       replay: StudioBrushPackDualTipExactReplay;
       receipt: StudioBrushPackDualTipExactCompletionReceipt;
     }>
   | Readonly<{
-      status: "cpu-fallback";
-      artifact: StudioDualTipArtifact;
-      replay: StudioBrushPackDualTipExactReplay;
-      receipt: StudioBrushPackDualTipCpuFallbackReceipt;
+      status: "unavailable";
+      reason: StudioBrushPackDualTipExactUnavailableReason;
+      referenceEvidence: StudioBrushPackDualTipCpuReferenceEvidence;
     }>;
 
 export type StudioBrushPackDualTipExactProviderCreationResult =
   | Readonly<{
       status: "ready";
       provider: StudioBrushPackDualTipExactProvider;
-      webGpu:
-        | "ready"
-        | "unavailable"
+      webGpu: "ready";
+    }>
+  | Readonly<{
+      status: "unavailable";
+      reason:
+        | "webgpu-unavailable"
         | "module-load-failed"
         | "runtime-initialization-failed";
     }>
@@ -194,18 +222,22 @@ function validExecution(
   );
 }
 
-function fallbackReceipt(
-  reason: StudioBrushPackDualTipCpuFallbackReason,
+function referenceEvidence(
   execution: StudioBrushPackDualTipExactExecution,
   artifact: StudioDualTipArtifact,
-): StudioBrushPackDualTipCpuFallbackReceipt {
+): StudioBrushPackDualTipCpuReferenceEvidence {
+  const { authority: _authority, ...oracleContract } = artifact.receipt;
+  void _authority;
   return Object.freeze({
-    kind: "studio-brush-pack-dual-tip-cpu-fallback-receipt",
-    version: STUDIO_BRUSH_PACK_DUAL_TIP_CPU_FALLBACK_RECEIPT_VERSION,
+    kind: "studio-brush-pack-dual-tip-cpu-reference-evidence",
+    version: STUDIO_BRUSH_PACK_DUAL_TIP_CPU_REFERENCE_EVIDENCE_VERSION,
     providerVersion: STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION,
-    executionRoute: "cpu-f32-oracle",
-    reason,
-    authority: "cpu-f32-oracle",
+    executionRoute: "cpu-f32-oracle-reference",
+    purpose: "plan-validation-and-qa-reference",
+    authority: "none",
+    pixelAuthority: false,
+    saveAuthority: false,
+    providerSelection: "not-selected",
     alphaContract: "premultiplied-linear-rgba-f32",
     packedCommandContract: "gpu-wasm-ready-f32-v1",
     mode: execution.mode,
@@ -215,8 +247,34 @@ function fallbackReceipt(
     stampCount: artifact.stampCount,
     width: artifact.width,
     height: artifact.height,
-    cpuReceipt: artifact.receipt,
+    oracleContract: Object.freeze(oracleContract),
     complete: true,
+  });
+}
+
+/** Explicit CPU provider API. Callers must choose this route before the operation begins. */
+export function executeStudioBrushPackDualTipWithExplicitCpuProvider(
+  selection: StudioBrushPackSelection,
+  input: StudioBrushPackDualTipRenderInput,
+): StudioBrushPackDualTipExplicitCpuResult {
+  const cpu = renderStudioBrushPackDualTipIfConfigured(selection, input);
+  if (cpu === null) return Object.freeze({ status: "not-configured" });
+  if (!cpu.ok) {
+    return Object.freeze({ status: "rejected", reason: "cpu-oracle-rejected" });
+  }
+  return Object.freeze({
+    status: "cpu-explicit",
+    artifact: cpu.artifact,
+    receipt: Object.freeze({
+      kind: "studio-brush-pack-dual-tip-explicit-cpu-receipt",
+      version: STUDIO_BRUSH_PACK_DUAL_TIP_EXPLICIT_CPU_RECEIPT_VERSION,
+      providerVersion: STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION,
+      executionRoute: "cpu-f32-oracle-explicit",
+      providerSelection: "explicit-before-execution",
+      authority: "cpu-f32-oracle",
+      cpuReceipt: cpu.artifact.receipt,
+      complete: true,
+    }),
   });
 }
 
@@ -237,7 +295,8 @@ function exactReplay(
   execution: StudioBrushPackDualTipExactExecution,
   primaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
   secondaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
-  artifact: StudioDualTipArtifact,
+  commands: StudioDualTipPackedCommands,
+  cpuReferenceEvidence: StudioBrushPackDualTipCpuReferenceEvidence,
   plan: StudioDynamicDualTipExactPlanV2,
 ): StudioBrushPackDualTipExactReplay {
   return Object.freeze({
@@ -250,13 +309,13 @@ function exactReplay(
     porterDuff: execution.porterDuff ?? "source-over",
     primaryAsset: replayAsset(primaryAsset),
     secondaryAsset: replayAsset(secondaryAsset),
-    commands: artifact.commands,
-    cpuArtifact: artifact,
+    commands,
+    cpuReferenceEvidence,
     exactPlanFingerprint: plan.fingerprint,
   });
 }
 
-function validCpuArtifact(
+function validOracleArtifact(
   artifact: StudioDualTipArtifact,
   commands: StudioDualTipPackedCommands,
 ): boolean {
@@ -277,6 +336,43 @@ function validCpuArtifact(
       && artifact.premultipliedLinearRgba.length === artifact.width * artifact.height * 4
       && artifact.receipt.authority === "cpu-f32-oracle"
       && artifact.receipt.packedCommandContract === "gpu-wasm-ready-f32-v1";
+  } catch {
+    return false;
+  }
+}
+
+function validCpuReferenceEvidence(
+  evidence: StudioBrushPackDualTipCpuReferenceEvidence,
+  commands: StudioDualTipPackedCommands,
+): boolean {
+  try {
+    return evidence.kind === "studio-brush-pack-dual-tip-cpu-reference-evidence"
+      && evidence.version === STUDIO_BRUSH_PACK_DUAL_TIP_CPU_REFERENCE_EVIDENCE_VERSION
+      && evidence.providerVersion === STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION
+      && evidence.executionRoute === "cpu-f32-oracle-reference"
+      && evidence.purpose === "plan-validation-and-qa-reference"
+      && evidence.authority === "none"
+      && evidence.pixelAuthority === false
+      && evidence.saveAuthority === false
+      && evidence.providerSelection === "not-selected"
+      && evidence.alphaContract === "premultiplied-linear-rgba-f32"
+      && evidence.packedCommandContract === "gpu-wasm-ready-f32-v1"
+      && (evidence.mode === "append" || evidence.mode === "rebuild")
+      && validIdentifier(evidence.strokeId)
+      && positiveSafeInteger(evidence.commandSequence)
+      && (
+        evidence.porterDuff === "source-over"
+        || evidence.porterDuff === "destination-out"
+      )
+      && positiveSafeInteger(evidence.stampCount)
+      && evidence.stampCount === commands.count
+      && positiveSafeInteger(evidence.width)
+      && positiveSafeInteger(evidence.height)
+      && evidence.oracleContract.contractId === STUDIO_DUAL_TIP_CONTRACT_ID
+      && evidence.oracleContract.alphaContract === "premultiplied-linear-rgba-f32"
+      && evidence.oracleContract.packedCommandContract === "gpu-wasm-ready-f32-v1"
+      && !("authority" in evidence.oracleContract)
+      && evidence.complete === true;
   } catch {
     return false;
   }
@@ -358,15 +454,19 @@ function validReplayEnvelope(
       && replay.commands.values.every(
         (item) => typeof item === "number" && Number.isFinite(item),
       )
-      && validCpuArtifact(replay.cpuArtifact, replay.commands);
+      && replay.cpuReferenceEvidence.mode === replay.mode
+      && replay.cpuReferenceEvidence.strokeId === replay.strokeId
+      && replay.cpuReferenceEvidence.commandSequence === replay.commandSequence
+      && replay.cpuReferenceEvidence.porterDuff === replay.porterDuff
+      && validCpuReferenceEvidence(replay.cpuReferenceEvidence, replay.commands);
   } catch {
     return false;
   }
 }
 
 /**
- * Canonical JSON save boundary. R8 bytes are base64 and CPU authority/commands remain replayable
- * without a GPU or optional provider chunk.
+ * Canonical WebGPU replay boundary. R8 bytes and packed commands are replayable, while the CPU
+ * record remains non-authoritative QA evidence and contains no pixel artifact.
  */
 export function serializeStudioBrushPackDualTipExactReplay(
   replay: StudioBrushPackDualTipExactReplay,
@@ -404,25 +504,22 @@ export function parseStudioBrushPackDualTipExactReplay(
 export class StudioBrushPackDualTipExactProvider {
   readonly #width: number;
   readonly #height: number;
-  readonly #module: ExactRuntimeModule | null;
-  readonly #runtime: StudioDynamicDualTipExactWebGpuRuntimeV2 | null;
-  #unavailableReason: StudioBrushPackDualTipCpuFallbackReason;
-  #gpuEnabled: boolean;
+  readonly #module: ExactRuntimeModule;
+  readonly #runtime: StudioDynamicDualTipExactWebGpuRuntimeV2;
+  #unavailableReason: StudioBrushPackDualTipExactUnavailableReason = "provider-failed";
+  #gpuEnabled = true;
   #disposed = false;
 
   public constructor(
     width: number,
     height: number,
-    module: ExactRuntimeModule | null,
-    runtime: StudioDynamicDualTipExactWebGpuRuntimeV2 | null,
-    unavailableReason: StudioBrushPackDualTipCpuFallbackReason,
+    module: ExactRuntimeModule,
+    runtime: StudioDynamicDualTipExactWebGpuRuntimeV2,
   ) {
     this.#width = width;
     this.#height = height;
     this.#module = module;
     this.#runtime = runtime;
-    this.#unavailableReason = unavailableReason;
-    this.#gpuEnabled = runtime !== null;
   }
 
   public async execute(
@@ -439,26 +536,28 @@ export class StudioBrushPackDualTipExactProvider {
     if (!cpu.ok) {
       return Object.freeze({ status: "rejected", reason: "cpu-oracle-rejected" });
     }
+    if (!validOracleArtifact(cpu.artifact, cpu.artifact.commands)) {
+      return Object.freeze({ status: "rejected", reason: "cpu-oracle-rejected" });
+    }
     const materialized = materializeStudioBrushPackDualTipR8(selection);
     if (!materialized) {
       return Object.freeze({ status: "rejected", reason: "cpu-oracle-rejected" });
     }
     if (signal?.aborted) return Object.freeze({ status: "cancelled" });
+    const evidence = referenceEvidence(execution, cpu.artifact);
     if (
       cpu.artifact.width !== this.#width
       || cpu.artifact.height !== this.#height
     ) {
-      return this.#cpuOnlyPrepared(
+      return this.#unavailable(
         "unsupported-plan",
-        execution,
-        cpu.artifact,
-        materialized.primary,
-        materialized.secondary,
+        evidence,
       );
     }
     return this.#executePrepared(
       execution,
-      cpu.artifact,
+      cpu.artifact.commands,
+      evidence,
       materialized.primary,
       materialized.secondary,
       signal,
@@ -487,20 +586,18 @@ export class StudioBrushPackDualTipExactProvider {
       porterDuff: replay.porterDuff,
     };
     if (
-      replay.cpuArtifact.width !== this.#width
-      || replay.cpuArtifact.height !== this.#height
+      replay.cpuReferenceEvidence.width !== this.#width
+      || replay.cpuReferenceEvidence.height !== this.#height
     ) {
-      return this.#cpuOnlyPrepared(
+      return this.#unavailable(
         "unsupported-plan",
-        execution,
-        replay.cpuArtifact,
-        primary,
-        secondary,
+        replay.cpuReferenceEvidence,
       );
     }
     return this.#executePrepared(
       execution,
-      replay.cpuArtifact,
+      replay.commands,
+      replay.cpuReferenceEvidence,
       primary,
       secondary,
       signal,
@@ -510,19 +607,17 @@ export class StudioBrushPackDualTipExactProvider {
 
   async #executePrepared(
     execution: StudioBrushPackDualTipExactExecution,
-    artifact: StudioDualTipArtifact,
+    commands: StudioDualTipPackedCommands,
+    evidence: StudioBrushPackDualTipCpuReferenceEvidence,
     primaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
     secondaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
     signal?: AbortSignal,
     expectedFingerprint?: `sha256:${string}`,
   ): Promise<StudioBrushPackDualTipExactProviderResult> {
-    if (!this.#module) {
-      return this.#cpuOnlyPrepared(
+    if (!this.#gpuEnabled || this.#disposed) {
+      return this.#unavailable(
         this.#disposed ? "disposed" : this.#unavailableReason,
-        execution,
-        artifact,
-        primaryAsset,
-        secondaryAsset,
+        evidence,
       );
     }
     const planResult = this.#module
@@ -532,62 +627,47 @@ export class StudioBrushPackDualTipExactProvider {
         commandSequence: execution.commandSequence,
         primaryAsset,
         secondaryAsset,
-        commands: artifact.commands,
+        commands,
         porterDuff: execution.porterDuff ?? "source-over",
       });
     if (
       planResult.status !== "ready"
       || (
         expectedFingerprint !== undefined
-        && expectedFingerprint !== `sha256:${"0".repeat(64)}`
         && planResult.plan.fingerprint !== expectedFingerprint
       )
     ) {
-      return this.#cpuOnlyPrepared(
+      return this.#unavailable(
         "unsupported-plan",
-        execution,
-        artifact,
-        primaryAsset,
-        secondaryAsset,
+        evidence,
       );
     }
-    const fallback = fallbackReceipt(
-      this.#disposed ? "disposed" : this.#unavailableReason,
-      execution,
-      artifact,
-    );
     const replay = exactReplay(
       execution,
       primaryAsset,
       secondaryAsset,
-      artifact,
+      commands,
+      evidence,
       planResult.plan,
     );
-    if (!this.#runtime || !this.#gpuEnabled || this.#disposed) {
-      return Object.freeze({
-        status: "cpu-fallback",
-        artifact,
-        replay,
-        receipt: fallback,
-      });
+    let result: StudioDynamicDualTipExactWebGpuExecutionResultV2;
+    try {
+      result = await this.#runtime.execute({
+        requestSequence: execution.requestSequence,
+        deviceEpoch: execution.deviceEpoch,
+        plan: planResult.plan,
+      }, signal);
+    } catch {
+      this.#unavailableReason = "provider-failed";
+      this.#gpuEnabled = false;
+      return this.#unavailable("provider-failed", evidence);
     }
-    const result = await this.#runtime.execute({
-      requestSequence: execution.requestSequence,
-      deviceEpoch: execution.deviceEpoch,
-      plan: planResult.plan,
-    }, signal);
     if (result.status === "cancelled") {
       return Object.freeze({ status: "cancelled" });
     }
     if (result.status === "completed") {
-      const cpuFallback = fallbackReceipt(
-        "provider-failed",
-        execution,
-        artifact,
-      );
       return Object.freeze({
         status: "webgpu-exact",
-        artifact,
         plan: planResult.plan,
         replay,
         receipt: Object.freeze({
@@ -595,17 +675,15 @@ export class StudioBrushPackDualTipExactProvider {
           version: STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION,
           executionRoute: "webgpu-exact-packed-deposition-v2",
           gpu: result.receipt,
-          cpuFallback,
+          cpuReferenceEvidence: evidence,
           replayFingerprint: planResult.plan.fingerprint,
           complete: true,
         }),
       });
     }
-    let reason: StudioBrushPackDualTipCpuFallbackReason = "provider-failed";
+    let reason: StudioBrushPackDualTipExactUnavailableReason = "provider-failed";
     if (result.status === "device-lost") {
       reason = "device-lost";
-      this.#unavailableReason = reason;
-      this.#gpuEnabled = false;
     } else if (
       result.status === "rejected"
       && result.reason === "resident-asset-budget"
@@ -624,71 +702,25 @@ export class StudioBrushPackDualTipExactProvider {
     } else if (result.status === "disposed") {
       reason = "disposed";
     }
-    return Object.freeze({
-      status: "cpu-fallback",
-      artifact,
-      replay,
-      receipt: fallbackReceipt(reason, execution, artifact),
-    });
+    if (
+      reason === "device-lost"
+      || reason === "provider-failed"
+      || reason === "disposed"
+    ) {
+      this.#unavailableReason = reason;
+      this.#gpuEnabled = false;
+    }
+    return this.#unavailable(reason, evidence);
   }
 
-  #cpuOnlyPrepared(
-    reason: StudioBrushPackDualTipCpuFallbackReason,
-    execution: StudioBrushPackDualTipExactExecution,
-    artifact: StudioDualTipArtifact,
-    primaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
-    secondaryAsset: StudioDynamicDualTipExactR8AssetInputV2,
+  #unavailable(
+    reason: StudioBrushPackDualTipExactUnavailableReason,
+    referenceEvidenceValue: StudioBrushPackDualTipCpuReferenceEvidence,
   ): StudioBrushPackDualTipExactProviderResult {
-    if (!this.#module) {
-      // Build a deterministic replay without loading WebGPU by using the already imported type
-      // boundary only when possible. A missing module has no v2 fingerprint, so load failure is a
-      // CPU-only terminal that still preserves the CPU artifact.
-      const placeholder = `sha256:${"0".repeat(64)}` as const;
-      const replay: StudioBrushPackDualTipExactReplay = Object.freeze({
-        kind: "studio-brush-pack-dual-tip-exact-replay",
-        version: STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_REPLAY_VERSION,
-        executionRoute: "webgpu-exact-packed-deposition-v2",
-        mode: execution.mode,
-        strokeId: execution.strokeId,
-        commandSequence: execution.commandSequence,
-        porterDuff: execution.porterDuff ?? "source-over",
-        primaryAsset: replayAsset(primaryAsset),
-        secondaryAsset: replayAsset(secondaryAsset),
-        commands: artifact.commands,
-        cpuArtifact: artifact,
-        exactPlanFingerprint: placeholder,
-      });
-      return Object.freeze({
-        status: "cpu-fallback",
-        artifact,
-        replay,
-        receipt: fallbackReceipt(reason, execution, artifact),
-      });
-    }
-    const planResult = this.#module
-      .buildStudioDynamicDualTipExactPlanV2FromPackedCommands({
-        mode: execution.mode,
-        strokeId: execution.strokeId,
-        commandSequence: execution.commandSequence,
-        primaryAsset,
-        secondaryAsset,
-        commands: artifact.commands,
-        porterDuff: execution.porterDuff ?? "source-over",
-      });
-    if (planResult.status !== "ready") {
-      return Object.freeze({ status: "rejected", reason: "cpu-oracle-rejected" });
-    }
     return Object.freeze({
-      status: "cpu-fallback",
-      artifact,
-      replay: exactReplay(
-        execution,
-        primaryAsset,
-        secondaryAsset,
-        artifact,
-        planResult.plan,
-      ),
-      receipt: fallbackReceipt(reason, execution, artifact),
+      status: "unavailable",
+      reason,
+      referenceEvidence: referenceEvidenceValue,
     });
   }
 
@@ -703,7 +735,7 @@ export class StudioBrushPackDualTipExactProvider {
     this.#disposed = true;
     this.#unavailableReason = "disposed";
     this.#gpuEnabled = false;
-    this.#runtime?.dispose();
+    this.#runtime.dispose();
   }
 }
 
@@ -731,64 +763,47 @@ export async function createStudioBrushPackDualTipExactProvider(
       && typeof options.moduleLoader !== "function"
     )
   ) return Object.freeze({ status: "rejected", reason: "invalid-options" });
+  if (!options.device) {
+    return Object.freeze({ status: "unavailable", reason: "webgpu-unavailable" });
+  }
   let module: ExactRuntimeModule;
   try {
     module = await (options.moduleLoader
       ?? (() => import("../studio-dynamic-dual-tip-webgpu-runtime-v2")))();
   } catch {
+    return Object.freeze({ status: "unavailable", reason: "module-load-failed" });
+  }
+  let runtime: ReturnType<
+    ExactRuntimeModule["createStudioDynamicDualTipExactWebGpuRuntimeV2"]
+  >;
+  try {
+    runtime = module.createStudioDynamicDualTipExactWebGpuRuntimeV2({
+      device: options.device,
+      width: options.width,
+      height: options.height,
+      ...(options.initialDeviceEpoch === undefined
+        ? {}
+        : { initialDeviceEpoch: options.initialDeviceEpoch }),
+      ...(options.maximumDepositions === undefined
+        ? {}
+        : { maximumDepositions: options.maximumDepositions }),
+      ...(options.maximumResidentAssetBytes === undefined
+        ? {}
+        : { maximumResidentAssetBytes: options.maximumResidentAssetBytes }),
+      ...(options.ownsDevice === undefined
+        ? {}
+        : { ownsDevice: options.ownsDevice }),
+    });
+  } catch {
     return Object.freeze({
-      status: "ready",
-      provider: new StudioBrushPackDualTipExactProvider(
-        options.width,
-        options.height,
-        null,
-        null,
-        "module-load-failed",
-      ),
-      webGpu: "module-load-failed",
+      status: "unavailable",
+      reason: "runtime-initialization-failed",
     });
   }
-  if (!options.device) {
-    return Object.freeze({
-      status: "ready",
-      provider: new StudioBrushPackDualTipExactProvider(
-        options.width,
-        options.height,
-        module,
-        null,
-        "webgpu-unavailable",
-      ),
-      webGpu: "unavailable",
-    });
-  }
-  const runtime = module.createStudioDynamicDualTipExactWebGpuRuntimeV2({
-    device: options.device,
-    width: options.width,
-    height: options.height,
-    ...(options.initialDeviceEpoch === undefined
-      ? {}
-      : { initialDeviceEpoch: options.initialDeviceEpoch }),
-    ...(options.maximumDepositions === undefined
-      ? {}
-      : { maximumDepositions: options.maximumDepositions }),
-    ...(options.maximumResidentAssetBytes === undefined
-      ? {}
-      : { maximumResidentAssetBytes: options.maximumResidentAssetBytes }),
-    ...(options.ownsDevice === undefined
-      ? {}
-      : { ownsDevice: options.ownsDevice }),
-  });
   if (runtime.status !== "ready") {
     return Object.freeze({
-      status: "ready",
-      provider: new StudioBrushPackDualTipExactProvider(
-        options.width,
-        options.height,
-        module,
-        null,
-        "runtime-initialization-failed",
-      ),
-      webGpu: "runtime-initialization-failed",
+      status: "unavailable",
+      reason: "runtime-initialization-failed",
     });
   }
   return Object.freeze({
@@ -798,7 +813,6 @@ export async function createStudioBrushPackDualTipExactProvider(
       options.height,
       module,
       runtime.runtime,
-      "provider-failed",
     ),
     webGpu: "ready",
   });

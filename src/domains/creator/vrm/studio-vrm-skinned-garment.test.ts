@@ -257,7 +257,7 @@ describe("Studio VRM skinned garment", () => {
       mode: "skinned-shell-v1",
       usedBones: ["hips", "leftUpperLeg", "rightUpperLeg"],
       boneCount: 3,
-      fallbackReason: null,
+      unavailableReason: null,
     }));
     expect(surface.receipt.blendedVertexCount).toBeGreaterThan(0);
     expectNormalizedFiniteWeights(surface.mesh);
@@ -323,7 +323,7 @@ describe("Studio VRM skinned garment", () => {
       boneCount: 2,
       indexed: true,
       templateKind: "merged-parts-v1",
-      fallbackReason: null,
+      unavailableReason: null,
     }));
     expect(surface.receipt.blendedVertexCount).toBeGreaterThan(0);
     expectNormalizedFiniteWeights(surface.mesh);
@@ -364,7 +364,7 @@ describe("Studio VRM skinned garment", () => {
       indexed: true,
       connectedComponentCount: 1,
       continuousSleeveCount: 2,
-      fallbackReason: null,
+      unavailableReason: null,
     }));
     expectNormalizedFiniteWeights(surface.mesh);
 
@@ -465,7 +465,7 @@ describe("Studio VRM skinned garment", () => {
     disposeMaterials(itemMaterials);
   });
 
-  it("필수 본·template·변환·geometry·예산 오류를 명시적인 fallback으로 기록한다", () => {
+  it("필수 본·template·변환·geometry·예산 오류를 unavailable로 닫는다", () => {
     const rig = armRig();
     const material = new THREE.MeshBasicMaterial();
     const missing = buildStudioVrmSkinnedGarment({
@@ -475,12 +475,16 @@ describe("Studio VRM skinned garment", () => {
       materials: [material],
       resolveBone: rig.resolveBone,
     });
-    expect(missing.surface).toBeNull();
-    expect(missing.receipt).toEqual(expect.objectContaining({
-      mode: "rigid-fallback",
-      fallbackReason: "missing-required-bone",
-      missingBones: ["rightUpperArm"],
-    }));
+    expect(missing).toMatchObject({
+      ok: false,
+      status: "unavailable",
+      surface: null,
+      receipt: {
+        mode: "unavailable",
+        unavailableReason: "missing-required-bone",
+        missingBones: ["rightUpperArm"],
+      },
+    });
 
     const budget = buildStudioVrmSkinnedGarment({
       name: "budget",
@@ -491,7 +495,7 @@ describe("Studio VRM skinned garment", () => {
       vertexBudget: 128,
     });
     expect(budget.surface).toBeNull();
-    expect(budget.receipt.fallbackReason).toBe("vertex-budget");
+    expect(budget.receipt.unavailableReason).toBe("vertex-budget");
     expect(budget.receipt.vertexCount).toBeGreaterThan(128);
 
     const triangles = buildStudioVrmSkinnedGarment({
@@ -503,7 +507,7 @@ describe("Studio VRM skinned garment", () => {
       triangleBudget: 1,
     });
     expect(triangles.surface).toBeNull();
-    expect(triangles.receipt.fallbackReason).toBe("triangle-budget");
+    expect(triangles.receipt.unavailableReason).toBe("triangle-budget");
 
     const spoof = new THREE.Group() as THREE.Group & { isBone: boolean };
     spoof.isBone = true;
@@ -516,7 +520,7 @@ describe("Studio VRM skinned garment", () => {
       resolveBone: (name) => name === "leftUpperArm" ? spoof : rig.resolveBone(name),
     });
     expect(invalid.surface).toBeNull();
-    expect(invalid.receipt.fallbackReason).toBe("invalid-bone-node");
+    expect(invalid.receipt.unavailableReason).toBe("invalid-bone-node");
 
     const nonFinite = buildStudioVrmSkinnedGarment({
       name: "non-finite",
@@ -525,7 +529,7 @@ describe("Studio VRM skinned garment", () => {
       materials: [material],
       resolveBone: rig.resolveBone,
     });
-    expect(nonFinite.receipt.fallbackReason).toBe("non-finite-geometry");
+    expect(nonFinite.receipt.unavailableReason).toBe("non-finite-geometry");
 
     const incomplete = buildStudioVrmSkinnedGarment({
       name: "wardrobe:top:shirt",
@@ -534,7 +538,7 @@ describe("Studio VRM skinned garment", () => {
       materials: [material],
       resolveBone: rig.resolveBone,
     });
-    expect(incomplete.receipt.fallbackReason).toBe("upper-template-incomplete");
+    expect(incomplete.receipt.unavailableReason).toBe("upper-template-incomplete");
 
     const singularRig = armRig();
     singularRig.root.scale.x = 0;
@@ -545,7 +549,7 @@ describe("Studio VRM skinned garment", () => {
       materials: [material],
       resolveBone: singularRig.resolveBone,
     });
-    expect(singular.receipt.fallbackReason).toBe("invalid-root-transform");
+    expect(singular.receipt.unavailableReason).toBe("invalid-root-transform");
     material.dispose();
   });
 

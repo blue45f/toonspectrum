@@ -23,12 +23,13 @@ import type {
 
 export interface StudioCanvasViewportDomOverlaysProps {
   acceleratedSceneSelectedIds: StudioCanvasViewportLiveSurfaces["acceleratedSceneSelectedIds"];
-  canonicalDryMediaAuthorized: StudioCanvasViewportLiveSurfaces["canonicalDryMediaAuthorized"];
+  canonicalDryMediaCanvasVisible: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCanvasVisible"];
   canonicalDryMediaCandidate: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCandidate"];
   canonicalDryMediaLayoutKey: string;
   canvasFlipH: StudioCanvasViewportProps["canvasFlipH"];
   canvasH: StudioCanvasViewportProps["canvasH"];
   velloHubAuthority: StudioCanvasViewportLiveSurfaces["velloHubAuthority"];
+  velloDocumentSurfaceEnabled: StudioCanvasViewportLiveSurfaces["velloDocumentSurfaceEnabled"];
   effScale: StudioCanvasViewportProps["effScale"];
   elements: StudioCanvasViewportProps["elements"];
   hokusaiLiveCanvasRef: StudioCanvasViewportLiveSurfaces["hokusaiLiveCanvasRef"];
@@ -47,6 +48,9 @@ export interface StudioCanvasViewportDomOverlaysProps {
   onWebGpuFrameRequest: StudioCanvasViewportHandlers["onWebGpuFrameRequest"];
   pixiMountParent: HTMLDivElement | null;
   pixiSceneDocumentTransform: StudioCanvasViewportLiveSurfaces["pixiSceneDocumentTransform"];
+  velloSceneDocumentTransform: StudioCanvasViewportLiveSurfaces["velloSceneDocumentTransform"];
+  velloSceneRevision: StudioCanvasViewportLiveSurfaces["velloSceneRevision"];
+  velloSurfaceDpr: StudioCanvasViewportLiveSurfaces["velloSurfaceDpr"];
   readVelloHubPenDown: StudioCanvasViewportLiveSurfaces["readVelloHubPenDown"];
   setCanonicalDryMediaCanvasAuthority: StudioCanvasViewportLiveSurfaces["setCanonicalDryMediaCanvasAuthority"];
   setVelloHubAuthority: StudioCanvasViewportLiveSurfaces["setVelloHubAuthority"];
@@ -61,12 +65,13 @@ export interface StudioCanvasViewportDomOverlaysProps {
 
 export function StudioCanvasViewportDomOverlays({
   acceleratedSceneSelectedIds,
-  canonicalDryMediaAuthorized,
+  canonicalDryMediaCanvasVisible,
   canonicalDryMediaCandidate,
   canonicalDryMediaLayoutKey,
   canvasFlipH,
   canvasH,
   velloHubAuthority,
+  velloDocumentSurfaceEnabled,
   effScale,
   elements,
   hokusaiLiveCanvasRef,
@@ -85,6 +90,9 @@ export function StudioCanvasViewportDomOverlays({
   onWebGpuFrameRequest,
   pixiMountParent,
   pixiSceneDocumentTransform,
+  velloSceneDocumentTransform,
+  velloSceneRevision,
+  velloSurfaceDpr,
   readVelloHubPenDown,
   setCanonicalDryMediaCanvasAuthority,
   setVelloHubAuthority,
@@ -185,26 +193,40 @@ export function StudioCanvasViewportDomOverlays({
             ) : null}
           </Suspense>
           <StudioRenderSurface
-            enabled={velloHubCapability.enabled}
+            enabled={velloDocumentSurfaceEnabled}
             mountParent={pixiMountParent}
-            width={stageViewLayout.hostWidth}
-            height={stageViewLayout.hostHeight}
-            documentTransform={pixiSceneDocumentTransform}
+            width={stageViewLayout.width}
+            height={stageViewLayout.height}
+            dpr={velloSurfaceDpr}
+            documentTransform={velloSceneDocumentTransform}
             documentWidth={CANVAS_W}
             documentHeight={canvasH}
             elements={elements}
-            selectedIds={acceleratedSceneSelectedIds}
+            sceneRevision={velloSceneRevision}
             isPenDown={readVelloHubPenDown}
             onAuthorityChange={setVelloHubAuthority}
           />
+          {velloHubAuthority.status === "unavailable" ? (
+            <div
+              role="alert"
+              aria-live="assertive"
+              aria-atomic="true"
+              data-studio-vello-unavailable="true"
+              className="pointer-events-none absolute inset-x-4 top-4 z-[30] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
+            >
+              {velloHubAuthority.visibleCanvasCount === 1
+                ? "Vello 렌더러를 계속 사용할 수 없어 마지막 정확 프레임을 유지했습니다. 다른 렌더러로 자동 전환하지 않았습니다."
+                : "Vello 렌더러를 사용할 수 없어 가속 문서 표면으로 전환하지 않았습니다. 같은 작업을 다른 엔진으로 재실행하지 않았습니다."}
+            </div>
+          ) : null}
           <StudioPixiSceneOverlayHost
             enabled={
               !velloHubCapability.enabled
-              || velloHubAuthority.status === "fallback"
+              || velloHubAuthority.status === "legacy"
             }
             mountParent={pixiMountParent}
-            // Vello Hub와 같은 renderer-neutral selection seam. Vello가 admission/render에
-            // 실패한 경우에만 Pixi가 명시적으로 이 island의 단독 소유권을 되찾는다.
+            // Mixed/unsupported pages are an explicit legacy boundary. A Vello
+            // runtime failure never re-enables Pixi as a pixel fallback.
             width={stageViewLayout.hostWidth}
             height={stageViewLayout.hostHeight}
             documentTransform={pixiSceneDocumentTransform}
@@ -246,7 +268,7 @@ export function StudioCanvasViewportDomOverlays({
               <StudioCanonicalVNextDryMediaCanvas
                 element={canonicalDryMediaCandidate}
                 layoutKey={canonicalDryMediaLayoutKey}
-                visible={canonicalDryMediaAuthorized !== null}
+                visible={canonicalDryMediaCanvasVisible}
                 surfaceBounds={webGpuViewportSurface.surface}
                 documentWidth={CANVAS_W}
                 documentHeight={canvasH}

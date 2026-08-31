@@ -234,9 +234,10 @@ describe("studio-volume-device · 백엔드 심", () => {
     expect(image.rgba.length).toBe(12 * 10 * 4);
   });
 
-  it("런타임이 null 이면 GPU 백엔드는 CPU 백엔드 자체가 된다", () => {
-    const backend = createStudioVolumeGpuBackend(null);
-    expect(backend.kind).toBe("cpu");
+  it("선택한 GPU 런타임이 없으면 생성 단계에서 실패한다", () => {
+    expect(() => createStudioVolumeGpuBackend(null)).toThrow(
+      expect.objectContaining({ code: "runtime-unavailable" }),
+    );
   });
 
   it("GPU 런타임이 있으면 플랜을 넘기고 결과를 디코딩한다", async () => {
@@ -267,29 +268,31 @@ describe("studio-volume-device · 백엔드 심", () => {
     expect(image.stats.densitySamples).toBe(42 * 120);
   });
 
-  it("dispatch 가 던지면 조용히 CPU 로 폴백한다", async () => {
+  it("dispatch 가 던지면 CPU 재실행 없이 실패한다", async () => {
     const dispatch = vi.fn().mockRejectedValue(new Error("device lost"));
     const backend = createStudioVolumeGpuBackend({ dispatch });
-    const image = await backend.render(makeRequest());
+    await expect(backend.render(makeRequest())).rejects.toMatchObject({
+      code: "dispatch-failed",
+    });
     expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(image.rgba.length).toBe(12 * 10 * 4);
-    // CPU 경로가 실제로 그렸는지(전부 0 이 아닌지) 확인.
-    expect(image.rgba.some((v) => v > 0)).toBe(true);
   });
 
-  it("출력 길이가 모자라면 폴백한다", async () => {
+  it("출력 길이가 모자라면 결과를 게시하지 않는다", async () => {
     const dispatch = vi.fn().mockResolvedValue(new Float32Array(4));
     const backend = createStudioVolumeGpuBackend({ dispatch });
-    const image = await backend.render(makeRequest());
-    expect(image.rgba.some((v) => v > 0)).toBe(true);
+    await expect(backend.render(makeRequest())).rejects.toMatchObject({
+      code: "invalid-output",
+    });
   });
 
   it("미지원 옵션(spp>1 · 배경 깊이 · 퇴화 볼륨)은 dispatch 를 아예 부르지 않는다", async () => {
     const dispatch = vi.fn().mockResolvedValue(new Float32Array(0));
     const backend = createStudioVolumeGpuBackend({ dispatch });
 
-    await backend.render(makeRequest({ options: { width: 4, height: 4, samplesPerPixel: 4 } }));
-    await backend.render(
+    await expect(backend.render(makeRequest({
+      options: { width: 4, height: 4, samplesPerPixel: 4 },
+    }))).rejects.toMatchObject({ code: "unsupported-request" });
+    await expect(backend.render(
       makeRequest({
         options: {
           width: 4,
@@ -297,15 +300,18 @@ describe("studio-volume-device · 백엔드 심", () => {
           samplesPerPixel: 1,
           backgroundDistance: new Float32Array(16).fill(3),
         },
-      })
-    );
+      }),
+    )).rejects.toMatchObject({ code: "unsupported-request" });
     const degenerate = prepareStudioVolume({
       resolution: [2, 2, 2],
       density: new Float32Array(8).fill(1),
       boundsMin: [0, 0, 0],
       boundsMax: [0, 1, 1],
     });
-    await backend.render(makeRequest({ prepared: degenerate, occupancy: null }));
+    await expect(backend.render(makeRequest({
+      prepared: degenerate,
+      occupancy: null,
+    }))).rejects.toMatchObject({ code: "unsupported-request" });
 
     expect(dispatch).not.toHaveBeenCalled();
   });

@@ -58,6 +58,7 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
 
     expect(run).toContain("advancedFillVirtualReferenceRef.current");
     expect(run).toContain("renderStudioAdvancedFillVectorReference(vectorInput");
+    expect(run.match(/rasterExecutionBackend: "offscreen-worker"/gu)).toHaveLength(2);
     expect(run).toContain("signal: controller.signal");
     expect(run).toContain("renderedReference.fingerprint !== vectorTarget.sourceFingerprint");
     expect(run).toContain("referenceSrc = renderedReference.dataUrl");

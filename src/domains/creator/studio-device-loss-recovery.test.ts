@@ -11,16 +11,18 @@ import {
   type StudioDeviceLossTournamentPort,
   type StudioGpuDeviceLike,
 } from "./studio-device-loss-recovery";
-import { createStudioTournamentRuntime } from "./studio-renderer-tournament-runtime";
+import {
+  createStudioTournamentRuntime,
+  installStudioTournamentRuntime,
+} from "./studio-renderer-tournament-runtime";
 
 /**
  * V12 §17.3 Device Loss contracts: on a real `lost` resolution the machine
- * discards in-flight work (epoch invalidation), kills the GPU tournament
- * family, announces the fallback demotion — in that order — then re-acquires
- * with exponential backoff on the injected clock. Recovery revives the
- * providers (winner snapshot restored), repeated losses permanently demote at
- * the threshold, staged commands are never silently dropped, and disposal
- * detaches every listener and timer.
+ * discards in-flight work (epoch invalidation), announces selected-provider
+ * unavailability, then re-acquires the same provider with exponential backoff.
+ * The default never mutates tournament state; the legacy adapter remains
+ * explicitly injectable and is tested separately. Staged commands are never
+ * silently dropped, and disposal detaches every listener and timer.
  */
 
 /* ------------------------------------------------------------------ */
@@ -212,6 +214,30 @@ describe("studioDeviceLossBackoffDelayMs", () => {
 /* ------------------------------------------------------------------ */
 
 describe("device loss handling", () => {
+  it("does not kill tournament providers through the default recovery port", async () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null });
+    installStudioTournamentRuntime(runtime);
+    const fakeClock = createFakeClock();
+    const device = createFakeDevice();
+    const recovery = createDeviceLossRecovery<string, FakeDevice>({
+      clock: fakeClock.clock,
+      requestDevice: () => Promise.resolve(null),
+      onDemote: () => undefined,
+      onRecover: () => undefined,
+    });
+    try {
+      recovery.observe(device);
+      device.lose({ reason: "destroyed" });
+      await flushMicrotasks();
+      for (const providerId of STUDIO_GPU_FAMILY_PROVIDER_IDS) {
+        expect(runtime.killSwitch.isKilled(providerId)).toBe(false);
+      }
+    } finally {
+      recovery.dispose();
+      installStudioTournamentRuntime(null);
+    }
+  });
+
   it("starts healthy with a current epoch after observe", () => {
     const harness = createHarness();
     const epoch = harness.recovery.observe(createFakeDevice());

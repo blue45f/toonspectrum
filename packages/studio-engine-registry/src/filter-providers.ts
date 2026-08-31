@@ -38,7 +38,6 @@ export const canvasKitImageFilterDescriptor: ProviderDescriptor =
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 34,
-    fallbackProviderId: null,
     knownIssues: [],
   });
 
@@ -65,12 +64,12 @@ export const openCvImageWorkerDescriptor: ProviderDescriptor =
     ],
     limitations: [
       "analysis/mask lane (magic wand, line extraction, dust) — compositing stays with the surface owner",
+      "worker startup or execution failure is reported as unavailable; no alternate filter provider is selected automatically",
     ],
     previewQuality: "production",
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 48,
-    fallbackProviderId: "canvaskit-imagefilter",
     knownIssues: ["measured: canny 512^2 p50 1.37ms, dilate 0.48ms, gaussian 3.21ms"],
   });
 
@@ -94,12 +93,12 @@ export const wasmVipsPipelineDescriptor: ProviderDescriptor =
     limitations: [
       "final/export lane only — no preview phase; LGPL isolated deployment mode required",
       "single-thread baseline measured; SMP requires COOP/COEP workers",
+      "provider failure aborts the requested export operation; no CanvasKit substitution is permitted",
     ],
     previewQuality: "reference",
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 64,
-    fallbackProviderId: "canvaskit-imagefilter",
     knownIssues: ["measured: resize 2048->512 p50 16.4ms, gaussblur s4 2048^2 p50 46.7ms"],
   });
 

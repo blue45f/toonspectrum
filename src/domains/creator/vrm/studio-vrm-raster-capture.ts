@@ -2,19 +2,17 @@ import * as THREE from "three";
 
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "../bg3d/studio-bg3d-shot-batch-limits";
-import {
-  encodeStudioBg3dShotPngInWorker,
-  isStudioBg3dShotPngFallbackEligibleError,
-} from "../bg3d/studio-bg3d-shot-png-worker-client";
+import { encodeStudioBg3dShotPngInWorker } from "../bg3d/studio-bg3d-shot-png-worker-client";
 import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "../bg3d/studio-bg3d-shot-png-worker-protocol";
 import { createStudioBg3dStraightAlphaOutputPass } from "../bg3d/studio-bg3d-straight-alpha-output-pass";
 
 import type { StudioBg3dLtRasterLayer } from "../bg3d/studio-bg3d-lt-render";
 
-// The compatibility encoder only runs when Worker/OffscreenCanvas creation is unavailable. A
-// one-off insert capture at devicePixelRatio × supersample density must still encode there, so
-// this bound matches the capture pixel budget instead of artificially failing hi-res inserts.
-const STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS = STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
+// The explicit main-thread encoder supports the full capture budget. It is never selected because
+// a Worker request failed; callers must choose it before the encoding request starts.
+const STUDIO_VRM_CAPTURE_MAIN_THREAD_MAX_PIXELS = STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
+
+export type StudioVrmRasterPngEncoderBackend = "worker" | "main-thread";
 
 export interface StudioVrmRasterCaptureDimensions {
   readonly width: number;
@@ -32,6 +30,8 @@ export interface StudioVrmRasterCaptureBackground {
 export interface StudioVrmRasterCaptureOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  /** Selected once before encoding starts. Omission selects the product Worker backend. */
+  readonly encoderBackend?: StudioVrmRasterPngEncoderBackend;
 }
 
 export interface StudioVrmRasterCaptureDependencies {
@@ -249,7 +249,7 @@ async function validatePngBlob(
   }
 }
 
-/** Small compatibility path, admitted only when Worker/OffscreenCanvas creation is unavailable. */
+/** Explicit main-thread PNG backend. Callers must select it before encoding starts. */
 export async function encodeStudioVrmCapturePngOnMainThread(
   rgba: Uint8ClampedArray,
   dimensions: StudioVrmRasterCaptureDimensions,
@@ -257,11 +257,11 @@ export async function encodeStudioVrmCapturePngOnMainThread(
 ): Promise<Blob> {
   assertRgba(rgba, dimensions);
   if (options.signal?.aborted) throw abortError();
-  if (dimensions.width * dimensions.height > STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS) {
-    throw new RangeError("VRM PNG 호환 인코더의 픽셀 예산을 초과했습니다.");
+  if (dimensions.width * dimensions.height > STUDIO_VRM_CAPTURE_MAIN_THREAD_MAX_PIXELS) {
+    throw new RangeError("VRM PNG 메인 스레드 인코더의 픽셀 예산을 초과했습니다.");
   }
   if (typeof document === "undefined") {
-    throw new Error("VRM PNG 호환 인코더를 사용할 수 없습니다.");
+    throw new Error("VRM PNG 메인 스레드 인코더를 사용할 수 없습니다.");
   }
 
   const canvas = document.createElement("canvas");
@@ -271,7 +271,7 @@ export async function encodeStudioVrmCapturePngOnMainThread(
   if (!context || typeof canvas.toBlob !== "function") {
     canvas.width = 1;
     canvas.height = 1;
-    throw new Error("VRM PNG 호환 인코더를 준비하지 못했습니다.");
+    throw new Error("VRM PNG 메인 스레드 인코더를 준비하지 못했습니다.");
   }
 
   try {
@@ -290,13 +290,13 @@ export async function encodeStudioVrmCapturePngOnMainThread(
       };
       const handleAbort = () => finish(() => reject(abortError()));
       const timeoutId = setTimeout(() => finish(() => reject(
-        timeoutError("VRM PNG 호환 인코딩 시간이 초과되었습니다."),
+        timeoutError("VRM PNG 메인 스레드 인코딩 시간이 초과되었습니다."),
       )), timeoutMs);
       options.signal?.addEventListener("abort", handleAbort, { once: true });
       canvas.toBlob((result) => {
         if (options.signal?.aborted) finish(() => reject(abortError()));
         else if (result) finish(() => resolve(result));
-        else finish(() => reject(new Error("VRM PNG 호환 인코딩에 실패했습니다.")));
+        else finish(() => reject(new Error("VRM PNG 메인 스레드 인코딩에 실패했습니다.")));
       }, "image/png");
     });
     await validatePngBlob(png, dimensions, options.signal);
@@ -384,8 +384,8 @@ const DEFAULT_DEPENDENCIES: StudioVrmRasterCaptureDependencies = {
  * Encode a top-down RGBA snapshot off-main and retain the verified PNG Blob. Surface-paint
  * persistence uses this boundary so compressed bytes can be hashed and stored without first
  * inflating them into a data URL.
- * Runtime Worker failures are fail-closed; only creation/capability failures may use the bounded
- * compatibility encoder.
+ * The backend is selected once before execution. Worker failures are terminal and never rerun on
+ * the main thread. Product callers omit `encoderBackend`, selecting Worker.
  */
 export async function encodeStudioVrmCapturePngBlob(
   rgba: Uint8ClampedArray,
@@ -401,17 +401,13 @@ export async function encodeStudioVrmCapturePngBlob(
     height: dimensions.height,
     data: rgba,
   };
-  const png = await dependencies.encodePngInWorker([layer], options).catch(
-    (cause: unknown) => {
-      if (
-        isStudioBg3dShotPngFallbackEligibleError(cause) &&
-        dimensions.width * dimensions.height <= STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS
-      ) {
-        return dependencies.encodePngOnMainThread(rgba, dimensions, options);
-      }
-      throw cause;
-    },
-  );
+  const encoderBackend = options.encoderBackend ?? "worker";
+  if (encoderBackend !== "worker" && encoderBackend !== "main-thread") {
+    throw new TypeError("VRM PNG 인코더 백엔드가 올바르지 않습니다.");
+  }
+  const png = encoderBackend === "main-thread"
+    ? await dependencies.encodePngOnMainThread(rgba, dimensions, options)
+    : await dependencies.encodePngInWorker([layer], options);
   await validatePngBlob(png, dimensions, options.signal);
   return png;
 }

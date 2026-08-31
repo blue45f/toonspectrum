@@ -325,11 +325,11 @@ class ManualResidentWorker implements StudioImageFilterWorkerLike {
 }
 
 describe("runStudioImageFilterWorker", () => {
-  it("falls back directly without a worker and matches buildImageFilters output", async () => {
+  it("runs direct only when the caller explicitly selects the independent direct mode", async () => {
     const request = requestFixture();
     const expected = expectedPixels(request.el);
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+    const output = await runStudioImageFilterWorker(request, { executionMode: "direct" });
 
     expect(output.execution).toBe("direct");
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
@@ -338,7 +338,7 @@ describe("runStudioImageFilterWorker", () => {
   it.each([
     ["worker unavailable", null],
     ["worker postMessage failure", () => new ThrowingPostWorker()],
-  ] as const)("%s never surprise-blocks the main thread for an expensive advanced blur", async (
+  ] as const)("%s rejects without running an expensive advanced blur on the main thread", async (
     _label,
     workerFactory,
   ) => {
@@ -356,16 +356,13 @@ describe("runStudioImageFilterWorker", () => {
     };
 
     await expect(runStudioImageFilterWorker(request, { workerFactory }))
-      .rejects.toMatchObject({
-        name: "StudioAdvancedBlurWorkerRequiredError",
-        code: "STUDIO_ADVANCED_BLUR_WORKER_REQUIRED",
-      });
+      .rejects.toMatchObject({ name: "StudioImageFilterWorkerUnavailableError" });
   });
 
   it.each([
     ["worker unavailable", null],
     ["worker postMessage failure", () => new ThrowingPostWorker()],
-  ] as const)("%s never surprise-blocks the main thread for an expensive professional filter", async (
+  ] as const)("%s rejects without running an expensive professional filter on the main thread", async (
     _label,
     workerFactory,
   ) => {
@@ -378,16 +375,13 @@ describe("runStudioImageFilterWorker", () => {
     };
 
     await expect(runStudioImageFilterWorker(request, { workerFactory }))
-      .rejects.toMatchObject({
-        name: "StudioProfessionalFilterWorkerRequiredError",
-        code: "STUDIO_PROFESSIONAL_FILTER_WORKER_REQUIRED",
-      });
+      .rejects.toMatchObject({ name: "StudioImageFilterWorkerUnavailableError" });
   });
 
   it.each([
     ["worker unavailable", null],
     ["worker postMessage failure", () => new ThrowingPostWorker()],
-  ] as const)("%s never surprise-blocks the main thread for expensive tone cleanup", async (
+  ] as const)("%s rejects without running expensive tone cleanup on the main thread", async (
     _label,
     workerFactory,
   ) => {
@@ -400,10 +394,7 @@ describe("runStudioImageFilterWorker", () => {
     };
 
     await expect(runStudioImageFilterWorker(request, { workerFactory }))
-      .rejects.toMatchObject({
-        name: "StudioToneArtifactWorkerRequiredError",
-        code: "STUDIO_TONE_ARTIFACT_WORKER_REQUIRED",
-      });
+      .rejects.toMatchObject({ name: "StudioImageFilterWorkerUnavailableError" });
   });
 
   it("projects an element-shaped source before direct execution and reads each filter field once", async () => {
@@ -425,7 +416,7 @@ describe("runStudioImageFilterWorker", () => {
     const request = requestFixture(el);
     const expected = expectedPixels({ brightness: 0.3 });
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+    const output = await runStudioImageFilterWorker(request, { executionMode: "direct" });
 
     expect(output.execution).toBe("direct");
     expect(brightnessReads).toBe(1);
@@ -438,7 +429,7 @@ describe("runStudioImageFilterWorker", () => {
     const request = requestFixture(el);
     const expected = expectedPixels(el);
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+    const output = await runStudioImageFilterWorker(request, { executionMode: "direct" });
 
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
   });
@@ -724,15 +715,13 @@ describe("runStudioImageFilterWorker", () => {
       ]);
   });
 
-  it("falls back to direct execution when postMessage throws synchronously", async () => {
+  it("rejects without direct execution when postMessage throws synchronously", async () => {
     const request = requestFixture();
-    const expected = expectedPixels(request.el);
     const worker = new ThrowingPostWorker();
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: () => worker });
-
-    expect(output.execution).toBe("direct");
-    expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+    await expect(runStudioImageFilterWorker(request, { workerFactory: () => worker }))
+      .rejects.toMatchObject({ name: "StudioImageFilterWorkerUnavailableError" });
+    expect(worker.terminateCount).toBe(1);
   });
 
   it("rejects with the worker's reported error", async () => {
@@ -744,30 +733,28 @@ describe("runStudioImageFilterWorker", () => {
     ).rejects.toThrow("boom");
   });
 
-  it("falls back to direct execution on a worker load error before any request is posted", async () => {
+  it("rejects on a worker load error before any request is posted", async () => {
     const request = requestFixture();
-    const expected = expectedPixels(request.el);
     const worker = new LoadErrorWorker();
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: () => worker });
-
-    expect(output.execution).toBe("direct");
-    expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+    await expect(runStudioImageFilterWorker(request, { workerFactory: () => worker }))
+      .rejects.toThrow("worker chunk failed to load");
+    expect(worker.terminateCount).toBe(1);
   });
 
-  it("falls back and terminates when a worker never announces readiness", async () => {
+  it("rejects and terminates when a worker never announces readiness", async () => {
     vi.useFakeTimers();
     try {
       const request = requestFixture();
-      const expected = expectedPixels(request.el);
       const worker = new HangingWorker(false);
       const pending = runStudioImageFilterWorker(request, { workerFactory: () => worker });
+      const rejection = expect(pending).rejects.toMatchObject({
+        name: "StudioImageFilterWorkerUnavailableError",
+      });
 
       await vi.advanceTimersByTimeAsync(3_000);
 
-      const output = await pending;
-      expect(output.execution).toBe("direct");
-      expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+      await rejection;
       expect(worker.terminateCount).toBe(1);
     } finally {
       vi.useRealTimers();
@@ -791,7 +778,7 @@ describe("runStudioImageFilterWorker", () => {
     const request = requestFixture({ brightness: Number.NaN, contrast: Number.POSITIVE_INFINITY });
     const original = Array.from(request.imageData.data);
 
-    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+    const output = await runStudioImageFilterWorker(request, { executionMode: "direct" });
 
     expect(Array.from(output.imageData.data)).toEqual(original);
   });
@@ -840,6 +827,15 @@ describe("runStudioImageFilterWorker", () => {
 });
 
 describe("createStudioImageFilterWorkerSession", () => {
+  it("rejects when its selected Worker authority is unavailable", async () => {
+    const session = createStudioImageFilterWorkerSession({ workerFactory: null });
+
+    await expect(session.run(requestFixture())).rejects.toMatchObject({
+      name: "StudioImageFilterWorkerUnavailableError",
+    });
+    session.dispose();
+  });
+
   it("reuses one ready Worker across sequential slider ticks until explicit disposal", async () => {
     const worker = new ApplyingWorker();
     const factory = vi.fn(() => worker);
@@ -876,6 +872,19 @@ describe("createStudioImageFilterWorkerSession", () => {
 });
 
 describe("createStudioImageFilterResidentWorkerSession", () => {
+  it("rejects rather than switching a selected resident Worker session to direct", async () => {
+    const session = createStudioImageFilterResidentWorkerSession({ workerFactory: null });
+    const source = makeImageData(3, 2);
+    const before = Array.from(source.data);
+
+    await expect(session.run(
+      { imageData: source, el: { brightness: 0.2 } },
+      { sourceRevision: "worker-required" },
+    )).rejects.toMatchObject({ name: "StudioImageFilterWorkerUnavailableError" });
+    expect(Array.from(source.data)).toEqual(before);
+    session.dispose();
+  });
+
   it("loads one immutable source and sends only filter parameters on later slider ticks", async () => {
     const worker = new ResidentApplyingWorker();
     const session = createStudioImageFilterResidentWorkerSession({
@@ -984,9 +993,9 @@ describe("createStudioImageFilterResidentWorkerSession", () => {
     expect(worker.terminateCount).toBe(1);
   });
 
-  it("uses an isolated direct copy when Worker creation is unavailable", async () => {
+  it("uses an isolated direct copy only in an explicitly selected direct session", async () => {
     const session = createStudioImageFilterResidentWorkerSession({
-      workerFactory: null,
+      executionMode: "direct",
     });
     const source = makeImageData(3, 2);
     const original = Array.from(source.data);

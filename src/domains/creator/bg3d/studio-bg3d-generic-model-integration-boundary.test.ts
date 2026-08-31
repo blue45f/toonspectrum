@@ -80,6 +80,7 @@ describe("Studio BG3D generic model mode integration boundary", () => {
     expect(source).toContain('from "../studio-generic-3d-workflow-metadata"');
     expect(admissionSource).toContain("attachStudioGeneric3dWorkflowMetadata");
     expect(source).toContain("parseStudioGeneric3dWorkflowMetadata");
+    expect(upload.match(/executionBackend: "worker"/gu)).toHaveLength(2);
   });
 
   it("profiles renderer structure once while keeping unsupported child transforms read-only", () => {

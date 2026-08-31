@@ -18,6 +18,7 @@ import {
   STUDIO_OFFSCREEN_RASTER_MAX_PIXELS,
   STUDIO_OFFSCREEN_RASTER_MAX_SOURCES,
   adoptStudioOffscreenPixelBuffer,
+  isStudioOffscreenRasterEncodedBlobExact,
   type StudioOffscreenRasterOutput,
   type StudioOffscreenRasterPixelSource,
 } from "../studio-offscreen-raster-worker-protocol";
@@ -776,6 +777,20 @@ export class StudioEngineSettledTileRasterAdapter {
       return rejected(
         "worker-failed",
         "The render Worker returned a result that does not match the requested output.",
+        workerResult.runId,
+      );
+    }
+    if (
+      input.output.kind === "encoded"
+      && workerResult.payload.kind === "encoded"
+      && !await isStudioOffscreenRasterEncodedBlobExact(
+        workerResult.payload.blob,
+        input.output.mime,
+      )
+    ) {
+      return rejected(
+        "worker-failed",
+        "The render Worker substituted or mislabeled the requested encoded container.",
         workerResult.runId,
       );
     }

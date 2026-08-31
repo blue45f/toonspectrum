@@ -64,9 +64,9 @@ export function attachStudioBg3dEditorInsertHost(h) {
     deleteStudioBg3dLtUserPreset, renameStudioBg3dLtUserPreset, upsertStudioBg3dLtUserPreset,
     getProductStudioBg3dLtPresetSqliteRepository, STUDIO_BG3D_LT_BUILT_IN_PRESETS,
     STUDIO_BG3D_LT_PRESET_MAX_COUNT, STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH,
-    STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH, applyStudioBg3dLtPreset, renderStudioBg3dLtLayers,
+    STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH, applyStudioBg3dLtPreset,
     STUDIO_BG3D_LT_RENDER_MAX_PIXELS, renderStudioBg3dLtLayersInWorker,
-    StudioBg3dLtRenderWorkerError, buildStudioBg3dMagicFilterMask,
+    buildStudioBg3dMagicFilterMask,
     encodeStudioBg3dMagicMaskPngDataUrl, captureStudioBg3dMagicObjectIds,
     STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES, resolveStudioBg3dMagicSelection,
     STUDIO_BG3D_MEASUREMENT_MAX_REFERENCES, classifyStudioBg3dMeasurementInference,
@@ -137,7 +137,7 @@ export function attachStudioBg3dEditorInsertHost(h) {
     loadStudioBg3dBabylonSpecialistEntry, loadStudioBg3dModelThumbnailRuntime,
     LT_EXPORT_HEIGHTS, LT_TONE_MODE_LABELS, LT_TONE_PATTERN_LABELS, LT_TONE_TYPE_LABELS,
     SEMANTIC_MATERIAL_CONFIDENCE_LABELS, SEMANTIC_MATERIAL_SLOT_LABELS,
-    STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS, STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
+    STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
     TRANSFORM_MODES, VIEW_EDITOR_SECTIONS, VIEWPORT_BTN, StudioBg3dActionFooter,
     StudioBg3dDirectionalShadowLight, StudioBg3dImmersivePanel, StudioBg3dLtPanel,
     StudioBg3dMeasurementPanel, StudioBg3dMeasurementViewport, StudioBg3dPhysicsPanel,
@@ -231,7 +231,7 @@ export function attachStudioBg3dEditorInsertHost(h) {
     handleViewportReady, resetWebXrPresentationUi, finishWebXrControllerCleanup,
     disposeCurrentWebXrControllerGeneration, disposeWebXrControllerForOpenChange,
     handleWebXrControllerReady, handleWebXrSessionStateChange, historyRef, historyIndexRef,
-    deviceQuality, hasCloneFailure, hasPendingClone, hasPendingSharedCharacter,
+    deviceQuality, engineRuntime, hasCloneFailure, hasPendingClone, hasPendingSharedCharacter,
     hasUnavailableSharedCharacter, physicsInteractionLocked, insertBlocked,
     magicLayerSelectedPrimitive, magicLayerLensShift, magicLayerUnavailableReason,
     shotBatchBlockedReason, transitionPhysicsPhase, commitImmediateHistoryTransition, doUndo,
@@ -541,17 +541,7 @@ export function attachStudioBg3dEditorInsertHost(h) {
           signal: insertController.signal,
           timeoutMs: STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
         },
-      ).catch((workerFailure: unknown) => {
-        if (
-          workerFailure instanceof StudioBg3dLtRenderWorkerError &&
-          workerFailure.code === "worker-unavailable" &&
-          captured.width * captured.height <= STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS &&
-          isInsertCurrent()
-        ) {
-          return renderStudioBg3dLtLayers(ltRenderInput, ltSettingsSnapshot);
-        }
-        throw workerFailure;
-      });
+      );
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
       if (rendered.layers.length === 0) {
         setError("현재 LT 설정에서는 보이는 선화나 톤이 만들어지지 않습니다. 선화 또는 톤을 켜 주세요.");
@@ -584,10 +574,12 @@ export function attachStudioBg3dEditorInsertHost(h) {
         );
         const babylonEntry = await loadStudioBg3dBabylonSpecialistEntry();
         if (!isInsertCurrent() || captureAdapterIsStale()) return;
-        const magicBackends: readonly StudioBg3dMagicBabylonBackend[] =
-          typeof navigator !== "undefined" && "gpu" in navigator
-            ? ["webgpu", "webgl2"]
-            : ["webgl2"];
+        // Magic is a shipped product capture, not a cross-engine diagnostic. It must use exactly
+        // the backend the artist selected for BG3D; failure remains visible instead of silently
+        // changing the pixels to an independently configured engine.
+        const magicBackends: readonly StudioBg3dMagicBabylonBackend[] = [
+          engineRuntime.preference,
+        ];
         ltMagicCaptureGenerationRef.current += 1;
         const objectIdCapture = await captureStudioBg3dMagicObjectIds({
           snapshot: magicRuntimeSnapshot,

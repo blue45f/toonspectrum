@@ -145,6 +145,36 @@ describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
 });
 
 describe("StudioLiveRetainedMediaOverlayRenderer", () => {
+  it("distinguishes rejected sources from an unavailable selected surface", () => {
+    const detached = new StudioLiveRetainedMediaOverlayRenderer();
+    expect(detached.begin(drawElement("detached", "pencil", [12, 20]))).toEqual({
+      status: "unavailable",
+      reason: "surface-unavailable",
+    });
+    expect(detached.begin(drawElement("unsupported", "pencil", [12, 20], {
+      brush: "pen",
+    }))).toEqual({
+      status: "rejected",
+      reason: "unsupported",
+    });
+  });
+
+  it("keeps the accepted stroke until the host explicitly cancels a rejected append", () => {
+    const { renderer } = attachedRenderer();
+    const accepted = drawElement("accepted", "pencil", [12, 20, 28, 24]);
+    expect(renderer.begin(accepted).status).toBe("started");
+    expect(renderer.appendFrom(drawElement("other", "pencil", [12, 20, 28, 24])))
+      .toEqual({ status: "rejected", reason: "stroke-identity" });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.lastOperationFailureReason).toBe("stroke-identity");
+    expect(renderer.appendFrom(accepted)).toEqual({
+      status: "rejected",
+      reason: "stroke-identity",
+    });
+    expect(renderer.resetActive()).toBe(true);
+    expect(renderer.isActive).toBe(false);
+  });
+
   it("starts a pencil tap and only paints new ribbon cells on append", () => {
     const { renderer } = attachedRenderer();
     const first = drawElement("pencil-live", "pencil", [12, 20]);

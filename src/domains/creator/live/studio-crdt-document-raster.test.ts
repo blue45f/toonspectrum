@@ -474,12 +474,11 @@ describe("StudioCrdtDocument semantic raster roots", () => {
     document.destroy();
   });
 
-  // task #23: getRasterOperationLogAsync offloads parse/validate to a Web Worker (direct-fallback in
-  // this test environment, since no real Worker exists) via extractStudioCrdtRasterRawRoots +
-  // parseStudioCrdtRasterDocumentRoots. It must return byte-for-byte the same result as the
-  // synchronous getRasterOperationLog for identical document state.
+  // getRasterOperationLogAsync offloads parse/validate to one explicitly selected Web Worker.
+  // This test environment has no Worker, so the product facade reports the async read unavailable
+  // instead of changing authority to the synchronous parser.
   describe("getRasterOperationLogAsync", () => {
-    it("matches the synchronous getRasterOperationLog for a real multi-operation log", async () => {
+    it("returns null without substituting the synchronous parser when Worker is unavailable", async () => {
       const document = new StudioCrdtDocument();
       document.mergeRasterOperationLog(
         operationLog({ operations: [operation(1, "1"), operation(2, "2")] })
@@ -489,7 +488,7 @@ describe("StudioCrdtDocument semantic raster roots", () => {
       const async = await document.getRasterOperationLogAsync(surface.surfaceId);
 
       expect(sync).not.toBeNull();
-      expect(async).toEqual(sync);
+      expect(async).toBeNull();
 
       document.destroy();
     });

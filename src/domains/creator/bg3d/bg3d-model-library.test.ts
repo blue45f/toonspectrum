@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   BG3D_MODEL_LEGACY_EXTERNAL_STATUS_MESSAGE,
@@ -42,6 +42,8 @@ import {
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
 } from "./studio-bg3d-glb-validation";
+import { disposeSharedStudioBg3dValidationWorker } from "./studio-bg3d-glb-validation-worker-client";
+import { StudioBg3dValidationWorkerTestFixture } from "./studio-bg3d-glb-validation-worker.test-fixture";
 import { StudioBg3dModalOperationCoordinator } from "./studio-bg3d-modal-operation-coordinator";
 import {
   createDefaultStudioBg3dSceneDocument,
@@ -426,7 +428,12 @@ function installFakeIndexedDb(seed: readonly Bg3dModelStoredRecord[] = []): Fake
   return state;
 }
 
+beforeEach(() => {
+  vi.stubGlobal("Worker", StudioBg3dValidationWorkerTestFixture);
+});
+
 afterEach(() => {
+  disposeSharedStudioBg3dValidationWorker();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -523,6 +530,20 @@ describe("bg3d-model-library format and metadata policy", () => {
 });
 
 describe("verified GLB preparation", () => {
+  it("keeps the product Worker failure terminal and permits only a separately selected direct validation", async () => {
+    vi.stubGlobal("Worker", undefined);
+    const file = glbFile("backend-contract.glb");
+
+    await expect(prepareVerifiedBg3dModelRecord(file)).rejects.toMatchObject({
+      code: "worker-failed",
+    });
+    await expect(prepareVerifiedBg3dModelRecord(file, {
+      executionBackend: "direct",
+      idFactory: () => "backend-contract",
+      now: 1,
+    })).resolves.toMatchObject({ id: "backend-contract" });
+  });
+
   it("persists canonical validation metadata and only validator-owned bytes", async () => {
     const source = validGlb();
     const sharedBuffer = Uint8Array.from(source).buffer;

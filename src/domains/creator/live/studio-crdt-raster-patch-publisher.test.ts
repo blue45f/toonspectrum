@@ -411,7 +411,30 @@ describe("studio raster patch publisher", () => {
     expect(await run(false)).toEqual(await run(true));
   });
 
-  it("uses HTMLCanvas when OffscreenCanvas fails and copies straight RGBA into ImageData", async () => {
+  it("fails closed when the selected OffscreenCanvas backend fails", async () => {
+    const offscreen = vi.fn((): StudioRasterPngCanvas => ({
+      getContext: () => null,
+    }));
+    const html = vi.fn((): StudioRasterPngCanvas => ({
+      getContext: () => null,
+    }));
+    const encoder = createStudioRasterBrowserPngEncoder({
+      backend: "offscreen-canvas",
+      createOffscreenCanvas: offscreen,
+      createHtmlCanvas: html,
+    });
+
+    await expect(encoder({
+      width: 1,
+      height: 1,
+      rgba: Uint8ClampedArray.of(200, 100, 50, 128),
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "canvas_context_unavailable" });
+    expect(offscreen).toHaveBeenCalledOnce();
+    expect(html).not.toHaveBeenCalled();
+  });
+
+  it("uses HTMLCanvas only when it is explicitly selected and copies straight RGBA", async () => {
     const copied: number[] = [];
     const offscreen = vi.fn((): StudioRasterPngCanvas => ({
       getContext: () => null,
@@ -426,6 +449,7 @@ describe("studio raster patch publisher", () => {
       ], { type: "image/png" })),
     }));
     const encoder = createStudioRasterBrowserPngEncoder({
+      backend: "html-canvas",
       createOffscreenCanvas: offscreen,
       createHtmlCanvas: html,
     });
@@ -435,7 +459,7 @@ describe("studio raster patch publisher", () => {
     const encoded = await encoder({ width: 1, height: 1, rgba: pixels, signal: controller.signal });
 
     expect(encoded.mediaType).toBe("image/png");
-    expect(offscreen).toHaveBeenCalledOnce();
+    expect(offscreen).not.toHaveBeenCalled();
     expect(html).toHaveBeenCalledOnce();
     expect(copied).toEqual([...pixels]);
   });

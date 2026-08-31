@@ -34,6 +34,8 @@ import {
   type StudioZipReaderSource,
 } from "./studio-zip-reader";
 
+import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
+
 export const STUDIO_WILL_V1_OPC_EXTENSION = ".will" as const;
 export const STUDIO_WILL_V1_OPC_MEDIA_TYPE =
   "application/vnd.toonspectrum.will-v1-bounded+zip" as const;
@@ -102,6 +104,8 @@ export interface StudioWillV1OpcOptions {
   readonly limits?: Partial<StudioWillV1OpcLimits>;
   readonly willLimits?: Partial<StudioWillV1Limits>;
   readonly signal?: AbortSignal;
+  /** Explicit direct/reference or Worker-hosted archive CRC backend. */
+  readonly crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 export interface StudioWillV1OpcImportOptions extends StudioWillV1OpcOptions {
@@ -1035,7 +1039,7 @@ export async function buildStudioWillV1OpcBytes(
     bytes = await buildStudioPackageArchiveBytes(entries, {
       limits: archiveLimits(limits),
       signal: options.signal,
-      allowLargeDirectFallbackInHeadless: true,
+      crc32ExecutionMode: options.crc32ExecutionMode ?? "direct-bounded",
     });
   } catch (cause) {
     if (options.signal?.aborted) return fail("ABORTED", { cause });

@@ -37,7 +37,7 @@ export type StudioBg3dShotPngWorkerResponse =
       readonly kind: "ready";
     }
   | {
-      /** The only Worker-side capability failure eligible for the bounded DOM fallback. */
+      /** Worker-side capability failure; the selected Worker operation ends as unavailable. */
       readonly version: typeof STUDIO_BG3D_SHOT_PNG_WORKER_PROTOCOL_VERSION;
       readonly kind: "unavailable";
       readonly code: "offscreen-canvas";

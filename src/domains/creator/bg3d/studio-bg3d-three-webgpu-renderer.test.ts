@@ -8,6 +8,7 @@ import {
 const rendererMock = vi.hoisted(() => ({
   backendIsWebGpu: true,
   initError: null as Error | null,
+  initPromise: null as Promise<void> | null,
   dispose: vi.fn(),
   backendDispose: vi.fn(),
   fallbackAtInit: undefined as unknown,
@@ -35,6 +36,7 @@ vi.mock("three/webgpu", () => ({
     async init() {
       rendererMock.fallbackAtInit = this._getFallback;
       if (rendererMock.initError) throw rendererMock.initError;
+      if (rendererMock.initPromise) await rendererMock.initPromise;
     }
 
     dispose() {
@@ -54,6 +56,7 @@ describe("Studio BG3D Three WebGPU renderer", () => {
   afterEach(() => {
     rendererMock.backendIsWebGpu = true;
     rendererMock.initError = null;
+    rendererMock.initPromise = null;
     rendererMock.dispose.mockReset();
     rendererMock.backendDispose.mockReset();
     rendererMock.fallbackAtInit = undefined;
@@ -117,6 +120,27 @@ describe("Studio BG3D Three WebGPU renderer", () => {
     expect(rejection).toMatchObject({ code: "initialization-failed", cause });
     expect(rendererMock.dispose).not.toHaveBeenCalled();
     expect(rendererMock.backendDispose).toHaveBeenCalledOnce();
+  });
+
+  it("bounds a WebGPU initialization that never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      rendererMock.initPromise = new Promise<void>(() => undefined);
+      const canvas = stubCanvas();
+      const pending = createStudioBg3dThreeWebGpuRenderer(canvas, {
+        initializationTimeoutMs: 25,
+      });
+      const rejection = expect(pending).rejects.toMatchObject({
+        code: "initialization-failed",
+      });
+
+      await vi.advanceTimersByTimeAsync(25);
+      await rejection;
+      expect(rendererMock.backendDispose).toHaveBeenCalledOnce();
+      expect(rendererMock.dispose).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports a device loss once and stays silent after the editor disposes the renderer", async () => {

@@ -8,7 +8,6 @@
  */
 
 import {
-  createFallbackQualityEngine,
   registerQualityEngineLoader,
   type StudioPathOpsResult,
   type StudioQualityEngine,
@@ -16,6 +15,7 @@ import {
   type StudioStrokeToPathStyle,
 } from "./studio-canvaskit-adapter";
 import { flattenStudioCanvasKitPathCommands } from "./studio-canvaskit-portable-geometry";
+import { StudioEngineUnavailableError } from "./studio-engine-failure-policy";
 
 import type {
   CanvasKit,
@@ -182,15 +182,14 @@ function windingPathResult(
 /**
  * Creates a synchronous quality provider from an already initialized CanvasKit module.
  *
- * Text shaping remains delegated to the current fallback because the adapter's canonical text
- * contract requires glyph IDs and source clusters. CanvasKit Paragraph can rasterize shaped text,
- * but it does not expose the full editable run contract we need. HarfBuzz will own that role.
+ * Text shaping is deliberately unavailable because the adapter's canonical text contract requires
+ * glyph IDs and source clusters. CanvasKit Paragraph can rasterize shaped text, but it does not
+ * expose the full editable run contract we need. HarfBuzz can become a separately selected provider;
+ * CanvasKit never delegates this operation to a basic approximation.
  */
 export function createStudioCanvasKitQualityEngine(
   canvasKit: CanvasKit,
 ): StudioQualityEngine {
-  const textFallback = createFallbackQualityEngine();
-
   return {
     id: "canvaskit",
     capabilities: {
@@ -200,8 +199,12 @@ export function createStudioCanvasKitQualityEngine(
       fontSubsetting: false,
     },
 
-    shapeText(request) {
-      return textFallback.shapeText(request);
+    shapeText() {
+      throw new StudioEngineUnavailableError({
+        providerId: "canvaskit",
+        stage: "capability",
+        message: "CanvasKit does not satisfy the editable text-shaping contract.",
+      });
     },
 
     pathOp(a, b, op) {

@@ -13,12 +13,11 @@ import type { WinnerCacheEntry } from "@toonspectrum/studio-engine-registry";
  * On a real `GPUDevice.lost` resolution this module drives, in order:
  * 1. discard signal for in-flight GPU work (`device_epoch` invalidation —
  *    §17.3 "GPU resource는 device_epoch로 표시");
- * 2. temporary tournament kill of the GPU-family providers (reusing
- *    `StudioRendererTournamentRuntime.applyKillList` via the port below);
- * 3. immediate demotion notice so the fallback lanes (cpu/worker) take over;
+ * 2. immediate unavailable notice for the already-selected GPU provider;
+ * 3. no tournament mutation and no alternate-provider selection by default;
  * 4. exponential-backoff device re-acquisition on the injected clock. Success
  *    revives the killed providers (restoring their snapshotted winner-cache
- *    entries, so re-promotion needs no fresh tournament) and hands back every
+ *    entries only when a legacy caller explicitly injects the tournament adapter) and hands back every
  *    command staged during the outage. Repeated losses feed a permanent
  *    demotion counter: at the threshold (default 3) the machine parks in
  *    `permanently-demoted` and the GPU family stays killed for the session.
@@ -93,9 +92,8 @@ export function studioDeviceLossBackoffDelayMs(
 /* ------------------------------------------------------------------ */
 
 /**
- * What device-loss handling needs from the renderer tournament. Injected so
- * this module never owns tournament state; the default adapter below wraps
- * the shared StudioRendererTournamentRuntime.
+ * Legacy availability-mirroring seam for the renderer tournament. Product recovery uses the
+ * no-substitution port below; explicit migration/diagnostic callers may inject an adapter.
  */
 export interface StudioDeviceLossTournamentPort {
   /** ② Temporary kill of the GPU-family providers (idempotent per loss). */
@@ -105,6 +103,18 @@ export interface StudioDeviceLossTournamentPort {
   /** Terminal kill — providers stay out, winner evictions stay. */
   permanentlyDemoteGpuProviders(reason: string): void;
 }
+
+/**
+ * Default no-substitution port. Device recovery may retry the same provider, but it must not
+ * alter tournament state in a way that silently selects CPU/Worker/Canvas for a later operation.
+ * The tournament adapter below remains opt-in for diagnostic and legacy migrations only.
+ */
+export const STUDIO_DEVICE_LOSS_NO_FALLBACK_TOURNAMENT_PORT:
+  StudioDeviceLossTournamentPort = Object.freeze({
+  killGpuProviders: () => undefined,
+  reviveGpuProviders: () => undefined,
+  permanentlyDemoteGpuProviders: () => undefined,
+});
 
 /**
  * GPU-family tournament provider ids known today: the filter island's
@@ -216,8 +226,9 @@ export interface StudioDeviceLossDemotionEvent<TCommand = unknown> {
   readonly lossCount: number;
   /**
    * Commands staged during the outage. Non-empty only on permanent demotion
-   * (a successful recovery drains them through onRecover instead) — the
-   * fallback lane must replay them; they are never dropped here.
+   * (a successful recovery drains them through onRecover instead). The host
+   * may preserve or explicitly retry them; this event never authorizes another
+   * provider to replay them.
    */
   readonly stagedCommands: readonly TCommand[];
 }
@@ -246,7 +257,7 @@ export interface StudioDeviceLossRecoveryOptions<
   TCommand = unknown,
   TDevice extends StudioGpuDeviceLike = StudioGpuDeviceLike,
 > {
-  /** ③ Fallback-lane demotion notice (cpu/worker take over immediately). */
+  /** Compatibility callback name: announces selected-provider unavailability only. */
   onDemote: (event: StudioDeviceLossDemotionEvent<TCommand>) => void;
   /** ④ Revive notice after successful backoff re-acquisition. */
   onRecover: (event: StudioDeviceLossRecoveryEvent<TCommand, TDevice>) => void;
@@ -262,7 +273,10 @@ export interface StudioDeviceLossRecoveryOptions<
   }) => Promise<TDevice | null>;
   /** ① In-flight result discard signal. Optional but strongly recommended. */
   onDiscardInFlight?: (event: StudioDeviceLossDiscardEvent) => void;
-  /** Defaults to the shared-runtime adapter (createStudioTournamentDeviceLossPort). */
+  /**
+   * Defaults to a no-op, no-substitution port. The legacy tournament adapter is opt-in and must
+   * not be used by product renderer bindings.
+   */
   tournament?: StudioDeviceLossTournamentPort;
   backoff?: Partial<StudioDeviceLossBackoff>;
   /** Losses before permanent demotion. Default 3 (§17.3 임계). */
@@ -327,7 +341,7 @@ export function createDeviceLossRecovery<
   options: StudioDeviceLossRecoveryOptions<TCommand, TDevice>,
 ): StudioDeviceLossRecovery<TCommand, TDevice> {
   const clock = options.clock;
-  const tournament = options.tournament ?? createStudioTournamentDeviceLossPort();
+  const tournament = options.tournament ?? STUDIO_DEVICE_LOSS_NO_FALLBACK_TOURNAMENT_PORT;
   const requestDevice =
     options.requestDevice ?? (() => defaultRequestDevice<TDevice>());
   const backoff: StudioDeviceLossBackoff = {
@@ -454,8 +468,7 @@ export function createDeviceLossRecovery<
     if (lostGeneration !== generation) return; // replaced device — stale signal
     if (state === "permanently-demoted") return;
     losses += 1;
-    // ① Invalidate the epoch first: in-flight results must be discarded
-    //    before any fallback work can be observed.
+    // ① Invalidate the epoch first: in-flight results must be discarded before recovery starts.
     const invalidatedEpoch = epoch;
     epoch += 1;
     if (options.onDiscardInFlight) {
@@ -469,8 +482,8 @@ export function createDeviceLossRecovery<
       );
       return;
     }
-    // ② Kill the GPU family before ③ announcing the demotion, so fallback
-    //    lane selection already sees them excluded.
+    // ② Notify the selected-provider outage. The default port does not mutate tournament state;
+    //    an explicitly injected legacy port may still mirror availability for migration tests.
     state = "lost";
     tournament.killGpuProviders(`gpu-device-loss: ${reason}`);
     guard(() =>

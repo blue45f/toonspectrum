@@ -25,10 +25,13 @@ export interface StudioHealCloneWorkerLike {
 }
 
 export type StudioHealCloneWorkerFactory = () => StudioHealCloneWorkerLike | null;
+export type StudioHealCloneExecutionMode = "worker" | "direct";
 
 export interface StudioHealCloneWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the warm Vite module Worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  executionMode?: StudioHealCloneExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioHealCloneWorkerFactory | null;
   readyTimeoutMilliseconds?: number;
   operationTimeoutMilliseconds?: number;
@@ -62,6 +65,12 @@ function createAbortError(message = "복구 브러시 계산을 취소했습니�
 function createTimeoutError(): Error {
   const error = new Error("복구 브러시 Worker가 제한 시간 안에 완료되지 않았습니다.");
   error.name = "TimeoutError";
+  return error;
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioHealCloneWorkerUnavailableError";
   return error;
 }
 
@@ -181,13 +190,9 @@ function runHealCloneWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runHealCloneDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
     const rejectMalformedResponse = () => finish(() => reject(
       new Error("복구 브러시 Worker가 알 수 없는 응답을 반환했습니다."),
     ));
@@ -273,7 +278,10 @@ function runHealCloneWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "복구 브러시 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       // 픽셀 버퍼가 이미 전송(detach)됐으므로 직접 실행으로 되돌리지 않고 이 Worker epoch를 폐기한다.
@@ -293,7 +301,7 @@ function runHealCloneWithWorker(
       postRequest();
     } else {
       readyTimer = setTimeout(
-        resolveDirectFallback,
+        () => rejectWorkerUnavailable("복구 브러시 Worker 준비 시간이 초과되었습니다."),
         boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
       );
     }
@@ -380,17 +388,21 @@ function runHealCloneWithSharedModuleWorker(
     clearSharedHealCloneIdleTimer();
     if (disposeGeneration !== sharedHealCloneDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    let creationError: unknown;
     if (!sharedHealCloneWorker) {
       try {
         sharedHealCloneWorker = createStudioHealCloneModuleWorker();
-      } catch {
+      } catch (error) {
+        creationError = error;
         sharedHealCloneWorker = null;
       }
       sharedHealCloneWorkerReady = false;
       if (sharedHealCloneWorker) sharedHealCloneWorkerEpoch += 1;
     }
     const worker = sharedHealCloneWorker;
-    if (!worker) return runHealCloneDirect(request, options.signal);
+    if (!worker) {
+      throw createWorkerUnavailableError("복구 브러시 Worker를 만들 수 없습니다.", creationError);
+    }
     const epoch = sharedHealCloneWorkerEpoch;
     const controller = new AbortController();
     sharedHealCloneFlight = { worker, epoch, controller };
@@ -423,8 +435,8 @@ function runHealCloneWithSharedModuleWorker(
 /**
  * 복구 브러시/도장 도장 적용을 capacity 1 모듈 Worker 큐에서 실행한다. 기본 Worker는 첫 ready
  * 이후 스트로크 간 유지되며, 명시적 workerFactory만 격리된 one-shot 수명을 사용한다. ArrayBuffer
- * 픽셀 소유권은 요청마다 이전하고, Worker를 만들 수 없거나 준비 전에 로드가 실패하면 동일 엔진의
- * 직접 실행으로 폴백한다.
+ * 픽셀 소유권은 요청마다 이전한다. Worker를 만들 수 없거나 준비 전에 로드가 실패하면 선택한
+ * Worker 실행은 unavailable로 종료되며 같은 요청을 메인 스레드에서 다시 실행하지 않는다.
  */
 export async function runStudioHealCloneWorker(
   request: StudioHealCloneWorkerRunRequest,
@@ -432,18 +444,20 @@ export async function runStudioHealCloneWorker(
 ): Promise<StudioHealCloneWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafe = cloneSafeRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runHealCloneDirect(cloneSafe, options.signal);
   if (options.workerFactory === undefined) {
     return runHealCloneWithSharedModuleWorker(cloneSafe, options);
   }
   const factory = options.workerFactory;
-  if (!factory) return runHealCloneDirect(cloneSafe, options.signal);
+  if (!factory) throw createWorkerUnavailableError("복구 브러시 Worker를 만들 수 없습니다.");
 
   let worker: StudioHealCloneWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runHealCloneDirect(cloneSafe, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("복구 브러시 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runHealCloneDirect(cloneSafe, options.signal);
+  if (!worker) throw createWorkerUnavailableError("복구 브러시 Worker를 만들 수 없습니다.");
   return runHealCloneWithWorker(worker, cloneSafe, options);
 }

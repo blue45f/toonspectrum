@@ -16,7 +16,7 @@ import { sha256HexPortable } from "./studio-sha256";
 import type { InferenceSession, Tensor } from "onnxruntime-web";
 
 export const STUDIO_ONNX_RUNTIME_VERSION = "1.27.0" as const;
-export const STUDIO_ONNX_EXECUTION_PROVIDER_ORDER = [
+export const STUDIO_ONNX_EXECUTION_PROVIDERS = [
   "webgpu",
   "wasm",
 ] as const;
@@ -31,9 +31,6 @@ export const DEFAULT_STUDIO_ONNX_INFERENCE_BUDGETS =
   });
 
 export type StudioOnnxExecutionProvider = "webgpu" | "wasm";
-export type StudioOnnxFallbackReason =
-  | "webgpu-api-unavailable"
-  | "webgpu-session-create-failed";
 
 export type StudioOnnxInferenceErrorCode =
   | "aborted"
@@ -136,16 +133,11 @@ export interface StudioOnnxSessionReceipt {
     readonly sha256: `sha256:${string}`;
     readonly byteLength: number;
   };
-  readonly preferredExecutionProvider: "webgpu";
-  readonly attemptedExecutionProviders: readonly ["webgpu", "wasm"];
+  readonly selectedExecutionProvider: StudioOnnxExecutionProvider;
+  readonly attemptedExecutionProviders: readonly [StudioOnnxExecutionProvider];
   readonly activeExecutionProvider: StudioOnnxExecutionProvider;
-  readonly fallback:
-    | {
-        readonly from: "webgpu";
-        readonly to: "wasm";
-        readonly reason: StudioOnnxFallbackReason;
-      }
-    | null;
+  readonly attemptCount: 1;
+  readonly failureIsolation: "fail-closed";
 }
 
 export interface StudioOnnxInferenceResult {
@@ -183,6 +175,8 @@ export interface StudioOnnxInferenceProvider {
 
 export interface CreateStudioOnnxInferenceProviderOptions {
   readonly registry: StudioOnnxModelRegistry;
+  /** Immutable for this provider. A failed provider is never replaced in-flight. */
+  readonly executionProvider?: StudioOnnxExecutionProvider;
   readonly budgets?: Partial<StudioOnnxInferenceBudgets>;
   readonly urlPolicy?: StudioOnnxUrlPolicy;
   readonly loadRuntime?: StudioOnnxRuntimeLoader;
@@ -734,8 +728,7 @@ function runtimeTensorElementType(
 function freezeReceipt(input: {
   readonly descriptor: StudioOnnxModelDescriptor;
   readonly byteLength: number;
-  readonly activeExecutionProvider: StudioOnnxExecutionProvider;
-  readonly fallbackReason: StudioOnnxFallbackReason | null;
+  readonly executionProvider: StudioOnnxExecutionProvider;
 }): StudioOnnxSessionReceipt {
   return Object.freeze({
     providerId: "onnxruntime-web",
@@ -746,17 +739,13 @@ function freezeReceipt(input: {
       sha256: input.descriptor.sha256,
       byteLength: input.byteLength,
     }),
-    preferredExecutionProvider: "webgpu",
-    attemptedExecutionProviders: STUDIO_ONNX_EXECUTION_PROVIDER_ORDER,
-    activeExecutionProvider: input.activeExecutionProvider,
-    fallback:
-      input.fallbackReason === null
-        ? null
-        : Object.freeze({
-            from: "webgpu",
-            to: "wasm",
-            reason: input.fallbackReason,
-          }),
+    selectedExecutionProvider: input.executionProvider,
+    attemptedExecutionProviders: Object.freeze([
+      input.executionProvider,
+    ]) as readonly [StudioOnnxExecutionProvider],
+    activeExecutionProvider: input.executionProvider,
+    attemptCount: 1,
+    failureIsolation: "fail-closed",
   });
 }
 
@@ -772,6 +761,7 @@ class OnnxStudioInferenceProvider implements StudioOnnxInferenceProvider {
   private readonly urlPolicy: StudioOnnxUrlPolicy;
   private readonly loadRuntime: StudioOnnxRuntimeLoader;
   private readonly loadModelBytes: StudioOnnxModelByteLoader;
+  private readonly executionProvider: StudioOnnxExecutionProvider;
   private readonly webGpuApiAvailable: () => boolean;
   private readonly sessions = new Map<string, CachedStudioOnnxSession>();
   private currentEpoch: StudioOnnxEpoch;
@@ -786,6 +776,7 @@ class OnnxStudioInferenceProvider implements StudioOnnxInferenceProvider {
     this.urlPolicy = Object.freeze({ ...options.urlPolicy });
     this.loadRuntime = options.loadRuntime ?? loadStudioOnnxRuntime;
     this.loadModelBytes = options.loadModelBytes ?? fetchStudioOnnxModelBytes;
+    this.executionProvider = options.executionProvider ?? "webgpu";
     this.webGpuApiAvailable =
       options.webGpuApiAvailable ?? defaultWebGpuApiAvailable;
     const initialEpoch = options.initialEpoch ?? {
@@ -949,69 +940,36 @@ class OnnxStudioInferenceProvider implements StudioOnnxInferenceProvider {
     signal?: AbortSignal,
   ): Promise<CachedStudioOnnxSession> {
     throwIfAborted(signal);
-    const webGpuAvailable = this.webGpuApiAvailable();
-    let session: InferenceSession;
-    let activeExecutionProvider: StudioOnnxExecutionProvider;
-    let fallbackReason: StudioOnnxFallbackReason | null = null;
+    if (
+      this.executionProvider === "webgpu"
+      && !this.webGpuApiAvailable()
+    ) {
+      throw inferenceError(
+        "session-create-failed",
+        "The selected ONNX WebGPU execution provider is unavailable.",
+      );
+    }
 
-    if (webGpuAvailable) {
-      try {
-        session = await awaitSessionWithAbort(
-          runtime.InferenceSession.create(bytes, {
-            executionProviders: [
-              {
-                name: "webgpu",
-                validationMode: "basic",
-              },
-            ],
-            graphOptimizationLevel: "all",
-            executionMode: "sequential",
-          }),
-          signal,
-        );
-        activeExecutionProvider = "webgpu";
-      } catch (cause) {
-        if (signal?.aborted || isAbortError(cause)) throw abortedError();
-        fallbackReason = "webgpu-session-create-failed";
-        try {
-          session = await awaitSessionWithAbort(
-            runtime.InferenceSession.create(bytes, {
-              executionProviders: ["wasm"],
-              graphOptimizationLevel: "all",
-              executionMode: "sequential",
-            }),
-            signal,
-          );
-          activeExecutionProvider = "wasm";
-        } catch (fallbackCause) {
-          if (signal?.aborted || isAbortError(fallbackCause)) throw abortedError();
-          throw inferenceError(
-            "session-create-failed",
-            "ONNX Runtime could not create either a WebGPU or WASM session.",
-            fallbackCause,
-          );
-        }
-      }
-    } else {
-      fallbackReason = "webgpu-api-unavailable";
-      try {
-        session = await awaitSessionWithAbort(
-          runtime.InferenceSession.create(bytes, {
-            executionProviders: ["wasm"],
-            graphOptimizationLevel: "all",
-            executionMode: "sequential",
-          }),
-          signal,
-        );
-        activeExecutionProvider = "wasm";
-      } catch (cause) {
-        if (signal?.aborted || isAbortError(cause)) throw abortedError();
-        throw inferenceError(
-          "session-create-failed",
-          "ONNX Runtime could not create the WASM fallback session.",
-          cause,
-        );
-      }
+    let session: InferenceSession;
+    try {
+      session = await awaitSessionWithAbort(
+        runtime.InferenceSession.create(bytes, {
+          executionProviders:
+            this.executionProvider === "webgpu"
+              ? [{ name: "webgpu", validationMode: "basic" }]
+              : ["wasm"],
+          graphOptimizationLevel: "all",
+          executionMode: "sequential",
+        }),
+        signal,
+      );
+    } catch (cause) {
+      if (signal?.aborted || isAbortError(cause)) throw abortedError();
+      throw inferenceError(
+        "session-create-failed",
+        `ONNX Runtime could not create the selected ${this.executionProvider} session.`,
+        cause,
+      );
     }
 
     if (signal?.aborted || this.isDestroyed) {
@@ -1040,8 +998,7 @@ class OnnxStudioInferenceProvider implements StudioOnnxInferenceProvider {
       receipt: freezeReceipt({
         descriptor,
         byteLength: bytes.byteLength,
-        activeExecutionProvider,
-        fallbackReason,
+        executionProvider: this.executionProvider,
       }),
       activeLeases: 0,
       idleResolvers: [],

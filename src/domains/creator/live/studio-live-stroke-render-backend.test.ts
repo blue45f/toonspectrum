@@ -82,9 +82,9 @@ describe("studio live-stroke render backend coordinator", () => {
       epoch,
       strokeId: "stroke-a",
       pinnedBackend: "webgpu",
-      presentationBackend: "canvas2d",
+      presentationBackend: null,
       canvasShadowRetained: true,
-      canvasShadowVisible: true,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
     });
 
@@ -135,15 +135,15 @@ describe("studio live-stroke render backend coordinator", () => {
     })).toMatchObject({ status: "rejected", reason: "backend-pinned" });
   });
 
-  it("retains a visible Canvas shadow until the exact current GPU receipt", () => {
+  it("keeps WebGPU presentation unavailable until the exact current GPU receipt", () => {
     const { coordinator, epoch } = beginWebGpu();
     const first = requestGpu(coordinator, epoch, "stroke-a", "gpu:first");
     const second = requestGpu(coordinator, epoch, "stroke-a", "gpu:second");
 
     expect(session(coordinator)).toMatchObject({
-      presentationBackend: "canvas2d",
+      presentationBackend: null,
       canvasShadowRetained: true,
-      canvasShadowVisible: true,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
       expectedGpuRequest: second,
     });
@@ -154,7 +154,7 @@ describe("studio live-stroke render backend coordinator", () => {
       complete: true,
     });
     expect(stale).toMatchObject({ status: "rejected", reason: "stale-gpu-result" });
-    expect(session(coordinator).canvasShadowVisible).toBe(true);
+    expect(session(coordinator).canvasShadowVisible).toBe(false);
 
     const invalid = coordinator.receiveGpuFrameReceipt({
       token: second,
@@ -162,7 +162,7 @@ describe("studio live-stroke render backend coordinator", () => {
       complete: true,
     });
     expect(invalid).toMatchObject({ status: "rejected", reason: "invalid-gpu-receipt" });
-    expect(session(coordinator).canvasShadowVisible).toBe(true);
+    expect(session(coordinator).canvasShadowVisible).toBe(false);
 
     const shown = receiptGpu(coordinator, second);
     expect(shown.effects).toEqual([
@@ -180,16 +180,16 @@ describe("studio live-stroke render backend coordinator", () => {
     });
   });
 
-  it("restores the retained Canvas shadow while a newer in-place GPU frame is pending", () => {
+  it("does not reveal Canvas while a newer in-place GPU frame is pending", () => {
     const { coordinator, epoch } = beginWebGpu();
     const first = requestGpu(coordinator, epoch, "stroke-a", "gpu:first");
     receiptGpu(coordinator, first);
     const second = requestGpu(coordinator, epoch, "stroke-a", "gpu:second");
 
     expect(session(coordinator)).toMatchObject({
-      presentationBackend: "canvas2d",
+      presentationBackend: null,
       gpuOverlayVisible: false,
-      canvasShadowVisible: true,
+      canvasShadowVisible: false,
       expectedGpuRequest: second,
       acceptedGpuRequest: first,
     });
@@ -208,7 +208,7 @@ describe("studio live-stroke render backend coordinator", () => {
     "surface-lost",
     "timeout",
     "cancelled",
-  ] as const)("fails %s GPU authority visibly to the retained Canvas shadow", (reason) => {
+  ] as const)("marks %s GPU authority unavailable without selecting Canvas", (reason) => {
     const { coordinator, epoch } = beginWebGpu();
     const token = requestGpu(coordinator, epoch);
     receiptGpu(coordinator, token);
@@ -224,25 +224,25 @@ describe("studio live-stroke render backend coordinator", () => {
       status: "accepted",
       effects: [
         { type: "gpu-overlay.hide" },
-        { type: "canvas-shadow.restore" },
-        { type: "canvas.failover", reason },
+        { type: "canvas-shadow.retain-hidden" },
+        { type: "selected-engine.unavailable", backend: "webgpu", reason },
       ],
     });
     expect(session(coordinator)).toMatchObject({
       pinnedBackend: "webgpu",
-      presentationBackend: "canvas2d",
+      presentationBackend: null,
       canvasShadowRetained: true,
-      canvasShadowVisible: true,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
       expectedGpuRequest: null,
       acceptedGpuRequest: null,
-      canvasFallbackReason: reason,
+      unavailableReason: reason,
     });
     expect(coordinator.requestGpuFrame({
       epoch,
       strokeId: "stroke-a",
       requestId: "gpu:must-not-recover-mid-stroke",
-    })).toMatchObject({ status: "rejected", reason: "canvas-fallback-active" });
+    })).toMatchObject({ status: "rejected", reason: "selected-engine-unavailable" });
     expect(coordinator.checkBackendPin({
       epoch,
       strokeId: "stroke-a",
@@ -279,8 +279,8 @@ describe("studio live-stroke render backend coordinator", () => {
 
     expect(session(coordinator)).toMatchObject({
       phase: "awaiting-canonical-canvas",
-      presentationBackend: "canvas2d",
-      canvasShadowVisible: true,
+      presentationBackend: null,
+      canvasShadowVisible: false,
       gpuOverlayVisible: false,
       expectedGpuRequest: gpuToken,
       expectedCanonicalCanvas: canvasToken,
@@ -353,7 +353,7 @@ describe("studio live-stroke render backend coordinator", () => {
   it.each([
     ["failed", "canonical-commit-failed"],
     ["cancelled", "canonical-commit-cancelled"],
-  ] as const)("restores Canvas on a %s canonical draw and releases only after an exact retry", (
+  ] as const)("retains the selected GPU frame on a %s canonical draw and releases after an exact retry", (
     outcome,
     reason,
   ) => {
@@ -369,11 +369,11 @@ describe("studio live-stroke render backend coordinator", () => {
       status: "accepted",
       next: {
         phase: "awaiting-canonical-canvas",
-        presentationBackend: "canvas2d",
-        canvasShadowVisible: true,
-        gpuOverlayVisible: false,
+        presentationBackend: "webgpu",
+        canvasShadowVisible: false,
+        gpuOverlayVisible: true,
         expectedCanonicalCanvas: null,
-        canvasFallbackReason: reason,
+        unavailableReason: reason,
       },
     });
 

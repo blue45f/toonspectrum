@@ -7,8 +7,8 @@
  * 이 분할이 코드 중복 없이 최대 이득을 준다(그리고 두 백엔드의 결과가 같은 수식에서 나온다).
  *
  * 디바이스 수명 규율은 studio-gpu-filter-runtime 과 같은 원칙을 따르되 완전히 독립이다:
- *  - 기능 감지 실패 / 어댑터 없음 / 획득 예외 → null (호출부는 CPU 경로로 폴백)
- *  - device lost → 런타임을 lost 로 표시(진행 중 호출은 실패 → 호출부 폴백)
+ *  - 기능 감지 실패 / 어댑터 없음 / 획득 예외 → null (선택한 GPU 경로 unavailable)
+ *  - device lost → 런타임을 lost 로 표시(진행 중 호출은 마지막 정상 프레임을 유지)
  *  - `gpu` 를 주입하면 공유 싱글턴을 우회한다 → 테스트가 가짜 디바이스로 심(seam)을 검증
  *
  * 버퍼는 텍스처가 아니라 storage buffer 를 쓴다. HDR 은 f32 4채널이라 rgba8 텍스처로는
@@ -205,7 +205,7 @@ export function studioDenoiseWorkgroupCount(extent: number): number {
 
 export interface StudioDenoiseGpuRuntime {
   readonly device: GPUDevice;
-  /** true 면 이 런타임은 다시 쓸 수 없다 — 호출부는 즉시 CPU 로 폴백해야 한다. */
+  /** true 면 선택한 GPU 경로를 다시 쓸 수 없고 해당 작업은 unavailable이다. */
   readonly lost: boolean;
   getAtrousPipeline(): GPUComputePipeline;
   createStorageBuffer(byteLength: number, label?: string): GPUBuffer;
@@ -340,7 +340,7 @@ async function acquireDevice(gpu: GPU): Promise<StudioDenoiseGpuRuntimeImpl | nu
       });
     return runtime;
   } catch {
-    // 어댑터/디바이스 획득은 정책·드라이버 이유로 던질 수 있다 → CPU 폴백.
+    // 어댑터/디바이스 획득은 정책·드라이버 이유로 던질 수 있다 → GPU unavailable.
     return null;
   }
 }
@@ -449,9 +449,9 @@ export interface StudioDenoiseGpuOptions extends StudioDenoiseGpuRuntimeOptions 
 
 /**
  * GPU 고속 경로로 한 프레임을 디노이즈한다.
- * 런타임을 얻을 수 없거나 실행 중 실패하면 **null** 을 반환한다 — 호출부는
- * `denoiseStudioFrame` (CPU) 으로 폴백하면 된다. 여기서 조용히 CPU 를 돌리지 않는 이유는
- * 호출부가 "GPU 를 못 썼다"는 사실을 계측/로그로 알아야 하기 때문이다.
+ * 런타임을 얻을 수 없거나 실행 중 실패하면 **null** 을 반환한다. 이는 선택한 GPU 작업의
+ * unavailable 영수증이며, 호출부는 마지막 정상 프레임을 유지해야 한다. CPU 참조 경로는
+ * 다음 작업을 시작하기 전에 명시적으로 선택했을 때만 실행한다.
  */
 export async function denoiseStudioFrameOnGpu(
   frame: StudioDenoiseFrame,
@@ -467,7 +467,7 @@ export async function denoiseStudioFrameOnGpu(
     const filtered = await runStudioDenoiseAtrousGpu(runtime, prepared);
     return finishStudioDenoise(prepared, filtered, "gpu");
   } catch {
-    // 디바이스 lost·검증 오류 등 — 호출부가 CPU 로 폴백한다.
+    // 디바이스 lost·검증 오류 등 — 선택한 GPU 작업은 fail-closed로 끝난다.
     return null;
   }
 }

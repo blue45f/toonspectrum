@@ -15,7 +15,6 @@ import {
   type StudioBg3dGeometryWorkerStage,
 } from "./studio-bg3d-geometry-worker-protocol";
 
-export const STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES = 512 * 1024;
 export const STUDIO_BG3D_GEOMETRY_WORKER_MAX_QUEUED_JOBS = 8;
 export const STUDIO_BG3D_GEOMETRY_WORKER_DEFAULT_TIMEOUT_MS = 30_000;
 

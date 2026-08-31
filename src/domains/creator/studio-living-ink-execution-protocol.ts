@@ -305,6 +305,13 @@ export type StudioLivingInkExecutionBackend =
   | "webgl2-offscreen-half-float"
   | "webgpu-offscreen-half-float";
 
+/**
+ * Provider chosen before a Worker execution epoch starts. This is intentionally separate from the
+ * receipt backend: callers select one provider id, while receipts name the exact implementation
+ * that actually produced pixels. A Worker must never substitute the other provider mid-epoch.
+ */
+export type StudioLivingInkExecutionProviderId = "webgl2" | "webgpu";
+
 export interface StudioLivingInkExecutionCapabilities {
   readonly backend: StudioLivingInkExecutionBackend;
   readonly worker: true;
@@ -508,10 +515,8 @@ interface StudioLivingInkWorkerRequestBase {
 
 export type StudioLivingInkWorkerRequest =
   | (StudioLivingInkWorkerRequestBase & Readonly<{
-      type: "living-ink/probe";
-    }>)
-  | (StudioLivingInkWorkerRequestBase & Readonly<{
       type: "living-ink/initialize";
+      backend: StudioLivingInkExecutionProviderId;
       config: StudioLivingInkExecutionConfig;
     }>)
   | (StudioLivingInkWorkerRequestBase & Readonly<{
@@ -537,10 +542,6 @@ interface StudioLivingInkWorkerResponseBase {
 }
 
 export type StudioLivingInkWorkerResponse =
-  | (StudioLivingInkWorkerResponseBase & Readonly<{
-      type: "living-ink/capabilities";
-      capabilities: StudioLivingInkExecutionCapabilities;
-    }>)
   | (StudioLivingInkWorkerResponseBase & Readonly<{
       type: "living-ink/ready";
       capabilities: StudioLivingInkExecutionCapabilities;

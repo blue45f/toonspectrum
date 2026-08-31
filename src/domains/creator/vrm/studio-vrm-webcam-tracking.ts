@@ -9,7 +9,10 @@
 //  - TrackingChannels는 "카메라 좌표계"(미러 전)이고,
 //    convertChannelsToVrmData에서 mirrorMode·gazeLock·sensitivity를 반영한다.
 
-import { resolveStudioMediaPipeVisionWasmFileset } from "../studio-mediapipe-vision-assets";
+import {
+  resolveStudioMediaPipeVisionWasmFileset,
+  type StudioMediaPipeVisionDelegate,
+} from "../studio-mediapipe-vision-assets";
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
@@ -105,6 +108,11 @@ export interface VrmTrackingData {
   lookAt?: { yawDeg: number; pitchDeg: number };
 }
 
+export interface StudioVrmMediaPipeLandmarkerInitOptions {
+  /** Fixed before task creation. Omission selects the product-default GPU provider. */
+  readonly delegate?: StudioMediaPipeVisionDelegate;
+}
+
 /* ── Constants ────────────────────────────────────────────────────────── */
 
 /** 기본 트래킹 옵션. */
@@ -166,13 +174,25 @@ const BS = {
 /* ── Singleton FaceLandmarker ─────────────────────────────────────────── */
 
 let cachedLandmarker: FaceLandmarker | null = null;
+let cachedFaceLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initPromise: Promise<FaceLandmarker> | null = null;
 let initPromiseGeneration: number | null = null;
+let initPromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let faceLandmarkerGeneration = 0;
 
 function liveLandmarkerDisposedError(kind: "face" | "hand" | "pose"): Error {
   const error = new Error(`Live ${kind} landmarker initialization was disposed.`);
   error.name = "AbortError";
+  return error;
+}
+
+function landmarkerDelegateIdentityError(
+  kind: "face" | "hand" | "pose" | "photo-hand" | "photo-pose",
+): Error {
+  const error = new Error(
+    `The ${kind} MediaPipe singleton is already owned by another delegate.`,
+  );
+  error.name = "StudioVrmMediaPipeDelegateIdentityError";
   return error;
 }
 
@@ -188,17 +208,35 @@ function safelyCloseLiveLandmarker(landmarker: { close(): void }): void {
  * MediaPipe FaceLandmarker를 lazy 초기화(싱글턴).
  * 두 번째 호출부터는 캐시된 인스턴스를 즉시 반환한다.
  */
-export async function initFaceLandmarker(): Promise<FaceLandmarker> {
-  if (cachedLandmarker) return cachedLandmarker;
+export async function initFaceLandmarker(
+  options: StudioVrmMediaPipeLandmarkerInitOptions = {},
+): Promise<FaceLandmarker> {
+  const delegate = options.delegate ?? "GPU";
+  if (cachedLandmarker) {
+    if (cachedFaceLandmarkerDelegate !== delegate) {
+      throw landmarkerDelegateIdentityError("face");
+    }
+    return cachedLandmarker;
+  }
   if (initPromise) {
-    if (initPromiseGeneration === faceLandmarkerGeneration) return initPromise;
+    if (initPromiseGeneration === faceLandmarkerGeneration) {
+      if (initPromiseDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("face");
+      }
+      return initPromise;
+    }
     try {
       await initPromise;
     } catch {
       // The disposed generation is expected to fail closed after its factory settles.
     }
-    if (cachedLandmarker) return cachedLandmarker;
-    return initFaceLandmarker();
+    if (cachedLandmarker) {
+      if (cachedFaceLandmarkerDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("face");
+      }
+      return cachedLandmarker;
+    }
+    return initFaceLandmarker(options);
   }
 
   const generation = faceLandmarkerGeneration;
@@ -212,7 +250,6 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
     });
     if (generation !== faceLandmarkerGeneration) throw liveLandmarkerDisposedError("face");
 
-    // Try GPU first, fallback to CPU (some GPUs / environments fail on GPU delegate)
     // 신뢰도 0.5→0.6: 저품질 프레임의 랜드마크 튐 컷.
     // 0.7 이상은 재탐지 빈발로 fps 출렁임을 유발하므로 금지.
     const faceOptions = {
@@ -223,44 +260,29 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
       minFacePresenceConfidence: 0.6,
       minTrackingConfidence: 0.6,
     } as const;
-    let landmarker: FaceLandmarker;
-    try {
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-face",
-        create: () => FLM.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-            delegate: "GPU",
-          },
-          ...faceOptions,
-        }),
-      });
-    } catch (gpuErr) {
-      if (generation !== faceLandmarkerGeneration) throw liveLandmarkerDisposedError("face");
-      console.warn("FaceLandmarker GPU delegate failed, falling back to CPU:", gpuErr);
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-face",
-        create: () => FLM.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-            delegate: "CPU",
-          },
-          ...faceOptions,
-        }),
-      });
-    }
+    const landmarker = await runStudioMediaPipeVisionTaskCreation({
+      owner: "vrm-video-face",
+      create: () => FLM.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate,
+        },
+        ...faceOptions,
+      }),
+    });
 
     if (generation !== faceLandmarkerGeneration) {
       safelyCloseLiveLandmarker(landmarker);
       throw liveLandmarkerDisposedError("face");
     }
     cachedLandmarker = landmarker;
+    cachedFaceLandmarkerDelegate = delegate;
     return landmarker;
   })();
   initPromise = pending;
   initPromiseGeneration = generation;
+  initPromiseDelegate = delegate;
 
   try {
     return await pending;
@@ -268,6 +290,7 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
     if (initPromise === pending) {
       initPromise = null;
       initPromiseGeneration = null;
+      initPromiseDelegate = null;
     }
   }
 }
@@ -277,28 +300,49 @@ export function disposeFaceLandmarker(): void {
   faceLandmarkerGeneration += 1;
   const active = cachedLandmarker;
   cachedLandmarker = null;
+  cachedFaceLandmarkerDelegate = null;
   if (active) safelyCloseLiveLandmarker(active);
 }
 
 let cachedPoseLandmarker: PoseLandmarker | null = null;
+let cachedPoseLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initPosePromise: Promise<PoseLandmarker> | null = null;
 let initPosePromiseGeneration: number | null = null;
+let initPosePromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let livePoseLandmarkerGeneration = 0;
 
 /**
  * MediaPipe PoseLandmarker를 lazy 초기화(싱글턴).
  */
-export async function initPoseLandmarker(): Promise<PoseLandmarker> {
-  if (cachedPoseLandmarker) return cachedPoseLandmarker;
+export async function initPoseLandmarker(
+  options: StudioVrmMediaPipeLandmarkerInitOptions = {},
+): Promise<PoseLandmarker> {
+  const delegate = options.delegate ?? "GPU";
+  if (cachedPoseLandmarker) {
+    if (cachedPoseLandmarkerDelegate !== delegate) {
+      throw landmarkerDelegateIdentityError("pose");
+    }
+    return cachedPoseLandmarker;
+  }
   if (initPosePromise) {
-    if (initPosePromiseGeneration === livePoseLandmarkerGeneration) return initPosePromise;
+    if (initPosePromiseGeneration === livePoseLandmarkerGeneration) {
+      if (initPosePromiseDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("pose");
+      }
+      return initPosePromise;
+    }
     try {
       await initPosePromise;
     } catch {
       // A disposed generation cannot be cancelled inside MediaPipe; wait for its settlement.
     }
-    if (cachedPoseLandmarker) return cachedPoseLandmarker;
-    return initPoseLandmarker();
+    if (cachedPoseLandmarker) {
+      if (cachedPoseLandmarkerDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("pose");
+      }
+      return cachedPoseLandmarker;
+    }
+    return initPoseLandmarker(options);
   }
 
   const generation = livePoseLandmarkerGeneration;
@@ -310,46 +354,30 @@ export async function initPoseLandmarker(): Promise<PoseLandmarker> {
     });
     if (generation !== livePoseLandmarkerGeneration) throw liveLandmarkerDisposedError("pose");
 
-    let landmarker: PoseLandmarker;
-    try {
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-pose",
-        create: () => PLM.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-            delegate: "GPU",
-          },
-          runningMode: "VIDEO",
-          outputSegmentationMasks: false,
-        }),
-      });
-    } catch (err) {
-      if (generation !== livePoseLandmarkerGeneration) throw liveLandmarkerDisposedError("pose");
-      console.warn("PoseLandmarker GPU delegate failed, falling back to CPU:", err);
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-pose",
-        create: () => PLM.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-            delegate: "CPU",
-          },
-          runningMode: "VIDEO",
-          outputSegmentationMasks: false,
-        }),
-      });
-    }
+    const landmarker = await runStudioMediaPipeVisionTaskCreation({
+      owner: "vrm-video-pose",
+      create: () => PLM.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+          delegate,
+        },
+        runningMode: "VIDEO",
+        outputSegmentationMasks: false,
+      }),
+    });
 
     if (generation !== livePoseLandmarkerGeneration) {
       safelyCloseLiveLandmarker(landmarker);
       throw liveLandmarkerDisposedError("pose");
     }
     cachedPoseLandmarker = landmarker;
+    cachedPoseLandmarkerDelegate = delegate;
     return landmarker;
   })();
   initPosePromise = pending;
   initPosePromiseGeneration = generation;
+  initPosePromiseDelegate = delegate;
 
   try {
     return await pending;
@@ -357,6 +385,7 @@ export async function initPoseLandmarker(): Promise<PoseLandmarker> {
     if (initPosePromise === pending) {
       initPosePromise = null;
       initPosePromiseGeneration = null;
+      initPosePromiseDelegate = null;
     }
   }
 }
@@ -366,16 +395,23 @@ export function disposePoseLandmarker(): void {
   livePoseLandmarkerGeneration += 1;
   const active = cachedPoseLandmarker;
   cachedPoseLandmarker = null;
+  cachedPoseLandmarkerDelegate = null;
   if (active) safelyCloseLiveLandmarker(active);
 }
 
 let cachedPhotoPoseLandmarker: PoseLandmarker | null = null;
+let cachedPhotoPoseLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initPhotoPosePromise: Promise<PoseLandmarker> | null = null;
+let initPhotoPosePromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let photoPoseLandmarkerGeneration = 0;
 
-export type PhotoPoseLandmarkerFactory = () => Promise<PoseLandmarker>;
+export type PhotoPoseLandmarkerFactory = (
+  delegate?: StudioMediaPipeVisionDelegate,
+) => Promise<PoseLandmarker>;
 
-async function createPhotoPoseLandmarker(): Promise<PoseLandmarker> {
+async function createPhotoPoseLandmarker(
+  delegate: StudioMediaPipeVisionDelegate = "GPU",
+): Promise<PoseLandmarker> {
   const { FilesetResolver, PoseLandmarker: PLM } =
     await loadStudioMediaPipeVisionModule();
   const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
@@ -390,24 +426,13 @@ async function createPhotoPoseLandmarker(): Promise<PoseLandmarker> {
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,
   } as const;
-  try {
-    return await runStudioMediaPipeVisionTaskCreation({
-      owner: "vrm-photo-pose",
-      create: () => PLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "GPU" },
-        ...options,
-      }),
-    });
-  } catch (error) {
-    console.warn("Photo PoseLandmarker GPU delegate failed, falling back to CPU:", error);
-    return runStudioMediaPipeVisionTaskCreation({
-      owner: "vrm-photo-pose",
-      create: () => PLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "CPU" },
-        ...options,
-      }),
-    });
-  }
+  return runStudioMediaPipeVisionTaskCreation({
+    owner: "vrm-photo-pose",
+    create: () => PLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate },
+      ...options,
+    }),
+  });
 }
 
 function photoPoseLandmarkerDisposedError(): Error {
@@ -422,14 +447,39 @@ function photoPoseLandmarkerDisposedError(): Error {
  * independent MediaPipe task instances.
  */
 export function initPhotoPoseLandmarker(
-  factory: PhotoPoseLandmarkerFactory = createPhotoPoseLandmarker,
+  options?: StudioVrmMediaPipeLandmarkerInitOptions,
+): Promise<PoseLandmarker>;
+export function initPhotoPoseLandmarker(
+  factory: PhotoPoseLandmarkerFactory,
+  options?: StudioVrmMediaPipeLandmarkerInitOptions,
+): Promise<PoseLandmarker>;
+export function initPhotoPoseLandmarker(
+  factoryOrOptions: PhotoPoseLandmarkerFactory | StudioVrmMediaPipeLandmarkerInitOptions = {},
+  maybeOptions: StudioVrmMediaPipeLandmarkerInitOptions = {},
 ): Promise<PoseLandmarker> {
-  if (cachedPhotoPoseLandmarker) return Promise.resolve(cachedPhotoPoseLandmarker);
-  if (initPhotoPosePromise) return initPhotoPosePromise;
+  const factory = typeof factoryOrOptions === "function"
+    ? factoryOrOptions
+    : createPhotoPoseLandmarker;
+  const options = typeof factoryOrOptions === "function"
+    ? maybeOptions
+    : factoryOrOptions;
+  const delegate = options.delegate ?? "GPU";
+  if (cachedPhotoPoseLandmarker) {
+    if (cachedPhotoPoseLandmarkerDelegate !== delegate) {
+      return Promise.reject(landmarkerDelegateIdentityError("photo-pose"));
+    }
+    return Promise.resolve(cachedPhotoPoseLandmarker);
+  }
+  if (initPhotoPosePromise) {
+    if (initPhotoPosePromiseDelegate !== delegate) {
+      return Promise.reject(landmarkerDelegateIdentityError("photo-pose"));
+    }
+    return initPhotoPosePromise;
+  }
 
   const generation = photoPoseLandmarkerGeneration;
   const pending: Promise<PoseLandmarker> = Promise.resolve()
-    .then(factory)
+    .then(() => factory(delegate))
     .then(
       (landmarker) => {
         if (
@@ -444,15 +494,21 @@ export function initPhotoPoseLandmarker(
           throw photoPoseLandmarkerDisposedError();
         }
         cachedPhotoPoseLandmarker = landmarker;
+        cachedPhotoPoseLandmarkerDelegate = delegate;
         initPhotoPosePromise = null;
+        initPhotoPosePromiseDelegate = null;
         return landmarker;
       },
       (error: unknown) => {
-        if (initPhotoPosePromise === pending) initPhotoPosePromise = null;
+        if (initPhotoPosePromise === pending) {
+          initPhotoPosePromise = null;
+          initPhotoPosePromiseDelegate = null;
+        }
         throw error;
       },
     );
   initPhotoPosePromise = pending;
+  initPhotoPosePromiseDelegate = delegate;
   return pending;
 }
 
@@ -460,7 +516,9 @@ export function disposePhotoPoseLandmarker(): void {
   photoPoseLandmarkerGeneration += 1;
   const active = cachedPhotoPoseLandmarker;
   cachedPhotoPoseLandmarker = null;
+  cachedPhotoPoseLandmarkerDelegate = null;
   initPhotoPosePromise = null;
+  initPhotoPosePromiseDelegate = null;
   try {
     active?.close();
   } catch {
@@ -469,12 +527,18 @@ export function disposePhotoPoseLandmarker(): void {
 }
 
 let cachedPhotoHandLandmarker: HandLandmarker | null = null;
+let cachedPhotoHandLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initPhotoHandPromise: Promise<HandLandmarker> | null = null;
+let initPhotoHandPromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let photoHandLandmarkerGeneration = 0;
 
-export type PhotoHandLandmarkerFactory = () => Promise<HandLandmarker>;
+export type PhotoHandLandmarkerFactory = (
+  delegate?: StudioMediaPipeVisionDelegate,
+) => Promise<HandLandmarker>;
 
-async function createPhotoHandLandmarker(): Promise<HandLandmarker> {
+async function createPhotoHandLandmarker(
+  delegate: StudioMediaPipeVisionDelegate = "GPU",
+): Promise<HandLandmarker> {
   const { FilesetResolver, HandLandmarker: HLM } =
     await loadStudioMediaPipeVisionModule();
   const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
@@ -489,24 +553,13 @@ async function createPhotoHandLandmarker(): Promise<HandLandmarker> {
     minHandPresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
   } as const;
-  try {
-    return await runStudioMediaPipeVisionTaskCreation({
-      owner: "vrm-photo-hand",
-      create: () => HLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "GPU" },
-        ...options,
-      }),
-    });
-  } catch (error) {
-    console.warn("Photo HandLandmarker GPU delegate failed, falling back to CPU:", error);
-    return runStudioMediaPipeVisionTaskCreation({
-      owner: "vrm-photo-hand",
-      create: () => HLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "CPU" },
-        ...options,
-      }),
-    });
-  }
+  return runStudioMediaPipeVisionTaskCreation({
+    owner: "vrm-photo-hand",
+    create: () => HLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate },
+      ...options,
+    }),
+  });
 }
 
 function photoHandLandmarkerDisposedError(): Error {
@@ -520,14 +573,39 @@ function photoHandLandmarkerDisposedError(): Error {
  * photo scan change task mode while the webcam frame loop is still reading it.
  */
 export function initPhotoHandLandmarker(
-  factory: PhotoHandLandmarkerFactory = createPhotoHandLandmarker,
+  options?: StudioVrmMediaPipeLandmarkerInitOptions,
+): Promise<HandLandmarker>;
+export function initPhotoHandLandmarker(
+  factory: PhotoHandLandmarkerFactory,
+  options?: StudioVrmMediaPipeLandmarkerInitOptions,
+): Promise<HandLandmarker>;
+export function initPhotoHandLandmarker(
+  factoryOrOptions: PhotoHandLandmarkerFactory | StudioVrmMediaPipeLandmarkerInitOptions = {},
+  maybeOptions: StudioVrmMediaPipeLandmarkerInitOptions = {},
 ): Promise<HandLandmarker> {
-  if (cachedPhotoHandLandmarker) return Promise.resolve(cachedPhotoHandLandmarker);
-  if (initPhotoHandPromise) return initPhotoHandPromise;
+  const factory = typeof factoryOrOptions === "function"
+    ? factoryOrOptions
+    : createPhotoHandLandmarker;
+  const options = typeof factoryOrOptions === "function"
+    ? maybeOptions
+    : factoryOrOptions;
+  const delegate = options.delegate ?? "GPU";
+  if (cachedPhotoHandLandmarker) {
+    if (cachedPhotoHandLandmarkerDelegate !== delegate) {
+      return Promise.reject(landmarkerDelegateIdentityError("photo-hand"));
+    }
+    return Promise.resolve(cachedPhotoHandLandmarker);
+  }
+  if (initPhotoHandPromise) {
+    if (initPhotoHandPromiseDelegate !== delegate) {
+      return Promise.reject(landmarkerDelegateIdentityError("photo-hand"));
+    }
+    return initPhotoHandPromise;
+  }
 
   const generation = photoHandLandmarkerGeneration;
   const pending: Promise<HandLandmarker> = Promise.resolve()
-    .then(factory)
+    .then(() => factory(delegate))
     .then(
       (landmarker) => {
         if (
@@ -542,15 +620,21 @@ export function initPhotoHandLandmarker(
           throw photoHandLandmarkerDisposedError();
         }
         cachedPhotoHandLandmarker = landmarker;
+        cachedPhotoHandLandmarkerDelegate = delegate;
         initPhotoHandPromise = null;
+        initPhotoHandPromiseDelegate = null;
         return landmarker;
       },
       (error: unknown) => {
-        if (initPhotoHandPromise === pending) initPhotoHandPromise = null;
+        if (initPhotoHandPromise === pending) {
+          initPhotoHandPromise = null;
+          initPhotoHandPromiseDelegate = null;
+        }
         throw error;
       },
     );
   initPhotoHandPromise = pending;
+  initPhotoHandPromiseDelegate = delegate;
   return pending;
 }
 
@@ -558,7 +642,9 @@ export function disposePhotoHandLandmarker(): void {
   photoHandLandmarkerGeneration += 1;
   const active = cachedPhotoHandLandmarker;
   cachedPhotoHandLandmarker = null;
+  cachedPhotoHandLandmarkerDelegate = null;
   initPhotoHandPromise = null;
+  initPhotoHandPromiseDelegate = null;
   try {
     active?.close();
   } catch {
@@ -567,22 +653,42 @@ export function disposePhotoHandLandmarker(): void {
 }
 
 let cachedHandLandmarker: HandLandmarker | null = null;
+let cachedHandLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initHandPromise: Promise<HandLandmarker> | null = null;
 let initHandPromiseGeneration: number | null = null;
+let initHandPromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let liveHandLandmarkerGeneration = 0;
 
 /** MediaPipe HandLandmarker를 lazy 초기화(싱글턴, 양손). */
-export async function initHandLandmarker(): Promise<HandLandmarker> {
-  if (cachedHandLandmarker) return cachedHandLandmarker;
+export async function initHandLandmarker(
+  options: StudioVrmMediaPipeLandmarkerInitOptions = {},
+): Promise<HandLandmarker> {
+  const delegate = options.delegate ?? "GPU";
+  if (cachedHandLandmarker) {
+    if (cachedHandLandmarkerDelegate !== delegate) {
+      throw landmarkerDelegateIdentityError("hand");
+    }
+    return cachedHandLandmarker;
+  }
   if (initHandPromise) {
-    if (initHandPromiseGeneration === liveHandLandmarkerGeneration) return initHandPromise;
+    if (initHandPromiseGeneration === liveHandLandmarkerGeneration) {
+      if (initHandPromiseDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("hand");
+      }
+      return initHandPromise;
+    }
     try {
       await initHandPromise;
     } catch {
       // The stale task keeps global init authority until MediaPipe settles it.
     }
-    if (cachedHandLandmarker) return cachedHandLandmarker;
-    return initHandLandmarker();
+    if (cachedHandLandmarker) {
+      if (cachedHandLandmarkerDelegate !== delegate) {
+        throw landmarkerDelegateIdentityError("hand");
+      }
+      return cachedHandLandmarker;
+    }
+    return initHandLandmarker(options);
   }
 
   const generation = liveHandLandmarkerGeneration;
@@ -596,38 +702,26 @@ export async function initHandLandmarker(): Promise<HandLandmarker> {
     const model =
       "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
-    let landmarker: HandLandmarker;
-    try {
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-hand",
-        create: () => HLM.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: model, delegate: "GPU" },
-          runningMode: "VIDEO",
-          numHands: 2,
-        }),
-      });
-    } catch (err) {
-      if (generation !== liveHandLandmarkerGeneration) throw liveLandmarkerDisposedError("hand");
-      console.warn("HandLandmarker GPU delegate failed, falling back to CPU:", err);
-      landmarker = await runStudioMediaPipeVisionTaskCreation({
-        owner: "vrm-video-hand",
-        create: () => HLM.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: model, delegate: "CPU" },
-          runningMode: "VIDEO",
-          numHands: 2,
-        }),
-      });
-    }
+    const landmarker = await runStudioMediaPipeVisionTaskCreation({
+      owner: "vrm-video-hand",
+      create: () => HLM.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: model, delegate },
+        runningMode: "VIDEO",
+        numHands: 2,
+      }),
+    });
 
     if (generation !== liveHandLandmarkerGeneration) {
       safelyCloseLiveLandmarker(landmarker);
       throw liveLandmarkerDisposedError("hand");
     }
     cachedHandLandmarker = landmarker;
+    cachedHandLandmarkerDelegate = delegate;
     return landmarker;
   })();
   initHandPromise = pending;
   initHandPromiseGeneration = generation;
+  initHandPromiseDelegate = delegate;
 
   try {
     return await pending;
@@ -635,6 +729,7 @@ export async function initHandLandmarker(): Promise<HandLandmarker> {
     if (initHandPromise === pending) {
       initHandPromise = null;
       initHandPromiseGeneration = null;
+      initHandPromiseDelegate = null;
     }
   }
 }
@@ -644,6 +739,7 @@ export function disposeHandLandmarker(): void {
   liveHandLandmarkerGeneration += 1;
   const active = cachedHandLandmarker;
   cachedHandLandmarker = null;
+  cachedHandLandmarkerDelegate = null;
   if (active) safelyCloseLiveLandmarker(active);
 }
 

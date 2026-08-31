@@ -58,14 +58,11 @@ describe("VelloHub real CPU vertical slice", () => {
 });
 
 /**
- * Degradation for the focus/speed-line geometry increment.
- *
- * These are the two element types the WebGPU surface can actually take over
- * today, so their fallback has to be proven with the REAL software rasteriser,
- * not a stub: a machine with no WebGPU, and a machine that loses its device
- * mid-session, must both keep painting the artwork the artist authored.
+ * CPU remains an independent golden/reference renderer for lowered geometry.
+ * Product WebGPU failure is tested separately as fail-closed: it never invokes
+ * this software rasteriser without an explicit reference request.
  */
-describe("Comic line geometry survives the no-GPU and device-loss lanes", () => {
+describe("Comic line geometry CPU reference lane", () => {
   const focusElement = {
     id: "burst",
     type: "focusLines",
@@ -116,7 +113,7 @@ describe("Comic line geometry survives the no-GPU and device-loss lanes", () => 
     expect(opaquePixelCount(first.pixels)).toBeGreaterThan(500);
   });
 
-  it("actually applies element rotation on the fallback lane", async () => {
+  it("actually applies element rotation on the reference lane", async () => {
     // The lowering used to ignore speed-line rotation entirely and pivot focus
     // rays about the pattern centre. Identical pixels here would mean rotation
     // never reached the renderer.
@@ -130,7 +127,7 @@ describe("Comic line geometry survives the no-GPU and device-loss lanes", () => 
     expect(opaquePixelCount(turned.pixels)).toBeGreaterThan(0);
   });
 
-  it("falls back to a painted CPU frame when the GPU backend reports device loss", async () => {
+  it("does not render CPU automatically when the GPU backend fails", async () => {
     const present = presentScene(focusElement);
     const presented: StudioVelloBackendFrame[] = [];
     const held: string[] = [];
@@ -165,12 +162,23 @@ describe("Comic line geometry survives the no-GPU and device-loss lanes", () => 
       subscribeDeviceLoss: () => () => undefined,
     });
 
-    const receipt = await hub.render(present.scene);
-    expect(receipt.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    await expect(hub.render(present.scene)).rejects.toMatchObject({
+      name: "StudioVelloHubUnavailableError",
+      failure: { source: "render", reason: "GPUDevice was lost" },
+    });
+    expect(presented).toEqual([]);
+    expect(held.at(-1)).toContain("unavailable-render:GPUDevice was lost");
+
+    const receipt = await hub.renderReference(present.scene);
+    expect(receipt).toMatchObject({
+      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
+      decision: "reference",
+      referenceOnly: true,
+    });
     const frame = presented.at(-1);
     expect(frame?.kind).toBe("pixels");
     if (frame?.kind !== "pixels") return;
-    // The recovery frame must carry the artwork, not an empty surface.
+    // The separately requested reference frame still carries the artwork.
     expect(opaquePixelCount(frame.pixels)).toBeGreaterThan(500);
     hub.dispose();
   });

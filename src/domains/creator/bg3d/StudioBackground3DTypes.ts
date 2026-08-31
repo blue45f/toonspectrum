@@ -146,7 +146,6 @@ export const EMPTY_THREE_ANIMATION_CLIPS: readonly THREE.AnimationClip[] = Objec
 export const EMPTY_THREE_JOINTS: readonly StudioBg3dThreeJointDescriptor[] = Object.freeze([]);
 export const EMPTY_THREE_MORPH_TARGETS: readonly StudioBg3dThreeMorphDescriptor[] = Object.freeze([]);
 
-export const STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS = 1_048_576;
 export const STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS = 120_000;
 
 export const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; hint: string }> = [

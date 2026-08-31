@@ -109,7 +109,7 @@ describe("Studio VRM XPBD skirt product attachment", () => {
     expect(runtime.solveCount).toBe(2);
   });
 
-  it("fails closed for a long skirt without calf endpoints so the wrapper can mount its fallback", () => {
+  it("fails closed for a long skirt without calf endpoints without constructing another garment", () => {
     const { vrm } = createRig({ missingFeet: true });
     const result = createStudioVrmXpbdSkirtAttachmentRuntime({
       vrm,

@@ -2,7 +2,7 @@
 
 ## 상태
 
-승인 (2026-08-29, 제품 오너 구두 지시 3건 반영)
+수정 승인 (2026-08-31, 자동·강제 런타임 폴백 금지 정책 반영)
 
 ## 맥락
 
@@ -30,15 +30,17 @@ V13 feature contract 기준 Vello 갭(Hybrid 레인조차 native/lowered로 소�
 ## 결정
 
 1. **갭 커버리지 계약**: `packages/studio-engine-registry/src/capability-gap-plan.ts`가 feature
-   contract에서 갭 목록을 유도하고, 갭마다 명명된 대안 엔진 체인
-   (`skia-graphite-webgpu` 챌린저 → `skia-canvaskit-gpu` 완성 레인 → `skia-canvaskit` 기준선)의
-   존재를 검증한다. 앱의 shipped universe(`STUDIO_KNOWN_ENGINE_DESCRIPTORS`)에 세 id가 모두
-   존재해야 하며, 갭 기능을 Skia 계약이 완성하지 못하면 빌드가 실패한다
+   contract에서 갭 목록을 유도하고, 명시적으로 계획할 수 있는
+   `skia-canvaskit-gpu` 완성 레인, `skia-graphite-webgpu` 챌린저, 그리고 런타임 비소유
+   `skia-canvaskit` CPU 참조 레인의 존재와 실제 capability token을 검증한다. 이 목록은
+   순차 실행 체인이 아니다. 앱의 shipped universe(`STUDIO_KNOWN_ENGINE_DESCRIPTORS`)에 세 id가
+   모두 존재해야 하며, 갭 기능을 Skia 계약이 완성하지 못하면 빌드가 실패한다
    (`src/domains/creator/studio-engine-gap-coverage.test.ts`).
-2. **Graphite 적극 채택 = 챌린저 신분 + 자동 강등**: ADR 0010의 리스크 수용 구조를 그대로
-   적용한다. Graphite는 experimental 챌린저로 shipped universe에 등재하고, 토너먼트 품질
-   게이트를 통과해야만 승격하며, 쿼런틴·킬스위치 시 선언된 `fallbackProviderId` 체인으로
-   자동 강등된다("불안정하면 Skia로 교체"는 수동 스왑이 아니라 디스크립터 계약이다).
+2. **Graphite 적극 채택 = 명시적 챌린저 계획 + 실패 폐쇄**: Graphite는 experimental
+   챌린저로 shipped universe에 등재하고 토너먼트 품질 게이트를 통과한 뒤에만 새 실행 계획의
+   provider가 될 수 있다. 이미 선택된 Graphite provider가 초기화·실행·device-loss로 실패하면
+   그 island는 `unavailable`로 닫히며 CanvasKit WebGL/CPU로 전환하지 않는다. 다른 provider를
+   쓰려면 사용자의 명시적 선택 또는 새 문서/세션 계획이 필요하다.
 3. **활성화 한 단계화**: `packages/studio-engine-skia/src/graphite-probe.ts`가 기기(WebGPU)와
    빌드(Graphite CanvasKit 아티팩트 등록 여부)를 프로브해 `adoptable / missing-artifact /
    no-webgpu`를 정직하게 답한다. 오늘의 차단 요인은 업스트림 아티팩트 부재이며, 아티팩트가
@@ -49,19 +51,23 @@ V13 feature contract 기준 Vello 갭(Hybrid 레인조차 native/lowered로 소�
 
 ## 근거
 
-- ADR 0003(표면당 주인 하나), ADR 0004(CanvasKit 기준선), ADR 0010(품질 게이트+폴백+프로브
-  3조건 채택)과 정합. 갭 커버리지 계약은 0010의 (b) 폴백 체인 존재를 기계 검증으로 승격한 것.
+- ADR 0003(표면당 주인 하나)의 소유권 규칙과 정합한다. ADR 0010/기존 0017의 자동 폴백
+  조항은 본 수정 결정으로 대체한다. 활성화 증거는 대체 provider 성공이 아니라 같은 provider의
+  `failureIsolation.behavior = fail-closed`와 fault-injection 전 범위 격리를 검증한다.
 - 참조: [Vello 저장소](https://github.com/linebender/vello),
   [google/forma (아카이브)](https://github.com/google/forma),
-  [Skia Graphite 개요](https://deepwiki.com/google/skia/4-graphite:-next-generation-gpu-backend),
+  [Skia Graphite/Dawn WebGPU context](https://skia.googlesource.com/skia/+/refs/heads/main/include/gpu/graphite/dawn/DawnBackendContext.h),
+  [Skia release notes](https://github.com/google/skia/blob/main/RELEASE_NOTES.md),
   [CanvasKit](https://skia.org/docs/user/modules/canvaskit/),
-  [WebGPU/Skia 동향](https://shopify.engineering/webgpu-skia-web-graphics).
+  [CanvasKit changelog](https://github.com/google/skia/blob/main/modules/canvaskit/CHANGELOG.md).
 
 ## 결과
 
 - 갭 기능이 대안 엔진을 잃으면 조용한 드롭 대신 테스트 실패로 드러난다.
-- Graphite 채택 준비가 코드로 존재하고(프로브·체인·테스트), 아티팩트 등장 시 활성화 비용이
-  최소화된다. 불안정 시 교체는 자동이다.
+- Graphite 채택 준비가 코드로 존재하고(프로브·명시적 계획·테스트), 아티팩트 등장 시 활성화
+  비용이 최소화된다. 불안정 시 현재 작업은 명시적 오류로 닫히며 엔진은 자동 교체되지 않는다.
+- `ProviderDescriptor`, planner/FrameGraph IR, activation evidence 어디에도 런타임 fallback provider
+  또는 chain을 표현하는 필드가 없다. legacy 필드는 strict schema가 거부한다.
 - 죽은 엔진(Forma)이 서베이·런타임을 오염시키지 않는다.
 
 ## 재검토 조건

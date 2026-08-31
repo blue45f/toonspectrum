@@ -193,10 +193,9 @@ describe("Studio tournament persistence bootstrap", () => {
     expect(page).not.toContain(
       'from "./studio-current-tool-help"',
     );
-    expect(page).toContain("peekBootedStudioTournamentRuntime()");
+    expect(page).not.toContain("peekBootedStudioTournamentRuntime()");
     expect(page).not.toContain("getStudioTournamentRuntime()");
-    expect(page).toContain(
-      'strokeRouteTournamentGate?.admits("living-ink") ?? true',
-    );
+    expect(page).not.toContain("resolveStudioStrokeRoutePointerDownGate");
+    expect(page).toContain("const livingInkAdmitted = livingInkSelected");
   });
 });

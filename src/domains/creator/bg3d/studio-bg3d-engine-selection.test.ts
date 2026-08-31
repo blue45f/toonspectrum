@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
   latchStudioBg3dWebglOnlyFeatures,
-  recordStudioBg3dWebGpuFailure,
+  normalizeStudioBg3dEnginePreference,
   resolveStudioBg3dEngineRuntime,
   selectStudioBg3dEngine,
-  STUDIO_BG3D_ENGINE_SELECTION_NOTICES,
   STUDIO_BG3D_EDITOR_ACTIVATION_BUDGET_GZIP_BYTES,
   STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES,
-  STUDIO_BG3D_WEBGPU_FAILURE_LIMIT,
+  STUDIO_BG3D_ENGINE_PREFERENCES,
+  STUDIO_BG3D_ENGINE_SELECTION_NOTICES,
   type StudioBg3dEngineSelectionRequest,
 } from "./studio-bg3d-engine-selection";
 import { classifyStudioBg3dInAppBrowser } from "./studio-bg3d-inapp-browser";
@@ -35,161 +35,146 @@ const UNSUPPORTED_PROBE: StudioBg3dWebGpuProbeResult = Object.freeze({
 
 const STANDALONE = classifyStudioBg3dInAppBrowser({
   userAgent:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/133.0 Safari/537.36",
 });
 const KAKAOTALK = classifyStudioBg3dInAppBrowser({
-  userAgent: "Mozilla/5.0 (Linux; Android 15; SM-S928N; wv) Mobile Safari/537.36 KAKAOTALK 10.6.5",
+  userAgent: "Mozilla/5.0 (Linux; Android 15; wv) Mobile Safari/537.36 KAKAOTALK 10.6.5",
 });
 const INSTAGRAM = classifyStudioBg3dInAppBrowser({
-  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) Mobile/15E148 Instagram 350.0",
+  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2) Mobile/15E148 Instagram 350.0",
 });
 
 const BASE: StudioBg3dEngineSelectionRequest = Object.freeze({
-  preference: "auto",
+  preference: "webgpu",
   probe: SUPPORTED_PROBE,
   inApp: STANDALONE,
   deviceProfile: "desktop",
   webgpuRuntimeAvailable: true,
 });
 
-describe("Studio BG3D engine selection", () => {
-  it("promotes a capable standalone browser to the WebGPU runtime", () => {
-    expect(selectStudioBg3dEngine(BASE)).toMatchObject({
-      backend: "webgpu",
-      runtimeId: "three-webgpu",
-      fallbackBackend: "webgl2",
-      reason: "auto-webgpu-promoted",
-      webgpuSelectable: true,
-      diagnostics: [],
-    });
+describe("Studio BG3D explicit engine selection", () => {
+  it("exposes only explicit engines and migrates legacy auto to WebGPU", () => {
+    expect(STUDIO_BG3D_ENGINE_PREFERENCES).toEqual(["webgpu", "webgl2"]);
+    expect(normalizeStudioBg3dEnginePreference("auto")).toBe("webgpu");
+    expect(normalizeStudioBg3dEnginePreference("unknown")).toBe("webgpu");
+    expect(normalizeStudioBg3dEnginePreference("webgl2")).toBe("webgl2");
   });
 
-  it("keeps WebGL2 as the baseline whenever WebGPU cannot be created", () => {
+  it("admits a supported explicit WebGPU selection without a fallback contract", () => {
+    const plan = selectStudioBg3dEngine(BASE);
+    expect(plan).toMatchObject({
+      backend: "webgpu",
+      runtimeId: "three-webgpu",
+      status: "available",
+      reason: "user-webgpu-override",
+      diagnostics: [],
+    });
+    expect(plan).not.toHaveProperty("fallbackBackend");
+    expect(plan).not.toHaveProperty("webgpuSelectable");
+  });
+
+  it("keeps WebGPU selected but unavailable when capability admission fails", () => {
     expect(selectStudioBg3dEngine({ ...BASE, probe: UNSUPPORTED_PROBE })).toMatchObject({
-      backend: "webgl2",
-      runtimeId: "three-webgl",
-      fallbackBackend: null,
+      backend: "webgpu",
+      runtimeId: "three-webgpu",
+      status: "unavailable",
       reason: "webgpu-probe-unsupported",
-      webgpuSelectable: false,
     });
-
     expect(selectStudioBg3dEngine({ ...BASE, webgpuRuntimeAvailable: false })).toMatchObject({
-      backend: "webgl2",
+      backend: "webgpu",
+      status: "unavailable",
       reason: "webgpu-runtime-unavailable",
-      webgpuSelectable: false,
     });
-
     expect(selectStudioBg3dEngine({
       ...BASE,
       probe: { ...SUPPORTED_PROBE, computeSupported: false },
-    })).toMatchObject({ backend: "webgl2", reason: "webgpu-compute-unavailable" });
-  });
-
-  it("refuses WebGPU on a blocked in-app browser even when the artist asks for it", () => {
-    const plan = selectStudioBg3dEngine({ ...BASE, inApp: INSTAGRAM, preference: "webgpu" });
-    expect(plan).toMatchObject({
-      backend: "webgl2",
+    })).toMatchObject({
+      backend: "webgpu",
+      status: "unavailable",
+      reason: "webgpu-compute-unavailable",
+    });
+    expect(selectStudioBg3dEngine({ ...BASE, inApp: INSTAGRAM })).toMatchObject({
+      backend: "webgpu",
+      status: "unavailable",
       reason: "inapp-browser-blocked",
-      webgpuSelectable: false,
     });
   });
 
-  it("starts an opt-in in-app browser on WebGL2 but leaves WebGPU reachable", () => {
-    const auto = selectStudioBg3dEngine({ ...BASE, inApp: KAKAOTALK });
-    expect(auto).toMatchObject({
-      backend: "webgl2",
-      reason: "inapp-browser-opt-in-required",
-      webgpuSelectable: true,
+  it("marks initialization or device loss failed without demoting the selection", () => {
+    expect(selectStudioBg3dEngine({ ...BASE, webgpuRuntimeFailed: true })).toMatchObject({
+      backend: "webgpu",
+      runtimeId: "three-webgpu",
+      status: "failed",
+      reason: "webgpu-runtime-failed",
     });
-    expect(auto.notice).toContain("직접 선택");
-
-    expect(selectStudioBg3dEngine({ ...BASE, inApp: KAKAOTALK, preference: "webgpu" }))
-      .toMatchObject({ backend: "webgpu", reason: "user-webgpu-override" });
   });
 
-  it("declines automatic promotion for save-data and low-memory phones", () => {
-    expect(selectStudioBg3dEngine({ ...BASE, saveData: true }))
-      .toMatchObject({ backend: "webgl2", reason: "save-data-enabled", webgpuSelectable: true });
-
-    expect(selectStudioBg3dEngine({ ...BASE, deviceProfile: "mobile", deviceMemoryGb: 2 }))
-      .toMatchObject({ backend: "webgl2", reason: "low-device-memory" });
-
-    // The same phone memory on a desktop-classified session is not a decline reason.
-    expect(selectStudioBg3dEngine({ ...BASE, deviceProfile: "desktop", deviceMemoryGb: 2 }))
-      .toMatchObject({ backend: "webgpu", reason: "auto-webgpu-promoted" });
-  });
-
-  it("stops retrying WebGPU after repeated session failures", () => {
-    let failures = 0;
-    failures = recordStudioBg3dWebGpuFailure(failures);
-    expect(selectStudioBg3dEngine({ ...BASE, webgpuFailureCount: failures }))
-      .toMatchObject({ backend: "webgpu", reason: "auto-webgpu-promoted" });
-
-    failures = recordStudioBg3dWebGpuFailure(failures);
-    expect(failures).toBe(STUDIO_BG3D_WEBGPU_FAILURE_LIMIT);
-    expect(selectStudioBg3dEngine({ ...BASE, webgpuFailureCount: failures })).toMatchObject({
-      backend: "webgl2",
-      reason: "repeated-webgpu-failure",
-      webgpuSelectable: false,
-    });
-    expect(recordStudioBg3dWebGpuFailure(failures)).toBe(STUDIO_BG3D_WEBGPU_FAILURE_LIMIT);
-  });
-
-  it("honors an explicit WebGL2 choice and still reports what WebGPU would have done", () => {
-    const plan = selectStudioBg3dEngine({ ...BASE, preference: "webgl2", saveData: true });
-    expect(plan).toMatchObject({
-      backend: "webgl2",
-      reason: "user-webgl2-override",
-      webgpuSelectable: true,
-    });
-    expect(plan.diagnostics).toContain("save-data-enabled");
-  });
-
-  it("reports every blocking reason as a diagnostic, headlined by the first", () => {
+  it("keeps opt-in, save-data, and memory signals advisory", () => {
     const plan = selectStudioBg3dEngine({
       ...BASE,
-      probe: UNSUPPORTED_PROBE,
-      webgpuRuntimeAvailable: false,
-      inApp: INSTAGRAM,
+      inApp: KAKAOTALK,
+      deviceProfile: "mobile",
+      deviceMemoryGb: 2,
       saveData: true,
     });
-    expect(plan.reason).toBe("webgpu-runtime-unavailable");
+    expect(plan).toMatchObject({ backend: "webgpu", status: "available" });
     expect(plan.diagnostics).toEqual([
-      "webgpu-runtime-unavailable",
-      "webgpu-probe-unsupported",
-      "inapp-browser-blocked",
+      "inapp-browser-opt-in-required",
       "save-data-enabled",
+      "low-device-memory",
     ]);
   });
 
-  it("falls back to the WebGL2 baseline for a malformed request instead of throwing", () => {
-    expect(selectStudioBg3dEngine(undefined as unknown as StudioBg3dEngineSelectionRequest))
-      .toMatchObject({ backend: "webgl2", reason: "auto-webgl2-baseline" });
+  it("preserves an independent explicit WebGL2 engine even when WebGPU is unsupported", () => {
+    const plan = selectStudioBg3dEngine({
+      ...BASE,
+      preference: "webgl2",
+      probe: UNSUPPORTED_PROBE,
+      webglOnlyFeatures: { webxr: true, vrmCharacters: true },
+    });
+    expect(plan).toMatchObject({
+      backend: "webgl2",
+      runtimeId: "three-webgl",
+      status: "available",
+      reason: "user-webgl2-override",
+    });
+    expect(plan.diagnostics).toContain("webgpu-probe-unsupported");
   });
 
-  it("returns frozen plans with a Korean notice for every reason", () => {
-    const plan = selectStudioBg3dEngine(BASE);
-    expect(Object.isFrozen(plan)).toBe(true);
-    expect(plan.notice.length).toBeGreaterThan(0);
+  it("fails malformed input closed on WebGPU rather than mounting WebGL2", () => {
+    expect(selectStudioBg3dEngine(undefined as unknown as StudioBg3dEngineSelectionRequest))
+      .toMatchObject({
+        backend: "webgpu",
+        status: "unavailable",
+        reason: "webgpu-probe-unsupported",
+      });
   });
 });
 
 describe("Studio BG3D engine runtime resolution", () => {
-  it("keeps the selected engine when the runtime catalog agrees", () => {
+  it("keeps the explicitly selected runtime when topology agrees", () => {
     expect(resolveStudioBg3dEngineRuntime(BASE)).toMatchObject({
       backend: "webgpu",
       runtimeId: "three-webgpu",
-      reason: "auto-webgpu-promoted",
+      status: "available",
     });
     expect(resolveStudioBg3dEngineRuntime({ ...BASE, preference: "webgl2" })).toMatchObject({
       backend: "webgl2",
       runtimeId: "three-webgl",
-      reason: "user-webgl2-override",
+      status: "available",
     });
   });
 
-  it("requires the capabilities the editor cannot open without", () => {
-    // Both production runtimes must carry every required capability, or selection refuses them.
+  it("does not ask topology to replace an unavailable WebGPU selection", () => {
+    expect(resolveStudioBg3dEngineRuntime({ ...BASE, probe: UNSUPPORTED_PROBE })).toMatchObject({
+      backend: "webgpu",
+      runtimeId: "three-webgpu",
+      status: "unavailable",
+      reason: "webgpu-probe-unsupported",
+    });
+  });
+
+  it("requires both production runtimes to carry every editor capability", () => {
     for (const runtimeId of ["three-webgl", "three-webgpu"] as const) {
       for (const capability of STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES) {
         expect(STUDIO_BG3D_RUNTIME_CATALOG[runtimeId].capabilities.has(capability)).toBe(true);
@@ -198,99 +183,48 @@ describe("Studio BG3D engine runtime resolution", () => {
       expect(STUDIO_BG3D_RUNTIME_CATALOG[runtimeId].activationGzipBytes)
         .toBeLessThanOrEqual(STUDIO_BG3D_EDITOR_ACTIVATION_BUDGET_GZIP_BYTES);
     }
-    expect(STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES).toContain("capture-rgba-depth");
-  });
-
-  it("carries the host reason through when the baseline is chosen", () => {
-    const plan = resolveStudioBg3dEngineRuntime({ ...BASE, inApp: INSTAGRAM });
-    expect(plan).toMatchObject({ backend: "webgl2", reason: "inapp-browser-blocked" });
   });
 });
 
 describe("Studio BG3D WebGL-only feature demand", () => {
-  it("refuses WebGPU during an immersive session, even on request", () => {
-    const request = {
-      ...BASE,
-      webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, webxr: true },
-    };
-    expect(selectStudioBg3dEngine(request)).toMatchObject({
-      backend: "webgl2",
-      reason: "webgl-only-webxr",
-      webgpuSelectable: false,
-    });
-    // An explicit WebGPU choice cannot override a feature that would not render.
-    expect(selectStudioBg3dEngine({ ...request, preference: "webgpu" })).toMatchObject({
-      backend: "webgl2",
-      reason: "webgl-only-webxr",
-      webgpuSelectable: false,
-    });
-  });
-
-  it("still promotes WebGPU when no WebGL-only feature is present", () => {
+  it("keeps WebGPU selected and unavailable for WebXR and VRM requirements", () => {
     expect(selectStudioBg3dEngine({
       ...BASE,
-      webglOnlyFeatures: EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
-    })).toMatchObject({ backend: "webgpu", reason: "auto-webgpu-promoted" });
-  });
-
-  it("latches a demand so leaving the feature does not remount the viewport again", () => {
-    const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
-    // No observation keeps the identical object, so the hook's state does not churn.
-    expect(latchStudioBg3dWebglOnlyFeatures(empty, {})).toBe(empty);
-    expect(latchStudioBg3dWebglOnlyFeatures(empty, { webxr: false })).toBe(empty);
-
-    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { webxr: true });
-    expect(latched).toMatchObject({ webxr: true });
-    expect(Object.isFrozen(latched)).toBe(true);
-    expect(latchStudioBg3dWebglOnlyFeatures(latched, { webxr: false })).toBe(latched);
-  });
-
-  it("pins a scene holding a VRM character to the baseline, over an explicit WebGPU choice", () => {
-    // This block was removed once, on the grounds that the shared-character loader asks for MToon
-    // node materials under a WebGPU renderer and both backends draw the same silhouette. Loading
-    // was never the issue. Measured on one scene with one camera, one light rig and one tone
-    // mapping, the two upstream MToon implementations shade differently across the whole surface:
-    // WebGPU is ~5.7% darker in mean luminance and loses rim highlights by up to 169/255. The
-    // unlit control in the same harness is byte-identical, so this is MToon, not the pipeline.
-    //
-    // A delivered page has to look the same for every collaborator, on every machine, and next to
-    // everything already published — so the character scene runs where the poser runs.
-    expect(Object.keys(EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES).toSorted())
-      .toEqual(["vrmCharacters", "webxr"]);
-
-    // A hard block, not an auto-decline: an explicit WebGPU choice must not re-grade a character.
+      webglOnlyFeatures: { webxr: true, vrmCharacters: false },
+    })).toMatchObject({
+      backend: "webgpu",
+      status: "unavailable",
+      reason: "webgl-only-webxr",
+    });
     expect(selectStudioBg3dEngine({
       ...BASE,
-      preference: "webgpu",
       webglOnlyFeatures: { webxr: false, vrmCharacters: true },
-    })).toMatchObject({ backend: "webgl2", reason: "webgl-only-vrm-character" });
-
-    // And a background with no character still gets the next-generation engine.
-    expect(selectStudioBg3dEngine({
-      ...BASE,
-      webglOnlyFeatures: { webxr: false, vrmCharacters: false },
-    })).toMatchObject({ backend: "webgpu" });
+    })).toMatchObject({
+      backend: "webgpu",
+      status: "unavailable",
+      reason: "webgl-only-vrm-character",
+    });
   });
 
-  it("keeps every engine notice short enough to read in the panel at 360px", () => {
-    // The notice renders inside a narrow status box in the View panel, and the editor is used at
-    // 360px in Korean in-app browsers. The first draft of the VRM notice ran to 94 characters —
-    // more than double every other one — by explaining the shading implementations rather than
-    // what the artist should do. The budget is what stops that being rediscovered by a reader on
-    // a phone; the reasoning belongs in the docs, which have room for it.
+  it("latches feature demand without changing the selected backend", () => {
+    const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
+    expect(latchStudioBg3dWebglOnlyFeatures(empty, {})).toBe(empty);
+    const latched = latchStudioBg3dWebglOnlyFeatures(empty, {
+      webxr: true,
+      vrmCharacters: true,
+    });
+    expect(latched).toEqual({ webxr: true, vrmCharacters: true });
+    expect(Object.isFrozen(latched)).toBe(true);
+    expect(latchStudioBg3dWebglOnlyFeatures(latched, {
+      webxr: false,
+      vrmCharacters: false,
+    })).toBe(latched);
+  });
+
+  it("keeps every Korean notice readable in the narrow panel", () => {
     for (const [reason, notice] of Object.entries(STUDIO_BG3D_ENGINE_SELECTION_NOTICES)) {
       expect(notice.length, `${reason}: ${notice.length}자`).toBeLessThanOrEqual(80);
-      expect(notice.trim(), `${reason} must not be blank`).not.toBe("");
+      expect(notice.trim()).not.toBe("");
     }
-  });
-
-  it("latches a character demand so removing the character does not remount the viewport", () => {
-    const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
-    expect(latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: false })).toBe(empty);
-
-    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: true });
-    expect(latched).toMatchObject({ webxr: false, vrmCharacters: true });
-    expect(Object.isFrozen(latched)).toBe(true);
-    expect(latchStudioBg3dWebglOnlyFeatures(latched, { vrmCharacters: false })).toBe(latched);
   });
 });

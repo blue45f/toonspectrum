@@ -3,8 +3,6 @@ import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import {
   planStudioFilterIslandLanes,
-  studioFilterIslandBucket,
-  studioFilterLaneProviderId,
 } from "./filter/studio-filter-island-plan";
 import {
   applyFilterMaskToPixels,
@@ -14,7 +12,6 @@ import {
   type FilterMaskCoverage,
   type FilterMaskKonvaFilterFn,
 } from "./filter/studio-filter-mask";
-import { scheduleStudioFilterRenderTournament } from "./filter/studio-filter-render-tournament";
 import {
   captureStudioFilterExecutionRouteSnapshot,
   recordStudioFilterExecutionShadow,
@@ -65,8 +62,8 @@ const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;
 // The fix is scheduling, not arithmetic. An eligible GPU chain renders each drag frame into one
 // retained GPUCanvas surface; no staging map or pixel readback occurs while the pointer is moving.
 // The same in-flight frame handle performs the sole canonical readback after settle. Unsupported,
-// masked, or visibly failed GPU work keeps the small Worker proxy and full-resolution Worker/Konva
-// fallback, so an artist never receives silently approximated final pixels.
+// masked or unsupported programs are assigned to a declared compatibility boundary before work;
+// a visibly failed GPU operation preserves the previous frame without starting another engine.
 /** A value this soon after the previous one is a drag frame, not a decision. */
 const IMAGE_FILTER_DRAG_WINDOW_MS = 450;
 /** Full-resolution recompute waits for the drag to stop; the proxy carries the frames until then. */
@@ -473,7 +470,6 @@ export function StudioKonvaImageNode({
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [proxyFilteredCanvas, setProxyFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [gpuFilteredCanvas, setGpuFilteredCanvas] = useState<GpuFilteredCanvasState>();
-  const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const [workerRequiredFailureKey, setWorkerRequiredFailureKey] = useState<string>();
   const [animatedFilterRuntimeFailure, setAnimatedFilterRuntimeFailure] = useState<{
     message: string;
@@ -764,10 +760,18 @@ export function StudioKonvaImageNode({
     };
   }, [filterModule, hasFilters]);
 
-  // Worker 클라이언트도 같은 조건에서 지연 로드 — 별도 청크라 이 모듈을 먼저 열지 않는 페이지의
-  // 첫 청크 예산에 영향을 주지 않는다(loadStudioKonvaFilters와 동일한 이유).
+  const gpuFilterProgramEligible =
+    gpuFilterModule?.isStudioGpuFilterChainEligible(el) === true;
+  // Worker 코드는 GPU 모듈이 정상 로드된 뒤 현재 프로그램을 지원하지 않는다고 판정했을 때만
+  // 가져온다. GPU provider가 선택된 요청은 Worker 청크의 준비 여부와 완전히 독립적이다.
   useEffect(() => {
-    if (!hasFilters || filterWorkerClient) return;
+    if (
+      !hasFilters
+      || !gpuFilterModuleSettled
+      || !gpuFilterModule
+      || gpuFilterProgramEligible
+      || filterWorkerClient
+    ) return;
     let active = true;
     import("./studio-image-filter-worker-client")
       .then((mod) => {
@@ -783,9 +787,16 @@ export function StudioKonvaImageNode({
     return () => {
       active = false;
     };
-  }, [filterWorkerClient, hasFilters]);
+  }, [
+    filterWorkerClient,
+    gpuFilterModule,
+    gpuFilterModuleSettled,
+    gpuFilterProgramEligible,
+    hasFilters,
+  ]);
 
-  // M1 GPU(WGSL) 필터 경로 — 지원 5필드 전용, 실패/미지원 시 null이라 기존 Worker 경로로 폴백.
+  // M1 GPU(WGSL) 필터 경로 — 지원 5필드 전용. 실패는 선택 엔진 사용 불가로 노출되며
+  // Worker/Konva 실행 권한을 부여하지 않는다.
   // konva 미의존 별도 청크라 첫 청크 예산 무영향(worker client 로드와 동일한 이유).
   useEffect(() => {
     if (!hasFilters || gpuFilterModuleSettled) return;
@@ -944,17 +955,15 @@ export function StudioKonvaImageNode({
   // Worker 오프로드 경로 — cachePad>0(테두리 필터 활성)은 Konva의 cache({offset}) 위치 보정을
   // 정확히 복제하기 까다로워 제외하고 기존 Konva 내장 cache+filters 경로로 둔다. 애니메이션 GIF는
   // 이 static-image tournament에 들어오지 않고 아래 전용 live-frame cache owner가 담당한다.
-  const useWorkerFilterPath =
+  const workerPipelineRequested =
     workerDimensionsSafe
     && hasFilters
     && !!filterModule
-    && !!filterWorkerClient
-    // Do not dispatch the first Worker job before the GPU candidate has either loaded or failed.
-    // Otherwise module arrival races can bypass the tournament for the first retained frame.
-    && gpuFilterModuleSettled
     && cachePad === 0
     && !el.isAnimatedGif
     && !filterMaskActivationBlocked;
+  const filterPipelinePlanningReady = workerPipelineRequested
+    && gpuFilterModuleSettled;
   const workerRequestKey = JSON.stringify([
     el.src,
     filterCacheKey,
@@ -964,11 +973,15 @@ export function StudioKonvaImageNode({
     // 요청으로 취급하면 안 된다(fail-closed 폴백 키와 결과 상태 매칭이 함께 이 키를 쓴다).
     filterMaskWantedSrc ?? null,
   ]);
-  const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
+  // Once this operation enters the GPU/Worker filter boundary, failure keeps that boundary active
+  // so Konva's synchronous filter cache cannot become an automatic replacement renderer.
+  const filterPipelineActive = workerPipelineRequested;
   // Drag-preview surface. A masked filter is excluded on purpose: its blend reads the exact
   // full-resolution source, so approximating it would put unrequested pixels on screen.
   const proxyPreviewEligible =
-    useWorkerFilterPath
+    filterPipelinePlanningReady
+    && !gpuFilterProgramEligible
+    && !!filterWorkerClient
     && !filterMaskWantedSrc
     && workerPixelCount >= IMAGE_FILTER_PROXY_MIN_SOURCE_PIXELS;
   const proxyScale = proxyPreviewEligible
@@ -1097,7 +1110,7 @@ export function StudioKonvaImageNode({
       }, 5_000);
     }
     console.error(
-      "[studio] blocked an oversized synchronous image-filter fallback while outline padding is active",
+      "[studio] blocked an oversized synchronous compatibility filter while outline padding is active",
     );
   }, [paddedWorkerRequiredBlocked, workerRequestKey]);
 
@@ -1105,7 +1118,7 @@ export function StudioKonvaImageNode({
   // source RGBA snapshot. The resident session transfers one private source copy on revision
   // changes; parameter-only ticks send only projected filter fields.
   useEffect(() => {
-    if (!useWorkerFilterPath || !displayImg || !filterWorkerClient) {
+    if (!filterPipelinePlanningReady || !displayImg) {
       filterWorkerSessionRef.current?.dispose();
       filterWorkerSessionRef.current = null;
       filterProxySessionRef.current?.dispose();
@@ -1120,8 +1133,9 @@ export function StudioKonvaImageNode({
       setWorkerFilteredCanvas(undefined);
       setProxyFilteredCanvas(undefined);
       setGpuFilteredCanvas(undefined);
-      setWorkerFallbackKey(undefined);
-      if (!paddedWorkerRequiredBlocked) setWorkerRequiredFailureKey(undefined);
+      if (!paddedWorkerRequiredBlocked && !workerPipelineRequested) {
+        setWorkerRequiredFailureKey(undefined);
+      }
       workerSourcePixelsRef.current = null;
       releaseWorkerResultCache(workerResultCacheRef.current);
       workerResultCacheRef.current = null;
@@ -1157,11 +1171,31 @@ export function StudioKonvaImageNode({
       && previousRequestAt !== null
       && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
     setWorkerRequiredFailureKey((current) => current === requestKey ? current : undefined);
-    setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
     // A regular image can retain several recent filter results. If the same source becomes a
     // full-page composite, enforce its stricter one-canvas budget as soon as the mode changes,
     // without waiting for another Worker result to arrive.
     trimWorkerResultCache(workerResultCacheRef.current, workerResultCacheLimit, filterKey);
+
+    const markSelectedFilterUnavailable = (message: string, cause?: unknown): void => {
+      console.error(`[studio] selected image filter engine unavailable: ${message}`, cause);
+      setWorkerRequiredFailureKey(requestKey);
+      if (!workerFailureNoticeRef.current) {
+        const notice = { key: requestKey };
+        workerFailureNoticeRef.current = notice;
+        toast(
+          `선택한 이미지 필터 엔진을 사용할 수 없습니다. ${message}`,
+          { tone: "info", durationMs: 5_000 },
+        );
+        globalThis.setTimeout(() => {
+          if (workerFailureNoticeRef.current === notice) workerFailureNoticeRef.current = null;
+        }, 5_000);
+      }
+    };
+
+    if (!gpuFilterModule) {
+      markSelectedFilterUnavailable("WebGPU 필터 모듈을 불러오지 못해 이전 화면을 유지합니다.");
+      return;
+    }
 
     const filterProgram = elRef.current;
     const gpuChainEligible =
@@ -1171,12 +1205,16 @@ export function StudioKonvaImageNode({
       workload: { width, height, chainSteps: filterChainSteps },
     } as const;
     const filterIslandPlan = planStudioFilterIslandLanes(filterIslandInput);
-    const filterTournamentBucket = studioFilterIslandBucket(filterIslandInput);
     // Filter masks currently require an exact source/filtered blend. Until that blend also lives in
     // the GPU presentation shader, the masked lane stays on Worker/Konva rather than reading the GPU
     // frame back during pointer movement.
+    const selectedFilterLane = filterIslandPlan.selectedLane;
+    if (filterIslandPlan.status === "unavailable") {
+      markSelectedFilterUnavailable("선택한 provider가 비활성화되어 이전 화면을 유지합니다.");
+      return;
+    }
     const useRetainedGpuPreview =
-      filterIslandPlan.lanes[0] === "gpu-chain" && gpuFilterModule
+      selectedFilterLane === "gpu-chain"
       && maskCoverage === null
       && typeof gpuFilterModule.presentGpuFilterChain === "function"
       && typeof gpuFilterModule.createStudioGpuFilterPresentationSurface === "function";
@@ -1185,12 +1223,28 @@ export function StudioKonvaImageNode({
     // 계획 계산만 있고 GPU 작업은 없다. 불완전 입력은 miss 로만 기록되며 절대 던지지 않는다.
     recordStudioFilterExecutionShadow(
       captureStudioFilterExecutionRouteSnapshot({
-        islandHeadLane: filterIslandPlan.lanes[0] ?? "konva-native",
+        islandHeadLane: selectedFilterLane,
         gpuFilterModule,
         maskActive: maskCoverage !== null,
       }),
-      useRetainedGpuPreview ? "gpu-chain" : "worker",
+      selectedFilterLane,
     );
+    if (selectedFilterLane === "gpu-chain" && !useRetainedGpuPreview) {
+      markSelectedFilterUnavailable("WebGPU presentation 계약을 충족하지 못해 이전 화면을 유지합니다.");
+      return;
+    }
+    if (selectedFilterLane === "worker" && !filterWorkerClientSettled) {
+      // The explicitly selected Worker provider is still loading. Do not run GPU/Konva while its
+      // own chunk settles; this effect reruns when the load reaches a terminal state.
+      return;
+    }
+    const selectedWorkerClient = selectedFilterLane === "worker"
+      ? filterWorkerClient
+      : null;
+    if (selectedFilterLane === "worker" && !selectedWorkerClient) {
+      markSelectedFilterUnavailable("필터 Worker 모듈을 불러오지 못해 이전 화면을 유지합니다.");
+      return;
+    }
     if (!useRetainedGpuPreview) {
       gpuFilterPreviewFrameRef.current?.dispose();
       gpuFilterPreviewFrameRef.current = null;
@@ -1227,16 +1281,12 @@ export function StudioKonvaImageNode({
         workerSourcePixelsRef.current = sourcePixels;
         return sourcePixels;
       } catch (error) {
-        console.error("[studio] image filter canvas preparation failed, using Konva fallback:", error);
-        setWorkerFallbackKey(requestKey);
+        markSelectedFilterUnavailable("원본 픽셀을 준비하지 못해 이전 화면을 유지합니다.", error);
         return null;
       }
     };
 
     const gpuController = new AbortController();
-    const tournamentController = new AbortController();
-    let gpuRenderStartedAt = 0;
-    let gpuPresentationElapsedMs = 0;
     let gpuPreviewPromise: Promise<StudioGpuFilterPreviewFrame | null> | null = null;
     const runGpuPreview = (): Promise<StudioGpuFilterPreviewFrame | null> => {
       if (gpuPreviewPromise) return gpuPreviewPromise;
@@ -1246,7 +1296,6 @@ export function StudioKonvaImageNode({
       const surface = gpuFilterPresentationSurfaceRef.current
         ?? gpuFilterModule.createStudioGpuFilterPresentationSurface();
       gpuFilterPresentationSurfaceRef.current = surface;
-      gpuRenderStartedAt = studioImageFilterClockMs();
       gpuPreviewPromise = gpuFilterModule.presentGpuFilterChain(
         { data: sourcePixels.data, width, height },
         filterProgram,
@@ -1258,8 +1307,8 @@ export function StudioKonvaImageNode({
           ),
           surface,
           onFailure: (failure) => {
-            console.error(
-              `[studio] retained GPU filter ${failure.phase} failed; using Worker fallback:`,
+            markSelectedFilterUnavailable(
+              `WebGPU ${failure.phase} 단계가 실패해 이전 화면을 유지합니다.`,
               failure.message,
             );
           },
@@ -1270,7 +1319,6 @@ export function StudioKonvaImageNode({
           return null;
         }
         const previous = gpuFilterPreviewFrameRef.current;
-        gpuPresentationElapsedMs = studioImageFilterClockMs() - gpuRenderStartedAt;
         gpuFilterPreviewFrameRef.current = frame;
         previous?.dispose();
         setGpuFilteredCanvas({
@@ -1287,7 +1335,7 @@ export function StudioKonvaImageNode({
         return frame;
       }).catch((error) => {
         if (!cancelled) {
-          console.error("[studio] retained GPU filter preview failed; using Worker fallback:", error);
+          markSelectedFilterUnavailable("WebGPU 미리보기가 실패해 이전 화면을 유지합니다.", error);
         }
         return null;
       });
@@ -1351,7 +1399,6 @@ export function StudioKonvaImageNode({
           outCtx.putImageData(imageData, 0, 0);
           resultCache.canvases.set(filterKey, outCanvas);
           trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
-          setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
           setWorkerRequiredFailureKey((current) => current === requestKey ? undefined : current);
           if (gpuFilterPreviewFrameRef.current) {
             gpuFilterPreviewFrameRef.current.dispose();
@@ -1361,80 +1408,11 @@ export function StudioKonvaImageNode({
           setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
           return true;
         } catch (error) {
-          console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
-          setWorkerFallbackKey(requestKey);
+          markSelectedFilterUnavailable("필터 결과를 표시 표면에 확정하지 못했습니다.", error);
           return false;
         }
       };
 
-      const scheduleAcceptedFilterTournament = (production: {
-        provider: "gpu-chain" | "worker";
-        elapsedMs: number;
-        pixels: Uint8Array | Uint8ClampedArray;
-      }): void => {
-        if (!gpuChainEligible || !gpuFilterModule || maskCoverage !== null) return;
-        const productionProviderId = studioFilterLaneProviderId(production.provider);
-        const challengerProviderId = studioFilterLaneProviderId(
-          production.provider === "gpu-chain" ? "worker" : "gpu-chain",
-        );
-        scheduleStudioFilterRenderTournament({
-          bucket: filterTournamentBucket,
-          requestKey,
-          width,
-          height,
-          penDown: !!liveStrokeRef?.current,
-          production: {
-            providerId: productionProviderId,
-            elapsedMs: production.elapsedMs,
-            pixels: production.pixels,
-          },
-          challenger: {
-            providerId: challengerProviderId,
-            render: async (signal) => {
-              if (production.provider === "gpu-chain") {
-                const result = await filterWorkerClient.runStudioImageFilterWorker({
-                  imageData: {
-                    data: new Uint8ClampedArray(sourcePixels.data),
-                    width,
-                    height,
-                  },
-                  el: filterProgram,
-                }, { signal });
-                if (result.execution !== "worker") {
-                  throw new Error("Worker tournament candidate did not execute in a Worker");
-                }
-                return { pixels: result.imageData.data };
-              }
-
-              const surface = gpuFilterModule.createStudioGpuFilterPresentationSurface();
-              let frame: StudioGpuFilterPreviewFrame | null = null;
-              try {
-                frame = await gpuFilterModule.presentGpuFilterChain(
-                  { data: sourcePixels.data, width, height },
-                  filterProgram,
-                  {
-                    signal,
-                    sourceRevision: sourcePixels.revision,
-                    isSourceRevisionCurrent: (revision) => (
-                      !cancelled && workerSourcePixelsRef.current?.revision === revision
-                    ),
-                    surface,
-                  },
-                );
-                if (!frame) throw new Error("GPU tournament candidate declined");
-                const finalPixels = await frame.readbackFinal();
-                if (!finalPixels) throw new Error("GPU tournament candidate readback failed");
-                return { pixels: finalPixels.data };
-              } finally {
-                frame?.dispose();
-                surface.dispose();
-              }
-            },
-          },
-          referenceProviderId: studioFilterLaneProviderId("worker"),
-          signal: tournamentController.signal,
-        });
-      };
       let workerRequestDispatched = false;
       const dispatchWorkerRequest = (): void => {
         if (workerRequestDispatched || cancelled) return;
@@ -1442,9 +1420,9 @@ export function StudioKonvaImageNode({
         controller = new AbortController();
         dispatchedAt = studioImageFilterClockMs();
         if (!filterWorkerSessionRef.current) {
-          const createSession = filterWorkerClient.createStudioImageFilterResidentWorkerSession;
+          const createSession = selectedWorkerClient?.createStudioImageFilterResidentWorkerSession;
           if (typeof createSession === "function") {
-            filterWorkerSessionRef.current = createSession();
+            filterWorkerSessionRef.current = createSession({ executionMode: "worker" });
           }
         }
         const request = {
@@ -1460,26 +1438,19 @@ export function StudioKonvaImageNode({
               signal: controller.signal,
               sourceRevision: sourcePixels.revision,
             })
-          : filterWorkerClient.runStudioImageFilterWorker({
+          : selectedWorkerClient!.runStudioImageFilterWorker({
               ...request,
-              // Compatibility fallback for an older/lazily mismatched client chunk: one-shot run
-              // still owns its transfer buffer and must not detach the cached immutable snapshot.
+              // Same-provider one-shot execution for an older/lazily mismatched Worker client.
+              // It owns its transfer buffer and must not detach the cached immutable snapshot.
               imageData: {
                 ...request.imageData,
                 data: new Uint8ClampedArray(sourcePixels.data),
               },
-            }, { signal: controller.signal });
+            }, { executionMode: "worker", signal: controller.signal });
         pending
           .then((result) => {
             dispatchSettled = true;
-            const elapsedMs = studioImageFilterClockMs() - dispatchedAt;
-            if (commitFilteredPixels(result.imageData) && result.execution === "worker") {
-              scheduleAcceptedFilterTournament({
-                provider: "worker",
-                elapsedMs,
-                pixels: result.imageData.data,
-              });
-            }
+            commitFilteredPixels(result.imageData);
           })
           .catch((error) => {
             dispatchSettled = true;
@@ -1505,8 +1476,7 @@ export function StudioKonvaImageNode({
               }
               return;
             }
-            console.error("[studio] image filter worker failed, using Konva fallback:", error);
-            setWorkerFallbackKey(requestKey);
+            markSelectedFilterUnavailable("필터 Worker 실행이 실패해 이전 화면을 유지합니다.", error);
           });
       };
       // The same in-flight preview promise is consumed by the immediate presentation and this
@@ -1515,28 +1485,26 @@ export function StudioKonvaImageNode({
       if (useRetainedGpuPreview) {
         void runGpuPreview().then(async (frame) => {
           if (!frame || cancelled) {
-            dispatchWorkerRequest();
+            if (!cancelled) {
+              markSelectedFilterUnavailable("WebGPU 프레임을 만들지 못해 이전 화면을 유지합니다.");
+            }
             return;
           }
-          const readbackStartedAt = studioImageFilterClockMs();
           const finalPixels = await frame.readbackFinal();
-          const readbackElapsedMs = studioImageFilterClockMs() - readbackStartedAt;
           if (cancelled) return;
           if (!finalPixels) {
-            dispatchWorkerRequest();
+            markSelectedFilterUnavailable("WebGPU 최종 readback이 실패해 이전 화면을 유지합니다.");
             return;
           }
-          if (commitFilteredPixels(finalPixels)) {
-            scheduleAcceptedFilterTournament({
-              provider: "gpu-chain",
-              elapsedMs: gpuPresentationElapsedMs + readbackElapsedMs,
-              pixels: finalPixels.data,
-            });
+          commitFilteredPixels(finalPixels);
+        }).catch((error) => {
+          if (!cancelled) {
+            markSelectedFilterUnavailable("WebGPU 필터 실행이 실패해 이전 화면을 유지합니다.", error);
           }
-        }).catch(() => dispatchWorkerRequest());
+        });
         return;
       }
-      dispatchWorkerRequest();
+      if (selectedFilterLane === "worker") dispatchWorkerRequest();
     }, draggingParameters ? IMAGE_FILTER_DRAG_SETTLE_MS : IMAGE_FILTER_WORKER_DEBOUNCE_MS);
 
     // The retained GPU surface answers the slider at presentation cadence. The settle timer above
@@ -1550,7 +1518,7 @@ export function StudioKonvaImageNode({
     // full-resolution result for this key exists — so it can approximate without ever becoming
     // the pixels the artist keeps.
     let proxyController: AbortController | null = null;
-    const proxyTimer = draggingParameters && !useRetainedGpuPreview
+    const proxyTimer = draggingParameters && selectedFilterLane === "worker"
       ? setTimeout(() => {
           if (cancelled) return;
           let proxyPixels = proxySourcePixelsRef.current;
@@ -1581,9 +1549,9 @@ export function StudioKonvaImageNode({
             }
           }
           if (!filterProxySessionRef.current) {
-            const createSession = filterWorkerClient.createStudioImageFilterResidentWorkerSession;
+            const createSession = selectedWorkerClient?.createStudioImageFilterResidentWorkerSession;
             if (typeof createSession !== "function") return;
-            filterProxySessionRef.current = createSession();
+            filterProxySessionRef.current = createSession({ executionMode: "worker" });
           }
           const proxySession = filterProxySessionRef.current;
           const proxySource = proxyPixels;
@@ -1645,7 +1613,6 @@ export function StudioKonvaImageNode({
       cancelled = true;
       clearTimeout(timer);
       gpuController.abort();
-      tournamentController.abort();
       if (gpuPreviewTimer !== null) clearTimeout(gpuPreviewTimer);
       if (proxyTimer !== null) clearTimeout(proxyTimer);
       if (proxyController !== null) proxyController.abort();
@@ -1663,11 +1630,13 @@ export function StudioKonvaImageNode({
       }
     };
   }, [
-    useWorkerFilterPath,
+    filterPipelinePlanningReady,
+    workerPipelineRequested,
     displayImg,
     maskedFilterKey,
     activeFilterMask,
     filterWorkerClient,
+    filterWorkerClientSettled,
     gpuFilterModule,
     el.src,
     workerWidth,
@@ -1704,8 +1673,8 @@ export function StudioKonvaImageNode({
     ?? currentGpuFilteredCanvas
     ?? retainedWorkerFilteredCanvas
     ?? currentProxyFilteredCanvas;
-  const showComputedCanvas = workerPipelineActive && !!visibleComputedCanvas;
-  const synchronousFallbackBlocked =
+  const showComputedCanvas = filterPipelineActive && !!visibleComputedCanvas;
+  const synchronousCompatibilityBlocked =
     filterMaskActivationBlocked
     || paddedWorkerRequiredBlocked
     || workerRequiredFailureKey === workerRequestKey;
@@ -1720,14 +1689,15 @@ export function StudioKonvaImageNode({
     if (displayImg) {
       node.clearCache();
       // Worker 경로가 선택된 동안은 pending 상태에서도 동기 full-filter를 중복 실행하지 않는다.
-      // 준비/실행 오류로 fail-closed 된 요청만 기존 Konva 캐시 경로를 사용한다.
+      // 준비/실행 오류로 fail-closed 된 요청은 차단 상태를 유지한다. 이 분기는 작업 전에
+      // Worker가 필요하지 않다고 판정된 동기 호환 경로에서만 기존 Konva 캐시를 사용한다.
       if (
         workerDimensionsSafe
         && hasFilters
         && filterModule
         && !el.isAnimatedGif
-        && !workerPipelineActive
-        && !synchronousFallbackBlocked
+        && !filterPipelineActive
+        && !synchronousCompatibilityBlocked
       ) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         // Animated GIF cache ownership lives in the bounded 12fps loop below; this static cache
@@ -1747,7 +1717,7 @@ export function StudioKonvaImageNode({
     } else {
       setKonvaFilterPresentationReady(undefined);
     }
-  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity, synchronousFallbackBlocked, workerRequestKey]);
+  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, filterPipelineActive, workerDimensionsSafe, filterDensity, synchronousCompatibilityBlocked, workerRequestKey]);
 
   // Browser-decoded GIF presentation owner. The filter-free mode is the original 12fps batchDraw
   // loop. An admitted filtered GIF additionally clears/rebuilds the Konva cache from the current
@@ -1765,18 +1735,23 @@ export function StudioKonvaImageNode({
       ? admittedStatus.cacheConfig
       : undefined;
     if (!animatedFilterActive) {
-      // A filter removal, rejected program, or source-owner transition must release any prior
-      // filtered snapshot immediately. The raw GIF remains browser-driven and the loop below
-      // preserves the original 12fps batchDraw cadence.
+      // A filter removal releases the filtered snapshot back to the browser-driven GIF owner.
+      // A still-selected filter that is preparing/unavailable keeps the image explicitly hidden;
+      // it must not turn this same operation into a raw-GIF renderer switch.
       try {
         node.clearCache();
       } catch {
-        // Canvas loss is already an unfiltered/degraded state; there is no successful cache claim.
+        // Canvas loss has no successful filtered-cache claim to release.
       }
       setKonvaFilterPresentationReady((current) => (
         current?.source === source ? undefined : current
       ));
       setAnimatedFilterPresentationKey(undefined);
+      if (hasFilters) {
+        node.visible(false);
+        node.getLayer()?.batchDraw();
+        return;
+      }
     }
     const loop = startStudioAnimatedImageFilterFrameLoop({
       cacheConfig,
@@ -1801,6 +1776,10 @@ export function StudioKonvaImageNode({
       },
       onRuntimeFailure: (error) => {
         if (imageRef.current !== node || elRef.current.src !== src) return;
+        // Hide synchronously before publishing React state so another layer redraw cannot expose
+        // the raw browser frame between the cache failure and the unavailable render.
+        node.visible(false);
+        node.getLayer()?.batchDraw();
         const message = error instanceof Error
           ? `${error.name}: ${error.message}`
           : String(error);
@@ -1819,6 +1798,7 @@ export function StudioKonvaImageNode({
     el.frames,
     el.isAnimatedGif,
     el.src,
+    hasFilters,
     liveStrokeRef,
     workerRequestKey,
   ]);
@@ -1878,7 +1858,7 @@ export function StudioKonvaImageNode({
     : undefined;
   const rasterPresentationSource = !imageSource
     ? undefined
-    : workerPipelineActive
+    : filterPipelineActive
       // A proxy canvas is intentionally approximate and a retained canvas may belong to a prior
       // parameter revision. `readbackFinal()` commits the exact result into
       // currentWorkerFilteredCanvas, and only that full-resolution Worker result closes the fence.
@@ -1949,12 +1929,12 @@ export function StudioKonvaImageNode({
 
   if (!displayImg || !imageSource) return null;
 
-  // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
-  // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
-  // Konva 폴백(cachePad>0 테두리 경로·Worker 준비/실행 실패 fail-closed)도 같은 마스크 결과를
-  // 내야 한다 — 내장 필터 체인을 [원본 스냅샷, ...체인, 마스크 블렌드]로 감싼다. 캐시 캔버스는
-  // 표시 반전이 구워져 있고 cachePad 만큼 패딩이 있으므로 샘플 변환으로 콘텐츠 창을 되돌린다.
-  const konvaFallbackFilters = activeFilterMask && filters.length > 0
+  // 계산 provider가 만든 최종 캔버스는 filters/filterAttrs를 비워 그대로 표시한다.
+  // cachePad>0처럼 실행 전에 명시적으로 분리된 Konva compatibility 경계만 내장 필터 체인을
+  // [원본 스냅샷, ...체인, 마스크 블렌드]로 감싼다. 선택된 GPU/Worker 실패는 이 경계로
+  // 진입하지 않는다. 캐시 캔버스는 표시 반전이 구워져 있고 cachePad 만큼 패딩이 있으므로
+  // 샘플 변환으로 콘텐츠 창을 되돌린다.
+  const konvaCompatibilityFilters = activeFilterMask && filters.length > 0
     ? wrapKonvaFiltersWithFilterMask(
         filters as unknown as readonly FilterMaskKonvaFilterFn[],
         activeFilterMask.coverage,
@@ -1966,19 +1946,21 @@ export function StudioKonvaImageNode({
         }
       ) as unknown as NonNullable<Konva.NodeConfig["filters"]>
     : filters;
-  const animatedFilterFallbackBlocked = isAnimatedGif && hasFilters && !animatedFilterActive;
+  const animatedFilteredPresentationUnavailable = isAnimatedGif
+    && hasFilters
+    && publishedAnimatedFilterStatus.state !== "active";
   const activeFilters: Konva.NodeConfig["filters"] =
-    workerPipelineActive
+    filterPipelineActive
     || !workerDimensionsSafe
-    || synchronousFallbackBlocked
-    || animatedFilterFallbackBlocked
+    || synchronousCompatibilityBlocked
+    || animatedFilteredPresentationUnavailable
       ? undefined
-      : konvaFallbackFilters;
+      : konvaCompatibilityFilters;
   const activeFilterAttrs =
-    workerPipelineActive
+    filterPipelineActive
     || !workerDimensionsSafe
-    || synchronousFallbackBlocked
-    || animatedFilterFallbackBlocked
+    || synchronousCompatibilityBlocked
+    || animatedFilteredPresentationUnavailable
       ? {}
       : filterAttrs;
 
@@ -2012,6 +1994,7 @@ export function StudioKonvaImageNode({
       height={el.height}
       rotation={el.rotation}
       opacity={el.opacity ?? 1}
+      visible={!animatedFilteredPresentationUnavailable}
       filters={activeFilters}
       {...activeFilterAttrs}
       shadowColor={el.shadowColor}

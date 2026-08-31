@@ -42,14 +42,13 @@ export function studioLivingInkCanReuseAcceptedAuthority(input: Readonly<{
 }
 
 /**
- * Ink owns a recoverable coloured DrawEl, but the water tool owns no pigment geometry. Saving the
- * latter as a normal vector stroke after a Worker/route failure paints the selected foreground
- * colour and mutates a document that should have remained unchanged.
+ * A Living Ink failure is terminal for the selected provider. The retained DrawEl is an input
+ * journal, not permission to publish the stroke through Konva or another renderer.
  */
 export function studioLivingInkFailureDisposition(
-  mode: "ink" | "water",
-): "preserve-document-noop" | "save-vector-fallback" {
-  return mode === "water" ? "preserve-document-noop" : "save-vector-fallback";
+  _mode: "ink" | "water",
+): "preserve-document-noop" {
+  return "preserve-document-noop";
 }
 
 /**

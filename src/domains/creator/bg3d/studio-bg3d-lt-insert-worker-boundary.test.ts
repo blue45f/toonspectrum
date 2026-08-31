@@ -42,25 +42,16 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     expect(insert).toContain("timeoutMs: STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS");
   });
 
-  it("falls back synchronously only for unavailable Workers under the shot-pipeline pixel cap", () => {
+  it("fails closed when the selected LT Worker is unavailable", () => {
     const insert = sourceBetween(
       "async function handleInsert()",
       "// 선택된 것이 도형(primitives)인지",
     );
-    // 2026-08-21 intentional change: ltOutputFingerprint moved into
-    // studio-bg3d-editor-derivations.ts (editor split); the cap now ends at the next declaration.
-    const fallback = sourceBetween(
-      "const STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS",
-      "const BG_PANEL_TABS",
-    );
 
-    expect(fallback).toContain("1_048_576");
-    expect(insert).toContain('workerFailure.code === "worker-unavailable"');
-    expect(insert).toContain(
-      "captured.width * captured.height <= STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS",
-    );
-    expect(insert).toContain("return renderStudioBg3dLtLayers(ltRenderInput, ltSettingsSnapshot)");
-    expect(insert.match(/renderStudioBg3dLtLayers\(/gu)).toHaveLength(1);
+    expect(editorSource).not.toContain("STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS");
+    expect(insert).not.toContain('workerFailure.code === "worker-unavailable"');
+    expect(insert).not.toContain("renderStudioBg3dLtLayers(ltRenderInput, ltSettingsSnapshot)");
+    expect(insert.match(/renderStudioBg3dLtLayersInWorker\(/gu)).toHaveLength(1);
     expect(insert).toContain('insertFailure.code === "timeout"');
     expect(insert).toContain("LT 처리 작업을 안전하게 완료하지 못했습니다.");
   });

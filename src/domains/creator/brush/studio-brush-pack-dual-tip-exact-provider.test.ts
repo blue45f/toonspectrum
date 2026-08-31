@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioBrushPackDualTipExactProvider,
+  executeStudioBrushPackDualTipWithExplicitCpuProvider,
   parseStudioBrushPackDualTipExactReplay,
   serializeStudioBrushPackDualTipExactReplay,
 } from "./studio-brush-pack-dual-tip-exact-provider";
@@ -165,7 +166,7 @@ async function providerWithRuntime(
 }
 
 describe("brush-pack exact dual-tip provider call-site", () => {
-  it("lazily selects v2 from the CPU packed stream and never constructs a v1 preview", async () => {
+  it("uses WebGPU as the only pixel authority while retaining CPU plan evidence", async () => {
     const fixture = await providerWithRuntime(async (frame) => completed(frame));
     const result = await fixture.provider.execute(
       selection(),
@@ -182,10 +183,11 @@ describe("brush-pack exact dual-tip provider call-site", () => {
       providerCapability: "dynamic-dual-tip-deposition-r8-v2",
       executionRoute: "webgpu-exact-packed-deposition-v2",
     });
-    expect(result.plan.depositions).toHaveLength(result.artifact.commands.count);
+    expect(result.plan.depositions).toHaveLength(result.replay.commands.count);
     expect(result.plan.depositions.every(
       (item) => item.blendFamily === "lighten",
     )).toBe(true);
+    expect("artifact" in result).toBe(false);
     expect(fixture.runtime.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         requestSequence: 1,
@@ -200,17 +202,24 @@ describe("brush-pack exact dual-tip provider call-site", () => {
         exactness: "algorithmically-exact-deposition-order",
         complete: true,
       },
-      cpuFallback: {
-        executionRoute: "cpu-f32-oracle",
-        authority: "cpu-f32-oracle",
+      cpuReferenceEvidence: {
+        executionRoute: "cpu-f32-oracle-reference",
+        purpose: "plan-validation-and-qa-reference",
+        authority: "none",
+        pixelAuthority: false,
+        saveAuthority: false,
+        providerSelection: "not-selected",
         packedCommandContract: "gpu-wasm-ready-f32-v1",
         complete: true,
       },
       complete: true,
     });
+    expect("cpuFallback" in result.receipt).toBe(false);
+    expect("authority" in result.receipt.cpuReferenceEvidence.oracleContract)
+      .toBe(false);
   });
 
-  it("preserves a canonical JSON replay and can submit it through a fresh exact provider", async () => {
+  it("serializes WebGPU commands with no CPU pixel/save authority and replays on WebGPU", async () => {
     const firstProvider = await providerWithRuntime(async (frame) => completed(frame));
     const first = await firstProvider.provider.execute(
       selection(),
@@ -227,15 +236,26 @@ describe("brush-pack exact dual-tip provider call-site", () => {
       executionRoute: "webgpu-exact-packed-deposition-v2",
       porterDuff: "destination-out",
       exactPlanFingerprint: first.plan.fingerprint,
-      cpuArtifact: {
-        receipt: { authority: "cpu-f32-oracle" },
+      cpuReferenceEvidence: {
+        authority: "none",
+        pixelAuthority: false,
+        saveAuthority: false,
+        providerSelection: "not-selected",
       },
     });
+    expect(serialized).not.toContain("premultipliedLinearRgba");
+    expect(serialized).not.toContain("cpuArtifact");
+    expect(serialized).not.toContain("cpuFallback");
     const wrongPackedContract = JSON.parse(serialized!) as {
       commands: { stride: number };
     };
     wrongPackedContract.commands.stride += 1;
     expect(parseStudioBrushPackDualTipExactReplay(wrongPackedContract)).toBeNull();
+    const forgedCpuAuthority = JSON.parse(serialized!) as {
+      cpuReferenceEvidence: { authority: string };
+    };
+    forgedCpuAuthority.cpuReferenceEvidence.authority = "cpu-f32-oracle";
+    expect(parseStudioBrushPackDualTipExactReplay(forgedCpuAuthority)).toBeNull();
 
     const replayProvider = await providerWithRuntime(async (frame) => completed(frame));
     const replayed = await replayProvider.provider.replay(parsed, {
@@ -245,11 +265,10 @@ describe("brush-pack exact dual-tip provider call-site", () => {
     expect(replayed.status).toBe("webgpu-exact");
     if (replayed.status !== "webgpu-exact") return;
     expect(replayed.plan.fingerprint).toBe(first.plan.fingerprint);
-    expect(replayed.artifact.premultipliedLinearRgba)
-      .toEqual(first.artifact.premultipliedLinearRgba);
+    expect("artifact" in replayed).toBe(false);
   });
 
-  it("returns a complete CPU authority receipt when WebGPU is unavailable", async () => {
+  it("fails provider creation closed before loading modules when WebGPU is unavailable", async () => {
     const moduleLoader = vi.fn(() => exactModulePromise);
     const created = await createStudioBrushPackDualTipExactProvider({
       device: null,
@@ -257,28 +276,47 @@ describe("brush-pack exact dual-tip provider call-site", () => {
       height: 33,
       moduleLoader,
     });
-    expect(created.status).toBe("ready");
-    if (created.status !== "ready") return;
-    expect(created.webGpu).toBe("unavailable");
-    const result = await created.provider.execute(
-      selection(),
-      input(),
-      execution(),
-    );
-    expect(result.status).toBe("cpu-fallback");
-    if (result.status !== "cpu-fallback") return;
-    expect(result.receipt).toMatchObject({
+    expect(created).toEqual({
+      status: "unavailable",
       reason: "webgpu-unavailable",
-      executionRoute: "cpu-f32-oracle",
-      authority: "cpu-f32-oracle",
-      alphaContract: "premultiplied-linear-rgba-f32",
-      complete: true,
     });
-    expect(result.replay.exactPlanFingerprint).toMatch(/^sha256:[0-9a-f]{64}$/u);
-    expect(result.replay.exactPlanFingerprint).not.toBe(`sha256:${"0".repeat(64)}`);
+    expect(moduleLoader).not.toHaveBeenCalled();
   });
 
-  it("falls back to CPU after device loss and remains CPU-only for later requests", async () => {
+  it("fails provider creation closed on module and runtime initialization failures", async () => {
+    const moduleFailed = await createStudioBrushPackDualTipExactProvider({
+      device: {} as GPUDevice,
+      width: 33,
+      height: 33,
+      moduleLoader: async () => {
+        throw new Error("optional chunk unavailable");
+      },
+    });
+    expect(moduleFailed).toEqual({
+      status: "unavailable",
+      reason: "module-load-failed",
+    });
+
+    const module = await exactModulePromise;
+    const runtimeFailed = await createStudioBrushPackDualTipExactProvider({
+      device: {} as GPUDevice,
+      width: 33,
+      height: 33,
+      moduleLoader: async () => ({
+        ...module,
+        createStudioDynamicDualTipExactWebGpuRuntimeV2: () => ({
+          status: "rejected" as const,
+          reason: "initialization-failed" as const,
+        }),
+      }),
+    });
+    expect(runtimeFailed).toEqual({
+      status: "unavailable",
+      reason: "runtime-initialization-failed",
+    });
+  });
+
+  it("ends the selected WebGPU provider epoch unavailable after device loss", async () => {
     let calls = 0;
     const fixture = await providerWithRuntime(async (frame) => {
       calls += 1;
@@ -291,9 +329,16 @@ describe("brush-pack exact dual-tip provider call-site", () => {
       input(),
       execution(),
     );
-    expect(lost.status).toBe("cpu-fallback");
-    if (lost.status !== "cpu-fallback") return;
-    expect(lost.receipt.reason).toBe("device-lost");
+    expect(lost.status).toBe("unavailable");
+    if (lost.status !== "unavailable") return;
+    expect(lost.reason).toBe("device-lost");
+    expect(lost.referenceEvidence).toMatchObject({
+      authority: "none",
+      pixelAuthority: false,
+      saveAuthority: false,
+    });
+    expect("artifact" in lost).toBe(false);
+    expect("replay" in lost).toBe(false);
 
     const later = await fixture.provider.execute(
       selection(),
@@ -305,10 +350,93 @@ describe("brush-pack exact dual-tip provider call-site", () => {
         commandSequence: 2,
       }),
     );
-    expect(later.status).toBe("cpu-fallback");
-    if (later.status !== "cpu-fallback") return;
-    expect(later.receipt.reason).toBe("device-lost");
+    expect(later.status).toBe("unavailable");
+    if (later.status !== "unavailable") return;
+    expect(later.reason).toBe("device-lost");
+    expect("artifact" in later).toBe(false);
+    expect("replay" in later).toBe(false);
     expect(fixture.runtime.execute).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "resident-asset-budget",
+    "request-limit",
+  ] as const)("returns %s unavailable without CPU pixels", async (reason) => {
+    const fixture = await providerWithRuntime(async () => ({
+      status: "rejected",
+      reason,
+    }));
+    const result = await fixture.provider.execute(selection(), input(), execution());
+    expect(result.status).toBe("unavailable");
+    if (result.status !== "unavailable") return;
+    expect(result.reason).toBe(reason);
+    expect(result.referenceEvidence.authority).toBe("none");
+    expect("artifact" in result).toBe(false);
+    expect("replay" in result).toBe(false);
+  });
+
+  it("closes unsupported plans and disposed providers without alternate output", async () => {
+    const fixture = await providerWithRuntime(async (frame) => completed(frame));
+    const unsupported = await fixture.provider.execute(
+      selection(),
+      input({ output: { width: 32, height: 33 } }),
+      execution(),
+    );
+    expect(unsupported.status).toBe("unavailable");
+    if (unsupported.status !== "unavailable") return;
+    expect(unsupported.reason).toBe("unsupported-plan");
+    expect("artifact" in unsupported).toBe(false);
+    expect(fixture.runtime.execute).not.toHaveBeenCalled();
+
+    fixture.provider.dispose();
+    const disposed = await fixture.provider.execute(
+      selection(),
+      input(),
+      execution({ requestSequence: 2, commandSequence: 2 }),
+    );
+    expect(disposed.status).toBe("unavailable");
+    if (disposed.status !== "unavailable") return;
+    expect(disposed.reason).toBe("disposed");
+    expect("artifact" in disposed).toBe(false);
+    expect(fixture.runtime.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("latches provider exceptions unavailable instead of recovering with CPU output", async () => {
+    const fixture = await providerWithRuntime(async () => {
+      throw new Error("GPU submission failed");
+    });
+    const failed = await fixture.provider.execute(selection(), input(), execution());
+    expect(failed.status).toBe("unavailable");
+    if (failed.status !== "unavailable") return;
+    expect(failed.reason).toBe("provider-failed");
+    expect("artifact" in failed).toBe(false);
+
+    const later = await fixture.provider.execute(
+      selection(),
+      input(),
+      execution({ requestSequence: 2, commandSequence: 2 }),
+    );
+    expect(later.status).toBe("unavailable");
+    if (later.status !== "unavailable") return;
+    expect(later.reason).toBe("provider-failed");
+    expect(fixture.runtime.execute).toHaveBeenCalledOnce();
+  });
+
+  it("allows CPU pixels only through the separately selected explicit CPU API", () => {
+    const result = executeStudioBrushPackDualTipWithExplicitCpuProvider(
+      selection(),
+      input(),
+    );
+    expect(result.status).toBe("cpu-explicit");
+    if (result.status !== "cpu-explicit") return;
+    expect(result.artifact.receipt.authority).toBe("cpu-f32-oracle");
+    expect(result.artifact.premultipliedLinearRgba.length).toBe(33 * 33 * 4);
+    expect(result.receipt).toMatchObject({
+      executionRoute: "cpu-f32-oracle-explicit",
+      providerSelection: "explicit-before-execution",
+      authority: "cpu-f32-oracle",
+      complete: true,
+    });
   });
 
   it("keeps cancellation terminal instead of turning it into a visible CPU stroke", async () => {

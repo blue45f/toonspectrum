@@ -43,6 +43,7 @@ import {
   type StudioProductCodecCertificationSigner,
   type StudioProductCodecCertificationTrustRoot,
   type StudioProductCodecCertificateVerificationResult,
+  type StudioProductCodecExecutionProviderReceipt,
 } from "./studio-product-codec-certification";
 
 import type { StudioRasterInterchangeFormat } from "./render/studio-raster-interchange";
@@ -50,12 +51,7 @@ import type { StudioRasterInterchangeFormat } from "./render/studio-raster-inter
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
   "application/vnd.toonspectrum.raster-codec-conformance+json" as const;
 
-export const
-STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES =
-  4 * 1024 * 1024;
-
 export type StudioFirstPartyRasterCodecExecutionPolicy =
-  | "auto"
   | "direct"
   | "worker";
 
@@ -64,8 +60,8 @@ export interface ExecuteAndCertifyStudioFirstPartyRasterCodecInput {
   readonly direction: StudioCodecDirection;
   readonly inputBytes: Uint8Array;
   /**
-   * `auto` prefers the dedicated Worker and permits a bounded direct fallback only when Worker
-   * startup is unavailable. `worker` is fail-closed. `direct` is an explicit caller opt-in.
+   * The default is the fail-closed dedicated Worker. `direct` is an independent provider that a
+   * caller must select before the request starts; Worker failure never replays work through it.
    */
   readonly execution?: StudioFirstPartyRasterCodecExecutionPolicy;
   readonly signal?: AbortSignal;
@@ -86,6 +82,8 @@ export interface StudioFirstPartyRasterCertifiedExecution {
   readonly scope: string;
   readonly bytes: Uint8Array;
   readonly receipt: StudioCodecExecutionReceipt;
+  readonly executionProviderReceipt:
+    StudioProductCodecExecutionProviderReceipt;
   readonly conformance: StudioFirstPartyRasterConformanceEvidence;
   readonly conformanceBytes: Uint8Array;
   readonly certificateBytes: Uint8Array;
@@ -219,8 +217,8 @@ function requestFor(
 function normalizeExecutionPolicy(
   value: unknown,
 ): StudioFirstPartyRasterCodecExecutionPolicy {
-  if (value === undefined) return "auto";
-  if (value === "auto" || value === "direct" || value === "worker") {
+  if (value === undefined) return "worker";
+  if (value === "direct" || value === "worker") {
     return value;
   }
   throw new StudioFirstPartyRasterCodecCertificationError(
@@ -236,6 +234,10 @@ type SuccessfulCodecExecution =
       bytes: Uint8Array;
       receipt: StudioCodecExecutionReceipt;
     }>;
+
+type CertifiedCodecExecution = SuccessfulCodecExecution & Readonly<{
+  executionProviderReceipt: StudioProductCodecExecutionProviderReceipt;
+}>;
 
 async function executeDirect(
   request: StudioCodecExecutionRequest,
@@ -261,18 +263,6 @@ async function executeDirect(
     );
   }
   return execution;
-}
-
-function isWorkerStartupFailure(
-  error: unknown,
-): error is StudioFirstPartyRasterCodecWorkerClientError {
-  return (
-    error instanceof StudioFirstPartyRasterCodecWorkerClientError
-    && (
-      error.code === "worker-post-failed"
-      || error.code === "worker-unavailable"
-    )
-  );
 }
 
 function workerCertificationError(
@@ -326,20 +316,11 @@ function executionMatchesProvider(
 async function executeWithPolicy(
   input: ExecuteAndCertifyStudioFirstPartyRasterCodecInput,
   provider: StudioCodecProvider,
-): Promise<SuccessfulCodecExecution> {
+): Promise<CertifiedCodecExecution> {
   const policy = normalizeExecutionPolicy(input.execution);
   const request = requestFor(provider, input.direction);
   let execution: SuccessfulCodecExecution;
   if (policy === "direct") {
-    if (
-      input.inputBytes.byteLength
-        > STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-    ) {
-      throw new StudioFirstPartyRasterCodecCertificationError(
-        "CODEC_WORKER_REQUIRED",
-        "Large first-party raster codec input requires a working Worker.",
-      );
-    }
     execution = await executeDirect(
       request,
       input.inputBytes,
@@ -358,33 +339,7 @@ async function executeWithPolicy(
         },
       );
     } catch (error) {
-      if (
-        policy === "auto"
-        && isWorkerStartupFailure(error)
-        && input.inputBytes.byteLength
-          <=
-          STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-      ) {
-        execution = await executeDirect(
-          request,
-          input.inputBytes,
-          provider,
-          input.signal,
-        );
-      } else if (
-        policy === "auto"
-        && isWorkerStartupFailure(error)
-        && input.inputBytes.byteLength
-          >
-          STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
-      ) {
-        throw new StudioFirstPartyRasterCodecCertificationError(
-          "CODEC_WORKER_REQUIRED",
-          "Large first-party raster codec input requires a working Worker.",
-        );
-      } else {
-        throw workerCertificationError(error);
-      }
+      throw workerCertificationError(error);
     }
   }
   if (!executionMatchesProvider(execution, request, provider)) {
@@ -393,7 +348,32 @@ async function executeWithPolicy(
       "First-party raster codec execution identity is invalid.",
     );
   }
-  return execution;
+  return Object.freeze({
+    ...execution,
+    executionProviderReceipt: Object.freeze({
+      schemaVersion: 1,
+      kind: "toonspectrum-codec-execution-provider-selection",
+      selectedProvider: policy,
+      attemptedProviders: Object.freeze([policy]) as readonly [
+        StudioFirstPartyRasterCodecExecutionPolicy,
+      ],
+    }),
+  });
+}
+
+function sameExecutionProviderReceipt(
+  actual: StudioProductCodecExecutionProviderReceipt,
+  certified: StudioProductCodecExecutionProviderReceipt | undefined,
+): boolean {
+  return certified !== undefined
+    && actual.schemaVersion === certified.schemaVersion
+    && actual.kind === certified.kind
+    && actual.selectedProvider === certified.selectedProvider
+    && actual.attemptedProviders.length === 1
+    && certified.attemptedProviders.length === 1
+    && actual.attemptedProviders[0] === actual.selectedProvider
+    && certified.attemptedProviders[0] === certified.selectedProvider
+    && actual.attemptedProviders[0] === certified.attemptedProviders[0];
 }
 
 function sameReceipt(
@@ -494,6 +474,7 @@ export async function executeAndCertifyStudioFirstPartyRasterCodec(
       issueStudioProductCodecCertificate(
         {
           receipt: execution.receipt,
+          executionProviderReceipt: execution.executionProviderReceipt,
           outputBytes: execution.bytes,
           evidenceBytes: conformance.bytes,
           evidenceMediaType:
@@ -513,6 +494,7 @@ export async function executeAndCertifyStudioFirstPartyRasterCodec(
       scope,
       bytes: execution.bytes,
       receipt: execution.receipt,
+      executionProviderReceipt: execution.executionProviderReceipt,
       conformance: conformance.evidence,
       conformanceBytes: conformance.bytes,
       certificateBytes,
@@ -567,6 +549,10 @@ export async function verifyStudioFirstPartyRasterCertifiedExecution(
       !== STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE
     || !conformanceObjectMatches(execution)
     || !sameReceipt(execution.receipt, receipt)
+    || !sameExecutionProviderReceipt(
+      execution.executionProviderReceipt,
+      verified.certificate.executionProviderReceipt,
+    )
     || receipt.format !== execution.format
     || receipt.providerId !== expectedProvider.manifest.providerId
     || receipt.direction !== execution.direction

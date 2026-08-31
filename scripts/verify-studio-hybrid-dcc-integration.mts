@@ -1679,17 +1679,55 @@ async function runVerticalSlice(
       .textContent().catch(() => null);
     block("bg3d-handoff", handoffLog?.trim() || "BG3D handoff did not open its shipped dialog");
   }
+  // This shipped integration scenario deliberately exercises one preselected backend. The
+  // headless browser does not expose a WebGPU adapter, so choose WebGL2 before the scene starts
+  // instead of waiting for a WebGPU failure and conditionally substituting another engine.
+  const viewTab = bg3dDialog.getByRole("tab", { name: "보기", exact: true });
+  await visibleOrBlock(viewTab, "bg3d-engine-tab", "BG3D engine controls are not visible");
+  await viewTab.click();
+  const webgl2 = bg3dDialog.getByTestId("studio-bg3d-engine-preference-webgl2");
+  await visibleOrBlock(
+    webgl2,
+    "bg3d-engine-selection",
+    "The explicit WebGL2 engine choice is not visible",
+  );
+  await webgl2.click();
+  const explicitWebgl2Active = await page.waitForFunction(() => {
+    const choice = document.querySelector(
+      '[data-testid="studio-bg3d-engine-preference-webgl2"]',
+    );
+    const active = document.querySelector(
+      '[data-testid="studio-bg3d-engine-active-backend"]',
+    );
+    return choice?.getAttribute("aria-pressed") === "true"
+      && active?.textContent?.includes("WebGL2 사용 중");
+  }, undefined, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!explicitWebgl2Active) {
+    block(
+      "bg3d-engine-selection",
+      "The explicitly selected WebGL2 engine did not become active",
+    );
+  }
+  const bg3dCanvas = bg3dDialog.getByTestId("studio-bg3d-viewport").locator("canvas").first();
+  await visibleOrBlock(
+    bg3dCanvas,
+    "bg3d-render-canvas",
+    "The explicitly selected WebGL2 canvas is not visible",
+  );
   const layersTab = bg3dDialog.getByRole("tab", { name: /^레이어(?:\s+\d+\/\d+)?$/u });
   await visibleOrBlock(layersTab, "bg3d-layer-tab", "BG3D layer identity UI is not visible");
   await layersTab.click();
-  const bg3dIdentity = bg3dDialog.getByText(assetId, { exact: true }).first();
-  await visibleOrBlock(
-    bg3dIdentity,
-    "bg3d-source-identity",
-    `BG3D did not expose handed-off source identity ${assetId}`,
-  );
-  const bg3dCanvas = bg3dDialog.getByTestId("studio-bg3d-viewport").locator("canvas").first();
-  await visibleOrBlock(bg3dCanvas, "bg3d-render-canvas", "BG3D WebGL canvas is not visible");
+  const bg3dIdentity = bg3dDialog.getByRole("button", { name: assetId, exact: true });
+  if (!await bg3dIdentity.waitFor({ state: "visible", timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false)) {
+    block(
+      "bg3d-source-identity",
+      `BG3D did not expose handed-off source identity ${assetId}`,
+    );
+  }
   await page.waitForTimeout(500);
   const renderedFraming = await readNeutralBg3dSubjectFraming(page, bg3dCanvas);
   await page.screenshot({ path: screenshotBg3d, animations: "disabled" });

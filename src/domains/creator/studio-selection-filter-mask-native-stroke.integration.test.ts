@@ -147,6 +147,7 @@ describe("native Studio stroke -> alpha selection -> masked filter commit", () =
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => {
           const renderer = new resvgModule.Resvg(request.svg, {
             font: { loadSystemFonts: false },

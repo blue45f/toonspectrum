@@ -21,10 +21,13 @@ export interface StudioMagicWandWorkerLike {
 }
 
 export type StudioMagicWandWorkerFactory = () => StudioMagicWandWorkerLike | null;
+export type StudioMagicWandExecutionMode = "worker" | "direct";
 
 export interface StudioMagicWandWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  executionMode?: StudioMagicWandExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioMagicWandWorkerFactory | null;
 }
 
@@ -53,6 +56,12 @@ function createAbortError(): Error {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioMagicWandWorkerUnavailableError";
+  return error;
 }
 
 function runMagicWandDirect(
@@ -109,13 +118,9 @@ function runMagicWandWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runMagicWandDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
 
     worker.onmessage = (event) => {
       const response = event.data;
@@ -132,8 +137,8 @@ function runMagicWandWithWorker(
         try {
           worker.postMessage(message, studioMagicWandRequestTransfers(message));
           requestPosted = true;
-        } catch {
-          resolveDirectFallback();
+        } catch (error) {
+          rejectWorkerUnavailable("마술봉 Worker에 요청을 전달하지 못했습니다.", error);
         }
         return;
       }
@@ -150,7 +155,10 @@ function runMagicWandWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "마술봉 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       // 픽셀 버퍼가 이미 전송(detach)돼 직접 실행으로 되돌릴 데이터가 없다.
@@ -166,30 +174,35 @@ function runMagicWandWithWorker(
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    readyTimer = setTimeout(
+      () => rejectWorkerUnavailable("마술봉 Worker 준비 시간이 초과되었습니다."),
+      3_000,
+    );
   });
 }
 
 /**
  * 마술봉의 플러드필+윤곽 추적을 한 번의 모듈 Worker 호출로 실행한다. ArrayBuffer 기반 픽셀
- * 데이터는 소유권이 이전(detach)되어 전송된다. Worker를 못 만들면(구형 브라우저·CSP) 동일한
- * scanMagicWandRegionFromImageData 경로를 메인 스레드에서 동기 실행해 폴백한다.
+ * 데이터는 소유권이 이전(detach)되어 전송된다. 선택한 Worker를 사용할 수 없거나 실행이 실패하면
+ * 같은 요청을 메인 스레드에서 다시 실행하지 않고 unavailable/reject로 종료한다.
  */
 export async function runStudioMagicWandWorker(
   request: StudioMagicWandWorkerRunRequest,
   options: StudioMagicWandWorkerClientOptions = {},
 ): Promise<StudioMagicWandWorkerClientResult> {
   throwIfAborted(options.signal);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runMagicWandDirect(request, options.signal);
   const factory =
     options.workerFactory === undefined ? createStudioMagicWandModuleWorker : options.workerFactory;
-  if (!factory) return runMagicWandDirect(request, options.signal);
+  if (!factory) throw createWorkerUnavailableError("마술봉 Worker를 만들 수 없습니다.");
 
   let worker: StudioMagicWandWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runMagicWandDirect(request, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("마술봉 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runMagicWandDirect(request, options.signal);
+  if (!worker) throw createWorkerUnavailableError("마술봉 Worker를 만들 수 없습니다.");
   return runMagicWandWithWorker(worker, request, options.signal);
 }

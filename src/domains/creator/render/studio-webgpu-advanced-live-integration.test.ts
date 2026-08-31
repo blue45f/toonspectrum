@@ -20,7 +20,38 @@ function expectInOrder(value: string, fragments: readonly string[]): void {
 }
 
 describe("Studio advanced WebGPU live-ink integration", () => {
-  it("pins only an exactly prepared advanced stroke and keeps the legacy overlay as fallback", () => {
+  it("keeps the engine provider immutable and allows Canvas2D only by explicit selection", () => {
+    const engine = source("./studio-webgpu-engine.ts");
+    const canvas = source("../StudioWebGpuCanvas.tsx");
+    const renderStart = engine.indexOf("private renderPreparedStrokes(");
+    const renderEnd = engine.indexOf("public clear(): void", renderStart);
+    const renderSource = engine.slice(renderStart, renderEnd);
+    const unavailableStart = renderSource.indexOf("this.pendingWebGpuRender = null;");
+    const unavailableSource = renderSource.slice(unavailableStart);
+    const deviceLossStart = engine.indexOf("private handleDeviceLost(");
+    const deviceLossEnd = engine.indexOf("private ensureSelectedCanvas2d(", deviceLossStart);
+    const deviceLossSource = engine.slice(deviceLossStart, deviceLossEnd);
+
+    expect(engine).toContain('this.backend = options.selectedBackend ?? "webgpu"');
+    expect(engine).toContain("readonly canvas2dCanvas: HTMLCanvasElement");
+    expect(engine).not.toContain("fallbackCanvas");
+    expect(engine).toContain('if (this.backend !== "canvas2d") return null');
+    expect(engine).not.toContain("activateCanvas2d");
+    expect(engine).not.toContain('setBackend("canvas2d")');
+    expect(renderSource).toContain('if (this.backend === "canvas2d") {');
+    expect(renderSource).toContain("this.markSelectedBackendUnavailable({");
+    expect(renderSource).toContain("revokeInitializationReplay: false");
+    expect(unavailableStart).toBeGreaterThan(-1);
+    expect(unavailableSource).not.toContain(
+      "this.renderCanvas2d(strokeSnapshot, requestId, frameGeneration)"
+    );
+    expect(deviceLossSource).toContain("this.markSelectedBackendUnavailable()");
+    expect(deviceLossSource).not.toContain("this.renderCanvas2d(");
+    expect(deviceLossSource).not.toContain("this.render(this.lastStrokes");
+    expect(canvas).toContain('selectedBackend: "webgpu"');
+  });
+
+  it("pins one exactly prepared provider and rejects it without a runtime substitute", () => {
     const page = source("../StudioPage.tsx");
 
     expect(page).toContain('import("./render/studio-webgpu-live-stroke-plan")');
@@ -38,34 +69,35 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expect(liveSurfaceStart).toContain("overlayCandidate");
-    for (const higherPriorityOwner of [
-      "&& !livingInkAdmitted",
-      "&& !hokusaiPinned",
-      "&& !stampDirect",
-      "&& !gpuPin",
+    for (const exclusiveSelection of [
+      "const livingInkSelected =",
+      "const hokusaiSelected = !livingInkSelected",
+      "const stampSelected = !livingInkSelected",
+      "const wetMediaSelected = !livingInkSelected",
+      "const retainedMediaSelected = !livingInkSelected",
+      "const dynamicSelected = !livingInkSelected",
+      "const genericDirectSelected = !livingInkSelected",
     ]) {
-      expect(liveSurfaceStart).toContain(higherPriorityOwner);
+      expect(liveSurfaceStart).toContain(exclusiveSelection);
     }
     expect(page).toContain('destination: "transparent-overlay"');
+    const gpuEligibilityStart = liveSurfaceStart.indexOf("const gpuStartEligible =");
     const gpuEligibility = liveSurfaceStart.slice(
-      liveSurfaceStart.indexOf("const gpuStartEligible ="),
-      liveSurfaceStart.indexOf("gpuLiveOperationOrderKeyRef.current ="),
+      gpuEligibilityStart,
+      liveSurfaceStart.indexOf("gpuLiveOperationOrderKeyRef.current =", gpuEligibilityStart),
     );
     expectInOrder(gpuEligibility, [
-      '(strokeRouteTournamentGate?.admits("gpu") ?? true)',
-      "pendingGpuAuthorityPromoted",
-      "!livingInkAdmitted",
-      "!hokusaiPinned",
-      "!stampDirect",
-      'STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"',
+      "gpuSelected",
       'webGpuBackendRef.current === "webgpu"',
+      "webGpuCanvasHandleRef.current?.isBackendAvailable() === true",
       "gpuLiveStrokePlannerRef.current !== null",
-      "!pixelDirect",
-      "isDirectLiveDraftEl(next)",
     ]);
+    expect(liveSurfaceStart).not.toContain("strokeRouteTournamentGate");
+    expect(liveSurfaceStart).toContain("pendingGpuAuthorityBlocksNewSurface");
+    expect(liveSurfaceStart).not.toContain("promotePendingGpuAuthoritiesToKonva");
   });
 
-  it("keeps an exact Konva shadow until dual receipt authority swaps surfaces atomically", () => {
+  it("keeps Canvas hidden for a WebGPU-selected operation until an exact GPU receipt", () => {
     const page = source("../StudioPage.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const applyStart = page.indexOf(
@@ -83,6 +115,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(viewport).toContain("!gpuCanvasShadowVisibleRef.current");
     expect(applySource).toContain("activeGpuReceiptExact");
     expect(applySource).toContain("activeSnapshot.gpuOverlayVisible");
+    expect(applySource).toContain('activeSnapshot.pinnedBackend === "canvas2d"');
     expect(applySource).toContain("liveDraftLayerRef.current?.drawScene()");
     expect(applySource.indexOf("liveDraftLayerRef.current?.drawScene()"))
       .toBeLessThan(applySource.indexOf(
@@ -99,22 +132,22 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     );
     expect(page).toContain("active: liveStrokeBackendAuditActiveIdRef.current");
     expect(page).toContain("if (!auditReceipt.active) {");
-    const promotion = page.indexOf(
-      "const pendingGpuAuthorityPromoted = ("
+    const blocking = page.indexOf(
+      "const pendingGpuAuthorityBlocksNewSurface ="
     );
     const stampStart = page.indexOf(
       "const stampDirect = Boolean(",
-      promotion,
+      blocking,
     );
-    expect(promotion).toBeGreaterThan(-1);
-    expect(stampStart).toBeGreaterThan(promotion);
-    expect(page).toContain(") || promotePendingGpuAuthoritiesToKonva()");
+    expect(blocking).toBeGreaterThan(-1);
+    expect(stampStart).toBeGreaterThan(blocking);
+    expect(page).not.toContain("promotePendingGpuAuthoritiesToKonva");
     expect(page.indexOf("const gpuStartEligible =", stampStart)).toBeGreaterThan(stampStart);
     expect(page).toContain(
       "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
     );
     expect(page).toContain(
-      "Source-over order is global, not backend-specific."
+      "same stroke to Canvas2D/Konva"
     );
   });
 
@@ -147,27 +180,32 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("pendingGpuStrokesRef.current.length - reserved.gpu");
   });
 
-  it("seals the release endpoint and fails visible to the retained Konva draft", () => {
+  it("seals the release endpoint and rejects without publishing a Konva draft", () => {
     const page = source("../StudioPage.tsx");
 
     expect(page).toContain("appendGpuLiveSourceJournalSuffix(source, true)");
-    expect(page).toContain("draftPreviewStoreRef.current.settle(finished)");
-    expect(page).toContain("relinquishGpuLiveInkToKonva(true)");
+    const settleStart = page.indexOf("const settleGpuLiveStroke =");
+    const settleEnd = page.indexOf("const flushDirectLiveDraft =", settleStart);
+    const settleSource = page.slice(settleStart, settleEnd);
+    expect(settleSource).toContain('failSelectedGpuLiveInk("request-failed", finished.id)');
+    expect(settleSource).not.toContain("draftPreviewStoreRef.current.settle(finished)");
+    expect(page).not.toContain("relinquishGpuLiveInkToKonva");
     expect(page).toContain(
       "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
     );
     expect(page).not.toContain("handle?.replacePinnedStrokes(pendingGpu)");
-    expect(page).toContain("liveDraftLayerRef.current?.batchDraw()");
-    expect(page).toContain("if (gpuLiveInkPinnedRef.current) relinquishGpuLiveInkToKonva(true)");
+    expect(page).toContain("appendGpuLiveSourceJournalSuffix(next)");
+    expect(page).toContain("never falls through to the Canvas2D/Konva draw below");
   });
 
-  it("fails over synchronously when the engine rejects a compact command", () => {
+  it("fails closed synchronously when the selected engine rejects a compact command", () => {
     const page = source("../StudioPage.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 
     expect(page).toContain('if (outcome.status === "rejected") {');
     expect(page).toContain("gpuLiveSourceJournalRef.current = advanced.state");
-    expect(page).toContain("relinquishGpuLiveInkToKonva(true)");
+    expect(page).toContain('failSelectedGpuLiveInk("request-failed", el.id)');
+    expect(page).not.toContain("relinquishGpuLiveInkToKonva");
     expect(page).toContain("armGpuPinnedRequestWatchdog(outcome.requestId)");
     expect(page).toContain("STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS");
     expect(page).toContain("new StudioGpuPinReceiptWatchdog({");
@@ -194,6 +232,26 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain(
       "const gpuOverlayVisible = receiptedSessionVisible"
     );
+    expect(page).toContain("onSelectedEngineUnavailable");
+  });
+
+  it("cancels selected wet, dynamic, and retained-media operations without a Konva publish", () => {
+    const page = source("../StudioPage.tsx");
+    const flushStart = page.indexOf("const flushDirectLiveDraft = () => {");
+    const flushEnd = page.indexOf("const flushDirectLiveDraftNow", flushStart);
+    const flushSource = page.slice(flushStart, flushEnd);
+
+    for (const provider of ["습식 매체", "동적 브러시", "리테인드 매체"]) {
+      expect(flushSource).toContain(`rejectActiveSelectedLiveSurface(\n          "${provider}"`);
+    }
+    expect(flushSource).toContain("다른 렌더러로 전환하지 않습니다.");
+    const selectedProviderSource = flushSource.slice(
+      flushSource.indexOf("if (liveWetInkDraftDirectRef.current)"),
+      flushSource.indexOf("if (liveStampDraftDirectRef.current)"),
+    );
+    expect(selectedProviderSource).not.toContain("draftPreviewStoreRef.current.setActive(next)");
+    expect(selectedProviderSource).not.toContain("draftPreviewNormalLayerRef.current?.drawScene()");
+    expect(selectedProviderSource).not.toContain("draftPreviewDynamicLayerRef.current?.drawScene()");
   });
 
   it("assigns live operations a monotonic terminal key independent of random element ids", () => {
@@ -206,54 +264,91 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).not.toContain("orderKey: el.id,");
   });
 
-  it("does not trust a void repair and keeps an exact final vector until receipt handoff", () => {
+  it("gates pointer-up commit and durability on the exact terminal WebGPU receipt", () => {
     const page = source("../StudioPage.tsx");
     const settleStart = page.indexOf("const settleGpuLiveStroke =");
     const settleEnd = page.indexOf("const flushDirectLiveDraft =", settleStart);
     const settleSource = page.slice(settleStart, settleEnd);
+    const finishStart = page.indexOf("function finishDrawingPointer(");
+    const finishEnd = page.indexOf("function onStagePointerCancel", finishStart);
+    const finishSource = page.slice(finishStart, finishEnd);
+    const sealStart = page.indexOf("function sealStudioDrawReleaseInput(");
+    const sealEnd = page.indexOf("function finishStudioSpecialistStroke(", sealStart);
+    const sealSource = page.slice(sealStart, sealEnd);
+    const clearStart = page.indexOf("const clearDraftPreview =");
+    const clearEnd = page.indexOf("const DEFERRED_STROKE_COMMIT_IDLE_MS", clearStart);
+    const clearSource = page.slice(clearStart, clearEnd);
+    const flushStart = page.indexOf("flushPendingStrokeCommitsRef.current = () => {");
+    const flushEnd = page.indexOf("discardPendingStrokeCommitsRef.current =", flushStart);
+    const flushSource = page.slice(flushStart, flushEnd);
 
     expect(settleStart).toBeGreaterThan(-1);
     expect(settleEnd).toBeGreaterThan(settleStart);
-    expect(settleSource).toContain("gpuFinalReceiptFallbackStrokeRef.current = finished");
-    expect(settleSource).toContain("gpuFinalReceiptRequestIdRef.current = correctedEl");
-    expect(settleSource).toContain("pendingGpuDrawAuthoritiesRef.current = [");
-    expect(settleSource).not.toContain("replacePinnedStrokes(pendingGpuStrokesRef.current)");
-    expect(page).toContain(
-      "promotePendingGpuAuthoritiesToKonva(gpuFinalFallbackOrderIdsRef.current ?? undefined)"
+    expect(settleSource).toContain("gpuFinalReceiptStrokeRef.current = finished");
+    expect(settleSource).toContain("gpuFinalReceiptRequestIdRef.current = finalRequestId");
+    expect(settleSource).toContain(
+      "gpuFinalReceiptRequestIdsRef.current.set(finished.id, finalRequestId)",
     );
-    expect(page).toContain("draftPreviewStoreRef.current.replaceSettled(promotion.settledDrafts)");
+    expect(settleSource).toContain("handle.replacePinnedJournalBaseline(nextPendingGpuStrokes)");
+    expect(settleSource).toContain("registerLiveStrokeGpuRequest(finished.id, outcome.requestId)");
+    expect(settleSource).toContain("pendingGpuDrawAuthoritiesRef.current = [");
+    expectInOrder(finishSource, [
+      "const gpuPinnedAtRelease = gpuLiveInkPinnedRef.current",
+      "!settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished)",
+      "discardDrawingPointerSession()",
+      'releasePlan.commitMode === "deferred" || gpuPinnedAtRelease',
+      "queueDeferredStrokeCommit(finished)",
+    ]);
+    expect(sealSource).toContain("if (gpuLiveInkPinnedRef.current)");
+    expect(sealSource).toContain(
+      "drawingCrdtPublisherRef.current.cancel(authoritativeLiveStroke.id)",
+    );
+    expect(sealSource).toContain("selectedGpuFinalCrdtFlushDeferred = true");
+    expect(sealSource).toContain(
+      "drawingRef.current && !selectedGpuFinalCrdtFlushDeferred",
+    );
+    expect(clearSource).toContain("hasExactSelectedGpuFinalReceipt(finalGpuReceiptStroke.id)");
+    expect(clearSource).not.toContain('failSelectedGpuLiveInk("surface-lost"');
+    expect(flushSource).toContain(
+      "pendingBatchAwaitsSelectedGpuFinalReceipt(pendingBeforeReceiptGate)",
+    );
+    expect(flushSource.indexOf("pendingBatchAwaitsSelectedGpuFinalReceipt"))
+      .toBeLessThan(flushSource.indexOf("takePendingStrokeCommits()"));
+    expect(page).toContain("selectedGpuStrokeRequiresFinalReceipt(finished.id)");
+    expect(page).toContain("persistAcceptedSelectedGpuFinalReceipt(");
+    expect(page).toContain("gpuFinalCrdtPublishedRequestIdsRef.current.get(strokeId)");
+    expect(page).toContain("studioCrdtDocumentRef.current?.replaceStroke(");
+    expect(page.indexOf("hasExactSelectedGpuFinalReceipt(strokeId)"))
+      .toBeLessThan(page.indexOf("studioCrdtDocumentRef.current?.replaceStroke("));
+    expect(page).toContain("cancelRejectedSelectedGpuPendingStroke(strokeId)");
+    expect(page).toContain("drawingCrdtPublisherRef.current.cancel(strokeId)");
+    expect(page).toContain("studioCrdtDocumentRef.current?.deleteStroke(strokeId)");
+    expect(page).not.toContain("promotePendingGpuAuthoritiesToKonva");
     expect(page).toContain("releaseStudioGpuPendingAuthorityPrefix(");
     expect(page).toContain("webGpuCanvasHandleRef.current?.setPinnedVisible(false)");
   });
 
-  it("hands active and pointerup-settled authority to Konva when its canvas surface disappears", () => {
+  it("marks surface loss unavailable without handing authority to Canvas or Konva", () => {
     const page = source("../StudioPage.tsx");
     const handleStart = page.indexOf("function setWebGpuCanvasHandle(");
     const handleEnd = page.indexOf("function onWebGpuBackendChange", handleStart);
     const handleSource = page.slice(handleStart, handleEnd);
-    const lossStart = page.indexOf("function failOverGpuAuthorityAfterSurfaceLoss(");
-    const lossEnd = page.indexOf("function setWebGpuCanvasHandle(", lossStart);
-    const lossSource = page.slice(lossStart, lossEnd);
 
     expect(handleStart).toBeGreaterThan(-1);
-    expect(lossStart).toBeGreaterThan(-1);
-    expect(lossEnd).toBeGreaterThan(lossStart);
-    expect(lossSource).toContain("gpuAuthoritySurfaceIsPending()");
     expect(page).toContain("pendingGpuDrawAuthoritiesRef.current.length > 0");
     expect(page).toContain("pendingGpuStrokesRef.current.length > 0");
-    expect(lossSource).toContain("relinquishGpuLiveInkToKonva(true)");
-    expect(lossSource).toContain("gpuHandleBaselineRecoveryPendingRef.current = !promoted");
-    expect(handleSource).toContain("failOverGpuAuthorityAfterSurfaceLoss()");
+    expect(page).not.toContain("relinquishGpuLiveInkToKonva");
+    expect(page).not.toContain("promotePendingGpuAuthoritiesToKonva");
+    expect(handleSource).toContain('reportAllLiveStrokeGpuAuditFailures("surface-lost")');
     expect(handleSource).toContain("handle.setPinnedPresentationVisible(false)");
-    expect(handleSource).toContain("!promotePendingGpuAuthoritiesToKonva()");
     expect(handleSource).not.toContain("replacePinnedStrokes(");
     expect(handleSource).not.toContain("setPinnedVisible(true)");
 
     const deviceLostStart = page.indexOf("function onWebGpuDeviceLost()");
     const deviceLostEnd = page.indexOf("function onWebGpuFrameReady", deviceLostStart);
     const deviceLostSource = page.slice(deviceLostStart, deviceLostEnd);
-    expect(deviceLostSource).toContain("failOverGpuAuthorityAfterSurfaceLoss()");
-    expect(deviceLostSource).not.toContain("gpuLiveInkPinnedRef.current");
+    expect(deviceLostSource).toContain('reportAllLiveStrokeGpuAuditFailures("device-lost")');
+    expect(deviceLostSource).not.toContain('publishStudioRenderBackend("canvas2d")');
   });
 
   it("normalizes symmetry releases and preserves the original handoff queue on invariant failure", () => {
@@ -267,7 +362,8 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(releaseSource).toContain("availableGpuStrokeCount: pendingGpuStrokesRef.current.length");
     expect(releaseSource).toContain("completeElementIds: completeGpuElementIds");
     expect(releaseSource).toContain('if (releasedAuthorities?.status === "rejected") {');
-    expect(releaseSource).toContain("const promoted = relinquishGpuLiveInkToKonva(true)");
+    expect(releaseSource).toContain('status: "retained", reason: "gpu-authority-release-rejected"');
+    expect(releaseSource).not.toContain("relinquishGpuLiveInkToKonva");
     expect(releaseSource).not.toContain(
       'releasedAuthorities.status === "released"\n        ? [...releasedAuthorities.remaining]\n        : []'
     );
@@ -281,7 +377,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     );
     expect(releaseSource).not.toContain("syncPinnedStrokes(nextGpuStrokes)");
     expect(releaseSource).not.toContain("setPinnedVisible(true)");
-    expect(releaseSource).toContain("promotePostContactRemainder");
+    expect(releaseSource).toContain("postContactRemainderBlocksRelease");
     expect(releaseSource).toContain('reason: "post-contact-rebaseline-forbidden"');
     expect(releaseSource.match(/released\.overlay > overlayRenderer\.settledStrokeCount/g)).toHaveLength(2);
     expect(releaseSource).toContain(
@@ -304,7 +400,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).not.toContain("consumeStudioGpuHandoffReservationPrefix(");
     expect(page).toContain("committedInkSurfaceHandoffsRef.current = [...queue]");
     expect(page).toContain('if (releaseOutcome.status === "released") {');
-    expect(page).toContain('} else if (releaseOutcome.status === "promoted") {');
+    expect(page).not.toContain('releaseOutcome.status === "promoted"');
     expect(page).toContain(
       "liveInkOverlayRendererRef.current.suppressSettledPrefix(released.overlay)"
     );
@@ -387,6 +483,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     const policy = source("../live/studio-live-ink-backend.ts");
 
     expect(policy).toContain('composite === "erase" && prepared.destination !== "retained-layer"');
-    expect(policy).toContain('return { backend: "canvas2d", reason: "eraser" }');
+    expect(policy).toContain('return unavailable("eraser")');
+    expect(policy).not.toContain('backend: "canvas2d", reason: "eraser"');
   });
 });

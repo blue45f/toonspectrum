@@ -11,6 +11,7 @@
 
 import {
   STUDIO_OFFSCREEN_RASTER_WORKER_PROTOCOL_VERSION,
+  isStudioOffscreenRasterEncodedBlobExact,
   isStudioOffscreenRasterRunMessage,
   studioOffscreenRasterFailure,
   type StudioOffscreenOwnedBitmap,
@@ -150,8 +151,12 @@ async function composite(
         describe(error, "래스터 인코딩에 실패했습니다."),
       );
     }
-    if (!blob || blob.size <= 0) {
-      return studioOffscreenRasterFailure(request.runId, "encode-failed", "빈 이미지가 생성되었습니다.");
+    if (!await isStudioOffscreenRasterEncodedBlobExact(blob, mime)) {
+      return studioOffscreenRasterFailure(
+        request.runId,
+        "encode-failed",
+        `요청한 ${mime} 코덱이 정확한 컨테이너를 생성하지 못했습니다. 다른 형식으로 전환하지 않았습니다.`,
+      );
     }
     return {
       version: STUDIO_OFFSCREEN_RASTER_WORKER_PROTOCOL_VERSION,
@@ -235,7 +240,7 @@ function drawPlaced(
 
 /**
  * 이 런타임이 OffscreenCanvas 2D 합성을 지원하는지 확인한다. Worker 는 이 결과로 ready 대신
- * unavailable 을 먼저 보내, 클라이언트가 즉시 메인스레드 폴백으로 갈 수 있게 한다.
+ * unavailable 을 먼저 보내, 클라이언트가 선택된 provider 부재를 즉시 표시할 수 있게 한다.
  */
 export function supportsStudioOffscreenCanvas2d(): boolean {
   try {

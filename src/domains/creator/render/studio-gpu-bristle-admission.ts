@@ -42,7 +42,7 @@ export const STUDIO_GPU_BRISTLE_ADMISSION_THRESHOLDS = Object.freeze({
   minNormalRidgeContrast: 1.08,
 });
 
-/** Product floor. Below this the lane declines per stroke and the CPU carrier paints. */
+/** Product floor. Below this the already-selected GPU lane rejects the stroke. */
 export const STUDIO_GPU_BRISTLE_SURFACE_LIMITS = Object.freeze({
   minShortEdgePx: 32,
   maxSurfacePixels: 4_000_000,
@@ -85,15 +85,17 @@ const REASON_MESSAGES_KO: Readonly<
   "probe-statistics-invalid": "GPU 강모 레인 검증값을 읽지 못했습니다.",
 });
 
-const FALLBACK_SUFFIX_KO = " 기존 유화 캐리어로 그립니다.";
+const UNAVAILABLE_SUFFIX_KO =
+  " 현재 획을 다른 엔진으로 자동 전환하지 않습니다. 다음 획에서 다른 엔진을 명시적으로 선택해 주세요.";
 
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
 /**
- * Evaluate one device's probe. Admission is all-or-nothing: any failed threshold refuses the lane
- * for that device epoch and the carrier paints — quality outranks the lane existing.
+ * Evaluate one device's probe. Admission is all-or-nothing: any failed threshold makes this
+ * selected lane unavailable for the device epoch. It never authorizes a CPU carrier for the same
+ * stroke.
  */
 export function proveStudioGpuBristleAdmission(
   samples: StudioGpuBristleAdmissionSamples,
@@ -147,7 +149,7 @@ export function proveStudioGpuBristleAdmission(
     samples: Object.freeze(normalized),
     message: admitted
       ? ""
-      : `${REASON_MESSAGES_KO[reasons[0]!]}${FALLBACK_SUFFIX_KO}`,
+      : `${REASON_MESSAGES_KO[reasons[0]!]}${UNAVAILABLE_SUFFIX_KO}`,
   });
 }
 
@@ -172,8 +174,8 @@ const SURFACE_MESSAGES_KO: Readonly<
 
 /**
  * Per-stroke surface floor and ceiling, mirroring `studio-living-ink-product-policy.ts:44-61`:
- * a refusal is a Korean sentence plus a route back to the vector/ribbon path, never a silent
- * downgrade.
+ * a refusal is a Korean sentence and a terminal result for this selected stroke. Another
+ * vector/ribbon provider may be selected only before a later stroke begins.
  */
 export function acceptStudioGpuBristleSurface(
   widthPx: number,
@@ -186,7 +188,7 @@ export function acceptStudioGpuBristleSurface(
     return Object.freeze({
       accepted: false,
       reason: "surface-invalid" as const,
-      message: `${SURFACE_MESSAGES_KO["surface-invalid"]}${FALLBACK_SUFFIX_KO}`,
+      message: `${SURFACE_MESSAGES_KO["surface-invalid"]}${UNAVAILABLE_SUFFIX_KO}`,
     });
   }
   const width = Math.ceil(widthPx);
@@ -195,7 +197,7 @@ export function acceptStudioGpuBristleSurface(
     return Object.freeze({
       accepted: false,
       reason: "surface-too-small" as const,
-      message: `${SURFACE_MESSAGES_KO["surface-too-small"]}${FALLBACK_SUFFIX_KO}`,
+      message: `${SURFACE_MESSAGES_KO["surface-too-small"]}${UNAVAILABLE_SUFFIX_KO}`,
     });
   }
   if (
@@ -206,7 +208,7 @@ export function acceptStudioGpuBristleSurface(
     return Object.freeze({
       accepted: false,
       reason: "surface-too-large" as const,
-      message: `${SURFACE_MESSAGES_KO["surface-too-large"]}${FALLBACK_SUFFIX_KO}`,
+      message: `${SURFACE_MESSAGES_KO["surface-too-large"]}${UNAVAILABLE_SUFFIX_KO}`,
     });
   }
   return Object.freeze({ accepted: true, reason: null, message: "" });

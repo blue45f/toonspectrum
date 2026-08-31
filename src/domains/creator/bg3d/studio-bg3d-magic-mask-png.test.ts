@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  STUDIO_BG3D_MAGIC_MASK_DOM_FALLBACK_MAX_PIXELS,
+  STUDIO_BG3D_MAGIC_MASK_MAIN_THREAD_MAX_PIXELS,
   STUDIO_BG3D_MAGIC_MASK_PNG_DATA_URL_PREFIX,
   StudioBg3dMagicMaskPngError,
   encodeStudioBg3dMagicMaskPngDataUrl,
@@ -163,16 +163,28 @@ describe("studio-bg3d-magic-mask-png", () => {
   it.each([
     "worker-unavailable",
     "offscreen-unavailable",
-  ] as const)("uses the bounded DOM canvas fallback for %s only", async (code) => {
+  ] as const)("keeps Worker capability failure %s terminal", async (code) => {
+    const createCanvas = vi.fn(() => canvasFor(png(2, 1)));
+    await expect(encodeStudioBg3dMagicMaskPngDataUrl(input(), {
+      encodePngInWorker: vi.fn(async () => {
+        throw new StudioBg3dShotPngWorkerError(code);
+      }),
+      createCanvas,
+      readBlobAsDataUrl: dataUrlForPng,
+    })).rejects.toMatchObject({ code });
+    expect(createCanvas).not.toHaveBeenCalled();
+  });
+
+  it("uses the bounded DOM canvas encoder only when selected before execution", async () => {
     const written: Uint8ClampedArray[] = [];
     const canvas = canvasFor(png(2, 1), written);
     const source = input();
     const expected = source.data.slice();
+    const encodePngInWorker = vi.fn();
 
     const result = await encodeStudioBg3dMagicMaskPngDataUrl(source, {
-      encodePngInWorker: vi.fn(async () => {
-        throw new StudioBg3dShotPngWorkerError(code);
-      }),
+      encoderBackend: "main-thread",
+      encodePngInWorker,
       createCanvas: () => canvas,
       readBlobAsDataUrl: dataUrlForPng,
     });
@@ -182,6 +194,7 @@ describe("studio-bg3d-magic-mask-png", () => {
     expect(canvas.height).toBe(1);
     expect(written).toEqual([new Uint8ClampedArray(expected)]);
     expect(source.data).toEqual(expected);
+    expect(encodePngInWorker).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -203,44 +216,39 @@ describe("studio-bg3d-magic-mask-png", () => {
     expect(createCanvas).not.toHaveBeenCalled();
   });
 
-  it("refuses an oversized main-thread fallback before creating a canvas", async () => {
+  it("refuses an oversized explicitly selected main-thread request before creating a canvas", async () => {
     const width = 1_025;
     const height = 1_024;
-    expect(width * height).toBeGreaterThan(STUDIO_BG3D_MAGIC_MASK_DOM_FALLBACK_MAX_PIXELS);
+    expect(width * height).toBeGreaterThan(STUDIO_BG3D_MAGIC_MASK_MAIN_THREAD_MAX_PIXELS);
     const createCanvas = vi.fn(() => canvasFor(png(width, height)));
     await expect(encodeStudioBg3dMagicMaskPngDataUrl({
       width,
       height,
       data: new Uint8Array(width * height * 4),
     }, {
-      encodePngInWorker: vi.fn(async () => {
-        throw new StudioBg3dShotPngWorkerError("worker-unavailable");
-      }),
+      encoderBackend: "main-thread",
       createCanvas,
       readBlobAsDataUrl: dataUrlForPng,
-    })).rejects.toMatchObject({ code: "dom-fallback-too-large" });
+    })).rejects.toMatchObject({ code: "main-thread-too-large" });
     expect(createCanvas).not.toHaveBeenCalled();
   });
 
   it("fails closed when the DOM canvas/context/PNG result is unavailable", async () => {
-    const unavailable = vi.fn(async () => {
-      throw new StudioBg3dShotPngWorkerError("worker-unavailable");
-    });
     await expect(encodeStudioBg3dMagicMaskPngDataUrl(input(), {
-      encodePngInWorker: unavailable,
+      encoderBackend: "main-thread",
       createCanvas: () => null,
-    })).rejects.toMatchObject({ code: "dom-fallback-unavailable" });
+    })).rejects.toMatchObject({ code: "main-thread-unavailable" });
     await expect(encodeStudioBg3dMagicMaskPngDataUrl(input(), {
-      encodePngInWorker: unavailable,
+      encoderBackend: "main-thread",
       createCanvas: () => ({
         width: 0,
         height: 0,
         getContext: () => null,
         toBlob: vi.fn(),
       } as unknown as HTMLCanvasElement),
-    })).rejects.toMatchObject({ code: "dom-fallback-unavailable" });
+    })).rejects.toMatchObject({ code: "main-thread-unavailable" });
     await expect(encodeStudioBg3dMagicMaskPngDataUrl(input(), {
-      encodePngInWorker: unavailable,
+      encoderBackend: "main-thread",
       createCanvas: () => canvasFor(null),
     })).rejects.toMatchObject({ code: "encode-failed" });
   });
@@ -282,7 +290,7 @@ describe("studio-bg3d-magic-mask-png", () => {
     })).rejects.toMatchObject({ code: "data-url-failed" });
   });
 
-  it("honors cancellation before work and while the DOM fallback is encoding", async () => {
+  it("honors cancellation before work and while the selected main-thread encoder runs", async () => {
     const preAborted = new AbortController();
     preAborted.abort();
     const encodePngInWorker = vi.fn();
@@ -299,9 +307,7 @@ describe("studio-bg3d-magic-mask-png", () => {
     const controller = new AbortController();
     const pending = encodeStudioBg3dMagicMaskPngDataUrl(input(), {
       signal: controller.signal,
-      encodePngInWorker: vi.fn(async () => {
-        throw new StudioBg3dShotPngWorkerError("worker-unavailable");
-      }),
+      encoderBackend: "main-thread",
       createCanvas: () => canvas,
       readBlobAsDataUrl: dataUrlForPng,
     });

@@ -102,11 +102,14 @@ export interface StudioLiveWetInkOverlayOptions {
   readonly surfaceFactory?: StudioWetInkBrushSurfaceFactory;
 }
 
-export type StudioLiveWetInkFallbackReason =
-  | "unsupported-snapshot"
+export type StudioLiveWetInkUnavailableReason =
   | "surface-unavailable"
   | "surface-budget"
   | "native-scale-unsupported"
+  | "surface-render";
+
+export type StudioLiveWetInkRejectedReason =
+  | "unsupported-snapshot"
   | "hidden"
   | "aborted"
   | "stale-page"
@@ -117,8 +120,32 @@ export type StudioLiveWetInkFallbackReason =
   | "dab-budget"
   | "simulation-budget"
   | "upload-budget"
-  | "surface-render"
   | "exact-replay";
+
+export type StudioLiveWetInkFailureReason =
+  | StudioLiveWetInkUnavailableReason
+  | StudioLiveWetInkRejectedReason;
+
+export type StudioLiveWetInkOperationFailure =
+  | {
+      readonly status: "unavailable";
+      readonly reason: StudioLiveWetInkUnavailableReason;
+    }
+  | {
+      readonly status: "rejected";
+      readonly reason: StudioLiveWetInkRejectedReason;
+    };
+
+function wetInkOperationFailure(
+  reason: StudioLiveWetInkFailureReason,
+): StudioLiveWetInkOperationFailure {
+  return reason === "surface-unavailable"
+    || reason === "surface-budget"
+    || reason === "native-scale-unsupported"
+    || reason === "surface-render"
+    ? { status: "unavailable", reason }
+    : { status: "rejected", reason };
+}
 
 export type StudioLiveWetInkBeginResult =
   | {
@@ -126,10 +153,7 @@ export type StudioLiveWetInkBeginResult =
       readonly consumedSourcePoints: number;
       readonly appendedDabs: number;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveWetInkFallbackReason;
-    };
+  | StudioLiveWetInkOperationFailure;
 
 export type StudioLiveWetInkAppendResult =
   | {
@@ -138,10 +162,7 @@ export type StudioLiveWetInkAppendResult =
       readonly appendedDabs: number;
       readonly uploadedTiles: number;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveWetInkFallbackReason;
-    };
+  | StudioLiveWetInkOperationFailure;
 
 export type StudioLiveWetInkEndResult =
   | {
@@ -151,10 +172,7 @@ export type StudioLiveWetInkEndResult =
       readonly seed: number;
       readonly uploadedTiles: number;
     }
-  | {
-      readonly status: "fallback";
-      readonly reason: StudioLiveWetInkFallbackReason;
-    };
+  | StudioLiveWetInkOperationFailure;
 
 interface ActiveWetInkStroke {
   readonly recipe: StudioWetInkBrushPhysicalRecipe;
@@ -331,10 +349,10 @@ export class StudioLiveWetInkOverlayRenderer {
   private surface: StudioLiveInkSurface | null = null;
   private dpr = 1;
   private surfaceUsable = false;
-  private surfaceFailure: StudioLiveWetInkFallbackReason = "surface-unavailable";
+  private surfaceFailure: StudioLiveWetInkUnavailableReason = "surface-unavailable";
   private active: ActiveWetInkStroke | null = null;
   private settled: StudioWetInkBrushReplayPlan[] = [];
-  private fallbackReason: StudioLiveWetInkFallbackReason | null = null;
+  private lastFailureReason: StudioLiveWetInkFailureReason | null = null;
   /** Reused offscreen tile canvases keyed by "w×h" to cut live-frame GC pressure. */
   private readonly tileSurfacePool = new Map<string, StudioWetInkBrushSurface[]>();
 
@@ -375,8 +393,8 @@ export class StudioLiveWetInkOverlayRenderer {
     return this.settled.length;
   }
 
-  get lastFallbackReason(): StudioLiveWetInkFallbackReason | null {
-    return this.fallbackReason;
+  get lastOperationFailureReason(): StudioLiveWetInkFailureReason | null {
+    return this.lastFailureReason;
   }
 
   get isNativeSurfaceReady(): boolean {
@@ -388,21 +406,21 @@ export class StudioLiveWetInkOverlayRenderer {
     authority: StudioLiveWetInkAuthority,
   ): StudioLiveWetInkBeginResult {
     const guarded = authorityGuard(authority);
-    if (guarded) return { status: "fallback", reason: guarded };
+    if (guarded) return wetInkOperationFailure(guarded);
     const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
     if (!recipe || element.hidden === true) {
-      return { status: "fallback", reason: "unsupported-snapshot" };
+      return wetInkOperationFailure("unsupported-snapshot");
     }
     if (!this.surfaceReady()) {
-      return { status: "fallback", reason: this.surfaceFailure };
+      return wetInkOperationFailure(this.surfaceFailure);
     }
     const firstX = finiteCoordinate(element.points[0]);
     const firstY = finiteCoordinate(element.points[1]);
     if (firstX === null || firstY === null) {
-      return { status: "fallback", reason: "invalid-sample" };
+      return wetInkOperationFailure("invalid-sample");
     }
     const geometry = liveFieldGeometry(this.surface!, recipe);
-    if (!geometry) return { status: "fallback", reason: "field-budget" };
+    if (!geometry) return wetInkOperationFailure("field-budget");
     const field = createStudioWetInkField({
       width: geometry.width,
       height: geometry.height,
@@ -421,7 +439,7 @@ export class StudioLiveWetInkOverlayRenderer {
       paperRoughness: recipe.material.paperRoughness,
       inkColor: recipe.inkColor,
     });
-    if (!field.ok) return { status: "fallback", reason: "field-budget" };
+    if (!field.ok) return wetInkOperationFailure("field-budget");
     const firstPressure = mapStudioBrushAliasPressure(
       recipe.brushId,
       element.pressures?.[0],
@@ -441,7 +459,7 @@ export class StudioLiveWetInkOverlayRenderer {
         diffuse: true,
       },
     );
-    if (!started) return { status: "fallback", reason: "invalid-sample" };
+    if (!started) return wetInkOperationFailure("invalid-sample");
 
     this.resetActiveState();
     this.clearActiveRect();
@@ -463,8 +481,8 @@ export class StudioLiveWetInkOverlayRenderer {
     this.active = active;
     this.setActiveCanvasOpacity(recipe.compositeOpacity);
     const painted = this.depositAndPaint(active, started.dabs);
-    if (painted.status === "fallback") return painted;
-    this.fallbackReason = null;
+    if (painted.status === "unavailable" || painted.status === "rejected") return painted;
+    this.lastFailureReason = null;
     return {
       status: "started",
       consumedSourcePoints: 1,
@@ -476,12 +494,12 @@ export class StudioLiveWetInkOverlayRenderer {
     element: DrawEl,
     authority: StudioLiveWetInkAuthority,
   ): StudioLiveWetInkAppendResult {
+    if (this.lastFailureReason) {
+      return wetInkOperationFailure(this.lastFailureReason);
+    }
     const active = this.active;
     if (!active) {
-      return {
-        status: "fallback",
-        reason: this.fallbackReason ?? "surface-unavailable",
-      };
+      return wetInkOperationFailure("surface-unavailable");
     }
     const guarded = authorityGuard(authority);
     if (guarded) return this.failActive(guarded);
@@ -545,8 +563,11 @@ export class StudioLiveWetInkOverlayRenderer {
     element: DrawEl,
     authority: StudioLiveWetInkAuthority,
   ): StudioLiveWetInkEndResult {
+    if (this.lastFailureReason) {
+      return wetInkOperationFailure(this.lastFailureReason);
+    }
     const active = this.active;
-    if (!active) return { status: "fallback", reason: "surface-unavailable" };
+    if (!active) return wetInkOperationFailure("surface-unavailable");
     const guardedBeforePlan = authorityGuard(authority);
     if (guardedBeforePlan) return this.failActive(guardedBeforePlan);
     if (!Object.is(active.pageEpoch, authority.pageEpoch)) {
@@ -568,7 +589,7 @@ export class StudioLiveWetInkOverlayRenderer {
       && finiteCoordinate(element.points[previousIndex * 2 + 1]) === active.previousSourceY;
     if (appendCompatible) {
       const appended = this.appendFrom(element, authority);
-      if (appended.status === "fallback") return appended;
+      if (appended.status === "unavailable" || appended.status === "rejected") return appended;
     }
     // Release-time stabilization/post-correction may replace an already visible prefix. The live
     // suffix field is disposable; the exact full replay below is the only safe rewrite and avoids
@@ -617,14 +638,17 @@ export class StudioLiveWetInkOverlayRenderer {
   }
 
   resetActive(): boolean {
-    if (!this.active) return false;
+    const hadOperation = this.active !== null || this.lastFailureReason !== null;
+    if (!hadOperation) return false;
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.clearActiveRect();
     return true;
   }
 
   clear(): void {
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.settled = [];
     this.clearActiveRect();
     this.clearSettledRect();
@@ -827,7 +851,7 @@ export class StudioLiveWetInkOverlayRenderer {
     }
     try {
       // Preparation happens before this mutation, so allocation/upload failures leave the current
-      // live surface intact and the retained fallback can be exposed without a blank flash.
+      // accepted prefix intact while the host chooses how to handle the failed operation.
       context.restore();
       this.clearActiveRect();
       this.setActiveCanvasOpacity(plan.compositeOpacity);
@@ -912,7 +936,7 @@ export class StudioLiveWetInkOverlayRenderer {
         !this.drawExactPlanToActive(plan)
         || !this.flattenActiveToSettled(plan.compositeOpacity)
       ) {
-        this.fallbackReason = "surface-render";
+        this.lastFailureReason = "surface-render";
         this.clearActiveRect();
         this.clearSettledRect();
         return;
@@ -937,19 +961,17 @@ export class StudioLiveWetInkOverlayRenderer {
       this.failActive(uploads.ok ? "surface-render" : "upload-budget");
       return;
     }
+    this.lastFailureReason = null;
     this.setActiveCanvasOpacity(active.recipe.compositeOpacity);
   }
 
   private failActive(
-    reason: StudioLiveWetInkFallbackReason,
-  ): {
-    readonly status: "fallback";
-    readonly reason: StudioLiveWetInkFallbackReason;
-  } {
-    this.fallbackReason = reason;
-    this.resetActiveState();
-    this.clearActiveRect();
-    return { status: "fallback", reason };
+    reason: StudioLiveWetInkFailureReason,
+  ): StudioLiveWetInkOperationFailure {
+    // Keep the accepted source/visible prefix intact until the host explicitly cancels this
+    // operation or selects a later one. A failure result never chooses another renderer.
+    this.lastFailureReason = reason;
+    return wetInkOperationFailure(reason);
   }
 
   private resetActiveState(): void {

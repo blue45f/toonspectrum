@@ -7,7 +7,6 @@ import {
 } from "./studio-vrm-texture-fill-worker-client";
 import {
   getCachedStudioVrmTextureGeometryIndex,
-  getStudioVrmTextureGeometryIndex,
   inspectStudioVrmTextureGeometryAdmission,
   precomputeStudioVrmTextureGeometryIndex,
   type StudioVrmTextureGeometryIndex,
@@ -68,7 +67,6 @@ const RGBA_CHANNELS = 4;
 const DEFAULT_TARGET_RGBA_BYTES = STUDIO_VRM_TEXTURE_MAX_TEXELS * RGBA_CHANNELS;
 export const STUDIO_VRM_TEXTURE_PAINT_TARGET_RESIDENT_RGBA_COPIES = 4;
 export const STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES = 100_000;
-export const STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES = 4_096;
 const DEFAULT_HISTORY_BYTES = 32 * 1024 * 1024;
 const DEFAULT_TARGET_RESIDENT_BYTES =
   DEFAULT_TARGET_RGBA_BYTES * STUDIO_VRM_TEXTURE_PAINT_TARGET_RESIDENT_RGBA_COPIES;
@@ -319,9 +317,8 @@ export interface CreateStudioVrmTexturePaintRuntimeOptions {
   /** Prepared target resident bytes plus the reserved undo-history budget. */
   readonly maxAggregateResidentBytes?: number;
   /**
-   * Worker UV-island indexing hard cap. Pointer input synchronously indexes only meshes up to
-   * `STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES`; larger admitted meshes require
-   * a completed prewarm cache and otherwise use a face-local fallback.
+   * Worker UV-island indexing hard cap. Pointer input consumes only a completed Worker cache and
+   * otherwise keeps the face-local identity; it never rebuilds topology synchronously.
    */
   readonly maxGeometryIndexTriangles?: number;
   /** @deprecated Logical RGBA compatibility alias. Prefer maxTargetResidentBytes. */
@@ -2566,11 +2563,11 @@ export class StudioVrmTexturePaintRuntime {
           uvAttribute: job.uvAttribute,
           maxTriangles: this.options.maxGeometryIndexTriangles,
           signal,
-          allowSynchronousFallback: false,
+          executionBackend: "worker",
         });
       } catch {
         // Worker availability, abort, timeout, stale geometry, and malformed custom geometry all
-        // fail closed. Pointer input remains usable through the small-sync/face-local paths.
+        // fail closed. Pointer input keeps face-local identity without rebuilding topology.
       }
     }
   }
@@ -2843,16 +2840,9 @@ export class StudioVrmTexturePaintRuntime {
             geometry,
             indexOptions,
           );
-          if (
-            !geometryIndex
-            && admission.triangleCount
-              <= STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES
-          ) {
-            geometryIndex = getStudioVrmTextureGeometryIndex(geometry, indexOptions);
-          }
         }
       } catch {
-        // 손상된 custom geometry는 아래 face-specific fallback으로 격리한다.
+        // 손상된 custom geometry는 아래 face-specific identity로 격리한다.
       }
       const island = geometryIndex?.getIsland(faceIndex) ?? null;
       islandId = island
@@ -2880,7 +2870,7 @@ export class StudioVrmTexturePaintRuntime {
             }
           }
         } catch {
-          // island/fallback ID는 유지하고 밀도 보강만 생략한다.
+          // island/face-local ID는 유지하고 밀도 보강만 생략한다.
         }
       }
     }

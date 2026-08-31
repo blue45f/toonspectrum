@@ -21,7 +21,7 @@ import {
  *   The product installs the SQLite/OPFS adapter; without it the runtime is
  *   explicitly memory-only and never opens localStorage/IndexedDB;
  * - hydration is a one-shot boot step (`hydrate()`); every synchronous
- *   decision path — selectFilterLane included — reads only the already-loaded
+ *   observation path — selectFilterLane included — reads only the already-loaded
  *   in-memory state;
  * - cost samples come exclusively from real measurements (recordRenderSample
  *   drops invalid values instead of fabricating estimates);
@@ -30,9 +30,9 @@ import {
  * - shadow samples run through an injected idle scheduler and can only observe
  *   the production result, never change it (exceptions surface as
  *   report.error only);
- * - selectFilterLane projects the winner cache + kill switch onto a filter
- *   lane ladder so the existing island plan (studio-filter-island-plan.ts)
- *   executes tournament conclusions on its real call path.
+ * - selectFilterLane projects the winner cache + kill switch into
+ *   observation-only candidate evidence. Product filter and stroke execution
+ *   never consume this ordering as a retry or provider-substitution path.
  *
  * Hot-path contract: everything here is pure functions or plain module state.
  * No React imports, no renders, no timers.
@@ -601,8 +601,8 @@ export function getStudioTournamentRuntime(): StudioRendererTournamentRuntime {
  * hydration, and hydration is what pulls the persistence adapter (and, with
  * the SQLite/OPFS adapter installed, its ~865 KB wasm) over the network. A
  * null runtime is not a correctness problem — an unbooted tournament has an
- * empty winner cache and nothing killed, which is exactly the state the lane
- * ladder is contractually unchanged by.
+ * empty winner cache and nothing killed, which is exactly the neutral
+ * observation state.
  */
 export function peekStudioTournamentRuntime(): StudioRendererTournamentRuntime | null {
   return sharedRuntime;
@@ -678,11 +678,11 @@ export function scheduleShadowSample(
 }
 
 /* ------------------------------------------------------------------ */
-/* Filter lane selection — tournament conclusions on the real path     */
+/* Candidate observation — never product execution authority           */
 /* ------------------------------------------------------------------ */
 
 export interface SelectFilterLaneInput<TLane extends string> {
-  /** Planner-produced lane ladder (head lane first). */
+  /** Observation candidates in their baseline evidence order. */
   lanes: readonly TLane[];
   bucket: string;
   deviceHash: string;
@@ -692,23 +692,24 @@ export interface SelectFilterLaneInput<TLane extends string> {
 }
 
 export interface SelectFilterLaneResult<TLane extends string> {
+  /** Surviving observation candidates. Empty means no provider is available. */
   lanes: TLane[];
-  /** Lanes whose providers are currently killed (even when the kill was ignored). */
+  /** Lanes whose providers are currently killed. */
   killedLanes: TLane[];
   /** Lane the winner cache moved (or confirmed) at the head, if any. */
   promotedLane: TLane | null;
-  /** Non-null when the kill switch was ignored to avoid an empty chain. */
-  killIgnoredReason: string | null;
+  /** Explicit fail-closed outcome when every supplied provider is killed. */
+  unavailableReason: "all-providers-killed" | null;
 }
 
 /**
- * Pure projection of already-hydrated in-memory tournament state onto a lane
- * ladder (no I/O, no awaits — safe on synchronous decision paths):
- * 1. killed providers leave the ladder — unless that would empty it, in which
- *    case the kill is ignored, the original order survives, and the reason is
- *    returned for logging (a fallback chain must always remain);
+ * Pure, observation-only projection of already-hydrated in-memory tournament
+ * state onto a candidate list (no I/O, no awaits):
+ * 1. killed providers leave the candidate set. If every supplied provider is
+ *    killed, the result is empty and explicitly unavailable; no provider is
+ *    resurrected;
  * 2. a cached winner for this bucket/device moves its lane to the head. A
- *    winner that is killed or not in the ladder promotes nothing.
+ *    winner that is killed or not in the candidate set promotes nothing.
  * With an empty cache and no kills the input order is returned unchanged.
  */
 export function selectFilterLane<TLane extends string>(
@@ -722,17 +723,11 @@ export function selectFilterLane<TLane extends string>(
   );
 
   if (lanes.length === 0 && input.lanes.length > 0) {
-    const reasons = killedLanes
-      .map((lane) => {
-        const providerId = input.laneProviderId(lane);
-        return `${providerId}: ${input.killSwitch.reasonFor(providerId) ?? "unknown"}`;
-      })
-      .join("; ");
     return {
-      lanes: [...input.lanes],
+      lanes: [],
       killedLanes,
       promotedLane: null,
-      killIgnoredReason: `kill switch would empty the lane chain; keeping the original order [${reasons}]`,
+      unavailableReason: "all-providers-killed",
     };
   }
 
@@ -750,5 +745,5 @@ export function selectFilterLane<TLane extends string>(
     }
   }
 
-  return { lanes, killedLanes, promotedLane, killIgnoredReason: null };
+  return { lanes, killedLanes, promotedLane, unavailableReason: null };
 }

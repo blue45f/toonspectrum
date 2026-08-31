@@ -25,10 +25,13 @@ export interface StudioCrdtRasterWorkerLike {
 }
 
 export type StudioCrdtRasterWorkerFactory = () => StudioCrdtRasterWorkerLike | null;
+export type StudioCrdtRasterExecutionMode = "worker" | "direct";
 
 export interface StudioCrdtRasterWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  executionMode?: StudioCrdtRasterExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioCrdtRasterWorkerFactory | null;
 }
 
@@ -57,6 +60,12 @@ function createAbortError(): Error {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioCrdtRasterWorkerUnavailableError";
+  return error;
 }
 
 function runCrdtRasterDirect(
@@ -105,13 +114,9 @@ function runCrdtRasterWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runCrdtRasterDirect(roots, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
 
     worker.onmessage = (event) => {
       const response = event.data;
@@ -128,8 +133,8 @@ function runCrdtRasterWithWorker(
         try {
           worker.postMessage(message);
           requestPosted = true;
-        } catch {
-          resolveDirectFallback();
+        } catch (error) {
+          rejectWorkerUnavailable("래스터 문서 파싱 Worker에 요청을 전달하지 못했습니다.", error);
         }
         return;
       }
@@ -146,7 +151,10 @@ function runCrdtRasterWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "래스터 문서 파싱 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       const error =
@@ -161,7 +169,10 @@ function runCrdtRasterWithWorker(
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    readyTimer = setTimeout(
+      () => rejectWorkerUnavailable("래스터 문서 파싱 Worker 준비 시간이 초과되었습니다."),
+      3_000,
+    );
   });
 }
 
@@ -169,24 +180,26 @@ function runCrdtRasterWithWorker(
  * 래스터 operation-log 파싱·검증(JSON.parse + canonical 재직렬화 비교, exact-schema 검증, 전역
  * patch 수 상한 검증)을 한 번의 모듈 Worker 호출로 실행한다. 입력(roots)·출력(snapshot) 모두
  * 구조적 복제만으로 충분한 순수 JSON/Map 이라 transferable은 쓰지 않는다 — SVG 내보내기 Worker와
- * 동일한 관례. Worker를 못 만들면(구형 브라우저·CSP) 동일한 parseStudioCrdtRasterDocumentRoots를
- * 메인 스레드에서 동기 실행해 폴백한다.
+ * 동일한 관례. 선택한 Worker를 사용할 수 없거나 실행이 실패하면 같은 요청을 메인 스레드에서
+ * 다시 실행하지 않고 unavailable/reject로 종료한다.
  */
 export async function runStudioCrdtRasterWorker(
   roots: StudioCrdtRasterRawRoots,
   options: StudioCrdtRasterWorkerClientOptions = {},
 ): Promise<StudioCrdtRasterWorkerClientResult> {
   throwIfAborted(options.signal);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runCrdtRasterDirect(roots, options.signal);
   const factory =
     options.workerFactory === undefined ? createStudioCrdtRasterModuleWorker : options.workerFactory;
-  if (!factory) return runCrdtRasterDirect(roots, options.signal);
+  if (!factory) throw createWorkerUnavailableError("래스터 문서 파싱 Worker를 만들 수 없습니다.");
 
   let worker: StudioCrdtRasterWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runCrdtRasterDirect(roots, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("래스터 문서 파싱 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runCrdtRasterDirect(roots, options.signal);
+  if (!worker) throw createWorkerUnavailableError("래스터 문서 파싱 Worker를 만들 수 없습니다.");
   return runCrdtRasterWithWorker(worker, roots, options.signal);
 }

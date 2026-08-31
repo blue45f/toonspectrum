@@ -13,6 +13,8 @@ import {
   type StudioZipReaderLimits,
 } from "./studio-zip-reader";
 
+import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
+
 /** Bounded CBZ + ComicInfo.xml interchange for page-oriented webtoon handoff. */
 
 export const STUDIO_CBZ_MIME = "application/vnd.comicbook+zip" as const;
@@ -105,8 +107,8 @@ export interface StudioCbzExportInput {
 export interface StudioCbzExportOptions {
   limits?: Partial<StudioCbzLimits>;
   signal?: AbortSignal;
-  /** CLI/headless export only; ignored by browser runtimes. */
-  allowLargeDirectArchiveCrcInHeadless?: boolean;
+  /** Fixed before ZIP construction. Browser product callers select `worker`. */
+  crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 export interface StudioCbzImportOptions extends StudioCbzExportOptions {
@@ -1017,7 +1019,7 @@ export async function buildStudioCbzBytes(
     {
       limits: writerLimits(resolveLimits(options.limits)),
       signal: options.signal,
-      allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+      crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
     }
   );
   return { bytes, warnings: Object.freeze([...prepared.warnings]) };
@@ -1032,7 +1034,7 @@ export async function buildStudioCbzBlob(
     mimeType: STUDIO_CBZ_MIME,
     limits: writerLimits(resolveLimits(options.limits)),
     signal: options.signal,
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
   });
   return { blob, warnings: Object.freeze([...prepared.warnings]) };
 }

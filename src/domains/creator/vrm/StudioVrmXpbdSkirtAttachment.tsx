@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- The tested Three.js runtime is owned by this R3F leaf. */
 
 import { createPortal, useFrame } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import {
@@ -225,6 +225,31 @@ function unavailable(
   detail: string,
 ): StudioVrmXpbdSkirtAttachmentUnavailable {
   return Object.freeze({ ok: false, status: "unavailable", code, detail });
+}
+
+function readSelectedRuntimePoseSignature(
+  runtime: StudioVrmXpbdSkirtAttachmentRuntime,
+): string | null {
+  try {
+    return runtime.readPoseSignature();
+  } catch {
+    return null;
+  }
+}
+
+function stepSelectedRuntime(
+  runtime: StudioVrmXpbdSkirtAttachmentRuntime,
+  topologyGeneration: number,
+  poseGeneration: number,
+): StudioVrmXpbdSkirtAttachmentFrameResult {
+  try {
+    return runtime.step(topologyGeneration, poseGeneration);
+  } catch {
+    return unavailable(
+      "solver-unavailable",
+      "The selected XPBD skirt runtime failed while solving the current attachment epoch.",
+    );
+  }
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -753,7 +778,6 @@ export function StudioVrmXpbdSkirtAttachment({
   metrics,
   effectiveFit,
   topologyGeneration = 0,
-  fallback,
   onSurfaceReceipt,
   onAttachmentStatus,
   onCaptureSyncChange,
@@ -764,7 +788,6 @@ export function StudioVrmXpbdSkirtAttachment({
   readonly metrics: WardrobeMetrics;
   readonly effectiveFit: number;
   readonly topologyGeneration?: number;
-  readonly fallback: ReactNode;
   readonly onSurfaceReceipt: (
     slot: WardrobeSlot,
     receipt: StudioVrmXpbdSkirtSurfaceReceipt | null,
@@ -798,25 +821,35 @@ export function StudioVrmXpbdSkirtAttachment({
   const runtime = runtimeResult?.ok ? runtimeResult.runtime : null;
   const [failedRuntime, setFailedRuntime] = useState<StudioVrmXpbdSkirtAttachmentRuntime | null>(null);
   const runtimePending = activeRuntimeBinding === null;
-  const fallbackRequired = runtimeResult !== null && (!runtime || failedRuntime === runtime);
+  const runtimeUnavailable = runtimeResult !== null && (!runtime || failedRuntime === runtime);
 
   useLayoutEffect(() => {
-    const created = createStudioVrmXpbdSkirtAttachmentRuntime({
-      vrm,
-      kind,
-      metrics,
-      effectiveFit,
-      topologyGeneration,
-      devicePlan,
-      // Material-only authored changes are applied in the layout effect below and must not rebuild
-      // topology/rest ownership.
-      color: "#ffffff",
-      fabricId: "cotton",
-    });
+    let created: StudioVrmXpbdSkirtAttachmentRuntimeResult;
+    try {
+      created = createStudioVrmXpbdSkirtAttachmentRuntime({
+        vrm,
+        kind,
+        metrics,
+        effectiveFit,
+        topologyGeneration,
+        devicePlan,
+        // Material-only authored changes are applied in the layout effect below and must not rebuild
+        // topology/rest ownership.
+        color: "#ffffff",
+        fabricId: "cotton",
+      });
+    } catch {
+      created = unavailable(
+        "topology-unavailable",
+        "The selected XPBD skirt runtime could not be constructed.",
+      );
+    }
     // GPU resources are created only after commit. An abandoned concurrent render therefore owns
     // nothing, while StrictMode cleanup/setup retains and releases each committed runtime exactly
     // once. Publishing the binding happens only after the runtime lease is held.
-    if (created.ok && !created.runtime.retain()) return;
+    if (created.ok && !created.runtime.retain()) {
+      created = unavailable("disposed", "The selected XPBD skirt surface is unavailable.");
+    }
     let ownerLeaseReleased = false;
     const releaseOwnerLease = () => {
       if (!created.ok || ownerLeaseReleased) return;
@@ -848,6 +881,7 @@ export function StudioVrmXpbdSkirtAttachment({
     controller: null,
   });
   const reportedRuntimeRef = useRef<StudioVrmXpbdSkirtAttachmentRuntime | null>(null);
+  const reportedUnavailableBindingRef = useRef<StudioVrmXpbdSkirtRuntimeBinding | null>(null);
   const onSurfaceReceiptRef = useRef(onSurfaceReceipt);
   const onAttachmentStatusRef = useRef(onAttachmentStatus);
   const onCaptureSyncChangeRef = useRef(onCaptureSyncChange);
@@ -861,8 +895,17 @@ export function StudioVrmXpbdSkirtAttachment({
     onCaptureSyncChangeRef.current = onCaptureSyncChange;
   }, [onAttachmentStatus, onCaptureSyncChange, onSurfaceReceipt]);
 
+  useLayoutEffect(() => {
+    if (!activeRuntimeBinding || !runtimeUnavailable) return;
+    if (reportedUnavailableBindingRef.current === activeRuntimeBinding) return;
+    reportedUnavailableBindingRef.current = activeRuntimeBinding;
+    reportedRuntimeRef.current = null;
+    onSurfaceReceiptRef.current(slot, null);
+    onAttachmentStatusRef.current?.(slot, equip.itemId, "unavailable");
+  }, [activeRuntimeBinding, equip.itemId, runtimeUnavailable, slot]);
+
   captureSyncHandlerRef.current = () => {
-    if (!runtime || fallbackRequired || runtime.surface.disposed) {
+    if (!runtime || runtimeUnavailable || runtime.surface.disposed) {
       return unavailable("disposed", "The XPBD skirt capture runtime is not ready.");
     }
     if (poseFenceRef.current.runtime !== runtime) {
@@ -874,25 +917,15 @@ export function StudioVrmXpbdSkirtAttachment({
         controller: createStudioVrmXpbdSkirtSolveCadence(runtime.devicePlan.maxSolveHz),
       };
     }
-    const poseSignature = runtime.readPoseSignature();
+    const poseSignature = readSelectedRuntimePoseSignature(runtime);
     if (!poseSignature) {
-      if (reportedRuntimeRef.current === runtime) {
-        reportedRuntimeRef.current = null;
-        onSurfaceReceiptRef.current(slot, null);
-        onAttachmentStatusRef.current?.(slot, equip.itemId, "detached");
-      }
       setFailedRuntime(runtime);
       return unavailable("invalid-rig-frame", "The capture skirt rig frame is unavailable.");
     }
     const poseGeneration = poseFenceRef.current.nextPoseGeneration;
     poseFenceRef.current.nextPoseGeneration += 1;
-    const stepped = runtime.step(topologyGeneration, poseGeneration);
+    const stepped = stepSelectedRuntime(runtime, topologyGeneration, poseGeneration);
     if (!stepped.ok) {
-      if (reportedRuntimeRef.current === runtime) {
-        reportedRuntimeRef.current = null;
-        onSurfaceReceiptRef.current(slot, null);
-        onAttachmentStatusRef.current?.(slot, equip.itemId, "detached");
-      }
       setFailedRuntime(runtime);
       return stepped;
     }
@@ -906,9 +939,9 @@ export function StudioVrmXpbdSkirtAttachment({
   };
 
   useLayoutEffect(() => {
-    if (!runtime || fallbackRequired) return;
+    if (!runtime || runtimeUnavailable) return;
     runtime.surface.updateMaterial(equip.color, equip.fabricId);
-  }, [equip.color, equip.fabricId, fallbackRequired, runtime]);
+  }, [equip.color, equip.fabricId, runtime, runtimeUnavailable]);
 
   useLayoutEffect(() => {
     if (
@@ -922,24 +955,24 @@ export function StudioVrmXpbdSkirtAttachment({
   }, [activeRuntimeBinding, failedRuntime]);
 
   useLayoutEffect(() => {
-    if (!runtime || fallbackRequired) return;
+    if (!runtime || runtimeUnavailable) return;
     const sync: StudioVrmXpbdSkirtCaptureSync = () => captureSyncHandlerRef.current();
     onCaptureSyncChangeRef.current?.(slot, sync, true);
     return () => onCaptureSyncChangeRef.current?.(slot, sync, false);
-  }, [fallbackRequired, runtime, slot]);
+  }, [runtime, runtimeUnavailable, slot]);
 
   useEffect(() => {
-    if (!runtime || fallbackRequired) return;
+    if (!runtime || runtimeUnavailable) return;
     return () => {
       if (reportedRuntimeRef.current !== runtime) return;
       reportedRuntimeRef.current = null;
       onSurfaceReceiptRef.current(slot, null);
       onAttachmentStatusRef.current?.(slot, equip.itemId, "detached");
     };
-  }, [equip.itemId, fallbackRequired, runtime, slot]);
+  }, [equip.itemId, runtime, runtimeUnavailable, slot]);
 
   useFrame((_, delta) => {
-    if (!runtime || fallbackRequired || runtime.surface.disposed) return;
+    if (!runtime || runtimeUnavailable || runtime.surface.disposed) return;
     if (poseFenceRef.current.runtime !== runtime) {
       poseFenceRef.current = { runtime, nextPoseGeneration: 0 };
     }
@@ -949,7 +982,7 @@ export function StudioVrmXpbdSkirtAttachment({
         controller: createStudioVrmXpbdSkirtSolveCadence(runtime.devicePlan.maxSolveHz),
       };
     }
-    const poseSignature = runtime.readPoseSignature();
+    const poseSignature = readSelectedRuntimePoseSignature(runtime);
     if (!poseSignature) {
       setFailedRuntime(runtime);
       return;
@@ -959,13 +992,8 @@ export function StudioVrmXpbdSkirtAttachment({
     if (!cadenceRef.current.controller?.shouldSolve(delta, poseSignature, false)) return;
     const poseGeneration = poseFenceRef.current.nextPoseGeneration;
     poseFenceRef.current.nextPoseGeneration += 1;
-    const stepped = runtime.step(topologyGeneration, poseGeneration);
+    const stepped = stepSelectedRuntime(runtime, topologyGeneration, poseGeneration);
     if (!stepped.ok) {
-      if (reportedRuntimeRef.current === runtime) {
-        reportedRuntimeRef.current = null;
-        onSurfaceReceiptRef.current(slot, null);
-        onAttachmentStatusRef.current?.(slot, equip.itemId, "detached");
-      }
       setFailedRuntime(runtime);
       return;
     }
@@ -976,11 +1004,10 @@ export function StudioVrmXpbdSkirtAttachment({
     onAttachmentStatusRef.current?.(slot, equip.itemId, "ready");
   }, VRM_FRAME_XPBD_SKIRT_PRIORITY);
 
-  // The first committed layout creates and retains the runtime before paint. Rendering the rigid
-  // fallback while that setup is merely pending would falsely report an XPBD failure to Shared
-  // Stage, so only an explicit unavailable/failed result may mount the compatibility preview.
+  // The selected XPBD operation owns this attachment epoch. Pending and terminal-unavailable
+  // states render no replacement garment; a procedural garment is a separate catalog mode and is
+  // never mounted in response to an XPBD runtime or solver failure.
   if (runtimePending) return null;
-  if (fallbackRequired) return fallback;
-  if (!runtime) return fallback;
+  if (runtimeUnavailable || !runtime) return null;
   return createPortal(<primitive object={runtime.surface.mesh} />, vrm.scene);
 }

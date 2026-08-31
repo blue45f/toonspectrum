@@ -129,7 +129,7 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "filter-runtime-unavailable",
-      "GIF 필터 런타임을 사용할 수 없어 원본 애니메이션으로 표시합니다.",
+      "GIF 필터 런타임을 사용할 수 없어 필터 표시를 중단했습니다.",
     );
   }
   if (input.filterCapabilityRuntime === "loading") {
@@ -143,7 +143,7 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "filter-capability-runtime-unavailable",
-      "필터 안전성 검사 런타임을 사용할 수 없어 원본 애니메이션으로 표시합니다.",
+      "필터 안전성 검사 런타임을 사용할 수 없어 필터 표시를 중단했습니다.",
     );
   }
   if (input.filterMask === "loading") {
@@ -153,21 +153,21 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "filter-mask-unavailable",
-      "필터 마스크를 읽을 수 없어 원본 애니메이션으로 표시합니다.",
+      "필터 마스크를 읽을 수 없어 필터 표시를 중단했습니다.",
     );
   }
   if (input.runtimeFailure) {
     return status(
       "degraded",
       "runtime-cache-failed",
-      `GIF 프레임 필터 캐시를 갱신하지 못해 원본 애니메이션으로 표시합니다: ${input.runtimeFailure}`,
+      `GIF 프레임 필터 캐시를 갱신하지 못해 필터 표시를 중단했습니다: ${input.runtimeFailure}`,
     );
   }
   if (input.filterCount <= 0) {
     return status(
       "degraded",
       "empty-filter-program",
-      "요청한 GIF 효과에 실행 가능한 필터 프로그램이 없어 원본 애니메이션으로 표시합니다.",
+      "요청한 GIF 효과에 실행 가능한 필터 프로그램이 없어 필터 표시를 중단했습니다.",
     );
   }
   if (input.requiresOffthreadProvider) {
@@ -190,7 +190,7 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "invalid-surface-dimensions",
-      "GIF 필터 표면의 크기가 올바르지 않아 원본 애니메이션으로 표시합니다.",
+      "GIF 필터 표면의 크기가 올바르지 않아 필터 표시를 중단했습니다.",
     );
   }
 
@@ -213,7 +213,7 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "pixel-budget-exceeded",
-      "GIF 실시간 필터의 2MP 프레임 예산을 초과해 원본 애니메이션으로 표시합니다.",
+      "GIF 실시간 필터의 2MP 프레임 예산을 초과해 필터 표시를 중단했습니다.",
       { density: chosenDensity, ...chosen },
     );
   }
@@ -221,7 +221,7 @@ export function evaluateStudioAnimatedImageFilterCapability(
     return status(
       "degraded",
       "pixel-pass-budget-exceeded",
-      "GIF 실시간 필터의 8M pixel-pass 예산을 초과해 원본 애니메이션으로 표시합니다.",
+      "GIF 실시간 필터의 8M pixel-pass 예산을 초과해 필터 표시를 중단했습니다.",
       { density: chosenDensity, ...chosen },
     );
   }
@@ -273,8 +273,8 @@ export interface StudioAnimatedImageFilterFrameLoop {
 /**
  * Starts the browser-decoded GIF frame owner. `filterFrames=false` is deliberately the original
  * lightweight 12fps `batchDraw` path. With filters enabled, each admitted frame clears and rebuilds
- * the cache before the draw. A cache failure is reported once and the loop keeps the raw animation
- * moving; it never freezes a successful-looking first frame.
+ * the cache before the draw. A cache failure is terminal for this selected filtered presentation:
+ * it is reported once and no raw-animation redraw is scheduled as an implicit replacement.
  */
 export function startStudioAnimatedImageFilterFrameLoop(
   input: StudioAnimatedImageFilterFrameLoopInput,
@@ -303,15 +303,11 @@ export function startStudioAnimatedImageFilterFrameLoop(
         filtered = true;
       } catch (error) {
         filterHealthy = false;
-        try {
-          input.node.clearCache();
-        } catch {
-          // The status callback is the authority; cleanup remains best-effort under canvas loss.
-        }
         if (!failureReported) {
           failureReported = true;
           input.onRuntimeFailure?.(error);
         }
+        return false;
       }
     }
     input.node.getLayer()?.batchDraw();
@@ -334,13 +330,13 @@ export function startStudioAnimatedImageFilterFrameLoop(
       lastDrawAt = now;
       drawCurrentFrame();
     }
-    requestNext();
+    if (!input.filterFrames || filterHealthy) requestNext();
   };
 
   // A filtered GIF must not advertise success while showing an unfiltered first frame. The
   // filter-free path intentionally preserves the old behavior and waits for its first 80ms tick.
   if (input.filterFrames && !input.isPenDown()) drawCurrentFrame();
-  requestNext();
+  if (!input.filterFrames || filterHealthy) requestNext();
 
   return {
     refreshNow: drawCurrentFrame,
@@ -349,7 +345,7 @@ export function startStudioAnimatedImageFilterFrameLoop(
       stopped = true;
       if (frameId !== null) input.cancelFrame(frameId);
       frameId = null;
-      if (input.filterFrames) {
+      if (input.filterFrames && filterHealthy) {
         try {
           input.node.clearCache();
           input.node.getLayer()?.batchDraw();

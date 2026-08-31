@@ -71,7 +71,8 @@ describe("studio-wasm64-memory-governor capability probes", () => {
     const report = checkStudioWasm64Capability();
 
     expect(typeof report.isWasm64Supported).toBe("boolean");
-    expect(typeof report.isWasm32FallbackSupported).toBe("boolean");
+    expect(report.requestedRuntime).toBe("memory64");
+    expect(typeof report.isWasm32ReferenceSupported).toBe("boolean");
     expect(typeof report.isSimdSupported).toBe("boolean");
     expect(report.maxAllocatableMemoryGiB).toBeNull();
     expect(report.webMemory64AddressSpaceLimitGiB).toBe(16);
@@ -90,6 +91,7 @@ describe("studio-wasm64-memory-governor capability probes", () => {
         failureReason: null,
       });
     } else {
+      expect(report.selectedRuntime).toBe("unavailable");
       expect(report.memory64.operational).toBe(false);
       expect(report.memory64.failureReason).not.toBeNull();
     }
@@ -111,7 +113,7 @@ describe("studio-wasm64-memory-governor capability probes", () => {
 
     expect(report).toMatchObject({
       isWasm64Supported: false,
-      isWasm32FallbackSupported: false,
+      isWasm32ReferenceSupported: false,
       isSimdSupported: false,
       selectedRuntime: "unavailable",
     });
@@ -119,15 +121,24 @@ describe("studio-wasm64-memory-governor capability probes", () => {
     expect(report.memory32.failureReason).toBe("webassembly-unavailable");
   });
 
-  it("distinguishes a supported legacy memory32 fallback from Memory64", () => {
+  it("keeps supported memory32 evidence reference-only until explicitly selected", () => {
+    const webAssembly = nativeHostWithoutMemory64();
     const report = checkStudioWasm64Capability({
-      webAssembly: nativeHostWithoutMemory64(),
+      webAssembly,
     });
 
     expect(report.isWasm64Supported).toBe(false);
     expect(report.memory64.failureReason).toBe("module-not-validated");
-    expect(report.isWasm32FallbackSupported).toBe(true);
-    expect(report.selectedRuntime).toBe("memory32-fallback");
+    expect(report.isWasm32ReferenceSupported).toBe(true);
+    expect(report.requestedRuntime).toBe("memory64");
+    expect(report.selectedRuntime).toBe("unavailable");
+
+    const explicitReference = checkStudioWasm64Capability({
+      webAssembly: nativeHostWithoutMemory64(),
+      selectedMode: "i32",
+    });
+    expect(explicitReference.requestedRuntime).toBe("memory32-requested");
+    expect(explicitReference.selectedRuntime).toBe("memory32-requested");
   });
 
   it("caches the default host probe once but never caches an injected test seam", () => {
@@ -172,7 +183,7 @@ describe("StudioWasmLinearMemoryRuntime", () => {
   });
 
   it("keeps explicit memory32 on its smaller compatibility ceiling", () => {
-    const result = createStudioWasmMemoryRuntime({ preferredMode: "i32" });
+    const result = createStudioWasmMemoryRuntime({ selectedMode: "i32" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -224,7 +235,7 @@ describe("StudioWasmLinearMemoryRuntime", () => {
     }
   });
 
-  it("fails closed unless memory32 fallback is explicitly enabled", () => {
+  it("never turns a failed Memory64 request into Memory32 execution", () => {
     const webAssembly = nativeHostWithoutMemory64();
     const denied = createStudioWasmMemoryRuntime({
       webAssembly,
@@ -235,20 +246,20 @@ describe("StudioWasmLinearMemoryRuntime", () => {
       reason: "memory64-unsupported",
     });
 
-    const fallback = createStudioWasmMemoryRuntime({
+    const explicitReference = createStudioWasmMemoryRuntime({
       webAssembly,
-      fallbackPolicy: "memory32",
+      selectedMode: "i32",
       maximumPages: BigInt(2),
     });
-    expect(fallback.ok).toBe(true);
-    if (!fallback.ok) return;
-    expect(fallback.runtime.addressType).toBe("i32");
-    expect(fallback.runtime.selection).toBe("memory32-fallback");
+    expect(explicitReference.ok).toBe(true);
+    if (!explicitReference.ok) return;
+    expect(explicitReference.runtime.addressType).toBe("i32");
+    expect(explicitReference.runtime.selection).toBe("memory32-requested");
   });
 
   it("supports an explicit memory32 runtime and refreshes views after grow", () => {
     const result = createStudioWasmMemoryRuntime({
-      preferredMode: "i32",
+      selectedMode: "i32",
       initialPages: BigInt(1),
       maximumPages: BigInt(3),
     });
@@ -279,7 +290,7 @@ describe("StudioWasmLinearMemoryRuntime", () => {
     "detects a real external %s Wasm memory.grow and invalidates old views",
     (addressType) => {
       const result = createStudioWasmMemoryRuntime({
-        preferredMode: addressType,
+        selectedMode: addressType,
         initialPages: BigInt(1),
         maximumPages: BigInt(3),
       });
@@ -311,7 +322,7 @@ describe("StudioWasmLinearMemoryRuntime", () => {
 
   it("synchronizes direct external JS growth at grow and view entry points", () => {
     const result = createStudioWasmMemoryRuntime({
-      preferredMode: "i32",
+      selectedMode: "i32",
       initialPages: BigInt(1),
       maximumPages: BigInt(3),
     });
@@ -472,7 +483,7 @@ describe("StudioWasmLinearMemoryRuntime", () => {
 
   it("refuses over-budget growth before asking the host to allocate", () => {
     const result = createStudioWasmMemoryRuntime({
-      preferredMode: "i32",
+      selectedMode: "i32",
       initialPages: BigInt(1),
       maximumPages: BigInt(2),
     });

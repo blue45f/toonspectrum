@@ -694,7 +694,7 @@ describe("canonical vNext dry-media presentation controller", () => {
       sameOutputLineage: true,
       samePresentationConfiguration: true,
       specialistSurfaceVisible: true,
-      retainedCanvasFallback: "must-remain-recoverable",
+      retainedCanvasAuthority: "recoverable-last-good",
       persistentAuthority: "draw-el-vector",
       rasterPromotion: "not-promoted",
     });
@@ -740,7 +740,7 @@ describe("canonical vNext dry-media presentation controller", () => {
     });
 
     await expect(controller.presentFinalLiveAndCommit(frame)).resolves.toEqual({
-      status: "retained-fallback",
+      status: "unavailable",
       reason: "presentation-not-authorized",
       detail: "final-parity",
     });
@@ -777,7 +777,7 @@ describe("canonical vNext dry-media presentation controller", () => {
     });
 
     await expect(controller.presentFinalLiveAndCommit(frame)).resolves.toEqual({
-      status: "retained-fallback",
+      status: "unavailable",
       reason: "presentation-not-authorized",
       detail: "final-parity",
     });
@@ -796,7 +796,7 @@ describe("canonical vNext dry-media presentation controller", () => {
       runtime,
     });
     await expect(controller.presentPointerPreview(frame)).resolves.toEqual({
-      status: "retained-fallback",
+      status: "unavailable",
       reason: "runtime-rejected",
       detail: "presentation-lease-required",
     });
@@ -822,7 +822,7 @@ describe("canonical vNext dry-media presentation controller", () => {
     });
 
     await expect(controller.presentPointerPreview(frame)).resolves.toEqual({
-      status: "retained-fallback",
+      status: "unavailable",
       reason: "presentation-rejected",
       detail: "invalid-frame",
     });

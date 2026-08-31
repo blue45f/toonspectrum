@@ -148,10 +148,13 @@ async function expectZipError(
 
 describe("readStudioZipArchive", () => {
   it("reads writer-produced stored entries from bytes and Blob sources", async () => {
-    const source = await buildStudioPackageArchiveBytes([
-      { path: "hello.txt", data: encoder.encode("안녕") },
-      { path: "nested/data.bin", data: new Uint8Array([1, 2, 3]) },
-    ]);
+    const source = await buildStudioPackageArchiveBytes(
+      [
+        { path: "hello.txt", data: encoder.encode("안녕") },
+        { path: "nested/data.bin", data: new Uint8Array([1, 2, 3]) },
+      ],
+      { crc32ExecutionMode: "direct-headless" },
+    );
 
     const archive = await readStudioZipArchive(source);
     expect(archive.entries.map((entry) => entry.path)).toEqual([

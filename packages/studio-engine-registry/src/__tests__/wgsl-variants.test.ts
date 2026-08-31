@@ -438,7 +438,6 @@ describe("enumerateVariantsForGraph — effect-compiler 접속", () => {
       finalQuality: "production" as const,
       determinism: "bit-exact" as const,
       memoryEstimateMb: 1,
-      fallbackProviderId: null,
       knownIssues: [],
     };
     registry.registerTestFixture({

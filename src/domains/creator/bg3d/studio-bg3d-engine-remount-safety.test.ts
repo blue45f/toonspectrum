@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 /**
  * Canvas remount 이 아티스트 작업을 지우지 않는다는 보장.
  *
- * 엔진 선호 변경·WebGPU 폴백·디바이스 손실 복구는 모두 `canvasKey` 를 바꿔 R3F Canvas 를 다시
+ * 엔진 선호 변경과 실패한 WebGPU의 명시적 재시도는 `canvasKey` 를 바꿔 R3F Canvas 를 다시
  * 마운트한다. 그 순간 renderer 아이덴티티가 바뀌는데, 편집기의 초기 장면 복원 effect 가 그
  * 아이덴티티를 의존성으로 갖는다. 아무 구분 없이 다시 돌면 히스토리를 비우고 모달을 열었던
  * 시점의 장면으로 되돌려 **그동안의 편집을 조용히 날린다** — 예외도 로그도 남지 않는다.
@@ -67,7 +67,7 @@ describe("BG3D canvas remount safety", () => {
 
   it("refuses to start an immersive session while WebGPU owns the canvas", () => {
     // 몰입형 브리지는 `WebGLRenderer.xr` 을 구동한다. 시작을 허용하면 네이티브 세션 요청이 먼저
-    // 나가고, 그 뒤 엔진 정책이 WebGL2 를 latch 하면서 요청 중인 controller 를 파괴한다.
+    // 나가고, 그 뒤 엔진 정책이 WebGPU 계획을 사용 불가로 만들며 controller 를 파괴한다.
     const reason = layoutSource.slice(
       layoutSource.indexOf("const webXrDisabledReason"),
       layoutSource.indexOf("const webXrDisabledReason") + 600,

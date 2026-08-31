@@ -3,7 +3,10 @@
  * on-device MediaPipe foreground segmenter. Source pixels stay inside the
  * browser; only the versioned model and WASM runtime are downloaded.
  */
-import type { StudioLocalForegroundSegmenterRuntime } from "../studio-bg-remove";
+import type {
+  StudioLocalForegroundDelegate,
+  StudioLocalForegroundSegmenterRuntime,
+} from "../studio-bg-remove";
 import type {
   StudioLayerLiftLocalForegroundInferenceEngine,
   StudioLayerLiftLocalForegroundInferenceInput,
@@ -20,6 +23,8 @@ export type StudioLayerLiftMediaPipeRasterFactory = (
 ) => StudioLayerLiftMediaPipeRaster;
 
 export interface CreateStudioLayerLiftMediaPipeInferenceLoaderOptions {
+  /** Fixed before the Layer Lift request begins. Omission selects the GPU product provider. */
+  readonly delegate?: StudioLocalForegroundDelegate;
   readonly loadRuntime?: () => Promise<StudioLocalForegroundSegmenterRuntime>;
   readonly createRaster?: StudioLayerLiftMediaPipeRasterFactory;
 }
@@ -88,9 +93,7 @@ function modelIdentity(
     providerVersion: "0.10.35",
     modelId: "selfie-segmenter",
     modelVersion: "float16-latest",
-    executionRoute: runtime.activeDelegate === "GPU"
-      ? "gpu"
-      : "gpu-cpu-fallback",
+    executionRoute: runtime.activeDelegate === "GPU" ? "gpu" : "cpu-explicit",
   });
 }
 
@@ -127,12 +130,15 @@ function createInferenceEngine(
 }
 
 /**
- * Create a lazy production loader. MediaPipe itself owns the singleton runtime,
- * including the bounded GPU → CPU initialization fallback.
+ * Create a lazy production loader whose delegate identity is fixed before inference begins.
  */
 export function createStudioLayerLiftMediaPipeInferenceLoader(
   options: CreateStudioLayerLiftMediaPipeInferenceLoaderOptions = {},
 ): StudioLayerLiftLocalForegroundInferenceLoader {
+  const selectedDelegate = options.delegate ?? "GPU";
+  const expectedSelection = options.delegate === undefined
+    ? "product-default-gpu"
+    : "explicit-before-execution";
   const createRaster = options.createRaster ?? createBrowserRaster;
 
   return async (signal) => {
@@ -140,10 +146,24 @@ export function createStudioLayerLiftMediaPipeInferenceLoader(
     // Layer Lift is explicit user work. Importing the segmenter here keeps the MediaPipe
     // arbiter, WASM resolver, and foreground compositor outside the Studio startup graph.
     const foreground = await import("../studio-bg-remove");
-    const loadRuntime =
-      options.loadRuntime ?? foreground.getStudioLocalForegroundSegmenterRuntime;
+    const loadRuntime = options.loadRuntime ?? (() => (
+      options.delegate === undefined
+        ? foreground.getStudioLocalForegroundSegmenterRuntime()
+        : foreground.getStudioLocalForegroundSegmenterRuntime({
+            delegate: selectedDelegate,
+          })
+    ));
     const runtime = await loadRuntime();
     throwIfAborted(signal);
+    if (
+      runtime.selectedDelegate !== selectedDelegate
+      || runtime.activeDelegate !== selectedDelegate
+      || runtime.providerSelection !== expectedSelection
+      || runtime.attemptedDelegates.length !== 1
+      || runtime.attemptedDelegates[0] !== selectedDelegate
+    ) {
+      throw new Error("Layer Lift MediaPipe delegate identity mismatch.");
+    }
     return createInferenceEngine(
       runtime,
       createRaster,

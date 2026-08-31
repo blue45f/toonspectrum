@@ -191,7 +191,7 @@ describe("product filter render tournament", () => {
     expect(runtime.winnerCache.get(input.bucket, "dev-a")).toBeNull();
   });
 
-  it("keeps kill-switch and fallback safety ahead of challenger scheduling", () => {
+  it("keeps kill-switch denial ahead of observation-only challenger scheduling", () => {
     const scheduler = manualScheduler();
     const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
     runtime.applyKillList([WORKER], "remote fault");

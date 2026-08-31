@@ -12,6 +12,14 @@ const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",
 );
+const localViewportSource = readFileSync(
+  new URL("./StudioVrmPoserViewport.tsx", import.meta.url),
+  "utf8",
+);
+const sharedStageSource = readFileSync(
+  new URL("../bg3d/StudioBg3dSharedVrmAppearanceRuntime.tsx", import.meta.url),
+  "utf8",
+);
 
 const poserSource = readStudioVrmPoserImplementationSource();
 
@@ -34,18 +42,40 @@ describe("Studio VRM XPBD skirt product boundary", () => {
     expect(attachmentSource).toContain("}, VRM_FRAME_XPBD_SKIRT_PRIORITY);");
   });
 
-  it("routes only pleated/longskirt to XPBD and renders the existing garment on unavailable", () => {
+  it("routes only pleated/longskirt to XPBD and renders no replacement on unavailable", () => {
     expect(projectionSource).toContain('def?.geometrySource === "xpbd-skirt-v1"');
     expect(projectionSource).toContain("<StudioVrmXpbdSkirtAttachment");
-    expect(projectionSource).toContain(
-      "fallback={<StudioVrmProceduralWardrobeAttachment {...props} />}",
-    );
-    expect(attachmentSource).toContain("if (fallbackRequired) return fallback;");
+    expect(projectionSource).not.toContain("fallback={<");
+    expect(attachmentSource).not.toMatch(/\bfallback\b/u);
+    expect(attachmentSource).toContain("if (runtimeUnavailable || !runtime) return null;");
     expect(attachmentSource).toContain("setFailedRuntime(runtime);");
-    expect(projectionSource).toContain(
-      'complete: def.geometrySource !== "xpbd-skirt-v1"',
-    );
+    expect(attachmentSource).toContain('onAttachmentStatusRef.current?.(slot, equip.itemId, "unavailable")');
     expect(attachmentSource).toContain("if (runtimePending) return null;");
+  });
+
+  it("uses the same fail-closed wardrobe router in local and Shared Stage", () => {
+    expect(localViewportSource).toContain("<StudioVrmWardrobeAttachment");
+    expect(sharedStageSource).toContain("<StudioVrmWardrobeAttachment");
+    expect(projectionSource).toContain(
+      '<StudioVrmSelectedWardrobeAttachment {...props} mode="skinned-procedural-v1" />',
+    );
+    expect(projectionSource).toContain(
+      '<StudioVrmSelectedWardrobeAttachment {...props} mode="rigid-procedural" />',
+    );
+
+    const skinnedStart = requiredIndex(
+      projectionSource,
+      'if (mode === "skinned-procedural-v1")',
+    );
+    const rigidStart = requiredIndex(
+      projectionSource,
+      "const groups = assembleGarmentGroups(",
+      skinnedStart,
+    );
+    const skinnedFailureBranch = projectionSource.slice(skinnedStart, rigidStart);
+    expect(skinnedFailureBranch).toContain("entries: []");
+    expect(skinnedFailureBranch).not.toContain("assembleGarmentGroups(");
+    expect(skinnedFailureBranch).toContain("complete: false");
   });
 
   it("creates GPU cloth only after commit and publishes it under an active resource lease", () => {
@@ -53,12 +83,12 @@ describe("Studio VRM XPBD skirt product boundary", () => {
     const layoutEffect = requiredIndex(attachmentSource, "useLayoutEffect(() => {");
     const createRuntime = requiredIndex(
       attachmentSource,
-      "const created = createStudioVrmXpbdSkirtAttachmentRuntime({",
+      "created = createStudioVrmXpbdSkirtAttachmentRuntime({",
       layoutEffect,
     );
     const retain = requiredIndex(
       attachmentSource,
-      "if (created.ok && !created.runtime.retain()) return;",
+      "if (created.ok && !created.runtime.retain()) {",
       createRuntime,
     );
     const publish = requiredIndex(attachmentSource, "setRuntimeBinding(binding);", retain);
@@ -79,7 +109,10 @@ describe("Studio VRM XPBD skirt product boundary", () => {
   it("caps SHA-heavy solves, updates capsules each sampled frame, and forbids duplicate generations", () => {
     expect(attachmentSource).toContain("maxSolveHz: 20");
     expect(attachmentSource).toContain("maxSolveHz: 10");
-    expect(attachmentSource).toContain("const poseSignature = runtime.readPoseSignature();");
+    expect(attachmentSource).toContain("const poseSignature = readSelectedRuntimePoseSignature(runtime);");
+    expect(attachmentSource).toContain(
+      "const stepped = stepSelectedRuntime(runtime, topologyGeneration, poseGeneration);",
+    );
     expect(attachmentSource).toContain("cadenceRef.current.controller?.shouldSolve");
     expect(attachmentSource).toContain("poseGeneration <= lastPoseGeneration");
     expect(attachmentSource).toContain("const currentRig = sampleRig(");

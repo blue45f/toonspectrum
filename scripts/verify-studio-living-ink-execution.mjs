@@ -1,10 +1,9 @@
 /**
  * Actual Chromium gate for the independent ToonSpectrum Living Ink execution provider.
  *
- * The Worker picks its runtime from what the browser exposes: a WebGPU adapter selects the WGSL
- * field runtime, otherwise the WebGL2/GLSL runtime. Running one browser therefore only ever gated
- * one of the two shipped backends. This runner drives the same harness once per backend lane so a
- * WebGPU user cannot silently receive a worse result than a WebGL2 user.
+ * Each lane passes an explicit provider id into every Worker epoch. Browser capabilities can make
+ * that provider unavailable, but cannot select or substitute the other backend. The same visual
+ * harness therefore verifies WebGPU/WGSL and WebGL2/GLSL as independent product choices.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -18,9 +17,8 @@ import { WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-living-ink-${Date.now()}`);
-const PROBE_RESULTS_PATH = new URL("../tests/benchmarks/results/living-ink-probe.json",
-  import.meta.url,
-);
+const PROBE_RESULTS_PATH = process.env.TOONSPECTRUM_LIVING_INK_PROBE_RESULTS_PATH
+  ?? new URL("../tests/benchmarks/results/living-ink-probe.json", import.meta.url);
 const HARNESS_PATH = "/__studio_living_ink_execution__";
 const ENTRY = "/scripts/studio-living-ink-execution-browser.ts";
 const TIMEOUT_MS = 180_000;
@@ -39,8 +37,8 @@ const CSP = "default-src 'none'; script-src 'self'; connect-src 'self'; worker-s
 /**
  * One lane per shipped backend. `--use-angle=metal` plus `--enable-unsafe-webgpu` is the same
  * launch recipe the Vello gpu-browser probe uses to obtain a real adapter on this platform; the
- * WebGL2 lane explicitly disables WebGPU so it keeps gating the GLSL runtime on machines where
- * Chromium enables WebGPU by default.
+ * WebGL2 lane explicitly disables WebGPU as an adversarial check: the query still selects WebGL2,
+ * and a WebGPU lane cannot succeed by executing GLSL when its selected adapter/runtime fails.
  */
 const BACKEND_LANES = Object.freeze([
   Object.freeze({
@@ -95,11 +93,9 @@ const BACKEND_LANES = Object.freeze([
  * 1. A WGSL reserved word in a declaration (`from: vec2f`) does not throw. `createComputePipeline`
  *    returns an invalid pipeline and every dispatch against it is silently dropped, so the runtime
  *    computes nothing while still presenting a plausible frame.
- * 2. When the WGSL runtime is refused, the WebGPU factory falls back to a WebGL2 runtime and stamps
- *    the WebGPU backend name onto its capabilities. For one measured run this lane therefore ran
- *    GLSL end to end while reporting itself as the WGSL lane, and its "near-parity" numbers were
- *    GLSL's own. The harness now takes backend identity from the receipt of an operation that
- *    actually ran; `src/domains/creator/studio-living-ink-wgsl-shaders.test.ts` guards the first.
+ * 2. A historical WebGPU factory could execute WebGL2 while stamping a WebGPU capability. Provider
+ *    selection is now explicit in the initialize request, the factory is WebGPU-only, and both the
+ *    provider and this harness reject a receipt whose backend differs from that selection.
  */
 const WEBGPU_RECORDED_PARITY_GAP = Object.freeze([]);
 
@@ -360,7 +356,10 @@ async function runLane(lane, port) {
     page.on("requestfailed", (request) => diagnostics.requestFailures.push(
       `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "unknown"}`,
     ));
-    await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, { waitUntil: "domcontentloaded" });
+    await page.goto(
+      `http://127.0.0.1:${port}${HARNESS_PATH}?backend=${encodeURIComponent(lane.id)}`,
+      { waitUntil: "domcontentloaded" },
+    );
     await page.waitForFunction(
       () => window.__studioLivingInkExecutionResult !== undefined,
       undefined,
@@ -460,7 +459,7 @@ async function main() {
       name: "studio-living-ink-execution-verifier",
       configureServer(server) {
         server.middlewares.use((request, response, next) => {
-          if (request.url !== HARNESS_PATH) return next();
+          if (request.url?.split("?", 1)[0] !== HARNESS_PATH) return next();
           response.setHeader("Content-Type", "text/html; charset=utf-8");
           response.setHeader("Content-Security-Policy", CSP);
           response.setHeader("Cache-Control", "no-store");

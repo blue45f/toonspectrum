@@ -1,7 +1,7 @@
 /**
  * Product boundary for the immutable professional-filter CPU oracles.
  *
- * Tiny jobs can run through Konva's direct fallback. Expensive jobs must use the module Worker;
+ * Tiny jobs can preselect Konva's direct lane. Expensive jobs must use the module Worker;
  * direct execution fails closed before the kernel allocates. Ordered smart stacks are costed with
  * duplicates intact so a cheap individual filter cannot hide an expensive combined job.
  */

@@ -1,8 +1,8 @@
 /**
- * ADR 0017 governance: every V13 feature the Vello lanes cannot own must keep a NAMED alternative
- * engine in the shipped universe, and the next-gen challenger (Skia Graphite) must keep its
- * declared demotion chain — "모험 적용, 불안정하면 Skia로 교체" is a descriptor-level contract,
- * not a manual swap. Losing any of these fails the build here, loudly.
+ * ADR 0017 governance: every V13 feature the Vello lanes cannot own must keep a NAMED completion
+ * engine in the shipped universe. The next-gen challenger (Skia Graphite) and the CPU reference
+ * stay independently selectable, but none of these descriptors encodes an automatic demotion
+ * chain. Losing a named lane or reintroducing a fallback link fails the build here, loudly.
  *
  * WHAT THIS GATE DOES NOT PROVE, stated plainly so a green run is never read as more than it is:
  * it checks DECLARATION, not activation. `STUDIO_KNOWN_ENGINE_DESCRIPTORS` is the known capability
@@ -11,14 +11,15 @@
  * render on the device in front of you. Today it demonstrably cannot: `createSkiaGpuIslandBackend`
  * is documented as "probe-only backend used until CanvasKit MakeWebGLCanvasSurface is adopted on a
  * worker" and returns `unavailable` on every uncached request, so the completion lane this file
- * pins as the recovery for mask, image filter, backdrop blend and path effect has no working
- * renderer behind it yet. That is a real gap, and it is a RENDERER gap: the honest response is to
- * say so here rather than to loosen the descriptor contract, which would only hide it. What this
- * gate buys in the meantime is that the chain cannot be quietly dismantled — a lane dropped or
- * under-declared fails the build — so when the backend lands it lands into a chain that still
- * names the right lanes.
+ * names for mask, image filter, backdrop blend and path effect has no working renderer behind it
+ * yet. That is a real gap, and it is a RENDERER gap: the honest response is to report that the
+ * selected lane is unavailable rather than substituting another provider. What this gate buys in
+ * the meantime is that the explicit provider universe cannot be quietly under-declared.
  */
-import { validateVelloCapabilityGapCoverage } from "@toonspectrum/studio-engine-registry";
+import {
+  planVelloCapabilityGaps,
+  validateVelloCapabilityGapCoverage,
+} from "@toonspectrum/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_KNOWN_ENGINE_DESCRIPTORS } from "./studio-asset-metadata-registry";
@@ -57,15 +58,20 @@ describe("Vello capability-gap alternative-engine coverage", () => {
     }
   });
 
-  it("the Graphite challenger demotes down its declared chain to the production baseline", () => {
+  it("keeps challenger, completion, and reference roles explicit and chain-free", () => {
+    const plan = planVelloCapabilityGaps();
     const challenger = byId.get("skia-graphite-webgpu");
     const completion = byId.get("skia-canvaskit-gpu");
-    const terminal = byId.get("skia-canvaskit");
+    const reference = byId.get("skia-canvaskit");
 
     // 모험은 챌린저 신분으로만: 토너먼트 게이트를 통과하기 전까지 experimental이다.
     expect(challenger?.maturity).toBe("experimental");
-    expect(challenger?.fallbackProviderId).toBe("skia-canvaskit-gpu");
-    expect(completion?.fallbackProviderId).toBe("skia-canvaskit");
-    expect(terminal?.maturity).toBe("production-baseline");
+    expect(plan.challengerProviderId).toBe(challenger?.id);
+    expect(plan.completionProviderId).toBe(completion?.id);
+    expect(plan.referenceProviderId).toBe(reference?.id);
+    expect(challenger).not.toHaveProperty("fallbackProviderId");
+    expect(completion).not.toHaveProperty("fallbackProviderId");
+    expect(reference).not.toHaveProperty("fallbackProviderId");
+    expect(reference?.maturity).toBe("production-baseline");
   });
 });

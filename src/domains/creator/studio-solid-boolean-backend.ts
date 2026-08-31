@@ -1,6 +1,7 @@
 /**
  * Solid boolean backends for MOD-014.
- * Default commit path uses Manifold WASM (manifold-3d). Pure convex CSG is a fallback.
+ * Default commit path uses Manifold WASM (manifold-3d) as its only provider.
+ * Pure convex CSG remains available only through an explicitly selected backend.
  */
 
 import {
@@ -28,8 +29,9 @@ async function loadManifoldRuntimeForHost(): Promise<StudioManifoldRuntime> {
   if (cachedRuntime) return cachedRuntime;
   if (cachedRuntimePromise) return cachedRuntimePromise;
   cachedRuntimePromise = (async () => {
-    // Prefer explicit node_modules resolve (Vitest/Node). Vite app uses loadStudioManifoldRuntime.
-    try {
+    // Select one host-specific loader before work starts. A loader failure is terminal for this
+    // request; it must not trigger a second execution path with different module semantics.
+    if (typeof process !== "undefined" && process.versions?.node) {
       const { createRequire } = await import("node:module");
       const require = createRequire(import.meta.url);
       const wasmPath = require.resolve("manifold-3d/manifold.wasm");
@@ -39,23 +41,19 @@ async function loadManifoldRuntimeForHost(): Promise<StudioManifoldRuntime> {
       const runtime = createStudioManifoldRuntime(module);
       cachedRuntime = runtime;
       return runtime;
-    } catch {
-      const runtime = await loadStudioManifoldRuntime();
-      cachedRuntime = runtime;
-      return runtime;
     }
+    const runtime = await loadStudioManifoldRuntime();
+    cachedRuntime = runtime;
+    return runtime;
   })();
-  return cachedRuntimePromise;
-}
-
-function flipTriangleIndices(indices: Uint32Array): Uint32Array {
-  const out = new Uint32Array(indices.length);
-  for (let i = 0; i + 2 < indices.length; i += 3) {
-    out[i] = indices[i]!;
-    out[i + 1] = indices[i + 2]!;
-    out[i + 2] = indices[i + 1]!;
+  try {
+    return await cachedRuntimePromise;
+  } catch (error) {
+    // A later, separately initiated boolean may make a fresh runtime selection. This request never
+    // retries after its selected Manifold loader failed.
+    cachedRuntimePromise = null;
+    throw error;
   }
-  return out;
 }
 
 /**
@@ -76,56 +74,43 @@ export function isStudioSolidBooleanResultViable(
   return true;
 }
 
-/** Production / default: Manifold triangle solid CSG. */
-export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBackend {
+/** Production / default: one Manifold triangle-solid execution per admitted request. */
+export function createStudioManifoldSolidBooleanBackend(
+  options: {
+    readonly runtimeLoader?: () => Promise<StudioManifoldRuntime> | StudioManifoldRuntime;
+  } = {},
+): StudioSolidBooleanBackend {
   return {
     async boolean(input) {
-      const runtime = await loadManifoldRuntimeForHost();
+      const runtime = await (options.runtimeLoader?.() ?? loadManifoldRuntimeForHost());
       const provider = createStudioManifoldMeshProvider({
         epoch: 0,
         runtimeLoader: () => runtime,
       });
-      const run = async (
-        leftIdx: Uint32Array,
-        rightIdx: Uint32Array,
-        note: string,
-      ): Promise<StudioSolidBooleanResult> => {
+      try {
         const receipt = await provider.boolean({
           left: {
             positions: input.left.positions,
-            triangleIndices: leftIdx,
+            triangleIndices: input.left.indices,
           },
           right: {
             positions: input.right.positions,
-            triangleIndices: rightIdx,
+            triangleIndices: input.right.indices,
           },
           operation: input.operation,
           epoch: 0,
         });
-        return {
+        const result = {
           positions: receipt.output.mesh.positions,
           indices: receipt.output.mesh.triangleIndices,
-          diagnostic: `manifold:${receipt.runtimeVersion}:${receipt.operation}${note}`,
+          diagnostic: `manifold:${receipt.runtimeVersion}:${receipt.operation}`,
         };
-      };
-      try {
-        try {
-          const primary = await run(input.left.indices, input.right.indices, "");
-          if (isStudioSolidBooleanResultViable(primary, input.operation)) return primary;
-        } catch {
-          // retry flipped winding (common when authoring mesh has inverted normals)
-        }
-        const flipped = await run(
-          flipTriangleIndices(input.left.indices),
-          flipTriangleIndices(input.right.indices),
-          ":winding-flipped",
-        );
-        if (!isStudioSolidBooleanResultViable(flipped, input.operation)) {
+        if (!isStudioSolidBooleanResultViable(result, input.operation)) {
           throw new Error(
-            `Manifold boolean produced degenerate solid (tris=${flipped.indices.length / 3})`,
+            `Manifold boolean produced degenerate solid (tris=${result.indices.length / 3})`,
           );
         }
-        return flipped;
+        return result;
       } finally {
         await provider.destroy();
       }
@@ -135,7 +120,8 @@ export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBac
 
 /**
  * Pure convex solid CSG (plane-clip). Changes topology on non-AABB meshes (e.g. tetrahedra).
- * Used as unit-testable fallback and for environments without WASM.
+ * This is a separate, caller-selected backend. It is never invoked by the default backend after
+ * a Manifold failure.
  */
 export function createStudioPureConvexSolidBooleanBackend(): StudioSolidBooleanBackend {
   return {
@@ -409,30 +395,20 @@ function meshFromTriangles(
   };
 }
 
-/** Default commit backend: Manifold first, pure convex CSG fallback (viable solids only). */
-export function createStudioDefaultSolidBooleanBackend(): StudioSolidBooleanBackend {
-  const manifold = createStudioManifoldSolidBooleanBackend();
-  const pure = createStudioPureConvexSolidBooleanBackend();
+/** Default commit backend: Manifold WASM only; failures and abnormal results stay terminal. */
+export function createStudioDefaultSolidBooleanBackend(
+  options: { readonly manifoldBackend?: StudioSolidBooleanBackend } = {},
+): StudioSolidBooleanBackend {
+  const manifold = options.manifoldBackend ?? createStudioManifoldSolidBooleanBackend();
   return {
     async boolean(input) {
-      try {
-        const primary = await manifold.boolean(input);
-        if (isStudioSolidBooleanResultViable(primary, input.operation)) return primary;
+      const result = await manifold.boolean(input);
+      if (!isStudioSolidBooleanResultViable(result, input.operation)) {
         throw new Error(
-          `manifold solid not viable (tris=${primary.indices.length / 3})`,
+          `Manifold solid is unavailable: non-viable result (tris=${result.indices.length / 3}).`,
         );
-      } catch (error) {
-        try {
-          const fallback = await pure.boolean(input);
-          // pure backend already rejects non-viable results
-          return {
-            ...fallback,
-            diagnostic: `${fallback.diagnostic};manifold-fallback:${error instanceof Error ? error.message : "failed"}`,
-          };
-        } catch {
-          throw error instanceof Error ? error : new Error(String(error));
-        }
       }
+      return result;
     },
   };
 }

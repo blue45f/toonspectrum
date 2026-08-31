@@ -778,7 +778,9 @@ export function StudioBrushLibraryPanel({
       setImporting(true);
       try {
         const { importStudioAbrFile } = await import("../studio-abr-import-client");
-        const result = await importStudioAbrFile(file);
+        const result = await importStudioAbrFile(file, {
+          executionBackend: "worker",
+        });
         const imported = result.brushes.map((candidate) => createBrush(candidate.name, candidate.snapshot));
         const product = await productRepository();
         const saved = await product.repository.putMany(imported);

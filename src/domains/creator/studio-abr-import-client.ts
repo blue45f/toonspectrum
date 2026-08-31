@@ -12,6 +12,7 @@ import {
 } from "./studio-abr-import-worker-protocol";
 
 export const STUDIO_ABR_WORKER_TIMEOUT_MS = 45_000;
+export type StudioAbrImportExecutionBackend = "worker" | "direct";
 
 interface WorkerLike {
   postMessage(message: StudioAbrWorkerRequest, transfer: Transferable[]): void;
@@ -23,10 +24,16 @@ interface WorkerLike {
 }
 
 export interface StudioAbrImportClientOptions {
+  /** Fixed before the file is read. Browser product callers select `worker`. */
+  readonly executionBackend?: StudioAbrImportExecutionBackend;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
-  readonly workerFactory?: () => WorkerLike;
-  readonly mainThreadFallback?: (bytes: ArrayBuffer) => Promise<StudioAbrImportResult>;
+  /** Test/platform seam for the selected Worker backend. */
+  readonly workerFactory?: (() => WorkerLike | null) | null;
+  /** Explicit direct/reference provider; never used by the Worker backend. */
+  readonly directImporter?: (
+    bytes: ArrayBuffer,
+  ) => StudioAbrImportResult | Promise<StudioAbrImportResult>;
 }
 
 function isResponse(value: unknown, requestId: number): value is StudioAbrWorkerResponse {
@@ -65,21 +72,32 @@ export async function importStudioAbrFile(
   file: File,
   options: StudioAbrImportClientOptions = {}
 ): Promise<StudioAbrImportResult> {
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("ABR 가져오기 실행 backend가 올바르지 않습니다.");
+  }
   if (!fileNameLooksLikeAbr(file)) throw new StudioAbrImportError("file-type");
   if (file.size === 0) throw new StudioAbrImportError("empty");
   if (file.size > STUDIO_ABR_IMPORT_LIMITS.maxBytes) throw new StudioAbrImportError("file-size");
   if (options.signal?.aborted) throw new StudioAbrImportError("aborted");
   const bytes = await file.arrayBuffer();
   if (options.signal?.aborted) throw new StudioAbrImportError("aborted");
-  const fallback = options.mainThreadFallback ?? parseStudioAbrBuffer;
-  if (typeof Worker === "undefined" && !options.workerFactory) return fallback(bytes);
-
-  let worker: WorkerLike;
-  try {
-    worker = (options.workerFactory ?? defaultWorkerFactory)();
-  } catch {
-    return fallback(bytes);
+  if (executionBackend === "direct") {
+    return (options.directImporter ?? parseStudioAbrBuffer)(bytes);
   }
+
+  const factory = options.workerFactory === undefined
+    ? defaultWorkerFactory
+    : options.workerFactory;
+  if (!factory) throw new StudioAbrImportError("worker");
+  let createdWorker: WorkerLike | null;
+  try {
+    createdWorker = factory();
+  } catch (cause) {
+    throw new StudioAbrImportError("worker", { cause });
+  }
+  if (!createdWorker) throw new StudioAbrImportError("worker");
+  const worker = createdWorker;
   const requestId = 1;
   const timeoutMs = Math.max(1_000, Math.min(120_000, options.timeoutMs ?? STUDIO_ABR_WORKER_TIMEOUT_MS));
   return new Promise<StudioAbrImportResult>((resolve, reject) => {

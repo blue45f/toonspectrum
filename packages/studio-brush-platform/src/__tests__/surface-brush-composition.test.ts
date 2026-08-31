@@ -207,6 +207,9 @@ describe("executeSurfaceBrushStroke real UV texture lane", () => {
       first.operations.map((_, index) => index),
     );
     expect(first.operations.at(-1)?.pressure).toBe(0.9);
+    expect(first.operations.every((operation) => operation.projection === "primary")).toBe(
+      true,
+    );
     expect(first.receipt).toMatchObject({
       providerId: "mesh-raycast",
       inputSamples: 3,
@@ -338,33 +341,27 @@ describe("executeSurfaceBrushStroke real UV texture lane", () => {
     );
   });
 
-  it("uses an explicit fallback hit provider and never labels it primary", () => {
+  it("rejects legacy fallback options before either provider is entered", () => {
     const primary = hitProvider([uvHit(0.2, 0.5), null, uvHit(0.8, 0.5)], {
       id: "three-raycast",
     });
     const fallback = hitProvider([null, uvHit(0.5, 0.5), null], {
       id: "planar-fallback",
     });
-    const result = executeSurfaceBrushStroke(
-      brush(),
-      stroke([0.4, 0.6, 0.8]),
-      primary.provider,
-      { missPolicy: "fallback", fallbackProvider: fallback.provider },
-    );
-    expect(result.receipt).toMatchObject({
-      fallbackProviderId: "planar-fallback",
-      fallbackSamples: 1,
-      missedSamples: 0,
-      runs: 1,
-    });
-    expect(
-      result.operations.some(
-        (operation) => operation.sampleIndex === 1 && operation.projection === "fallback",
+    const legacyOptions = {
+      missPolicy: "fallback",
+      fallbackProvider: fallback.provider,
+    } as unknown as Parameters<typeof executeSurfaceBrushStroke>[3];
+    expect(() =>
+      executeSurfaceBrushStroke(
+        brush(),
+        stroke([0.4, 0.6, 0.8]),
+        primary.provider,
+        legacyOptions,
       ),
-    ).toBe(true);
-    expect(result.warnings.some((warning) => warning.includes("supplied the UV hit"))).toBe(
-      true,
-    );
+    ).toThrowError(/automatic fallback options are forbidden/);
+    expect(primary.projected).toEqual([]);
+    expect(fallback.projected).toEqual([]);
   });
 
   it("rejects misses when requested and rolls back the provider", () => {
@@ -434,25 +431,12 @@ describe("executeSurfaceBrushStroke real UV texture lane", () => {
     ).toThrowError(/mapping product overflowed/);
   });
 
-  it("surfaces projection and commit failures, with fallback only when opted in", () => {
+  it("surfaces projection and commit failures without switching providers", () => {
     const failed = hitProvider([new Error("BVH unavailable")], { id: "bvh" });
     expect(() =>
       executeSurfaceBrushStroke(brush(), stroke([0.5]), failed.provider),
     ).toThrowError(/surface\.provider\[bvh\]\.sample\[0\]: BVH unavailable/);
     expect(failed.cancellations).toEqual(["projection-failed"]);
-
-    const fallback = hitProvider([uvHit(0.4, 0.4)], { id: "cpu-triangle" });
-    const recovered = executeSurfaceBrushStroke(
-      brush(),
-      stroke([0.5]),
-      hitProvider([new Error("GPU picker lost")], { id: "gpu-picker" }).provider,
-      {
-        providerFailurePolicy: "fallback",
-        fallbackProvider: fallback.provider,
-      },
-    );
-    expect(recovered.receipt.fallbackSamples).toBe(1);
-    expect(recovered.warnings[0]).toContain("GPU picker lost");
 
     const commitFailed = hitProvider([uvHit(0.5, 0.5)], { commit: "throw" });
     expect(() =>

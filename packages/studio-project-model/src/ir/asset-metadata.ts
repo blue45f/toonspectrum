@@ -372,7 +372,12 @@ export const assetPreviewVariantsIRSchema = z
   .strict();
 export type AssetPreviewVariantsIR = z.infer<typeof assetPreviewVariantsIRSchema>;
 
-export const assetFallbackIRSchema = z
+/**
+ * Legacy input only. V12 cards used this shape to describe automatic renderer
+ * substitution. Do not emit it in new metadata: use providerUnavailable
+ * instead, which is deliberately fail-closed.
+ */
+const legacyAssetRendererSubstitutionIRSchema = z
   .object({
     strategy: z.enum(["renderer-variant", "normalized-ir", "source-reimport", "unavailable"]),
     rendererVariantId: identifierSchema.nullable().default(null),
@@ -398,7 +403,29 @@ export const assetFallbackIRSchema = z
       });
     }
   });
-export type AssetFallbackIR = z.infer<typeof assetFallbackIRSchema>;
+
+/**
+ * What to do when the selected provider cannot run this asset. This is an
+ * unavailable state, not a route instruction: no renderer is selected or
+ * substituted here. The next operation is deliberately an explicit user or
+ * caller provider selection over the retained normalized IR.
+ */
+export const assetProviderUnavailableIRSchema = z
+  .object({
+    status: z.literal("unavailable"),
+    retainsNormalizedIr: z.literal(true),
+    nextOperation: z.literal("select-provider"),
+    selectableRendererVariantIds: z
+      .array(identifierSchema)
+      .min(1)
+      .max(ASSET_METADATA_LIMITS.array),
+    reason: longTextSchema,
+    limitations: z.array(shortTextSchema).max(ASSET_METADATA_LIMITS.array).default([]),
+  })
+  .strict();
+export type AssetProviderUnavailableIR = z.infer<
+  typeof assetProviderUnavailableIRSchema
+>;
 
 export const assetReplacementEvidenceIRSchema = z.enum([
   "visual-equivalence",
@@ -408,7 +435,7 @@ export const assetReplacementEvidenceIRSchema = z.enum([
   "memory",
   "determinism",
   "license",
-  "fallback",
+  "explicit-provider-selection",
   "soak",
 ]);
 
@@ -595,7 +622,7 @@ const assetMetadataBaseSchema = z
       stable: null,
       studioMax: null,
     })),
-    fallback: assetFallbackIRSchema.nullable().default(null),
+    providerUnavailable: assetProviderUnavailableIRSchema.nullable().default(null),
     replacementCondition: assetReplacementConditionIRSchema.nullable().default(null),
     marketplace: assetMarketplaceMetadataIRSchema.nullable().default(null),
   })
@@ -713,16 +740,24 @@ const assetMetadataBaseSchema = z
         }
       }
     }
-    if (
-      metadata.fallback?.rendererVariantId !== null &&
-      metadata.fallback?.rendererVariantId !== undefined &&
-      !rendererIds.has(metadata.fallback.rendererVariantId)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["fallback", "rendererVariantId"],
-        message: `unknown renderer variant: ${metadata.fallback.rendererVariantId}`,
-      });
+    const unavailable = metadata.providerUnavailable;
+    if (unavailable !== null) {
+      if (metadata.normalizedIrRef === null) {
+        context.addIssue({
+          code: "custom",
+          path: ["providerUnavailable", "retainsNormalizedIr"],
+          message: "an unavailable asset must retain a normalizedIrRef",
+        });
+      }
+      for (const id of unavailable.selectableRendererVariantIds) {
+        if (!rendererIds.has(id)) {
+          context.addIssue({
+            code: "custom",
+            path: ["providerUnavailable", "selectableRendererVariantIds"],
+            message: `unknown selectable renderer variant: ${id}`,
+          });
+        }
+      }
     }
   });
 
@@ -812,12 +847,15 @@ function normalizeAssetMetadata(metadata: AssetMetadataBase): AssetMetadataBase 
               ),
             },
     },
-    fallback:
-      metadata.fallback === null
+    providerUnavailable:
+      metadata.providerUnavailable === null
         ? null
         : {
-            ...metadata.fallback,
-            limitations: sortedUnique(metadata.fallback.limitations),
+            ...metadata.providerUnavailable,
+            selectableRendererVariantIds: sortedUnique(
+              metadata.providerUnavailable.selectableRendererVariantIds,
+            ),
+            limitations: sortedUnique(metadata.providerUnavailable.limitations),
           },
     replacementCondition:
       metadata.replacementCondition === null
@@ -840,6 +878,82 @@ export const assetMetadataIRSchema = assetMetadataBaseSchema.transform(
   normalizeAssetMetadata,
 );
 export type AssetMetadataIR = z.infer<typeof assetMetadataIRSchema>;
+
+export class AssetMetadataMigrationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssetMetadataMigrationError";
+  }
+}
+
+/**
+ * Converts the retired V12 automatic-substitution record into the fail-closed
+ * card shape. This is intentionally opt-in through parseAssetMetadata: direct
+ * schema parsing rejects a retired `fallback` field, preventing new writers
+ * from accidentally preserving auto-selection semantics.
+ */
+export function migrateLegacyAssetRendererSubstitution(value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  const candidate = value as Record<string, unknown>;
+  if (!("fallback" in candidate)) return value;
+  const { fallback: retiredInstruction, ...withoutRetiredInstruction } = candidate;
+  // Old cards emitted `fallback: null` by default. It carries no routing
+  // instruction, so remove it without inventing an unavailable state.
+  if (retiredInstruction === null) return withoutRetiredInstruction;
+  if (
+    candidate.providerUnavailable !== undefined &&
+    candidate.providerUnavailable !== null
+  ) {
+    throw new AssetMetadataMigrationError(
+      "retired renderer-substitution metadata conflicts with providerUnavailable",
+    );
+  }
+
+  const legacy = legacyAssetRendererSubstitutionIRSchema.safeParse(retiredInstruction);
+  if (!legacy.success) {
+    throw new AssetMetadataMigrationError(
+      "retired renderer-substitution metadata is invalid and cannot be migrated",
+    );
+  }
+  if (
+    !legacy.data.preservesNormalizedIr ||
+    candidate.normalizedIrRef === null ||
+    candidate.normalizedIrRef === undefined
+  ) {
+    throw new AssetMetadataMigrationError(
+      "retired renderer-substitution metadata cannot migrate without retained normalized IR",
+    );
+  }
+
+  const selectableRendererVariantIds = Array.isArray(candidate.rendererVariants)
+    ? candidate.rendererVariants.flatMap((variant) => {
+        if (variant === null || typeof variant !== "object" || Array.isArray(variant)) {
+          return [];
+        }
+        const id = (variant as Record<string, unknown>).id;
+        return typeof id === "string" ? [id] : [];
+      })
+    : [];
+  if (selectableRendererVariantIds.length === 0) {
+    throw new AssetMetadataMigrationError(
+      "retired renderer-substitution metadata cannot migrate without selectable renderer variants",
+    );
+  }
+
+  return {
+    ...withoutRetiredInstruction,
+    providerUnavailable: {
+      status: "unavailable",
+      retainsNormalizedIr: true,
+      nextOperation: "select-provider",
+      selectableRendererVariantIds,
+      reason:
+        "A retired automatic renderer-substitution record was migrated. " +
+        "Keep the normalized IR and require an explicit provider selection before retrying.",
+      limitations: legacy.data.limitations,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Content digest (deterministic, dependency-free, byte-exact)
@@ -906,7 +1020,9 @@ export function parseAssetMetadata(
   value: unknown,
   vocabulary?: Iterable<string>,
 ): AssetMetadataIR {
-  const metadata = assetMetadataIRSchema.parse(value);
+  const metadata = assetMetadataIRSchema.parse(
+    migrateLegacyAssetRendererSubstitution(value),
+  );
   if (vocabulary !== undefined) assertAssetCapabilitiesKnown(metadata, vocabulary);
   return metadata;
 }

@@ -21,6 +21,7 @@ import type {
   StudioVectorReferenceInput,
   StudioVectorReferenceBudgets,
   StudioVectorReferencePreparedExport,
+  StudioVectorReferencePreparedRenderOptions,
   StudioVectorReferenceRenderOptions,
   StudioVectorReferenceResult,
 } from "../studio-vector-fill-reference";
@@ -250,7 +251,7 @@ export type StudioEditableRasterCopyExportPreparer = (
 
 export type StudioEditableRasterCopyPreparedRenderer = (
   prepared: StudioVectorReferencePreparedExport,
-  options?: Pick<StudioVectorReferenceRenderOptions, "signal" | "rasterize">,
+  options?: StudioVectorReferencePreparedRenderOptions,
 ) => Promise<StudioVectorReferenceResult>;
 
 export type StudioEditableRasterCopyPreparedResult =

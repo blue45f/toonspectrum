@@ -14,8 +14,8 @@
  * Gauss-Seidel sweeps of FMA-contracted f32 diverge from JS f64 within a handful of steps, and this
  * repo already concedes the point (`../studio-living-ink-fluid-reference.ts` exists for the same
  * reason). This module is therefore a *statistical* oracle: it computes the same physics in f64 so
- * `./studio-gpu-bristle-metrics` can compare invariants and distributions, and it is the fallback
- * that keeps the lane meaningful on a machine with no WebGPU at all.
+ * `./studio-gpu-bristle-metrics` can compare invariants and distributions. It is an explicitly
+ * selected reference/QA provider, never a runtime substitute for an unavailable WebGPU stroke.
  *
  * DETERMINISM CONTRACT, matching `../studio-bristle-physics-oil-v1.ts:28-31`: no clock, no
  * `Math.random`, no iteration over object key order. Same input → identical typed arrays. The tuft

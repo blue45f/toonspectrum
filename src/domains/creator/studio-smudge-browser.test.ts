@@ -84,7 +84,7 @@ describe("Studio smudge browser dirty-region orchestration", () => {
       h: height,
       radiusPx: 20,
       points: [{ x: 22, y: 22 }, { x: 62, y: 82 }],
-    }), { signal });
+    }), { executionMode: "worker", signal });
     expect(putImageData).toHaveBeenCalledWith(
       expect.objectContaining({ width, height }),
       x,

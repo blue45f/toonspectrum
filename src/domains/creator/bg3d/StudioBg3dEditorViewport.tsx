@@ -138,7 +138,7 @@ export function StudioBg3dEditorViewport({ h }) {
     loadStudioBg3dBabylonSpecialistEntry, loadStudioBg3dModelThumbnailRuntime,
     LT_EXPORT_HEIGHTS, LT_TONE_MODE_LABELS, LT_TONE_PATTERN_LABELS, LT_TONE_TYPE_LABELS,
     SEMANTIC_MATERIAL_CONFIDENCE_LABELS, SEMANTIC_MATERIAL_SLOT_LABELS,
-    STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS, STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
+    STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
     TRANSFORM_MODES, VIEW_EDITOR_SECTIONS, VIEWPORT_BTN, StudioBg3dActionFooter,
     StudioBg3dDirectionalShadowLight, StudioBg3dImmersivePanel, StudioBg3dLtPanel,
     StudioBg3dMeasurementPanel, StudioBg3dMeasurementViewport, StudioBg3dPhysicsPanel,
@@ -341,7 +341,30 @@ export function StudioBg3dEditorViewport({ h }) {
                     <div ref={viewRightRef} className="relative w-full h-full" />
                   </div>
                 )}
-                <Canvas
+                {engineRuntime.phase === "probing" ? (
+                  <div
+                    role="status"
+                    data-testid="studio-bg3d-engine-probing"
+                    className="flex h-full w-full items-center justify-center p-6 text-center text-sm text-fg-3"
+                  >
+                    선택한 3D 엔진을 확인하고 있습니다.
+                  </div>
+                ) : engineRuntime.plan.status !== "available" ? (
+                  <div
+                    role="alert"
+                    data-testid="studio-bg3d-engine-unavailable"
+                    className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-danger"
+                  >
+                    <p className="font-semibold">
+                      {engineRuntime.deviceLostMessage ?? engineRuntime.plan.notice}
+                    </p>
+                    <p className="max-w-md text-xs leading-relaxed text-fg-3">
+                      자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
+                      WebGPU 또는 WebGL2를 직접 선택해 주세요.
+                    </p>
+                  </div>
+                ) : (
+                  <Canvas
                   key={`${webXrCanvasGeneration}:${engineRuntime.canvasKey}`}
                   eventSource={viewportHostRef as unknown as React.RefObject<HTMLElement>}
                   camera={{
@@ -446,7 +469,8 @@ export function StudioBg3dEditorViewport({ h }) {
                     <StudioBg3dImmersiveRenderBridge active={immersiveSceneActive} />
                     {!immersiveSceneActive ? commonOrbitControls : null}
                   </View>
-                </Canvas>
+                  </Canvas>
+                )}
 
                 {!isCapturing && !immersiveSceneActive ? (
                   <StudioBg3dSharedCharacterStatusOverlay
@@ -947,17 +971,6 @@ export function StudioBg3dEditorViewport({ h }) {
                     )}
                   >
                     {surfaceSnapStatus.message}
-                  </div>
-                ) : null}
-
-                {engineRuntime.deviceLostMessage && !immersiveSceneActive ? (
-                  <div
-                    role="alert"
-                    aria-live="assertive"
-                    data-testid="bg3d-engine-fallback-status"
-                    className="pointer-events-none absolute inset-x-3 top-3 z-20 mx-auto max-w-md rounded-xl border border-bad/50 bg-panel/95 px-3 py-2 text-center text-xs font-semibold leading-relaxed text-bad shadow-lg backdrop-blur"
-                  >
-                    {engineRuntime.deviceLostMessage}
                   </div>
                 ) : null}
 

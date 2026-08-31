@@ -125,6 +125,25 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     expect(source).not.toContain('await import("./brush/studio-wet-mix")');
   });
 
+  it("keeps PNG encoding on the preselected runtime when module loading fails", () => {
+    const helper = moduleEdges("./studio-legacy-editor-runtime-helpers.ts");
+    const start = helper.source.indexOf(
+      "export async function encodeStudioPixelEditResultPng(",
+    );
+    const end = helper.source.indexOf(
+      "export async function yieldStudioPixelEditMainThread",
+      start,
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const encode = helper.source.slice(start, end);
+
+    expect(encode).toContain("await loadStudioPixelEditBrushRuntime()");
+    expect(encode).toContain("runtime.encodeStudioRetouchCanvasPng(canvas, { signal })");
+    expect(encode).not.toContain(".catch(");
+    expect(encode).not.toContain("encodeStudioPixelEditCanvasPng");
+  });
+
   it("keeps heal/clone completion cancellable and its pointer-move preview off React state", () => {
     const { source } = moduleEdges("./StudioPage.tsx");
     const bakeStart = source.indexOf("async function bakeHealCloneDragStroke");

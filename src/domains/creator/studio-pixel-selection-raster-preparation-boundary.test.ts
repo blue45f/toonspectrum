@@ -95,6 +95,7 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(prepare).toContain("planStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioVectorReference");
+    expect(prepare).toContain('rasterExecutionBackend: "offscreen-worker"');
     // applyStudioEditableRasterCopy owns the one synchronous current-plan check. Repeating it in
     // this caller would recalculate the canonical fingerprint with no async gap between checks.
     expect(prepare).not.toContain("isStudioEditableRasterCopyPlanCurrent(");

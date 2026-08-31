@@ -297,7 +297,7 @@ export async function runStudioAdvancedFillInBrowser(
         enforceAlphaLock: request.alphaLockSrc !== undefined,
         alphaLockSource: alphaLockSource ?? undefined,
       },
-      { signal: request.abort },
+      { executionMode: "worker", signal: request.abort },
     );
     const result = execution.result;
 

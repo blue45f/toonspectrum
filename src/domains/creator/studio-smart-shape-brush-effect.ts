@@ -18,7 +18,7 @@ import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import type { DrawEl } from "./studio-element-model";
 import type { QuickShapeKind } from "./studio-quickshape";
 
-export type StudioSmartShapeBrushEffectFallbackReason =
+export type StudioSmartShapeBrushEffectUnavailableReason =
   | "missing-source"
   | "eraser"
   | "pixel"
@@ -27,6 +27,18 @@ export type StudioSmartShapeBrushEffectFallbackReason =
   | "unknown-brush"
   | "invalid-geometry";
 
+export type StudioSmartShapeBrushEffectAvailability =
+  | {
+      readonly status: "available";
+      readonly brush: string;
+      readonly renderFamily: StudioBrushRenderFamily;
+      readonly sourceStroke: DrawEl;
+    }
+  | {
+      readonly status: "unavailable";
+      readonly reason: StudioSmartShapeBrushEffectUnavailableReason;
+    };
+
 export type StudioSmartShapeBrushEffectResult =
   | {
       readonly status: "applied";
@@ -34,9 +46,8 @@ export type StudioSmartShapeBrushEffectResult =
       readonly stroke: DrawEl;
     }
   | {
-      readonly status: "fallback";
-      readonly reason: StudioSmartShapeBrushEffectFallbackReason;
-      readonly stroke: DrawEl;
+      readonly status: "unavailable";
+      readonly reason: StudioSmartShapeBrushEffectUnavailableReason;
     };
 
 const MAX_ELLIPSE_OUTLINE_SAMPLES = 512;
@@ -156,65 +167,55 @@ function resampleChannel(
   });
 }
 
-/** Removes brush-only replay fields when a requested effect cannot safely be reconstructed. */
-export function stripStudioSmartShapeBrushEffect(stroke: DrawEl): DrawEl {
-  return {
-    ...stroke,
-    brush: undefined,
-    brushCatalogId: undefined,
-    brushCatalogName: undefined,
-    pressures: undefined,
-    pressureModel: undefined,
-    materialPressureModel: undefined,
-    materialMinimumDiameterRatio: undefined,
-    sampleSpacing: undefined,
-    tiltXs: undefined,
-    tiltYs: undefined,
-    twists: undefined,
-    speeds: undefined,
-    tangentialPressures: undefined,
-    brushDynamics: undefined,
-    brushTip: undefined,
-    stamp: undefined,
-    stampPipeline: undefined,
-    watercolorPipeline: undefined,
-    paintModel: undefined,
-  };
-}
-
-function fallback(
-  stroke: DrawEl,
-  reason: StudioSmartShapeBrushEffectFallbackReason,
-): StudioSmartShapeBrushEffectResult {
-  return { status: "fallback", reason, stroke: stripStudioSmartShapeBrushEffect(stroke) };
+function unavailable(
+  reason: StudioSmartShapeBrushEffectUnavailableReason,
+): Extract<StudioSmartShapeBrushEffectResult, { readonly status: "unavailable" }> {
+  return { status: "unavailable", reason };
 }
 
 /**
- * Applies a selected brush only when Canvas/Konva and SVG already share a real freehand renderer.
- * Prefix-causal stamp/watercolor strokes cannot be re-routed: their persisted samples describe the
- * original hand gesture, not the snapped outline. They deliberately fall back to a plain shape.
+ * Resolves the selected effect before QuickShape creates a geometric preview. Unsupported source
+ * semantics are terminal for this promotion request; callers must keep their authoritative stroke.
  */
-export function applyStudioSmartShapeBrushEffect(
-  geometricStroke: DrawEl,
+export function resolveStudioSmartShapeBrushEffectAvailability(
   sourceStroke: DrawEl | null | undefined,
-): StudioSmartShapeBrushEffectResult {
-  if (!sourceStroke) return fallback(geometricStroke, "missing-source");
-  if (sourceStroke.mode === "eraser") return fallback(geometricStroke, "eraser");
-  if (isStudioPixelPencilRenderMode(sourceStroke.brush)) {
-    return fallback(geometricStroke, "pixel");
-  }
+): StudioSmartShapeBrushEffectAvailability {
+  if (!sourceStroke) return unavailable("missing-source");
+  if (sourceStroke.mode === "eraser") return unavailable("eraser");
+  if (isStudioPixelPencilRenderMode(sourceStroke.brush)) return unavailable("pixel");
   if (sourceStroke.stampPipeline === "causal-walker-v2") {
-    return fallback(geometricStroke, "causal-stamp");
+    return unavailable("causal-stamp");
   }
   if (sourceStroke.watercolorPipeline === "causal-walker-v2") {
-    return fallback(geometricStroke, "causal-watercolor");
+    return unavailable("causal-watercolor");
   }
 
   const brush = sourceStroke.brush ?? "pen";
   const knownBrush = Object.prototype.hasOwnProperty.call(STUDIO_BRUSH_RENDER_FAMILY, brush)
     || resolveStudioCapturedBrushDynamicsPresetId(sourceStroke) !== null
     || resolveStudioStampBrushKind(brush) !== null;
-  if (!knownBrush) return fallback(geometricStroke, "unknown-brush");
+  if (!knownBrush) return unavailable("unknown-brush");
+  return {
+    status: "available",
+    brush,
+    renderFamily: resolveStudioBrushRenderFamily(brush),
+    sourceStroke,
+  };
+}
+
+/**
+ * Applies a selected brush only when Canvas/Konva and SVG already share a real freehand renderer.
+ * Prefix-causal stamp/watercolor strokes cannot be re-routed: their persisted samples describe the
+ * original hand gesture, not the snapped outline. An unavailable result carries no substitute
+ * stroke, so the caller can reject promotion and retain the original operation unchanged.
+ */
+export function applyStudioSmartShapeBrushEffect(
+  geometricStroke: DrawEl,
+  sourceStroke: DrawEl | null | undefined,
+): StudioSmartShapeBrushEffectResult {
+  const availability = resolveStudioSmartShapeBrushEffectAvailability(sourceStroke);
+  if (availability.status === "unavailable") return availability;
+  const { brush, renderFamily: family, sourceStroke: source } = availability;
 
   const kind = geometricStroke.kind;
   if (
@@ -223,18 +224,17 @@ export function applyStudioSmartShapeBrushEffect(
     && kind !== "ellipse"
     && kind !== "triangle"
     && kind !== "polygon"
-  ) return fallback(geometricStroke, "invalid-geometry");
+  ) return unavailable("invalid-geometry");
   const outline = studioSmartShapeBrushOutline(
     kind,
     geometricStroke.points,
     geometricStroke.strokeWidth,
     geometricStroke.shapeParams,
   );
-  if (!outline) return fallback(geometricStroke, "invalid-geometry");
+  if (!outline) return unavailable("invalid-geometry");
 
   const sampleCount = outline.length / 2;
-  const family = resolveStudioBrushRenderFamily(brush);
-  const dynamic = resolveStudioCapturedBrushDynamicsPresetId(sourceStroke) !== null;
+  const dynamic = resolveStudioCapturedBrushDynamicsPresetId(source) !== null;
   const calligraphy = family === "calligraphy";
   const stamp = resolveStudioStampBrushKind(brush) !== null;
   let applied: DrawEl = {
@@ -247,32 +247,32 @@ export function applyStudioSmartShapeBrushEffect(
     strokeStyle: undefined,
     shapeParams: undefined,
     brush,
-    brushCatalogId: sourceStroke.brushCatalogId,
-    brushCatalogName: sourceStroke.brushCatalogName,
-    pressures: resampleChannel(sourceStroke.pressures, sampleCount, 0.5),
-    pressureModel: sourceStroke.pressureModel,
-    materialPressureModel: sourceStroke.materialPressureModel,
-    materialMinimumDiameterRatio: sourceStroke.materialMinimumDiameterRatio,
-    sampleSpacing: sourceStroke.sampleSpacing,
+    brushCatalogId: source.brushCatalogId,
+    brushCatalogName: source.brushCatalogName,
+    pressures: resampleChannel(source.pressures, sampleCount, 0.5),
+    pressureModel: source.pressureModel,
+    materialPressureModel: source.materialPressureModel,
+    materialMinimumDiameterRatio: source.materialMinimumDiameterRatio,
+    sampleSpacing: source.sampleSpacing,
     tiltXs: calligraphy || dynamic
-      ? resampleChannel(sourceStroke.tiltXs, sampleCount, 0)
+      ? resampleChannel(source.tiltXs, sampleCount, 0)
       : undefined,
     tiltYs: calligraphy || dynamic
-      ? resampleChannel(sourceStroke.tiltYs, sampleCount, 0)
+      ? resampleChannel(source.tiltYs, sampleCount, 0)
       : undefined,
     twists: calligraphy || dynamic
-      ? resampleChannel(sourceStroke.twists, sampleCount, 0)
+      ? resampleChannel(source.twists, sampleCount, 0)
       : undefined,
-    speeds: dynamic ? resampleChannel(sourceStroke.speeds, sampleCount, 0) : undefined,
+    speeds: dynamic ? resampleChannel(source.speeds, sampleCount, 0) : undefined,
     tangentialPressures: dynamic
-      ? resampleChannel(sourceStroke.tangentialPressures, sampleCount, 0)
+      ? resampleChannel(source.tangentialPressures, sampleCount, 0)
       : undefined,
-    brushDynamics: dynamic ? sourceStroke.brushDynamics : undefined,
-    brushTip: calligraphy ? sourceStroke.brushTip : undefined,
-    stamp: stamp ? sourceStroke.stamp : undefined,
+    brushDynamics: dynamic ? source.brushDynamics : undefined,
+    brushTip: calligraphy ? source.brushTip : undefined,
+    stamp: stamp ? source.stamp : undefined,
     stampPipeline: undefined,
     watercolorPipeline: undefined,
-    paintModel: sourceStroke.paintModel,
+    paintModel: source.paintModel,
   };
   if (!isStudioStrokePaintModelCompatible(applied)) {
     applied = { ...applied, paintModel: undefined };

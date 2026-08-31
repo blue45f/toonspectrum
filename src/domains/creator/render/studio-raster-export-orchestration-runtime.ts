@@ -20,6 +20,14 @@ import type {
 import type { WatermarkSettings } from "../studio-watermark";
 import type Konva from "konva";
 
+/** 선택된 페이지 그레이드 합성 표면을 만들 수 없어 원본으로 대체하지 않았음을 나타낸다. */
+export class StudioPageGradeBakeUnavailableError extends Error {
+  constructor() {
+    super("페이지 색보정 합성 표면을 만들지 못해 내보내기를 중단했어요.");
+    this.name = "StudioPageGradeBakeUnavailableError";
+  }
+}
+
 export function bakeStudioPageGradeIntoCanvas(
   source: HTMLCanvasElement,
   grade: PageGrade
@@ -29,7 +37,7 @@ export function bakeStudioPageGradeIntoCanvas(
   output.width = source.width;
   output.height = source.height;
   const context = output.getContext("2d");
-  if (!context) return source;
+  if (!context) throw new StudioPageGradeBakeUnavailableError();
   const cssFilter = pageGradeToCssFilter(grade);
   if (cssFilter) context.filter = cssFilter;
   context.drawImage(source, 0, 0);
@@ -205,7 +213,7 @@ export function createStudioRasterExportOrchestration({
         width: image.width,
         height: image.height,
         data: image.data,
-      });
+      }, { executionMode: "worker" });
       return encoded.encoded;
     } finally {
       setMasterEditMode(originalMasterEditMode);
@@ -333,7 +341,9 @@ export function createStudioRasterExportOrchestration({
         compositeCanvas.width = width;
         compositeCanvas.height = totalHeight;
         const context = compositeCanvas.getContext("2d");
-        if (!context) return;
+        if (!context) {
+          throw new Error("스트립 합성 표면을 만들지 못해 내보내기를 중단했어요.");
+        }
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, width, totalHeight);
         let currentY = 0;

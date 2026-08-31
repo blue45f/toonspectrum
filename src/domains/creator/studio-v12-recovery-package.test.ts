@@ -10,12 +10,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { openStudioLocalDatabase } from "./studio-local-database";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
-import { buildStudioPackageArchiveBytes } from "./studio-package-archive";
+import {
+  buildStudioPackageArchiveBytes as buildStudioPackageArchiveBytesWithBackend,
+} from "./studio-package-archive";
 import { createSqliteJournalStore } from "./studio-sqlite-journal-store";
 import {
   STUDIO_V12_RECOVERY_PACKAGE_MIME,
   StudioV12RecoveryPackageError,
-  buildStudioV12RecoveryPackage,
+  buildStudioV12RecoveryPackage as buildStudioV12RecoveryPackageWithBackend,
   createStudioV12RecoveryOpfsAttachmentTarget,
   importStudioV12RecoveryPackage,
   openStudioV12RecoveryPackage,
@@ -35,6 +37,26 @@ const decoder = new TextDecoder();
 const LOCAL_SIGNATURE = 0x0403_4b50;
 const CENTRAL_SIGNATURE = 0x0201_4b50;
 const EOCD_SIGNATURE = 0x0605_4b50;
+
+function buildStudioV12RecoveryPackage(
+  input: Parameters<typeof buildStudioV12RecoveryPackageWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioV12RecoveryPackageWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioV12RecoveryPackageWithBackend> {
+  return buildStudioV12RecoveryPackageWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioPackageArchiveBytes(
+  entries: Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioPackageArchiveBytesWithBackend> {
+  return buildStudioPackageArchiveBytesWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 interface TestZipEntry {
   path: string;

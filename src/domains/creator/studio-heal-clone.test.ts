@@ -657,7 +657,16 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     const source: FakeSource = { testImage };
     const dabs: HealCloneDab[] = [{ srcX: 80, srcY: 20, destX: 20, destY: 60 }];
 
-    const out = await bakeHealCloneStrokeToCanvas(source, 100, 80, dabs, brush, "clone", factory);
+    const out = await bakeHealCloneStrokeToCanvas(
+      source,
+      100,
+      80,
+      dabs,
+      brush,
+      "clone",
+      factory,
+      { executionMode: "direct" },
+    );
 
     expect(out).not.toBeNull();
     expect((out as FakeHealCanvas).id).toBe(1);
@@ -692,7 +701,7 @@ describe("bakeHealCloneStrokeToCanvas", () => {
         brush,
         "clone",
         fakeHealCloneFactory(log, buffers),
-        { workerFactory: null },
+        { executionMode: "direct" },
       );
       const reads = log
         .filter((entry) => entry.includes("getImageData"))
@@ -731,6 +740,7 @@ describe("bakeHealCloneStrokeToCanvas", () => {
       { radiusPx: 1, hardness: 1, opacity: 1 },
       "clone",
       fakeHealCloneFactory(log, buffers),
+      { executionMode: "direct" },
     );
 
     expect(out).not.toBeNull();
@@ -784,7 +794,16 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 10, destX: 15, destY: 10 }];
     const healBrush = { radiusPx: 3, hardness: 1, opacity: 1 };
 
-    const out = await bakeHealCloneStrokeToCanvas(source, 20, 20, dabs, healBrush, "heal", factory);
+    const out = await bakeHealCloneStrokeToCanvas(
+      source,
+      20,
+      20,
+      dabs,
+      healBrush,
+      "heal",
+      factory,
+      { executionMode: "direct" },
+    );
     expect(out).not.toBeNull();
 
     const expectedDst = cloneImage(testImage);

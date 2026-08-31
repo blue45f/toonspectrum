@@ -7,12 +7,17 @@ import {
   createStudioVrmSurfacePaintTool,
   inspectStudioVrmSurfaceBrushProgram,
   STUDIO_VRM_SURFACE_PAINT_CAPABILITIES,
+  STUDIO_VRM_SURFACE_PAINT_FAILURE_POLICY,
+  STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+  STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
   type StudioVrmSurfacePaintBrushSettings,
   type StudioVrmSurfacePaintPointerSample,
   type StudioVrmSurfacePaintToolSnapshot,
 } from "./studio-vrm-surface-paint-tool";
+import { getStudioVrmTextureGeometryIndex } from "./studio-vrm-texture-geometry-index";
 import {
   createStudioVrmTexturePaintRuntime,
+  STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES,
   type StudioVrmTexturePaintCanvasFactory,
   type StudioVrmTexturePaintRayHit,
   type StudioVrmTexturePaintRuntime,
@@ -76,6 +81,9 @@ const SETTINGS: StudioVrmSurfacePaintBrushSettings = Object.freeze({
 
 function geometryWithTwoUvIslands(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
+  // Product VRM primitives are indexed. Keep the fixture on that admitted geometry path so its
+  // per-face world/UV density is available; unclassified non-indexed input must remain fail-closed.
+  geometry.setIndex([0, 1, 2, 3, 4, 5]);
   geometry.setAttribute(
     "position",
     new THREE.Float32BufferAttribute([
@@ -112,7 +120,16 @@ function createFixture(): Fixture {
   texture.flipY = false;
   texture.needsUpdate = true;
   const material = new THREE.MeshBasicMaterial({ map: texture });
-  const mesh = new THREE.Mesh(geometryWithTwoUvIslands(), material);
+  const geometry = geometryWithTwoUvIslands();
+  // The product runtime consumes a Worker-prewarmed cache at pointerdown. Prime that same cache
+  // synchronously in the unit fixture so admission does not depend on an ambient Worker race.
+  if (!getStudioVrmTextureGeometryIndex(geometry, {
+    uvAttribute: "uv",
+    maxTriangles: STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES,
+  })) {
+    throw new Error("surface-paint fixture geometry index is unavailable");
+  }
+  const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
   let canvas: MemoryCanvas | null = null;
   const createCanvas = ((width: number, height: number) => {
@@ -249,10 +266,21 @@ describe("Studio VRM V12 surface-paint product tool", () => {
     const supported = createStudioVrmSurfaceBrushProgram(SETTINGS);
     expect(inspectStudioVrmSurfaceBrushProgram(supported).supported).toBe(true);
     expect(STUDIO_VRM_SURFACE_PAINT_CAPABILITIES).toMatchObject({
+      providerId: "three-vrm-texture-paint",
       tip: { round: "supported", stamp: "unsupported", image: "unsupported" },
       mixing: { none: "supported", smudge: "unsupported", wet: "unsupported" },
-      fallback: "round-tip",
+      failurePolicy: {
+        automaticAlternateBrushSelectionAllowed: false,
+        sourceState: "preserved",
+        lastCommit: "preserved",
+        nextOperation: "select-provider-or-tool",
+      },
       hotPathGpuReadback: false,
+    });
+    expect(STUDIO_VRM_SURFACE_PAINT_CAPABILITIES).not.toHaveProperty("fallback");
+    expect(STUDIO_VRM_SURFACE_PAINT_FAILURE_POLICY).toMatchObject({
+      automaticAlternateBrushSelectionAllowed: false,
+      nextOperation: "select-provider-or-tool",
     });
 
     for (const tip of ["stamp", "image"] as const) {
@@ -274,6 +302,120 @@ describe("Studio VRM V12 surface-paint product tool", () => {
     }
   });
 
+  it("fails closed with explicit receipts and never replaces the selected surface tool", async () => {
+    const fixture = createFixture();
+    const samples = strokeSamples(fixture);
+    const tool = createStudioVrmSurfacePaintTool();
+
+    const unavailable = tool.begin({
+      runtime: null,
+      settings: SETTINGS,
+      sample: samples[0],
+    });
+    expect(unavailable).toMatchObject({
+      ok: false,
+      status: "unavailable",
+      reason: "runtime-unavailable",
+      selectedToolId: STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
+      selectedProviderId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+      sourceState: "preserved",
+      lastCommit: null,
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    expect(unavailable).not.toHaveProperty("route");
+
+    const invalid = tool.begin({
+      runtime: fixture.runtime,
+      settings: { ...SETTINGS, sizeCssPixels: Number.NaN },
+      sample: samples[0],
+    });
+    expect(invalid).toMatchObject({
+      ok: false,
+      status: "rejected",
+      reason: "invalid-input",
+      sourceState: "preserved",
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    expect(invalid).not.toHaveProperty("route");
+
+    const missingFaceIndex = tool.begin({
+      runtime: fixture.runtime,
+      settings: SETTINGS,
+      sample: {
+        ...samples[0],
+        hit: { ...samples[0].hit, faceIndex: null },
+      },
+    });
+    expect(missingFaceIndex).toMatchObject({
+      ok: false,
+      status: "rejected",
+      reason: "unsupported-face-index",
+      sourceState: "preserved",
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    expect(missingFaceIndex).not.toHaveProperty("route");
+
+    expect(tool.begin({ runtime: fixture.runtime, settings: SETTINGS, sample: samples[0] }))
+      .toMatchObject({ ok: true, status: "accepted", route: "surface-brush" });
+    const collectingSnapshot = tool.getSnapshot();
+    const busy = tool.begin({
+      runtime: fixture.runtime,
+      settings: SETTINGS,
+      sample: { ...samples[0], pointerId: samples[0].pointerId + 1 },
+    });
+    expect(busy).toMatchObject({
+      ok: false,
+      status: "unavailable",
+      reason: "busy",
+      sourceState: "preserved",
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    expect(busy).not.toHaveProperty("route");
+    expect(tool.getSnapshot()).toBe(collectingSnapshot);
+    expect(tool.cancel("pointer-cancel", samples[0].pointerId)).toBe(true);
+
+    const prepared = unwrap(await fixture.runtime.prepareSurfaceBrushSession({
+      hit: samples[0].hit,
+      pressure: samples[0].pressure,
+    }));
+    const runtimeBusy = tool.begin({
+      runtime: fixture.runtime,
+      settings: SETTINGS,
+      sample: samples[0],
+    });
+    expect(runtimeBusy).toMatchObject({
+      ok: false,
+      status: "unavailable",
+      reason: "busy",
+      sourceState: "preserved",
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    unwrap(fixture.runtime.cancelSurfaceBrushSession(prepared.session));
+
+    expect(fixture.runtime.getSnapshot().history.undoCount).toBe(0);
+    expect(unwrap(fixture.runtime.exportPaintedTargets())).toEqual([]);
+    tool.dispose();
+    const disposed = tool.begin({
+      runtime: fixture.runtime,
+      settings: SETTINGS,
+      sample: samples[0],
+    });
+    expect(disposed).toMatchObject({
+      ok: false,
+      status: "unavailable",
+      reason: "tool-disposed",
+      sourceState: "preserved",
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    disposeFixture(fixture);
+  });
+
   it("commits one seam-safe atlas transaction and replays deterministically after undo", async () => {
     const fixture = createFixture();
     const commit = vi.spyOn(fixture.runtime, "commitSurfaceBrushSession");
@@ -284,7 +426,13 @@ describe("Studio VRM V12 surface-paint product tool", () => {
     const samples = strokeSamples(fixture);
 
     expect(tool.begin({ runtime: fixture.runtime, settings: SETTINGS, sample: samples[0] }))
-      .toEqual({ route: "surface-brush" });
+      .toEqual({
+        ok: true,
+        status: "accepted",
+        route: "surface-brush",
+        selectedToolId: STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
+        selectedProviderId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+      });
     expect(tool.append(samples[1])).toBe(true);
     expect(tool.append(samples[2])).toBe(true);
     const first = await tool.finish(samples[0].pointerId);
@@ -320,7 +468,13 @@ describe("Studio VRM V12 surface-paint product tool", () => {
     expect(unwrap(fixture.runtime.exportPaintedTargets())).toEqual([]);
 
     expect(tool.begin({ runtime: fixture.runtime, settings: SETTINGS, sample: samples[0] }))
-      .toEqual({ route: "surface-brush" });
+      .toEqual({
+        ok: true,
+        status: "accepted",
+        route: "surface-brush",
+        selectedToolId: STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
+        selectedProviderId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+      });
     tool.append(samples[1]);
     tool.append(samples[2]);
     const second = await tool.finish(samples[0].pointerId);
@@ -334,6 +488,25 @@ describe("Studio VRM V12 surface-paint product tool", () => {
     expect(second.execution.operations).toEqual(first.execution.operations);
     expect(secondPixels).toEqual(firstPixels);
     expect(fixture.runtime.getSnapshot().history.undoCount).toBe(1);
+
+    const lastGood = tool.getSnapshot().lastCommit;
+    const rejected = tool.begin({
+      runtime: fixture.runtime,
+      settings: { ...SETTINGS, color: "not-a-color" },
+      sample: samples[0],
+    });
+    expect(rejected).toMatchObject({
+      ok: false,
+      status: "rejected",
+      reason: "invalid-input",
+      sourceState: "preserved",
+      lastCommit: lastGood,
+      alternateBrushSelected: false,
+      nextOperation: "select-provider-or-tool",
+    });
+    expect(tool.getSnapshot().lastCommit).toBe(lastGood);
+    expect(Uint8Array.from(unwrap(fixture.runtime.exportPaintedTargets())[0]!.pixels))
+      .toEqual(secondPixels);
     tool.dispose();
     disposeFixture(fixture);
   });

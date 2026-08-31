@@ -38,9 +38,12 @@ function capability(
 ): WasmMemory64CapabilityReceipt {
   return Object.freeze({
     ...BASE_CAPABILITY,
+    requestedRuntime: selectedRuntime === "memory32-requested"
+      ? "memory32-requested"
+      : "memory64",
     selectedRuntime,
     isMemory64Supported: selectedRuntime === "memory64",
-    isMemory32FallbackSupported: selectedRuntime !== "unavailable",
+    isMemory32ReferenceSupported: selectedRuntime === "memory32-requested",
   });
 }
 
@@ -88,7 +91,7 @@ function request(
 function acknowledgement(
   token: Memory64CrossRealmReservationToken,
   pages = BigInt(token.authorizedResidentPages),
-  runtime = token.preferredRuntime,
+  runtime = token.selectedRuntime,
 ): Memory64CrossRealmAllocationAck {
   return Object.freeze({
     kind: "epoch16-memory64/cross-realm-allocation-ack",
@@ -104,7 +107,7 @@ function acknowledgement(
 
 function fakeRuntime(
   addressType: "i64" | "i32",
-  runtime: "memory64" | "memory32-fallback",
+  runtime: "memory64" | "memory32-requested",
   pages: bigint,
 ): StudioWasmLinearMemoryRuntime {
   return {
@@ -171,7 +174,6 @@ describe("Memory64 cross-realm reservations", () => {
       runtime: "memory64",
       residentBytes: BigInt(2) * PAGE,
       residentPages: BigInt(2),
-      fallbackReason: null,
       authority: "main-realm-memory64-workload-coordinator",
     });
     expect(instance.activeResidentPages).toBe(BigInt(2));
@@ -245,21 +247,20 @@ describe("Memory64 cross-realm reservations", () => {
     expect(reservation.release()).toBe(true);
   });
 
-  it("makes memory32 feature preservation explicit in the reservation receipt", () => {
-    const instance = coordinator({ selectedRuntime: "memory32-fallback" });
+  it("makes an exact Memory32 reference selection explicit in the reservation receipt", () => {
+    const instance = coordinator({ selectedRuntime: "memory32-requested" });
     const reservation = instance.reserveCrossRealm(request(BigInt(4), BigInt(1)));
     expect(reservation).toMatchObject({
       ok: true,
       status: "reserved",
-      selectedRuntime: "memory32-fallback",
+      selectedRuntime: "memory32-requested",
       plan: {
-        status: "fallback",
-        fallbackReason: "memory64-unavailable",
-        runtime: "memory32-fallback",
+        status: "ready",
+        runtime: "memory32-requested",
         addressType: "i32",
       },
       token: {
-        preferredRuntime: "memory32-fallback",
+        selectedRuntime: "memory32-requested",
       },
       opfsSpill: {
         authority: "opfs-cas-paging",
@@ -347,28 +348,31 @@ describe("Memory64 cross-realm reservations", () => {
       ...reservation.token,
       canonicalPayload: { project: "forbidden" },
     })).toBeNull();
+    expect(snapshotMemory64CrossRealmReservationToken({
+      ...reservation.token,
+      preferredRuntime: "memory64",
+    })).toBeNull();
     reservation.release();
   });
 
-  it("retries smaller i64 windows before memory32 feature preservation", () => {
+  it("fails closed after smaller i64 windows without attempting Memory32", () => {
     const instance = coordinator();
     const reservation = instance.reserveCrossRealm(request(BigInt(8), BigInt(2)));
     expect(reservation.ok).toBe(true);
     if (!reservation.ok) return;
     const allocate = vi.fn((input: Readonly<{
-      runtime: "memory64" | "memory32-fallback";
+      runtime: "memory64" | "memory32-requested";
       addressType: "i64" | "i32";
       pages: bigint;
     }>) => {
-      if (input.runtime === "memory64") throw new RangeError("deny i64 window");
-      return fakeRuntime(input.addressType, input.runtime, input.pages);
+      throw new RangeError(`deny ${input.runtime} window`);
     });
     const release = vi.fn();
-    const workerLease = allocateMemory64CrossRealmWorkerLease({
+    expect(() => allocateMemory64CrossRealmWorkerLease({
       token: reservation.token,
       requiredResidentBytes: BigInt(2) * PAGE,
       allocationPort: { allocate, release },
-    });
+    })).toThrow(/selected memory64 window/u);
     expect(allocate.mock.calls.map(([input]) => ({
       runtime: input.runtime,
       pages: input.pages,
@@ -376,10 +380,35 @@ describe("Memory64 cross-realm reservations", () => {
       { runtime: "memory64", pages: BigInt(8) },
       { runtime: "memory64", pages: BigInt(4) },
       { runtime: "memory64", pages: BigInt(2) },
-      { runtime: "memory32-fallback", pages: BigInt(8) },
     ]);
+    expect(release).not.toHaveBeenCalled();
+    expect(reservation.release()).toBe(true);
+  });
+
+  it("allocates Memory32 only when its exact reference provider was preselected", () => {
+    const instance = coordinator({ selectedRuntime: "memory32-requested" });
+    const reservation = instance.reserveCrossRealm(request(BigInt(8), BigInt(2)));
+    expect(reservation.ok).toBe(true);
+    if (!reservation.ok) return;
+    const allocate = vi.fn((input) => (
+      fakeRuntime(input.addressType, input.runtime, input.pages)
+    ));
+    const release = vi.fn();
+
+    const workerLease = allocateMemory64CrossRealmWorkerLease({
+      token: reservation.token,
+      requiredResidentBytes: BigInt(2) * PAGE,
+      allocationPort: { allocate, release },
+    });
+
+    expect(allocate).toHaveBeenCalledTimes(1);
+    expect(allocate).toHaveBeenCalledWith({
+      runtime: "memory32-requested",
+      addressType: "i32",
+      pages: BigInt(8),
+    });
     expect(workerLease.acknowledgement).toMatchObject({
-      runtime: "memory32-fallback",
+      runtime: "memory32-requested",
       addressType: "i32",
       residentPages: "8",
     });
@@ -388,7 +417,6 @@ describe("Memory64 cross-realm reservations", () => {
       workerLease.acknowledgement,
     ).ok).toBe(true);
     expect(workerLease.release()).toBe(true);
-    expect(workerLease.release()).toBe(false);
     expect(release).toHaveBeenCalledTimes(1);
     expect(reservation.release()).toBe(true);
   });

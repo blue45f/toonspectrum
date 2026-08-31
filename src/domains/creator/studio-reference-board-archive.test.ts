@@ -7,7 +7,7 @@ import {
   type StudioAssetWithContentHash,
 } from "./studio-asset-library";
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
 } from "./studio-project-archive";
 import {
@@ -21,6 +21,16 @@ import {
   prepareStudioReferenceBoardArchiveExport,
   restoreStudioReferenceBoardArchiveImport,
 } from "./studio-reference-board-archive";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function pngBytes(seed = 1): Uint8Array {
   return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, seed]);

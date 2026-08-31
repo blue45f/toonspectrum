@@ -814,7 +814,10 @@ export const studioAdjustmentLayerCpuAdapter: StudioAdjustmentLayerFilterAdapter
   });
 
 export function createStudioAdjustmentLayerWorkerAdapter(
-  options: Pick<StudioImageFilterWorkerClientOptions, "workerFactory"> = {},
+  options: Pick<
+    StudioImageFilterWorkerClientOptions,
+    "executionMode" | "workerFactory"
+  > = {},
 ): StudioAdjustmentLayerFilterAdapter {
   return Object.freeze({
     contractVersion: STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
@@ -833,7 +836,7 @@ export function createStudioAdjustmentLayerWorkerAdapter(
       throwIfAborted(input.signal);
       return {
         contractVersion: STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
-        backend: result.execution === "worker" ? "worker" : "worker-direct",
+        backend: result.execution,
         imageData: result.imageData,
         sourceRevision: input.sourceRevision,
         operationsFingerprint: input.operationsFingerprint,
@@ -843,37 +846,40 @@ export function createStudioAdjustmentLayerWorkerAdapter(
 }
 
 /**
- * Existing WebGPU kernels currently cover deterministic colour/LUT operations. Each ordered
- * operation is attempted independently; unsupported or unavailable kernels fail closed to the
- * CPU reference for that exact operation, so stack order is never weakened by partial batching.
+ * Exact WebGPU adapter for the deterministic colour/LUT kernels it supports.
+ *
+ * Provider selection is immutable for the pass: an unavailable or unsupported kernel rejects the
+ * pass before publication. Callers that need the CPU reference must select that adapter before
+ * execution instead of changing providers after WebGPU has started.
  */
 export function createStudioAdjustmentLayerGpuAdapter(
   options?: StudioGpuFilterRuntimeOptions,
 ): StudioAdjustmentLayerFilterAdapter {
   return Object.freeze({
     contractVersion: STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
-    id: "webgpu-hybrid",
+    id: "webgpu",
     preservesOperationOrder: true,
     failClosed: true,
     async run(input: StudioAdjustmentLayerFilterAdapterInput) {
       throwIfAborted(input.signal);
       let current = cloneImageData(input.imageData);
-      let gpuOperations = 0;
       for (const operation of input.operations) {
         throwIfAborted(input.signal);
         const fields = studioAdjustmentOperationToFilterFields(operation);
         const gpuResult = await applyGpuFilterChain(current, fields, options);
-        current = gpuResult ?? runCpuFilterOperations(current, [operation]);
-        if (gpuResult) gpuOperations += 1;
+        if (!gpuResult) {
+          fail(
+            "ADAPTER_FAILURE",
+            "The selected WebGPU adjustment adapter could not execute the complete pass.",
+            { adapterId: "webgpu", operationEngine: operation.engine },
+          );
+        }
+        current = gpuResult;
       }
       throwIfAborted(input.signal);
       return {
         contractVersion: STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
-        backend: gpuOperations === input.operations.length
-          ? "webgpu"
-          : gpuOperations > 0
-            ? "webgpu-cpu-hybrid"
-            : "webgpu-cpu-fallback",
+        backend: "webgpu",
         imageData: current,
         sourceRevision: input.sourceRevision,
         operationsFingerprint: input.operationsFingerprint,

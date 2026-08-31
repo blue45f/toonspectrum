@@ -249,7 +249,7 @@ describe("off-destination tile composition", () => {
       surfaceFactory: () => {
         throw new Error("must not allocate");
       },
-    })).toEqual({ status: "fallback", reason: "native-scale-unsupported" });
+    })).toEqual({ status: "unavailable", reason: "native-scale-unsupported" });
     expect(highScale.draws).toHaveLength(0);
 
     const overBudget = new FakeDestination();
@@ -258,7 +258,7 @@ describe("off-destination tile composition", () => {
       surfaceFactory: () => {
         throw new Error("must not allocate");
       },
-    })).toEqual({ status: "fallback", reason: "surface-budget" });
+    })).toEqual({ status: "unavailable", reason: "surface-budget" });
     expect(overBudget.draws).toHaveLength(0);
   });
 
@@ -275,7 +275,7 @@ describe("off-destination tile composition", () => {
       },
     });
 
-    expect(result).toEqual({ status: "fallback", reason: "surface-preparation-failed" });
+    expect(result).toEqual({ status: "unavailable", reason: "surface-preparation-failed" });
     expect(destination.draws).toHaveLength(0);
   });
 
@@ -323,7 +323,7 @@ describe("off-destination tile composition", () => {
     expect(surfaces.every((record) => record.surface.width === 1)).toBe(true);
   });
 
-  it("marks a destination exception partial so callers cannot double-paint legacy fallback", () => {
+  it("marks a destination exception partial so callers cannot double-paint with another renderer", () => {
     const plan = ready();
     const destination = new FakeDestination();
     destination.throwOnDraw = true;
@@ -338,7 +338,7 @@ describe("off-destination tile composition", () => {
 });
 
 describe("StudioDrawNode leaf integration boundary", () => {
-  it("attempts physical wet replay before the exact ribbon and legacy fallbacks", () => {
+  it("selects physical wet replay without a post-start renderer substitution", () => {
     const source = readFileSync(new URL("./StudioDrawNode.tsx", import.meta.url), "utf8");
     const plan = source.indexOf("planStudioInteractiveWetInkBrushReplay(");
     const ribbonPlan = source.indexOf("planStudioWetRibbonCarrier(", plan);
@@ -357,6 +357,7 @@ describe("StudioDrawNode leaf integration boundary", () => {
     expect(legacyFallback).toBeGreaterThan(ribbonRender);
     expect(source).toContain("wetInkReplayPlan?.ok");
     expect(source).toContain("if (wetRibbonPlan)");
-    expect(source).toContain('wetInkResult.status !== "fallback"');
+    expect(source).toContain("A selected wet-ink replay never changes renderer");
+    expect(source).not.toContain('wetInkResult.status !== "fallback"');
   });
 });

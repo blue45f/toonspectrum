@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildStudioPackageArchiveBlob,
-  buildStudioPackageArchiveBytes,
+  buildStudioPackageArchiveBlob as buildStudioPackageArchiveBlobWithBackend,
+  buildStudioPackageArchiveBytes as buildStudioPackageArchiveBytesWithBackend,
   STUDIO_PACKAGE_ARCHIVE_LIMITS,
+  type StudioPackageArchiveBuildOptions,
   type StudioPackageArchiveEntry,
   type StudioPackageArchiveError,
 } from "./studio-package-archive";
@@ -14,6 +17,26 @@ const EOCD_SIGNATURE = 0x06054b50;
 const UTF8_FLAG = 0x0800;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+
+function buildStudioPackageArchiveBytes(
+  entries: readonly StudioPackageArchiveEntry[],
+  options: StudioPackageArchiveBuildOptions = {},
+): Promise<Uint8Array> {
+  return buildStudioPackageArchiveBytesWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioPackageArchiveBlob(
+  entries: readonly StudioPackageArchiveEntry[],
+  options: StudioPackageArchiveBuildOptions = {},
+): Promise<Blob> {
+  return buildStudioPackageArchiveBlobWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 interface ParsedEntry {
   path: string;
@@ -237,11 +260,66 @@ describe("studio-package-archive ZIP32 writer", () => {
     const data = new Uint8Array(1024 * 1024 + 1);
 
     await expect(
-      buildStudioPackageArchiveBlob([{ path: "large.bin", data }]),
+      buildStudioPackageArchiveBlobWithBackend(
+        [{ path: "large.bin", data }],
+        { crc32ExecutionMode: "worker" },
+      ),
     ).rejects.toThrow(
-      "편집 화면 멈춤을 막기 위해 메인 스레드에서 계산하지 않습니다",
+      "CRC32 계산 Worker를 사용할 수 없습니다",
     );
     expect(data.byteLength).toBe(1024 * 1024 + 1);
+  });
+
+  it("preselects CRC execution at every browser and archive-Worker product boundary", () => {
+    const packageSource = readFileSync(
+      new URL("./studio-package-archive.ts", import.meta.url),
+      "utf8",
+    );
+    expect(packageSource.match(/executionMode:\s*options\.crc32ExecutionMode\s*\?\?\s*"worker"/gu))
+      .toHaveLength(2);
+
+    const exportMenuSource = readFileSync(
+      new URL("./export/StudioExportMenuPanel.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(exportMenuSource.match(/crc32ExecutionMode:\s*"worker"/gu)).toHaveLength(2);
+
+    const projectExportSource = readFileSync(
+      new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+      "utf8",
+    );
+    expect(projectExportSource).toContain('crc32ExecutionMode: "worker"');
+
+    const batchWorkerSource = readFileSync(
+      new URL("./bg3d/studio-bg3d-shot-batch.worker.ts", import.meta.url),
+      "utf8",
+    );
+    expect(batchWorkerSource).toContain('crc32ExecutionMode: "direct-headless"');
+
+    const willReferenceSource = readFileSync(
+      new URL("./studio-will-v1-opc-interchange.ts", import.meta.url),
+      "utf8",
+    );
+    expect(willReferenceSource).toContain(
+      'crc32ExecutionMode: options.crc32ExecutionMode ?? "direct-bounded"',
+    );
+    const willWorkerSource = readFileSync(
+      new URL("./studio-will-v1-opc.worker.ts", import.meta.url),
+      "utf8",
+    );
+    expect(willWorkerSource).toContain('crc32ExecutionMode: "direct-headless"');
+
+    for (const relativePath of [
+      "./studio-cbz-interchange.ts",
+      "./studio-openraster-interchange.ts",
+      "./studio-project-archive.ts",
+      "./studio-v12-recovery-package.ts",
+      "./bg3d/studio-bg3d-shot-batch.ts",
+    ]) {
+      const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+      expect(source).toContain('crc32ExecutionMode: options.crc32ExecutionMode ?? "worker"');
+      expect(source).not.toContain("allowLargeDirectArchiveCrcInHeadless");
+    }
   });
 
   it("writes a valid empty ZIP32 archive", async () => {

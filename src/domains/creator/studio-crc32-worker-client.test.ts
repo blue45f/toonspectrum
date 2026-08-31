@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
@@ -72,9 +72,9 @@ function pattern(length = 128): Uint8Array {
 }
 
 describe("createStudioCrc32WorkerSession", () => {
-  it("uses the bounded direct path without detaching small inputs", async () => {
+  it("uses the bounded direct path only when selected before work", async () => {
     const data = pattern();
-    const session = createStudioCrc32WorkerSession({ workerFactory: null });
+    const session = createStudioCrc32WorkerSession({ executionMode: "direct-bounded" });
 
     await expect(session.run(data)).resolves.toEqual({
       execution: "direct",
@@ -86,24 +86,23 @@ describe("createStudioCrc32WorkerSession", () => {
   });
 
   it.each([16, 64])(
-    "fails closed for %d MiB instead of blocking the main thread when Worker is unavailable",
+    "fails closed for %d MiB in bounded direct mode",
     async (megabytes) => {
       const data = new Uint8Array(megabytes * 1024 * 1024);
-      const session = createStudioCrc32WorkerSession({ workerFactory: null });
+      const session = createStudioCrc32WorkerSession({ executionMode: "direct-bounded" });
 
       await expect(session.run(data)).rejects.toThrow(
-        "편집 화면 멈춤을 막기 위해 메인 스레드에서 계산하지 않습니다",
+        "메인 스레드 안전 상한을 초과했습니다",
       );
       expect(data.byteLength).toBe(megabytes * 1024 * 1024);
       session.dispose();
     },
   );
 
-  it("allows an explicit large direct fallback only for a headless archive runtime", async () => {
+  it("allows an explicitly selected large direct mode only for a headless archive runtime", async () => {
     const data = pattern(2 * 1024 * 1024);
     const session = createStudioCrc32WorkerSession({
-      workerFactory: null,
-      allowLargeDirectFallbackInHeadless: true,
+      executionMode: "direct-headless",
     });
 
     await expect(session.run(data)).resolves.toEqual({
@@ -114,10 +113,92 @@ describe("createStudioCrc32WorkerSession", () => {
     session.dispose();
   });
 
+  it("rejects direct-headless when a browser DOM is present", async () => {
+    vi.stubGlobal("document", {});
+    try {
+      const session = createStudioCrc32WorkerSession({
+        executionMode: "direct-headless",
+      });
+      await expect(session.run(pattern())).rejects.toThrow(
+        "DOM이 없는 실행 환경에서만 사용할 수 있습니다",
+      );
+      session.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps Worker absence and construction failure terminal for small inputs", async () => {
+    const unavailable = createStudioCrc32WorkerSession({
+      executionMode: "worker",
+      workerFactory: null,
+    });
+    await expect(unavailable.run(pattern())).rejects.toMatchObject({
+      name: "StudioCrc32WorkerError",
+      message: "CRC32 계산 Worker를 사용할 수 없습니다.",
+    });
+    unavailable.dispose();
+
+    const constructionFailure = createStudioCrc32WorkerSession({
+      executionMode: "worker",
+      workerFactory: () => {
+        throw new Error("CSP blocked Worker");
+      },
+    });
+    await expect(constructionFailure.run(pattern())).rejects.toMatchObject({
+      name: "StudioCrc32WorkerError",
+      message: "CRC32 Worker를 생성하지 못했습니다.",
+    });
+    constructionFailure.dispose();
+  });
+
+  it("keeps Worker ready timeout and post failure terminal without direct execution", async () => {
+    vi.useFakeTimers();
+    try {
+      const neverReady = new ControlledWorker();
+      const timedSession = createStudioCrc32WorkerSession({
+        executionMode: "worker",
+        workerFactory: () => neverReady,
+      });
+      const timedInput = pattern();
+      const timed = timedSession.run(timedInput);
+      const timedRejection = expect(timed).rejects.toMatchObject({
+        name: "StudioCrc32WorkerError",
+        message: "CRC32 Worker 준비 시간이 초과되었습니다.",
+      });
+      await vi.advanceTimersByTimeAsync(3_000);
+      await timedRejection;
+      expect(timedInput.byteLength).toBe(128);
+      expect(neverReady.terminateCount).toBe(1);
+      timedSession.dispose();
+
+      const postFailureWorker = new ControlledWorker();
+      Object.defineProperty(postFailureWorker, "postMessage", {
+        value: () => {
+          throw new DOMException("transfer blocked", "DataCloneError");
+        },
+      });
+      const postFailureSession = createStudioCrc32WorkerSession({
+        executionMode: "worker",
+        workerFactory: () => postFailureWorker,
+      });
+      const postInput = pattern();
+      const postFailure = postFailureSession.run(postInput);
+      postFailureWorker.emitReady();
+      await expect(postFailure).rejects.toMatchObject({ name: "DataCloneError" });
+      expect(postInput.byteLength).toBe(128);
+      expect(postFailureWorker.terminateCount).toBe(1);
+      postFailureSession.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("transfers ownership out and back while reusing one warm Worker", async () => {
     const worker = new ControlledWorker();
     let factoryCalls = 0;
     const session = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => {
         factoryCalls += 1;
         return worker;
@@ -162,7 +243,10 @@ describe("createStudioCrc32WorkerSession", () => {
     partial.set(pattern(64));
     const expected = calculateStudioCrc32(partial);
     const worker = new ControlledWorker();
-    const session = createStudioCrc32WorkerSession({ workerFactory: () => worker });
+    const session = createStudioCrc32WorkerSession({
+      executionMode: "worker",
+      workerFactory: () => worker,
+    });
     const pending = session.run(partial);
 
     worker.emitReady();
@@ -183,6 +267,7 @@ describe("createStudioCrc32WorkerSession", () => {
     const secondWorker = new ControlledWorker();
     const workers = [firstWorker, secondWorker];
     const session = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => workers.shift() ?? null,
     });
     const controller = new AbortController();
@@ -206,6 +291,7 @@ describe("createStudioCrc32WorkerSession", () => {
     const secondWorker = new ControlledWorker();
     const workers = [firstWorker, secondWorker];
     const session = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => workers.shift() ?? null,
     });
     const first = session.run(pattern());
@@ -221,22 +307,22 @@ describe("createStudioCrc32WorkerSession", () => {
     session.dispose();
   });
 
-  it("falls back only before transfer and preserves post-transfer Worker failures", async () => {
+  it("keeps Worker failures terminal before and after transfer", async () => {
     const loadFailureWorker = new ControlledWorker();
     const directSession = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => loadFailureWorker,
     });
     const directInput = pattern();
     const direct = directSession.run(directInput);
     loadFailureWorker.emitLoadError("worker chunk blocked");
-    await expect(direct).resolves.toMatchObject({
-      execution: "direct",
-      crc32: calculateStudioCrc32(directInput),
-    });
+    await expect(direct).rejects.toThrow("worker chunk blocked");
+    expect(directInput.byteLength).toBe(128);
     directSession.dispose();
 
     const executionFailureWorker = new ControlledWorker();
     const workerSession = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => executionFailureWorker,
     });
     const posted = workerSession.run(pattern());
@@ -259,6 +345,7 @@ describe("createStudioCrc32WorkerSession", () => {
     const input = pattern();
     let factoryCalls = 0;
     const session = createStudioCrc32WorkerSession({
+      executionMode: "worker",
       workerFactory: () => {
         factoryCalls += 1;
         return new ControlledWorker();

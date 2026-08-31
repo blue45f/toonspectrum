@@ -78,7 +78,8 @@ describe("proveStudioGpuBristleAdmission", () => {
     expect(verdict.admitted).toBe(false);
     expect(verdict.reasons).toEqual(["impasto-relief-flat"]);
     expect(verdict.message).toContain("임파스토");
-    expect(verdict.message).toContain("유화 캐리어");
+    expect(verdict.message).toContain("다른 엔진으로 자동 전환하지 않습니다");
+    expect(verdict.message).toContain("다음 획");
   });
 
   it("refuses rather than guesses when a statistic is not a number", () => {
@@ -96,14 +97,15 @@ describe("acceptStudioGpuBristleSurface", () => {
     expect(acceptStudioGpuBristleSurface(512, 384).accepted).toBe(true);
   });
 
-  it("declines below the short-edge floor with Korean copy naming the fallback", () => {
+  it("rejects below the short-edge floor without naming a substitute", () => {
     const verdict = acceptStudioGpuBristleSurface(
       STUDIO_GPU_BRISTLE_SURFACE_LIMITS.minShortEdgePx - 1,
       512,
     );
     expect(verdict.accepted).toBe(false);
     expect(verdict.reason).toBe("surface-too-small");
-    expect(verdict.message).toContain("유화 캐리어");
+    expect(verdict.message).toContain("다른 엔진으로 자동 전환하지 않습니다");
+    expect(verdict.message).not.toContain("유화 캐리어");
   });
 
   it("declines above the pixel ceiling and above the edge ceiling", () => {

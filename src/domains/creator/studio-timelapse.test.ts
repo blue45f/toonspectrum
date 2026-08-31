@@ -314,13 +314,20 @@ class FakeRecorder implements MotionRecorderLike {
     public stream: MotionStreamLike,
     public options: { mimeType: string; videoBitsPerSecond: number }
   ) {}
+  get mimeType() {
+    return this.options.mimeType;
+  }
   start(timesliceMs?: number) {
     this.started = timesliceMs;
   }
   stop() {
     this.stopCount += 1;
     if (this.stopCount > 1) return; // 실 레코더의 중복 stop 가드 흉내
-    this.ondataavailable?.({ data: new Blob(["chunk"], { type: "video/webm" }) });
+    this.ondataavailable?.({
+      data: new Blob([
+        Uint8Array.of(0x1a, 0x45, 0xdf, 0xa3, 0x01) as unknown as BlobPart,
+      ], { type: "video/webm" }),
+    });
     this.onstop?.();
   }
 }

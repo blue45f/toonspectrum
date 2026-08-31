@@ -141,9 +141,9 @@ describe("vello-cpu adapter (wasm)", () => {
     ]);
   });
 
-  it("descriptor passes schema validation and declares the CanvasKit fallback", () => {
+  it("descriptor passes schema validation and has no automatic fallback field", () => {
     const parsed = providerDescriptorSchema.parse(velloCpuProviderDescriptor);
-    expect(parsed.fallbackProviderId).toBe("skia-canvaskit");
+    expect(parsed).not.toHaveProperty("fallbackProviderId");
     expect(parsed.capabilities).toContain("export.deterministic");
   });
 });

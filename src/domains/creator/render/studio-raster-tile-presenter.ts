@@ -564,7 +564,8 @@ export type StudioRasterTilePresentationFailureReason =
   | "disposed"
   | "stale"
   | "canvas2d-unavailable"
-  | "presentation-failed";
+  | "presentation-failed"
+  | "webgpu-unavailable";
 
 export type StudioRasterTilePresentationResult =
   | {
@@ -591,7 +592,8 @@ export interface StudioRasterTilePresenterCallbacks {
 
 export interface StudioRasterTilePresenterOptions extends StudioRasterTilePresenterCallbacks {
   readonly gpuCanvas: HTMLCanvasElement;
-  readonly fallbackCanvas: HTMLCanvasElement;
+  /** Used only when `gpu: null` explicitly selects Canvas2D; never used after WebGPU failure. */
+  readonly canvas2dCanvas: HTMLCanvasElement;
   readonly gpu?: GPU | null;
   readonly sha256?: StudioRasterTileSha256;
   /** Monotonic clock override used only by deterministic recovery-policy tests. */
@@ -661,20 +663,23 @@ function safeCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D 
   return context && "putImageData" in context ? context as CanvasRenderingContext2D : null;
 }
 
-/** Owns two presentation surfaces so a configured WebGPU canvas never needs a 2D context. */
+/**
+ * Presents through one immutable backend selected at construction. `gpu: null` explicitly selects
+ * Canvas2D; every other value selects WebGPU and fails closed if that provider is unavailable.
+ */
 export class StudioRasterTilePresenter {
   private readonly gpuCanvas: HTMLCanvasElement;
-  private readonly fallbackCanvas: HTMLCanvasElement;
+  private readonly canvas2dCanvas: HTMLCanvasElement;
   private readonly callbacks: StudioRasterTilePresenterCallbacks;
   private readonly gpuOverride: GPU | null | undefined;
   private readonly sha256: StudioRasterTileSha256;
   private readonly now: () => number;
+  private readonly selectedBackend: Exclude<StudioRasterTilePresenterBackend, "unavailable">;
   private backend: StudioRasterTilePresenterBackend = "unavailable";
   private disposed = false;
   private activeRequest: ActiveRequest | null = null;
   private desiredGeneration = -1;
   private readyGeneration: number | null = null;
-  private latestVerifiedPlan: StudioRasterTilePresentationPlan | null = null;
   private gpuState: GpuState | null = null;
   private gpuInitialization: Promise<GpuState | null> | null = null;
   private gpuRetryNotBefore = 0;
@@ -682,7 +687,7 @@ export class StudioRasterTilePresenter {
 
   constructor(options: StudioRasterTilePresenterOptions) {
     this.gpuCanvas = options.gpuCanvas;
-    this.fallbackCanvas = options.fallbackCanvas;
+    this.canvas2dCanvas = options.canvas2dCanvas;
     this.callbacks = {
       onBackendChange: options.onBackendChange,
       onFrameReady: options.onFrameReady,
@@ -690,6 +695,7 @@ export class StudioRasterTilePresenter {
       onDeviceLost: options.onDeviceLost,
     };
     this.gpuOverride = options.gpu;
+    this.selectedBackend = options.gpu === null ? "canvas2d" : "webgpu";
     this.sha256 = options.sha256 ?? browserSha256;
     this.now = options.now ?? (() => performance.now());
     this.hideBothCanvases();
@@ -724,10 +730,11 @@ export class StudioRasterTilePresenter {
     }
 
     try {
-      const [verification, gpuState] = await Promise.all([
-        verifyStudioRasterTilePlanHashes(plan, active.controller.signal, this.sha256),
-        this.ensureGpuState(),
-      ]);
+      const verification = await verifyStudioRasterTilePlanHashes(
+        plan,
+        active.controller.signal,
+        this.sha256
+      );
       if (!this.isCurrent(active)) {
         return { status: "stale", generation: request.generation, reason: "stale" };
       }
@@ -735,44 +742,59 @@ export class StudioRasterTilePresenter {
         this.rejectCurrentFrame(request.generation, verification.reason);
         return { status: "rejected", generation: request.generation, reason: verification.reason };
       }
-      this.latestVerifiedPlan = plan;
-      if (gpuState) {
-        try {
-          await this.renderWebGpu(plan, gpuState, active.controller.signal);
-          if (!this.isCurrent(active)) {
-            return { status: "stale", generation: request.generation, reason: "stale" };
-          }
-          this.gpuFailureCount = 0;
-          this.gpuRetryNotBefore = 0;
-          this.publishReady(plan, "webgpu");
+      if (this.selectedBackend === "canvas2d") {
+        if (!this.renderCanvas2d(plan)) {
+          this.rejectCurrentFrame(request.generation, "canvas2d-unavailable");
           return {
-            status: "ready",
-            generation: plan.generation,
-            backend: "webgpu",
-            visibleTileCount: plan.tiles.length,
+            status: "rejected",
+            generation: request.generation,
+            reason: "canvas2d-unavailable",
           };
-        } catch (error) {
-          if (active.controller.signal.aborted) throw error;
-          this.releaseGpuState(gpuState, true);
-          this.deferGpuRetry();
         }
+        this.publishReady(plan, "canvas2d");
+        return {
+          status: "ready",
+          generation: plan.generation,
+          backend: "canvas2d",
+          visibleTileCount: plan.tiles.length,
+        };
+      }
+
+      const gpuState = await this.ensureGpuState();
+      if (!this.isCurrent(active)) {
+        return { status: "stale", generation: request.generation, reason: "stale" };
+      }
+      if (!gpuState) {
+        this.rejectCurrentFrame(request.generation, "webgpu-unavailable");
+        return {
+          status: "rejected",
+          generation: request.generation,
+          reason: "webgpu-unavailable",
+        };
+      }
+      try {
+        await this.renderWebGpu(plan, gpuState, active.controller.signal);
+      } catch (error) {
+        if (active.controller.signal.aborted) throw error;
+        this.releaseGpuState(gpuState, true);
+        this.deferGpuRetry();
+        this.rejectCurrentFrame(request.generation, "presentation-failed");
+        return {
+          status: "rejected",
+          generation: request.generation,
+          reason: "presentation-failed",
+        };
       }
       if (!this.isCurrent(active)) {
         return { status: "stale", generation: request.generation, reason: "stale" };
       }
-      if (!this.renderCanvas2d(plan)) {
-        this.rejectCurrentFrame(request.generation, "canvas2d-unavailable");
-        return {
-          status: "rejected",
-          generation: request.generation,
-          reason: "canvas2d-unavailable",
-        };
-      }
-      this.publishReady(plan, "canvas2d");
+      this.gpuFailureCount = 0;
+      this.gpuRetryNotBefore = 0;
+      this.publishReady(plan, "webgpu");
       return {
         status: "ready",
         generation: plan.generation,
-        backend: "canvas2d",
+        backend: "webgpu",
         visibleTileCount: plan.tiles.length,
       };
     } catch {
@@ -791,7 +813,6 @@ export class StudioRasterTilePresenter {
     if (this.disposed) return;
     this.cancelActiveRequest(reason);
     this.invalidateVisibleFrame(reason);
-    this.latestVerifiedPlan = null;
   }
 
   dispose(): void {
@@ -799,11 +820,10 @@ export class StudioRasterTilePresenter {
     this.disposed = true;
     this.cancelActiveRequest("disposed");
     this.invalidateVisibleFrame("disposed");
-    this.latestVerifiedPlan = null;
     this.releaseGpuState(this.gpuState, true);
     this.gpuState = null;
     this.gpuInitialization = null;
-    this.clearCanvas2d();
+    if (this.selectedBackend === "canvas2d") this.clearCanvas2d();
     this.backend = "unavailable";
   }
 
@@ -851,6 +871,7 @@ export class StudioRasterTilePresenter {
     if (this.disposed || generation !== this.desiredGeneration) return;
     this.hideBothCanvases();
     this.readyGeneration = null;
+    this.setBackend("unavailable");
     this.callbacks.onFrameInvalid?.(generation, reason);
   }
 
@@ -860,11 +881,12 @@ export class StudioRasterTilePresenter {
     this.hideBothCanvases();
     const previous = this.readyGeneration;
     this.readyGeneration = null;
+    this.setBackend("unavailable");
     if (previous !== null) this.callbacks.onFrameInvalid?.(previous, reason);
   }
 
   private hideBothCanvases(): void {
-    for (const canvas of [this.gpuCanvas, this.fallbackCanvas]) {
+    for (const canvas of [this.gpuCanvas, this.canvas2dCanvas]) {
       canvas.style.visibility = "hidden";
       canvas.style.opacity = "0";
     }
@@ -875,8 +897,8 @@ export class StudioRasterTilePresenter {
     backend: Exclude<StudioRasterTilePresenterBackend, "unavailable">
   ): void {
     if (this.disposed || plan.generation !== this.desiredGeneration) return;
-    const visible = backend === "webgpu" ? this.gpuCanvas : this.fallbackCanvas;
-    const hidden = backend === "webgpu" ? this.fallbackCanvas : this.gpuCanvas;
+    const visible = backend === "webgpu" ? this.gpuCanvas : this.canvas2dCanvas;
+    const hidden = backend === "webgpu" ? this.canvas2dCanvas : this.gpuCanvas;
     hidden.style.visibility = "hidden";
     hidden.style.opacity = "0";
     visible.style.visibility = "visible";
@@ -904,7 +926,7 @@ export class StudioRasterTilePresenter {
     if (this.gpuState) return this.gpuState;
     if (this.gpuInitialization) return this.gpuInitialization;
     // A missing/unstable adapter must not turn every CRDT frame into another GPU allocation
-    // attempt. Canvas2D remains fully local and authoritative during this bounded cooldown.
+    // attempt. WebGPU remains selected and unavailable during this bounded cooldown.
     if (this.now() < this.gpuRetryNotBefore) return null;
     const gpu = this.gpu();
     if (!gpu) return null;
@@ -1004,13 +1026,12 @@ export class StudioRasterTilePresenter {
     this.gpuRetryNotBefore = Math.max(this.gpuRetryNotBefore, this.now() + delay);
   }
 
-  private resizeSurfaces(plan: StudioRasterTilePresentationPlan): void {
-    for (const canvas of [this.gpuCanvas, this.fallbackCanvas]) {
-      if (canvas.width !== plan.physicalWidth) canvas.width = plan.physicalWidth;
-      if (canvas.height !== plan.physicalHeight) canvas.height = plan.physicalHeight;
-      canvas.style.width = `${plan.viewport.surfaceBounds.width}px`;
-      canvas.style.height = `${plan.viewport.surfaceBounds.height}px`;
-    }
+  private resizeSelectedSurface(plan: StudioRasterTilePresentationPlan): void {
+    const canvas = this.selectedBackend === "webgpu" ? this.gpuCanvas : this.canvas2dCanvas;
+    if (canvas.width !== plan.physicalWidth) canvas.width = plan.physicalWidth;
+    if (canvas.height !== plan.physicalHeight) canvas.height = plan.physicalHeight;
+    canvas.style.width = `${plan.viewport.surfaceBounds.width}px`;
+    canvas.style.height = `${plan.viewport.surfaceBounds.height}px`;
   }
 
   private ensureGpuCacheCapacity(
@@ -1094,9 +1115,12 @@ export class StudioRasterTilePresenter {
     state: GpuState,
     signal: AbortSignal
   ): Promise<void> {
+    if (this.selectedBackend !== "webgpu") {
+      throw new Error("studio_raster_webgpu_not_selected");
+    }
     throwIfAborted(signal);
     if (this.gpuState !== state) throw new Error("studio_raster_gpu_state_stale");
-    this.resizeSurfaces(plan);
+    this.resizeSelectedSurface(plan);
     state.context.configure({
       device: state.device,
       format: GPU_CANVAS_FORMAT,
@@ -1149,18 +1173,19 @@ export class StudioRasterTilePresenter {
   }
 
   private clearCanvas2d(): void {
-    const context = safeCanvasContext(this.fallbackCanvas);
+    const context = safeCanvasContext(this.canvas2dCanvas);
     if (!context) return;
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, this.fallbackCanvas.width, this.fallbackCanvas.height);
+    context.clearRect(0, 0, this.canvas2dCanvas.width, this.canvas2dCanvas.height);
     context.restore();
   }
 
   private renderCanvas2d(plan: StudioRasterTilePresentationPlan): boolean {
-    this.resizeSurfaces(plan);
-    const context = safeCanvasContext(this.fallbackCanvas);
-    const ownerDocument = this.fallbackCanvas.ownerDocument;
+    if (this.selectedBackend !== "canvas2d") return false;
+    this.resizeSelectedSurface(plan);
+    const context = safeCanvasContext(this.canvas2dCanvas);
+    const ownerDocument = this.canvas2dCanvas.ownerDocument;
     if (!context || !ownerDocument?.createElement) return false;
     const scratch = ownerDocument.createElement("canvas");
     const scratchContext = safeCanvasContext(scratch);
@@ -1219,9 +1244,5 @@ export class StudioRasterTilePresenter {
     this.deferGpuRetry();
     this.callbacks.onDeviceLost?.(info);
     this.invalidateVisibleFrame("device-lost");
-    const plan = this.latestVerifiedPlan;
-    if (!plan || plan.generation !== this.desiredGeneration) return;
-    if (this.renderCanvas2d(plan)) this.publishReady(plan, "canvas2d");
-    else this.rejectCurrentFrame(plan.generation, "canvas2d-unavailable");
   }
 }

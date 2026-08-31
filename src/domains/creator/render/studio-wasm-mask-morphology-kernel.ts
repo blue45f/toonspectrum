@@ -54,6 +54,7 @@ export type StudioWasmMaskMorphologyValidationFailureReason =
 
 export type StudioWasmMaskMorphologyRunFailureReason =
   | StudioWasmMaskMorphologyValidationFailureReason
+  | "backend-mismatch"
   | "memory-grow-failed"
   | "view-creation-failed"
   | "view-generation-mismatch"
@@ -82,7 +83,11 @@ export type StudioMaskMorphologyExecutionResult =
     }
   | {
       readonly ok: false;
-      readonly reason: StudioWasmMaskMorphologyValidationFailureReason;
+      readonly reason:
+        | StudioWasmMaskMorphologyValidationFailureReason
+        | StudioWasmMaskMorphologyKernelCreationFailureReason
+        | StudioWasmMaskMorphologyRunFailureReason;
+      readonly cause?: unknown;
     };
 
 interface ValidatedMaskDimensions {
@@ -448,7 +453,7 @@ function calculateReferencePixel(
   return best;
 }
 
-/** Byte-exact in-bounds 3×3 morphology reference and unsupported-host fallback. */
+/** Byte-exact in-bounds 3×3 morphology provider for explicitly selected reference/QA runs. */
 export function applyStudioMaskMorphology3x3Reference(
   mask: StudioMaskByteArray,
   width: number,
@@ -781,8 +786,7 @@ function createDefaultKernel(
     BigInt(STUDIO_WASM_MASK_MORPHOLOGY_WORKING_SET_BYTES)
     / STUDIO_WASM_PAGE_BYTES;
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: addressType,
-    fallbackPolicy: "deny",
+    selectedMode: addressType,
     initialPages: BigInt(1),
     maximumPages,
   });
@@ -808,35 +812,37 @@ export interface StudioPersistentMaskMorphologyExecutor {
 }
 
 export interface StudioPersistentMaskMorphologyExecutorOptions {
-  readonly minimumWasmBytes?: number;
-  /**
-   * Test seam and future kernel injection point. The default order is strictly
-   * Memory64, memory32, then byte-exact JS.
-   */
-  readonly kernelFactories?: readonly (
-    () => StudioWasmMaskMorphologyKernelFactoryResult
-  )[];
+  /** One backend is selected before this executor accepts its first operation. */
+  readonly backend: StudioWasmMaskMorphologyBackend;
+  /** Test seam for the selected Wasm backend; it is never used to try another backend. */
+  readonly createKernel?: () => StudioWasmMaskMorphologyKernelFactoryResult;
 }
 
 export function createStudioPersistentMaskMorphologyExecutor(
-  options: StudioPersistentMaskMorphologyExecutorOptions = {},
+  options: StudioPersistentMaskMorphologyExecutorOptions,
 ): StudioPersistentMaskMorphologyExecutor {
-  const minimumWasmBytes =
-    options.minimumWasmBytes
-    ?? STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES;
+  const backend = options.backend;
   if (
-    !Number.isSafeInteger(minimumWasmBytes)
-    || minimumWasmBytes < 0
-    || minimumWasmBytes > STUDIO_WASM_MASK_MORPHOLOGY_MAX_INPUT_BYTES
+    backend !== "js"
+    && backend !== "wasm-memory32"
+    && backend !== "wasm-memory64"
   ) {
-    throw new RangeError("minimumWasmBytes is outside the morphology budget");
+    throw new TypeError("A supported morphology backend must be selected explicitly");
   }
-  const kernelFactories = options.kernelFactories ?? [
-    () => createDefaultKernel("i64"),
-    () => createDefaultKernel("i32"),
-  ];
-  let nextFactoryIndex = 0;
-  let activeKernel: StudioWasmMaskMorphologyKernelLike | null = null;
+  const addressType: StudioWasmAddressType | null = backend === "wasm-memory32"
+    ? "i32"
+    : backend === "wasm-memory64"
+      ? "i64"
+      : null;
+  const kernelFactory = options.createKernel
+    ?? (addressType ? () => createDefaultKernel(addressType) : undefined);
+  let activeKernel: StudioWasmMaskMorphologyKernelLike | undefined;
+  let terminalFailure: {
+    readonly reason:
+      | StudioWasmMaskMorphologyKernelCreationFailureReason
+      | StudioWasmMaskMorphologyRunFailureReason;
+    readonly cause?: unknown;
+  } | null = null;
 
   return Object.freeze({
     process(
@@ -853,44 +859,63 @@ export function createStudioPersistentMaskMorphologyExecutor(
         return { ok: false, reason: "invalid-operation" };
       }
 
-      if (validated.byteLength >= minimumWasmBytes) {
-        while (true) {
-          if (!activeKernel) {
-            const factory = kernelFactories[nextFactoryIndex];
-            if (!factory) break;
-            nextFactoryIndex += 1;
-            const created = factory();
-            if (!created.ok) continue;
-            activeKernel = created.kernel;
-          }
-          const wasmResult = activeKernel.process(
+      if (backend === "js") {
+        return {
+          ok: true,
+          pixels: applyStudioMaskMorphology3x3Reference(
             mask,
             width,
             height,
             operation,
-          );
-          if (wasmResult.ok) {
-            return {
-              ok: true,
-              pixels: wasmResult.pixels,
-              backend: wasmResult.backend,
-            };
-          }
-          // A failed kernel is quarantined for this executor epoch. Continue to
-          // the next address type before falling back to JS.
-          activeKernel = null;
-        }
+          ),
+          backend,
+        };
       }
-
+      if (terminalFailure) return { ok: false, ...terminalFailure };
+      if (!activeKernel) {
+        let created: StudioWasmMaskMorphologyKernelFactoryResult;
+        try {
+          created = kernelFactory!();
+        } catch (cause) {
+          terminalFailure = { reason: "kernel-run-failed", cause };
+          return { ok: false, ...terminalFailure };
+        }
+        if (!created.ok) {
+          terminalFailure = {
+            reason: created.reason,
+            ...(created.cause === undefined ? {} : { cause: created.cause }),
+          };
+          return { ok: false, ...terminalFailure };
+        }
+        if (created.kernel.addressType !== addressType) {
+          terminalFailure = { reason: "backend-mismatch" };
+          return { ok: false, ...terminalFailure };
+        }
+        activeKernel = created.kernel;
+      }
+      const wasmResult = activeKernel.process(
+        mask,
+        width,
+        height,
+        operation,
+      );
+      if (!wasmResult.ok) {
+        activeKernel = undefined;
+        terminalFailure = {
+          reason: wasmResult.reason,
+          ...(wasmResult.cause === undefined ? {} : { cause: wasmResult.cause }),
+        };
+        return { ok: false, ...terminalFailure };
+      }
+      if (wasmResult.backend !== backend) {
+        activeKernel = undefined;
+        terminalFailure = { reason: "backend-mismatch" };
+        return { ok: false, ...terminalFailure };
+      }
       return {
         ok: true,
-        pixels: applyStudioMaskMorphology3x3Reference(
-          mask,
-          width,
-          height,
-          operation,
-        ),
-        backend: "js",
+        pixels: wasmResult.pixels,
+        backend: wasmResult.backend,
       };
     },
   });

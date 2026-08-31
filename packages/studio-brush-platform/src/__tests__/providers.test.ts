@@ -40,16 +40,16 @@ describe("google-ink-mesh provider descriptor", () => {
     expect(googleInkMeshProviderDescriptor.commit).toBe(INK_MESH_COMMIT);
   });
 
-  it("fails closed: no fallback provider and a single-entry fallback chain", () => {
+  it("fails closed without publishing a fallback contract", () => {
     // Mirrors the hokusai V17.1 policy: no geometry-equivalence certification
     // exists for a perfect-freehand rendition of ink mesh output, so a host
     // without the ink WASM module hides the brush instead of substituting.
-    expect(googleInkMeshProviderDescriptor.fallbackProviderId).toBeNull();
+    expect(googleInkMeshProviderDescriptor).not.toHaveProperty(
+      "fallbackProviderId",
+    );
     const registry = new EngineCapabilityRegistry();
     registerBrushPlatformProviders(registry);
-    expect(registry.fallbackChain("google-ink-mesh")).toEqual([
-      "google-ink-mesh",
-    ]);
+    expect(registry).not.toHaveProperty("fallbackChain");
   });
 });
 
@@ -75,7 +75,7 @@ describe("registerBrushPlatformProviders", () => {
     const plan = planner.plan({
       surfaceId: "studio-main",
       mode: "interactive",
-      primaryCandidates: ["hokusai-natural-media"],
+      primaryOwnerId: "hokusai-natural-media",
       islands: [
         {
           islandId: "inking",
@@ -99,8 +99,7 @@ describe("registerBrushPlatformProviders", () => {
       "google-ink-mesh",
     ]);
     expect(
-      plan.islands.find((island) => island.islandId === "mesh-inking")
-        ?.fallbackChain,
-    ).toEqual(["google-ink-mesh"]);
+      plan.islands.find((island) => island.islandId === "mesh-inking"),
+    ).not.toHaveProperty("fallbackChain");
   });
 });

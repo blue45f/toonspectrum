@@ -342,7 +342,9 @@ function encodeImportedStudioWillV1DocumentTransport(
 export async function encodeStudioWillV1DocumentTransport(
   input: StudioWillV1OpcExportInput,
 ): Promise<Uint8Array> {
-  const built = await buildStudioWillV1OpcBytes(input);
+  const built = await buildStudioWillV1OpcBytes(input, {
+    crc32ExecutionMode: "direct-bounded",
+  });
   const imported = await importStudioWillV1Opc(built.bytes);
   return encodeImportedStudioWillV1DocumentTransport(imported);
 }
@@ -476,6 +478,7 @@ export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_PROVIDER:
         ? (
             await buildStudioWillV1OpcBytes(
               decodeStudioWillV1DocumentTransport(execution.inputBytes),
+              { crc32ExecutionMode: "direct-bounded" },
             )
           ).bytes
         : encodeImportedStudioWillV1DocumentTransport(

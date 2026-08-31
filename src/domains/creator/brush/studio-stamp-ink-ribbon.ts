@@ -791,9 +791,9 @@ function planKnifeReliefBands(
 }
 
 /**
- * The ribbon options a stamp style implies, so the SVG serializer and the Canvas2D fallback cannot
- * drift apart on the union's deposit. A style with no `opaque_linearize` pin (every non-cc0 lane)
- * yields an empty object and the historical plan.
+ * The ribbon options a stamp style implies, so the SVG serializer and Canvas2D compatibility
+ * renderer cannot drift apart on the union's deposit. A style with no `opaque_linearize` pin
+ * (every non-cc0 lane) yields an empty object and the historical plan.
  */
 export function studioStampInkRibbonOptions(
   style: Pick<StudioStampBrushStyle, "mypaintCc0Dynamics">,

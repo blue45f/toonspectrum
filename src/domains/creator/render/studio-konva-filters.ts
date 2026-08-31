@@ -795,8 +795,9 @@ export function buildImageFilters(
     attrs.bfRadius = bf.radius;
     attrs.bfAngle = bf.angle;
   }
-  // Advanced photographic/edge-aware blurs share one deterministic CPU oracle. The module Worker
-  // marks its execution mode so large jobs may run there; a direct Konva fallback remains bounded.
+  // Advanced photographic/edge-aware blurs share one deterministic CPU oracle. The caller fixes
+  // `worker` or `direct` before execution; a Worker failure never re-enters this function as a
+  // direct Konva substitute for the same operation.
   if (hasActiveLensBlur(el)) {
     filters.push(F.LensBlur!);
     const blur = normalizeStudioLensBlurOptions(el.lensBlur);

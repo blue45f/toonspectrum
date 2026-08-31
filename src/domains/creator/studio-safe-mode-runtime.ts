@@ -135,11 +135,11 @@ function createRuntime(options: StudioSafeModeRuntimeOptions): StudioSafeModeRun
           channel: "gpu",
           level: permanent ? "failed" : "degraded",
           title: permanent
-            ? "GPU가 반복해서 끊겨 이번 세션은 CPU 렌더링으로 계속합니다"
-            : "GPU 연결이 끊겨 CPU 렌더링으로 전환했습니다",
+            ? "선택한 GPU 렌더러를 이번 세션에서 사용할 수 없습니다"
+            : "선택한 GPU 렌더러를 현재 사용할 수 없습니다",
           detail: permanent
-            ? `그림은 그대로예요. 화질과 속도만 낮아집니다. (${event.lossCount}회 끊김)`
-            : "그림은 그대로예요. 다시 연결을 시도하는 중입니다.",
+            ? `그림과 마지막 정상 프레임은 그대로 보존합니다. 다른 엔진은 직접 선택해야 합니다. (${event.lossCount}회 끊김)`
+            : "다른 엔진으로 자동 전환하지 않고 같은 GPU 렌더러의 재연결을 시도하는 중입니다.",
           at: clock.now(),
         });
       },

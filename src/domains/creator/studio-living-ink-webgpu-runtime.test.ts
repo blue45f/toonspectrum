@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
@@ -96,10 +98,9 @@ describe("Living Ink WebGPU runtime", () => {
 
   it("never hands out a WGSL runtime that resolves blank frames", async () => {
     /*
-     * The Worker prefers this backend whenever an adapter exists, so a WGSL path that computes
-     * nothing used to reach the user as a blank canvas with no way back to the working backend.
+     * A selected WGSL path that computes nothing must not reach the user as a blank canvas.
      * Admission is by demonstration: a runtime whose display buffer stays empty is disposed, and
-     * the caller is sent down the WebGL2 branch (which, in Node, has no context and yields null).
+     * the WebGPU factory returns null without constructing another provider.
      */
     const saved = new Map<string, PropertyDescriptor | undefined>();
     const stub = (name: string, value: unknown) => {
@@ -158,22 +159,21 @@ describe("Living Ink WebGPU runtime", () => {
   });
 
   /*
-   * The backend-preference contract, stated as a test.
+   * The WebGPU admission contract, stated as a test.
    *
    * The WGSL runtime is the faster of the two shipped backends, and this is the seam where a user
    * with a WebGPU adapter gets it. The material policy ranks handfeel and texture above throughput
    * and lets performance veto only — so "an adapter exists" is not a sufficient reason to prefer
    * it, and neither is "it rendered something". A resolve that has lost the paper and optical
    * density model still renders: uniformly, brightly, and wrongly. This test pins that such a
-   * runtime is refused, which is what sends the Worker down its WebGL2 branch.
+   * runtime is refused, which leaves the selected WebGPU provider unavailable.
    */
   it("refuses a WGSL runtime that renders flat, untextured paper even though it is not blank", async () => {
     // Uniform paper white everywhere: non-blank, zero texture standard deviation, zero ink
     // darkness — precisely the signature of a bare `exp(-density)` display resolve.
     const restore = stubWebGpuWithDisplay([0.965, 0.956, 0.932, 1]);
     try {
-      // Admission fails, the runtime is disposed, and the WebGL2 fallback branch yields null in
-      // Node (no WebGL2 context), so a null here *is* the demotion.
+      // Admission fails, the runtime is disposed, and null reports WebGPU unavailable.
       await expect(tryCreateStudioLivingInkWebGpuRuntime(config)).resolves.toBeNull();
     } finally {
       restore();
@@ -186,7 +186,7 @@ describe("Living Ink WebGPU runtime", () => {
     expect(STUDIO_LIVING_INK_WGSL_ADMISSION.minimumProbeStrokeDarkness).toBeGreaterThan(0);
   });
 
-  it("exports a preferred-runtime helper used by the Worker", async () => {
+  it("exports a WebGPU-only runtime helper used by the Worker", async () => {
     // Without a real adapter the helper returns null; presence of the export is the product seam.
     const runtime = await tryCreateStudioLivingInkWebGpuRuntime(config);
     if (runtime) {
@@ -196,5 +196,15 @@ describe("Living Ink WebGPU runtime", () => {
     } else {
       expect(runtime).toBeNull();
     }
+  });
+
+  it("does not import, construct, or relabel the independent WebGL2 provider", () => {
+    const source = readFileSync(
+      new URL("./studio-living-ink-webgpu-runtime.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toContain("StudioLivingInkWebGl2Runtime");
+    expect(source).not.toContain('backend: "webgpu-offscreen-half-float" as const');
+    expect(source).not.toContain("Object.defineProperty(webgl");
   });
 });

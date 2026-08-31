@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it, vi } from "vitest";
 
 import { parseStudioProjectFile } from "./studio-project-file";
 import {
@@ -99,6 +101,41 @@ class ReplyWorker implements StudioRevisionCompareWorkerLike {
   }
 }
 
+class RuntimeFailureWorker implements StudioRevisionCompareWorkerLike {
+  onmessage: StudioRevisionCompareWorkerLike["onmessage"] = null;
+  onerror: StudioRevisionCompareWorkerLike["onerror"] = null;
+  postMessageCount = 0;
+  terminateCount = 0;
+  readonly preventDefault = vi.fn();
+
+  postMessage(): void {
+    this.postMessageCount += 1;
+    queueMicrotask(() => {
+      this.onerror?.({ preventDefault: this.preventDefault });
+    });
+  }
+
+  terminate(): void {
+    this.terminateCount += 1;
+  }
+}
+
+class PostFailureWorker implements StudioRevisionCompareWorkerLike {
+  onmessage: StudioRevisionCompareWorkerLike["onmessage"] = null;
+  onerror: StudioRevisionCompareWorkerLike["onerror"] = null;
+  postMessageCount = 0;
+  terminateCount = 0;
+
+  postMessage(): void {
+    this.postMessageCount += 1;
+    throw new DOMException("clone failed", "DataCloneError");
+  }
+
+  terminate(): void {
+    this.terminateCount += 1;
+  }
+}
+
 function successResponse(): Extract<
   StudioRevisionCompareWorkerResponse,
   { type: "studio-revision-compare/success" }
@@ -113,7 +150,10 @@ function successResponse(): Extract<
 describe("runStudioRevisionComparison", () => {
   it("uses the module worker path and returns only semantic descriptors", async () => {
     const worker = new ApplyingWorker();
-    const result = await runStudioRevisionComparison(input(), { workerFactory: () => worker });
+    const result = await runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
+      workerFactory: () => worker,
+    });
     expect(result.targetRevision).toBe(2);
     expect(result.localToTarget.hasChanges).toBe(true);
     expect(result.serverToLocal.summary["element-text-changed"]).toBe(1);
@@ -144,22 +184,77 @@ describe("runStudioRevisionComparison", () => {
       originalPostMessage(message);
     };
 
-    await runStudioRevisionComparison(projected, { workerFactory: () => worker });
+    await runStudioRevisionComparison(projected, {
+      executionBackend: "worker",
+      workerFactory: () => worker,
+    });
     expect(posted).not.toContain(rawDataUrl);
     expect(posted).not.toContain("data:image");
     expect(posted).toContain("toonspectrum:resource-sha256:v1:");
   });
 
-  it("uses the bounded direct fallback when workers are unavailable", async () => {
-    const result = await runStudioRevisionComparison(input(), { workerFactory: null });
+  it("runs direct comparison only when direct was selected before the request", async () => {
+    const workerFactory = vi.fn(() => new ApplyingWorker());
+    const result = await runStudioRevisionComparison(input(), {
+      executionBackend: "direct",
+      workerFactory,
+    });
     expect(result.localToTarget.totalChanges).toBeGreaterThan(0);
     expect(result.serverToLocal.totalChanges).toBe(1);
+    expect(workerFactory).not.toHaveBeenCalled();
+  });
+
+  it("defaults to Worker and fails closed when that backend is unavailable or cannot be created", async () => {
+    await expect(runStudioRevisionComparison(input(), {
+      workerFactory: null,
+    })).rejects.toMatchObject({
+      name: "StudioRevisionCompareWorkerError",
+      message: "버전 비교 Worker를 사용할 수 없습니다.",
+    });
+
+    const throwingFactory = vi.fn((): StudioRevisionCompareWorkerLike => {
+      throw new Error("worker constructor blocked");
+    });
+    await expect(runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
+      workerFactory: throwingFactory,
+    })).rejects.toMatchObject({
+      name: "StudioRevisionCompareWorkerError",
+      message: "버전 비교 Worker를 생성하지 못했습니다.",
+    });
+    expect(throwingFactory).toHaveBeenCalledOnce();
+  });
+
+  it("does not rerun direct comparison after Worker post or runtime failure", async () => {
+    const postFailure = new PostFailureWorker();
+    await expect(runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
+      workerFactory: () => postFailure,
+    })).rejects.toMatchObject({
+      name: "StudioRevisionCompareWorkerError",
+      message: "버전 비교 Worker 요청을 시작하지 못했습니다.",
+    });
+    expect(postFailure.postMessageCount).toBe(1);
+    expect(postFailure.terminateCount).toBe(1);
+
+    const runtimeFailure = new RuntimeFailureWorker();
+    await expect(runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
+      workerFactory: () => runtimeFailure,
+    })).rejects.toMatchObject({
+      name: "StudioRevisionCompareWorkerError",
+      message: "버전 비교 Worker 실행에 실패했습니다.",
+    });
+    expect(runtimeFailure.postMessageCount).toBe(1);
+    expect(runtimeFailure.preventDefault).toHaveBeenCalledOnce();
+    expect(runtimeFailure.terminateCount).toBe(1);
   });
 
   it("terminates an in-flight worker when comparison is cancelled", async () => {
     const worker = new HangingWorker();
     const controller = new AbortController();
     const pending = runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
       workerFactory: () => worker,
       signal: controller.signal,
     });
@@ -169,7 +264,7 @@ describe("runStudioRevisionComparison", () => {
     expect(worker.terminateCount).toBe(1);
   });
 
-  it("refuses a huge main-thread fallback instead of freezing the editor", async () => {
+  it("refuses a huge explicit direct comparison instead of freezing the editor", async () => {
     const elements = Array.from(
       { length: STUDIO_REVISION_COMPARE_DIRECT_MAX_ELEMENTS + 1 },
       (_, index) => ({ id: `element-${index}`, type: "image" })
@@ -185,9 +280,9 @@ describe("runStudioRevisionComparison", () => {
       doc: { pagesList: [{ id: "page-1", elements, bg: "#fff", bgGrad: null, canvasH: 1000 }] },
     };
 
-    await expect(runStudioRevisionComparison(huge, { workerFactory: null })).rejects.toThrow(
-      /직접 비교 안전 상한/
-    );
+    await expect(runStudioRevisionComparison(huge, {
+      executionBackend: "direct",
+    })).rejects.toThrow(/direct 버전 비교는 안전 상한/);
   });
 
   it("rejects null and malformed Worker envelopes instead of trusting TypeScript types", async () => {
@@ -200,7 +295,10 @@ describe("runStudioRevisionComparison", () => {
     for (const response of [null, {}, malformedSummary]) {
       const worker = new ReplyWorker(response);
       await expect(
-        runStudioRevisionComparison(input(), { workerFactory: () => worker })
+        runStudioRevisionComparison(input(), {
+          executionBackend: "worker",
+          workerFactory: () => worker,
+        })
       ).rejects.toThrow(/응답 계약/);
       expect(worker.terminateCount).toBe(1);
     }
@@ -213,7 +311,10 @@ describe("runStudioRevisionComparison", () => {
       error: { name: "StudioRevisionDiffError", message: "중복 요소 ID" },
     });
     await expect(
-      runStudioRevisionComparison(input(), { workerFactory: () => bounded })
+      runStudioRevisionComparison(input(), {
+        executionBackend: "worker",
+        workerFactory: () => bounded,
+      })
     ).rejects.toMatchObject({ name: "StudioRevisionDiffError", message: "중복 요소 ID" });
 
     const oversizedPrivateMessage = "private".repeat(400);
@@ -223,6 +324,7 @@ describe("runStudioRevisionComparison", () => {
       error: { name: "Error", message: oversizedPrivateMessage },
     });
     const error = await runStudioRevisionComparison(input(), {
+      executionBackend: "worker",
       workerFactory: () => oversized,
     }).catch((cause: unknown) => cause);
     expect(error).toBeInstanceOf(Error);
@@ -269,7 +371,10 @@ describe("runStudioRevisionComparison", () => {
       oversizedPageLabels,
     ]) {
       await expect(
-        runStudioRevisionComparison(input(), { workerFactory: () => new ReplyWorker(response) })
+        runStudioRevisionComparison(input(), {
+          executionBackend: "worker",
+          workerFactory: () => new ReplyWorker(response),
+        })
       ).rejects.toThrow(/응답 계약/);
     }
   });
@@ -292,6 +397,7 @@ describe("runStudioRevisionComparison", () => {
     let factoryCalls = 0;
 
     await expect(runStudioRevisionComparison(oversized, {
+      executionBackend: "worker",
       workerFactory: () => {
         factoryCalls += 1;
         return new HangingWorker();
@@ -318,6 +424,7 @@ describe("runStudioRevisionComparison", () => {
     for (const unsafe of [deep, cyclic]) {
       let factoryCalls = 0;
       await expect(runStudioRevisionComparison(unsafe, {
+        executionBackend: "worker",
         workerFactory: () => {
           factoryCalls += 1;
           return new HangingWorker();
@@ -336,7 +443,12 @@ describe("runStudioRevisionComparison", () => {
       )}`;
 
     await expect(
-      runStudioRevisionComparison(oversized, { workerFactory: null })
+      runStudioRevisionComparison(oversized, { executionBackend: "direct" })
     ).rejects.toThrow(/개별 문자열/);
+  });
+
+  it("keeps the product callsite on the explicit Worker backend", () => {
+    const panel = readFileSync(new URL("./StudioCheckpointPanel.tsx", import.meta.url), "utf8");
+    expect(panel).toContain('{ executionBackend: "worker", signal: controller.signal }');
   });
 });

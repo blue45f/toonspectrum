@@ -204,6 +204,7 @@ describe("liquify raster ROI", () => {
       { x: 79.75, y: 64.5, pressure: 0.55 },
     ];
     const options = {
+      executionMode: "direct",
       mode,
       hardness: 0.65,
       minimumRadiusRatio: 0.25,
@@ -249,7 +250,7 @@ describe("liquify raster ROI", () => {
       11,
       0.9,
       harness.createCanvas,
-      { mode: "push", hardness: 0.2 },
+      { executionMode: "direct", mode: "push", hardness: 0.2 },
     ) as PixelCanvas;
     const expected = expectedFullFrame(sourceImage, points, 11, 0.9, {
       mode: "push",
@@ -292,7 +293,7 @@ describe("liquify raster ROI", () => {
       10,
       0.75,
       harness.createCanvas,
-      { flipX, flipY },
+      { executionMode: "direct", flipX, flipY },
     ) as PixelCanvas;
     expect(output.pixels.data).toEqual(
       expectedFullFrame(sourceImage, sourcePoints, 10, 0.75, { mode: "push" }).data,
@@ -347,6 +348,7 @@ describe("liquify raster ROI", () => {
       height,
       field,
       harness.createCanvas,
+      { executionMode: "direct" },
     ) as PixelCanvas;
     const expected = cloneImage(sourceImage);
     applyLiquifyDisplacement(sourceImage, expected, field);

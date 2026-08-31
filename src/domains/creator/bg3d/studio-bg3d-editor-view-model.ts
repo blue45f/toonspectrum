@@ -95,7 +95,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     DEFAULT_LT_USER_PRESET_DESCRIPTION, EMPTY_THREE_ANIMATION_CLIPS, EMPTY_THREE_JOINTS, EMPTY_THREE_MORPH_TARGETS,
     loadStudioBg3dBabylonSpecialistEntry, loadStudioBg3dModelThumbnailRuntime, LT_EXPORT_HEIGHTS, LT_TONE_MODE_LABELS,
     LT_TONE_PATTERN_LABELS, LT_TONE_TYPE_LABELS, SEMANTIC_MATERIAL_CONFIDENCE_LABELS, SEMANTIC_MATERIAL_SLOT_LABELS,
-    STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS, STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS, TRANSFORM_MODES, VIEW_EDITOR_SECTIONS,
+    STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS, TRANSFORM_MODES, VIEW_EDITOR_SECTIONS,
     VIEWPORT_BTN, StudioBg3dActionFooter, StudioBg3dDirectionalShadowLight, StudioBg3dImmersivePanel,
     StudioBg3dLtPanel, StudioBg3dMeasurementPanel, StudioBg3dMeasurementViewport, StudioBg3dPhysicsPanel,
     StudioBg3dPhysicsTransport, StudioBg3dPlacementPointerController, StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog,
@@ -284,11 +284,12 @@ export function bindStudioBg3dEditorViewModel(h) {
     saveData: deviceSignals.saveData,
     deviceMemoryGb: deviceSignals.deviceMemoryGb,
     observedWebglOnlyFeatures: {
-      // The immersive session bridge drives WebGLRenderer.xr, so an active session pins WebGL2.
+      // The immersive bridge needs WebGLRenderer.xr, so it makes a selected WebGPU plan unavailable
+      // until the artist explicitly chooses WebGL2.
       webxr: webXrSessionState.status !== "idle",
-      // A character on the stage pins WebGL2 too — not because WebGPU cannot load MToon, but
-      // because the two MToon implementations shade differently, and the delivered frame has to
-      // match the poser and every other machine. See studio-bg3d-engine-selection.
+      // A character has the same explicit-choice requirement — not because WebGPU cannot load
+      // MToon, but because the two implementations shade differently and delivery must match the
+      // poser and every other machine. See studio-bg3d-engine-selection.
       vrmCharacters: sharedCharacters.length > 0,
     },
   });

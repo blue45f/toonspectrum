@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   StudioBg3dShotPngWorkerError,
   encodeStudioBg3dShotPngInWorker,
-  isStudioBg3dShotPngFallbackEligibleError,
   type StudioBg3dShotPngWorkerLike,
 } from "./studio-bg3d-shot-png-worker-client";
 import {
@@ -217,13 +216,12 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     })).toBe(false);
   });
 
-  it("classifies only Worker construction and the explicit OffscreenCanvas capability result as fallback eligible", async () => {
+  it("reports Worker construction and OffscreenCanvas capability failures without substitution", async () => {
     const construction = encodeStudioBg3dShotPngInWorker([layer()], {
       workerFactory: () => { throw new Error("CSP"); },
     });
     const constructionError = await construction.catch((error: unknown) => error);
     expect(constructionError).toMatchObject({ code: "worker-unavailable" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(constructionError)).toBe(true);
 
     const unsupportedWorker = new FakeWorker();
     const unsupported = encodeStudioBg3dShotPngInWorker([layer()], {
@@ -236,7 +234,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     });
     const unsupportedError = await unsupported.catch((error: unknown) => error);
     expect(unsupportedError).toMatchObject({ code: "offscreen-unavailable" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(unsupportedError)).toBe(true);
     expect(unsupportedWorker.terminateCalls).toBe(1);
 
     const preReadyWorker = new FakeWorker();
@@ -246,7 +243,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     preReadyWorker.emitError();
     const preReadyError = await preReady.catch((error: unknown) => error);
     expect(preReadyError).toMatchObject({ code: "worker-failed" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(preReadyError)).toBe(false);
   });
 
   it("keeps post-ready protocol, encode, runtime, and transfer failures terminal", async () => {
@@ -287,14 +283,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     emitReady(transferWorker);
     await expect(transferFailure).rejects.toMatchObject({ code: "worker-failed" });
 
-    for (const error of [
-      await malformed.catch((value: unknown) => value),
-      await encodeFailure.catch((value: unknown) => value),
-      await runtimeFailure.catch((value: unknown) => value),
-      await transferFailure.catch((value: unknown) => value),
-    ]) {
-      expect(isStudioBg3dShotPngFallbackEligibleError(error)).toBe(false);
-    }
   });
 
   it("rejects forged PNG headers and dimensions after terminating the Worker", async () => {
@@ -321,7 +309,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     controller.abort();
     const abortError = await aborted.catch((error: unknown) => error);
     expect(abortError).toMatchObject({ code: "aborted", name: "AbortError" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(abortError)).toBe(false);
     expect(abortedWorker.terminateCalls).toBe(1);
 
     vi.useFakeTimers();
@@ -334,7 +321,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     await vi.advanceTimersByTimeAsync(100);
     const startupError = await startupOutcome;
     expect(startupError).toMatchObject({ code: "timeout", name: "TimeoutError" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(startupError)).toBe(false);
 
     const encodeWorker = new FakeWorker();
     const timed = encodeStudioBg3dShotPngInWorker([layer()], {
@@ -346,7 +332,6 @@ describe("Studio BG3D shot PNG Worker boundary", () => {
     await vi.advanceTimersByTimeAsync(100);
     const timedError = await timedOutcome;
     expect(timedError).toMatchObject({ code: "timeout", name: "TimeoutError" });
-    expect(isStudioBg3dShotPngFallbackEligibleError(timedError)).toBe(false);
     expect(encodeWorker.terminateCalls).toBe(1);
   });
 

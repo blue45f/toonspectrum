@@ -35,6 +35,7 @@ const config: StudioLivingInkExecutionConfig = {
     granulation: 0.5,
   },
 };
+const backend = "webgl2" as const;
 
 const recipe: StudioLivingInkStrokeRecipeSnapshot = {
   mode: "ink",
@@ -171,11 +172,37 @@ async function activated(
     providerFactory: async () => provider,
     ...callbacks,
   });
-  await expect(coordinator.activate({ pageId: "page-1", config })).resolves.toBe(true);
+  await expect(coordinator.activate({ pageId: "page-1", backend, config })).resolves.toBe(true);
   return coordinator;
 }
 
 describe("StudioLivingInkStudioCoordinator", () => {
+  it("passes one explicit provider selection into the product factory", async () => {
+    const provider = new FakeProvider();
+    const factory = vi.fn(async () => provider);
+    const coordinator = new StudioLivingInkStudioCoordinator({ providerFactory: factory });
+    await expect(coordinator.activate({
+      pageId: "page-webgpu",
+      backend: "webgpu",
+      config,
+    })).resolves.toBe(true);
+    expect(factory).toHaveBeenCalledWith(config, "webgpu");
+  });
+
+  it("fails closed before replay when the selected provider differs from the persisted receipt", async () => {
+    const provider = new FakeProvider();
+    const factory = vi.fn(async () => provider);
+    const coordinator = new StudioLivingInkStudioCoordinator({ providerFactory: factory });
+    await expect(coordinator.activate({
+      pageId: "page-mismatch",
+      backend: "webgpu",
+      config,
+      expectedFinalReceipt: receipt(1, null),
+    })).resolves.toBe(false);
+    expect(factory).not.toHaveBeenCalled();
+    expect(coordinator.state).toBe("failed");
+  });
+
   it("keeps a continuous, non-duplicated interpolation anchor across 65+ authoritative samples", async () => {
     const provider = new FakeProvider();
     const coordinator = await activated(provider);
@@ -329,7 +356,12 @@ describe("StudioLivingInkStudioCoordinator", () => {
 
     const replay = new FakeProvider();
     const reopened = new StudioLivingInkStudioCoordinator({ providerFactory: async () => replay });
-    await expect(reopened.activate({ pageId: "page-1", config, journal: work.journal })).resolves.toBe(true);
+    await expect(reopened.activate({
+      pageId: "page-1",
+      backend,
+      config,
+      journal: work.journal,
+    })).resolves.toBe(true);
     expect(replay.operations).toEqual(work.journal);
     expect(replay.simulationAcks).toHaveLength(work.journal.length);
     expect(replay.simulationAcks.at(-1)).toMatchObject({
@@ -390,6 +422,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
     const reopened = new StudioLivingInkStudioCoordinator({ providerFactory: async () => replay });
     await expect(reopened.activate({
       pageId: "page-1",
+      backend,
       config,
       journal: clearWork.journal,
       expectedFinalReceipt: clearWork.frame.receipt,
@@ -407,13 +440,13 @@ describe("StudioLivingInkStudioCoordinator", () => {
     const coordinator = new StudioLivingInkStudioCoordinator({
       providerFactory: async () => providers.shift()!,
     });
-    await coordinator.activate({ pageId: "page-1", config });
+    await coordinator.activate({ pageId: "page-1", backend, config });
     coordinator.admitStroke({ pageId: "page-1", strokeId: "stroke-1", recipe });
     coordinator.pinActiveRoute("stroke-1", "route-1");
     coordinator.append("stroke-1", "route-1", [sample(0), sample(1)]);
     await Promise.resolve();
 
-    const switching = coordinator.activate({ pageId: "page-2", config });
+    const switching = coordinator.activate({ pageId: "page-2", backend, config });
     await Promise.resolve();
     await expect(switching).resolves.toBe(true);
     expect(oldProvider.disposed).toHaveBeenCalledTimes(1);
@@ -431,6 +464,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
     });
     await expect(coordinator.activate({
       pageId: "page-1",
+      backend,
       config,
       expectedFinalReceipt: receipt(9, null),
     })).resolves.toBe(false);
@@ -478,7 +512,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
       }),
     });
 
-    const activation = coordinator.activate({ pageId: "page-1", config });
+    const activation = coordinator.activate({ pageId: "page-1", backend, config });
     await Promise.resolve();
     expect(coordinator.state).toBe("loading");
 
@@ -507,7 +541,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
       fixedTicks: 1,
     }];
 
-    const activation = coordinator.activate({ pageId: "page-1", config, journal });
+    const activation = coordinator.activate({ pageId: "page-1", backend, config, journal });
     while (provider.operations.length === 0) await Promise.resolve();
     expect(coordinator.state).toBe("loading");
 
@@ -530,7 +564,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
     const coordinator = new StudioLivingInkStudioCoordinator({
       providerFactory: async () => providers.shift()!,
     });
-    await coordinator.activate({ pageId: "page-1", config });
+    await coordinator.activate({ pageId: "page-1", backend, config });
     coordinator.admitStroke({ pageId: "page-1", strokeId: "stroke-1", recipe });
     coordinator.pinActiveRoute("stroke-1", "route-1");
     coordinator.append("stroke-1", "route-1", [sample(0), sample(1)]);
@@ -553,7 +587,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
     const coordinator = new StudioLivingInkStudioCoordinator({
       providerFactory: async () => providers.shift()!,
     });
-    await coordinator.activate({ pageId: "page-1", config });
+    await coordinator.activate({ pageId: "page-1", backend, config });
     const action = coordinator.applyAction({
       routeKey: "stale-clear",
       kind: "clear",
@@ -562,7 +596,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
     });
     await Promise.resolve();
 
-    await expect(coordinator.activate({ pageId: "page-2", config })).resolves.toBe(true);
+    await expect(coordinator.activate({ pageId: "page-2", backend, config })).resolves.toBe(true);
     releaseApply();
     await expect(action).rejects.toThrow(/route changed/);
     expect(coordinator.pageId).toBe("page-2");
@@ -583,7 +617,7 @@ describe("StudioLivingInkStudioCoordinator", () => {
       providerFactory: async () => provider,
       onCapacityDiagnostic: diagnostic,
     });
-    await coordinator.activate({ pageId: "page-1", config, journal });
+    await coordinator.activate({ pageId: "page-1", backend, config, journal });
     expect(coordinator.admitStroke({ pageId: "page-1", strokeId: "stroke-1", recipe })).toBe(false);
     expect(coordinator.capacityDiagnostic).toContain("기록 용량");
     expect(diagnostic).toHaveBeenCalledTimes(1);

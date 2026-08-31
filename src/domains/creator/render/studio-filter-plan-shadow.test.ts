@@ -83,40 +83,43 @@ describe("V11 shadow planner parity (filter execution route)", () => {
       total += 1;
     }
     expect(total).toBe(48);
-    // Both planning-time head lanes must be reachable in the enumeration —
-    // otherwise the parity claim silently shrinks. konva-native is asserted
-    // separately: it is the terminal runtime-failure fallback and must never
-    // surface as a planning-time head at this seam.
+    // Both admission-time lanes must be reachable in the enumeration.
+    // Konva remains an explicitly selectable compatibility/reference lane,
+    // never an automatic result of another selected provider failing.
     expect(reached.get("gpu-chain") ?? 0, "gpu-chain reachable").toBeGreaterThan(0);
     expect(reached.get("worker") ?? 0, "worker reachable").toBeGreaterThan(0);
-    expect(reached.get("konva-native") ?? 0, "konva-native never a planned head").toBe(0);
+    expect(reached.get("konva-native") ?? 0, "konva-native is not auto-selected").toBe(0);
   });
 
-  it("konva-native terminates every planned fallback chain (ladder tail, never head)", () => {
+  it("binds every valid admission state to exactly one execution provider", () => {
     for (const input of allSnapshots()) {
       const result = planStudioFilterExecutionShadow(input);
-      const chain = result.plan?.islands[0]?.fallbackChain ?? [];
-      expect(chain.length, JSON.stringify(input)).toBeGreaterThan(0);
-      expect(chain[chain.length - 1]).toBe("filter-exec-konva-native");
+      expect(result.plannedLane, JSON.stringify(input)).not.toBeNull();
+      expect(result.plan?.islands[0]?.providerId, JSON.stringify(input)).toBe(
+        `filter-exec-${result.plannedLane}`,
+      );
+      expect(result.plan?.islands[0], JSON.stringify(input)).not.toHaveProperty(
+        "fallbackChain",
+      );
+      expect(admittedStudioFilterExecutionLanes(input), JSON.stringify(input)).toEqual([
+        result.legacyLane,
+      ]);
     }
   });
 
-  it("planner output carries the full ladder as an explicit fallback chain on the GPU head", () => {
+  it("keeps a GPU admission as a singleton final-export island", () => {
     const result = planStudioFilterExecutionShadow(snapshot());
     expect(result.legacyLane).toBe("gpu-chain");
     expect(result.plannedLane).toBe("gpu-chain");
-    expect(result.plan?.islands[0]?.fallbackChain).toEqual([
-      "filter-exec-gpu-chain",
-      "filter-exec-worker",
-      "filter-exec-konva-native",
-    ]);
+    expect(result.plan?.islands[0]?.providerId).toBe("filter-exec-gpu-chain");
+    expect(result.plan?.islands[0]).not.toHaveProperty("fallbackChain");
     expect(result.plan?.primaryOwnerId).toBe("filter-exec-konva-native");
     // The island's terminal single readback is legal only in final-export
     // mode (absolute rule 8 stays machine-checked).
     expect(result.plan?.mode).toBe("final-export");
   });
 
-  it("each single gate failure demotes the GPU head to the worker lane", () => {
+  it("selects Worker at admission when a GPU prerequisite is absent", () => {
     const gates: readonly Partial<StudioFilterExecutionRouteSnapshotInput>[] = [
       { islandHeadLane: "worker" },
       { islandHeadLane: "konva-native" },
@@ -130,20 +133,17 @@ describe("V11 shadow planner parity (filter execution route)", () => {
       expect(result.legacyLane, JSON.stringify(override)).toBe("worker");
       expect(result.plannedLane, JSON.stringify(override)).toBe("worker");
       expect(result.agrees).toBe(true);
+      expect(result.plan?.islands[0]?.providerId).toBe("filter-exec-worker");
+      expect(result.plan?.islands[0]).not.toHaveProperty("fallbackChain");
     }
   });
 
-  it("admitted lanes always keep worker and konva-native as the CPU tail", () => {
+  it("returns a singleton admitted lane in stable identity space", () => {
     for (const input of allSnapshots()) {
       const lanes = admittedStudioFilterExecutionLanes(input);
-      expect(lanes[lanes.length - 2]).toBe("worker");
-      expect(lanes[lanes.length - 1]).toBe("konva-native");
-      // Ladder order is priority order — no admitted lane may outrank a
-      // higher-priority admitted lane.
-      const ranks = lanes.map((lane) =>
-        STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY.indexOf(lane),
-      );
-      expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+      expect(lanes).toHaveLength(1);
+      expect(STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY).toContain(lanes[0]);
+      expect(lanes[0]).not.toBe("konva-native");
     }
   });
 });

@@ -38,6 +38,7 @@ type CapturedImageProps = {
   studioAnimatedImageFilterOwner?: string;
   studioAnimatedImageFilterReason?: string;
   studioAnimatedImageFilterStatus?: string;
+  visible?: boolean;
   x?: number;
 };
 
@@ -82,6 +83,7 @@ const konvaCapture = vi.hoisted(() => {
       getLayer: vi.fn(() => layer),
       image: vi.fn(() => capture.appliedImage),
       isVisible: vi.fn(() => true),
+      visible: vi.fn(),
     },
     currentProps: null as Record<string, unknown> | null,
     fireLayerDraw: () => {
@@ -1033,7 +1035,7 @@ describe("StudioKonvaImageNode animated GIF scheduling", () => {
     expect(animationFrames.pending).toHaveLength(1);
   });
 
-  it("surfaces budget degradation while keeping the raw GIF animation moving", async () => {
+  it("surfaces budget degradation without redisplaying the raw GIF", async () => {
     const onStatus = vi.fn<(status: StudioAnimatedImageFilterStatus) => void>();
     render(
       <StudioKonvaImageNode
@@ -1064,10 +1066,11 @@ describe("StudioKonvaImageNode animated GIF scheduling", () => {
       state: "degraded",
     });
     expect(latestImageProps().filters).toBeUndefined();
+    expect(latestImageProps().visible).toBe(false);
     expect(konvaCapture.node.cache).not.toHaveBeenCalled();
     konvaCapture.layer.batchDraw.mockClear();
-    fireNextAnimationFrame(80);
-    expect(konvaCapture.layer.batchDraw).toHaveBeenCalledTimes(1);
+    expect(animationFrames.pending).toHaveLength(0);
+    expect(konvaCapture.layer.batchDraw).not.toHaveBeenCalled();
     expect(filterCapture.runWorker).not.toHaveBeenCalled();
     expect(tournamentCapture.schedule).not.toHaveBeenCalled();
   });

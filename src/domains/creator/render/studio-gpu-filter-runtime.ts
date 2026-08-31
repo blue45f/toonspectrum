@@ -3,9 +3,9 @@
  * 이미지 보정 컴퓨트 커널 전용 경량 WebGPU 디바이스 매니저.
  *
  * studio-webgpu-engine(잉크 엔진)의 디바이스 수명 규율을 그대로 따르되 완전히 독립이다:
- *  - 기능 감지 실패/어댑터 없음/획득 예외 → null (호출부는 CPU 경로로 폴백)
+ *  - 기능 감지 실패/어댑터 없음/획득 예외 → null (선택한 WebGPU provider 사용 불가)
  *  - device lost → 런타임을 lost 로 표시하고 공유 싱글턴을 비운다(진행 중 호출은 실패 →
- *    호출부 폴백, 다음 acquire 는 새 디바이스를 다시 시도)
+ *    마지막 정상 화면 유지; 다른 provider는 같은 작업에서 시작하지 않음)
  *  - dispose 는 세대(generation) 카운터로 in-flight 획득과 경합해도 안전하다
  *
  * 픽셀은 rgba8 을 u32 로 패킹한 storage buffer 로 오르내린다 — 텍스처 row-padding(256B
@@ -39,7 +39,7 @@ export interface StudioGpuFilterShaderSource {
 
 export interface StudioGpuFilterRuntime {
   readonly device: GPUDevice;
-  /** true 면 이 런타임은 다시 쓸 수 없다 — 호출부는 즉시 CPU 로 폴백해야 한다. */
+  /** true 면 선택한 WebGPU provider를 다시 쓸 수 없고 해당 작업은 unavailable이다. */
   readonly lost: boolean;
   getComputePipeline(shader: StudioGpuFilterShaderSource): GPUComputePipeline;
   /** ping-pong 픽셀 버퍼(STORAGE|COPY_SRC|COPY_DST) lease. */
@@ -304,7 +304,7 @@ async function createRuntime(gpu: GPU | null, generation: number): Promise<Studi
 }
 
 /**
- * 공유 필터 런타임 획득 — 미지원/실패/획득 중 dispose 는 전부 null(호출부는 CPU 폴백).
+ * 공유 필터 런타임 획득 — 미지원/실패/획득 중 dispose 는 전부 null(fail-closed).
  * options.gpu 가 지정되면 싱글턴을 우회해 독립 런타임을 만든다(호출부가 dispose 책임).
  */
 export function acquireStudioGpuFilterRuntime(

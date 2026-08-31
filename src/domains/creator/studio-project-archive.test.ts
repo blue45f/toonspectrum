@@ -1,19 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
 } from "./ai/studio-ai-provenance";
+import { disposeSharedStudioBg3dValidationWorker } from "./bg3d/studio-bg3d-glb-validation-worker-client";
+import { StudioBg3dValidationWorkerTestFixture } from "./bg3d/studio-bg3d-glb-validation-worker.test-fixture";
 import { createStudioBg3dMeshoptCompressedTriangleGlbFixture } from "./bg3d/studio-bg3d-meshopt.test-fixture";
 import {
   STUDIO_BG3D_GLB_MIME,
   createDefaultStudioBg3dSceneDocument,
 } from "./bg3d/studio-bg3d-scene-document";
 import {
-  buildStudioPackageArchiveBlob,
+  buildStudioPackageArchiveBlob as buildStudioPackageArchiveBlobWithBackend,
 } from "./studio-package-archive";
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   collectStudioBg3dProjectArchivePlan,
   importStudioProjectArchive,
   resolveStudioProjectArchiveAttachment,
@@ -38,6 +40,35 @@ const decoder = new TextDecoder();
 const LOCAL_SIGNATURE = 0x04034b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const EOCD_SIGNATURE = 0x06054b50;
+
+function installBg3dValidationWorker(): void {
+  vi.stubGlobal("Worker", StudioBg3dValidationWorkerTestFixture);
+}
+
+afterEach(() => {
+  disposeSharedStudioBg3dValidationWorker();
+  vi.unstubAllGlobals();
+});
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioPackageArchiveBlob(
+  entries: Parameters<typeof buildStudioPackageArchiveBlobWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioPackageArchiveBlobWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioPackageArchiveBlobWithBackend> {
+  return buildStudioPackageArchiveBlobWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function minimalPage(elements: unknown[] = [], bg = "#ffffff") {
   return { id: "page-1", elements, bg, bgGrad: null, canvasH: 1_080 };
@@ -636,6 +667,7 @@ describe("studio-project-archive", () => {
   });
 
   it("canonical 3D 장면의 sha256 필드를 바꾸지 않고 GLB archive 바이트와 무결성 연결한다", async () => {
+    installBg3dValidationWorker();
     const glb = glbBytes(17);
     const glbHash = await sha256(glb);
     const scene = {
@@ -718,6 +750,7 @@ describe("studio-project-archive", () => {
   });
 
   it("번들 BG3D attachment provenance를 archive와 복원 경계에서 그대로 보존한다", async () => {
+    installBg3dValidationWorker();
     const glb = glbBytes(23);
     const glbHash = await sha256(glb);
     const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
@@ -888,6 +921,7 @@ describe("studio-project-archive", () => {
   });
 
   it("required Meshopt GLB를 canonical 정책으로 archive build/import 왕복한다", async () => {
+    installBg3dValidationWorker();
     const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
     const archiveInputFor = async (glb: Uint8Array, id: string) => {
       const digest = await sha256(glb);

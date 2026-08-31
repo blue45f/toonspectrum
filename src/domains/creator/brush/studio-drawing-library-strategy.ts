@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v8" as const;
+  "studio-drawing-library-strategy-v10" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
@@ -19,7 +19,7 @@ export type StudioDrawingLibraryProductLayer =
   | "path-quality-worker"
   | "vector-geometry"
   | "vector-tessellation"
-  | "deterministic-raster-fallback"
+  | "deterministic-raster-oracle"
   | "filter-worker"
   | "gpu-vector-research"
   | "browser-runtime-benchmark"
@@ -142,11 +142,11 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-live-natural-media-provider-active-30-routes",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly. Nineteen verified pencil, charcoal and oil identities now auto-route through its transferable packed-dirty Dedicated Worker; the canonical transparent PNG plus hash-keyed Konva draw receipt owns commit handoff.",
+        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly. Nineteen verified pencil, charcoal and oil identities may select its transferable packed-dirty Dedicated Worker before the stroke begins; the canonical transparent PNG plus hash-keyed Konva draw receipt owns commit handoff.",
       riskNotes: [
-        "Only 19 quality-gated pencil, charcoal and oil identities changed default routing; the other 207 shelf identities keep their existing exact routes.",
-        "Provider failure stays on the runtime-stroke-boundary fallback for the whole stroke; mid-stroke pixel-authority promotion remains forbidden.",
-        "The explicit selected-stroke transparent PNG transform remains available as the protocol-v2 conversion fallback.",
+        "Only 19 quality-gated pencil, charcoal and oil identities expose this pre-stroke provider selection; the other 207 shelf identities keep their existing exact routes.",
+        "Provider failure is terminal for the selected stroke; a different provider may be selected only before the next stroke, and mid-stroke pixel-authority promotion remains forbidden.",
+        "The selected-stroke transparent PNG transform is a separately selected protocol-v2 conversion route.",
         "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own packed dirty-frame binding and fail-closed live Worker protocol v1.",
         "License inventory, checked-in integrity hashes, byte-reproducible release build and real-browser runtime QA gate the local provider.",
         "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter, dirty bounds, output dimensions, pixel layout and output hashes must be receipted.",
@@ -194,7 +194,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-gpu-scene-overlay-provider",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "pixi.js 8.19 is installed with a lazy WebGPU-first/WebGL-fallback selectable-scene provider. StudioPixiSceneOverlayHost always-on mounts createStudioPixiSceneProvider on the canvas stage for selection overlays (pointer-inactive).",
+        "pixi.js 8.19 is installed with a lazy, explicitly selected WebGPU or WebGL selectable-scene provider. StudioPixiSceneOverlayHost uses an always-on mount for the WebGPU lane on the canvas stage for selection overlays (pointer-inactive) and fails closed if it is unavailable.",
       riskNotes: [
         "It owns only a dedicated transparent pointer-inactive overlay canvas; the document, selection commands and hit-test meaning remain ToonSpectrum-owned.",
         "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
@@ -229,7 +229,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       riskNotes: [
         "Only plain SVG path data and structured receipts may cross the Worker boundary; Embind objects and WASM pointers never enter the document.",
         "It has no live or committed brush-pixel authority and cannot replace the canonical stroke plan.",
-        "Every allocated CanvasKit path must be deleted inside the Worker epoch, and unsupported text shaping continues through the ToonSpectrum fallback.",
+        "Every allocated CanvasKit path must be deleted inside the Worker epoch, and unsupported text shaping fails closed at the explicitly selected first-party text boundary.",
       ],
     }),
     strategy({
@@ -253,15 +253,15 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       displayName: "tiny-skia",
       packageName: "tiny-skia",
       license: "BSD-3-Clause",
-      productLayer: "deterministic-raster-fallback",
+      productLayer: "deterministic-raster-oracle",
       decision: "poc-deterministic-raster-oracle",
       runtimeInstallation: "not-installed-poc",
       maintenanceNote:
-        "Candidate Rust/WASM CPU fallback and golden-image oracle; upstream stable 0.12.0 is not installed and has no product route.",
+        "Candidate Rust/WASM CPU golden-image oracle; upstream stable 0.12.0 is not installed and has no product route.",
       riskNotes: [
         "The supported surface is CPU-only RGBA8888 and excludes GPU rendering, text, ICC profiles, advanced path operations and non-PNG codecs.",
         "Upstream's goal of matching Skia output is not by itself a cross-browser or cross-architecture determinism guarantee.",
-        "Adoption gate: native/WASM golden hashes, alpha/blend fixtures and bounded Worker benchmarks must outperform or materially simplify the current CanvasKit/Canvas2D fallback.",
+        "Adoption gate: native/WASM golden hashes, alpha/blend fixtures and bounded Worker benchmarks must outperform or materially simplify separately selected CanvasKit and Canvas2D provider routes.",
       ],
     }),
     strategy({
@@ -335,7 +335,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       maintenanceNote:
         "WGPU 2D vector path renderer engine providing coarse/fine stroke tile binning and subpixel anti-aliased path rasterization.",
       riskNotes: [
-        "WGPU context must fall back gracefully to CanvasKit/Canvas2D when WebGPU is disabled.",
+        "The selected Vello WebGPU operation fails closed when WebGPU is unavailable; CanvasKit and Canvas2D are independent providers that may only be selected before another operation.",
       ],
     }),
     strategy({
@@ -437,7 +437,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
  * libraries, while GPL/proprietary references may be useful without being product dependencies.
  */
 export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
-  "studio-drawing-source-audit-v6" as const;
+  "studio-drawing-source-audit-v7" as const;
 
 export type StudioDrawingSourceKind =
   | "first-party"
@@ -578,7 +578,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "browser-native",
     brushAuthorityOverlap: "none-infrastructure",
     rationale:
-      "Raw WebGL2 is retained as an isolated GPU surface and fallback transport, never as an independent document or history model.",
+      "Raw WebGL2 is retained as an isolated, explicitly selected GPU transport and never becomes a same-operation replacement for WebGPU or an independent document/history model.",
   }),
   sourceAudit({
     id: "raw-webgpu",
@@ -593,7 +593,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "browser-native",
     brushAuthorityOverlap: "none-infrastructure",
     rationale:
-      "The textured dry-media vertical slice uses ToonSpectrum-owned WebGPU lowering and a shared RGBA16F presentation surface behind capability, receipt and atomic fallback gates. The normal Studio viewport conditionally promotes one selected, top-most, unclipped dry-media stroke after exact parity receipts; pointer-live drawing and the default shelf remain on their retained product routes.",
+      "The textured dry-media vertical slice uses ToonSpectrum-owned WebGPU lowering and a shared RGBA16F presentation surface behind capability, exact-receipt and atomic-authority gates. The normal Studio viewport promotes one selected, top-most, unclipped dry-media stroke only after exact parity receipts; a failed selected WebGPU operation never reveals a Konva replacement frame.",
   }),
   sourceAudit({
     id: "perfect-freehand",
@@ -664,7 +664,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "brush-renderer-overlap",
     rationale:
-      "The installed Rust/WASM binding is automatically wired for 19 verified pencil, charcoal and oil identities: packed dirty deltas, one-frame backpressure, finish-tail acknowledgement, overlay composition, canonical full-frame parity, transparent PNG and a hash-keyed document draw receipt. The other 207 shelf identities retain their existing routes, while runtime-stroke-boundary and the selected-stroke protocol-v2 transform remain explicit failure/conversion fallbacks.",
+      "The installed Rust/WASM binding is selected before the stroke for 19 verified pencil, charcoal and oil identities: packed dirty deltas, one-frame backpressure, finish-tail acknowledgement, overlay composition, canonical full-frame parity, transparent PNG and a hash-keyed document draw receipt. The other shelf identities retain explicitly planned compatibility routes; runtime failure never switches the active stroke to another renderer.",
   }),
   sourceAudit({
     id: "p5-brush",
@@ -706,7 +706,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "scene-model-overlap",
     rationale:
-      "The WebGPU-first selectable overlay provider is isolated and always-on mounted by StudioPixiSceneOverlayHost; it stays a pointer-inactive presentation overlay while Konva keeps selection and transform authority.",
+      "The explicitly selected WebGPU selectable overlay provider is isolated and mounted by StudioPixiSceneOverlayHost; it stays a pointer-inactive presentation overlay while Konva keeps selection and transform authority, and it never switches to WebGL during the same operation.",
   }),
   sourceAudit({
     id: "paper",
@@ -764,7 +764,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "proof-of-concept-only",
     brushAuthorityOverlap: "path-renderer-overlap",
     rationale:
-      "Its official CPU-only RGBA8888 Skia subset can be evaluated as a deterministic fallback and golden oracle, but native/WASM hash parity, alpha/blend fixtures and Worker benchmarks must pass before adoption; it cannot supply GPU, text, ICC or advanced PathOps.",
+      "Its official CPU-only RGBA8888 Skia subset can be evaluated as a deterministic golden/reference oracle, but native/WASM hash parity, alpha/blend fixtures and Worker benchmarks must pass before adoption; it cannot supply GPU, text, ICC or advanced PathOps.",
   }),
   sourceAudit({
     id: "photon",
@@ -787,14 +787,14 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     sourceKind: "open-source",
     officialSource: "https://github.com/linebender/vello",
     versionEvidence:
-      "crates.io stable vello 0.9.0 audited 2026-07-30; not installed",
+      "workspace Rust/WASM fork pinned to Vello 0.9.0 with CPU and browser-GPU artifacts, exact integrity manifests and product probes",
     license: "MIT OR Apache-2.0",
     activity: "young-fast-moving",
-    disposition: "research-only",
-    codePolicy: "research-only",
+    disposition: "adopted-opt-in",
+    codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "path-renderer-overlap",
     rationale:
-      "Official upstream calls Vello alpha, lists unfinished filters/artifact handling/GPU allocation/glyph caching, and says web is not a primary target with incomplete WebGPU implementations. It remains research-only until production web support plus browser parity, device-loss, memory and deterministic-export fallback gates pass.",
+      "The workspace fork now owns a bounded product document slice through exact scene-revision and GPU-presentation receipts. Upstream remains alpha and incomplete for filters, artifact handling, allocation reuse and glyph caching, so unsupported content is selected into a compatibility provider before rendering and a Vello failure never starts another provider.",
   }),
   sourceAudit({
     id: "servo",

@@ -33,17 +33,16 @@ import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-pr
  *   is sample-scoped, not plan-scoped: both the legacy path and the provider
  *   seam route through the same `applyStabilizer` kernel, so the plan does not
  *   restate it.
- * - The quarantined "ink-stroke-modeler" lane stays opt-in (ADR-0009 fallback
+ * - The quarantined "ink-stroke-modeler" lane stays opt-in (ADR-0009 admission
  *   principle, mirroring `allowInk !== true` in selectStabilizerBackend) and
  *   additionally sits behind the live-ink fleet rollout gate
  *   (studio-live-ink-rollout.ts), the optional stroke-scoped live-ink backend
  *   decision (studio-live-ink-backend.ts), and the renderer-tournament kill
  *   switch (RemoteKillSwitch.isKilled, consumed structurally like
  *   selectFilterLane in studio-renderer-tournament-runtime.ts).
- * - First-party lanes are the recovery chain and are therefore
- *   extinction-guarded: a kill entry against an ema/spring provider id never
- *   changes the plan, mirroring selectFilterLane's "a kill list that would
- *   empty the chain is ignored" rule.
+ * - The kill switch applies to the exact provider selected by the existing
+ *   admission rules. A killed provider makes the plan unavailable; it never
+ *   selects or executes another stabilizer provider.
  *
  * Hot-path contract: pure functions only. No I/O, no awaits, no module state.
  */
@@ -129,7 +128,7 @@ export type StudioLiveInkStabilizerPlanReason =
   | "stabilizer-disabled"
   /** Pristine outcome: the shipped ema/spring lane with graph params verbatim. */
   | "first-party-current"
-  /** Quarantined ink lane admitted through opt-in + rollout + backend + kill gates. */
+  /** Quarantined ink lane admitted through opt-in + rollout + backend gates. */
   | "ink-opt-in";
 
 export type StudioLiveInkStabilizerInkExclusion =
@@ -139,12 +138,10 @@ export type StudioLiveInkStabilizerInkExclusion =
   | "stabilizer-disabled"
   /** Observation caller had no fleet rollout decision — fail closed. */
   | "rollout-missing"
-  /** Fleet rollout resolved canvas2d (kill switch, forced, disabled, excluded …). */
+  /** Fleet rollout did not admit this exact ink provider (killed, disabled, excluded, …). */
   | "rollout-not-admitted"
-  /** Stroke-scoped live-ink backend decision resolved canvas2d. */
-  | "backend-not-webgpu"
-  /** Renderer tournament kill switch killed the ink stabilizer provider. */
-  | "tournament-killed";
+  /** Stroke-scoped live-ink backend decision did not select WebGPU. */
+  | "backend-not-webgpu";
 
 /** Structurally satisfied by RemoteKillSwitch (@toonspectrum/studio-engine-registry). */
 export interface StudioLiveInkStabilizerKillSwitchLike {
@@ -166,7 +163,7 @@ export interface StudioLiveInkStabilizerPlanInput {
   readonly rollout?: StudioLiveInkRolloutDecision | null;
   /** Optional stroke-scoped backend decision (decideStudioLiveInkBackend). */
   readonly liveInkBackend?: StudioLiveInkBackendDecision | null;
-  /** Tournament kill switch; only the ink lane honors kills (see module doc). */
+  /** Tournament kill switch applied to the exact selected provider. */
   readonly killSwitch?: StudioLiveInkStabilizerKillSwitchLike | null;
 }
 
@@ -180,6 +177,9 @@ export interface StudioLiveInkStabilizerPlan {
   readonly providerId: string | null;
   readonly bucket: string;
   readonly reason: StudioLiveInkStabilizerPlanReason;
+  /** A killed selected provider is terminal; no alternate provider is selected. */
+  readonly status: "selected" | "unavailable";
+  readonly unavailableReason: "selected-provider-killed" | null;
   /** First failed ink gate, or null when the ink lane was selected. */
   readonly inkExclusion: StudioLiveInkStabilizerInkExclusion | null;
 }
@@ -251,15 +251,28 @@ function resolveInkExclusion(
   if (disabled) return "stabilizer-disabled";
   const rollout = input.rollout;
   if (rollout === undefined || rollout === null) return "rollout-missing";
-  if (rollout.preference !== "webgpu") return "rollout-not-admitted";
+  if (rollout.status !== "selected" || rollout.preference !== "webgpu") {
+    return "rollout-not-admitted";
+  }
   const backend = input.liveInkBackend;
-  if (backend !== undefined && backend !== null && backend.backend !== "webgpu") {
+  if (
+    backend !== undefined
+    && backend !== null
+    && (backend.status !== "ready" || backend.backend !== "webgpu")
+  ) {
     return "backend-not-webgpu";
   }
-  if (input.killSwitch?.isKilled(studioLiveInkStabilizerProviderId(INK_LANE)) === true) {
-    return "tournament-killed";
-  }
   return null;
+}
+
+function selectedProviderAvailability(
+  input: StudioLiveInkStabilizerPlanInput,
+  providerId: string,
+): Pick<StudioLiveInkStabilizerPlan, "status" | "unavailableReason"> {
+  const killed = input.killSwitch?.isKilled(providerId) === true;
+  return killed
+    ? { status: "unavailable", unavailableReason: "selected-provider-killed" }
+    : { status: "selected", unavailableReason: null };
 }
 
 /**
@@ -286,18 +299,22 @@ export function planLiveInkStabilizer(
       providerId: null,
       bucket,
       reason: "stabilizer-disabled",
+      status: "selected",
+      unavailableReason: null,
       inkExclusion,
     };
   }
 
   if (inkExclusion === null) {
+    const providerId = studioLiveInkStabilizerProviderId(INK_LANE);
     return {
       lane: INK_LANE,
       backendId: INK_LANE,
       params: { ink: { minOutputRate: studioLiveInkStabilizerInkMinOutputRate(input.pointRateHz) } },
-      providerId: studioLiveInkStabilizerProviderId(INK_LANE),
+      providerId,
       bucket,
       reason: "ink-opt-in",
+      ...selectedProviderAvailability(input, providerId),
       inkExclusion: null,
     };
   }
@@ -305,13 +322,15 @@ export function planLiveInkStabilizer(
   // Legacy first-party dispatch, quoted from applyStabilizer:
   // `config.kind === "ema" ? emaStabilize(...) : springStabilize(...)`.
   const lane: StabilizerBackendId = input.stabilizer.kind === "ema" ? "ema" : "spring";
+  const providerId = studioLiveInkStabilizerProviderId(lane);
   return {
     lane,
     backendId: lane,
     params: { strength, predictionMs },
-    providerId: studioLiveInkStabilizerProviderId(lane),
+    providerId,
     bucket,
     reason: "first-party-current",
+    ...selectedProviderAvailability(input, providerId),
     inkExclusion,
   };
 }
@@ -326,12 +345,19 @@ export function planLiveInkStabilizer(
  * verbatim-copy contract (fresh array, same sample objects). The ink lane
  * keeps the seam's fail-loud behavior: without a preloaded wasm modeler,
  * `process` throws the seam's explicit error instead of silently degrading.
+ * An unavailable selected provider also throws before processing; execution
+ * never substitutes another backend.
  */
 export function runStudioLiveInkStabilizerPlan(
   plan: StudioLiveInkStabilizerPlan,
   samples: readonly ModeledSampleIR[],
   options?: Pick<SelectStabilizerBackendOptions, "inkModeler">,
 ): ModeledSampleIR[] {
+  if (plan.status === "unavailable") {
+    throw new Error(
+      `Selected Studio stabilizer provider is unavailable (${plan.providerId ?? "unknown"}): ${plan.unavailableReason ?? "unknown"}`,
+    );
+  }
   if (plan.backendId === null || plan.params === null) {
     return [...samples];
   }
@@ -359,7 +385,9 @@ export type StudioLiveInkPlanParityReport =
     }
   | {
       readonly comparable: false;
-      readonly reason: "ink-lane-has-no-legacy-baseline";
+      readonly reason:
+        | "ink-lane-has-no-legacy-baseline"
+        | "selected-provider-unavailable";
       readonly sampleCount: number;
     };
 
@@ -382,6 +410,13 @@ function samplesDiffer(left: ModeledSampleIR, right: ModeledSampleIR): boolean {
 export function observeLiveInkPlanParity(
   input: StudioLiveInkPlanParityInput,
 ): StudioLiveInkPlanParityReport {
+  if (input.plan.status === "unavailable") {
+    return {
+      comparable: false,
+      reason: "selected-provider-unavailable",
+      sampleCount: input.samples.length,
+    };
+  }
   if (input.plan.lane === INK_LANE) {
     return {
       comparable: false,

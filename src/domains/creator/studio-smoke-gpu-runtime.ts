@@ -2,7 +2,7 @@
  * Studio Smoke GPU Runtime — 연기 컴퓨트 전용 경량 WebGPU 디바이스 매니저
  *
  * studio-gpu-filter-runtime 의 수명 규율을 그대로 복제하되 완전히 독립이다:
- *  - 기능 감지 실패/어댑터 없음/획득 예외 → null (호출부는 CPU 경로로 폴백)
+ *  - 기능 감지 실패/어댑터 없음/획득 예외 → null (선택한 WebGPU 경로 unavailable)
  *  - device lost → 런타임을 lost 로 표시하고 공유 싱글턴을 비운다
  *  - dispose 는 세대(generation) 카운터로 in-flight 획득과 경합해도 안전
  *  - `options.gpu` 주입 시 싱글턴을 우회해 독립 런타임 생성(테스트 격리)
@@ -31,7 +31,7 @@ export interface StudioSmokeGpuShaderSource {
 
 export interface StudioSmokeGpuRuntime {
   readonly device: GPUDevice;
-  /** true 면 이 런타임은 다시 쓸 수 없다 — 호출부는 즉시 CPU 로 폴백해야 한다. */
+  /** true 면 선택한 WebGPU 경로를 다시 쓸 수 없고 해당 작업은 unavailable이다. */
   readonly lost: boolean;
   getComputePipeline(shader: StudioSmokeGpuShaderSource): GPUComputePipeline;
   /** f32 필드용 storage buffer(STORAGE|COPY_SRC|COPY_DST). */
@@ -193,7 +193,7 @@ async function createRuntime(gpu: GPU | null, generation: number): Promise<Studi
   }
 }
 
-/** 공유 연기 GPU 런타임 획득 — 미지원/실패/획득 중 dispose 는 전부 null(CPU 폴백). */
+/** 공유 연기 GPU 런타임 획득 — 미지원/실패/획득 중 dispose 는 전부 null(fail-closed). */
 export function acquireStudioSmokeGpuRuntime(
   options?: StudioSmokeGpuRuntimeOptions,
 ): Promise<StudioSmokeGpuRuntime | null> {

@@ -14,7 +14,7 @@ import {
 describe("studio drawing library strategy", () => {
   it("keeps an extensible specialist inventory without document or brush-pixel authority", () => {
     expect(STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION)
-      .toBe("studio-drawing-library-strategy-v8");
+      .toBe("studio-drawing-library-strategy-v10");
     const requiredIds = [
       "perfect-freehand",
       "lazy-brush",
@@ -98,7 +98,17 @@ describe("studio drawing library strategy", () => {
     expect(hokusai?.riskNotes.join(" ")).toContain("real-browser runtime QA");
     expect(hokusai?.riskNotes.join(" ")).toContain("cross-platform bit identity");
     expect(hokusai?.riskNotes.join(" ")).toContain("live Worker protocol v1");
-    expect(hokusai?.riskNotes.join(" ")).toContain("protocol-v2 conversion fallback");
+    expect(hokusai?.maintenanceNote).toContain("select its transferable");
+    expect(hokusai?.maintenanceNote).toContain("before the stroke begins");
+    expect(hokusai?.riskNotes.join(" ")).toContain(
+      "Provider failure is terminal for the selected stroke",
+    );
+    expect(hokusai?.riskNotes.join(" ")).toContain(
+      "only before the next stroke",
+    );
+    expect(hokusai?.riskNotes.join(" ")).toContain(
+      "separately selected protocol-v2 conversion route",
+    );
     const p5Brush = resolveStudioDrawingLibraryStrategy("p5-brush");
     expect(p5Brush).toMatchObject({
       productLayer: "settled-procedural-raster",
@@ -125,7 +135,7 @@ describe("studio drawing library strategy", () => {
       canonicalAuthority: false,
       brushPixelAuthority: false,
     });
-    expect(pixi?.maintenanceNote).toContain("WebGPU-first/WebGL-fallback");
+    expect(pixi?.maintenanceNote).toContain("explicitly selected WebGPU or WebGL");
     expect(pixi?.maintenanceNote).toContain("always-on");
     expect(pixi?.maintenanceNote).toContain("StudioPixiSceneOverlayHost");
     expect(pixi?.riskNotes).toContain(
@@ -182,7 +192,7 @@ describe("studio drawing library strategy", () => {
     expect(tinySkia).toMatchObject({
       packageName: "tiny-skia",
       license: "BSD-3-Clause",
-      productLayer: "deterministic-raster-fallback",
+      productLayer: "deterministic-raster-oracle",
       decision: "poc-deterministic-raster-oracle",
       runtimeInstallation: "not-installed-poc",
       canonicalAuthority: false,
@@ -192,6 +202,13 @@ describe("studio drawing library strategy", () => {
     expect(tinySkia?.riskNotes.join(" ")).toContain("CPU-only RGBA8888");
     expect(tinySkia?.riskNotes.join(" ")).toContain(
       "not by itself a cross-browser",
+    );
+    expect(tinySkia?.maintenanceNote).toContain("CPU golden-image oracle");
+    expect(tinySkia?.riskNotes.join(" ")).toContain(
+      "separately selected CanvasKit and Canvas2D provider routes",
+    );
+    expect(canvasKit?.riskNotes.join(" ")).toContain(
+      "fails closed at the explicitly selected first-party text boundary",
     );
 
     const photon = resolveStudioDrawingLibraryStrategy("photon");
@@ -333,7 +350,7 @@ describe("studio drawing source adoption audit", () => {
 
   it("freezes the complete reviewed candidate set and provenance fields", () => {
     expect(STUDIO_DRAWING_SOURCE_AUDIT_VERSION)
-      .toBe("studio-drawing-source-audit-v6");
+      .toBe("studio-drawing-source-audit-v7");
     expect(STUDIO_DRAWING_SOURCE_AUDIT.map(({ id }) => id)).toEqual(
       candidateIds,
     );
@@ -372,6 +389,7 @@ describe("studio drawing source adoption audit", () => {
       "pixi",
       "paper",
       "canvaskit",
+      "vello",
     ]) {
       expect(resolveStudioDrawingSourceAudit(id)?.disposition, id)
         .toBe("adopted-opt-in");
@@ -385,8 +403,8 @@ describe("studio drawing source adoption audit", () => {
     }
 
     expect(resolveStudioDrawingSourceAudit("vello")).toMatchObject({
-      disposition: "research-only",
-      codePolicy: "research-only",
+      disposition: "adopted-opt-in",
+      codePolicy: "isolated-runtime",
       brushAuthorityOverlap: "path-renderer-overlap",
     });
     expect(resolveStudioDrawingSourceAudit("servo")).toMatchObject({
@@ -422,7 +440,7 @@ describe("studio drawing source adoption audit", () => {
     }
   });
 
-  it("records evidence and fail-closed gates for uninstalled vector, raster and filter candidates", () => {
+  it("records evidence and fail-closed gates for candidates and the bounded Vello provider", () => {
     expect(resolveStudioDrawingSourceAudit("lyon")).toMatchObject({
       officialSource: "https://github.com/nical/lyon",
       versionEvidence:
@@ -462,14 +480,14 @@ describe("studio drawing source adoption audit", () => {
     expect(resolveStudioDrawingSourceAudit("vello")).toMatchObject({
       officialSource: "https://github.com/linebender/vello",
       versionEvidence:
-        "crates.io stable vello 0.9.0 audited 2026-07-30; not installed",
+        "workspace Rust/WASM fork pinned to Vello 0.9.0 with CPU and browser-GPU artifacts, exact integrity manifests and product probes",
       license: "MIT OR Apache-2.0",
       activity: "young-fast-moving",
     });
     expect(resolveStudioDrawingSourceAudit("vello")?.rationale)
-      .toContain("calls Vello alpha");
+      .toContain("bounded product document slice");
     expect(resolveStudioDrawingSourceAudit("vello")?.rationale)
-      .toContain("web is not a primary target");
+      .toContain("never starts another provider");
 
     expect(resolveStudioDrawingSourceAudit("servo")).toMatchObject({
       officialSource: "https://github.com/servo/servo",
@@ -496,13 +514,13 @@ describe("studio drawing source adoption audit", () => {
       brushAuthorityOverlap: "brush-renderer-overlap",
     });
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
-      .toContain("automatically wired for 19 verified");
+      .toContain("selected before the stroke for 19 verified");
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
       .toContain("finish-tail acknowledgement");
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
       .toContain("canonical full-frame parity");
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
-      .toContain("other 207 shelf identities retain their existing routes");
+      .toContain("runtime failure never switches the active stroke");
   });
 
   it("records the narrow receipt-gated raw WebGPU product host without claiming a default live core", () => {
@@ -515,9 +533,9 @@ describe("studio drawing source adoption audit", () => {
     expect(resolveStudioDrawingSourceAudit("raw-webgpu")?.rationale)
       .toContain("RGBA16F");
     expect(resolveStudioDrawingSourceAudit("raw-webgpu")?.rationale)
-      .toContain("conditionally promotes one selected, top-most, unclipped");
+      .toContain("promotes one selected, top-most, unclipped");
     expect(resolveStudioDrawingSourceAudit("raw-webgpu")?.rationale)
-      .toContain("pointer-live drawing and the default shelf remain");
+      .toContain("never reveals a Konva replacement frame");
   });
 
   it("keeps commercially gated and copyleft editors out of product code", () => {

@@ -10,6 +10,7 @@ import {
 import {
   STUDIO_ADJUSTMENT_LAYER_ADAPTER_CONTRACT_VERSION,
   StudioAdjustmentLayerRuntimeError,
+  createStudioAdjustmentLayerGpuAdapter,
   createStudioAdjustmentLayerRuntimeRecipe,
   createStudioAdjustmentLayerWorkerAdapter,
   executeStudioAdjustmentLayerRuntime,
@@ -601,7 +602,7 @@ describe("studio adjustment-layer runtime", () => {
     expect(image.data).toEqual(sourceSnapshot);
   });
 
-  it("holds Worker/direct adapters to the same CPU reference parity contract", async () => {
+  it("holds the explicitly selected direct adapter to the CPU reference parity contract", async () => {
     const image = rgbaImage(19, 7, (x, y) => [
       (x * 21 + y * 9) % 256,
       (x * 7 + y * 31) % 256,
@@ -629,7 +630,10 @@ describe("studio adjustment-layer runtime", () => {
       operationsFingerprint: "ops-1",
     };
     const report = await verifyStudioAdjustmentLayerAdapterParity(
-      createStudioAdjustmentLayerWorkerAdapter({ workerFactory: null }),
+      createStudioAdjustmentLayerWorkerAdapter({
+        executionMode: "direct",
+        workerFactory: null,
+      }),
       input,
       { maxChannelDelta: 0, maxDifferentChannelRatio: 0 },
     );
@@ -643,5 +647,28 @@ describe("studio adjustment-layer runtime", () => {
     });
     const cpu = await studioAdjustmentLayerCpuAdapter.run(input);
     expect(cpu.imageData.data).not.toEqual(image.data);
+  });
+
+  it("fails the selected WebGPU adapter without switching the pass to CPU", async () => {
+    const image = rgbaImage(2, 1, () => [32, 64, 96, 255]);
+    const input: StudioAdjustmentLayerFilterAdapterInput = {
+      imageData: image,
+      operations: [{
+        id: "levels",
+        engine: "levels",
+        enabled: true,
+        params: { black: 4, white: 240, gamma: 1 },
+      }],
+      sourceRevision: "webgpu-fail-closed",
+      operationsFingerprint: "ops-webgpu",
+    };
+
+    await expect(
+      createStudioAdjustmentLayerGpuAdapter({ gpu: null }).run(input),
+    ).rejects.toMatchObject({ code: "ADAPTER_FAILURE" });
+    expect(image.data).toEqual(new Uint8ClampedArray([
+      32, 64, 96, 255,
+      32, 64, 96, 255,
+    ]));
   });
 });

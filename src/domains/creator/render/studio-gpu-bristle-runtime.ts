@@ -14,9 +14,8 @@
  *   - the device is LEASED from `studio-gpu-fabric.ts`, never self-requested;
  *   - loss arrives through `onStudioGpuDeviceLost` AND through `device.lost`, and either one puts
  *     the runtime permanently in `device-lost`;
- *   - on loss nothing is `destroy()`ed — the device is already gone — and the caller falls to the
- *     CPU carrier from the next render. There is no mid-stroke re-acquire: replaying into a fresh
- *     device mid-gesture flickers, and a clean fall to CPU is the better artifact.
+ *   - on loss nothing is `destroy()`ed — the device is already gone — and the selected WebGPU
+ *     operation ends as unavailable. There is no mid-stroke re-acquire or CPU-carrier replay.
  *   - limits are read once from `getStudioGpuFabricCapabilities()`; re-probing on the hot path is
  *     banned by that module's own header.
  *
@@ -1035,8 +1034,8 @@ export interface StudioGpuBristleRuntimeResult {
 }
 
 /**
- * Acquire the lane. Every failure returns a named status and a null runtime — the caller paints
- * with the CPU carrier and never learns anything about WebGPU.
+ * Acquire the selected WebGPU lane. Every failure returns a named status and a null runtime so
+ * the caller can end the operation as unavailable without painting through another carrier.
  */
 export async function createStudioGpuBristleRuntime(
   options: StudioGpuBristleRuntimeOptions,
