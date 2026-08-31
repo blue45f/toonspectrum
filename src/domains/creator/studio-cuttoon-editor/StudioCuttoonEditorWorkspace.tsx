@@ -67,7 +67,6 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     selectedImageMutationLocked,
     setAppSettingsInitialTab,
     setAppSettingsOpen,
-    setBg3dOpen,
     setCurrentPageId,
     setDrawShape,
     setEyedropperActive,
@@ -217,7 +216,6 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
           setReferencePanelOpen={setReferencePanelOpen}
           setMannequinPoserOpen={setMannequinPoserOpen}
           setPoserVrmOpen={setPoserVrmOpen}
-          setBg3dOpen={setBg3dOpen}
           setHybridDccOpen={setHybridDccOpen}
           setStrokeWidth={setStrokeWidth}
           setTool={setTool}

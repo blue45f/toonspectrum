@@ -4,6 +4,7 @@ import {
 } from "../brush/studio-drawing-assist-document";
 import { CANVAS_W } from "../studio-assets";
 import { uid } from "../studio-id";
+import { createCanvasImageElement } from "../studio-image-placement";
 import { isEffectivelyLocked, type LayerGroup } from "../studio-layers";
 import {
   ensureStudioLinked3dRenderShot,
@@ -55,6 +56,172 @@ import type { StudioShared3dStageDccSource } from "../studio-shared-3d-stage-doc
 export interface StudioBg3dLtApplyFailure {
   readonly ok: false;
   readonly message: string;
+}
+
+export interface StudioBg3dMergedCompositePlanSuccess {
+  readonly ok: true;
+  readonly anchorElementId: string;
+  readonly bundleId: string | undefined;
+  readonly nextElements: readonly El[];
+}
+
+/**
+ * Materializes the one-layer BG3D fallback without committing it. Keeping this pure lets the
+ * realtime path attach the page-local Shared Stage sidecar in the same history transition instead
+ * of first inserting an unlinked image and trying to repair it in a second commit.
+ */
+export function planStudioBg3dMergedComposite(input: {
+  readonly result: StudioBackground3DInsertResult;
+  readonly elements: readonly El[];
+  readonly groups: readonly LayerGroup[];
+  readonly targetElementId: string | undefined;
+  readonly canvasHeight: number;
+  readonly newElementId: string;
+  readonly bundleId?: string;
+  readonly magicMaskMessage: string;
+}): StudioBg3dLtApplyFailure | StudioBg3dMergedCompositePlanSuccess {
+  const {
+    result,
+    elements,
+    groups,
+    targetElementId,
+    canvasHeight,
+    newElementId,
+    bundleId,
+    magicMaskMessage,
+  } = input;
+  if (result.magicFilterMask) return { ok: false, message: magicMaskMessage };
+
+  if (targetElementId) {
+    const target = elements.find(({ id }) => id === targetElementId);
+    if (!target || target.type !== "image") {
+      return { ok: false, message: "다시 적용할 3D 배경 이미지를 찾지 못했습니다." };
+    }
+    if (isEffectivelyLocked(target, [...groups])) {
+      return {
+        ok: false,
+        message: "잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.",
+      };
+    }
+    return {
+      ok: true,
+      anchorElementId: target.id,
+      bundleId,
+      nextElements: elements.map((element) => element.id === target.id
+        ? ({
+            ...target,
+            src: result.compositePngDataUrl,
+            height: Math.max(1, Math.round(target.width * (result.height / result.width))),
+            bg3dScene: result.bg3dScene,
+            bg3dLtBundleId: bundleId,
+            bg3dLtRole: undefined,
+            bg3dLtRenderMode: undefined,
+            name: "3D LT 배경 · 병합",
+          } satisfies El)
+        : element),
+    };
+  }
+
+  const mergedImage = createCanvasImageElement({
+    id: newElementId,
+    src: result.compositePngDataUrl,
+    canvasWidth: CANVAS_W,
+    canvasHeight,
+    sourceWidth: result.width,
+    sourceHeight: result.height,
+  });
+  return {
+    ok: true,
+    anchorElementId: mergedImage.id,
+    bundleId,
+    nextElements: [
+      ...elements,
+      {
+        ...mergedImage,
+        name: "3D LT 배경 · 병합",
+        bg3dScene: result.bg3dScene,
+        ...(bundleId ? { bg3dLtBundleId: bundleId } : {}),
+      } satisfies El,
+    ],
+  };
+}
+
+export interface StudioBg3dRealtimeMergedApplyPlanSuccess {
+  readonly ok: true;
+  readonly anchorElementId: string;
+  readonly bundleId: string;
+  readonly nextElements: readonly El[];
+  readonly nextShared3dStage: StudioShared3dStageCollectionDocument | undefined;
+  readonly sharedStageMutationKind:
+    StudioBg3dSharedStageMutationKind | "refresh" | "connect";
+  readonly hiddenElementIds: readonly string[];
+  readonly restoredElementIds: readonly string[];
+}
+
+/**
+ * Realtime rooms still use one self-contained raster/scene layer, but the relationship between
+ * that exact background anchor and captured VRM sources is page document state. Plan both halves
+ * together so reopening the selected background resolves the persisted Stage instead of forever
+ * falling back to `unlinked`.
+ */
+export function planStudioBg3dRealtimeMergedApply(input: {
+  readonly result: StudioBackground3DInsertResult;
+  readonly elements: readonly El[];
+  readonly groups: readonly LayerGroup[];
+  readonly shared3dStage: PageState["shared3dStage"];
+  readonly targetElementId: string | undefined;
+  readonly canvasHeight: number;
+  readonly newElementId: string;
+  readonly allocatedBundleId: string;
+  readonly dccSource: StudioShared3dStageDccSource | null;
+}): StudioBg3dLtApplyFailure | StudioBg3dRealtimeMergedApplyPlanSuccess {
+  const existingBundleId = resolveStudioShared3dStageBundleIdForElement(
+    input.elements,
+    input.targetElementId,
+  );
+  const bundleId = existingBundleId ?? input.allocatedBundleId;
+  const merged = planStudioBg3dMergedComposite({
+    result: input.result,
+    elements: input.elements,
+    groups: input.groups,
+    targetElementId: input.targetElementId,
+    canvasHeight: input.canvasHeight,
+    newElementId: input.newElementId,
+    bundleId,
+    magicMaskMessage: "매직 레이어 마스크는 분리된 컬러·톤 레이어가 있어야 만들 수 있어요. 실시간 공동 편집에서는 매직 레이어를 끄고 다시 추가해 주세요.",
+  });
+  if (!merged.ok) return merged;
+
+  const captures = resolveStudioBg3dCapturedCharacterPlacements({ renderResult: input.result });
+  if (!captures.ok) return captures;
+  const visibility = planStudioBg3dSharedCharacterVisibility({
+    shared3dStage: input.shared3dStage,
+    elements: merged.nextElements,
+    capturedCharacterElementIds: captures.capturedCharacterElementIds,
+    groups: [...input.groups],
+  });
+  if (!visibility.ok) return visibility;
+  const stage = planStudioBg3dSharedStageMutation({
+    currentStageCollection: visibility.currentStageCollection,
+    bundleId,
+    requestedMutationKind: input.result.sharedStageMutation?.kind,
+    nextElements: visibility.sharedCharacterVisibility.nextElements,
+    capturedCharacterElementIds: captures.capturedCharacterElementIds,
+    capturedCharacterPlacements: captures.capturedCharacterPlacements,
+    hiddenElementIds: visibility.sharedCharacterVisibility.hiddenElementIds,
+    dccSource: input.dccSource,
+  });
+  if (!stage.ok) return stage;
+  return {
+    ok: true,
+    anchorElementId: merged.anchorElementId,
+    bundleId,
+    nextElements: stage.stageMutation.nextElements,
+    nextShared3dStage: stage.stageMutation.nextState,
+    sharedStageMutationKind: stage.sharedStageMutationKind,
+    hiddenElementIds: visibility.sharedCharacterVisibility.hiddenElementIds,
+    restoredElementIds: stage.stageMutation.restoredElementIds,
+  };
 }
 
 type StudioBg3dLinkedCharacterCapture =

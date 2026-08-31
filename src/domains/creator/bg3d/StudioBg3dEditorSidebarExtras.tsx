@@ -323,36 +323,42 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     <>
               <section hidden={hideOnTab("layers")}>
                 {sharedStageResolution ? (
-                  <StudioBg3dSharedStagePanel
-                    resolution={sharedStageResolution}
-                    characters={sharedCharacters}
-                    statuses={sharedCharacterStatuses}
-                    selectedElementId={effectiveSelectedSharedCharacterElementId}
-                    selectedGrounding={effectiveSelectedSharedCharacter
-                      ? sharedCharacterGroundings[effectiveSelectedSharedCharacter.runtimeKey]
-                      : undefined}
-                    captureElementCount={sharedCharacterCaptureElementIds.length}
-                    charactersLinkedToOtherBackgroundCount={
-                      sharedCharactersLinkedToOtherBackgroundCount
-                    }
-                    targetHasLinkedCharacters={targetHasLinkedCharacters}
-                    targetHasSavedSharedScene={targetHasSavedSharedScene}
-                    includeCharactersInCapture={includeSharedCharactersInCapture}
-                    mutationKind={sharedStageMutationKind}
-                    materializationKind={sharedStageMaterializationKind}
-                    captureDisabled={isCapturing || isRestoringScene}
-                    placementDisabled={
-                      isCapturing || isRestoringScene || physicsInteractionLocked
-                    }
-                    onSelectMutation={selectSharedStageMutation}
-                    onSetMutation={setSharedStageMutationKind}
-                    onSetMaterialization={setSharedStageMaterializationKind}
-                    onSelectCharacter={(elementId) => {
-                      setSelectedSharedCharacterElementId(elementId);
-                      setSelectedIds(new Set());
-                    }}
-                    onCommitCharacterTransform={commitSharedCharacterTransform}
-                  />
+                  <Suspense fallback={(
+                    <p className="mb-4 rounded-xl border border-line bg-raised/60 px-3 py-2.5 text-[0.68rem] text-fg-3">
+                      공유 3D 장면 상태를 불러오는 중이에요…
+                    </p>
+                  )}>
+                    <StudioBg3dSharedStagePanel
+                      resolution={sharedStageResolution}
+                      characters={sharedCharacters}
+                      statuses={sharedCharacterStatuses}
+                      selectedElementId={effectiveSelectedSharedCharacterElementId}
+                      selectedGrounding={effectiveSelectedSharedCharacter
+                        ? sharedCharacterGroundings[effectiveSelectedSharedCharacter.runtimeKey]
+                        : undefined}
+                      captureElementCount={sharedCharacterCaptureElementIds.length}
+                      charactersLinkedToOtherBackgroundCount={
+                        sharedCharactersLinkedToOtherBackgroundCount
+                      }
+                      targetHasLinkedCharacters={targetHasLinkedCharacters}
+                      targetHasSavedSharedScene={targetHasSavedSharedScene}
+                      includeCharactersInCapture={includeSharedCharactersInCapture}
+                      mutationKind={sharedStageMutationKind}
+                      materializationKind={sharedStageMaterializationKind}
+                      captureDisabled={isCapturing || isRestoringScene}
+                      placementDisabled={
+                        isCapturing || isRestoringScene || physicsInteractionLocked
+                      }
+                      onSelectMutation={selectSharedStageMutation}
+                      onSetMutation={setSharedStageMutationKind}
+                      onSetMaterialization={setSharedStageMaterializationKind}
+                      onSelectCharacter={(elementId) => {
+                        setSelectedSharedCharacterElementId(elementId);
+                        setSelectedIds(new Set());
+                      }}
+                      onCommitCharacterTransform={commitSharedCharacterTransform}
+                    />
+                  </Suspense>
                 ) : null}
                 <div className={cx(
                   "mb-2 flex items-center justify-between gap-3",

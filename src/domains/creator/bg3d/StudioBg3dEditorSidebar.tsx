@@ -20,7 +20,8 @@ export function StudioBg3dEditorSidebar({ h }) {
     instantiateCompositePreset, cloneBgCustomModelInstances, createBgCustomModelInstance,
     duplicateBgCustomModelInstance, isStudioBg3dThreeTwoBoneIkChainSupported,
     measureBg3dObjectSize, parseBg3dSceneWithModelsFromDataUrl, StudioBg3dThreeOperationError,
-    clonePrimitives, createPrimitive, duplicatePrimitive, PRIMITIVE_DEFS, BG_SCENE_TEMPLATES,
+    clonePrimitives, createPrimitive, duplicatePrimitive, PRIMITIVE_DEFS,
+    BG_SCENE_TEMPLATE_CATEGORIES, BG_SCENE_TEMPLATE_CATEGORY_LABELS, BG_SCENE_TEMPLATES,
     instantiateSceneTemplate, BG_SKY_PRESETS, getSkyPreset, normalizePanoramaRotationDegrees,
     createStudioGeneric3dRightsFromAttachment, createStudioGeneric3dVerifiedManifest,
     createStudioGeneric3dPoseProxies, mergeStudioGeneric3dWorkflowMaps,
@@ -502,11 +503,33 @@ export function StudioBg3dEditorSidebar({ h }) {
                   <LayoutTemplate size={15} className="text-accent" aria-hidden />
                   씬 템플릿
                 </h3>
-                <StudioBg3dSceneTemplatePanel
-                  activeCategory={sceneTemplateCategory}
-                  onCategoryChange={setSceneTemplateCategory}
-                  onAddTemplate={addSceneTemplate}
-                />
+                {activePanelTab === "templates" ? (
+                  <Suspense fallback={(
+                    <p role="status" className="rounded-lg border border-line bg-card px-3 py-4 text-center text-[0.68rem] text-fg-3">
+                      템플릿 도구를 불러오는 중입니다…
+                    </p>
+                  )}>
+                    <StudioBg3dSceneTemplatePanel
+                      templates={BG_SCENE_TEMPLATES}
+                      templateCategories={BG_SCENE_TEMPLATE_CATEGORIES}
+                      templateCategoryLabels={BG_SCENE_TEMPLATE_CATEGORY_LABELS}
+                      compositePresets={COMPOSITE_PRESETS}
+                      activeCategory={sceneTemplateCategory}
+                      onCategoryChange={setSceneTemplateCategory}
+                      onAddTemplate={addSceneTemplate}
+                      templateInstances={h.templateInstanceSummaries}
+                      organizationDisabledReason={h.templateOrganizationBlockedReason}
+                      onSelectTemplateInstance={h.selectTemplateInstance}
+                      onSelectAllTemplateInstances={h.selectAllTemplateInstances}
+                      onGroundTemplateInstance={h.groundTemplateInstance}
+                      onArrangeAllTemplateInstances={h.arrangeAllTemplateInstances}
+                      onResetTemplateInstance={h.resetTemplateInstance}
+                      onResetAllTemplateInstances={h.resetAllTemplateInstances}
+                      onDeleteTemplateInstance={h.deleteTemplateInstance}
+                      onDeleteAllTemplateInstances={h.deleteAllTemplateInstances}
+                    />
+                  </Suspense>
+                ) : null}
 
                 <div className="mt-5 border-t border-line pt-4">
                   <div className="mb-2 flex items-center justify-between gap-3">

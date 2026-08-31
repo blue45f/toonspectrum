@@ -62,6 +62,7 @@ import {
 import {
   planStudioBg3dLtDetachComposite,
   planStudioBg3dLtDrawingAssist,
+  planStudioBg3dRealtimeMergedApply,
   planStudioBg3dSharedCharacterVisibility,
   planStudioBg3dSharedStageMutation,
   resolveStudioBg3dCapturedCharacterPlacements,
@@ -3906,7 +3907,18 @@ function StudioCuttoonEditor({
     if (studioRoute.surface === "brushes") {
       void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
     } else if (studioRoute.surface === "bg3d") {
-      setBg3dOpen(true);
+      // A UI opener may already have populated an existing layer's edit source before the
+      // routed-surface synchronizer upgrades canvas -> bg3d. Do not erase that source on the
+      // resulting route commit. Only a route-owned entry (deep link, Back/Forward) starts a
+      // fresh scene because no BG3D surface was open before the route became authoritative.
+      if (!routedSurfacePanelSyncRef.current.bg3d) {
+        setBg3dSeedTemplateId(null);
+        setBg3dSeedPrimitiveKind(null);
+        setBg3dInitialDataUrl(undefined);
+        setBg3dInitialScene(undefined);
+        setBg3dInitialElementId(undefined);
+        setBg3dOpen(true);
+      }
     } else if (studioRoute.surface === "poser") {
       setPoserVrmOpen(true);
     } else if (studioRoute.surface === "animation") {
@@ -5820,7 +5832,7 @@ function StudioCuttoonEditor({
         setPoserVrmOpen(true);
         break;
       case "bg3d":
-        setBg3dOpen(true);
+        openBackground3dFromMenu();
         break;
       case "ai-assist":
         setMenu("aiAssist");
@@ -7492,6 +7504,11 @@ function StudioCuttoonEditor({
     navigateStudio2dSurface("poser");
   }
   function openBackground3dFromMenu() {
+    setBg3dSeedTemplateId(null);
+    setBg3dSeedPrimitiveKind(null);
+    setBg3dInitialDataUrl(undefined);
+    setBg3dInitialScene(undefined);
+    setBg3dInitialElementId(undefined);
     setBg3dOpen(true);
     navigateStudio2dSurface("bg3d");
   }
@@ -7523,6 +7540,13 @@ function StudioCuttoonEditor({
     if (!bg3dOpen) {
       bg3dDccSourceRef.current = null;
       bg3dDccShotMappingsRef.current = [];
+      // Every close path (dialog, route Back, DCC admission, rail toggle) retires the edit target.
+      // Otherwise a later fresh menu entry can reopen an unselected layer in update mode.
+      setBg3dSeedTemplateId(null);
+      setBg3dSeedPrimitiveKind(null);
+      setBg3dInitialDataUrl(undefined);
+      setBg3dInitialScene(undefined);
+      setBg3dInitialElementId(undefined);
     }
   }, [bg3dOpen]);
   const bg3dTargetBundleId = useMemo(
@@ -19113,16 +19137,9 @@ const puppetWarpArmed =
       return false;
     }
     /**
-     * 하나의 자기완결 이미지 레이어 — 래스터 본문과 그 안에 담긴 장면 문서가 전부다. LT 번들
-     * 아이디도, 공유 스테이지 연결도, `linked3dRender`도 남기지 않는다. 즉 요소 바깥에 사는
-     * 상태를 가리키는 참조가 하나도 없다. 정확히 이 모양을 필요로 하는 표면이 둘 있다.
-     *
-     *   - 문서 마스터: 분리 번들을 담을 레이어 그룹을 의도적으로 갖지 않는다.
-     *   - 실시간 룸: 번들 아이디를 발행하면 그 Scene·LT 래스터 본문을 원격 참가자가 해석할 수
-     *     없는 빈 참조가 된다.
-     *
-     * 장면 원본은 요소에 그대로 실려 다시 편집할 수 있으므로, "병합"이 잃는 것은 분리된
-     * 컬러·톤·선화 레이어이지 3D 원본이 아니다.
+     * 문서 마스터용 자기완결 이미지 레이어. 마스터에는 분리 번들을 담을 그룹도 페이지별 Shared
+     * Stage도 없으므로 래스터와 장면 원본만 남긴다. 실시간 페이지는 아래의 별도 원자 계획에서
+     * 같은 병합 레이어에 안정적인 배경 앵커와 Shared Stage를 함께 결박한다.
      */
     function materializeBg3dMergedComposite(magicMaskMessage: string): boolean {
       if (result.magicFilterMask) {
@@ -19148,6 +19165,13 @@ const puppetWarpArmed =
           bg3dLtRenderMode: undefined,
           name: "3D LT 배경 · 병합",
         })) return false;
+        // Match the other destructive raster replacements: browser verification must be able to
+        // distinguish a successful document commit from the exact new PNG reaching the visible
+        // Konva layer. The probe is absent in production, so this is otherwise a no-op.
+        expectStudioRasterImagePresentation({
+          elementId: targetElementId,
+          src: result.compositePngDataUrl,
+        });
         return true;
       }
       const mergedImage = createCanvasImageElement({
@@ -19163,22 +19187,59 @@ const puppetWarpArmed =
         name: "3D LT 배경 · 병합",
         bg3dScene: result.bg3dScene,
       })) return false;
+      expectStudioRasterImagePresentation({
+        elementId: mergedImage.id,
+        src: result.compositePngDataUrl,
+      });
       return true;
     }
 
-    // linked3dRender, shared3dStage, the anchor Scene and LT raster bodies do not yet share one
-    // bounded CRDT/CAS receipt, so the separated LT bundle stays out of a realtime room. What the
-    // room does get is the merged composite above: a raster body plus an embedded scene document,
-    // which is the same shape any pasted image already replicates. That keeps the "no hollow
-    // remote reference" property that made this fail closed, without leaving the 3D background
-    // unattachable — `/studio` opens an instant jam room, so this branch is the default path.
+    // The separated LT raster bundle still stays out of a realtime room because its multiple pixel
+    // bodies do not share one bounded CRDT/CAS receipt. The merged raster + embedded Scene remains
+    // self-contained, while its page-local bundle identity and Shared Stage relationship are
+    // committed atomically so selecting/reopening the background can resolve the character link.
     if (isRealtimeTeamSession) {
-      if (!materializeBg3dMergedComposite(
-        "매직 레이어 마스크는 분리된 컬러·톤 레이어가 있어야 만들 수 있어요. 실시간 공동 편집에서는 매직 레이어를 끄고 다시 추가해 주세요.",
-      )) return false;
+      const realtimePlan = planStudioBg3dRealtimeMergedApply({
+        result,
+        elements,
+        groups,
+        shared3dStage: activePage.shared3dStage,
+        targetElementId,
+        canvasHeight: canvasH,
+        newElementId: uid(),
+        allocatedBundleId: uid(),
+        dccSource: bg3dDccSourceRef.current,
+      });
+      if (!realtimePlan.ok) {
+        setError(realtimePlan.message);
+        return false;
+      }
+      if (!commit([...realtimePlan.nextElements], {
+        shared3dStage: realtimePlan.nextShared3dStage,
+      })) return false;
+      setSelectedId(realtimePlan.anchorElementId);
+      setTool("select");
+      expectStudioRasterImagePresentation({
+        elementId: realtimePlan.anchorElementId,
+        src: result.compositePngDataUrl,
+      });
+      const sharedStageNotice = realtimePlan.sharedStageMutationKind === "unlink"
+        ? " 캐릭터 공유 연결은 해제했어요."
+        : realtimePlan.hiddenElementIds.length > 0
+          ? ` 캐릭터 ${realtimePlan.hiddenElementIds.length}명과의 공유 연결도 함께 저장했어요.`
+          : " 배경 전용 공유 장면으로 저장했어요.";
       setStatusNotice(
-        "실시간 공동 편집이라 컬러·톤·선화를 한 레이어로 합쳐 추가했어요. 3D 장면 원본은 그대로 남아 다시 편집할 수 있어요.",
+        `실시간 공동 편집이라 컬러·톤·선화를 한 레이어로 합쳐 추가했어요. 3D 장면 원본은 그대로 남아 다시 편집할 수 있어요.${sharedStageNotice}`,
       );
+      if (realtimePlan.restoredElementIds.length > 0) {
+        announceDrawingShortcut(
+          `공유 캐릭터 원본 ${realtimePlan.restoredElementIds.length}명 복원`,
+        );
+      } else if (realtimePlan.hiddenElementIds.length > 0) {
+        announceDrawingShortcut(
+          `공유 캐릭터 ${realtimePlan.hiddenElementIds.length}명 합성 · 원본 레이어는 숨김 상태로 보존`,
+        );
+      }
       return true;
     }
 
@@ -30019,6 +30080,24 @@ function clearSelectionForEdit() {
     openFrameAnimationForSelected,
     openPixelSelectionTransform,
     openSelectedLayerCrop,
+    toggleBg3dEditor: () => {
+      if (bg3dOpen) {
+        setBg3dOpen(false);
+        return;
+      }
+
+      // The rail is both the new-scene entry and the most direct way back into a selected BG3D
+      // plate. Resolve every initial field before opening so restore never mounts a blank insert
+      // scene and then races a later edit-source update.
+      setBg3dSeedTemplateId(null);
+      setBg3dSeedPrimitiveKind(null);
+      setBg3dInitialScene(selectedBg3dEditSource?.scene);
+      setBg3dInitialDataUrl(selectedBg3dEditSource?.legacyDataUrl);
+      setBg3dInitialElementId(
+        selected && selectedBg3dEditSource ? selected.id : undefined,
+      );
+      setBg3dOpen(true);
+    },
     addBubble,
     addText,
     announceDrawingShortcut,

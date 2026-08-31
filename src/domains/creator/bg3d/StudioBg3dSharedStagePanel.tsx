@@ -36,6 +36,101 @@ export interface StudioBg3dSharedStagePanelProps {
   readonly onCommitCharacterTransform: StudioShared3dCharacterTransformCommitHandler;
 }
 
+interface SharedStageStatusCopy {
+  readonly label: string;
+  readonly message: string;
+}
+
+function resolveSharedStageStatusCopy({
+  resolution,
+  characters,
+  statuses,
+  captureElementCount,
+  targetHasLinkedCharacters,
+  mutationKind,
+  captureDisabled,
+}: Pick<
+  StudioBg3dSharedStagePanelProps,
+  | "resolution"
+  | "characters"
+  | "statuses"
+  | "captureElementCount"
+  | "targetHasLinkedCharacters"
+  | "mutationKind"
+  | "captureDisabled"
+>): SharedStageStatusCopy {
+  if (resolution.phase === "unlinked" && mutationKind === "background-only") {
+    return captureDisabled
+      ? {
+          label: "장면 처리 중",
+          message: "3D 배경을 캡처하거나 원본을 복원하는 중이에요. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없어요.",
+        }
+      : {
+          label: "배경만 추가 예정",
+          message: "캐릭터는 연결하지 않고 배경만 추가할 예정이에요. 아래 적용을 누르기 전에는 저장되지 않아요.",
+        };
+  }
+
+  if (
+    resolution.phase === "unlinked"
+    && mutationKind === "connect"
+    && characters.length > 0
+  ) {
+    let readyCount = 0;
+    let loadingCount = 0;
+    let unavailableCount = 0;
+    for (const character of characters) {
+      const status = statuses[character.runtimeKey];
+      if (status === "ready") readyCount += 1;
+      else if (status === "unavailable") unavailableCount += 1;
+      else loadingCount += 1;
+    }
+
+    if (unavailableCount > 0) {
+      return {
+        label: "캐릭터 확인 필요",
+        message: `캐릭터 ${unavailableCount}명의 렌더 인스턴스를 준비하지 못했어요. 모델을 확인한 뒤 연결해 주세요.`,
+      };
+    }
+    if (loadingCount > 0) {
+      return {
+        label: "캐릭터 준비 중",
+        message: `캐릭터 렌더 ${readyCount}/${characters.length}명 준비됨 · 모두 준비되면 이 배경과 연결할 수 있어요.`,
+      };
+    }
+    if (captureDisabled) {
+      return {
+        label: "장면 처리 중",
+        message: "배경과 캐릭터 장면을 캡처하거나 원본을 복원하는 중이에요. 작업이 끝나기 전에는 적용 방식을 바꿀 수 없어요.",
+      };
+    }
+    const previewOnlyCount = Math.max(0, readyCount - captureElementCount);
+    if (previewOnlyCount > 0) {
+      return {
+        label: "캐릭터 확인 필요",
+        message: `캐릭터 ${previewOnlyCount}명의 현재 설정을 결과에 빠짐없이 담을 수 없어 연결 적용 전 확인이 필요해요.`,
+      };
+    }
+    return {
+      label: "연결 예정",
+      message: `캐릭터 ${captureElementCount}명을 이 배경과 연결할 예정이에요. 아래 적용을 누르기 전에는 저장되지 않아요.`,
+    };
+  }
+
+  return {
+    label: resolution.phase === "unlinked"
+      ? "연결 안 됨"
+      : !targetHasLinkedCharacters
+        ? "배경만 연결됨"
+        : resolution.phase === "ready"
+          ? "연결됨"
+          : resolution.phase === "live-update"
+            ? "원본 변경됨"
+            : "연결 확인 필요",
+    message: resolution.message,
+  };
+}
+
 /** Shared Stage relationship and per-background character placement controls. */
 export function StudioBg3dSharedStagePanel({
   resolution,
@@ -58,6 +153,16 @@ export function StudioBg3dSharedStagePanel({
   onSelectCharacter,
   onCommitCharacterTransform,
 }: StudioBg3dSharedStagePanelProps) {
+  const statusCopy = resolveSharedStageStatusCopy({
+    resolution,
+    characters,
+    statuses,
+    captureElementCount,
+    targetHasLinkedCharacters,
+    mutationKind,
+    captureDisabled,
+  });
+
   return (
     <>
       <div
@@ -82,18 +187,10 @@ export function StudioBg3dSharedStagePanel({
           <div className="flex items-center justify-between gap-2">
             <p className="font-bold">공유 3D 장면</p>
             <span className="rounded-md border border-current/25 px-1.5 py-0.5 text-[0.62rem] font-bold">
-              {resolution.phase === "unlinked"
-                ? "연결 안 됨"
-                : !targetHasLinkedCharacters
-                  ? "배경만 연결됨"
-                  : resolution.phase === "ready"
-                    ? "연결됨"
-                    : resolution.phase === "live-update"
-                      ? "원본 변경됨"
-                      : "연결 확인 필요"}
+              {statusCopy.label}
             </span>
           </div>
-          <p className="mt-0.5">{resolution.message}</p>
+          <p className="mt-0.5">{statusCopy.message}</p>
         </div>
         <div
           role="group"

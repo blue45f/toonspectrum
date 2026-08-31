@@ -124,6 +124,7 @@
     "verify:studio-bg3d-physics": "tsx scripts/verify-studio-bg3d-physics.mts",
     "verify:studio-3d-console": "tsx scripts/verify-studio-3d-console.mts",
     "verify:studio-3d-visual": "playwright test e2e/studio-3d-visual-verification.spec.ts",
+    "verify:studio-bg3d-webgpu-rotation": "STUDIO_BG3D_WEBGPU_GIZMO=1 playwright test e2e/studio-3d-visual-verification.spec.ts --grep 'WebGPU 기즈모 연속 회전'",
     "studio:vrm-generate": "tsx scripts/studio-vrm-generate-mcp-host.mts generate",
     "studio:vrm-generate-mcp": "tsx scripts/studio-vrm-generate-mcp-host.mts",
     "studio:avatar-reference-catalogue:write": "tsx scripts/generate-studio-vrm-avatar-reference-catalogue.mts --write",

@@ -6,6 +6,7 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
+import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
 
 export function StudioBg3dEditorViewport({ h }) {
   const {
@@ -411,6 +412,7 @@ export function StudioBg3dEditorViewport({ h }) {
                     onCancel={() => cancelCustomModelPlacement("3D 모델 배치를 취소했습니다.")}
                     onRotate={rotateCustomModelPlacement}
                   />
+                  <StudioBg3dViewFrameClear />
                   {effectiveIsQuadView ? (
                     <Fragment>
                       <View track={viewTopRef as unknown as React.RefObject<HTMLElement>}>

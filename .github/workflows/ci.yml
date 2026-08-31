@@ -354,6 +354,10 @@ jobs:
         # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
         # deterministic while the verifier still owns the exact viewport of every proof page.
         run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console
+      - name: Verify BG3D WebGPU TransformControls rotation frames do not accumulate
+        # The defect exists only while the WebGPU compositor is live and the pointer is still down;
+        # the ordinary headless WebGL2 visual suite cannot reproduce this interaction path.
+        run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-bg3d-webgpu-rotation
       - name: Verify BG3D next-generation engine capture parity and in-app browser policy
         # Renders one scene through both the WebGL2 and WebGPU capture adapters and fails if the
         # composited raster or the depth samples diverge, then replays the page under KakaoTalk,

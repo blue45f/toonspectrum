@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 /**
  * 실 브라우저에서 렌더된 프레임을 근거로 하는 Studio 3D 표면 전수 검증.
@@ -24,6 +24,9 @@ const TEST_CREATOR_SESSION = {
 
 const BG3D_DIALOG = '[data-testid="studio-bg3d-dialog"]';
 const BG3D_VIEWPORT = '[data-testid="studio-bg3d-viewport"]';
+const BG3D_RENDER_CANVAS = `${BG3D_VIEWPORT} canvas`;
+const STUDIO_DOCUMENT_SCOPE = "[data-studio-post-processing-scope]";
+const BG3D_WEBGPU_GIZMO_GATE = process.env.STUDIO_BG3D_WEBGPU_GIZMO === "1";
 
 interface FrameStats {
   readonly width: number;
@@ -38,13 +41,30 @@ interface FrameStats {
    * 오브젝트 하나)는 전체 평균을 거의 움직이지 않지만 해당 칸은 크게 움직인다.
    */
   readonly tiles: readonly number[];
+  /** 16×12 칸의 R/G/B 평균을 차례로 편 배열. 같은 밝기의 색 변화도 검출한다. */
+  readonly colorTiles: readonly number[];
 }
 
-/** 렌더된 프레임의 픽셀 통계. 디코딩은 브라우저가 한다(Node 측 이미지 의존성 없음). */
-async function frameStats(page: Page, selector: string): Promise<FrameStats> {
-  const shot = await page.locator(selector).first().screenshot();
-  return page.evaluate(async (base64) => {
-    const response = await fetch(`data:image/png;base64,${base64}`);
+interface Bg3dRenderSurface {
+  readonly cssWidth: number;
+  readonly cssHeight: number;
+  readonly bufferWidth: number;
+  readonly bufferHeight: number;
+}
+
+interface StableFrameCapture {
+  readonly frame: FrameStats;
+  readonly settleMs: number;
+  readonly samples: number;
+  readonly finalInternalPeakTileDelta: number;
+  readonly firstToFinalPeakTileDelta: number;
+  readonly firstSurface: Bg3dRenderSurface;
+  readonly finalSurface: Bg3dRenderSurface;
+}
+
+async function decodeFrameStats(page: Page, base64: string): Promise<FrameStats> {
+  return page.evaluate(async (encodedPng) => {
+    const response = await fetch(`data:image/png;base64,${encodedPng}`);
     const bitmap = await createImageBitmap(await response.blob());
     // 통계는 축소본으로 충분하고, 큰 뷰포트에서 훨씬 싸다.
     const width = Math.min(bitmap.width, 320);
@@ -68,6 +88,7 @@ async function frameStats(page: Page, selector: string): Promise<FrameStats> {
     const tileCols = 16;
     const tileRows = 12;
     const tileSums = new Float64Array(tileCols * tileRows);
+    const colorTileSums = new Float64Array(tileCols * tileRows * 3);
     const tileCounts = new Float64Array(tileCols * tileRows);
     for (let y = 0; y < height; y += 1) {
       const row = Math.min(tileRows - 1, Math.floor((y / height) * tileRows));
@@ -76,6 +97,9 @@ async function frameStats(page: Page, selector: string): Promise<FrameStats> {
         const offset = (y * width + x) * 4;
         const tile = row * tileCols + column;
         tileSums[tile] += (data[offset] + data[offset + 1] + data[offset + 2]) / 3;
+        colorTileSums[tile * 3] += data[offset];
+        colorTileSums[tile * 3 + 1] += data[offset + 1];
+        colorTileSums[tile * 3 + 2] += data[offset + 2];
         tileCounts[tile] += 1;
       }
     }
@@ -86,8 +110,18 @@ async function frameStats(page: Page, selector: string): Promise<FrameStats> {
       dominantShare: dominant / total,
       meanLuma: lumaSum / total,
       tiles: Array.from(tileSums, (sum, index) => sum / Math.max(1, tileCounts[index])),
+      colorTiles: Array.from(
+        colorTileSums,
+        (sum, index) => sum / Math.max(1, tileCounts[Math.floor(index / 3)]),
+      ),
     };
-  }, shot.toString("base64"));
+  }, base64);
+}
+
+/** 렌더된 프레임의 픽셀 통계. 디코딩은 브라우저가 한다(Node 측 이미지 의존성 없음). */
+async function frameStats(page: Page, selector: string): Promise<FrameStats> {
+  const shot = await page.locator(selector).first().screenshot();
+  return decodeFrameStats(page, shot.toString("base64"));
 }
 
 /** 두 프레임이 가장 크게 달라진 칸의 휘도 차. 안티에일리어싱 잡음은 한 자리를 넘지 않는다. */
@@ -97,6 +131,190 @@ function peakTileDelta(a: FrameStats, b: FrameStats): number {
     peak = Math.max(peak, Math.abs(a.tiles[index] - (b.tiles[index] ?? 0)));
   }
   return peak;
+}
+
+/** 밝기가 같은 재질/색 변화도 놓치지 않는 타일별 최대 RGB 채널 차. */
+function peakColorTileDelta(a: FrameStats, b: FrameStats): number {
+  let peak = 0;
+  for (let index = 0; index < a.colorTiles.length; index += 1) {
+    peak = Math.max(peak, Math.abs(a.colorTiles[index] - (b.colorTiles[index] ?? 0)));
+  }
+  return peak;
+}
+
+async function readBg3dRenderSurface(page: Page): Promise<Bg3dRenderSurface> {
+  return page.locator(BG3D_RENDER_CANVAS).first().evaluate((canvas) => ({
+    cssWidth: canvas.clientWidth,
+    cssHeight: canvas.clientHeight,
+    bufferWidth: canvas.width,
+    bufferHeight: canvas.height,
+  }));
+}
+
+/**
+ * 마지막 pointer move 뒤 WebGPU queue와 browser compositor가 같은 자세를 present할 때까지
+ * 기다린다. 실제 ghost는 안정된 continuous/direct 프레임 사이에도 남으므로 바깥의 <8 판정은
+ * 그대로 유지한다. 여기서는 동일 경로 내부의 캡처 타이밍만 제거한다.
+ */
+async function waitForStableBg3dFrame(
+  page: Page,
+  testInfo: TestInfo,
+  label: string,
+  timeoutMs = 15_000,
+): Promise<StableFrameCapture> {
+  // DOM 상태 overlay와 toolbar의 글자 anti-aliasing은 framebuffer 잔상과 무관하므로 실제
+  // R3F render canvas만 캡처한다.
+  const viewport = page.locator(BG3D_RENDER_CANVAS).first();
+  const startedAt = Date.now();
+  const firstPng = await viewport.screenshot();
+  const firstFrame = await decodeFrameStats(page, firstPng.toString("base64"));
+  const firstSurface = await readBg3dRenderSurface(page);
+  let previousFrame = firstFrame;
+  let previousSurface = firstSurface;
+  let finalPng = firstPng;
+  let finalFrame = firstFrame;
+  let finalSurface = firstSurface;
+  let finalInternalPeakTileDelta = Number.POSITIVE_INFINITY;
+  let stableIntervals = 0;
+  let samples = 1;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await page.waitForTimeout(100);
+    finalPng = await viewport.screenshot();
+    finalFrame = await decodeFrameStats(page, finalPng.toString("base64"));
+    finalSurface = await readBg3dRenderSurface(page);
+    samples += 1;
+    finalInternalPeakTileDelta = peakTileDelta(previousFrame, finalFrame);
+    const sameSurface = finalFrame.width === previousFrame.width
+      && finalFrame.height === previousFrame.height
+      && finalSurface.bufferWidth === previousSurface.bufferWidth
+      && finalSurface.bufferHeight === previousSurface.bufferHeight;
+    stableIntervals = sameSurface && finalInternalPeakTileDelta < 2
+      ? stableIntervals + 1
+      : 0;
+    if (stableIntervals >= 2) break;
+    previousFrame = finalFrame;
+    previousSurface = finalSurface;
+  }
+
+  const settleMs = Date.now() - startedAt;
+  const metrics = {
+    timeoutMs,
+    settleMs,
+    samples,
+    timedOut: stableIntervals < 2,
+    finalInternalPeakTileDelta,
+    firstToFinalPeakTileDelta: peakTileDelta(firstFrame, finalFrame),
+    firstSurface,
+    finalSurface,
+  };
+  await testInfo.attach(`${label}-first.png`, { body: firstPng, contentType: "image/png" });
+  await testInfo.attach(`${label}-stable.png`, { body: finalPng, contentType: "image/png" });
+  await testInfo.attach(`${label}-settle.json`, {
+    body: Buffer.from(JSON.stringify(metrics, null, 2)),
+    contentType: "application/json",
+  });
+  if (metrics.timedOut) {
+    throw new Error(
+      `${label}: 같은 자세의 WebGPU 프레임이 ${timeoutMs}ms 안에 안정되지 않았습니다 `
+      + `(최종 내부 칸 최대 휘도차 ${finalInternalPeakTileDelta.toFixed(2)}).`,
+    );
+  }
+  return { frame: finalFrame, ...metrics };
+}
+
+/** 두 PNG를 흰 배경에 같은 크기로 합성해 실제 보이는 RGB 차이를 잰다. */
+async function visiblePngDelta(page: Page, left: string, right: string): Promise<{
+  readonly changedPixels: number;
+  readonly peakChannelDelta: number;
+}> {
+  return page.evaluate(async ([leftUrl, rightUrl]) => {
+    const decode = async (url: string) => {
+      const response = await fetch(url);
+      return createImageBitmap(await response.blob());
+    };
+    const [leftBitmap, rightBitmap] = await Promise.all([decode(leftUrl), decode(rightUrl)]);
+    const width = 320;
+    const height = 240;
+    const pixels = (bitmap: ImageBitmap) => {
+      const canvas = new OffscreenCanvas(width, height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("2D 컨텍스트를 만들지 못했습니다.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(bitmap, 0, 0, width, height);
+      return context.getImageData(0, 0, width, height).data;
+    };
+    const leftPixels = pixels(leftBitmap);
+    const rightPixels = pixels(rightBitmap);
+    let changedPixels = 0;
+    let peakChannelDelta = 0;
+    for (let offset = 0; offset < leftPixels.length; offset += 4) {
+      let changed = false;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const delta = Math.abs(leftPixels[offset + channel] - rightPixels[offset + channel]);
+        peakChannelDelta = Math.max(peakChannelDelta, delta);
+        if (delta > 3) changed = true;
+      }
+      if (changed) changedPixels += 1;
+    }
+    return { changedPixels, peakChannelDelta };
+  }, [left, right] as const);
+}
+
+/** 전용 headed browser lane에서 실제 native/SwiftShader WebGPU renderer를 고정한다. */
+async function forceBg3dWebGpu(page: Page): Promise<void> {
+  const backend = page.locator('[data-testid="studio-bg3d-engine-active-backend"]').first();
+  await page.getByRole("tab", { name: "보기", exact: true }).click();
+  await page.locator('[data-testid="studio-bg3d-engine-preference-webgpu"]').first().click();
+  await expect(backend).toContainText("WebGPU", { timeout: 120_000 });
+  await page.getByRole("tab", { name: "도형", exact: true }).click();
+  await page.waitForTimeout(1_000);
+}
+
+/**
+ * 같은 시작/끝과 같은 총 시간을 쓰되, 하나는 24개 중간 자세를 실제로 그리고 다른 하나는
+ * 최종 자세만 그린다. mouse-up 뒤 WebGPU compositor가 버퍼를 정리하므로 반드시 누른 채 캡처한다.
+ */
+async function dragBg3dRotationRing(
+  page: Page,
+  testInfo: TestInfo,
+  label: "continuous" | "direct",
+  steps: 1 | 24,
+): Promise<{ capture: StableFrameCapture; values: readonly string[] }> {
+  const box = await page.locator(BG3D_VIEWPORT).boundingBox();
+  if (!box) throw new Error("BG3D viewport 좌표를 읽지 못했습니다.");
+  const point = ([x, y]: readonly [number, number]) => ({
+    x: box.x + box.width * x,
+    y: box.y + box.height * y,
+  });
+  const start = point([0.618, 0.507]);
+  const end = point([0.499, 0.555]);
+  await page.mouse.move(start.x, start.y);
+  await page.waitForTimeout(300);
+  await page.mouse.down();
+  try {
+    // 직접 경로도 마지막 move 전까지 같은 pointer-down 시간을 보내게 해, 두 경로 모두 마지막
+    // 자세를 present할 시간은 정확히 80ms로 맞춘다. 기존에는 연속 80ms, 직접 1,920ms였다.
+    if (steps === 1) await page.waitForTimeout(80 * 23);
+    for (let step = 1; step <= steps; step += 1) {
+      const progress = step / steps;
+      await page.mouse.move(
+        start.x + (end.x - start.x) * progress,
+        start.y + (end.y - start.y) * progress,
+      );
+      await page.waitForTimeout(80);
+    }
+    const capture = await waitForStableBg3dFrame(page, testInfo, label);
+    const values = await Promise.all(
+      ["X", "Y", "Z"].map((axis) =>
+        page.getByRole("spinbutton", { name: `회전 ${axis}` }).first().inputValue()
+      ),
+    );
+    return { capture, values };
+  } finally {
+    await page.mouse.up();
+  }
 }
 
 /**
@@ -114,19 +332,22 @@ async function waitForFrameChange(
   baseline: FrameStats,
   label: string,
   timeoutMs = 90_000,
+  metric: "luma" | "color" = "luma",
 ): Promise<FrameStats> {
   const deadline = Date.now() + timeoutMs;
   let latest = baseline;
   let peak = 0;
   while (Date.now() < deadline) {
     latest = await frameStats(page, selector);
-    peak = peakTileDelta(latest, baseline);
+    peak = metric === "color"
+      ? peakColorTileDelta(latest, baseline)
+      : peakTileDelta(latest, baseline);
     if (peak > 3) return latest;
     await page.waitForTimeout(2_000);
   }
   throw new Error(
     `${label}: 프레임이 바뀌지 않았습니다 `
-    + `(칸 최대 휘도차 ${peak.toFixed(1)}, `
+    + `(칸 최대 ${metric === "color" ? "RGB 채널차" : "휘도차"} ${peak.toFixed(1)}, `
     + `색 ${baseline.distinctColors} → ${latest.distinctColors}).`,
   );
 }
@@ -165,6 +386,13 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((session) => {
       localStorage.setItem("toonspectrum-auth-session-v1", JSON.stringify(session));
+      window.__studioRasterImagePresentationProbe = {
+        version: 1,
+        expectationEpoch: 0,
+        expected: null,
+        receiptEpoch: 0,
+        receipt: null,
+      };
     }, TEST_CREATOR_SESSION);
   });
 
@@ -203,6 +431,68 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     expect(fatal).toEqual([]);
   });
 
+  test("WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는다", async ({ page }, testInfo) => {
+    test.skip(
+      !BG3D_WEBGPU_GIZMO_GATE,
+      "headed native/SwiftShader WebGPU 전용 회귀는 별도 package gate에서 실행합니다.",
+    );
+    test.setTimeout(300_000);
+    const fatal = collectFatalErrors(page);
+    await page.setViewportSize({ width: 1_440, height: 1_000 });
+    await openStudio(page);
+    await openBg3d(page);
+    await forceBg3dWebGpu(page);
+
+    await page.locator('[aria-label="상자 추가"]').first().click();
+    await page.getByRole("button", { name: "회전", exact: true }).first().click();
+    const continuous = await dragBg3dRotationRing(page, testInfo, "continuous", 24);
+
+    await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0);
+    await openBg3d(page);
+    await forceBg3dWebGpu(page);
+    await page.locator('[aria-label="상자 추가"]').first().click();
+    await page.getByRole("button", { name: "회전", exact: true }).first().click();
+    const direct = await dragBg3dRotationRing(page, testInfo, "direct", 1);
+
+    // 두 입력은 같은 최종 자세와 같은 pointer-down 시간을 갖는다. 수정 전 WebGPU에서는 24개
+    // 중간 실루엣이 남아 peak가 37.68이었고, 매 frame clear 뒤에는 2.93으로 내려왔다.
+    const finalPeakTileDelta = peakTileDelta(continuous.capture.frame, direct.capture.frame);
+    const metrics = {
+      threshold: 8,
+      finalPeakTileDelta,
+      continuous: continuous.capture,
+      direct: direct.capture,
+    };
+    await testInfo.attach("bg3d-webgpu-rotation-metrics.json", {
+      body: Buffer.from(JSON.stringify(metrics, null, 2)),
+      contentType: "application/json",
+    });
+    console.info(`[bg3d-webgpu-rotation] ${JSON.stringify({
+      finalPeakTileDelta,
+      continuous: {
+        settleMs: continuous.capture.settleMs,
+        samples: continuous.capture.samples,
+        internalDelta: continuous.capture.finalInternalPeakTileDelta,
+        firstToFinalDelta: continuous.capture.firstToFinalPeakTileDelta,
+        firstSurface: continuous.capture.firstSurface,
+        surface: continuous.capture.finalSurface,
+      },
+      direct: {
+        settleMs: direct.capture.settleMs,
+        samples: direct.capture.samples,
+        internalDelta: direct.capture.finalInternalPeakTileDelta,
+        firstToFinalDelta: direct.capture.firstToFinalPeakTileDelta,
+        firstSurface: direct.capture.firstSurface,
+        surface: direct.capture.finalSurface,
+      },
+    })}`);
+    expect(continuous.values).toEqual(direct.values);
+    expect(Math.abs(Number(continuous.values[1]))).toBeGreaterThan(10);
+    expect(finalPeakTileDelta).toBeLessThan(8);
+    expect(fatal).toEqual([]);
+  });
+
   test("절차형 에셋과 선화 미리보기가 프레임을 바꾼다", async ({ page }) => {
     test.setTimeout(300_000);
     const fatal = collectFatalErrors(page);
@@ -232,7 +522,12 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
   test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }) => {
     test.setTimeout(300_000);
     const fatal = collectFatalErrors(page);
+    // Konva Stage는 브라우저 viewport에 보이는 문서 구간만 backing canvas로 만든다. 기본
+    // 1280×720에서는 삽입된 3D 배경의 하단 변화가 clip 아래에 있어, 실제 PNG와 presentation
+    // receipt가 갱신돼도 문서 screenshot 비교가 그 픽셀을 관찰하지 못한다.
+    await page.setViewportSize({ width: 1_440, height: 1_000 });
     await openStudio(page);
+    const emptyCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
     await openBg3d(page);
 
     const emptyScene = await frameStats(page, BG3D_VIEWPORT);
@@ -243,12 +538,33 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
 
     // 삽입이 성공하면 편집기가 닫힌다. 실패로 닫히는 분기에서는 열린 채 오류만 남았다.
     await expect(page.locator(BG3D_DIALOG)).toHaveCount(0, { timeout: 120_000 });
+    await page.waitForFunction(() => {
+      const probe = window.__studioRasterImagePresentationProbe;
+      return probe?.expected !== null
+        && probe?.receipt?.expectationEpoch === probe.expected.epoch
+        && probe.receipt.src === probe.expected.src;
+    }, null, { timeout: 30_000 });
+    const initialCompositeSrc = await page.evaluate(() => (
+      window.__studioRasterImagePresentationProbe?.expected?.src ?? ""
+    ));
+    expect(initialCompositeSrc).toMatch(/^data:image\/png;base64,/);
     await page.waitForTimeout(4_000);
 
     // 캔버스에 3D 배경 레이어가 선택된 채로 존재해야 한다.
     await expect(page.getByText("3D LT 배경", { exact: false }).first()).toBeVisible({
       timeout: 30_000,
     });
+    // 삽입 직후 자동 선택된 Transformer/핸들을 제거하고 실제 문서 raster만 비교한다. 전체
+    // scroll viewport나 선택 테두리 변화는 빈/깨진 PNG도 성공으로 오판할 수 있다.
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    const insertedCanvas = await waitForFrameChange(
+      page,
+      STUDIO_DOCUMENT_SCOPE,
+      emptyCanvas,
+      "3D 배경 캔버스 합성",
+      30_000,
+    );
+    expect(insertedCanvas.distinctColors).toBeGreaterThan(1);
 
     // 실시간 룸에서는 병합 합성이 들어간다는 사실을 중립 알림으로 알려야 한다 — 오류가 아니다.
     const notice = page.locator("[data-studio-status-notice-dismiss]").first();
@@ -257,6 +573,115 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     }
     // 성공한 삽입이 빨간 오류 배너를 남겨서는 안 된다.
     await expect(page.locator("[data-studio-status-error-dismiss]")).toHaveCount(0);
+
+    // 레이어 트리에서 방금 삽입한 원본을 다시 선택하고 ID를 기록한다. 업데이트가 delete +
+    // reinsert로 바뀌어도 단순 count=1은 통과하므로 동일 identity를 직접 고정한다.
+    await page.getByRole("tab", { name: "레이어 1" }).click();
+    const insertedLayer = page.getByRole("treeitem", { name: /3D LT 배경/ }).first();
+    const insertedLayerId = await insertedLayer.getAttribute("id");
+    expect(insertedLayerId).toMatch(/^studio-layer-.+/);
+    await insertedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
+    await expect(insertedLayer).toHaveAttribute("aria-selected", "true");
+
+    // 선택된 병합 레이어의 canonical bg3dScene을 메인 레일에서도 다시 열 수 있어야 한다.
+    // 원본 전달이 빠지면 빈 insert 장면과 "컬러 배경 추가" footer가 나타난다.
+    await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
+    await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    await page.getByRole("tab", { name: "레이어" }).click();
+    await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
+    const restoredViewport = await frameStats(page, BG3D_VIEWPORT);
+
+    // 실제 장면 변경도 update source에 반영되는지 확인한다. 기존 장면을 그대로 다시 저장하면
+    // no-op update나 stale source도 ID/count assertion만으로는 통과할 수 있다.
+    await page.getByRole("tab", { name: "도형", exact: true }).click();
+    await page.locator('[aria-label="구 추가"]').first().click();
+    const overlappedSphereViewport = await waitForFrameChange(
+      page,
+      BG3D_VIEWPORT,
+      restoredViewport,
+      "재편집 장면의 구 렌더",
+      30_000,
+    );
+    // 두 번째 도형은 기존 상자 가까이에 생긴다. 상자에 가려진 구는 편집 뷰포트의 선택 기즈모만
+    // 바꾸고 최종 LT PNG의 가시 픽셀은 충분히 바꾸지 않을 수 있다. 구를 옆으로 옮겨 실제 문서
+    // raster가 달라져야 하는 장면을 만든 뒤 업데이트한다.
+    const spherePositionX = page.getByRole("spinbutton", { name: "위치 X" }).first();
+    await spherePositionX.fill("2.5");
+    await expect(spherePositionX).toHaveValue("2.5");
+    await waitForFrameChange(
+      page,
+      BG3D_VIEWPORT,
+      overlappedSphereViewport,
+      "재편집 장면의 구 위치 이동",
+      30_000,
+    );
+    await page.getByRole("tab", { name: "레이어" }).click();
+    await expect(page.getByRole("button", { name: "구 1", exact: true })).toBeVisible();
+
+    // 업데이트는 선택한 레이어를 교체해야 하며 새 레이어를 하나 더 만들면 안 된다.
+    await page.getByRole("button", { name: "3D 배경 업데이트" }).click();
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0, { timeout: 120_000 });
+    await page.waitForFunction(() => {
+      const probe = window.__studioRasterImagePresentationProbe;
+      return probe?.expected !== null
+        && probe?.receipt?.expectationEpoch === probe.expected.epoch
+        && probe.receipt.elementId === probe.expected.elementId
+        && probe.receipt.src === probe.expected.src;
+    }, null, { timeout: 30_000 });
+    const updatedCompositeSrc = await page.evaluate(() => (
+      window.__studioRasterImagePresentationProbe?.expected?.src ?? ""
+    ));
+    const compositeDelta = await visiblePngDelta(
+      page,
+      initialCompositeSrc,
+      updatedCompositeSrc,
+    );
+    expect(compositeDelta.peakChannelDelta).toBeGreaterThan(3);
+    expect(compositeDelta.changedPixels).toBeGreaterThan(100);
+    await expect(page.getByRole("tab", { name: "레이어 1" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "레이어 2" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "레이어 1" }).click();
+    const updatedLayer = page.locator(`#${insertedLayerId}`);
+    await expect(updatedLayer).toHaveCount(1);
+    await expect(updatedLayer).toHaveAttribute("aria-selected", "true");
+
+    // 먼저 재열기와 무관한 update 자체의 가시 결과를 고정한다. 이 지점에서 새 raster가 보이지
+    // 않으면 캡처/patch/이미지 디코드 경로 결함이고, 여기서는 보이는데 아래 재열기 뒤 사라지면
+    // route/modal 전환이 문서 화면을 되돌린 결함이다.
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    const updatedCanvas = await waitForFrameChange(
+      page,
+      STUDIO_DOCUMENT_SCOPE,
+      insertedCanvas,
+      "3D 배경 업데이트 캔버스 합성",
+      30_000,
+      "color",
+    );
+    expect(updatedCanvas.distinctColors).toBeGreaterThan(1);
+    await updatedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
+    await expect(updatedLayer).toHaveAttribute("aria-selected", "true");
+
+    // 저장된 canonical scene도 다시 열어 추가한 구가 남아 있는지 먼저 확인한다. 이 검증이
+    // 통과하고 아래 raster만 같다면 metadata update와 image capture 사이 결함이다.
+    await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
+    await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    await page.getByRole("tab", { name: "레이어" }).click();
+    await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "구 1", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "구 1", exact: true }).click();
+    await page.getByRole("tab", { name: "도형", exact: true }).click();
+    await expect(page.getByRole("spinbutton", { name: "위치 X" }).first()).toHaveValue("2.5");
+    await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0);
+
+    // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다.
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    await page.waitForTimeout(2_000);
+    const reopenedCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+    expect(peakColorTileDelta(reopenedCanvas, insertedCanvas)).toBeGreaterThan(3);
+    expect(peakColorTileDelta(reopenedCanvas, updatedCanvas)).toBeLessThan(3);
 
     expect(fatal).toEqual([]);
   });

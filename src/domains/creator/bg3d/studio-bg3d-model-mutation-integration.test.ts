@@ -50,7 +50,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     expect(additive).toContain("if (!canAdmitSceneNodes(1)) return");
     expect(additive).toContain("if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return");
     expectInOrder(additive, [
-      "if (!canAdmitSceneNodes(newPrimitives.length + newModels.length)) return",
+      "if (!canAdmitSceneNodes(primitivePairs.length + modelPairs.length)) return",
       "physicsRuntimeSourceRef.current = {",
       "setPrimitives(nextPrimitives)",
       "setCustomModels(nextCustomModels)",
