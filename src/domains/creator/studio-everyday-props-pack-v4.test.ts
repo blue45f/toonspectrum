@@ -383,9 +383,14 @@ describe("ToonSpectrum everyday prop pack v4", () => {
       createPropInstance("mug", "minseo-mug-contact")!,
       metrics,
     );
-    const hand = vrm.scene.getObjectByName("TS_Minseo_Campus_Hand_R");
-    expect(hand).toBeDefined();
-    const handSize = new Box3().setFromObject(hand!).getSize(new Vector3());
+    // The clearance this guards is the PALM's: the mug body must not intersect the mass the
+    // handle sits against. Wave 1 modelled the whole hand as one mitten, so its mesh WAS the
+    // palm; Wave 7 splits palm from fingers, and the fingers curl around the handle rather than
+    // pushing the body away, so including them would demand clearance the grip never needs.
+    const palm = vrm.scene.getObjectByName("TS_Minseo_Campus_Palm_R")
+      ?? vrm.scene.getObjectByName("TS_Minseo_Campus_Hand_R");
+    expect(palm, "no right palm mesh on the Minseo rig").toBeDefined();
+    const handSize = new Box3().setFromObject(palm!).getSize(new Vector3());
     const halfPalmVolume = Math.max(handSize.x, handSize.z) * 0.5;
     const anchor = new Vector3(...resolved.anchor.position);
     const handle = mug.scene.getObjectByName("Mug_HandleContact")!;
