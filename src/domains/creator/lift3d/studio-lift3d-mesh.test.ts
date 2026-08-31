@@ -12,6 +12,7 @@ import { STUDIO_LIFT3D_LIMITS } from "./studio-lift3d-contract";
 import {
   STUDIO_LIFT3D_MAX_DEPTH_BANDS,
   buildStudioLift3dDepthField,
+  studioLift3dBandBuckets,
 } from "./studio-lift3d-depth";
 import {
   extractStudioLift3dMask,
@@ -21,6 +22,7 @@ import {
 import {
   buildStudioLift3dGeometry,
   countStudioLift3dPlannedQuads,
+  partitionStudioLift3dBandFaces,
   maxStudioLift3dResolutionForLayers,
   normalizeStudioLift3dPositions,
 } from "./studio-lift3d-mesh";
@@ -29,6 +31,43 @@ import {
   signedVolume,
   verticalGradientImage,
 } from "./studio-lift3d.test-fixture";
+
+/** 밴드 분할 불변식을 훑을 깊이 모양들. 매끄러운 것부터 병리적인 것까지. */
+const DEPTH_SHAPES: ReadonlyArray<readonly [string, (x: number, y: number, side: number) => number]> = [
+  ["세로 그라데이션", (_x, y, side) => y / side],
+  ["동심 고리", (x, y, side) => Math.min(1, Math.hypot(x - side / 2, y - side / 2) / (side / 2))],
+  ["부드러운 노이즈", (x, y) => 0.5 + 0.5 * Math.sin(x / 9) * Math.cos(y / 11)],
+  // 부풀리기 시절 카드가 마스크의 74.5% / 100% 를 덮던 두 입력.
+  ["대각 줄무늬", (x, y) => ((x + 3 * y) % 12) / 12],
+  ["체커보드", (x, y) => ((x % 2) + 2 * (y % 2)) / 4],
+];
+
+function depthFieldOf(
+  side: number,
+  heightAt: (x: number, y: number, side: number) => number,
+): { width: number; height: number; heights: Float64Array; maxDistance: number } {
+  const heights = new Float64Array(side * side);
+  for (let y = 0; y < side; y += 1) {
+    for (let x = 0; x < side; x += 1) heights[y * side + x] = heightAt(x, y, side);
+  }
+  return { width: side, height: side, heights, maxDistance: side / 2 };
+}
+
+/** 한 밴드 안에서 대각으로만 이어진 사각형 쌍의 수. */
+function countPinches(present: Uint8Array, width: number): number {
+  let count = 0;
+  for (let y = 1; y < width; y += 1) {
+    for (let x = 1; x < width; x += 1) {
+      const nw = present[(y - 1) * width + (x - 1)]!;
+      const ne = present[(y - 1) * width + x]!;
+      const sw = present[y * width + (x - 1)]!;
+      const se = present[y * width + x]!;
+      if ((nw === 1 && se === 1 && ne === 0 && sw === 0)
+        || (ne === 1 && sw === 1 && nw === 0 && se === 0)) count += 1;
+    }
+  }
+  return count;
+}
 
 /** 사각형 하나가 쓰는 코너 수와 편집 메시의 코너 예산. 예산 계산을 테스트에서도 같은 말로 쓴다. */
 const QUAD_CORNERS = 4;
@@ -417,6 +456,34 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(previous).toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
   });
 
+  it("동심 고리처럼 경계가 긴 밴드도 상한 해상도에서 예산 안이다", () => {
+    // 상한 공식의 여유는 옆벽 4uB 를 가정한다. 가로 띠보다 경계가 긴 동심 고리가 그 가정을
+    // 시험하는 모양이라, 최대 레이어와 함께 걸어 본다.
+    const bands = STUDIO_LIFT3D_MAX_DEPTH_BANDS;
+    const side = Math.min(
+      maxStudioLift3dResolutionForLayers(bands),
+      STUDIO_LIFT3D_LIMITS.maxResolution,
+    );
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = Math.min(
+          1,
+          Math.hypot(x - side / 2, y - side / 2) / (side / 2),
+        );
+      }
+    }
+
+    const planned = countStudioLift3dPlannedQuads(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", layerBands: bands },
+    );
+
+    expect(planned * QUAD_CORNERS).toBeLessThanOrEqual(CORNER_BUDGET);
+  });
+
   it("상한 해상도에서 최대 레이어를 쌓아도 면 예산 안에 들어온다", () => {
     // 화면 전체가 피사체인 배경이 사각형을 가장 많이 만든다. 여기서 통과하지 못하면
     // 슬라이더 두 개를 각각 최대로 올린 조합이 사용자에게는 늘 실패로만 보인다.
@@ -519,6 +586,164 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
+  it("카드는 어떤 깊이 모양에서도 마스크 사각형을 정확히 한 번씩 나눠 갖는다", () => {
+    // 시차 카드가 서로를 가리지 않는 근거다. 면이 두 카드에 들어가지 않으므로(겹침 0) 앞 카드가
+    // 뒤 카드를 덮을 수 없고, 빠지는 면이 없으므로(덮임 100%) 구멍도 없다. 매끄러운 깊이만이
+    // 아니라 잡음·병리적 깊이에서도 성립해야 하는 불변식이라 모양을 훑는다.
+    for (const [label, heightAt] of DEPTH_SHAPES) {
+      for (const bandCount of [2, 5, STUDIO_LIFT3D_MAX_DEPTH_BANDS]) {
+        const side = 40;
+        const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+        const depth = depthFieldOf(side, heightAt);
+
+        const faces = partitionStudioLift3dBandFaces(
+          mask,
+          studioLift3dBandBuckets(mask, depth, bandCount),
+          bandCount,
+        );
+
+        expect(faces).toHaveLength(bandCount);
+        const seen = new Int32Array((side - 1) * (side - 1));
+        for (const band of faces) {
+          for (let face = 0; face < band.length; face += 1) seen[face]! += band[face]!;
+        }
+        let orphans = 0;
+        let shared = 0;
+        for (let face = 0; face < seen.length; face += 1) {
+          if (seen[face] === 0) orphans += 1;
+          if (seen[face]! > 1) shared += 1;
+        }
+
+        expect({ label, bandCount, orphans, shared })
+          .toEqual({ label, bandCount, orphans: 0, shared: 0 });
+      }
+    }
+  });
+
+  it("꼬집힘 옮기기는 결정론적이고 꼬집힘을 늘리지 않는다", () => {
+    // 면을 버리지 않고 이웃 밴드로 옮겨 푸는 방식이라, 옮기다가 다른 자리에 꼬집힘을 만들거나
+    // 두 자리가 서로를 밀어 진동할 수 있다. 최대 횟수로 종료는 보장되지만 **악화되지 않는지**는
+    // 별개다. 잡음이 심한 깊이일수록 옮길 일이 많아 그쪽을 함께 본다.
+    const side = 40;
+    const bandCount = 8;
+    for (const [label, heightAt] of DEPTH_SHAPES) {
+      const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+      const depth = depthFieldOf(side, heightAt);
+      const buckets = studioLift3dBandBuckets(mask, depth, bandCount);
+
+      const first = partitionStudioLift3dBandFaces(mask, buckets, bandCount);
+      const second = partitionStudioLift3dBandFaces(mask, buckets, bandCount);
+      expect(first.map((band) => Array.from(band)))
+        .toEqual(second.map((band) => Array.from(band)));
+
+      // 옮기기 이전(순수 배정)과 이후의 꼬집힘을 견준다.
+      const width = side - 1;
+      const raw: Uint8Array[] = Array.from(
+        { length: bandCount },
+        () => new Uint8Array(width * width),
+      );
+      for (let j = 0; j < width; j += 1) {
+        for (let i = 0; i < width; i += 1) {
+          const corners = [
+            buckets[j * side + i]!, buckets[j * side + i + 1]!,
+            buckets[(j + 1) * side + i]!, buckets[(j + 1) * side + i + 1]!,
+          ];
+          raw[Math.max(...corners)]![j * width + i] = 1;
+        }
+      }
+      const before = raw.reduce((sum, band) => sum + countPinches(band, width), 0);
+      const after = first.reduce((sum, band) => sum + countPinches(band, width), 0);
+
+      expect({ label, worsened: after > before }).toEqual({ label, worsened: false });
+    }
+  });
+
+  it("잡음이 심한 깊이는 상한 해상도에서도 예외 없이 예산 초과로 거절된다", () => {
+    // 상한은 매끄러운 깊이에 맞춘 보정값이지 상한이 아니다. 실제 비용은 밴드 경계의 길이로
+    // 정해지고 그 길이는 리샘플 전에 알 수 없다. 그러니 넘는 입력이 반드시 있고, 그때 예외가
+    // 아니라 두 손잡이를 짚는 사유 코드로 끝나는 것이 이 파이프라인의 계약이다.
+    const bandCount = STUDIO_LIFT3D_MAX_DEPTH_BANDS;
+    const side = Math.min(
+      maxStudioLift3dResolutionForLayers(bandCount),
+      STUDIO_LIFT3D_LIMITS.maxResolution,
+    );
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      depthFieldOf(side, (x, y) => ((x + 3 * y) % 12) / 12),
+      { mode: "parallax", depthScale: 0.25, targetHeight: 6, layerBands: bandCount },
+    );
+
+    expect(built.ok).toBe(false);
+    if (built.ok) return;
+    expect(built.code).toBe("budget-exceeded");
+    expect(built.detail).toContain(`해상도(${side})`);
+    // 살아남은 층이 아니라 요청한 층 수를 짚어야 사용자가 만질 손잡이를 안다.
+    expect(built.detail).toContain(`레이어 수(${bandCount})`);
+  });
+
+  it("이웃 카드가 깊이에서 맞닿아 층 사이에 틈이 없다", () => {
+    // 얇은 판을 각자의 밴드 중앙에만 띄우면 카드 사이 z 간격이 빈 공간이 된다. 정면에서는
+    // 멀쩡하다가 카메라가 돌아가는 순간 밴드 경계마다 배경이 비친다 — 시차를 보려고 돌리는
+    // 바로 그 움직임에서 갈라지는 셈이다.
+    //
+    // 맞닿았다면 카드 k 의 앞면과 카드 k+1 의 뒷면이 **같은 z** 다. 그러면 서로 다른 z 값의
+    // 개수가 층 수 + 1 이 된다(떠 있으면 층마다 둘씩이라 2배가 된다).
+    const side = 40;
+    const bandCount = 6;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      depthFieldOf(side, (_x, y) => y / side),
+      { mode: "parallax", depthScale: 0.4, targetHeight: 4, layerBands: bandCount },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const depths = [...new Set(
+      built.value.mesh.vertices.map((vertex) => vertex.position.z.toFixed(9)),
+    )];
+    expect(built.value.layerCount).toBe(bandCount);
+    expect(depths).toHaveLength(bandCount + 1);
+  });
+
+  it("면을 못 내는 밴드가 사이에 끼어도 이웃 카드는 서로 맞닿는다", () => {
+    // 셀은 있지만 2×2 가 안 나와 면을 못 내는 밴드가 중간에 있을 수 있다. 그 유령을 이웃으로
+    // 삼아 깊이를 잡으면, 밴드가 버려진 뒤 아무도 채우지 않는 z 구간이 남아 카메라를 돌릴 때
+    // 갈라진다. 이웃은 **실제로 면을 내는** 카드여야 한다.
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        // 위쪽 절반은 밴드 0, 아래쪽 절반은 밴드 2.
+        heights[y * side + x] = y < side / 2 ? 0.1 : 0.9;
+      }
+    }
+    // 가운데 밴드(1)에 외딴 셀 하나를, **더 높은** 밴드 한가운데 둔다. 면은 네 꼭짓점 중
+    // 가장 앞 밴드가 가져가므로, 이 셀에 닿는 사각형은 전부 밴드 2 로 간다 — 밴드 1 은 셀만
+    // 있고 면이 없는 유령이 된다.
+    heights[16 * side + 6] = 0.5;
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", depthScale: 0.4, targetHeight: 4, layerBands: 3 },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    // 밴드는 셋이지만 면을 내는 카드는 둘뿐이다.
+    expect(built.value.layerCount).toBe(2);
+    const depths = [...new Set(
+      built.value.mesh.vertices.map((vertex) => vertex.position.z.toFixed(9)),
+    )];
+    // 맞닿았다면 서로 다른 z 는 층 수 + 1 = 3 이다. 유령을 이웃으로 삼으면 4 가 된다.
+    expect(depths).toHaveLength(3);
+  });
+
   it("사각형을 하나도 못 만드는 밴드는 층 수에서 뺀다", () => {
     // 한 칸 폭 부위에만 걸린 밴드는 부풀린 뒤에도 2×2 가 안 나와 정점이 하나도 안 나간다.
     // 그 껍질을 세어만 두면 존재하지 않는 층이 지표와 화면에 광고된다.
@@ -562,6 +787,8 @@ describe("Studio Lift 3D 메시 빌더", () => {
       0,
       // 위쪽 한도도 같다. 조용히 조이면 요청한 층 수와 다른 결과가 성공으로 나간다.
       STUDIO_LIFT3D_MAX_DEPTH_BANDS + 1,
+      // 분수도 마찬가지다. 반올림하면 1.5 가 2 로 올라가 위상이 조용히 바뀐다.
+      1.5,
     ]) {
       const built = buildStudioLift3dGeometry(mask, depth, {
         mode: "parallax",

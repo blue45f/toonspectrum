@@ -158,6 +158,19 @@ describe("Studio Lift 3D 파이프라인", () => {
       .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
   });
 
+  it("분수 레이어 수는 반올림하지 않고 거절한다", () => {
+    // 1.5 를 2 로 올리면 프리셋 위상(relief) 대신 parallax 가 되는데, 비교가 이미 반올림된
+    // 값으로 이뤄져 조정 경고조차 나가지 않는다. 층은 개수이므로 계약을 분명히 한다.
+    for (const layerBands of [1.5, 2.5, 0.5]) {
+      const lifted = liftStudioImageTo3d(discImage(96), { subject: "background", layerBands });
+
+      expect(lifted.ok).toBe(false);
+      if (lifted.ok) return;
+      expect(lifted.code).toBe("invalid-option");
+      expect(lifted.detail).toContain("정수");
+    }
+  });
+
   it("지원 범위를 넘는 레이어 수는 한 번만 조이고 그 사실을 알린다", () => {
     // 유한하지만 24 를 넘는 값을 그대로 쓰면 해상도 상한만 쓸데없이 깎이고, MAX_VALUE 근처에서는
     // 상한 공식이 NaN 이 되어 상한 자체가 무시된다 — 그러면 최대 해상도로 24층을 쌓게 된다.
