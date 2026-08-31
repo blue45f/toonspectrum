@@ -19208,6 +19208,7 @@ const puppetWarpArmed =
         canvasHeight: canvasH,
         newElementId: uid(),
         allocatedBundleId: uid(),
+        allocatedGroupId: uid(),
         dccSource: bg3dDccSourceRef.current,
       });
       if (!realtimePlan.ok) {
@@ -19215,6 +19216,7 @@ const puppetWarpArmed =
         return false;
       }
       if (!commit([...realtimePlan.nextElements], {
+        groups: [...realtimePlan.nextGroups],
         shared3dStage: realtimePlan.nextShared3dStage,
       })) return false;
       setSelectedId(realtimePlan.anchorElementId);

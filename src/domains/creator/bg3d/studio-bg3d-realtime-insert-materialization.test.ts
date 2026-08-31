@@ -10,12 +10,17 @@ import {
 import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 
 import { planStudioBg3dRealtimeMergedApply } from "./studio-bg3d-lt-apply";
+import { planStudioBg3dLtLayers } from "./studio-bg3d-lt-layer-plan";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 
 import type { StudioBackground3DInsertResult } from "../scene-3d/studio-3d-insert-contract";
 import type { El } from "../studio-element-model";
 
 const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const VALID_COLOR_PNG = "data:image/png;base64,Y29sb3I=";
+const VALID_COMPOSITE_PNG = "data:image/png;base64,Y29tcG9zaXRl";
+const VALID_UPDATED_PNG = "data:image/png;base64,dXBkYXRlZA==";
+const VALID_LINE_PNG = "data:image/png;base64,bGluZQ==";
 
 function applyBg3dRenderedImageBody(): string {
   const start = studioPageSource.indexOf("async function applyBg3dRenderedImage(");
@@ -40,6 +45,19 @@ function characterElement(): Extract<El, { type: "image" }> {
   };
 }
 
+function rasterImage(id: string, src: string): Extract<El, { type: "image" }> {
+  return {
+    id,
+    type: "image",
+    src,
+    x: 0,
+    y: 270,
+    width: 960,
+    height: 540,
+    rotation: 0,
+  };
+}
+
 type SharedCharacterSource = ReturnType<
   typeof createStudioShared3dSceneSessionFromElements
 >["characters"][number];
@@ -55,11 +73,11 @@ function insertResult(input: {
     height: 540,
     layers: [{
       role: "color",
-      pngDataUrl: input.png ?? "data:image/png;base64,layer",
+      pngDataUrl: input.png ?? VALID_COLOR_PNG,
       width: 960,
       height: 540,
     }],
-    compositePngDataUrl: input.png ?? "data:image/png;base64,composite",
+    compositePngDataUrl: input.png ?? VALID_COMPOSITE_PNG,
     perspectiveGuides: [],
     bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
     sharedStageMutation: { kind: input.mutation },
@@ -91,6 +109,7 @@ function planConnectedInsert() {
     canvasHeight: 1080,
     newElementId: "background-1",
     allocatedBundleId: "bundle-1",
+    allocatedGroupId: "group-1",
     dccSource: null,
   });
   expect(plan.ok).toBe(true);
@@ -112,10 +131,16 @@ describe("Studio BG3D realtime-room insert materialization", () => {
     expect(background).toMatchObject({
       id: "background-1",
       type: "image",
-      src: "data:image/png;base64,composite",
+      src: VALID_COMPOSITE_PNG,
       bg3dLtBundleId: "bundle-1",
+      bg3dLtRole: "main-line",
+      bg3dLtRenderMode: "combined",
+      groupId: "group-1",
       bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
     });
+    expect(plan.nextGroups).toEqual([
+      expect.objectContaining({ id: "group-1", name: "3D LT 배경" }),
+    ]);
     expect(character).toMatchObject({ id: "character-1", hidden: true });
     expect(plan.hiddenElementIds).toEqual(["character-1"]);
     expect(resolveStudioShared3dStageCollectionForBundle(
@@ -135,15 +160,16 @@ describe("Studio BG3D realtime-room insert materialization", () => {
       result: insertResult({
         mutation: "refresh",
         source: first.source,
-        png: "data:image/png;base64,updated",
+        png: VALID_UPDATED_PNG,
       }),
       elements: first.plan.nextElements,
-      groups: [],
+      groups: first.plan.nextGroups,
       shared3dStage: first.plan.nextShared3dStage,
       targetElementId: first.plan.anchorElementId,
       canvasHeight: 1080,
       newElementId: "must-not-be-used",
       allocatedBundleId: "must-not-replace-bundle",
+      allocatedGroupId: "must-not-replace-group",
       dccSource: null,
     });
 
@@ -153,8 +179,11 @@ describe("Studio BG3D realtime-room insert materialization", () => {
     expect(updated.bundleId).toBe("bundle-1");
     expect(updated.nextElements.filter(({ id }) => id === "background-1")).toHaveLength(1);
     expect(updated.nextElements.find(({ id }) => id === "background-1")).toMatchObject({
-      src: "data:image/png;base64,updated",
+      src: VALID_UPDATED_PNG,
       bg3dLtBundleId: "bundle-1",
+      bg3dLtRole: "main-line",
+      bg3dLtRenderMode: "combined",
+      groupId: "group-1",
     });
     expect(resolveStudioShared3dStageCollectionForBundle(
       updated.nextShared3dStage,
@@ -174,6 +203,7 @@ describe("Studio BG3D realtime-room insert materialization", () => {
       canvasHeight: 1080,
       newElementId: "background-only",
       allocatedBundleId: "bundle-background-only",
+      allocatedGroupId: "group-background-only",
       dccSource: null,
     });
 
@@ -192,12 +222,13 @@ describe("Studio BG3D realtime-room insert materialization", () => {
     const unlinked = planStudioBg3dRealtimeMergedApply({
       result: insertResult({ mutation: "unlink" }),
       elements: first.plan.nextElements,
-      groups: [],
+      groups: first.plan.nextGroups,
       shared3dStage: first.plan.nextShared3dStage,
       targetElementId: first.plan.anchorElementId,
       canvasHeight: 1080,
       newElementId: "must-not-be-used",
       allocatedBundleId: "must-not-replace-bundle",
+      allocatedGroupId: "must-not-replace-group",
       dccSource: null,
     });
 
@@ -211,7 +242,117 @@ describe("Studio BG3D realtime-room insert materialization", () => {
     });
   });
 
-  it("wires the realtime branch through one element+Shared Stage commit before separated LT", () => {
+  it("keeps a realtime merged insert valid for an ordinary separated-LT edit", () => {
+    const first = planConnectedInsert();
+    const ordinary = planStudioBg3dLtLayers<El, typeof DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT>({
+      elements: first.plan.nextElements,
+      groups: first.plan.nextGroups,
+      render: {
+        kind: "separated",
+        width: 960,
+        height: 540,
+        layers: [{ role: "color", pngDataUrl: VALID_COLOR_PNG, width: 960, height: 540 }],
+        bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      },
+      targetElementId: first.plan.anchorElementId,
+      allocations: { elementIds: { color: "ordinary-color" } },
+      newElementTemplate: rasterImage("ordinary-template", VALID_COLOR_PNG),
+    });
+
+    expect(ordinary.ok).toBe(true);
+    if (!ordinary.ok) throw new Error(ordinary.message);
+    expect(ordinary.operation).toBe("update");
+    expect(ordinary.bundleId).toBe("bundle-1");
+    expect(ordinary.groupId).toBe("group-1");
+    expect(ordinary.nextElements.find(({ id }) => id === ordinary.anchorElementId)).toMatchObject({
+      id: "ordinary-color",
+      bg3dLtBundleId: "bundle-1",
+      bg3dLtRole: "color",
+      bg3dLtRenderMode: "separated",
+      groupId: "group-1",
+      bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    });
+  });
+
+  it.each(["existing-color", "existing-main-line"])(
+    "collapses the whole separated bundle when realtime refresh targets %s",
+    (targetElementId) => {
+      const character = characterElement();
+      const source = createStudioShared3dSceneSessionFromElements([character]).characters[0]!;
+      const separated = planStudioBg3dLtLayers<El, typeof DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT>({
+        elements: [character],
+        groups: [],
+        render: {
+          kind: "separated",
+          width: 960,
+          height: 540,
+          layers: [
+            { role: "color", pngDataUrl: VALID_COLOR_PNG, width: 960, height: 540 },
+            { role: "main-line", pngDataUrl: VALID_LINE_PNG, width: 960, height: 540 },
+          ],
+          bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+        },
+        allocations: {
+          bundleId: "existing-bundle",
+          groupId: "existing-group",
+          elementIds: {
+            color: "existing-color",
+            "main-line": "existing-main-line",
+          },
+        },
+        newElementTemplate: rasterImage("separated-template", VALID_LINE_PNG),
+      });
+      expect(separated.ok).toBe(true);
+      if (!separated.ok) throw new Error(separated.message);
+
+      const collapsed = planStudioBg3dRealtimeMergedApply({
+        result: insertResult({ mutation: "connect", source, png: VALID_UPDATED_PNG }),
+        elements: separated.nextElements,
+        groups: separated.nextGroups,
+        shared3dStage: undefined,
+        targetElementId,
+        canvasHeight: 1080,
+        newElementId: "unused-collapsed-element",
+        allocatedBundleId: "unused-collapsed-bundle",
+        allocatedGroupId: "unused-collapsed-group",
+        dccSource: null,
+      });
+
+      expect(collapsed.ok).toBe(true);
+      if (!collapsed.ok) throw new Error(collapsed.message);
+      expect(collapsed.anchorElementId).toBe("existing-main-line");
+      expect(collapsed.bundleId).toBe("existing-bundle");
+      expect(collapsed.nextElements.filter(
+        (element) => element.type === "image" && element.bg3dLtBundleId === "existing-bundle",
+      )).toHaveLength(1);
+      expect(collapsed.nextElements.find(({ id }) => id === "existing-color")).toBeUndefined();
+      expect(collapsed.nextElements.find(({ id }) => id === "existing-main-line")).toMatchObject({
+        src: VALID_UPDATED_PNG,
+        bg3dLtBundleId: "existing-bundle",
+        bg3dLtRole: "main-line",
+        bg3dLtRenderMode: "combined",
+        groupId: "existing-group",
+        bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      });
+      expect(collapsed.nextElements.filter(
+        (element) => element.type === "image" && element.bg3dScene !== undefined,
+      ).map(({ id }) => id)).toEqual(["existing-main-line"]);
+      expect(collapsed.nextGroups).toEqual([
+        expect.objectContaining({ id: "existing-group", name: "3D LT 배경" }),
+      ]);
+      expect(resolveStudioShared3dStageCollectionForBundle(
+        collapsed.nextShared3dStage,
+        collapsed.nextElements,
+        collapsed.bundleId,
+      )).toMatchObject({
+        phase: "ready",
+        backgroundElementId: "existing-main-line",
+        linkedCharacterElementIds: ["character-1"],
+      });
+    },
+  );
+
+  it("wires the realtime branch through one element+group+Shared Stage commit before separated LT", () => {
     const body = applyBg3dRenderedImageBody();
     const realtimeBranch = body.indexOf("if (isRealtimeTeamSession) {");
     const masterBranch = body.indexOf("if (masterEditMode) {");
@@ -221,6 +362,7 @@ describe("Studio BG3D realtime-room insert materialization", () => {
     expect(masterBranch).toBeGreaterThan(realtimeBranch);
     expect(realtime).toContain("planStudioBg3dRealtimeMergedApply({");
     expect(realtime).toContain("commit([...realtimePlan.nextElements], {");
+    expect(realtime).toContain("groups: [...realtimePlan.nextGroups],");
     expect(realtime).toContain("shared3dStage: realtimePlan.nextShared3dStage,");
     expect(realtime).toContain("expectStudioRasterImagePresentation({");
     expect(body.indexOf("if (isRealtimeTeamSession) {")).toBeLessThan(

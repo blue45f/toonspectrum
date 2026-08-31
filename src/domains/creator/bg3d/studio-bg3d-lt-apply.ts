@@ -27,12 +27,13 @@ import {
 
 import {
   planStudioBg3dEditableCompositeDetach,
+  type StudioBg3dEditableCompositeDetachSuccess,
 } from "./studio-bg3d-editable-composite-detach-plan";
+import {
+  planStudioBg3dLtLayers,
+  type StudioBg3dLtLayerPlanSuccess,
+} from "./studio-bg3d-lt-layer-plan";
 
-import type {
-  StudioBg3dEditableCompositeDetachSuccess,
-} from "./studio-bg3d-editable-composite-detach-plan";
-import type { StudioBg3dLtLayerPlanSuccess } from "./studio-bg3d-lt-layer-plan";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioBackground3DInsertResult } from "../scene-3d/studio-3d-insert-contract";
 import type { El } from "../studio-element-model";
@@ -61,8 +62,9 @@ export interface StudioBg3dLtApplyFailure {
 export interface StudioBg3dMergedCompositePlanSuccess {
   readonly ok: true;
   readonly anchorElementId: string;
-  readonly bundleId: string | undefined;
+  readonly bundleId: string;
   readonly nextElements: readonly El[];
+  readonly nextGroups: readonly LayerGroup[];
 }
 
 /**
@@ -77,7 +79,8 @@ export function planStudioBg3dMergedComposite(input: {
   readonly targetElementId: string | undefined;
   readonly canvasHeight: number;
   readonly newElementId: string;
-  readonly bundleId?: string;
+  readonly allocatedBundleId: string;
+  readonly allocatedGroupId: string;
   readonly magicMaskMessage: string;
 }): StudioBg3dLtApplyFailure | StudioBg3dMergedCompositePlanSuccess {
   const {
@@ -87,40 +90,11 @@ export function planStudioBg3dMergedComposite(input: {
     targetElementId,
     canvasHeight,
     newElementId,
-    bundleId,
+    allocatedBundleId,
+    allocatedGroupId,
     magicMaskMessage,
   } = input;
   if (result.magicFilterMask) return { ok: false, message: magicMaskMessage };
-
-  if (targetElementId) {
-    const target = elements.find(({ id }) => id === targetElementId);
-    if (!target || target.type !== "image") {
-      return { ok: false, message: "다시 적용할 3D 배경 이미지를 찾지 못했습니다." };
-    }
-    if (isEffectivelyLocked(target, [...groups])) {
-      return {
-        ok: false,
-        message: "잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.",
-      };
-    }
-    return {
-      ok: true,
-      anchorElementId: target.id,
-      bundleId,
-      nextElements: elements.map((element) => element.id === target.id
-        ? ({
-            ...target,
-            src: result.compositePngDataUrl,
-            height: Math.max(1, Math.round(target.width * (result.height / result.width))),
-            bg3dScene: result.bg3dScene,
-            bg3dLtBundleId: bundleId,
-            bg3dLtRole: undefined,
-            bg3dLtRenderMode: undefined,
-            name: "3D LT 배경 · 병합",
-          } satisfies El)
-        : element),
-    };
-  }
 
   const mergedImage = createCanvasImageElement({
     id: newElementId,
@@ -130,19 +104,43 @@ export function planStudioBg3dMergedComposite(input: {
     sourceWidth: result.width,
     sourceHeight: result.height,
   });
+  // A realtime room still stores one raster, but it must remain a complete LT bundle rather than
+  // carrying only bg3dLtBundleId. Reusing the ordinary bundle planner also makes a transition from
+  // separated LT atomic: every stale sibling disappears, the canonical scene moves to exactly one
+  // anchor, and the dedicated group stays a valid one-member group. Selecting any sibling is safe
+  // because the planner resolves and replaces the whole bundle, not just the clicked element.
+  const plan = planStudioBg3dLtLayers<El, StudioBg3dSceneDocument>({
+    elements,
+    groups,
+    render: {
+      kind: "combined",
+      pngDataUrl: result.compositePngDataUrl,
+      width: result.width,
+      height: result.height,
+      bg3dScene: result.bg3dScene,
+    },
+    targetElementId,
+    allocations: {
+      bundleId: allocatedBundleId,
+      groupId: allocatedGroupId,
+      elementIds: { "main-line": newElementId },
+    },
+    newElementTemplate: {
+      ...mergedImage,
+      name: "3D LT 배경 · 병합",
+      bg3dScene: result.bg3dScene,
+    } satisfies El,
+  });
+  if (!plan.ok) return { ok: false, message: plan.message };
+
   return {
     ok: true,
-    anchorElementId: mergedImage.id,
-    bundleId,
-    nextElements: [
-      ...elements,
-      {
-        ...mergedImage,
-        name: "3D LT 배경 · 병합",
-        bg3dScene: result.bg3dScene,
-        ...(bundleId ? { bg3dLtBundleId: bundleId } : {}),
-      } satisfies El,
-    ],
+    anchorElementId: plan.anchorElementId,
+    bundleId: plan.bundleId,
+    nextElements: plan.nextElements.map((element) => element.id === plan.anchorElementId
+      ? ({ ...element, name: "3D LT 배경 · 병합", layerRole: undefined } satisfies El)
+      : element),
+    nextGroups: plan.nextGroups,
   };
 }
 
@@ -151,6 +149,7 @@ export interface StudioBg3dRealtimeMergedApplyPlanSuccess {
   readonly anchorElementId: string;
   readonly bundleId: string;
   readonly nextElements: readonly El[];
+  readonly nextGroups: readonly LayerGroup[];
   readonly nextShared3dStage: StudioShared3dStageCollectionDocument | undefined;
   readonly sharedStageMutationKind:
     StudioBg3dSharedStageMutationKind | "refresh" | "connect";
@@ -173,13 +172,9 @@ export function planStudioBg3dRealtimeMergedApply(input: {
   readonly canvasHeight: number;
   readonly newElementId: string;
   readonly allocatedBundleId: string;
+  readonly allocatedGroupId: string;
   readonly dccSource: StudioShared3dStageDccSource | null;
 }): StudioBg3dLtApplyFailure | StudioBg3dRealtimeMergedApplyPlanSuccess {
-  const existingBundleId = resolveStudioShared3dStageBundleIdForElement(
-    input.elements,
-    input.targetElementId,
-  );
-  const bundleId = existingBundleId ?? input.allocatedBundleId;
   const merged = planStudioBg3dMergedComposite({
     result: input.result,
     elements: input.elements,
@@ -187,10 +182,12 @@ export function planStudioBg3dRealtimeMergedApply(input: {
     targetElementId: input.targetElementId,
     canvasHeight: input.canvasHeight,
     newElementId: input.newElementId,
-    bundleId,
+    allocatedBundleId: input.allocatedBundleId,
+    allocatedGroupId: input.allocatedGroupId,
     magicMaskMessage: "매직 레이어 마스크는 분리된 컬러·톤 레이어가 있어야 만들 수 있어요. 실시간 공동 편집에서는 매직 레이어를 끄고 다시 추가해 주세요.",
   });
   if (!merged.ok) return merged;
+  const bundleId = merged.bundleId;
 
   const captures = resolveStudioBg3dCapturedCharacterPlacements({ renderResult: input.result });
   if (!captures.ok) return captures;
@@ -198,7 +195,7 @@ export function planStudioBg3dRealtimeMergedApply(input: {
     shared3dStage: input.shared3dStage,
     elements: merged.nextElements,
     capturedCharacterElementIds: captures.capturedCharacterElementIds,
-    groups: [...input.groups],
+    groups: [...merged.nextGroups],
   });
   if (!visibility.ok) return visibility;
   const stage = planStudioBg3dSharedStageMutation({
@@ -217,6 +214,7 @@ export function planStudioBg3dRealtimeMergedApply(input: {
     anchorElementId: merged.anchorElementId,
     bundleId,
     nextElements: stage.stageMutation.nextElements,
+    nextGroups: merged.nextGroups,
     nextShared3dStage: stage.stageMutation.nextState,
     sharedStageMutationKind: stage.sharedStageMutationKind,
     hiddenElementIds: visibility.sharedCharacterVisibility.hiddenElementIds,

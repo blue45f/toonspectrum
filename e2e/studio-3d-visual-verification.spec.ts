@@ -577,7 +577,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 레이어 트리에서 방금 삽입한 원본을 다시 선택하고 ID를 기록한다. 업데이트가 delete +
     // reinsert로 바뀌어도 단순 count=1은 통과하므로 동일 identity를 직접 고정한다.
     await page.getByRole("tab", { name: "레이어 1" }).click();
-    const insertedLayer = page.getByRole("treeitem", { name: /3D LT 배경/ }).first();
+    // The complete LT metadata path creates a dedicated "3D LT 배경" group. Match the child
+    // raster row explicitly so the group treeitem cannot be mistaken for the persisted element.
+    const insertedLayer = page.getByRole("treeitem", { name: /^3D LT 배경 · 병합,/ }).first();
     const insertedLayerId = await insertedLayer.getAttribute("id");
     expect(insertedLayerId).toMatch(/^studio-layer-.+/);
     await insertedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
