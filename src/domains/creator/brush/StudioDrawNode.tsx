@@ -52,8 +52,6 @@ import {
   planOilBrushDabs,
   planOilBrushDabsIncremental,
   releaseOilBrushDabDraftPlanners,
-  studioOilPaintBodyForBrush,
-  studioOilTipProfileForBrush,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
@@ -145,7 +143,7 @@ import {
 } from "./studio-draw-rendering";
 import {
   isStudioFluidPaintBrushId,
-  studioFluidPaintStationSpacingRatio,
+  studioOilFamilyPlanFields,
 } from "./studio-fluid-paint-reference";
 import { resolveStudioDrawTapRadius } from "./studio-live-visible-tap";
 import {
@@ -2467,9 +2465,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: FX_OIL_DAB_CAP,
-              paintBody: studioOilPaintBodyForBrush(brush),
-              tipProfile: studioOilTipProfileForBrush(brush),
-              stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+              ...studioOilFamilyPlanFields(brush),
             };
             // 활성 초안만 요소 id 로 키된 증분 플래너를 쓴다. 대브 베드와 캐리어 모두 이동당
             // 전체를 다시 세우고 있었고(2906-대브 베드 기준 캐리어만 14.6ms), 두 플래너 모두

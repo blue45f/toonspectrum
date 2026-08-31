@@ -13,8 +13,8 @@
  *  2. it holds for the plain carrier and for each shipped program combination (load dynamics,
  *     bristle physics, impasto relief, body-only, and the opt-in fixed-anchor banding), because
  *     the settled-prefix argument is only valid for the stages that read a bounded window;
- *  3. it holds through the dab cap, where `FxOilDabPlanner` refits the whole lattice and no prefix
- *     survives — the planner must notice and rebuild rather than reuse;
+ *  3. it holds through the dab cap, where the spacing ladder keeps the placed stations still so the
+ *     prefix survives — and on the one append that climbs a rung, where it does not;
  *  4. it holds when the option object changes mid-stroke, and when the stroke is replaced by an
  *     unrelated one on the same planner instance;
  *  5. reuse actually happens on an ordinary append (otherwise 1–4 pass trivially).
@@ -75,6 +75,8 @@ function dabsAt(brushId: string, sampleCount: number, planner?: FxOilDabPlanner)
     maxDabs: FX_OIL_DAB_CAP,
     paintBody: studioOilPaintBodyForBrush(brushId),
     tipProfile: studioOilTipProfileForBrush(brushId),
+    // Matches the live overlay, which is the caller this planner exists for.
+    capMode: "prefix-stable-ladder-v2" as const,
     ...(spacing === undefined ? {} : { stationSpacingRatio: spacing }),
   };
   return planner ? planner.plan(input) : planOilBrushDabs(input);
@@ -207,17 +209,21 @@ describe("StudioOilRibbonCarrierPlanner", () => {
     expect(plan).toEqual(planStudioOilRibbonCarrier(grown, options));
   });
 
-  it("rebuilds instead of reusing when the lattice refits at the dab cap", () => {
+  it("keeps reusing across appends once the bed is capped", () => {
+    // Spacing here puts ~1.8 dabs on every source sample, so this pair is well past the cap. The
+    // arc-proportional refit this replaces moved every station whenever the arc grew, so a capped
+    // stroke shared no prefix and rebuilt the whole carrier on every pointer move for the rest of
+    // the drag. On the fixed ladder the placed stations stay put and the prefix survives.
     const planner = new StudioOilRibbonCarrierPlanner();
     const dabPlanner = new FxOilDabPlanner();
-    // Spacing here puts ~1.8 dabs on every source sample, so this pair straddles the cap.
-    const before = dabsAt("oil--flat-ribbon", 2100, dabPlanner);
+    const before = dabsAt("oil--flat-ribbon", 3000, dabPlanner);
     planner.plan(before, undefined);
-    const after = dabsAt("oil--flat-ribbon", 3000, dabPlanner);
-    expect(after).toHaveLength(FX_OIL_DAB_CAP);
+    const after = dabsAt("oil--flat-ribbon", 3008, dabPlanner);
+    expect(after.length).toBeGreaterThan(before.length);
     expect(planner.plan(after, undefined)).toEqual(
       planStudioOilRibbonCarrier(after, undefined),
     );
+    expect(planner.reusedRuns).toBeGreaterThan(0);
   });
 
   it("rebuilds when the program options change mid-stroke", () => {

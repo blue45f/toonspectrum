@@ -6,9 +6,10 @@
  * ADR-0010 puts texture and pen-feel above performance, so "close" is a regression.
  *
  * The interesting boundary is the dab cap. Below it `sampleStations` walks a prefix-stable arc
- * lattice; at `naturalStationCount > stationLimit` it refits across the WHOLE arc and every station
- * moves, so a cache that assumed stability would silently diverge exactly where strokes get long.
- * The three cap rows below pin cap-1 / cap / cap+1 natural stations.
+ * lattice; at `naturalStationCount > stationLimit` it coarsens the spacing one ladder rung at a
+ * time, which keeps the placed stations still — but the append that climbs a rung re-spaces the
+ * whole arc, and a cache that assumed stability there would silently diverge exactly where strokes
+ * get long. The rows below pin cap-1 / cap and both sides of the first rung climb.
  */
 import { describe, expect, it } from "vitest";
 
@@ -41,13 +42,19 @@ function makeStroke(n: number, step = 3): { points: number[]; pressures: number[
   return { points, pressures };
 }
 
-function planInputFor(n: number, stroke: { points: number[]; pressures: number[] }): FxOilPlanInput {
+function planInputFor(
+  n: number,
+  stroke: { points: number[]; pressures: number[] },
+  maxDabs: number = FX_OIL_DAB_CAP,
+): FxOilPlanInput {
   return {
     points: stroke.points.slice(0, n * 2),
     pressures: stroke.pressures.slice(0, n),
     baseWidth: BASE_WIDTH,
     seed: SEED,
-    maxDabs: FX_OIL_DAB_CAP,
+    maxDabs,
+    // The live oil path plans with the ladder, so the identity contract is asserted on it.
+    capMode: "prefix-stable-ladder-v2",
     paintBody: "oil",
     tipProfile: "bristle",
   };
@@ -84,20 +91,27 @@ function expectByteEqualDabs(actual: readonly FxOilDab[], expected: readonly FxO
 }
 
 /**
- * Smallest source-point count whose natural station lattice reaches the cap. Below it the dab
- * count equals the natural station count; at and above it the count saturates, which is what makes
- * this a usable probe for the refit boundary.
+ * Walks the stroke once and reports the two appends the capped regime turns on.
+ *
+ * `capped` is the first append whose bed fills the budget; `climb` is the first append after it
+ * where the count DROPS, which is the ladder coarsening its spacing by a rung. A binary search
+ * cannot find either: past the cap the count is not monotone in the point count, it saturates,
+ * falls one rung and grows back. One linear scan is exact, and a small budget keeps it quick while
+ * exercising the same lattice code the shipped cap does.
  */
-function firstCappedPointCount(stroke: { points: number[]; pressures: number[] }): number {
-  let low = 2;
-  let high = stroke.pressures.length;
-  while (low < high) {
-    const mid = (low + high) >> 1;
-    const dabs = planOilBrushDabs(planInputFor(mid, stroke));
-    if (dabs.length >= FX_OIL_DAB_CAP) high = mid;
-    else low = mid + 1;
+function capBoundary(
+  stroke: { points: number[]; pressures: number[] },
+  maxDabs: number,
+): { capped: number; climb: number } {
+  let previous = 0;
+  let capped = -1;
+  for (let n = 2; n <= stroke.pressures.length; n += 1) {
+    const count = planOilBrushDabs(planInputFor(n, stroke, maxDabs)).length;
+    if (capped < 0 && count >= maxDabs) capped = n;
+    if (capped > 0 && count < previous) return { capped, climb: n };
+    previous = count;
   }
-  return low;
+  throw new Error("stroke never reached a ladder rung climb");
 }
 
 describe("FxOilDabPlanner", () => {
@@ -130,27 +144,37 @@ describe("FxOilDabPlanner", () => {
     expect(reuseBelowCap).toBeGreaterThan(0);
   });
 
-  it("stays byte-identical across the dab-cap refit boundary", () => {
-    // 0.8 px between samples, so the station count rises by at most one per appended point and
-    // cap-1 / cap / cap+1 natural stations are all individually reachable.
-    const stroke = makeStroke(9000, 0.8);
-    const capped = firstCappedPointCount(stroke);
-    expect(capped).toBeLessThan(9000);
-    expect(planOilBrushDabs(planInputFor(capped - 1, stroke)).length).toBe(FX_OIL_DAB_CAP - 1);
-    expect(planOilBrushDabs(planInputFor(capped, stroke)).length).toBe(FX_OIL_DAB_CAP);
-    expect(planOilBrushDabs(planInputFor(capped + 1, stroke)).length).toBe(FX_OIL_DAB_CAP);
+  it("stays byte-identical across the dab cap and the ladder rung above it", () => {
+    // A 512-dab budget puts the cap and the rung above it a few hundred appends in rather than
+    // eight thousand, so every append in the interesting window can be checked individually. The
+    // lattice code under test is the shipped one; only the budget is smaller.
+    const PROBE_CAP = 512;
+    const stroke = makeStroke(4000, 0.8);
+    const { capped, climb } = capBoundary(stroke, PROBE_CAP);
+    expect(planOilBrushDabs(planInputFor(capped - 1, stroke, PROBE_CAP)).length)
+      .toBe(PROBE_CAP - 1);
+    expect(planOilBrushDabs(planInputFor(capped, stroke, PROBE_CAP)).length).toBe(PROBE_CAP);
+    expect(climb).toBeGreaterThan(capped);
 
     const planner = new FxOilDabPlanner();
-    for (let n = 1; n <= capped + 2; n += 1) {
-      if (n % 8 !== 0 && n < capped - 1) continue;
-      const input = planInputFor(n, stroke);
+    for (let n = 1; n <= climb + 2; n += 1) {
+      const input = planInputFor(n, stroke, PROBE_CAP);
       const incremental = planner.plan(input);
-      if (n < capped - 1) continue;
       expectByteEqualDabs(incremental, planOilBrushDabs(input));
     }
-    // Past the boundary `sampleStations` refits the whole arc and every station moves, so the
-    // verifier must find nothing reusable rather than trusting a prefix that no longer holds.
-    expect(planner.reusedDabs).toBe(0);
+
+    // The rung climb re-spaces the whole arc, so that one append has nothing to reuse — the
+    // verifier must find nothing rather than trust a prefix that no longer holds.
+    const rebuild = new FxOilDabPlanner();
+    rebuild.plan(planInputFor(climb - 1, stroke, PROBE_CAP));
+    rebuild.plan(planInputFor(climb, stroke, PROBE_CAP));
+    expect(rebuild.reusedDabs).toBe(0);
+
+    // Every other append past the cap keeps its prefix, which is the whole point of the ladder:
+    // the arc-proportional refit it replaces moved every station on every append, so the bed — and
+    // the entire carrier built on top of it — was rebuilt from scratch for the rest of the stroke.
+    rebuild.plan(planInputFor(climb + 1, stroke, PROBE_CAP));
+    expect(rebuild.reusedDabs).toBeGreaterThan(PROBE_CAP / 2);
   });
 
   it("keeps the ribbon carrier plan identical, including the impasto relief lanes", () => {

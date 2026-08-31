@@ -6,6 +6,14 @@
  * Fluid Paint stroke has the same *feel* (bristle density, velocity clamp, RYB mix, GGX relief).
  */
 
+import {
+  studioOilPaintBodyForBrush,
+  studioOilTipProfileForBrush,
+  type FxOilCapStationMode,
+  type FxOilPaintBody,
+  type FxOilTipProfile,
+} from "../studio-fx-brush";
+
 export const STUDIO_FLUID_PAINT_REFERENCE_VERSION =
   "studio-fluid-paint-reference-v1" as const;
 
@@ -185,6 +193,32 @@ export function isStudioFluidPaintBrushId(value: unknown): value is StudioFluidP
  */
 export const STUDIO_FLUID_PAINT_STATION_SPACING_RATIO =
   0.068 / STUDIO_FLUID_PAINT_BRUSH.splatsPerSegment;
+
+/**
+ * Every field the oil family adds to an `FxOilPlanInput`, resolved from the brush id.
+ *
+ * These four travel together on purpose. Three of them were already passed side by side at each
+ * oil call site; `capMode` joined them and was immediately forgotten at one of the three, which
+ * would have let the same stroke be previewed on the ladder and then committed on the legacy
+ * refit — the stroke visibly changing the moment the live overlay handed off. Handing the set out
+ * as one object is what keeps that from depending on anyone remembering.
+ *
+ * The airbrush family plans through the same planner and deliberately does NOT use this: it has no
+ * carrier pipeline to save, so it keeps the budget-filling refit.
+ */
+export function studioOilFamilyPlanFields(brush: string): {
+  readonly paintBody: FxOilPaintBody;
+  readonly tipProfile: FxOilTipProfile;
+  readonly stationSpacingRatio: number | undefined;
+  readonly capMode: FxOilCapStationMode;
+} {
+  return {
+    paintBody: studioOilPaintBodyForBrush(brush),
+    tipProfile: studioOilTipProfileForBrush(brush),
+    stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+    capMode: "prefix-stable-ladder-v2",
+  };
+}
 
 export function studioFluidPaintStationSpacingRatio(brush: string): number | undefined {
   return isStudioFluidPaintBrushId(brush) || brush.startsWith("oil--fluid-paint")

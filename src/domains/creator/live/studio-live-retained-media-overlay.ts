@@ -12,7 +12,7 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
-import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
+import { studioOilFamilyPlanFields } from "../brush/studio-fluid-paint-reference";
 import { studioLiveVisibleTapDocumentRadius } from "../brush/studio-live-visible-tap";
 import {
   StudioOilRibbonCarrierPlanner,
@@ -36,8 +36,6 @@ import {
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planOilBrushDabs,
-  studioOilPaintBodyForBrush,
-  studioOilTipProfileForBrush,
   type StudioIncrementalFxPressurePathBuilder,
 } from "../studio-fx-brush";
 import {
@@ -233,22 +231,28 @@ function oilDabPoints(
 }
 
 /**
- * How much of the pointer's own time a capped oil bed may spend rebuilding itself.
+ * How much of the pointer's own time an oil bed may spend rebuilding itself.
  *
- * At `FX_OIL_DAB_CAP` the bed stops growing and starts redistributing: `sampleStations` refits a
- * fixed 4096-station lattice across the whole arc, so every append rebuilds the whole bed. That is
- * why the overlay used to stop repainting a capped stroke — but the same refit pins the LAST
- * station to the last source point, so freezing froze the stroke's tip on screen and detached it
- * from the cursor for the rest of the drag.
+ * A long oil stroke's replan costs tens of milliseconds, and the overlay used to stop repainting
+ * altogether once the bed saturated — which froze the stroke's tip on screen, because the lattice
+ * pins its last station to the last source point. A fixed sample stride cannot bound that either:
+ * how far the tip falls behind depends on how fast the cursor is moving and how long the rebuild
+ * takes on this machine, neither of which a constant knows.
  *
- * A fixed sample stride cannot bound that: how far the tip falls behind depends on how fast the
- * cursor is moving and how long the rebuild takes on this machine, neither of which a constant
- * knows. The bound is therefore the rebuild's OWN measured cost — after a repaint that took `t`,
- * the next one waits `t * (DIVISOR - 1)`, so the bed never occupies more than `1 / DIVISOR` of the
- * pointer's time no matter what it costs here. A fast machine repaints often and stays glued to
- * the cursor; a slow one repaints less but still follows it, and neither can be starved.
+ * The bound is the rebuild's OWN measured cost — after a repaint that took `t`, the next one waits
+ * `t * (DIVISOR - 1)`, so the bed never occupies more than `1 / DIVISOR` of the pointer's time no
+ * matter what it costs here. A fast machine repaints often and stays glued to the cursor; a slow
+ * one repaints less but still follows it, and neither can be starved.
+ *
+ * This is measured on every oil repaint rather than only on a saturated bed. Keying it to the dab
+ * count made the count a stand-in for "expensive", and that stand-in does not survive contact with
+ * the capped spacing ladder: a capped bed now lands inside a band below `FX_OIL_DAB_CAP` instead of
+ * exactly on it, so the budget silently stopped engaging on precisely the strokes it was written
+ * for. The cost is the thing the budget cares about and the overlay already times it, so it reads
+ * that instead of guessing from a proxy. A cheap repaint yields a cooldown of its own small size,
+ * which is no deferral in practice.
  */
-const OIL_CAP_REPAINT_DUTY_DIVISOR = 3;
+const OIL_REPAINT_DUTY_DIVISOR = 3;
 
 interface ActiveRetainedStroke {
   readonly id: string;
@@ -275,9 +279,9 @@ interface ActiveRetainedStroke {
    */
   paintedOilPoints: readonly number[] | null;
   paintedOilPressures: readonly number[] | null;
-  /** Wall clock and duration of the last capped repaint, for the duty budget above. */
-  lastOilCapRepaintAt: number;
-  lastOilCapRepaintMs: number;
+  /** Wall clock and duration of the last oil repaint, for the duty budget above. */
+  lastOilRepaintAt: number;
+  lastOilRepaintMs: number;
   paintedPencilMarks: number;
   paintedSourceSegments: number;
   /**
@@ -438,8 +442,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedOilPasses: 0,
       paintedOilPoints: null,
       paintedOilPressures: null,
-      lastOilCapRepaintAt: 0,
-      lastOilCapRepaintMs: 0,
+      lastOilRepaintAt: 0,
+      lastOilRepaintMs: 0,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
       oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
@@ -497,8 +501,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedOilPasses: 0,
         paintedOilPoints: null,
         paintedOilPressures: null,
-        lastOilCapRepaintAt: 0,
-        lastOilCapRepaintMs: 0,
+        lastOilRepaintAt: 0,
+        lastOilRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -597,11 +601,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       // allocation on every pointer frame past the cap, quadratic over the drag, and it would sit
       // outside the very budget this guard exists to enforce.
       const now = this.now();
-      const cooldownRemaining = active.paintedDabs >= FX_OIL_DAB_CAP
-        ? active.lastOilCapRepaintAt
-          + active.lastOilCapRepaintMs * (OIL_CAP_REPAINT_DUTY_DIVISOR - 1)
-          - now
-        : 0;
+      const cooldownRemaining = active.lastOilRepaintAt
+        + active.lastOilRepaintMs * (OIL_REPAINT_DUTY_DIVISOR - 1)
+        - now;
       if (target === this.activeContext && !finalizeOil && cooldownRemaining > 0) {
         // Deferring the newest pointer event drops the only carrier of the new endpoint, so if the
         // user then holds still nothing would ever ask again and the preview would sit detached
@@ -632,9 +634,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         baseWidth: Math.max(1, element.strokeWidth),
         seed: fxBrushSeedFromKey(element.id),
         maxDabs: FX_OIL_DAB_CAP,
-        paintBody: studioOilPaintBodyForBrush(brush),
-        tipProfile: studioOilTipProfileForBrush(brush),
-        stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+        ...studioOilFamilyPlanFields(brush),
       };
       // Same values either way: the planner re-derives the station lattice and reuses only the
       // prefix it has verified byte-equal, so a growing stroke stops rebuilding 4096 stations x
@@ -687,14 +687,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         active.paintedOilPasses += 1;
         active.paintedOilPoints = flatPoints;
         active.paintedOilPressures = element.pressures ? [...element.pressures] : null;
-        if (dabs.length >= FX_OIL_DAB_CAP) {
-          // Measured from the start, but the cooldown runs from the END of the paint: charging it
-          // from the start would hand back the paint's own duration and leave the bed taking half
-          // the interval instead of the documented share.
-          const finishedAt = this.now();
-          active.lastOilCapRepaintMs = finishedAt - now;
-          active.lastOilCapRepaintAt = finishedAt;
-        }
+        // Measured from the start, but the cooldown runs from the END of the paint: charging it
+        // from the start would hand back the paint's own duration and leave the bed taking half
+        // the interval instead of the documented share.
+        const finishedAt = this.now();
+        active.lastOilRepaintMs = finishedAt - now;
+        active.lastOilRepaintAt = finishedAt;
       }
       if (target === this.settledContext) this.settledHasPixels = true;
       return true;
@@ -1088,8 +1086,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedOilPasses: 0,
         paintedOilPoints: null,
         paintedOilPressures: null,
-        lastOilCapRepaintAt: 0,
-        lastOilCapRepaintMs: 0,
+        lastOilRepaintAt: 0,
+        lastOilRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -1113,8 +1111,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedOilPasses: 0,
         paintedOilPoints: null,
         paintedOilPressures: null,
-        lastOilCapRepaintAt: 0,
-        lastOilCapRepaintMs: 0,
+        lastOilRepaintAt: 0,
+        lastOilRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -1128,8 +1126,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedOilPasses: 0,
       paintedOilPoints: null,
       paintedOilPressures: null,
-      lastOilCapRepaintAt: 0,
-      lastOilCapRepaintMs: 0,
+      lastOilRepaintAt: 0,
+      lastOilRepaintMs: 0,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
@@ -1143,8 +1141,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.active.paintedOilPressures = replayActive.paintedOilPressures;
     // The replay just performed a full capped repaint; its cost is what the next append must
     // budget against, or a resize mid-stroke hands out a free rebuild.
-    this.active.lastOilCapRepaintAt = replayActive.lastOilCapRepaintAt;
-    this.active.lastOilCapRepaintMs = replayActive.lastOilCapRepaintMs;
+    this.active.lastOilRepaintAt = replayActive.lastOilRepaintAt;
+    this.active.lastOilRepaintMs = replayActive.lastOilRepaintMs;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;
     this.active.paintedSourceSegments = replayActive.paintedSourceSegments;
   }

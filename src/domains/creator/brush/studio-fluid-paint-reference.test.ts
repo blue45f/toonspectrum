@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  studioOilPaintBodyForBrush,
+  studioOilTipProfileForBrush,
+} from "../studio-fx-brush";
+
+import {
   STUDIO_FLUID_PAINT_BRUSH,
   STUDIO_FLUID_PAINT_DISPLAY,
   STUDIO_FLUID_PAINT_SPLAT,
@@ -13,6 +18,7 @@ import {
   studioFluidPaintRybToRgb,
   studioFluidPaintSplatWeight,
   studioFluidPaintStationSpacingRatio,
+  studioOilFamilyPlanFields,
 } from "./studio-fluid-paint-reference";
 
 describe("Fluid Paint (david.li/paint) reference", () => {
@@ -71,5 +77,21 @@ describe("Fluid Paint (david.li/paint) reference", () => {
       STUDIO_FLUID_PAINT_STATION_SPACING_RATIO,
     );
     expect(studioFluidPaintStationSpacingRatio("oil")).toBeUndefined();
+  });
+});
+
+describe("studioOilFamilyPlanFields", () => {
+  it("carries the prefix-stable ladder with the rest of the oil plan fields", () => {
+    // The four travel together so a call site cannot take the paint body and forget the cap mode.
+    // It was forgotten exactly once, at the committed Canvas renderer, which would have let a
+    // capped stroke be previewed on the ladder and then redrawn on the legacy refit the moment the
+    // live overlay handed off — the stroke visibly changing with nothing having been edited.
+    for (const brush of ["oil", "acrylic", "oil--flat-ribbon", "oil--impasto-ribbon"]) {
+      const fields = studioOilFamilyPlanFields(brush);
+      expect(fields.capMode).toBe("prefix-stable-ladder-v2");
+      expect(fields.paintBody).toBe(studioOilPaintBodyForBrush(brush));
+      expect(fields.tipProfile).toBe(studioOilTipProfileForBrush(brush));
+      expect(fields.stationSpacingRatio).toBe(studioFluidPaintStationSpacingRatio(brush));
+    }
   });
 });

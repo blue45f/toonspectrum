@@ -6,7 +6,9 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
-import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
+import { studioFluidPaintStationSpacingRatio,
+  studioOilFamilyPlanFields,
+} from "../brush/studio-fluid-paint-reference";
 import {
   resolveStudioInkPressure,
   studioInkFallbackPressure,
@@ -622,9 +624,9 @@ export function serializeFreehandMedia(
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: FX_OIL_DAB_CAP,
-      paintBody: studioOilPaintBodyForBrush(brush),
-      tipProfile: studioOilTipProfileForBrush(brush),
-      stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+      // The airbrush branch below shares this planner and deliberately does NOT take these: it has
+      // no carrier pipeline to save, so it keeps the budget-filling refit.
+      ...studioOilFamilyPlanFields(brush),
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
     // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화
