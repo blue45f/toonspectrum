@@ -67,6 +67,8 @@ export const STUDIO_LIFT3D_WARNING_CODES = [
   "front-ratio-inert",
   /** 요청한 시차 레이어 수가 지원 범위를 벗어나 조였다. */
   "layer-bands-clamped",
+  /** 옆으로 맞닿은 두 시차 카드가 z 에서 두 층 이상 떨어져, 그 사이가 빈 채로 남았다. */
+  "layer-depth-gap",
   "resolution-clamped",
   "shallow-subject",
   "texture-omitted",
