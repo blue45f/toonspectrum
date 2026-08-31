@@ -108,6 +108,22 @@ export function texturedBackgroundImage(size: number): StudioLift3dSourceImage {
   return { width: size, height: size, pixels };
 }
 
+/**
+ * 왼쪽 절반과 오른쪽 절반의 명암이 **딱 끊기는** 불투명 배경. 화면을 세로로 가르는 균열
+ * 하나가 생기는 원화라, 균열의 길이가 아니라 비율로 판정할 때 분모를 무엇으로 잡았는지가
+ * 그대로 드러난다.
+ */
+export function cliffBackgroundImage(size: number): StudioLift3dSourceImage {
+  const pixels = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const level = x < size / 2 ? 38 : 217;
+      writePixel(pixels, (y * size + x) * 4, { r: level, g: level, b: level, a: 255 });
+    }
+  }
+  return { width: size, height: size, pixels };
+}
+
 function pngChunk(type: string, data: Uint8Array): Uint8Array {
   const typeBytes = new TextEncoder().encode(type);
   const body = new Uint8Array(typeBytes.length + data.length);

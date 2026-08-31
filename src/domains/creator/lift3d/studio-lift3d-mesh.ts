@@ -467,6 +467,12 @@ export function partitionStudioLift3dBandFaces(
  * 빈 밴드가 이미 버려진 뒤의 **순번**으로 세야 한다. 밴드 번호로 세면 절벽처럼 중간 밴드가
  * 통째로 빈 원화가 전부 걸리는데, 그런 원화는 카드 두 장이 순번상 이웃이라 실제로는 맞닿는다.
  *
+ * 분모는 인접 사각형 **전부**가 아니라 **카드가 갈리는 경계**(`crossings`)다. 한 카드 안쪽
+ * 경계까지 세면 분모가 해상도의 제곱으로 늘고 균열 길이는 한 제곱만 늘어, 화면을 세로로 가르는
+ * 균열조차 해상도를 올릴수록 비율이 내려간다 — 지오메트리는 그대로인데 경고만 조용해진다.
+ * 실측으로도 그랬다: 절벽 원화의 전체 높이 균열이 전체 쌍 대비로는 해상도 64 에서 0.78%,
+ * 160 에서 0.31% 로 **임계 아래로 가라앉는데**, 카드 경계 대비로는 91.0% → 96.3% 로 눕는다.
+ *
  * 카드는 방출 순서(= z 순서)대로, **면을 내지 못한 밴드는 빼고** 와야 한다. 배열 순서가 곧
  * 순번이다. `partitionStudioLift3dBandFaces` 가 돌려준 존재 배열을 그대로 받는다.
  */
@@ -474,11 +480,8 @@ export function countStudioLift3dCardDepthGaps(
   cards: readonly Uint8Array[],
   width: number,
   height: number,
-): { readonly pairs: number; readonly gaps: number; readonly maxGap: number } {
-  // 카드가 두 장 이하면 순번 차이가 2 가 될 수 없어 `gaps` 는 어차피 0 이지만, 그때도 `pairs`
-  // 는 실제로 세어 돌려준다 — 비율을 판정하는 쪽이 "경계가 없다" 와 "경계는 있는데 틈이 없다"
-  // 를 구별할 수 있어야 한다.
-  if (width < 1 || height < 1) return { pairs: 0, gaps: 0, maxGap: 0 };
+): { readonly crossings: number; readonly gaps: number; readonly maxGap: number } {
+  if (width < 1 || height < 1) return { crossings: 0, gaps: 0, maxGap: 0 };
   const owner = new Int32Array(width * height).fill(-1);
   for (let index = 0; index < cards.length; index += 1) {
     const present = cards[index]!;
@@ -486,59 +489,51 @@ export function countStudioLift3dCardDepthGaps(
       if (present[face] === 1) owner[face] = index;
     }
   }
-  let pairs = 0;
+  let crossings = 0;
   let gaps = 0;
   let maxGap = 0;
+  const visit = (here: number, there: number): void => {
+    if (there < 0 || here === there) return;
+    crossings += 1;
+    const distance = Math.abs(here - there);
+    if (distance < 2) return;
+    gaps += 1;
+    if (distance > maxGap) maxGap = distance;
+  };
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const here = owner[y * width + x]!;
       if (here < 0) continue;
       // 오른쪽·아래만 본다. 네 방향을 다 보면 같은 경계를 두 번 센다.
-      if (x + 1 < width) {
-        const right = owner[y * width + x + 1]!;
-        if (right >= 0) {
-          pairs += 1;
-          const distance = Math.abs(here - right);
-          if (distance >= 2) {
-            gaps += 1;
-            if (distance > maxGap) maxGap = distance;
-          }
-        }
-      }
-      if (y + 1 < height) {
-        const below = owner[(y + 1) * width + x]!;
-        if (below >= 0) {
-          pairs += 1;
-          const distance = Math.abs(here - below);
-          if (distance >= 2) {
-            gaps += 1;
-            if (distance > maxGap) maxGap = distance;
-          }
-        }
-      }
+      if (x + 1 < width) visit(here, owner[y * width + x + 1]!);
+      if (y + 1 < height) visit(here, owner[(y + 1) * width + x]!);
     }
   }
-  return { pairs, gaps, maxGap };
+  return { crossings, gaps, maxGap };
 }
 
 /**
  * 틈을 경고로 올릴 최소 비율.
  *
- * **실제로 예산 안에 들어오는 설정**에서 잰 값이다. 배경 프리셋의 기본 해상도 224 는 잔결이
- * 고운 원화에서 6층부터 예산 초과로 아예 실패하므로, 그 구간 수치로 임계를 잡으면 만들어질
- * 수 없는 설정에 맞춘 값이 된다.
+ * 카드 경계 중 **틈으로 벌어진 경계**의 비율이다. **실제로 예산 안에 들어오는 설정**에서 쟀다 —
+ * 배경 프리셋의 기본 해상도 224 는 잔결이 고운 원화에서 6층부터 예산 초과로 아예 실패하므로,
+ * 그 구간 수치로 임계를 잡으면 만들어질 수 없는 설정에 맞춘 값이 된다.
  *
  * | 잔결 있는 숲 | 4층 | 6층 | 8층 | 12층 | 16층 | 24층 |
  * | --- | --- | --- | --- | --- | --- | --- |
- * | 해상도 64 | 0% | 1.24% | 7.35% | 25.04% | 36.89% | 48.60% |
- * | 해상도 96 | 0% | 0.09% | 2.30% | 14.87% | 28.32% | 44.10% |
- * | 해상도 128 | 0% | 0% | 0.05% | 7.68% | 19.41% | 37.10% |
- * | 해상도 160 | 0% | 0% | 0% | 2.09% | 11.31% | 29.34% |
+ * | 해상도 64 | 0% | 3.1% | 15.5% | 44.3% | 60.7% | 73.5% |
+ * | 해상도 96 | 0% | 0.3% | 5.4% | 28.1% | 47.4% | 65.9% |
+ * | 해상도 128 | 0% | 0% | 0.1% | 15.7% | 35.0% | 57.6% |
+ * | 해상도 160 | 0% | 0% | 0.0% | 4.8% | 22.2% | 49.0% |
  *
- * 매끄러운 배경은 어느 칸에서도 0% 다. 즉 이 값은 원화의 성질이 아니라 **층수·해상도가 원화의
- * 깊이 잔결과 맞는지**를 잰다. 0.1% 아래는 경계 몇 줄이라 눈에 띄지 않고, 몇 %대부터 카메라를
- * 돌릴 때 실제로 갈라져 보인다. 1% 는 그 사이이고, 두 손잡이 어느 쪽으로 움직여도 비율이
- * 단조롭게 내려가므로 경고가 짚는 방향이 언제나 맞다.
+ * 매끄러운 배경은 어느 칸에서도 0% 이고, 화면을 세로로 가르는 절벽은 6층에서 91~96% 다. 즉 이
+ * 값은 원화의 성질이 아니라 **층수·해상도가 원화의 깊이 잔결과 맞는지**를 잰다. 0.3% 아래는
+ * 경계 몇 줄이라 눈에 띄지 않고, 몇 %대부터 카메라를 돌릴 때 실제로 갈라져 보인다. 1% 는 그
+ * 사이다.
+ *
+ * 층수는 어느 원화에서도 듣는다(내리면 비율이 단조롭게 내려간다). 해상도는 잔결이 고운 원화의
+ * 표본화 부족을 풀어 주지만 원화에 진짜 단차가 있는 절벽에서는 듣지 않으므로, 문구도 그 둘을
+ * 같은 무게로 말하지 않는다.
  */
 const DEPTH_GAP_WARNING_RATIO = 0.01;
 
@@ -786,17 +781,18 @@ export function buildStudioLift3dGeometry(
   // 크기에서 다시 빼지 말고 격자 자신에게서 읽는다 — 어긋나면 조용히 엉뚱한 칸을 본다.
   const firstCard = options.mode === "parallax" ? live[0]?.grid : undefined;
   if (firstCard) {
-    const { pairs, gaps, maxGap } = countStudioLift3dCardDepthGaps(
+    const { crossings, gaps, maxGap } = countStudioLift3dCardDepthGaps(
       live.map((entry) => entry.grid.present),
       firstCard.width,
       firstCard.height,
     );
-    if (pairs > 0 && gaps / pairs >= DEPTH_GAP_WARNING_RATIO) {
+    if (crossings > 0 && gaps / crossings >= DEPTH_GAP_WARNING_RATIO) {
       warnings.push(studioLift3dWarning(
         "layer-depth-gap",
         `옆으로 맞닿은 카드가 ${gaps}곳에서 최대 ${maxGap}층 떨어져 있습니다. `
-        + "그 자리는 카메라를 돌리면 틈으로 벌어집니다 — 레이어 수를 낮추거나 해상도를 "
-        + "올리면 단차가 한 층으로 합쳐지고, 끊김 없는 깊이가 필요하면 relief 위상을 쓰세요",
+        + "그 자리는 카메라를 돌리면 틈으로 벌어집니다 — 레이어 수를 낮추면 단차가 한 층으로 "
+        + "합쳐집니다(잔결이 고운 원화라면 해상도를 올려도 듣습니다). 끊김 없는 깊이가 "
+        + "필요하면 relief 위상을 쓰세요",
       ));
     }
   }

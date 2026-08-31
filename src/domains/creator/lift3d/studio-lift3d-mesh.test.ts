@@ -923,7 +923,7 @@ describe("시차 카드 사이의 깊이 틈", () => {
     const right = Uint8Array.from([0, 1]);
 
     expect(countStudioLift3dCardDepthGaps([left, right], 2, 1)).toEqual({
-      pairs: 1,
+      crossings: 1,
       gaps: 0,
       maxGap: 0,
     });
@@ -935,7 +935,7 @@ describe("시차 카드 사이의 깊이 틈", () => {
     const front = Uint8Array.from([0, 1]);
 
     expect(countStudioLift3dCardDepthGaps([back, middle, front], 2, 1)).toEqual({
-      pairs: 1,
+      crossings: 1,
       gaps: 1,
       maxGap: 2,
     });
@@ -950,13 +950,13 @@ describe("시차 카드 사이의 깊이 틈", () => {
     expect(countStudioLift3dCardDepthGaps([back, front], 2, 1).gaps).toBe(0);
   });
 
-  it("카드가 한 장이면 경계는 세되 틈은 0 이다", () => {
-    // `pairs` 가 0 인 것과 틈이 0 인 것은 다른 사실이다. 비율로 판정하는 쪽이 둘을 구별해야
-    // 0 으로 나누지 않는다.
+  it("한 카드 안쪽 경계는 분모에 넣지 않는다", () => {
+    // 인접 사각형을 전부 세면 분모가 해상도의 제곱으로 늘어, 화면을 가르는 균열도 해상도를
+    // 올릴수록 비율이 내려간다. 분모는 카드가 갈리는 경계여야 한다.
     const only = Uint8Array.from([1, 1]);
 
     expect(countStudioLift3dCardDepthGaps([only], 2, 1)).toEqual({
-      pairs: 1,
+      crossings: 0,
       gaps: 0,
       maxGap: 0,
     });
@@ -964,7 +964,7 @@ describe("시차 카드 사이의 깊이 틈", () => {
 
   it("면이 없는 격자는 경계가 없다", () => {
     expect(countStudioLift3dCardDepthGaps([], 0, 0)).toEqual({
-      pairs: 0,
+      crossings: 0,
       gaps: 0,
       maxGap: 0,
     });
