@@ -2351,6 +2351,13 @@ interface ImpastoReliefRunShape {
   readonly cell: number;
 }
 
+/** Scratch the flank and rim closures fill for one station; see `collectRun`. */
+interface ImpastoReliefPoint {
+  geomOffset: number;
+  sampleOffset: number;
+  width: number;
+}
+
 interface PlannedImpastoReliefRun {
   readonly points: readonly number[];
   /** Mean signed shading distance from flat (positive = lit flank). */
@@ -2489,36 +2496,38 @@ function planImpastoReliefOverlayLanes(
   const stripeStride = field.hairStride;
   const stripeOffset = field.hairOffset;
 
+  // Filled and re-read once per station instead of allocated there. A full relief replan cuts
+  // ~26.5k runs of four stations each, and returning a fresh `{geomOffset, sampleOffset, width}`
+  // from the flank and rim closures made ~106k of them; the two closures also keep the call site
+  // polymorphic, so the allocation is not one an escape analysis can be relied on to remove.
+  const at: ImpastoReliefPoint = { geomOffset: 0, sampleOffset: 0, width: 0 };
+
   const collectRun = (
     runStart: number,
     runEnd: number,
-    pointAt: (station: OilCarrierStation, side: 1 | -1) => {
-      readonly geomOffset: number;
-      readonly sampleOffset: number;
-      readonly width: number;
-    },
+    pointAt: (station: OilCarrierStation, side: 1 | -1, into: ImpastoReliefPoint) => void,
     side: 1 | -1,
     trackIndex: number,
     runIndex: number,
     bounds: Float64Array,
   ): PlannedImpastoReliefRun | undefined => {
-    const points: number[] = [];
+    // The length is known before the walk — the array used to be grown from empty, once per run.
+    const samples = runEnd - runStart + 1;
+    const points = new Array<number>(samples > 0 ? samples * 2 : 0);
     let strengthSum = 0;
     let widthSum = 0;
-    let samples = 0;
     const box = runIndex * 4;
     for (let index = runStart; index <= runEnd; index += 1) {
       const station = stations[index]!;
-      const at = pointAt(station, side);
+      pointAt(station, side, at);
       // Quantised here, not at emission. `quantizedPoints` is elementwise and welding only
       // concatenates runs (dropping the shared joint point), so quantising a run's own points
       // and joining them gives the same array as joining and then quantising — and this way a
       // reused run arrives with its coordinates already on the grid instead of every welded
       // stripe re-rounding every coordinate it is made of on every move.
-      points.push(
-        quantize(station.x + station.normalX * at.geomOffset),
-        quantize(station.y + station.normalY * at.geomOffset),
-      );
+      const slot = (index - runStart) * 2;
+      points[slot] = quantize(station.x + station.normalX * at.geomOffset);
+      points[slot + 1] = quantize(station.y + station.normalY * at.geomOffset);
       const sampleX = station.x + station.normalX * at.sampleOffset;
       const sampleY = station.y + station.normalY * at.sampleOffset;
       if (sampleX < bounds[box]!) bounds[box] = sampleX;
@@ -2527,8 +2536,10 @@ function planImpastoReliefOverlayLanes(
       if (sampleY > bounds[box + 3]!) bounds[box + 3] = sampleY;
       strengthSum += sampleImpastoReliefShading(field, sampleX, sampleY) - 1;
       widthSum += at.width;
-      samples += 1;
     }
+    // Checked after the walk, not before it: a one-station run still has to widen its sample box.
+    // Leaving that box at its empty sentinel would read as "no cell this run samples was touched"
+    // on the next move, which is the opposite of what an unmeasured run means.
     if (samples < 2) return undefined;
     return {
       points: Object.freeze(points),
@@ -2547,34 +2558,35 @@ function planImpastoReliefOverlayLanes(
   // Ridge flanks — one lit and one shaded band per hair, clamped inside the body silhouette
   // so a screen-blended glint can never halo outside the paint.
   const flankPointAt = (bristleIndex: number) =>
-    (station: OilCarrierStation, flankSide: 1 | -1) => {
+    (station: OilCarrierStation, flankSide: 1 | -1, into: ImpastoReliefPoint): void => {
       const hair = station.source.bristles[bristleIndex]!;
       const ridgeWidth = impastoRidgeWidth(station, hair);
       const width = Math.max(0.4, ridgeWidth * 0.85);
       const offset = station.radiusY * hair.offsetRatio;
       const flankDelta = Math.max(ridgeWidth * 0.5, field.cell * 0.4);
       const maxOffset = station.radiusY * IMPASTO_RELIEF_MAX_OFFSET_RATIO - width * 0.5;
-      return {
-        geomOffset: clamp(offset + flankSide * flankDelta, -maxOffset, maxOffset),
-        // The flank stripe hugs the crest within one grid texel, and the next hair sits only
-        // ~0.3·radiusY away — sample exactly one texel off the crest, never further, or the
-        // probe lands on the neighbouring ridge's OPPOSITE flank and cancels the signal.
-        sampleOffset: offset + flankSide * field.cell * 0.9,
-        width,
-      };
+      into.geomOffset = clamp(offset + flankSide * flankDelta, -maxOffset, maxOffset);
+      // The flank stripe hugs the crest within one grid texel, and the next hair sits only
+      // ~0.3·radiusY away — sample exactly one texel off the crest, never further, or the
+      // probe lands on the neighbouring ridge's OPPOSITE flank and cancels the signal.
+      into.sampleOffset = offset + flankSide * field.cell * 0.9;
+      into.width = width;
     };
   // Body rim — thick paint catches light along its own silhouette cliff.
-  const rimPointAt = (station: OilCarrierStation, rimSide: 1 | -1) => {
+  const rimPointAt = (
+    station: OilCarrierStation,
+    rimSide: 1 | -1,
+    into: ImpastoReliefPoint,
+  ): void => {
     const width = clamp(station.radiusY * 0.26, 0.4, 2.6);
     const inset = Math.min(
       station.radiusY * 0.9,
       Math.max(station.radiusY * 0.7, station.radiusY - 1.6 * field.cell),
     );
-    return {
-      geomOffset: rimSide * inset,
-      sampleOffset: rimSide * Math.max(station.radiusY - 0.9 * field.cell, station.radiusY * 0.5),
-      width,
-    };
+    into.geomOffset = rimSide * inset;
+    into.sampleOffset = rimSide
+      * Math.max(station.radiusY - 0.9 * field.cell, station.radiusY * 0.5);
+    into.width = width;
   };
 
   const shape: ImpastoReliefRunShape = { bristleCount, stripeStride, stripeOffset, cell: field.cell };
@@ -2615,11 +2627,7 @@ function planImpastoReliefOverlayLanes(
   const collectTrack = (
     trackIndex: number,
     side: 1 | -1,
-    pointAt: (station: OilCarrierStation, side: 1 | -1) => {
-      readonly geomOffset: number;
-      readonly sampleOffset: number;
-      readonly width: number;
-    },
+    pointAt: (station: OilCarrierStation, side: 1 | -1, into: ImpastoReliefPoint) => void,
   ): void => {
     // Every reusable index carries a run in the cached track, so the copy never leaves a hole.
     // `reusableReliefRuns` offers an index only within its own bounds array, which is as long as
