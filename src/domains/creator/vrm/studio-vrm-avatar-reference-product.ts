@@ -18,9 +18,9 @@ import {
 export const STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_URL =
   "/catalog/studio-vrm-avatar-reference-catalogue-v1.json" as const;
 export const STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_MAX_BYTES = 512 * 1024;
-export const STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_BYTE_LENGTH = 411_204 as const;
+export const STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_BYTE_LENGTH = 420_936 as const;
 export const STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_SHA256 =
-  "1ed9786ecbee2279cedd7d6cbb9880043f41b66158a3274cf38642b717a65c72" as const;
+  "f482cb50758880260508d074a54060fc3c9f5fe874738c38199a63f4eed8b1f6" as const;
 
 function deepFreeze<T>(value: T): T {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
@@ -38,8 +38,8 @@ function deepFreeze<T>(value: T): T {
 export const STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY = deepFreeze({
   sourceAssetId: "toonspectrum-minseo-campus",
   sourceUrl: "/vrm/TS_Minseo_Campus.vrm",
-  sourceByteLength: 463_276,
-  sourceSha256: "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0",
+  sourceByteLength: 1_325_288,
+  sourceSha256: "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
   rendererId: "toonspectrum-avatar-forge-front",
   rendererRevision: "2",
   rendererModuleSha256: "12e7dd19fdf4d2372b5f0ac345cc4371f75d7154f01a6480bb46d3f08b21c672",

@@ -65,9 +65,9 @@ describe("Avatar Forge reference catalogue generator", () => {
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
       "public/vrm/TS_Minseo_Campus.vrm",
     )));
-    expect(source.byteLength).toBe(463_276);
+    expect(source.byteLength).toBe(1_325_288);
     expect(sha256(source)).toBe(
-      "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0",
+      "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
     );
     const generator = await readFile(
       resolve(
@@ -182,7 +182,7 @@ describe("Avatar Forge reference catalogue generator", () => {
       catalogue: { entries: Array<{ presetId: string; embedding: Parameters<typeof studioVrmAvatarReferenceEmbeddingSha256>[0] }> };
     };
     expect(parsed.authority.sourceSha256).toBe(
-      "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0",
+      "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
     );
     expect(parsed.authority.pixelFormat).toBe("rgba8-unorm-top-left-row-major");
     expect(parsed.renders).toHaveLength(21);
