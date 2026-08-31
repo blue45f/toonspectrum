@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
+  getProductStudioMarketplaceRuntimeCompatibility,
   probeStudioMarketplaceRuntimeCompatibility,
 } from "./studio-marketplace-runtime-compatibility";
 
@@ -19,10 +20,11 @@ describe("Studio marketplace runtime compatibility", () => {
     expect(context).toEqual({
       currentStudioVersion: "1.0.0",
       supportedEngines: ["canvas2d", "webgl2", "webgpu", "three"],
+      unverifiedEngines: [],
     });
   });
 
-  it("keeps a thrown adapter probe unverified instead of guessing unsupported", async () => {
+  it("keeps only a thrown adapter probe unverified while preserving known Canvas support", async () => {
     const context = await probeStudioMarketplaceRuntimeCompatibility({
       probeCanvasContext: (contextId) => contextId === "2d",
       probeWebGpuAdapter: async () => {
@@ -32,7 +34,8 @@ describe("Studio marketplace runtime compatibility", () => {
 
     expect(context).toEqual({
       currentStudioVersion: "1.0.0",
-      supportedEngines: null,
+      supportedEngines: ["canvas2d"],
+      unverifiedEngines: ["webgpu"],
     });
   });
 
@@ -44,11 +47,12 @@ describe("Studio marketplace runtime compatibility", () => {
 
     expect(context).toEqual({
       currentStudioVersion: "1.0.0",
-      supportedEngines: null,
+      supportedEngines: [],
+      unverifiedEngines: ["canvas2d", "webgl2", "webgpu", "three"],
     });
   });
 
-  it("does not mislabel a partial engine probe as a complete unsupported decision", async () => {
+  it("preserves known Canvas and WebGL engines when only WebGPU is inconclusive", async () => {
     const context = await probeStudioMarketplaceRuntimeCompatibility({
       probeCanvasContext: () => true,
       probeWebGpuAdapter: async () => null,
@@ -56,7 +60,53 @@ describe("Studio marketplace runtime compatibility", () => {
 
     expect(context).toEqual({
       currentStudioVersion: "1.0.0",
-      supportedEngines: null,
+      supportedEngines: ["canvas2d", "webgl2", "three"],
+      unverifiedEngines: ["webgpu"],
     });
+  });
+
+  it("ties Three uncertainty to an inconclusive WebGL2 context without hiding Canvas2D", async () => {
+    const context = await probeStudioMarketplaceRuntimeCompatibility({
+      probeCanvasContext: (contextId) => contextId === "2d" ? true : null,
+      probeWebGpuAdapter: async () => false,
+    });
+
+    expect(context).toEqual({
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d"],
+      unverifiedEngines: ["webgl2", "three"],
+    });
+  });
+
+  it("keeps explicit negative probes conclusively unsupported", async () => {
+    const context = await probeStudioMarketplaceRuntimeCompatibility({
+      probeCanvasContext: () => false,
+      probeWebGpuAdapter: async () => false,
+    });
+
+    expect(context).toEqual({
+      currentStudioVersion: "1.0.0",
+      supportedEngines: [],
+      unverifiedEngines: [],
+    });
+  });
+
+  it("evicts a partial product probe so an explicit retry performs fresh measurements", async () => {
+    const probeCanvasContext = vi.fn((contextId: "2d" | "webgl2") => contextId === "2d");
+    const probeWebGpuAdapter = vi.fn(async () => null);
+    const options = { probeCanvasContext, probeWebGpuAdapter } as const;
+
+    const firstProbe = getProductStudioMarketplaceRuntimeCompatibility(options);
+    await expect(firstProbe).resolves.toEqual({
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d"],
+      unverifiedEngines: ["webgpu"],
+    });
+
+    const retryProbe = getProductStudioMarketplaceRuntimeCompatibility(options);
+    expect(retryProbe).not.toBe(firstProbe);
+    await retryProbe;
+    expect(probeCanvasContext).toHaveBeenCalledTimes(4);
+    expect(probeWebGpuAdapter).toHaveBeenCalledTimes(2);
   });
 });

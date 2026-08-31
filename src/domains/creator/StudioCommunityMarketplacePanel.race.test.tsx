@@ -371,6 +371,7 @@ beforeEach(() => {
   mocks.runtimeCompatibility.mockResolvedValue({
     currentStudioVersion: "1.0.0",
     supportedEngines: ["canvas2d", "webgl2", "three"],
+    unverifiedEngines: [],
   });
   mocks.projectPack.mockReturnValue({
     status: "unsupported",
@@ -423,6 +424,7 @@ describe("StudioCommunityMarketplacePanel request races", () => {
     const pendingCompatibility = deferred<{
       currentStudioVersion: string;
       supportedEngines: string[];
+      unverifiedEngines: string[];
     }>();
     mocks.listPublic.mockResolvedValue(page([]));
     mocks.runtimeCompatibility
@@ -430,6 +432,7 @@ describe("StudioCommunityMarketplacePanel request races", () => {
       .mockResolvedValueOnce({
         currentStudioVersion: "1.0.0",
         supportedEngines: ["canvas2d", "webgl2", "three"],
+        unverifiedEngines: [],
       });
 
     render(<StudioCommunityMarketplacePanel initialOpen />);
@@ -448,6 +451,46 @@ describe("StudioCommunityMarketplacePanel request races", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "호환성 다시 확인" })).toBeNull();
     });
+  });
+
+  it("부분 엔진 측정은 확인된 엔진을 유지하면서 미확정 엔진 재측정을 제공한다", async () => {
+    mocks.listPublic.mockResolvedValue(page([]));
+    mocks.runtimeCompatibility.mockResolvedValueOnce({
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d", "webgl2", "three"],
+      unverifiedEngines: ["webgpu"],
+    });
+
+    render(<StudioCommunityMarketplacePanel initialOpen />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain(
+        "확인된 엔진용 자료는 계속 사용할 수 있고",
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "호환성 다시 확인" }));
+    await waitFor(() => expect(mocks.runtimeCompatibility).toHaveBeenCalledTimes(2));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "호환성 다시 확인" })).toBeNull();
+    });
+  });
+
+  it("확인된 엔진이 없으면 부분 성공을 주장하지 않고 전체 측정 실패로 안내한다", async () => {
+    mocks.listPublic.mockResolvedValue(page([]));
+    mocks.runtimeCompatibility.mockResolvedValueOnce({
+      currentStudioVersion: "1.0.0",
+      supportedEngines: [],
+      unverifiedEngines: ["webgpu"],
+    });
+
+    render(<StudioCommunityMarketplacePanel initialOpen />);
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert.textContent).toContain("설치 호환성을 확인할 수 없어요");
+      expect(alert.textContent).not.toContain("확인된 엔진용 자료는 계속 사용할 수 있고");
+    });
+    expect(screen.getByRole("button", { name: "호환성 다시 확인" })).toBeTruthy();
   });
 
   it("잘못된 release SemVer를 막고 입력한 새 버전을 manifest 생성에 전달한다", async () => {

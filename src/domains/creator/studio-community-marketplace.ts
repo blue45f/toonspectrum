@@ -134,8 +134,10 @@ export interface StudioCommunityAssetProjection {
 export interface StudioCommunityMarketplaceCompatibilityContext {
   /** Authoritative compatibility version; omit until the Studio build publishes one. */
   readonly currentStudioVersion?: string | null;
-  /** Trustworthy measured engine snapshot; omit rather than guessing from browser identity. */
+  /** Positively measured engine support; omit rather than guessing from browser identity. */
   readonly supportedEngines?: readonly CreatorMarketplaceResourceEngine[] | null;
+  /** Engines whose measurement was inconclusive; resources requiring them remain fail-closed. */
+  readonly unverifiedEngines?: readonly CreatorMarketplaceResourceEngine[] | null;
 }
 
 export type StudioCommunityShareCandidateKind = "brush" | "filter" | "palette";
@@ -363,9 +365,11 @@ export function projectCreatorMarketplaceRecordToStudioPack(
     currentStudioVersion: compatibilityContext.currentStudioVersion,
     declaredEngines: record.compatibility.engines,
     supportedEngines: compatibilityContext.supportedEngines,
+    unverifiedEngines: compatibilityContext.unverifiedEngines,
   });
   const productContextSupplied = "currentStudioVersion" in compatibilityContext
-    || "supportedEngines" in compatibilityContext;
+    || "supportedEngines" in compatibilityContext
+    || "unverifiedEngines" in compatibilityContext;
   if (
     compatibility.status === "unsupported"
     || (productContextSupplied && compatibility.status === "unverified")
@@ -467,9 +471,11 @@ export function projectCreatorMarketplaceRecordToAssets(
     currentStudioVersion: compatibilityContext.currentStudioVersion,
     declaredEngines: record.compatibility.engines,
     supportedEngines: compatibilityContext.supportedEngines,
+    unverifiedEngines: compatibilityContext.unverifiedEngines,
   });
   const productContextSupplied = "currentStudioVersion" in compatibilityContext
-    || "supportedEngines" in compatibilityContext;
+    || "supportedEngines" in compatibilityContext
+    || "unverifiedEngines" in compatibilityContext;
   if (
     compatibility.status === "unsupported"
     || (productContextSupplied && compatibility.status === "unverified")

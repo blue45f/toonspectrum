@@ -21,6 +21,8 @@ type CanvasContextId = "2d" | "webgl2";
 export interface StudioMarketplaceRuntimeCompatibilityContext {
   readonly currentStudioVersion: typeof STUDIO_MARKETPLACE_COMPATIBILITY_VERSION;
   readonly supportedEngines: readonly CreatorMarketplaceResourceEngine[] | null;
+  /** Engines whose probe was inconclusive; they remain fail-closed without erasing known support. */
+  readonly unverifiedEngines: readonly CreatorMarketplaceResourceEngine[];
 }
 
 export interface StudioMarketplaceRuntimeCompatibilityProbeOptions {
@@ -51,8 +53,8 @@ async function probeWebGpuAdapterFromGlobals(): Promise<boolean | null> {
   );
   if (snapshot.adapterAvailable) return true;
   // Missing APIs and an explicit null adapter are conclusive for this document. A timeout,
-  // cancellation, or driver exception is not evidence that the device lacks WebGPU; keep the
-  // whole engine snapshot unverified so a later Studio entry can retry instead of mislabelling it.
+  // cancellation, or driver exception is not evidence that the device lacks WebGPU; keep only
+  // WebGPU unverified so independently measured Canvas/WebGL engines remain usable.
   return snapshot.probeFailure === "webgpu-api-unavailable"
     || snapshot.probeFailure === "adapter-unavailable"
     ? false
@@ -74,16 +76,24 @@ export async function probeStudioMarketplaceRuntimeCompatibility(
     ?? probeWebGpuAdapterFromGlobals;
 
   const measuredSupport = new Set<CreatorMarketplaceResourceEngine>();
-  let measuredEveryEngine = true;
+  const unverified = new Set<CreatorMarketplaceResourceEngine>();
 
   for (const contextId of ["2d", "webgl2"] as const) {
     let supported: boolean | null;
     try {
       supported = probeCanvasContext(contextId);
     } catch {
-      supported = false;
+      supported = null;
     }
-    if (supported === null) measuredEveryEngine = false;
+    if (supported === null) {
+      if (contextId === "2d") {
+        unverified.add("canvas2d");
+      } else {
+        unverified.add("webgl2");
+        unverified.add("three");
+      }
+      continue;
+    }
     if (!supported) continue;
     if (contextId === "2d") {
       measuredSupport.add("canvas2d");
@@ -95,23 +105,28 @@ export async function probeStudioMarketplaceRuntimeCompatibility(
 
   try {
     const webGpuSupported = await probeWebGpuAdapter();
-    if (webGpuSupported === null) measuredEveryEngine = false;
-    if (webGpuSupported) measuredSupport.add("webgpu");
+    if (webGpuSupported === null) {
+      unverified.add("webgpu");
+    } else if (webGpuSupported) {
+      measuredSupport.add("webgpu");
+    }
   } catch {
     // An injected or future probe may throw even though today's shared probe never does. Treat the
     // adapter state as unverified; a driver error is not proof that the engine is absent.
-    measuredEveryEngine = false;
+    unverified.add("webgpu");
   }
 
-  const supportedEngines = measuredEveryEngine
-    ? Object.freeze(
-      CREATOR_MARKETPLACE_RESOURCE_ENGINES.filter((engine) => measuredSupport.has(engine)),
-    )
-    : null;
+  const supportedEngines = Object.freeze(
+    CREATOR_MARKETPLACE_RESOURCE_ENGINES.filter((engine) => measuredSupport.has(engine)),
+  );
+  const unverifiedEngines = Object.freeze(
+    CREATOR_MARKETPLACE_RESOURCE_ENGINES.filter((engine) => unverified.has(engine)),
+  );
 
   return Object.freeze({
     currentStudioVersion: STUDIO_MARKETPLACE_COMPATIBILITY_VERSION,
     supportedEngines,
+    unverifiedEngines,
   });
 }
 
@@ -119,16 +134,22 @@ let productCompatibilityPromise:
   | Promise<StudioMarketplaceRuntimeCompatibilityContext>
   | null = null;
 
-/** One adapter probe is shared by the panel and one-shot deep-link installer for this page load. */
-export function getProductStudioMarketplaceRuntimeCompatibility(): Promise<
-  StudioMarketplaceRuntimeCompatibilityContext
-> {
+/**
+ * One adapter probe is shared by the panel and one-shot deep-link installer for this page load.
+ * Optional probes are a deterministic test seam for the retry/cache boundary.
+ */
+export function getProductStudioMarketplaceRuntimeCompatibility(
+  options: StudioMarketplaceRuntimeCompatibilityProbeOptions = {},
+): Promise<StudioMarketplaceRuntimeCompatibilityContext> {
   if (productCompatibilityPromise === null) {
-    const probe = probeStudioMarketplaceRuntimeCompatibility();
+    const probe = probeStudioMarketplaceRuntimeCompatibility(options);
     productCompatibilityPromise = probe;
     void probe.then((context) => {
       if (
-        context.supportedEngines === null
+        (
+          context.supportedEngines === null
+          || context.unverifiedEngines.length > 0
+        )
         && productCompatibilityPromise === probe
       ) {
         productCompatibilityPromise = null;

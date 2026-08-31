@@ -1791,6 +1791,12 @@ export function StudioCommunityMarketplacePanel({
           setCompatibilityIssue(
             "기기 엔진 측정을 완료하지 못해 설치 호환성을 확인할 수 없어요. 잠시 후 다시 시도해 주세요.",
           );
+        } else if (context.unverifiedEngines.length > 0) {
+          setCompatibilityIssue(
+            context.supportedEngines.length > 0
+              ? "일부 기기 엔진 측정을 완료하지 못했어요. 확인된 엔진용 자료는 계속 사용할 수 있고, 측정되지 않은 엔진이 필요한 자료만 설치를 보류합니다."
+              : "기기 엔진 측정을 완료하지 못해 설치 호환성을 확인할 수 없어요. 잠시 후 다시 시도해 주세요.",
+          );
         }
       })
       .catch((caught: unknown) => {

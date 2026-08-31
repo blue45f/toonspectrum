@@ -179,6 +179,8 @@ export interface StudioMarketplaceCompatibilityEvaluationInput {
   readonly declaredEngines: readonly string[];
   /** Omitted means "not measured"; an empty array is a measured device with no supported engine. */
   readonly supportedEngines?: readonly string[] | null;
+  /** Inconclusive per-engine probes; a resource requiring one remains unverified, not unsupported. */
+  readonly unverifiedEngines?: readonly string[] | null;
 }
 
 export type StudioMarketplaceCompatibilityEvaluation =
@@ -488,23 +490,37 @@ export function evaluateStudioMarketplaceCompatibility(
 
   const measuredEngines = input.supportedEngines;
   const hasMeasuredEngines = measuredEngines !== undefined && measuredEngines !== null;
-  if (measuredEngines !== undefined && measuredEngines !== null) {
-    const supportedEngines = new Set(
-      measuredEngines.map((engine) => engine.trim()).filter(Boolean),
-    );
-    if (!declaredEngines.some((engine) => supportedEngines.has(engine))) {
-      return {
-        status: "unsupported",
-        verified: true,
-        code: "engine-unavailable",
-        reason:
-          `이 리소스에 필요한 렌더링 엔진(${engineNames(declaredEngines)})을 현재 기기에서 사용할 수 없습니다. 브라우저와 그래픽 드라이버를 업데이트하거나 지원되는 기기에서 다시 시도해 주세요.`,
-      };
-    }
+  const supportedEngines = new Set(
+    (measuredEngines ?? []).map((engine) => engine.trim()).filter(Boolean),
+  );
+  const unverifiedEngines = new Set(
+    (input.unverifiedEngines ?? []).map((engine) => engine.trim()).filter(Boolean),
+  );
+  const hasSupportedDeclaredEngine = declaredEngines.some(
+    (engine) => supportedEngines.has(engine),
+  );
+  // Marketplace engine declarations are alternatives. A positive proof therefore wins even when
+  // another optional engine is inconclusive; uncertainty matters only if no declared alternative
+  // was proven on this device.
+  const hasUnverifiedDeclaredEngine = !hasSupportedDeclaredEngine
+    && declaredEngines.some((engine) => unverifiedEngines.has(engine));
+  if (
+    hasMeasuredEngines
+    && !hasSupportedDeclaredEngine
+    && !hasUnverifiedDeclaredEngine
+  ) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "engine-unavailable",
+      reason:
+        `이 리소스에 필요한 렌더링 엔진(${engineNames(declaredEngines)})을 현재 기기에서 사용할 수 없습니다. 브라우저와 그래픽 드라이버를 업데이트하거나 지원되는 기기에서 다시 시도해 주세요.`,
+    };
   }
 
   const hasCurrentVersion = currentStudioVersion !== null;
-  if (hasCurrentVersion && hasMeasuredEngines) {
+  const hasVerifiedEngine = hasMeasuredEngines && hasSupportedDeclaredEngine;
+  if (hasCurrentVersion && hasVerifiedEngine) {
     return {
       status: "compatible",
       verified: true,
@@ -514,11 +530,13 @@ export function evaluateStudioMarketplaceCompatibility(
   }
   const code = hasCurrentVersion
     ? "engine-capabilities-unavailable" as const
-    : hasMeasuredEngines
+    : hasVerifiedEngine
       ? "studio-version-unavailable" as const
       : "compatibility-sources-unavailable" as const;
   const reason = code === "engine-capabilities-unavailable"
-    ? "현재 기기의 렌더링 엔진 지원 상태를 확인할 권위 있는 측정값이 없어 호환성을 검증하지 못했습니다."
+    ? hasUnverifiedDeclaredEngine
+      ? `이 리소스에 필요한 렌더링 엔진(${engineNames(declaredEngines)}) 측정을 완료하지 못해 호환성을 검증하지 못했습니다. 잠시 후 다시 확인해 주세요.`
+      : "현재 기기의 렌더링 엔진 지원 상태를 확인할 권위 있는 측정값이 없어 호환성을 검증하지 못했습니다."
     : code === "studio-version-unavailable"
       ? "현재 Studio 호환성 버전을 확인할 권위 있는 값이 없어 호환성을 검증하지 못했습니다."
       : "현재 Studio 호환성 버전과 기기 렌더링 엔진의 권위 있는 값이 없어 호환성을 검증하지 못했습니다.";

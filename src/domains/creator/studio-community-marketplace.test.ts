@@ -238,6 +238,42 @@ describe("studio community marketplace projection", () => {
     expect(supported.status).toBe("installable");
   });
 
+  it("선택적 WebGPU 측정 실패가 확인된 Canvas 패키지까지 전역 차단하지 않는다", () => {
+    const partialContext = {
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d"] as const,
+      unverifiedEngines: ["webgpu"] as const,
+    };
+    const canvasProjection = projectCreatorMarketplaceRecordToStudioPack(
+      record("brush", {
+        snapshot: DEFAULT_STUDIO_BRUSH_SNAPSHOT as unknown as CreatorMarketplaceJsonValue,
+      }, {
+        engines: ["canvas2d"],
+      }),
+      partialContext,
+    );
+    expect(canvasProjection.status).toBe("installable");
+
+    const webGpuProjection = projectCreatorMarketplaceRecordToStudioPack(
+      record("3d-preset", { recipeId: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID }, {
+        engines: ["webgpu"],
+      }),
+      partialContext,
+    );
+    expect(webGpuProjection).toMatchObject({ status: "unsupported", pack: null });
+    expect(webGpuProjection.reason).toContain("WebGPU");
+    expect(webGpuProjection.reason).toContain("측정을 완료하지 못해");
+
+    const knownUnavailableProjection = projectCreatorMarketplaceRecordToStudioPack(
+      record("3d-preset", { recipeId: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID }, {
+        engines: ["webgl2"],
+      }),
+      partialContext,
+    );
+    expect(knownUnavailableProjection).toMatchObject({ status: "unsupported", pack: null });
+    expect(knownUnavailableProjection.reason).toContain("그래픽 드라이버");
+  });
+
   it("로컬에 실제 존재하는 template recipe만 내장 참조로 승격한다", () => {
     const supported = projectCreatorMarketplaceRecordToStudioPack(
       record("template", { templateId: "confession" }),

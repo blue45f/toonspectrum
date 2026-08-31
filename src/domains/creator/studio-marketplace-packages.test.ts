@@ -399,6 +399,50 @@ describe("studio marketplace runtime compatibility", () => {
     });
   });
 
+  it("isolates inconclusive optional engines without erasing proven alternatives", () => {
+    const partialContext = {
+      minimumStudioVersion: "1.0.0",
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d"],
+      unverifiedEngines: ["webgpu"],
+    } as const;
+
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["canvas2d"],
+    })).toEqual({
+      status: "compatible",
+      verified: true,
+      code: "compatible",
+      reason: null,
+    });
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["canvas2d", "webgpu"],
+    })).toMatchObject({ status: "compatible", code: "compatible" });
+
+    const unverified = evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["webgpu"],
+    });
+    expect(unverified).toMatchObject({
+      status: "unverified",
+      verified: false,
+      code: "engine-capabilities-unavailable",
+    });
+    expect(unverified.reason).toContain("WebGPU");
+    expect(unverified.reason).toContain("다시 확인");
+
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["webgl2"],
+    })).toMatchObject({
+      status: "unsupported",
+      verified: true,
+      code: "engine-unavailable",
+    });
+  });
+
   it("blocks a measured engine mismatch and distinguishes missing runtime sources", () => {
     const unsupported = evaluateStudioMarketplaceCompatibility({
       minimumStudioVersion: "1.0.0",
