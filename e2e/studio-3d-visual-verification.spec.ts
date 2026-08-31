@@ -266,7 +266,17 @@ async function visiblePngDelta(page: Page, left: string, right: string): Promise
 async function forceBg3dWebGpu(page: Page): Promise<void> {
   const backend = page.locator('[data-testid="studio-bg3d-engine-active-backend"]').first();
   await page.getByRole("tab", { name: "보기", exact: true }).click();
-  await page.locator('[data-testid="studio-bg3d-engine-preference-webgpu"]').first().click();
+  const webgpuPreference = page
+    .locator('[data-testid="studio-bg3d-engine-preference-webgpu"]')
+    .first();
+  await expect(webgpuPreference).toBeVisible();
+  // The dedicated CI lane can launch directly in WebGPU. The selected engine button is disabled
+  // by design, so clicking it would wait for five minutes before the actual rotation assertion.
+  if (await webgpuPreference.getAttribute("aria-pressed") !== "true") {
+    await expect(webgpuPreference).toBeEnabled();
+    await webgpuPreference.click();
+  }
+  await expect(webgpuPreference).toHaveAttribute("aria-pressed", "true");
   await expect(backend).toContainText("WebGPU", { timeout: 120_000 });
   await page.getByRole("tab", { name: "도형", exact: true }).click();
   await page.waitForTimeout(1_000);
@@ -290,31 +300,49 @@ async function dragBg3dRotationRing(
   });
   const start = point([0.618, 0.507]);
   const end = point([0.499, 0.555]);
-  await page.mouse.move(start.x, start.y);
-  await page.waitForTimeout(300);
-  await page.mouse.down();
-  try {
-    // 직접 경로도 마지막 move 전까지 같은 pointer-down 시간을 보내게 해, 두 경로 모두 마지막
-    // 자세를 present할 시간은 정확히 80ms로 맞춘다. 기존에는 연속 80ms, 직접 1,920ms였다.
-    if (steps === 1) await page.waitForTimeout(80 * 23);
-    for (let step = 1; step <= steps; step += 1) {
-      const progress = step / steps;
-      await page.mouse.move(
-        start.x + (end.x - start.x) * progress,
-        start.y + (end.y - start.y) * progress,
-      );
-      await page.waitForTimeout(80);
+  const readRotationValues = () => Promise.all(
+    ["X", "Y", "Z"].map((axis) =>
+      page.getByRole("spinbutton", { name: `회전 ${axis}` }).first().inputValue()
+    ),
+  );
+  const initialValues = await readRotationValues();
+  let lastValues = initialValues;
+
+  // WebGPU canvas가 다시 mount된 직후에는 DOM 상의 선택/회전 상태가 먼저 보이고
+  // TransformControls의 픽 장면이 한 두 프레임 뒤에 준비될 수 있다. 고정 좌표 pointer-down이 그
+  // 틈에 링을 놓치면 직접 경로만 0°에 머물러 ghost 판정 자체가 무효해진다. 값이
+  // 변한 실제 hit만 캡처에 사용하고, miss는 같은 좌표·시간 경로로 유한하게 재시도한다.
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await page.mouse.move(start.x, start.y);
+    await page.waitForTimeout(300);
+    await page.mouse.down();
+    try {
+      // 직접 경로도 마지막 move 전까지 같은 pointer-down 시간을 보내게 해, 두 경로 모두 마지막
+      // 자세를 present할 시간은 정확히 80ms로 맞춘다. 기존에는 연속 80ms, 직접 1,920ms였다.
+      if (steps === 1) await page.waitForTimeout(80 * 23);
+      for (let step = 1; step <= steps; step += 1) {
+        const progress = step / steps;
+        await page.mouse.move(
+          start.x + (end.x - start.x) * progress,
+          start.y + (end.y - start.y) * progress,
+        );
+        await page.waitForTimeout(80);
+      }
+      lastValues = await readRotationValues();
+      const hitRotationRing = lastValues.some((value, index) => value !== initialValues[index]);
+      if (!hitRotationRing) continue;
+
+      const capture = await waitForStableBg3dFrame(page, testInfo, label);
+      return { capture, values: lastValues };
+    } finally {
+      await page.mouse.up();
     }
-    const capture = await waitForStableBg3dFrame(page, testInfo, label);
-    const values = await Promise.all(
-      ["X", "Y", "Z"].map((axis) =>
-        page.getByRole("spinbutton", { name: `회전 ${axis}` }).first().inputValue()
-      ),
-    );
-    return { capture, values };
-  } finally {
-    await page.mouse.up();
   }
+
+  throw new Error(
+    `${label}: 회전 링이 3회 연속 pointer hit를 받지 못했습니다 `
+      + `(${initialValues.join(",")} → ${lastValues.join(",")}).`,
+  );
 }
 
 /**
@@ -583,7 +611,11 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.getByRole("tab", { name: "레이어 1" }).click();
     // The complete LT metadata path creates a dedicated "3D LT 배경" group. Match the child
     // raster row explicitly so the group treeitem cannot be mistaken for the persisted element.
-    const insertedLayer = page.getByRole("treeitem", { name: /^3D LT 배경 · 병합,/ }).first();
+    const layerTree = page.getByRole("tree", { name: "레이어 트리" });
+    const insertedLayer = layerTree.locator(
+      '[data-studio-layer-row="true"][aria-label^="3D LT 배경 · 병합,"]',
+    );
+    await expect(insertedLayer).toHaveCount(1);
     const insertedLayerId = await insertedLayer.getAttribute("id");
     expect(insertedLayerId).toMatch(/^studio-layer-.+/);
     // The navigator paints rows with `content-visibility:auto`. A row outside the panel's
@@ -655,8 +687,11 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await expect(page.getByRole("tab", { name: "레이어 1" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "레이어 2" })).toHaveCount(0);
     await page.getByRole("tab", { name: "레이어 1" }).click();
-    const updatedLayer = page.locator(`#${insertedLayerId}`);
+    const updatedLayer = layerTree.locator(
+      '[data-studio-layer-row="true"][aria-label^="3D LT 배경 · 병합,"]',
+    );
     await expect(updatedLayer).toHaveCount(1);
+    await expect(updatedLayer).toHaveAttribute("id", insertedLayerId!);
     await expect(updatedLayer).toHaveAttribute("aria-selected", "true");
 
     // 먼저 재열기와 무관한 update 자체의 가시 결과를 고정한다. 이 지점에서 새 raster가 보이지
