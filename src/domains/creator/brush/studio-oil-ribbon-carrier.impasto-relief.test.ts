@@ -433,5 +433,15 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // where a de-quantisation bug would explode, vertex count is where a splat-density bug would.
     expect(scribble.reliefRuns).toBeLessThanOrEqual(1_200);
     expect(scribble.reliefVertices).toBeLessThanOrEqual(6_300);
+    // FLOORS, because a ceiling cannot see relief that stopped existing. `impastoHairStride`
+    // divides by the grid cell through a `floor`, so anything that coarsens the cell resolves
+    // fewer hairs and silently deletes ridges — rounding `impastoReliefCell` to the rung ABOVE
+    // `natural` instead of below took a straight capped stroke from 43 rasterised ridge runs to
+    // 20, and every assertion above stayed green through it. Measured 114/8842 and 1176/5213;
+    // these sit ~20% under, which a halving cannot clear.
+    expect(long.reliefRuns).toBeGreaterThanOrEqual(90);
+    expect(long.reliefVertices).toBeGreaterThanOrEqual(7_000);
+    expect(scribble.reliefRuns).toBeGreaterThanOrEqual(940);
+    expect(scribble.reliefVertices).toBeGreaterThanOrEqual(4_100);
   });
 });
