@@ -2576,13 +2576,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  // oil--gpu-bristle 레인은 GPU bitmap만 픽셀 권한을 가진다. 요청 생성 실패,
-                  // 비문서 렌더, pending, unsupported, Worker/WebGPU decline 모두 source를
-                  // 보존하고 이 프레임을 비워 두며 Canvas carrier로 자동 전환하지 않는다.
+                  // oil--gpu-bristle 레인은 GPU bitmap만 픽셀 권한을 가진다. drawing-draft와
+                  // document는 같은 Worker 상태를 이어 쓰고, renderer-local transform-draft는
+                  // 새 비동기 작업을 시작하지 않는다. 요청 생성 실패, pending, unsupported,
+                  // Worker/WebGPU decline은 source를 보존하고 Canvas carrier로 전환하지 않는다.
                   const gpuBristleSelected = brush?.startsWith(
                     STUDIO_GPU_BRISTLE_BRUSH_ID_PREFIX,
                   ) ?? false;
-                  const gpuBristle = gpuBristleSelected && durableDocumentRender
+                  const gpuBristle = gpuBristleSelected && (durableDocumentRender || activeDraft)
                     ? studioGpuBristleOilRequest(el.id, brush, dabs, opacity, stroke)
                     : null;
                   if (gpuBristleSelected) {

@@ -285,6 +285,9 @@ export function StudioCanvasViewportStageHost({
     webtoonTheme: viewport.webtoonTheme,
     wetMixArmed: viewport.wetMixArmed,
   };
+  const documentLayer = (
+    <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+  );
   const toolLayerProps: StudioCanvasViewportToolLayersProps = {
     activeSurfaceReviewLocked: viewport.activeSurfaceReviewLocked,
     advancedRulers: viewport.advancedRulers,
@@ -646,12 +649,17 @@ export function StudioCanvasViewportStageHost({
                 showWebtoonGuides={showWebtoonGuides}
                 webtoonGuides={webtoonGuides}
               />
-              <Group
-                name="studio-konva-document-shadow"
-                opacity={frameGraphOwnsDocumentPixels ? 0 : 1}
-              >
-                <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
-              </Group>
+              {frameGraphOwnsDocumentPixels ? (
+                <Group
+                  name="studio-konva-document-shadow"
+                  opacity={0}
+                  listening={false}
+                >
+                  {documentLayer}
+                </Group>
+              ) : (
+                documentLayer
+              )}
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,

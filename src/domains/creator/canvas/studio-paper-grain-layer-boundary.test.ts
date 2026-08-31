@@ -102,8 +102,9 @@ describe("paper grain lives on its own DOM canvas", () => {
   });
 
   it("keeps the paper rect out of the layer the Vello frame graph can take over", () => {
-    // Vello only makes the document Group transparent after an exact frame receipt. The paper
-    // remains in the background layer so a GPU handoff cannot blank the authored sheet texture.
+    // Vello only inserts the transparent document Group after an exact frame receipt. Otherwise
+    // authored wrappers remain direct main-Layer children for drag and live-transform isolation.
+    // The paper remains in the background layer so a GPU handoff cannot blank the sheet texture.
     const source = readFileSync(
       resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"),
       "utf8",
@@ -117,7 +118,10 @@ describe("paper grain lives on its own DOM canvas", () => {
     expect(paperAt).toBeGreaterThan(backgroundLayerAt);
     expect(paperAt).toBeLessThan(mainLayerAt);
     expect(source).toContain('name="studio-konva-document-shadow"');
-    expect(source).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(source).toContain("{frameGraphOwnsDocumentPixels ? (");
+    expect(source).toContain("opacity={0}");
+    expect(source).toContain(") : (\n                documentLayer\n              )}");
+    expect(source).not.toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
   });
 
   it("never renders through a WebGPU context — the 2d context is the only one it asks for", () => {

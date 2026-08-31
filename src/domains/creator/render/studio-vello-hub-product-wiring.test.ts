@@ -66,7 +66,11 @@ describe("VelloHub /studio product wiring", () => {
     expect(viewportSource).toContain("frameGraphOwnsDocumentPixels");
     expect(viewportSource).toContain("velloEligibleDocumentIds");
     expect(viewportSource).toContain('name="studio-konva-document-shadow"');
-    expect(viewportSource).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(viewportSource).toContain("const documentLayer = (");
+    expect(viewportSource).toContain("{frameGraphOwnsDocumentPixels ? (");
+    expect(viewportSource).toContain("opacity={0}");
+    expect(viewportSource).toContain(") : (\n                documentLayer\n              )}");
+    expect(viewportSource).not.toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
     expect(viewportSource).toContain(
       "velloHubAuthority.sceneRevision === velloSceneRevision",
     );

@@ -156,4 +156,16 @@ describe("gpu-bristle route import boundary", () => {
     expect(selectedBranch).toContain("if (!overlay) return;");
     expect(selectedBranch).not.toContain("paintStudioOilRibbonCarrier");
   });
+
+  it("requests the selected GPU lane for pointer drafts without enabling transform-draft jobs", () => {
+    const drawNode = readFileSync(path.join(ROOT, DRAW_NODE), "utf8");
+    const selection = drawNode.indexOf("const gpuBristleSelected =");
+    const selectedBranch = drawNode.slice(
+      selection,
+      drawNode.indexOf("const paintInput =", selection),
+    );
+    expect(selectedBranch).toContain("gpuBristleSelected && (durableDocumentRender || activeDraft)");
+    expect(selectedBranch).not.toContain("gpuBristleSelected && durableDocumentRender");
+    expect(selectedBranch).toContain("if (!gpuBristle) return;");
+  });
 });
