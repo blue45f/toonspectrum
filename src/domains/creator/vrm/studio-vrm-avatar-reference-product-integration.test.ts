@@ -74,9 +74,9 @@ describe("Avatar reference recommendation product wiring", () => {
 
   it("pins catalogue generation to the tracked VRM and every canonical preset state", () => {
     expect(productSource).toContain('sourceUrl: "/vrm/TS_Minseo_Campus.vrm"');
-    expect(productSource).toContain("sourceByteLength: 463_276");
+    expect(productSource).toContain("sourceByteLength: 1_325_288");
     expect(productSource).toContain(
-      "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0",
+      "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
     );
     expect(productSource).toContain("studioVrmAvatarReferencePresetStateSha256");
     expect(productSource).toContain("referenceImageSha256");

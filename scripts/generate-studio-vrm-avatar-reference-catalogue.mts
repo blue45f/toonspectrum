@@ -71,8 +71,8 @@ const SOURCE_PATH = resolve(
   "public/vrm/TS_Minseo_Campus.vrm",
 );
 const SOURCE_URL = "/vrm/TS_Minseo_Campus.vrm";
-const SOURCE_BYTE_LENGTH = 463_276;
-const SOURCE_SHA256 = "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0";
+const SOURCE_BYTE_LENGTH = 1_325_288;
+const SOURCE_SHA256 = "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea";
 const HARNESS_PATH = "/__studio_vrm_avatar_reference_catalogue_v1__";
 const HARNESS_ENTRY = "/scripts/studio-vrm-avatar-reference-catalogue-browser.tsx";
 const READY_TIMEOUT_MS = 90_000;
@@ -90,7 +90,11 @@ const CHROMIUM_ARGS = Object.freeze([
 const CSP = [
   "default-src 'none'",
   "script-src 'self' 'wasm-unsafe-eval'",
-  "connect-src 'self' ws:",
+  // `blob:` because GLTFLoader fetches a GLB's embedded textures through blob URLs, and
+  // production already allows it (see vercel.json). Without it the harness renders a VRM with
+  // every texture silently missing -- invisible while the pinned model had none, and a wrong
+  // answer the moment one does. `img-src` and `worker-src` below already carry blob:.
+  "connect-src 'self' blob: ws:",
   "img-src 'self' data: blob:",
   "style-src 'unsafe-inline'",
   "worker-src 'self' blob:",
@@ -824,20 +828,30 @@ async function generateEnvelope(): Promise<Readonly<{
         `${result.queryId}: MediaPipe original query margin is not strictly positive`,
       );
     }
-    for (const result of qualityQueries.slice(originalQueries.length)) {
-      invariant(
+    // Every calibration miss, not the first: there are 21 presets x 2 transforms
+    // here, and a gate that reports one at a time turns "is retrieval healthy on
+    // this avatar" into 42 sequential runs. The rank and the ordering it lost to
+    // also matter -- "not in top-3" alone cannot separate a near miss at 4 from a
+    // collapse.
+    const calibrationMisses = qualityQueries
+      .slice(originalQueries.length)
+      .filter((result) => !(
         Number.isFinite(result.targetSimilarity)
-          && result.targetRank >= 1
-          && result.targetRank <= 3
-          && result.topPresetIds.includes(result.targetPresetId),
-        // The rank and the ordering it lost to: "not in top-3" alone cannot tell a
-        // near-miss at rank 4 from a retrieval that collapsed entirely, and this
-        // gate fires whenever the avatar it renders against changes.
-        `${result.queryId}: calibration query did not retain its preset in top-3 — `
-          + `rank ${result.targetRank}, similarity ${result.targetSimilarity}, `
-          + `top: ${result.topPresetIds.join(" > ")}`,
-      );
-    }
+        && result.targetRank >= 1
+        && result.targetRank <= 3
+        && result.topPresetIds.includes(result.targetPresetId)
+      ));
+    invariant(
+      calibrationMisses.length === 0,
+      `${calibrationMisses.length} of ${qualityQueries.length - originalQueries.length} `
+        + "calibration queries did not retain their preset in top-3:\n"
+        + calibrationMisses
+          .map((result) =>
+            `  ${result.queryId}: rank ${result.targetRank}, `
+            + `similarity ${result.targetSimilarity.toFixed(4)}, `
+            + `top: ${result.topPresetIds.join(" > ")}`)
+          .join("\n"),
+    );
     await page.evaluate(async () => {
       await window.__studioVrmAvatarReferenceCatalogueDispose?.();
     });

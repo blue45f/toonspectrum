@@ -225,6 +225,55 @@ function settleFrames(count: number): Promise<void> {
   });
 }
 
+/** Frames that let React effects, the R3F portal and shader compilation start. */
+const SETTLE_MIN_FRAMES = 24;
+/** Frames between two stability probes. */
+const SETTLE_PROBE_FRAMES = 6;
+/** Give up rather than publish a frame that never settled. */
+const SETTLE_MAX_PROBES = 24;
+
+/**
+ * Wait until the canvas stops changing, then let the caller read it back.
+ *
+ * A fixed 24-frame budget was enough while the reference model carried no textures and a preset
+ * only ADDED hair to it. Rendering the preset AS the hair does more work per preset, and 24 frames
+ * stopped being enough intermittently: two of the twenty-one renders differed between runs, which
+ * made the whole artifact irreproducible and `--check` fail at random. Raising the constant would
+ * only move the threshold, so settle on evidence instead — probe the canvas until two reads agree
+ * — and throw if it never does, because a frame that never settles must not become a pinned byte.
+ */
+async function settleUntilStable(host: HTMLElement, label: string): Promise<void> {
+  await settleFrames(SETTLE_MIN_FRAMES);
+  const probe = document.createElement("canvas");
+  probe.width = STUDIO_VRM_AVATAR_REFERENCE_BROWSER_WIDTH;
+  probe.height = STUDIO_VRM_AVATAR_REFERENCE_BROWSER_HEIGHT;
+  const probeContext = probe.getContext("2d", { willReadFrequently: true });
+  invariant(probeContext, "settle probe context is unavailable");
+  let previous: Uint8ClampedArray | null = null;
+  for (let attempt = 0; attempt < SETTLE_MAX_PROBES; attempt += 1) {
+    const canvas = host.querySelector("canvas");
+    invariant(canvas instanceof HTMLCanvasElement, `${label}: R3F canvas disappeared while settling`);
+    probeContext.drawImage(canvas, 0, 0);
+    const pixels = probeContext.getImageData(0, 0, probe.width, probe.height).data;
+    if (previous !== null && previous.length === pixels.length) {
+      let identical = true;
+      for (let index = 0; index < pixels.length; index += 1) {
+        if (pixels[index] !== previous[index]) {
+          identical = false;
+          break;
+        }
+      }
+      if (identical) return;
+    }
+    previous = new Uint8ClampedArray(pixels);
+    await settleFrames(SETTLE_PROBE_FRAMES);
+  }
+  throw new Error(
+    `${label}: canvas never produced two identical frames within `
+    + `${SETTLE_MIN_FRAMES + SETTLE_MAX_PROBES * SETTLE_PROBE_FRAMES} frames`,
+  );
+}
+
 function CanonicalActor({ vrm }: { readonly vrm: VRM }) {
   useFrame(() => {
     // Zero-delta update keeps the production normalized humanoid in sync without introducing any
@@ -415,10 +464,27 @@ window.__studioVrmAvatarReferenceCatalogueRender = async (presetId) => {
     `unknown Avatar Forge preset: ${presetId}`,
   );
   renderRevision += 1;
-  renderHarness(runtime.root, runtime.vrm, createAvatarForgeState(presetId), renderRevision);
-  // The production component uses layout/effects plus an R3F portal. Fixed zero-delta frames let
-  // its controller, portal and shader compilation settle before the one authoritative readback.
-  await settleFrames(24);
+  // This catalogue exists to give one reference image per hair preset, so the preset has to BE
+  // the hair. `replaceOriginal` defaults to false, which layers the preset over whatever the base
+  // avatar already wears -- correct in Studio, wrong here, and invisible for as long as the pinned
+  // reference model happened to be effectively hairless.
+  //
+  // The moment it is not, every render shares one large hair mass and the presets stop separating:
+  // measured on a reference avatar with real hair, 11 of 42 calibration queries fell out of top-3
+  // (ranks 4-16, every one of them the center-scale-90 variant, none the horizontal flip).
+  // Rendering the preset as the hair returns all 42. Encoding the assumption here is what keeps
+  // the catalogue answering the question it claims to answer, whichever model it renders.
+  const presetState = createAvatarForgeState(presetId);
+  renderHarness(
+    runtime.root,
+    runtime.vrm,
+    { ...presetState, hair: { ...presetState.hair, replaceOriginal: true } },
+    renderRevision,
+  );
+  // The production component uses layout/effects plus an R3F portal; settle on the canvas itself
+  // rather than a frame count, so the one authoritative readback is of a frame that has stopped
+  // moving. See settleUntilStable for the irreproducibility a fixed budget produced.
+  await settleUntilStable(runtime.host, presetId);
   const source = runtime.host.querySelector("canvas");
   invariant(source instanceof HTMLCanvasElement, "R3F canvas disappeared before readback");
   invariant(
