@@ -316,10 +316,52 @@ describe("Studio group uniform-resize runtime boundary", () => {
   it("requests external cancellation without releasing the renderer writer lease", () => {
     const source = functionBody("requestCanvasSelectionResizeCancel");
 
+    expectSourceToken(source, "const session = groupResizeRef.current", "current resize session");
     expectSourceToken(source, 'phase !== "active"', "resize cancel request");
+    expectSourceToken(source, 'session.phase = "cancel-requested"', "synchronous cancel seal");
     expectSourceToken(source, "setCanvasSelectionResizeCancelSignal", "resize cancel request");
+    expect(source.indexOf('session.phase = "cancel-requested"')).toBeLessThan(
+      source.indexOf("setCanvasSelectionResizeCancelSignal"),
+    );
     expect(source).not.toContain("groupResizeRef.current = null");
     expect(source).not.toContain("endLiveResourceEdit()");
+  });
+
+  it.each([
+    ["Escape", (() => {
+      const start = pageSource.indexOf('} else if (e.key === "Escape") {');
+      const end = pageSource.indexOf(
+        "\n      } else if (",
+        start + '} else if (e.key === "Escape") {'.length,
+      );
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      return pageSource.slice(start, end);
+    })()],
+    ["Stage pointercancel", functionBody("onStagePointerCancel")],
+  ])("seals %s synchronously before a same-turn transformend can commit", (_route, routeSource) => {
+    const requestSource = functionBody("requestCanvasSelectionResizeCancel");
+    const commitSource = functionBody("commitCanvasSelectionResize");
+
+    expectSourceToken(routeSource, "cancelCanvasSelectionResize()", "cancel request route");
+    expectSourceToken(
+      requestSource,
+      'session.phase = "cancel-requested"',
+      "same-turn cancellation seal",
+    );
+    expect(requestSource.indexOf('session.phase = "cancel-requested"')).toBeLessThan(
+      requestSource.indexOf("setCanvasSelectionResizeCancelSignal"),
+    );
+    expectSourceToken(
+      commitSource,
+      'session.phase !== "active"',
+      "same-turn transformend commit gate",
+    );
+    expect(commitSource.indexOf('session.phase !== "active"')).toBeLessThan(
+      commitSource.indexOf('session.phase = "settling"'),
+    );
+    expect(requestSource).not.toContain("groupResizeRef.current = null");
+    expect(requestSource).not.toContain("endLiveResourceEdit()");
   });
 
   it("routes Stage pointer cancellation through the request channel and reserves the finalizer for the commit port", () => {
@@ -381,7 +423,7 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(lifecycleSource, 'session.phase !== "active"', "resize lifecycle");
     expectSourceToken(
       lifecycleSource,
-      "setCanvasSelectionResizeCancelSignal",
+      "requestCanvasSelectionResizeCancel()",
       "resize lifecycle request",
     );
     expect(lifecycleSource).not.toContain("groupResizeRef.current = null");
@@ -447,7 +489,7 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expect(watchSource).not.toContain("endLiveResourceEdit()");
     expectSourceToken(
       watchSource,
-      "setCanvasSelectionResizeCancelSignal",
+      "requestCanvasSelectionResizeCancel()",
       "reconciliation watch",
     );
     // A transient gesture never changes elements, so only a document snapshot replacement fires.

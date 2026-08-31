@@ -5281,7 +5281,7 @@ function StudioCuttoonEditor({
   // 중단시킨다. renderer close/settle이 성공한 뒤 commit-port finalizer만 ref와 lease를 해제한다.
   const [canvasSelectionResizeCancelSignal, setCanvasSelectionResizeCancelSignal] = useState(0);
   const groupResizeRef = useRef<{
-    phase: "active" | "settling";
+    phase: "active" | "cancel-requested" | "settling";
     selectedIds: string[];
     sourceBounds: StudioGroupUniformResizeBounds;
     sourceElements: El[];
@@ -5350,7 +5350,7 @@ function StudioCuttoonEditor({
     // old stroke would keep following the handles on a session this page has already abandoned.
     // This is only a cancellation request. Renderer cleanup owns the session/CRDT lease until its
     // retryable close succeeds and invokes the commit-port finalizer.
-    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+    requestCanvasSelectionResizeCancel();
   }, [activePage.id, masterEditMode, marqueeIds, selectedId]);
   // The preview captures the entire composition used by clip/lift eligibility, not only selected
   // element identities. Any immutable document update can move/replace a panel or change stacking
@@ -5358,7 +5358,7 @@ function StudioCuttoonEditor({
   // elements snapshot. Inert on the hot path: transient frames never write document state.
   useLayoutEffect(() => {
     if (groupResizeRef.current?.phase !== "active") return;
-    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+    requestCanvasSelectionResizeCancel();
   }, [elements]);
   // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
   // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.
@@ -5482,7 +5482,13 @@ function StudioCuttoonEditor({
     return true;
   }
   function requestCanvasSelectionResizeCancel() {
-    if (groupResizeRef.current?.phase !== "active") return;
+    const session = groupResizeRef.current;
+    if (!session || session.phase !== "active") return;
+    // Seal synchronously before queueing React state. Escape/pointercancel teardown may emit a
+    // same-turn transformend before the proxy sees the new signal; that terminal event must find
+    // this session non-committable. The renderer still owns the ref/writer lease until its
+    // retryable close invokes cancelCanvasSelectionResize below.
+    session.phase = "cancel-requested";
     setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
   }
   /** Commit-port finalizer: renderer close/settle is the sole authority allowed to call this. */
