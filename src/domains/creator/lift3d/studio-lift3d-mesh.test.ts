@@ -21,6 +21,7 @@ import {
 } from "./studio-lift3d-mask";
 import {
   buildStudioLift3dGeometry,
+  countStudioLift3dCardDepthGaps,
   countStudioLift3dPlannedQuads,
   partitionStudioLift3dBandFaces,
   maxStudioLift3dResolutionForLayers,
@@ -891,5 +892,178 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(normalized.bounds.min).toEqual({ x: -1, y: 0, z: -0.5 });
     expect(normalized.bounds.max).toEqual({ x: 1, y: 2, z: 0.5 });
     expect(normalized.positions[0]).toEqual({ x: -1, y: 0, z: -0.5 });
+  });
+});
+
+/**
+ * 세로로는 완만히 오르고 가로로는 **네 칸 주기로 뚝 끊기는** 깊이.
+ *
+ * 세로 경사가 모든 밴드를 채워 버려질 밴드가 없고, 가로 단차는 한 칸에서 서너 밴드를 건너뛴다.
+ * 카드 순번이 2 이상 벌어지는 자리를 만들려면 이 둘이 **함께** 있어야 한다 — 순수한 경사는
+ * 아무리 층을 잘게 잘라도 빈 밴드가 버려지면서 순번이 도로 이어 붙는다.
+ */
+function steppedDepthField(side: number): {
+  width: number; height: number; heights: Float64Array; maxDistance: number;
+} {
+  const heights = new Float64Array(side * side);
+  for (let y = 0; y < side; y += 1) {
+    for (let x = 0; x < side; x += 1) {
+      const ramp = 0.45 * (y / (side - 1));
+      const step = Math.floor(x / 2) % 2 === 0 ? 0 : 0.45;
+      heights[y * side + x] = ramp + step;
+    }
+  }
+  return { width: side, height: side, heights, maxDistance: side / 2 };
+}
+
+describe("시차 카드 사이의 깊이 틈", () => {
+  it("순번이 이웃한 카드끼리는 z 에서 맞닿으므로 틈이 아니다", () => {
+    // 2×1 면 두 장을 좌우로 놓고 각각 0번·1번 카드에 준다.
+    const left = Uint8Array.from([1, 0]);
+    const right = Uint8Array.from([0, 1]);
+
+    expect(countStudioLift3dCardDepthGaps([left, right], 2, 1)).toEqual({
+      pairs: 1,
+      gaps: 0,
+      maxGap: 0,
+    });
+  });
+
+  it("옆으로 맞닿았는데 순번이 두 칸 벌어지면 그 경계를 센다", () => {
+    const back = Uint8Array.from([1, 0]);
+    const middle = Uint8Array.from([0, 0]);
+    const front = Uint8Array.from([0, 1]);
+
+    expect(countStudioLift3dCardDepthGaps([back, middle, front], 2, 1)).toEqual({
+      pairs: 1,
+      gaps: 1,
+      maxGap: 2,
+    });
+  });
+
+  it("밴드 번호가 아니라 **배열 순번**으로 센다", () => {
+    // 같은 그림이지만 가운데 카드가 면을 하나도 내지 못해 방출에서 빠진 경우. 남은 두 장은
+    // 순번상 이웃이라 실제로 맞닿는다 — 밴드 번호로 셌다면 여기서도 틈을 셌을 것이다.
+    const back = Uint8Array.from([1, 0]);
+    const front = Uint8Array.from([0, 1]);
+
+    expect(countStudioLift3dCardDepthGaps([back, front], 2, 1).gaps).toBe(0);
+  });
+
+  it("카드가 한 장이면 경계는 세되 틈은 0 이다", () => {
+    // `pairs` 가 0 인 것과 틈이 0 인 것은 다른 사실이다. 비율로 판정하는 쪽이 둘을 구별해야
+    // 0 으로 나누지 않는다.
+    const only = Uint8Array.from([1, 1]);
+
+    expect(countStudioLift3dCardDepthGaps([only], 2, 1)).toEqual({
+      pairs: 1,
+      gaps: 0,
+      maxGap: 0,
+    });
+  });
+
+  it("면이 없는 격자는 경계가 없다", () => {
+    expect(countStudioLift3dCardDepthGaps([], 0, 0)).toEqual({
+      pairs: 0,
+      gaps: 0,
+      maxGap: 0,
+    });
+  });
+
+  it("층수가 원화의 깊이 잔결보다 잘면 경고로 알린다", () => {
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(mask, steppedDepthField(side), {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 3,
+      layerBands: 8,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const warning = built.warnings.find((entry) => entry.code === "layer-depth-gap");
+    expect(warning).toBeDefined();
+    // 사용자가 돌릴 수 있는 손잡이를 문구가 짚어야 한다.
+    expect(warning?.message).toContain("레이어 수");
+    expect(warning?.message).toContain("relief");
+  });
+
+  it("층수를 낮추면 단차가 한 층으로 합쳐져 경고가 사라진다", () => {
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(mask, steppedDepthField(side), {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 3,
+      layerBands: 2,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.warnings.map((entry) => entry.code)).not.toContain("layer-depth-gap");
+  });
+
+  it("매끄러운 경사는 층을 끝까지 올려도 틈이 없다", () => {
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(mask, depthFieldOf(side, (_x, y) => y / (side - 1)), {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 3,
+      layerBands: STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.warnings.map((entry) => entry.code)).not.toContain("layer-depth-gap");
+  });
+
+  it("셀만 있고 면이 없는 유령 밴드를 순번으로 세지 않는다", () => {
+    // 유령을 순번에 끼워 넣으면 실제로 맞닿는 두 카드가 두 칸 떨어져 보여, 멀쩡한 결과에
+    // 틈 경고가 붙는다. 순번은 **면을 내는 카드**만 받는다.
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = y < side / 2 ? 0.1 : 0.9;
+      }
+    }
+    // 가운데 밴드에 외딴 셀 하나. 면은 가장 앞 밴드가 가져가므로 밴드 1 은 셀만 남는다.
+    heights[16 * side + 6] = 0.5;
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", depthScale: 0.4, targetHeight: 4, layerBands: 3 },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.value.layerCount).toBe(2);
+    expect(built.warnings.map((entry) => entry.code)).not.toContain("layer-depth-gap");
+  });
+
+  it("깊이가 딱 끊기는 원화는 빈 밴드가 버려져 두 카드가 맞닿는다", () => {
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    // 0.05 와 0.95 두 층뿐인 절벽. 사이의 밴드는 셀이 없어 통째로 버려진다.
+    const cliff = depthFieldOf(side, (x) => (x < side / 2 ? 0.05 : 0.95));
+
+    const built = buildStudioLift3dGeometry(mask, cliff, {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 3,
+      layerBands: 12,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.value.layerCount).toBe(2);
+    expect(built.warnings.map((entry) => entry.code)).not.toContain("layer-depth-gap");
   });
 });

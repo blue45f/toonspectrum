@@ -89,6 +89,25 @@ export function verticalGradientImage(size: number): StudioLift3dSourceImage {
   return { width: size, height: size, pixels };
 }
 
+/**
+ * 큰 명암 경사 위에 **고운 잔결**이 얹힌 불투명 배경. 숲·수풀처럼 흔한 배경 원화다.
+ *
+ * 경사가 모든 깊이 밴드를 채우고 잔결이 한 칸에서 여러 밴드를 건너뛰게 하므로, 층수를 원화의
+ * 깊이 잔결보다 잘게 잡았을 때 카드 사이에 틈이 생기는 조건을 그대로 재현한다.
+ */
+export function texturedBackgroundImage(size: number): StudioLift3dSourceImage {
+  const pixels = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const shade = 0.5 + 0.3 * (y / Math.max(1, size - 1))
+        + 0.18 * Math.sin(x / 4) * Math.cos(y / 5);
+      const level = Math.max(0, Math.min(255, Math.round(shade * 255)));
+      writePixel(pixels, (y * size + x) * 4, { r: level, g: level, b: level, a: 255 });
+    }
+  }
+  return { width: size, height: size, pixels };
+}
+
 function pngChunk(type: string, data: Uint8Array): Uint8Array {
   const typeBytes = new TextEncoder().encode(type);
   const body = new Uint8Array(typeBytes.length + data.length);

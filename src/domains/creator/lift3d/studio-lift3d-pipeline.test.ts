@@ -16,10 +16,45 @@ import {
   encodeTestPng,
   flatImage,
   opaqueSquareImage,
+  texturedBackgroundImage,
   verticalGradientImage,
 } from "./studio-lift3d.test-fixture";
 
 describe("Studio Lift 3D 파이프라인", () => {
+  it("잔결이 고운 원화에 층을 잘게 잡으면 카드 사이 틈을 경고한다", () => {
+    // 실측(해상도 128): 8층까지 0.05% 이하이다가 12층 7.68%, 16층 19.41%, 24층 37.10% 로 튄다.
+    // 층수가 원화의 깊이 잔결보다 잘게 잡힌 탓이고, 사용자가 층수로 고칠 수 있는 자리다.
+    // 프리셋 기본 해상도(224)는 이 원화에서 6층부터 예산 초과로 실패하므로 함께 낮춰 잡는다.
+    const image = texturedBackgroundImage(256);
+    const resolution = 128;
+
+    const dense = liftStudioImageTo3d(image, {
+      subject: "background",
+      resolution,
+      layerBands: STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+    });
+    expect(dense.ok).toBe(true);
+    if (!dense.ok) return;
+    expect(dense.warnings.map((warning) => warning.code)).toContain("layer-depth-gap");
+
+    // 같은 원화라도 기본 층수에서는 틈이 없다. 경고가 원화가 아니라 **층수**를 짚어야 한다.
+    const sparse = liftStudioImageTo3d(image, { subject: "background", resolution, layerBands: 6 });
+    expect(sparse.ok).toBe(true);
+    if (!sparse.ok) return;
+    expect(sparse.warnings.map((warning) => warning.code)).not.toContain("layer-depth-gap");
+  });
+
+  it("매끄러운 배경은 층을 끝까지 올려도 틈을 경고하지 않는다", () => {
+    const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+      subject: "background",
+      layerBands: STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.warnings.map((warning) => warning.code)).not.toContain("layer-depth-gap");
+  });
+
   it("모든 피사체 종류에 프리셋이 있다", () => {
     for (const subject of STUDIO_LIFT3D_SUBJECTS) {
       expect(STUDIO_LIFT3D_PRESETS[subject].label.length).toBeGreaterThan(0);

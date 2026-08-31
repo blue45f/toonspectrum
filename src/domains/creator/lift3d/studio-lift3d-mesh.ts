@@ -456,6 +456,92 @@ export function partitionStudioLift3dBandFaces(
   return out;
 }
 
+/**
+ * 옆으로 맞닿았는데 z 에서 **두 층 이상** 떨어진 카드 경계를 센다.
+ *
+ * 카드는 이웃 카드와의 중점까지 뻗으므로 **순번이 이웃한** 카드끼리는 z 에서 맞닿는다. 그런데
+ * 맞닿음은 순번으로 성립하고 갈라짐은 **위치**로 생긴다 — 옆으로 맞닿은 두 사각형이 0번과 5번
+ * 카드에 속하면, 그 경계에서 1~4번 카드가 차지하는 z 구간은 아무도 채우지 않는다. 정면에서는
+ * 멀쩡하다가 카메라를 돌리는 순간 그 자리가 틈으로 벌어진다.
+ *
+ * 빈 밴드가 이미 버려진 뒤의 **순번**으로 세야 한다. 밴드 번호로 세면 절벽처럼 중간 밴드가
+ * 통째로 빈 원화가 전부 걸리는데, 그런 원화는 카드 두 장이 순번상 이웃이라 실제로는 맞닿는다.
+ *
+ * 카드는 방출 순서(= z 순서)대로, **면을 내지 못한 밴드는 빼고** 와야 한다. 배열 순서가 곧
+ * 순번이다. `partitionStudioLift3dBandFaces` 가 돌려준 존재 배열을 그대로 받는다.
+ */
+export function countStudioLift3dCardDepthGaps(
+  cards: readonly Uint8Array[],
+  width: number,
+  height: number,
+): { readonly pairs: number; readonly gaps: number; readonly maxGap: number } {
+  // 카드가 두 장 이하면 순번 차이가 2 가 될 수 없어 `gaps` 는 어차피 0 이지만, 그때도 `pairs`
+  // 는 실제로 세어 돌려준다 — 비율을 판정하는 쪽이 "경계가 없다" 와 "경계는 있는데 틈이 없다"
+  // 를 구별할 수 있어야 한다.
+  if (width < 1 || height < 1) return { pairs: 0, gaps: 0, maxGap: 0 };
+  const owner = new Int32Array(width * height).fill(-1);
+  for (let index = 0; index < cards.length; index += 1) {
+    const present = cards[index]!;
+    for (let face = 0; face < present.length; face += 1) {
+      if (present[face] === 1) owner[face] = index;
+    }
+  }
+  let pairs = 0;
+  let gaps = 0;
+  let maxGap = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const here = owner[y * width + x]!;
+      if (here < 0) continue;
+      // 오른쪽·아래만 본다. 네 방향을 다 보면 같은 경계를 두 번 센다.
+      if (x + 1 < width) {
+        const right = owner[y * width + x + 1]!;
+        if (right >= 0) {
+          pairs += 1;
+          const distance = Math.abs(here - right);
+          if (distance >= 2) {
+            gaps += 1;
+            if (distance > maxGap) maxGap = distance;
+          }
+        }
+      }
+      if (y + 1 < height) {
+        const below = owner[(y + 1) * width + x]!;
+        if (below >= 0) {
+          pairs += 1;
+          const distance = Math.abs(here - below);
+          if (distance >= 2) {
+            gaps += 1;
+            if (distance > maxGap) maxGap = distance;
+          }
+        }
+      }
+    }
+  }
+  return { pairs, gaps, maxGap };
+}
+
+/**
+ * 틈을 경고로 올릴 최소 비율.
+ *
+ * **실제로 예산 안에 들어오는 설정**에서 잰 값이다. 배경 프리셋의 기본 해상도 224 는 잔결이
+ * 고운 원화에서 6층부터 예산 초과로 아예 실패하므로, 그 구간 수치로 임계를 잡으면 만들어질
+ * 수 없는 설정에 맞춘 값이 된다.
+ *
+ * | 잔결 있는 숲 | 4층 | 6층 | 8층 | 12층 | 16층 | 24층 |
+ * | --- | --- | --- | --- | --- | --- | --- |
+ * | 해상도 64 | 0% | 1.24% | 7.35% | 25.04% | 36.89% | 48.60% |
+ * | 해상도 96 | 0% | 0.09% | 2.30% | 14.87% | 28.32% | 44.10% |
+ * | 해상도 128 | 0% | 0% | 0.05% | 7.68% | 19.41% | 37.10% |
+ * | 해상도 160 | 0% | 0% | 0% | 2.09% | 11.31% | 29.34% |
+ *
+ * 매끄러운 배경은 어느 칸에서도 0% 다. 즉 이 값은 원화의 성질이 아니라 **층수·해상도가 원화의
+ * 깊이 잔결과 맞는지**를 잰다. 0.1% 아래는 경계 몇 줄이라 눈에 띄지 않고, 몇 %대부터 카메라를
+ * 돌릴 때 실제로 갈라져 보인다. 1% 는 그 사이이고, 두 손잡이 어느 쪽으로 움직여도 비율이
+ * 단조롭게 내려가므로 경고가 짚는 방향이 언제나 맞다.
+ */
+const DEPTH_GAP_WARNING_RATIO = 0.01;
+
 interface PlannedShell {
   readonly grid: FaceGrid;
   readonly depthAt: ShellDepthAt;
@@ -694,6 +780,25 @@ export function buildStudioLift3dGeometry(
 
   for (const shell of shells) {
     quadCount += emitStudioLift3dShell(accumulator, context, shell.grid, shell.depthAt);
+  }
+
+  // 틈은 **살아남은 카드**끼리의 순번으로만 판정할 수 있으므로 여기서 센다. 격자 크기는 셀
+  // 크기에서 다시 빼지 말고 격자 자신에게서 읽는다 — 어긋나면 조용히 엉뚱한 칸을 본다.
+  const firstCard = options.mode === "parallax" ? live[0]?.grid : undefined;
+  if (firstCard) {
+    const { pairs, gaps, maxGap } = countStudioLift3dCardDepthGaps(
+      live.map((entry) => entry.grid.present),
+      firstCard.width,
+      firstCard.height,
+    );
+    if (pairs > 0 && gaps / pairs >= DEPTH_GAP_WARNING_RATIO) {
+      warnings.push(studioLift3dWarning(
+        "layer-depth-gap",
+        `옆으로 맞닿은 카드가 ${gaps}곳에서 최대 ${maxGap}층 떨어져 있습니다. `
+        + "그 자리는 카메라를 돌리면 틈으로 벌어집니다 — 레이어 수를 낮추거나 해상도를 "
+        + "올리면 단차가 한 층으로 합쳐지고, 끊김 없는 깊이가 필요하면 relief 위상을 쓰세요",
+      ));
+    }
   }
 
   if (droppedPinches > 0) {
