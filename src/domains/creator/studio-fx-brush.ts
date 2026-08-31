@@ -140,11 +140,69 @@ function sanitizePoints(rawPoints: unknown, rawPressures: unknown): StrokePoint[
   return out;
 }
 
+/**
+ * The oil family opts into the prefix-stable ladder; every other brush keeps the original refit.
+ *
+ * Oil is where the refit hurt: its carrier rebuilds smoothed geometry, stations, bristle runs and
+ * lanes on top of the bed, so a bed that shared no prefix cost a full pipeline rebuild per pointer
+ * move. Glitter and pastel plan far cheaper particles from the same sampler and have no such
+ * pipeline, so they are left byte-identical rather than given a new dab distribution for nothing.
+ */
+const OIL_CAP_STATION_MODE = "prefix-stable-ladder-v2" as const;
+
+/**
+ * How much coarser one rung of the capped-spacing ladder is.
+ *
+ * The ladder exists so a capped bed keeps a stable prefix; the ratio decides what that costs in
+ * density. A rung is only ever climbed, and climbing one is the single moment the whole bed has to
+ * be replanned, so a coarse ratio buys fewer rebuilds and a fine one buys spacing closer to the
+ * budget. This value is measured, not assumed — see the note in
+ * `docs/perf/oil-family-stage-anatomy-2026-08-30.md`.
+ */
+const CAPPED_STATION_STEP_RATIO = 2 ** (1 / 4);
+
+/** Hard stop for the rung search; far beyond any stroke a pointer can produce. */
+const CAPPED_STATION_STEP_MAX_RUNGS = 512;
+
+/**
+ * The spacing a capped bed walks at: the natural spacing coarsened by whole ladder rungs until the
+ * station count fits the budget.
+ *
+ * Depends only on `step`, the rung index and the budget — never on where the arc happens to end —
+ * which is what keeps already-placed stations still while the stroke grows. The rung index rises
+ * monotonically with `totalLength`, so the spacing never oscillates back and forth across a
+ * boundary. Two rungs are reserved: one for the leading station, one for the tail station the walk
+ * appends at the stroke's end.
+ */
+function cappedStationStep(
+  step: number,
+  totalLength: number,
+  stationLimit: number,
+): number {
+  const budget = Math.max(1, stationLimit - 2);
+  let scaled = step;
+  for (let rung = 0; rung < CAPPED_STATION_STEP_MAX_RUNGS; rung += 1) {
+    if (Math.floor(totalLength / scaled) <= budget) return scaled;
+    scaled *= CAPPED_STATION_STEP_RATIO;
+  }
+  return scaled;
+}
+
 /** Arc-length resample stations along a polyline. */
 function sampleStations(
   points: readonly StrokePoint[],
   spacing: number,
-  maximumStations = Number.POSITIVE_INFINITY
+  maximumStations = Number.POSITIVE_INFINITY,
+  /**
+   * How the station budget is honoured once the natural spacing overruns it.
+   *
+   * `refit-v1` is the original: fit exactly `maximumStations` across the whole arc. Every station
+   * then depends on the arc's total length, so a growing stroke shares no prefix with its previous
+   * plan. `prefix-stable-ladder-v2` coarsens the spacing on a fixed ladder instead, which keeps
+   * placed stations still while the stroke grows. The ladder changes the dabs a capped stroke
+   * produces, so it is opt-in per brush family rather than a blanket change.
+   */
+  capMode: "refit-v1" | "prefix-stable-ladder-v2" = "refit-v1",
 ): StrokePoint[] {
   if (points.length === 0) return [];
   if (points.length === 1) return [points[0]!];
@@ -167,11 +225,19 @@ function sampleStations(
   const naturalStationCount =
     1 + naturalStepCount + (naturalTail > POINT_EPS ? 1 : 0);
 
-  // A hard dab/particle budget must not make a long stroke disappear halfway through. Once the
-  // natural spacing exceeds the caller's station budget, fit a bounded set across the complete
-  // arc length and preserve both source endpoints exactly. Ordinary strokes keep the historical
-  // prefix-stable spacing path below.
-  if (naturalStationCount > stationLimit) {
+  // A hard station budget must not make a long stroke disappear halfway through, and the way it
+  // used to be honoured cost more than it saved: fitting exactly `stationLimit` stations across
+  // the whole arc (`totalLength * index / (stationLimit - 1)`) moves EVERY station whenever the
+  // arc grows, so past the cap a growing stroke shared no prefix with its previous plan and every
+  // downstream stage — dab bed, smoothed geometry, bristle runs, the whole carrier — was rebuilt
+  // from scratch on every pointer move.
+  //
+  // The budget is honoured by coarsening the spacing instead, on a fixed ladder. Stations then sit
+  // at multiples of one step that does not depend on `totalLength`, so growing the arc appends
+  // stations without disturbing the ones already there, and the incremental planners keep their
+  // prefixes. The step only changes when the arc crosses a ladder rung, which is logarithmic in
+  // stroke length rather than once per move.
+  if (naturalStationCount > stationLimit && capMode === "refit-v1") {
     const stations: StrokePoint[] = [];
     let segmentIndex = 1;
     let segmentStartDistance = 0;
@@ -210,6 +276,10 @@ function sampleStations(
     return stations;
   }
 
+  const walkStep = naturalStationCount > stationLimit
+    ? cappedStationStep(step, totalLength, stationLimit)
+    : step;
+
   const stations: StrokePoint[] = [points[0]!];
   let carry = 0;
   for (let i = 1; i < points.length; i++) {
@@ -218,8 +288,8 @@ function sampleStations(
     const segLen = Math.hypot(b.x - a.x, b.y - a.y);
     if (segLen <= POINT_EPS) continue;
     let consumed = 0;
-    while (carry + (segLen - consumed) >= step) {
-      const need = step - carry;
+    while (carry + (segLen - consumed) >= walkStep) {
+      const need = walkStep - carry;
       const t = (consumed + need) / segLen;
       stations.push({
         x: a.x + (b.x - a.x) * t,
@@ -2235,7 +2305,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const points = sanitizePoints(input.points, input.pressures);
   if (points.length === 0) return [];
   const settings = resolveOilDabSettings(input);
-  const stations = sampleStations(points, settings.spacing, settings.maxDabs);
+  const stations = sampleStations(points, settings.spacing, settings.maxDabs, OIL_CAP_STATION_MODE);
   const bristleOffsets = bristleBedOffsets(settings.baseWidth, settings.seed);
   const dabs: FxOilDab[] = [];
   appendOilBrushDabs(dabs, stations, 0, settings, bristleOffsets);
@@ -2292,7 +2362,7 @@ export class FxOilDabPlanner {
       this.stations = [];
       this.dabs = [];
     }
-    const stations = sampleStations(points, settings.spacing, settings.maxDabs);
+    const stations = sampleStations(points, settings.spacing, settings.maxDabs, OIL_CAP_STATION_MODE);
     if (stations.length >= settings.maxDabs) {
       // The station budget is saturated, so `sampleStations` is refitting the lattice across the
       // whole arc and every station moves on every append: no prefix can survive. Drop the retained

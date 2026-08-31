@@ -340,6 +340,27 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBeGreaterThan(afterExpensive);
   });
 
+  it("does not defer behind a repaint that was cheap", () => {
+    // The budget is measured on every oil repaint now, not only on a saturated bed, because the
+    // dab count stopped being a usable stand-in for "expensive" once the capped spacing ladder
+    // landed beds inside a band below the cap. That only works if a cheap repaint buys a
+    // correspondingly tiny cooldown — otherwise always-on rationing would stall ordinary strokes.
+    const { renderer, active, clock, wakes } = attachedRenderer();
+    expect(renderer.begin(longOilStroke("oil-cheap-repaint", 3000)).status).toBe("started");
+
+    clock.nowMs = 1_000;
+    clock.stepMs = 1;
+    renderer.appendFrom(longOilStroke("oil-cheap-repaint", 3040));
+    clock.stepMs = 0;
+
+    // A 1 ms repaint owes 2 ms; three later, the next append paints instead of deferring.
+    clock.nowMs = 1_004;
+    const before = active.stats().strokeCalls;
+    expect(renderer.appendFrom(longOilStroke("oil-cheap-repaint", 3080)).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
+    expect(wakes).toHaveLength(0);
+  });
+
   it("wakes itself to paint a deferred tail when the cursor stops moving", () => {
     // Deferring drops the only event carrying the new endpoint. If the user then holds still,
     // nothing would ask again, and the preview would sit detached from a stationary cursor — the

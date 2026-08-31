@@ -100,13 +100,16 @@ describe("studio oil ribbon carrier — bristle physics program (brush--bristle-
     }
   });
 
-  it("plans a 2048-station physics stroke within 25ms of the legacy carrier", () => {
+  it("plans a 2000-station physics stroke within 25ms of the legacy carrier", () => {
+    // The budget is 2400 rather than 2048 because the capped spacing ladder lands the bed inside a
+    // band below its limit instead of exactly on it. Sizing up keeps the measured bed at least as
+    // large as the one this budget was calibrated against, rather than relaxing the assertion.
     const longDabs = planOilBrushDabs({
       points: [0, 0, 1200, 40, 2400, -30, 3600, 20],
       pressures: [0.5, 0.75, 0.6, 0.8],
       baseWidth: 24,
       seed: 7,
-      maxDabs: 2048,
+      maxDabs: 2400,
     });
     expect(longDabs.length).toBeGreaterThanOrEqual(2000);
     // Warm-up passes exclude first-call JIT from both measurements.
