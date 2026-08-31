@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { isStudioEditorMutationContinuationAllowed } from "./studio-editor-scope";
 import {
-  applyStudioMarketplaceDeepLink,
   beginStudioMarketplaceDeepLinkOperation,
   consumeStudioMarketplaceInstallLocation,
   consumeStudioMarketplaceInstallSearch,
@@ -14,6 +13,9 @@ import {
   releaseStudioMarketplaceDeepLinkLifecycleSoon,
   retainStudioMarketplaceDeepLinkLifecycle,
 } from "./studio-marketplace-deep-link";
+import {
+  applyStudioMarketplaceDeepLinkOperation as applyStudioMarketplaceDeepLink,
+} from "./studio-marketplace-deep-link-operation";
 
 import type { StudioMarketplaceInstallGuard } from "./studio-marketplace-deep-link";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
@@ -28,6 +30,10 @@ const studioChromeSource = readFileSync(
 );
 const deepLinkSource = readFileSync(
   new URL("./studio-marketplace-deep-link.ts", import.meta.url),
+  "utf8",
+);
+const deepLinkOperationSource = readFileSync(
+  new URL("./studio-marketplace-deep-link-operation.ts", import.meta.url),
   "utf8",
 );
 
@@ -175,8 +181,10 @@ describe("Studio marketplace deep link", () => {
     );
     expect(handler).toContain("setStudioMarketplaceCloudSyncRetry({ record, pack, issue })");
     expect(studioPageSource).toContain("const retryStudioMarketplaceCloudSync = async () =>");
-    expect(studioPageSource).toContain("inspectStudioCreatorPackInstallStateProduct(");
-    expect(studioPageSource).toContain('if (localState !== "installed")');
+    expect(studioPageSource).toContain("retryStudioMarketplaceCloudSyncOperation(");
+    expect(deepLinkOperationSource).toContain("inspectStudioCreatorPackInstallStateProduct(");
+    expect(deepLinkOperationSource).toContain('if (localState !== "installed")');
+    expect(deepLinkOperationSource).toContain("signal.throwIfAborted()");
     expect(studioChromeSource).toContain("계정 설치 확인 다시 시도");
     expect(studioChromeSource).toContain("studioMarketplaceCloudSyncRetryPending");
     expect(studioChromeSource).toContain('role="alert"');
@@ -598,9 +606,9 @@ describe("Studio marketplace deep link", () => {
       loadDependencies: async () => deps,
     });
     expect(currentHref).toBe("/studio/draft/editor?assetMarket=community");
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(deps.loadResource).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(deps.loadResource).toHaveBeenCalledOnce();
+    });
 
     releaseStudioMarketplaceDeepLinkLifecycleSoon(lifecycle, lifecycleGeneration);
     currentHref = "/market/resource/asset-1";

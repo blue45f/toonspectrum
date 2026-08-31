@@ -17550,32 +17550,12 @@ const puppetWarpArmed =
     setError(null);
     setStatusNotice("현재 기기의 정확한 설치와 계정 라이브러리를 다시 확인하고 있어요…");
     try {
-      const [
-        { inspectStudioCreatorPackInstallStateProduct },
-        { browserStudioCreatorPackStorage },
-        { synchronizeStudioCommunityMarketplaceInstalledPack },
-      ] = await Promise.all([
-        import("./studio-creator-pack-product-runtime"),
-        import("./studio-creator-pack-runtime"),
-        import("./studio-community-marketplace-cloud-sync"),
-      ]);
-      if (controller.signal.aborted) return;
-      const localState = await inspectStudioCreatorPackInstallStateProduct(
-        retry.pack,
-        {
-          storage: browserStudioCreatorPackStorage(),
-          signal: controller.signal,
-          isInstallCurrent: () => !controller.signal.aborted,
-        },
-      );
-      if (controller.signal.aborted) return;
-      if (localState !== "installed") {
-        throw new Error("현재 기기에서 이 정확한 패키지 설치를 더 이상 확인할 수 없습니다.");
-      }
-      const synchronized = await synchronizeStudioCommunityMarketplaceInstalledPack(
+      const { retryStudioMarketplaceCloudSyncOperation } =
+        await import("./studio-marketplace-deep-link-operation");
+      const synchronized = await retryStudioMarketplaceCloudSyncOperation(
         retry.record,
         retry.pack,
-        { signal: controller.signal },
+        controller.signal,
       );
       if (controller.signal.aborted) return;
       setStudioMarketplaceCloudSyncRetry(null);
