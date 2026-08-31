@@ -391,3 +391,83 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
     expect(PIXELS * 2 + PIXELS).not.toBe(PIXELS * 2);
   });
 });
+
+describe("region-limited shading", () => {
+  /**
+   * The whole point of `region` is that it is not an approximation. A retained caller re-shades a
+   * rectangle and keeps the rest of the previous buffer, so anything the region path writes has to
+   * be the number a full pass writes at the same index — otherwise the tile drifts one dirty
+   * rectangle at a time and nothing downstream can tell.
+   */
+  it("writes exactly what a full pass writes, and touches nothing else", () => {
+    for (const quality of QUALITIES) {
+      const width = 23;
+      const height = 17;
+      const heights = ridgeTile(width, height, 7.5);
+      const full = computeStudioImpastoReliefShading(heights, { width, height, quality });
+
+      // A sentinel outside the region: a full pass would overwrite it, the region path must not.
+      const partial = new Float32Array(width * height).fill(-7);
+      const region = { x: 4, y: 3, width: 9, height: 6 };
+      computeStudioImpastoReliefShading(heights, {
+        width,
+        height,
+        quality,
+        into: partial,
+        region,
+      });
+
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const at = y * width + x;
+          const inside = x >= region.x && x < region.x + region.width
+            && y >= region.y && y < region.y + region.height;
+          if (inside) {
+            expect(partial[at], `${quality} inside ${x},${y}`).toBe(full[at]);
+          } else {
+            expect(partial[at], `${quality} outside ${x},${y}`).toBe(-7);
+          }
+        }
+      }
+    }
+  });
+
+  it("clamps a region that hangs off the tile instead of throwing", () => {
+    const width = 9;
+    const height = 7;
+    const heights = ridgeTile(width, height, 3);
+    const full = computeStudioImpastoReliefShading(heights, { width, height });
+    const partial = new Float32Array(width * height).fill(-1);
+    // Deriving a region from a dirty rectangle legitimately produces one that overhangs.
+    computeStudioImpastoReliefShading(heights, {
+      width,
+      height,
+      into: partial,
+      region: { x: -5, y: -4, width: width + 20, height: height + 20 },
+    });
+    expect(Array.from(partial)).toEqual(Array.from(full));
+  });
+
+  it("leaves the buffer alone when the region falls entirely outside the tile", () => {
+    const width = 6;
+    const height = 6;
+    const heights = ridgeTile(width, height, 2);
+    const partial = new Float32Array(width * height).fill(0.5);
+    computeStudioImpastoReliefShading(heights, {
+      width,
+      height,
+      into: partial,
+      region: { x: 40, y: 40, width: 3, height: 3 },
+    });
+    expect(Array.from(partial)).toEqual(Array.from(new Float32Array(width * height).fill(0.5)));
+  });
+
+  it("refuses a region without a buffer to preserve", () => {
+    const heights = ridgeTile(5, 5, 2);
+    expect(() => computeStudioImpastoReliefShading(heights, {
+      width: 5,
+      height: 5,
+      region: { x: 0, y: 0, width: 2, height: 2 },
+    })).toThrow(StudioImpastoReliefShadingError);
+  });
+});

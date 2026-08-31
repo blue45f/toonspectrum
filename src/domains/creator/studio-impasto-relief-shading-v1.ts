@@ -89,6 +89,26 @@ export interface StudioImpastoReliefShadingOptions {
   readonly heightScale?: number;
   /** Optional output buffer (length must be width×height). */
   readonly into?: Float32Array;
+  /**
+   * Recompute only this rectangle of the tile, leaving the rest of `into` untouched.
+   *
+   * Every output cell here is a pure function of the height tile through a fixed stencil — a
+   * 3×3 Sobel window, or two taps along the light in `emboss-2tap` — and the only other inputs
+   * are option constants. There is no normalization over the data, so restricting the write
+   * region does not change a single value it does write: it is the same arithmetic on the same
+   * neighbourhood. That is what lets a caller holding a retained tile re-shade just the cells
+   * whose neighbourhood actually moved.
+   *
+   * The caller owns the dilation. A cell's value depends on its NEIGHBOURS, so a region covering
+   * exactly the changed height cells is one ring too small; widen it by the stencil radius (1)
+   * before passing it in. Requires `into` — there is nothing to preserve without it.
+   */
+  readonly region?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 
 interface ResolvedReliefOptions {
@@ -316,6 +336,22 @@ export function computeStudioImpastoReliefShading(
       `options.into length ${out.length} does not match ${width}x${height}`,
     );
   }
+  if (options.region && !options.into) {
+    throw new StudioImpastoReliefShadingError(
+      "options.region requires options.into: there is nothing to preserve outside the region",
+    );
+  }
+  // Clamped rather than validated: a caller deriving a region from a dirty rectangle legitimately
+  // produces one that hangs off the tile edge, and clamping is what it would have to write itself.
+  const fromX = options.region ? Math.max(0, Math.floor(options.region.x)) : 0;
+  const fromY = options.region ? Math.max(0, Math.floor(options.region.y)) : 0;
+  const toX = options.region
+    ? Math.min(width, Math.ceil(options.region.x + options.region.width))
+    : width;
+  const toY = options.region
+    ? Math.min(height, Math.ceil(options.region.y + options.region.height))
+    : height;
+  if (fromX >= toX || fromY >= toY) return out;
   const scale =
     (heights instanceof Uint8Array || heights instanceof Uint8ClampedArray
       ? 1 / 255
@@ -332,7 +368,7 @@ export function computeStudioImpastoReliefShading(
     // light, matching the GGX path's ridge orientation at a fraction of the cost.
     const planar = Math.hypot(resolved.lightX, resolved.lightY);
     if (planar <= 1e-9) {
-      out.fill(1);
+      for (let y = fromY; y < toY; y += 1) out.fill(1, y * width + fromX, y * width + toX);
       return out;
     }
     const offsetX = Math.round(resolved.lightX / planar) | 0;
@@ -340,8 +376,8 @@ export function computeStudioImpastoReliefShading(
     // 8/2 matches the Sobel row weight sum over the 2px central difference, so
     // both quality modes respond to normalScale with comparable slopes.
     const gain = ((8 / 2) / resolved.normalScale) * planar;
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
+    for (let y = fromY; y < toY; y += 1) {
+      for (let x = fromX; x < toX; x += 1) {
         const toward = heightAt(heights, width, height, x - offsetX, y - offsetY, scale);
         const away = heightAt(heights, width, height, x + offsetX, y + offsetY, scale);
         const value = 1 + gain * (toward - away);
@@ -352,8 +388,8 @@ export function computeStudioImpastoReliefShading(
     return out;
   }
 
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
+  for (let y = fromY; y < toY; y += 1) {
+    for (let x = fromX; x < toX; x += 1) {
       const topLeft = heightAt(heights, width, height, x - 1, y - 1, scale);
       const top = heightAt(heights, width, height, x, y - 1, scale);
       const topRight = heightAt(heights, width, height, x + 1, y - 1, scale);
