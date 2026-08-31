@@ -2668,7 +2668,9 @@ function planImpastoReliefOverlayLanes(
 
   // Quantise into a bounded set of (kind, tone) lanes: one paint pass per lane keeps
   // self-crossings honest exactly like the load bands above.
-  const buckets = new Map<string, {
+  // Keyed by `order`, which is `(kind, bucket)` flattened — the string key this used to build was
+  // one concatenation and one hash per run, ~26.5k of each per move, for a key space of six.
+  const buckets = new Map<number, {
     kind: StudioOilRibbonImpastoReliefKind;
     order: number;
     runs: PlannedImpastoReliefRun[];
@@ -2679,13 +2681,18 @@ function planImpastoReliefOverlayLanes(
   // flank flicker between two tone buckets from one three-station run to the next, which put the
   // two halves of a single glint in two different lanes: the weld could not rejoin them and the
   // lane rendered as a mosaic of light and dark tiles instead of a raked ridge.
-  const held = new Map<number, { kind: StudioOilRibbonImpastoReliefKind; bucket: number }>();
+  //
+  // The history is per track and each track is walked once, end to end, so it is two locals rather
+  // than the map keyed by track index it used to be — that map allocated a state object for every
+  // run to hold a pair of numbers only the next run in the same track could ever read.
   for (const track of tracks) {
+    let heldKind: StudioOilRibbonImpastoReliefKind | null = null;
+    let heldBucket = 0;
     for (const run of track) {
       if (run === undefined) continue;
       const magnitude = Math.abs(run.strength);
       if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) {
-        held.delete(run.trackIndex);
+        heldKind = null;
         continue;
       }
       const kind: StudioOilRibbonImpastoReliefKind = run.strength > 0 ? "highlight" : "shadow";
@@ -2703,25 +2710,27 @@ function planImpastoReliefOverlayLanes(
           : IMPASTO_RELIEF_OPACITY_BUCKETS - 1;
       // A flank that flips lit/shaded is a genuinely different surface, so the trigger only holds
       // within one kind; crossing zero always re-enters on the raw bucket.
-      const previous = held.get(run.trackIndex);
       const ratio = opacity / maxOpacity;
-      const bucket = !previous || previous.kind !== kind
+      const bucket = heldKind !== kind
         ? raw
-        : raw > previous.bucket
-          ? (ratio >= bucketEdgeAbove(previous.bucket) + IMPASTO_RELIEF_BUCKET_HYSTERESIS
-              ? raw : previous.bucket)
-          : raw < previous.bucket
-            ? (ratio <= bucketEdgeBelow(previous.bucket) - IMPASTO_RELIEF_BUCKET_HYSTERESIS
-                ? raw : previous.bucket)
+        : raw > heldBucket
+          ? (ratio >= bucketEdgeAbove(heldBucket) + IMPASTO_RELIEF_BUCKET_HYSTERESIS
+              ? raw : heldBucket)
+          : raw < heldBucket
+            ? (ratio <= bucketEdgeBelow(heldBucket) - IMPASTO_RELIEF_BUCKET_HYSTERESIS
+                ? raw : heldBucket)
             : raw;
-      held.set(run.trackIndex, { kind, bucket });
+      heldKind = kind;
+      heldBucket = bucket;
       // Shadows first, glints last: paint order is the plan order on both surfaces.
       const order = (kind === "shadow" ? 0 : IMPASTO_RELIEF_OPACITY_BUCKETS) + bucket;
-      const key = `${kind}:${bucket}`;
-      const entry = buckets.get(key) ?? { kind, order, runs: [], opacities: [] };
+      let entry = buckets.get(order);
+      if (entry === undefined) {
+        entry = { kind, order, runs: [], opacities: [] };
+        buckets.set(order, entry);
+      }
       entry.runs.push(run);
       entry.opacities.push(opacity);
-      buckets.set(key, entry);
     }
   }
 
