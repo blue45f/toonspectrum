@@ -14,6 +14,9 @@ import { studioBackgroundGradientColorStops } from "../studio-background-gradien
 import { vignetteCss } from "../studio-page-grade";
 import { createStudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import {
+  STUDIO_KONVA_DOCUMENT_SHADOW_NAME,
+} from "../studio-single-object-drag-layer";
+import {
   StudioRasterCrdtSurface,
   StudioRemoteCursorOverlay,
   StudioTextEditOverlay,
@@ -285,9 +288,6 @@ export function StudioCanvasViewportStageHost({
     webtoonTheme: viewport.webtoonTheme,
     wetMixArmed: viewport.wetMixArmed,
   };
-  const documentLayer = (
-    <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
-  );
   const toolLayerProps: StudioCanvasViewportToolLayersProps = {
     activeSurfaceReviewLocked: viewport.activeSurfaceReviewLocked,
     advancedRulers: viewport.advancedRulers,
@@ -649,17 +649,12 @@ export function StudioCanvasViewportStageHost({
                 showWebtoonGuides={showWebtoonGuides}
                 webtoonGuides={webtoonGuides}
               />
-              {frameGraphOwnsDocumentPixels ? (
-                <Group
-                  name="studio-konva-document-shadow"
-                  opacity={0}
-                  listening={false}
-                >
-                  {documentLayer}
-                </Group>
-              ) : (
-                documentLayer
-              )}
+              <Group
+                name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}
+                opacity={frameGraphOwnsDocumentPixels ? 0 : 1}
+              >
+                <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+              </Group>
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,

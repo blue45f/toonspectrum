@@ -102,9 +102,9 @@ describe("paper grain lives on its own DOM canvas", () => {
   });
 
   it("keeps the paper rect out of the layer the Vello frame graph can take over", () => {
-    // Vello only inserts the transparent document Group after an exact frame receipt. Otherwise
-    // authored wrappers remain direct main-Layer children for drag and live-transform isolation.
-    // The paper remains in the background layer so a GPU handoff cannot blank the sheet texture.
+    // The stable document Group keeps React/Konva node identity intact and changes only opacity
+    // after an exact frame receipt. The paper remains in the background Layer so a GPU handoff
+    // cannot blank the sheet texture.
     const source = readFileSync(
       resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"),
       "utf8",
@@ -112,16 +112,28 @@ describe("paper grain lives on its own DOM canvas", () => {
     const paperAt = source.indexOf('name="paper-grain"');
     const mainLayerAt = source.indexOf("<Layer ref={mainLayerRef}>");
     const backgroundLayerAt = source.indexOf('name="bg"');
+    const shadowAt = source.indexOf(
+      "name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}",
+    );
+    const documentAt = source.indexOf(
+      "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
+      shadowAt,
+    );
+    const shadowOpening = source.slice(shadowAt, documentAt);
     expect(paperAt).toBeGreaterThan(0);
     expect(mainLayerAt).toBeGreaterThan(0);
     expect(backgroundLayerAt).toBeGreaterThan(0);
     expect(paperAt).toBeGreaterThan(backgroundLayerAt);
     expect(paperAt).toBeLessThan(mainLayerAt);
-    expect(source).toContain('name="studio-konva-document-shadow"');
-    expect(source).toContain("{frameGraphOwnsDocumentPixels ? (");
-    expect(source).toContain("opacity={0}");
-    expect(source).toContain(") : (\n                documentLayer\n              )}");
-    expect(source).not.toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(source).toContain("name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}");
+    expect(source).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(source).toContain(
+      "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
+    );
+    expect(shadowAt).toBeGreaterThan(mainLayerAt);
+    expect(documentAt).toBeGreaterThan(shadowAt);
+    expect(shadowOpening).not.toContain("listening={false}");
+    expect(source).not.toContain("const documentLayer = (");
   });
 
   it("never renders through a WebGPU context — the 2d context is the only one it asks for", () => {

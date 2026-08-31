@@ -61,16 +61,28 @@ describe("VelloHub /studio product wiring", () => {
   });
 
   it("gives FrameGraph document pixels while Konva keeps pointer routing", () => {
+    const shadowAt = viewportSource.indexOf(
+      "name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}",
+    );
+    const documentAt = viewportSource.indexOf(
+      "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
+      shadowAt,
+    );
+    const shadowOpening = viewportSource.slice(shadowAt, documentAt);
+
     expect(canvasTargetSource).toContain('canvas.style.pointerEvents = "none"');
     expect(viewportSource).toContain("data-studio-frame-graph-document");
     expect(viewportSource).toContain("frameGraphOwnsDocumentPixels");
     expect(viewportSource).toContain("velloEligibleDocumentIds");
-    expect(viewportSource).toContain('name="studio-konva-document-shadow"');
-    expect(viewportSource).toContain("const documentLayer = (");
-    expect(viewportSource).toContain("{frameGraphOwnsDocumentPixels ? (");
-    expect(viewportSource).toContain("opacity={0}");
-    expect(viewportSource).toContain(") : (\n                documentLayer\n              )}");
-    expect(viewportSource).not.toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(viewportSource).toContain("name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}");
+    expect(viewportSource).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(viewportSource).toContain(
+      "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
+    );
+    expect(shadowAt).toBeGreaterThan(-1);
+    expect(documentAt).toBeGreaterThan(shadowAt);
+    expect(shadowOpening).not.toContain("listening={false}");
+    expect(viewportSource).not.toContain("const documentLayer = (");
     expect(viewportSource).toContain(
       "velloHubAuthority.sceneRevision === velloSceneRevision",
     );

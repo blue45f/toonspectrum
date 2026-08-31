@@ -338,13 +338,16 @@ export function requestStudioGpuBristleOverlay(
   if (!activeWorker) return null;
 
   // Prefix identity by exact `Object.is`, the same technique `FxOilDabPlanner`
-  // (`../studio-fx-brush.ts:1910-1944`) uses one stage earlier. Anything else — the documented
-  // 4096-dab arc refit, an undo, a pressure-array resample — is an explicit reset, never an
-  // implicit "append the new stations", which would silently desync the tuft.
+  // (`../studio-fx-brush.ts:1910-1944`) uses one stage earlier. The surface is part of that identity:
+  // `beginStroke` fixes the runtime texture and document-space viewport, so a growing draft bbox
+  // must reset and replay into its new surface instead of appending stations to the old texture.
+  // Anything else — the documented 4096-dab arc refit, an undo, or a pressure-array resample — is
+  // also an explicit reset, never an implicit append that would silently desync the tuft.
   const consumed = existing?.consumedStationCount ?? 0;
   const anchor = consumed > 0 ? request.stations[consumed - 1] : undefined;
   const continues =
     existing !== undefined
+    && surfaceSignature(existing.surface) === surfaceSignature(request.surface)
     && consumed > 0
     && request.stations.length >= consumed
     && anchor !== undefined

@@ -177,6 +177,39 @@ describe("requestStudioGpuBristleOverlay cache and prefix contract", () => {
     expect(worker.sent[1]!.consumedStationCount).toBe(20);
   });
 
+  it("resets and replays the full station history when the render surface changes", () => {
+    setStudioGpuBristleSupportForTests(true);
+    const worker = installFakeWorker();
+    const base = stations(16);
+    requestStudioGpuBristleOverlay(request({ stations: base }), () => {});
+    deliverStudioGpuBristleResponseForTests({
+      kind: "studio-gpu-bristle-ok",
+      jobId: worker.sent[0]!.jobId,
+      strokeKey: "el-1",
+      bitmap: fakeBitmap() as unknown as ImageBitmap,
+      consumedStationCount: 16,
+    });
+
+    const grown = [...base, ...stations(4, 16)];
+    const grownSurface = {
+      widthPx: 192,
+      heightPx: 120,
+      originX: -12,
+      originY: 2,
+      pixelsPerUnit: 2,
+    };
+    requestStudioGpuBristleOverlay(
+      request({ stations: grown, surface: grownSurface }),
+      () => {},
+    );
+
+    expect(worker.sent).toHaveLength(2);
+    expect(worker.sent[1]!.reset).toBe(true);
+    expect(worker.sent[1]!.stations).toEqual(grown);
+    expect(worker.sent[1]!.consumedStationCount).toBe(20);
+    expect(worker.sent[1]!.surface).toEqual(grownSurface);
+  });
+
   it("resets and replays from station 0 when an earlier station moved", () => {
     setStudioGpuBristleSupportForTests(true);
     const worker = installFakeWorker();

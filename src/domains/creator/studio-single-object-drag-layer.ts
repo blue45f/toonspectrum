@@ -4,6 +4,10 @@ import type Konva from "konva";
 export const STUDIO_LIVE_TRANSFORM_Z_ORDER_EXEMPT_ATTR =
   "studioLiveTransformZOrderExempt";
 
+/** Stable, hit-testable owner for Konva's authored shadow while FrameGraph paints document pixels. */
+export const STUDIO_KONVA_DOCUMENT_SHADOW_NAME =
+  "studio-konva-document-shadow";
+
 type LiftedNodeRestorePhase =
   | "complete"
   | "owned-in-drag-layer"
@@ -325,16 +329,18 @@ export interface BeginStudioSingleObjectDragLayerOptions {
   readonly layerSensitiveComposite?: boolean;
 }
 
-function directChildOfLayer(
+function studioLiftHomeParent(
   node: Konva.Node,
   layer: Konva.Layer,
-): Konva.Node | null {
-  let current: Konva.Node | null = node;
-  while (current) {
-    const parent = current.getParent();
-    if (parent === layer) return current;
-    if (!parent) return null;
-    current = parent;
+): Konva.Container | null {
+  const parent = node.getParent();
+  if (parent === layer) return layer;
+  if (
+    parent?.getParent() === layer
+    && parent.getClassName() === "Group"
+    && parent.name() === STUDIO_KONVA_DOCUMENT_SHADOW_NAME
+  ) {
+    return parent;
   }
   return null;
 }
@@ -407,7 +413,10 @@ function laterSiblingDependsOnStackingBelow(node: Konva.Node): boolean {
  */
 function subtreeHasVisiblePaint(node: Konva.Node): boolean {
   try {
-    if (!node.isVisible() || node.getAbsoluteOpacity() <= 0) return false;
+    // Siblings share the same ancestor visibility/opacity. Inspect local authored state so the
+    // reserved document shadow's authority opacity cannot make real Vello-painted siblings look
+    // empty to the z-order gate.
+    if (!node.visible() || node.opacity() <= 0) return false;
     // A cached container can replay pixels even when its current children are hidden or empty.
     if (node.isCached()) return true;
     const children = (node as Konva.Container).getChildren?.();
@@ -500,10 +509,10 @@ export function beginStudioSingleObjectDragLayer(
     return null;
   }
 
-  const movingRoot = directChildOfLayer(target, mainLayer);
+  const targetHomeParent = studioLiftHomeParent(target, mainLayer);
+  const movingRoot = target;
   if (
-    !movingRoot
-    || movingRoot !== target
+    !targetHomeParent
     || movingRoot.isCached()
     || authoredCompositeOperationIsLayerSensitive(target, movingRoot)
   ) {
@@ -524,7 +533,7 @@ export function beginStudioSingleObjectDragLayer(
   // Capture every index before moving the first node; removals compact the remaining indices.
   const lifted: LiftedNodeRecord[] = roots.map((node) => ({
     node,
-    parent: mainLayer,
+    parent: node === movingRoot ? targetHomeParent : mainLayer,
     zIndex: node.zIndex(),
     phase: "complete",
     restoreAbsolutePosition: null,
@@ -629,6 +638,9 @@ export function beginStudioSingleDrawTransformSourceLayer(
 ): StudioSingleObjectDragLayerSession | null {
   const { elementId, wrapper, transformer, dragLayer } = options;
   const mainLayer = wrapper.getLayer();
+  const wrapperHomeParent = mainLayer
+    ? studioLiftHomeParent(wrapper, mainLayer)
+    : null;
   if (
     !mainLayer
     || !dragLayer
@@ -636,7 +648,7 @@ export function beginStudioSingleDrawTransformSourceLayer(
     || mainLayer.getStage() === null
     || mainLayer.getStage() !== dragLayer.getStage()
     || wrapper.getAttr("studioElementId") !== elementId
-    || wrapper.getParent() !== mainLayer
+    || !wrapperHomeParent
     || wrapper.isCached()
     || subtreeCompositeIsLayerSensitive(wrapper)
     || laterSiblingDependsOnStackingBelow(wrapper)
@@ -653,7 +665,7 @@ export function beginStudioSingleDrawTransformSourceLayer(
 
   const lifted: LiftedNodeRecord[] = [{
     node: wrapper,
-    parent: mainLayer,
+    parent: wrapperHomeParent,
     zIndex: wrapper.zIndex(),
     phase: "complete",
     restoreAbsolutePosition: null,
@@ -682,9 +694,10 @@ export function beginStudioSingleDrawTransformSourceLayer(
  * moved here. On a stroke-heavy page this turns "repaint the whole document per anchor frame"
  * (measured ~80-157ms per drawScene) into repainting one stroke plus handles.
  *
- * Same fail-closed exclusions as the drag lift: a clipped wrapper (not a direct Layer child), a
- * cached root, or a layer-sensitive composite refuses the lift and the transform stays
- * release-only. Composite is checked over the whole SUBTREE, not just the wrapper: the
+ * Same fail-closed exclusions as the drag lift: a clipped wrapper (neither a direct Layer child
+ * nor a direct child of the reserved document-shadow owner), a cached root, or a layer-sensitive
+ * composite refuses the lift and the transform stays release-only. Composite is checked over the
+ * whole SUBTREE, not just the wrapper: the
  * eraser's destination-out rides the wrapper, but a highlighter's multiply passes are emitted by
  * StudioDrawNode as descendant shapes, and lifting those onto an empty Layer would blend them
  * against transparency instead of the artwork — a visible appearance change for the gesture.
@@ -694,6 +707,9 @@ export function beginStudioSingleDrawTransformLayer(
 ): StudioSingleObjectDragLayerSession | null {
   const { elementId, wrapper, proxy, transformer, dragLayer } = options;
   const mainLayer = wrapper.getLayer();
+  const wrapperHomeParent = mainLayer
+    ? studioLiftHomeParent(wrapper, mainLayer)
+    : null;
   if (
     !mainLayer
     || !dragLayer
@@ -701,7 +717,7 @@ export function beginStudioSingleDrawTransformLayer(
     || mainLayer.getStage() === null
     || mainLayer.getStage() !== dragLayer.getStage()
     || wrapper.getAttr("studioElementId") !== elementId
-    || wrapper.getParent() !== mainLayer
+    || !wrapperHomeParent
     || wrapper.isCached()
     || subtreeCompositeIsLayerSensitive(wrapper)
     || laterSiblingDependsOnStackingBelow(wrapper)
@@ -720,7 +736,7 @@ export function beginStudioSingleDrawTransformLayer(
   const roots: Konva.Node[] = [wrapper, proxy, transformer];
   const lifted: LiftedNodeRecord[] = roots.map((node) => ({
     node,
-    parent: mainLayer,
+    parent: node === wrapper ? wrapperHomeParent : mainLayer,
     zIndex: node.zIndex(),
     phase: "complete",
     restoreAbsolutePosition: null,

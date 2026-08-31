@@ -15,6 +15,7 @@ import {
   beginStudioSingleObjectDragLayer,
   restoreStudioSingleObjectDragLayer,
   studioSingleObjectDragLayerRecoveryPendingForElement,
+  STUDIO_KONVA_DOCUMENT_SHADOW_NAME,
   STUDIO_LIVE_TRANSFORM_Z_ORDER_EXEMPT_ATTR,
 } from "./studio-single-object-drag-layer";
 
@@ -67,14 +68,23 @@ function createScene(): Scene {
 }
 
 function addSelectedNode(
-  layer: Konva.Layer,
+  parent: Konva.Container,
   id = "object-1",
 ): Konva.Group {
   const target = new studioKonvaRuntime.Group({ x: 20, y: 30, draggable: true });
   target.setAttr("studioElementId", id);
   target.add(new studioKonvaRuntime.Rect({ width: 40, height: 25 }));
-  layer.add(target);
+  parent.add(target);
   return target;
+}
+
+function addDocumentShadow(opacity = 1): Konva.Group {
+  const shadow = new studioKonvaRuntime.Group({
+    name: STUDIO_KONVA_DOCUMENT_SHADOW_NAME,
+    opacity,
+  });
+  scene.mainLayer.add(shadow);
+  return shadow;
 }
 
 let restoreCanvas: () => void;
@@ -128,6 +138,39 @@ describe("single-object drag Layer", () => {
     expect(target.getAbsolutePosition()).toEqual(movedPosition);
     expect([...scene.mainLayer.getChildren()]).toEqual(originalOrder);
     expect(restoreStudioSingleObjectDragLayer(session)).toBe(false);
+  });
+
+  it("lifts a direct authored child without replacing its reserved shadow owner", () => {
+    const shadow = addDocumentShadow(0);
+    const peer = new studioKonvaRuntime.Rect({ width: 10, height: 10 });
+    shadow.add(peer);
+    const target = addSelectedNode(shadow);
+    const transformer = new studioKonvaRuntime.Transformer();
+    scene.mainLayer.add(transformer);
+    transformer.nodes([target]);
+    const shadowOrder = [...shadow.getChildren()];
+
+    const session = beginStudioSingleObjectDragLayer({
+      target,
+      selectedElementId: "object-1",
+      selectionSize: 1,
+      mainLayer: scene.mainLayer,
+      dragLayer: scene.dragLayer,
+      transformer,
+      selectedIsDraw: false,
+      hasMaskOrClip: false,
+    });
+
+    expect(session).not.toBeNull();
+    expect(shadow.getParent()).toBe(scene.mainLayer);
+    expect(peer.getParent()).toBe(shadow);
+    expect(target.getParent()).toBe(scene.dragLayer);
+    expect(transformer.getParent()).toBe(scene.dragLayer);
+
+    expect(restoreStudioSingleObjectDragLayer(session)).toBe(true);
+    expect(target.getParent()).toBe(shadow);
+    expect(transformer.getParent()).toBe(scene.mainLayer);
+    expect([...shadow.getChildren()]).toEqual(shadowOrder);
   });
 
   it("leaves a node another owner re-parented mid-gesture exactly where they put it", () => {
@@ -364,8 +407,8 @@ describe("single-object drag Layer", () => {
 });
 
 describe("single-draw transform gesture Layer lift", () => {
-  function addTransformScene() {
-    const wrapper = addSelectedNode(scene.mainLayer, "stroke-1");
+  function addTransformScene(parent: Konva.Container = scene.mainLayer) {
+    const wrapper = addSelectedNode(parent, "stroke-1");
     const proxy = new studioKonvaRuntime.Rect({ x: 10, y: 20, width: 100, height: 50 });
     scene.mainLayer.add(proxy);
     const transformer = new studioKonvaRuntime.Transformer();
@@ -447,6 +490,40 @@ describe("single-draw transform gesture Layer lift", () => {
     expect(mainReceipt.mock.invocationCallOrder[0]).toBeLessThan(
       dragReceipt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
+  });
+
+  it("restores admitted source ownership to the stable reserved shadow", () => {
+    const shadow = addDocumentShadow(0);
+    const earlierPeer = new studioKonvaRuntime.Rect({ width: 20, height: 20 });
+    shadow.add(earlierPeer);
+    const { wrapper, proxy, transformer } = addTransformScene(shadow);
+    const shadowOrder = [...shadow.getChildren()];
+
+    const chromeSession = beginStudioSingleDrawTransformChromeLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(chromeSession).not.toBeNull();
+    expect(wrapper.getParent()).toBe(shadow);
+
+    const sourceSession = beginStudioSingleDrawTransformSourceLayer({
+      elementId: "stroke-1",
+      wrapper,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(sourceSession).not.toBeNull();
+    expect(wrapper.getParent()).toBe(scene.dragLayer);
+    expect(shadow.getParent()).toBe(scene.mainLayer);
+    expect(earlierPeer.getParent()).toBe(shadow);
+
+    expect(restoreStudioSingleObjectDragLayer(sourceSession)).toBe(true);
+    expect(wrapper.getParent()).toBe(shadow);
+    expect([...shadow.getChildren()]).toEqual(shadowOrder);
+    expect(restoreStudioSingleObjectDragLayer(chromeSession)).toBe(true);
   });
 
   it("refuses an admitted source claim without disturbing isolated chrome", () => {
@@ -557,6 +634,26 @@ describe("single-draw transform gesture Layer lift", () => {
     expect(proxy.getLayer()).toBe(scene.mainLayer);
     expect(transformer.getLayer()).toBe(scene.mainLayer);
     expect([...scene.mainLayer.getChildren()]).toEqual(originalOrder);
+  });
+
+  it("restores an atomic transform lift to the reserved shadow parent", () => {
+    const shadow = addDocumentShadow();
+    const { wrapper, proxy, transformer } = addTransformScene(shadow);
+
+    const session = beginStudioSingleDrawTransformLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+
+    expect(session).not.toBeNull();
+    expect(wrapper.getParent()).toBe(scene.dragLayer);
+    expect(restoreStudioSingleObjectDragLayer(session)).toBe(true);
+    expect(wrapper.getParent()).toBe(shadow);
+    expect(proxy.getParent()).toBe(scene.mainLayer);
+    expect(transformer.getParent()).toBe(scene.mainLayer);
   });
 
   it("rolls back nodes already moved when a later moveTo fails", () => {
@@ -967,6 +1064,28 @@ describe("single-draw transform gesture Layer lift", () => {
         dragLayer: scene.dragLayer,
       }),
     ).not.toBeNull();
+  });
+
+  it("keeps Vello-painted sibling order even while the reserved shadow is transparent", () => {
+    const shadow = addDocumentShadow(0);
+    const { wrapper, proxy, transformer } = addTransformScene(shadow);
+    const opaqueSiblingAbove = new studioKonvaRuntime.Rect({
+      width: 40,
+      height: 40,
+      fill: "white",
+    });
+    shadow.add(opaqueSiblingAbove);
+
+    expect(
+      beginStudioSingleDrawTransformLayer({
+        elementId: "stroke-1",
+        wrapper,
+        proxy,
+        transformer,
+        dragLayer: scene.dragLayer,
+      }),
+    ).toBeNull();
+    expect(wrapper.getParent()).toBe(shadow);
   });
 
   it("distinguishes a parked overlay shell from paint inside that shell", () => {
