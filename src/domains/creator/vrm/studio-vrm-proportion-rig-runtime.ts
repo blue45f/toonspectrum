@@ -24,6 +24,7 @@ import {
   NEUTRAL_STUDIO_VRM_PROPORTIONS,
   STUDIO_VRM_PROPORTION_PRESETS,
   STUDIO_VRM_REQUIRED_HUMANOID_BONES,
+  STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS,
   resolveVrmProportionBoneTargets,
   resolveVrmProportionPlan,
   sanitizeStudioVrmProportions,
@@ -66,12 +67,23 @@ export type StudioVrmProportionRigAdapter = {
   /** Must call springBoneManager.setInitState(); `reset()` is not an equivalent substitute. */
   readonly setSpringBoneInitState?: () => boolean | void;
   /**
-   * Rescales spring-bone collider shapes to the body's new size, absolute from their authored rest
-   * so repeated applies cannot accumulate. `setInitState()` recaptures joint rest only -- it never
-   * touches collider geometry -- so without this a collider keeps the size it was authored at while
-   * the body around it grows, and hair passes straight through the torso it was meant to ride on.
+   * Rescales spring-bone collider shapes and spring-joint hit radii to the body's new size,
+   * absolute from their authored rest so repeated applies cannot accumulate. `setInitState()`
+   * recaptures joint rest only -- it never touches collider geometry -- so without this a collider
+   * keeps the size it was authored at while the body around it grows, and hair passes straight
+   * through the torso it was meant to ride on.
+   *
+   * `scaledSubtreeRoots` are the bone nodes this runtime gives a uniform scale to. Everything
+   * beneath one of them is carried whole by the scene graph; everything else only sees its joints
+   * move apart by `uniformScale`. The set is passed rather than inferred because the two cases are
+   * a matter of **membership**, not of magnitude -- `overallHeight` 1.25 with `headBodyRatio` 0.8
+   * leaves `head` at exactly 1, and reading that 1 as "not a scaled bone" would stretch the skull
+   * capsules 25% around a head that never grew.
    */
-  readonly syncSpringBoneColliderShapes?: (uniformScale: number) => boolean | void;
+  readonly syncSpringBoneColliderShapes?: (
+    uniformScale: number,
+    scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
+  ) => boolean | void;
   readonly reapplyAuthoredPose: () => boolean | void;
 };
 
@@ -875,9 +887,16 @@ export function createStudioVrmProportionRigRuntime(
       : true;
   const runSpringInit = () =>
     adapter.setSpringBoneInitState ? invokeLifecycle(adapter.setSpringBoneInitState) : true;
+  // Membership, resolved once from the captured raw bone nodes: which subtrees the runtime scales
+  // never depends on the proportions, only on which bones exist.
+  const scaledSubtreeRoots: ReadonlySet<THREE.Object3D> = new Set(
+    captures
+      .filter((capture) => STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS.includes(capture.name))
+      .map((capture) => capture.node),
+  );
   const runColliderSync = (uniformScale: number) =>
     adapter.syncSpringBoneColliderShapes
-      ? invokeLifecycle(() => adapter.syncSpringBoneColliderShapes?.(uniformScale))
+      ? invokeLifecycle(() => adapter.syncSpringBoneColliderShapes?.(uniformScale, scaledSubtreeRoots))
       : true;
 
   /**

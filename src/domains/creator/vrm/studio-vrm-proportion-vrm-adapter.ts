@@ -167,9 +167,6 @@ export function measureStudioVrmProportionHeadLength(
   });
 }
 
-/** 상속 배율이 1 인지 가르는 허용 오차. float32 컨테이너 잡음보다 넉넉하다. */
-const INHERITED_SCALE_EPSILON = 1e-6;
-
 /**
  * A collider's authored geometry, captured once so every resize is absolute from rest. Rescaling
  * the live values in place would compound across slider moves.
@@ -223,6 +220,15 @@ function rootRelativeScaleOf(root: THREE.Object3D, node: THREE.Object3D): number
   return Number.isFinite(average) && average > 0 ? average : 1;
 }
 
+/** Whether `node` sits beneath one of `roots`. A root does not contain itself here -- no collider is a bone. */
+function isInsideAny(node: THREE.Object3D, roots: ReadonlySet<THREE.Object3D>): boolean {
+  if (roots.size === 0) return false;
+  for (let cursor = node.parent; cursor; cursor = cursor.parent) {
+    if (roots.has(cursor)) return true;
+  }
+  return false;
+}
+
 /**
  * Captures every spring-bone collider shape and every spring joint's hit radius at rest.
  *
@@ -271,20 +277,27 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
  * the runtime scaled therefore grows its envelope in length only, and stays as thin as it was
  * authored while the mesh around it thickens.
  *
- * So there are two cases, and the fix differs per case.
+ * So there are two cases, split by **which subtree the collider hangs in** -- `scaledSubtreeRoots`
+ * names the bones the runtime gives a uniform scale to, and membership is asked of the scene graph.
  *
- * **A collider whose own frame took a scale** -- the generated skull capsules sit under `HairRoot`
- * below `head`, and `head` is one of the few bones this runtime scales, absorbing `headBodyRatio`
- * as well as `overallHeight`. Its geometry is already carried whole by the scene graph, so the
- * local `offset`/`tail` must be left alone (multiplying them too made the skull 2.56x at
- * `overallHeight` 1.6 while the hair around it grew 1.6x). Its radius, being raw, is the one thing
- * the graph does not carry, so it is re-derived as `rest x inherited`. Both halves then agree.
+ * **A collider inside a scaled subtree** -- the generated skull capsules sit under `HairRoot` below
+ * `head`, and `head` absorbs `headBodyRatio` as well as `overallHeight`. Its geometry is already
+ * carried whole by the scene graph, so the local `offset`/`tail` must be left alone (multiplying
+ * them too made the skull 2.56x at `overallHeight` 1.6 while the hair around it grew 1.6x). Its
+ * radius, being raw, is the one thing the graph does not carry, so it is re-derived as
+ * `rest x inherited`. Both halves then agree.
  *
- * **A collider whose frame did not scale** -- the torso capsule on `spine` -- is the opposite. The
- * graph carried nothing, so the axis has to pick up the joint spacing itself. Its radius must
+ * **A collider outside every scaled subtree** -- the torso capsule on `spine` -- is the opposite.
+ * The graph carried nothing, so the axis has to pick up the joint spacing itself. Its radius must
  * *not* move: the proportion model moves joints apart, it does not make the body thicker. Torso
  * vertices weighted to `hips`/`spine` keep their exact cross-section at every height, so scaling
  * the radius would have made the capsule 60% wider than the torso it rides on.
+ *
+ * Membership, not magnitude, is what separates them. Reading the inherited factor and calling 1
+ * "unscaled" gets the skull wrong whenever two edits cancel: `overallHeight` 1.25 with
+ * `headBodyRatio` 0.8 leaves `head` at exactly 1, and the capsule would then be stretched 25%
+ * around a head that never grew (local offset 0.0691 -> 0.0864, span x1.25), with an abrupt jump
+ * on either side of the coincidence.
  *
  * Joint hit radii follow the same reasoning as collider radii: raw scalars compared against world
  * distances, so each one is re-derived from its own bone's inherited scale. Hair bones under a
@@ -299,6 +312,7 @@ function resizeSpringBoneGeometry(
   root: THREE.Object3D,
   captured: CapturedSpringGeometry,
   uniformScale: number,
+  scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
 ): boolean {
   if (!Number.isFinite(uniformScale) || uniformScale <= 0) return false;
   for (const entry of captured.colliders) {
@@ -311,7 +325,7 @@ function resizeSpringBoneGeometry(
     // at 2.5x radius after the slider returned to neutral.
     if (entry.radius !== null) entry.shape.radius = entry.radius * inherited;
 
-    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) continue;
+    if (isInsideAny(entry.collider, scaledSubtreeRoots)) continue;
 
     if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
     if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
@@ -369,8 +383,16 @@ export function createStudioVrmProportionVrmAdapter(
             springBoneManager.setInitState();
             return true;
           },
-          syncSpringBoneColliderShapes: (uniformScale: number) =>
-            resizeSpringBoneGeometry(vrm.scene, capturedSpringGeometry, uniformScale),
+          syncSpringBoneColliderShapes: (
+            uniformScale: number,
+            scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
+          ) =>
+            resizeSpringBoneGeometry(
+              vrm.scene,
+              capturedSpringGeometry,
+              uniformScale,
+              scaledSubtreeRoots,
+            ),
         }
       : {}),
     reapplyAuthoredPose: input.reapplyAuthoredPose,

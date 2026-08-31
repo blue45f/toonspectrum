@@ -154,6 +154,7 @@ function createRigFixture(options: RigFixtureOptions = {}) {
   const authoredRoot = snapshotTransform(root);
   const events: string[] = [];
   const colliderScales: number[] = [];
+  const colliderScaledRoots: ReadonlySet<THREE.Object3D>[] = [];
   let generation = 1;
   let activeNodes: ReadonlyMap<StudioHumanoidBoneName, THREE.Object3D> = nodes;
   let failSpringCount = 0;
@@ -230,9 +231,13 @@ function createRigFixture(options: RigFixtureOptions = {}) {
           ...(options.includeColliderSync === false
             ? {}
             : {
-                syncSpringBoneColliderShapes: (uniformScale: number) => {
+                syncSpringBoneColliderShapes: (
+                  uniformScale: number,
+                  scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
+                ) => {
                   events.push("colliders");
                   colliderScales.push(uniformScale);
+                  colliderScaledRoots.push(scaledSubtreeRoots);
                   return true;
                 },
               }),
@@ -251,6 +256,7 @@ function createRigFixture(options: RigFixtureOptions = {}) {
   return {
     adapter,
     colliderScales,
+    colliderScaledRoots,
     events,
     headLength: options.headLength ?? REFERENCE.headLength,
     intermediaries,
@@ -663,6 +669,42 @@ describe("studio-vrm-proportion-rig-runtime", () => {
     const scaled = runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight: 1.4 });
     expect(scaled.ok).toBe(true);
     expect(fixture.colliderScales[fixture.colliderScales.length - 1]).toBeCloseTo(1.4, 12);
+  });
+
+  it("tells the adapter which subtrees it scales, by membership and not by magnitude", () => {
+    // 콜라이더가 씬 그래프에 실려 통째로 옮겨졌는지는 **소속**의 문제다. 결과 배율로 되짚으면
+    // 서로 상쇄하는 편집에서 판정이 뒤집힌다 — `overallHeight` 1.25 와 `headBodyRatio` 0.8 은
+    // `head` 배율을 정확히 1 로 만들지만, `head` 가 스케일을 받지 않는 본이 되지는 않는다.
+    const fixture = createRigFixture();
+    const runtime = runtimeFor(fixture);
+
+    const cancelling = runtime.apply({
+      ...NEUTRAL_STUDIO_VRM_PROPORTIONS,
+      overallHeight: 1.25,
+      headBodyRatio: 0.8,
+    });
+    expect(cancelling.ok).toBe(true);
+    const head = fixture.nodes.get("head");
+    if (!head) throw new Error("expected a head bone");
+    expect(head.scale.x, "상쇄 편집이라 머리 배율은 정확히 1 이어야 한다").toBeCloseTo(1, 12);
+
+    const roots = fixture.colliderScaledRoots[fixture.colliderScaledRoots.length - 1];
+    expect(roots, "머리 배율이 1 이어도 `head` 는 여전히 스케일 서브트리의 뿌리다").toContain(head);
+    for (const name of ["leftHand", "rightHand", "leftFoot", "rightFoot"] as const) {
+      const node = fixture.nodes.get(name);
+      if (!node) throw new Error(`expected ${name}`);
+      expect(roots, `${name} 이 스케일 서브트리 목록에서 빠졌다`).toContain(node);
+    }
+    // 이동만 받는 본은 들어가면 안 된다 — 들어가면 몸통 캡슐이 관절을 따라가지 않는다.
+    for (const name of ["hips", "spine", "chest", "neck", "leftUpperArm"] as const) {
+      const node = fixture.nodes.get(name);
+      if (!node) continue;
+      expect(roots, `${name} 은 스케일을 받지 않는데 목록에 있다`).not.toContain(node);
+    }
+
+    // 비율과 무관하게 같은 집합이어야 한다.
+    expect(runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS }).ok).toBe(true);
+    expect(fixture.colliderScaledRoots[fixture.colliderScaledRoots.length - 1]).toEqual(roots);
   });
 
   it("records collider sync as unavailable when the adapter cannot resize them", () => {

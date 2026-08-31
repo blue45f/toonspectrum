@@ -252,7 +252,14 @@ const FOOT_BONES: readonly StudioHumanoidBoneName[] = ["leftFoot", "rightFoot"];
  * 뿌리의 균등 스케일이 이미 오프셋까지 포함해 서브트리 전체를 정확히 키우므로, 여기에 길이 이동을
  * 또 얹으면 배수가 두 번 곱해지고(=손가락이 손보다 더 늘어남) 검증기의 불변식도 깨진다.
  */
-const UNIFORM_SCALE_SUBTREE_ROOTS: readonly StudioHumanoidBoneName[] = [
+/**
+ * 이 런타임이 **균등 스케일을 주는** 본들. 그 아래 서브트리는 뿌리의 스케일이 통째로 옮긴다.
+ *
+ * 값이 아니라 **소속**이라는 점이 중요하다. `overallHeight 1.25` 와 `headBodyRatio 0.8` 처럼
+ * 서로 상쇄하는 편집에서는 `head` 의 배율이 정확히 1 이 되지만, 그렇다고 `head` 가 스케일을
+ * 받지 않는 본이 되는 것은 아니다. 결과 배율로 소속을 되짚으면 그런 조합에서 판정이 뒤집힌다.
+ */
+export const STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS: readonly StudioHumanoidBoneName[] = [
   "head",
   "leftHand",
   "rightHand",
@@ -485,7 +492,7 @@ function isInsideUniformScaleSubtree(
 ): boolean {
   let cursor = byName.get(name)?.parent ?? null;
   for (let depth = 0; depth < MAX_BONE_DEPTH && cursor; depth += 1) {
-    if (has(UNIFORM_SCALE_SUBTREE_ROOTS, cursor)) return true;
+    if (has(STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS, cursor)) return true;
     cursor = byName.get(cursor)?.parent ?? null;
   }
   return false;

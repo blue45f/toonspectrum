@@ -649,6 +649,59 @@ describe("generate recipe → .vrm file reload", () => {
     60_000,
   );
 
+  it("leaves the skull capsule alone when height and head edits cancel out", async () => {
+    // `head` 배율은 `headBodyRatio × overallHeight` 다. 1.25 와 0.8 은 정확히 1 을 만든다 —
+    // 머리와 머리카락은 저작 크기 그대로인데, 상속 배율을 보고 "스케일 안 받은 콜라이더"로
+    // 분류하면 축이 25% 늘고 중심이 1.7cm 올라간다. 소속으로 갈라야 하는 이유다.
+    const measure = async (proportions: Partial<typeof NEUTRAL_STUDIO_VRM_PROPORTIONS>) => {
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "hime-noble" })),
+      );
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => true,
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, {
+        headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+      });
+      if (!created.ok) throw new Error(created.message);
+      expect(
+        created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, ...proportions }).ok,
+      ).toBe(true);
+      vrm.scene.updateMatrixWorld(true);
+      const skull = [...(vrm.springBoneManager?.colliders ?? [])][1];
+      if (!skull) throw new Error("expected a skull capsule");
+      const shape = (skull as unknown as {
+        shape: { offset: Vector3; tail?: Vector3; radius: number };
+      }).shape;
+      skull.updateWorldMatrix(true, false);
+      const a = shape.offset.clone().applyMatrix4(skull.matrixWorld);
+      const b = (shape.tail ?? shape.offset).clone().applyMatrix4(skull.matrixWorld);
+      return {
+        headScale: vrm.humanoid?.getRawBoneNode("head")?.scale.x ?? 1,
+        offset: shape.offset.clone(),
+        radius: shape.radius,
+        span: a.distanceTo(b),
+      };
+    };
+
+    const rest = await measure({});
+    const cancelled = await measure({ overallHeight: 1.25, headBodyRatio: 0.8 });
+    const grown = await measure({ overallHeight: 1.25 });
+
+    // 상쇄 편집: 머리가 그대로이므로 캡슐도 그대로여야 한다.
+    expect(cancelled.headScale, "상쇄 편집인데 머리 배율이 1 이 아니다").toBeCloseTo(1, 9);
+    expect(cancelled.offset.distanceTo(rest.offset), "두개골 캡슐 중심이 움직였다").toBeLessThan(1e-9);
+    expect(cancelled.span / rest.span, "두개골 축이 자라지 않은 머리를 따라 늘어났다").toBeCloseTo(1, 6);
+    expect(cancelled.radius, "두개골 반경이 움직였다").toBeCloseTo(rest.radius, 9);
+
+    // 대조군: 머리가 실제로 자라면 축과 반경이 딱 그만큼 따라간다.
+    expect(grown.headScale).toBeCloseTo(1.25, 9);
+    expect(grown.span / rest.span).toBeCloseTo(1.25, 6);
+    expect(grown.radius / rest.radius).toBeCloseTo(1.25, 6);
+  }, 60_000);
+
   it("puts every collider and joint back on its authored size when the sliders return", async () => {
     // 슬라이더는 한 런타임 위에서 여러 번 움직인다. 모든 쓰기가 rest 기준 절대값이어야
     // 왕복이 제자리로 돌아온다. 반경을 "프레임이 스케일된" 가지 안에서만 쓰면, 한 번
