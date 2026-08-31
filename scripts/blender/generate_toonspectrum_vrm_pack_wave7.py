@@ -80,12 +80,13 @@ tube = WAVE6.tube
 # the thirteen keep their established identity; only ``fabric`` is added, which
 # the Wave 5 material table requires and Wave 1 never defined.
 
-# TS_Minseo_Campus is deliberately absent. It is the SHA-pinned canonical source
-# of the reproducible avatar-reference render: studio-vrm-avatar-reference-
-# product.ts, the catalogue generator's drift guard, studio-vrm-avatar-reference-
-# recommendation.ts and public/catalog/...-catalogue-v1.json all pin its bytes,
-# and the catalogue's Playwright harness does not complete on a heavier model.
-# Regenerating it needs that pipeline handled first, so it is not in this roster.
+# TS_Minseo_Campus is not in CHARACTERS. It is the SHA-pinned canonical source of
+# the reproducible avatar-reference render -- studio-vrm-avatar-reference-
+# product.ts, the catalogue generator's drift guard, and
+# public/catalog/...-catalogue-v1.json all pin its bytes -- so regenerating it
+# means republishing that catalogue in the same change. It lives in
+# OPT_IN_CHARACTERS below and is only built when named explicitly, because an
+# empty file filter means "all" and once regenerated it by accident.
 CHARACTERS = (
     {
         "file": "TS_Taeo_Barista.vrm", "name": "태오 (동네 바리스타)", "style": "barista",
@@ -1452,6 +1453,19 @@ def rebuild_painted_face(prefix, spec, armature, materials, face_context):
     return eyes, brows, mouth
 
 
+# Built only when `toonspectrum_vrm_files` names it. Never swept up by "all".
+OPT_IN_CHARACTERS = (
+    {
+        "file": "TS_Minseo_Campus.vrm", "name": "민서 (캠퍼스 메이커)", "style": "campus",
+        "height": 1.65, "heads": 7.1, "age": 0.78, "shoulder": 0.074,
+        "body": (1.00, 0.94, 1.00),
+        "skin": (0.78, 0.55, 0.39, 1.0), "primary": (0.10, 0.16, 0.29, 1.0),
+        "secondary": (0.90, 0.31, 0.18, 1.0), "accent": (0.92, 0.86, 0.76, 1.0),
+        "hair": (0.08, 0.045, 0.035, 1.0), "fabric": (0.16, 0.22, 0.36, 1.0),
+    },
+)
+
+
 WAVE7_STYLES = {
     "campus": add_campus,
     "barista": add_barista,
@@ -1510,9 +1524,11 @@ WAVE5.configure_vrm = configure_vrm_v7
 def main():
     requested_value = bpy.context.scene.get("toonspectrum_vrm_files", "")
     requested = {name.strip() for name in requested_value.split(",") if name.strip()}
-    selected = [spec for spec in CHARACTERS if not requested or spec["file"] in requested]
+    # An empty filter builds the roster only. Opt-in specs join it solely when named.
+    pool = list(CHARACTERS) + ([*OPT_IN_CHARACTERS] if requested else [])
+    selected = [spec for spec in pool if not requested or spec["file"] in requested]
     if requested and len(selected) != len(requested):
-        known = {spec["file"] for spec in CHARACTERS}
+        known = {spec["file"] for spec in pool}
         raise ValueError("Unknown Wave 7 VRM files: " + ", ".join(sorted(requested - known)))
     for spec in selected:
         WAVE6.generate_character(spec)
