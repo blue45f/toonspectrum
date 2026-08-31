@@ -540,9 +540,17 @@ async function generateEnvelope(): Promise<Readonly<{
       // MediaPipe's native logger writes this successful XNNPACK initialization notice to stderr,
       // which Chromium exposes as a console error even though no error occurred.
       if (message.text() === "INFO: Created TensorFlow Lite XNNPACK delegate for CPU.") return;
-      diagnostics.consoleErrors.push(message.text());
+      diagnostics.consoleErrors.push(`[${message.type()}] ${message.text()}`);
     });
-    page.on("pageerror", (error) => diagnostics.pageErrors.push(error.stack ?? error.message));
+    page.on("pageerror", (error) => {
+      // `error.stack ?? error.message` renders as "" for a thrown non-Error and
+      // for a CSP-sanitised cross-origin failure, which says nothing about what
+      // died. Keep every field the runtime gives us.
+      const rendered = [error.name, error.message, error.stack, String(error)]
+        .filter((part) => typeof part === "string" && part.length > 0)
+        .join(" | ");
+      diagnostics.pageErrors.push(rendered.length > 0 ? rendered : `<empty ${typeof error}>`);
+    });
     page.on("requestfailed", (request) => {
       const errorText = request.failure()?.errorText ?? "";
       // Chromium reports a fulfilled fetch(HEAD) as ERR_ABORTED when no response body follows.
@@ -556,14 +564,26 @@ async function generateEnvelope(): Promise<Readonly<{
       diagnostics.failedRequests.push(`${request.method()} ${request.url()} ${errorText}`);
     });
     await page.goto(`${harness.origin}${HARNESS_PATH}`, { waitUntil: "load" });
-    await page.waitForFunction(
-      () => (
-        window.__studioVrmAvatarReferenceCatalogueReady === true
-        || typeof window.__studioVrmAvatarReferenceCatalogueError === "string"
-      ),
-      undefined,
-      { timeout: READY_TIMEOUT_MS },
-    );
+    try {
+      await page.waitForFunction(
+        () => (
+          window.__studioVrmAvatarReferenceCatalogueReady === true
+          || typeof window.__studioVrmAvatarReferenceCatalogueError === "string"
+        ),
+        undefined,
+        { timeout: READY_TIMEOUT_MS },
+      );
+    } catch (cause) {
+      // The harness sets neither flag if it dies before its own try/catch is
+      // reached, and the diagnostics collected above are only inspected far
+      // below -- so a timeout used to report the deadline and discard every
+      // console error, page error and failed request that explained it.
+      throw new Error(
+        `harness never signalled within ${READY_TIMEOUT_MS}ms. `
+        + `Collected: ${JSON.stringify(diagnostics)}`,
+        { cause },
+      );
+    }
     const startupError = await page.evaluate(
       () => window.__studioVrmAvatarReferenceCatalogueError ?? null,
     );
@@ -810,7 +830,12 @@ async function generateEnvelope(): Promise<Readonly<{
           && result.targetRank >= 1
           && result.targetRank <= 3
           && result.topPresetIds.includes(result.targetPresetId),
-        `${result.queryId}: calibration query did not retain its preset in top-3`,
+        // The rank and the ordering it lost to: "not in top-3" alone cannot tell a
+        // near-miss at rank 4 from a retrieval that collapsed entirely, and this
+        // gate fires whenever the avatar it renders against changes.
+        `${result.queryId}: calibration query did not retain its preset in top-3 — `
+          + `rank ${result.targetRank}, similarity ${result.targetSimilarity}, `
+          + `top: ${result.topPresetIds.join(" > ")}`,
       );
     }
     await page.evaluate(async () => {

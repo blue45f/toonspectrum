@@ -20,7 +20,7 @@ import {
 import {
   disposeStudioVrmAsset,
   loadStudioVrmAsset,
-} from "../src/domains/creator/vrm/studio-vrm-asset-runtime.test.ts";
+} from "../src/domains/creator/vrm/studio-vrm-asset-runtime.ts";
 import {
   createStudioVrmAvatarForgeFaceController,
 } from "../src/domains/creator/vrm/studio-vrm-avatar-forge-face-controller.ts";

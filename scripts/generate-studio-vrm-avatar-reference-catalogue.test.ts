@@ -23,6 +23,34 @@ function sha256(value: Uint8Array | string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+describe("browser harness module boundaries", () => {
+  // 517f96a1 moved studio-vrm-asset-runtime into vrm/ and rewrote this file's
+  // import to `.../studio-vrm-asset-runtime.test.ts`. The harness then died at
+  // module evaluation with "does not provide an export named
+  // disposeStudioVrmAsset" — before its own try/catch could set the error flag,
+  // so the generator only ever reported a 90s timeout. Nothing caught it,
+  // because the catalogue scripts are manual and this class of break needs no
+  // browser to detect.
+  it("never imports a production symbol from a test module", async () => {
+    const harness = await readFile(
+      resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx"),
+      "utf8",
+    );
+    const offenders = [...harness.matchAll(/from\s+"([^"]+)"/gu)]
+      .map((match) => match[1]!)
+      .filter((specifier) => /\.test\.[cm]?[jt]sx?$/u.test(specifier));
+    expect(offenders, `harness imports from test modules: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("imports the asset runtime from its implementation", async () => {
+    const harness = await readFile(
+      resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx"),
+      "utf8",
+    );
+    expect(harness).toContain('"../src/domains/creator/vrm/studio-vrm-asset-runtime.ts"');
+  });
+});
+
 describe("Avatar Forge reference catalogue generator", () => {
   it("accepts only explicit write/check modes", () => {
     expect(parseStudioVrmAvatarReferenceGenerationMode(["--write"])).toBe("write");
