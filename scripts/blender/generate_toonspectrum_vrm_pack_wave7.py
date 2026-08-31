@@ -80,15 +80,13 @@ tube = WAVE6.tube
 # the thirteen keep their established identity; only ``fabric`` is added, which
 # the Wave 5 material table requires and Wave 1 never defined.
 
+# TS_Minseo_Campus is deliberately absent. It is the SHA-pinned canonical source
+# of the reproducible avatar-reference render: studio-vrm-avatar-reference-
+# product.ts, the catalogue generator's drift guard, studio-vrm-avatar-reference-
+# recommendation.ts and public/catalog/...-catalogue-v1.json all pin its bytes,
+# and the catalogue's Playwright harness does not complete on a heavier model.
+# Regenerating it needs that pipeline handled first, so it is not in this roster.
 CHARACTERS = (
-    {
-        "file": "TS_Minseo_Campus.vrm", "name": "민서 (캠퍼스 메이커)", "style": "campus",
-        "height": 1.65, "heads": 7.1, "age": 0.78, "shoulder": 0.074,
-        "body": (1.00, 0.94, 1.00),
-        "skin": (0.78, 0.55, 0.39, 1.0), "primary": (0.10, 0.16, 0.29, 1.0),
-        "secondary": (0.90, 0.31, 0.18, 1.0), "accent": (0.92, 0.86, 0.76, 1.0),
-        "hair": (0.08, 0.045, 0.035, 1.0), "fabric": (0.16, 0.22, 0.36, 1.0),
-    },
     {
         "file": "TS_Taeo_Barista.vrm", "name": "태오 (동네 바리스타)", "style": "barista",
         "height": 1.73, "heads": 6.8, "age": 0.82, "shoulder": 0.095,
@@ -1001,23 +999,11 @@ def add_moss_golem(prefix, spec, armature, materials, face_context):
 # VRoid-class look wants those cues flat or painted, so this pass keeps the
 # meshes (expression targets bind to them) and instead shrinks the offenders and
 # removes their outlines.
+# Only the parts that survive rebuild_painted_face need tuning here; everything
+# else in the Wave 6 face is deleted and repainted.
 FACE_REFINEMENTS = (
     # (name fragment, uniform scale, keep outline)
     ("_CheekVolume_", 0.34, False),
-    ("_CrowFoot_", 0.30, False),
-    ("_Philtrum", 0.45, False),
-    ("_Nostril_", 0.52, False),
-    ("_NoseTip", 0.74, False),
-    ("_NoseBridge", 0.80, False),
-    ("_UpperLipRidge", 0.56, False),
-    ("_LowerLipRidge", 0.50, False),
-    ("_MouthExpression", 0.62, False),
-    ("_EyeHighlight_", 1.0, False),
-    ("_Iris_", 1.0, False),
-    ("_Pupil_", 1.0, False),
-    ("_ScleraExpression_", 1.0, False),
-    ("_UpperEyelid_", 1.0, False),
-    ("_LowerEyelid_", 1.0, False),
     ("_InnerEar_", 1.0, False),
     ("_JawVolume", 1.0, False),
 )
@@ -1114,6 +1100,358 @@ def refine_face(prefix):
     return touched
 
 
+
+# ─────────────────────── VRoid-style painted face ────────────────────────
+#
+# Wave 6 builds every facial feature as its own protruding solid: an iris ball,
+# a pupil ball, two lid shells, a nose tip with nostrils, a stack of lip
+# volumes. Close up that reads as a face assembled from parts, which is the
+# single largest gap to a VRoid-class avatar. VRoid draws the same features as
+# flat, alpha-cut, *painted* surfaces sitting on the skull.
+#
+# The expression contract forces the shape of this rewrite: vrm-original-bundle
+# .test.ts pins blink.morphTargetBinds to exactly 2 and aa.morphTargetBinds to
+# exactly 1, so expressions must stay morph-target driven. The painted eye,
+# brow and mouth planes therefore carry the same shape keys the solids did, and
+# ``targets`` is repointed at them before configure_expressions runs.
+
+FACE_TEX = 256
+
+
+def _pack_image(name, pixels, size=FACE_TEX):
+    image = bpy.data.images.new(name, size, size, alpha=True)
+    image.pixels.foreach_set(pixels)
+    image.update()
+    image.pack()
+    return image
+
+
+def _blend_px(dst, offset, rgb, alpha):
+    """Source-over compositing in the flat RGBA buffer."""
+    inv = 1.0 - alpha
+    dst[offset] = dst[offset] * inv + rgb[0] * alpha
+    dst[offset + 1] = dst[offset + 1] * inv + rgb[1] * alpha
+    dst[offset + 2] = dst[offset + 2] * inv + rgb[2] * alpha
+    dst[offset + 3] = min(1.0, dst[offset + 3] + alpha)
+
+
+def _smoothstep(edge0, edge1, x):
+    if edge1 == edge0:
+        return 0.0 if x < edge0 else 1.0
+    t = min(1.0, max(0.0, (x - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def paint_eye_texture(name, spec, sign):
+    """One full anime eye: sclera, graded iris, pupil, two highlights, a heavy
+    upper lash that tapers past the outer corner, and a thin lower rim.
+
+    ``sign`` is +1 for the left eye, so the outer corner is at large u; the
+    right eye is painted mirrored rather than flipping the plane, which would
+    invert its normals.
+    """
+    n = FACE_TEX
+    px = [0.0] * (n * n * 4)
+    iris = spec.get("iris", spec.get("accent", (0.24, 0.48, 0.64, 1.0)))
+    iris_deep = tuple(c * 0.42 for c in iris[:3])
+    iris_lit = tuple(min(1.0, c * 1.35 + 0.12) for c in iris[:3])
+    pupil = spec.get("pupil", (0.03, 0.03, 0.05, 1.0))[:3]
+    lash = tuple(min(1.0, c * 0.36) for c in spec["hair"][:3])
+    sclera = (0.985, 0.975, 0.975)
+    sclera_shade = (0.86, 0.85, 0.88)
+
+    half_w, up, low = 0.455, 0.300, 0.235
+    iris_cx, iris_cy, iris_rx, iris_ry = 0.5, 0.548, 0.212, 0.252
+
+    for y in range(n):
+        v = (y + 0.5) / n
+        for x in range(n):
+            u = (x + 0.5) / n
+            uu = u if sign > 0 else 1.0 - u          # outer corner always at uu>0.5
+            dx = (uu - 0.5) / half_w
+            offset = (y * n + x) * 4
+            if abs(dx) > 1.14:
+                continue
+            k = max(0.0, 1.0 - dx * dx)
+            v_top = 0.5 + up * (k ** 0.58)
+            v_bot = 0.5 - low * (k ** 0.80)
+            inside = abs(dx) <= 1.0 and v_bot <= v <= v_top
+
+            if inside:
+                shade = _smoothstep(v_top - 0.16, v_top, v) * 0.55
+                col = tuple(sclera[i] * (1 - shade) + sclera_shade[i] * shade for i in range(3))
+                _blend_px(px, offset, col, 1.0)
+                # Iris: darker rim, lit lower edge, so it is not a flat disc.
+                ix, iy = (uu - iris_cx) / iris_rx, (v - iris_cy) / iris_ry
+                r = (ix * ix + iy * iy) ** 0.5
+                if r <= 1.0:
+                    rim = _smoothstep(0.62, 1.0, r)
+                    lit = _smoothstep(0.35, -0.55, iy) * 0.55
+                    base = tuple(
+                        iris[i] * (1 - rim) + iris_deep[i] * rim for i in range(3)
+                    )
+                    base = tuple(base[i] * (1 - lit) + iris_lit[i] * lit for i in range(3))
+                    _blend_px(px, offset, base, 1.0 - _smoothstep(0.94, 1.0, r) * 0.15)
+                    pr = ((uu - iris_cx) / 0.086) ** 2 + ((v - iris_cy) / 0.104) ** 2
+                    if pr <= 1.0:
+                        _blend_px(px, offset, pupil, 1.0 - _smoothstep(0.80, 1.0, pr))
+
+            # Highlights sit above the lash in draw order so they always read.
+            for hx, hy, hr, ha in ((0.418, 0.640, 0.072, 0.96), (0.602, 0.452, 0.034, 0.68)):
+                hd = (((uu - hx) / hr) ** 2 + ((v - hy) / (hr * 1.05)) ** 2) ** 0.5
+                if hd <= 1.0 and inside:
+                    _blend_px(px, offset, (1.0, 1.0, 1.0), ha * (1.0 - _smoothstep(0.55, 1.0, hd)))
+
+            # Upper lash: thickens and lifts toward the outer corner.
+            outer = _smoothstep(0.30, 1.02, dx)
+            thick = 0.052 + 0.088 * outer
+            lash_lo = v_top - 0.055 - 0.030 * outer
+            lash_hi = v_top + thick
+            if abs(dx) <= 1.10 and lash_lo <= v <= lash_hi:
+                edge = min(_smoothstep(lash_lo, lash_lo + 0.030, v),
+                           1.0 - _smoothstep(lash_hi - 0.022, lash_hi, v))
+                _blend_px(px, offset, lash, min(1.0, edge * 1.6))
+            # Lower rim: a thin line on the outer half only.
+            if abs(dx) <= 0.96 and v_bot - 0.020 <= v <= v_bot + 0.026:
+                _blend_px(px, offset, lash, 0.55 * _smoothstep(-0.40, 0.70, dx))
+    return _pack_image(name, px)
+
+
+def paint_brow_texture(name, spec, sign):
+    """A tapered brow stroke — soft at the inner end, pointed at the outer."""
+    n = FACE_TEX
+    px = [0.0] * (n * n * 4)
+    brow = tuple(min(1.0, c * 0.62) for c in spec["hair"][:3])
+    for y in range(n):
+        v = (y + 0.5) / n
+        for x in range(n):
+            u = (x + 0.5) / n
+            uu = u if sign > 0 else 1.0 - u
+            t = (uu - 0.10) / 0.80
+            if t < 0.0 or t > 1.0:
+                continue
+            arc = 0.50 + 0.13 * (t ** 0.75) - 0.10 * t * t
+            thick = 0.085 * (1.0 - 0.72 * _smoothstep(0.45, 1.0, t)) * (0.55 + 0.45 * _smoothstep(0.0, 0.28, t))
+            d = abs(v - arc)
+            if d <= thick:
+                a = 1.0 - _smoothstep(thick * 0.55, thick, d)
+                _blend_px(px, (y * n + x) * 4, brow, a)
+    return _pack_image(name, px)
+
+
+def paint_mouth_texture(name, spec, key):
+    """Lips as a painted shape. ``key`` selects the viseme silhouette."""
+    n = FACE_TEX
+    px = [0.0] * (n * n * 4)
+    lip = (0.72, 0.30, 0.31)
+    lip_deep = (0.52, 0.17, 0.20)
+    for y in range(n):
+        v = (y + 0.5) / n
+        for x in range(n):
+            u = (x + 0.5) / n
+            dx = (u - 0.5) / 0.30
+            if abs(dx) > 1.0:
+                continue
+            k = max(0.0, 1.0 - dx * dx)
+            upper = 0.50 + 0.085 * (k ** 0.55) - 0.020 * _smoothstep(0.0, 0.25, abs(dx))
+            lower = 0.50 - 0.115 * (k ** 0.70)
+            if lower <= v <= upper:
+                depth = _smoothstep(upper, lower, v)
+                col = tuple(lip[i] * (1 - depth * 0.55) + lip_deep[i] * depth * 0.55 for i in range(3))
+                edge = min(_smoothstep(lower, lower + 0.020, v), 1.0 - _smoothstep(upper - 0.018, upper, v))
+                _blend_px(px, (y * n + x) * 4, col, min(1.0, edge * 1.8))
+            # Philtrum notch and the parting line, painted rather than modelled.
+            if abs(v - 0.50) <= 0.010 and abs(dx) <= 0.88:
+                _blend_px(px, (y * n + x) * 4, lip_deep, 0.62)
+    return _pack_image(name, px)
+
+
+def paint_nose_texture(name, spec):
+    """A faint bridge line and a small shadow under the tip. VRoid noses are a
+    painted hint; anything stronger reads as a blob stuck to the face."""
+    n = FACE_TEX
+    px = [0.0] * (n * n * 4)
+    shade = tuple(max(0.0, c * 0.74) for c in spec["skin"][:3])
+    for y in range(n):
+        v = (y + 0.5) / n
+        for x in range(n):
+            u = (x + 0.5) / n
+            d = abs(u - 0.5)
+            offset = (y * n + x) * 4
+            # Bridge: barely there, fading in from the brow line downwards.
+            if 0.34 <= v <= 0.88 and d <= 0.055:
+                a = (1.0 - _smoothstep(0.020, 0.055, d)) * _smoothstep(0.88, 0.46, v) * 0.13
+                _blend_px(px, offset, shade, a)
+            # Tip shadow: a small soft lobe, the only part meant to be noticed.
+            lobe = ((u - 0.5) / 0.145) ** 2 + ((v - 0.285) / 0.085) ** 2
+            if lobe <= 1.0:
+                _blend_px(px, offset, shade, (1.0 - _smoothstep(0.25, 1.0, lobe)) * 0.26)
+    return _pack_image(name, px)
+
+
+def paint_blush_texture(name, spec):
+    """A soft cheek wash. Needs alpha blending, not a cutout, or it hard-edges."""
+    n = FACE_TEX
+    px = [0.0] * (n * n * 4)
+    tint = (0.94, 0.55, 0.52)
+    for y in range(n):
+        v = (y + 0.5) / n
+        for x in range(n):
+            u = (x + 0.5) / n
+            d = (((u - 0.5) / 0.46) ** 2 + ((v - 0.5) / 0.40) ** 2) ** 0.5
+            if d <= 1.0:
+                _blend_px(px, (y * n + x) * 4, tint, (1.0 - _smoothstep(0.10, 1.0, d)) * 0.40)
+    return _pack_image(name, px)
+
+
+def blush_material(name, image):
+    material = COMMON.make_material(name, (1.0, 1.0, 1.0, 1.0), roughness=0.55)
+    mtoon = material.vrm_addon_extension.mtoon1
+    mtoon.pbr_metallic_roughness.base_color_texture.index.source = image
+    mtoon.alpha_mode = "BLEND"
+    mtoon.extensions.vrmc_materials_mtoon.outline_width_factor = 0.0
+    return material
+
+
+def painted_material(name, image, *, cutoff=0.42):
+    """MToon material whose colour comes entirely from the painted texture."""
+    material = COMMON.make_material(name, (1.0, 1.0, 1.0, 1.0), roughness=0.48)
+    mtoon = material.vrm_addon_extension.mtoon1
+    mtoon.pbr_metallic_roughness.base_color_texture.index.source = image
+    for attr in ("base_color_factor",):
+        if hasattr(mtoon.pbr_metallic_roughness, attr):
+            setattr(mtoon.pbr_metallic_roughness, attr, (1.0, 1.0, 1.0, 1.0))
+    mtoon.alpha_mode = "MASK"
+    mtoon.alpha_cutoff = cutoff
+    mtoon.extensions.vrmc_materials_mtoon.outline_width_factor = 0.0
+    return material
+
+
+def face_plane(name, centre, size, armature, bone_name, material, *, bow=0.0, subdiv=10, mirror_uv=False):
+    """A grid facing -Y with planar UVs, bowed back at the edges to hug the skull.
+
+    ``mirror_uv`` flips u so the right side can share the left side's painted
+    texture; flipping the plane's X scale instead would invert its normals.
+    """
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=subdiv, y_subdivisions=subdiv, size=1.0, location=centre)
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.scale = (size[0], size[1], 1.0)
+    obj.rotation_euler = (pi / 2, 0, 0)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    if mirror_uv:
+        for datum in obj.data.uv_layers.active.data:
+            datum.uv.x = 1.0 - datum.uv.x
+    if bow:
+        hw, hh = size[0] * 0.5, size[1] * 0.5
+        for vertex in obj.data.vertices:
+            nx = vertex.co.x / hw if hw else 0.0
+            nz = vertex.co.z / hh if hh else 0.0
+            vertex.co.y += bow * min(1.0, nx * nx + nz * nz)
+    return COMMON.rig_primitive(obj, armature, material, {bone_name: 1.0})
+
+
+def rebuild_painted_face(prefix, spec, armature, materials, face_context):
+    """Swap Wave 6's assembled face solids for painted alpha-cut planes."""
+    unit = spec["height"] / spec["heads"]
+    center, eye_y, eye_z, targets = face_context
+    head_scale = spec.get("head_scale", (1.0, 1.0, 1.0))
+
+    replaced = (
+        "_ScleraExpression_", "_Iris_", "_Pupil_", "_EyeHighlight_",
+        "_UpperEyelid_", "_LowerEyelid_", "_BrowExpression_",
+        "_MouthExpression", "_UpperLipRidge", "_LowerLipRidge",
+        "_Philtrum", "_Nostril_", "_CrowFoot_", "_NoseTip", "_NoseBridge",
+    )
+    for obj in list(bpy.data.objects):
+        if obj.type != "MESH" or not obj.name.startswith(prefix):
+            continue
+        if any(fragment in obj.name for fragment in replaced):
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+    surface_y = eye_y - unit * 0.055
+    # One painted texture per feature, mirrored onto the right side: two of each
+    # pushed the material count past the 16-material budget.
+    eye_art = painted_material(prefix + "_EyeArt", paint_eye_texture(prefix + "_EyeTex", spec, 1.0))
+    brow_art = painted_material(prefix + "_BrowArt", paint_brow_texture(prefix + "_BrowTex", spec, 1.0))
+    blush_art = blush_material(prefix + "_BlushArt", paint_blush_texture(prefix + "_BlushTex", spec))
+    eyes, brows = [], []
+    for suffix, sign in (("L", 1.0), ("R", -1.0)):
+        # Widened from EYE_X: a 0.40u plane at 0.185u crossed the centre line and
+        # the two eyes touched. 0.34u at 0.215u leaves an eye-gap of ~0.09u.
+        eye_x = unit * 0.215 * sign * head_scale[0]
+        eye_bone = "eye." + suffix
+
+        eye = face_plane(
+            prefix + "_ScleraExpression_" + suffix,
+            (eye_x, surface_y, eye_z + unit * 0.010),
+            (unit * 0.335, unit * 0.295), armature, eye_bone, eye_art,
+            bow=unit * 0.055, mirror_uv=sign < 0,
+        )
+        WAVE5.add_shape_key_from_basis(eye, "Blink", lambda co: setattr(co, "z", co.z * 0.06))
+        WAVE5.add_shape_key_from_basis(eye, "Wide", lambda co: setattr(co, "z", co.z * 1.24))
+        WAVE5.add_shape_key_from_basis(eye, "Squint", lambda co: setattr(co, "z", co.z * 0.54))
+        eyes.append(eye)
+
+        brow = face_plane(
+            prefix + "_BrowExpression_" + suffix,
+            (eye_x + sign * unit * 0.010, surface_y - unit * 0.010, eye_z + unit * 0.178),
+            (unit * 0.315, unit * 0.125), armature, "head", brow_art,
+            bow=unit * 0.030, mirror_uv=sign < 0,
+        )
+        for key_name, dz, dtilt in (
+            ("HappyBrow", 0.055, 0.30), ("SadBrow", -0.030, -0.55),
+            ("AngryBrow", -0.048, 0.70), ("RelaxedBrow", 0.026, 0.12),
+            ("SurprisedBrow", 0.092, 0.10),
+        ):
+            WAVE5.add_shape_key_from_basis(
+                brow, key_name,
+                (lambda z, t: (lambda co: setattr(co, "z", co.z + unit * z + co.x * t * 0.16)))(dz, dtilt * sign),
+            )
+        brows.append(brow)
+
+    mouth = face_plane(
+        prefix + "_MouthExpression",
+        (0.0, surface_y + unit * 0.055, eye_z - unit * 0.520),
+        (unit * 0.34, unit * 0.26), armature, "head",
+        painted_material(prefix + "_MouthArt", paint_mouth_texture(prefix + "_MouthTex", spec, "neutral")),
+        bow=unit * 0.040,
+    )
+    # Visemes and emotions reshape the painted lip plane; VRoid drives the same
+    # silhouettes from a texture atlas, but the morph contract keeps them here.
+    for key_name, sx, sz, dz in (
+        ("AA", 1.02, 1.85, -0.030), ("IH", 1.16, 0.62, -0.006),
+        ("OU", 0.62, 1.35, -0.018), ("EE", 1.24, 0.72, 0.004),
+        ("OH", 0.80, 1.70, -0.026), ("Happy", 1.20, 1.05, 0.016),
+        ("Sad", 0.92, 0.86, -0.020), ("Angry", 1.06, 0.80, -0.016),
+        ("Relaxed", 1.05, 0.94, 0.008), ("Surprised", 0.74, 1.62, -0.022),
+    ):
+        WAVE5.add_shape_key_from_basis(
+            mouth, key_name,
+            (lambda a, b, c: (lambda co: (setattr(co, "x", co.x * a), setattr(co, "z", co.z * b + unit * c))))(sx, sz, dz),
+        )
+
+    face_plane(
+        prefix + "_NoseShade",
+        (0.0, surface_y + unit * 0.012, eye_z - unit * 0.235),
+        (unit * 0.115, unit * 0.150), armature, "head",
+        blush_material(prefix + "_NoseArt", paint_nose_texture(prefix + "_NoseTex", spec)),
+        bow=unit * 0.018,
+    )
+    for suffix, sign in (("L", 1.0), ("R", -1.0)):
+        face_plane(
+            prefix + "_Blush_" + suffix,
+            (sign * unit * 0.255, surface_y + unit * 0.052, eye_z - unit * 0.145),
+            (unit * 0.215, unit * 0.115), armature, "head", blush_art,
+            bow=unit * 0.030,
+        )
+
+    targets["eyes"] = eyes
+    targets["brows"] = brows
+    targets["mouth"] = mouth
+    return eyes, brows, mouth
+
+
 WAVE7_STYLES = {
     "campus": add_campus,
     "barista": add_barista,
@@ -1144,8 +1482,7 @@ def add_style_details_v7(prefix, spec, armature, materials, face_context):
     WAVE6.ensure_detail_materials(prefix, spec, materials)
     WAVE6.add_common_hand_and_foot_detail(prefix, spec, armature, materials)
     refine_face(prefix)
-    reshape_eyes(prefix)
-    add_eye_definition(prefix, spec, armature, materials, face_context)
+    rebuild_painted_face(prefix, spec, armature, materials, face_context)
     builder(prefix, spec, armature, materials, face_context)
 
 
