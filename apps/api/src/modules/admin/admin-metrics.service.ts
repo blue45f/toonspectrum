@@ -36,48 +36,52 @@ async getDashboard(userId: string, periodDays: number): Promise<DashboardRespons
     // PG의 timestamp 컬럼은 epoch-ms 숫자와 직접 비교할 수 없다(범위 초과 오류). Date로 바인딩해 비교.
     const activeFromDate = new Date(activeFrom);
 
-    const [totalUsers, adminCount, creatorCount, fanPostCount, fanReplyCount, reviewReplyCount, reviewCount] = await Promise.all([
-      countFrom(users),
-      countFrom(users, eq(users.role, "admin")),
-      countFrom(users, eq(users.role, "creator")),
-      countFrom(fanPosts),
-      countFrom(fanPostReplies),
-      countFrom(reviewReplies),
-      countFrom(reviews),
-    ]);
-
-    const [activeUsers7d, activeUsers30d] = await Promise.all([
-      countDistinctActiveUsers(activeFrom7d),
-      countDistinctActiveUsers(activeFrom),
-    ]);
-
-    const [activeReviewCount, activeFanPostCount, activeFanReplyCount, activeReviewReplyCount, activeRatingCount] = await Promise.all([
-      countFrom(reviews, sql`${reviews.createdAt} >= ${activeFromDate}`),
-      countFrom(fanPosts, sql`${fanPosts.createdAt} >= ${activeFromDate}`),
-      countFrom(fanPostReplies, sql`${fanPostReplies.createdAt} >= ${activeFromDate}`),
-      countFrom(reviewReplies, sql`${reviewReplies.createdAt} >= ${activeFromDate}`),
-      countFrom(ratings, sql`${ratings.updatedAt} >= ${activeFromDate}`),
-    ]);
-
-    const [revenueSummaryRows, planRows, activePlanRows, campaignRows] = await Promise.all([
-      db
-        .select({
-          pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),
-          approvedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then ${revenueLedger.amountCents} else 0 end), 0)`.as("approvedAmount"),
-          paidAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then ${revenueLedger.amountCents} else 0 end), 0)`.as("paidAmount"),
-          rejectedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then ${revenueLedger.amountCents} else 0 end), 0)`.as("rejectedAmount"),
-          revokedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then ${revenueLedger.amountCents} else 0 end), 0)`.as("revokedAmount"),
-          pendingEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then 1 else 0 end), 0)`.as("pendingEvents"),
-          approvedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then 1 else 0 end), 0)`.as("approvedEvents"),
-          paidEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then 1 else 0 end), 0)`.as("paidEvents"),
-          rejectedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then 1 else 0 end), 0)`.as("rejectedEvents"),
-          revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
-        })
-        .from(revenueLedger)
-        .where(sql`${revenueLedger.createdAt} >= ${activeFromDate}`),
-      countFrom(monetizationPlans),
-      countFrom(monetizationPlans, eq(monetizationPlans.isActive, true)),
-      countFrom(creatorCampaigns),
+    const [
+      [totalUsers, adminCount, creatorCount, fanPostCount, fanReplyCount, reviewReplyCount, reviewCount],
+      [activeUsers7d, activeUsers30d],
+      [activeReviewCount, activeFanPostCount, activeFanReplyCount, activeReviewReplyCount, activeRatingCount],
+      [revenueSummaryRows, planRows, activePlanRows, campaignRows],
+    ] = await Promise.all([
+      Promise.all([
+        countFrom(users),
+        countFrom(users, eq(users.role, "admin")),
+        countFrom(users, eq(users.role, "creator")),
+        countFrom(fanPosts),
+        countFrom(fanPostReplies),
+        countFrom(reviewReplies),
+        countFrom(reviews),
+      ]),
+      Promise.all([
+        countDistinctActiveUsers(activeFrom7d),
+        countDistinctActiveUsers(activeFrom),
+      ]),
+      Promise.all([
+        countFrom(reviews, sql`${reviews.createdAt} >= ${activeFromDate}`),
+        countFrom(fanPosts, sql`${fanPosts.createdAt} >= ${activeFromDate}`),
+        countFrom(fanPostReplies, sql`${fanPostReplies.createdAt} >= ${activeFromDate}`),
+        countFrom(reviewReplies, sql`${reviewReplies.createdAt} >= ${activeFromDate}`),
+        countFrom(ratings, sql`${ratings.updatedAt} >= ${activeFromDate}`),
+      ]),
+      Promise.all([
+        db
+          .select({
+            pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),
+            approvedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then ${revenueLedger.amountCents} else 0 end), 0)`.as("approvedAmount"),
+            paidAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then ${revenueLedger.amountCents} else 0 end), 0)`.as("paidAmount"),
+            rejectedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then ${revenueLedger.amountCents} else 0 end), 0)`.as("rejectedAmount"),
+            revokedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then ${revenueLedger.amountCents} else 0 end), 0)`.as("revokedAmount"),
+            pendingEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then 1 else 0 end), 0)`.as("pendingEvents"),
+            approvedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then 1 else 0 end), 0)`.as("approvedEvents"),
+            paidEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then 1 else 0 end), 0)`.as("paidEvents"),
+            rejectedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then 1 else 0 end), 0)`.as("rejectedEvents"),
+            revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
+          })
+          .from(revenueLedger)
+          .where(sql`${revenueLedger.createdAt} >= ${activeFromDate}`),
+        countFrom(monetizationPlans),
+        countFrom(monetizationPlans, eq(monetizationPlans.isActive, true)),
+        countFrom(creatorCampaigns),
+      ]),
     ]);
 
     const revenueSummary = revenueSummaryRows[0] ?? {};
@@ -188,11 +192,15 @@ async getSystemHealth(userId: string) {
       dbStatus = "error";
     }
 
-    const userCount = await countFrom(users);
-    const reviewCount = await countFrom(reviews);
-    const fanPostCount = await countFrom(fanPosts);
-    const revenueCount = await countFrom(revenueLedger);
-    const config = await getAppConfig();
+    const [[userCount, reviewCount, fanPostCount, revenueCount], config] = await Promise.all([
+      Promise.all([
+        countFrom(users),
+        countFrom(reviews),
+        countFrom(fanPosts),
+        countFrom(revenueLedger),
+      ]),
+      getAppConfig(),
+    ]);
 
     const memory = process.memoryUsage();
     return {

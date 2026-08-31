@@ -118,7 +118,8 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
     if (parsedQuery.status !== "all") where.push(eq(revenueLedger.status, parsedQuery.status));
     const whereClause = where.length === 1 ? where[0] : and(...where);
 
-    const [periodSummary] = await db
+    const [periodSummary, plans, events] = await Promise.all([
+      db
       .select({
         pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),
         approvedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then ${revenueLedger.amountCents} else 0 end), 0)`.as("approvedAmount"),
@@ -132,9 +133,9 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
         revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
       })
       .from(revenueLedger)
-      .where(whereClause);
+      .where(whereClause),
 
-    const plans = await db
+      db
       .select({
         planId: revenueLedger.planId,
         planName: sql<string>`max(${monetizationPlans.name})`.as("planName"),
@@ -143,12 +144,12 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
       })
       .from(revenueLedger)
       .leftJoin(monetizationPlans, eq(monetizationPlans.id, revenueLedger.planId))
-      .where(whereClause)
-      .groupBy(revenueLedger.planId)
-      .orderBy(desc(sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`))
-      .limit(10);
+        .where(whereClause)
+        .groupBy(revenueLedger.planId)
+        .orderBy(desc(sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`))
+        .limit(10),
 
-    const events = await db
+      db
       .select({
         id: revenueLedger.id,
         status: revenueLedger.status,
@@ -170,7 +171,8 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
       .from(revenueLedger)
       .orderBy(desc(revenueLedger.createdAt))
       .where(whereClause)
-      .limit(24);
+      .limit(24),
+    ]);
 
     const summary = periodSummary ?? {};
     return {
@@ -348,9 +350,7 @@ async bulkSetRevenueStatus(userId: string, eventIds: string[], status: RevenueSt
     if (!Array.isArray(eventIds) || !eventIds.length) {
       throw new BadRequestException("대상 정산건을 선택해 주세요.");
     }
-    for (const id of eventIds) {
-      await this.setRevenueStatus(userId, id, { status, note });
-    }
+    await Promise.all(eventIds.map((id) => this.setRevenueStatus(userId, id, { status, note })));
     void logAuditAction(userId, "REVENUE_BULK_STATUS_CHANGE", "revenue", null, { eventIds, status, note });
     return { ok: true, count: eventIds.length };
   }

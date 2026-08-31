@@ -259,6 +259,17 @@ export class AdminController {
     return this.adminService.getSystemHealth(uid);
   }
 
+  @Get("benchmark")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getBenchmark(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query("iterations") iterationsValue?: string,
+  ) {
+    const uid = enforceUserOrError(userId);
+    const iterations = Number.parseInt(iterationsValue ?? "3", 10) || 3;
+    return this.adminService.getBenchmark(uid, iterations);
+  }
+
   @Post("system/maintenance")
   async setMaintenanceMode(
     @Headers("x-user-id") userId: string | undefined,

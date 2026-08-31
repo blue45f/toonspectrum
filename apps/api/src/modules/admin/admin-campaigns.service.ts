@@ -80,13 +80,14 @@ async getCampaigns(userId: string, query: CampaignQuery = {}) {
     };
   }
 
-async upsertCampaign(userId: string, payload: CampaignPayload) {
+  async upsertCampaign(userId: string, payload: CampaignPayload) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
     const parsed = parseCampaignPayload(payload);
 
-    await ensureCreatorExists(parsed.creatorId);
-    if (parsed.planId) await ensureCampaignPlanExists(parsed.planId);
+    const checks: Promise<void>[] = [ensureCreatorExists(parsed.creatorId)];
+    if (parsed.planId) checks.push(ensureCampaignPlanExists(parsed.planId));
+    await Promise.all(checks);
 
     if (parsed.id) {
       const [existing] = await db

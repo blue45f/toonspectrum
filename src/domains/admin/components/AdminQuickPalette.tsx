@@ -11,6 +11,7 @@ import {
   History,
   Download,
   AlertTriangle,
+  Gauge
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -174,6 +175,13 @@ export function AdminQuickPalette({ userId, onSelectTab }: AdminQuickPaletteProp
               >
                 <Download className="w-4 h-4 text-cyan-400" />
                 {t("admin.palette.exportRevenue")}
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => onSelectTab("ops"))}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+              >
+                <Gauge className="w-4 h-4 text-emerald-400" />
+                {t("admin.ops.benchmarkTitle")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("ops"))}

@@ -17,6 +17,31 @@ import {
   MemberStatus,
 } from "./admin-types";
 
+type AdminBenchmarkSampleStatus = "ok" | "partial" | "error";
+
+
+interface AdminBenchmarkAttempt {
+  status: "ok" | "error";
+  durationMs: number;
+  error?: string;
+  sampleSize?: number;
+}
+
+interface AdminBenchmarkSample {
+  name: string;
+  status: AdminBenchmarkSampleStatus;
+  iterations: number;
+  successCount: number;
+  errorCount: number;
+  durationMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  minMs: number;
+  maxMs: number;
+  sampleSize?: number;
+  error?: string;
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -222,5 +247,133 @@ export class AdminService {
 
   async revokeAllSessions(userId: string) {
     return this.adminMetricsService.revokeAllSessions(userId);
+  }
+
+  async getBenchmark(userId: string, iterations = 3) {
+    await this.adminMetricsService.getAdminMe(userId);
+    const normalizedIterations = Math.min(10, Math.max(1, Math.floor(iterations)));
+
+    const summarize = (name: string, attempts: AdminBenchmarkAttempt[]): AdminBenchmarkSample => {
+      const successes = attempts.filter((entry) => entry.status === "ok");
+      const durations = successes.map((entry) => entry.durationMs).sort((a, b) => a - b);
+      const sampleSizes = successes
+        .map((entry) => entry.sampleSize)
+        .filter((size): size is number => typeof size === "number");
+
+      const percentile = (values: number[], ratio: number) => {
+        if (!values.length) return 0;
+        const idx = Math.max(0, Math.min(values.length - 1, Math.ceil(ratio * values.length) - 1));
+        return values[idx] ?? 0;
+      };
+
+      const sumMs = durations.reduce((total, value) => total + value, 0);
+      const minMs = durations[0] ?? 0;
+      const maxMs = durations[durations.length - 1] ?? 0;
+      const avgMs = durations.length ? Math.round(sumMs / durations.length) : 0;
+      const successCount = successes.length;
+      const errorCount = attempts.length - successCount;
+      const sampleSize = sampleSizes[0];
+
+      if (successCount === 0) {
+        const firstError = attempts[0]?.error ?? "요청이 모두 실패했습니다.";
+        return {
+          name,
+          status: "error",
+          iterations: attempts.length,
+          successCount,
+          errorCount,
+          durationMs: 0,
+          p50Ms: 0,
+          p95Ms: 0,
+          minMs: 0,
+          maxMs: 0,
+          error: firstError,
+        };
+      }
+
+      if (errorCount > 0) {
+        return {
+          name,
+          status: "partial",
+          iterations: attempts.length,
+          successCount,
+          errorCount,
+          durationMs: avgMs,
+          p50Ms: percentile(durations, 0.5),
+          p95Ms: percentile(durations, 0.95),
+          minMs,
+          maxMs,
+          sampleSize,
+          error: attempts.find((entry) => entry.error)?.error ?? "일부 요청이 실패했습니다.",
+        };
+      }
+
+      return {
+        name,
+        status: "ok",
+        iterations: attempts.length,
+        successCount,
+        errorCount,
+        durationMs: avgMs,
+        p50Ms: percentile(durations, 0.5),
+        p95Ms: percentile(durations, 0.95),
+        minMs,
+        maxMs,
+        sampleSize,
+      };
+    };
+
+    const run = async <T>(fn: () => Promise<T>): Promise<AdminBenchmarkAttempt> => {
+      const start = Date.now();
+      try {
+        const value = await fn();
+        const durationMs = Date.now() - start;
+        const sampleSize = Array.isArray(value)
+          ? value.length
+          : Array.isArray((value as { items?: unknown[] })?.items)
+            ? ((value as { items: unknown[] }).items.length)
+            : undefined;
+        return { status: "ok", durationMs, sampleSize };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          status: "error",
+          durationMs: Date.now() - start,
+          error: message,
+        };
+      }
+    };
+
+    const runSeries = async <T>(name: string, fn: () => Promise<T>): Promise<AdminBenchmarkSample> => {
+      const attempts: AdminBenchmarkAttempt[] = [];
+      for (let i = 0; i < normalizedIterations; i += 1) {
+        attempts.push(await run(fn));
+      }
+      return summarize(name, attempts);
+    };
+
+    const samples = await Promise.all([
+      runSeries("dashboard_30", () => this.adminMetricsService.getDashboard(userId, 30)),
+      runSeries("revenue_30_pending", () =>
+        this.adminRevenueService.getRevenue(userId, 30, { status: "pending" })
+      ),
+      runSeries("revenue_30_all", () => this.adminRevenueService.getRevenue(userId, 30, { status: "all" })),
+      runSeries("plans", () => this.adminRevenueService.getPlans(userId)),
+      runSeries("campaigns_100", () => this.adminCampaignsService.getCampaigns(userId, { limit: 100 })),
+      runSeries("users_100", () => this.adminMembersService.listUsers(userId, { limit: 100 })),
+      runSeries("promos_100", () => this.adminMetricsService.getPromos(userId)),
+      runSeries("announcements", () => this.adminMetricsService.getAnnouncements(userId)),
+      runSeries("community_posts_100", () =>
+        this.adminModerationService.listCommunityPosts(userId, { scope: "all", limit: 100 } as never)
+      ),
+      runSeries("audit_logs_100", () => this.adminMetricsService.getAuditLogs(userId, { limit: 100 })),
+      runSeries("system_health", () => this.adminMetricsService.getSystemHealth(userId)),
+      runSeries("config", () => this.adminMetricsService.getConfig(userId)),
+    ]);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      samples,
+    };
   }
 }

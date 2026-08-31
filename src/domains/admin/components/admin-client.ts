@@ -78,6 +78,26 @@ export interface RevenueResponse {
   generatedAt: string;
 }
 
+export interface AdminBenchmarkSample {
+  name: string;
+  status: "ok" | "partial" | "error";
+  iterations: number;
+  successCount: number;
+  errorCount: number;
+  durationMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  minMs: number;
+  maxMs: number;
+  sampleSize?: number;
+  error?: string;
+}
+
+export interface AdminBenchmarkResult {
+  generatedAt: string;
+  samples: AdminBenchmarkSample[];
+}
+
 export class AdminApiError extends Error {
   constructor(
     public status: number,

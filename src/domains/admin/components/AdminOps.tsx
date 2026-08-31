@@ -1,7 +1,12 @@
-import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle, ShieldAlert, Gauge } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { adminFetch, formatNum, type AdminApiError } from "./admin-client";
+import {
+  adminFetch,
+  formatNum,
+  type AdminApiError,
+  type AdminBenchmarkResult,
+} from "./admin-client";
 import { AdminNotice, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
@@ -17,6 +22,8 @@ interface AppConfig {
   showSynopsis: boolean;
   showRelatedInfo: boolean;
 }
+
+type ConfigKey = keyof AppConfig;
 // 콘텐츠 노출 킬스위치 — 법적 리스크(저작권·크롤 성과도용) 있는 기능을 즉시 끈다. 기본 ON(노출).
 const CONTENT_KILL_SWITCHES = [
   { key: "showCovers", label: "표지 이미지", desc: "저작권 · 끄면 자체 타이포 커버만 노출" },
@@ -129,44 +136,21 @@ function Section({
   );
 }
 
-function MonetizationToggle({ uid }: { uid: string }) {
-  const [config, setConfig] = useState<AppConfig | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+function MonetizationToggle({
+  config,
+  savingKey,
+  onSave,
+}: {
+  config: AppConfig;
+  savingKey: ConfigKey | null;
+  onSave: (key: ConfigKey, value: boolean) => Promise<void>;
+}) {
   const t = useT();
 
-  useEffect(() => {
-    let alive = true;
-    setError(null);
-    setConfig(null);
-    adminFetch<AppConfig>("/config", uid)
-      .then((c) => alive && setConfig(c))
-      .catch((e: AdminApiError) => alive && setError(e.message));
-    return () => {
-      alive = false;
-    };
-  }, [uid]);
-
   const toggle = async () => {
-    if (!config || saving) return;
     const next = !config.monetizationEnabled;
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await adminFetch<AppConfig>("/config", uid, {
-        method: "POST",
-        body: JSON.stringify({ monetizationEnabled: next }),
-      });
-      setConfig(updated ?? { monetizationEnabled: next });
-    } catch (e) {
-      setError((e as AdminApiError).message);
-    } finally {
-      setSaving(false);
-    }
+    await onSave("monetizationEnabled", next);
   };
-
-  if (error) return <AdminNotice title={t("admin.ops.loadError")} body={error} />;
-  if (!config) return <AdminSpinner />;
 
   const on = config.monetizationEnabled;
 
@@ -183,7 +167,7 @@ function MonetizationToggle({ uid }: { uid: string }) {
           aria-checked={on}
           aria-label={t("admin.ops.monetizationTitle")}
           onClick={() => void toggle()}
-          disabled={saving}
+          disabled={savingKey === "monetizationEnabled"}
           className={[
             "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
             on ? "bg-accent" : "bg-raised",
@@ -202,44 +186,21 @@ function MonetizationToggle({ uid }: { uid: string }) {
   );
 }
 
-function ContentKillSwitches({ uid }: { uid: string }) {
-  const [config, setConfig] = useState<AppConfig | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+function ContentKillSwitches({
+  config,
+  savingKey,
+  onSave,
+}: {
+  config: AppConfig;
+  savingKey: ConfigKey | null;
+  onSave: (key: ConfigKey, value: boolean) => Promise<void>;
+}) {
   const t = useT();
 
-  useEffect(() => {
-    let alive = true;
-    setError(null);
-    setConfig(null);
-    adminFetch<AppConfig>("/config", uid)
-      .then((c) => alive && setConfig(c))
-      .catch((e: AdminApiError) => alive && setError(e.message));
-    return () => {
-      alive = false;
-    };
-  }, [uid]);
-
   const toggle = async (key: keyof AppConfig) => {
-    if (!config || savingKey) return;
     const next = !config[key];
-    setSavingKey(key);
-    setError(null);
-    try {
-      const updated = await adminFetch<AppConfig>("/config", uid, {
-        method: "POST",
-        body: JSON.stringify({ [key]: next }),
-      });
-      setConfig(updated ?? { ...config, [key]: next });
-    } catch (e) {
-      setError((e as AdminApiError).message);
-    } finally {
-      setSavingKey(null);
-    }
+    await onSave(key, next);
   };
-
-  if (error) return <AdminNotice title={t("admin.ops.loadError")} body={error} />;
-  if (!config) return <AdminSpinner />;
 
   return (
     <div className="flex flex-col gap-2">
@@ -523,20 +484,142 @@ function IngestStatusPanel({ reloadToken = 0 }: { reloadToken?: number }) {
   );
 }
 
+function AdminBenchmarkPanel({ uid }: { uid: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<AdminBenchmarkResult | null>(null);
+  const t = useT();
+
+  const run = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await adminFetch<AdminBenchmarkResult>("/benchmark", uid);
+      setResult(next);
+    } catch (e) {
+      setError(await getApiErrorMessage(e, t("admin.ops.benchmarkError")));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        className={adminButtonClass("accent")}
+        onClick={() => void run()}
+        disabled={loading}
+      >
+        <Gauge size={15} /> {loading ? t("admin.ops.runningBenchmark") : t("admin.ops.runBenchmark")}
+      </button>
+
+      {error && <AdminNotice title={t("admin.ops.benchmarkError")} body={error} />}
+
+      {result ? (
+        <div className="rounded-xl border border-line bg-panel p-4">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="font-medium text-fg">{t("admin.ops.benchmarkResult")}</span>
+            <span className="text-fg-3">{formatDateTime(result.generatedAt)}</span>
+          </div>
+          <ul className="mt-3 divide-y divide-line text-sm">
+            {result.samples.map((sample) => (
+              <li key={sample.name} className="py-2.5 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-fg-2">{sample.name}</span>
+                  <span
+                    className={["text-xs font-semibold", sample.status === "ok" ? "text-good" : "text-bad"]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {sample.status}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+                  <span>응답 {formatDuration(sample.durationMs)}</span>
+                  {sample.sampleSize != null && <span>샘플 수 {formatNum(sample.sampleSize)}</span>}
+                  {sample.status === "error" && sample.error && (
+                    <span className="text-bad break-all">오류: {sample.error}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-sm text-fg-3">{t("admin.ops.benchmarkIdle")}</p>
+      )}
+    </div>
+  );
+}
+
 
 export function AdminOps({ uid }: { uid: string }) {
   // 수동 크롤이 끝나면(성공/실패 무관) 수집 상태 패널을 자동 재조회한다.
   const [statusReloadToken, setStatusReloadToken] = useState(0);
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [savingConfigKey, setSavingConfigKey] = useState<ConfigKey | null>(null);
   const t = useT();
+
+  useEffect(() => {
+    let alive = true;
+    setConfigError(null);
+    setConfig(null);
+    adminFetch<AppConfig>("/config", uid)
+      .then((next) => {
+        if (alive) setConfig(next);
+      })
+      .catch((e: AdminApiError) => {
+        if (alive) setConfigError(e.message);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [uid]);
+
+  const saveConfig = useCallback(async (key: ConfigKey, value: boolean) => {
+    setConfigError(null);
+    setSavingConfigKey(key);
+    try {
+      const updated = await adminFetch<AppConfig>("/config", uid, {
+        method: "POST",
+        body: JSON.stringify({ [key]: value }),
+      });
+      setConfig((current) => {
+        if (!current) return current;
+        if (updated) {
+          return { ...current, ...updated };
+        }
+        return { ...current, [key]: value } as AppConfig;
+      });
+    } catch (e) {
+      setConfigError((e as AdminApiError).message);
+    } finally {
+      setSavingConfigKey(null);
+    }
+  }, [uid]);
+
+  if (configError && !config) {
+    return <AdminNotice title={t("admin.ops.loadError")} body={configError} />;
+  }
+
+  if (!config) {
+    return <AdminSpinner />;
+  }
 
   return (
     <div className="flex flex-col gap-6">
+      {configError && <AdminNotice title={t("admin.ops.loadError")} body={configError} />}
+
       <Section
         icon={<DollarSign size={15} />}
         title={t("admin.ops.monetizationTitle")}
         description={t("admin.ops.monetizationDesc")}
       >
-        <MonetizationToggle uid={uid} />
+        <MonetizationToggle config={config} savingKey={savingConfigKey} onSave={saveConfig} />
       </Section>
 
       <Section
@@ -544,7 +627,7 @@ export function AdminOps({ uid }: { uid: string }) {
         title={t("admin.ops.killSwitchTitle")}
         description={t("admin.ops.killSwitchDesc")}
       >
-        <ContentKillSwitches uid={uid} />
+        <ContentKillSwitches config={config} savingKey={savingConfigKey} onSave={saveConfig} />
       </Section>
 
       <Section
@@ -553,6 +636,14 @@ export function AdminOps({ uid }: { uid: string }) {
         description={t("admin.ops.ingestDesc")}
       >
         <ManualIngest onSettled={() => setStatusReloadToken((token) => token + 1)} />
+      </Section>
+
+      <Section
+        icon={<Gauge size={15} />}
+        title={t("admin.ops.benchmarkTitle")}
+        description={t("admin.ops.benchmarkDesc")}
+      >
+        <AdminBenchmarkPanel uid={uid} />
       </Section>
 
       <Section icon={<Database size={15} />} title={t("admin.ops.statusTitle")} description={t("admin.ops.statusDesc")}>

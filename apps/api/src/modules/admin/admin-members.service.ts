@@ -154,16 +154,17 @@ async getUserDetails(userId: string, targetUserId: string) {
 
     if (!target) throw new BadRequestException("해당 회원을 찾을 수 없습니다.");
 
-    const [reviewsCount, fanPostsCount, ratingsCount] = await Promise.all([
-      countFrom(reviews, eq(reviews.userId, targetUserId)),
-      countFrom(fanPosts, eq(fanPosts.userId, targetUserId)),
-      countFrom(ratings, eq(ratings.userId, targetUserId)),
+    const [[reviewsCount, fanPostsCount, ratingsCount], paidRows] = await Promise.all([
+      Promise.all([
+        countFrom(reviews, eq(reviews.userId, targetUserId)),
+        countFrom(fanPosts, eq(fanPosts.userId, targetUserId)),
+        countFrom(ratings, eq(ratings.userId, targetUserId)),
+      ]),
+      db
+        .select({ amount: revenueLedger.amountCents })
+        .from(revenueLedger)
+        .where(and(eq(revenueLedger.payerId, targetUserId), eq(revenueLedger.status, "paid"))),
     ]);
-
-    const paidRows = await db
-      .select({ amount: revenueLedger.amountCents })
-      .from(revenueLedger)
-      .where(and(eq(revenueLedger.payerId, targetUserId), eq(revenueLedger.status, "paid")));
 
     const totalPaidCents = paidRows.reduce((acc, r) => acc + Number(r.amount ?? 0), 0);
 
@@ -184,9 +185,7 @@ async bulkSetUserStatus(userId: string, userIds: string[], status: MemberStatus,
       throw new BadRequestException("대상 회원을 1명 이상 선택해 주세요.");
     }
     const filteredIds = userIds.filter((id) => id !== admin.id);
-    for (const id of filteredIds) {
-      await setUserLifecycleStatus(id, status, reason);
-    }
+    await Promise.all(filteredIds.map((id) => setUserLifecycleStatus(id, status, reason)));
     void logAuditAction(userId, "USER_BULK_STATUS_CHANGE", "user", null, { userIds: filteredIds, status, reason });
     return { ok: true, count: filteredIds.length };
   }
