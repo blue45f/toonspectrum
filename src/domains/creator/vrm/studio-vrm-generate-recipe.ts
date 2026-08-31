@@ -12,7 +12,6 @@ import {
   type StudioVrmExportSceneSnapshot,
 } from "./studio-vrm-export-plan";
 import {
-  STUDIO_VRM_EXPORT_REQUIRED_BONES,
   type StudioVrmExportExpression,
   type StudioVrmExportExpressionPreset,
   type StudioVrmExportFirstPersonAnnotation,
@@ -26,6 +25,7 @@ import {
 import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
 import { meshClamp } from "./studio-vrm-humanoid-mesh-geometry";
 import {
+  STUDIO_VRM_RIG_BONES,
   STUDIO_VRM_RIG_NEUTRAL_HEIGHT,
   STUDIO_VRM_RIG_PARENTS,
   studioVrmRigInverseBindMatrices,
@@ -105,10 +105,10 @@ export function resolveStudioVrmGenerateSeed(input: {
   };
 }
 
-/** 노드 0 은 아마추어, 1..15 는 본, 그 뒤가 스킨드 메시 노드다. */
+/** 노드 0 은 아마추어, 그 뒤가 리그의 본(`STUDIO_VRM_RIG_BONES` 순서), 그 뒤가 스킨드 메시 노드다. */
 const ARMATURE_NODE = 0;
 const FIRST_BONE_NODE = 1;
-const BONE_COUNT = STUDIO_VRM_EXPORT_REQUIRED_BONES.length;
+const BONE_COUNT = STUDIO_VRM_RIG_BONES.length;
 const FIRST_MESH_NODE = FIRST_BONE_NODE + BONE_COUNT;
 
 export type StudioVrmGenerateRecipe = {
@@ -162,7 +162,7 @@ const STUDIO_VRM_GENERATE_BLINK_OVERRIDES: Readonly<Record<string, "block" | "bl
 /** 본 인덱스 맵. `humanBones` 와 노드 자식 배열이 같은 규약을 쓰도록 한 곳에서 만든다. */
 function humanoidBones(): StudioVrmExportHumanoidBones {
   return Object.fromEntries(
-    STUDIO_VRM_EXPORT_REQUIRED_BONES.map((bone, index) => [bone, index + FIRST_BONE_NODE]),
+    STUDIO_VRM_RIG_BONES.map((bone, index) => [bone, index + FIRST_BONE_NODE]),
   ) as StudioVrmExportHumanoidBones;
 }
 
@@ -177,7 +177,7 @@ function buildBoneNodes(
   headChildren: readonly number[] = [],
 ): StudioVrmExportNode[] {
   const childrenOf = new Map<string, number[]>();
-  STUDIO_VRM_EXPORT_REQUIRED_BONES.forEach((bone, index) => {
+  STUDIO_VRM_RIG_BONES.forEach((bone, index) => {
     const parent = STUDIO_VRM_RIG_PARENTS[bone];
     if (parent === null) return;
     const siblings = childrenOf.get(parent) ?? [];
@@ -188,7 +188,7 @@ function buildBoneNodes(
     childrenOf.set("head", [...(childrenOf.get("head") ?? []), ...headChildren]);
   }
 
-  return STUDIO_VRM_EXPORT_REQUIRED_BONES.map((bone) => {
+  return STUDIO_VRM_RIG_BONES.map((bone) => {
     const children = childrenOf.get(bone);
     const scale = rig.nodeScale[bone];
     return {
@@ -322,16 +322,18 @@ function buildHairSpringBone(
 ): StudioVrmExportSpringBoneConfig {
   const spine = rig.worldRest.spine;
   const unit = rig.heightScale * STUDIO_VRM_RIG_NEUTRAL_HEIGHT;
-  const spineNode = STUDIO_VRM_EXPORT_REQUIRED_BONES.indexOf("spine") + FIRST_BONE_NODE;
+  const spineNode = STUDIO_VRM_RIG_BONES.indexOf("spine") + FIRST_BONE_NODE;
   const torsoNominal = 0.076 * unit;
   // 캡슐의 **외곽**이 엉덩이~어깨가 되도록 끝점을 반경만큼 안으로 넣는다. 예전처럼 끝점을
   // 그대로 두면 위쪽 반구가 어깨보다 반경만큼(12cm) 더 올라가 목과 목덜미를 통째로 삼켰고,
   // 정지 상태의 나페·포니테일 뿌리가 그 안에 들어가 첫 프레임부터 3cm 밀려났다.
   const spanBottom = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
   const spanTop = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
-  const torsoMid = (spanBottom + spanTop) / 2;
-  const bottomY = Math.min(torsoMid, spanBottom + torsoNominal);
-  const topY = Math.max(torsoMid, spanTop - torsoNominal);
+  // 끝점은 엉덩이·어깨 관절에 **그대로** 둔다. 반경만큼 안으로 넣어 겉면을 맞추던 방식은
+  // 두 가지를 깨뜨렸다 — 체형이 바뀔 때 반경은 굵기(불변)를 따르고 끝점은 관절(가변)을 따르므로
+  // 인셋이 함께 커지지 않아 캡슐이 어깨에서 7cm 모자랐고, 애초에 그 인셋은 캡슐이 목덜미를
+  // 삼키지 못하게 하려던 장치인데 지금은 `fitRadiusInsideHair` 가 정지 헤어를 기준으로 반경을
+  // 직접 줄여 같은 일을 더 정확히 한다. 관절에 붙여 두면 체형 배율이 그대로 곱해진다.
 
   // 두개골 캡슐 — 앞머리·옆머리가 이제 스프링 체인이라, 이게 없으면 고개를 흔들 때
   // 얼굴을 그대로 통과한다(실측: 두개골 정규거리 0.19~0.24 까지, 1.0 이 표면이다).
@@ -360,12 +362,12 @@ function buildHairSpringBone(
   // 그러지 않으면 rest 자체가 평형이 아니어서, 고개를 전혀 움직이지 않아도 첫 프레임부터
   // 앞머리가 앞으로 튀어나간다.
   // 몸통도 같은 원칙으로 정지 헤어 안쪽에 넣는다. 끝점은 위에서 정한 채로 반경만 줄인다.
-  const torsoRadius = fitRadiusInsideHair(
-    torsoNominal,
-    (radius) =>
-      hairJointClearance(hairRig, [0, 0, 0], (point) =>
-        segmentDistance(point, [spine[0], bottomY, spine[2]], [spine[0], topY, spine[2]]) - radius,
-      ),
+  const bottomY = spanBottom;
+  const topY = spanTop;
+  const torsoRadius = fitRadiusInsideHair(torsoNominal, (radius) =>
+    hairJointClearance(hairRig, [0, 0, 0], (point) =>
+      segmentDistance(point, [spine[0], bottomY, spine[2]], [spine[0], topY, spine[2]]) - radius,
+    ),
   );
   const fit = skullColliderFit(skull, hairRig, headJoint);
   const verticalRadius = fit * Math.min(skull.radiusX, skull.radiusZ);

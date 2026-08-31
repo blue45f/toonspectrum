@@ -125,13 +125,159 @@ describe("studio VRM humanoid rig", () => {
     }
   });
 
-  it("only scales leaf bones, so no rotated child can inherit a shear", () => {
-    const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+  it("keeps any scale a bone with children carries strictly uniform, so nothing inherits a shear", () => {
+    // 전단은 **비균등** 스케일 아래에서 자식이 회전할 때 생긴다. 그래서 규약은 두 갈래다:
+    // 비균등 조형 스케일(얼굴 비율)은 말단에만, 자식을 이고 있는 본은 균등만.
+    const rig = buildStudioVrmRig({
+      proportions: { ...NEUTRAL.proportions, handScale: 1.4, footScale: 0.7 },
+      face: { ...NEUTRAL.face, headWidth: 1.3, headHeight: 0.8 },
+    });
     const parents = new Set(
       rig.bones.map((bone) => STUDIO_VRM_RIG_PARENTS[bone]).filter((bone) => bone !== null),
     );
+    let nonUniformLeaves = 0;
     for (const bone of Object.keys(rig.nodeScale) as StudioVrmRigBone[]) {
-      expect(parents.has(bone), `${bone} 에 스케일이 붙었는데 자식이 있다`).toBe(false);
+      const scale = rig.nodeScale[bone];
+      if (!scale) continue;
+      const uniformScale = scale[0] === scale[1] && scale[1] === scale[2];
+      if (parents.has(bone)) {
+        expect(uniformScale, `${bone} 은 자식을 이고 있는데 스케일이 비균등이다`).toBe(true);
+      } else if (!uniformScale) {
+        nonUniformLeaves += 1;
+      }
+    }
+    // 얼굴 조형이 실제로 비균등으로 실려 있어야 이 테스트가 의미가 있다.
+    expect(nonUniformLeaves).toBeGreaterThan(0);
+  });
+
+  it("flattens fingers along the palm normal, not across the palm", () => {
+    // 고리 기저를 손바닥 법선이 아니라 이웃 방향에서 세우면 손가락이 좌우로 좁아진다 —
+    // 너클 간격은 서로 닿도록 잡아 두었는데 그만큼 틈이 벌어지고, 단면도 세로로 선 모양이 된다.
+    const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+    const mesh = buildStudioVrmHumanoidMesh(NEUTRAL);
+    const body = mesh.parts.find((part) => part.nodeName === "Body");
+    if (!body) throw new Error("expected a body part");
+    const primitive = body.primitives[0];
+    const joints = primitive.joints ?? [];
+    const weights = primitive.weights ?? [];
+    const extentsOf = (bone: StudioVrmRigBone) => {
+      const index = rig.jointIndex[bone];
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (let vertex = 0; vertex < primitive.positions.length / 3; vertex += 1) {
+        let weight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          if ((joints[vertex * 4 + slot] ?? -1) === index) weight += weights[vertex * 4 + slot] ?? 0;
+        }
+        if (weight < 0.4) continue;
+        minY = Math.min(minY, primitive.positions[vertex * 3 + 1]);
+        maxY = Math.max(maxY, primitive.positions[vertex * 3 + 1]);
+        minZ = Math.min(minZ, primitive.positions[vertex * 3 + 2]);
+        maxZ = Math.max(maxZ, primitive.positions[vertex * 3 + 2]);
+      }
+      return { height: maxY - minY, width: maxZ - minZ, minZ, maxZ };
+    };
+
+    const middle = extentsOf("leftMiddleIntermediate");
+    expect(middle.height).toBeGreaterThan(0);
+    // 손가락은 위아래로 납작하다 — 손바닥 법선 방향이 좁고, 손바닥을 가로지르는 방향이 넓다.
+    expect(middle.height / middle.width, "손가락이 손바닥을 가로질러 눌렸다").toBeLessThan(1);
+
+    // 그리고 이웃 손가락이 서로 닿을 만큼 붙어 있다.
+    const index = extentsOf("leftIndexIntermediate");
+    expect(index.minZ - middle.maxZ, "이웃 손가락 사이가 벌어졌다").toBeLessThan(0.005);
+  });
+
+  it("gives every finger its own UV lane so painting one does not paint the rest", () => {
+    // Body 는 머티리얼이 하나뿐이라 UV 가 겹치면 표면 페인팅이 같은 텍셀을 공유한다. 손가락이
+    // 없던 시절의 사각형 하나를 다섯 손가락이 그대로 나눠 쓰면, 검지에 칠한 획이 중지·약지·
+    // 새끼·엄지에 그대로 복제된다.
+    const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+    const mesh = buildStudioVrmHumanoidMesh(NEUTRAL);
+    const body = mesh.parts.find((part) => part.nodeName === "Body");
+    if (!body) throw new Error("expected a body part");
+    const primitive = body.primitives[0];
+    const joints = numbers(primitive.joints as readonly number[] | undefined);
+    const weights = numbers(primitive.weights);
+    const uvs = numbers(primitive.uvs);
+    expect(uvs.length).toBeGreaterThan(0);
+
+    const uSpan = (bones: readonly StudioVrmRigBone[]) => {
+      const indices = new Set(bones.map((bone) => rig.jointIndex[bone]));
+      let min = Infinity;
+      let max = -Infinity;
+      for (let vertex = 0; vertex * 3 < primitive.positions.length; vertex += 1) {
+        let weight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          if (indices.has(joints[vertex * 4 + slot] ?? -1)) weight += weights[vertex * 4 + slot] ?? 0;
+        }
+        // 손가락 마디에만 온전히 실린 정점만 본다 — 너클 혼합 고리는 손바닥과 공유한다.
+        if (weight < 0.999) continue;
+        min = Math.min(min, uvs[vertex * 2]);
+        max = Math.max(max, uvs[vertex * 2]);
+      }
+      return { min, max };
+    };
+
+    const lanes = (["left", "right"] as const).flatMap((prefix) =>
+      (
+        [
+          [`${prefix}IndexProximal`, `${prefix}IndexIntermediate`, `${prefix}IndexDistal`],
+          [`${prefix}MiddleProximal`, `${prefix}MiddleIntermediate`, `${prefix}MiddleDistal`],
+          [`${prefix}RingProximal`, `${prefix}RingIntermediate`, `${prefix}RingDistal`],
+          [`${prefix}LittleProximal`, `${prefix}LittleIntermediate`, `${prefix}LittleDistal`],
+          [`${prefix}ThumbMetacarpal`, `${prefix}ThumbProximal`, `${prefix}ThumbDistal`],
+        ] as unknown as readonly (readonly StudioVrmRigBone[])[]
+      ).map((bones) => ({ name: bones[0], span: uSpan(bones) })),
+    );
+    expect(lanes).toHaveLength(10);
+
+    for (const lane of lanes) {
+      expect(Number.isFinite(lane.span.min), `${lane.name} 에 실린 정점이 없다`).toBe(true);
+      expect(lane.span.max, `${lane.name} 레인이 비어 있다`).toBeGreaterThan(lane.span.min);
+    }
+    // 열 개 레인이 서로 겹치지 않아야 한다.
+    for (let a = 0; a < lanes.length; a += 1) {
+      for (let b = a + 1; b < lanes.length; b += 1) {
+        const overlap =
+          Math.min(lanes[a].span.max, lanes[b].span.max) -
+          Math.max(lanes[a].span.min, lanes[b].span.min);
+        expect(overlap, `${lanes[a].name} 과 ${lanes[b].name} 의 UV 가 겹친다`).toBeLessThanOrEqual(0);
+      }
+    }
+    // 그리고 다른 파트의 사각형을 침범하면 안 된다 — 손가락 블록은 v 0.41~0.69 이다.
+    for (let vertex = 0; vertex * 3 < primitive.positions.length; vertex += 1) {
+      const u = uvs[vertex * 2];
+      const v = uvs[vertex * 2 + 1];
+      expect(u, "UV 가 0~1 밖으로 나갔다").toBeGreaterThanOrEqual(0);
+      expect(u).toBeLessThanOrEqual(1);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("places finger joints under the hand and lets the hand scale carry them", () => {
+    // 손 노드에는 균등 `handScale` 이 붙어 있고 손가락은 그 자식이다. 월드 rest 누적이 조상
+    // 스케일을 반영하지 않으면 IBM(이동만 담는다)이 가리키는 위치와 씬 그래프가 놓는 위치가
+    // 어긋나 손가락이 통째로 날아간다.
+    const neutral = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+    const scaled = buildStudioVrmRig({
+      proportions: { ...NEUTRAL.proportions, handScale: 1.5 },
+      face: NEUTRAL.face,
+    });
+    for (const prefix of ["left", "right"] as const) {
+      const hand = `${prefix}Hand` as StudioVrmRigBone;
+      const tip = `${prefix}MiddleDistal` as StudioVrmRigBone;
+      expect(STUDIO_VRM_RIG_PARENTS[`${prefix}MiddleProximal` as StudioVrmRigBone]).toBe(hand);
+      const neutralReach = Math.abs(neutral.worldRest[tip][0] - neutral.worldRest[hand][0]);
+      const scaledReach = Math.abs(scaled.worldRest[tip][0] - scaled.worldRest[hand][0]);
+      expect(neutralReach).toBeGreaterThan(0);
+      expect(scaledReach / neutralReach, `${prefix} 손가락이 손 스케일을 따라가지 않았다`).toBeCloseTo(
+        1.5,
+        9,
+      );
     }
   });
 });

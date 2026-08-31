@@ -20,6 +20,7 @@ import {
   resolveStudioVrmGenerateSeed,
   STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
 } from "./studio-vrm-generate-recipe";
+import { STUDIO_VRM_RIG_BONES } from "./studio-vrm-humanoid-rig";
 import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import { validateVrmGlbBytes } from "./vrm-library";
 
@@ -188,7 +189,11 @@ describe("exportStudioVrmFromGenerateRecipe", () => {
     const humanoidB = inspectGeneratedVrmHumanoid(bytesB);
     expect(humanoidA.isCompleteHumanoid).toBe(true);
     expect(humanoidB.isCompleteHumanoid).toBe(true);
-    expect(humanoidA.humanoidBoneNames).toEqual([...STUDIO_VRM_EXPORT_REQUIRED_BONES].sort());
+    // 리그가 굽는 본 = VRM 이 요구하는 15본 + 손가락 30본. 두 목록은 역할이 다르다.
+    expect(humanoidA.humanoidBoneNames).toEqual([...STUDIO_VRM_RIG_BONES].sort());
+    for (const required of STUDIO_VRM_EXPORT_REQUIRED_BONES) {
+      expect(humanoidA.humanoidBoneNames, `${required} 누락`).toContain(required);
+    }
 
     const reloadedA = await reloadGeneratedVrmAsHumanoid(bytesA);
     const reloadedB = await reloadGeneratedVrmAsHumanoid(bytesB);

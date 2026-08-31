@@ -224,15 +224,22 @@ function torsoSkin(rig: StudioVrmRig, y: number, h: number): MeshSkinBinding {
 /**
  * Body 메시는 머티리얼이 하나뿐이라 파트끼리 UV 가 겹치면 안 된다(표면 페인팅·텍스처 채우기가
  * 같은 텍스처를 공유하므로). 파트마다 서로 겹치지 않는 사각형을 할당한다.
+ *
+ * 손가락 블록은 손 하나당 다섯 레인으로 다시 쪼개진다 — {@link fingerLane} 참고.
  */
+/** 손가락 레인 사이 거터. 필터링으로 이웃 손가락 텍셀이 새어 들어오는 것을 막는다. */
+const UV_FINGER_GUTTER = 0.002;
+
 const UV = Object.freeze({
   torso: [0.0, 0.0, 0.5, 0.36] as MeshUvRect,
   armLeft: [0.5, 0.0, 0.74, 0.18] as MeshUvRect,
   armRight: [0.75, 0.0, 0.99, 0.18] as MeshUvRect,
   handLeft: [0.5, 0.19, 0.61, 0.29] as MeshUvRect,
   handRight: [0.62, 0.19, 0.73, 0.29] as MeshUvRect,
-  thumbLeft: [0.74, 0.19, 0.81, 0.29] as MeshUvRect,
-  thumbRight: [0.82, 0.19, 0.89, 0.29] as MeshUvRect,
+  // 손가락은 다섯 개가 **각자** 레인을 갖는다. 엄지 하나만 있던 시절의 사각형 하나를 그대로
+  // 물려주면 다섯 손가락이 같은 좌표에 겹쳐, 검지에 칠한 획이 나머지 넷에 그대로 복제된다.
+  fingersLeft: [0.5, 0.41, 0.74, 0.69] as MeshUvRect,
+  fingersRight: [0.75, 0.41, 0.99, 0.69] as MeshUvRect,
   legLeft: [0.0, 0.37, 0.24, 0.69] as MeshUvRect,
   legRight: [0.25, 0.37, 0.49, 0.69] as MeshUvRect,
   footLeft: [0.5, 0.3, 0.63, 0.4] as MeshUvRect,
@@ -427,32 +434,150 @@ function buildArm(
   addLoft(builder, rings, { segments: LIMB_SEGMENTS, uvRect, capStart: true });
 }
 
-/** 손 — 손바닥이 아래를 보는 T 포즈 기준으로 Y 로 얇고 Z 로 넓다. */
+/**
+ * 방향에 수직인 고리. 손가락처럼 비스듬히 뻗는 마디도 단면이 찌그러지지 않는다.
+ *
+ * `flatten` 은 **손바닥 법선** 방향에 걸린다 — 손가락은 위아래로 납작하지 좌우로 좁지 않다.
+ */
+function tubeRing(
+  center: MeshVec3,
+  direction: MeshVec3,
+  radius: number,
+  flatten: number,
+  skin: MeshSkinBinding,
+  texV: number,
+): LoftRing {
+  const length = Math.hypot(direction[0], direction[1], direction[2]) || 1;
+  const axis: MeshVec3 = [direction[0] / length, direction[1] / length, direction[2] / length];
+  // 손바닥 법선(+Y)을 기준으로 기저를 세운다. 축과 나란해지면 외적이 0 으로 무너지므로 그때만
+  // 다른 축을 쓴다.
+  const up: MeshVec3 = Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  // `side` = axis × up — 손가락이 서로 이웃하는 방향.
+  const side: MeshVec3 = [
+    axis[1] * up[2] - axis[2] * up[1],
+    axis[2] * up[0] - axis[0] * up[2],
+    axis[0] * up[1] - axis[1] * up[0],
+  ];
+  const sideLength = Math.hypot(side[0], side[1], side[2]) || 1;
+  const unitSide: MeshVec3 = [side[0] / sideLength, side[1] / sideLength, side[2] / sideLength];
+  // `normal` = side × axis — 손바닥 법선. 납작함은 **이쪽**에 준다. 이웃 방향(`side`)을 눌러
+  // 버리면 손가락이 가늘어져 너클 간격만큼 벌어진 채 서로 닿지 않는다.
+  const normal: MeshVec3 = [
+    unitSide[1] * axis[2] - unitSide[2] * axis[1],
+    unitSide[2] * axis[0] - unitSide[0] * axis[2],
+    unitSide[0] * axis[1] - unitSide[1] * axis[0],
+  ];
+  return {
+    center,
+    u: [
+      normal[0] * radius * flatten,
+      normal[1] * radius * flatten,
+      normal[2] * radius * flatten,
+    ],
+    v: [unitSide[0] * radius, unitSide[1] * radius, unitSide[2] * radius],
+    skin,
+    texV,
+  };
+}
+
+function subtractVec(a: MeshVec3, b: MeshVec3): MeshVec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+/**
+ * 손가락 하나 — 마디 관절을 그대로 훑어 끝까지 테이퍼되는 튜브.
+ *
+ * 고리는 각 관절에서 **두 마디에 반씩 실어** 굽힐 때 관절이 끊기지 않게 한다. 끝마디는 리그에
+ * 자식이 없으므로 마지막 마디 방향으로 조금 더 뻗어 손톱 쪽을 만든다.
+ */
+function buildFinger(
+  builder: SurfaceBuilder,
+  rig: StudioVrmRig,
+  hand: StudioVrmRigBone,
+  chain: readonly [StudioVrmRigBone, StudioVrmRigBone, StudioVrmRigBone],
+  radius: number,
+  uvRect: MeshUvRect,
+): void {
+  const [proximal, intermediate, distal] = chain;
+  const knuckle = rig.worldRest[proximal];
+  const middle = rig.worldRest[intermediate];
+  const tipJoint = rig.worldRest[distal];
+  const lastSegment = subtractVec(tipJoint, middle);
+  const tip: MeshVec3 = [
+    tipJoint[0] + lastSegment[0] * 0.8,
+    tipJoint[1] + lastSegment[1] * 0.8,
+    tipJoint[2] + lastSegment[2] * 0.8,
+  ];
+  // 손가락은 손바닥 방향으로 살짝 납작하다.
+  const flatten = 0.82;
+  const stops: readonly (readonly [
+    center: MeshVec3,
+    direction: MeshVec3,
+    scale: number,
+    skin: MeshSkinBinding,
+  ])[] = [
+    [knuckle, subtractVec(middle, knuckle), 1, mix(rig, hand, proximal, 0.55)],
+    [middle, subtractVec(tipJoint, knuckle), 0.88, mix(rig, proximal, intermediate, 0.55)],
+    [tipJoint, subtractVec(tip, middle), 0.76, mix(rig, intermediate, distal, 0.55)],
+    [tip, lastSegment, 0.42, only(rig, distal)],
+  ];
+  addLoft(
+    builder,
+    stops.map(([center, direction, scale, skin], index) =>
+      tubeRing(center, direction, radius * scale, flatten, skin, index / (stops.length - 1)),
+    ),
+    { segments: 8, uvRect, capEnd: true },
+  );
+}
+
+/**
+ * 손 — 손바닥이 아래를 보는 T 포즈 기준으로 Y 로 얇고 Z 로 넓다.
+ *
+ * 손바닥은 손목에서 너클까지만 덮고, 그 앞은 손가락 다섯 개가 자기 본을 달고 뻗는다. 예전에는
+ * 손 전체가 벙어리장갑 하나에 엄지 돌기를 붙인 형태였고 손가락 본이 아예 없어서, 포즈 라이브러리나
+ * 리타게팅이 손가락을 굽힐 대상 자체가 없었다.
+ */
+/**
+ * 손가락 블록의 `index` 번째 세로 레인.
+ *
+ * 양쪽에 거터를 둬서 이웃 레인의 텍셀이 바이리니어 필터로 새어 들어오지 않게 한다.
+ */
+function fingerLane(block: MeshUvRect, index: number, count: number): MeshUvRect {
+  const [u0, v0, u1, v1] = block;
+  const width = (u1 - u0) / count;
+  const start = u0 + width * index;
+  return [start + UV_FINGER_GUTTER, v0, start + width - UV_FINGER_GUTTER, v1];
+}
+
 function buildHand(
   builder: SurfaceBuilder,
   rig: StudioVrmRig,
   side: 1 | -1,
   palmRect: MeshUvRect,
-  thumbRect: MeshUvRect,
+  fingersRect: MeshUvRect,
 ): void {
-  const unit = bodyUnit(rig);
+  // 손 굵기는 관절 간격과 같은 배율로 굽는다 — 노드 스케일이 아니라 기하에 들어가야
+  // 손가락이 바인드에서 한 번 더 스케일되지 않는다.
+  const unit = bodyUnit(rig) * rig.handScale;
   const hand = side > 0 ? "leftHand" : "rightHand";
   const lower = side > 0 ? "leftLowerArm" : "rightLowerArm";
+  const prefix = side > 0 ? "left" : "right";
   const [wristX, y, z] = rig.worldRest[hand];
-  const reach = 0.07 * unit * side;
+  // 손바닥은 너클까지. 손가락은 그 앞을 자기 본으로 잇는다.
+  const knuckleX = rig.worldRest[`${prefix}MiddleProximal` as StudioVrmRigBone][0];
+  const palmReach = knuckleX - wristX;
 
   const stops: readonly (readonly [t: number, ry: number, rz: number, skin: MeshSkinBinding])[] = [
-    [0, 0.0165, 0.019, mix(rig, lower, hand, 0.6)],
-    [0.26, 0.015, 0.027, only(rig, hand)],
-    [0.6, 0.0132, 0.027, only(rig, hand)],
-    [0.85, 0.0105, 0.022, only(rig, hand)],
-    [1, 0.006, 0.013, only(rig, hand)],
+    [0, 0.0165 / rig.handScale, 0.018 / rig.handScale, mix(rig, lower, hand, 0.6)],
+    [0.34, 0.015, 0.024, only(rig, hand)],
+    [0.78, 0.0135, 0.025, only(rig, hand)],
+    [1, 0.0125, 0.024, only(rig, hand)],
   ];
   addLoft(
     builder,
     stops.map(([t, ry, rz, skin], index) =>
       lateralRing(
-        [wristX + reach * t, y, z],
+        [wristX + palmReach * t, y, z],
         ry * unit,
         rz * unit,
         skin,
@@ -463,25 +588,39 @@ function buildHand(
     { segments: LIMB_SEGMENTS, uvRect: palmRect, capEnd: true },
   );
 
-  // 엄지 — 손목 근처에서 앞(+Z)으로 뻗는 짧은 원뿔. 실루엣이 손으로 읽히게 하는 최소 장치.
-  const thumbBaseX = wristX + reach * 0.2;
-  const thumbStops: readonly (readonly [t: number, radius: number])[] = [
-    [0, 0.011],
-    [0.5, 0.0095],
-    [1, 0.0055],
+  // 반경은 너클 간격(`fingerSpread`)의 절반을 넘지 않아야 이웃 손가락과 겹치지 않는다.
+  const fingers: readonly (readonly [name: string, radius: number])[] = [
+    ["Index", 0.0062],
+    ["Middle", 0.0065],
+    ["Ring", 0.006],
+    ["Little", 0.0052],
   ];
-  addLoft(
+  const laneCount = fingers.length + 1;
+  fingers.forEach(([name, radius], index) => {
+    buildFinger(
+      builder,
+      rig,
+      hand,
+      [
+        `${prefix}${name}Proximal` as StudioVrmRigBone,
+        `${prefix}${name}Intermediate` as StudioVrmRigBone,
+        `${prefix}${name}Distal` as StudioVrmRigBone,
+      ],
+      radius * unit,
+      fingerLane(fingersRect, index, laneCount),
+    );
+  });
+  buildFinger(
     builder,
-    thumbStops.map(([t, radius], index) =>
-      verticalRing(
-        [thumbBaseX + reach * 0.18 * t, y - 0.004 * unit, z + 0.036 * unit * t],
-        radius * unit,
-        radius * unit,
-        only(rig, hand),
-        index / (thumbStops.length - 1),
-      ),
-    ),
-    { segments: 10, uvRect: thumbRect, capStart: true, capEnd: true },
+    rig,
+    hand,
+    [
+      `${prefix}ThumbMetacarpal` as StudioVrmRigBone,
+      `${prefix}ThumbProximal` as StudioVrmRigBone,
+      `${prefix}ThumbDistal` as StudioVrmRigBone,
+    ],
+    0.008 * unit,
+    fingerLane(fingersRect, fingers.length, laneCount),
   );
 }
 
@@ -1668,7 +1807,7 @@ export type StudioVrmHumanoidMesh = {
   readonly morphTargetNames: readonly string[];
   /**
    * 헤어 가닥이 매달린 체인 조인트. 가닥이 없으면(짧은 머리·헤어 없음) `null`.
-   * 스킨 `joints` 는 휴머노이드 15본 **뒤에** 이 순서대로 이어 붙는다.
+   * 스킨 `joints` 는 휴머노이드 본(`STUDIO_VRM_RIG_BONES`) **뒤에** 이 순서대로 이어 붙는다.
    */
   readonly hairRig: StudioVrmHairRig | null;
 };
@@ -1702,8 +1841,8 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
   buildHead(body, rig, surface);
   buildArm(body, rig, 1, UV.armLeft);
   buildArm(body, rig, -1, UV.armRight);
-  buildHand(body, rig, 1, UV.handLeft, UV.thumbLeft);
-  buildHand(body, rig, -1, UV.handRight, UV.thumbRight);
+  buildHand(body, rig, 1, UV.handLeft, UV.fingersLeft);
+  buildHand(body, rig, -1, UV.handRight, UV.fingersRight);
   buildLeg(body, rig, 1, UV.legLeft);
   buildLeg(body, rig, -1, UV.legRight);
   buildFoot(body, rig, 1, UV.footLeft);

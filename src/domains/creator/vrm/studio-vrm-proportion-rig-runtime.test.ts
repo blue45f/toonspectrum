@@ -33,6 +33,7 @@ type RigFixtureOptions = {
   readonly rotatedBones?: ReadonlySet<StudioHumanoidBoneName>;
   readonly rotatedBoneEuler?: readonly [number, number, number];
   readonly includeManagers?: boolean;
+  readonly includeColliderSync?: boolean;
   readonly rootTransform?: {
     readonly position: readonly [number, number, number];
     readonly rotation: readonly [number, number, number];
@@ -67,6 +68,13 @@ function expectRig(
   expected: ReadonlyMap<StudioHumanoidBoneName, Transform>
 ) {
   for (const [name, node] of nodes) expectTransform(node, expected.get(name)!);
+}
+
+function isDescendant(node: THREE.Object3D, ancestor: THREE.Object3D): boolean {
+  for (let cursor = node.parent; cursor; cursor = cursor.parent) {
+    if (cursor === ancestor) return true;
+  }
+  return false;
 }
 
 function nearestIncludedParent(
@@ -145,6 +153,8 @@ function createRigFixture(options: RigFixtureOptions = {}) {
   );
   const authoredRoot = snapshotTransform(root);
   const events: string[] = [];
+  const colliderScales: number[] = [];
+  const colliderScaledRoots: ReadonlySet<THREE.Object3D>[] = [];
   let generation = 1;
   let activeNodes: ReadonlyMap<StudioHumanoidBoneName, THREE.Object3D> = nodes;
   let failSpringCount = 0;
@@ -218,6 +228,19 @@ function createRigFixture(options: RigFixtureOptions = {}) {
             failSpringCount -= 1;
             return false;
           },
+          ...(options.includeColliderSync === false
+            ? {}
+            : {
+                syncSpringBoneColliderShapes: (
+                  uniformScale: number,
+                  scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
+                ) => {
+                  events.push("colliders");
+                  colliderScales.push(uniformScale);
+                  colliderScaledRoots.push(scaledSubtreeRoots);
+                  return true;
+                },
+              }),
         }),
     reapplyAuthoredPose: () => {
       events.push("pose");
@@ -232,6 +255,8 @@ function createRigFixture(options: RigFixtureOptions = {}) {
 
   return {
     adapter,
+    colliderScales,
+    colliderScaledRoots,
     events,
     headLength: options.headLength ?? REFERENCE.headLength,
     intermediaries,
@@ -497,12 +522,20 @@ describe("studio-vrm-proportion-rig-runtime", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(fixture.events).toEqual(["reset", "rebuild", "constraint", "spring", "pose"]);
+    expect(fixture.events).toEqual([
+      "reset",
+      "rebuild",
+      "constraint",
+      "colliders",
+      "spring",
+      "pose",
+    ]);
     expect(result.stages).toEqual([
       "reset-normalized-pose-and-sync-raw-rest",
       "write-raw-proportion-targets",
       "rebuild-normalized-rig",
       "set-node-constraint-init-state",
+      "sync-spring-bone-colliders",
       "set-spring-bone-init-state",
       "reapply-authored-pose",
     ]);
@@ -515,6 +548,172 @@ describe("studio-vrm-proportion-rig-runtime", () => {
     expect(originalNormalizedRoot.parent).toBeNull();
     expect(fixture.normalizedRoot.parent).toBe(fixture.normalizedMount);
     expect(fixture.normalizedMount.children.indexOf(fixture.normalizedRoot)).toBe(originalSiblingIndex);
+  });
+
+  it("keeps a leaf's non-uniform sculpt scale and only multiplies it uniformly", () => {
+    // Sculpting rigs put shape on leaves, so `head` legitimately carries a non-uniform rest scale.
+    // Collapsing it to its mean flattened the face the moment any body slider moved, and requiring
+    // uniformity outright rejected 18 of the 21 shipped generated presets outright.
+    const fixture = createRigFixture();
+    // A bone with no humanoid bone beneath it. Generated characters put the face sculpt on `head`,
+    // which is a leaf there; this fixture models a full humanoid where `head` still carries eyes.
+    const leaf = [...fixture.nodes.entries()].find(
+      ([, node]) => ![...fixture.nodes.values()].some((other) => other !== node && isDescendant(other, node)),
+    );
+    expect(leaf).toBeDefined();
+    if (!leaf) return;
+    const [, sculpted] = leaf;
+    sculpted.scale.set(1.05, 0.94, 1);
+    sculpted.updateMatrix();
+    fixture.root.updateMatrixWorld(true);
+
+    const runtime = runtimeFor(fixture);
+    const result = runtime.apply(createStudioVrmProportions("sd-chibi-3"));
+    expect(result.ok).toBe(true);
+
+    // The authored aspect ratio survives; the factor the runtime introduced is the same on all axes.
+    expect(sculpted.scale.x / sculpted.scale.y).toBeCloseTo(1.05 / 0.94, 12);
+    expect(sculpted.scale.x / 1.05).toBeCloseTo(sculpted.scale.z / 1, 12);
+    expect(sculpted.scale.y / 0.94).toBeCloseTo(sculpted.scale.z / 1, 12);
+  });
+
+  it("rejects a non-uniform leaf scale that a non-humanoid child would inherit", () => {
+    // 휴머노이드 소속 여부는 기준이 아니다. 눈·턱 본이 없는 머리라도 액세서리나 스프링 계층을
+    // 이고 있을 수 있고, 거기서 회전이 일어나면 전단을 물려받는다. 안전한 것은 자식이 비균등
+    // 성분을 **상쇄**할 때뿐이다 — 생성 아바타의 역스케일 피벗이 하는 일이다.
+    const withChild = (childScale: readonly [number, number, number]) => {
+      const fixture = createRigFixture();
+      const leaf = [...fixture.nodes.entries()].find(
+        ([, node]) =>
+          ![...fixture.nodes.values()].some((other) => other !== node && isDescendant(other, node)),
+      );
+      expect(leaf).toBeDefined();
+      if (!leaf) return null;
+      const [, sculpted] = leaf;
+      sculpted.scale.set(1.25, 0.8, 1);
+      const child = new THREE.Object3D();
+      child.scale.set(childScale[0], childScale[1], childScale[2]);
+      sculpted.add(child);
+      sculpted.updateMatrix();
+      fixture.root.updateMatrixWorld(true);
+      return createStudioVrmProportionRigRuntime(fixture.adapter, {
+        headLength: fixture.headLength,
+      });
+    };
+
+    const bare = withChild([1, 1, 1]);
+    expect(bare?.ok, "상쇄하지 않는 자식이 있는데 비균등 조형을 허용했다").toBe(false);
+    if (bare && !bare.ok) expect(bare.code).toBe("unsafe-transform");
+
+    // 역스케일 피벗이 비균등 성분을 되돌리면 전단이 전파될 수 없다.
+    const pivoted = withChild([1 / 1.25, 1 / 0.8, 1]);
+    expect(pivoted?.ok, "역스케일 피벗이 있는데도 거부했다").toBe(true);
+  });
+
+  it("rejects a cancelling pivot that also rotates", () => {
+    // `S · R · S⁻¹` 는 R 이 S 와 교환될 때만 직교다. 스케일은 정확히 되돌리면서 축을 섞어
+    // 돌리는 자식은 아래로 전단을 그대로 넘긴다.
+    const fixture = createRigFixture();
+    const leaf = [...fixture.nodes.entries()].find(
+      ([, node]) =>
+        ![...fixture.nodes.values()].some((other) => other !== node && isDescendant(other, node)),
+    );
+    expect(leaf).toBeDefined();
+    if (!leaf) return;
+    const [, sculpted] = leaf;
+    sculpted.scale.set(1.25, 0.8, 1);
+    const pivot = new THREE.Object3D();
+    pivot.scale.set(1 / 1.25, 1 / 0.8, 1);
+    pivot.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.6);
+    sculpted.add(pivot);
+    sculpted.updateMatrix();
+    fixture.root.updateMatrixWorld(true);
+
+    const created = createStudioVrmProportionRigRuntime(fixture.adapter, {
+      headLength: fixture.headLength,
+    });
+    expect(created.ok, "축을 섞어 도는 피벗인데 비균등 조형을 허용했다").toBe(false);
+    if (created.ok) return;
+    expect(created.code).toBe("unsafe-transform");
+  });
+
+  it("rejects a non-uniform scale on a bone that carries another humanoid bone", () => {
+    // The leaf licence must not extend to a carrying frame: a rotated descendant would inherit shear.
+    const fixture = createRigFixture();
+    const spine = fixture.nodes.get("spine")!;
+    spine.scale.set(1.2, 1, 1);
+    spine.updateMatrix();
+    fixture.root.updateMatrixWorld(true);
+
+    const created = createStudioVrmProportionRigRuntime(fixture.adapter, {
+      headLength: fixture.headLength,
+    });
+    expect(created.ok).toBe(false);
+    if (created.ok) return;
+    expect(created.code).toBe("unsafe-transform");
+  });
+
+  it("resizes spring-bone colliders by the uniform body scale before capturing spring rest", () => {
+    // `setInitState()` recaptures joint rest only, so a collider left at its authored size while
+    // the body grows stops covering the anatomy it was authored against.
+    const fixture = createRigFixture();
+    const runtime = runtimeFor(fixture);
+
+    expect(runtime.apply(createStudioVrmProportions("sd-chibi-3")).ok).toBe(true);
+    expect(fixture.colliderScales).toHaveLength(1);
+    expect(fixture.colliderScales[0]).toBeGreaterThan(0);
+    // Colliders are resized before the spring rest is captured, never after.
+    expect(fixture.events.indexOf("colliders")).toBeLessThan(fixture.events.indexOf("spring"));
+
+    // Absolute from rest: a second apply must pass the new scale, not a compounded one.
+    const scaled = runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight: 1.4 });
+    expect(scaled.ok).toBe(true);
+    expect(fixture.colliderScales[fixture.colliderScales.length - 1]).toBeCloseTo(1.4, 12);
+  });
+
+  it("tells the adapter which subtrees it scales, by membership and not by magnitude", () => {
+    // 콜라이더가 씬 그래프에 실려 통째로 옮겨졌는지는 **소속**의 문제다. 결과 배율로 되짚으면
+    // 서로 상쇄하는 편집에서 판정이 뒤집힌다 — `overallHeight` 1.25 와 `headBodyRatio` 0.8 은
+    // `head` 배율을 정확히 1 로 만들지만, `head` 가 스케일을 받지 않는 본이 되지는 않는다.
+    const fixture = createRigFixture();
+    const runtime = runtimeFor(fixture);
+
+    const cancelling = runtime.apply({
+      ...NEUTRAL_STUDIO_VRM_PROPORTIONS,
+      overallHeight: 1.25,
+      headBodyRatio: 0.8,
+    });
+    expect(cancelling.ok).toBe(true);
+    const head = fixture.nodes.get("head");
+    if (!head) throw new Error("expected a head bone");
+    expect(head.scale.x, "상쇄 편집이라 머리 배율은 정확히 1 이어야 한다").toBeCloseTo(1, 12);
+
+    const roots = fixture.colliderScaledRoots[fixture.colliderScaledRoots.length - 1];
+    expect(roots, "머리 배율이 1 이어도 `head` 는 여전히 스케일 서브트리의 뿌리다").toContain(head);
+    for (const name of ["leftHand", "rightHand", "leftFoot", "rightFoot"] as const) {
+      const node = fixture.nodes.get(name);
+      if (!node) throw new Error(`expected ${name}`);
+      expect(roots, `${name} 이 스케일 서브트리 목록에서 빠졌다`).toContain(node);
+    }
+    // 이동만 받는 본은 들어가면 안 된다 — 들어가면 몸통 캡슐이 관절을 따라가지 않는다.
+    for (const name of ["hips", "spine", "chest", "neck", "leftUpperArm"] as const) {
+      const node = fixture.nodes.get(name);
+      if (!node) continue;
+      expect(roots, `${name} 은 스케일을 받지 않는데 목록에 있다`).not.toContain(node);
+    }
+
+    // 비율과 무관하게 같은 집합이어야 한다.
+    expect(runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS }).ok).toBe(true);
+    expect(fixture.colliderScaledRoots[fixture.colliderScaledRoots.length - 1]).toEqual(roots);
+  });
+
+  it("records collider sync as unavailable when the adapter cannot resize them", () => {
+    const fixture = createRigFixture({ includeColliderSync: false });
+    const result = runtimeFor(fixture).apply(createStudioVrmProportions("webtoon-7"));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.stages).toContain("spring-bone-colliders-unavailable");
+    expect(result.stages).toContain("set-spring-bone-init-state");
   });
 
   it("records unavailable optional managers without skipping normalized rebuild or authored pose", () => {
@@ -546,10 +745,12 @@ describe("studio-vrm-proportion-rig-runtime", () => {
       "reset",
       "rebuild",
       "constraint",
+      "colliders",
       "spring",
       "reset",
       "rebuild",
       "constraint",
+      "colliders",
       "spring",
       "pose",
     ]);

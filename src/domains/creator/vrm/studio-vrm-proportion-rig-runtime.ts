@@ -24,6 +24,7 @@ import {
   NEUTRAL_STUDIO_VRM_PROPORTIONS,
   STUDIO_VRM_PROPORTION_PRESETS,
   STUDIO_VRM_REQUIRED_HUMANOID_BONES,
+  STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS,
   resolveVrmProportionBoneTargets,
   resolveVrmProportionPlan,
   sanitizeStudioVrmProportions,
@@ -65,6 +66,24 @@ export type StudioVrmProportionRigAdapter = {
   readonly setNodeConstraintInitState?: () => boolean | void;
   /** Must call springBoneManager.setInitState(); `reset()` is not an equivalent substitute. */
   readonly setSpringBoneInitState?: () => boolean | void;
+  /**
+   * Rescales spring-bone collider shapes and spring-joint hit radii to the body's new size,
+   * absolute from their authored rest so repeated applies cannot accumulate. `setInitState()`
+   * recaptures joint rest only -- it never touches collider geometry -- so without this a collider
+   * keeps the size it was authored at while the body around it grows, and hair passes straight
+   * through the torso it was meant to ride on.
+   *
+   * `scaledSubtreeRoots` are the bone nodes this runtime gives a uniform scale to. Everything
+   * beneath one of them is carried whole by the scene graph; everything else only sees its joints
+   * move apart by `uniformScale`. The set is passed rather than inferred because the two cases are
+   * a matter of **membership**, not of magnitude -- `overallHeight` 1.25 with `headBodyRatio` 0.8
+   * leaves `head` at exactly 1, and reading that 1 as "not a scaled bone" would stretch the skull
+   * capsules 25% around a head that never grew.
+   */
+  readonly syncSpringBoneColliderShapes?: (
+    uniformScale: number,
+    scaledSubtreeRoots: ReadonlySet<THREE.Object3D>,
+  ) => boolean | void;
   readonly reapplyAuthoredPose: () => boolean | void;
 };
 
@@ -89,6 +108,8 @@ export type StudioVrmProportionRigStage =
   | "node-constraint-state-unavailable"
   | "set-spring-bone-init-state"
   | "spring-bone-state-unavailable"
+  | "sync-spring-bone-colliders"
+  | "spring-bone-colliders-unavailable"
   | "reapply-authored-pose";
 
 export type StudioVrmProportionRigOperation = "apply" | "restore" | "dispose";
@@ -197,6 +218,8 @@ type CapturedBone = {
   readonly restLocalPosition: THREE.Vector3;
   readonly restLocalScale: THREE.Vector3;
   readonly restLogicalOffset: StudioVrmVec3;
+  /** False when no other humanoid bone sits beneath this one, which is what licenses a non-uniform sculpt scale. */
+  readonly carriesHumanoidDescendant: boolean;
 };
 
 type OwnedTransform = {
@@ -319,6 +342,49 @@ function hasSafeTransform(node: THREE.Object3D) {
   );
 }
 
+/**
+ * True when a non-uniform scale on `node` cannot reach anything rotatable below it.
+ *
+ * Humanoid membership is not the test -- a head with no eye or jaw bones can still carry an
+ * accessory or spring hierarchy, and a rotation in there would inherit the shear. What makes the
+ * sculpt safe is that every immediate child cancels the non-uniform part **without rotating**, which
+ * is exactly what the generated avatar's inverse-scale `HairRoot` pivot does. A node with no children at all passes
+ * vacuously.
+ */
+function containsNonUniformScale(node: THREE.Object3D) {
+  if (isUniformPositiveScale(node.scale)) return true;
+  return node.children.every((child) => {
+    // The cancelling child must not rotate. `S . R . S^-1` is orthogonal only when `R` commutes with
+    // `S`, so a rotation that mixes differently scaled axes still hands shear to everything below.
+    if (!isUnitQuaternion(child.quaternion)) return false;
+    if (Math.abs(child.quaternion.w) < 1 - QUATERNION_UNIT_EPSILON) return false;
+    return isUniformPositiveScale(
+      new THREE.Vector3(
+        node.scale.x * child.scale.x,
+        node.scale.y * child.scale.y,
+        node.scale.z * child.scale.z,
+      ),
+    );
+  });
+}
+
+/**
+ * A leaf bone -- one with no humanoid bone beneath it -- may carry a non-uniform rest scale. That
+ * is the sculpting convention (`studio-vrm-humanoid-rig.ts`): shape lives on leaves so no rotated
+ * child inherits shear. Everything else must still be finite, positive and invertible.
+ */
+function hasSafeLeafTransform(node: THREE.Object3D) {
+  return (
+    allFinite(node.position.toArray()) &&
+    isUnitQuaternion(node.quaternion) &&
+    allFinite(node.scale.toArray()) &&
+    node.scale.x > 0 &&
+    node.scale.y > 0 &&
+    node.scale.z > 0 &&
+    hasAutoUpdatedInvertibleLocalMatrix(node)
+  );
+}
+
 function hasSafeRootTransform(node: THREE.Object3D) {
   return (
     allFinite(node.position.toArray()) &&
@@ -429,6 +495,20 @@ function captureHierarchy(
     }
   }
 
+  // A bone that carries no other humanoid bone beneath it may hold a non-uniform rest scale.
+  // Sculpting rigs put shape on leaves exactly so nothing rotated can inherit shear, and this
+  // runtime only ever multiplies that rest scale by a uniform factor. Requiring uniformity here
+  // rejected every generated character whose face proportions differ from 1 -- 18 of the 21
+  // shipped presets -- so the body sliders were unusable on them.
+  const carryingFrames = new Set<THREE.Object3D>();
+  for (const node of nodes.values()) {
+    const chain = rootChain(node, adapter.root);
+    if (!chain) continue;
+    for (const frame of chain) {
+      if (frame !== node) carryingFrames.add(frame);
+    }
+  }
+
   const checkedFrames = new Set<THREE.Object3D>();
   for (const [name, node] of nodes) {
     const chain = rootChain(node, adapter.root);
@@ -438,7 +518,12 @@ function captureHierarchy(
     for (const frame of chain) {
       if (checkedFrames.has(frame)) continue;
       checkedFrames.add(frame);
-      const safe = frame === adapter.root ? hasSafeRootTransform(frame) : hasSafeTransform(frame);
+      const safe =
+        frame === adapter.root
+          ? hasSafeRootTransform(frame)
+          : carryingFrames.has(frame)
+            ? hasSafeTransform(frame)
+            : hasSafeLeafTransform(frame) && containsNonUniformScale(frame);
       if (!safe) {
         return createFailure(
           "unsafe-transform",
@@ -486,6 +571,7 @@ function captureHierarchy(
       restLocalPosition: node.position.clone(),
       restLocalScale: node.scale.clone(),
       restLogicalOffset: freezeVec3(logicalOffset.x, logicalOffset.y, logicalOffset.z),
+      carriesHumanoidDescendant: carryingFrames.has(node),
     });
   }
 
@@ -552,9 +638,22 @@ function writeTargets(
       capture.node.position.copy(capture.restLocalPosition);
       capture.node.scale.copy(capture.restLocalScale);
     } else {
-      const restUniformScale =
-        (capture.restLocalScale.x + capture.restLocalScale.y + capture.restLocalScale.z) / 3;
-      capture.node.scale.setScalar(restUniformScale * target.scale);
+      // A rest scale that is uniform within tolerance is float32 container noise, so collapse it
+      // to its mean -- that is what keeps repeated applies from accumulating drift and keeps every
+      // carrying frame exactly orthogonal. A rest scale that is genuinely non-uniform is a
+      // deliberate sculpt on a leaf, and averaging it away would flatten the face the moment any
+      // body slider moved. Either way the factor this runtime introduces stays uniform.
+      if (isUniformPositiveScale(capture.restLocalScale)) {
+        const restUniformScale =
+          (capture.restLocalScale.x + capture.restLocalScale.y + capture.restLocalScale.z) / 3;
+        capture.node.scale.setScalar(restUniformScale * target.scale);
+      } else {
+        capture.node.scale.set(
+          capture.restLocalScale.x * target.scale,
+          capture.restLocalScale.y * target.scale,
+          capture.restLocalScale.z * target.scale,
+        );
+      }
 
       if (capture.immediateParent === capture.semanticFrame) {
         capture.node.position.set(target.position[0], target.position[1], target.position[2]);
@@ -568,7 +667,14 @@ function writeTargets(
         capture.node.position.copy(desiredWorld.applyMatrix4(actualParentInverse));
       }
     }
-    if (!allFinite(capture.node.position.toArray()) || !isUniformPositiveScale(capture.node.scale)) {
+    const scaleStaysSafe = capture.carriesHumanoidDescendant
+      ? isUniformPositiveScale(capture.node.scale)
+      : allFinite(capture.node.scale.toArray()) &&
+        capture.node.scale.x > 0 &&
+        capture.node.scale.y > 0 &&
+        capture.node.scale.z > 0 &&
+        containsNonUniformScale(capture.node);
+    if (!allFinite(capture.node.position.toArray()) || !scaleStaysSafe) {
       return false;
     }
     capture.node.updateMatrix();
@@ -707,6 +813,8 @@ function adapterContractIsValid(adapter: StudioVrmProportionRigAdapter) {
       typeof adapter.setNodeConstraintInitState === "function") &&
     (adapter.setSpringBoneInitState === undefined ||
       typeof adapter.setSpringBoneInitState === "function") &&
+    (adapter.syncSpringBoneColliderShapes === undefined ||
+      typeof adapter.syncSpringBoneColliderShapes === "function") &&
     typeof adapter.reapplyAuthoredPose === "function"
   );
 }
@@ -736,6 +844,9 @@ export function createStudioVrmProportionRigRuntime(
 
   let applyGeneration = 0;
   let disposed = false;
+  // The uniform body scale that goes with `committedTargets`, so recovery can restore collider
+  // geometry to the same size the committed skeleton was built at.
+  let committedUniformScale = NEUTRAL_STUDIO_VRM_PROPORTIONS.overallHeight;
   let committedTargets = new Map(
     resolveVrmProportionBoneTargets(NEUTRAL_STUDIO_VRM_PROPORTIONS, snapshot).map((target) => [
       target.boneName,
@@ -776,6 +887,17 @@ export function createStudioVrmProportionRigRuntime(
       : true;
   const runSpringInit = () =>
     adapter.setSpringBoneInitState ? invokeLifecycle(adapter.setSpringBoneInitState) : true;
+  // Membership, resolved once from the captured raw bone nodes: which subtrees the runtime scales
+  // never depends on the proportions, only on which bones exist.
+  const scaledSubtreeRoots: ReadonlySet<THREE.Object3D> = new Set(
+    captures
+      .filter((capture) => STUDIO_VRM_UNIFORM_SCALE_SUBTREE_ROOTS.includes(capture.name))
+      .map((capture) => capture.node),
+  );
+  const runColliderSync = (uniformScale: number) =>
+    adapter.syncSpringBoneColliderShapes
+      ? invokeLifecycle(() => adapter.syncSpringBoneColliderShapes?.(uniformScale, scaledSubtreeRoots))
+      : true;
 
   /**
    * Restores the last committed proportions, rebuilds every derived runtime, and reapplies pose.
@@ -796,6 +918,8 @@ export function createStudioVrmProportionRigRuntime(
       invokeLifecycle(adapter.rebuildNormalizedRig) &&
       currentGeneration().current &&
       runConstraintInit() &&
+      currentGeneration().current &&
+      runColliderSync(committedUniformScale) &&
       currentGeneration().current &&
       runSpringInit() &&
       currentGeneration().current &&
@@ -969,6 +1093,20 @@ export function createStudioVrmProportionRigRuntime(
       );
     }
 
+    // Colliders first: `setInitState()` recaptures joint rest against whatever collider geometry
+    // is current, so a collider resized afterwards would be inconsistent with the captured rest.
+    if (adapter.syncSpringBoneColliderShapes) {
+      if (!runColliderSync(runtimeProportions.overallHeight)) {
+        return failLifecycle(
+          "sync-spring-bone-colliders",
+          "The spring-bone collider shapes could not be resized."
+        );
+      }
+      stages.push("sync-spring-bone-colliders");
+    } else {
+      stages.push("spring-bone-colliders-unavailable");
+    }
+
     if (adapter.setSpringBoneInitState) {
       if (!invokeLifecycle(adapter.setSpringBoneInitState)) {
         return failLifecycle(
@@ -1001,6 +1139,7 @@ export function createStudioVrmProportionRigRuntime(
     }
 
     committedTargets = targetByBone;
+    committedUniformScale = runtimeProportions.overallHeight;
     adapter.root.updateMatrixWorld(true);
     return Object.freeze({
       ok: true,
