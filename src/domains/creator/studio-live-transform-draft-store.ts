@@ -32,6 +32,8 @@ export interface StudioLiveTransformDraftClaim {
   readonly elementId: string;
   /** True only after this exact generation no longer owns the store. */
   readonly isReleased: () => boolean;
+  /** O(1) generation-local proof that this claim currently owns visible exact draft authority. */
+  readonly hasPresentation: () => boolean;
   /** Replace the latest exact preview. This is called from the rAF renderer seam, never pointermove. */
   readonly present: (presentation: StudioLiveTransformDraftPresentation) => void;
   /** Remove an active preview immediately. False retains a handoff whose source recovery failed. */
@@ -188,6 +190,7 @@ export function createStudioLiveTransformDraftStore(
         scope,
         elementId,
         isReleased: () => !owns(),
+        hasPresentation: () => owns() && snapshot !== null,
         present: ({ element, clip }) => {
           if (!owns() || element.id !== elementId) return;
           if (!releaseHandoff()) return;

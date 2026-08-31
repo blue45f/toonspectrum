@@ -19,6 +19,27 @@ function draw(id = "stroke", points: number[] = [0, 0, 10, 10]): DrawEl {
 }
 
 describe("createStudioLiveTransformDraftStore", () => {
+  it("reports visible presentation only for the generation that currently owns it", () => {
+    const store = createStudioLiveTransformDraftStore();
+    const first = store.claim(SCOPE, "stroke");
+    expect(first?.hasPresentation()).toBe(false);
+
+    first?.present({ element: draw(), clip: null });
+    expect(first?.hasPresentation()).toBe(true);
+    expect(first?.clear()).toBe(true);
+    expect(first?.hasPresentation()).toBe(false);
+    expect(first?.isReleased()).toBe(false);
+
+    first?.present({ element: draw(), clip: null });
+    expect(first?.release()).toBe(true);
+    expect(first?.hasPresentation()).toBe(false);
+    expect(first?.isReleased()).toBe(true);
+    const second = store.claim(SCOPE, "stroke");
+    second?.present({ element: draw(), clip: null });
+    expect(second?.hasPresentation()).toBe(true);
+    expect(first?.hasPresentation()).toBe(false);
+  });
+
   it("publishes only the latest immutable snapshot identity to isolated subscribers", () => {
     const store = createStudioLiveTransformDraftStore();
     const listener = vi.fn();

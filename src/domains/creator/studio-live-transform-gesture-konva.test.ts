@@ -265,9 +265,9 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     const failedClaim = vi.spyOn(store, "claim").mockImplementation(() => {
       throw new Error("draft claim failed");
     });
-    const readAbsolutePosition = scene.wrapper.getAbsolutePosition.bind(scene.wrapper);
+    const readAbsolutePosition = scene.proxy.getAbsolutePosition.bind(scene.proxy);
     let remainingRestoreFailures = 3;
-    const failedRestore = vi.spyOn(scene.wrapper, "getAbsolutePosition").mockImplementation(() => {
+    const failedRestore = vi.spyOn(scene.proxy, "getAbsolutePosition").mockImplementation(() => {
       if (remainingRestoreFailures > 0) {
         remainingRestoreFailures -= 1;
         throw new Error("wrapper position unavailable");
@@ -290,7 +290,8 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
         proxy: scene.proxy,
         transformer: scene.transformer,
       })).toThrow("Konva live-transform setup and rollback both failed");
-      expect(scene.wrapper.getLayer()).toBe(scene.dragLayer);
+      expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+      expect(scene.proxy.getLayer()).toBe(scene.dragLayer);
       expect(remainingRestoreFailures).toBe(0);
       // No adapter token can be returned with this setup error. The Layer host's pending lease must
       // therefore remain discoverable and block a second writer until recovery finishes.
@@ -367,7 +368,9 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   it("replans non-uniform frames and switches back to the retained affine fast path", () => {
     const { gesture, store, clock } = beginGesture();
     expect(scene.draftRoot.zIndex()).toBe(0);
-    expect(scene.wrapper.getLayer()).toBe(scene.dragLayer);
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(scene.proxy.getLayer()).toBe(scene.dragLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.dragLayer);
     expect(scene.transformer.zIndex()).toBeGreaterThan(scene.draftRoot.zIndex());
 
     const nonUniform = {
@@ -376,6 +379,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     };
     gesture.offer(nonUniform);
     clock.flush();
+    expect(scene.wrapper.getLayer()).toBe(scene.dragLayer);
     const expected = planStudioDrawObjectTransform({
       el: sourceElement,
       sourceBounds,
@@ -402,6 +406,31 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(store.getSnapshot()).toBeNull();
   });
 
+  it("renders one isolated SceneCanvas receipt per steady affine frame", () => {
+    const { gesture, store, clock } = beginGesture();
+    const dragReceipt = vi.spyOn(scene.dragLayer, "drawScene");
+
+    gesture.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 100 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+    // The first admitted frame has one source-lift receipt and one transformed source receipt.
+    expect(dragReceipt).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot()).toBeNull();
+
+    dragReceipt.mockClear();
+    gesture.offer({
+      targetBounds: { x: 35, y: 45, width: 150, height: 75 },
+      rotationDeg: 20,
+    });
+    clock.flush();
+    expect(dragReceipt).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot()).toBeNull();
+
+    gesture.close({ kind: "cancel", reason: "escape" });
+  });
+
   it("keeps a frame release-only when clearing the Layer SceneCanvas exceeds the backing cap", () => {
     // The object-local transformed AABB is under 0.5M pixels at this scale. The isolated Layer's
     // 720x1020 Retina-3 SceneCanvas is 6.6M backing pixels, so only the full-clear charge rejects.
@@ -421,7 +450,15 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
       STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS,
     );
     const { gesture, store, clock } = beginGesture();
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(scene.proxy.getLayer()).toBe(scene.dragLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.dragLayer);
+    const sourceDrawScene = vi.spyOn(scene.mainLayer, "drawScene");
+    const sourceBatchDraw = vi.spyOn(scene.mainLayer, "batchDraw");
 
+    // Real Transformer events mutate the proxy before the preview scheduler sees the frame. The
+    // chrome-only claim ensures those writes invalidate only the drag Layer.
+    scene.proxy.setAttrs({ x: 30, y: 40, width: 200, height: 75, rotation: 15 });
     gesture.offer({
       targetBounds: { x: 30, y: 40, width: 200, height: 75 },
       rotationDeg: 15,
@@ -429,8 +466,55 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     clock.flush();
 
     expect(store.getSnapshot()).toBeNull();
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.visible()).toBe(true);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
+    expect(sourceDrawScene).not.toHaveBeenCalled();
+    expect(sourceBatchDraw).not.toHaveBeenCalled();
+    gesture.close({ kind: "cancel", reason: "escape" });
+    expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
+  });
+
+  it("rechecks identical geometry after DPR changes, then keeps rejected frames off the source Layer", () => {
+    const { gesture, clock } = beginGesture();
+    gesture.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 100 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+    expect(scene.wrapper.getLayer()).toBe(scene.dragLayer);
+    expect(scene.wrapper.scale()).toEqual({ x: 2, y: 2 });
+
+    const sourceDrawScene = vi.spyOn(scene.mainLayer, "drawScene");
+    const sourceBatchDraw = vi.spyOn(scene.mainLayer, "batchDraw");
+    scene.dragLayer.getCanvas().setPixelRatio(3);
+
+    // The first rejected frame is an authority transition: neutralize and return the source once.
+    scene.proxy.setAttrs({ x: 30, y: 40, width: 200, height: 100, rotation: 15 });
+    gesture.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 100 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
+    expect(sourceDrawScene).toHaveBeenCalled();
+    expect(sourceBatchDraw).toHaveBeenCalled();
+
+    sourceDrawScene.mockClear();
+    sourceBatchDraw.mockClear();
+    // Once release-only, later handle mutations are chrome-only and cannot repaint the source.
+    scene.proxy.setAttrs({ x: 50, y: 60, width: 240, height: 120, rotation: 25 });
+    gesture.offer({
+      targetBounds: { x: 50, y: 60, width: 240, height: 120 },
+      rotationDeg: 25,
+    });
+    clock.flush();
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(sourceDrawScene).not.toHaveBeenCalled();
+    expect(sourceBatchDraw).not.toHaveBeenCalled();
+
     gesture.close({ kind: "cancel", reason: "escape" });
   });
 
@@ -454,6 +538,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     expect(drawScene).toHaveBeenCalled();
     expect(studioKonvaRuntime.autoDrawEnabled).toBe(autoDrawEnabled);
 
+    drawScene.mockClear();
     gesture.offer({
       targetBounds: { x: 30, y: 40, width: 200, height: 100 },
       rotationDeg: 20,
@@ -464,20 +549,41 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     // double-authority frame nor a blank frame.
     expect(visibilityAtPublication.at(-1)).toBe(true);
     expect(scene.wrapper.visible()).toBe(true);
+    // Exact→affine needs two receipts only at the authority boundary: source first, then the
+    // final source-only canvas after the draft subtree is synchronously removed.
+    expect(drawScene).toHaveBeenCalledTimes(2);
     gesture.close({ kind: "cancel", reason: "escape" });
   });
 
-  it("keeps every non-lifted route release-only instead of repainting the document Layer per frame", () => {
+  it("isolates chrome while a z-order-rejected source remains release-only in its document Layer", () => {
     // An authored node above the stroke refuses isolated lifting. Even a retained attr write would
     // invalidate the full main SceneCanvas, whose sibling renderer cost is unbounded by admission.
     scene.mainLayer.add(new studioKonvaRuntime.Rect({ width: 10, height: 10, fill: "#fff" }));
-    const { gesture, store } = createGesture();
-    expect(gesture).toBeNull();
+    const { gesture, store, clock } = beginGesture();
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
-    expect(scene.wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR)).toBeUndefined();
+    expect(scene.proxy.getLayer()).toBe(scene.dragLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.dragLayer);
+    const sourceDrawScene = vi.spyOn(scene.mainLayer, "drawScene");
+    const sourceBatchDraw = vi.spyOn(scene.mainLayer, "batchDraw");
+
+    scene.proxy.setAttrs({ x: 30, y: 40, width: 200, height: 75, rotation: 15 });
+    gesture.offer({
+      targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+      rotationDeg: 15,
+    });
+    clock.flush();
+
+    expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
     expect(scene.wrapper.rotation()).toBe(0);
     expect(store.getSnapshot()).toBeNull();
+    expect(sourceDrawScene).not.toHaveBeenCalled();
+    expect(sourceBatchDraw).not.toHaveBeenCalled();
+
+    gesture.close({ kind: "cancel", reason: "escape" });
+    expect(scene.proxy.getLayer()).toBe(scene.mainLayer);
+    expect(scene.transformer.getLayer()).toBe(scene.mainLayer);
+    expect(scene.wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR)).toBeUndefined();
   });
 
   it("retains the exact terminal candidate until authoritative receipt, then restores source", () => {

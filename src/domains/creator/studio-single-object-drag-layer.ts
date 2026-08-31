@@ -28,6 +28,8 @@ export interface StudioSingleObjectDragLayerSession {
   readonly target: Konva.Node;
   readonly transformer: Konva.Transformer | null;
   readonly lifted: readonly LiftedNodeRecord[];
+  /** Whether canvas authority receipts are deferred or must complete inside this transition. */
+  readonly presentationMode: "deferred-batch" | "synchronous-authority";
   restored: boolean;
 }
 
@@ -162,12 +164,20 @@ function restoreStudioSingleObjectDragLayerInternal(
     presentationErrors.push(error);
   }
   try {
-    session.mainLayer.batchDraw();
+    if (session.presentationMode === "synchronous-authority") {
+      session.mainLayer.drawScene();
+    } else {
+      session.mainLayer.batchDraw();
+    }
   } catch (error) {
     presentationErrors.push(error);
   }
   try {
-    session.dragLayer.batchDraw();
+    if (session.presentationMode === "synchronous-authority") {
+      session.dragLayer.drawScene();
+    } else {
+      session.dragLayer.batchDraw();
+    }
   } catch (error) {
     presentationErrors.push(error);
   }
@@ -272,8 +282,16 @@ function performStudioSingleObjectLayerLift(
       record.node.moveTo(session.dragLayer);
     }
     session.transformer?.forceUpdate();
-    session.mainLayer.batchDraw();
-    session.dragLayer.batchDraw();
+    if (session.presentationMode === "synchronous-authority") {
+      // This lift can run inside the preview rAF. Synchronously clear the departed canvas and
+      // acknowledge the new canvas before returning; a queued batch would leave both authorities
+      // visible in the browser's imminent paint. Any failure enters the same phase-aware rollback.
+      session.mainLayer.drawScene();
+      session.dragLayer.drawScene();
+    } else {
+      session.mainLayer.batchDraw();
+      session.dragLayer.batchDraw();
+    }
     return session;
   } catch (error) {
     // Setup has not returned a session to its caller yet, so rollback must own the same bounded,
@@ -521,6 +539,7 @@ export function beginStudioSingleObjectDragLayer(
     target,
     transformer: liftedTransformer,
     lifted,
+    presentationMode: "deferred-batch",
     restored: false,
   });
 }
@@ -533,6 +552,123 @@ export interface BeginStudioSingleDrawTransformLayerOptions {
   readonly proxy: Konva.Node;
   readonly transformer: Konva.Transformer;
   readonly dragLayer: Konva.Layer | null;
+}
+
+export interface BeginStudioSingleDrawTransformSourceLayerOptions {
+  readonly elementId: string;
+  /** Authoritative stroke wrapper. It remains in the document Layer until this claim succeeds. */
+  readonly wrapper: Konva.Node;
+  /** Already-isolated Transformer, refreshed when source ownership crosses Layer boundaries. */
+  readonly transformer: Konva.Transformer;
+  readonly dragLayer: Konva.Layer | null;
+}
+
+/**
+ * Isolate only the resize proxy and Transformer at gesture begin.
+ *
+ * Admission depends on the first real target frame, so moving the authored wrapper here is too
+ * early: an over-budget/rejected gesture would make every handle repaint rasterize that source in
+ * the chrome Layer. This claim deliberately leaves the wrapper in its document Layer. A later
+ * admitted frame can add a separate source claim with
+ * `beginStudioSingleDrawTransformSourceLayer`; both claims use the same phase-aware restore path.
+ */
+export function beginStudioSingleDrawTransformChromeLayer(
+  options: BeginStudioSingleDrawTransformLayerOptions,
+): StudioSingleObjectDragLayerSession | null {
+  const { elementId, wrapper, proxy, transformer, dragLayer } = options;
+  const mainLayer = wrapper.getLayer();
+  if (
+    !mainLayer
+    || !dragLayer
+    || mainLayer === dragLayer
+    || mainLayer.getStage() === null
+    || mainLayer.getStage() !== dragLayer.getStage()
+    || wrapper.getAttr("studioElementId") !== elementId
+    || proxy.getParent() !== mainLayer
+    || transformer.getParent() !== mainLayer
+    || studioSingleObjectRecoveryConflicts({
+      elementId,
+      dragLayer,
+      nodes: [wrapper, proxy, transformer],
+    })
+  ) {
+    return null;
+  }
+
+  const roots: Konva.Node[] = [proxy, transformer];
+  const lifted: LiftedNodeRecord[] = roots.map((node) => ({
+    node,
+    parent: mainLayer,
+    zIndex: node.zIndex(),
+    phase: "complete",
+    restoreAbsolutePosition: null,
+    moveReachedHome: false,
+  }));
+  return performStudioSingleObjectLayerLift({
+    elementId,
+    mainLayer,
+    dragLayer,
+    target: wrapper,
+    transformer,
+    lifted,
+    presentationMode: "synchronous-authority",
+    restored: false,
+  });
+}
+
+/**
+ * Claim the authoritative stroke for an already-admitted frame.
+ *
+ * This is intentionally independent from the chrome claim. A rejected frame never calls it, and
+ * an admitted-to-rejected transition restores only this session while the handles remain isolated.
+ * Composition and z-order gates are evaluated at the actual authority transition, after gesture
+ * chrome has left the document Layer, so only authored paint can refuse the source lift.
+ */
+export function beginStudioSingleDrawTransformSourceLayer(
+  options: BeginStudioSingleDrawTransformSourceLayerOptions,
+): StudioSingleObjectDragLayerSession | null {
+  const { elementId, wrapper, transformer, dragLayer } = options;
+  const mainLayer = wrapper.getLayer();
+  if (
+    !mainLayer
+    || !dragLayer
+    || mainLayer === dragLayer
+    || mainLayer.getStage() === null
+    || mainLayer.getStage() !== dragLayer.getStage()
+    || wrapper.getAttr("studioElementId") !== elementId
+    || wrapper.getParent() !== mainLayer
+    || wrapper.isCached()
+    || subtreeCompositeIsLayerSensitive(wrapper)
+    || laterSiblingDependsOnStackingBelow(wrapper)
+    || laterVisiblePaintingSibling(wrapper, new Set())
+    || transformer.getLayer() !== dragLayer
+    || studioSingleObjectRecoveryConflicts({
+      elementId,
+      dragLayer,
+      nodes: [wrapper, transformer],
+    })
+  ) {
+    return null;
+  }
+
+  const lifted: LiftedNodeRecord[] = [{
+    node: wrapper,
+    parent: mainLayer,
+    zIndex: wrapper.zIndex(),
+    phase: "complete",
+    restoreAbsolutePosition: null,
+    moveReachedHome: false,
+  }];
+  return performStudioSingleObjectLayerLift({
+    elementId,
+    mainLayer,
+    dragLayer,
+    target: wrapper,
+    transformer,
+    lifted,
+    presentationMode: "synchronous-authority",
+    restored: false,
+  });
 }
 
 /**
@@ -597,6 +733,7 @@ export function beginStudioSingleDrawTransformLayer(
     target: wrapper,
     transformer,
     lifted,
+    presentationMode: "deferred-batch",
     restored: false,
   });
 }

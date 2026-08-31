@@ -44,20 +44,29 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
 // do not implement Konva.Container.moveTo/zIndex/absolutePosition.
 vi.mock("./studio-single-object-drag-layer", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./studio-single-object-drag-layer")>();
+  const successfulLift = (options: {
+    elementId: string;
+    wrapper: Konva.Node;
+    transformer: Konva.Transformer;
+    dragLayer: Konva.Layer | null;
+  }) => {
+    if (!options.dragLayer) return null;
+    return {
+      elementId: options.elementId,
+      mainLayer: options.wrapper.getLayer(),
+      dragLayer: options.dragLayer,
+      target: options.wrapper,
+      transformer: options.transformer,
+      lifted: [],
+      presentationMode: "synchronous-authority" as const,
+      restored: false,
+    };
+  };
   return {
     ...actual,
-    beginStudioSingleDrawTransformLayer: vi.fn((options) => {
-      if (!options.dragLayer) return null;
-      return {
-        elementId: options.elementId,
-        mainLayer: options.wrapper.getLayer(),
-        dragLayer: options.dragLayer,
-        target: options.wrapper,
-        transformer: options.transformer,
-        lifted: [],
-        restored: false,
-      };
-    }),
+    beginStudioSingleDrawTransformChromeLayer: vi.fn(successfulLift),
+    beginStudioSingleDrawTransformLayer: vi.fn(successfulLift),
+    beginStudioSingleDrawTransformSourceLayer: vi.fn(successfulLift),
     restoreStudioSingleObjectDragLayer: vi.fn((session) => {
       if (!session) return false;
       session.restored = true;
@@ -758,6 +767,13 @@ describe("StudioGroupUniformResizeProxy", () => {
             current: {
               batchDraw: vi.fn(),
               drawScene: vi.fn(),
+              getNativeCanvasElement: vi.fn(() => ({
+                width: 1_920,
+                height: 1_080,
+              })),
+              getCanvas: vi.fn(() => ({
+                getPixelRatio: vi.fn(() => 1),
+              })),
             } as unknown as Konva.Layer,
           },
         },

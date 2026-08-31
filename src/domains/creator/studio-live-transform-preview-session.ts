@@ -26,7 +26,13 @@ export interface StudioLiveTransformPreviewPresentation {
 
 /** Renderer adapter at the transient-preview seam. It must never mutate the document. */
 export interface StudioLiveTransformPreviewAdapter {
-  readonly apply: (presentation: StudioLiveTransformPreviewPresentation) => void;
+  /** Present affine authority; false means the adapter already restored release-only authority. */
+  readonly apply: (presentation: StudioLiveTransformPreviewPresentation) => boolean;
+  /**
+   * O(1) renderer facts that can change an affine admission verdict without changing geometry.
+   * When omitted, affine frames keep the original attrs-only dedupe contract.
+   */
+  readonly presentationEnvironmentKey?: () => string | number;
   /**
    * Optional exact fallback for a valid frame the retained affine cannot reproduce. The adapter
    * replans and presents the model draft; false keeps the honest release-only fallback.
@@ -103,6 +109,7 @@ export function createStudioLiveTransformPreviewSession(
   let scheduledFrame: number | null = null;
   let pending: StudioLiveSelectionTransformFrame | null = null;
   let presentedAttrs: StudioLiveTransformPreviewNodeAttrs | null = null;
+  let presentedEnvironmentKey: string | number | undefined;
   let presentationKind: "none" | "affine" | "exact" = "none";
 
   const reportError = (error: unknown): void => {
@@ -127,6 +134,7 @@ export function createStudioLiveTransformPreviewSession(
     if (presentationKind === "none") return STUDIO_LIVE_TRANSFORM_NEUTRALIZED;
     const neutralized = forceNeutralize();
     presentedAttrs = null;
+    presentedEnvironmentKey = undefined;
     presentationKind = "none";
     return neutralized;
   };
@@ -137,6 +145,7 @@ export function createStudioLiveTransformPreviewSession(
     generation += 1;
     pending = null;
     presentedAttrs = null;
+    presentedEnvironmentKey = undefined;
     presentationKind = "none";
     try {
       options.onFatalError?.(error);
@@ -163,6 +172,7 @@ export function createStudioLiveTransformPreviewSession(
         try {
           if (options.adapter.applyExact?.(frame) === true) {
             presentedAttrs = null;
+            presentedEnvironmentKey = undefined;
             presentationKind = "exact";
             return;
           }
@@ -174,6 +184,7 @@ export function createStudioLiveTransformPreviewSession(
             return;
           }
           presentedAttrs = null;
+          presentedEnvironmentKey = undefined;
           presentationKind = "none";
           return;
         }
@@ -187,11 +198,24 @@ export function createStudioLiveTransformPreviewSession(
       }
       return;
     }
-    if (presentationKind === "affine" && sameAttrs(presentedAttrs, projection.attrs)) return;
-
     try {
-      options.adapter.apply({ frame, attrs: projection.attrs });
+      const environmentKey = options.adapter.presentationEnvironmentKey?.();
+      if (
+        presentationKind === "affine"
+        && sameAttrs(presentedAttrs, projection.attrs)
+        && Object.is(presentedEnvironmentKey, environmentKey)
+      ) {
+        return;
+      }
+      const presented = options.adapter.apply({ frame, attrs: projection.attrs });
+      if (!presented) {
+        presentedAttrs = null;
+        presentedEnvironmentKey = undefined;
+        presentationKind = "none";
+        return;
+      }
       presentedAttrs = projection.attrs;
+      presentedEnvironmentKey = environmentKey;
       presentationKind = "affine";
     } catch (error) {
       reportError(error);
@@ -203,6 +227,7 @@ export function createStudioLiveTransformPreviewSession(
         return;
       }
       presentedAttrs = null;
+      presentedEnvironmentKey = undefined;
       presentationKind = "none";
     }
   };

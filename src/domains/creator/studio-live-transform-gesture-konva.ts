@@ -40,7 +40,8 @@ import {
   findStudioDrawWrapperNode,
 } from "./studio-selection-chrome-mirror";
 import {
-  beginStudioSingleDrawTransformLayer,
+  beginStudioSingleDrawTransformChromeLayer,
+  beginStudioSingleDrawTransformSourceLayer,
   restoreStudioSingleObjectDragLayer,
   studioSingleObjectDragLayerRecoveryPendingForElement,
 } from "./studio-single-object-drag-layer";
@@ -193,15 +194,14 @@ interface StudioLiveTransformRasterMetrics {
   readonly sceneCanvasBackingPixels: number;
 }
 
-/** O(1) raster facts for the source's current Layer, refreshed because viewport DPR can change. */
+/** O(1) raster facts for the candidate authority Layer, refreshed because viewport DPR can change. */
 function studioLiveTransformRasterMetrics(
   stage: Konva.Stage,
-  node: Konva.Node,
+  layer: Konva.Layer | null,
 ): StudioLiveTransformRasterMetrics {
   const stageScale = Math.max(Math.abs(stage.scaleX()), Math.abs(stage.scaleY()));
-  const sourceLayer = node.getLayer();
-  const sceneCanvas = sourceLayer?.getCanvas();
-  const nativeSceneCanvas = sourceLayer?.getNativeCanvasElement();
+  const sceneCanvas = layer?.getCanvas();
+  const nativeSceneCanvas = layer?.getNativeCanvasElement();
   const pixelRatio = sceneCanvas?.getPixelRatio() ?? studioKonvaRuntime.pixelRatio;
   return {
     rasterScale: stageScale * pixelRatio,
@@ -243,7 +243,9 @@ export function beginStudioKonvaDrawTransformGesture(
   const snapshot = compileStudioLiveTransformDrawSnapshot(element);
 
   let parkedIndicators: Konva.Node[] = [];
-  let lift: StudioSingleObjectDragLayerSession | null = null;
+  let chromeLift: StudioSingleObjectDragLayerSession | null = null;
+  let sourceLift: StudioSingleObjectDragLayerSession | null = null;
+  let sourceIsolationUnavailable = false;
   let clipHost: StudioLiveTransformClipHost | null = null;
   let originalClip: StudioLiveTransformClipRect | null = null;
   let previewSession: ReturnType<typeof createStudioLiveTransformPreviewSession> | null = null;
@@ -287,7 +289,10 @@ export function beginStudioKonvaDrawTransformGesture(
   };
 
   const frameAdmitted = (frame: StudioLiveSelectionTransformFrame): boolean => {
-    const rasterMetrics = studioLiveTransformRasterMetrics(options.stage, node);
+    // Admission charges the destination SceneCanvas before the authoritative source can move.
+    // Reading `node.getLayer()` here would grade the document Layer before the first frame and the
+    // drag Layer afterwards, making the answer depend on a mutation the gate is meant to authorize.
+    const rasterMetrics = studioLiveTransformRasterMetrics(options.stage, dragLayer);
     return admitStudioLiveTransformExactDraft({
       complexity: snapshot.exactDraftComplexity,
       sourceBounds: options.sourceBounds,
@@ -345,7 +350,11 @@ export function beginStudioKonvaDrawTransformGesture(
       studioKonvaRuntime.autoDrawEnabled = false;
       prepareSource();
       paintSourceReceipt();
-      if (draftClaim) {
+      const draftWasPresented = draftClaim?.hasPresentation() === true;
+      // A retained affine frame normally has no exact subtree. Keep its hot path to one isolated
+      // SceneCanvas draw; clearing an already-empty claim and drawing the same Layer again adds no
+      // authority receipt. Release must still surrender even an empty generation during cleanup.
+      if (draftClaim && (mode === "release" || draftWasPresented)) {
         let claimReceipt: boolean | null = null;
         flushDraftPublication(() => {
           claimReceipt = mode === "release"
@@ -358,25 +367,78 @@ export function beginStudioKonvaDrawTransformGesture(
         if (claimReceipt !== true && !draftClaim.isReleased()) {
           throw new Error(`Failed to ${mode} the live-transform draft claim`);
         }
-        dragLayer?.drawScene();
+        if (draftWasPresented) dragLayer?.drawScene();
       }
     } finally {
       studioKonvaRuntime.autoDrawEnabled = autoDrawEnabled;
     }
   };
 
+  const claimIsolatedSource = (): boolean => {
+    if (sourceLift && !sourceLift.restored) return true;
+    if (sourceIsolationUnavailable) return false;
+    const claimed = beginStudioSingleDrawTransformSourceLayer({
+      elementId: snapshot.elementId,
+      wrapper: node,
+      transformer: options.transformer,
+      dragLayer,
+    });
+    if (!claimed) {
+      sourceIsolationUnavailable = true;
+      return false;
+    }
+    sourceLift = claimed;
+    sourceVisible = node.visible();
+    clipHost = findStudioLiveTransformClipHost(node, dragLayer);
+    originalClip = readStudioLiveTransformClip(clipHost);
+    return true;
+  };
+
+  /**
+   * End only the source authority claim while leaving proxy/Transformer chrome isolated.
+   *
+   * This transition runs once when an admitted presentation falls back to release-only. Later
+   * rejected handle frames mutate only the chrome Layer; the authoritative wrapper stays in its
+   * document Layer and is neither transformed nor included in the chrome canvas redraw.
+   */
+  const returnSourceToDocumentLayer = (): void => {
+    if (!sourceLift) return;
+    if (!sourceLift.restored) {
+      transferAuthorityToSource("clear", () => {
+        resetStudioLiveTransformPreviewNodeAttrs(node);
+        applyStudioLiveTransformClip(clipHost, originalClip);
+        terminalDraft = null;
+      });
+      restoreStudioLiveTransformClip(clipHost, originalClip);
+      if (!restoreStudioSingleObjectDragLayer(sourceLift)) {
+        throw new Error(
+          "Failed to return the rejected live-transform source to its document Layer",
+        );
+      }
+    }
+    sourceLift = null;
+    clipHost = null;
+    originalClip = null;
+  };
+
   const exactPresentation = (
     frame: StudioLiveSelectionTransformFrame,
   ): DrawEl | null => {
-    if (!draftClaim || !lift) return null;
-    if (!frameAdmitted(frame)) return null;
+    if (!draftClaim) return null;
+    if (!frameAdmitted(frame) || !claimIsolatedSource()) {
+      returnSourceToDocumentLayer();
+      return null;
+    }
     const plan = planStudioDrawObjectTransformWithBounds({
       el: snapshot.element,
       sourceBounds: options.sourceBounds,
       targetBounds: frame.targetBounds,
       rotationDeg: frame.rotationDeg,
     });
-    if (!plan) return null;
+    if (!plan) {
+      returnSourceToDocumentLayer();
+      return null;
+    }
     const transformed = plan.element;
     let published = false;
     mutateAndDrawSourceLayerSynchronously(() => {
@@ -407,7 +469,11 @@ export function beginStudioKonvaDrawTransformGesture(
       terminalDraft = transformed;
       published = true;
     });
-    return published ? transformed : null;
+    if (!published) {
+      returnSourceToDocumentLayer();
+      return null;
+    }
+    return transformed;
   };
 
   const cleanup = (
@@ -456,9 +522,15 @@ export function beginStudioKonvaDrawTransformGesture(
     });
     let ownershipRestored = true;
     critical(() => {
-      if (lift && !lift.restored && !restoreStudioSingleObjectDragLayer(lift)) {
+      if (sourceLift && !sourceLift.restored && !restoreStudioSingleObjectDragLayer(sourceLift)) {
         ownershipRestored = false;
-        throw new Error("Failed to restore the single-draw transform Layer ownership");
+        throw new Error("Failed to restore the single-draw source Layer ownership");
+      }
+    });
+    critical(() => {
+      if (chromeLift && !chromeLift.restored && !restoreStudioSingleObjectDragLayer(chromeLift)) {
+        ownershipRestored = false;
+        throw new Error("Failed to restore the single-draw transform chrome Layer ownership");
       }
     });
     critical(() => {
@@ -513,18 +585,23 @@ export function beginStudioKonvaDrawTransformGesture(
 
     // Gate drag/chrome mirrors before the first frame: wrapper x/y now represent an absolute live
     // transform pose, not a drag delta.
-    node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
-    lift = beginStudioSingleDrawTransformLayer({
+    const autoDrawEnabled = studioKonvaRuntime.autoDrawEnabled;
+    try {
+      studioKonvaRuntime.autoDrawEnabled = false;
+      node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    } finally {
+      studioKonvaRuntime.autoDrawEnabled = autoDrawEnabled;
+    }
+    chromeLift = beginStudioSingleDrawTransformChromeLayer({
       elementId: snapshot.elementId,
       wrapper: node,
       proxy: options.proxy,
       transformer: options.transformer,
       dragLayer,
     });
-    // Every live route is isolated or release-only. Even an O(1) retained attr update invalidates
-    // the node's whole owning SceneCanvas; without the lift, a small selected stroke could repaint
-    // arbitrarily expensive siblings in the document Layer on every animation frame.
-    if (!lift) {
+    // Chrome must be isolated even when every source frame is release-only. The wrapper remains in
+    // the document Layer until one real frame passes admission and claims source authority below.
+    if (!chromeLift) {
       cleanup({ kind: "cancel", reason: "preview-error" });
       return null;
     }
@@ -533,30 +610,26 @@ export function beginStudioKonvaDrawTransformGesture(
       snapshot.elementId,
     ) ?? null;
     sourceVisible = node.visible();
-    // Resolve after the lift. An unclipped lifted stroke owns a wrapper clipFunc; a stroke that
-    // cannot be lifted keeps the nearest per-element clip Group as its host.
-    clipHost = findStudioLiveTransformClipHost(node, dragLayer);
-    originalClip = readStudioLiveTransformClip(clipHost);
 
     previewSession = createStudioLiveTransformPreviewSession({
       sourceBounds: options.sourceBounds,
       renderRoute: snapshot.renderRoute,
       scheduler: options.preview.scheduler ?? browserFrameScheduler(),
       adapter: {
+        presentationEnvironmentKey: () => {
+          const metrics = studioLiveTransformRasterMetrics(options.stage, dragLayer);
+          return `rasterScale:${metrics.rasterScale};backingPixels:${metrics.sceneCanvasBackingPixels}`;
+        },
         apply: ({ frame, attrs }) => {
+          const gestureFrame = {
+            targetBounds: frame.targetBounds,
+            rotationDeg: frame.rotationDeg,
+          };
+          if (!frameAdmitted(gestureFrame) || !claimIsolatedSource()) {
+            returnSourceToDocumentLayer();
+            return false;
+          }
           transferAuthorityToSource("clear", () => {
-            // Retained frames still used to scan points and panels for clip parity. Apply the same
-            // O(1) admission before any such work, so a 100k-point generic stroke cannot bypass
-            // the exact lane's budget merely because its frame is affine-equivalent.
-            if (!frameAdmitted({
-              targetBounds: frame.targetBounds,
-              rotationDeg: frame.rotationDeg,
-            })) {
-              resetStudioLiveTransformPreviewNodeAttrs(node);
-              applyStudioLiveTransformClip(clipHost, originalClip);
-              terminalDraft = null;
-              return;
-            }
             applyStudioLiveTransformPreviewNodeAttrs(node, attrs);
             applyStudioLiveTransformClip(
               clipHost,
@@ -571,6 +644,7 @@ export function beginStudioKonvaDrawTransformGesture(
             );
             terminalDraft = null;
           });
+          return true;
         },
         applyExact: (frame) => {
           return exactPresentation({
@@ -579,11 +653,7 @@ export function beginStudioKonvaDrawTransformGesture(
           }) !== null;
         },
         neutralize: () => {
-          transferAuthorityToSource("clear", () => {
-            resetStudioLiveTransformPreviewNodeAttrs(node);
-            applyStudioLiveTransformClip(clipHost, originalClip);
-            terminalDraft = null;
-          });
+          returnSourceToDocumentLayer();
         },
       },
       ...(options.onError !== undefined ? { onError: options.onError } : {}),

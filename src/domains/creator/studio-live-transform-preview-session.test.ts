@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createStudioLiveTransformPreviewSession } from "./studio-live-transform-preview-session";
 
-import type { StudioLiveTransformPreviewScheduler } from "./studio-live-transform-preview-session";
+import type {
+  StudioLiveTransformPreviewPresentation,
+  StudioLiveTransformPreviewScheduler,
+} from "./studio-live-transform-preview-session";
 
 function manualScheduler() {
   let nextHandle = 1;
@@ -34,7 +37,7 @@ const sourceBounds = { x: 10, y: 20, width: 100, height: 50 };
 describe("createStudioLiveTransformPreviewSession", () => {
   it("coalesces a pointer burst to one newest renderer projection per animation frame", () => {
     const clock = manualScheduler();
-    const apply = vi.fn();
+    const apply = vi.fn((_presentation: StudioLiveTransformPreviewPresentation) => true);
     const session = createStudioLiveTransformPreviewSession({
       sourceBounds,
       scheduler: clock.scheduler,
@@ -75,9 +78,90 @@ describe("createStudioLiveTransformPreviewSession", () => {
     });
   });
 
+  it("re-evaluates identical affine geometry when its renderer environment changes", () => {
+    const clock = manualScheduler();
+    let environmentKey = "dpr-1:backing-small";
+    let admitted = true;
+    const apply = vi.fn(() => admitted);
+    const session = createStudioLiveTransformPreviewSession({
+      sourceBounds,
+      scheduler: clock.scheduler,
+      adapter: {
+        apply,
+        presentationEnvironmentKey: () => environmentKey,
+        neutralize: vi.fn(),
+      },
+    });
+    const frame = {
+      targetBounds: { x: 30, y: 40, width: 200, height: 100 },
+      rotationDeg: 20,
+    };
+
+    session.push(frame);
+    clock.flush();
+    session.push(frame);
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+
+    environmentKey = "dpr-3:backing-large";
+    admitted = false;
+    session.push(frame);
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(2);
+
+    // A false receipt is release-only, not a retained affine presentation eligible for dedupe.
+    session.push(frame);
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(3);
+
+    admitted = true;
+    session.push(frame);
+    clock.flush();
+    session.push(frame);
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(4);
+  });
+
+  it("contains an environment-key read failure through the renderer neutralization boundary", () => {
+    const clock = manualScheduler();
+    const keyError = new Error("renderer environment unavailable");
+    let shouldFail = true;
+    const apply = vi.fn(() => true);
+    const neutralize = vi.fn();
+    const onError = vi.fn();
+    const session = createStudioLiveTransformPreviewSession({
+      sourceBounds,
+      scheduler: clock.scheduler,
+      adapter: {
+        apply,
+        presentationEnvironmentKey: () => {
+          if (shouldFail) throw keyError;
+          return "dpr-1:backing-small";
+        },
+        neutralize,
+      },
+      onError,
+    });
+    const frame = {
+      targetBounds: { x: 30, y: 40, width: 200, height: 100 },
+      rotationDeg: 20,
+    };
+
+    session.push(frame);
+    clock.flush();
+    expect(onError).toHaveBeenCalledWith(keyError);
+    expect(neutralize).toHaveBeenCalledTimes(1);
+    expect(apply).not.toHaveBeenCalled();
+
+    shouldFail = false;
+    session.push(frame);
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
   it("holds the last good pose for an invalid reading and neutralizes once for unsupported input", () => {
     const clock = manualScheduler();
-    const apply = vi.fn();
+    const apply = vi.fn(() => true);
     const neutralize = vi.fn();
     const session = createStudioLiveTransformPreviewSession({
       sourceBounds,
@@ -116,7 +200,7 @@ describe("createStudioLiveTransformPreviewSession", () => {
 
   it("uses a model-backed exact adapter for non-uniform and route-changing frames", () => {
     const clock = manualScheduler();
-    const apply = vi.fn();
+    const apply = vi.fn(() => true);
     const applyExact = vi.fn(() => true);
     const neutralize = vi.fn();
     const session = createStudioLiveTransformPreviewSession({
@@ -154,7 +238,7 @@ describe("createStudioLiveTransformPreviewSession", () => {
   it("fails fatally when an exact rejection cannot neutralize an earlier presentation", () => {
     const clock = manualScheduler();
     const neutralizeError = new Error("renderer authority rollback failed");
-    const apply = vi.fn();
+    const apply = vi.fn(() => true);
     const applyExact = vi.fn(() => false);
     const neutralize = vi.fn(() => {
       throw neutralizeError;
@@ -208,7 +292,10 @@ describe("createStudioLiveTransformPreviewSession", () => {
       sourceBounds,
       scheduler: clock.scheduler,
       adapter: {
-        apply: () => calls.push("affine"),
+        apply: () => {
+          calls.push("affine");
+          return true;
+        },
         applyExact: () => {
           calls.push("exact");
           return true;
@@ -238,7 +325,7 @@ describe("createStudioLiveTransformPreviewSession", () => {
 
   it("invalidates pending and already-dispatched callbacks when the gesture resolves", () => {
     const clock = manualScheduler();
-    const apply = vi.fn();
+    const apply = vi.fn(() => true);
     const session = createStudioLiveTransformPreviewSession({
       sourceBounds,
       scheduler: clock.scheduler,
@@ -267,7 +354,7 @@ describe("createStudioLiveTransformPreviewSession", () => {
 
   it("disables preview instead of moving geometry work into the pointer hot path when scheduling fails", () => {
     const schedulerError = new Error("requestAnimationFrame unavailable");
-    const apply = vi.fn();
+    const apply = vi.fn(() => true);
     const onError = vi.fn();
     const session = createStudioLiveTransformPreviewSession({
       sourceBounds,
@@ -303,7 +390,7 @@ describe("createStudioLiveTransformPreviewSession", () => {
       .mockImplementationOnce(() => {
         throw adapterError;
       })
-      .mockImplementation(() => undefined);
+      .mockImplementation(() => true);
     const neutralize = vi.fn();
     const onError = vi.fn();
     const session = createStudioLiveTransformPreviewSession({

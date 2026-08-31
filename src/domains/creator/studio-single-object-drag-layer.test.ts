@@ -9,7 +9,9 @@ import {
   STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
 } from "./studio-selection-chrome-mirror";
 import {
+  beginStudioSingleDrawTransformChromeLayer,
   beginStudioSingleDrawTransformLayer,
+  beginStudioSingleDrawTransformSourceLayer,
   beginStudioSingleObjectDragLayer,
   restoreStudioSingleObjectDragLayer,
   studioSingleObjectDragLayerRecoveryPendingForElement,
@@ -371,6 +373,164 @@ describe("single-draw transform gesture Layer lift", () => {
     transformer.nodes([proxy]);
     return { wrapper, proxy, transformer };
   }
+
+  it("keeps the source in the document Layer until an admitted frame claims it", () => {
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const originalOrder = [...scene.mainLayer.getChildren()];
+    const originalPositions = new Map(
+      originalOrder.map((node) => [node, node.getAbsolutePosition()]),
+    );
+    const mainReceipt = vi.spyOn(scene.mainLayer, "drawScene");
+    const dragReceipt = vi.spyOn(scene.dragLayer, "drawScene");
+
+    const chromeSession = beginStudioSingleDrawTransformChromeLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+
+    expect(chromeSession).not.toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+    expect(mainReceipt).toHaveBeenCalledTimes(1);
+    expect(dragReceipt).toHaveBeenCalledTimes(1);
+    expect(mainReceipt.mock.invocationCallOrder[0]).toBeLessThan(
+      dragReceipt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+
+    mainReceipt.mockClear();
+    dragReceipt.mockClear();
+
+    const sourceSession = beginStudioSingleDrawTransformSourceLayer({
+      elementId: "stroke-1",
+      wrapper,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+
+    expect(sourceSession).not.toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.dragLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+    expect(mainReceipt).toHaveBeenCalledTimes(1);
+    expect(dragReceipt).toHaveBeenCalledTimes(1);
+    expect(mainReceipt.mock.invocationCallOrder[0]).toBeLessThan(
+      dragReceipt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+
+    mainReceipt.mockClear();
+    dragReceipt.mockClear();
+
+    expect(restoreStudioSingleObjectDragLayer(sourceSession)).toBe(true);
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+    expect(mainReceipt).toHaveBeenCalledTimes(1);
+    expect(dragReceipt).toHaveBeenCalledTimes(1);
+    expect(mainReceipt.mock.invocationCallOrder[0]).toBeLessThan(
+      dragReceipt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+
+    mainReceipt.mockClear();
+    dragReceipt.mockClear();
+
+    expect(restoreStudioSingleObjectDragLayer(chromeSession)).toBe(true);
+    expect([...scene.mainLayer.getChildren()]).toEqual(originalOrder);
+    for (const node of originalOrder) {
+      expect(node.getAbsolutePosition()).toEqual(originalPositions.get(node));
+    }
+    expect(mainReceipt).toHaveBeenCalledTimes(1);
+    expect(dragReceipt).toHaveBeenCalledTimes(1);
+    expect(mainReceipt.mock.invocationCallOrder[0]).toBeLessThan(
+      dragReceipt.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("refuses an admitted source claim without disturbing isolated chrome", () => {
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const authoredPaint = new studioKonvaRuntime.Rect({
+      x: 160,
+      y: 120,
+      width: 50,
+      height: 50,
+      fill: "#ff00ff",
+    });
+    // Move real authored paint above the wrapper while keeping the gesture chrome later still.
+    scene.mainLayer.add(authoredPaint);
+    authoredPaint.zIndex(wrapper.zIndex() + 1);
+
+    const chromeSession = beginStudioSingleDrawTransformChromeLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+
+    expect(chromeSession).not.toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+
+    expect(beginStudioSingleDrawTransformSourceLayer({
+      elementId: "stroke-1",
+      wrapper,
+      transformer,
+      dragLayer: scene.dragLayer,
+    })).toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(authoredPaint.getLayer()).toBe(scene.mainLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+
+    expect(restoreStudioSingleObjectDragLayer(chromeSession)).toBe(true);
+    expect(proxy.getLayer()).toBe(scene.mainLayer);
+    expect(transformer.getLayer()).toBe(scene.mainLayer);
+  });
+
+  it("keeps a synchronous source receipt retryable after structural restore completes", () => {
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const chromeSession = beginStudioSingleDrawTransformChromeLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    const sourceSession = beginStudioSingleDrawTransformSourceLayer({
+      elementId: "stroke-1",
+      wrapper,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(chromeSession).not.toBeNull();
+    expect(sourceSession).not.toBeNull();
+
+    const drawDrag = scene.dragLayer.drawScene.bind(scene.dragLayer);
+    let remainingFailures = 3;
+    const failedDragReceipt = vi.spyOn(scene.dragLayer, "drawScene").mockImplementation(() => {
+      if (remainingFailures > 0) {
+        remainingFailures -= 1;
+        throw new Error("drag Layer receipt failed");
+      }
+      return drawDrag();
+    });
+
+    expect(restoreStudioSingleObjectDragLayer(sourceSession)).toBe(false);
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+    expect(sourceSession?.restored).toBe(false);
+    expect(remainingFailures).toBe(0);
+    expect(studioSingleObjectDragLayerRecoveryPendingForElement("stroke-1")).toBe(true);
+
+    expect(restoreStudioSingleObjectDragLayer(sourceSession)).toBe(true);
+    expect(sourceSession?.restored).toBe(true);
+    expect(studioSingleObjectDragLayerRecoveryPendingForElement("stroke-1")).toBe(false);
+    expect(restoreStudioSingleObjectDragLayer(chromeSession)).toBe(true);
+    failedDragReceipt.mockRestore();
+  });
 
   it("lifts stroke, proxy and Transformer together and restores order and position", () => {
     const unrelated = new studioKonvaRuntime.Group();
