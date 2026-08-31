@@ -2379,12 +2379,19 @@ export class FxOilDabPlanner {
       this.dabs = [];
     }
     const stations = sampleStations(points, settings.spacing, settings.maxDabs, settings.capMode);
-    if (stations.length >= settings.maxDabs) {
-      // The station budget is saturated, so `sampleStations` is refitting the lattice across the
-      // whole arc and every station moves on every append: no prefix can survive. Drop the retained
-      // bed rather than keep 4096 stations x 7-44 bristles alive next to the one being built —
-      // holding both generations measured +4.5 ms per move in GC alone. Bailing out here can only
-      // ever cause a full replan, never a wrong reuse.
+    if (settings.capMode === "refit-v1" && stations.length >= settings.maxDabs) {
+      // Under `refit-v1` a saturated budget means `sampleStations` is refitting the lattice across
+      // the whole arc and every station moves on every append: no prefix can survive. Drop the
+      // retained bed rather than keep 4096 stations x 7-44 bristles alive next to the one being
+      // built — holding both generations measured +4.5 ms per move in GC alone. Bailing out here
+      // can only ever cause a full replan, never a wrong reuse.
+      //
+      // The ladder is excluded because for it a saturated count means the opposite. It reaches the
+      // budget on the last spacing interval BEFORE a rung climb, where the stations are as stable
+      // as anywhere else, and a stroke can sit in that interval for many appends — so bailing out
+      // there rebuilds all 4096 dabs per pointer move at exactly the length this change exists to
+      // make cheap. The prefix verifier below already handles the rung climb: it finds nothing
+      // byte-equal and rebuilds, which is the same outcome by the same evidence.
       this.stations = [];
       this.dabs = [];
       this.lastReusedDabs = 0;
