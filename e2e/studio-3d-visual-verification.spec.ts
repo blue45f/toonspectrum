@@ -215,9 +215,16 @@ async function waitForStableBg3dFrame(
     contentType: "application/json",
   });
   if (metrics.timedOut) {
+    // Stability needs a matching surface AND a small delta. A near-zero delta with a timeout
+    // therefore means the frames agreed while the surface kept changing, so the dimensions are
+    // the only thing that explains the stall — and the run log is all this job keeps.
     throw new Error(
       `${label}: 같은 자세의 WebGPU 프레임이 ${timeoutMs}ms 안에 안정되지 않았습니다 `
-      + `(최종 내부 칸 최대 휘도차 ${finalInternalPeakTileDelta.toFixed(2)}).`,
+      + `(최종 내부 칸 최대 휘도차 ${finalInternalPeakTileDelta.toFixed(2)}, `
+      + `버퍼 ${firstSurface.bufferWidth}×${firstSurface.bufferHeight}`
+      + ` → ${finalSurface.bufferWidth}×${finalSurface.bufferHeight}, `
+      + `프레임 ${firstFrame.width}×${firstFrame.height}`
+      + ` → ${finalFrame.width}×${finalFrame.height}, 샘플 ${samples}).`,
     );
   }
   return { frame: finalFrame, ...metrics };
