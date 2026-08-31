@@ -620,16 +620,28 @@ export function buildStudioLift3dGeometry(
   // 격자를 먼저 다 세운다. 방출은 그 다음이다 — 실제로 나올 사각형 수를 정확히 알기 전에
   // 정점을 쌓기 시작하면, 예산 초과를 수십만 개를 만든 뒤에야 알게 된다.
   const planned = planStudioLift3dShellGrids(mask, depth, options.mode, options.layerBands);
-  // 카드 두께와 카드 간격이 **같은** 밴드 수에서 나와야 한다. 빈 밴드가 버려졌을 때
-  // 살아남은 개수로 두께를 잡으면, 간격은 그대로인데 카드만 두꺼워져 층이 서로 파고든다.
-  const cardHalf = thickness / Math.max(8, planned.bandCount * 4);
   const shells: readonly PlannedShell[] = options.mode === "parallax"
     ? planned.grids.map((grid, index) => {
-      const center = thickness * (planned.bands[index]!.center - 0.5);
-      return {
-        grid,
-        depthAt: (): readonly [number, number] => [center + cardHalf, center - cardHalf],
-      };
+      // 카드는 **이웃 카드와 맞닿는 깊이까지** 뻗는다. 얇은 판을 각자의 밴드 중앙에만 띄우면
+      // 카드 사이 z 간격이 그대로 빈 공간이 되어, 정면에서는 멀쩡하다가 카메라가 좌우로
+      // 돌아가는 순간 밴드 경계마다 배경이 비쳐 보인다 — 시차를 보려고 돌리는 바로 그
+      // 움직임에서 갈라진다. 이웃과의 중점까지 뻗으면 층이 계단처럼 이어져 틈이 없다.
+      //
+      // 중점은 **살아남은** 이웃을 기준으로 잡는다. 빈 밴드가 버려진 자리도 그만큼 메워야
+      // 틈이 남지 않는다. 양 끝은 요청한 밴드 폭의 절반만큼만 더 뻗는다.
+      const centers = planned.bands;
+      const halfBand = 0.5 / planned.bandCount;
+      const here = centers[index]!.center;
+      const previous = centers[index - 1]?.center;
+      const next = centers[index + 1]?.center;
+      const back = previous === undefined ? here - halfBand : (previous + here) / 2;
+      const front = next === undefined ? here + halfBand : (here + next) / 2;
+      // 이웃과 정확히 같은 값을 공유하므로 카드끼리 파고들지도, 벌어지지도 않는다.
+      const span: readonly [number, number] = [
+        thickness * (front - 0.5),
+        thickness * (back - 0.5),
+      ];
+      return { grid, depthAt: (): readonly [number, number] => span };
     })
     : [{
       grid: planned.grids[0]!,

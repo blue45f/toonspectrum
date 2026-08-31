@@ -683,6 +683,32 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(built.detail).toContain(`레이어 수(${bandCount})`);
   });
 
+  it("이웃 카드가 깊이에서 맞닿아 층 사이에 틈이 없다", () => {
+    // 얇은 판을 각자의 밴드 중앙에만 띄우면 카드 사이 z 간격이 빈 공간이 된다. 정면에서는
+    // 멀쩡하다가 카메라가 돌아가는 순간 밴드 경계마다 배경이 비친다 — 시차를 보려고 돌리는
+    // 바로 그 움직임에서 갈라지는 셈이다.
+    //
+    // 맞닿았다면 카드 k 의 앞면과 카드 k+1 의 뒷면이 **같은 z** 다. 그러면 서로 다른 z 값의
+    // 개수가 층 수 + 1 이 된다(떠 있으면 층마다 둘씩이라 2배가 된다).
+    const side = 40;
+    const bandCount = 6;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      depthFieldOf(side, (_x, y) => y / side),
+      { mode: "parallax", depthScale: 0.4, targetHeight: 4, layerBands: bandCount },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const depths = [...new Set(
+      built.value.mesh.vertices.map((vertex) => vertex.position.z.toFixed(9)),
+    )];
+    expect(built.value.layerCount).toBe(bandCount);
+    expect(depths).toHaveLength(bandCount + 1);
+  });
+
   it("사각형을 하나도 못 만드는 밴드는 층 수에서 뺀다", () => {
     // 한 칸 폭 부위에만 걸린 밴드는 부풀린 뒤에도 2×2 가 안 나와 정점이 하나도 안 나간다.
     // 그 껍질을 세어만 두면 존재하지 않는 층이 지표와 화면에 광고된다.
