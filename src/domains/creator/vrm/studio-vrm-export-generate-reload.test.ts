@@ -525,6 +525,56 @@ describe("generate recipe → .vrm file reload", () => {
     expect(tall.skullRadius / rest.skullRadius, "두개골 콜라이더가 두 번 커졌다").toBeCloseTo(1.6, 3);
   }, 60_000);
 
+  it.each([
+    ["headBodyRatio", { headBodyRatio: 2.5 }, 2.5],
+    ["overallHeight", { overallHeight: 1.6 }, 1.6],
+    ["both", { overallHeight: 1.3, headBodyRatio: 2 }, 2.6],
+  ] as const)(
+    "keeps the skull collider the same shape as the head it rides (%s)",
+    async (_label, override, expected) => {
+      // 두개골 캡슐은 `HairRoot` 를 거쳐 `head` 아래에 있고, `head` 는 `overallHeight` 와
+      // `headBodyRatio` 를 **둘 다** 흡수한다. 상속분을 나눈 뒤 한쪽만 되돌리면 반경은 둘 다
+      // 따라가는데 축은 한쪽만 따라가 형태가 망가진다(비율 2.5 에서 반경 ×2.50 · 축 ×1.00).
+      const presetId = "hime-noble";
+      const shape: { radius: number; span: number }[] = [];
+      for (const proportions of [{}, override]) {
+        const vrm = await loadVrmBytes(
+          exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+        );
+        const adapter = createStudioVrmProportionVrmAdapter({
+          vrm,
+          getCurrentModelGeneration: () => 1,
+          reapplyAuthoredPose: () => true,
+        });
+        const created = createStudioVrmProportionRigRuntime(adapter, {
+          headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+        });
+        if (!created.ok) throw new Error(created.message);
+        expect(
+          created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, ...proportions }).ok,
+        ).toBe(true);
+        vrm.scene.updateMatrixWorld(true);
+
+        const skull = [...(vrm.springBoneManager?.colliders ?? [])][1];
+        if (!skull) throw new Error("expected a skull capsule");
+        const geometry = (skull as unknown as {
+          shape: { offset: Vector3; tail?: Vector3; radius: number };
+        }).shape;
+        skull.updateWorldMatrix(true, false);
+        const worldScale = new Vector3();
+        skull.matrixWorld.decompose(new Vector3(), new Quaternion(), worldScale);
+        const a = geometry.offset.clone().applyMatrix4(skull.matrixWorld);
+        const b = (geometry.tail ?? geometry.offset).clone().applyMatrix4(skull.matrixWorld);
+        shape.push({ radius: geometry.radius * worldScale.x, span: a.distanceTo(b) });
+      }
+      const [rest, scaled] = shape;
+      // 반경과 축이 **같은** 배율로 따라가야 형태가 유지된다.
+      expect(scaled.radius / rest.radius, "두개골 반경이 머리를 따라가지 않았다").toBeCloseTo(expected, 3);
+      expect(scaled.span / rest.span, "두개골 축이 머리를 따라가지 않았다").toBeCloseTo(expected, 3);
+    },
+    60_000,
+  );
+
   it("gives the loaded humanoid finger bones that actually drive the hand mesh", async () => {
     // 예전에는 손이 벙어리장갑 하나에 엄지 돌기를 붙인 형태였고 손가락 본이 아예 없었다.
     // 포즈 라이브러리도 리타게팅도 손가락을 굽힐 대상 자체가 없었다.

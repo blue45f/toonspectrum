@@ -168,6 +168,9 @@ export function measureStudioVrmProportionHeadLength(
 }
 
 /** Creates the concrete three-vrm lifecycle adapter used by Poser and shared BG3D. */
+/** 상속 배율이 1 인지 가르는 허용 오차. float32 컨테이너 잡음보다 넉넉하다. */
+const INHERITED_SCALE_EPSILON = 1e-6;
+
 /**
  * A collider's authored geometry, captured once so every resize is absolute from rest. Rescaling
  * the live values in place would compound across slider moves.
@@ -258,9 +261,20 @@ function resizeSpringBoneColliderShapes(
   for (const entry of captured) {
     const inherited = rootRelativeScaleOf(root, entry.collider) / entry.restRootScale;
     if (!Number.isFinite(inherited) || inherited <= 0) return false;
-    const axis = uniformScale / inherited;
-    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(axis);
-    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(axis);
+
+    // A collider whose own frame took a scale is already carried whole by the scene graph, and that
+    // scale is the complete story for it -- the generated skull capsules sit beneath `head`, which
+    // absorbs `headBodyRatio` as well as `overallHeight`. Rescaling the local values on top would
+    // double-count; dividing the inherited factor back out and re-applying only `overallHeight`
+    // would strand the axis while the radius still followed both, leaving a malformed envelope
+    // (at `headBodyRatio` 2.5 the radius went x2.50 while the axis stayed x1.00).
+    //
+    // A collider whose frame did not scale -- the torso capsule on `spine` -- is the opposite case:
+    // nothing carried it, so its axis has to pick up the joint spacing itself.
+    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) continue;
+
+    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
+    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
   }
   return true;
 }
