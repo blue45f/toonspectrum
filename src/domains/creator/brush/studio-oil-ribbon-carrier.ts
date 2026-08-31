@@ -1434,6 +1434,53 @@ const IMPASTO_RELIEF_RIDGE_REACH_MIN_CELLS = 0.8;
 /** Film rim slope width in cells — the body edge is a paint cliff, not a hard alias step. */
 const IMPASTO_RELIEF_EDGE_FEATHER_CELLS = 1.5;
 /**
+ * Quantum the height grid's cell size climbs by, and the rung ceiling.
+ *
+ * The natural cell is `max(longSpan / 256, …)`, a continuous function of the stroke's bounding
+ * box — so every pointer move that extends the arc rescales the whole tile, and with it every
+ * cell index, every sampled shading value and every relief run built on top. Nothing downstream
+ * can be reused across an append, which is why relief costs the same on move 4000 as on move 40.
+ *
+ * Snapping the cell onto a geometric ladder makes it piecewise constant: it holds through a long
+ * run of appends and then steps once.
+ *
+ * Rounded DOWN, never up. A coarser cell would keep the tile inside the budgets above for free,
+ * but the cell is not only a cost dial — `impastoHairStride` divides the ribbon width by it to
+ * decide how many hairs the field can resolve, through a `floor`. Rounding up by even 9% pushes
+ * that quotient across an integer on some beds and HALVES the number of ridges rasterised (and
+ * with them the flank stripes, which walk the same stride): measured on a straight capped stroke,
+ * 43 relief runs became 20. That is a quality regression, not a pixel difference. Rounding down
+ * keeps `cell <= natural`, so the tile is never coarser than the continuous formula would have
+ * made it and the stride can only be finer.
+ *
+ * The rung SIZE is then set by the painted-work budget, not by taste. A cell one rung below
+ * natural puts `ratio^2` more cells in the tile, and a finer cell also lets `impastoHairStride`
+ * resolve more hairs — so the ratio lands directly on relief vertex count. At 2^(1/8) the
+ * scribble budget stroke went from its recorded 4288 relief vertices to 5213, eating the whole
+ * ~20% headroom the guard in `impasto-relief.test.ts` carries. 2^(1/16) holds the cell within
+ * 4.4% of natural and stays inside that budget. The price is twice as many rung climbs over a
+ * stroke's growth, which is still only tens of them across thousands of appends.
+ */
+const IMPASTO_RELIEF_CELL_STEP_RATIO = 2 ** (1 / 16);
+const IMPASTO_RELIEF_CELL_MAX_RUNGS = 512;
+
+/**
+ * Smallest ladder rung at or above `natural`, so the cell is stable across appends.
+ *
+ * Computed by climbing rather than by `Math.log`, so the value is a product of the same factors
+ * in the same order regardless of how the caller arrived at `natural` — two appends that land on
+ * the same rung get a bit-identical cell, which is the property the whole reuse chain rests on.
+ */
+function impastoReliefCell(natural: number): number {
+  let cell = IMPASTO_RELIEF_MIN_CELL_PX;
+  for (let rung = 0; rung < IMPASTO_RELIEF_CELL_MAX_RUNGS; rung += 1) {
+    const next = cell * IMPASTO_RELIEF_CELL_STEP_RATIO;
+    if (next > natural) return cell;
+    cell = next;
+  }
+  return cell;
+}
+/**
  * dli's normalScale 7 is tuned for a canvas whose alpha saturates under accumulated strokes; a
  * single stroke's tile at the coarse plan grid carries roughly half that paint, so the module's
  * own heightScale dial restores the reference slope response without touching the BRDF.
@@ -1553,16 +1600,24 @@ function buildImpastoReliefField(
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
   const spanX = Math.max(1e-3, maxX - minX);
   const spanY = Math.max(1e-3, maxY - minY);
-  let cell = Math.max(
+  let natural = Math.max(
     IMPASTO_RELIEF_MIN_CELL_PX,
     Math.max(spanX, spanY) / IMPASTO_RELIEF_GRID_LONG_SIDE,
   );
-  const cellsAtLongSide = (spanX / cell) * (spanY / cell);
+  const cellsAtLongSide = (spanX / natural) * (spanY / natural);
   if (cellsAtLongSide > IMPASTO_RELIEF_GRID_MAX_CELLS) {
-    cell *= Math.sqrt(cellsAtLongSide / IMPASTO_RELIEF_GRID_MAX_CELLS);
+    natural *= Math.sqrt(cellsAtLongSide / IMPASTO_RELIEF_GRID_MAX_CELLS);
   }
-  const gridWidth = Math.max(4, Math.ceil(spanX / cell) + 1);
-  const gridHeight = Math.max(4, Math.ceil(spanY / cell) + 1);
+  const cell = impastoReliefCell(natural);
+  // Snap the origin to a whole number of cells as well. The cell size alone is not enough: the
+  // tile is addressed from `minX`/`minY`, and a stroke that grows leftward drags every existing
+  // sample onto a different cell centre even when the cell size has not moved. On a snapped
+  // origin an append can only ever prepend whole cells, so the previous tile is an integer-offset
+  // sub-grid of the new one and the values inside it are the same numbers.
+  const originX = Math.floor(minX / cell) * cell;
+  const originY = Math.floor(minY / cell) * cell;
+  const gridWidth = Math.max(4, Math.ceil((maxX - originX) / cell) + 1);
+  const gridHeight = Math.max(4, Math.ceil((maxY - originY) / cell) + 1);
   const cellCount = gridWidth * gridHeight;
   const film = new Float32Array(cellCount);
   const feather = IMPASTO_RELIEF_EDGE_FEATHER_CELLS * cell;
@@ -1585,18 +1640,18 @@ function buildImpastoReliefField(
     const radius = station.radiusY;
     const reach = radius + feather;
     const reachSquared = reach * reach;
-    const minCellX = Math.max(0, Math.floor((station.x - reach - minX) / cell));
-    const maxCellX = Math.min(gridWidth - 1, Math.ceil((station.x + reach - minX) / cell));
-    const minCellY = Math.max(0, Math.floor((station.y - reach - minY) / cell));
-    const maxCellY = Math.min(gridHeight - 1, Math.ceil((station.y + reach - minY) / cell));
+    const minCellX = Math.max(0, Math.floor((station.x - reach - originX) / cell));
+    const maxCellX = Math.min(gridWidth - 1, Math.ceil((station.x + reach - originX) / cell));
+    const minCellY = Math.max(0, Math.floor((station.y - reach - originY) / cell));
+    const maxCellY = Math.min(gridHeight - 1, Math.ceil((station.y + reach - originY) / cell));
     // Coverage saturates at 1 for `dist ≤ radius`; only the [radius, radius+feather] annulus
     // needs the sqrt falloff, which is what keeps a 2000-station film affordable.
     const innerSquared = radius * radius;
     for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-      const deltaY = minY + (cellY + 0.5) * cell - station.y;
+      const deltaY = originY + (cellY + 0.5) * cell - station.y;
       const deltaYSquared = deltaY * deltaY;
       for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-        const deltaX = minX + (cellX + 0.5) * cell - station.x;
+        const deltaX = originX + (cellX + 0.5) * cell - station.x;
         const distanceSquared = deltaX * deltaX + deltaYSquared;
         if (distanceSquared > reachSquared) continue;
         const at = cellY * gridWidth + cellX;
@@ -1665,24 +1720,24 @@ function buildImpastoReliefField(
       const loadSpan = toLoad - fromLoad;
       const minCellX = Math.max(
         0,
-        Math.floor((Math.min(fromX, toX) - ridgeReach - minX) / cell),
+        Math.floor((Math.min(fromX, toX) - ridgeReach - originX) / cell),
       );
       const maxCellX = Math.min(
         gridWidth - 1,
-        Math.ceil((Math.max(fromX, toX) + ridgeReach - minX) / cell),
+        Math.ceil((Math.max(fromX, toX) + ridgeReach - originX) / cell),
       );
       const minCellY = Math.max(
         0,
-        Math.floor((Math.min(fromY, toY) - ridgeReach - minY) / cell),
+        Math.floor((Math.min(fromY, toY) - ridgeReach - originY) / cell),
       );
       const maxCellY = Math.min(
         gridHeight - 1,
-        Math.ceil((Math.max(fromY, toY) + ridgeReach - minY) / cell),
+        Math.ceil((Math.max(fromY, toY) + ridgeReach - originY) / cell),
       );
       for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-        const pointY = minY + (cellY + 0.5) * cell - fromY;
+        const pointY = originY + (cellY + 0.5) * cell - fromY;
         for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-          const pointX = minX + (cellX + 0.5) * cell - fromX;
+          const pointX = originX + (cellX + 0.5) * cell - fromX;
           const t = clamp(
             (pointX * segmentX + pointY * segmentY) * inverseLengthSquared,
             0,
@@ -1707,8 +1762,8 @@ function buildImpastoReliefField(
     gridWidth,
     gridHeight,
     cell,
-    originX: minX,
-    originY: minY,
+    originX,
+    originY,
     hairStride,
     hairOffset,
     // dli defaults verbatim (normalScale 7, roughness 0.075, F0 0.05, light (0,−1,1) image-space);
