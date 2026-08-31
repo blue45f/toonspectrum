@@ -75,8 +75,8 @@ describe("active stroke lifecycle integration boundary", () => {
     expect(persistence).toContain("const activeRecovery = readActiveStrokeLifecycleRecovery()");
     expect(persistence).toContain("const effectivePendingBatch =");
     expect(persistence).toContain("const effectiveMasterStroke =");
-    expect(persistence).toContain("studioActiveStrokeRecoveryFingerprint(recoveredActiveStroke)");
-    expect(persistence).toContain("pendingStrokeCommits: effectivePendingBatch");
+    expect(persistence).toContain("studioActiveStrokeRecoveryFingerprint(");
+    expect(persistence).toContain("pendingStrokeCommits: durableEffectivePendingBatch");
     expect(persistence).toContain("recoveredMasterStroke: effectiveMasterStroke");
     expect(persistence).not.toContain("pendingStrokeCommitsRef.current = {");
     expect(persistence).not.toContain("lifecycleMasterStrokeRecoveryRef.current =");

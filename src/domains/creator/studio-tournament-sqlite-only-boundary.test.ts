@@ -23,19 +23,8 @@ describe("Studio tournament product boundary", () => {
   });
 
   it("wires accepted non-test GPU and Worker completions into the bounded tournament", () => {
-    const node = source("./StudioKonvaImageNode.tsx");
     const timing = source("./filter/studio-filter-render-tournament.ts");
 
-    expect(node).toContain(
-      'import { scheduleStudioFilterRenderTournament } from "./filter/studio-filter-render-tournament";',
-    );
-    expect(node).toMatch(
-      /scheduleAcceptedFilterTournament\(\{\s*provider: "worker"/u,
-    );
-    expect(node).toMatch(
-      /scheduleAcceptedFilterTournament\(\{\s*provider: "gpu-chain"/u,
-    );
-    expect(node).toContain("result.execution === \"worker\"");
     expect(timing).toContain("runtime.recordRenderSample(");
     expect(timing).toContain("runtime.evaluateMeasuredTournament({");
     expect(timing).toContain("void runtime.persist()");

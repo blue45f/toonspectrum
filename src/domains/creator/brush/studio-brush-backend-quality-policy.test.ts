@@ -127,7 +127,7 @@ describe("studio brush backend integration audit", () => {
     expect(auditById.get("canonical-webgpu-textured")?.evidence)
       .toContain("selected, top-most, unclipped");
     expect(auditById.get("canonical-webgpu-textured")?.evidence)
-      .toContain("not yet routed");
+      .toContain("presentation receipts");
     expect(auditById.get("perfect-freehand-outline")).toMatchObject({
       connection: "active-product",
       asynchronous: false,

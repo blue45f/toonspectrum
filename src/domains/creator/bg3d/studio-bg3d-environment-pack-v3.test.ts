@@ -248,9 +248,9 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
     }));
     vi.stubGlobal("fetch", fetcher);
 
-    await expect(getStoredBg3dModelV12(asset.id)).rejects.toThrow();
+    await expect(getStoredBg3dModelV12(asset.id, { executionBackend: "direct" })).rejects.toThrow();
     responseBytes = deployedBytes;
-    const recovered = await getStoredBg3dModelV12(asset.id);
+    const recovered = await getStoredBg3dModelV12(asset.id, { executionBackend: "direct" });
     expect(recovered?.contentHash).toBe(asset.sha256);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });

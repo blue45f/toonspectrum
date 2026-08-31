@@ -470,7 +470,9 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     const testImage = paintedImage(20, 20, (x) => (x < 10 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
     const source: FakeSource = { testImage };
 
-    const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
+    const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory, {
+      executionMode: "direct",
+    });
 
     expect(out).not.toBeNull();
     expect((out as FakeCanvas).id).toBe(1);
@@ -515,7 +517,7 @@ describe("bakeLiquifyStrokeToCanvas", () => {
         4,
         0.75,
         factory,
-        { flipX, flipY }
+        { flipX, flipY, executionMode: "direct" }
       );
 
       expect(out).not.toBeNull();

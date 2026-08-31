@@ -314,8 +314,8 @@ async function runStudioRasterInterchangeWorker(
       if (response.type === "studio-raster-interchange/failure") {
         finish(() => reject(
           workerFailure(
-            "래스터 Worker가 작업을 완료하지 못했습니다.",
-            "StudioRasterInterchangeWorkerError",
+            response.error.message || "래스터 Worker가 작업을 완료하지 못했습니다.",
+            response.error.name || "StudioRasterInterchangeWorkerError",
           ),
         ));
         return;

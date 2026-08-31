@@ -206,8 +206,9 @@ export interface Bg3dModelHashResolution {
   readonly deletionReceipt: Bg3dModelDeletionReceipt | null;
 }
 
-interface Bg3dModelDatabaseOperationOptions {
+export interface Bg3dModelDatabaseOperationOptions {
   readonly signal?: AbortSignal;
+  readonly executionBackend?: StudioBg3dGlbValidationExecutionBackend;
 }
 
 let lastThumbnailCaptureRevision = 0;
@@ -324,6 +325,7 @@ const bundledEnvironmentRecordPromiseById = new Map<
 async function loadBundledEnvironmentRecord(
   id: string,
   signal?: AbortSignal,
+  executionBackend?: StudioBg3dGlbValidationExecutionBackend,
 ): Promise<Bg3dVerifiedStoredRecord | null> {
   const asset = getStudioBg3dEnvironmentAsset(id);
   if (!asset) return null;
@@ -355,6 +357,7 @@ async function loadBundledEnvironmentRecord(
           profile: "mobile",
           idFactory: () => asset.id,
           now: 0,
+          executionBackend,
         });
       } finally {
         // The verified record owns its Blob. Retaining the deployment Uint8Array as well would
@@ -1923,7 +1926,7 @@ export async function getStoredBg3dModelByHashV12(
   const canonicalHash = canonicalizeBg3dModelHash(hash);
   if (!canonicalHash) return null;
   const bundled = getStudioBg3dEnvironmentAssetByHash(canonicalHash);
-  if (bundled) return loadBundledEnvironmentRecord(bundled.id, options.signal);
+  if (bundled) return loadBundledEnvironmentRecord(bundled.id, options.signal, options.executionBackend);
   const authority = v12Authority(options);
   const manifest = parseV12ModelManifest(await authority.readManifest("models"));
   const record = manifest.records.find(({ contentHash }) => contentHash === canonicalHash);
@@ -1952,7 +1955,7 @@ export async function resolveBg3dModelHashV12(
   const bundled = getStudioBg3dEnvironmentAssetByHash(canonicalHash);
   if (bundled) {
     return {
-      record: await loadBundledEnvironmentRecord(bundled.id, options.signal),
+      record: await loadBundledEnvironmentRecord(bundled.id, options.signal, options.executionBackend),
       deletionReceipt: null,
     };
   }
@@ -2162,7 +2165,7 @@ export async function getStoredBg3dModelV12(
   options: Bg3dModelV12StorageOptions & Bg3dModelDatabaseOperationOptions = {},
 ): Promise<Bg3dVerifiedStoredRecord | null> {
   if (!isSafeBg3dModelStorageId(id)) return null;
-  const bundled = await loadBundledEnvironmentRecord(id, options.signal);
+  const bundled = await loadBundledEnvironmentRecord(id, options.signal, options.executionBackend);
   if (bundled) return bundled;
   const authority = v12Authority(options);
   const manifest = parseV12ModelManifest(await authority.readManifest("models"));

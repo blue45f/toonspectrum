@@ -1,12 +1,12 @@
 {
   "harness": "tests/visual/bristle-quality.test.ts",
   "model": "packages/studio-brush-platform/src/bristle-model.ts",
-  "generatedAt": "2026-08-29T08:26:43.596Z",
+  "generatedAt": "2026-08-31T19:40:43.614Z",
   "host": {
-    "platform": "linux",
-    "arch": "x64",
-    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
-    "node": "v22.22.2"
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
   },
   "lineage": "2D reduction of WetBrush (Chen et al., SIGGRAPH Asia 2015) — concepts only, no upstream code: bristles collapse to a 1D cross-section with a spring-loaded spread, seeded clump splitting and a per-hair ink reservoir",
   "presets": {
@@ -274,43 +274,43 @@
       "rows": [
         {
           "bristleCount": 8,
-          "simOnlyP50Ms": 0.10156,
-          "withFootprintsP50Ms": 0.19082,
-          "simOnlyPerSampleUs": 0.4232,
-          "frameBudgetPct": 0.609,
-          "samplesPerFrameBudget": 39385
+          "simOnlyP50Ms": 0.03571,
+          "withFootprintsP50Ms": 0.08825,
+          "simOnlyPerSampleUs": 0.1488,
+          "frameBudgetPct": 0.214,
+          "samplesPerFrameBudget": 112019
         },
         {
           "bristleCount": 16,
-          "simOnlyP50Ms": 0.22645,
-          "withFootprintsP50Ms": 0.39901,
-          "simOnlyPerSampleUs": 0.9436,
-          "frameBudgetPct": 1.359,
-          "samplesPerFrameBudget": 17663
+          "simOnlyP50Ms": 0.05754,
+          "withFootprintsP50Ms": 0.09254,
+          "simOnlyPerSampleUs": 0.2398,
+          "frameBudgetPct": 0.345,
+          "samplesPerFrameBudget": 69515
         },
         {
           "bristleCount": 32,
-          "simOnlyP50Ms": 0.34287,
-          "withFootprintsP50Ms": 0.61822,
-          "simOnlyPerSampleUs": 1.4286,
-          "frameBudgetPct": 2.057,
-          "samplesPerFrameBudget": 11666
+          "simOnlyP50Ms": 0.09908,
+          "withFootprintsP50Ms": 0.16975,
+          "simOnlyPerSampleUs": 0.4128,
+          "frameBudgetPct": 0.594,
+          "samplesPerFrameBudget": 40370
         },
         {
           "bristleCount": 64,
-          "simOnlyP50Ms": 0.58243,
-          "withFootprintsP50Ms": 1.16069,
-          "simOnlyPerSampleUs": 2.4268,
-          "frameBudgetPct": 3.495,
-          "samplesPerFrameBudget": 6867
+          "simOnlyP50Ms": 0.18779,
+          "withFootprintsP50Ms": 0.34446,
+          "simOnlyPerSampleUs": 0.7825,
+          "frameBudgetPct": 1.127,
+          "samplesPerFrameBudget": 21300
         },
         {
           "bristleCount": 128,
-          "simOnlyP50Ms": 1.04794,
-          "withFootprintsP50Ms": 2.82681,
-          "simOnlyPerSampleUs": 4.3664,
-          "frameBudgetPct": 6.288,
-          "samplesPerFrameBudget": 3817
+          "simOnlyP50Ms": 0.38,
+          "withFootprintsP50Ms": 1.02242,
+          "simOnlyPerSampleUs": 1.5833,
+          "frameBudgetPct": 2.28,
+          "samplesPerFrameBudget": 10526
         }
       ]
     },

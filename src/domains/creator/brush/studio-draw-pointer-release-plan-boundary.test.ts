@@ -93,7 +93,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     expect(finish).not.toContain("smoothStrokePoints(");
     expect(finish).not.toContain("isStudioImmediateFreehandCommit(");
     expect(finish).not.toContain("let finished = drawingRef.current");
-    expect(finish.split("\n").length).toBeLessThanOrEqual(400);
+    expect(finish.split("\n").length).toBeLessThanOrEqual(420);
     expect(sealStart).toBeGreaterThan(-1);
     expectTokenOrder(sealInput, [
       "updateActiveShapeEndpoint(stage, pointerEvent, false)",

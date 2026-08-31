@@ -444,7 +444,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
 
     for (const [index, asset] of STUDIO_BG3D_ENVIRONMENT_ASSETS_V5.entries()) {
       const expected = EXPECTED_METRICS[asset.fileName as keyof typeof EXPECTED_METRICS];
-      const record = await getStoredBg3dModelV12(asset.id);
+      const record = await getStoredBg3dModelV12(asset.id, { executionBackend: "direct" });
       expect(record).not.toBeNull();
       expect(record).toMatchObject({
         id: asset.id,
@@ -490,6 +490,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
       }) as unknown as ImageBitmap));
       const verified = await admitStoredBg3dModelForRenderingV12(asset.id, {
         profile: "mobile",
+        executionBackend: "direct",
       });
       const loaded = await loadVerifiedStudioBg3dGlbWithThree(
         verified,

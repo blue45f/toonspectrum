@@ -267,7 +267,7 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
       }),
       arrayBuffer: async () => Uint8Array.from(deployedBytes).buffer as ArrayBuffer,
     })));
-    const record = await getStoredBg3dModelV12(asset.id);
+    const record = await getStoredBg3dModelV12(asset.id, { executionBackend: "direct" });
     expect(record).not.toBeNull();
     const bundled = createStudioBg3dModelAttachment(record!, {
       attachmentId: "wave4-hospital-attachment",

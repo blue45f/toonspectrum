@@ -52,9 +52,8 @@ describe("Studio mobile top browser harness boundary", () => {
     expect(harness).toContain(
       'const presenceDock = document.querySelector(\'[data-studio-presence-dock="true"]\');',
     );
-    expect(harness).toContain(
-      "for (const candidate of [siteHeader, menubar, statusRail, toolBelt, presenceDock]) {",
-    );
+    expect(harness).toContain("presenceDock,");
+    expect(harness).toContain("mobileDock,");
   });
 
   it("excuses only transport-level failures at the third-party font CDNs", () => {

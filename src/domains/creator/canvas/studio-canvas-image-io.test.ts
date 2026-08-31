@@ -215,6 +215,44 @@ describe("Studio canvas image file loading", () => {
   });
 
   it("fails closed when the extension and the actual open-raster bytes disagree", async () => {
+    class RasterWorkerMock {
+      onmessage: ((event: MessageEvent<StudioRasterInterchangeWorkerResponse>) => void) | null = null;
+      onerror: ((event: { readonly message?: string }) => void) | null = null;
+
+      constructor() {
+        queueMicrotask(() => this.onmessage?.({ data: {
+          type: "studio-raster-interchange/ready",
+          version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+        } } as MessageEvent<StudioRasterInterchangeWorkerResponse>));
+      }
+
+      postMessage(request: StudioRasterInterchangeWorkerRequest): void {
+        if (request.type !== "studio-raster-interchange/decode") throw new Error("decode request expected");
+        try {
+          const result = decodeStudioRasterInterchange(request.bytes, request.expectedFormat);
+          queueMicrotask(() => this.onmessage?.({ data: {
+            type: "studio-raster-interchange/decode-success",
+            version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+            requestId: request.requestId,
+            result,
+          } } as MessageEvent<StudioRasterInterchangeWorkerResponse>));
+        } catch (error) {
+          queueMicrotask(() => this.onmessage?.({ data: {
+            type: "studio-raster-interchange/failure",
+            version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+            requestId: request.requestId,
+            error: {
+              name: error instanceof Error ? error.name : "Error",
+              message: error instanceof Error ? error.message : String(error),
+            },
+          } } as MessageEvent<StudioRasterInterchangeWorkerResponse>));
+        }
+      }
+
+      terminate(): void {}
+    }
+    vi.stubGlobal("Worker", RasterWorkerMock);
+
     const encoded = encodeStudioRasterInterchange("qoi", {
       width: 1,
       height: 1,

@@ -215,7 +215,7 @@ describe("studio liquify commercial modes", () => {
       8,
       1,
       fakeCanvasFactory(bloatCalls),
-      { mode: "bloat" }
+      { mode: "bloat", executionMode: "direct" }
     );
     expect(bloat).not.toBeNull();
     expect(bloatCalls).toEqual(["canvas-1:draw", "canvas-1:put"]);
@@ -228,7 +228,8 @@ describe("studio liquify commercial modes", () => {
       [{ x: 10, y: 10 }],
       8,
       1,
-      fakeCanvasFactory(pushCalls)
+      fakeCanvasFactory(pushCalls),
+      { executionMode: "direct" }
     );
     expect(push).toBeNull();
     expect(pushCalls).toEqual([]);
