@@ -17,7 +17,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { searchStudio } from "./studio-command-search";
+import { buildStudioSearchIndex, searchStudio } from "./studio-command-search";
 
 import type {
   StudioSearchEntry,
@@ -25,11 +25,16 @@ import type {
   StudioSearchResult,
 } from "./studio-command-search";
 import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
-import type { StudioInspectorRoute } from "./studio-inspector-layout";
+import type {
+  StudioInspectorActionContext,
+  StudioInspectorRoute,
+} from "./studio-inspector-layout";
+
+export type StudioCommandSearchCloseReason = "dismiss" | "action";
 
 export interface StudioCommandSearchDialogProps {
   open: boolean;
-  onClose: () => void;
+  onClose: (reason?: StudioCommandSearchCloseReason) => void;
   /** 인스펙터 라우트로 이동. 없으면 그 행은 이동한다고 광고하지 않는다. */
   onNavigateInspector?: (
     route: StudioInspectorRoute,
@@ -46,6 +51,8 @@ export interface StudioCommandSearchDialogProps {
    * 소비자가 없으면 명령 행은 "도움말"이라고 광고하지 않는다.
    */
   onOpenHelp?: (helpNodeId: string, commandId: string) => void;
+  /** Live Inspector context keeps selection-only search results honest. */
+  inspectorContext?: StudioInspectorActionContext;
 }
 
 const FOCUSABLE =
@@ -95,13 +102,23 @@ const NO_ACTION: StudioCommandSearchAction = Object.freeze({
   hint: "이 항목은 아직 검색에서 열 수 없습니다",
 });
 
+const SELECTION_REQUIRED_ACTION: StudioCommandSearchAction = Object.freeze({
+  kind: "none",
+  badge: "선택 필요",
+  hint: "캔버스에서 요소를 먼저 선택하세요",
+});
+
 function studioCommandSearchAction(
   entry: StudioSearchEntry,
   available: StudioCommandSearchHandlerAvailability,
+  inspectorContext?: StudioInspectorActionContext,
 ): StudioCommandSearchAction {
   const target = entry.target;
   switch (target.type) {
     case "inspector":
+      if (entry.requiresSelection && inspectorContext?.hasSelection === false) {
+        return SELECTION_REQUIRED_ACTION;
+      }
       return available.inspector
         ? { kind: "inspector", badge: "이동", hint: "인스펙터로 이동" }
         : NO_ACTION;
@@ -163,6 +180,7 @@ export function StudioCommandSearchDialog({
   onOpenTutorial,
   onExpandPalette,
   onOpenHelp,
+  inspectorContext,
 }: StudioCommandSearchDialogProps) {
   const titleId = useId();
   const inputId = useId();
@@ -172,9 +190,13 @@ export function StudioCommandSearchDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  const searchIndex = useMemo(
+    () => buildStudioSearchIndex(inspectorContext),
+    [inspectorContext],
+  );
   const outcome: StudioSearchOutcome = useMemo(
-    () => searchStudio(query),
-    [query],
+    () => searchStudio(query, {}, searchIndex),
+    [query, searchIndex],
   );
 
   const available = useMemo<StudioCommandSearchHandlerAvailability>(
@@ -211,13 +233,17 @@ export function StudioCommandSearchDialog({
           result,
           index: base + offset,
           optionId: `${listboxId}-option-${base + offset}`,
-          action: studioCommandSearchAction(result.entry, available),
+          action: studioCommandSearchAction(
+            result.entry,
+            available,
+            inspectorContext,
+          ),
         })),
       });
       consumed = base + section.results.length;
     }
     return groups;
-  }, [available, listboxId, outcome]);
+  }, [available, inspectorContext, listboxId, outcome]);
 
   const flat = useMemo(() => grouped.flatMap((group) => group.rows), [grouped]);
   const activeRow = flat[activeIndex];
@@ -244,7 +270,11 @@ export function StudioCommandSearchDialog({
   const activate = useCallback(
     (result: StudioSearchResult) => {
       const target = result.entry.target;
-      const action = studioCommandSearchAction(result.entry, available);
+      const action = studioCommandSearchAction(
+        result.entry,
+        available,
+        inspectorContext,
+      );
       switch (action.kind) {
         case "inspector": {
           if (target.type !== "inspector") return;
@@ -254,19 +284,19 @@ export function StudioCommandSearchDialog({
           };
           if (target.focusTarget) onNavigateInspector?.(route, target.focusTarget);
           else onNavigateInspector?.(route);
-          onClose();
+          onClose("action");
           return;
         }
         case "tutorial": {
           if (target.type !== "tutorial") return;
           onOpenTutorial?.(target.tutorialId);
-          onClose();
+          onClose("action");
           return;
         }
         case "palette": {
           if (target.type !== "palette") return;
           onExpandPalette?.(target.paletteId);
-          onClose();
+          onClose("action");
           return;
         }
         case "help": {
@@ -274,7 +304,7 @@ export function StudioCommandSearchDialog({
           // 도움말 표면도 모달이다. 검색을 열어 둔 채 겹치면 Esc 가 어느 쪽을
           // 닫는지 알 수 없으므로 검색은 닫고 넘긴다.
           onOpenHelp?.(result.entry.helpNodeId, target.commandId);
-          onClose();
+          onClose("action");
           return;
         }
         default:
@@ -285,6 +315,7 @@ export function StudioCommandSearchDialog({
     },
     [
       available,
+      inspectorContext,
       onClose,
       onExpandPalette,
       onNavigateInspector,
@@ -410,7 +441,7 @@ export function StudioCommandSearchDialog({
           />
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onClose()}
             title="닫기 (Esc)"
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >

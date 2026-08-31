@@ -62,6 +62,8 @@ export interface StudioSearchCorpusEntry {
   keywords?: readonly string[];
   helpNodeId: string;
   target: StudioSearchTarget;
+  /** Keep the row searchable, but explain that navigation needs an active selection. */
+  requiresSelection?: boolean;
   /**
    * Ids from `studioInspectorActions()` this entry absorbs. The navigator's own
    * corpus is merged into the same index, so without this the same destination
@@ -132,6 +134,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       keywords: ["clip", "clipping", "클리핑", "가두기", "inherit alpha"],
       helpNodeId: "help/property/clipping",
       target: { type: "inspector", primary: "properties" },
+      requiresSelection: true,
     },
     {
       id: "property.blend-mode",
@@ -152,6 +155,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       keywords: ["blend", "multiply", "screen", "overlay", "곱하기", "스크린"],
       helpNodeId: "help/property/blend-mode",
       target: { type: "inspector", primary: "properties" },
+      requiresSelection: true,
     },
     {
       id: "property.opacity",
@@ -173,6 +177,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
         primary: "properties",
         focusTarget: "selection.geometry",
       },
+      requiresSelection: true,
     },
     {
       id: "property.transform-numeric",
@@ -196,6 +201,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
         primary: "properties",
         focusTarget: "selection.geometry",
       },
+      requiresSelection: true,
     },
     {
       id: "property.layer-style",
@@ -215,6 +221,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       keywords: ["style", "shadow", "stroke", "glow", "그림자", "테두리"],
       helpNodeId: "help/property/layer-style",
       target: { type: "inspector", primary: "properties" },
+      requiresSelection: true,
     },
 
     /* ---- 색보정 (이미지 보정 패널 섹션) ---- */

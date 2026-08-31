@@ -47,6 +47,32 @@ describe("Studio Space pan shortcut", () => {
     }
   });
 
+  it.each([
+    "combobox",
+    "listbox",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "searchbox",
+    "spinbutton",
+    "tree",
+    "treeitem",
+  ])("preserves Space for a custom %s widget", (role) => {
+    const widget = document.createElement("div");
+    widget.setAttribute("role", role);
+    widget.tabIndex = 0;
+    const icon = document.createElement("span");
+    widget.append(icon);
+
+    for (const target of [widget, icon]) {
+      expect(shouldStartStudioSpacePan({
+        code: "Space",
+        editing: false,
+        isSpacePressed: false,
+        target,
+      })).toBe(false);
+    }
+  });
+
   it("does not restart while editing, already panning, or handling another key", () => {
     const canvas = document.createElement("canvas");
 

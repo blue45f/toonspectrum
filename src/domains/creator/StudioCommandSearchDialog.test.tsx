@@ -14,7 +14,7 @@
  * 결과가 아예 없는 화면이었다. 아래 두 describe 가 그 두 가지를 고정한다.
  */
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -112,6 +112,25 @@ describe("StudioCommandSearchDialog", () => {
       image: "mask",
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("선택 전용 속성은 빈 캔버스에서 이동한다고 광고하지 않는다", () => {
+    const onNavigateInspector = vi.fn();
+    openDialog({
+      onNavigateInspector,
+      inspectorContext: {
+        hasSelection: false,
+        selectedType: null,
+        drawing: false,
+        imageToolsAvailable: true,
+      },
+    });
+    type("자유 변형");
+    const result = screen.getByRole("option", { name: /위치·크기/u });
+    expect(result.getAttribute("aria-disabled")).toBe("true");
+    expect(within(result).getByText("선택 필요")).toBeTruthy();
+    fireEvent.click(result);
+    expect(onNavigateInspector).not.toHaveBeenCalled();
   });
 
   it("숫자 배치 결과는 실제 선택 속성 카드까지 포커스하도록 전달한다", () => {
@@ -330,6 +349,45 @@ describe("StudioCommandSearchHost", () => {
     render(<StudioCommandSearchHost />);
     fireEvent.click(screen.getByTestId("studio-command-search-trigger"));
     expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  it("Escape로 닫으면 검색을 연 원래 요소로 포커스를 돌려준다", async () => {
+    render(
+      <>
+        <button type="button">캔버스 도구</button>
+        <StudioCommandSearchHost />
+      </>,
+    );
+    const origin = screen.getByRole("button", { name: "캔버스 도구" });
+    origin.focus();
+    fireEvent.keyDown(window, { key: "F1" });
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(origin));
+  });
+
+  it("검색 결과가 목적지에 포커스하면 실행 요소로 덮어쓰지 않는다", async () => {
+    render(
+      <>
+        <button type="button">목적지</button>
+        <StudioCommandSearchHost
+          onNavigateInspector={() => {
+            screen.getByRole("button", { name: "목적지" }).focus();
+          }}
+        />
+      </>,
+    );
+    const trigger = screen.getByTestId("studio-command-search-trigger");
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByRole("dialog");
+    type("레이어 마스크");
+    fireEvent.click(screen.getByRole("option", { name: /속성 › 마스크/u }));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "목적지" }),
+      );
+    });
   });
 
   it("모바일에서는 트리거를 숨기고 F1 만 남긴다", () => {

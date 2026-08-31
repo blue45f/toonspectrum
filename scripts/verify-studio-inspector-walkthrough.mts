@@ -888,7 +888,7 @@ async function walkDesktop(
         control: "브러시 크기 프리셋 그리드",
         state: "속성 탭 · 그리기 도구",
         path: presetPath,
-        verdict: presetVisible ? "reachable" : "blocked",
+        verdict: presetVisible && sizeApplied ? "reachable" : "blocked",
         effect: `30px 프리셋 클릭 후 aria-pressed=true 로 적용됨=${sizeApplied}; ${presetDiagnostics}`,
         defect: presetVisible && !sizeApplied ? "프리셋 클릭이 활성 크기를 바꾸지 않는다" : undefined,
       });

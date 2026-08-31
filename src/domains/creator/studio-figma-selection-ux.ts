@@ -78,7 +78,9 @@ function studioStoredRotationSupported(element: El): boolean {
   return element.type === "image"
     || element.type === "text"
     || element.type === "bubble"
-    || element.type === "sticker";
+    || element.type === "sticker"
+    || element.type === "focusLines"
+    || element.type === "speedLines";
 }
 
 export function unionStudioSelectionBounds(

@@ -10,7 +10,14 @@ import {
   unionStudioSelectionBounds,
 } from "./studio-figma-selection-ux";
 
-import type { DrawEl, El, ImageEl, TextEl } from "./studio-element-model";
+import type {
+  DrawEl,
+  El,
+  FocusLinesEl,
+  ImageEl,
+  SpeedLinesEl,
+  TextEl,
+} from "./studio-element-model";
 
 function draw(partial: Partial<DrawEl> & Pick<DrawEl, "id" | "points">): DrawEl {
   return {
@@ -41,6 +48,42 @@ function text(partial: Partial<TextEl> & Pick<TextEl, "id" | "x" | "y">): TextEl
     fill: "#111",
     ...partial,
   } as TextEl;
+}
+
+function focusLines(partial: Partial<FocusLinesEl> = {}): FocusLinesEl {
+  return {
+    id: "focus",
+    type: "focusLines",
+    x: 10,
+    y: 20,
+    width: 300,
+    height: 200,
+    lineCount: 24,
+    innerRadius: 30,
+    outerRadius: 140,
+    stroke: "#111",
+    strokeWidth: 2,
+    noise: 0,
+    rotation: 12,
+    ...partial,
+  };
+}
+
+function speedLines(partial: Partial<SpeedLinesEl> = {}): SpeedLinesEl {
+  return {
+    id: "speed",
+    type: "speedLines",
+    x: 10,
+    y: 20,
+    width: 300,
+    height: 200,
+    lineCount: 24,
+    direction: "horizontal",
+    stroke: "#111",
+    strokeWidth: 2,
+    rotation: 12,
+    ...partial,
+  };
 }
 
 describe("studio figma selection ux", () => {
@@ -395,6 +438,20 @@ describe("studio figma selection ux", () => {
     expect(resolveStudioFigmaSelectionLayoutMetrics([element])?.supportsRotation).toBe(true);
     expect(planStudioSelectionLayoutPatch(element, { rotation: 30 })).toEqual({
       rotation: 30,
+    });
+  });
+
+  it.each([
+    ["집중선", focusLines()],
+    ["속도선", speedLines()],
+  ] as const)("keeps stored rotation editable for %s", (_label, element) => {
+    expect(resolveStudioFigmaSelectionLayoutMetrics([element])).toMatchObject({
+      rotation: 12,
+      supportsRotation: true,
+      rotationDisabledReason: null,
+    });
+    expect(planStudioSelectionLayoutPatch(element, { rotation: 37 })).toEqual({
+      rotation: 37,
     });
   });
 

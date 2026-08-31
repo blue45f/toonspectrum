@@ -41,12 +41,14 @@ function Harness({
   onLayoutChange,
   cancelEpoch,
   defaultPresentation,
+  presentation,
 }: {
   initial?: StudioDrawingPaletteLayout;
   onDraggingChange?: (dragging: boolean) => void;
   onLayoutChange?: (layout: StudioDrawingPaletteLayout) => void;
   cancelEpoch?: number;
   defaultPresentation?: "full" | "icon-popup";
+  presentation?: "full" | "icon-popup";
 }) {
   const [layout, setLayout] = useState(initial);
   return (
@@ -61,6 +63,7 @@ function Harness({
       onDraggingChange={onDraggingChange}
       cancelEpoch={cancelEpoch}
       defaultPresentation={defaultPresentation}
+      presentation={presentation}
     />
   );
 }
@@ -419,7 +422,15 @@ describe("StudioDrawingPaletteStack", () => {
       callback(0);
       return 1;
     });
-    Element.prototype.scrollIntoView = vi.fn();
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "scrollIntoView",
+    );
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
 
     function DeepLinkHarness() {
       const [layout, setLayout] = useState<StudioDrawingPaletteLayout>(
@@ -440,23 +451,37 @@ describe("StudioDrawingPaletteStack", () => {
       );
     }
 
-    render(<DeepLinkHarness />);
+    try {
+      render(<DeepLinkHarness />);
 
-    act(() => {
-      requestStudioInspectorFocus("tool.brush-studio");
-    });
+      act(() => {
+        requestStudioInspectorFocus("tool.brush-studio");
+      });
 
-    const sectionHeader = await screen.findByRole("button", {
-      name: "브러시 스튜디오",
-    });
-    await waitFor(() => {
-      expect(
-        screen.getByRole("dialog", { name: "도구 속성 팝업" }),
-      ).toBeTruthy();
-      expect(sectionHeader.getAttribute("aria-expanded")).toBe("true");
-      expect(document.activeElement).toBe(sectionHeader);
-      expect(studioInspectorFocusTokenFor("tool.brush-studio")).toBe(0);
-    });
+      const sectionHeader = await screen.findByRole("button", {
+        name: "브러시 스튜디오",
+      });
+      await waitFor(() => {
+        expect(
+          screen.getByRole("dialog", { name: "도구 속성 팝업" }),
+        ).toBeTruthy();
+        expect(sectionHeader.getAttribute("aria-expanded")).toBe("true");
+        expect(document.activeElement).toBe(sectionHeader);
+        expect(studioInspectorFocusTokenFor("tool.brush-studio")).toBe(0);
+      });
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(
+          Element.prototype,
+          "scrollIntoView",
+          originalScrollIntoView,
+        );
+      } else {
+        Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+      }
+    }
+    expect(Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView"))
+      .toEqual(originalScrollIntoView);
   });
 
   it("expands collapsed tool properties before a nested inspector deep link runs", () => {
@@ -513,6 +538,20 @@ describe("StudioDrawingPaletteStack", () => {
         '[data-studio-drawing-palette-stack="true"]',
       )?.dataset.studioDrawingPalettePresentation,
     ).toBe("icon-popup");
+  });
+
+  it("dismisses an open popup when a controlled owner switches to full presentation", () => {
+    const { rerender } = render(<Harness presentation="icon-popup" />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "서브 도구 팝업 열기" }),
+    );
+    expect(screen.getByRole("dialog", { name: "서브 도구 팝업" })).toBeTruthy();
+
+    rerender(<Harness presentation="full" />);
+
+    expect(screen.queryByRole("dialog", { name: "서브 도구 팝업" })).toBeNull();
+    expect(screen.getByRole("button", { name: "G펜 선택" })).toBeTruthy();
   });
 
   it("supports precise separator keyboard resizing and default restoration", () => {

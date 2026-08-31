@@ -404,6 +404,9 @@ describe("StudioMobileEditingDock", () => {
     expect(expandedWorkspaceToggle.getAttribute("aria-label")).toContain(
       expandedWorkspaceToggle.textContent,
     );
+    expect(expandedWorkspaceToggle.getAttribute("title")).toBe(
+      expandedWorkspaceToggle.getAttribute("aria-label"),
+    );
     fireEvent.click(within(dock).getByRole("button", { name: "선택" }));
     expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("false");
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);

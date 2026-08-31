@@ -20424,8 +20424,8 @@ const puppetWarpArmed =
   }
 
   function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
-    if (marqueeIds.length > 1) {
-      const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    if (targets.length > 1) {
       if (targets.some((element) => isEffectivelyLocked(element, groups))) {
         setError("잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
         return;
@@ -20435,14 +20435,15 @@ const puppetWarpArmed =
       announceDrawingShortcut(`${targets.length}개 요소 속성을 함께 변경했어요`);
       return;
     }
-    if (!selected) return;
-    if (isEffectivelyLocked(selected, groups)) {
+    const target = targets[0];
+    if (!target) return;
+    if (isEffectivelyLocked(target, groups)) {
       setError("잠긴 레이어는 수정할 수 없어요.");
       return;
     }
-    const next = planStudioSelectionLayoutPatch(selected, patch);
+    const next = planStudioSelectionLayoutPatch(target, patch);
     if (!next) return;
-    patchEl(selected.id, next);
+    patchEl(target.id, next);
   }
 
   function reorder(dir: "front" | "back" | "forward" | "backward") {

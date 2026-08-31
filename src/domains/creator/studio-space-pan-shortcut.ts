@@ -8,13 +8,21 @@ const STUDIO_SPACE_PAN_INTERACTIVE_SELECTOR = [
   "[contenteditable]:not([contenteditable='false'])",
   "[role='button']",
   "[role='checkbox']",
+  "[role='combobox']",
+  "[role='listbox']",
   "[role='menuitem']",
+  "[role='menuitemcheckbox']",
+  "[role='menuitemradio']",
   "[role='option']",
   "[role='radio']",
+  "[role='searchbox']",
   "[role='slider']",
+  "[role='spinbutton']",
   "[role='switch']",
   "[role='tab']",
   "[role='textbox']",
+  "[role='tree']",
+  "[role='treeitem']",
 ].join(",");
 
 /**

@@ -11,12 +11,15 @@
  */
 
 import { Search } from "lucide-react";
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import { subscribeStudioCommandSearchRequests } from "./studio-help-center-channel";
 
-import type { StudioCommandSearchDialogProps } from "./StudioCommandSearchDialog";
+import type {
+  StudioCommandSearchCloseReason,
+  StudioCommandSearchDialogProps,
+} from "./StudioCommandSearchDialog";
 import type { ReactNode } from "react";
 
 const StudioCommandSearchDialog = lazy(() =>
@@ -61,11 +64,34 @@ export function StudioCommandSearchHost({
   ...dialogProps
 }: StudioCommandSearchHostProps) {
   const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const close = useCallback((reason: StudioCommandSearchCloseReason = "dismiss") => {
+    setOpen(false);
+    const restoreTarget = restoreFocusRef.current;
+    restoreFocusRef.current = null;
+    if (reason === "action" || !restoreTarget) return;
+    const restore = () => {
+      const target = restoreTarget.isConnected ? restoreTarget : triggerRef.current;
+      target?.focus({ preventScroll: true });
+    };
+    if (globalThis.requestAnimationFrame) {
+      globalThis.requestAnimationFrame(restore);
+    } else {
+      restore();
+    }
+  }, []);
   const openSearch = useCallback(() => {
+    if (!open && typeof document !== "undefined") {
+      const activeElement = document.activeElement;
+      restoreFocusRef.current =
+        activeElement instanceof HTMLElement && activeElement !== document.body
+          ? activeElement
+          : triggerRef.current;
+    }
     onRequestOpen?.();
     setOpen(true);
-  }, [onRequestOpen]);
+  }, [onRequestOpen, open]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -96,6 +122,7 @@ export function StudioCommandSearchHost({
         >
           {hideTrigger ? null : (
             <button
+              ref={triggerRef}
               type="button"
               onClick={openSearch}
               data-testid="studio-command-search-trigger"

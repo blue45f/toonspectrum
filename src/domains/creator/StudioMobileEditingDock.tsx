@@ -746,6 +746,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     mobileSheet === "pages" ||
     mobileSheet === "props" ||
     mobileSheet === "color-vision";
+  const workspaceToggleAccessibleLabel = workspaceDockExpanded
+    ? `${label.collapse} · ${label.workspaceToggle}`
+    : label.workspaceToggle;
 
   useEffect(() => {
     if (!isMobile || mobileSheet === null) return;
@@ -1807,10 +1810,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 type="button"
                 aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
                 aria-expanded={workspaceDockExpanded}
-                aria-label={workspaceDockExpanded
-                  ? `${label.collapse} · ${label.workspaceToggle}`
-                  : label.workspaceToggle}
-                title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·필터·새 작업·작업 패널·색각·줌 도구 펼치기"}
+                aria-label={workspaceToggleAccessibleLabel}
+                title={workspaceDockExpanded
+                  ? workspaceToggleAccessibleLabel
+                  : "댓글·페이지·필터·새 작업·작업 패널·색각·줌 도구 펼치기"}
                 data-studio-mobile-workspace-toggle="true"
                 onFocus={preloadStudioInspectorDrawingSurface}
                 onPointerDown={preloadStudioInspectorDrawingSurface}

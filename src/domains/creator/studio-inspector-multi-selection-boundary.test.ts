@@ -10,6 +10,18 @@ const shellSource = readFileSync(
   new URL("./StudioInspectorAsideShell.tsx", import.meta.url),
   "utf8",
 );
+const pageSource = readFileSync(
+  new URL("./StudioPage.tsx", import.meta.url),
+  "utf8",
+);
+
+function functionBody(name: string, nextName: string): string {
+  const start = pageSource.indexOf(`function ${name}`);
+  const end = pageSource.indexOf(`function ${nextName}`, start + 1);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return pageSource.slice(start, end);
+}
 
 describe("Studio inspector multi-selection scope", () => {
   it("does not render representative-only detail controls below the shared geometry panel", () => {
@@ -25,5 +37,20 @@ describe("Studio inspector multi-selection scope", () => {
     expect(shellSource).toContain(
       "marqueeIds.length <= 1 &&\n              (selectedSupportsImageInspectorTabs || unselectedImageToolsVisible)",
     );
+  });
+
+  it("applies numeric edits to a one-item marquee selection", () => {
+    const applyPatchSource = functionBody(
+      "applyFigmaSelectionLayoutPatch",
+      "reorder",
+    );
+
+    expect(applyPatchSource).toContain(
+      "const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected)",
+    );
+    expect(applyPatchSource).toContain("if (targets.length > 1)");
+    expect(applyPatchSource).toContain("const target = targets[0]");
+    expect(applyPatchSource).toContain("patchEl(target.id, next)");
+    expect(applyPatchSource).not.toContain("if (!selected) return");
   });
 });

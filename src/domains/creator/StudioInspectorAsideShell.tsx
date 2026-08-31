@@ -201,6 +201,15 @@ export function StudioInspectorAsideShell({
           <StudioCommandSearchHost
             hideTrigger={isMobile}
             onRequestOpen={() => setRightPanelOpen(true)}
+            inspectorContext={{
+              hasSelection: inspectorContentMode === "selection",
+              selectedType:
+                inspectorContentMode === "selection" ? selected?.type ?? null : null,
+              drawing: inspectorDrawing,
+              drawingToolPropertiesAvailable:
+                drawMode !== "shape" && drawMode !== "pixel",
+              imageToolsAvailable: true,
+            }}
             trailing={
               isMobile ? null : (
                 <button

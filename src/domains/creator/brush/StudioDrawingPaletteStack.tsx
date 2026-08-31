@@ -201,8 +201,9 @@ export function StudioDrawingPaletteStack({
   }, [onLayoutChange]);
 
   useEffect(() => {
-    if (controlledPresentation !== undefined) return;
-    setUncontrolledPresentation(defaultPresentation);
+    if (controlledPresentation === undefined) {
+      setUncontrolledPresentation(defaultPresentation);
+    }
     dismissPaletteOverlay();
   }, [controlledPresentation, defaultPresentation, dismissPaletteOverlay]);
 

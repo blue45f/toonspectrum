@@ -64,6 +64,8 @@ export interface StudioSearchEntry {
   keywords: readonly string[];
   helpNodeId: string;
   target: StudioSearchTarget | { type: "command"; commandId: string };
+  /** Selection-only rows remain discoverable while their action is unavailable. */
+  requiresSelection: boolean;
 }
 
 export interface StudioSearchResult {
@@ -210,6 +212,7 @@ export function buildStudioSearchIndex(
       keywords: [command.id, command.category],
       helpNodeId: command.helpNodeId,
       target: { type: "command", commandId: command.id },
+      requiresSelection: false,
     };
     const en = enLabel(command.labels);
     if (en !== undefined) entry.labelEn = en;
@@ -234,6 +237,7 @@ export function buildStudioSearchIndex(
       keywords: item.keywords ?? [],
       helpNodeId: item.helpNodeId,
       target: item.target,
+      requiresSelection: item.requiresSelection === true,
     });
   }
 
@@ -249,6 +253,7 @@ export function buildStudioSearchIndex(
       aliases: [],
       keywords: action.keywords,
       helpNodeId: `help/inspector/${action.id}`,
+      requiresSelection: false,
       target: {
         type: "inspector",
         primary: action.route.primary,
@@ -271,6 +276,7 @@ export function buildStudioSearchIndex(
       ),
       helpNodeId: `help/tutorial/${tutorial.id}`,
       target: { type: "tutorial", tutorialId: tutorial.id },
+      requiresSelection: false,
     });
   }
 
