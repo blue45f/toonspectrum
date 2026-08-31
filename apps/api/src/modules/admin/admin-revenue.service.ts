@@ -118,7 +118,7 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
     if (parsedQuery.status !== "all") where.push(eq(revenueLedger.status, parsedQuery.status));
     const whereClause = where.length === 1 ? where[0] : and(...where);
 
-    const [periodSummary, plans, events] = await Promise.all([
+    const [[periodSummary], plans, events] = await Promise.all([
       db
       .select({
         pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),

@@ -359,7 +359,7 @@ export class AdminService {
       ),
       runSeries("revenue_30_all", () => this.adminRevenueService.getRevenue(userId, 30, { status: "all" })),
       runSeries("plans", () => this.adminRevenueService.getPlans(userId)),
-      runSeries("campaigns_100", () => this.adminCampaignsService.getCampaigns(userId, { limit: 100 })),
+      runSeries("campaigns", () => this.adminCampaignsService.getCampaigns(userId)),
       runSeries("users_100", () => this.adminMembersService.listUsers(userId, { limit: 100 })),
       runSeries("promos_100", () => this.adminMetricsService.getPromos(userId)),
       runSeries("announcements", () => this.adminMetricsService.getAnnouncements(userId)),
