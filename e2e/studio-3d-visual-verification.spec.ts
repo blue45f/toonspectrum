@@ -582,10 +582,14 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const insertedLayer = page.getByRole("treeitem", { name: /^3D LT 배경 · 병합,/ }).first();
     const insertedLayerId = await insertedLayer.getAttribute("id");
     expect(insertedLayerId).toMatch(/^studio-layer-.+/);
-    // CI can keep the child row outside the navigator viewport. Scrolling the treeitem also
-    // materializes its content-visibility:auto subtree before clicking the non-control label.
+    // The navigator paints rows with `content-visibility:auto`. A row outside the panel's
+    // rendered window keeps its accessible name — so the role query and the id read above still
+    // resolve — but its label gets no layout box, and a click on that label can never settle.
+    // The row itself always has a box (`contain-intrinsic-size:44px`) and owns the selection
+    // handler, so select through the row and land the click on the aria-hidden marker at its
+    // left edge, clear of the row's own controls.
     await insertedLayer.scrollIntoViewIfNeeded();
-    await insertedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
+    await insertedLayer.click({ position: { x: 12, y: 18 } });
     await expect(insertedLayer).toHaveAttribute("aria-selected", "true");
 
     // 선택된 병합 레이어의 canonical bg3dScene을 메인 레일에서도 다시 열 수 있어야 한다.
@@ -664,7 +668,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
       "color",
     );
     expect(updatedCanvas.distinctColors).toBeGreaterThan(1);
-    await updatedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
+    // Same row, same `content-visibility:auto` caveat as the first selection above.
+    await updatedLayer.scrollIntoViewIfNeeded();
+    await updatedLayer.click({ position: { x: 12, y: 18 } });
     await expect(updatedLayer).toHaveAttribute("aria-selected", "true");
 
     // 저장된 canonical scene도 다시 열어 추가한 구가 남아 있는지 먼저 확인한다. 이 검증이
