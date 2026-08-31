@@ -228,9 +228,13 @@ export function useStudioInspectorAsideModel(
     !selectedSupportsImageInspectorTabs &&
     unselectedImageToolsVisible;
 
+  // Keep an explicitly opened image workspace visible while the artist inspects a text/frame
+  // selection: its recovery surface explains how to choose or prepare a raster target. Starting a
+  // drawing tool is the context switch that closes that workspace; the visible "시작 안내" action
+  // remains the direct way to close it without changing tools.
   useEffect(() => {
-    if (inspectorContentMode !== "empty") setUnselectedImageToolsVisible(false);
-  }, [inspectorContentMode]);
+    if (inspectorDrawing) setUnselectedImageToolsVisible(false);
+  }, [inspectorDrawing]);
   const inspectorTransientState: StudioInspectorTransientState = {
     advancedFillActive,
     advancedFillBusy,

@@ -33,6 +33,21 @@ describe("Studio inspector raster recovery boundary", () => {
     expect(asideSource).not.toContain("advancedFillInspectorRouteWithoutImageSelection");
   });
 
+  it("preserves explicit image-tool deep links when no raster layer is selected", () => {
+    expect(asideSource).toContain(
+      'route.primary === "properties" && route.image !== undefined',
+    );
+    expect(asideSource).toContain('if (inspectorDrawing) activateCanvasTool("select")');
+    expect(asideSource).toContain("!selectedSupportsImageInspectorTabs");
+    expect(asideSource).toContain("setUnselectedImageToolsVisible(true)");
+    expect(asideSource).toContain(
+      'if (inspectorDrawing) setUnselectedImageToolsVisible(false)',
+    );
+    expect(asideSource).not.toContain(
+      'if (inspectorContentMode !== "empty") setUnselectedImageToolsVisible(false)',
+    );
+  });
+
   it("wires one real non-destructive raster-copy action through the lazy inspector seam", () => {
     const implementation = functionBody(pageSource, "createEditableRasterCopyForInspector");
 

@@ -139,6 +139,7 @@ export function StudioInspectorAsideShell({
     setSnapEnabled,
     setTagsText,
     setTitle,
+    setUnselectedImageToolsVisible,
     unselectedImageToolsVisible,
     setUserGuides,
     setWebtoonTheme,
@@ -219,6 +220,17 @@ export function StudioInspectorAsideShell({
                 ? isDrawingInspectorFocusTarget(focusTarget)
                 : false;
               if (drawingFocusTarget) activateCanvasTool("draw", "pen");
+              // Command Search and other deep links can request an image-tool route while a
+              // text/frame (or no) layer is selected. Preserve that explicit intent so the
+              // recovery surface mounts instead of advertising a route that appears to do nothing.
+              const imageRouteRequested =
+                route.primary === "properties" && route.image !== undefined;
+              if (imageRouteRequested) {
+                if (inspectorDrawing) activateCanvasTool("select");
+                if (!selectedSupportsImageInspectorTabs) {
+                  setUnselectedImageToolsVisible(true);
+                }
+              }
               changeInspectorLayout(
                 normalizeStudioInspectorLayout({ ...inspectorLayout, ...route }),
               );
