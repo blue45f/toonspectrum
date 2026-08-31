@@ -224,15 +224,22 @@ function torsoSkin(rig: StudioVrmRig, y: number, h: number): MeshSkinBinding {
 /**
  * Body 메시는 머티리얼이 하나뿐이라 파트끼리 UV 가 겹치면 안 된다(표면 페인팅·텍스처 채우기가
  * 같은 텍스처를 공유하므로). 파트마다 서로 겹치지 않는 사각형을 할당한다.
+ *
+ * 손가락 블록은 손 하나당 다섯 레인으로 다시 쪼개진다 — {@link fingerLane} 참고.
  */
+/** 손가락 레인 사이 거터. 필터링으로 이웃 손가락 텍셀이 새어 들어오는 것을 막는다. */
+const UV_FINGER_GUTTER = 0.002;
+
 const UV = Object.freeze({
   torso: [0.0, 0.0, 0.5, 0.36] as MeshUvRect,
   armLeft: [0.5, 0.0, 0.74, 0.18] as MeshUvRect,
   armRight: [0.75, 0.0, 0.99, 0.18] as MeshUvRect,
   handLeft: [0.5, 0.19, 0.61, 0.29] as MeshUvRect,
   handRight: [0.62, 0.19, 0.73, 0.29] as MeshUvRect,
-  thumbLeft: [0.74, 0.19, 0.81, 0.29] as MeshUvRect,
-  thumbRight: [0.82, 0.19, 0.89, 0.29] as MeshUvRect,
+  // 손가락은 다섯 개가 **각자** 레인을 갖는다. 엄지 하나만 있던 시절의 사각형 하나를 그대로
+  // 물려주면 다섯 손가락이 같은 좌표에 겹쳐, 검지에 칠한 획이 나머지 넷에 그대로 복제된다.
+  fingersLeft: [0.5, 0.41, 0.74, 0.69] as MeshUvRect,
+  fingersRight: [0.75, 0.41, 0.99, 0.69] as MeshUvRect,
   legLeft: [0.0, 0.37, 0.24, 0.69] as MeshUvRect,
   legRight: [0.25, 0.37, 0.49, 0.69] as MeshUvRect,
   footLeft: [0.5, 0.3, 0.63, 0.4] as MeshUvRect,
@@ -530,12 +537,24 @@ function buildFinger(
  * 손 전체가 벙어리장갑 하나에 엄지 돌기를 붙인 형태였고 손가락 본이 아예 없어서, 포즈 라이브러리나
  * 리타게팅이 손가락을 굽힐 대상 자체가 없었다.
  */
+/**
+ * 손가락 블록의 `index` 번째 세로 레인.
+ *
+ * 양쪽에 거터를 둬서 이웃 레인의 텍셀이 바이리니어 필터로 새어 들어오지 않게 한다.
+ */
+function fingerLane(block: MeshUvRect, index: number, count: number): MeshUvRect {
+  const [u0, v0, u1, v1] = block;
+  const width = (u1 - u0) / count;
+  const start = u0 + width * index;
+  return [start + UV_FINGER_GUTTER, v0, start + width - UV_FINGER_GUTTER, v1];
+}
+
 function buildHand(
   builder: SurfaceBuilder,
   rig: StudioVrmRig,
   side: 1 | -1,
   palmRect: MeshUvRect,
-  thumbRect: MeshUvRect,
+  fingersRect: MeshUvRect,
 ): void {
   // 손 굵기는 관절 간격과 같은 배율로 굽는다 — 노드 스케일이 아니라 기하에 들어가야
   // 손가락이 바인드에서 한 번 더 스케일되지 않는다.
@@ -576,7 +595,8 @@ function buildHand(
     ["Ring", 0.006],
     ["Little", 0.0052],
   ];
-  for (const [name, radius] of fingers) {
+  const laneCount = fingers.length + 1;
+  fingers.forEach(([name, radius], index) => {
     buildFinger(
       builder,
       rig,
@@ -587,9 +607,9 @@ function buildHand(
         `${prefix}${name}Distal` as StudioVrmRigBone,
       ],
       radius * unit,
-      thumbRect,
+      fingerLane(fingersRect, index, laneCount),
     );
-  }
+  });
   buildFinger(
     builder,
     rig,
@@ -600,7 +620,7 @@ function buildHand(
       `${prefix}ThumbDistal` as StudioVrmRigBone,
     ],
     0.008 * unit,
-    thumbRect,
+    fingerLane(fingersRect, fingers.length, laneCount),
   );
 }
 
@@ -1821,8 +1841,8 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
   buildHead(body, rig, surface);
   buildArm(body, rig, 1, UV.armLeft);
   buildArm(body, rig, -1, UV.armRight);
-  buildHand(body, rig, 1, UV.handLeft, UV.thumbLeft);
-  buildHand(body, rig, -1, UV.handRight, UV.thumbRight);
+  buildHand(body, rig, 1, UV.handLeft, UV.fingersLeft);
+  buildHand(body, rig, -1, UV.handRight, UV.fingersRight);
   buildLeg(body, rig, 1, UV.legLeft);
   buildLeg(body, rig, -1, UV.legRight);
   buildFoot(body, rig, 1, UV.footLeft);
