@@ -1577,15 +1577,22 @@ function impastoBristleCount(stations: readonly OilCarrierStation[]): number {
   return Number.isFinite(count) ? count : 0;
 }
 
+interface ImpastoReliefGrid {
+  readonly cell: number;
+  readonly originX: number;
+  readonly originY: number;
+  readonly gridWidth: number;
+  readonly gridHeight: number;
+  readonly bristleCount: number;
+  readonly hairStride: number;
+  readonly hairOffset: number;
+}
+
 /**
- * Fold the ribbon's own band geometry into a coarse stroke-local height tile and relief-shade it
- * with the dli GGX port. Height is max-blended (paint level, not additive beading): the body film
- * is a capsule union along the centreline, each bristle hair raises a ridge proportional to its
- * planned load. Pure function of the stations — no clock, no randomness.
+ * Grid the field will be rasterised on — derived from the stations, but quantised so it holds
+ * still across an append (see `IMPASTO_RELIEF_CELL_STEP_RATIO`).
  */
-function buildImpastoReliefField(
-  stations: readonly OilCarrierStation[],
-): ImpastoReliefField | null {
+function impastoReliefGrid(stations: readonly OilCarrierStation[]): ImpastoReliefGrid | null {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -1610,31 +1617,73 @@ function buildImpastoReliefField(
   }
   const cell = impastoReliefCell(natural);
   // Snap the origin to a whole number of cells as well. The cell size alone is not enough: the
-  // tile is addressed from `minX`/`minY`, and a stroke that grows leftward drags every existing
+  // tile is addressed from its origin, and a stroke that grows leftward would drag every existing
   // sample onto a different cell centre even when the cell size has not moved. On a snapped
   // origin an append can only ever prepend whole cells, so the previous tile is an integer-offset
   // sub-grid of the new one and the values inside it are the same numbers.
   const originX = Math.floor(minX / cell) * cell;
   const originY = Math.floor(minY / cell) * cell;
-  const gridWidth = Math.max(4, Math.ceil((maxX - originX) / cell) + 1);
-  const gridHeight = Math.max(4, Math.ceil((maxY - originY) / cell) + 1);
-  const cellCount = gridWidth * gridHeight;
-  const film = new Float32Array(cellCount);
-  const feather = IMPASTO_RELIEF_EDGE_FEATHER_CELLS * cell;
+  const bristleCount = impastoBristleCount(stations);
+  const hairStride = impastoHairStride(stations, cell, bristleCount);
+  return {
+    cell,
+    originX,
+    originY,
+    gridWidth: Math.max(4, Math.ceil((maxX - originX) / cell) + 1),
+    gridHeight: Math.max(4, Math.ceil((maxY - originY) / cell) + 1),
+    bristleCount,
+    hairStride,
+    // Centred, not started at zero. Walking `0, stride, 2·stride, …` leaves the remainder entirely
+    // at the far edge of the bed, so one side of the ribbon keeps its outermost ridges and the
+    // other loses them — and a lamp asked which flank is lit then answers from an asymmetric bed.
+    hairOffset: Math.floor((((bristleCount - 1) % hairStride) + 1) / 2),
+  };
+}
 
-  // Body film — capsule union of station discs. Striding by ~radiusY/3 keeps overlapping discs
-  // from being rasterised hundreds of times; max-blend makes the stride invisible in the level.
-  let travelled = Number.POSITIVE_INFINITY;
-  let lastX = 0;
-  let lastY = 0;
-  for (let index = 0; index < stations.length; index += 1) {
+/** Where the body-film walk had got to; carried so a resumed pass stamps the same stations. */
+interface ImpastoFilmCursor {
+  travelled: number;
+  lastX: number;
+  lastY: number;
+}
+
+function impastoFilmCursor(): ImpastoFilmCursor {
+  return { travelled: Number.POSITIVE_INFINITY, lastX: 0, lastY: 0 };
+}
+
+/**
+ * Body film — capsule union of station discs, over `[from, to)`.
+ *
+ * Striding by ~radiusY/3 keeps overlapping discs from being rasterised hundreds of times;
+ * max-blend makes the stride invisible in the level. The stride is a running distance, so the
+ * cursor has to be carried across a resumed pass or a partial rebuild would stamp a different
+ * set of stations than the batch walk does.
+ *
+ * `finalIndex` is the index the WHOLE stroke ends on, which is exempt from the stride the same
+ * way index 0 is. A partial pass must not treat its own last station as that one, or it bakes a
+ * stamp the full walk never makes.
+ */
+function stampImpastoFilm(
+  film: Float32Array,
+  grid: ImpastoReliefGrid,
+  stations: readonly OilCarrierStation[],
+  from: number,
+  to: number,
+  cursor: ImpastoFilmCursor,
+  finalIndex: number,
+): void {
+  const { cell, originX, originY, gridWidth, gridHeight } = grid;
+  const feather = IMPASTO_RELIEF_EDGE_FEATHER_CELLS * cell;
+  for (let index = from; index < to; index += 1) {
     const station = stations[index]!;
-    if (index > 0) travelled += Math.hypot(station.x - lastX, station.y - lastY);
-    lastX = station.x;
-    lastY = station.y;
+    if (index > 0) {
+      cursor.travelled += Math.hypot(station.x - cursor.lastX, station.y - cursor.lastY);
+    }
+    cursor.lastX = station.x;
+    cursor.lastY = station.y;
     const stampGap = Math.max(cell, station.radiusY * 0.35);
-    if (index !== 0 && index !== stations.length - 1 && travelled < stampGap) continue;
-    travelled = 0;
+    if (index !== 0 && index !== finalIndex && cursor.travelled < stampGap) continue;
+    cursor.travelled = 0;
     // Pressure loads more paint: heavier stations stand a little prouder of the canvas.
     const level = IMPASTO_RELIEF_FILM_HEIGHT * (0.72 + 0.28 * station.opacity);
     const radius = station.radiusY;
@@ -1666,55 +1715,59 @@ function buildImpastoReliefField(
       }
     }
   }
+}
 
-  // Bristle ridges — walk each hair's polyline (the exact geometry the lanes stroke) and raise a
-  // load-proportional ridge. Max-blend per cell: a hair is a level of standing paint, and a
-  // crossing of equal loads must not stack itself into a knot (mirrors the one-pass band rule).
-  const ridge = new Float32Array(cellCount);
-  const bristleCount = impastoBristleCount(stations);
-  const hairStride = impastoHairStride(stations, cell, bristleCount);
-  // Centred, not started at zero. Walking `0, stride, 2·stride, …` leaves the remainder entirely at
-  // the far edge of the bed, so one side of the ribbon keeps its outermost ridges and the other
-  // loses them — and a lamp asked which flank is lit then answers from an asymmetric bed. Offset
-  // by half the remainder so the sampled hairs straddle the centreline evenly.
-  const hairOffset = Math.floor((((bristleCount - 1) % hairStride) + 1) / 2);
+/**
+ * Bristle ridges over the station segments `[from, to)` — segment `i` joins stations `i, i+1`.
+ *
+ * Walks each sampled hair's polyline (the exact geometry the lanes stroke) and raises a
+ * load-proportional ridge. Max-blend per cell: a hair is a level of standing paint, and a
+ * crossing of equal loads must not stack itself into a knot (mirrors the one-pass band rule).
+ * Segment-local, so unlike the film this needs no cursor.
+ */
+function stampImpastoRidge(
+  ridge: Float32Array,
+  grid: ImpastoReliefGrid,
+  stations: readonly OilCarrierStation[],
+  from: number,
+  to: number,
+): void {
+  const { cell, originX, originY, gridWidth, gridHeight, bristleCount, hairStride, hairOffset } =
+    grid;
+  if (to <= from) return;
   const minRidgeReach = cell * IMPASTO_RELIEF_RIDGE_REACH_MIN_CELLS;
-  const hairX = new Float64Array(stations.length);
-  const hairY = new Float64Array(stations.length);
-  const hairLoad = new Float64Array(stations.length);
-  const hairReach = new Float64Array(stations.length);
+  const span = to - from + 1;
+  const hairX = new Float64Array(span);
+  const hairY = new Float64Array(span);
+  const hairLoad = new Float64Array(span);
+  const hairReach = new Float64Array(span);
   for (let bristleIndex = hairOffset; bristleIndex < bristleCount; bristleIndex += hairStride) {
-    for (let index = 0; index < stations.length; index += 1) {
-      const station = stations[index]!;
+    for (let slot = 0; slot < span; slot += 1) {
+      const station = stations[from + slot]!;
       const hair = station.source.bristles[bristleIndex]!;
       const offset = station.radiusY * hair.offsetRatio;
-      hairX[index] = station.x + station.normalX * offset;
-      hairY[index] = station.y + station.normalY * offset;
-      hairLoad[index] = clamp(station.opacity * hair.opacity, 0, 1);
-      hairReach[index] = Math.max(minRidgeReach, impastoRidgeWidth(station, hair) * 0.5);
+      hairX[slot] = station.x + station.normalX * offset;
+      hairY[slot] = station.y + station.normalY * offset;
+      hairLoad[slot] = clamp(station.opacity * hair.opacity, 0, 1);
+      hairReach[slot] = Math.max(minRidgeReach, impastoRidgeWidth(station, hair) * 0.5);
     }
-    for (let index = 0; index + 1 < stations.length; index += 1) {
-      const fromX = hairX[index]!;
-      const fromY = hairY[index]!;
-      const toX = hairX[index + 1]!;
-      const toY = hairY[index + 1]!;
-      const fromLoad = hairLoad[index]!;
-      const toLoad = hairLoad[index + 1]!;
+    for (let slot = 0; slot + 1 < span; slot += 1) {
+      const fromX = hairX[slot]!;
+      const fromY = hairY[slot]!;
+      const toX = hairX[slot + 1]!;
+      const toY = hairY[slot + 1]!;
+      const fromLoad = hairLoad[slot]!;
+      const toLoad = hairLoad[slot + 1]!;
       const segmentX = toX - fromX;
       const segmentY = toY - fromY;
       // The hair keeps one diameter over a segment (only `contact` varies with travel, and only
       // slightly), so one reach is the whole ridge for that segment.
-      const ridgeReach = Math.max(hairReach[index]!, hairReach[index + 1]!);
+      const ridgeReach = Math.max(hairReach[slot]!, hairReach[slot + 1]!);
       const ridgeReachSquared = ridgeReach * ridgeReach;
-      // ONE capsule per segment, not a chain of overlapping discs.
-      //
-      // The tent is a distance falloff, so the max over a dense chain of point splats IS the
-      // segment's distance field — the chain was only ever quadrature for it, and a badly
-      // over-sampled one: the discs were stepped at 0.6 of a tent radius while each is two radii
-      // wide, so every cell under the ridge was re-read and re-compared three to five times to
-      // arrive at the value the closed form gives once. Rasterising the capsule directly drops
-      // that multiplier, and it is also the more faithful ridge: point quadrature scallops the
-      // crest between taps, the distance field does not.
+      // ONE capsule per segment, not a chain of overlapping discs. The tent is a distance
+      // falloff, so the max over a dense chain of point splats IS the segment's distance field —
+      // the chain was only ever badly over-sampled quadrature for it, and it scallops the crest
+      // between taps where the distance field does not.
       const lengthSquared = segmentX * segmentX + segmentY * segmentY;
       const inverseLengthSquared = lengthSquared > POINT_EPSILON ? 1 / lengthSquared : 0;
       const loadSpan = toLoad - fromLoad;
@@ -1756,24 +1809,187 @@ function buildImpastoReliefField(
       }
     }
   }
+}
 
-  for (let at = 0; at < cellCount; at += 1) film[at]! += ridge[at]!;
+/** Shade a finished height tile. Split out so both the batch and retained paths share it. */
+function shadeImpastoRelief(
+  film: Float32Array,
+  ridge: Float32Array,
+  grid: ImpastoReliefGrid,
+): ImpastoReliefField {
+  const height = new Float32Array(film.length);
+  for (let at = 0; at < film.length; at += 1) height[at] = film[at]! + ridge[at]!;
   return {
-    gridWidth,
-    gridHeight,
-    cell,
-    originX,
-    originY,
-    hairStride,
-    hairOffset,
+    gridWidth: grid.gridWidth,
+    gridHeight: grid.gridHeight,
+    cell: grid.cell,
+    originX: grid.originX,
+    originY: grid.originY,
+    hairStride: grid.hairStride,
+    hairOffset: grid.hairOffset,
     // dli defaults verbatim (normalScale 7, roughness 0.075, F0 0.05, light (0,−1,1) image-space);
     // only heightScale compensates the single-stroke tile (see the constant above).
-    shading: computeStudioImpastoReliefShading(film, {
-      width: gridWidth,
-      height: gridHeight,
+    shading: computeStudioImpastoReliefShading(height, {
+      width: grid.gridWidth,
+      height: grid.gridHeight,
       heightScale: IMPASTO_RELIEF_HEIGHT_SCALE,
     }),
   };
+}
+
+/**
+ * Fold the ribbon's own band geometry into a coarse stroke-local height tile and relief-shade it
+ * with the dli GGX port. Height is max-blended (paint level, not additive beading): the body film
+ * is a capsule union along the centreline, each bristle hair raises a ridge proportional to its
+ * planned load. Pure function of the stations — no clock, no randomness.
+ */
+function buildImpastoReliefField(
+  stations: readonly OilCarrierStation[],
+): ImpastoReliefField | null {
+  const grid = impastoReliefGrid(stations);
+  if (!grid) return null;
+  const cellCount = grid.gridWidth * grid.gridHeight;
+  const film = new Float32Array(cellCount);
+  const ridge = new Float32Array(cellCount);
+  stampImpastoFilm(film, grid, stations, 0, stations.length, impastoFilmCursor(), stations.length - 1);
+  stampImpastoRidge(ridge, grid, stations, 0, stations.length - 1);
+  return shadeImpastoRelief(film, ridge, grid);
+}
+
+/**
+ * Retained height field for a growing stroke.
+ *
+ * `buildImpastoReliefField` is a pure function of every station, and re-running it was 25.6% of
+ * the carrier's per-move cost on a capped bed (film 3.3ms + ridge 18.0ms of 80.4ms) purely to
+ * re-derive a tile whose settled part cannot have changed.
+ *
+ * What makes reuse expressible at all is that the grid now holds still (see
+ * `IMPASTO_RELIEF_CELL_STEP_RATIO`): between rung climbs an append can only ever prepend or
+ * append whole cells, so the previous tile is an integer-offset sub-grid of the new one.
+ *
+ * The retained part is deliberately NOT "everything rasterised last time". Both rasters are
+ * max-blends, and max cannot retract — so a cell raised by a station whose position later moves
+ * would keep the stale contribution forever. Only stations strictly inside the caller's settled
+ * prefix are baked; everything from there on is re-stamped into a working copy each move. Three
+ * things force the whole tile back to a full rebuild, because each of them changes what the
+ * settled contributions MEAN rather than merely adding to them:
+ *
+ *  - the cell climbing a ladder rung, which re-addresses every value;
+ *  - `hairStride`/`hairOffset` moving, which changes WHICH hairs are rasterised across the whole
+ *    stroke — the old ridges belong to hairs that are no longer in the set and max cannot remove
+ *    them;
+ *  - the bristle count changing, for the same reason.
+ */
+class StudioImpastoReliefFieldPlanner {
+  private grid: ImpastoReliefGrid | null = null;
+  private settledFilm: Float32Array | null = null;
+  private settledRidge: Float32Array | null = null;
+  /** Stations baked into the settled layers: `[0, settledEnd)`. */
+  private settledEnd = 0;
+  /** Film walk state at `settledEnd`, so a resumed pass stamps the same stations. */
+  private cursor: ImpastoFilmCursor = impastoFilmCursor();
+
+  reset(): void {
+    this.grid = null;
+    this.settledFilm = null;
+    this.settledRidge = null;
+    this.settledEnd = 0;
+    this.cursor = impastoFilmCursor();
+  }
+
+  /**
+   * `settled` is the caller's proven-settled station prefix (`identical - 8`). Passing 0 is
+   * always correct and simply costs a full rebuild.
+   */
+  build(stations: readonly OilCarrierStation[], settled: number): ImpastoReliefField | null {
+    const grid = impastoReliefGrid(stations);
+    if (!grid) {
+      this.reset();
+      return null;
+    }
+    const cellCount = grid.gridWidth * grid.gridHeight;
+    const previous = this.grid;
+    // A ridge segment reads two stations, so the last settled segment is the one ending at
+    // `settled - 1`; and the film's own stamp for station `settled - 1` is already baked.
+    const bakeTo = Math.max(0, Math.min(settled, stations.length));
+    const reusable = previous !== null
+      && this.settledFilm !== null
+      && this.settledRidge !== null
+      && previous.cell === grid.cell
+      && previous.hairStride === grid.hairStride
+      && previous.hairOffset === grid.hairOffset
+      && previous.bristleCount === grid.bristleCount
+      && bakeTo >= this.settledEnd;
+
+    if (!reusable) {
+      this.settledFilm = new Float32Array(cellCount);
+      this.settledRidge = new Float32Array(cellCount);
+      this.settledEnd = 0;
+      this.cursor = impastoFilmCursor();
+    } else if (
+      previous!.gridWidth !== grid.gridWidth
+      || previous!.gridHeight !== grid.gridHeight
+      || previous!.originX !== grid.originX
+      || previous!.originY !== grid.originY
+    ) {
+      // Same cell, moved or grown tile: the old values keep their meaning, they just live at a
+      // different offset. Rounding is safe because both origins are multiples of the same cell.
+      const shiftX = Math.round((previous!.originX - grid.originX) / grid.cell);
+      const shiftY = Math.round((previous!.originY - grid.originY) / grid.cell);
+      this.settledFilm = blitImpastoLayer(this.settledFilm!, previous!, grid, shiftX, shiftY);
+      this.settledRidge = blitImpastoLayer(this.settledRidge!, previous!, grid, shiftX, shiftY);
+    }
+
+    // Advance the settled layers to the new boundary. This is the only pass whose cost grows
+    // with the stroke, and it walks each station exactly once over the stroke's whole life.
+    if (bakeTo > this.settledEnd) {
+      stampImpastoFilm(
+        this.settledFilm!,
+        grid,
+        stations,
+        this.settledEnd,
+        bakeTo,
+        this.cursor,
+        // The stroke's final station is exempt from the stride, and it is never settled — so a
+        // bake must not grant that exemption to its own last station.
+        -1,
+      );
+      stampImpastoRidge(this.settledRidge!, grid, stations, Math.max(0, this.settledEnd - 1), bakeTo - 1);
+      this.settledEnd = bakeTo;
+    }
+
+    const film = new Float32Array(this.settledFilm!);
+    const ridge = new Float32Array(this.settledRidge!);
+    const tailCursor: ImpastoFilmCursor = { ...this.cursor };
+    stampImpastoFilm(film, grid, stations, this.settledEnd, stations.length, tailCursor, stations.length - 1);
+    stampImpastoRidge(ridge, grid, stations, Math.max(0, this.settledEnd - 1), stations.length - 1);
+
+    this.grid = grid;
+    return shadeImpastoRelief(film, ridge, grid);
+  }
+}
+
+/** Move a retained layer onto a tile with the same cell but a different origin or size. */
+function blitImpastoLayer(
+  source: Float32Array,
+  from: ImpastoReliefGrid,
+  to: ImpastoReliefGrid,
+  shiftX: number,
+  shiftY: number,
+): Float32Array {
+  const target = new Float32Array(to.gridWidth * to.gridHeight);
+  for (let y = 0; y < from.gridHeight; y += 1) {
+    const targetY = y + shiftY;
+    if (targetY < 0 || targetY >= to.gridHeight) continue;
+    const sourceRow = y * from.gridWidth;
+    const targetRow = targetY * to.gridWidth;
+    for (let x = 0; x < from.gridWidth; x += 1) {
+      const targetX = x + shiftX;
+      if (targetX < 0 || targetX >= to.gridWidth) continue;
+      target[targetRow + targetX] = source[sourceRow + x]!;
+    }
+  }
+  return target;
 }
 
 /** Bilinear shading sample at a canvas-space point (clamped to the tile like the shader). */
@@ -1862,9 +2078,12 @@ function weldReliefRuns(
  */
 function planImpastoReliefOverlayLanes(
   stations: readonly OilCarrierStation[],
+  retained?: { readonly planner: StudioImpastoReliefFieldPlanner; readonly settled: number },
 ): readonly StudioOilRibbonImpastoReliefLane[] {
   if (stations.length < 2) return Object.freeze([]);
-  const field = buildImpastoReliefField(stations);
+  const field = retained
+    ? retained.planner.build(stations, retained.settled)
+    : buildImpastoReliefField(stations);
   if (!field) return Object.freeze([]);
   const planned: PlannedImpastoReliefRun[] = [];
   const bristleCount = impastoBristleCount(stations);
@@ -2124,7 +2343,9 @@ export function planStudioOilRibbonCarrier(
  *
  * The v1 load-dynamics and bristle-physics programs publish per-station arrays that are replanned
  * across the whole bed, so their runs are never reused — geometry and stations still are. The
- * impasto relief overlay reads stations only and is always recomputed.
+ * impasto relief overlay reads stations only, and its height field is retained on the same
+ * settled boundary (`StudioImpastoReliefFieldPlanner`); the shading, run sampling and lane
+ * bucketing on top of it still run in full.
  */
 export class StudioOilRibbonCarrierPlanner {
   private optionsKey: string | null = null;
@@ -2148,6 +2369,11 @@ export class StudioOilRibbonCarrierPlanner {
    * re-simulated on every pointer frame.
    */
   private readonly bristlePhysics = new StudioBristlePhysicsOilPlanner();
+  /**
+   * Retained impasto height field. Reads stations only, and only the settled prefix is baked, so
+   * it resumes on the same boundary the bristle runs do.
+   */
+  private readonly impastoRelief = new StudioImpastoReliefFieldPlanner();
 
   /** Runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedRuns(): number {
@@ -2170,6 +2396,7 @@ export class StudioOilRibbonCarrierPlanner {
     this.lastBristleCount = -1;
     this.loadDynamics.reset();
     this.bristlePhysics.reset();
+    this.impastoRelief.reset();
   }
 
   plan(
@@ -2202,6 +2429,7 @@ export class StudioOilRibbonCarrierPlanner {
       // Same reason: the retained march holds stationCount x laneCount doubles.
       this.loadDynamics.reset();
       this.bristlePhysics.reset();
+      this.impastoRelief.reset();
     }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
@@ -2230,7 +2458,10 @@ export class StudioOilRibbonCarrierPlanner {
       })
       : undefined;
     const impastoReliefLanes = !bodyOnly && options?.impastoRelief?.enabled === true
-      ? planImpastoReliefOverlayLanes(stations)
+      ? planImpastoReliefOverlayLanes(stations, {
+        planner: this.impastoRelief,
+        settled: settledStations,
+      })
       : undefined;
 
     let bristleLanes: readonly StudioOilRibbonBristleLane[] = Object.freeze([]);
