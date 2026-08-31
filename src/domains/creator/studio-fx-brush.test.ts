@@ -241,6 +241,49 @@ describe("planOilBrushDabs", () => {
     expect(Math.hypot(dabs[1]!.x - 1_000, dabs[1]!.y)).toBeLessThan(2);
     expect(dabs[1]!.radiusX).toBeGreaterThan(dabs[0]!.radiusX);
   });
+
+  it("still preserves both ends at the minimum budget on the prefix-stable ladder", () => {
+    // The ladder honours the budget by coarsening the spacing, and it has to reserve BOTH
+    // endpoints out of it. A budget of two leaves room for no interior station at all; fitting one
+    // anyway would push the endpoint past the budget, where it is truncated off the end and the
+    // stroke visibly stops short.
+    const dabs = planOilBrushDabs({
+      points: [0, 0, 500, 0, 1_000, 0],
+      pressures: [0, 0.5, 1],
+      baseWidth: 20,
+      seed: 17,
+      maxDabs: 2,
+      capMode: "prefix-stable-ladder-v2",
+    });
+
+    expect(dabs).toHaveLength(2);
+    expect(Math.hypot(dabs[0]!.x, dabs[0]!.y)).toBeLessThan(2);
+    expect(Math.hypot(dabs[1]!.x - 1_000, dabs[1]!.y)).toBeLessThan(2);
+  });
+
+  it("leaves the budget-filling refit in place for callers that do not opt into the ladder", () => {
+    // This planner also serves the airbrush family's exports, which have no carrier pipeline to
+    // save and so nothing to buy with a redistributed bed. The ladder must stay opt-in: the same
+    // stroke planned without `capMode` fills the budget exactly, as it always has.
+    const points: number[] = [];
+    for (let index = 0; index < 900; index += 1) points.push(index * 4, 200);
+    const pressures = Array.from({ length: 900 }, () => 0.6);
+
+    const refit = planOilBrushDabs({ points, pressures, baseWidth: 20, seed: 17, maxDabs: 512 });
+    expect(refit).toHaveLength(512);
+
+    const laddered = planOilBrushDabs({
+      points,
+      pressures,
+      baseWidth: 20,
+      seed: 17,
+      maxDabs: 512,
+      capMode: "prefix-stable-ladder-v2",
+    });
+    expect(laddered.length).toBeLessThan(512);
+    // …but only by a ladder rung, never unboundedly.
+    expect(laddered.length).toBeGreaterThan(512 / 1.19);
+  });
 });
 
 describe("planPastelBrushDabs", () => {

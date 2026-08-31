@@ -53,6 +53,8 @@ function planInputFor(
     baseWidth: BASE_WIDTH,
     seed: SEED,
     maxDabs,
+    // The live oil path plans with the ladder, so the identity contract is asserted on it.
+    capMode: "prefix-stable-ladder-v2",
     paintBody: "oil",
     tipProfile: "bristle",
   };

@@ -639,6 +639,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintBody: studioOilPaintBodyForBrush(brush),
         tipProfile: studioOilTipProfileForBrush(brush),
         stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+        // Oil is the family whose carrier rebuilds a whole pipeline on top of the bed, so it is
+        // the one that needs the bed to stop moving under it. The SVG export's oil branch passes
+        // the same mode; a stroke previewed here and exported there must plan the same dabs.
+        capMode: "prefix-stable-ladder-v2" as const,
       };
       // Same values either way: the planner re-derives the station lattice and reuses only the
       // prefix it has verified byte-equal, so a growing stroke stops rebuilding 4096 stations x

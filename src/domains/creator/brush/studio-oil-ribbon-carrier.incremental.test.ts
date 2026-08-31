@@ -75,6 +75,8 @@ function dabsAt(brushId: string, sampleCount: number, planner?: FxOilDabPlanner)
     maxDabs: FX_OIL_DAB_CAP,
     paintBody: studioOilPaintBodyForBrush(brushId),
     tipProfile: studioOilTipProfileForBrush(brushId),
+    // Matches the live overlay, which is the caller this planner exists for.
+    capMode: "prefix-stable-ladder-v2" as const,
     ...(spacing === undefined ? {} : { stationSpacingRatio: spacing }),
   };
   return planner ? planner.plan(input) : planOilBrushDabs(input);

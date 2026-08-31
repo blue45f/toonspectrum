@@ -141,16 +141,6 @@ function sanitizePoints(rawPoints: unknown, rawPressures: unknown): StrokePoint[
 }
 
 /**
- * The oil family opts into the prefix-stable ladder; every other brush keeps the original refit.
- *
- * Oil is where the refit hurt: its carrier rebuilds smoothed geometry, stations, bristle runs and
- * lanes on top of the bed, so a bed that shared no prefix cost a full pipeline rebuild per pointer
- * move. Glitter and pastel plan far cheaper particles from the same sampler and have no such
- * pipeline, so they are left byte-identical rather than given a new dab distribution for nothing.
- */
-const OIL_CAP_STATION_MODE = "prefix-stable-ladder-v2" as const;
-
-/**
  * How much coarser one rung of the capped-spacing ladder is.
  *
  * The ladder exists so a capped bed keeps a stable prefix; the ratio decides what that costs in
@@ -179,7 +169,11 @@ function cappedStationStep(
   totalLength: number,
   stationLimit: number,
 ): number {
-  const budget = Math.max(1, stationLimit - 2);
+  // Two rungs are reserved: the leading station and the tail station the walk appends at the
+  // stroke's end. The interior budget may legitimately be ZERO — `maxDabs: 2` asks for exactly the
+  // two endpoints — and flooring it at one would fit an interior station the caller has no room
+  // for, which is then truncated off the END and takes the stroke's last point with it.
+  const budget = Math.max(0, stationLimit - 2);
   let scaled = step;
   for (let rung = 0; rung < CAPPED_STATION_STEP_MAX_RUNGS; rung += 1) {
     if (Math.floor(totalLength / scaled) <= budget) return scaled;
@@ -202,7 +196,7 @@ function sampleStations(
    * placed stations still while the stroke grows. The ladder changes the dabs a capped stroke
    * produces, so it is opt-in per brush family rather than a blanket change.
    */
-  capMode: "refit-v1" | "prefix-stable-ladder-v2" = "refit-v1",
+  capMode: FxOilCapStationMode = "refit-v1",
 ): StrokePoint[] {
   if (points.length === 0) return [];
   if (points.length === 1) return [points[0]!];
@@ -1823,6 +1817,9 @@ export type FxOilPaintBody = "oil" | "acrylic";
  */
 export type FxOilTipProfile = "bristle" | "hard";
 
+/** See `FxOilPlanInput.capMode`. */
+export type FxOilCapStationMode = "refit-v1" | "prefix-stable-ladder-v2";
+
 export type FxOilPlanInput = {
   points: readonly number[];
   pressures?: readonly number[] | null;
@@ -1833,6 +1830,20 @@ export type FxOilPlanInput = {
   paintBody?: FxOilPaintBody;
   /** Defaults to "bristle", the historical behaviour. */
   tipProfile?: FxOilTipProfile;
+  /**
+   * How the dab budget is honoured on a stroke long enough to overrun it. Defaults to `refit-v1`,
+   * the historical whole-arc redistribution.
+   *
+   * `prefix-stable-ladder-v2` coarsens the spacing on a fixed ladder so a growing stroke stops
+   * moving the stations it already placed — which is what lets the oil carrier reuse its bed
+   * instead of rebuilding the pipeline on every pointer move. It changes the dabs a capped stroke
+   * produces, so it is chosen by the caller: this planner also serves the airbrush family, whose
+   * exports have no such pipeline to save and no reason to be redistributed.
+   *
+   * Every path that plans the SAME stroke has to pass the same value, or a stroke would be
+   * previewed with one distribution and exported with another.
+   */
+  capMode?: FxOilCapStationMode;
   /**
    * Override station pitch as a fraction of head width. Fluid Paint walks the
    * tuft at 1/8 the default 0.068 pitch (8 capsules per bristle segment).
@@ -2042,6 +2053,7 @@ interface OilDabSettings {
   readonly paintBody: FxOilPaintBody;
   readonly tipProfile: FxOilTipProfile;
   readonly spacing: number;
+  readonly capMode: FxOilCapStationMode;
 }
 
 function resolveOilDabSettings(input: FxOilPlanInput): OilDabSettings {
@@ -2058,12 +2070,15 @@ function resolveOilDabSettings(input: FxOilPlanInput): OilDabSettings {
   // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
   const paintBody: FxOilPaintBody = input.paintBody === "acrylic" ? "acrylic" : "oil";
   const tipProfile: FxOilTipProfile = input.tipProfile === "hard" ? "hard" : "bristle";
+  const capMode: FxOilCapStationMode = input.capMode === "prefix-stable-ladder-v2"
+    ? "prefix-stable-ladder-v2"
+    : "refit-v1";
   const spacingRatio = Number.isFinite(input.stationSpacingRatio)
     && (input.stationSpacingRatio ?? 0) > 0
     ? Math.min(0.2, Math.max(0.004, input.stationSpacingRatio!))
     : OIL_STATION_SPACING_RATIO;
   const spacing = Math.max(0.5, baseWidth * spacingRatio);
-  return { baseWidth, seed, maxDabs, paintBody, tipProfile, spacing };
+  return { baseWidth, seed, maxDabs, paintBody, tipProfile, spacing, capMode };
 }
 
 /**
@@ -2305,7 +2320,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const points = sanitizePoints(input.points, input.pressures);
   if (points.length === 0) return [];
   const settings = resolveOilDabSettings(input);
-  const stations = sampleStations(points, settings.spacing, settings.maxDabs, OIL_CAP_STATION_MODE);
+  const stations = sampleStations(points, settings.spacing, settings.maxDabs, settings.capMode);
   const bristleOffsets = bristleBedOffsets(settings.baseWidth, settings.seed);
   const dabs: FxOilDab[] = [];
   appendOilBrushDabs(dabs, stations, 0, settings, bristleOffsets);
@@ -2356,13 +2371,14 @@ export class FxOilDabPlanner {
     }
     const settings = resolveOilDabSettings(input);
     const key = `${settings.baseWidth}|${settings.seed}|${settings.maxDabs}`
-      + `|${settings.paintBody}|${settings.tipProfile}|${settings.spacing}`;
+      + `|${settings.paintBody}|${settings.tipProfile}|${settings.spacing}`
+      + `|${settings.capMode}`;
     if (key !== this.settingsKey) {
       this.settingsKey = key;
       this.stations = [];
       this.dabs = [];
     }
-    const stations = sampleStations(points, settings.spacing, settings.maxDabs, OIL_CAP_STATION_MODE);
+    const stations = sampleStations(points, settings.spacing, settings.maxDabs, settings.capMode);
     if (stations.length >= settings.maxDabs) {
       // The station budget is saturated, so `sampleStations` is refitting the lattice across the
       // whole arc and every station moves on every append: no prefix can survive. Drop the retained

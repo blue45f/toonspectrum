@@ -625,6 +625,11 @@ export function serializeFreehandMedia(
       paintBody: studioOilPaintBodyForBrush(brush),
       tipProfile: studioOilTipProfileForBrush(brush),
       stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
+      // Same mode the live overlay plans with, so a capped oil stroke exports the bed it was
+      // previewed with. The airbrush branch below deliberately does NOT pass it: it shares this
+      // planner but has no carrier pipeline to save, so there is nothing to buy with a new dab
+      // distribution.
+      capMode: "prefix-stable-ladder-v2" as const,
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
     // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화
