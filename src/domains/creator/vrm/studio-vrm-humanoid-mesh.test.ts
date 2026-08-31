@@ -125,13 +125,51 @@ describe("studio VRM humanoid rig", () => {
     }
   });
 
-  it("only scales leaf bones, so no rotated child can inherit a shear", () => {
-    const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+  it("keeps any scale a bone with children carries strictly uniform, so nothing inherits a shear", () => {
+    // 전단은 **비균등** 스케일 아래에서 자식이 회전할 때 생긴다. 그래서 규약은 두 갈래다:
+    // 비균등 조형 스케일(얼굴 비율)은 말단에만, 자식을 이고 있는 본은 균등만.
+    const rig = buildStudioVrmRig({
+      proportions: { ...NEUTRAL.proportions, handScale: 1.4, footScale: 0.7 },
+      face: { ...NEUTRAL.face, headWidth: 1.3, headHeight: 0.8 },
+    });
     const parents = new Set(
       rig.bones.map((bone) => STUDIO_VRM_RIG_PARENTS[bone]).filter((bone) => bone !== null),
     );
+    let nonUniformLeaves = 0;
     for (const bone of Object.keys(rig.nodeScale) as StudioVrmRigBone[]) {
-      expect(parents.has(bone), `${bone} 에 스케일이 붙었는데 자식이 있다`).toBe(false);
+      const scale = rig.nodeScale[bone];
+      if (!scale) continue;
+      const uniformScale = scale[0] === scale[1] && scale[1] === scale[2];
+      if (parents.has(bone)) {
+        expect(uniformScale, `${bone} 은 자식을 이고 있는데 스케일이 비균등이다`).toBe(true);
+      } else if (!uniformScale) {
+        nonUniformLeaves += 1;
+      }
+    }
+    // 얼굴 조형이 실제로 비균등으로 실려 있어야 이 테스트가 의미가 있다.
+    expect(nonUniformLeaves).toBeGreaterThan(0);
+  });
+
+  it("places finger joints under the hand and lets the hand scale carry them", () => {
+    // 손 노드에는 균등 `handScale` 이 붙어 있고 손가락은 그 자식이다. 월드 rest 누적이 조상
+    // 스케일을 반영하지 않으면 IBM(이동만 담는다)이 가리키는 위치와 씬 그래프가 놓는 위치가
+    // 어긋나 손가락이 통째로 날아간다.
+    const neutral = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+    const scaled = buildStudioVrmRig({
+      proportions: { ...NEUTRAL.proportions, handScale: 1.5 },
+      face: NEUTRAL.face,
+    });
+    for (const prefix of ["left", "right"] as const) {
+      const hand = `${prefix}Hand` as StudioVrmRigBone;
+      const tip = `${prefix}MiddleDistal` as StudioVrmRigBone;
+      expect(STUDIO_VRM_RIG_PARENTS[`${prefix}MiddleProximal` as StudioVrmRigBone]).toBe(hand);
+      const neutralReach = Math.abs(neutral.worldRest[tip][0] - neutral.worldRest[hand][0]);
+      const scaledReach = Math.abs(scaled.worldRest[tip][0] - scaled.worldRest[hand][0]);
+      expect(neutralReach).toBeGreaterThan(0);
+      expect(scaledReach / neutralReach, `${prefix} 손가락이 손 스케일을 따라가지 않았다`).toBeCloseTo(
+        1.5,
+        9,
+      );
     }
   });
 });

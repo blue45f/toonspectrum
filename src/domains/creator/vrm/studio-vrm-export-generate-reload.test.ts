@@ -15,6 +15,7 @@ import {
   exportStudioVrmFromGenerateRecipe,
 } from "./studio-vrm-generate-recipe";
 import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
+import { STUDIO_VRM_RIG_BONES } from "./studio-vrm-humanoid-rig";
 import { countSpringBoneJoints } from "./studio-vrm-physics";
 import { NEUTRAL_STUDIO_VRM_PROPORTIONS } from "./studio-vrm-proportion-core";
 import { createStudioVrmProportionRigRuntime } from "./studio-vrm-proportion-rig-runtime";
@@ -465,5 +466,40 @@ describe("generate recipe → .vrm file reload", () => {
     }
     // And the span tracks the body rather than staying frozen at its authored size.
     expect(spans[1] / spans[0]).toBeCloseTo(1.6, 3);
+  }, 60_000);
+
+  it("gives the loaded humanoid finger bones that actually drive the hand mesh", async () => {
+    // 예전에는 손이 벙어리장갑 하나에 엄지 돌기를 붙인 형태였고 손가락 본이 아예 없었다.
+    // 포즈 라이브러리도 리타게팅도 손가락을 굽힐 대상 자체가 없었다.
+    const vrm = await loadVrmBytes(
+      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "natural-short" })),
+    );
+    const fingerBones = STUDIO_VRM_RIG_BONES.filter((bone) => !STUDIO_VRM_EXPORT_REQUIRED_BONES.includes(bone as never));
+    expect(fingerBones).toHaveLength(30);
+    for (const bone of fingerBones) {
+      expect(
+        vrm.humanoid?.getNormalizedBoneNode(bone as VRMHumanBoneName),
+        `${bone} 이 로더에서 사라졌다`,
+      ).not.toBeNull();
+    }
+
+    // 손가락을 굽히면 손 메시가 실제로 따라와야 한다 — 본만 있고 웨이트가 없으면 아무 일도 없다.
+    const skinned = vrm.scene.getObjectByProperty("type", "SkinnedMesh") as
+      | (Object3D & { skeleton?: { bones: Object3D[] } })
+      | undefined;
+    expect(skinned).toBeDefined();
+    const tip = vrm.humanoid?.getNormalizedBoneNode("leftMiddleDistal" as VRMHumanBoneName);
+    const proximal = vrm.humanoid?.getNormalizedBoneNode("leftMiddleProximal" as VRMHumanBoneName);
+    if (!tip || !proximal) throw new Error("expected middle finger bones");
+    vrm.scene.updateMatrixWorld(true);
+    const before = tip.getWorldPosition(new Vector3());
+    proximal.rotation.z = 1.1;
+    vrm.scene.updateMatrixWorld(true);
+    vrm.update(1 / 60);
+    vrm.scene.updateMatrixWorld(true);
+    const after = tip.getWorldPosition(new Vector3());
+    expect(after.distanceTo(before), "가운뎃손가락을 굽혔는데 끝마디가 움직이지 않았다").toBeGreaterThan(
+      0.01,
+    );
   }, 60_000);
 });
