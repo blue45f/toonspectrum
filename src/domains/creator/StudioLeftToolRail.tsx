@@ -172,6 +172,8 @@ export interface StudioLeftToolRailHandlers {
   openFrameAnimationForSelected: () => void;
   openPixelSelectionTransform: () => void;
   openSelectedLayerCrop: () => void;
+  /** 선택한 BG3D 레이어가 있으면 재편집하고, 없으면 빈 장면을 여는 레일 전용 토글. */
+  toggleBg3dEditor: () => void;
   addBubble: (
     variant: BubbleVariant,
     at?: { x: number; y: number; },
@@ -246,7 +248,6 @@ interface StudioLeftToolRailProps {
   setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMannequinPoserOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setBg3dOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setHybridDccOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
@@ -306,7 +307,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setReferencePanelOpen,
   setMannequinPoserOpen,
   setPoserVrmOpen,
-  setBg3dOpen,
   setHybridDccOpen,
   setStrokeWidth: _setStrokeWidth,
   setTool,
@@ -1199,7 +1199,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
               active={bg3dOpen}
               accented
-              onClick={() => setBg3dOpen?.((v) => !v)}
+              onClick={stableHandlers.toggleBg3dEditor}
             />
             ) : null}
 {isRailToolVisible("hybrid-dcc") ? (

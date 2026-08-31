@@ -7,6 +7,7 @@ import type {
 } from "./studio-crdt-scene-schema";
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
+import type { StudioShared3dStageCollectionDocument } from "../studio-shared-3d-stage-collection";
 
 export const SAMPLE_ARRAY_KEYS = [
   "points", "pressures", "tiltXs", "tiltYs", "twists", "speeds",
@@ -123,6 +124,10 @@ export interface StudioCrdtPageInput {
 export interface StudioCrdtPageRecord extends StudioCrdtPageInput {
   deleted: boolean;
   orderIndex: number;
+  /** True when the per-entry Shared 3D Stage sidecar owns this page, including tombstone-only pages. */
+  shared3dStageManaged?: boolean;
+  /** Canonical aggregate rebuilt from active sidecar entries; never stored in `payload.props`. */
+  shared3dStage?: StudioShared3dStageCollectionDocument;
 }
 
 export interface StudioCrdtPagePatch {

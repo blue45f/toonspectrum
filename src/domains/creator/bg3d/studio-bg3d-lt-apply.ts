@@ -4,6 +4,7 @@ import {
 } from "../brush/studio-drawing-assist-document";
 import { CANVAS_W } from "../studio-assets";
 import { uid } from "../studio-id";
+import { createCanvasImageElement } from "../studio-image-placement";
 import { isEffectivelyLocked, type LayerGroup } from "../studio-layers";
 import {
   ensureStudioLinked3dRenderShot,
@@ -26,12 +27,13 @@ import {
 
 import {
   planStudioBg3dEditableCompositeDetach,
+  type StudioBg3dEditableCompositeDetachSuccess,
 } from "./studio-bg3d-editable-composite-detach-plan";
+import {
+  planStudioBg3dLtLayers,
+  type StudioBg3dLtLayerPlanSuccess,
+} from "./studio-bg3d-lt-layer-plan";
 
-import type {
-  StudioBg3dEditableCompositeDetachSuccess,
-} from "./studio-bg3d-editable-composite-detach-plan";
-import type { StudioBg3dLtLayerPlanSuccess } from "./studio-bg3d-lt-layer-plan";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioBackground3DInsertResult } from "../scene-3d/studio-3d-insert-contract";
 import type { El } from "../studio-element-model";
@@ -55,6 +57,169 @@ import type { StudioShared3dStageDccSource } from "../studio-shared-3d-stage-doc
 export interface StudioBg3dLtApplyFailure {
   readonly ok: false;
   readonly message: string;
+}
+
+export interface StudioBg3dMergedCompositePlanSuccess {
+  readonly ok: true;
+  readonly anchorElementId: string;
+  readonly bundleId: string;
+  readonly nextElements: readonly El[];
+  readonly nextGroups: readonly LayerGroup[];
+}
+
+/**
+ * Materializes the one-layer BG3D fallback without committing it. Keeping this pure lets the
+ * realtime path attach the page-local Shared Stage sidecar in the same history transition instead
+ * of first inserting an unlinked image and trying to repair it in a second commit.
+ */
+export function planStudioBg3dMergedComposite(input: {
+  readonly result: StudioBackground3DInsertResult;
+  readonly elements: readonly El[];
+  readonly groups: readonly LayerGroup[];
+  readonly targetElementId: string | undefined;
+  readonly canvasHeight: number;
+  readonly newElementId: string;
+  readonly allocatedBundleId: string;
+  readonly allocatedGroupId: string;
+  readonly magicMaskMessage: string;
+}): StudioBg3dLtApplyFailure | StudioBg3dMergedCompositePlanSuccess {
+  const {
+    result,
+    elements,
+    groups,
+    targetElementId,
+    canvasHeight,
+    newElementId,
+    allocatedBundleId,
+    allocatedGroupId,
+    magicMaskMessage,
+  } = input;
+  if (result.magicFilterMask) return { ok: false, message: magicMaskMessage };
+
+  const mergedImage = createCanvasImageElement({
+    id: newElementId,
+    src: result.compositePngDataUrl,
+    canvasWidth: CANVAS_W,
+    canvasHeight,
+    sourceWidth: result.width,
+    sourceHeight: result.height,
+  });
+  // A realtime room still stores one raster, but it must remain a complete LT bundle rather than
+  // carrying only bg3dLtBundleId. Reusing the ordinary bundle planner also makes a transition from
+  // separated LT atomic: every stale sibling disappears, the canonical scene moves to exactly one
+  // anchor, and the dedicated group stays a valid one-member group. Selecting any sibling is safe
+  // because the planner resolves and replaces the whole bundle, not just the clicked element.
+  const plan = planStudioBg3dLtLayers<El, StudioBg3dSceneDocument>({
+    elements,
+    groups,
+    render: {
+      kind: "combined",
+      pngDataUrl: result.compositePngDataUrl,
+      width: result.width,
+      height: result.height,
+      bg3dScene: result.bg3dScene,
+    },
+    targetElementId,
+    allocations: {
+      bundleId: allocatedBundleId,
+      groupId: allocatedGroupId,
+      elementIds: { "main-line": newElementId },
+    },
+    newElementTemplate: {
+      ...mergedImage,
+      name: "3D LT 배경 · 병합",
+      bg3dScene: result.bg3dScene,
+    } satisfies El,
+  });
+  if (!plan.ok) return { ok: false, message: plan.message };
+
+  return {
+    ok: true,
+    anchorElementId: plan.anchorElementId,
+    bundleId: plan.bundleId,
+    nextElements: plan.nextElements.map((element) => element.id === plan.anchorElementId
+      ? ({ ...element, name: "3D LT 배경 · 병합", layerRole: undefined } satisfies El)
+      : element),
+    nextGroups: plan.nextGroups,
+  };
+}
+
+export interface StudioBg3dRealtimeMergedApplyPlanSuccess {
+  readonly ok: true;
+  readonly anchorElementId: string;
+  readonly bundleId: string;
+  readonly nextElements: readonly El[];
+  readonly nextGroups: readonly LayerGroup[];
+  readonly nextShared3dStage: StudioShared3dStageCollectionDocument | undefined;
+  readonly sharedStageMutationKind:
+    StudioBg3dSharedStageMutationKind | "refresh" | "connect";
+  readonly hiddenElementIds: readonly string[];
+  readonly restoredElementIds: readonly string[];
+}
+
+/**
+ * Realtime rooms still use one self-contained raster/scene layer, but the relationship between
+ * that exact background anchor and captured VRM sources is page document state. Plan both halves
+ * together so reopening the selected background resolves the persisted Stage instead of forever
+ * falling back to `unlinked`.
+ */
+export function planStudioBg3dRealtimeMergedApply(input: {
+  readonly result: StudioBackground3DInsertResult;
+  readonly elements: readonly El[];
+  readonly groups: readonly LayerGroup[];
+  readonly shared3dStage: PageState["shared3dStage"];
+  readonly targetElementId: string | undefined;
+  readonly canvasHeight: number;
+  readonly newElementId: string;
+  readonly allocatedBundleId: string;
+  readonly allocatedGroupId: string;
+  readonly dccSource: StudioShared3dStageDccSource | null;
+}): StudioBg3dLtApplyFailure | StudioBg3dRealtimeMergedApplyPlanSuccess {
+  const merged = planStudioBg3dMergedComposite({
+    result: input.result,
+    elements: input.elements,
+    groups: input.groups,
+    targetElementId: input.targetElementId,
+    canvasHeight: input.canvasHeight,
+    newElementId: input.newElementId,
+    allocatedBundleId: input.allocatedBundleId,
+    allocatedGroupId: input.allocatedGroupId,
+    magicMaskMessage: "매직 레이어 마스크는 분리된 컬러·톤 레이어가 있어야 만들 수 있어요. 실시간 공동 편집에서는 매직 레이어를 끄고 다시 추가해 주세요.",
+  });
+  if (!merged.ok) return merged;
+  const bundleId = merged.bundleId;
+
+  const captures = resolveStudioBg3dCapturedCharacterPlacements({ renderResult: input.result });
+  if (!captures.ok) return captures;
+  const visibility = planStudioBg3dSharedCharacterVisibility({
+    shared3dStage: input.shared3dStage,
+    elements: merged.nextElements,
+    capturedCharacterElementIds: captures.capturedCharacterElementIds,
+    groups: [...merged.nextGroups],
+  });
+  if (!visibility.ok) return visibility;
+  const stage = planStudioBg3dSharedStageMutation({
+    currentStageCollection: visibility.currentStageCollection,
+    bundleId,
+    requestedMutationKind: input.result.sharedStageMutation?.kind,
+    nextElements: visibility.sharedCharacterVisibility.nextElements,
+    capturedCharacterElementIds: captures.capturedCharacterElementIds,
+    capturedCharacterPlacements: captures.capturedCharacterPlacements,
+    hiddenElementIds: visibility.sharedCharacterVisibility.hiddenElementIds,
+    dccSource: input.dccSource,
+  });
+  if (!stage.ok) return stage;
+  return {
+    ok: true,
+    anchorElementId: merged.anchorElementId,
+    bundleId,
+    nextElements: stage.stageMutation.nextElements,
+    nextGroups: merged.nextGroups,
+    nextShared3dStage: stage.stageMutation.nextState,
+    sharedStageMutationKind: stage.sharedStageMutationKind,
+    hiddenElementIds: visibility.sharedCharacterVisibility.hiddenElementIds,
+    restoredElementIds: stage.stageMutation.restoredElementIds,
+  };
 }
 
 type StudioBg3dLinkedCharacterCapture =

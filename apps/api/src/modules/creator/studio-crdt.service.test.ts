@@ -33,6 +33,11 @@ import {
 
 import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
 import {
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX,
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT,
+  encodeStudioCrdtShared3dCompositeKey,
   hasValidStudioCrdtRootSchema,
   hasValidStudioCrdtStrokePaintContract,
 } from "./studio-crdt-root-schema";
@@ -330,6 +335,31 @@ function createScenePageDocument(): Y.Doc {
   pageOrder.set("active", true);
   doc.getArray<Y.Map<unknown>>("page-order").push([pageOrder]);
   return doc;
+}
+
+function addShared3dStageSidecar(doc: Y.Doc): string {
+  const stageId = "stage-1";
+  const key = encodeStudioCrdtShared3dCompositeKey("page-1", stageId);
+  doc.getMap<boolean>(STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT).set(key, true);
+  const record = doc.getMap<unknown>(
+    `${STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX}${encodeURIComponent(key)}`
+  );
+  record.set("pageId", "page-1");
+  record.set("stageId", stageId);
+  record.set("payloadVersion", 1);
+  record.set("order", 0);
+  record.set("payload", JSON.stringify({
+    id: stageId,
+    capturePolicy: "background-only",
+    background: {
+      bundleId: "bundle-1",
+      sourceHash: `sha256:${"a".repeat(64)}`,
+    },
+    characters: [],
+  }));
+  record.set("deactivate:0", true);
+  doc.getMap<boolean>(STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT);
+  return key;
 }
 
 function createDrawingAssistDocument() {
@@ -1258,6 +1288,147 @@ describe("StudioCrdtService", () => {
       attacker.destroy();
     }
   );
+
+  it("rejects removal of an existing Shared Stage ownership tombstone before storage", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const base = createScenePageDocument();
+    const stageKey = addShared3dStageSidecar(base);
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId: "work-shared-stage-grow-only",
+      updateId: "00000000-0000-4000-8000-000000000312",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    attacker.getMap(STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT).delete(stageKey);
+    const rewrite = Y.encodeStateAsUpdate(attacker, stateVector);
+    expect(hasValidStudioCrdtRootSchema(attacker)).toBe(false);
+
+    await expect(current.applyUpdate({
+      workId: "work-shared-stage-grow-only",
+      updateId: "00000000-0000-4000-8000-000000000313",
+      actorUserId: "editor",
+      data: fromUint8Array(rewrite),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-shared-stage-grow-only")).toHaveLength(1);
+    base.destroy();
+    attacker.destroy();
+  });
+
+  it("accepts a complete offline Shared Stage event suffix on first server sync", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const offline = createScenePageDocument();
+    const stageKey = addShared3dStageSidecar(offline);
+    const record = offline.getMap<unknown>(
+      `${STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX}${encodeURIComponent(stageKey)}`
+    );
+    record.set("activate:0", true);
+    record.set("activate:1", true);
+    expect(hasValidStudioCrdtRootSchema(offline)).toBe(true);
+
+    await current.applyUpdate({
+      workId: "work-shared-stage-offline-suffix",
+      updateId: "00000000-0000-4000-8000-000000000314",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(offline)),
+    });
+    expect(repository.updates.get("work-shared-stage-offline-suffix")).toHaveLength(1);
+    offline.destroy();
+  });
+
+  it("accepts concurrent Stage unlink and receipt addition in either server update order", async () => {
+    const base = createScenePageDocument();
+    const stageKey = addShared3dStageSidecar(base);
+    const stageRecord = base.getMap<unknown>(
+      `${STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX}${encodeURIComponent(stageKey)}`
+    );
+    const elementId = "character-1";
+    const sourceHash = `sha256:${"b".repeat(64)}`;
+    const modelRuntimeKey = `${elementId}:${sourceHash}`;
+    stageRecord.set("payload", JSON.stringify({
+      id: "stage-1",
+      capturePolicy: "require-all-linked",
+      background: {
+        bundleId: "bundle-1",
+        sourceHash: `sha256:${"a".repeat(64)}`,
+      },
+      characters: [{ elementId, modelRuntimeKey, sourceHash }],
+    }));
+    stageRecord.set("activate:1", true);
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    const baseVector = Y.encodeStateVector(base);
+
+    const receiptAdder = new Y.Doc();
+    Y.applyUpdate(receiptAdder, baseUpdate);
+    const receiptKey = encodeStudioCrdtShared3dCompositeKey("page-1", elementId);
+    receiptAdder.getMap<boolean>(STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT)
+      .set(receiptKey, true);
+    const receiptRecord = receiptAdder.getMap<unknown>(
+      `${STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX}${
+        encodeURIComponent(receiptKey)
+      }`
+    );
+    receiptRecord.set("pageId", "page-1");
+    receiptRecord.set("elementId", elementId);
+    receiptRecord.set("payloadVersion", 1);
+    receiptRecord.set("modelRuntimeKey", modelRuntimeKey);
+    receiptRecord.set("activate:0", true);
+    const receiptUpdate = Y.encodeStateAsUpdate(receiptAdder, baseVector);
+
+    const unlinker = new Y.Doc();
+    Y.applyUpdate(unlinker, baseUpdate);
+    unlinker.getMap<unknown>(
+      `${STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX}${encodeURIComponent(stageKey)}`
+    ).set("deactivate:1", true);
+    const unlinkUpdate = Y.encodeStateAsUpdate(unlinker, baseVector);
+
+    const orders = [
+      [receiptUpdate, unlinkUpdate],
+      [unlinkUpdate, receiptUpdate],
+    ] as const;
+    const updateIds = [
+      ["00000000-0000-4000-8000-000000000315", "00000000-0000-4000-8000-000000000316"],
+      ["00000000-0000-4000-8000-000000000317", "00000000-0000-4000-8000-000000000318"],
+    ] as const;
+    const baseUpdateIds = [
+      "00000000-0000-4000-8000-000000000319",
+      "00000000-0000-4000-8000-000000000320",
+    ] as const;
+    for (let index = 0; index < orders.length; index += 1) {
+      const repository = new MemoryStudioCrdtRepository();
+      const current = service(repository);
+      const workId = `work-shared-stage-dormant-receipt-${index}`;
+      await current.applyUpdate({
+        workId,
+        updateId: baseUpdateIds[index]!,
+        actorUserId: "editor",
+        data: fromUint8Array(baseUpdate),
+      });
+      for (let updateIndex = 0; updateIndex < 2; updateIndex += 1) {
+        await current.applyUpdate({
+          workId,
+          updateId: updateIds[index]![updateIndex]!,
+          actorUserId: "editor",
+          data: fromUint8Array(orders[index]![updateIndex]!),
+        });
+      }
+      expect(repository.updates.get(workId)).toHaveLength(3);
+      const hydrated = new Y.Doc();
+      applySync(hydrated, await service(repository).sync(workId));
+      expect(hasValidStudioCrdtRootSchema(hydrated)).toBe(true);
+      hydrated.destroy();
+    }
+
+    base.destroy();
+    receiptAdder.destroy();
+    unlinker.destroy();
+  });
 
   it("classifies a persisted deletion-history rewrite as storage corruption during hydration", async () => {
     const repository = new MemoryStudioCrdtRepository();

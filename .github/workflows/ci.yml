@@ -316,6 +316,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify Studio 3D surfaces against rendered frames
         run: pnpm run verify:studio-3d-visual
+      # A CI-only e2e failure is undiagnosable without the page state that produced it: the run
+      # log keeps the call log but not the DOM. Playwright writes an accessibility snapshot to
+      # `test-results/**/error-context.md` for every failed test, so publish that directory.
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-3d-visual-failure
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   studio-3d-runtime:
     # Preserve the existing "CI / verify" check context while moving the GPU proof onto
@@ -359,6 +370,10 @@ jobs:
         # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
         # deterministic while the verifier still owns the exact viewport of every proof page.
         run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console
+      - name: Verify BG3D WebGPU TransformControls rotation frames do not accumulate
+        # The defect exists only while the WebGPU compositor is live and the pointer is still down;
+        # the ordinary headless WebGL2 visual suite cannot reproduce this interaction path.
+        run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-bg3d-webgpu-rotation
       - name: Verify BG3D next-generation engine capture parity and in-app browser policy
         # Renders one scene through both the WebGL2 and WebGPU capture adapters and fails if the
         # composited raster or the depth samples diverge, then replays the page under KakaoTalk,

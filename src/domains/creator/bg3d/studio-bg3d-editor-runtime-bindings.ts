@@ -1,4 +1,6 @@
 /* Re-exports the original StudioBackground3D import graph for host extracts. */
+import { lazy as createLazyComponent } from "react";
+
 export { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 export { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera.js";
 export { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera.js";
@@ -88,6 +90,8 @@ export {
   type BgPrimitiveKind,
 } from "../studio-background-3d-primitives";
 export {
+  BG_SCENE_TEMPLATE_CATEGORIES,
+  BG_SCENE_TEMPLATE_CATEGORY_LABELS,
   BG_SCENE_TEMPLATES,
   instantiateSceneTemplate,
   type BgSceneTemplateCategory,
@@ -593,11 +597,19 @@ export {
   type StudioBg3dRigBakeReader,
 } from "./StudioBg3dSceneNodes";
 export { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
-export { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
+export const StudioBg3dSceneTemplatePanel = createLazyComponent(() =>
+  import("./StudioBg3dSceneTemplatePanel").then(({ StudioBg3dSceneTemplatePanel: Panel }) => ({
+    default: Panel,
+  }))
+);
 export { StudioBg3dShapesPanel } from "./StudioBg3dShapesPanel";
 export { StudioBg3dSharedCharacterSceneContent } from "./StudioBg3dSharedCharacterSceneContent";
 export { StudioBg3dSharedCharacterStatusOverlay } from "./StudioBg3dSharedCharacterStatusOverlay";
-export { StudioBg3dSharedStagePanel } from "./StudioBg3dSharedStagePanel";
+export const StudioBg3dSharedStagePanel = createLazyComponent(() =>
+  import("./StudioBg3dSharedStagePanel").then(({ StudioBg3dSharedStagePanel: Panel }) => ({
+    default: Panel,
+  }))
+);
 export {
   StudioBg3dViewPanel,
   type StudioBg3dBabylonDiagnosticBackend,

@@ -39,10 +39,15 @@ import {
   markDeletionTargetChanged,
   unindexDeletionOperation,
 } from "./studio-crdt-document-tracking";
+import {
+  bindStudioCrdtShared3dStageObservers,
+  getShared3dStageFrontier,
+} from "./studio-crdt-shared-3d-stage";
 
 import type { StudioCrdtDocumentHost } from "./studio-crdt-document-host";
 
 export function bindStudioCrdtDocumentObservers(host: StudioCrdtDocumentHost): void {
+    bindStudioCrdtShared3dStageObservers(host);
     for (const [id, value] of host.strokes) registerRecord(host, id, value);
     for (const value of host.order) registerOrderEntry(host, value);
     for (const [id, active] of host.sceneElementIds) {
@@ -61,8 +66,23 @@ export function bindStudioCrdtDocumentObservers(host: StudioCrdtDocumentHost): v
     for (const [id, active] of host.sceneElementIds) {
       if (active === true) refreshSceneElementRecordCache(host, id);
     }
-    for (const [id, active] of host.pageIds) {
-      if (active === true) refreshPageRecordCache(host, id);
+    const activePageIds = [...host.pageIds]
+      .filter(([, active]) => active === true)
+      .map(([id]) => id);
+    // Empty/page-less malformed sidecars remain lazily rejected by their explicit reader, matching
+    // the former constructor behavior. Once a page cache actually exists, one frontier serves all
+    // page decorations instead of reparsing every Stage once per page.
+    const shared3dStageStateByPageId = activePageIds.length === 0
+      ? new Map()
+      : new Map(
+          getShared3dStageFrontier(host).map((state) => [state.pageId, state] as const),
+        );
+    for (const id of activePageIds) {
+        refreshPageRecordCache(host, id, shared3dStageStateByPageId.get(id) ?? {
+          pageId: id,
+          managed: false,
+          value: undefined,
+        });
     }
     for (const [compositeKey, active] of host.layerGroupIds) {
       if (active === true) refreshLayerGroupRecordCache(host, compositeKey);

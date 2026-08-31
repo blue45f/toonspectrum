@@ -616,7 +616,7 @@ export function useStudioBg3dEditorEffects(h) {
   }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   useEffect(() => {
-    if (!open || !modelsPanelActivated) return;
+    if (!open || (!modelsPanelActivated && activePanelTab !== "templates")) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
     setTemplateLibraryStatus("loading");
@@ -632,7 +632,7 @@ export function useStudioBg3dEditorEffects(h) {
           setTemplateLibraryStatus("error");
         });
       });
-  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [activePanelTab, modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   useEffect(() => {
     if (!open) {

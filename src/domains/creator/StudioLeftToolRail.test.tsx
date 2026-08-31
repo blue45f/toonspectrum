@@ -158,6 +158,7 @@ function createHandlers(): StudioLeftToolRailHandlers {
     openFrameAnimationForSelected: vi.fn(),
     openPixelSelectionTransform: vi.fn(),
     openSelectedLayerCrop: vi.fn(),
+    toggleBg3dEditor: vi.fn(),
     addBubble: vi.fn(),
     addText: vi.fn(),
     announceDrawingShortcut: vi.fn(),
@@ -259,6 +260,15 @@ it("shows the configured comment shortcut in the placement tool and preserves th
   const unboundComment = screen.getByRole("button", { name: "댓글 핀 배치" });
   expect(unboundComment.getAttribute("aria-keyshortcuts")).toBeNull();
 
+});
+
+it("delegates the 3D background rail entry to the selection-aware editor toggle", () => {
+  const props = createProps();
+  render(<StudioLeftToolRail {...props} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "3D 배경" }));
+
+  expect(props.stableHandlers.toggleBg3dEditor).toHaveBeenCalledOnce();
 });
 
 it("keeps all four retouch labels and aria shortcuts in sync with remapped settings", () => {

@@ -1185,6 +1185,8 @@ describe("StudioCrdtDocument", () => {
     document.patchPage("page-b", { set: { canvasH: 2200, note: "원격 콘티" } });
 
     expect(document.getPages().map(({ id }) => id)).toEqual(["page-b", "page-a"]);
+    expect(document.getPage("page-b")!.orderIndex)
+      .toBeLessThan(document.getPage("page-a")!.orderIndex);
     expect(document.getPage("page-b")?.payload.props).toMatchObject({
       canvasH: 2200,
       note: "원격 콘티",

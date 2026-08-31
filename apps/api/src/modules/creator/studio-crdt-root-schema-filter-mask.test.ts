@@ -55,6 +55,7 @@ function addImageReference(
     elementType?: string;
     surfaceId?: unknown;
     enabled?: unknown;
+    hidden?: unknown;
   } = {}
 ): Y.Map<unknown> {
   const id = "image-1";
@@ -80,10 +81,29 @@ function addImageReference(
   if (options.enabled !== undefined) {
     record.set("prop:filterMaskEnabled", options.enabled);
   }
+  if (options.hidden !== undefined) {
+    record.set("prop:hidden", options.hidden);
+  }
   return record;
 }
 
 describe("Studio CRDT filter-mask surface boundary", () => {
+  it("accepts the hidden-only image topology reference emitted for Shared Stage visibility", () => {
+    const doc = new Y.Doc();
+    addImageReference(doc, { hidden: false });
+
+    expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
+    const snapshot = snapshotStudioWorkAssetReferences(doc);
+    expect(snapshot.activeCount).toBe(0);
+    expect(snapshot.admittedReferences.size).toBe(0);
+
+    const malformed = new Y.Doc();
+    addImageReference(malformed, { hidden: "false" });
+    expect(hasValidStudioCrdtRootSchema(malformed)).toBe(false);
+    doc.destroy();
+    malformed.destroy();
+  });
+
   it("accepts a topology-only image binding without admitting its local source body", () => {
     const doc = new Y.Doc();
     addMaskSurface(doc);

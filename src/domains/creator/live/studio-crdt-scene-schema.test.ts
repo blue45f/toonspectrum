@@ -341,6 +341,13 @@ describe("studio CRDT immutable filter-mask surface references", () => {
     expect(isStudioCrdtImageAuxiliaryReferencePayload(auxiliary)).toBe(true);
     expect(isStudioCrdtTopologyReferencePayload(auxiliary)).toBe(true);
 
+    const visibilityOnly = validateReference({
+      elementType: "image",
+      hidden: false,
+    });
+    expect(isStudioCrdtImageAuxiliaryReferencePayload(visibilityOnly)).toBe(true);
+    expect(isStudioCrdtTopologyReferencePayload(visibilityOnly)).toBe(true);
+
     const admitted = validateReference(imageReferenceProps({
       filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
       filterMaskEnabled: false,

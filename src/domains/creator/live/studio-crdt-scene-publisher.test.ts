@@ -1,9 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as Y from "yjs";
 
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "../bg3d/studio-bg3d-scene-document";
+import { createStudioShared3dStageDocument } from "../studio-shared-3d-stage-document";
+import { createNativePluralShared3dStageFixture } from "../studio-shared-3d-stage-test-fixture";
 import { createStudioStickyNoteElement } from "../studio-sticky-note";
+import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 
-import { StudioCrdtDocument, type StudioCrdtStrokeInput } from "./studio-crdt-document";
-import { studioCrdtElementToSceneElement } from "./studio-crdt-page-bridge";
+import {
+  StudioCrdtDocument,
+  STUDIO_CRDT_ORIGIN_LOCAL,
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT,
+  studioCrdtShared3dStageCompositeKey,
+  studioCrdtShared3dStageRecordRootName,
+  type StudioCrdtStrokeInput,
+} from "./studio-crdt-document";
+import {
+  reconcileStudioCrdtSceneGraphPages,
+  studioCrdtElementToSceneElement,
+} from "./studio-crdt-page-bridge";
 import {
   planStudioCrdtOrderMoves,
   publishStudioCrdtDrawGraphDiff,
@@ -11,6 +29,7 @@ import {
 } from "./studio-crdt-scene-publisher";
 
 import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
+import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stage-collection";
 
 interface TestElement {
   id: string;
@@ -28,6 +47,7 @@ interface TestPage {
   note?: string;
   paperSurface?: StudioPaperSurfaceSettings;
   paperGrainVisible?: boolean;
+  shared3dStage?: StudioShared3dStagePersistedState;
 }
 
 function text(id: string, overrides: Record<string, unknown> = {}): TestElement {
@@ -88,7 +108,354 @@ function stroke(id: string, pageId = "page-a"): StudioCrdtStrokeInput {
   };
 }
 
+function linkedCharacterPages() {
+  const vrmScene = createStudioVrmSceneDocument();
+  const visibleCharacter: TestElement = {
+    id: "character-a",
+    type: "image",
+    hidden: false,
+    vrmScene,
+  };
+  const hiddenCharacter: TestElement = { ...visibleCharacter, hidden: true };
+  const shared3dStage = createStudioShared3dStageDocument({
+    backgroundBundleId: "bundle-a",
+    elements: [
+      {
+        id: "background-a",
+        type: "image",
+        bg3dLtBundleId: "bundle-a",
+        bg3dScene: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      },
+      hiddenCharacter,
+    ],
+    characterElementIds: [hiddenCharacter.id],
+    hiddenByStageElementIds: [hiddenCharacter.id],
+  });
+  if (!shared3dStage) throw new Error("invalid linked character fixture");
+  return {
+    disconnected: [page("page-a", [visibleCharacter])],
+    connected: [page("page-a", [hiddenCharacter], { shared3dStage })],
+    manuallyHidden: [page("page-a", [hiddenCharacter])],
+  } as const;
+}
+
+function managedSharedStageSnapshot(pageCount: number): Uint8Array {
+  const raw = new Y.Doc();
+  const pageIndex = raw.getMap<boolean>("studio-pages");
+  const stageIndex = raw.getMap<boolean>(STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT);
+  raw.getMap<boolean>(STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT);
+  raw.transact(() => {
+    for (let index = 0; index < pageCount; index += 1) {
+      const pageId = `page-publish-cache-${index}`;
+      const pageRecord = raw.getMap<unknown>(`studio-page:${encodeURIComponent(pageId)}`);
+      pageIndex.set(pageId, true);
+      pageRecord.set("id", pageId);
+      pageRecord.set("payloadVersion", STUDIO_CRDT_PAGE_PAYLOAD_VERSION);
+      pageRecord.set("prop:bg", "#fff");
+      pageRecord.set("prop:bgGrad", null);
+      pageRecord.set("prop:canvasH", 1_600);
+
+      const stageId = `stage-publish-cache-${index}`;
+      const stageKey = studioCrdtShared3dStageCompositeKey(pageId, stageId);
+      const stageRecord = raw.getMap<unknown>(studioCrdtShared3dStageRecordRootName(stageKey));
+      stageRecord.set("pageId", pageId);
+      stageRecord.set("stageId", stageId);
+      stageRecord.set("payloadVersion", STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION);
+      stageRecord.set("order", 0);
+      stageRecord.set("payload", JSON.stringify({
+        id: stageId,
+        capturePolicy: "background-only",
+        background: {
+          bundleId: `bundle-publish-cache-${index}`,
+          sourceHash: `sha256:${"a".repeat(64)}`,
+        },
+        characters: [],
+      }));
+      stageRecord.set("activate:0", true);
+      stageIndex.set(stageKey, true);
+    }
+  });
+  try {
+    return Y.encodeStateAsUpdate(raw);
+  } finally {
+    raw.destroy();
+  }
+}
+
 describe("studio CRDT scene publisher", () => {
+  it("reads the Shared Stage frontier once for a multi-page scene publish", () => {
+    const document = new StudioCrdtDocument();
+    const getFrontier = vi.spyOn(document, "getShared3dStageFrontier");
+    const getPageState = vi.spyOn(document, "getShared3dStagePageState");
+    const pages = Array.from({ length: 128 }, (_, index) => page(`page-${index}`));
+
+    publishStudioCrdtSceneGraphDiff(document, pages, pages);
+
+    expect(getFrontier).toHaveBeenCalledTimes(1);
+    expect(getPageState).not.toHaveBeenCalled();
+    document.destroy();
+  });
+
+  it("parses each managed Shared Stage once for an identical many-page publish", () => {
+    const pageCount = 128;
+    const document = new StudioCrdtDocument(managedSharedStageSnapshot(pageCount));
+    const pages = document.getPages().map((record) => page(record.id, [], {
+      shared3dStage: record.shared3dStage,
+    }));
+    expect(pages.every(({ shared3dStage }) => shared3dStage !== undefined)).toBe(true);
+    const parse = vi.spyOn(JSON, "parse");
+
+    try {
+      expect(publishStudioCrdtSceneGraphDiff(document, pages, pages)).toEqual({
+        sceneElementMutations: 0,
+        layerGroupMutations: 0,
+        pageMutations: 0,
+        elementMoves: 0,
+        pageMoves: 0,
+      });
+      const stagePayloadParseCount = parse.mock.calls.filter(([value]) =>
+        typeof value === "string" && value.startsWith('{"id":"stage-publish-cache-'))
+        .length;
+      expect(stagePayloadParseCount).toBe(pageCount);
+    } finally {
+      parse.mockRestore();
+      document.destroy();
+    }
+  });
+
+  it("publishes Shared Stage authority outside the page envelope and hydrates it on a peer", () => {
+    const source = new StudioCrdtDocument();
+    const shared3dStage = createNativePluralShared3dStageFixture();
+
+    publishStudioCrdtSceneGraphDiff(
+      source,
+      [page("page-a")],
+      [page("page-a", [], { shared3dStage })],
+    );
+
+    expect(source.getPage("page-a")?.payload.props).not.toHaveProperty("shared3dStage");
+    expect(source.getPage("page-a")?.shared3dStageManaged).toBe(true);
+    expect(source.getPage("page-a")?.shared3dStage).toEqual(shared3dStage);
+
+    const peer = new StudioCrdtDocument(source.encodeStateAsUpdate());
+    expect(peer.getPage("page-a")?.payload.props).not.toHaveProperty("shared3dStage");
+    expect(peer.getPage("page-a")?.shared3dStageManaged).toBe(true);
+    expect(peer.getPage("page-a")?.shared3dStage).toEqual(shared3dStage);
+    peer.destroy();
+    source.destroy();
+  });
+
+  it("still bootstraps a missing managed page and sweeps its sidecar on page deletion", () => {
+    const document = new StudioCrdtDocument();
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const connected = [page("page-a", [], { shared3dStage })];
+    document.publishShared3dStagePageDiff("page-a", undefined, shared3dStage);
+    expect(document.getPage("page-a", true)).toBeNull();
+
+    expect(publishStudioCrdtSceneGraphDiff(document, connected, connected).pageMutations).toBe(1);
+    expect(document.getPage("page-a")?.shared3dStage).toEqual(shared3dStage);
+
+    publishStudioCrdtSceneGraphDiff(document, connected, []);
+    expect(document.getPage("page-a", true)?.deleted).toBe(true);
+    expect(document.getShared3dStagePageState("page-a")).toEqual({
+      pageId: "page-a",
+      managed: true,
+      value: undefined,
+    });
+    document.destroy();
+  });
+
+  it("rejects a malformed Shared Stage before creating a page or scene element", () => {
+    const document = new StudioCrdtDocument();
+    const invalid = {
+      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      version: 3,
+      authority: "page-shared-3d-stage-collection",
+      stages: [],
+      visibilityReceipts: [],
+    } as unknown as StudioShared3dStagePersistedState;
+
+    expect(() => publishStudioCrdtSceneGraphDiff(
+      document,
+      [page("page-a")],
+      [page("page-a", [text("must-not-publish")], { shared3dStage: invalid })],
+    )).toThrow("공유 3D 장면 연결 정보가 손상되었습니다");
+    expect(document.getPages(true)).toEqual([]);
+    expect(document.getSceneElements({ includeDeleted: true })).toEqual([]);
+    expect(document.getShared3dStageFrontier()).toEqual([]);
+    document.destroy();
+  });
+
+  it("uses an inactive Shared Stage tombstone to remove a stale local connection", () => {
+    const document = new StudioCrdtDocument();
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const connected = [page("page-a", [], { shared3dStage })];
+    const disconnected = [page("page-a")];
+    publishStudioCrdtSceneGraphDiff(document, [page("page-a")], connected);
+    publishStudioCrdtSceneGraphDiff(document, connected, disconnected);
+
+    const record = document.getPage("page-a");
+    expect(record?.shared3dStageManaged).toBe(true);
+    expect(record?.shared3dStage).toBeUndefined();
+    const reconciled = reconcileStudioCrdtSceneGraphPages(
+      connected,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(reconciled.pages[0]).not.toHaveProperty("shared3dStage");
+    document.destroy();
+  });
+
+  it("derives Stage-owned character hiding without persisting it as the user visibility scalar", () => {
+    const document = new StudioCrdtDocument();
+    const fixture = linkedCharacterPages();
+    publishStudioCrdtSceneGraphDiff(document, fixture.disconnected, fixture.connected);
+
+    expect(document.getSceneElement("character-a")?.payload.props.hidden).toBe(false);
+    const connected = reconcileStudioCrdtSceneGraphPages(
+      fixture.disconnected,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(connected.pages[0]?.elements[0]).toMatchObject({
+      id: "character-a",
+      hidden: true,
+    });
+
+    publishStudioCrdtSceneGraphDiff(document, fixture.connected, fixture.disconnected);
+    const disconnected = reconcileStudioCrdtSceneGraphPages(
+      connected.pages,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(disconnected.pages[0]?.shared3dStage).toBeUndefined();
+    expect(disconnected.pages[0]?.elements[0]).toMatchObject({ hidden: false });
+
+    publishStudioCrdtSceneGraphDiff(document, fixture.disconnected, fixture.manuallyHidden);
+    const manuallyHidden = reconcileStudioCrdtSceneGraphPages(
+      fixture.disconnected,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(manuallyHidden.pages[0]?.elements[0]).toMatchObject({ hidden: true });
+    document.destroy();
+  });
+
+  it("backfills a visible scalar before unlinking an existing image topology reference", () => {
+    const document = new StudioCrdtDocument();
+    const fixture = linkedCharacterPages();
+    document.addSceneElement({
+      id: "character-a",
+      pageId: "page-a",
+      layerId: "page-root",
+      payload: {
+        version: 1,
+        type: "reference",
+        // Existing filter-mask/legacy topology records can predate image visibility sync.
+        props: { elementType: "image" },
+      },
+    });
+
+    publishStudioCrdtSceneGraphDiff(document, fixture.disconnected, fixture.connected);
+    expect(document.getSceneElement("character-a")?.payload.props.hidden).toBe(false);
+    const connected = reconcileStudioCrdtSceneGraphPages(
+      fixture.disconnected,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(connected.pages[0]?.elements[0]).toMatchObject({
+      id: "character-a",
+      hidden: true,
+    });
+
+    publishStudioCrdtSceneGraphDiff(document, fixture.connected, fixture.disconnected);
+    const disconnected = reconcileStudioCrdtSceneGraphPages(
+      connected.pages,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true }),
+    );
+    expect(disconnected.pages[0]?.shared3dStage).toBeUndefined();
+    expect(disconnected.pages[0]?.elements[0]).toMatchObject({
+      id: "character-a",
+      hidden: false,
+    });
+    document.destroy();
+  });
+
+  it("converges concurrent connect and unlink to a visible source in either update order", () => {
+    const fixture = linkedCharacterPages();
+    const connector = new StudioCrdtDocument();
+    const unlinker = new StudioCrdtDocument();
+    publishStudioCrdtSceneGraphDiff(connector, fixture.disconnected, fixture.connected);
+    publishStudioCrdtSceneGraphDiff(unlinker, fixture.connected, fixture.disconnected);
+    const connectUpdate = connector.encodeStateAsUpdate();
+    const unlinkUpdate = unlinker.encodeStateAsUpdate();
+
+    const left = new StudioCrdtDocument();
+    left.applyUpdate(connectUpdate);
+    left.applyUpdate(unlinkUpdate);
+    const right = new StudioCrdtDocument();
+    right.applyUpdate(unlinkUpdate);
+    right.applyUpdate(connectUpdate);
+
+    for (const peer of [left, right]) {
+      const reconciled = reconcileStudioCrdtSceneGraphPages(
+        fixture.connected,
+        peer.getStrokes({ includeDeleted: true }),
+        peer.getSceneElements({ includeDeleted: true }),
+        peer.getPages(true),
+        peer.getLayerGroups({ includeDeleted: true }),
+      );
+      expect(reconciled.pages[0]?.shared3dStage).toBeUndefined();
+      expect(reconciled.pages[0]?.elements[0]).toMatchObject({
+        id: "character-a",
+        hidden: false,
+      });
+    }
+
+    connector.destroy();
+    unlinker.destroy();
+    left.destroy();
+    right.destroy();
+  });
+
+  it("publishes a legacy source's visible scalar before its unlink tombstone", () => {
+    const fixture = linkedCharacterPages();
+    const source = new StudioCrdtDocument();
+    const updates: Uint8Array[] = [];
+    source.subscribe((update, origin) => {
+      if (origin === STUDIO_CRDT_ORIGIN_LOCAL) updates.push(update);
+    });
+    publishStudioCrdtSceneGraphDiff(source, fixture.connected, fixture.disconnected);
+
+    const peer = new StudioCrdtDocument();
+    let observedTombstone = false;
+    for (const update of updates) {
+      peer.applyUpdate(update);
+      const state = peer.getShared3dStagePageState("page-a");
+      if (!state.managed) continue;
+      observedTombstone = true;
+      expect(state.value).toBeUndefined();
+      expect(peer.getSceneElement("character-a")?.payload.props.hidden).toBe(false);
+      break;
+    }
+    expect(observedTombstone).toBe(true);
+    peer.destroy();
+    source.destroy();
+  });
+
   it("publishes sticky-note text metadata to every peer", () => {
     const source = new StudioCrdtDocument();
     const stickyNote: TestElement = {

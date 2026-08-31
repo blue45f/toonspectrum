@@ -5,6 +5,10 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import {
+  allocateStudioBg3dTemplateInstanceNodeIds,
+  orderStudioBg3dHierarchySelectionRootsFirst,
+} from "./studio-bg3d-template-instance";
 
 export function attachStudioBg3dEditorPlacementHost(h) {
   const {
@@ -642,10 +646,20 @@ export function attachStudioBg3dEditorPlacementHost(h) {
             ...live.primitives.map((primitive) => primitive.id),
             ...live.customModels.map((model) => model.id),
           ]);
+          const templateInstanceAllocation = allocateStudioBg3dTemplateInstanceNodeIds({
+            sourceKind: "user",
+            sourceId: entry.id,
+            insertionOffset: 0,
+            nodeCount: entry.document.nodes.length,
+            occupiedNodeIds,
+            createSeed: () => generateId(),
+          });
+          if (!templateInstanceAllocation) throw new Error("template-instance-id");
+          let templateNodeOrdinal = 0;
           const instantiated = await instantiateBg3dTemplateDocument(
             entry.document,
             occupiedNodeIds,
-            generateId,
+            () => templateInstanceAllocation.nodeIds[templateNodeOrdinal++] ?? "",
           );
           if (!instantiated) throw new Error("template-instantiation");
 
@@ -787,7 +801,10 @@ export function attachStudioBg3dEditorPlacementHost(h) {
           setPrimitives(nextPrimitives);
           setCustomModels(nextCustomModels);
           if (insertedIds.length > 0) {
-            setSelectedIds(new Set([insertedIds[insertedIds.length - 1]]));
+            const insertedEntities = [...prepared.primitives, ...prepared.customModels];
+            setSelectedIds(new Set(
+              orderStudioBg3dHierarchySelectionRootsFirst(insertedEntities),
+            ));
           }
           setRefTick((tick) => tick + 1);
           setError(null);

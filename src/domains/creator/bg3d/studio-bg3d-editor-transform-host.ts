@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { hasStudioBg3dSelectedAncestor } from "./studio-bg3d-template-instance";
 
 export function attachStudioBg3dEditorTransformHost(h) {
   const {
@@ -318,6 +319,13 @@ export function attachStudioBg3dEditorTransformHost(h) {
     const initialFirst = dragInitialFirstTransformRef.current;
     if (!firstObj || !initialFirst) return;
     firstObj.updateWorldMatrix(true, false);
+    const hasSelectedTransformDriverAncestor = (item: BgPrimitive | BgCustomModelInstance) =>
+      hasStudioBg3dSelectedAncestor(
+        item,
+        selectedIds,
+        (id) => primitiveById.get(id) ?? customModelById.get(id),
+        (ancestor) => !isBgObjectTransformBlocked(ancestor),
+      );
 
     const patchTransform = (item: BgPrimitive | BgCustomModelInstance, isFirst: boolean) => {
       const initial = dragInitialSelectedTransformsRef.current.get(item.id);
@@ -364,12 +372,20 @@ export function attachStudioBg3dEditorTransformHost(h) {
     };
 
     setPrimitives((prev) => prev.map((p) => {
-      if (!selectedIds.has(p.id) || isBgObjectTransformBlocked(p)) return p;
+      if (
+        !selectedIds.has(p.id) ||
+        isBgObjectTransformBlocked(p) ||
+        p.id !== firstSelectedId && hasSelectedTransformDriverAncestor(p)
+      ) return p;
       return patchTransform(p, p.id === firstSelectedId) as BgPrimitive;
     }));
 
     setCustomModels((prev) => prev.map((m) => {
-      if (!selectedIds.has(m.id) || isBgObjectTransformBlocked(m)) return m;
+      if (
+        !selectedIds.has(m.id) ||
+        isBgObjectTransformBlocked(m) ||
+        m.id !== firstSelectedId && hasSelectedTransformDriverAncestor(m)
+      ) return m;
       return patchTransform(m, m.id === firstSelectedId) as BgCustomModelInstance;
     }));
   };

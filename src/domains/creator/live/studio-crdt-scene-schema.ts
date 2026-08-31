@@ -233,7 +233,11 @@ function studioFilterMaskReferenceProps(
   return candidate;
 }
 
-/** Topology-preserving image reference carrying only an immutable filter-mask surface binding. */
+/**
+ * Topology-preserving image reference carrying only local-body-safe auxiliary state. Visibility is
+ * included because Shared Stage ownership is a derived overlay over this scalar; syncing `false`
+ * never requires uploading or replacing the locally hydrated image/VRM body.
+ */
 export function isStudioCrdtImageAuxiliaryReferencePayload(
   payload: Pick<StudioCrdtSceneElementPayload, "type" | "props">
 ): boolean {
@@ -243,12 +247,17 @@ export function isStudioCrdtImageAuxiliaryReferencePayload(
     keys.length <= 1 ||
     keys.some((key) => (
       key !== "elementType" &&
+      key !== "hidden" &&
       !(STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS as readonly string[]).includes(key)
     ))
   ) {
     return false;
   }
-  return isStudioFilterMaskReferenceProps(studioFilterMaskReferenceProps(payload.props));
+  if (Object.hasOwn(payload.props, "hidden") && typeof payload.props.hidden !== "boolean") {
+    return false;
+  }
+  const filterProps = studioFilterMaskReferenceProps(payload.props);
+  return Object.keys(filterProps).length === 0 || isStudioFilterMaskReferenceProps(filterProps);
 }
 
 /**

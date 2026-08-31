@@ -25,11 +25,14 @@ import {
 import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
 import {
   STUDIO_CRDT_UUID_PATTERN as UUID_PATTERN,
+  admitsStudioCrdtShared3dStageEvents,
   hasValidStudioCrdtRootSchema,
   isBoundedStudioCrdtId,
   preservesStudioCrdtDeletionRoots,
+  preservesStudioCrdtShared3dStageRoots,
   snapshotStudioCrdtR8GrainReferences,
   snapshotStudioCrdtDeletionRoots,
+  snapshotStudioCrdtShared3dStageRoots,
   snapshotStudioWorkAssetReferences,
 } from "./studio-crdt-root-schema";
 import {
@@ -766,10 +769,16 @@ export class StudioCrdtService implements OnModuleDestroy {
       if (state.snapshot) {
         const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
         const rasterRootsBefore = snapshotStudioCrdtRasterRoots(staged);
+        const shared3dStageRootsBefore = snapshotStudioCrdtShared3dStageRoots(staged);
         try {
           Y.applyUpdate(staged, state.snapshot.snapshot, "server-hydrate-snapshot");
         } catch {
           throw new StudioCrdtStorageCorruptionError("Stored CRDT snapshot cannot be decoded");
+        }
+        if (!hasValidStudioCrdtRootSchema(staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT snapshot violates the Studio root schema"
+          );
         }
         if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
@@ -779,6 +788,16 @@ export class StudioCrdtService implements OnModuleDestroy {
         if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
             "Stored CRDT snapshot rewrites grow-only raster history"
+          );
+        }
+        if (!preservesStudioCrdtShared3dStageRoots(shared3dStageRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT snapshot rewrites Shared Stage ownership history"
+          );
+        }
+        if (!admitsStudioCrdtShared3dStageEvents(shared3dStageRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT snapshot skips Shared Stage ownership generations"
           );
         }
         sequence = state.snapshot.compactedSequence;
@@ -791,10 +810,16 @@ export class StudioCrdtService implements OnModuleDestroy {
         if (update.sequence <= sequence) continue;
         const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
         const rasterRootsBefore = snapshotStudioCrdtRasterRoots(staged);
+        const shared3dStageRootsBefore = snapshotStudioCrdtShared3dStageRoots(staged);
         try {
           Y.applyUpdate(staged, update.payload, "server-hydrate-update");
         } catch {
           throw new StudioCrdtStorageCorruptionError("Stored CRDT update cannot be decoded");
+        }
+        if (!hasValidStudioCrdtRootSchema(staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT update violates the Studio root schema"
+          );
         }
         if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
@@ -804,6 +829,16 @@ export class StudioCrdtService implements OnModuleDestroy {
         if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
             "Stored CRDT update rewrites grow-only raster history"
+          );
+        }
+        if (!preservesStudioCrdtShared3dStageRoots(shared3dStageRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT update rewrites Shared Stage ownership history"
+          );
+        }
+        if (!admitsStudioCrdtShared3dStageEvents(shared3dStageRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT update skips Shared Stage ownership generations"
           );
         }
         sequence = update.sequence;
@@ -843,6 +878,7 @@ export class StudioCrdtService implements OnModuleDestroy {
     const candidate = new Y.Doc();
     const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(doc);
     const rasterRootsBefore = snapshotStudioCrdtRasterRoots(doc);
+    const shared3dStageRootsBefore = snapshotStudioCrdtShared3dStageRoots(doc);
     const workAssetReferencesBefore = snapshotStudioWorkAssetReferences(doc);
     const r8GrainReferencesBefore = snapshotStudioCrdtR8GrainReferences(doc);
     try {
@@ -865,6 +901,16 @@ export class StudioCrdtService implements OnModuleDestroy {
       if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, probe)) {
         throw new StudioCrdtInvalidPayloadError(
           "update rewrites grow-only Studio raster history"
+        );
+      }
+      if (!preservesStudioCrdtShared3dStageRoots(shared3dStageRootsBefore, probe)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update rewrites Shared Stage ownership history"
+        );
+      }
+      if (!admitsStudioCrdtShared3dStageEvents(shared3dStageRootsBefore, probe)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update skips Shared Stage ownership generations"
         );
       }
       if (appendsStudioCrdtRasterCheckpoint(rasterRootsBefore, probe)) {

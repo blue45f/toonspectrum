@@ -79,6 +79,16 @@ import {
   STUDIO_CRDT_ORIGIN_SYNC,
   type StudioCrdtSyncResponse,
 } from "./studio-crdt-protocol";
+import {
+  getShared3dStageFrontier,
+  getShared3dStagePageState,
+  preflightShared3dStagePageDiff,
+  publishShared3dStagePageDiff,
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT,
+  type StudioCrdtShared3dStagePageState,
+  type StudioCrdtShared3dStagePublishOptions,
+} from "./studio-crdt-shared-3d-stage";
 
 import type {
   StudioCrdtBatchOptions,
@@ -112,6 +122,7 @@ import type {
   StudioCrdtChangeSnapshotField,
 } from "./studio-crdt-document-types";
 import type { StudioBrushRenderProvenanceCrdtSidecar } from "../brush/studio-brush-render-provenance";
+import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stage-collection";
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
 
@@ -222,6 +233,21 @@ export {
   type StudioCrdtBatchSubscription,
 } from "./studio-crdt-document-types";
 export { mergeStudioCrdtUpdates } from "./studio-crdt-document-helpers";
+export {
+  parseStudioCrdtShared3dStageCompositeKey,
+  preflightShared3dStagePageDiff,
+  studioCrdtShared3dStageCompositeKey,
+  studioCrdtShared3dStageRecordRootName,
+  studioCrdtShared3dStageVisibilityReceiptRootName,
+  STUDIO_CRDT_SHARED_3D_STAGE_MAX_GENERATION_EVENTS_PER_RECORD,
+  STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX,
+  STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+  STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT,
+  type StudioCrdtShared3dStagePageState,
+  type StudioCrdtShared3dStagePublishOptions,
+} from "./studio-crdt-shared-3d-stage";
 
 /**
  * Y.Map records hold stroke metadata while nested Y.Arrays append pointer samples incrementally.
@@ -244,6 +270,8 @@ export class StudioCrdtDocument {
   private readonly rasterCheckpoints: Y.Map<string>;
   private readonly brushRenderProvenance: Y.Map<string>;
   private readonly brushRenderProvenanceContentIndex: Y.Map<string>;
+  private readonly shared3dStageRecords: Y.Map<boolean>;
+  private readonly shared3dStageVisibilityReceipts: Y.Map<boolean>;
   private readonly deletionOpIdsByTarget = new Map<string, Set<string>>();
   private readonly cleanup = new Set<() => void>();
   private readonly strokeIdByType = new WeakMap<object, string>();
@@ -277,6 +305,8 @@ export class StudioCrdtDocument {
   private readonly observedSceneElementRoots = new Set<string>();
   private readonly observedPageRoots = new Set<string>();
   private readonly observedLayerGroupRoots = new Set<string>();
+  private readonly observedShared3dStageRoots = new Set<string>();
+  private readonly observedShared3dStageVisibilityReceiptRoots = new Set<string>();
   private destroyed = false;
 
   constructor(initialUpdate?: Uint8Array | string) {
@@ -299,6 +329,12 @@ export class StudioCrdtDocument {
     );
     this.brushRenderProvenanceContentIndex = this.doc.getMap<string>(
       STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_CONTENT_INDEX_ROOT
+    );
+    this.shared3dStageRecords = this.doc.getMap<boolean>(
+      STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT
+    );
+    this.shared3dStageVisibilityReceipts = this.doc.getMap<boolean>(
+      STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT
     );
     if (initialUpdate !== undefined) {
       const decoded =
@@ -482,6 +518,44 @@ export class StudioCrdtDocument {
 
   getPages(includeDeleted = false): StudioCrdtPageRecord[] {
     return getPages(asStudioCrdtDocumentHost(this), includeDeleted);
+  }
+
+  publishShared3dStagePageDiff(
+    pageId: string,
+    previous: StudioShared3dStagePersistedState | undefined,
+    next: StudioShared3dStagePersistedState | undefined,
+    options: StudioCrdtShared3dStagePublishOptions = {}
+  ): StudioCrdtShared3dStagePageState {
+    return publishShared3dStagePageDiff(
+      asStudioCrdtDocumentHost(this),
+      pageId,
+      previous,
+      next,
+      options
+    );
+  }
+
+  preflightShared3dStagePageDiff(
+    pageId: string,
+    previous: StudioShared3dStagePersistedState | undefined,
+    next: StudioShared3dStagePersistedState | undefined,
+    options: StudioCrdtShared3dStagePublishOptions = {}
+  ): void {
+    preflightShared3dStagePageDiff(
+      asStudioCrdtDocumentHost(this),
+      pageId,
+      previous,
+      next,
+      options
+    );
+  }
+
+  getShared3dStagePageState(pageId: string): StudioCrdtShared3dStagePageState {
+    return getShared3dStagePageState(asStudioCrdtDocumentHost(this), pageId);
+  }
+
+  getShared3dStageFrontier(): readonly StudioCrdtShared3dStagePageState[] {
+    return getShared3dStageFrontier(asStudioCrdtDocumentHost(this));
   }
 
   addLayerGroup(input: StudioCrdtLayerGroupInput): StudioCrdtLayerGroupRecord {
