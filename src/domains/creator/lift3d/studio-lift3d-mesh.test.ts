@@ -709,6 +709,41 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(depths).toHaveLength(bandCount + 1);
   });
 
+  it("면을 못 내는 밴드가 사이에 끼어도 이웃 카드는 서로 맞닿는다", () => {
+    // 셀은 있지만 2×2 가 안 나와 면을 못 내는 밴드가 중간에 있을 수 있다. 그 유령을 이웃으로
+    // 삼아 깊이를 잡으면, 밴드가 버려진 뒤 아무도 채우지 않는 z 구간이 남아 카메라를 돌릴 때
+    // 갈라진다. 이웃은 **실제로 면을 내는** 카드여야 한다.
+    const side = 24;
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        // 위쪽 절반은 밴드 0, 아래쪽 절반은 밴드 2.
+        heights[y * side + x] = y < side / 2 ? 0.1 : 0.9;
+      }
+    }
+    // 가운데 밴드(1)에 외딴 셀 하나를, **더 높은** 밴드 한가운데 둔다. 면은 네 꼭짓점 중
+    // 가장 앞 밴드가 가져가므로, 이 셀에 닿는 사각형은 전부 밴드 2 로 간다 — 밴드 1 은 셀만
+    // 있고 면이 없는 유령이 된다.
+    heights[16 * side + 6] = 0.5;
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", depthScale: 0.4, targetHeight: 4, layerBands: 3 },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    // 밴드는 셋이지만 면을 내는 카드는 둘뿐이다.
+    expect(built.value.layerCount).toBe(2);
+    const depths = [...new Set(
+      built.value.mesh.vertices.map((vertex) => vertex.position.z.toFixed(9)),
+    )];
+    // 맞닿았다면 서로 다른 z 는 층 수 + 1 = 3 이다. 유령을 이웃으로 삼으면 4 가 된다.
+    expect(depths).toHaveLength(3);
+  });
+
   it("사각형을 하나도 못 만드는 밴드는 층 수에서 뺀다", () => {
     // 한 칸 폭 부위에만 걸린 밴드는 부풀린 뒤에도 2×2 가 안 나와 정점이 하나도 안 나간다.
     // 그 껍질을 세어만 두면 존재하지 않는 층이 지표와 화면에 광고된다.

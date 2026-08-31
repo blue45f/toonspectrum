@@ -620,20 +620,36 @@ export function buildStudioLift3dGeometry(
   // 격자를 먼저 다 세운다. 방출은 그 다음이다 — 실제로 나올 사각형 수를 정확히 알기 전에
   // 정점을 쌓기 시작하면, 예산 초과를 수십만 개를 만든 뒤에야 알게 된다.
   const planned = planStudioLift3dShellGrids(mask, depth, options.mode, options.layerBands);
+
+  // 사각형을 하나도 못 만드는 껍질을 **먼저** 걸러 낸다. 밴드가 한 칸 폭 부위에만 걸리면 셀은
+  // 있어도 2×2 가 안 나와 정점이 하나도 안 나간다. 그런 밴드를 세어만 두면 존재하지 않는 층이
+  // 지표에 광고되고, 무엇보다 **아래 카드 깊이 계산이 그 유령을 이웃으로 삼아** 실제로는 아무도
+  // 채우지 않는 z 구간을 남긴다 — 카메라를 돌리면 그 자리가 갈라진다.
+  let plannedQuads = 0;
+  const live: { readonly grid: FaceGrid; readonly center: number }[] = [];
+  for (let index = 0; index < planned.grids.length; index += 1) {
+    const grid = planned.grids[index]!;
+    droppedPinches += grid.droppedPinches;
+    const quads = countShellQuads(grid);
+    if (quads === 0) continue;
+    plannedQuads += quads;
+    live.push({ grid, center: planned.bands[index]?.center ?? 0.5 });
+  }
+
   const shells: readonly PlannedShell[] = options.mode === "parallax"
-    ? planned.grids.map((grid, index) => {
+    ? live.map((entry, index) => {
       // 카드는 **이웃 카드와 맞닿는 깊이까지** 뻗는다. 얇은 판을 각자의 밴드 중앙에만 띄우면
       // 카드 사이 z 간격이 그대로 빈 공간이 되어, 정면에서는 멀쩡하다가 카메라가 좌우로
       // 돌아가는 순간 밴드 경계마다 배경이 비쳐 보인다 — 시차를 보려고 돌리는 바로 그
       // 움직임에서 갈라진다. 이웃과의 중점까지 뻗으면 층이 계단처럼 이어져 틈이 없다.
       //
-      // 중점은 **살아남은** 이웃을 기준으로 잡는다. 빈 밴드가 버려진 자리도 그만큼 메워야
-      // 틈이 남지 않는다. 양 끝은 요청한 밴드 폭의 절반만큼만 더 뻗는다.
-      const centers = planned.bands;
+      // 이웃은 **실제로 면을 내는** 카드여야 한다. 셀만 있고 면이 없는 밴드를 이웃으로 삼으면,
+      // 그 밴드가 버려진 뒤 아무도 채우지 않는 z 구간이 남는다. 양 끝만 요청한 밴드 폭의
+      // 절반씩 더 뻗는다.
       const halfBand = 0.5 / planned.bandCount;
-      const here = centers[index]!.center;
-      const previous = centers[index - 1]?.center;
-      const next = centers[index + 1]?.center;
+      const here = entry.center;
+      const previous = live[index - 1]?.center;
+      const next = live[index + 1]?.center;
       const back = previous === undefined ? here - halfBand : (previous + here) / 2;
       const front = next === undefined ? here + halfBand : (here + next) / 2;
       // 이웃과 정확히 같은 값을 공유하므로 카드끼리 파고들지도, 벌어지지도 않는다.
@@ -641,11 +657,11 @@ export function buildStudioLift3dGeometry(
         thickness * (front - 0.5),
         thickness * (back - 0.5),
       ];
-      return { grid, depthAt: (): readonly [number, number] => span };
+      return { grid: entry.grid, depthAt: (): readonly [number, number] => span };
     })
-    : [{
-      grid: planned.grids[0]!,
-      depthAt: (key, rim): readonly [number, number] => {
+    : live.map((entry) => ({
+      grid: entry.grid,
+      depthAt: (key: number, rim: boolean): readonly [number, number] => {
         if (options.mode === "inflate") {
           // 테두리도 앞뒤를 따로 둔다. 정점을 공유하면 얇은 부위에서 비다양체가 되고
           // (MIN_RIM_HEIGHT 주석 참고), 여기서 벌려 둔 만큼이 옆벽의 폭이 된다.
@@ -656,23 +672,9 @@ export function buildStudioLift3dGeometry(
         }
         return [thickness * depth.heights[key]!, -baseThickness];
       },
-    }];
+    }));
 
-
-  let plannedQuads = 0;
-  // 사각형을 하나도 못 만드는 껍질은 버린다. 밴드가 한 칸 폭 부위에만 걸리면 부풀린 뒤에도
-  // 2×2 가 안 나와 정점이 하나도 안 나가는데, 세어만 두면 존재하지 않는 층이 지표와 화면에
-  // 광고된다.
-  const emitting: PlannedShell[] = [];
-  for (const shell of shells) {
-    droppedPinches += shell.grid.droppedPinches;
-    const quads = countShellQuads(shell.grid);
-    if (quads === 0) continue;
-    plannedQuads += quads;
-    emitting.push(shell);
-  }
-
-  const layerCount = options.mode === "parallax" ? emitting.length : 1;
+  const layerCount = options.mode === "parallax" ? shells.length : 1;
 
   if (plannedQuads === 0) {
     return studioLift3dFailure("degenerate-geometry", "면을 하나도 만들지 못했습니다");
@@ -690,7 +692,7 @@ export function buildStudioLift3dGeometry(
     );
   }
 
-  for (const shell of emitting) {
+  for (const shell of shells) {
     quadCount += emitStudioLift3dShell(accumulator, context, shell.grid, shell.depthAt);
   }
 
