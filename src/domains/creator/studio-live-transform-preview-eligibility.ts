@@ -1,11 +1,13 @@
 /**
  * Which draw elements the live transform preview must refuse.
  *
- * The preview is one affine applied to the already-rendered subtree; the commit re-derives the
- * element from document state and lets the renderer replan it. Those agree only when the render is
- * a pure function of state the commit can transform. Where it is not, the gesture would show
- * artwork the commit will never produce and snap at release — so the preview stands down and the
- * stroke keeps today's commit-at-release behaviour. Correct, just not live.
+ * A retained fast path can apply one affine to an already-rendered subtree only after separate
+ * renderer-owned equivalence proof. The currently admitted engines instead use the exact fallback,
+ * which replans one isolated model draft. This vertical slice deliberately retains the proven
+ * exact-draft allowlist below: unaudited families can start background jobs, mutate
+ * committed caches, depend on a backdrop, or derive texture from world-fixed quantities. Where a
+ * faithful isolated presentation is not yet proven, the gesture keeps commit-at-release. Correct,
+ * just not live.
  *
  * This is the same fail-closed discipline the drag lift already applies to cached ancestors,
  * layer-sensitive composites and stacking-sensitive siblings. Each entry below was reported
@@ -19,8 +21,7 @@ import { studioSketchStyleOfElement } from "./studio-rough-shape";
 import type { DrawEl, El } from "./studio-element-model";
 
 /**
- * Renderers PROVEN to draw a pure function of the stroke's transformable state, and therefore the
- * only ones that may preview.
+ * Renderers proven safe to execute as isolated `renderPurpose="transform-draft"` copies.
  *
  * This started as a denylist of renderers that resample, and that shape was wrong: it fails OPEN.
  * Six review rounds each found one more renderer that had to be added -- dry media, then
@@ -31,19 +32,11 @@ import type { DrawEl, El } from "./studio-element-model";
  * behaviour. That asymmetry is the whole reason this file exists, and the list should have obeyed
  * it from the start.
  *
- * An engine earns a place here only by reading as a pure function of points, width and pressure --
- * no world-fixed constant, no index- or arc-length-derived noise, no snapping to a document grid.
- * Each entry below was checked against its planner for those tells:
- *
- *   - `causal-ink` and `calligraphy-segments` build a ribbon from the path itself
- *     (`studio-causal-ink.ts`, `studio-calligraphy-ribbon.ts`: no hash, no station index, no
- *     world-space rounding). The nib angle IS orientation-dependent, and the commit path rotates
- *     it explicitly -- see `studio-draw-object-transform`, which also refuses that rotation when
- *     per-sample stylus channels are present, in which case the guard below stands the stroke down.
- *   - `perfect-outline` and `capsule-outline` are outline geometry over the points
- *     (`studio-perfect-freehand.ts`, `studio-outline-stroke-contract.ts`: same, no tells).
- *   - `highlighter-path` is a plain path; its multiply composite is a separate concern already
- *     handled by the drag lift's subtree composite guard.
+ * An engine earns a place here only when model replanning is deterministic, transform-purpose
+ * rendering starts no document-owned async/cache/diagnostic work, and the commit planner carries
+ * every renderer-significant input. That does NOT certify affine equivalence: causal dab spacing,
+ * calligraphy quantization and perfect-outline topology all contain absolute-pixel rules, so the
+ * draw compiler currently marks all three admitted engines `model-draft-only`.
  *
  * Everything else stands down until someone audits its planner and adds it here with the same
  * evidence -- including engines that may well be safe (`neon-halo`, `glow-halo`, `angled-ribbon`),
@@ -62,7 +55,7 @@ import type { DrawEl, El } from "./studio-element-model";
  * before and after, so they are out until someone models them properly. Removing them is cheap --
  * those strokes keep commit-at-release -- and that is the point of the asymmetry.
  */
-const STUDIO_TRANSFORM_SAFE_ENGINES: ReadonlySet<string> = new Set([
+const STUDIO_EXACT_DRAFT_SAFE_ENGINES: ReadonlySet<string> = new Set([
   "causal-ink",
   "calligraphy-segments",
   "perfect-outline",
@@ -79,13 +72,13 @@ const STUDIO_TRANSFORM_SAFE_ENGINES: ReadonlySet<string> = new Set([
  * looks fine. Fail closed on disagreement; there is no reading of a contradictory pair that is
  * worth a preview.
  */
-function studioBrushEngineIsTransformSafe(brushId: unknown, catalogId: unknown): boolean {
+function studioBrushEngineIsExactDraftSafe(brushId: unknown, catalogId: unknown): boolean {
   const runtimeEngine = resolveStudioBrushRuntimeContract(brushId)?.engine;
-  if (runtimeEngine === undefined || !STUDIO_TRANSFORM_SAFE_ENGINES.has(runtimeEngine)) {
+  if (runtimeEngine === undefined || !STUDIO_EXACT_DRAFT_SAFE_ENGINES.has(runtimeEngine)) {
     return false;
   }
   const catalogEngine = resolveStudioBrushRuntimeContract(catalogId)?.engine;
-  return catalogEngine === undefined || STUDIO_TRANSFORM_SAFE_ENGINES.has(catalogEngine);
+  return catalogEngine === undefined || STUDIO_EXACT_DRAFT_SAFE_ENGINES.has(catalogEngine);
 }
 
 /**
@@ -105,18 +98,9 @@ export function studioLiveTransformPreviewBlockedForElement(
   // Symmetry generates copies about WORLD axes and the model stores no axis angle, so the
   // preview's `A ∘ S` and the commit's `S ∘ A` diverge whenever the two do not commute.
   if (draw.symmetry !== undefined && draw.symmetry.type !== "none") return true;
-  // Per-sample stylus orientation. `calligraphySegmentStep` composes the nib angle as
-  // `atan2(tiltY, tiltX) + twist`, and only on the branch where the sample has tilt, so no
-  // transform of these channels is correct without replicating renderer-internal branching --
-  // three attempts proved it, two of them emitting values the CRDT payload validator rejects.
-  // The commit therefore replays them exactly as authored, which the affine preview cannot show.
-  if (
-    (draw.tiltXs !== undefined && draw.tiltXs.length > 0)
-    || (draw.tiltYs !== undefined && draw.tiltYs.length > 0)
-    || (draw.twists !== undefined && draw.twists.length > 0)
-  ) {
-    return true;
-  }
+  // Per-sample calligraphy orientation is checked by the gesture adapter only AFTER its O(1)
+  // compiler budget admits at most 256 samples. Scanning tilt/twist here would make every ordinary
+  // Stage React render O(total calligraphy samples), even when nothing is selected or transforming.
   // Hand-drawn (Rough.js) shapes. `StudioDrawNode` builds the sketch plan with
   // `buildStudioRoughShapeRenderPlan(generator, { points, strokeWidth, … })` on every render, and
   // rough.js derives its perturbations from that geometry — so the commit's replan wobbles
@@ -132,7 +116,7 @@ export function studioLiveTransformPreviewBlockedForElement(
   // no runtime contract at all -- an unknown id, a persisted render mode like `pixel-grid-v1` that
   // is not an engine, a preset from a pack this build does not know -- resolves to undefined and
   // stands down here, which is the behaviour the denylist could never give.
-  if (!studioBrushEngineIsTransformSafe(draw.brush, draw.brushCatalogId)) {
+  if (!studioBrushEngineIsExactDraftSafe(draw.brush, draw.brushCatalogId)) {
     return true;
   }
   // Legacy strokes with no `sampleSpacing`. `resolveStudioFreehandRenderPath` reprocesses those

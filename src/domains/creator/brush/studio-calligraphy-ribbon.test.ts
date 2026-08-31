@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
+import {
+  planStudioCalligraphyRibbon,
+  studioCalligraphyRibbonWorkUpperBound,
+} from "./studio-calligraphy-ribbon";
 
 import type { CalligraphySegment } from "../studio-brush";
 
@@ -61,6 +64,32 @@ function bounds(points: readonly number[]) {
 }
 
 describe("planStudioCalligraphyRibbon", () => {
+  it("pins the 32-step renderer expansion used by live-transform admission", () => {
+    const source = Array.from({ length: 255 }, (_, index) => segment(
+      index * 2,
+      index % 2 === 0 ? 0 : 100,
+      (index + 1) * 2,
+      (index + 1) % 2 === 0 ? 0 : 100,
+      512,
+      0,
+      0.08,
+    ));
+    const plan = planStudioCalligraphyRibbon(source);
+    const actualOutlineCoordinateScalars = plan.runs.reduce(
+      (total, run) => total + run.outlinePoints.length,
+      0,
+    );
+    const upper = studioCalligraphyRibbonWorkUpperBound(256);
+
+    expect(upper).toEqual({
+      acceptedSegmentCount: 255,
+      outlineCoordinateScalars: 53_038,
+      canvasPathCommands: 27_542,
+    });
+    expect(plan.acceptedSegmentCount).toBe(255);
+    expect(actualOutlineCoordinateScalars).toBe(53_038);
+  });
+
   it("sweeps the authored elliptical nib into the outline and neutralizes legacy circle caps", () => {
     const aligned = planStudioCalligraphyRibbon([
       segment(0, 0, 20, 0, 10, 0, 0.25),

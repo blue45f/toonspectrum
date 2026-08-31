@@ -12,7 +12,7 @@ function draw(overrides: Record<string, unknown> = {}): El {
     points: [0, 0, 10, 10],
     stroke: "#101010",
     strokeWidth: 4,
-    // "pen" is causal-ink, one of the audited transform-safe engines, so the base fixture
+    // "pen" is causal-ink, one of the audited exact-draft-safe engines, so the base fixture
     // exercises the allowed path and each test below varies exactly one thing.
     brush: "pen",
     // A stored sampleSpacing is required for the preview: legacy strokes without one are
@@ -71,12 +71,42 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
   });
 
 
-  it("refuses strokes carrying per-sample stylus orientation", () => {
-    // The renderer composes the nib angle from tilt AND twist together, on a branch that depends
-    // on whether the sample has tilt, so no transform of these channels here is correct.
-    expect(studioLiveTransformPreviewBlockedForElement(draw({ tiltXs: [1], tiltYs: [0] }), false))
-      .toBe(true);
-    expect(studioLiveTransformPreviewBlockedForElement(draw({ twists: [30] }), false)).toBe(true);
+  it("keeps render-time eligibility O(1) and defers orientation samples to gesture admission", () => {
+    // This helper runs for every DrawEl in every Stage React render. Even non-zero calligraphy
+    // arrays are deliberately not scanned here; the gesture adapter scans only after a 256-sample
+    // O(1) preflight. Zero-filled browser/CRDT channels remain eligible there as well.
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "calligraphy", tiltXs: [0], tiltYs: [0], twists: [0] }),
+      false,
+    )).toBe(false);
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "calligraphy", twists: [30] }),
+      false,
+    )).toBe(false);
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "calligraphy", tiltXs: [20], tiltYs: [Number.NaN] }),
+      false,
+    )).toBe(false);
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({
+        brush: "calligraphy",
+        brushTip: { tiltEnabled: false, angleDeg: -30, roundness: 0.35 },
+        tiltXs: [20],
+        tiltYs: [10],
+        twists: [30],
+      }),
+      false,
+    )).toBe(false);
+    // Mouse-authored causal/perfect strokes persist the same zero channels, but those renderers
+    // never read them; they remain eligible for affine/exact capability routing.
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "pen", tiltXs: [0], tiltYs: [0], twists: [0] }),
+      false,
+    )).toBe(false);
+    expect(studioLiveTransformPreviewBlockedForElement(
+      draw({ brush: "gpen", tiltXs: [0], tiltYs: [0], twists: [0] }),
+      false,
+    )).toBe(false);
     // Empty channels are not stylus data and must not cost an ordinary stroke its preview.
     expect(
       studioLiveTransformPreviewBlockedForElement(
@@ -122,7 +152,7 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     ).toBe(false);
   });
 
-  it("allows only the audited transform-safe engines", () => {
+  it("allows only the audited exact-draft-safe engines", () => {
     // pen/g-pen are causal-ink and calligraphy is calligraphy-segments -- each checked against its
     // planner for world constants, index-derived noise and document-grid snapping.
     for (const brush of ["pen", "calligraphy"]) {
@@ -162,12 +192,9 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     ).toBe(true);
   });
 
-  it("still refuses a safe engine when the ELEMENT disqualifies it", () => {
+  it("still refuses a safe engine when an O(1) element property disqualifies it", () => {
     // The allowlist is the last word on the renderer; it does not override the element checks.
     expect(studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen" }), true)).toBe(true);
-    expect(
-      studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen", twists: [30] }), false),
-    ).toBe(true);
   });
 
   it("refuses legacy strokes that carry no sampleSpacing", () => {

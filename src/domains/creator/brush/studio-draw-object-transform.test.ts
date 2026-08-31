@@ -11,6 +11,7 @@ import { planStudioGroupUniformResize } from "../studio-group-uniform-resize";
 
 import {
   planStudioDrawObjectTransform,
+  planStudioDrawObjectTransformWithBounds,
   studioDrawObjectTransformScale,
 } from "./studio-draw-object-transform";
 
@@ -87,6 +88,20 @@ describe("studioDrawObjectTransformScale", () => {
 });
 
 describe("planStudioDrawObjectTransform · scaling", () => {
+  it("returns exact transformed point bounds from the same traversal", () => {
+    const plan = planStudioDrawObjectTransformWithBounds({
+      el: drawEl({ points: [0, 0, 10, 0, 4, 10] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 5, y: 7, width: 20, height: 10 },
+      rotationDeg: 90,
+    });
+
+    expect(plan?.bounds.x).toBeCloseTo(-5);
+    expect(plan?.bounds.y).toBeCloseTo(7);
+    expect(plan?.bounds.w).toBeCloseTo(10);
+    expect(plan?.bounds.h).toBeCloseTo(20);
+  });
+
   it("scales point coordinates exactly, so the stroke is re-rendered rather than resampled", () => {
     const next = planStudioDrawObjectTransform({
       el: drawEl(),
@@ -400,7 +415,7 @@ describe("orientation-dependent nibs", () => {
     expect(scaledOnly?.brushTip).toEqual(NIB);
   });
 
-  it("leaves the nib angle alone when the stroke carries per-sample orientation", () => {
+  it("rotates a tilt-disabled nib even when inert sample arrays are present", () => {
     // The renderer uses brushTip.angleDeg only as the fallback for samples WITHOUT tilt, and
     // atan2(tiltY, tiltX) + twist for samples with it. Rotating the fallback on a mixed stroke
     // would turn half the nib and leave the other half, distorting the commit.
@@ -411,7 +426,49 @@ describe("orientation-dependent nibs", () => {
       rotationDeg: 45,
     });
 
-    expect(rotated?.brushTip).toEqual(NIB);
+    expect(rotated?.brushTip).toEqual({ ...NIB, angleDeg: 15 });
+  });
+
+  it("treats zero-filled calligraphy channels as inert but preserves effective pen orientation", () => {
+    const zeroFilled = planStudioDrawObjectTransform({
+      el: drawEl({
+        brush: "fountain-pen",
+        tiltXs: [0, 0],
+        tiltYs: [0, 0],
+        twists: [0, 0],
+      }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+    expect(zeroFilled?.brushTip?.angleDeg).toBe(75);
+
+    const oriented = planStudioDrawObjectTransform({
+      el: drawEl({
+        brush: "fountain-pen",
+        tiltXs: [10, 0],
+        tiltYs: [0, 10],
+        twists: [0, 20],
+      }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+    expect(oriented).not.toBeNull();
+    expect("brushTip" in oriented!).toBe(false);
+
+    const partiallyMalformed = planStudioDrawObjectTransform({
+      el: drawEl({
+        brush: "fountain-pen",
+        tiltXs: [20, 20],
+        tiltYs: [Number.NaN, Number.NaN],
+      }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+    expect(partiallyMalformed).not.toBeNull();
+    expect("brushTip" in partiallyMalformed!).toBe(false);
   });
 
   it("refuses a transform whose width the CRDT payload validator would reject", () => {

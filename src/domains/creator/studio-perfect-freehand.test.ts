@@ -11,12 +11,68 @@ import {
   STUDIO_PERFECT_FREEHAND_PROFILES,
   studioPerfectFreehandEffectiveSizeAt,
   studioPerfectFreehandEncodeDynamicsPressure,
+  studioPerfectFreehandMaximumPaintRadius,
   studioPerfectFreehandOutlineToPathData,
   studioPerfectFreehandStrokeOptions,
+  studioPerfectFreehandWorkUpperBound,
   type StudioPerfectFreehandProfile,
   type StudioPerfectFreehandSizeDynamicMapping,
   type StudioPerfectFreehandStroker,
 } from "./studio-perfect-freehand";
+
+describe("studioPerfectFreehandWorkUpperBound", () => {
+  it("pins the perfect-freehand@1.2.3 sharp-turn, cap and Q-path expansion", () => {
+    expect(studioPerfectFreehandWorkUpperBound(2)).toEqual({
+      strokePointCount: 5,
+      outlinePointCount: 182,
+      outlineCoordinateScalars: 364,
+      pathCoordinateScalars: 730,
+      pathCommands: 184,
+    });
+    expect(studioPerfectFreehandWorkUpperBound(256)).toEqual({
+      strokePointCount: 256,
+      outlinePointCount: 7_210,
+      outlineCoordinateScalars: 14_420,
+      pathCoordinateScalars: 28_842,
+      pathCommands: 7_212,
+    });
+    expect(studioPerfectFreehandWorkUpperBound(Number.NaN)).toBeNull();
+  });
+
+  it("bounds a real adversarial zigzag outline from the pinned stroker", () => {
+    const pointCount = 256;
+    const outline = buildStudioPerfectFreehandOutline(
+      peekStudioPerfectFreehandStroker()!,
+      {
+        points: Array.from({ length: pointCount }, (_, index) => [
+          index * 2,
+          index % 2 === 0 ? 0 : 100,
+        ]).flat(),
+        pressures: Array.from({ length: pointCount }, () => 1),
+        strokeWidth: 400,
+        profile: STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"],
+      },
+    );
+    const upper = studioPerfectFreehandWorkUpperBound(pointCount)!;
+
+    expect(outline.length).toBeGreaterThan(pointCount);
+    expect(outline.length).toBeLessThanOrEqual(upper.outlinePointCount);
+    expect(studioPerfectFreehandOutlineToPathData(outline).match(/Q/g)?.length ?? 0)
+      .toBe(outline.length);
+  });
+
+  it("adds compact-dot floors to the paint bound without changing planner size", () => {
+    expect(studioPerfectFreehandMaximumPaintRadius(1)).toBe(3);
+    expect(studioPerfectFreehandMaximumPaintRadius(12)).toBe(12);
+    expect(studioPerfectFreehandMaximumPaintRadius(100_000)).toBe(400);
+    expect(studioPerfectFreehandMaximumPaintRadius(Number.NaN)).toBe(6);
+    expect(studioPerfectFreehandStrokeOptions(
+      STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"],
+      1,
+      true,
+    ).size).toBe(1);
+  });
+});
 
 describe("loadStudioPerfectFreehandStroker / peekStudioPerfectFreehandStroker", () => {
   it("첫 동기 프레임부터 준비된 같은 스트로커를 반환한다", async () => {

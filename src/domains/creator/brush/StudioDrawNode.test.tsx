@@ -492,6 +492,98 @@ describe("StudioDrawNode pattern image lifecycle", () => {
     });
     expect(patternLoader.loads).toHaveLength(2);
   });
+
+  it("reuses a resolved document tile synchronously for an exact transform draft", async () => {
+    const resolvedPattern = pattern({ patternId: "honeycomb", fg: "#345678" });
+    const source = drawEl({
+      kind: "rect",
+      pattern: resolvedPattern,
+      points: [0, 0, 20, 10],
+    });
+    const documentView = render(
+      <StudioDrawNode el={source} renderPurpose="document" />,
+    );
+    expect(patternLoader.loads.map((load) => load.src)).toEqual([
+      "pattern:honeycomb:#345678:transparent",
+    ]);
+
+    const resolvedImage = { id: "resolved-document-pattern" } as unknown as HTMLImageElement;
+    await act(async () => {
+      patternLoader.loads[0]!.resolve(resolvedImage);
+      await Promise.resolve();
+    });
+    expect(captured("Rect").at(-1)!.props.fillPatternImage).toBe(resolvedImage);
+    documentView.unmount();
+    konvaCapture.nodes.length = 0;
+
+    render(
+      <StudioDrawNode
+        el={{ ...source, points: [4, 3, 36, 24] }}
+        exposeSceneIdentity={false}
+        renderPurpose="transform-draft"
+      />,
+    );
+
+    expect(patternLoader.loads).toHaveLength(1);
+    expect(captured("Rect").at(-1)!.props).toMatchObject({
+      fillPatternImage: resolvedImage,
+      fillPatternRepeat: "repeat",
+      fillPriority: "pattern",
+    });
+  });
+
+  it("shares a cold transform-draft tile load and ignores stale patterns on non-fill routes", async () => {
+    const coldPattern = pattern({ patternId: "sparkles", fg: "#56789a" });
+    const view = render(
+      <>
+        <StudioDrawNode
+          el={drawEl({
+            id: "draft-a",
+            kind: "triangle",
+            pattern: coldPattern,
+            points: [0, 0, 20, 20],
+          })}
+          exposeSceneIdentity={false}
+          renderPurpose="transform-draft"
+        />
+        <StudioDrawNode
+          el={drawEl({
+            id: "draft-b",
+            kind: "polygon",
+            pattern: coldPattern,
+            points: [30, 0, 50, 20],
+          })}
+          exposeSceneIdentity={false}
+          renderPurpose="transform-draft"
+        />
+      </>,
+    );
+    expect(patternLoader.loads.map((load) => load.src)).toEqual([
+      "pattern:sparkles:#56789a:transparent",
+    ]);
+
+    const loadedImage = { id: "cold-transform-pattern" } as unknown as HTMLImageElement;
+    await act(async () => {
+      patternLoader.loads[0]!.resolve(loadedImage);
+      await Promise.resolve();
+    });
+    expect(
+      captured("Line").filter((node) => node.props.fillPatternImage === loadedImage),
+    ).toHaveLength(2);
+
+    view.rerender(
+      <StudioDrawNode
+        el={drawEl({
+          id: "freehand-with-stale-pattern",
+          kind: "freehand",
+          pattern: pattern({ patternId: "clouds", fg: "#abcdef" }),
+        })}
+        exposeSceneIdentity={false}
+        renderPurpose="transform-draft"
+      />,
+    );
+    expect(patternLoader.loads).toHaveLength(1);
+  });
 });
 
 /** Luminous lanes plan their own pass stacks; the count is derived so a shell retune stays honest. */

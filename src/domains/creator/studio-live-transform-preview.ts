@@ -4,8 +4,8 @@
  * Dragging a resize/rotate handle must show the ink moving *during* the gesture (PPT/Figma
  * behavior), not only at pointer-up. Re-baking `points` per pointer frame would re-run the full
  * stroke planner (perfect-freehand outline, dynamic-brush coverage, watercolor physics) every
- * frame, so the live preview instead expresses the gesture as one affine on the stroke's
- * already-planned scene node:
+ * frame. A renderer that separately certifies matrix equivalence can express the gesture as one
+ * affine on the stroke's already-planned scene node:
  *
  *   translate(target.x, target.y) ∘ rotate(θ) ∘ scale(sx, sy) ∘ translate(−source.x, −source.y)
  *
@@ -14,11 +14,10 @@
  *   u = (px − source.x)·sx,  v = (py − source.y)·sy
  *   p′ = (target.x + u·cosθ − v·sinθ,  target.y + u·sinθ + v·cosθ)
  *
- * — exactly `planStudioDrawObjectTransform`'s point mapping, so the preview lands on the same
- * pixels the commit bakes into `points` at transformend. Two knowingly approximate spots, both
- * inherent to previewing a bake: node scale previews stroke width anisotropically where the
- * planner's geometric-mean width rule keeps a round nib (identical under a uniform gesture), and
- * a mirror-symmetric stroke under rotation re-renders about its unrotated model axis at commit.
+ * — the same point mapping as `planStudioDrawObjectTransform` for uniform frames. That geometric
+ * identity alone does not prove renderer equivalence: absolute dab spacing, quantization and
+ * topology can still differ, so the compiler may force even a uniform frame through the isolated
+ * exact-draft renderer. Renderer-ineligible or over-budget strokes retain commit-at-release.
  *
  * This module is deliberately renderer-free: the attrs are plain numbers in the decomposition
  * every scene graph understands — Konva node attrs today, and the same gesture frame projects to
@@ -96,15 +95,14 @@ export const STUDIO_LIVE_TRANSFORM_PREVIEW_NEUTRAL_ATTRS: StudioLiveTransformPre
  * `invalid` is a degenerate or non-finite box, typically a transient mid-gesture reading. Holding
  * the last good projection is right there: the next frame recovers and nothing visibly stalls.
  *
- * `unsupported-non-uniform` is a perfectly valid frame this projection cannot represent. Holding
- * the last projection would freeze the ink at its last uniform pose while the handles keep moving,
- * then jump at release — worse than not previewing at all, which is why the caller neutralizes
- * instead and lets the stroke sit at its document position for the rest of the gesture.
+ * `unsupported-non-uniform` is a perfectly valid frame this retained projection cannot represent.
+ * Holding the last projection would freeze the ink at its last uniform pose while the handles keep
+ * moving. The caller therefore asks an exact model-draft adapter first and neutralizes only when
+ * that capability is unavailable.
  *
- * `unsupported-render-route` is the same shape as the non-uniform case and takes the same handling:
- * the frame projects fine, but the scale would carry the stroke across one of the renderer's
- * absolute pixel thresholds, so what the preview shows is not what the commit will draw. See
- * `studio-live-transform-render-route`.
+ * `unsupported-render-route` takes the same fallback: the frame projects geometrically, but the
+ * scale would cross a renderer topology threshold, so the existing subtree cannot represent what
+ * the commit will draw. See `studio-live-transform-render-route`.
  */
 export type StudioLiveTransformPreviewRejection =
   | "invalid"
@@ -159,10 +157,9 @@ export function planStudioLiveTransformPreviewAttrs(
   // 2x horizontal-only resize previews unchanged vertical thickness and commits about 1.41x
   // thickness everywhere, so the ink visibly snaps at release.
   //
-  // Uniform frames are exact and stay live: sqrt(s * s) === s is precisely what scaling the node
-  // does, which is why this rejects only the anisotropic case rather than scaling generally. The
-  // `uniform` flag comes from the commit planner's own scale helper, so the two cannot disagree
-  // about where the boundary is.
+  // Uniform geometry satisfies the commit planner's scalar width rule: sqrt(s * s) === s. The
+  // render-route policy still gets the final word, because a renderer can contain non-affine
+  // absolute-pixel rules even when its centreline and width scale uniformly.
   if (!scale.uniform) return null;
   return {
     x: frame.targetBounds.x,

@@ -2149,7 +2149,8 @@ function StudioCuttoonEditor({
     // while a vector-only raster preparation owns the contact; resizableNodeProps calls stopDrag()
     // on false, keeping the source geometry and preparation mutation ticket intact for replay.
     if (
-      pixelMarqueeRasterPreparationActivationRef.current
+      groupResizeRef.current
+      || pixelMarqueeRasterPreparationActivationRef.current
       || studioRasterRetouchPreparationRef.current
     ) {
       return false;
@@ -5276,13 +5277,16 @@ function StudioCuttoonEditor({
   // 그룹/다중 선택 리사이즈는 child Transformer를 직접 건드리지 않는다. 시작 시점의 선택,
   // 문서 스코프, 요소 참조를 캡처하고 전용 proxy가 끝날 때 모두 그대로인 경우에만 affine
   // 결과를 한 번 커밋한다. 팀 동기화나 다른 입력이 중간에 요소를 바꾸면 전체를 fail-close한다.
-  // Escape/포인터 취소는 이 세션 ref만 지우고 lease를 반납할 뿐, proxy의 Konva 제스처까지
-  // 닿지 않는다. 이 카운터가 그 채널이다 — proxy가 값 변화를 보고 자기 제스처를 중단한다.
+  // Escape/포인터 취소는 lease를 직접 반납하지 않고 이 카운터로 proxy의 Konva 제스처를
+  // 중단시킨다. renderer close/settle이 성공한 뒤 commit-port finalizer만 ref와 lease를 해제한다.
   const [canvasSelectionResizeCancelSignal, setCanvasSelectionResizeCancelSignal] = useState(0);
   const groupResizeRef = useRef<{
+    phase: "active" | "cancel-requested" | "settling";
     selectedIds: string[];
     sourceBounds: StudioGroupUniformResizeBounds;
     sourceElements: El[];
+    /** O(1) persisted-project generation fence; sample payloads are never serialized at begin. */
+    sourceDocumentGeneration: number;
     pageId: string;
     masterEditMode: boolean;
     mutationTicket: StudioEditorMutationTicket;
@@ -5321,7 +5325,7 @@ function StudioCuttoonEditor({
   // Page에서 lease를 먼저 닫아 브라우저 이벤트 순서와 무관하게 안전 경계를 보장한다.
   useEffect(() => {
     const session = groupResizeRef.current;
-    if (!session) return;
+    if (!session || session.phase !== "active") return;
     // Multi-resize sessions track marquee only; single-draw free-scale tracks selectedId.
     const currentIds =
       marqueeIdsRef.current.length > 0
@@ -5341,39 +5345,20 @@ function StudioCuttoonEditor({
     ) {
       return;
     }
-    groupResizeRef.current = null;
-    endLiveResourceEdit();
     // The proxy component is REUSED when the selection moves to another valid draw — enabled and
     // bounds stay true, so neither its cleanup nor its enablement effect fires. Without this the
     // old stroke would keep following the handles on a session this page has already abandoned.
-    // Inlined rather than calling cancelCanvasSelectionResize() so the dependency array stays the
-    // documented [activePage.id, masterEditMode, marqueeIds, selectedId].
-    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+    // This is only a cancellation request. Renderer cleanup owns the session/CRDT lease until its
+    // retryable close succeeds and invokes the commit-port finalizer.
+    requestCanvasSelectionResizeCancel();
   }, [activePage.id, masterEditMode, marqueeIds, selectedId]);
-  // A session captures its source elements BY IDENTITY, and reconciliation — a remote CRDT apply,
-  // an undo, any same-selection document update — replaces those objects without changing the
-  // page, the mode or the selected ids. The effect above therefore cannot see it: its dependency
-  // array is a documented boundary, pinned by the runtime-boundary contract, so this watches
-  // element identity separately rather than widening it.
-  //
-  // The commit already refuses this case (`sourceStillMatches`), so nothing corrupt can be
-  // written — but only at pointer-up. Until then the preview keeps transforming the reconciled
-  // stroke against source bounds that no longer describe it, and keeps holding the edit lease for
-  // a gesture that cannot succeed. Cancelling at the moment identity changes ends both.
-  //
-  // Inert on the hot path: a gesture makes no React commits, so `elements` does not change during
-  // one, and an unrelated re-render leaves every element identity intact and returns here.
-  useEffect(() => {
-    const session = groupResizeRef.current;
-    if (!session) return;
-    const byId = new Map(elements.map((element) => [element.id, element]));
-    const sourceStillMatches = session.sourceElements.every(
-      (element) => byId.get(element.id) === element
-    );
-    if (sourceStillMatches) return;
-    groupResizeRef.current = null;
-    endLiveResourceEdit();
-    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+  // The preview captures the entire composition used by clip/lift eligibility, not only selected
+  // element identities. Any immutable document update can move/replace a panel or change stacking
+  // while leaving the selected DrawEl untouched, so the whole gesture must fail closed on a new
+  // elements snapshot. Inert on the hot path: transient frames never write document state.
+  useLayoutEffect(() => {
+    if (groupResizeRef.current?.phase !== "active") return;
+    requestCanvasSelectionResizeCancel();
   }, [elements]);
   // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
   // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.
@@ -5481,11 +5466,14 @@ function StudioCuttoonEditor({
       );
       return false;
     }
+    const sourceElements = selectedIds.map((id) => currentById.get(id)!);
     if (!beginLiveResourceEdit(selectedIds, "transform")) return false;
     groupResizeRef.current = {
+      phase: "active",
       selectedIds,
       sourceBounds: { ...sourceBounds },
-      sourceElements: selectedIds.map((id) => currentById.get(id)!),
+      sourceElements,
+      sourceDocumentGeneration: studioRevisionProjectGenerationRef.current,
       pageId: currentPageIdRef.current,
       masterEditMode: masterEditModeRef.current,
       mutationTicket: captureStudioMutationTicket(),
@@ -5493,118 +5481,127 @@ function StudioCuttoonEditor({
     setError(null);
     return true;
   }
+  function requestCanvasSelectionResizeCancel() {
+    const session = groupResizeRef.current;
+    if (!session || session.phase !== "active") return;
+    // Seal synchronously before queueing React state. Escape/pointercancel teardown may emit a
+    // same-turn transformend before the proxy sees the new signal; that terminal event must find
+    // this session non-committable. The renderer still owns the ref/writer lease until its
+    // retryable close invokes cancelCanvasSelectionResize below.
+    session.phase = "cancel-requested";
+    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+  }
+  /** Commit-port finalizer: renderer close/settle is the sole authority allowed to call this. */
   function cancelCanvasSelectionResize() {
     if (!groupResizeRef.current) return;
     groupResizeRef.current = null;
     endLiveResourceEdit();
-    // Only bumped when a session actually existed, so the proxy's own cancel path — which calls
-    // back into here — finds nothing to cancel on the second pass and the round trip terminates.
-    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
   }
   function commitCanvasSelectionResize(
     targetBounds: StudioGroupUniformResizeBounds,
     rotationDeg = 0
-  ) {
+  ): boolean {
     const session = groupResizeRef.current;
-    groupResizeRef.current = null;
-    if (!session) return;
-    try {
-      const currentIds = currentCanvasResizeSelectionIds();
-      const currentIdSet = new Set(currentIds);
-      const currentElements = activeElementsRef.current;
-      const currentById = new Map(
-        currentElements.map((element) => [element.id, element])
+    if (!session || session.phase !== "active") return false;
+    // Durable publication does not end writer exclusion. The common gesture lifecycle releases
+    // this ref and the collaboration lease only after its terminal renderer settlement succeeds.
+    session.phase = "settling";
+    const currentIds = currentCanvasResizeSelectionIds();
+    const currentIdSet = new Set(currentIds);
+    const currentElements = activeElementsRef.current;
+    const currentById = new Map(
+      currentElements.map((element) => [element.id, element])
+    );
+    const selectionStillMatches =
+      currentIds.length === session.selectedIds.length &&
+      currentIdSet.size === currentIds.length &&
+      session.selectedIds.every((id) => currentIdSet.has(id));
+    const sourceStillMatches = session.sourceElements.every(
+      (element) => currentById.get(element.id) === element
+    );
+    if (
+      !finitePositiveGroupResizeBounds(targetBounds) ||
+      !Number.isFinite(rotationDeg) ||
+      !selectionStillMatches ||
+      !sourceStillMatches ||
+      studioRevisionProjectGenerationRef.current !== session.sourceDocumentGeneration ||
+      currentPageIdRef.current !== session.pageId ||
+      masterEditModeRef.current !== session.masterEditMode ||
+      activeSurfaceReviewLockedRef.current ||
+      !canApplyStudioMutation(session.mutationTicket)
+    ) {
+      setError(
+        "크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
       );
-      const selectionStillMatches =
-        currentIds.length === session.selectedIds.length &&
-        currentIdSet.size === currentIds.length &&
-        session.selectedIds.every((id) => currentIdSet.has(id));
-      const sourceStillMatches = session.sourceElements.every(
-        (element) => currentById.get(element.id) === element
-      );
-      if (
-        !finitePositiveGroupResizeBounds(targetBounds) ||
-        !Number.isFinite(rotationDeg) ||
-        !selectionStillMatches ||
-        !sourceStillMatches ||
-        currentPageIdRef.current !== session.pageId ||
-        masterEditModeRef.current !== session.masterEditMode ||
-        activeSurfaceReviewLockedRef.current ||
-        !canApplyStudioMutation(session.mutationTicket)
-      ) {
-        setError(
-          "크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
-        );
-        return;
-      }
+      return false;
+    }
 
-      // A single stroke is one point array, so it can absorb rotation and independent width/height
-      // exactly; the group planner stays authoritative for every mixed/multi selection, where a
-      // general affine is not a safe default. Both bake into `points` and hand the result to the
-      // one document commit below, so undo/redo and CRDT publication are identical either way.
-      const soleSelection =
-        session.selectedIds.length === 1
-          ? currentById.get(session.selectedIds[0]!)
-          : undefined;
-      const soleSelectedDraw =
-        soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
-          ? soleSelection
-          : undefined;
-      const next =
-        soleSelectedDraw?.type === "draw"
-          ? (() => {
-              const transformed = planStudioDrawObjectTransform({
-                el: soleSelectedDraw,
-                sourceBounds: session.sourceBounds,
-                targetBounds,
-                rotationDeg,
-              });
-              return transformed
-                ? currentElements.map((element) =>
-                    element.id === transformed.id ? transformed : element
-                  )
-                : [...currentElements];
-            })()
-          : planStudioGroupUniformResize({
-              items: currentElements,
-              selectedIds: session.selectedIds,
+    // A single stroke is one point array, so it can absorb rotation and independent width/height
+    // exactly; the group planner stays authoritative for every mixed/multi selection, where a
+    // general affine is not a safe default. Both bake into `points` and hand the result to the
+    // one document commit below, so undo/redo and CRDT publication are identical either way.
+    const soleSelection =
+      session.selectedIds.length === 1
+        ? currentById.get(session.selectedIds[0]!)
+        : undefined;
+    const soleSelectedDraw =
+      soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
+        ? soleSelection
+        : undefined;
+    const next =
+      soleSelectedDraw?.type === "draw"
+        ? (() => {
+            const transformed = planStudioDrawObjectTransform({
+              el: soleSelectedDraw,
               sourceBounds: session.sourceBounds,
               targetBounds,
-              isLocked: (element) =>
-                isEffectivelyLocked(element, activeGroupsRef.current),
+              rotationDeg,
             });
-      const nextById = new Map(next.map((element) => [element.id, element]));
-      const changed = session.selectedIds.some(
-        (id) => nextById.get(id) !== currentById.get(id)
-      );
-      if (!changed) {
-        const boundsChanged =
-          Math.abs(targetBounds.x - session.sourceBounds.x) > 1e-7 ||
-          Math.abs(targetBounds.y - session.sourceBounds.y) > 1e-7 ||
-          Math.abs(targetBounds.width - session.sourceBounds.width) > 1e-7 ||
-          Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
-        if (boundsChanged) {
-          setError(
-            "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
-          );
-        }
-        return;
-      }
-      if (commit(next)) {
-        const percent = Math.max(
-          1,
-          Math.round((targetBounds.width / session.sourceBounds.width) * 100)
+            return transformed
+              ? currentElements.map((element) =>
+                  element.id === transformed.id ? transformed : element
+                )
+              : [...currentElements];
+          })()
+        : planStudioGroupUniformResize({
+            items: currentElements,
+            selectedIds: session.selectedIds,
+            sourceBounds: session.sourceBounds,
+            targetBounds,
+            isLocked: (element) =>
+              isEffectivelyLocked(element, activeGroupsRef.current),
+          });
+    const nextById = new Map(next.map((element) => [element.id, element]));
+    const changed = session.selectedIds.some(
+      (id) => nextById.get(id) !== currentById.get(id)
+    );
+    if (!changed) {
+      const boundsChanged =
+        Math.abs(targetBounds.x - session.sourceBounds.x) > 1e-7 ||
+        Math.abs(targetBounds.y - session.sourceBounds.y) > 1e-7 ||
+        Math.abs(targetBounds.width - session.sourceBounds.width) > 1e-7 ||
+        Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
+      if (boundsChanged) {
+        setError(
+          "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
         );
-        setError(null);
-        announceDrawingShortcut(
-          session.selectedIds.length === 1
-            ? `레이어 크기 조절 · ${percent}%`
-            : `그룹 크기 조절 · ${percent}%`,
-        );
       }
-    } finally {
-      endLiveResourceEdit();
+      return false;
     }
+    const committed = commit(next);
+    if (committed) {
+      const percent = Math.max(
+        1,
+        Math.round((targetBounds.width / session.sourceBounds.width) * 100)
+      );
+      setError(null);
+      announceDrawingShortcut(
+        session.selectedIds.length === 1
+          ? `레이어 크기 조절 · ${percent}%`
+          : `그룹 크기 조절 · ${percent}%`,
+      );
+    }
+    return committed;
   }
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
@@ -20772,7 +20769,7 @@ const puppetWarpArmed =
         bubbleShapeSelectedPointIndex,
         cancelAdvancedFillPreview,
         cancelCanvasGroupDrag,
-        cancelCanvasSelectionResize,
+        cancelCanvasSelectionResize: requestCanvasSelectionResizeCancel,
         cancelLiquifyPointerSession,
         cancelStudioPointCommentComposer,
         cancelStudioRasterPreparation,
@@ -26513,7 +26510,7 @@ const puppetWarpArmed =
     bubbleAnchorPickActive,
     bubbleShapeDragRef,
     bubbleShapeRafRef,
-    cancelCanvasSelectionResize,
+    cancelCanvasSelectionResize: requestCanvasSelectionResizeCancel,
     canvasInteractionUnitIds,
     causalPostCorrectionStateRef,
     clearStudioHokusaiVectorShadow,
@@ -30966,7 +30963,8 @@ function clearSelectionForEdit() {
   addPage,
   closeViewToolWithFocus,
   beginCanvasSelectionResize,
-  cancelCanvasSelectionResize,
+  cancelCanvasSelectionResize: requestCanvasSelectionResizeCancel,
+  finalizeCanvasSelectionResize: cancelCanvasSelectionResize,
   commitCanvasSelectionResize,
   fitCanvasToWidth,
   onWebGpuFrameInvalid,

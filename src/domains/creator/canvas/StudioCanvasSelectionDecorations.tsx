@@ -1,12 +1,9 @@
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
 import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
 
-import { resolveStudioBrushRuntimeContract } from "../brush/studio-brush-runtime-contract";
-import { studioLineDrawsArrowHead } from "../brush/studio-stroke-shapes";
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
-import { studioLiveTransformRouteOfPoints } from "../studio-live-transform-render-route";
 import { StudioDrawSelectionOverlay } from "../studio-page-lazy-ui";
 import { unionBounds } from "../studio-selection";
 import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "../studio-selection-chrome-mirror";
@@ -15,6 +12,7 @@ import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy"
 import type { Tool } from "../studio-editor-tool-model";
 import type { DrawEl, El } from "../studio-element-model";
 import type { StudioGroupUniformResizeBounds } from "../studio-group-uniform-resize";
+import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import type Konva from "konva";
 
 /**
@@ -40,7 +38,7 @@ export interface StudioCanvasSelectionDecorationsContext {
   readonly commitCanvasSelectionResize: (
     targetBounds: StudioGroupUniformResizeBounds,
     rotationDeg: number
-  ) => void;
+  ) => boolean;
   readonly completeSelectionGroup: LayerGroup | null;
   readonly effScale: number;
   readonly elements: readonly El[];
@@ -56,6 +54,8 @@ export interface StudioCanvasSelectionDecorationsContext {
   readonly singleDrawFreeScale: boolean;
   /** Small dedicated Layer the live transform gesture lifts into (single-object drag Layer). */
   readonly singleObjectDragLayerRef: RefObject<Konva.Layer | null>;
+  readonly liveTransformDraftStore: StudioLiveTransformDraftStore;
+  readonly liveTransformDraftScope: string;
   readonly tool: Tool;
   readonly trRef: RefObject<Konva.Transformer | null>;
 }
@@ -83,6 +83,8 @@ export function renderStudioCanvasSelectionDecorations({
   selectionLockState,
   singleDrawFreeScale,
   singleObjectDragLayerRef,
+  liveTransformDraftStore,
+  liveTransformDraftScope,
   tool,
   trRef,
 }: StudioCanvasSelectionDecorationsContext): ReactNode {
@@ -233,72 +235,35 @@ export function renderStudioCanvasSelectionDecorations({
           // One stroke can absorb rotation and independent width/height exactly, so it
           // gets the full handle set. A multi-selection stays on uniform corners.
           freeTransform={singleDrawFreeScale}
-          // Group drags already shift the proxy through translateGroupPreview; a lone
-          // stroke has no such path, so the proxy follows the wrapper's transform itself.
-          mirrorDragElementId={
-            singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
-          }
-          // PPT-style real-time transform: the lone stroke's ink follows the handles live
-          // through the commit planner's own affine, applied imperatively per frame.
-          livePreviewElementId={
-            singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
-          }
-          // …and stands down for any frame whose scale would carry the stroke across one of the
-          // renderer's absolute pixel thresholds, which no engine allowlist can see.
-          livePreviewRenderRoute={
+          // The caller supplies document facts only. Route thresholds, arrow semantics, clip
+          // ownership, drag-Layer lift and wrapper lookup are private to the Konva adapter.
+          livePreview={
             singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
               ? {
-                  ...studioLiveTransformRouteOfPoints(
-                    canvasSelectionEls[0].points,
-                    canvasSelectionEls[0].strokeWidth,
-                  ),
-                  // Arrowheads are sized Math.max(8, strokeWidth * 2) — an absolute floor the
-                  // preview scales straight past. Only claimed when a head is actually drawn: the
-                  // `arrow` kind always has one, but a `line` draws one only where its stroke
-                  // style asks for it, and claiming it unconditionally cost plain lines a preview
-                  // over geometry they never render.
-                  drawsArrowHead:
-                    canvasSelectionEls[0].kind === "arrow"
-                    || (canvasSelectionEls[0].kind === "line"
-                      && studioLineDrawsArrowHead(canvasSelectionEls[0].strokeStyle)),
-                  // perfect-ink's compact dot never goes under a 3px radius; other profiles 1.4px.
-                  // The distance cutoffs, sparse predicate, dot floors and 400px outline cap all
-                  // live inside StudioDrawNode's perfect-freehand branch; applying them to other
-                  // renderers rejected previews over thresholds those renderers never consult.
-                  isPerfectFamily:
-                    resolveStudioBrushRuntimeContract(canvasSelectionEls[0].brush)?.engine
-                      === "perfect-outline",
-                  isPerfectInk: canvasSelectionEls[0].brush === "perfect-ink",
-                }
-              : undefined
-          }
-          // Panel membership is geometry-derived, so a transform can move a stroke out of its
-          // panel or pull an unclipped one in. Supplying the frames lets the gesture re-point the
-          // clip per frame instead of popping it at release.
-          livePreviewClipContext={
-            singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
-              ? {
+                  scope: liveTransformDraftScope,
+                  element: canvasSelectionEls[0],
                   elements,
-                  // The commit re-derives the clip from the transformed POINTS, not the selection
-                  // box, and the two disagree for any stroke whose points miss the box corners.
-                  points: canvasSelectionEls[0].points,
-                  ...(canvasSelectionEls[0].noClip !== undefined
-                    ? { noClip: canvasSelectionEls[0].noClip }
-                    : {}),
+                  draftStore: liveTransformDraftStore,
+                  transformLiftLayerRef: singleObjectDragLayerRef,
                 }
               : undefined
           }
-          // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
-          // anchor frame no longer repaints the whole document Layer.
-          transformLiftLayerRef={singleObjectDragLayerRef}
-          externalCancelSignal={canvasSelectionResizeCancelSignal}
-          onBegin={beginCanvasSelectionResize}
-          onCommit={commitCanvasSelectionResize}
-          onCancel={cancelCanvasSelectionResize}
+          gestureBinding={{
+            externalCancelSignal: canvasSelectionResizeCancelSignal,
+            acquire: beginCanvasSelectionResize,
+            commit: ({ targetBounds, rotationDeg }) =>
+              commitCanvasSelectionResize(targetBounds, rotationDeg),
+            release: cancelCanvasSelectionResize,
+            cancel: cancelCanvasSelectionResize,
+          }}
         />
       ) : null}
       <Transformer
         ref={trRef}
+        // Draw elements use the dedicated proxy Transformer above. This general Transformer has
+        // nodes([]) and paints no pixels for that selection, so it cannot be treated as authored
+        // z-order content that blocks the isolated exact draft Layer.
+        studioLiveTransformZOrderExempt={selected?.type === "draw" ? true : undefined}
         rotateEnabled
         rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
         rotationSnapTolerance={6}

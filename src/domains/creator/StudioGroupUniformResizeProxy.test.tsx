@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
 
-import type { El } from "./studio-element-model";
+import type { DrawEl, El } from "./studio-element-model";
+import type Konva from "konva";
 
 type CapturedProps = Record<string, unknown>;
 
@@ -37,6 +38,43 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   return { Rect, Transformer };
 });
 
+// Proxy tests exercise React/event/lifecycle wiring; the real isolated-Layer ownership state
+// machine has its own Konva integration suite. Give eligible fixtures a successful lift token so
+// these tests cannot accidentally fall back to release-only merely because their tiny node doubles
+// do not implement Konva.Container.moveTo/zIndex/absolutePosition.
+vi.mock("./studio-single-object-drag-layer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-single-object-drag-layer")>();
+  const successfulLift = (options: {
+    elementId: string;
+    wrapper: Konva.Node;
+    transformer: Konva.Transformer;
+    dragLayer: Konva.Layer | null;
+  }) => {
+    if (!options.dragLayer) return null;
+    return {
+      elementId: options.elementId,
+      mainLayer: options.wrapper.getLayer(),
+      dragLayer: options.dragLayer,
+      target: options.wrapper,
+      transformer: options.transformer,
+      lifted: [],
+      presentationMode: "synchronous-authority" as const,
+      restored: false,
+    };
+  };
+  return {
+    ...actual,
+    beginStudioSingleDrawTransformChromeLayer: vi.fn(successfulLift),
+    beginStudioSingleDrawTransformLayer: vi.fn(successfulLift),
+    beginStudioSingleDrawTransformSourceLayer: vi.fn(successfulLift),
+    restoreStudioSingleObjectDragLayer: vi.fn((session) => {
+      if (!session) return false;
+      session.restored = true;
+      return true;
+    }),
+  };
+});
+
 type FakeRectNode = {
   getLayer: () => { batchDraw: () => void };
   getStage: () => FakeStage | null;
@@ -55,6 +93,8 @@ type FakeRectNode = {
 
 type FakeStage = {
   find: (selector: unknown) => unknown[];
+  scaleX: () => number;
+  scaleY: () => number;
 };
 
 type FakeWrapperNode = ReturnType<typeof createWrapperNode>;
@@ -66,8 +106,28 @@ function createWrapperNode(
   elementId: string,
   options: { cached?: boolean; dragging?: boolean; parent?: unknown } = {},
 ) {
-  const state = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
-  const layer = { batchDraw: vi.fn() };
+  const state = {
+    x: 0,
+    y: 0,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    offsetX: 0,
+    offsetY: 0,
+  };
+  let visible = true;
+  const layer = {
+    batchDraw: vi.fn(),
+    drawScene: vi.fn(),
+    getNativeCanvasElement: vi.fn(() => ({
+      // Native canvas dimensions are physical backing pixels, not CSS/logical dimensions.
+      width: 1_920,
+      height: 1_080,
+    })),
+    getCanvas: vi.fn(() => ({
+      getPixelRatio: vi.fn(() => 1),
+    })),
+  };
   return {
     state,
     layer,
@@ -79,6 +139,14 @@ function createWrapperNode(
     isCached: vi.fn(() => options.cached === true),
     isDragging: vi.fn(() => options.dragging === true),
     getLayer: vi.fn(() => layer),
+    x: vi.fn(() => state.x),
+    y: vi.fn(() => state.y),
+    on: vi.fn(),
+    off: vi.fn(),
+    visible: vi.fn((value?: boolean) => {
+      if (value !== undefined) visible = value;
+      return visible;
+    }),
     position: vi.fn((value?: { x: number; y: number }) => {
       if (value) {
         state.x = value.x;
@@ -153,6 +221,8 @@ function createStage(
   indicators: readonly FakeIndicatorNode[]
 ): FakeStage {
   return {
+    scaleX: vi.fn(() => 1),
+    scaleY: vi.fn(() => 1),
     find: vi.fn((selector: unknown) => {
       if (typeof selector === "function") {
         return [wrapper].filter((node) =>
@@ -274,20 +344,65 @@ function transformerProps(): {
 
 const bounds = { x: 10, y: 20, width: 100, height: 50 };
 
+const LIVE_DRAW = {
+  id: "stroke-1",
+  type: "draw",
+  kind: "freehand",
+  points: [10, 20, 110, 70],
+  stroke: "#16100c",
+  strokeWidth: 4,
+} as unknown as DrawEl;
+
+let nextAnimationFrameHandle = 1;
+let animationFrameCallbacks = new Map<number, FrameRequestCallback>();
+
+function flushPreviewFrames(): void {
+  act(() => {
+    const callbacks = [...animationFrameCallbacks.values()];
+    animationFrameCallbacks.clear();
+    for (const callback of callbacks) callback(performance.now());
+  });
+}
+
 function commonProps() {
+  const onBegin = vi.fn(() => true);
+  const onCancel = vi.fn();
+  const onCommit = vi.fn();
+  const onRelease = vi.fn();
   return {
     bounds,
     coarse: false,
     effScale: 1,
     enabled: true,
     mobile: false,
-    onBegin: vi.fn(() => true),
-    onCancel: vi.fn(),
-    onCommit: vi.fn(),
+    gestureBinding: {
+      acquire: onBegin,
+      cancel: (reason: string) => onCancel(reason),
+      release: onRelease,
+      commit: ({ targetBounds, rotationDeg }: {
+        targetBounds: typeof bounds;
+        rotationDeg: number;
+      }) => onCommit(targetBounds, rotationDeg),
+    },
+    // Expose the underlying spies to keep behavior assertions independent of prop nesting.
+    onBegin,
+    onCancel,
+    onCommit,
+    onRelease,
   };
 }
 
 beforeEach(() => {
+  nextAnimationFrameHandle = 1;
+  animationFrameCallbacks = new Map();
+  vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+    const handle = nextAnimationFrameHandle++;
+    animationFrameCallbacks.set(handle, callback);
+    return handle;
+  }));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn((handle: number) => {
+    animationFrameCallbacks.delete(handle);
+  }));
   konvaHarness.rectNode = createRectNode() as unknown as Record<string, unknown>;
   konvaHarness.transformerNode =
     createTransformerNode() as unknown as Record<string, unknown>;
@@ -297,6 +412,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -388,6 +504,29 @@ describe("StudioGroupUniformResizeProxy", () => {
 
     act(() => rectProps().onTransformEnd({ target: rect }));
     expect(props.onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("중복 transformstart는 기존 generation을 유지하고 lease를 다시 획득하지 않는다", () => {
+    const props = commonProps();
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    const transformer =
+      konvaHarness.transformerNode as unknown as FakeTransformerNode;
+    render(<StudioGroupUniformResizeProxy {...props} />);
+
+    act(() => {
+      rectProps().onTransformStart();
+      rectProps().onTransformStart();
+    });
+    expect(props.onBegin).toHaveBeenCalledTimes(1);
+    expect(transformer.stopTransform).not.toHaveBeenCalled();
+
+    act(() => {
+      rect.scaleX(2);
+      rect.scaleY(2);
+      rectProps().onTransformEnd({ target: rect });
+    });
+    expect(props.onCommit).toHaveBeenCalledTimes(1);
+    expect(props.onCancel).not.toHaveBeenCalled();
   });
 
   it("freeTransform은 회전 핸들과 8방향 앵커를 열고 비균등 스케일을 허용한다", () => {
@@ -578,6 +717,24 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(props.onCommit).not.toHaveBeenCalled();
   });
 
+  it("Konva stopTransform이 던져도 renderer claim과 문서 lease를 취소한다", () => {
+    const props = commonProps();
+    const transformer =
+      konvaHarness.transformerNode as unknown as FakeTransformerNode;
+    render(<StudioGroupUniformResizeProxy {...props} />);
+
+    act(() => rectProps().onTransformStart());
+    vi.mocked(transformer.stopTransform).mockImplementation(() => {
+      throw new Error("Konva teardown failed");
+    });
+
+    act(() => window.dispatchEvent(new Event("blur")));
+
+    expect(transformer.stopTransform).toHaveBeenCalledTimes(1);
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(props.onCommit).not.toHaveBeenCalled();
+  });
+
   /** A panel comfortably containing the source bounds, so the stroke starts clipped by it. */
   const CLIP_PANEL = {
     id: "frame-1",
@@ -602,7 +759,24 @@ describe("StudioGroupUniformResizeProxy", () => {
       const props = {
         ...commonProps(),
         freeTransform: true,
-        livePreviewElementId: "stroke-1",
+        livePreview: {
+          scope: "page:page-1",
+          element: LIVE_DRAW,
+          elements: [LIVE_DRAW],
+          transformLiftLayerRef: {
+            current: {
+              batchDraw: vi.fn(),
+              drawScene: vi.fn(),
+              getNativeCanvasElement: vi.fn(() => ({
+                width: 1_920,
+                height: 1_080,
+              })),
+              getCanvas: vi.fn(() => ({
+                getPixelRatio: vi.fn(() => 1),
+              })),
+            } as unknown as Konva.Layer,
+          },
+        },
       };
       return { wrapper, indicator, props };
     }
@@ -639,6 +813,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.rotation(45);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
 
       expect(wrapper.state).toEqual({
         x: 30,
@@ -667,6 +842,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleY(3);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
 
       expect(wrapper.state).toEqual({
         x: 0,
@@ -694,12 +870,14 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleY(2);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
       expect(wrapper.state.scaleX).toBe(2);
 
       act(() => {
         rect.scaleY(3);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
 
       expect(wrapper.state).toEqual({
         x: 0,
@@ -722,7 +900,10 @@ describe("StudioGroupUniformResizeProxy", () => {
       render(
         <StudioGroupUniformResizeProxy
           {...props}
-          livePreviewClipContext={{ elements: [CLIP_PANEL] }}
+          livePreview={{
+            ...props.livePreview,
+            elements: [CLIP_PANEL, LIVE_DRAW],
+          }}
         />,
       );
 
@@ -733,6 +914,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.position({ x: 900, y: 900 });
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
       expect(clipGroup.getClipWidth()).toBe(0);
 
       // 비균일 프레임: 프리뷰를 접으면서 클립도 제스처 시작 시점 값으로 돌아와야 한다.
@@ -740,6 +922,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleY(3);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
 
       expect(clipGroup.attrs).toMatchObject({
         clipX: 0,
@@ -796,6 +979,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleY(1.5);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
       expect(wrapper.state.scaleX).toBe(1.5);
 
       act(() => window.dispatchEvent(new Event("blur")));
@@ -833,6 +1017,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleY(1.5);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
       expect(wrapper.state.scaleX).toBe(1.5);
 
       act(() => window.dispatchEvent(new Event("blur")));
@@ -881,12 +1066,14 @@ describe("StudioGroupUniformResizeProxy", () => {
         rect.scaleX(2);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
       const lastValid = { ...wrapper.state };
 
       act(() => {
         rect.scaleX(Number.NaN);
         rectProps().onTransform({ target: rect });
       });
+      flushPreviewFrames();
 
       expect(wrapper.state).toEqual(lastValid);
     });
@@ -898,7 +1085,10 @@ describe("StudioGroupUniformResizeProxy", () => {
     const props = commonProps();
     const rect = konvaHarness.rectNode as unknown as FakeRectNode;
     const view = render(
-      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={0} />,
+      <StudioGroupUniformResizeProxy
+        {...props}
+        gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 0 }}
+      />,
     );
 
     act(() => rectProps().onTransformStart());
@@ -908,7 +1098,10 @@ describe("StudioGroupUniformResizeProxy", () => {
     });
 
     view.rerender(
-      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+      <StudioGroupUniformResizeProxy
+        {...props}
+        gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 1 }}
+      />,
     );
 
     expect(props.onCancel).toHaveBeenCalledTimes(1);
@@ -919,15 +1112,55 @@ describe("StudioGroupUniformResizeProxy", () => {
 
     // 같은 값 재렌더는 아무 것도 하지 않는다(마운트 값은 기준선일 뿐 취소가 아니다).
     view.rerender(
-      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+      <StudioGroupUniformResizeProxy
+        {...props}
+        gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 1 }}
+      />,
     );
     expect(props.onCancel).toHaveBeenCalledTimes(1);
 
     // 활성 gesture가 없을 때의 신호 변화도 조용히 무시된다(왕복 루프 방지).
     view.rerender(
-      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={2} />,
+      <StudioGroupUniformResizeProxy
+        {...props}
+        gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 2 }}
+      />,
     );
     expect(props.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("외부 취소는 renderer close 복구가 끝날 때까지 page lease finalizer를 지연한다", () => {
+    vi.useFakeTimers();
+    const props = commonProps();
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    const view = render(
+      <StudioGroupUniformResizeProxy
+        {...props}
+        gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 0 }}
+      />,
+    );
+
+    try {
+      act(() => rectProps().onTransformStart());
+      // The first external-cancel close cannot restore the proxy. The common lifecycle must keep
+      // the commit-port lease and retry the same renderer claim from its host timer.
+      vi.mocked(rect.position).mockImplementationOnce(() => {
+        throw new Error("proxy restore failed");
+      });
+      view.rerender(
+        <StudioGroupUniformResizeProxy
+          {...props}
+          gestureBinding={{ ...props.gestureBinding, externalCancelSignal: 1 }}
+        />,
+      );
+
+      expect(props.onCancel).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(16));
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hidden visibility 전환만 활성 gesture를 취소하고 listener를 정리한다", () => {

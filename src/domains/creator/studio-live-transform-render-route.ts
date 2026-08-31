@@ -9,9 +9,9 @@
  *     stroke previews a 0.5px nib and commits `strokeWidth: 0.5`, which the renderer immediately
  *     floors back to 1px.
  *   - The perfect-freehand family picks its route from `strokeDistance`: under 16px with few
- *     points it draws a compact dot fallback, and at 180px or more with sparse spacing it takes
- *     the sparse-long branch. A 10px flick scaled 2x previews an enlarged dot and commits a
- *     tapered outline.
+ *     points it draws a compact dot fallback; a degenerate outline under 120px falls back to a
+ *     Line; and at 180px or more with sparse spacing it takes the sparse-long branch. A scale can
+ *     therefore change topology even when the engine identity stays unchanged.
  *
  * Neither is a property of the engine, and no list of engines can express either. Both are
  * properties of the (element, scale) PAIR, which is exactly what a per-frame check can see: the
@@ -27,12 +27,20 @@
 
 /** The scale-sensitive quantities `StudioDrawNode` branches on, read off the source element. */
 export interface StudioLiveTransformRenderRoute {
+  /**
+   * Some renderers are pure model functions but still contain enough absolute clamps/floors that
+   * a retained subtree cannot be proven affine-equivalent. They remain eligible for the isolated
+   * exact draft; this flag merely refuses the O(1) retained shortcut.
+   */
+  readonly retainedAffinePolicy?: "route-checked" | "model-draft-only";
   /** `el.strokeWidth` as stored, before the renderer's floor. */
   readonly strokeWidth: number;
   /** `Math.hypot` of the point-bounds span — the renderer's `strokeDistance`. */
   readonly strokeDistance: number;
   /** Source point count (pairs), for the sparse-spacing predicate. */
   readonly pointCount: number;
+  /** Gesture-start centreline length, compiled once for exact-draft work admission. */
+  readonly pathLength?: number;
   /** True when the renderer draws an arrowhead for this stroke (`kind` line/arrow with a head). */
   readonly drawsArrowHead?: boolean;
   /**
@@ -76,7 +84,7 @@ export interface StudioLiveTransformRenderRoute {
 const STUDIO_RENDER_ROUTE_ROTATION_SPAN = Math.SQRT2;
 
 /** Absolute px thresholds `StudioDrawNode` compares `strokeDistance` against. */
-const STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS = [16, 180] as const;
+const STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS = [16, 120, 180] as const;
 
 /** The renderer's minimum drawn diameter, from `StudioDrawNode`. */
 const STUDIO_RENDER_ROUTE_MIN_DIAMETER = 1;
@@ -123,6 +131,7 @@ export function studioLiveTransformRouteSurvivesScale(
   route: StudioLiveTransformRenderRoute,
   scale: number,
 ): boolean {
+  if (route.retainedAffinePolicy === "model-draft-only") return false;
   const { strokeWidth, strokeDistance, pointCount } = route;
   if (!Number.isFinite(scale) || scale <= 0) return false;
   if (!Number.isFinite(strokeWidth) || strokeWidth < 0) return false;
@@ -139,9 +148,9 @@ export function studioLiveTransformRouteSurvivesScale(
 
   // The perfect-freehand outline cap, which the preview scales straight past.
   if (perfectFamily) {
-  const previewOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth) * scale;
-  const committedOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth * scale);
-  if (Math.abs(previewOutline - committedOutline) > 1e-9) return false;
+    const previewOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth) * scale;
+    const committedOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth * scale);
+    if (Math.abs(previewOutline - committedOutline) > 1e-9) return false;
   }
 
   // The arrowhead floor, for strokes that draw one.
@@ -213,6 +222,9 @@ export function studioLiveTransformRouteOfPoints(
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  let pathLength = 0;
+  let previousX: number | null = null;
+  let previousY: number | null = null;
   for (let index = 0; index + 1 < points.length; index += 2) {
     const x = points[index]!;
     const y = points[index + 1]!;
@@ -220,10 +232,15 @@ export function studioLiveTransformRouteOfPoints(
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
+    if (previousX !== null && previousY !== null) {
+      pathLength += Math.hypot(x - previousX, y - previousY);
+    }
+    previousX = x;
+    previousY = y;
   }
   const pointCount = Math.floor(points.length / 2);
   const strokeDistance = pointCount === 0
     ? 0
     : Math.hypot(maxX - minX, maxY - minY);
-  return { strokeWidth, strokeDistance, pointCount };
+  return { strokeWidth, strokeDistance, pointCount, pathLength };
 }

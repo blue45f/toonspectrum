@@ -15,6 +15,7 @@ import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
 import { studioAdjustmentStackToFilterFields } from "../studio-adjustment-stack";
 import { resolveTimelineComposite, resolveTimelineTransforms } from "../studio-anim-tracks";
 import { containingPanel, elBounds } from "../studio-element-geometry";
+import { studioKonvaDrawTransformRecoveryPendingForElement } from "../studio-live-transform-gesture-konva";
 import { studioLiveTransformPreviewBlockedForElement } from "../studio-live-transform-preview-eligibility";
 import { clampFrameIndex, frameIndexOf, onionSkinLayers } from "../studio-frame-animation";
 import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
@@ -573,6 +574,14 @@ export function StudioCanvasViewportDocumentLayer({
                       onMouseDown={onSelect}
                       onTap={onSelect}
                       onDragStart={(event) => {
+                        // Setup can throw after moving this wrapper to the gesture Layer. Its
+                        // phase-aware rollback then owns the node from a module registry because
+                        // no pointer-session token could be returned. Do not acquire a new page
+                        // interaction lease while that older writer is still restoring the node.
+                        if (studioKonvaDrawTransformRecoveryPendingForElement(el.id)) {
+                          event.target.stopDrag();
+                          return;
+                        }
                         // A live transform preview repurposes this wrapper's x/y as the gesture's
                         // ABSOLUTE target-box origin, not a drag offset. A concurrent drag (second
                         // finger on a touch device while the first holds a Transformer anchor)
@@ -588,6 +597,12 @@ export function StudioCanvasViewportDocumentLayer({
                         if (!nodeInteractionBegin(el.id)) event.target.stopDrag();
                       }}
                       onDragEnd={(event) => {
+                        // `stopDrag()` above can produce a trailing dragend. The blocked drag did
+                        // not acquire the page interaction lease, so it must neither bake a delta
+                        // nor release the older recovery owner's lease.
+                        if (studioKonvaDrawTransformRecoveryPendingForElement(el.id)) {
+                          return;
+                        }
                         // Same guard on the trailing edge: a drag that began before the transform
                         // (or one Konva ends after the preview took the node) must not bake the
                         // preview projection, and must not release a lease it never took.

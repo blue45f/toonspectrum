@@ -132,12 +132,30 @@ export function studioLiveTransformCommittedClip(input: {
   readonly targetBounds: StudioDrawObjectTransformBounds;
   readonly rotationDeg: number;
   readonly points?: readonly number[];
+  /** Exact planner-produced point bounds avoid a second O(points) traversal. */
+  readonly transformedBounds?: {
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+  };
   readonly elements: readonly El[];
   readonly noClip?: boolean;
 }): StudioLiveTransformClipRect | null {
   if (input.noClip === true) return null;
   const bounds =
-    (input.sourceBounds && input.points
+    (input.transformedBounds
+      && [
+        input.transformedBounds.x,
+        input.transformedBounds.y,
+        input.transformedBounds.w,
+        input.transformedBounds.h,
+      ].every((value) => Number.isFinite(value))
+      && input.transformedBounds.w >= 0
+      && input.transformedBounds.h >= 0
+      ? input.transformedBounds
+      : null)
+    ?? (input.sourceBounds && input.points
       ? transformedPointBounds(
         input.sourceBounds,
         input.targetBounds,
