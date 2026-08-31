@@ -1682,6 +1682,14 @@ function impastoReliefGrid(stations: readonly OilCarrierStation[]): ImpastoRelie
   };
 }
 
+/** A rectangle of the tile whose heights changed since the retained shading was computed. */
+interface ImpastoDirtyRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 /** Where the body-film walk had got to; carried so a resumed pass stamps the same stations. */
 interface ImpastoFilmCursor {
   travelled: number;
@@ -1853,12 +1861,60 @@ function stampImpastoRidge(
   }
 }
 
-/** Shade a finished height tile. Split out so both the batch and retained paths share it. */
+/**
+ * Shade a finished height tile. Split out so both the batch and retained paths share it.
+ *
+ * `retained` lets a caller that already holds the previous tile re-shade only the cells whose
+ * height neighbourhood moved. The shading is a fixed stencil over the heights with no
+ * normalization across the data (see `region` on the shading module), so the cells outside the
+ * dirty rectangles keep exactly the values a full pass would have written.
+ */
 function shadeImpastoRelief(
   film: Float32Array,
   ridge: Float32Array,
   grid: ImpastoReliefGrid,
+  retained?: {
+    readonly height: Float32Array;
+    readonly shading: Float32Array;
+    readonly dirty: readonly ImpastoDirtyRect[];
+  },
 ): ImpastoReliefField {
+  if (retained) {
+    const { height, shading, dirty } = retained;
+    for (const rect of dirty) {
+      const x0 = Math.max(0, rect.x);
+      const y0 = Math.max(0, rect.y);
+      const x1 = Math.min(grid.gridWidth, rect.x + rect.width);
+      const y1 = Math.min(grid.gridHeight, rect.y + rect.height);
+      for (let y = y0; y < y1; y += 1) {
+        const row = y * grid.gridWidth;
+        for (let x = x0; x < x1; x += 1) {
+          const at = row + x;
+          height[at] = film[at]! + ridge[at]!;
+        }
+      }
+    }
+    for (const rect of dirty) {
+      computeStudioImpastoReliefShading(height, {
+        width: grid.gridWidth,
+        height: grid.gridHeight,
+        heightScale: IMPASTO_RELIEF_HEIGHT_SCALE,
+        into: shading,
+        // The stencil reads neighbours, so a cell one ring outside a changed cell changes too.
+        region: { x: rect.x - 1, y: rect.y - 1, width: rect.width + 2, height: rect.height + 2 },
+      });
+    }
+    return {
+      gridWidth: grid.gridWidth,
+      gridHeight: grid.gridHeight,
+      cell: grid.cell,
+      originX: grid.originX,
+      originY: grid.originY,
+      hairStride: grid.hairStride,
+      hairOffset: grid.hairOffset,
+      shading,
+    };
+  }
   const height = new Float32Array(film.length);
   for (let at = 0; at < film.length; at += 1) height[at] = film[at]! + ridge[at]!;
   return {
@@ -1930,6 +1986,25 @@ class StudioImpastoReliefFieldPlanner {
   private settledEnd = 0;
   /** Film walk state at `settledEnd`, so a resumed pass stamps the same stations. */
   private cursor: ImpastoFilmCursor = impastoFilmCursor();
+  /**
+   * Retained height and shading tiles.
+   *
+   * Re-shading the whole tile was 12.1ms of the carrier's 67.5ms per move on a capped bed even
+   * after the rasters stopped being rebuilt — the field was retained and then thrown through a
+   * full Sobel pass anyway. The shading is a pure stencil over the heights, so only the cells
+   * whose neighbourhood moved have to be redone.
+   */
+  private height: Float32Array | null = null;
+  private shading: Float32Array | null = null;
+  /**
+   * First station whose stamps may differ from the ones baked into the retained height tile.
+   *
+   * The working film/ridge are rebuilt each move as `settled layer + tail`, so a cell changes
+   * only where a station at or after the PREVIOUS tail start writes. Carrying that index rather
+   * than the current one is what keeps the rectangle honest across the move where the settled
+   * boundary advances.
+   */
+  private dirtyFromStation = 0;
 
   reset(): void {
     this.grid = null;
@@ -1937,6 +2012,9 @@ class StudioImpastoReliefFieldPlanner {
     this.settledRidge = null;
     this.settledEnd = 0;
     this.cursor = impastoFilmCursor();
+    this.height = null;
+    this.shading = null;
+    this.dirtyFromStation = 0;
   }
 
   /**
@@ -1963,11 +2041,17 @@ class StudioImpastoReliefFieldPlanner {
       && previous.bristleCount === grid.bristleCount
       && bakeTo >= this.settledEnd;
 
+    // Rectangles whose heights may differ from the retained tile. Empty means "reuse nothing".
+    const dirty: ImpastoDirtyRect[] = [];
+    const reshadeRetained = reusable && this.height !== null && this.shading !== null;
     if (!reusable) {
       this.settledFilm = new Float32Array(cellCount);
       this.settledRidge = new Float32Array(cellCount);
       this.settledEnd = 0;
       this.cursor = impastoFilmCursor();
+      this.height = null;
+      this.shading = null;
+      this.dirtyFromStation = 0;
     } else if (
       previous!.gridWidth !== grid.gridWidth
       || previous!.gridHeight !== grid.gridHeight
@@ -1980,6 +2064,15 @@ class StudioImpastoReliefFieldPlanner {
       const shiftY = Math.round((previous!.originY - grid.originY) / grid.cell);
       this.settledFilm = blitImpastoLayer(this.settledFilm!, previous!, grid, shiftX, shiftY);
       this.settledRidge = blitImpastoLayer(this.settledRidge!, previous!, grid, shiftX, shiftY);
+      if (reshadeRetained) {
+        this.height = blitImpastoLayer(this.height!, previous!, grid, shiftX, shiftY);
+        this.shading = blitImpastoLayer(this.shading!, previous!, grid, shiftX, shiftY);
+        // Everything the blit did NOT carry over is new, and so is the ring the old tile's edge
+        // sat on: those cells were shaded against a CLAMPED neighbourhood, and now have real
+        // neighbours. Four bands around the old footprint cover both, and stay thin — the tile
+        // grows by a cell or two at a time, so this is a perimeter cost, not an area one.
+        for (const band of impastoGrowthBands(previous!, grid, shiftX, shiftY)) dirty.push(band);
+      }
     }
 
     // Advance the settled layers to the new boundary. This is the only pass whose cost grows
@@ -2006,9 +2099,97 @@ class StudioImpastoReliefFieldPlanner {
     stampImpastoFilm(film, grid, stations, this.settledEnd, stations.length, tailCursor, stations.length - 1);
     stampImpastoRidge(ridge, grid, stations, Math.max(0, this.settledEnd - 1), stations.length - 1);
 
+    // A cell can differ from the retained tile only where a station at or after the previous
+    // tail start writes. Both this move's tail and the previous one are covered by starting at
+    // the smaller index, and one station back for the ridge segment that reaches into it.
+    const changedFrom = Math.max(0, Math.min(this.dirtyFromStation, this.settledEnd) - 1);
+    if (reshadeRetained) {
+      const stamped = impastoStationBounds(stations, changedFrom, grid);
+      if (stamped) dirty.push(stamped);
+    }
+    this.dirtyFromStation = this.settledEnd;
+
     this.grid = grid;
-    return shadeImpastoRelief(film, ridge, grid);
+    if (reshadeRetained && this.height!.length === cellCount && this.shading!.length === cellCount) {
+      return shadeImpastoRelief(film, ridge, grid, {
+        height: this.height!,
+        shading: this.shading!,
+        dirty,
+      });
+    }
+    const field = shadeImpastoRelief(film, ridge, grid);
+    const height = new Float32Array(cellCount);
+    for (let at = 0; at < cellCount; at += 1) height[at] = film[at]! + ridge[at]!;
+    this.height = height;
+    this.shading = field.shading as Float32Array;
+    return field;
   }
+}
+
+/**
+ * Cell rectangle the stations `[from, end)` can write into.
+ *
+ * Deliberately the same reach the tile margin is sized by, not the exact per-station clamp the
+ * stampers compute: a superset costs a few extra cells of re-shading, an undersized one leaves a
+ * stale cell that nothing will ever correct.
+ */
+function impastoStationBounds(
+  stations: readonly OilCarrierStation[],
+  from: number,
+  grid: ImpastoReliefGrid,
+): ImpastoDirtyRect | null {
+  if (from >= stations.length) return null;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let index = from; index < stations.length; index += 1) {
+    const station = stations[index]!;
+    const reach = station.radiusY * IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO
+      + IMPASTO_RELIEF_STAMP_REACH_CELLS * grid.cell;
+    minX = Math.min(minX, station.x - reach);
+    minY = Math.min(minY, station.y - reach);
+    maxX = Math.max(maxX, station.x + reach);
+    maxY = Math.max(maxY, station.y + reach);
+  }
+  if (!Number.isFinite(minX)) return null;
+  const x = Math.floor((minX - grid.originX) / grid.cell);
+  const y = Math.floor((minY - grid.originY) / grid.cell);
+  const right = Math.ceil((maxX - grid.originX) / grid.cell) + 1;
+  const bottom = Math.ceil((maxY - grid.originY) / grid.cell) + 1;
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * The bands of the new tile that the blit could not fill, plus the ring the old edge sat on.
+ *
+ * `shiftX`/`shiftY` place the old tile's origin inside the new one, so the old footprint is
+ * `[shiftX, shiftX + previous.gridWidth) x [shiftY, …)`. Everything outside it is a cell the blit
+ * left at zero. The ring is included because those cells were shaded against a clamped
+ * neighbourhood at the old boundary and now have real neighbours.
+ */
+function impastoGrowthBands(
+  previous: ImpastoReliefGrid,
+  grid: ImpastoReliefGrid,
+  shiftX: number,
+  shiftY: number,
+): ImpastoDirtyRect[] {
+  const left = shiftX;
+  const top = shiftY;
+  const right = shiftX + previous.gridWidth;
+  const bottom = shiftY + previous.gridHeight;
+  const bands: ImpastoDirtyRect[] = [];
+  // One cell of overlap on each side is the old edge ring; the stencil dilation in
+  // `shadeImpastoRelief` widens it again, which is what the clamped-neighbour cells need.
+  if (left > 0) bands.push({ x: 0, y: 0, width: left + 1, height: grid.gridHeight });
+  if (right < grid.gridWidth) {
+    bands.push({ x: right - 1, y: 0, width: grid.gridWidth - right + 1, height: grid.gridHeight });
+  }
+  if (top > 0) bands.push({ x: 0, y: 0, width: grid.gridWidth, height: top + 1 });
+  if (bottom < grid.gridHeight) {
+    bands.push({ x: 0, y: bottom - 1, width: grid.gridWidth, height: grid.gridHeight - bottom + 1 });
+  }
+  return bands;
 }
 
 /** Move a retained layer onto a tile with the same cell but a different origin or size. */
