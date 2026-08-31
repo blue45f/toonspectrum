@@ -167,7 +167,6 @@ export function measureStudioVrmProportionHeadLength(
   });
 }
 
-/** Creates the concrete three-vrm lifecycle adapter used by Poser and shared BG3D. */
 /** 상속 배율이 1 인지 가르는 허용 오차. float32 컨테이너 잡음보다 넉넉하다. */
 const INHERITED_SCALE_EPSILON = 1e-6;
 
@@ -184,8 +183,26 @@ type CapturedColliderShape = {
   };
   readonly offset: THREE.Vector3 | null;
   readonly tail: THREE.Vector3 | null;
+  readonly radius: number | null;
   /** The collider node's scale relative to the VRM root at rest, so inherited scaling divides out. */
   readonly restRootScale: number;
+};
+
+/**
+ * A spring joint's authored hit radius, captured from rest for the same reason the collider shapes
+ * are: `hitRadius` is compared against world distances, so it has to be re-derived, not compounded.
+ */
+type CapturedJointRadius = {
+  readonly settings: { hitRadius: number };
+  readonly bone: THREE.Object3D;
+  readonly hitRadius: number;
+  /** The joint bone's scale relative to the VRM root at rest. */
+  readonly restRootScale: number;
+};
+
+type CapturedSpringGeometry = {
+  readonly colliders: readonly CapturedColliderShape[];
+  readonly joints: readonly CapturedJointRadius[];
 };
 
 /**
@@ -207,14 +224,16 @@ function rootRelativeScaleOf(root: THREE.Object3D, node: THREE.Object3D): number
 }
 
 /**
- * Captures every spring-bone collider's authored shape.
+ * Captures every spring-bone collider shape and every spring joint's hit radius at rest.
  *
  * `VRMSpringBoneManager.colliders` is a derived getter over the joints' collider groups, so the
  * set is read here and the individual shapes are held by reference.
  */
-function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderShape[] {
-  const colliders = vrm.springBoneManager?.colliders ?? [];
-  if (colliders.length > 0) vrm.scene.updateMatrixWorld(true);
+function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
+  const manager = vrm.springBoneManager;
+  const colliders = manager?.colliders ?? [];
+  const springJoints = [...(manager?.joints ?? [])];
+  if (colliders.length > 0 || springJoints.length > 0) vrm.scene.updateMatrixWorld(true);
   const captured: CapturedColliderShape[] = [];
   for (const collider of colliders) {
     const shape = (collider as unknown as { shape?: CapturedColliderShape["shape"] }).shape;
@@ -224,68 +243,88 @@ function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderSha
       shape,
       offset: shape.offset ? shape.offset.clone() : null,
       tail: shape.tail ? shape.tail.clone() : null,
+      radius: typeof shape.radius === "number" ? shape.radius : null,
       restRootScale: rootRelativeScaleOf(vrm.scene, collider),
     });
   }
-  return captured;
+  const joints: CapturedJointRadius[] = [];
+  for (const joint of springJoints) {
+    joints.push({
+      settings: joint.settings,
+      bone: joint.bone,
+      hitRadius: joint.settings.hitRadius,
+      restRootScale: rootRelativeScaleOf(vrm.scene, joint.bone),
+    });
+  }
+  return { colliders: captured, joints };
 }
 
 /**
- * Resizes collider geometry for a body whose joint spacing changed by `uniformScale`.
+ * Resizes spring geometry for a body whose joint spacing changed by `uniformScale`.
  *
- * Two things have to be kept apart.
+ * three-vrm splits a capsule into two halves that scale by different rules, and the split is not
+ * the one the shape's own fields suggest. `VRMSpringBoneColliderShapeCapsule.calculateCollision`
+ * takes the capsule origin from `colliderMatrix` (which is `matrixWorld` with `offset` applied
+ * through its linear part) and the axis from `(tail - offset)` through that same linear part -- so
+ * **the scene graph already scales both**. But `this.radius` and the joint's `settings.hitRadius`
+ * enter the distance test as **raw scalars**, never touched by any matrix. A collider under a node
+ * the runtime scaled therefore grows its envelope in length only, and stays as thin as it was
+ * authored while the mesh around it thickens.
  *
- * **What the scene graph already did.** A collider hanging under a node that itself took a scale
- * rides that scale for free — the generated skull capsules sit under `HairRoot` below `head`, and
- * `head` is one of the few bones this runtime scales. Multiplying their local values as well made
- * them 2.56× at `overallHeight` 1.6 while the hair around them grew 1.6×. So the inherited factor
- * is divided back out.
+ * So there are two cases, and the fix differs per case.
  *
- * **What the proportion model does not do.** It moves joints apart; it does not make the body
- * thicker. Torso vertices weighted to `hips`/`spine` keep their exact cross-section at every
- * height. So the axis moves with the joints and the **radius does not move at all** — scaling it
- * would have made the torso capsule 60% wider than the torso it rides on, pushing hair off the back.
+ * **A collider whose own frame took a scale** -- the generated skull capsules sit under `HairRoot`
+ * below `head`, and `head` is one of the few bones this runtime scales, absorbing `headBodyRatio`
+ * as well as `overallHeight`. Its geometry is already carried whole by the scene graph, so the
+ * local `offset`/`tail` must be left alone (multiplying them too made the skull 2.56x at
+ * `overallHeight` 1.6 while the hair around it grew 1.6x). Its radius, being raw, is the one thing
+ * the graph does not carry, so it is re-derived as `rest x inherited`. Both halves then agree.
  *
- * The one thing this cannot recover is an authored inset: the generated torso capsule tucks its
- * endpoints in by its own radius so the capsule's outer extent lands on the hips and shoulders, and
- * with the radius now fixed that inset no longer scales. The residual is bounded by
- * `(uniformScale - 1) x radius` — about 3.7cm at 1.6x on a 58cm torso, against the 17cm the capsule
- * was off by before any of this.
+ * **A collider whose frame did not scale** -- the torso capsule on `spine` -- is the opposite. The
+ * graph carried nothing, so the axis has to pick up the joint spacing itself. Its radius must
+ * *not* move: the proportion model moves joints apart, it does not make the body thicker. Torso
+ * vertices weighted to `hips`/`spine` keep their exact cross-section at every height, so scaling
+ * the radius would have made the capsule 60% wider than the torso it rides on.
+ *
+ * Joint hit radii follow the same reasoning as collider radii: raw scalars compared against world
+ * distances, so each one is re-derived from its own bone's inherited scale. Hair bones under a
+ * scaled `head` get thicker along with the strands they model; every other joint reads 1 and is
+ * left untouched.
  */
-function resizeSpringBoneColliderShapes(
+function resizeSpringBoneGeometry(
   root: THREE.Object3D,
-  captured: readonly CapturedColliderShape[],
+  captured: CapturedSpringGeometry,
   uniformScale: number,
 ): boolean {
   if (!Number.isFinite(uniformScale) || uniformScale <= 0) return false;
-  for (const entry of captured) {
+  for (const entry of captured.colliders) {
     const inherited = rootRelativeScaleOf(root, entry.collider) / entry.restRootScale;
     if (!Number.isFinite(inherited) || inherited <= 0) return false;
 
-    // A collider whose own frame took a scale is already carried whole by the scene graph, and that
-    // scale is the complete story for it -- the generated skull capsules sit beneath `head`, which
-    // absorbs `headBodyRatio` as well as `overallHeight`. Rescaling the local values on top would
-    // double-count; dividing the inherited factor back out and re-applying only `overallHeight`
-    // would strand the axis while the radius still followed both, leaving a malformed envelope
-    // (at `headBodyRatio` 2.5 the radius went x2.50 while the axis stayed x1.00).
-    //
-    // A collider whose frame did not scale -- the torso capsule on `spine` -- is the opposite case:
-    // nothing carried it, so its axis has to pick up the joint spacing itself.
-    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) continue;
+    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) {
+      if (entry.radius !== null) entry.shape.radius = entry.radius * inherited;
+      continue;
+    }
 
     if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
     if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
   }
+  for (const entry of captured.joints) {
+    const inherited = rootRelativeScaleOf(root, entry.bone) / entry.restRootScale;
+    if (!Number.isFinite(inherited) || inherited <= 0) return false;
+    entry.settings.hitRadius = entry.hitRadius * inherited;
+  }
   return true;
 }
 
+/** Creates the concrete three-vrm lifecycle adapter used by Poser and shared BG3D. */
 export function createStudioVrmProportionVrmAdapter(
   input: StudioVrmProportionVrmAdapterInput,
 ): StudioVrmProportionRigAdapter {
   const { vrm } = input;
   const nodeConstraintManager = vrm.nodeConstraintManager;
   const springBoneManager = vrm.springBoneManager;
-  const capturedColliderShapes = captureSpringBoneColliderShapes(vrm);
+  const capturedSpringGeometry = captureSpringBoneGeometry(vrm);
   const resetNormalizedPoseAndSyncRawRest = () => {
     const humanoid = vrm.humanoid;
     if (!humanoid) return false;
@@ -324,7 +363,7 @@ export function createStudioVrmProportionVrmAdapter(
             return true;
           },
           syncSpringBoneColliderShapes: (uniformScale: number) =>
-            resizeSpringBoneColliderShapes(vrm.scene, capturedColliderShapes, uniformScale),
+            resizeSpringBoneGeometry(vrm.scene, capturedSpringGeometry, uniformScale),
         }
       : {}),
     reapplyAuthoredPose: input.reapplyAuthoredPose,

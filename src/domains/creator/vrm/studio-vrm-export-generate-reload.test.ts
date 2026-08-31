@@ -1,5 +1,5 @@
 import { VRMLoaderPlugin, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
-import { Quaternion, SkinnedMesh, Vector3, type Object3D } from "three";
+import { Euler, SkinnedMesh, Vector3, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
@@ -33,6 +33,14 @@ async function loadVrmBytes(bytes: Uint8Array<ArrayBuffer>): Promise<VRM> {
     loader.parse(bytes.slice().buffer as ArrayBuffer, "", resolve as never, reject);
   });
   return gltf.userData.vrm;
+}
+
+/** `node` 가 `ancestor` 아래에 있는지 — 씬 그래프가 스케일을 물려주는 범위와 같다. */
+function isUnder(node: Object3D, ancestor: Object3D): boolean {
+  for (let cursor: Object3D | null = node.parent; cursor; cursor = cursor.parent) {
+    if (cursor === ancestor) return true;
+  }
+  return false;
 }
 
 /**
@@ -474,9 +482,15 @@ describe("generate recipe → .vrm file reload", () => {
   }, 60_000);
 
   it("scales each collider by what the body around it actually did", async () => {
-    // 두 가지를 갈라야 한다. 두개골 캡슐은 `HairRoot` 를 거쳐 `head` 아래에 있으므로 씬 그래프가
-    // 이미 스케일을 물려준다 — 로컬 값까지 곱하면 1.6배 대신 2.56배가 된다. 반대로 몸통은
-    // 관절만 벌어지고 굵기는 그대로다 — 반경까지 키우면 캡슐이 몸보다 60% 뚱뚱해진다.
+    // three-vrm 이 캡슐을 두 조각으로 나눠 쓰는데, 나누는 선이 필드 이름과 다르다. 축은
+    // `colliderMatrix` 로 변환되므로 **씬 그래프가 이미** 스케일을 물려준다 — 로컬 값까지
+    // 곱하면 1.6배 대신 2.56배가 된다. 반면 `shape.radius` 는 어떤 행렬도 거치지 않는
+    // 원시 스칼라라 씬 그래프가 아무것도 해주지 않는다. 그래서 여기서 재는 유효량은
+    // 변환된 축 길이와 **원시** 반경이다.
+    //
+    // 두 콜라이더가 정반대 경우다. 두개골은 `head` 아래라 축이 이미 1.6배 — 반경도 같이
+    // 1.6배여야 형태가 유지된다. 몸통은 `spine` 아래라 아무것도 안 물려받고, 관절만 벌어지고
+    // 굵기는 그대로다 — 반경까지 키우면 캡슐이 몸보다 60% 뚱뚱해진다.
     const presetId = "hime-noble";
     const measured: { torsoRadius: number; skullRadius: number; torsoSpan: number }[] = [];
     for (const overallHeight of [1, 1.6]) {
@@ -503,11 +517,11 @@ describe("generate recipe → .vrm file reload", () => {
           shape: { offset: Vector3; tail?: Vector3; radius: number };
         }).shape;
         collider.updateWorldMatrix(true, false);
-        const scale = new Vector3();
-        collider.matrixWorld.decompose(new Vector3(), new Quaternion(), scale);
         const a = shape.offset.clone().applyMatrix4(collider.matrixWorld);
         const b = (shape.tail ?? shape.offset).clone().applyMatrix4(collider.matrixWorld);
-        return { radius: shape.radius * scale.x, span: a.distanceTo(b) };
+        // `radius` 는 원시값 그대로가 유효 반경이다. 월드 스케일을 곱하면 three-vrm 이
+        // 실제로 쓰지 않는 수를 재게 된다.
+        return { radius: shape.radius, span: a.distanceTo(b) };
       };
       const torso = worldOf(colliders[0]);
       const skull = worldOf(colliders[1]);
@@ -521,8 +535,11 @@ describe("generate recipe → .vrm file reload", () => {
     // 몸통: 축은 관절을 따라가고 굵기는 그대로.
     expect(tall.torsoSpan / rest.torsoSpan, "몸통 캡슐 축이 관절을 따라가지 않았다").toBeCloseTo(1.6, 3);
     expect(tall.torsoRadius, "몸통 캡슐이 몸보다 뚱뚱해졌다").toBeCloseTo(rest.torsoRadius, 6);
-    // 두개골: 머리가 실제로 커지므로 딱 그만큼만.
-    expect(tall.skullRadius / rest.skullRadius, "두개골 콜라이더가 두 번 커졌다").toBeCloseTo(1.6, 3);
+    // 두개골: 머리가 실제로 커지므로 반경도 딱 그만큼. 축은 씬 그래프가 이미 키웠다.
+    expect(
+      tall.skullRadius / rest.skullRadius,
+      "두개골 반경이 머리를 따라가지 않았다 — 축만 커지고 반경은 그대로면 납작해진다",
+    ).toBeCloseTo(1.6, 3);
   }, 60_000);
 
   it.each([
@@ -533,8 +550,9 @@ describe("generate recipe → .vrm file reload", () => {
     "keeps the skull collider the same shape as the head it rides (%s)",
     async (_label, override, expected) => {
       // 두개골 캡슐은 `HairRoot` 를 거쳐 `head` 아래에 있고, `head` 는 `overallHeight` 와
-      // `headBodyRatio` 를 **둘 다** 흡수한다. 상속분을 나눈 뒤 한쪽만 되돌리면 반경은 둘 다
-      // 따라가는데 축은 한쪽만 따라가 형태가 망가진다(비율 2.5 에서 반경 ×2.50 · 축 ×1.00).
+      // `headBodyRatio` 를 **둘 다** 흡수한다. 축은 `colliderMatrix` 가 그 배율을 통째로
+      // 실어 나르지만 `shape.radius` 는 원시 스칼라라 아무것도 실리지 않는다. 반경을 손대지
+      // 않으면 머리만 2.5배 커지고 캡슐은 저작 당시 굵기 그대로 남아 납작해진다.
       const presetId = "hime-noble";
       const shape: { radius: number; span: number }[] = [];
       for (const proportions of [{}, override]) {
@@ -561,11 +579,10 @@ describe("generate recipe → .vrm file reload", () => {
           shape: { offset: Vector3; tail?: Vector3; radius: number };
         }).shape;
         skull.updateWorldMatrix(true, false);
-        const worldScale = new Vector3();
-        skull.matrixWorld.decompose(new Vector3(), new Quaternion(), worldScale);
         const a = geometry.offset.clone().applyMatrix4(skull.matrixWorld);
         const b = (geometry.tail ?? geometry.offset).clone().applyMatrix4(skull.matrixWorld);
-        shape.push({ radius: geometry.radius * worldScale.x, span: a.distanceTo(b) });
+        // 축은 변환된 값이, 반경은 원시값이 유효량이다 — three-vrm 이 그렇게 읽는다.
+        shape.push({ radius: geometry.radius, span: a.distanceTo(b) });
       }
       const [rest, scaled] = shape;
       // 반경과 축이 **같은** 배율로 따라가야 형태가 유지된다.
@@ -574,6 +591,138 @@ describe("generate recipe → .vrm file reload", () => {
     },
     60_000,
   );
+
+  it.each([
+    ["headBodyRatio", { headBodyRatio: 2.5 }, 2.5],
+    ["overallHeight", { overallHeight: 1.6 }, 1.6],
+  ] as const)(
+    "thickens spring joints with the hair hierarchy they hang from (%s)",
+    async (_label, override, expected) => {
+      // `settings.hitRadius` 는 `calculateCollision(colliderMatrix, tail, hitRadius, …)` 로
+      // 넘어가 월드 거리와 직접 비교되는 **원시 스칼라**다. 머리카락 본은 `head` 아래라
+      // 월드 길이가 머리를 따라 커지는데 hitRadius 만 저작 당시 값에 얼어붙으면, 마디가
+      // 상대적으로 그만큼 가늘어져 콜라이더를 그냥 지나친다. 실제로 `headBodyRatio` 2.5 에서는
+      // 콜라이더가 아예 일을 하지 못해, 머리 흔들기 스윕의 최대 침투가 콜라이더를 통째로
+      // 떼어냈을 때와 소수점 셋째 자리까지 같았다(-0.376).
+      const presetId = "hime-noble";
+      const measured: { hair: number[]; body: number[] }[] = [];
+      for (const proportions of [{}, override]) {
+        const vrm = await loadVrmBytes(
+          exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+        );
+        const adapter = createStudioVrmProportionVrmAdapter({
+          vrm,
+          getCurrentModelGeneration: () => 1,
+          reapplyAuthoredPose: () => true,
+        });
+        const created = createStudioVrmProportionRigRuntime(adapter, {
+          headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+        });
+        if (!created.ok) throw new Error(created.message);
+        expect(
+          created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, ...proportions }).ok,
+        ).toBe(true);
+        vrm.scene.updateMatrixWorld(true);
+
+        const headNode = vrm.humanoid?.getRawBoneNode("head");
+        if (!headNode) throw new Error("expected a head bone");
+        const hair: number[] = [];
+        const body: number[] = [];
+        for (const joint of vrm.springBoneManager?.joints ?? []) {
+          (isUnder(joint.bone, headNode) ? hair : body).push(joint.settings.hitRadius);
+        }
+        expect(hair.length, "머리 아래 스프링 마디를 하나도 못 찾았다").toBeGreaterThan(0);
+        measured.push({ hair, body });
+      }
+      const [rest, scaled] = measured;
+      expect(scaled.hair).toHaveLength(rest.hair.length);
+      expect(scaled.body).toHaveLength(rest.body.length);
+      for (const [index, radius] of scaled.hair.entries()) {
+        expect(radius / rest.hair[index], `머리카락 마디 ${index} 가 머리를 따라가지 않았다`)
+          .toBeCloseTo(expected, 3);
+      }
+      // 머리 밖 마디는 아무것도 물려받지 않았으므로 굵기도 그대로여야 한다.
+      for (const [index, radius] of scaled.body.entries()) {
+        expect(radius, `몸통 마디 ${index} 가 이유 없이 굵어졌다`).toBeCloseTo(rest.body[index], 9);
+      }
+    },
+    60_000,
+  );
+
+  it("keeps the skull collider earning its keep after the head is scaled up", async () => {
+    // 앞의 두 테스트가 재는 비율이 실제로 무슨 일을 하는지 고정한다. 콜라이더의 값어치는
+    // "콜라이더를 붙였을 때가 뗐을 때보다 얼마나 덜 파고드는가" 하나뿐이고, 그 값어치는
+    // 머리를 키워도 남아 있어야 한다. 예전에는 `headBodyRatio` 2.5 에서 둘이 완전히 같았다 —
+    // 축만 커지고 반경과 hitRadius 는 저작 당시 값에 얼어붙어, 콜라이더가 아예 없는 것과
+    // 구별되지 않았다.
+    const presetId = "natural-short";
+    const rig = buildStudioVrmHumanoidMesh(createStudioVrmGenerateRecipe({ presetId }).state).rig;
+    const headScale = rig.nodeScale.head ?? [1, 1, 1];
+    const skull = rig.head;
+    // 두개골 타원체는 `head` 로컬(헤어 피벗 프레임)에서 저작값 그대로다. q < 1 이 안쪽이다.
+    const center = new Vector3(
+      (skull.center[0] - rig.worldRest.head[0]) * headScale[0],
+      (skull.center[1] - rig.worldRest.head[1]) * headScale[1],
+      (skull.center[2] - rig.worldRest.head[2]) * headScale[2],
+    );
+    const depth = (point: Vector3): number =>
+      Math.hypot(
+        (point.x - center.x) / (skull.radiusX * headScale[0]),
+        (point.y - center.y) / (skull.radiusY * headScale[1]),
+        (point.z - center.z) / (skull.radiusZ * headScale[2]),
+      );
+
+    const worstDip = async (withColliders: boolean): Promise<number> => {
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => true,
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, {
+        headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+      });
+      if (!created.ok) throw new Error(created.message);
+      expect(
+        created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, headBodyRatio: 2.5 }).ok,
+      ).toBe(true);
+
+      const joints = [...(vrm.springBoneManager?.joints ?? [])];
+      expect(joints.length).toBeGreaterThan(0);
+      if (!withColliders) for (const joint of joints) joint.colliderGroups = [];
+      const pivot = vrm.scene.getObjectByName("HairRoot");
+      if (!pivot) throw new Error("expected a hair pivot");
+      const head = vrm.humanoid?.getNormalizedBoneNode("head");
+      if (!head) throw new Error("expected a head bone");
+      const localOf = (bone: Object3D): Vector3 =>
+        pivot.worldToLocal(bone.getWorldPosition(new Vector3()));
+
+      vrm.scene.updateMatrixWorld(true);
+      const rest = joints.map((joint) => depth(localOf(joint.bone)));
+      let worst = 0;
+      for (let step = 0; step < 180; step += 1) {
+        head.quaternion.setFromEuler(
+          new Euler(Math.sin(step / 11) * 0.5, Math.sin(step / 8) * 1.1, 0, "XYZ"),
+        );
+        vrm.scene.updateMatrixWorld(true);
+        vrm.update(1 / 60);
+        if (step < 30) continue;
+        vrm.scene.updateMatrixWorld(true);
+        joints.forEach((joint, index) => {
+          worst = Math.min(worst, depth(localOf(joint.bone)) - rest[index]);
+        });
+      }
+      return worst;
+    };
+
+    const guarded = await worstDip(true);
+    const bare = await worstDip(false);
+    // 콜라이더를 뗀 쪽이 더 깊이 파고들어야 한다. 고칠 때 둘 다 -0.376 로 같았다.
+    expect(guarded, "콜라이더가 머리 확대 후 아무 일도 하지 않는다").toBeGreaterThan(bare * 0.8);
+    expect(bare).toBeLessThan(-0.2);
+  }, 60_000);
 
   it("gives the loaded humanoid finger bones that actually drive the hand mesh", async () => {
     // 예전에는 손이 벙어리장갑 하나에 엄지 돌기를 붙인 형태였고 손가락 본이 아예 없었다.
