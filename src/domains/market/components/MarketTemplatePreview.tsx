@@ -22,7 +22,7 @@ export function MarketTemplatePreview({ template, className }: MarketTemplatePre
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-panel/50 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <LayoutTemplate className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-template-heading" className="text-xs font-semibold text-fg">템플릿 참고 레이아웃 ({template.name})</h3>
+          <h2 id="market-template-heading" className="text-xs font-semibold text-fg">템플릿 참고 레이아웃 ({template.name})</h2>
         </div>
         <span className="inline-flex min-h-6 max-w-full items-center truncate rounded bg-raised px-2 text-[0.65rem] text-fg-3">
           ID: {template.templateId}

@@ -7,6 +7,7 @@ import type {
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
+  CreatorMarketplaceResourceSort,
 } from "@/lib/creator-marketplace-resource-contract";
 
 
@@ -16,6 +17,7 @@ export interface MarketResourceQuery {
   readonly license?: CreatorMarketplaceResourceLicense;
   readonly tag?: string;
   readonly publisher?: string;
+  readonly sort: CreatorMarketplaceResourceSort;
   readonly limit: number;
 }
 
@@ -99,6 +101,7 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         license: parsedQuery.license,
         tag: parsedQuery.tag,
         publisher: parsedQuery.publisher,
+        sort: parsedQuery.sort,
       },
       controller.signal
     )
@@ -121,8 +124,12 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         const cached = readCachedMarketPage(queryKey);
         if (cached) {
           setItems(cached.items);
-          setHasMore(cached.hasMore);
-          cursorRef.current = cached.nextCursor;
+          // A cached first page is an explicitly stale, offline-only snapshot. Its old cursor
+          // cannot be combined with a newly successful tail: doing so would carry a now-hidden
+          // head item forward and refresh its cache lifetime. Revalidate page one before any
+          // further pagination instead.
+          setHasMore(false);
+          cursorRef.current = null;
           setStale(true);
           setStaleSavedAt(cached.savedAt);
           setLoading(false);
@@ -167,6 +174,7 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         license: parsedQuery.license,
         tag: parsedQuery.tag,
         publisher: parsedQuery.publisher,
+        sort: parsedQuery.sort,
         cursor,
       },
       controller.signal

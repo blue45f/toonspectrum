@@ -105,7 +105,23 @@ export function detectBrowserLocale(): string {
   // hydration. Only consult the browser locale when an actual Window is present.
   if (typeof window === "undefined" || typeof navigator === "undefined")
     return FALLBACK_LANG;
-  return normalizeLocaleCode(navigator.language) || FALLBACK_LANG;
+  return resolveSelectableLocale(navigator.language);
+}
+
+/**
+ * Maps a browser/persisted locale to a value that the application's language
+ * controls can actually select. Browsers commonly report region variants such
+ * as `ko-KR` even when the published locale catalog intentionally exposes the
+ * language root (`ko`) only. Keeping the unmatched variant in a controlled
+ * `<select>` makes the browser visually fall back to its first option while the
+ * page continues rendering another language.
+ */
+export function resolveSelectableLocale(raw?: string | null): string {
+  const supported = new Set(NORMALIZED_LOCALE_OPTIONS);
+  const match = getLocaleCandidateChain(raw ?? "", []).find((candidate) =>
+    supported.has(candidate)
+  );
+  return match ?? FALLBACK_LANG;
 }
 
 export function getLanguageDisplayName(

@@ -39,11 +39,19 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
   "0026_creator_draft_cloud_save_intent",
   "0027_creator_draft_atomic_publication",
   "0029_creator_community_runtime_indexes",
+  "0030_creator_marketplace_immutable_releases",
+  "0031_creator_marketplace_moderation",
+  "0032_creator_marketplace_release_lifecycle",
+  "0033_creator_marketplace_cloud_library",
+  "0034_creator_marketplace_package_moderation",
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",
   "apps/api/src/db/schema.ts",
   "apps/api/src/db/creator-marketplace-resource.schema.ts",
+  "apps/api/src/db/creator-marketplace-report.schema.ts",
+  "apps/api/src/db/creator-marketplace-library.schema.ts",
+  "apps/api/src/db/creator-marketplace-package-moderation.schema.ts",
   "apps/api/src/db/creator-asset-object-storage.schema.ts",
   "apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
   "apps/api/src/db/studio-raster-asset.schema.ts",
@@ -1027,7 +1035,12 @@ function executeBootstrap({
         DROP TABLE IF EXISTS
           public.creator_work_asset_storage_reference,
           public.creator_asset_storage_object,
+          public.creator_marketplace_library_item,
+          public.creator_marketplace_package_moderation,
+          public.creator_marketplace_package_moderation_decision,
           public.creator_marketplace_publish_gate,
+          public.creator_marketplace_resource_report_gate,
+          public.creator_marketplace_resource_report,
           public.creator_marketplace_resource,
           public.creator_draft_collaboration_room
         CASCADE;

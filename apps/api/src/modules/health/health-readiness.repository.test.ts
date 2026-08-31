@@ -20,7 +20,15 @@ function completeSchemaCatalog() {
     authAccountUserIndexReady: true,
     authRuntimeDmlReady: true,
     marketplaceResourceAclReady: true,
+    marketplaceCloudLibraryAclReady: true,
+    marketplaceCloudLibraryTriggerReady: true,
+    marketplacePackageModerationAclReady: true,
+    marketplacePackageModerationTriggerReady: true,
     marketplacePublishGateAclReady: true,
+    marketplaceReportAclReady: true,
+    marketplaceReportGateAclReady: true,
+    marketplaceResourceLifecycleTriggerReady: true,
+    marketplaceResourceTimestampPrecisionReady: true,
     marketplaceSearchGenerated: true,
     marketplaceSearchIndexReady: true,
     marketplaceTagIndexReady: true,
@@ -89,7 +97,7 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).not.toContain("creator_work_challenge_idx");
     expect(catalogQuery).not.toContain("creator_series_user_idx");
     expect(catalogQuery).toContain(
-      ") = 'hidden = false'",
+      ") = '\"delistedAt\" IS NULL'",
     );
     expect(catalogQuery).toContain(
       "owning_extension.extname = 'pg_trgm'",
@@ -102,7 +110,41 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain("user_session_version_check");
     expect(catalogQuery).toContain("authRuntimeDmlReady");
     expect(catalogQuery).toContain("marketplaceResourceAclReady");
+    expect(catalogQuery).toContain("marketplaceCloudLibraryAclReady");
+    expect(catalogQuery).toContain("marketplaceCloudLibraryTriggerReady");
+    expect(catalogQuery).toContain("marketplacePackageModerationAclReady");
+    expect(catalogQuery).toContain("marketplacePackageModerationTriggerReady");
     expect(catalogQuery).toContain("marketplacePublishGateAclReady");
+    expect(catalogQuery).toContain("marketplaceReportAclReady");
+    expect(catalogQuery).toContain("marketplaceReportGateAclReady");
+    expect(catalogQuery).toContain(
+      "marketplaceResourceLifecycleTriggerReady",
+    );
+    expect(catalogQuery).toContain(
+      "marketplaceResourceTimestampPrecisionReady",
+    );
+    expect(catalogQuery).toContain("timestamp(3) with time zone");
+    expect(catalogQuery).toContain(
+      "creator_marketplace_resource_relist_non_head",
+    );
+    expect(catalogQuery).toContain(
+      "creator_marketplace_resource_delist_non_head",
+    );
+    expect(catalogQuery).toContain(
+      "creator_marketplace_resource_lifecycle_timestamp_required",
+    );
+    expect(catalogQuery).toContain(
+      "creator_marketplace_package_moderated",
+    );
+    expect(catalogQuery).toContain("packageReportEpoch");
+    expect(catalogQuery).toContain(
+      "creator_marketplace_resource_report_package_epoch_reporter_v3_unique",
+    );
+    expect(catalogQuery).toContain("package_report_epoch");
+    expect(catalogQuery).toContain(
+      "creator_marketplace_library_package_available",
+    );
+    expect(catalogQuery).toContain("exact_release_listed");
     expect(catalogQuery).toContain("public.creator_marketplace_resource");
     expect(catalogQuery).toContain("public.creator_marketplace_publish_gate");
     expect(catalogQuery).toContain("SELECT, INSERT, UPDATE, DELETE");
@@ -132,6 +174,60 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
+  it("requires a valid ready v3 report index with exact ordered keys and predicate", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        ...completeSchemaCatalog(),
+        marketplacePackageModerationTriggerReady: false,
+      }],
+    });
+    const repository = new PostgresHealthReadinessRepository({ query } as never);
+
+    await expect(repository.isSchemaReady()).resolves.toBe(false);
+    expect(query).toHaveBeenCalledOnce();
+    const sql = String(query.mock.calls[0]?.[0]?.text);
+    const boundaryStart = sql.indexOf(
+      "FROM pg_catalog.pg_class AS report_epoch_index",
+    );
+    const boundaryEnd = sql.indexOf(
+      "FROM pg_catalog.pg_trigger AS report_insert_trigger",
+      boundaryStart,
+    );
+    expect(boundaryStart).toBeGreaterThan(-1);
+    expect(boundaryEnd).toBeGreaterThan(boundaryStart);
+    const boundary = sql.slice(boundaryStart, boundaryEnd);
+    const compactBoundary = boundary.replace(/\s+/gu, " ");
+
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indisvalid",
+    );
+    expect(compactBoundary).toContain(
+      "pg_catalog.current_setting('max_identifier_length')::integer",
+    );
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indisready",
+    );
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indnkeyatts = 5",
+    );
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indnatts = 5",
+    );
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indexprs IS NULL",
+    );
+    expect(compactBoundary).toContain(
+      ") = ARRAY[ 'packagePublisherIdSnapshot', 'packageIdSnapshot', " +
+        "'packageModerationRevision', 'packageReportEpoch', 'reporterKeyHash' ]::text[]",
+    );
+    expect(compactBoundary).toContain(
+      "report_epoch_index_definition.indrelid, true ) = " +
+        "'(evidence ->> ''schemaVersion''::text) = ''3''::text'",
+    );
+    expect(boundary).not.toContain("pg_get_indexdef");
+    expect(boundary).not.toContain("LIKE '%schemaVersion%3%'");
+  });
+
   it.each([
     "authUserColumnsReady",
     "authUserConstraintsReady",
@@ -141,7 +237,15 @@ describe("PostgresHealthReadinessRepository", () => {
     "authAccountUserIndexReady",
     "authRuntimeDmlReady",
     "marketplaceResourceAclReady",
+    "marketplaceCloudLibraryAclReady",
+    "marketplaceCloudLibraryTriggerReady",
+    "marketplacePackageModerationAclReady",
+    "marketplacePackageModerationTriggerReady",
     "marketplacePublishGateAclReady",
+    "marketplaceReportAclReady",
+    "marketplaceReportGateAclReady",
+    "marketplaceResourceLifecycleTriggerReady",
+    "marketplaceResourceTimestampPrecisionReady",
     "marketplaceSearchGenerated",
     "marketplaceSearchIndexReady",
     "marketplaceTagIndexReady",
@@ -184,6 +288,11 @@ describe("PostgresHealthReadinessRepository", () => {
         "creator_work_team_comment_thread",
         "studio_ai_request_gate",
         "creator_marketplace_resource",
+        "creator_marketplace_library_item",
+        "creator_marketplace_package_moderation",
+        "creator_marketplace_package_moderation_decision",
+        "creator_marketplace_resource_report",
+        "creator_marketplace_resource_report_gate",
         "socket_io_attachments",
       ]),
     );
@@ -198,6 +307,9 @@ describe("PostgresHealthReadinessRepository", () => {
         .sort()
         .map((name) => `../../db/schema/${name}`),
       "../../db/creator-asset-object-storage.schema.ts",
+      "../../db/creator-marketplace-report.schema.ts",
+      "../../db/creator-marketplace-library.schema.ts",
+      "../../db/creator-marketplace-package-moderation.schema.ts",
       "../../db/creator-marketplace-resource.schema.ts",
       "../../db/studio-crdt-raster-checkpoint.schema.ts",
       "../../db/studio-raster-asset.schema.ts",

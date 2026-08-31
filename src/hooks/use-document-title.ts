@@ -1,3 +1,4 @@
+import { SITE_URL } from "@toonspectrum/core";
 import { useEffect } from "react";
 
 // 라우트별 브라우저 탭 제목을 설정한다. title이 비면 기본 "툰스펙트럼"으로 둔다.
@@ -42,4 +43,75 @@ export function useMetaDescription(description?: string | null) {
       if (prev != null) el.setAttribute("content", prev);
     };
   }, [description]);
+}
+
+interface PageSocialMeta {
+  readonly canonicalPath: string;
+  readonly title: string;
+  readonly description: string;
+  readonly type?: "website" | "article";
+  readonly image?: string;
+  readonly imageAlt?: string;
+}
+
+type HeadAttributeSnapshot = Readonly<{
+  element: Element;
+  attribute: string;
+  previous: string | null;
+}>;
+
+function setHeadAttribute(
+  selector: string,
+  attribute: string,
+  value: string,
+  snapshots: HeadAttributeSnapshot[]
+): void {
+  const element = document.head.querySelector(selector);
+  if (!element) return;
+  snapshots.push({ element, attribute, previous: element.getAttribute(attribute) });
+  element.setAttribute(attribute, value);
+}
+
+/**
+ * SPA route transitions must not leave the root page's canonical/Open Graph metadata behind.
+ * This updates only the tags already owned by index.html and restores their previous values on
+ * unmount, so nested routes cannot leak their social card into the next page.
+ *
+ * Crawlers that never execute JavaScript still need an edge/prerender response; this hook is the
+ * browser-rendered half of that contract, not a substitute for server-side marketplace metadata.
+ */
+export function usePageSocialMeta({
+  canonicalPath,
+  title,
+  description,
+  type = "website",
+  image = `${SITE_URL}/og-web.png`,
+  imageAlt = title,
+}: PageSocialMeta): void {
+  useEffect(() => {
+    const normalizedPath = canonicalPath.startsWith("/") ? canonicalPath : `/${canonicalPath}`;
+    const canonicalUrl = `${SITE_URL}${normalizedPath}`;
+    const safeTitle = title.trim().slice(0, 120);
+    const safeDescription = description.trim().slice(0, 200);
+    if (!safeTitle || !safeDescription) return;
+
+    const snapshots: HeadAttributeSnapshot[] = [];
+    setHeadAttribute('link[rel="canonical"]', "href", canonicalUrl, snapshots);
+    setHeadAttribute('meta[property="og:type"]', "content", type, snapshots);
+    setHeadAttribute('meta[property="og:title"]', "content", safeTitle, snapshots);
+    setHeadAttribute('meta[property="og:description"]', "content", safeDescription, snapshots);
+    setHeadAttribute('meta[property="og:url"]', "content", canonicalUrl, snapshots);
+    setHeadAttribute('meta[property="og:image"]', "content", image, snapshots);
+    setHeadAttribute('meta[property="og:image:alt"]', "content", imageAlt, snapshots);
+    setHeadAttribute('meta[name="twitter:title"]', "content", safeTitle, snapshots);
+    setHeadAttribute('meta[name="twitter:description"]', "content", safeDescription, snapshots);
+    setHeadAttribute('meta[name="twitter:image"]', "content", image, snapshots);
+
+    return () => {
+      for (const { element, attribute, previous } of snapshots) {
+        if (previous === null) element.removeAttribute(attribute);
+        else element.setAttribute(attribute, previous);
+      }
+    };
+  }, [canonicalPath, description, image, imageAlt, title, type]);
 }

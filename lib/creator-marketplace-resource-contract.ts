@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  CREATOR_MARKETPLACE_SEMVER_MAX_CHARACTERS,
+  isCreatorMarketplaceSemver,
+  normalizeCreatorMarketplaceLegacySemver,
+} from "./creator-marketplace-semver";
+
 export const CREATOR_MARKETPLACE_RESOURCE_KINDS = [
   "asset",
   "brush",
@@ -14,6 +20,11 @@ export const CREATOR_MARKETPLACE_RESOURCE_LICENSES = [
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",
+] as const;
+
+export const CREATOR_MARKETPLACE_RESOURCE_SORTS = [
+  "newest",
+  "relevance",
 ] as const;
 
 export const CREATOR_MARKETPLACE_RESOURCE_ENGINES = [
@@ -32,18 +43,68 @@ export const CREATOR_MARKETPLACE_RESOURCE_RUNTIMES = [
   "studio-bg3d-preset-v1",
 ] as const;
 
+export const CREATOR_MARKETPLACE_RESOURCE_REPORT_REASONS = [
+  "copyright",
+  "unsafe",
+  "spam",
+  "misleading",
+  "other",
+] as const;
+
+export const CREATOR_MARKETPLACE_RESOURCE_REPORT_STATUSES = [
+  "open",
+  "resolved",
+  "dismissed",
+] as const;
+
+export const CREATOR_MARKETPLACE_RESOURCE_MODERATION_ACTIONS = [
+  "hide",
+  "restore",
+  "dismiss",
+] as const;
+
+export const CREATOR_MARKETPLACE_PACKAGE_MODERATION_STATES = [
+  "active",
+  "hidden",
+] as const;
+
+/** Appeals are intentionally not part of the 0034 P0 API; only administrators hide/restore. */
+export const CREATOR_MARKETPLACE_PACKAGE_MODERATION_DECISION_ACTIONS = [
+  "hide",
+  "restore",
+] as const;
+
 export const CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES = 64 * 1_024;
 export const CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRY_BYTES = 16 * 1_024;
 export const CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE = 20;
 export const CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRIES = 32;
 export const CREATOR_MARKETPLACE_RESOURCE_CURSOR_MAX_CHARACTERS = 512;
+export const CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS = 80;
+export const CREATOR_MARKETPLACE_RESOURCE_QUERY_TAG_MAX_CHARACTERS = 24;
+export const CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS = 2_000;
+export const CREATOR_MARKETPLACE_MAX_RELEASE_ORDINAL = 2_147_483_647;
+export const CREATOR_MARKETPLACE_RESOURCE_REPORT_DETAILS_MAX_CHARACTERS = 500;
+export const CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS = 500;
+export const CREATOR_MARKETPLACE_RESOURCE_MODERATION_MAX_PAGE_SIZE = 50;
 
 export type CreatorMarketplaceResourceKind =
   (typeof CREATOR_MARKETPLACE_RESOURCE_KINDS)[number];
 export type CreatorMarketplaceResourceLicense =
   (typeof CREATOR_MARKETPLACE_RESOURCE_LICENSES)[number];
+export type CreatorMarketplaceResourceSort =
+  (typeof CREATOR_MARKETPLACE_RESOURCE_SORTS)[number];
 export type CreatorMarketplaceResourceEngine =
   (typeof CREATOR_MARKETPLACE_RESOURCE_ENGINES)[number];
+export type CreatorMarketplaceResourceReportReason =
+  (typeof CREATOR_MARKETPLACE_RESOURCE_REPORT_REASONS)[number];
+export type CreatorMarketplaceResourceReportStatus =
+  (typeof CREATOR_MARKETPLACE_RESOURCE_REPORT_STATUSES)[number];
+export type CreatorMarketplaceResourceModerationAction =
+  (typeof CREATOR_MARKETPLACE_RESOURCE_MODERATION_ACTIONS)[number];
+export type CreatorMarketplacePackageModerationState =
+  (typeof CREATOR_MARKETPLACE_PACKAGE_MODERATION_STATES)[number];
+export type CreatorMarketplacePackageModerationDecisionAction =
+  (typeof CREATOR_MARKETPLACE_PACKAGE_MODERATION_DECISION_ACTIONS)[number];
 
 export const CREATOR_MARKETPLACE_RUNTIME_BY_KIND = {
   asset: "studio-procedural-asset-v1",
@@ -68,13 +129,27 @@ export type CreatorMarketplaceJsonValue =
   | CreatorMarketplaceJsonValue[]
   | { [key: string]: CreatorMarketplaceJsonValue };
 
-const SemverSchema = z
+export const CreatorMarketplaceSemverSchema = z
   .string()
   .trim()
-  .max(40)
-  .regex(
-    /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u,
-    "버전은 1.2.3 형식이어야 합니다."
+  .max(CREATOR_MARKETPLACE_SEMVER_MAX_CHARACTERS)
+  .refine(
+    isCreatorMarketplaceSemver,
+    "버전은 1.2.3, 1.2.3-rc.1 또는 1.2.3+build.7 형태의 SemVer 2.0이어야 합니다."
+  );
+
+/**
+ * Read-only compatibility validator for rows admitted by the 0021-era grammar. It intentionally
+ * does not transform the value: normalizing here would change canonical manifest bytes and break
+ * the immutable stored hash. New publish requests continue to use CreatorMarketplaceSemverSchema.
+ */
+export const CreatorMarketplaceHistoricalSemverSchema = z
+  .string()
+  .trim()
+  .max(CREATOR_MARKETPLACE_SEMVER_MAX_CHARACTERS)
+  .refine(
+    (value) => normalizeCreatorMarketplaceLegacySemver(value) !== null,
+    "저장된 마켓 버전 형식이 지원 범위를 벗어났습니다."
   );
 const ResourceKeySchema = z
   .string()
@@ -97,13 +172,63 @@ const ShallowPortableDefinitionSchema = z.custom<
   "portable JSON definition은 비어 있지 않은 일반 객체여야 합니다."
 );
 
-const CreatorMarketplaceResourceKindSchema = z.enum(CREATOR_MARKETPLACE_RESOURCE_KINDS);
-const CreatorMarketplaceResourceLicenseSchema = z.enum(
+export const CreatorMarketplaceResourceKindSchema = z.enum(
+  CREATOR_MARKETPLACE_RESOURCE_KINDS
+);
+export const CreatorMarketplaceResourceLicenseSchema = z.enum(
   CREATOR_MARKETPLACE_RESOURCE_LICENSES
+);
+export const CreatorMarketplaceResourceSortSchema = z.enum(
+  CREATOR_MARKETPLACE_RESOURCE_SORTS
+);
+export const CreatorMarketplaceResourceReportReasonSchema = z.enum(
+  CREATOR_MARKETPLACE_RESOURCE_REPORT_REASONS
+);
+export const CreatorMarketplaceResourceReportStatusSchema = z.enum(
+  CREATOR_MARKETPLACE_RESOURCE_REPORT_STATUSES
+);
+export const CreatorMarketplaceResourceModerationActionSchema = z.enum(
+  CREATOR_MARKETPLACE_RESOURCE_MODERATION_ACTIONS
+);
+export const CreatorMarketplacePackageModerationStateSchema = z.enum(
+  CREATOR_MARKETPLACE_PACKAGE_MODERATION_STATES
+);
+export const CreatorMarketplacePackageModerationDecisionActionSchema = z.enum(
+  CREATOR_MARKETPLACE_PACKAGE_MODERATION_DECISION_ACTIONS
 );
 const CreatorMarketplaceResourceRuntimeSchema = z.enum(
   CREATOR_MARKETPLACE_RESOURCE_RUNTIMES
 );
+
+function creatorMarketplaceQueryContainsControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)) return true;
+  }
+  return false;
+}
+
+export const CreatorMarketplaceResourceSearchQuerySchema = z
+  .string()
+  .trim()
+  .max(CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS)
+  .refine(
+    (value) => !creatorMarketplaceQueryContainsControlCharacter(value),
+    "검색어에 제어 문자를 사용할 수 없습니다."
+  );
+export const CreatorMarketplaceResourceTagQuerySchema = z
+  .string()
+  .trim()
+  .max(CREATOR_MARKETPLACE_RESOURCE_QUERY_TAG_MAX_CHARACTERS)
+  .refine(
+    (value) => !creatorMarketplaceQueryContainsControlCharacter(value),
+    "태그에 제어 문자를 사용할 수 없습니다."
+  );
+export const CreatorMarketplaceResourcePublisherQuerySchema = z
+  .string()
+  .trim()
+  .uuid();
+export const CreatorMarketplaceResourcePackageIdSchema = ResourceKeySchema;
 
 export const CreatorMarketplacePortablePayloadSchema = z
   .object({
@@ -225,10 +350,27 @@ const CreatorMarketplaceResourceManifestBaseSchema = z
     packageId: ResourceKeySchema,
     name: z.string().trim().min(1).max(80),
     description: z.string().trim().max(1_000).default(""),
+    // Optional without a default so adding release notes never rewrites the canonical bytes/hash
+    // of 0021-era manifests that predate this field.
+    releaseNotes: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS)
+      .optional(),
     kind: CreatorMarketplaceResourceKindSchema,
-    resourceVersion: SemverSchema,
-    minimumStudioVersion: SemverSchema,
-    tags: z.array(z.string().trim().min(1).max(24)).max(8).default([]),
+    resourceVersion: CreatorMarketplaceSemverSchema,
+    minimumStudioVersion: CreatorMarketplaceSemverSchema,
+    tags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(CREATOR_MARKETPLACE_RESOURCE_QUERY_TAG_MAX_CHARACTERS)
+      )
+      .max(8)
+      .default([]),
     license: CreatorMarketplaceResourceLicenseSchema,
     attributionText: z.string().trim().max(240).default(""),
     containsAi: z.boolean().default(false),
@@ -246,6 +388,12 @@ const CreatorMarketplaceResourceManifestBaseSchema = z
       .max(CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRIES),
   })
   .strict();
+
+const CreatorMarketplaceStoredResourceManifestBaseSchema =
+  CreatorMarketplaceResourceManifestBaseSchema.extend({
+    resourceVersion: CreatorMarketplaceHistoricalSemverSchema,
+    minimumStudioVersion: CreatorMarketplaceHistoricalSemverSchema,
+  });
 
 type CreatorMarketplaceResourceManifestSemanticValue = Omit<
   z.infer<typeof CreatorMarketplaceResourceManifestBaseSchema>,
@@ -400,8 +548,10 @@ function refineCreatorMarketplaceManifest(
     }
 }
 
-export const CreatorMarketplaceResourceManifestSchema =
-  CreatorMarketplaceResourceManifestBaseSchema.superRefine((manifest, context) => {
+function refineCreatorMarketplaceManifestWithSize(
+  manifest: CreatorMarketplaceResourceManifestSemanticValue,
+  context: z.RefinementCtx
+): void {
     refineCreatorMarketplaceManifest(manifest, context);
     const definitionsAreStructurallySafe = manifest.entries.every(
       (entry) =>
@@ -419,7 +569,21 @@ export const CreatorMarketplaceResourceManifestSchema =
         message: "공유 manifest가 허용된 크기를 초과했습니다.",
       });
     }
-  });
+}
+
+export const CreatorMarketplaceResourceManifestSchema =
+  CreatorMarketplaceResourceManifestBaseSchema.superRefine(
+    refineCreatorMarketplaceManifestWithSize
+  );
+
+export const CreatorMarketplaceStoredResourceManifestSchema =
+  CreatorMarketplaceStoredResourceManifestBaseSchema.superRefine(
+    refineCreatorMarketplaceManifestWithSize
+  );
+
+export type CreatorMarketplaceStoredResourceManifest = z.infer<
+  typeof CreatorMarketplaceStoredResourceManifestSchema
+>;
 
 export type CreatorMarketplaceResourceManifest = z.infer<
   typeof CreatorMarketplaceResourceManifestSchema
@@ -433,8 +597,32 @@ export const CreatorMarketplaceResourcePublisherSchema = z
   })
   .strict();
 
+/**
+ * Exact, payload-free identity used only to reconcile legacy local Studio installs.
+ * The UUID was already supplied by the caller; this deliberately exposes no manifest,
+ * release version, entitlement, moderation note, or owner/account state.
+ */
+export const CreatorMarketplaceResourceIdentitySchema = z
+  .object({
+    id: z.string().uuid(),
+    publisherId: z.string().trim().min(1).max(160),
+    packageId: ResourceKeySchema,
+    kind: CreatorMarketplaceResourceKindSchema,
+    availability: z.enum([
+      "listed",
+      "owner-delisted",
+      "moderator-hidden",
+      "publisher-unavailable",
+    ]),
+  })
+  .strict();
+
+export type CreatorMarketplaceResourceIdentity = z.infer<
+  typeof CreatorMarketplaceResourceIdentitySchema
+>;
+
 const CreatorMarketplacePublicManifestBaseSchema =
-  CreatorMarketplaceResourceManifestBaseSchema.omit({ rightsConfirmed: true });
+  CreatorMarketplaceStoredResourceManifestBaseSchema.omit({ rightsConfirmed: true });
 
 export const CreatorMarketplacePublicManifestSchema =
   CreatorMarketplacePublicManifestBaseSchema.superRefine(
@@ -482,6 +670,437 @@ export const CreatorMarketplaceResourceListPageSchema = z
 
 export type CreatorMarketplaceResourceListPage = z.infer<
   typeof CreatorMarketplaceResourceListPageSchema
+>;
+
+export const CreatorMarketplaceResourceHistoryItemSchema = z
+  .object({
+    // Public history exposes identifiers only for releases that are currently listed. Hidden and
+    // owner-delisted rows are excluded by the repository before this contract is constructed.
+    id: z.string().uuid(),
+    releaseOrdinal: z.number().int().min(1),
+    name: z.string().trim().min(1).max(80),
+    resourceVersion: CreatorMarketplaceHistoricalSemverSchema,
+    minimumStudioVersion: CreatorMarketplaceHistoricalSemverSchema,
+    releaseNotes: z
+      .string()
+      .min(1)
+      .max(CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS)
+      .optional(),
+    manifestHash: Sha256Schema,
+    createdAt: z.iso.datetime({ offset: true }),
+    selected: z.boolean(),
+  })
+  .strict();
+
+export type CreatorMarketplaceResourceHistoryItem = z.infer<
+  typeof CreatorMarketplaceResourceHistoryItemSchema
+>;
+
+export const CreatorMarketplaceResourceHistoryPageSchema = z
+  .object({
+    packageId: ResourceKeySchema,
+    anchor: z
+      .object({
+        // This UUID was already supplied by the caller. A delisted anchor may be echoed, but no
+        // other delisted identifier is ever admitted into `items`.
+        id: z.string().uuid(),
+        resourceVersion: CreatorMarketplaceHistoricalSemverSchema,
+        listed: z.boolean(),
+      })
+      .strict(),
+    items: z
+      .array(CreatorMarketplaceResourceHistoryItemSchema)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    limit: z.number().int().min(1).max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    hasMore: z.boolean(),
+    nextCursor: z.number().int().min(1).nullable(),
+  })
+  .strict()
+  .superRefine((page, context) => {
+    const ids = new Set<string>();
+    const ordinals = new Set<number>();
+    for (const [index, item] of page.items.entries()) {
+      if (ids.has(item.id) || ordinals.has(item.releaseOrdinal)) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", index],
+          message: "릴리스 이력 식별자와 순서는 중복될 수 없습니다.",
+        });
+      }
+      ids.add(item.id);
+      ordinals.add(item.releaseOrdinal);
+      if (item.selected !== (item.id === page.anchor.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", index, "selected"],
+          message: "선택 상태는 요청한 이력 기준 릴리스와 일치해야 합니다.",
+        });
+      }
+      if (!page.anchor.listed && item.id === page.anchor.id) {
+        context.addIssue({
+          code: "custom",
+          path: ["items", index, "id"],
+          message: "목록에서 내린 기준 릴리스는 공개 이력에 포함할 수 없습니다.",
+        });
+      }
+    }
+  });
+
+export type CreatorMarketplaceResourceHistoryPage = z.infer<
+  typeof CreatorMarketplaceResourceHistoryPageSchema
+>;
+
+export const CreatorMarketplacePackageModerationSnapshotSchema = z
+  .object({
+    state: CreatorMarketplacePackageModerationStateSchema,
+    revision: z.number().int().min(0),
+    hiddenAt: z.iso.datetime({ offset: true }).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.state === "hidden") !== (value.hiddenAt !== null)) {
+      context.addIssue({
+        code: "custom",
+        path: ["hiddenAt"],
+        message: "패키지 숨김 상태와 숨김 시각이 일치해야 합니다.",
+      });
+    }
+    if (value.revision === 0 && value.state !== "active") {
+      context.addIssue({
+        code: "custom",
+        path: ["revision"],
+        message: "초기 패키지 중재 상태는 공개 상태여야 합니다.",
+      });
+    }
+  });
+
+export type CreatorMarketplacePackageModerationSnapshot = z.infer<
+  typeof CreatorMarketplacePackageModerationSnapshotSchema
+>;
+
+export const CreatorMarketplaceOwnedReleaseSchema = z
+  .object({
+    resource: CreatorMarketplaceResourceRecordSchema,
+    releaseOrdinal: z.number().int().min(1),
+    /** @deprecated Compatibility projection derived from packageModeration.state. */
+    hidden: z.boolean(),
+    delistedAt: z.iso.datetime({ offset: true }).nullable(),
+    packageModeration: CreatorMarketplacePackageModerationSnapshotSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.resource.isOwner) {
+      context.addIssue({
+        code: "custom",
+        path: ["resource", "isOwner"],
+        message: "소유 릴리스에는 소유자 투영만 사용할 수 있습니다.",
+      });
+    }
+    if (value.hidden !== (value.packageModeration.state === "hidden")) {
+      context.addIssue({
+        code: "custom",
+        path: ["hidden"],
+        message: "호환 숨김 값은 패키지 중재 상태에서 파생되어야 합니다.",
+      });
+    }
+  });
+
+export type CreatorMarketplaceOwnedRelease = z.infer<
+  typeof CreatorMarketplaceOwnedReleaseSchema
+>;
+
+export const CreatorMarketplaceOwnedHeadPageSchema = z
+  .object({
+    items: z
+      .array(CreatorMarketplaceOwnedReleaseSchema)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    limit: z.number().int().min(1).max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    hasMore: z.boolean(),
+    nextCursor: z
+      .string()
+      .min(1)
+      .max(CREATOR_MARKETPLACE_RESOURCE_CURSOR_MAX_CHARACTERS)
+      .regex(/^[A-Za-z0-9_-]+$/u)
+      .nullable(),
+  })
+  .strict();
+
+export type CreatorMarketplaceOwnedHeadPage = z.infer<
+  typeof CreatorMarketplaceOwnedHeadPageSchema
+>;
+
+export const CreatorMarketplaceOwnedHistoryPageSchema = z
+  .object({
+    packageId: ResourceKeySchema,
+    items: z
+      .array(CreatorMarketplaceOwnedReleaseSchema)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    limit: z.number().int().min(1).max(CREATOR_MARKETPLACE_RESOURCE_MAX_PAGE_SIZE),
+    hasMore: z.boolean(),
+    nextCursor: z.number().int().min(1).nullable(),
+  })
+  .strict();
+
+export type CreatorMarketplaceOwnedHistoryPage = z.infer<
+  typeof CreatorMarketplaceOwnedHistoryPageSchema
+>;
+
+export const CreatorMarketplaceResourceRelistReceiptSchema = z
+  .object({
+    relisted: z.literal(true),
+    changed: z.boolean(),
+    id: z.string().uuid(),
+    delistedAt: z.null(),
+  })
+  .strict();
+
+export type CreatorMarketplaceResourceRelistReceipt = z.infer<
+  typeof CreatorMarketplaceResourceRelistReceiptSchema
+>;
+
+/**
+ * A bounded, immutable snapshot captured by the API while the target release row is locked.
+ * It deliberately stores verifiable release metadata rather than another copy of the potentially
+ * 64 KiB manifest. The referenced release normally remains available, while this snapshot keeps
+ * the moderation record intelligible if account lifecycle cleanup later removes that release.
+ */
+const CreatorMarketplaceResourceReportEvidenceBaseSchema = z
+  .object({
+    resourceId: z.string().uuid(),
+    packageId: ResourceKeySchema,
+    name: z.string().trim().min(1).max(80),
+    kind: CreatorMarketplaceResourceKindSchema,
+    resourceVersion: CreatorMarketplaceHistoricalSemverSchema,
+    license: CreatorMarketplaceResourceLicenseSchema,
+    manifestHash: Sha256Schema,
+    manifestByteSize: z
+      .number()
+      .int()
+      .min(1)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES),
+    releaseCreatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const CreatorMarketplaceResourceReportEvidenceV1Schema =
+  CreatorMarketplaceResourceReportEvidenceBaseSchema.extend({
+    schemaVersion: z.literal(1),
+  }).strict();
+
+export const CreatorMarketplaceResourceReportEvidenceV2Schema =
+  CreatorMarketplaceResourceReportEvidenceBaseSchema.extend({
+    schemaVersion: z.literal(2),
+    publisherId: z.string().trim().min(1).max(160),
+    packageModerationRevision: z.number().int().min(0),
+  }).strict();
+
+export const CreatorMarketplaceResourceReportEvidenceV3Schema =
+  CreatorMarketplaceResourceReportEvidenceBaseSchema.extend({
+    schemaVersion: z.literal(3),
+    publisherId: z.string().trim().min(1).max(160),
+    packageModerationRevision: z.number().int().min(0),
+    /** Absolute package-head releaseOrdinal observed under the package advisory lock. */
+    packageReportEpoch: z.number().int().min(1),
+  }).strict();
+
+export const CreatorMarketplaceResourceReportEvidenceSchema =
+  z.discriminatedUnion("schemaVersion", [
+    CreatorMarketplaceResourceReportEvidenceV1Schema,
+    CreatorMarketplaceResourceReportEvidenceV2Schema,
+    CreatorMarketplaceResourceReportEvidenceV3Schema,
+  ]);
+
+export type CreatorMarketplaceResourceReportEvidence = z.infer<
+  typeof CreatorMarketplaceResourceReportEvidenceSchema
+>;
+
+export const CreatorMarketplaceResourceReportReceiptSchema = z
+  .object({
+    reported: z.literal(true),
+    reportId: z.string().uuid(),
+    status: z.literal("open"),
+  })
+  .strict();
+
+export type CreatorMarketplaceResourceReportReceipt = z.infer<
+  typeof CreatorMarketplaceResourceReportReceiptSchema
+>;
+
+export const CreatorMarketplaceCurrentPackageAvailabilitySchema =
+  z.discriminatedUnion("state", [
+    z.object({
+      state: z.literal("available"),
+      currentHead: z.object({ id: z.string().uuid() }).strict(),
+    }).strict(),
+    z.object({
+      state: z.literal("unavailable"),
+      reason: z.enum([
+        "moderated",
+        "owner-delisted",
+        "publisher-unavailable",
+      ]),
+    }).strict(),
+  ]);
+
+export type CreatorMarketplaceCurrentPackageAvailability = z.infer<
+  typeof CreatorMarketplaceCurrentPackageAvailabilitySchema
+>;
+
+export const CreatorMarketplaceResourceModerationQueueItemSchema = z
+  .object({
+    reportId: z.string().uuid(),
+    reason: CreatorMarketplaceResourceReportReasonSchema,
+    details: z
+      .string()
+      .max(CREATOR_MARKETPLACE_RESOURCE_REPORT_DETAILS_MAX_CHARACTERS),
+    status: CreatorMarketplaceResourceReportStatusSchema,
+    resolutionNote: z
+      .string()
+      .max(CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS),
+    reporter: z
+      .object({
+        id: z.string().trim().min(1).max(160).nullable(),
+        name: z.string().trim().min(1).max(120),
+      })
+      .strict(),
+    reviewedBy: z.string().trim().min(1).max(160).nullable(),
+    reviewedAt: z.iso.datetime({ offset: true }).nullable(),
+    createdAt: z.iso.datetime({ offset: true }),
+    evidence: CreatorMarketplaceResourceReportEvidenceSchema,
+    currentResource: z
+      .object({
+        id: z.string().uuid(),
+        /** @deprecated Compatibility projection derived from currentPackage.state. */
+        hidden: z.boolean(),
+        delistedAt: z.iso.datetime({ offset: true }).nullable(),
+      })
+      .strict()
+      .nullable(),
+    currentPackage: z
+      .object({
+        publisherId: z.string().trim().min(1).max(160),
+        packageId: ResourceKeySchema,
+        /** Absolute-head UUID used only as the package moderation action target. */
+        moderationTargetId: z.string().uuid(),
+        moderation: CreatorMarketplacePackageModerationSnapshotSchema,
+        availability: CreatorMarketplaceCurrentPackageAvailabilitySchema,
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict()
+  .superRefine((item, context) => {
+    if (
+      item.currentResource
+      && item.currentPackage
+      && item.currentResource.hidden
+        !== (item.currentPackage.moderation.state === "hidden")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["currentResource", "hidden"],
+        message: "리소스 호환 숨김 값은 현재 패키지 상태에서 파생되어야 합니다.",
+      });
+    }
+    if (!item.currentPackage) return;
+    const moderated = item.currentPackage.moderation.state === "hidden";
+    const availabilityModerated = item.currentPackage.availability.state === "unavailable"
+      && item.currentPackage.availability.reason === "moderated";
+    if (moderated !== availabilityModerated) {
+      context.addIssue({
+        code: "custom",
+        path: ["currentPackage", "availability"],
+        message: "패키지 중재 상태와 공개 가용성 사유가 일치해야 합니다.",
+      });
+    }
+    if (
+      item.currentPackage.availability.state === "available"
+      && item.currentPackage.availability.currentHead.id
+        !== item.currentPackage.moderationTargetId
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["currentPackage", "availability", "currentHead", "id"],
+        message: "공개 head와 중재 대상 head가 일치해야 합니다.",
+      });
+    }
+  });
+
+export type CreatorMarketplaceResourceModerationQueueItem = z.infer<
+  typeof CreatorMarketplaceResourceModerationQueueItemSchema
+>;
+
+export const CreatorMarketplaceResourceModerationQueuePageSchema = z
+  .object({
+    items: z
+      .array(CreatorMarketplaceResourceModerationQueueItemSchema)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MODERATION_MAX_PAGE_SIZE),
+    status: CreatorMarketplaceResourceReportStatusSchema,
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(CREATOR_MARKETPLACE_RESOURCE_MODERATION_MAX_PAGE_SIZE),
+    offset: z.number().int().min(0).max(1_000_000),
+    hasMore: z.boolean(),
+    nextOffset: z.number().int().min(0).max(1_000_000).nullable(),
+  })
+  .strict();
+
+export type CreatorMarketplaceResourceModerationQueuePage = z.infer<
+  typeof CreatorMarketplaceResourceModerationQueuePageSchema
+>;
+
+export const CreatorMarketplaceResourceModerationReceiptSchema = z
+  .object({
+    moderated: z.literal(true),
+    scope: z.literal("package"),
+    action: CreatorMarketplaceResourceModerationActionSchema,
+    changed: z.boolean(),
+    hidden: z.boolean(),
+    delisted: z.boolean(),
+    reviewedReportCount: z.number().int().min(0),
+    decisionId: z.string().uuid().nullable(),
+    package: z
+      .object({
+        publisherId: z.string().trim().min(1).max(160),
+        packageId: ResourceKeySchema,
+        moderation: CreatorMarketplacePackageModerationSnapshotSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (receipt.hidden !== (receipt.package.moderation.state === "hidden")) {
+      context.addIssue({
+        code: "custom",
+        path: ["hidden"],
+        message: "응답 숨김 값은 패키지 중재 상태에서 파생되어야 합니다.",
+      });
+    }
+    if (receipt.changed !== (receipt.decisionId !== null)) {
+      context.addIssue({
+        code: "custom",
+        path: ["decisionId"],
+        message: "변경된 중재 응답에는 새 결정 식별자가 필요합니다.",
+      });
+    }
+  });
+
+export type CreatorMarketplaceResourceModerationReceipt = z.infer<
+  typeof CreatorMarketplaceResourceModerationReceiptSchema
+>;
+
+export const CreatorMarketplaceOrphanReportDismissReceiptSchema = z
+  .object({
+    dismissed: z.literal(true),
+    reportId: z.string().uuid(),
+    dismissedReportCount: z.number().int().min(1),
+  })
+  .strict();
+
+export type CreatorMarketplaceOrphanReportDismissReceipt = z.infer<
+  typeof CreatorMarketplaceOrphanReportDismissReceiptSchema
 >;
 
 export function creatorMarketplaceJsonByteSize(value: unknown): number {

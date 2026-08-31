@@ -13,18 +13,30 @@ import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
+  usePageSocialMeta,
 } from "@/src/hooks/use-document-title";
 
 export function MarketResourceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { record, loading, notFound, error, staleSavedAt, reload } = useMarketResourceDetail(id);
+  const metaTitle = record?.name ?? (notFound ? "리소스를 찾을 수 없어요" : "창작 마켓");
+  const metaDescription = record?.description?.trim()
+    || (record
+      ? `${record.name} 리소스의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.`
+      : "ToonSpectrum 창작 마켓 리소스의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.");
 
-  useDocumentTitle(record?.name ?? (notFound ? "리소스를 찾을 수 없어요" : "창작 마켓"));
-  useMetaDescription(record?.description);
+  useDocumentTitle(metaTitle);
+  useMetaDescription(metaDescription);
+  usePageSocialMeta({
+    canonicalPath: record ? `/market/resource/${encodeURIComponent(record.id)}` : "/market",
+    title: `${metaTitle} · 툰스펙트럼`,
+    description: metaDescription,
+    type: record ? "article" : "website",
+  });
   useJsonLd(record ? marketResourceJsonLd(record) : null);
 
   const related = useMarketResources(
-    record ? { kind: record.kind, limit: 5 } : null
+    record ? { kind: record.kind, limit: 5, sort: "newest" } : null
   );
   const relatedItems = related.items.filter((item) => item.id !== record?.id).slice(0, 4);
 
@@ -39,16 +51,24 @@ export function MarketResourceDetailPage() {
       </Link>
 
       {loading ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" aria-hidden="true">
-          <div className="space-y-3">
-            <div className="skeleton aspect-[16/9] w-full rounded-xl" />
-            <div className="skeleton h-5 w-3/5" />
-            <div className="skeleton h-4 w-2/5" />
-          </div>
-          <div className="space-y-2 rounded-xl border border-line bg-card p-5">
-            {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} className="skeleton h-4 w-full" />
-            ))}
+        <div className="mt-6">
+          <p role="status" className="sr-only">
+            마켓 리소스 상세 정보를 불러오는 중입니다.
+          </p>
+          <div
+            className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
+            aria-hidden="true"
+          >
+            <div className="space-y-3">
+              <div className="skeleton aspect-[16/9] w-full rounded-xl" />
+              <div className="skeleton h-5 w-3/5" />
+              <div className="skeleton h-4 w-2/5" />
+            </div>
+            <div className="space-y-2 rounded-xl border border-line bg-card p-5">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="skeleton h-4 w-full" />
+              ))}
+            </div>
           </div>
         </div>
       ) : notFound ? (

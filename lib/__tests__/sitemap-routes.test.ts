@@ -18,6 +18,11 @@ describe("sitemap static routes", () => {
       expect(staticRoutes).toContain(route);
     }
   });
+
+  it("keeps the creator market landing and discovery routes indexable", () => {
+    expect(staticRoutes).toContain('"/market"');
+    expect(staticRoutes).toContain('"/market/browse"');
+  });
 });
 
 describe("home creator funnel", () => {

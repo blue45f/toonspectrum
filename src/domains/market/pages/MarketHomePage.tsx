@@ -9,14 +9,28 @@ import { MARKET_KINDS, MARKET_LICENSES } from "../models/market-kind";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
-import { useJsonLd } from "@/src/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useJsonLd,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/src/hooks/use-document-title";
 
+const MARKET_HOME_DESCRIPTION =
+  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
 
 export function MarketHomePage() {
-  const latest = useMarketResources({ limit: 8 });
+  const latest = useMarketResources({ limit: 8, sort: "newest" });
   const hasLatestItems = latest.items.length > 0;
   const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
+  useDocumentTitle("창작 마켓");
+  useMetaDescription(MARKET_HOME_DESCRIPTION);
+  usePageSocialMeta({
+    canonicalPath: "/market",
+    title: "창작 마켓 · 툰스펙트럼",
+    description: MARKET_HOME_DESCRIPTION,
+  });
   useJsonLd(marketHomeJsonLd(latest.items));
 
   const tagCounts = new Map<string, number>();
@@ -130,7 +144,15 @@ export function MarketHomePage() {
         ) : null}
         {hasFatalLatestError ? null : (
           <>
-            <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {latest.loading ? (
+              <p role="status" className="sr-only">
+                최근 공유된 마켓 리소스를 불러오는 중입니다.
+              </p>
+            ) : null}
+            <ul
+              aria-busy={latest.loading || undefined}
+              className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
+            >
               {latest.loading
                 ? Array.from({ length: 8 }, (_, index) => (
                     <li key={index} aria-hidden="true">
@@ -173,7 +195,7 @@ export function MarketHomePage() {
                 href={license.url ?? "/terms"}
                 target={license.url ? "_blank" : undefined}
                 rel={license.url ? "noreferrer" : undefined}
-                className="mt-2 inline-flex min-h-11 items-center text-xs text-cool underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                className="mt-2 inline-flex min-h-11 items-center text-xs text-cool underline decoration-current underline-offset-2 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
               >
                 사용권 전문 보기{license.url ? " ↗" : ""}
               </a>

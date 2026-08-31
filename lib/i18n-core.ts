@@ -9,6 +9,7 @@ import {
   normalizeLocaleCode,
   getLocaleCandidates,
   detectBrowserLocale,
+  resolveSelectableLocale,
 } from "./i18n-intl-utils";
 import {
   getRuntimeTranslationBundle,
@@ -133,7 +134,7 @@ export const useI18n = create<I18nState>()(
       lang: detectBrowserLocale(),
       translationBundleRevision: 0,
       setLang: (lang) => {
-        const normalized = normalizeLocaleCode(lang) || FALLBACK_LANG;
+        const normalized = resolveSelectableLocale(lang);
         applyHtmlLang(normalized);
         set({ lang: normalized });
         void loadRuntimeTranslationBundle(normalized);
@@ -143,7 +144,7 @@ export const useI18n = create<I18nState>()(
       name: "toonspectrum-lang",
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const normalized = normalizeLocaleCode(state.lang || FALLBACK_LANG);
+          const normalized = resolveSelectableLocale(state.lang || FALLBACK_LANG);
           state.lang = normalized;
           applyHtmlLang(normalized);
           void loadRuntimeTranslationBundle(normalized);

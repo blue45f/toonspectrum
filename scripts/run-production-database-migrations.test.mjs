@@ -25,10 +25,114 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(29);
+  expect(manifest).toHaveLength(34);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0029_creator_community_runtime_indexes");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(29);
+  expect(manifest.at(-1).id).toBe(
+    "0034_creator_marketplace_package_moderation",
+  );
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(34);
+});
+
+test("creator marketplace release migration backfills immutable SemVer order", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0030_creator_marketplace_immutable_releases",
+  );
+  expect(migration?.id).toBe("0030_creator_marketplace_immutable_releases");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "releaseOrdinal" integer',
+    'ADD COLUMN IF NOT EXISTS "delistedAt" timestamptz',
+    "creator_marketplace_semver_compare",
+    "creator_marketplace_resource_immutable_release",
+    "pg_advisory_xact_lock",
+    "equal-precedence release equivocation",
+    'creator_marketplace_resource_publisher_package_ordinal_unique',
+    'creator_marketplace_resource_publisher_package_precedence_uniq',
+    'WHERE "hidden" = false AND "delistedAt" IS NULL',
+    "0030_creator_marketplace_immutable_releases",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("creator marketplace moderation migration preserves evidence and separates visibility", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0031_creator_marketplace_moderation",
+  );
+  expect(migration?.id).toBe("0031_creator_marketplace_moderation");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'CREATE TABLE IF NOT EXISTS public."creator_marketplace_resource_report"',
+    'CREATE TABLE IF NOT EXISTS public."creator_marketplace_resource_report_gate"',
+    'UNIQUE ("resourceSnapshotId", "reporterKeyHash")',
+    'octet_length("reporterKeyHash") = 32',
+    "creator marketplace report evidence is immutable",
+    "creator marketplace moderation decision is immutable",
+    "creator marketplace owner delisting is monotonic",
+    'NEW."semverContractVersion" IS DISTINCT FROM OLD."semverContractVersion"',
+    "creator_marketplace_resource_lifecycle_update",
+    "0031_creator_marketplace_moderation",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toContain('NEW."delistedAt"');
+  expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("creator marketplace lifecycle migration permits only a fresh non-moderated head relist", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0032_creator_marketplace_release_lifecycle",
+  );
+  expect(migration?.id).toBe(
+    "0032_creator_marketplace_release_lifecycle",
+  );
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ALTER COLUMN "createdAt" TYPE timestamptz(3)',
+    'ALTER COLUMN "updatedAt" TYPE timestamptz(3)',
+    "creator_marketplace_resource_immutable_content",
+    "creator_marketplace_resource_lifecycle_separation",
+    "creator_marketplace_resource_relist_moderated",
+    "creator_marketplace_resource_relist_non_head",
+    "creator_marketplace_resource_lifecycle_timestamp_required",
+    "creator_marketplace_resource_publish_moderated",
+    "pg_advisory_xact_lock",
+    "NEW.\"updatedAt\" <= OLD.\"updatedAt\"",
+    "0032_creator_marketplace_release_lifecycle",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).not.toMatch(/UPDATE[\s\S]*"manifest"\s*=/u);
+});
+
+test("creator marketplace package cutover guards withdrawal and confirmation availability", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0034_creator_marketplace_package_moderation",
+  );
+  expect(migration?.id).toBe("0034_creator_marketplace_package_moderation");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "creator_marketplace_resource_delist_non_head",
+    "creator_marketplace_resource_relist_non_head",
+    "creator_marketplace_library_package_available",
+    "creator marketplace library membership requires an active publisher",
+    "creator marketplace library membership requires a listed package head",
+    'ADD COLUMN "packageReportEpoch" integer',
+    "creator_marketplace_resource_report_package_epoch_reporter_v3_unique",
+    "new creator marketplace reports require package epoch evidence v3",
+    'package_report_epoch IS DISTINCT FROM NEW."packageReportEpoch"',
+    "exact_release_listed",
+    "publisher_status IS DISTINCT FROM 'active'",
+    'release."delistedAt" IS NULL',
+    "ORDER BY account.\"id\"",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
 });
 
 test("creator community migration aligns canonical runtime indexes and records readiness", () => {
@@ -248,16 +352,49 @@ test("creator marketplace runtime ACL is normalized to the repository contract",
   );
 
   expect(sql).toContain(
-    "REVOKE ALL ON TABLE\n  public.creator_marketplace_resource,\n  public.creator_marketplace_publish_gate\nFROM PUBLIC;",
+    "REVOKE ALL ON TABLE\n  public.creator_marketplace_resource,\n  public.creator_marketplace_library_item,\n  public.creator_marketplace_package_moderation,\n  public.creator_marketplace_package_moderation_decision,\n  public.creator_marketplace_publish_gate,",
+  );
+  expect(sql).toContain("DO $creator_marketplace_acl$");
+  expect(sql).toContain("REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM %I");
+  expect(sql).toContain("REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC");
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_marketplace_resource",
   );
   expect(sql).toContain(
-    "GRANT SELECT, INSERT, DELETE\n  ON TABLE public.creator_marketplace_resource",
+    'GRANT UPDATE ("delistedAt", "updatedAt")\n  ON TABLE public.creator_marketplace_resource',
+  );
+  expect(sql).not.toMatch(/GRANT UPDATE \([^)]*"hidden"/u);
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_marketplace_library_item",
+  );
+  expect(sql).toContain('"lastConfirmedReleaseOrdinal"');
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_marketplace_package_moderation",
+  );
+  expect(sql).toContain('"currentDecisionId"');
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_marketplace_package_moderation_decision",
+  );
+  expect(sql).not.toMatch(
+    /GRANT[^;]*DELETE[^;]*creator_marketplace_library_item/u,
   );
   expect(sql).not.toContain(
-    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.creator_marketplace_resource",
+    "GRANT SELECT, INSERT, DELETE\n  ON TABLE public.creator_marketplace_resource",
+  );
+  expect(sql).not.toMatch(
+    /GRANT SELECT, INSERT, UPDATE, DELETE\n {2}ON TABLE public\.creator_marketplace_resource\n/u,
   );
   expect(sql).toContain(
     "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.creator_marketplace_publish_gate",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_marketplace_resource_report",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("status", "resolutionNote", "reviewedBy", "reviewedAt")',
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.creator_marketplace_resource_report_gate",
   );
   expect(sql).toContain('FROM "toonspectrum_runtime";');
   for (const privilege of [
@@ -272,7 +409,18 @@ test("creator marketplace runtime ACL is normalized to the repository contract",
     expect(violation).toContain(`'${privilege}'`);
   }
   expect(violation).toContain("public.creator_marketplace_resource");
+  expect(violation).toContain("public.creator_marketplace_library_item");
+  expect(violation).toContain("public.creator_marketplace_package_moderation");
+  expect(violation).toContain(
+    "public.creator_marketplace_package_moderation_decision",
+  );
   expect(violation).toContain("public.creator_marketplace_publish_gate");
+  expect(violation).toContain("public.creator_marketplace_resource_report");
+  expect(violation).toContain("public.creator_marketplace_resource_report_gate");
+  expect(violation).toContain("immutable_attribute");
+  expect(violation).toContain("'hidden'");
+  expect(violation).toContain("'delistedAt'");
+  expect(violation).toContain("'updatedAt'");
   expect(violation).toContain("'toonspectrum_runtime'");
   expect(violation).toContain("has_any_column_privilege");
   expect(violation).toContain("WITH GRANT OPTION");
@@ -414,8 +562,13 @@ test("post-baseline relation classification stays synchronized with the CI fixtu
   expect(POST_BASELINE_RELATIONS).toEqual([
     "creator_asset_storage_object",
     "creator_draft_collaboration_room",
+    "creator_marketplace_library_item",
+    "creator_marketplace_package_moderation",
+    "creator_marketplace_package_moderation_decision",
     "creator_marketplace_publish_gate",
     "creator_marketplace_resource",
+    "creator_marketplace_resource_report",
+    "creator_marketplace_resource_report_gate",
     "creator_work_asset_storage_reference",
   ]);
   const workflow = readFileSync(

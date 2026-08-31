@@ -18,7 +18,7 @@ export function StaleNoticeBar({ savedAt, message, onRetry, className }: StaleNo
     <div role="status" className={className ?? DEFAULT_CLASS}>
       <span>
         {message
-          ?? `연결이 불안정해 ${formatMarketDateTime(savedAt ?? new Date().toISOString())}에 저장된 목록을 보여드리고 있어요`}
+          ?? `연결이 불안정해 ${formatMarketDateTime(savedAt ?? new Date().toISOString())}에 저장된 사본을 보여드리고 있어요. 현재 공개 상태는 확인되지 않았어요`}
       </span>
       <button
         type="button"

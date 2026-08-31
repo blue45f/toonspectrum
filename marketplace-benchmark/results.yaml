@@ -1,0 +1,477 @@
+benchmark:
+  topic: ToonSpectrum creator asset marketplace competitive benchmark
+  as_of: 2026-08-31
+  evidence_mode: official_documentation_review
+  source_policy: Use current first-party product, help, developer, policy, or terms pages. Do not infer undocumented behavior from marketing labels.
+  access_status_meaning: Verified means that the cited official page was retrieved and directly supports the finding; it does not mean that the product flow was exercised.
+  exercise_boundary: No authenticated checkout, seller-console, paid-plan, region-specific, or destructive purchase flow was directly exercised for this artifact.
+  coverage:
+    comparison_entries: 38
+    entries_with_official_primary_source: 38
+    entries_with_verified_finding: 38
+    entries_inaccessible: 0
+    entries_unverifiable: 0
+    official_source_urls: 55
+    entry_coverage_percent: 100
+  link_validation:
+    automated_http_200: 35
+    browser_or_search_retrieved_after_automated_block: 20
+    malformed_or_unresolved_urls: 0
+    note: Automated probes were blocked or not completed for 20 dynamic or anti-bot pages, but current content from each official URL was retrieved through browser search during the review.
+  remaining_unverifiable_entries: []
+
+results:
+  - name: Clip Studio Assets
+    lane: illustration-editor marketplace
+    access_status: verified
+    sources:
+      - title: How to download materials from Assets
+        url: https://help.clip-studio.com/en-us/manual_en/630_material/How_to_download_materials_from_Assets.htm
+    verified_finding: >-
+      Official help documents search and filtering across brushes, images, 3D models and workspaces, compatible-software information on detail pages, and a download flow that returns supported materials to Clip Studio Paint.
+    toonspectrum_implication: >-
+      Keep compatibility visible before acquisition and finish activation with a findable Studio-library item rather than a generic file download.
+
+  - name: ACON3D
+    lane: webtoon 3D asset marketplace
+    access_status: verified
+    sources:
+      - title: ACON digital asset store
+        url: https://www.acon3d.com/en
+    verified_finding: >-
+      Current first-party listings expose webtoon-oriented 2D and 3D categories, file formats, compatible software, tags, ratings, reviews, wishlists and creator follows; examples include SketchUp, Clip Studio and Photoshop assets.
+    toonspectrum_implication: >-
+      Make webtoon production fit, exact file formats and compatible tools searchable fields, and preserve creator-follow and review signals only when backed by durable events.
+
+  - name: BOOTH
+    lane: creator storefront and VRM marketplace
+    access_status: verified
+    sources:
+      - title: BOOTH digital purchase access
+        url: https://booth.pixiv.help/hc/ja/articles/231285748
+      - title: BOOTH replacing downloadable files
+        url: https://booth.pixiv.help/hc/ja/articles/115003627093
+    verified_finding: >-
+      BOOTH documents digital access through the payment email, purchase history or library. Sellers can replace downloadable files, and deleting an old file removes that file from previous buyers' download access.
+    toonspectrum_implication: >-
+      Keep immutable release artifacts and buyer-visible version history so a seller update cannot silently rewrite or remove the evidence attached to an earlier acquisition.
+
+  - name: Gumroad
+    lane: direct digital storefront
+    access_status: verified
+    sources:
+      - title: Your Gumroad Library
+        url: https://gumroad.com/help/article/198-your-gumroad-library
+    verified_finding: >-
+      A Gumroad account library can gather purchases made with the same email, filter or sort them, archive and restore cards, and retain access through the original download link when a card is removed from the library.
+    toonspectrum_implication: >-
+      Separate account ownership, active versus archived organization, and concrete download or install evidence instead of collapsing them into one installed flag.
+
+  - name: Creative Market
+    lane: licensed creative asset marketplace
+    access_status: verified
+    sources:
+      - title: Downloading Creative Market purchases
+        url: https://support.creativemarket.com/hc/en-us/articles/360000996554-Downloading-your-purchases
+    verified_finding: >-
+      Purchases are downloadable from the product or purchases page, including many delisted products; purchased usage rights do not expire, but a seller can remove files and thereby end future redownload availability.
+    toonspectrum_implication: >-
+      Model license survival separately from hosted-file availability, and show buyers when they must preserve a local copy or when ToonSpectrum guarantees retained delivery.
+
+  - name: Envato Elements and Envato Market
+    lane: subscription and transactional creative assets
+    access_status: verified
+    sources:
+      - title: Envato subscription license introduction
+        url: https://help.elements.envato.com/hc/en-us/articles/360000621483-Introduction-to-the-Envato-subscription-License
+      - title: Upgrading an Envato Market license
+        url: https://help.market.envato.com/hc/en-us/articles/115005593503-How-to-Upgrade-or-Change-Your-Envato-Market-License
+    verified_finding: >-
+      Elements creates a project-specific license per download and preserves use for a project completed during an active subscription; a new project needs a new license. Envato Market license upgrades require purchasing the new license rather than paying only the difference.
+    toonspectrum_implication: >-
+      Record project assignment, license tier, acquisition time and cancellation effects as explicit entitlement facts rather than a single perpetual-owned boolean.
+
+  - name: Adobe Stock and Creative Cloud Marketplace
+    lane: professional creative ecosystem
+    access_status: verified
+    sources:
+      - title: Add and share Adobe Stock assets in Creative Cloud Libraries
+        url: https://helpx.adobe.com/stock/web/integration-and-collaboration/share-stock-assets.html
+      - title: Install plugins and extensions using Creative Cloud desktop
+        url: https://helpx.adobe.com/creative-cloud/apps/integration-with-other-apps/manage-plugins/install-plugins-extensions-using-creative-cloud-desktop-app.html
+    verified_finding: >-
+      Adobe Stock previews can be saved to Creative Cloud Libraries, placed in layouts and licensed from supporting apps. Creative Cloud desktop separately supports browsing, searching, acquiring and installing compatible plugins or extensions.
+    toonspectrum_implication: >-
+      Let users test a preview in project context before licensing, but keep content-asset entitlement distinct from executable-plugin acquisition and installation state.
+
+  - name: Figma Community
+    lane: editor-native community and remix ecosystem
+    access_status: verified
+    sources:
+      - title: Duplicate Community files
+        url: https://help.figma.com/hc/en-us/articles/360038510873-Find-and-Duplicate-Files-from-the-Community
+    verified_finding: >-
+      Community resource pages can expose interactive file or prototype previews. Duplicating adds an independent copy to drafts and does not carry the original file's version history, comments or permissions; paid files may expose a free preview.
+    toonspectrum_implication: >-
+      Make remix lineage explicit while distinguishing a copied artifact from a live linked instance whose upstream changes or permissions continue to apply.
+
+  - name: Canva marketplace ecosystem
+    lane: templates, apps, and editor-native acquisition
+    access_status: verified
+    sources:
+      - title: Canva Templates Creator marketplace
+        url: https://www.canva.com/creators/templates/
+      - title: Configuring Canva app scopes
+        url: https://www.canva.dev/docs/apps/configuring-scopes/
+    verified_finding: >-
+      Accepted Template Creators publish templates into Canva and earn royalties when templates are used. Public apps use declared scopes, and users see required data access and actions before installation.
+    toonspectrum_implication: >-
+      Preserve template-origin attribution and use-based creator economics, and disclose executable or connected-app permissions before activation.
+
+  - name: Fab
+    lane: engine-compatible 3D and game assets
+    access_status: verified
+    sources:
+      - title: Fab documentation
+        url: https://dev.epicgames.com/documentation/en-us/fab/fab-documentation
+    verified_finding: >-
+      Fab documents Creative Commons and tiered Standard licenses, engine and exchange formats, web acquisition, launcher export, Unreal and UEFN integrations, and a first-party 3D preview editor.
+    toonspectrum_implication: >-
+      Put license tier, engine or DCC compatibility, supported format and preview fidelity into one decision contract before export or Studio activation.
+
+  - name: Unity Asset Store
+    lane: engine-native packages and publisher support
+    access_status: verified
+    sources:
+      - title: Unity Asset Store submission guidelines
+        url: https://assetstore.unity.com/publishing/submission-guidelines
+    verified_finding: >-
+      Current submission rules require technical compatibility disclosure, dependencies and limitations, supported Unity and render-pipeline versions, and for UPM packages a JSON manifest with SemVer and Unity version fields; submissions are reviewed against these rules.
+    toonspectrum_implication: >-
+      Require machine-readable Studio version and dependency bounds, type-specific validation and transparent limitations before a package can be published.
+
+  - name: Superhive
+    lane: Blender-native professional marketplace
+    access_status: verified
+    sources:
+      - title: Superhive remote Blender extension support
+        url: https://superhivemarket.com/posts/blender-extension-support-launched-on-superhive
+    verified_finding: >-
+      Extension-compatible purchases can be installed by drag-and-drop or through a Superhive remote repository inside Blender, and new compatible releases appear as in-Blender updates; incompatible product versions are omitted from that extension view.
+    toonspectrum_implication: >-
+      Resolve installable releases by actual runtime compatibility and expose updates in Studio without presenting an incompatible purchase as activatable.
+
+  - name: Sketchfab
+    lane: interactive 3D preview and community
+    access_status: verified
+    sources:
+      - title: Sketchfab update after Fab launch
+        url: https://sketchfab.com/blogs/community/sketchfab-update-what-you-need-to-know-now-that-fabs-live/
+    verified_finding: >-
+      Sketchfab's Store closed after Fab launched and eligible downloadable products can be migrated to Fab, while Sketchfab continues its community and 3D viewer and preserves access to prior purchases through the Purchases page.
+    toonspectrum_implication: >-
+      Treat community and preview identity, transactional listing, migrated successor and historical entitlement as separate surfaces linked by durable migration records.
+    caveat: Historical migration status is verified from Sketchfab's official post; it is not evidence that every listing migrated automatically.
+
+  - name: CGTrader
+    lane: professional 3D models
+    access_status: verified
+    sources:
+      - title: CGTrader exchange-format guidance
+        url: https://help.cgtrader.com/hc/en-us/articles/360019474578-What-is-an-exchange-format
+    verified_finding: >-
+      CGTrader tells buyers to check included formats and software compatibility before purchase because exchange formats may preserve geometry while losing or degrading textures, mapping, rigging or animation.
+    toonspectrum_implication: >-
+      Report format-specific capability loss and require a conformance receipt instead of treating the presence of FBX, OBJ or another exchange file as proof of full fidelity.
+
+  - name: TurboSquid
+    lane: professional 3D models and quality assurance
+    access_status: verified
+    sources:
+      - title: Publishing products on TurboSquid
+        url: https://resources.turbosquid.com/turbosquid/publishing-basics/publishing-products-on-turbosquid/
+    verified_finding: >-
+      TurboSquid publishing requires multiple product shots, a wireframe and a 360-degree turntable, plus exact geometry, polygon and vertex information and disclosure of represented third-party brands.
+    toonspectrum_implication: >-
+      Define type-specific 3D preview and metadata minimums so topology, runtime budget and possible third-party rights are visible before acquisition.
+
+  - name: itch.io assets
+    lane: indie game asset marketplace
+    access_status: verified
+    sources:
+      - title: Creating and updating an itch.io project page
+        url: https://itch.io/docs/creators/getting-started
+    verified_finding: >-
+      itch.io project pages can distribute assets and multiple tagged files. A purchaser receives future files uploaded to the same page unless a file has a higher minimum price, while creators update by uploading a new file and deleting the old one.
+    toonspectrum_implication: >-
+      Keep release artifacts immutable and state whether an acquisition includes future releases instead of silently replacing files behind one product page.
+
+  - name: Roblox Creator Store
+    lane: runtime-native asset reuse and safety
+    access_status: verified
+    sources:
+      - title: Roblox Creator Store documentation
+        url: https://create.roblox.com/docs/production/creator-store
+    verified_finding: >-
+      Creator Store is available in Creator Hub and Studio Toolbox, supports category and verified-creator filters, previews and test experiences, and applies ownership, permission and moderation rules. Public assets prohibit obfuscated code and several remote-loading patterns.
+    toonspectrum_implication: >-
+      Combine in-editor acquisition with dependency permissions, code transparency, moderation and a fail-closed runtime policy for any asset that can execute behavior.
+
+  - name: Daz 3D
+    lane: characters, environments, poses, and install inventory
+    access_status: verified
+    sources:
+      - title: Daz Install Manager
+        url: https://www.daz3d.com/install-manager-info
+    verified_finding: >-
+      Purchased Daz assets appear in Install Manager, which separates ready-to-download, ready-to-install and installed states and supports updates, uninstall, offline mode, multiple accounts and custom install paths.
+    toonspectrum_implication: >-
+      Preserve acquisition, downloaded, installed, update-available and removed states separately and expose where each asset is installed.
+
+  - name: Krita and OpenGameArt resources
+    lane: open community resource libraries
+    access_status: verified
+    sources:
+      - title: Krita resource management
+        url: https://docs.krita.org/en/reference_manual/resource_management.html
+      - title: OpenGameArt OGA-BY 4.0 FAQ
+        url: https://opengameart.org/content/oga-by-40-faq
+    verified_finding: >-
+      Krita Resource Bundles package resources with metadata and a manifest and can be imported, tagged, enabled or disabled. OpenGameArt documents an attribution-oriented license variant intended to remain usable with technical protection, while warning that its FAQ is not the legal text.
+    toonspectrum_implication: >-
+      Support manifest-backed resource bundles and preserve exact SPDX or canonical license text and attribution instead of normalizing every open resource into one permissive label.
+
+  - name: ArtStation Marketplace
+    lane: portfolio-led professional marketplace
+    access_status: verified
+    sources:
+      - title: ArtStation buyer marketplace FAQ
+        url: https://help.artstation.com/en/articles/16155217-general-faq-for-buyers
+    verified_finding: >-
+      Buyers need an account and access purchases through a Library; the selected EULA controls usage, seller updates remain available, and receipts are retained in order history.
+    toonspectrum_implication: >-
+      Link creator portfolio and storefront discovery while freezing the acquired license and exposing updates and receipts in an account library.
+
+  - name: BlenderKit
+    lane: in-Blender searchable asset library
+    access_status: verified
+    sources:
+      - title: BlenderKit add-on and in-Blender catalog
+        url: https://www.blenderkit.com/addons
+    verified_finding: >-
+      BlenderKit documents search, download, purchase state and asset use inside Blender, with free, full and paid availability, bookmarks, filters and multiple ranking orders.
+    toonspectrum_implication: >-
+      Keep market discovery and installed or update state in Studio and make ranking modes and free-versus-paid availability explicit.
+
+  - name: KitBash3D Cargo and Greyscalegorilla
+    lane: one-click DCC delivery and scene readiness
+    access_status: verified
+    sources:
+      - title: KitBash3D Cargo
+        url: https://kitbash3d.com/pages/cargo
+      - title: Greyscalegorilla and Cargo integration FAQ
+        url: https://help.greyscalegorilla.com/en/articles/13403846-greyscalegorilla-common-questions-resources
+    verified_finding: >-
+      Cargo focuses on finding and importing production assets into supported DCCs. Greyscalegorilla states that its library moved to Cargo, legacy Studio and HUB no longer receive updates or support, and current library assets are reprocessed to USD for multiple DCCs.
+    toonspectrum_implication: >-
+      Treat a successful outcome as a usable scene object with translated materials and dependencies, and record migration from a legacy delivery client to its supported successor.
+
+  - name: VRoid Hub
+    lane: VRM-native distribution and machine-readable usage conditions
+    access_status: verified
+    sources:
+      - title: VRoid Hub model usage conditions
+        url: https://developer.vroid.com/en/guidelines/conditions_of_use.html
+    verified_finding: >-
+      Applications using VRoid Hub can display model-specific conditions for avatar use, violent or sexual depiction, corporate and individual commercial use, modification, redistribution and attribution.
+    toonspectrum_implication: >-
+      Replace a flat character license with machine-readable downstream-use conditions that survive clone, collaboration and export.
+
+  - name: nizima by Live2D
+    lane: interactive 2D character marketplace and packaged model delivery
+    access_status: verified
+    sources:
+      - title: nizima Live2D preview guide
+        url: https://docs.nizima.com/guide/preview-guide/
+      - title: nizima Live2D upload package guide
+        url: https://docs.nizima.com/en/guide/item-upload/live2d/
+    verified_finding: >-
+      nizima provides an interactive Live2D preview with model-specific motions and expressions. Its upload documentation separately identifies preview, export and original packages and their required contents.
+    toonspectrum_implication: >-
+      Add an isolated expression and motion sandbox and validate package roles explicitly rather than assuming a cover image represents the delivered model.
+
+  - name: VRChat Avatar Marketplace
+    lane: in-runtime avatar try-on and permanent entitlements
+    access_status: verified
+    sources:
+      - title: VRChat Avatar Marketplace
+        url: https://creators.vrchat.com/economy/store/avatar-marketplace/
+    verified_finding: >-
+      VRChat documents avatar listings purchased with credits, avatar try-on through supported worlds, creator configuration of gallery and pedestal presentation, and avatar performance information for buyer evaluation.
+    toonspectrum_implication: >-
+      Evaluate avatars in the target runtime, show performance rank and preserve the acquisition separately from the currently selected or worn avatar state.
+
+  - name: ActorCore and Reallusion marketplaces
+    lane: rigged character, motion, retargeting, and DCC delivery
+    access_status: verified
+    sources:
+      - title: ActorCore character and motion asset store
+        url: https://actorcore.reallusion.com/
+    verified_finding: >-
+      ActorCore exposes rigged characters and motions, applies online motion retargeting to selected characters, and offers application-specific download formats, Auto Setup tools and import presets for major 3D software.
+    toonspectrum_implication: >-
+      Preview motion on the intended rig and make retargeting, facial blendshape, topology and target-DCC export evidence part of the delivery receipt.
+
+  - name: Godot Asset Store
+    lane: open engine marketplace
+    access_status: verified
+    sources:
+      - title: Submitting to the Godot Asset Store
+        url: https://docs.godotengine.org/en/stable/community/asset_store/submitting_to_asset_store.html
+      - title: Godot Asset Store roadmap
+        url: https://store.godotengine.org/roadmap/
+    verified_finding: >-
+      Current submission documentation records compatible Godot versions and asset releases and exposes downloads, page visits and library additions to publishers. The official roadmap identifies additional planned work separately from shipped behavior.
+    toonspectrum_implication: >-
+      Keep immutable release and compatibility records, add privacy-safe activation analytics, and never present roadmap items as current capabilities.
+    caveat: The Asset Store is explicitly treated as beta; roadmap statements are not counted as implemented findings.
+
+  - name: VS Code Marketplace
+    lane: executable package trust and update control
+    access_status: verified
+    sources:
+      - title: VS Code Extension Marketplace
+        url: https://code.visualstudio.com/docs/configure/extensions/extension-marketplace
+      - title: VS Code extension runtime security
+        url: https://code.visualstudio.com/docs/configure/extensions/extension-runtime-security
+    verified_finding: >-
+      Listings expose publisher, downloads, rating, repository and license; users can manage or install specific versions. Published extensions are signed and scanned, verified publishers are marked, and malicious extensions can be blocklisted, disabled or removed.
+    toonspectrum_implication: >-
+      Require publisher verification, signatures, scanning, permission and version controls, plus emergency revocation before enabling executable Studio add-ons.
+
+  - name: Blender Extensions Platform
+    lane: editor-native executable extension distribution and governance
+    access_status: verified
+    sources:
+      - title: Blender Extensions install and update
+        url: https://docs.blender.org/manual/en/5.1/editors/preferences/extensions.html
+      - title: Blender extension manifest schema 1.0.0
+        url: https://developer.blender.org/docs/features/extensions/schema/1.0.0/
+      - title: Blender extension listing API v1
+        url: https://developer.blender.org/docs/features/extensions/api_listing/v1/
+      - title: Blender extension moderation guidelines
+        url: https://developer.blender.org/docs/features/extensions/moderation/guidelines/
+    verified_finding: >-
+      Blender installs, disables, removes and updates extensions in-editor. Its manifest requires SemVer, minimum Blender version and SPDX license and can declare platform bounds and explained permissions; listing metadata carries SHA-256 hashes and a blocklist, and official submissions receive code and functionality review.
+    toonspectrum_implication: >-
+      Base executable distribution on a content-addressed repository index, explicit capabilities and compatibility, human review and a client-enforced blocklist rather than extending the current passive asset manifest.
+
+  - name: Rive Marketplace
+    lane: interactive vector assets and remix lineage
+    access_status: verified
+    sources:
+      - title: Rive Marketplace overview
+        url: https://rive.app/docs/community/marketplace-overview
+    verified_finding: >-
+      Rive Marketplace files can be opened and remixed in the Rive editor, and marketplace documentation requires creator attribution under its stated Community licensing model.
+    toonspectrum_implication: >-
+      Preserve stateful behavior, source creator and remix ancestry as first-class metadata when interactive files are opened in Studio.
+
+  - name: LottieFiles
+    lane: motion asset customization, review, and delivery
+    access_status: verified
+    sources:
+      - title: Discovering and downloading LottieFiles animations
+        url: https://help.lottiefiles.com/discovering-downloading-and-uploading-animations
+      - title: Lottie Editor
+        url: https://lottiefiles.com/lottie-editor
+    verified_finding: >-
+      LottieFiles supports searching and previewing free and premium animations, saving them to a workspace and checking per-animation licensing. Marketplace animations can be opened in the web editor to change colors, layers, images and text and export JSON or dotLottie.
+    toonspectrum_implication: >-
+      Let buyers test safe parameter edits before acquisition and retain the source license and transformation history with the customized animation.
+
+  - name: Spline Community
+    lane: browser-native interactive 3D remix community
+    access_status: verified
+    sources:
+      - title: Spline Community platform
+        url: https://docs.spline.design/sharing-collaboration-and-workspaces/community-platform
+    verified_finding: >-
+      Spline documents publishing, exploring and remixing interactive 3D scenes from its browser-native creation environment, with community profiles and follow relationships.
+    toonspectrum_implication: >-
+      Use the same runtime contract for interactive preview and editor activation, while recording the remixed source and creator relationship.
+
+  - name: Adobe Substance 3D Assets
+    lane: parametric production assets and DCC transfer
+    access_status: verified
+    sources:
+      - title: Adobe Substance 3D Assets
+        url: https://www.adobe.com/products/substance3d/assets.html
+    verified_finding: >-
+      Adobe describes curated production assets and parametric materials designed for integration with Substance applications and popular third-party 3D software.
+    toonspectrum_implication: >-
+      Preserve editable parameters, variants and resolution choices and issue renderer or DCC translation receipts instead of flattening every material on import.
+
+  - name: Creative Fabrica
+    lane: subscription entitlements and complex commercial licensing
+    access_status: verified
+    sources:
+      - title: Creative Fabrica subscription license
+        url: https://www.creativefabrica.com/subscription-license/
+    verified_finding: >-
+      Subscription terms distinguish extractable standalone files from end products and specify which existing and new uses remain permitted after a subscription ends.
+    toonspectrum_implication: >-
+      Encode extractability and post-cancellation rights explicitly and show them at project assignment, export and redownload time.
+
+  - name: Poly Haven
+    lane: standardized CC0 3D ingestion
+    access_status: verified
+    sources:
+      - title: Poly Haven model technical standards
+        url: https://docs.polyhaven.com/en/technical-standards/models
+      - title: Poly Haven licensing and API FAQ
+        url: https://docs.polyhaven.com/en/faq
+    verified_finding: >-
+      Poly Haven publishes its assets under CC0, documents model technical standards and exposes a public API, enabling automated ingestion from a standardized first-party catalog.
+    toonspectrum_implication: >-
+      Start open-catalog ingestion with allowlisted sources, canonical origin, hashes and type-specific validation before accepting arbitrary uploads.
+
+  - name: MediBang Paint Cloud Materials
+    lane: manga-native editor materials and cloud sync
+    access_status: verified
+    sources:
+      - title: Using MediBang cloud materials
+        url: https://medibangpaint.com/en/use/2016/12/pc-use-materials-tiles-tones-items/
+      - title: MediBang material copyright restrictions
+        url: https://medibangpaint.com/en/use/2022/08/especiallyfaq_004/
+    verified_finding: >-
+      MediBang downloads first-party tiles, tones and items from a Cloud Materials panel and applies them to the canvas with angle and size controls. Its official rights table allows commercial use but prohibits redistribution of brushes, materials and fonts as resources.
+    toonspectrum_implication: >-
+      Keep manga-native material types and DPI visible, make placement controls immediate, and carry the no-resource-redistribution rule into clone and export flows.
+
+  - name: Ko-fi Shop and Patreon
+    lane: direct-to-fan storefront and recurring creator revenue
+    access_status: verified
+    sources:
+      - title: Ko-fi Shop digital products
+        url: https://help.ko-fi.com/hc/en-us/articles/360009712917-Ko-fi-Shop-Sell-digital-physical-products
+      - title: Patreon one-time digital purchases
+        url: https://support.patreon.com/hc/en-gb/articles/204606215-Can-I-make-a-one-time-payment
+    verified_finding: >-
+      Ko-fi lets creators sell uploaded or linked digital files, restrict items to membership audiences and set seller-specific terms; downloads are delivered automatically. Patreon supports one-time purchases of digital products, posts and collections with later access through Purchases, alongside recurring memberships.
+    toonspectrum_implication: >-
+      Treat one-time product ownership, membership-gated access and creator-defined terms as distinct entitlement paths, with a durable buyer library and explicit cancellation behavior.
+
+  - name: Adobe Mixamo
+    lane: asset transformation and production readiness
+    access_status: verified
+    sources:
+      - title: Upload and rig characters with Mixamo
+        url: https://helpx.adobe.com/creative-cloud/help/mixamo-rigging-animation.html
+      - title: Mixamo common questions
+        url: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
+    verified_finding: >-
+      Mixamo accepts FBX, OBJ or ZIP humanoid characters for marker-guided automatic rigging, can map existing FBX skeletons, applies library animations and downloads the result. The official FAQ limits auto-rigging to qualifying bipedal humanoids and stores only the last used character.
+    toonspectrum_implication: >-
+      Validate transformation prerequisites up front and produce a reproducible rigging receipt with source hash, marker choices, skeleton mapping, warnings and exported result rather than relying on service-side history.
+    caveat: These still-current official workflow pages were last updated in 2021; no newer first-party workflow documentation was found during this review.

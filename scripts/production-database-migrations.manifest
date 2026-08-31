@@ -27,3 +27,8 @@ apps/api/src/db/migrations/0026_creator_draft_cloud_save_intent.sql
 apps/api/src/db/migrations/0027_creator_draft_atomic_publication.sql
 apps/api/src/db/migrations/0028_studio_ai_openrouter_provider.sql
 apps/api/src/db/migrations/0029_creator_community_runtime_indexes.sql
+apps/api/src/db/migrations/0030_creator_marketplace_immutable_releases.sql
+apps/api/src/db/migrations/0031_creator_marketplace_moderation.sql
+apps/api/src/db/migrations/0032_creator_marketplace_release_lifecycle.sql
+apps/api/src/db/migrations/0033_creator_marketplace_cloud_library.sql
+apps/api/src/db/migrations/0034_creator_marketplace_package_moderation.sql

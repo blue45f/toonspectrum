@@ -15,12 +15,12 @@ export function MarketScene3dPreview({ recipe, className }: MarketScene3dPreview
       aria-describedby="market-3d-preview-note"
       className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
     >
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5 bg-panel/50">
-        <div className="flex items-center gap-2">
-          <Box className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-3d-heading" className="text-xs font-semibold text-fg">3D 프리셋 참고 일러스트 ({recipe.name})</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-panel/50 px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Box className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          <h2 id="market-3d-heading" className="min-w-0 break-words text-xs font-semibold text-fg">3D 프리셋 참고 일러스트 ({recipe.name})</h2>
         </div>
-        <span className="inline-flex min-h-6 items-center rounded bg-raised px-2 text-[0.65rem] text-fg-3">
+        <span className="inline-flex min-h-6 min-w-0 max-w-full items-center break-all rounded bg-raised px-2 text-[0.65rem] text-fg-3">
           레시피: {recipe.recipeId}
         </span>
       </div>

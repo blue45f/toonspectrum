@@ -56,18 +56,65 @@ export function marketBrowseJsonLd(
 
 /** 마켓 상세 — 공유 리소스 하나의 CreativeWork. 라이선스·배급자·수정일을 검색엔진에 노출한다. */
 export function marketResourceJsonLd(record: CreatorMarketplaceResourceRecord) {
+  const resourceUrl = `${MARKET_SITE_URL}/market/resource/${record.id}`;
   return {
     "@context": "https://schema.org",
     "@type": "CreativeWork",
     name: record.name,
     description: record.description || undefined,
-    url: `${MARKET_SITE_URL}/market/resource/${record.id}`,
+    url: resourceUrl,
+    version: record.resourceVersion,
     author: { "@type": "Person", name: record.publisher.name },
+    publisher: { "@type": "Person", name: record.publisher.name },
     dateModified: record.updatedAt,
     datePublished: record.createdAt,
     license: marketLicenseUrl(record.license),
     isAccessibleForFree: true,
     keywords: record.tags.length > 0 ? record.tags.join(", ") : undefined,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": resourceUrl,
+      breadcrumb: {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "창작 마켓",
+            item: `${MARKET_SITE_URL}/market`,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "마켓 탐색",
+            item: `${MARKET_SITE_URL}/market/browse`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: record.name,
+            item: resourceUrl,
+          },
+        ],
+      },
+    },
+    additionalProperty: [
+      {
+        "@type": "PropertyValue",
+        name: "리소스 종류",
+        value: marketKindMeta(record.kind).label,
+      },
+      {
+        "@type": "PropertyValue",
+        name: "최소 Studio 버전",
+        value: record.minimumStudioVersion,
+      },
+      {
+        "@type": "PropertyValue",
+        name: "호환 엔진",
+        value: record.compatibility.engines.join(", "),
+      },
+    ],
   };
 }
 

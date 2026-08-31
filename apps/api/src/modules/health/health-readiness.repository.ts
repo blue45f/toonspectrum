@@ -31,8 +31,13 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_challenge",
   "creator_draft_collaboration_room",
   "creator_follow",
+  "creator_marketplace_library_item",
+  "creator_marketplace_package_moderation",
+  "creator_marketplace_package_moderation_decision",
   "creator_marketplace_publish_gate",
   "creator_marketplace_resource",
+  "creator_marketplace_resource_report",
+  "creator_marketplace_resource_report_gate",
   "creator_profile",
   "creator_series",
   "creator_work",
@@ -83,15 +88,21 @@ export const REQUIRED_DATABASE_RELATIONS = [
 
 /**
  * Only cutovers that cannot be proven by a final-looking Drizzle schema use the durable ledger.
- * Migrations 0018+ are represented by required relations/capabilities below.
- * Secondary-index migrations such as 0029 remain outside runtime readiness during the expand
- * release; the strict production capability verifier owns that post-migration contract.
+ * Most migrations 0018+ are represented by required relations/capabilities below. A release
+ * storage cutover such as 0030 is also ledger-fenced because the runtime cannot safely query its
+ * new immutable ordinal before that migration. Secondary-index-only migration 0029 stays outside
+ * runtime readiness; the strict production capability verifier owns that contract.
  */
 export const REQUIRED_DATABASE_MIGRATIONS = [
   "0017_creator_work_live_lock_revision",
   "0025_auth_lifecycle_contract",
   "0026_creator_draft_cloud_save_intent",
   "0027_creator_draft_atomic_publication",
+  "0030_creator_marketplace_immutable_releases",
+  "0031_creator_marketplace_moderation",
+  "0032_creator_marketplace_release_lifecycle",
+  "0033_creator_marketplace_cloud_library",
+  "0034_creator_marketplace_package_moderation",
 ] as const;
 
 interface DatabasePingRow {
@@ -108,7 +119,15 @@ interface SchemaCatalogRow {
   authAccountUserIndexReady: boolean;
   authRuntimeDmlReady: boolean;
   marketplaceResourceAclReady: boolean;
+  marketplaceResourceLifecycleTriggerReady: boolean;
+  marketplaceResourceTimestampPrecisionReady: boolean;
+  marketplaceCloudLibraryAclReady: boolean;
+  marketplaceCloudLibraryTriggerReady: boolean;
+  marketplacePackageModerationAclReady: boolean;
+  marketplacePackageModerationTriggerReady: boolean;
   marketplacePublishGateAclReady: boolean;
+  marketplaceReportAclReady: boolean;
+  marketplaceReportGateAclReady: boolean;
   marketplaceSearchGenerated: boolean;
   marketplaceSearchIndexReady: boolean;
   marketplaceTagIndexReady: boolean;
@@ -399,6 +418,57 @@ export class PostgresHealthReadinessRepository
                 'public.account',
                 'SELECT, INSERT, UPDATE, DELETE'
               ) AS "authRuntimeDmlReady",
+            NOT EXISTS (
+              SELECT 1
+              FROM (VALUES
+                ('createdAt', 'timestamp(3) with time zone'),
+                ('updatedAt', 'timestamp(3) with time zone')
+              ) AS expected_timestamp("name", "type")
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS timestamp_attribute
+                WHERE timestamp_attribute.attrelid =
+                  to_regclass('public.creator_marketplace_resource')
+                  AND timestamp_attribute.attname = expected_timestamp."name"
+                  AND pg_catalog.format_type(
+                    timestamp_attribute.atttypid,
+                    timestamp_attribute.atttypmod
+                  ) = expected_timestamp."type"
+                  AND timestamp_attribute.attnum > 0
+                  AND NOT timestamp_attribute.attisdropped
+              )
+            ) AS "marketplaceResourceTimestampPrecisionReady",
+            EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS lifecycle_trigger
+              JOIN pg_catalog.pg_proc AS lifecycle_function
+                ON lifecycle_function.oid = lifecycle_trigger.tgfoid
+              WHERE lifecycle_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_resource')
+                AND lifecycle_trigger.tgname =
+                  'creator_marketplace_resource_lifecycle_update'
+                AND NOT lifecycle_trigger.tgisinternal
+                AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+                  LIKE '%creator_marketplace_resource_relist_non_head%'
+                AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+                  LIKE '%creator_marketplace_resource_delist_non_head%'
+                AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+                  LIKE '%creator_marketplace_resource_hidden_legacy%'
+                AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+                  LIKE '%creator_marketplace_resource_lifecycle_timestamp_required%'
+            ) AND EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS release_trigger
+              JOIN pg_catalog.pg_proc AS release_function
+                ON release_function.oid = release_trigger.tgfoid
+              WHERE release_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_resource')
+                AND release_trigger.tgname =
+                  'creator_marketplace_resource_immutable_release'
+                AND NOT release_trigger.tgisinternal
+                AND pg_catalog.pg_get_functiondef(release_function.oid)
+                  LIKE '%creator_marketplace_package_moderated%'
+            ) AS "marketplaceResourceLifecycleTriggerReady",
             pg_catalog.has_table_privilege(
               current_user,
               'public.creator_marketplace_resource',
@@ -409,15 +479,9 @@ export class PostgresHealthReadinessRepository
                 'public.creator_marketplace_resource',
                 'INSERT'
               )
-              AND pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_resource',
-                'DELETE'
-              )
               AND NOT EXISTS (
                 SELECT 1
                 FROM unnest(ARRAY[
-                  'UPDATE',
                   'REFERENCES'
                 ]::text[]) AS unexpected_column_privilege
                 WHERE pg_catalog.has_any_column_privilege(
@@ -426,9 +490,50 @@ export class PostgresHealthReadinessRepository
                   unexpected_column_privilege
                 )
               )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'UPDATE'
+              )
+              AND NOT pg_catalog.has_column_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'hidden',
+                'UPDATE'
+              )
+              AND pg_catalog.has_column_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'delistedAt',
+                'UPDATE'
+              )
+              AND pg_catalog.has_column_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'updatedAt',
+                'UPDATE'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS immutable_attribute
+                WHERE immutable_attribute.attrelid =
+                  'public.creator_marketplace_resource'::regclass
+                  AND immutable_attribute.attnum > 0
+                  AND NOT immutable_attribute.attisdropped
+                  AND immutable_attribute.attname <> ALL(
+                    ARRAY['delistedAt', 'updatedAt']::name[]
+                  )
+                  AND pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_resource',
+                    immutable_attribute.attname,
+                    'UPDATE'
+                  )
+              )
               AND NOT EXISTS (
                 SELECT 1
                 FROM unnest(ARRAY[
+                  'DELETE',
                   'TRUNCATE',
                   'TRIGGER'
                 ]::text[]) AS unexpected_table_privilege
@@ -450,10 +555,18 @@ export class PostgresHealthReadinessRepository
                   delegable_column_privilege || ' WITH GRANT OPTION'
                 )
               )
-              AND NOT pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_resource',
-                'DELETE WITH GRANT OPTION'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'delistedAt',
+                  'updatedAt'
+                ]::text[]) AS lifecycle_column
+                WHERE pg_catalog.has_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource',
+                  lifecycle_column,
+                  'UPDATE WITH GRANT OPTION'
+                )
               )
               AND NOT EXISTS (
                 SELECT 1
@@ -482,6 +595,438 @@ export class PostgresHealthReadinessRepository
                   public_table_privilege
                 )
               ) AS "marketplaceResourceAclReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_library_item',
+              'SELECT, INSERT'
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS immutable_attribute
+                WHERE immutable_attribute.attrelid =
+                  'public.creator_marketplace_library_item'::regclass
+                  AND immutable_attribute.attnum > 0
+                  AND NOT immutable_attribute.attisdropped
+                  AND immutable_attribute.attname <> ALL(ARRAY[
+                    'archivedAt',
+                    'lastConfirmedReleaseId',
+                    'lastConfirmedResourceVersion',
+                    'lastConfirmedReleaseOrdinal',
+                    'lastConfirmedManifestHash',
+                    'firstConfirmedAt',
+                    'lastConfirmedAt',
+                    'updatedAt'
+                  ]::name[])
+                  AND pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_library_item',
+                    immutable_attribute.attname,
+                    'UPDATE'
+                  )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'archivedAt',
+                  'lastConfirmedReleaseId',
+                  'lastConfirmedResourceVersion',
+                  'lastConfirmedReleaseOrdinal',
+                  'lastConfirmedManifestHash',
+                  'firstConfirmedAt',
+                  'lastConfirmedAt',
+                  'updatedAt'
+                ]::text[]) AS mutable_column
+                WHERE NOT pg_catalog.has_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_library_item',
+                  mutable_column,
+                  'UPDATE'
+                )
+                  OR pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_library_item',
+                    mutable_column,
+                    'UPDATE WITH GRANT OPTION'
+                  )
+              )
+              AND NOT pg_catalog.has_any_column_privilege(
+                current_user,
+                'public.creator_marketplace_library_item',
+                'REFERENCES'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.creator_marketplace_library_item',
+                  unexpected_table_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY['SELECT', 'INSERT']::text[]) AS delegable_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_library_item',
+                  delegable_privilege || ' WITH GRANT OPTION'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.creator_marketplace_library_item',
+                  public_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.creator_marketplace_library_item',
+                  public_table_privilege
+                )
+              ) AS "marketplaceCloudLibraryAclReady",
+            EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS insert_trigger
+              JOIN pg_catalog.pg_proc AS insert_function
+                ON insert_function.oid = insert_trigger.tgfoid
+              WHERE insert_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_library_item')
+                AND insert_trigger.tgname =
+                  'creator_marketplace_library_insert_guard'
+                AND NOT insert_trigger.tgisinternal
+                AND pg_catalog.pg_get_functiondef(insert_function.oid)
+                  LIKE '%creator_marketplace_package_moderation%'
+                AND pg_catalog.pg_get_functiondef(insert_function.oid)
+                  LIKE '%creator_marketplace_library_package_available%'
+                AND pg_catalog.pg_get_functiondef(insert_function.oid)
+                  LIKE '%publisher_status%'
+                AND pg_catalog.pg_get_functiondef(insert_function.oid)
+                  LIKE '%release."delistedAt" IS NULL%'
+                AND pg_catalog.pg_get_functiondef(insert_function.oid)
+                  NOT LIKE '%release."hidden"%'
+            ) AND EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS package_update_trigger
+              JOIN pg_catalog.pg_proc AS package_update_function
+                ON package_update_function.oid = package_update_trigger.tgfoid
+              WHERE package_update_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_library_item')
+                AND package_update_trigger.tgname =
+                  'creator_marketplace_library_000_package_update_guard'
+                AND NOT package_update_trigger.tgisinternal
+                AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+                  LIKE '%creator_marketplace_library_package_moderated%'
+                AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+                  LIKE '%creator_marketplace_library_package_available%'
+                AND pg_catalog.pg_get_functiondef(package_update_function.oid)
+                  LIKE '%exact_release_listed%'
+            ) AND EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS monotonic_trigger
+              WHERE monotonic_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_library_item')
+                AND monotonic_trigger.tgname =
+                  'creator_marketplace_library_update_guard'
+                AND NOT monotonic_trigger.tgisinternal
+            ) AND EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS cleanup_trigger
+              JOIN pg_catalog.pg_proc AS cleanup_function
+                ON cleanup_function.oid = cleanup_trigger.tgfoid
+              WHERE cleanup_trigger.tgrelid = to_regclass('public."user"')
+                AND cleanup_trigger.tgname =
+                  'creator_marketplace_library_soft_delete_cleanup'
+                AND NOT cleanup_trigger.tgisinternal
+                AND cleanup_function.prosecdef
+                AND cleanup_function.proconfig @>
+                  ARRAY['search_path=pg_catalog, public']::text[]
+            ) AND EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_trigger AS kind_trigger
+              JOIN pg_catalog.pg_proc AS kind_function
+                ON kind_function.oid = kind_trigger.tgfoid
+              WHERE kind_trigger.tgrelid =
+                to_regclass('public.creator_marketplace_resource')
+                AND kind_trigger.tgname =
+                  'creator_marketplace_resource_package_kind_continuity'
+                AND NOT kind_trigger.tgisinternal
+                AND pg_catalog.pg_get_functiondef(kind_function.oid)
+                  LIKE '%pg_advisory_xact_lock%'
+            ) AS "marketplaceCloudLibraryTriggerReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_package_moderation',
+              'SELECT, INSERT'
+            )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS immutable_attribute
+                WHERE immutable_attribute.attrelid =
+                  'public.creator_marketplace_package_moderation'::regclass
+                  AND immutable_attribute.attnum > 0
+                  AND NOT immutable_attribute.attisdropped
+                  AND immutable_attribute.attname <> ALL(ARRAY[
+                    'state',
+                    'revision',
+                    'currentDecisionId',
+                    'hiddenAt',
+                    'updatedAt'
+                  ]::name[])
+                  AND pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_package_moderation',
+                    immutable_attribute.attname,
+                    'UPDATE'
+                  )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'state',
+                  'revision',
+                  'currentDecisionId',
+                  'hiddenAt',
+                  'updatedAt'
+                ]::text[]) AS mutable_column
+                WHERE NOT pg_catalog.has_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_package_moderation',
+                  mutable_column,
+                  'UPDATE'
+                )
+                  OR pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_package_moderation',
+                    mutable_column,
+                    'UPDATE WITH GRANT OPTION'
+                  )
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_package_moderation_decision',
+                'SELECT, INSERT'
+              )
+              AND NOT pg_catalog.has_any_column_privilege(
+                current_user,
+                'public.creator_marketplace_package_moderation_decision',
+                'UPDATE'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('creator_marketplace_package_moderation'),
+                  ('creator_marketplace_package_moderation_decision')
+                ) AS private_relation("name")
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.' || private_relation."name",
+                  'REFERENCES'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('creator_marketplace_package_moderation'),
+                  ('creator_marketplace_package_moderation_decision')
+                ) AS private_relation("name")
+                CROSS JOIN unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.' || private_relation."name",
+                  unexpected_table_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('creator_marketplace_package_moderation'),
+                  ('creator_marketplace_package_moderation_decision')
+                ) AS private_relation("name")
+                CROSS JOIN unnest(ARRAY[
+                  'SELECT',
+                  'INSERT'
+                ]::text[]) AS delegable_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.' || private_relation."name",
+                  delegable_privilege || ' WITH GRANT OPTION'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('creator_marketplace_package_moderation'),
+                  ('creator_marketplace_package_moderation_decision')
+                ) AS private_relation("name")
+                CROSS JOIN unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.' || private_relation."name",
+                  public_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('creator_marketplace_package_moderation'),
+                  ('creator_marketplace_package_moderation_decision')
+                ) AS private_relation("name")
+                CROSS JOIN unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.' || private_relation."name",
+                  public_table_privilege
+                )
+              ) AS "marketplacePackageModerationAclReady",
+            NOT EXISTS (
+              SELECT 1
+              FROM (VALUES
+                ('creator_marketplace_package_moderation_decision_insert_guard'),
+                ('creator_marketplace_package_moderation_decision_update_guard'),
+                ('creator_marketplace_package_moderation_state_guard'),
+                ('creator_marketplace_package_decision_coupling_from_decision'),
+                ('creator_marketplace_package_decision_coupling_from_state'),
+                ('creator_marketplace_resource_report_package_insert_guard')
+              ) AS expected_trigger("name")
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_trigger AS actual_trigger
+                WHERE actual_trigger.tgname = expected_trigger."name"
+                  AND NOT actual_trigger.tgisinternal
+              )
+            )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_trigger AS release_trigger
+                JOIN pg_catalog.pg_proc AS release_function
+                  ON release_function.oid = release_trigger.tgfoid
+                WHERE release_trigger.tgrelid =
+                  to_regclass('public.creator_marketplace_resource')
+                  AND release_trigger.tgname =
+                    'creator_marketplace_resource_immutable_release'
+                  AND NOT release_trigger.tgisinternal
+                  AND pg_catalog.pg_get_functiondef(release_function.oid)
+                    LIKE '%creator_marketplace_package_moderation%'
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_trigger AS lifecycle_trigger
+                JOIN pg_catalog.pg_proc AS lifecycle_function
+                  ON lifecycle_function.oid = lifecycle_trigger.tgfoid
+                WHERE lifecycle_trigger.tgrelid =
+                  to_regclass('public.creator_marketplace_resource')
+                  AND lifecycle_trigger.tgname =
+                    'creator_marketplace_resource_lifecycle_update'
+                  AND NOT lifecycle_trigger.tgisinternal
+                  AND pg_catalog.pg_get_functiondef(lifecycle_function.oid)
+                    LIKE '%creator_marketplace_resource_hidden_legacy%'
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS report_epoch_attribute
+                WHERE report_epoch_attribute.attrelid =
+                  to_regclass('public.creator_marketplace_resource_report')
+                  AND report_epoch_attribute.attname = 'packageReportEpoch'
+                  AND pg_catalog.format_type(
+                    report_epoch_attribute.atttypid,
+                    report_epoch_attribute.atttypmod
+                  ) = 'integer'
+                  AND report_epoch_attribute.attnum > 0
+                  AND NOT report_epoch_attribute.attisdropped
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_class AS report_epoch_index
+                JOIN pg_catalog.pg_index AS report_epoch_index_definition
+                  ON report_epoch_index_definition.indexrelid = report_epoch_index.oid
+                WHERE report_epoch_index.relname = pg_catalog.left(
+                  'creator_marketplace_resource_report_package_epoch_reporter_v3_unique',
+                  pg_catalog.current_setting('max_identifier_length')::integer
+                )
+                  AND report_epoch_index.relkind = 'i'
+                  AND report_epoch_index_definition.indrelid =
+                    to_regclass('public.creator_marketplace_resource_report')
+                  AND report_epoch_index_definition.indisunique
+                  AND report_epoch_index_definition.indisvalid
+                  AND report_epoch_index_definition.indisready
+                  AND report_epoch_index_definition.indnkeyatts = 5
+                  AND report_epoch_index_definition.indnatts = 5
+                  AND report_epoch_index_definition.indexprs IS NULL
+                  AND ARRAY(
+                    SELECT indexed_attribute.attname::text
+                    FROM unnest(report_epoch_index_definition.indkey)
+                      WITH ORDINALITY AS indexed_key("attnum", "ordinal")
+                    JOIN pg_catalog.pg_attribute AS indexed_attribute
+                      ON indexed_attribute.attrelid =
+                        report_epoch_index_definition.indrelid
+                     AND indexed_attribute.attnum = indexed_key."attnum"
+                    WHERE indexed_key."ordinal" <=
+                      report_epoch_index_definition.indnkeyatts
+                    ORDER BY indexed_key."ordinal"
+                  ) = ARRAY[
+                    'packagePublisherIdSnapshot',
+                    'packageIdSnapshot',
+                    'packageModerationRevision',
+                    'packageReportEpoch',
+                    'reporterKeyHash'
+                  ]::text[]
+                  AND pg_catalog.pg_get_expr(
+                    report_epoch_index_definition.indpred,
+                    report_epoch_index_definition.indrelid,
+                    true
+                  ) = '(evidence ->> ''schemaVersion''::text) = ''3''::text'
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_trigger AS report_insert_trigger
+                JOIN pg_catalog.pg_proc AS report_insert_function
+                  ON report_insert_function.oid = report_insert_trigger.tgfoid
+                WHERE report_insert_trigger.tgrelid =
+                  to_regclass('public.creator_marketplace_resource_report')
+                  AND report_insert_trigger.tgname =
+                    'creator_marketplace_resource_report_package_insert_guard'
+                  AND NOT report_insert_trigger.tgisinternal
+                  AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+                    LIKE '%package_report_epoch%'
+                  AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+                    LIKE '%"packageReportEpoch"%'
+                  AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+                    LIKE '%"releaseOrdinal"%'
+                  AND pg_catalog.pg_get_functiondef(report_insert_function.oid)
+                    LIKE '%schemaVersion%3%'
+              ) AS "marketplacePackageModerationTriggerReady",
             pg_catalog.has_table_privilege(
               current_user,
               'public.creator_marketplace_publish_gate',
@@ -564,6 +1109,210 @@ export class PostgresHealthReadinessRepository
                   public_table_privilege
                 )
               ) AS "marketplacePublishGateAclReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_resource_report',
+              'SELECT'
+            )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report',
+                'INSERT'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report',
+                'UPDATE'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'status',
+                  'resolutionNote',
+                  'reviewedBy',
+                  'reviewedAt'
+                ]::text[]) AS lifecycle_column
+                WHERE NOT pg_catalog.has_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report',
+                  lifecycle_column,
+                  'UPDATE'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS immutable_attribute
+                WHERE immutable_attribute.attrelid =
+                  'public.creator_marketplace_resource_report'::regclass
+                  AND immutable_attribute.attnum > 0
+                  AND NOT immutable_attribute.attisdropped
+                  AND immutable_attribute.attname <> ALL(
+                    ARRAY[
+                      'status',
+                      'resolutionNote',
+                      'reviewedBy',
+                      'reviewedAt'
+                    ]::name[]
+                  )
+                  AND pg_catalog.has_column_privilege(
+                    current_user,
+                    'public.creator_marketplace_resource_report',
+                    immutable_attribute.attname,
+                    'UPDATE'
+                  )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report',
+                  unexpected_table_privilege
+                )
+              )
+              AND NOT pg_catalog.has_any_column_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report',
+                'REFERENCES'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT'
+                ]::text[]) AS delegable_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report',
+                  delegable_column_privilege || ' WITH GRANT OPTION'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'status',
+                  'resolutionNote',
+                  'reviewedBy',
+                  'reviewedAt'
+                ]::text[]) AS lifecycle_column
+                WHERE pg_catalog.has_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report',
+                  lifecycle_column,
+                  'UPDATE WITH GRANT OPTION'
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource_report',
+                  public_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource_report',
+                  public_table_privilege
+                )
+              ) AS "marketplaceReportAclReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_resource_report_gate',
+              'SELECT'
+            )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report_gate',
+                'INSERT'
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report_gate',
+                'UPDATE'
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report_gate',
+                'DELETE'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY['TRUNCATE', 'TRIGGER']::text[])
+                  AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report_gate',
+                  unexpected_table_privilege
+                )
+              )
+              AND NOT pg_catalog.has_any_column_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report_gate',
+                'REFERENCES'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE'
+                ]::text[]) AS delegable_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource_report_gate',
+                  delegable_column_privilege || ' WITH GRANT OPTION'
+                )
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource_report_gate',
+                'DELETE WITH GRANT OPTION'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource_report_gate',
+                  public_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource_report_gate',
+                  public_table_privilege
+                )
+              ) AS "marketplaceReportGateAclReady",
             EXISTS (
               SELECT 1
               FROM pg_catalog.pg_attribute AS attribute
@@ -619,7 +1368,7 @@ export class PostgresHealthReadinessRepository
                   index_state.indpred,
                   index_state.indrelid,
                   true
-                ) = 'hidden = false'
+                ) = '"delistedAt" IS NULL'
                 AND EXISTS (
                   SELECT 1
                   FROM pg_catalog.pg_depend AS extension_dependency
@@ -685,7 +1434,7 @@ export class PostgresHealthReadinessRepository
                   index_state.indpred,
                   index_state.indrelid,
                   true
-                ) = 'hidden = false'
+                ) = '"delistedAt" IS NULL'
             ) AS "marketplaceTagIndexReady",
             EXISTS (
               SELECT 1
@@ -748,7 +1497,15 @@ export class PostgresHealthReadinessRepository
       state.authAccountUserIndexReady !== true ||
       state.authRuntimeDmlReady !== true ||
       state.marketplaceResourceAclReady !== true ||
+      state.marketplaceResourceLifecycleTriggerReady !== true ||
+      state.marketplaceResourceTimestampPrecisionReady !== true ||
+      state.marketplaceCloudLibraryAclReady !== true ||
+      state.marketplaceCloudLibraryTriggerReady !== true ||
+      state.marketplacePackageModerationAclReady !== true ||
+      state.marketplacePackageModerationTriggerReady !== true ||
       state.marketplacePublishGateAclReady !== true ||
+      state.marketplaceReportAclReady !== true ||
+      state.marketplaceReportGateAclReady !== true ||
       state.marketplaceSearchGenerated !== true ||
       state.marketplaceSearchIndexReady !== true ||
       state.marketplaceTagIndexReady !== true ||

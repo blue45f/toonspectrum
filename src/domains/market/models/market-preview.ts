@@ -21,6 +21,11 @@ export interface FilterPreviewData {
   readonly values: Record<string, number | string | boolean>;
 }
 
+export interface PalettePreviewData {
+  readonly name: string;
+  readonly colors: readonly string[];
+}
+
 export interface TemplatePreviewData {
   readonly name: string;
   readonly templateId: string;
@@ -41,7 +46,18 @@ export interface RecipePreviewData {
 export function palettePreviewColors(
   record: CreatorMarketplaceResourceRecord
 ): readonly string[] | null {
+  return palettePreviewData(record)?.[0]?.colors ?? null;
+}
+
+/**
+ * A palette pack can carry several independently named color sets. Keep each valid entry so the
+ * detail page can let artists inspect the whole pack instead of silently previewing only entry 1.
+ */
+export function palettePreviewData(
+  record: CreatorMarketplaceResourceRecord
+): readonly PalettePreviewData[] | null {
   if (record.kind !== "palette") return null;
+  const items: PalettePreviewData[] = [];
   for (const entry of record.entries) {
     if (entry.delivery.mode !== "portable-json") continue;
     const definition = entry.delivery.payload.definition as { colors?: unknown };
@@ -51,10 +67,10 @@ export function palettePreviewColors(
       && colors.length > 0
       && colors.every((color) => typeof color === "string" && HEX_COLOR_PATTERN.test(color))
     ) {
-      return colors;
+      items.push({ name: entry.name, colors });
     }
   }
-  return null;
+  return items.length > 0 ? items : null;
 }
 
 export function brushPreviewData(

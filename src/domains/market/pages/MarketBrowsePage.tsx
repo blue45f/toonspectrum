@@ -7,50 +7,29 @@ import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketBrowseJsonLd } from "../models/market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES, marketKindMeta } from "../models/market-kind";
-
-import type {
-  CreatorMarketplaceResourceKind,
-  CreatorMarketplaceResourceLicense,
-} from "@/lib/creator-marketplace-resource-contract";
+import {
+  parseMarketBrowseQuery,
+  resolveMarketBrowseSort,
+} from "../models/market-query";
 
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
+import {
+  CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
+  CreatorMarketplaceResourceSearchQuerySchema,
+} from "@/lib/creator-marketplace-resource-contract";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
-import { useJsonLd } from "@/src/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useJsonLd,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/src/hooks/use-document-title";
 
 const PAGE_SIZE = 12;
-const MARKET_PUBLISHER_UUID_PATTERN =
-  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/iu;
-
-function readParam(
-  searchParams: URLSearchParams,
-  key: string
-): string | undefined {
-  const value = searchParams.get(key)?.trim();
-  return value ? value : undefined;
-}
-
-function readKind(searchParams: URLSearchParams): CreatorMarketplaceResourceKind | undefined {
-  const value = searchParams.get("kind");
-  return MARKET_KINDS.some((meta) => meta.kind === value)
-    ? (value as CreatorMarketplaceResourceKind)
-    : undefined;
-}
-
-function readLicense(searchParams: URLSearchParams): CreatorMarketplaceResourceLicense | undefined {
-  const value = searchParams.get("license");
-  return MARKET_LICENSES.some((meta) => meta.license === value)
-    ? (value as CreatorMarketplaceResourceLicense)
-    : undefined;
-}
-
-function readPublisher(searchParams: URLSearchParams): string | undefined {
-  const value = readParam(searchParams, "publisher");
-  return value && MARKET_PUBLISHER_UUID_PATTERN.test(value)
-    ? value
-    : undefined;
-}
+const MARKET_BROWSE_DESCRIPTION =
+  "웹툰 제작에 필요한 브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 종류와 사용권으로 찾아보세요.";
 
 function filterChipClass(active: boolean): string {
   return cn(
@@ -66,19 +45,28 @@ export function MarketBrowsePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigationType = useNavigationType();
   const searchInputId = "market-browse-search";
-  const [draftSearch, setDraftSearch] = useState(() => searchParams.get("q") ?? "");
+  const parsedUrlQuery = parseMarketBrowseQuery(searchParams);
+  const [draftSearch, setDraftSearch] = useState(() => parsedUrlQuery.searchDraft);
   const pendingSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const query = {
     limit: PAGE_SIZE,
-    search: readParam(searchParams, "q"),
-    kind: readKind(searchParams),
-    license: readLicense(searchParams),
-    tag: readParam(searchParams, "tag"),
-    publisher: readPublisher(searchParams),
+    ...parsedUrlQuery.values,
+    sort: resolveMarketBrowseSort(parsedUrlQuery.values),
   };
-  const page = useMarketResources(query);
+  const hasInvalidQuery = parsedUrlQuery.issues.length > 0;
+  const page = useMarketResources(hasInvalidQuery ? null : query);
+  const pageTitle = query.kind
+    ? `${marketKindMeta(query.kind).label} 리소스 탐색`
+    : "마켓 탐색";
 
+  useDocumentTitle(pageTitle);
+  useMetaDescription(MARKET_BROWSE_DESCRIPTION);
+  usePageSocialMeta({
+    canonicalPath: "/market/browse",
+    title: `${pageTitle} · 툰스펙트럼`,
+    description: MARKET_BROWSE_DESCRIPTION,
+  });
   useJsonLd(marketBrowseJsonLd(page.items, query.kind));
 
   const patchParams = useCallback(
@@ -105,7 +93,7 @@ export function MarketBrowsePage() {
       ?? "선택한 배급자"
     : null;
 
-  const committedSearch = query.search ?? "";
+  const committedSearch = parsedUrlQuery.searchDraft;
   const cancelPendingSearchCommit = useCallback(() => {
     if (pendingSearchTimerRef.current === null) return;
     clearTimeout(pendingSearchTimerRef.current);
@@ -133,22 +121,34 @@ export function MarketBrowsePage() {
   const updateDraftSearch = useCallback((value: string) => {
     setDraftSearch(value);
     cancelPendingSearchCommit();
+    const parsed = CreatorMarketplaceResourceSearchQuerySchema.safeParse(value);
+    if (!parsed.success) return;
     pendingSearchTimerRef.current = setTimeout(() => {
       pendingSearchTimerRef.current = null;
-      patchParams({ q: value.trim() || null });
+      patchParams({
+        q: parsed.data || null,
+        ...(parsed.data ? {} : { sort: null }),
+      });
     }, 300);
   }, [cancelPendingSearchCommit, patchParams]);
 
   const clearSearch = useCallback(() => {
     cancelPendingSearchCommit();
     setDraftSearch("");
-    patchParams({ q: null });
-  }, [cancelPendingSearchCommit, patchParams]);
+    patchParams({ q: null, ...(query.sort === "relevance" ? { sort: null } : {}) });
+  }, [cancelPendingSearchCommit, patchParams, query.sort]);
 
   const resetFilters = useCallback(() => {
     cancelPendingSearchCommit();
     setDraftSearch("");
-    patchParams({ q: null, tag: null, publisher: null, kind: null, license: null });
+    patchParams({
+      q: null,
+      tag: null,
+      publisher: null,
+      kind: null,
+      license: null,
+      sort: null,
+    });
   }, [cancelPendingSearchCommit, patchParams]);
 
   const hasActiveFilters = Boolean(
@@ -173,7 +173,13 @@ export function MarketBrowsePage() {
             onSubmit={(event) => {
               event.preventDefault();
               cancelPendingSearchCommit();
-              patchParams({ q: draftSearch.trim() || null });
+              const parsed = CreatorMarketplaceResourceSearchQuerySchema.safeParse(draftSearch);
+              if (parsed.success) {
+                patchParams({
+                  q: parsed.data || null,
+                  ...(parsed.data ? {} : { sort: null }),
+                });
+              }
             }}
           >
             <div className="relative flex-1">
@@ -184,6 +190,15 @@ export function MarketBrowsePage() {
                 aria-label="마켓 리소스 검색"
                 value={draftSearch}
                 onChange={(event) => updateDraftSearch(event.target.value)}
+                maxLength={CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS}
+                aria-invalid={
+                  parsedUrlQuery.issues.some((issue) => issue.param === "q") || undefined
+                }
+                aria-describedby={
+                  parsedUrlQuery.issues.some((issue) => issue.param === "q")
+                    ? "market-invalid-query"
+                    : undefined
+                }
                 placeholder="리소스·태그·배급자 검색 (예: 잉크, 수채화, 4컷, 배경)"
                 className="h-10 w-full appearance-none rounded-[0.7rem] border border-line bg-card pl-9 pr-9 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors duration-150 focus:border-accent pointer-coarse:h-11 pointer-coarse:pr-12 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               />
@@ -276,7 +291,7 @@ export function MarketBrowsePage() {
 
         {/* Status and Active Filter Chips */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
-          {!page.loading && !page.error ? (
+          {!hasInvalidQuery && !page.loading && !page.error ? (
             <p className="text-xs text-fg-3" aria-live="polite">
               현재 <span className="numeral tnum font-semibold text-fg">{page.items.length}</span>개 표시
             </p>
@@ -284,12 +299,28 @@ export function MarketBrowsePage() {
             <span />
           )}
 
-          {hasActiveFilters ? (
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="inline-flex min-h-9 items-center gap-2 text-xs font-medium text-fg-2 pointer-coarse:min-h-11">
+              <span>정렬</span>
+              <select
+                aria-label="정렬 기준"
+                value={query.sort}
+                onChange={(event) => patchParams({ sort: event.target.value })}
+                className="h-9 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none transition-colors duration-150 focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:h-11"
+              >
+                <option value="relevance" disabled={!query.search}>
+                  관련도순
+                </option>
+                <option value="newest">최신순</option>
+              </select>
+            </label>
+
+            {hasActiveFilters ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {query.search ? (
                 <button
                   type="button"
-                  aria-label={`검색 필터 ${query.search} 제거`}
+                  aria-label={`검색: “${query.search}” 필터 제거`}
                   onClick={clearSearch}
                   className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
                 >
@@ -300,7 +331,7 @@ export function MarketBrowsePage() {
               {query.tag ? (
                 <button
                   type="button"
-                  aria-label={`태그 필터 ${query.tag} 제거`}
+                  aria-label={`#${query.tag} 태그 필터 제거`}
                   onClick={() => patchParams({ tag: null })}
                   className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
                 >
@@ -333,7 +364,7 @@ export function MarketBrowsePage() {
               {query.publisher ? (
                 <button
                   type="button"
-                  aria-label="배급자 필터 제거"
+                  aria-label={`배급자: ${activePublisherLabel} 필터 제거`}
                   onClick={() => patchParams({ publisher: null })}
                   className="inline-flex min-h-6 min-w-0 max-w-full items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
                 >
@@ -349,11 +380,42 @@ export function MarketBrowsePage() {
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
                 조건 초기화
               </button>
-            </div>
-          ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {page.stale ? (
+        {hasInvalidQuery ? (
+          <div
+            id="market-invalid-query"
+            role="alert"
+            className="mt-4 rounded-lg border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-fg-2"
+          >
+            <p className="font-medium text-fg">주소의 검색 조건을 적용할 수 없어요.</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-relaxed">
+              {parsedUrlQuery.issues.map((issue) => (
+                <li key={`${issue.param}-${issue.code}`}>{issue.message}</li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => {
+                cancelPendingSearchCommit();
+                const patch = Object.fromEntries(
+                  [...new Set(parsedUrlQuery.issues.map((issue) => issue.param))]
+                    .map((param) => [param, null])
+                );
+                if ("q" in patch) setDraftSearch("");
+                patchParams(patch);
+              }}
+              className={buttonClass({ variant: "outline", size: "sm", className: "mt-3" })}
+            >
+              잘못된 조건 제거
+            </button>
+          </div>
+        ) : null}
+
+        {!hasInvalidQuery && page.stale ? (
           <StaleNoticeBar
             savedAt={page.staleSavedAt ?? new Date().toISOString()}
             onRetry={page.reload}
@@ -361,7 +423,7 @@ export function MarketBrowsePage() {
           />
         ) : null}
 
-        {page.error ? (
+        {!hasInvalidQuery && page.error ? (
           <StaleNoticeBar
             message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
             onRetry={page.reload}
@@ -369,10 +431,18 @@ export function MarketBrowsePage() {
           />
         ) : null}
 
-        {page.error ? null : (
+        {hasInvalidQuery || page.error ? null : (
           <>
             <h2 className="sr-only">탐색 결과</h2>
-            <ul className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {page.loading ? (
+              <p role="status" className="sr-only">
+                마켓 탐색 결과를 불러오는 중입니다.
+              </p>
+            ) : null}
+            <ul
+              aria-busy={page.loading || undefined}
+              className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
+            >
               {page.loading
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
                     <li key={index} aria-hidden="true">

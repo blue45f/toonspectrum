@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useMarketResources } from "./use-market-resources";
 
-import type {
-  CreatorMarketplaceResourceListPage,
-  CreatorMarketplaceResourceRecord,
+import {
+  creatorMarketplaceJsonByteSize,
+  type CreatorMarketplaceResourceListPage,
+  type CreatorMarketplaceResourceRecord,
 } from "@/lib/creator-marketplace-resource-contract";
-
 import { listCreatorMarketplaceResources } from "@/src/domains/market/remotes/market-resource-remote";
 
 vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
@@ -21,6 +21,56 @@ const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 function resource(id: string, name = id): CreatorMarketplaceResourceRecord {
   return { id, name } as CreatorMarketplaceResourceRecord;
+}
+
+function cachedResource(id: string): CreatorMarketplaceResourceRecord {
+  const payload = {
+    schemaVersion: 1 as const,
+    resourceKind: "brush" as const,
+    runtime: "studio-brush-v1" as const,
+    definition: {
+      snapshot: {
+        presetId: "cached-brush",
+        renderer: "perfect-freehand",
+        settings: { opacity: 1, size: 7 },
+      },
+    },
+  };
+  return {
+    schemaVersion: 1,
+    packageId: `cached/brush/${id}`,
+    name: "캐시 브러시",
+    description: "오프라인 캐시 경계 테스트",
+    kind: "brush",
+    resourceVersion: "1.0.0",
+    minimumStudioVersion: "1.0.0",
+    tags: ["캐시"],
+    license: "cc0-1.0",
+    attributionText: "",
+    containsAi: false,
+    provenance: { origin: "original", authoredByPublisher: true },
+    compatibility: { engines: ["canvas2d"] },
+    entries: [{
+      id: `brush/${id}`,
+      kind: "brush",
+      name: "캐시 브러시 항목",
+      delivery: {
+        mode: "portable-json",
+        mediaType: "application/vnd.toonspectrum.brush+json",
+        payload,
+        byteSize: creatorMarketplaceJsonByteSize(payload),
+        sha256: "a".repeat(64),
+      },
+    }],
+    id,
+    manifestHash: "b".repeat(64),
+    manifestByteSize: 512,
+    publisher: { id: "cached-publisher", name: "캐시 작가", avatar: null },
+    createdAt: "2026-08-30T00:00:00.000Z",
+    updatedAt: "2026-08-30T00:00:00.000Z",
+    isOwner: false,
+    access: "free",
+  };
 }
 
 function page(
@@ -61,13 +111,19 @@ describe("useMarketResources", () => {
       limit: 12,
       publisher: PUBLISHER_ID,
       kind: "brush" as const,
+      sort: "newest" as const,
     };
     const { result } = renderHook(() => useMarketResources(query));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(listResources).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ publisher: PUBLISHER_ID, kind: "brush", limit: 12 }),
+      expect.objectContaining({
+        publisher: PUBLISHER_ID,
+        kind: "brush",
+        limit: 12,
+        sort: "newest",
+      }),
       expect.any(AbortSignal)
     );
     const cachedPage = JSON.parse(
@@ -84,7 +140,11 @@ describe("useMarketResources", () => {
     expect(listResources).toHaveBeenCalledTimes(2);
     expect(listResources).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ publisher: PUBLISHER_ID, cursor: "cursor-2" }),
+      expect.objectContaining({
+        publisher: PUBLISHER_ID,
+        cursor: "cursor-2",
+        sort: "newest",
+      }),
       expect.any(AbortSignal)
     );
     expect(result.current.hasMore).toBe(false);
@@ -96,7 +156,10 @@ describe("useMarketResources", () => {
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(page([resource("resource-2")], null));
 
-    const { result } = renderHook(() => useMarketResources({ limit: 12 }));
+    const { result } = renderHook(() => useMarketResources({
+      limit: 12,
+      sort: "newest",
+    }));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => result.current.loadMore());
@@ -129,7 +192,7 @@ describe("useMarketResources", () => {
       .mockResolvedValueOnce(page([resource("new-1")], null));
 
     const { result, rerender } = renderHook(
-      ({ search }) => useMarketResources({ limit: 12, search }),
+      ({ search }) => useMarketResources({ limit: 12, search, sort: "newest" }),
       { initialProps: { search: "old" } }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -160,7 +223,7 @@ describe("useMarketResources", () => {
       .mockReturnValueOnce(newPage.promise);
 
     const { result, rerender } = renderHook(
-      ({ search }) => useMarketResources({ limit: 12, search }),
+      ({ search }) => useMarketResources({ limit: 12, search, sort: "newest" }),
       { initialProps: { search: "old" } }
     );
     const oldSignal = listResources.mock.calls[0]?.[1];
@@ -173,5 +236,72 @@ describe("useMarketResources", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.items.map((item) => item.id)).toEqual(["new"]);
+  });
+
+  it("keeps newest and relevance pages in separate cache generations", async () => {
+    listResources
+      .mockResolvedValueOnce(page([resource("newest-result")], null))
+      .mockResolvedValueOnce(page([resource("relevance-result")], null));
+
+    const { result, rerender } = renderHook(
+      ({ sort }: { sort: "newest" | "relevance" }) => useMarketResources({
+        limit: 12,
+        search: "ink",
+        sort,
+      }),
+      {
+        initialProps: {
+          sort: "newest" as "newest" | "relevance",
+        },
+      }
+    );
+    await waitFor(() => expect(result.current.items[0]?.id).toBe("newest-result"));
+
+    rerender({ sort: "relevance" });
+    await waitFor(() => expect(result.current.items[0]?.id).toBe("relevance-result"));
+
+    expect(localStorage.getItem(
+      `toonspectrum.market.page.v1:${JSON.stringify({
+        limit: 12,
+        search: "ink",
+        sort: "newest",
+      })}`
+    )).not.toBeNull();
+    expect(localStorage.getItem(
+      `toonspectrum.market.page.v1:${JSON.stringify({
+        limit: 12,
+        search: "ink",
+        sort: "relevance",
+      })}`
+    )).not.toBeNull();
+  });
+
+  it("does not paginate or refresh a stale cached head with a newly fetched tail", async () => {
+    const query = { limit: 12, sort: "newest" as const };
+    const cacheKey = `toonspectrum.market.page.v1:${JSON.stringify(query)}`;
+    const savedAt = new Date().toISOString();
+    localStorage.setItem(cacheKey, JSON.stringify({
+      savedAt,
+      items: [cachedResource("123e4567-e89b-42d3-a456-426614174000")],
+      hasMore: true,
+      nextCursor: "stale-cursor",
+    }));
+    listResources.mockRejectedValueOnce(new Error("offline"));
+
+    const { result } = renderHook(() => useMarketResources(query));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.stale).toBe(true);
+    expect(result.current.hasMore).toBe(false);
+    expect(result.current.items).toHaveLength(1);
+
+    act(() => result.current.loadMore());
+    await act(async () => Promise.resolve());
+
+    expect(listResources).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem(cacheKey) ?? "null")).toMatchObject({
+      savedAt,
+      nextCursor: "stale-cursor",
+    });
   });
 });

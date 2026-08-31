@@ -7,6 +7,7 @@ import {
   compareStudioMarketplaceVersions,
   createStudioMarketplaceConflictCloneId,
   createStudioMarketplaceShareManifest,
+  evaluateStudioMarketplaceCompatibility,
   evaluateStudioMarketplacePublishRights,
   filterStudioMarketplacePackages,
   loadStudioMarketplaceLibrary,
@@ -271,6 +272,52 @@ describe("studio marketplace import and manifest", () => {
     }).recommendedAction).toBe("block");
   });
 
+  it("follows SemVer prerelease precedence and ignores build metadata", () => {
+    const precedence = [
+      "1.0.0-alpha",
+      "1.0.0-alpha.1",
+      "1.0.0-alpha.beta",
+      "1.0.0-beta",
+      "1.0.0-beta.2",
+      "1.0.0-beta.11",
+      "1.0.0-rc.1",
+      "1.0.0",
+    ];
+    for (let index = 1; index < precedence.length; index += 1) {
+      expect(compareStudioMarketplaceVersions(
+        precedence[index]!,
+        precedence[index - 1]!,
+      )).toBe(1);
+    }
+    expect(compareStudioMarketplaceVersions("1.0.0-alpha.1", "1.0.0-alpha.beta"))
+      .toBe(-1);
+    expect(compareStudioMarketplaceVersions("1.0.0+build.7", "1.0.0+build.11"))
+      .toBe(0);
+    expect(compareStudioMarketplaceVersions("1.0.0-rc.1+sha.a", "1.0.0-rc.1+sha.b"))
+      .toBe(0);
+  });
+
+  it("treats a stable release as an update from prerelease and blocks the reverse downgrade", () => {
+    const stable = marketplacePackage({ version: "1.2.0" });
+    expect(resolveStudioMarketplaceImport(stable, {
+      packageId: stable.id,
+      version: "1.2.0-rc.1",
+      packageFingerprint: "sha256:release-candidate",
+      addedAt: stable.updatedAt,
+    }).status).toBe("update");
+
+    const releaseCandidate = marketplacePackage({ version: "1.2.0-rc.1" });
+    expect(resolveStudioMarketplaceImport(releaseCandidate, {
+      packageId: releaseCandidate.id,
+      version: "1.2.0",
+      packageFingerprint: "sha256:stable",
+      addedAt: releaseCandidate.updatedAt,
+    })).toMatchObject({
+      status: "downgrade-blocked",
+      recommendedAction: "block",
+    });
+  });
+
   it("keeps the original entry and creates a deterministic ID for same-version conflicts", () => {
     const pkg = marketplacePackage();
     const original: StudioMarketplaceLibraryState = {
@@ -316,6 +363,145 @@ describe("studio marketplace import and manifest", () => {
     expect(manifest.package.license.redistributionAllowed).toBe(true);
     expect(manifest.package.includedItems).toHaveLength(1);
     expect(manifest.notice).toContain("구매 파일");
+  });
+});
+
+describe("studio marketplace runtime compatibility", () => {
+  it("blocks resources that require a newer Studio version with actionable Korean copy", () => {
+    const decision = evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "2.0.0",
+      currentStudioVersion: "1.4.3",
+      declaredEngines: ["canvas2d"],
+      supportedEngines: ["canvas2d"],
+    });
+
+    expect(decision).toMatchObject({
+      status: "unsupported",
+      verified: true,
+      code: "studio-version-too-old",
+    });
+    expect(decision.reason).toContain("Studio 2.0.0 이상");
+    expect(decision.reason).toContain("현재 버전은 1.4.3");
+    expect(decision.reason).toContain("업데이트");
+  });
+
+  it("accepts a stable Studio for a prerelease minimum and a measured engine intersection", () => {
+    expect(evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.5.0-rc.2+publisher.7",
+      currentStudioVersion: "1.5.0+studio.12",
+      declaredEngines: ["webgpu", "canvas2d"],
+      supportedEngines: ["canvas2d"],
+    })).toEqual({
+      status: "compatible",
+      verified: true,
+      code: "compatible",
+      reason: null,
+    });
+  });
+
+  it("isolates inconclusive optional engines without erasing proven alternatives", () => {
+    const partialContext = {
+      minimumStudioVersion: "1.0.0",
+      currentStudioVersion: "1.0.0",
+      supportedEngines: ["canvas2d"],
+      unverifiedEngines: ["webgpu"],
+    } as const;
+
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["canvas2d"],
+    })).toEqual({
+      status: "compatible",
+      verified: true,
+      code: "compatible",
+      reason: null,
+    });
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["canvas2d", "webgpu"],
+    })).toMatchObject({ status: "compatible", code: "compatible" });
+
+    const unverified = evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["webgpu"],
+    });
+    expect(unverified).toMatchObject({
+      status: "unverified",
+      verified: false,
+      code: "engine-capabilities-unavailable",
+    });
+    expect(unverified.reason).toContain("WebGPU");
+    expect(unverified.reason).toContain("다시 확인");
+
+    expect(evaluateStudioMarketplaceCompatibility({
+      ...partialContext,
+      declaredEngines: ["webgl2"],
+    })).toMatchObject({
+      status: "unsupported",
+      verified: true,
+      code: "engine-unavailable",
+    });
+  });
+
+  it("blocks a measured engine mismatch and distinguishes missing runtime sources", () => {
+    const unsupported = evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0.0",
+      currentStudioVersion: "1.0.0",
+      declaredEngines: ["webgpu"],
+      supportedEngines: ["canvas2d", "webgl2"],
+    });
+    expect(unsupported).toMatchObject({
+      status: "unsupported",
+      code: "engine-unavailable",
+    });
+    expect(unsupported.reason).toContain("WebGPU");
+    expect(unsupported.reason).toContain("그래픽 드라이버");
+
+    const unverified = evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0.0",
+      declaredEngines: ["canvas2d"],
+    });
+    expect(unverified).toMatchObject({
+      status: "unverified",
+      verified: false,
+      code: "compatibility-sources-unavailable",
+    });
+    expect(unverified.reason).toContain("권위 있는 값이 없어");
+  });
+
+  it("fails closed when supplied version or manifest compatibility data is invalid", () => {
+    expect(evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0",
+      currentStudioVersion: "1.0.0",
+      declaredEngines: ["canvas2d"],
+    })).toMatchObject({
+      status: "unsupported",
+      code: "minimum-version-invalid",
+    });
+    expect(evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0.0-01",
+      currentStudioVersion: "1.0.0",
+      declaredEngines: ["canvas2d"],
+    })).toMatchObject({
+      status: "unsupported",
+      code: "minimum-version-invalid",
+    });
+    expect(evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0.0",
+      currentStudioVersion: "",
+      declaredEngines: ["canvas2d"],
+    })).toMatchObject({
+      status: "unsupported",
+      code: "current-version-invalid",
+    });
+    expect(evaluateStudioMarketplaceCompatibility({
+      minimumStudioVersion: "1.0.0",
+      currentStudioVersion: "1.0.0",
+      declaredEngines: [],
+    })).toMatchObject({
+      status: "unsupported",
+      code: "declared-engines-invalid",
+    });
   });
 });
 

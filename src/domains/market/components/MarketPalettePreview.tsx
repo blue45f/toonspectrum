@@ -55,7 +55,7 @@ export function MarketPalettePreview({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
           <Palette className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-palette-heading" className="text-xs font-semibold text-fg">색상 구성 ({colors.length}색)</h3>
+          <h2 id="market-palette-heading" className="text-xs font-semibold text-fg">색상 구성 ({colors.length}색)</h2>
         </div>
         <div className="flex items-center gap-2">
           <button

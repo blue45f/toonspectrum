@@ -8,6 +8,7 @@ import {
   GOOGLE_PLAY_LOCALE_LIST,
   getLanguageOptions,
   getLocaleCandidates,
+  resolveSelectableLocale,
   i18nDict,
   ensureRuntimeLocaleBundle,
   resolveI18nValue,
@@ -142,6 +143,13 @@ describe("i18n locale candidates", () => {
     expect(candidates).toContain("zh");
     expect(candidates).toContain("en");
     expect(candidates).toContain("ko");
+  });
+
+  it("maps browser-only region variants to a locale exposed by the language control", () => {
+    expect(resolveSelectableLocale("ko-KR")).toBe("ko");
+    expect(resolveSelectableLocale("zh-Hant-TW")).toBe("zh-hant");
+    expect(resolveSelectableLocale("en-US")).toBe("en-us");
+    expect(resolveSelectableLocale("not-a-published-locale")).toBe("ko");
   });
 });
 

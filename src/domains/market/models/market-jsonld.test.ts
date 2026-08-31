@@ -61,6 +61,22 @@ describe("market json-ld", () => {
     expect((ld.author as { name: string }).name).toBe("작가");
     expect(ld.license).toBe("https://creativecommons.org/licenses/by/4.0/");
     expect(ld.dateModified).toBe("2026-08-23T00:00:00.000Z");
+    expect(ld.version).toBe("1.0.0");
+    const page = ld.mainEntityOfPage as {
+      breadcrumb: { itemListElement: Array<{ name: string; item: string }> };
+    };
+    expect(page.breadcrumb.itemListElement.map((item) => item.name)).toEqual([
+      "창작 마켓",
+      "마켓 탐색",
+      "느와르 팔레트",
+    ]);
+    expect(page.breadcrumb.itemListElement[2]?.item).toBe(
+      "https://www.toonstudio.cloud/market/resource/123e4567-e89b-42d3-a456-426614174000",
+    );
+    expect(ld.additionalProperty).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "최소 Studio 버전", value: "0.1.0" }),
+      expect.objectContaining({ name: "호환 엔진", value: "canvas2d" }),
+    ]));
   });
 
   it("표준 사용권은 사이트 약관 URL로 폴백한다", () => {

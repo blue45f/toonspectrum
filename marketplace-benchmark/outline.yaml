@@ -1,0 +1,90 @@
+topic: ToonSpectrum creator asset marketplace competitive benchmark
+as_of: 2026-08-31
+scope:
+  time_range: unlimited
+  recency_rule: Prefer currently documented product behavior and record migrated, beta, or closed surfaces explicitly.
+  product_goal: Prioritize capabilities that improve discovery, trust, preview fidelity, Studio activation, rights integrity, and repeat use.
+items:
+  - name: Clip Studio Assets
+    lane: illustration-editor marketplace
+  - name: ACON3D
+    lane: webtoon 3D asset marketplace
+  - name: BOOTH
+    lane: creator storefront and VRM marketplace
+  - name: Gumroad
+    lane: direct digital storefront
+  - name: Creative Market
+    lane: licensed creative asset marketplace
+  - name: Envato Elements and Envato Market
+    lane: subscription and transactional creative assets
+  - name: Adobe Stock and Creative Cloud Marketplace
+    lane: professional creative ecosystem
+  - name: Figma Community
+    lane: editor-native community and remix ecosystem
+  - name: Canva marketplace ecosystem
+    lane: templates, apps, and editor-native acquisition
+  - name: Fab
+    lane: engine-compatible 3D and game assets
+  - name: Unity Asset Store
+    lane: engine-native packages and publisher support
+  - name: Superhive
+    lane: Blender-native professional marketplace
+  - name: Sketchfab
+    lane: interactive 3D preview and community
+    status_note: Sketchfab Store closed after Fab launched; eligible creators can migrate downloadable products to Fab, while community, viewer, and historical-purchase capabilities remain separate.
+  - name: CGTrader
+    lane: professional 3D models
+  - name: TurboSquid
+    lane: professional 3D models and quality assurance
+  - name: itch.io assets
+    lane: indie game asset marketplace
+  - name: Roblox Creator Store
+    lane: runtime-native asset reuse and safety
+  - name: Daz 3D
+    lane: characters, environments, poses, and install inventory
+  - name: Krita and OpenGameArt resources
+    lane: open community resource libraries
+  - name: ArtStation Marketplace
+    lane: portfolio-led professional marketplace
+  - name: BlenderKit
+    lane: in-Blender searchable asset library
+  - name: KitBash3D Cargo and Greyscalegorilla
+    lane: one-click DCC delivery and scene readiness
+  - name: VRoid Hub
+    lane: VRM-native distribution and machine-readable usage conditions
+  - name: nizima by Live2D
+    lane: interactive 2D character marketplace and packaged model delivery
+  - name: VRChat Avatar Marketplace
+    lane: in-runtime avatar try-on and permanent entitlements
+  - name: ActorCore and Reallusion marketplaces
+    lane: rigged character, motion, retargeting, and DCC delivery
+  - name: Godot Asset Store
+    lane: open engine marketplace
+    status_note: Beta as of the benchmark date; separate current behavior from roadmap.
+  - name: VS Code Marketplace
+    lane: executable package trust and update control
+  - name: Blender Extensions Platform
+    lane: editor-native executable extension distribution and governance
+  - name: Rive Marketplace
+    lane: interactive vector assets and remix lineage
+  - name: LottieFiles
+    lane: motion asset customization, review, and delivery
+  - name: Spline Community
+    lane: browser-native interactive 3D remix community
+  - name: Adobe Substance 3D Assets
+    lane: parametric production assets and DCC transfer
+  - name: Creative Fabrica
+    lane: subscription entitlements and complex commercial licensing
+  - name: Poly Haven
+    lane: standardized CC0 3D ingestion
+  - name: MediBang Paint Cloud Materials
+    lane: manga-native editor materials and cloud sync
+  - name: Ko-fi Shop and Patreon
+    lane: direct-to-fan storefront and recurring creator revenue
+  - name: Adobe Mixamo
+    lane: asset transformation and production readiness
+execution:
+  batch_size: 3
+  items_per_agent: 4
+  output_dir: ./marketplace-benchmark
+  consolidated_results: ./marketplace-benchmark/results.yaml

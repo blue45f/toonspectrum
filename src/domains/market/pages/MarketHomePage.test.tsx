@@ -22,7 +22,10 @@ vi.mock("../components/MarketResourceCard", () => ({
 }));
 
 vi.mock("@/src/hooks/use-document-title", () => ({
+  useDocumentTitle: vi.fn(),
   useJsonLd: vi.fn(),
+  useMetaDescription: vi.fn(),
+  usePageSocialMeta: vi.fn(),
 }));
 
 const useResources = vi.mocked(useMarketResources);
@@ -53,6 +56,20 @@ afterEach(() => {
 });
 
 describe("MarketHomePage", () => {
+  it("announces recent-resource skeleton loading", () => {
+    useResources.mockReturnValue(marketPage({ loading: true }));
+
+    const { container } = render(
+      <MemoryRouter>
+        <MarketHomePage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("최근 공유된 마켓 리소스");
+    expect(container.querySelector("ul[aria-busy='true']")).toBeTruthy();
+    expect(container.querySelectorAll("li[aria-hidden='true']")).toHaveLength(8);
+  });
+
   it("links the share CTA directly to the open Studio community share view", () => {
     useResources.mockReturnValue(marketPage());
 
@@ -65,6 +82,22 @@ describe("MarketHomePage", () => {
     expect(
       screen.getByRole("link", { name: "스튜디오에서 공유하기" }).getAttribute("href")
     ).toBe("/studio?assetMarket=community&communityView=share");
+  });
+
+  it("distinguishes every license text link without relying on color alone", () => {
+    useResources.mockReturnValue(marketPage());
+
+    render(
+      <MemoryRouter>
+        <MarketHomePage />
+      </MemoryRouter>
+    );
+
+    const licenseLinks = screen.getAllByRole("link", { name: /사용권 전문 보기/ });
+    expect(licenseLinks).toHaveLength(4);
+    for (const link of licenseLinks) {
+      expect(link.className.split(/\s+/u)).toContain("underline");
+    }
   });
 
   it("keeps cached resource cards visible while clearly marking stale data", () => {
@@ -83,7 +116,8 @@ describe("MarketHomePage", () => {
     );
 
     expect(screen.getByTestId("resource-cached-resource")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("저장된 목록을 보여드리고 있어요");
+    expect(screen.getByRole("status").textContent).toContain("저장된 사본을 보여드리고 있어요");
+    expect(screen.getByRole("status").textContent).toContain("현재 공개 상태는 확인되지 않았어요");
     const retry = screen.getByRole("button", { name: "다시 시도" });
     expect(retry.className).toContain("pointer-coarse:min-h-11");
     fireEvent.click(retry);

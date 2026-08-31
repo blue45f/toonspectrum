@@ -58,7 +58,7 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-filter-heading" className="text-xs font-semibold text-fg">필터 효과 참고 일러스트 ({filter.name})</h3>
+          <h2 id="market-filter-heading" className="text-xs font-semibold text-fg">필터 효과 참고 일러스트 ({filter.name})</h2>
           <span className="inline-flex min-h-6 items-center rounded bg-raised px-1.5 text-[0.65rem] text-fg-3">
             엔진: {filter.engine}
           </span>

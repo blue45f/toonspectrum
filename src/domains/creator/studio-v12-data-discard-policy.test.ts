@@ -45,8 +45,11 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(source("./studio-animatic-sqlite-persistence.ts")).toContain(
       'STUDIO_ANIMATIC_SQLITE_NAMESPACE = "studio-animatic-v12"',
     );
+    expect(source("./studio-community-pack-legacy-migration.ts")).toContain(
+      'export const STUDIO_CREATOR_PACK_SQLITE_NAMESPACE = "studio-creator-pack-v12"',
+    );
     expect(source("./studio-creator-pack-product-runtime.ts")).toContain(
-      'STUDIO_CREATOR_PACK_SQLITE_NAMESPACE = "studio-creator-pack-v12"',
+      'export { STUDIO_CREATOR_PACK_SQLITE_NAMESPACE } from "./studio-community-pack-legacy-migration"',
     );
     expect(source("./studio-translation-memory-sqlite-persistence.ts")).toContain(
       '"studio-translation-memory-v12"',

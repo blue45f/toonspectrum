@@ -1,0 +1,117 @@
+categories:
+  product_context:
+    detail_level: moderate
+    fields:
+      - name: status_and_surface_boundary
+        description: Active, beta, deprecated, closed, or migrated status plus the surfaces that own preview, checkout, delivery, community, and historical entitlements.
+      - name: positioning_and_jobs
+        description: Primary audience, asset jobs-to-be-done, and marketplace operating model.
+      - name: operating_model
+        description: Open, curated, invitation-only, first-party, community commons, portfolio-led, direct storefront, or subscription-pool model and support ownership.
+  catalog_and_discovery:
+    detail_level: detailed
+    fields:
+      - name: asset_taxonomy_and_formats
+        description: Brushes, palettes, templates, 2D, 3D, VRM, poses, backgrounds, plugins, project files, and supported interchange formats.
+      - name: search_ranking_and_catalog_integrity
+        description: Keyword and semantic search, similar or image search, filters, typo tolerance, ranking transparency, diversity, sponsored labeling, duplicate and spam defense.
+      - name: curation_and_retention
+        description: Editorial collections, personalization, follows, wishlists, notifications, history, recommendations, bundles, and creator storefronts.
+  evaluation_and_preview:
+    detail_level: detailed
+    fields:
+      - name: listing_information_architecture
+        description: Card and detail-page decision information, social proof, compatibility, rights, update, and support signals.
+      - name: interactive_preview_and_sandbox
+        description: Brush testing, palette copying, before-after filters, 3D rotation, topology and rig inspection, motion and expression playback, avatar try-on, and fidelity to Studio output.
+      - name: technical_runtime_budget
+        description: File size, textures, polygons, draw calls, materials, bones, blendshapes, animation clips, browser memory, mobile GPU cost, and brush long-stroke cost.
+      - name: transformation_and_fidelity_receipt
+        description: Conversion warnings, losses, automated changes, reversible steps, and evidence comparing source with imported or transformed output.
+  acquisition_and_library:
+    detail_level: detailed
+    fields:
+      - name: pricing_and_checkout
+        description: Free, paid, subscription, trial, pay-what-you-want, coupons, bundles, gifting, tax, receipts, refunds, and disputes.
+      - name: entitlement_state_machine
+        description: Acquisition, subscription, gift, refund, cancellation, delisting, suspension, and which use, download, update, export, or new-project rights survive each state.
+      - name: personal_and_team_library
+        description: Installed, update, device sync, project assignment, storage, offline cache, deduplication, bulk update or uninstall, collections, archived versions, and inventory export.
+      - name: acquisition_to_activation_funnel
+        description: Impression through preview, acquisition, install, first Studio use, repeat use, and export or publish, with creator-facing analytics.
+  studio_integration:
+    detail_level: detailed
+    fields:
+      - name: fulfillment_transaction_integrity
+        description: One-time deep-link consumption, idempotency, duplicate prevention, checksums, retries, rollback, partial failure recovery, and user-visible receipts.
+      - name: compatibility_and_conformance
+        description: Studio, engine, format, renderer, OS, device, GPU, dependencies, coordinate system, physical scale, and evidence behind compatibility claims.
+      - name: parametric_variants_and_instances
+        description: Editable parameters, presets, variants, linked instances, overrides, bundles, and safe upstream update propagation.
+      - name: dynamic_behavior_contract
+        description: Inputs, events, state machines, permissions, dependencies, deterministic behavior, reduced-motion support, and fallbacks for executable or interactive assets.
+  rights_and_provenance:
+    detail_level: detailed
+    fields:
+      - name: canonical_identity_and_lineage
+        description: Stable asset, version, creator, publisher, hash, origin, derivative, remix, clone, and instance identities preserved across Studio operations.
+      - name: nested_rights_and_redistribution
+        description: Extractability, standalone redistribution, flattened output, larger works, sublicensing, template use, collaborator rights, and derivative royalty propagation.
+      - name: project_license_ledger
+        description: Frozen license version, acquisition timestamp, project assignment, seats, collaborators, attribution, and exportable machine-readable manifest.
+      - name: ai_origin_and_training_policy
+        description: AI-assisted and AI-generated disclosures, training permission, provenance evidence, buyer filters, ranking treatment, and complaint handling.
+  creator_supply_and_governance:
+    detail_level: detailed
+    fields:
+      - name: publishing_and_lifecycle
+        description: Draft preview, validation, moderation, pricing, release, versioning, changelogs, rollback, delisting, successor products, and buyer continuity.
+      - name: creator_economics
+        description: Fees, revenue share, subscription allocation, split royalties, payout, tax, refunds, promotions, and remix attribution.
+      - name: moderation_and_operational_sla
+        description: Review times, mature content, reports, IP claims, takedowns, appeals, seller response, vulnerability handling, and abandoned products.
+      - name: organization_governance
+        description: Roles, private catalogs, approved publishers, pooled seats, billing, audit logs, procurement controls, and allow or deny lists.
+  security_and_resilience:
+    detail_level: detailed
+    fields:
+      - name: executable_asset_security
+        description: Signatures, verified publishers, malware, secret and SBOM scans, dynamic analysis, permissions, sandboxing, vulnerability notices, allowlists, and emergency blocklists.
+      - name: delivery_and_offline_resilience
+        description: Versioned URLs, CDN behavior, cache invalidation, resumable delivery, corrupt-cache repair, signed snapshots, offline grace, and silent file replacement protection.
+  product_quality:
+    detail_level: detailed
+    fields:
+      - name: accessibility_localization_and_responsive
+        description: Keyboard and screen-reader operation, contrast, reduced motion, captions, alt text, mobile layouts, language and currency, and localized asset metadata.
+      - name: performance_and_seo
+        description: Core Web Vitals, image and preview loading, caching, pagination, canonical and social metadata, structured data, and crawlable discovery.
+      - name: webtoon_production_fit
+        description: Vertical-scroll and panel templates, DPI and color modes, fonts, balloons, tones, moire safeguards, backgrounds, character consistency, toon render passes, and publication-ready export.
+      - name: character_avatar_metadata
+        description: Skeleton, humanoid mapping, expressions, lip sync, physics, outfits, proportions, motion compatibility, performance rank, and embedded license survival.
+  prioritization:
+    detail_level: moderate
+    fields:
+      - name: evidence_context
+        description: Official source URL, observation date, region, account or plan, device or editor version, and whether directly exercised or documented.
+      - name: user_value
+        description: Expected effect on discovery confidence, activation, repeat use, creator supply, and trust.
+      - name: implementation_complexity
+        description: Frontend, contract, API, migration, Studio, security, operations, and legal dependencies.
+      - name: risk_and_priority
+        description: Correctness, rights, security, performance, product, and migration risk with P0 to P3 recommendation.
+priority_scale:
+  P0:
+    definition: Required to prevent correctness, rights, or security failure in an enabled capability, or required before an explicitly disabled high-risk surface may be enabled.
+    interpretation: A future-surface P0 is a gate for that surface, not a blocker for a release that keeps the surface disabled.
+  P1:
+    definition: High-value capability or risk reduction that should follow the active P0 gates and materially improves activation, trust, or repeat use.
+  P2:
+    definition: Useful differentiation or workflow improvement whose absence does not compromise the integrity of an enabled capability.
+  P3:
+    definition: Exploratory or lower-signal enhancement that requires stronger evidence before scheduling.
+uncertain:
+  - Commercial pricing and regional availability that require an authenticated or region-specific account.
+  - Roadmap items that are documented but not yet released.
+  - Seller-only moderation, analytics, payout, and dispute workflows not visible in public documentation.

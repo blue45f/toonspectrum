@@ -1,3 +1,8 @@
+import {
+  compareCreatorMarketplaceSemver,
+  isCreatorMarketplaceSemver,
+} from "@/lib/creator-marketplace-semver";
+
 /**
  * Local-first package contract shared by Studio assets, brushes, filters, palettes,
  * templates and 3D presets.
@@ -163,6 +168,49 @@ export interface StudioMarketplaceImportResolution {
   readonly message: string;
 }
 
+export interface StudioMarketplaceCompatibilityEvaluationInput {
+  readonly minimumStudioVersion: string;
+  /**
+   * The authoritative Studio compatibility version supplied by the product runtime. Omit it when
+   * the build has no trustworthy compatibility-version source; an arbitrary app/package version
+   * must never be substituted because that could reject every otherwise valid marketplace item.
+   */
+  readonly currentStudioVersion?: string | null;
+  readonly declaredEngines: readonly string[];
+  /** Omitted means "not measured"; an empty array is a measured device with no supported engine. */
+  readonly supportedEngines?: readonly string[] | null;
+  /** Inconclusive per-engine probes; a resource requiring one remains unverified, not unsupported. */
+  readonly unverifiedEngines?: readonly string[] | null;
+}
+
+export type StudioMarketplaceCompatibilityEvaluation =
+  | Readonly<{
+      status: "compatible";
+      verified: true;
+      code: "compatible";
+      reason: null;
+    }>
+  | Readonly<{
+      status: "unverified";
+      verified: false;
+      code:
+        | "compatibility-sources-unavailable"
+        | "studio-version-unavailable"
+        | "engine-capabilities-unavailable";
+      reason: string;
+    }>
+  | Readonly<{
+      status: "unsupported";
+      verified: true;
+      code:
+        | "minimum-version-invalid"
+        | "current-version-invalid"
+        | "studio-version-too-old"
+        | "declared-engines-invalid"
+        | "engine-unavailable";
+      reason: string;
+    }>;
+
 export interface StudioMarketplaceShareManifest {
   readonly schema: typeof STUDIO_MARKETPLACE_SHARE_MANIFEST_SCHEMA;
   readonly version: 1;
@@ -252,24 +300,252 @@ function packageSearchText(pkg: StudioMarketplacePackage): string {
   ].join("\n").toLocaleLowerCase("ko-KR");
 }
 
-function semverParts(version: string): readonly number[] {
-  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(version.trim());
-  if (!match) return [0, 0, 0];
-  return [
-    Number.parseInt(match[1] ?? "0", 10),
-    Number.parseInt(match[2] ?? "0", 10),
-    Number.parseInt(match[3] ?? "0", 10),
-  ];
+interface StudioMarketplaceSemver {
+  readonly core: readonly [bigint, bigint, bigint];
+  readonly prerelease: readonly string[];
+}
+
+// Marketplace records use exact x.y.z versions. The comparator also accepts historical x / x.y
+// local receipts so an old install remains deterministically older/newer instead of becoming an
+// accidental same-version conflict. Build metadata is parsed but deliberately excluded from the
+// precedence representation, as required by SemVer 2.0.
+const STUDIO_MARKETPLACE_COMPARABLE_SEMVER =
+  /^(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
+function parseStudioMarketplaceSemver(version: string): StudioMarketplaceSemver | null {
+  const match = STUDIO_MARKETPLACE_COMPARABLE_SEMVER.exec(version.trim());
+  if (!match) return null;
+  const prerelease = match[4]?.split(".") ?? [];
+  // SemVer forbids leading zeroes only for numeric prerelease identifiers. Build identifiers may
+  // contain them and are intentionally discarded from the precedence representation.
+  if (
+    prerelease.some(
+      (identifier) => /^\d+$/u.test(identifier) && !/^(?:0|[1-9]\d*)$/u.test(identifier),
+    )
+  ) {
+    return null;
+  }
+  try {
+    return {
+      core: [
+        BigInt(match[1] ?? "0"),
+        BigInt(match[2] ?? "0"),
+        BigInt(match[3] ?? "0"),
+      ],
+      prerelease,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isExactStudioMarketplaceSemver(version: string): boolean {
+  return isCreatorMarketplaceSemver(version);
+}
+
+function compareBigInts(left: bigint, right: bigint): number {
+  if (left === right) return 0;
+  return left > right ? 1 : -1;
+}
+
+function numericPrereleaseIdentifier(value: string): bigint | null {
+  if (!/^(?:0|[1-9]\d*)$/u.test(value)) return null;
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
+
+function comparePrereleaseIdentifiers(left: string, right: string): number {
+  if (left === right) return 0;
+  const leftNumeric = numericPrereleaseIdentifier(left);
+  const rightNumeric = numericPrereleaseIdentifier(right);
+  if (leftNumeric !== null && rightNumeric !== null) {
+    return compareBigInts(leftNumeric, rightNumeric);
+  }
+  if (leftNumeric !== null) return -1;
+  if (rightNumeric !== null) return 1;
+  return left > right ? 1 : -1;
+}
+
+function compareParsedStudioMarketplaceSemver(
+  left: StudioMarketplaceSemver,
+  right: StudioMarketplaceSemver,
+): number {
+  for (let index = 0; index < left.core.length; index += 1) {
+    const difference = compareBigInts(left.core[index]!, right.core[index]!);
+    if (difference !== 0) return difference;
+  }
+  if (left.prerelease.length === 0 && right.prerelease.length === 0) return 0;
+  if (left.prerelease.length === 0) return 1;
+  if (right.prerelease.length === 0) return -1;
+  const sharedLength = Math.min(left.prerelease.length, right.prerelease.length);
+  for (let index = 0; index < sharedLength; index += 1) {
+    const difference = comparePrereleaseIdentifiers(
+      left.prerelease[index]!,
+      right.prerelease[index]!,
+    );
+    if (difference !== 0) return difference;
+  }
+  if (left.prerelease.length === right.prerelease.length) return 0;
+  return left.prerelease.length > right.prerelease.length ? 1 : -1;
 }
 
 export function compareStudioMarketplaceVersions(left: string, right: string): number {
-  const leftParts = semverParts(left);
-  const rightParts = semverParts(right);
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (difference !== 0) return difference > 0 ? 1 : -1;
+  const normalizedLeft = left.trim();
+  const normalizedRight = right.trim();
+  if (
+    isCreatorMarketplaceSemver(normalizedLeft)
+    && isCreatorMarketplaceSemver(normalizedRight)
+  ) {
+    return compareCreatorMarketplaceSemver(normalizedLeft, normalizedRight);
   }
-  return 0;
+  const leftVersion = parseStudioMarketplaceSemver(normalizedLeft);
+  const rightVersion = parseStudioMarketplaceSemver(normalizedRight);
+  if (leftVersion && rightVersion) {
+    return compareParsedStudioMarketplaceSemver(leftVersion, rightVersion);
+  }
+  if (normalizedLeft === normalizedRight) return 0;
+  // Invalid values can exist only in legacy local receipts, not in the marketplace contract.
+  // Keep them deterministically below a valid release so a valid package can repair the receipt.
+  if (leftVersion) return 1;
+  if (rightVersion) return -1;
+  return normalizedLeft > normalizedRight ? 1 : -1;
+}
+
+function engineNames(engines: readonly string[]): string {
+  const labels: Readonly<Record<string, string>> = {
+    canvas2d: "Canvas 2D",
+    webgl2: "WebGL 2",
+    webgpu: "WebGPU",
+    three: "Three.js",
+  };
+  return engines.map((engine) => labels[engine] ?? engine).join(", ");
+}
+
+/**
+ * Evaluates only capabilities backed by authoritative caller input. Missing runtime sources return
+ * an explicit `unverified` result rather than being called compatible; supplied invalid or
+ * incompatible values fail closed with recovery copy suitable for the Studio card and one-shot
+ * deep-link status. The projection integration decides whether an unverified result is actionable
+ * only after the product provides the corresponding authoritative runtime source.
+ */
+export function evaluateStudioMarketplaceCompatibility(
+  input: StudioMarketplaceCompatibilityEvaluationInput,
+): StudioMarketplaceCompatibilityEvaluation {
+  const minimumStudioVersion = input.minimumStudioVersion.trim();
+  if (!isExactStudioMarketplaceSemver(minimumStudioVersion)) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "minimum-version-invalid",
+      reason:
+        "리소스가 선언한 최소 Studio 버전이 올바르지 않아 안전하게 설치할 수 없습니다. 게시자에게 호환성 정보를 수정한 새 버전을 요청해 주세요.",
+    };
+  }
+
+  const suppliedCurrentStudioVersion = input.currentStudioVersion;
+  const hasCurrentVersionSource = suppliedCurrentStudioVersion !== undefined
+    && suppliedCurrentStudioVersion !== null;
+  const currentStudioVersion = typeof suppliedCurrentStudioVersion === "string"
+    ? suppliedCurrentStudioVersion.trim()
+    : null;
+  if (
+    hasCurrentVersionSource
+    && (!currentStudioVersion || !isExactStudioMarketplaceSemver(currentStudioVersion))
+  ) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "current-version-invalid",
+      reason:
+        "현재 Studio 버전을 확인할 수 없어 안전하게 설치할 수 없습니다. Studio를 새로고침하거나 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.",
+    };
+  }
+  if (
+    currentStudioVersion
+    && compareStudioMarketplaceVersions(currentStudioVersion, minimumStudioVersion) < 0
+  ) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "studio-version-too-old",
+      reason:
+        `이 리소스는 Studio ${minimumStudioVersion} 이상이 필요합니다. 현재 버전은 ${currentStudioVersion}입니다. Studio를 업데이트한 뒤 다시 시도해 주세요.`,
+    };
+  }
+
+  const declaredEngines = [...new Set(
+    input.declaredEngines.map((engine) => engine.trim()).filter(Boolean),
+  )];
+  if (declaredEngines.length === 0) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "declared-engines-invalid",
+      reason:
+        "리소스가 지원 엔진을 선언하지 않아 안전하게 설치할 수 없습니다. 게시자에게 호환성 정보를 수정한 새 버전을 요청해 주세요.",
+    };
+  }
+
+  const measuredEngines = input.supportedEngines;
+  const hasMeasuredEngines = measuredEngines !== undefined && measuredEngines !== null;
+  const supportedEngines = new Set(
+    (measuredEngines ?? []).map((engine) => engine.trim()).filter(Boolean),
+  );
+  const unverifiedEngines = new Set(
+    (input.unverifiedEngines ?? []).map((engine) => engine.trim()).filter(Boolean),
+  );
+  const hasSupportedDeclaredEngine = declaredEngines.some(
+    (engine) => supportedEngines.has(engine),
+  );
+  // Marketplace engine declarations are alternatives. A positive proof therefore wins even when
+  // another optional engine is inconclusive; uncertainty matters only if no declared alternative
+  // was proven on this device.
+  const hasUnverifiedDeclaredEngine = !hasSupportedDeclaredEngine
+    && declaredEngines.some((engine) => unverifiedEngines.has(engine));
+  if (
+    hasMeasuredEngines
+    && !hasSupportedDeclaredEngine
+    && !hasUnverifiedDeclaredEngine
+  ) {
+    return {
+      status: "unsupported",
+      verified: true,
+      code: "engine-unavailable",
+      reason:
+        `이 리소스에 필요한 렌더링 엔진(${engineNames(declaredEngines)})을 현재 기기에서 사용할 수 없습니다. 브라우저와 그래픽 드라이버를 업데이트하거나 지원되는 기기에서 다시 시도해 주세요.`,
+    };
+  }
+
+  const hasCurrentVersion = currentStudioVersion !== null;
+  const hasVerifiedEngine = hasMeasuredEngines && hasSupportedDeclaredEngine;
+  if (hasCurrentVersion && hasVerifiedEngine) {
+    return {
+      status: "compatible",
+      verified: true,
+      code: "compatible",
+      reason: null,
+    };
+  }
+  const code = hasCurrentVersion
+    ? "engine-capabilities-unavailable" as const
+    : hasVerifiedEngine
+      ? "studio-version-unavailable" as const
+      : "compatibility-sources-unavailable" as const;
+  const reason = code === "engine-capabilities-unavailable"
+    ? hasUnverifiedDeclaredEngine
+      ? `이 리소스에 필요한 렌더링 엔진(${engineNames(declaredEngines)}) 측정을 완료하지 못해 호환성을 검증하지 못했습니다. 잠시 후 다시 확인해 주세요.`
+      : "현재 기기의 렌더링 엔진 지원 상태를 확인할 권위 있는 측정값이 없어 호환성을 검증하지 못했습니다."
+    : code === "studio-version-unavailable"
+      ? "현재 Studio 호환성 버전을 확인할 권위 있는 값이 없어 호환성을 검증하지 못했습니다."
+      : "현재 Studio 호환성 버전과 기기 렌더링 엔진의 권위 있는 값이 없어 호환성을 검증하지 못했습니다.";
+  return {
+    status: "unverified",
+    verified: false,
+    code,
+    reason,
+  };
 }
 
 export function filterStudioMarketplacePackages(

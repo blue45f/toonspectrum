@@ -12,7 +12,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
@@ -143,6 +143,10 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     isMobile,
     layerMergeBusy,
     setStudioStatusNotice,
+    studioMarketplaceCloudSyncRetry,
+    studioMarketplaceCloudSyncRetryPending,
+    retryStudioMarketplaceCloudSync,
+    dismissStudioMarketplaceCloudSyncRetry,
     studioStatusNotice,
     liveWorkspaceLayout,
     loadedWork,
@@ -328,6 +332,33 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = s;
+  const marketplaceCloudSyncRetryButtonRef = useRef(null);
+  const marketplaceCloudSyncStatusRef = useRef(null);
+  const marketplaceCloudSyncFocusRestoreRef = useRef(null);
+  useEffect(() => {
+    const request = marketplaceCloudSyncFocusRestoreRef.current;
+    if (!request || studioMarketplaceCloudSyncRetryPending) return;
+    const target = studioMarketplaceCloudSyncRetry
+      ? marketplaceCloudSyncRetryButtonRef.current
+      : marketplaceCloudSyncStatusRef.current;
+    if (!target?.isConnected || target.disabled) return;
+    const active = document.activeElement;
+    if (active !== target && (
+      active === null
+      || active === document.body
+      || active === document.documentElement
+      || active === request.origin
+    )) {
+      target.focus();
+    }
+    marketplaceCloudSyncFocusRestoreRef.current = null;
+  }, [
+    densityShowsStatusRail,
+    error,
+    studioMarketplaceCloudSyncRetry,
+    studioMarketplaceCloudSyncRetryPending,
+    studioStatusNotice,
+  ]);
   return (
     <>
       <StudioAppMenubar
@@ -516,7 +547,12 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           </div>
         ) : null}
         {densityShowsStatusRail && studioStatusNotice ? (
-          <div role="status" className="my-1 flex items-start justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">
+          <div
+            ref={marketplaceCloudSyncStatusRef}
+            role="status"
+            tabIndex={-1}
+            className="my-1 flex items-start justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
             <span className="min-w-0 break-words">{studioStatusNotice}</span>
             <button
               type="button"
@@ -524,6 +560,41 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               aria-label="알림 닫기"
               className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-accent-soft/60"
               onClick={() => setStudioStatusNotice(null)}
+            >
+              <X size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+        {densityShowsStatusRail && studioMarketplaceCloudSyncRetry ? (
+          <div
+            role="alert"
+            className="my-1 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-xs text-warn"
+          >
+            <span className="min-w-0 flex-1 break-words">
+              {studioMarketplaceCloudSyncRetry.record.name}의 로컬 설치는 유지됩니다. 계정 설치 확인만 다시 맞춰야 합니다: {studioMarketplaceCloudSyncRetry.issue}
+            </span>
+            <button
+              ref={marketplaceCloudSyncRetryButtonRef}
+              type="button"
+              disabled={studioMarketplaceCloudSyncRetryPending}
+              className="min-h-11 shrink-0 rounded-md border border-current/35 px-3 font-semibold transition hover:bg-warn/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={(event) => {
+                marketplaceCloudSyncFocusRestoreRef.current =
+                  document.activeElement === event.currentTarget
+                    ? { origin: event.currentTarget }
+                    : null;
+                void retryStudioMarketplaceCloudSync();
+              }}
+            >
+              {studioMarketplaceCloudSyncRetryPending
+                ? "계정 설치 확인 중…"
+                : "계정 설치 확인 다시 시도"}
+            </button>
+            <button
+              type="button"
+              aria-label="계정 설치 확인 재시도 닫기"
+              className="grid size-11 shrink-0 place-items-center rounded transition hover:bg-warn/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn"
+              onClick={dismissStudioMarketplaceCloudSyncRetry}
             >
               <X size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>

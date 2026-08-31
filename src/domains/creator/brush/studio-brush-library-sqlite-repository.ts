@@ -81,6 +81,10 @@ export interface ProductBrushLibraryRepository {
     entries: readonly StudioBrushLibraryInstallCompareAndRestoreEntry[],
     sidecars?: readonly StudioKeyValueSqlCompareAndRestoreEntry[],
   ) => Promise<StudioSqlCompareAndRestoreResult>;
+  /** Migration CAS seam: inserts only rows that are still absent, never overwriting newer edits. */
+  readonly insertMissingInstallSnapshot?: (
+    brushes: readonly StudioSavedBrush[],
+  ) => Promise<number>;
 }
 
 export interface StudioBrushLibraryInstallCompareAndRestoreEntry {
@@ -613,6 +617,10 @@ async function openProductBrushLibraryRepositoryInternal(
           restore: entry.restore === null ? null : studioBrushToSqlRecord(entry.restore),
         })),
         sidecars,
+      ),
+    insertMissingInstallSnapshot: (brushes) =>
+      brushDatabase.insertMissingBrushLibraryRecords(
+        brushes.map(studioBrushToSqlRecord),
       ),
   };
 }
