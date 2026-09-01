@@ -1,0 +1,99 @@
+name: QA isolated auth and marketplace matrix
+
+on:
+  push:
+    branches:
+      - qa/extended-matrix-20260902
+    paths:
+      - e2e/auth-account-matrix.spec.ts
+      - e2e/market-live.spec.ts
+      - e2e/run-market-live-e2e.mjs
+      - playwright.market-live.config.ts
+      - scripts/isolated-market-api.mjs
+      - scripts/production-database-migrations.manifest
+      - apps/api/src/db/migrations/**
+      - .github/workflows/qa-isolated-auth-market-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-auth-market:
+    name: Isolated auth and marketplace lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: toonqa
+          POSTGRES_PASSWORD: toonqa
+          POSTGRES_DB: toonspectrum_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U toonqa -d toonspectrum_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CI: "true"
+      TEST_DATABASE_URL: postgres://toonqa:toonqa@127.0.0.1:5432/toonspectrum_qa
+      TOONSPECTRUM_MARKET_LIVE_E2E: "1"
+      TOONSPECTRUM_MARKET_LIVE_API_URL: http://127.0.0.1:4317
+      TOONSPECTRUM_MARKET_LIVE_EMAIL: qa.browser.matrix@example.test
+      TOONSPECTRUM_MARKET_LIVE_PASSWORD: QaBrowserMatrix-20260902!
+      TOONSPECTRUM_MARKET_LIVE_NAME: 격리 브라우저 QA
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run isolated account and marketplace lifecycle tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p qa-results/isolated-auth-market
+          pnpm run test:market:live 2>&1 \
+            | tee qa-results/isolated-auth-market/run.log
+
+      - name: Record database lifecycle counts
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p qa-results/isolated-auth-market
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -At <<'SQL' \
+            > qa-results/isolated-auth-market/database-counts.txt
+          SELECT 'users=' || count(*) FROM public."user";
+          SELECT 'sessions_with_version=' || count(*)
+          FROM public."user"
+          WHERE COALESCE("sessionVersion", 0) > 0;
+          SELECT 'migration_ledger=' || count(*)
+          FROM public.toonspectrum_schema_migration;
+          SQL
+
+      - name: Upload logs and database evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-auth-market-matrix
+          retention-days: 14
+          if-no-files-found: warn
+          path: qa-results/isolated-auth-market
