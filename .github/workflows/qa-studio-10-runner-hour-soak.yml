@@ -58,7 +58,6 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        browser: [chromium, firefox, webkit]
         include:
           - browser: chromium
             profile: compact-android-320
