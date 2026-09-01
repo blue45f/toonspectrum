@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   StudioCommentsPanel,
   type StudioCommentsPanelProps,
@@ -18,7 +19,7 @@ import type {
 } from "./studio-comments";
 
 const source = readFileSync(resolve("src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
-const studioPageSource = readFileSync(resolve("src/domains/creator/StudioPage.tsx"), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 // 의도된 변경(2026-08, B-06): 전역 keydown 디스패처(⇧C·tool-comment·Esc 캐스케이드)가
 // studio-page-shortcut-dispatcher.ts 로 추출되어, 단축키 분기 검증은 그 파일을 스캔한다.
 const studioShortcutDispatcherSource = readFileSync(
