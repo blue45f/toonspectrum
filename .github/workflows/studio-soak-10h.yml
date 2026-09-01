@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - qa/studio-soak-10h-20260902
+    paths:
+      - .github/workflows/studio-soak-10h.yml
+      - scripts/qa/studio-soak-runner.mjs
+      - scripts/qa/verify-studio-cross-browser-matrix.mjs
   workflow_dispatch:
     inputs:
       phase_minutes:
@@ -18,7 +22,7 @@ permissions:
 
 concurrency:
   group: studio-soak-10h-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   NODE_OPTIONS: --max-old-space-size=8192
