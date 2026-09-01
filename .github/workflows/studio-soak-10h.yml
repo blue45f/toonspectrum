@@ -18,7 +18,7 @@ permissions:
 
 concurrency:
   group: studio-soak-10h-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   NODE_OPTIONS: --max-old-space-size=8192
