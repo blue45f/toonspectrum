@@ -1,6 +1,7 @@
 import {
   Brush,
   Box,
+  Cuboid,
   LayoutTemplate,
   Palette,
   Shapes,
@@ -64,6 +65,14 @@ export const MARKET_KINDS: readonly MarketKindMeta[] = Object.freeze([
     description: "절차형 3D 배경 프리셋으로 스크린 잡기",
     icon: Box,
     hue: 200,
+  },
+  {
+    kind: "3d-asset",
+    label: "3D 에셋",
+    english: "3D ASSET",
+    description: "3D 모델·소품·캐릭터 파츠를 공유하고 Studio에서 바로 배치",
+    icon: Cuboid,
+    hue: 170,
   },
   {
     kind: "asset",

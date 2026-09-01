@@ -263,6 +263,7 @@ const KIND_LABEL: Readonly<Record<CreatorMarketplaceResourceKind, string>> =
     palette: "studio.community.kind.palette",
     template: "studio.community.kind.template",
     "3d-preset": "studio.community.kind.threeDPreset",
+    "3d-asset": "studio.community.kind.threeDAsset",
   });
 const KIND_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceKind, string>> =
   Object.freeze({
@@ -272,6 +273,7 @@ const KIND_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceKind, strin
     palette: "팔레트",
     template: "템플릿",
     "3d-preset": "3D",
+    "3d-asset": "3D 에셋",
   });
 
 const LICENSE_LABEL: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =

@@ -26,10 +26,10 @@ const PIGMENT_NOISE_STATION_PERIOD = 12;
 
 export const STUDIO_CAUSAL_WATERCOLOR_DAB_CAP_RANGE = {
   min: 2,
-  max: 16_384,
+  max: 32_768,
 } as const;
 
-export const DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS = 8_192;
+export const DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS = 16_384;
 
 export interface StudioCausalWatercolorSample {
   readonly x: number;

@@ -102,6 +102,7 @@ const COMMUNITY_INSTALLABLE_KINDS = new Set<StudioCreatorPackKind>([
   "palette",
   "template",
   "3d-preset",
+  "3d-asset",
 ]);
 
 const FORMAT_BY_KIND: Readonly<Record<StudioCreatorPackKind, string>> =
@@ -111,6 +112,7 @@ const FORMAT_BY_KIND: Readonly<Record<StudioCreatorPackKind, string>> =
     palette: "application/vnd.toonspectrum.palette+json",
     template: "application/vnd.toonspectrum.template+json",
     "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+    "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
   });
 
 export type StudioCommunityPackProjection =

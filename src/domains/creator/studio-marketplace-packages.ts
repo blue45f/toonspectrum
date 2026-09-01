@@ -31,7 +31,8 @@ export type StudioMarketplacePackageKind =
   | "filter"
   | "palette"
   | "template"
-  | "3d-preset";
+  | "3d-preset"
+  | "3d-asset";
 
 export type StudioMarketplaceAccessModel = "free" | "paid" | "subscription";
 export type StudioMarketplaceOrigin =

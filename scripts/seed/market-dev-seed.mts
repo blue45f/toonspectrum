@@ -69,6 +69,7 @@ const MEDIA_TYPE_BY_KIND = {
   palette: "application/vnd.toonspectrum.palette+json",
   template: "application/vnd.toonspectrum.template+json",
   "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
 } as const;
 
 function sha256(value: string): string {

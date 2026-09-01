@@ -17,7 +17,7 @@ import {
 } from "@/src/hooks/use-document-title";
 
 const MARKET_HOME_DESCRIPTION =
-  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
+  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋, 3D 에셋과 소품을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 8, sort: "newest" });

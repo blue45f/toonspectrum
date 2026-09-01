@@ -76,6 +76,34 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           </div>
         ) : null}
 
+        {/* 3D Asset Wireframe preview for 3d-asset cards */}
+        {record.kind === "3d-asset" && !paletteColors ? (
+          <svg className="absolute inset-0 size-full opacity-30 transition-opacity duration-200 group-hover:opacity-50" viewBox="0 0 200 100" preserveAspectRatio="none">
+            {/* Wireframe cube */}
+            <polygon
+              points="60,30 100,15 140,30 100,45"
+              fill="none"
+              stroke={`oklch(0.85 0.12 ${kind.hue})`}
+              strokeWidth="1.5"
+            />
+            <line x1="60" y1="30" x2="60" y2="65" stroke={`oklch(0.85 0.12 ${kind.hue})`} strokeWidth="1.5" />
+            <line x1="100" y1="45" x2="100" y2="80" stroke={`oklch(0.85 0.12 ${kind.hue})`} strokeWidth="1.5" />
+            <line x1="140" y1="30" x2="140" y2="65" stroke={`oklch(0.85 0.12 ${kind.hue})`} strokeWidth="1.5" />
+            <polygon
+              points="60,65 100,80 140,65 100,50"
+              fill="none"
+              stroke={`oklch(0.85 0.12 ${kind.hue})`}
+              strokeWidth="1.5"
+              strokeDasharray="4,3"
+            />
+            {/* Grid floor */}
+            <line x1="40" y1="85" x2="160" y2="85" stroke={`oklch(0.7 0.08 ${kind.hue})`} strokeWidth="0.8" strokeOpacity="0.4" />
+            <line x1="70" y1="82" x2="70" y2="88" stroke={`oklch(0.7 0.08 ${kind.hue})`} strokeWidth="0.6" strokeOpacity="0.3" />
+            <line x1="100" y1="82" x2="100" y2="88" stroke={`oklch(0.7 0.08 ${kind.hue})`} strokeWidth="0.6" strokeOpacity="0.3" />
+            <line x1="130" y1="82" x2="130" y2="88" stroke={`oklch(0.7 0.08 ${kind.hue})`} strokeWidth="0.6" strokeOpacity="0.3" />
+          </svg>
+        ) : null}
+
         <span
           className="rounded-md bg-canvas px-1.5 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-fg shadow-sm"
         >

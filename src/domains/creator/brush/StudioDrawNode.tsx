@@ -235,22 +235,6 @@ function processStudioPencilAliasPassPoints(
   });
 }
 
-function traceStudioRetainedMediaPolygon(
-  context: Pick<
-    CanvasRenderingContext2D,
-    "beginPath" | "closePath" | "lineTo" | "moveTo"
-  >,
-  points: readonly number[],
-): void {
-  if (points.length < 6) return;
-  context.beginPath();
-  context.moveTo(points[0]!, points[1]!);
-  for (let coordinateIndex = 2; coordinateIndex < points.length; coordinateIndex += 2) {
-    context.lineTo(points[coordinateIndex]!, points[coordinateIndex + 1]!);
-  }
-  context.closePath();
-}
-
 // 손그림(스케치) 도형용 rough.js generator 훅 — 스케치가 켜진 도형이 처음 보일 때만
 // 동적 import로 로드한다(Studio eager 청크에 rough.js 미포함). 로드 전에는 null을 반환해
 // 깨끗한 Konva 프리미티브 폴백으로 그리고, 로드가 끝나면 상태 변경으로 다시 그린다.
@@ -2147,25 +2131,61 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   // butt strokes, the pressure mesh has neither an outer hole nor a darker inner
                   // overlap; each source segment still owns its canonical pigment response.
                   for (const { pass, ribbon } of passPlans) {
+                    const buckets: number[][] = Array.from({ length: 17 }, () => []);
                     for (const run of ribbon.runs) {
                       for (const cell of run.cells) {
-                        context.globalAlpha = inheritedAlpha * Math.min(
+                        if (cell.points.length < 6) continue;
+                        const alpha = Math.min(
                           1,
                           pass.opacityScale
                           * Math.sqrt(cell.opacityScale * cell.flowScale),
                         );
-                        traceStudioRetainedMediaPolygon(context, cell.points);
-                        context.fill();
+                        const bIndex = Math.max(0, Math.min(16, Math.round(alpha * 16)));
+                        if (bIndex > 0) {
+                          const bucket = buckets[bIndex]!;
+                          for (let ci = 0; ci < cell.points.length; ci += 1) {
+                            bucket.push(cell.points[ci]!);
+                          }
+                          bucket.push(Number.NaN);
+                        }
                       }
                       for (const cap of run.caps) {
-                        context.globalAlpha = inheritedAlpha * Math.min(
+                        if (cap.points.length < 6) continue;
+                        const alpha = Math.min(
                           1,
                           pass.opacityScale
                           * Math.sqrt(cap.opacityScale * cap.flowScale),
                         );
-                        traceStudioRetainedMediaPolygon(context, cap.points);
-                        context.fill();
+                        const bIndex = Math.max(0, Math.min(16, Math.round(alpha * 16)));
+                        if (bIndex > 0) {
+                          const bucket = buckets[bIndex]!;
+                          for (let ci = 0; ci < cap.points.length; ci += 1) {
+                            bucket.push(cap.points[ci]!);
+                          }
+                          bucket.push(Number.NaN);
+                        }
                       }
+                    }
+
+                    for (let b = 1; b <= 16; b += 1) {
+                      const coords = buckets[b]!;
+                      if (coords.length === 0) continue;
+                      context.globalAlpha = inheritedAlpha * (b / 16);
+                      context.beginPath();
+                      let startIdx = 0;
+                      for (let i = 0; i <= coords.length; i += 1) {
+                        if (i === coords.length || Number.isNaN(coords[i])) {
+                          if (i - startIdx >= 6) {
+                            context.moveTo(coords[startIdx]!, coords[startIdx + 1]!);
+                            for (let c = startIdx + 2; c < i; c += 2) {
+                              context.lineTo(coords[c]!, coords[c + 1]!);
+                            }
+                            context.closePath();
+                          }
+                          startIdx = i + 1;
+                        }
+                      }
+                      context.fill();
                     }
                   }
                   context.restore();

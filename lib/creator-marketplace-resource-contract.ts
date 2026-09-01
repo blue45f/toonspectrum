@@ -13,6 +13,7 @@ export const CREATOR_MARKETPLACE_RESOURCE_KINDS = [
   "palette",
   "template",
   "3d-preset",
+  "3d-asset",
 ] as const;
 
 export const CREATOR_MARKETPLACE_RESOURCE_LICENSES = [
@@ -41,6 +42,7 @@ export const CREATOR_MARKETPLACE_RESOURCE_RUNTIMES = [
   "studio-palette-v1",
   "studio-template-v1",
   "studio-bg3d-preset-v1",
+  "studio-3d-asset-v1",
 ] as const;
 
 export const CREATOR_MARKETPLACE_RESOURCE_REPORT_REASONS = [
@@ -113,12 +115,14 @@ export const CREATOR_MARKETPLACE_RUNTIME_BY_KIND = {
   palette: "studio-palette-v1",
   template: "studio-template-v1",
   "3d-preset": "studio-bg3d-preset-v1",
+  "3d-asset": "studio-3d-asset-v1",
 } as const satisfies Record<CreatorMarketplaceResourceKind, string>;
 
 export const CREATOR_MARKETPLACE_BUILTIN_PREFIX_BY_KIND = {
   asset: "studio-asset:",
   template: "studio-scene-template:",
   "3d-preset": "studio-bg3d-preset:",
+  "3d-asset": "studio-3d-asset:",
 } as const;
 
 export type CreatorMarketplaceJsonValue =
@@ -313,6 +317,7 @@ const CreatorMarketplacePortableDeliverySchema = z
       "application/vnd.toonspectrum.palette+json",
       "application/vnd.toonspectrum.template+json",
       "application/vnd.toonspectrum.3d-preset+json",
+      "application/vnd.toonspectrum.3d-asset+json",
     ]),
     payload: CreatorMarketplacePortablePayloadSchema,
     byteSize: z.number().int().min(2).max(CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRY_BYTES),
@@ -342,6 +347,7 @@ const CREATOR_MARKETPLACE_MEDIA_TYPE_BY_KIND: Record<
   palette: "application/vnd.toonspectrum.palette+json",
   template: "application/vnd.toonspectrum.template+json",
   "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
 };
 
 const CreatorMarketplaceResourceManifestBaseSchema = z
@@ -448,7 +454,8 @@ function refineCreatorMarketplaceManifest(
         const expectedPrefix =
           entry.kind === "asset" ||
           entry.kind === "template" ||
-          entry.kind === "3d-preset"
+          entry.kind === "3d-preset" ||
+          entry.kind === "3d-asset"
             ? CREATOR_MARKETPLACE_BUILTIN_PREFIX_BY_KIND[entry.kind]
             : null;
         if (
@@ -468,7 +475,7 @@ function refineCreatorMarketplaceManifest(
       }
 
       if (
-        (entry.kind === "asset" || entry.kind === "3d-preset") &&
+        (entry.kind === "asset" || entry.kind === "3d-preset" || entry.kind === "3d-asset") &&
         entry.delivery.mode !== "procedural-recipe"
       ) {
         context.addIssue({
@@ -480,6 +487,7 @@ function refineCreatorMarketplaceManifest(
       if (
         entry.kind !== "asset" &&
         entry.kind !== "3d-preset" &&
+        entry.kind !== "3d-asset" &&
         entry.delivery.mode !== "portable-json"
       ) {
         context.addIssue({

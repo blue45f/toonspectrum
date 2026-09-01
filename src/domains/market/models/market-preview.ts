@@ -149,7 +149,7 @@ export function templatePreviewData(
 export function recipePreviewData(
   record: CreatorMarketplaceResourceRecord
 ): readonly RecipePreviewData[] | null {
-  if (record.kind !== "asset" && record.kind !== "3d-preset") return null;
+  if (record.kind !== "asset" && record.kind !== "3d-preset" && record.kind !== "3d-asset") return null;
   const items: RecipePreviewData[] = [];
   for (const entry of record.entries) {
     if (entry.delivery.mode === "procedural-recipe") {

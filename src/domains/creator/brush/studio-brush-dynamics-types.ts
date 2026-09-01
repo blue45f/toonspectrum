@@ -42,8 +42,8 @@ export const STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS = {
   roundness: { min: 0.08, max: 1 },
 } as const;
 
-export const STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE = { min: 1, max: 4096 } as const;
-export const DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS = 1024;
+export const STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE = { min: 1, max: 32_768 } as const;
+export const DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS = 8_192;
 export const STUDIO_BRUSH_DYNAMICS_RATIO_LIMITS = {
   spacing: { min: 0.01, max: 16 },
   scatter: { min: 0, max: 16 },

@@ -48,7 +48,8 @@ const KIND_OPTIONS: readonly {
   { id: "filter", label: "필터", icon: Filter },
   { id: "palette", label: "팔레트", icon: Palette },
   { id: "template", label: "템플릿", icon: LayoutTemplate },
-  { id: "3d-preset", label: "3D", icon: Box },
+  { id: "3d-preset", label: "3D 프리셋", icon: Box },
+  { id: "3d-asset", label: "3D 에셋", icon: Box },
 ];
 
 const KIND_LABEL: Record<StudioCreatorPackKind, string> = {
@@ -57,6 +58,7 @@ const KIND_LABEL: Record<StudioCreatorPackKind, string> = {
   palette: "팔레트",
   template: "템플릿",
   "3d-preset": "3D 프리셋",
+  "3d-asset": "3D 에셋",
 };
 
 function PackCard({

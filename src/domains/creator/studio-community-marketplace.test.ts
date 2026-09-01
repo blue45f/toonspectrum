@@ -43,6 +43,7 @@ function record(
     palette: "studio-palette-v1",
     template: "studio-template-v1",
     "3d-preset": "studio-bg3d-preset-v1",
+    "3d-asset": "studio-3d-asset-v1",
   } as const;
   const mediaType = {
     asset: "application/vnd.toonspectrum.asset+json",
@@ -51,6 +52,7 @@ function record(
     palette: "application/vnd.toonspectrum.palette+json",
     template: "application/vnd.toonspectrum.template+json",
     "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+    "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
   } as const;
   return {
     schemaVersion: 1,

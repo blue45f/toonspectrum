@@ -146,7 +146,7 @@ export const creatorMarketplaceResources = pgTable(
       .where(sql`${table.delistedAt} is null`),
     check(
       "creator_marketplace_resource_kind_check",
-      sql`${table.kind} in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')`
+      sql`${table.kind} in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset', '3d-asset')`
     ),
     check(
       "creator_marketplace_resource_license_check",

@@ -39,6 +39,7 @@ const MEDIA_TYPE_BY_KIND = {
   palette: "application/vnd.toonspectrum.palette+json",
   template: "application/vnd.toonspectrum.template+json",
   "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
 } as const;
 
 function definitionFor(
@@ -72,6 +73,11 @@ function definitionFor(
         recipeId: "background.classroom",
         parameters: { lighting: "day" },
       };
+    case "3d-asset":
+      return {
+        recipeId: "object.desk",
+        parameters: { scale: 1 },
+      };
   }
 }
 
@@ -94,11 +100,12 @@ function manifestFor(
       palette: "studio-palette-v1",
       template: "studio-template-v1",
       "3d-preset": "studio-bg3d-preset-v1",
+      "3d-asset": "studio-3d-asset-v1",
     } as const)[kind],
     definition: definitionFor(kind),
   };
   const delivery =
-    kind === "asset" || kind === "3d-preset"
+    kind === "asset" || kind === "3d-preset" || kind === "3d-asset"
       ? {
           mode: "procedural-recipe" as const,
           mediaType: MEDIA_TYPE_BY_KIND[kind],

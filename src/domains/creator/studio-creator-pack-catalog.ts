@@ -13,13 +13,13 @@ import type { CreatorMarketplaceResourceKind } from "@/lib/creator-marketplace-r
 
 export type StudioCreatorPackKind = Extract<
   StudioMarketplacePackageKind,
-  "brush" | "filter" | "palette" | "template" | "3d-preset"
+  "brush" | "filter" | "palette" | "template" | "3d-preset" | "3d-asset"
 >;
 
 export interface StudioCreatorPortablePackEntry {
   readonly id: string;
   readonly name: string;
-  readonly kind: Exclude<StudioCreatorPackKind, "template" | "3d-preset">;
+  readonly kind: Exclude<StudioCreatorPackKind, "template" | "3d-preset" | "3d-asset">;
   readonly delivery: {
     readonly mode: "portable-json";
     /** Backend envelope의 `definition`; schemaVersion/resourceKind/runtime은 client가 감싼다. */
@@ -30,7 +30,7 @@ export interface StudioCreatorPortablePackEntry {
 export interface StudioCreatorBuiltinPackEntry {
   readonly id: string;
   readonly name: string;
-  readonly kind: "template" | "3d-preset";
+  readonly kind: "template" | "3d-preset" | "3d-asset";
   readonly delivery: {
     readonly mode: "builtin-ref";
     readonly runtimeRef: string;

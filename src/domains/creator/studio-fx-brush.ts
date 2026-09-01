@@ -39,7 +39,7 @@ export const FX_BRUSH_DAB_CAP = 512;
  * station. Preserve a dense centreline on very long canvases instead of redistributing 512 large
  * footprints across the whole path and exposing polygon corners.
  */
-export const FX_OIL_DAB_CAP = 4096;
+export const FX_OIL_DAB_CAP = 16_384;
 /**
  * Pastel is a continuous dry medium, not a decorative particle brush. A shared 512-dab ceiling
  * previously limited it to at most 256 two-dot stations and then redistributed those circles over
@@ -47,7 +47,7 @@ export const FX_OIL_DAB_CAP = 4096;
  * row of round carriers. Keep a dedicated, still-bounded station budget for its anisotropic fibre
  * carrier instead.
  */
-export const FX_PASTEL_DAB_CAP = 4096;
+export const FX_PASTEL_DAB_CAP = 16_384;
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;

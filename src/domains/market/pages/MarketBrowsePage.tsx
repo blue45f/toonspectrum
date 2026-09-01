@@ -29,7 +29,7 @@ import {
 
 const PAGE_SIZE = 12;
 const MARKET_BROWSE_DESCRIPTION =
-  "웹툰 제작에 필요한 브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 종류와 사용권으로 찾아보세요.";
+  "웹툰 제작에 필요한 브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋, 3D 에셋과 소품을 종류와 사용권으로 찾아보세요.";
 
 function filterChipClass(active: boolean): string {
   return cn(
@@ -164,7 +164,7 @@ export function MarketBrowsePage() {
             마켓 탐색
           </h1>
           <p className="mt-1 max-w-xl text-xs text-fg-3">
-            브러시, 팔레트, 필터, 템플릿, 3D 프리셋 등 웹툰 창작에 필요한 검증된 도구를 탐색하세요.
+            브러시, 팔레트, 필터, 템플릿, 3D 프리셋, 3D 에셋 등 웹툰 창작에 필요한 검증된 도구를 탐색하세요.
           </p>
 
           <form

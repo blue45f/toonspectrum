@@ -53,6 +53,7 @@ const MEDIA_TYPE_BY_KIND = {
   palette: "application/vnd.toonspectrum.palette+json",
   template: "application/vnd.toonspectrum.template+json",
   "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
+  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
 } as const;
 
 export interface CreatorMarketplaceListParams {
@@ -269,7 +270,7 @@ export async function createCreatorMarketplacePortableDelivery(
   const canonical = canonicalizeCreatorMarketplaceJson(validatedPayload);
   return {
     mode:
-      kind === "asset" || kind === "3d-preset"
+      kind === "asset" || kind === "3d-preset" || kind === "3d-asset"
         ? ("procedural-recipe" as const)
         : ("portable-json" as const),
     mediaType: MEDIA_TYPE_BY_KIND[kind],

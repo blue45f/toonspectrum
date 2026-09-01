@@ -238,18 +238,22 @@ export function MarketResourceDetailArticle({
       ? "장면 템플릿 카탈로그 열기"
       : record.kind === "3d-preset"
         ? "3D 배경 카탈로그 열기"
-        : installReceiptState === "update-available"
-          ? `스튜디오에서 v${record.resourceVersion}로 업데이트`
-          : installReceiptState === "installed-current"
-            ? "스튜디오에서 설치 상태 확인"
-            : "스튜디오에 리소스 팩 설치";
+        : record.kind === "3d-asset"
+          ? "3D 에셋 라이브러리 열기"
+          : installReceiptState === "update-available"
+            ? `스튜디오에서 v${record.resourceVersion}로 업데이트`
+            : installReceiptState === "installed-current"
+              ? "스튜디오에서 설치 상태 확인"
+              : "스튜디오에 리소스 팩 설치";
   const studioActionSummary = isDirectAsset
     ? "Studio 커뮤니티 마켓을 열고 지원되는 첫 에셋을 현재 캔버스에 삽입합니다."
     : record.kind === "template"
       ? "Studio 장면 템플릿 카탈로그와 참조된 템플릿 계열을 엽니다. 장면 카드를 눌러야 현재 컷에 적용됩니다."
       : record.kind === "3d-preset"
         ? "Studio 배경 3D 도형·절차형 카탈로그를 엽니다. 항목을 직접 선택해야 장면에 추가됩니다."
-        : "Studio 커뮤니티 마켓을 열고 이 리소스 팩을 로컬 도구 라이브러리에 설치합니다.";
+        : record.kind === "3d-asset"
+          ? "Studio 3D 에셋 라이브러리를 엽니다. 3D 모델·소품을 장면에 직접 배치할 수 있습니다."
+          : "Studio 커뮤니티 마켓을 열고 이 리소스 팩을 로컬 도구 라이브러리에 설치합니다.";
 
   return (
     <article className="mt-6">
@@ -382,6 +386,10 @@ export function MarketResourceDetailArticle({
 
                 {record.kind === "3d-preset" && selectedRecipe ? (
                   <MarketScene3dPreview key={`3d-${safePreviewIndex}`} recipe={selectedRecipe} />
+                ) : null}
+
+                {record.kind === "3d-asset" && selectedRecipe ? (
+                  <MarketScene3dPreview key={`3d-asset-${safePreviewIndex}`} recipe={selectedRecipe} />
                 ) : null}
               </div>
             </section>
