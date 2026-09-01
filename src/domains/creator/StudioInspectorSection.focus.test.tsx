@@ -36,7 +36,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const header = screen.getByRole("button", { name: "타이포그래피" });
+    const header = screen.getByRole("button", { name: "글꼴" });
     expect(header.getAttribute("aria-expanded")).toBe("false");
 
     act(() => requestStudioInspectorFocus("element.typography"));
@@ -65,7 +65,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const header = screen.getByRole("button", { name: "타이포그래피" });
+    const header = screen.getByRole("button", { name: "글꼴" });
     await waitFor(() => {
       expect(header.getAttribute("aria-expanded")).toBe("true");
       expect(document.activeElement).toBe(header);
@@ -81,7 +81,7 @@ describe("StudioInspectorSection focus navigation", () => {
     );
 
     act(() => requestStudioInspectorFocus("element.typography"));
-    const firstHeader = screen.getByRole("button", { name: "타이포그래피" });
+    const firstHeader = screen.getByRole("button", { name: "글꼴" });
     await waitFor(() => expect(document.activeElement).toBe(firstHeader));
     expect(studioInspectorFocusTokenFor("element.typography")).toBe(0);
     firstMount.unmount();
@@ -97,7 +97,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const remountedHeader = screen.getByRole("button", { name: "타이포그래피" });
+    const remountedHeader = screen.getByRole("button", { name: "글꼴" });
     expect(remountedHeader.getAttribute("aria-expanded")).toBe("false");
     expect(
       remountedHeader.closest("section")?.getAttribute("data-inspector-section-highlighted"),

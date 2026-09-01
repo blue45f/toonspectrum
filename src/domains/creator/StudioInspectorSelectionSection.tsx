@@ -339,7 +339,9 @@ export function StudioInspectorSelectionSection({
               </StudioInspectorSection>
               )}
               {(selected.type === "text" || selected.type === "bubble") && (
-                <StudioInspectorSection sectionId="element.text-align" loadingLabel="글자 정렬을 여는 중...">
+                /* 문단 — 정렬·세로 쓰기·자간·행간·높이 맞춤. 정렬은 예전에 타이포그래피 섹션에도
+                   한 번 더 있었다(같은 속성 두 번 노출, 감사 §5.4). 이제 여기 한 곳뿐이다. */
+                <StudioInspectorSection sectionId="element.text-align" loadingLabel="문단 설정을 여는 중...">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
                     글자 정렬
@@ -354,6 +356,8 @@ export function StudioInspectorSelectionSection({
                           type="button"
                           onClick={() => patchEl(selected.id, { align: a.v } as Partial<El>)}
                           aria-pressed={(selected.align ?? "center") === a.v}
+                          data-inspector-priority="advanced"
+                          data-inspector-control-id={`paragraph.align.${a.v}`}
                           className={cn(
                             "rounded-md border px-2.5 py-0.5 text-xs",
                             (selected.align ?? "center") === a.v
@@ -372,10 +376,50 @@ export function StudioInspectorSelectionSection({
                     <input
                       type="checkbox"
                       checked={!!selected.vertical}
+                      data-inspector-priority="advanced"
+                      data-inspector-control-id="paragraph.vertical"
                       onChange={(e) => patchEl(selected.id, { vertical: e.target.checked } as Partial<El>)}
                       className="size-4 accent-accent"
                     />
                   </label>
+                  {selected.type === "text" && (
+                    <>
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        자간
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={-2}
+                            max={12}
+                            step={0.5}
+                            value={selected.letterSpacing ?? 0}
+                            data-inspector-priority="advanced"
+                            data-inspector-control-id="paragraph.letterSpacing"
+                            onChange={(e) => patchEl(selected.id, { letterSpacing: Number(e.target.value) } as Partial<El>)}
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
+                          />
+                          <span className="w-7 text-right text-xs tabular-nums text-fg-3">{selected.letterSpacing ?? 0}</span>
+                        </span>
+                      </label>
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        행간
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={0.8}
+                            max={2}
+                            step={0.1}
+                            value={selected.lineHeight ?? 1}
+                            data-inspector-priority="advanced"
+                            data-inspector-control-id="paragraph.lineHeight"
+                            onChange={(e) => patchEl(selected.id, { lineHeight: Number(e.target.value) } as Partial<El>)}
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
+                          />
+                          <span className="w-7 text-right text-xs tabular-nums text-fg-3">{(selected.lineHeight ?? 1).toFixed(1)}</span>
+                        </span>
+                      </label>
+                    </>
+                  )}
                   {selected.type === "bubble" && (
                     <button
                       type="button"
