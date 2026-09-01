@@ -1,0 +1,65 @@
+name: QA extended matrix artifact triage
+
+on:
+  push:
+    branches:
+      - qa/extended-matrix-artifact-triage-20260902
+    paths:
+      - scripts/qa-triage-playwright-artifacts.mjs
+      - .github/workflows/qa-extended-matrix-artifact-triage.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: qa-extended-matrix-artifact-triage-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout triage branch
+        uses: actions/checkout@v6
+
+      - name: Download all extended-matrix evidence
+        uses: actions/download-artifact@v6
+        with:
+          github-token: ${{ github.token }}
+          repository: blue45f/toonspectrum
+          run-id: 33541025206
+          pattern: qa-*
+          path: artifact-input
+          merge-multiple: false
+
+      - name: Extract structured failures and error contexts
+        run: node scripts/qa-triage-playwright-artifacts.mjs artifact-input qa-results/extended-matrix-artifact-summary.md
+
+      - name: Show summary head
+        run: sed -n '1,500p' qa-results/extended-matrix-artifact-summary.md
+
+      - name: Commit triage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-qa-bot"
+          git config user.email "toonstudio-qa-bot@users.noreply.github.com"
+          git add qa-results/extended-matrix-artifact-summary.md
+          if git diff --cached --quiet; then
+            echo "No triage report changes"
+            exit 0
+          fi
+          git commit -m "test(qa): record extended matrix artifact triage"
+          git push origin HEAD:qa/extended-matrix-artifact-triage-20260902
+
+      - name: Upload compact triage report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: extended-matrix-artifact-triage
+          path: qa-results/extended-matrix-artifact-summary.md
+          if-no-files-found: warn
+          retention-days: 30
