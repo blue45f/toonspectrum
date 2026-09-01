@@ -1,0 +1,105 @@
+name: QA Studio cross-browser matrix
+
+on:
+  push:
+    branches:
+      - qa/studio-cross-browser-matrix-20260902
+    paths:
+      - scripts/qa-live-studio-cross-browser-audit.mjs
+      - .github/workflows/qa-studio-cross-browser-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-cross-browser-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  browser-audit:
+    name: ${{ matrix.engine }} live Studio audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine:
+          - chromium
+          - firefox
+          - webkit
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=4096
+      STUDIO_BASE_URL: https://www.toonstudio.cloud
+      QA_BROWSER_ENGINE: ${{ matrix.engine }}
+      QA_REPORT_DIR: qa-results/studio-cross-browser/${{ matrix.engine }}
+      QA_EVIDENCE_DIR: artifacts/studio-cross-browser/${{ matrix.engine }}
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install ${{ matrix.engine }} with system dependencies
+        run: pnpm exec playwright install --with-deps "${{ matrix.engine }}"
+
+      - name: Run live cross-browser audit
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$QA_REPORT_DIR" "$QA_EVIDENCE_DIR"
+          node scripts/qa-live-studio-cross-browser-audit.mjs \
+            2>&1 | tee "$QA_REPORT_DIR/execution.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$QA_REPORT_DIR/exit-code.txt"
+          exit 0
+
+      - name: Add report to the workflow summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$QA_REPORT_DIR/report.md" ]]; then
+            cat "$QA_REPORT_DIR/report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '## %s audit\n\nNo report was generated.\n' "$QA_BROWSER_ENGINE" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-cross-browser-${{ matrix.engine }}-2026-09-02
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-cross-browser/${{ matrix.engine }}
+            artifacts/studio-cross-browser/${{ matrix.engine }}
+
+      - name: Enforce audit result
+        if: always()
+        shell: bash
+        run: |
+          code=999
+          if [[ -f "$QA_REPORT_DIR/exit-code.txt" ]]; then
+            code="$(cat "$QA_REPORT_DIR/exit-code.txt")"
+          fi
+          if [[ "$code" != "0" ]]; then
+            echo "${QA_BROWSER_ENGINE} audit reported failures (exit code ${code})."
+            exit 1
+          fi
+          echo "${QA_BROWSER_ENGINE} audit passed."
