@@ -1,16 +1,28 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   resolveStudioFigmaSelectionLayoutMetrics,
 } from "./studio-figma-selection-ux";
+import { resetStudioInspectorSectionStateCache } from "./studio-inspector-section-state";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 
 import type { DrawEl, El, ImageEl } from "./studio-element-model";
 
+beforeEach(() => {
+  // The 변형 grid remembers its open state like every inspector section; start each case folded.
+  globalThis.localStorage?.clear();
+  resetStudioInspectorSectionStateCache();
+});
 afterEach(cleanup);
+
+/** Opens the folded 변형 grid (UX 감사 2026-09-02 §5.7) so the numeric fields are on screen. */
+function openGeometry(): void {
+  const toggle = screen.getByRole("button", { name: /^변형/u });
+  if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+}
 
 function draw(partial: Partial<DrawEl> & Pick<DrawEl, "id" | "points">): DrawEl {
   return {
@@ -38,6 +50,7 @@ describe("StudioFigmaDesignPanel", () => {
     const onChange = renderPanel([
       draw({ id: "s", points: [10, 10, 110, 60], strokeWidth: 4 }),
     ]);
+    openGeometry();
 
     const width = screen.getByLabelText("너비 W") as HTMLInputElement;
     const height = screen.getByLabelText("높이 H") as HTMLInputElement;
@@ -64,11 +77,13 @@ describe("StudioFigmaDesignPanel", () => {
 
   it("explains the relative rotation model instead of faking an absolute angle", () => {
     renderPanel([draw({ id: "s", points: [0, 0, 40, 40] })]);
+    openGeometry();
     expect(screen.getByText(/여기서 몇 도/u)).toBeTruthy();
   });
 
   it("says why rotation is inert on a box-derived shape stroke", () => {
     renderPanel([draw({ id: "r", kind: "rect", points: [0, 0, 60, 30] })]);
+    openGeometry();
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     expect(rotation.disabled).toBe(true);
     expect(rotation.title).toContain("자유곡선");
@@ -90,6 +105,7 @@ describe("StudioFigmaDesignPanel", () => {
         rotation: 15,
       } as ImageEl,
     ]);
+    openGeometry();
     const rotation = screen.getByLabelText("회전") as HTMLInputElement;
     expect(rotation.disabled).toBe(false);
     expect(rotation.value).toBe("15");
@@ -120,9 +136,12 @@ describe("StudioFigmaDesignPanel", () => {
       } as ImageEl,
     ]);
 
+    // 불투명도 is the essential row — live before the grid opens.
+    const opacity = screen.getByLabelText("불투명도") as HTMLInputElement;
+    expect(opacity.disabled).toBe(false);
+    openGeometry();
     const x = screen.getByLabelText("가로 위치 X") as HTMLInputElement;
     const width = screen.getByLabelText("너비 W") as HTMLInputElement;
-    const opacity = screen.getByLabelText("불투명") as HTMLInputElement;
     expect(x.disabled).toBe(false);
     expect(width.disabled).toBe(true);
     expect(opacity.disabled).toBe(false);
@@ -168,6 +187,7 @@ describe("StudioFigmaDesignPanel", () => {
         onChange={onChange}
       />,
     );
+    openGeometry();
     const x = screen.getByLabelText("가로 위치 X") as HTMLInputElement;
     fireEvent.change(x, { target: { value: "999" } });
     expect(x.value).toBe("999");
@@ -195,8 +215,9 @@ describe("StudioFigmaDesignPanel", () => {
         opacity: 0.5,
       } as ImageEl,
     ]);
+    openGeometry();
     const width = screen.getByLabelText("너비 W") as HTMLInputElement;
-    const opacity = screen.getByLabelText("불투명") as HTMLInputElement;
+    const opacity = screen.getByLabelText("불투명도") as HTMLInputElement;
     fireEvent.change(width, { target: { value: "-10" } });
     fireEvent.keyDown(width, { key: "Enter" });
     expect(onChange).toHaveBeenLastCalledWith({ width: 1 });
@@ -217,6 +238,7 @@ describe("StudioFigmaDesignPanel", () => {
         height: 40,
       } as ImageEl,
     ]);
+    openGeometry();
 
     for (const name of ["가로 위치 X", "세로 위치 Y", "너비 W", "높이 H"]) {
       const input = screen.getByLabelText(name) as HTMLInputElement;
@@ -224,5 +246,64 @@ describe("StudioFigmaDesignPanel", () => {
       expect(input.parentElement?.className).toContain("w-full");
       expect(input.parentElement?.className).toContain("overflow-hidden");
     }
+  });
+
+  it("starts folded with a 변형 summary and only 불투명도 live (감사 §5.7)", () => {
+    renderPanel([
+      {
+        id: "i",
+        type: "image",
+        src: "data:image/png;base64,AA==",
+        x: 120,
+        y: 840,
+        width: 640,
+        height: 320,
+        rotation: 0,
+        opacity: 1,
+      } as ImageEl,
+    ]);
+
+    expect(screen.getByLabelText("불투명도")).toBeTruthy();
+    expect(screen.queryByLabelText("가로 위치 X")).toBeNull();
+    const toggle = screen.getByRole("button", { name: /^변형/u });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toContain("X 120 · Y 840 · 640×320 · 0°");
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("가로 위치 X")).toBeTruthy();
+    // The grid lives inside the same section the deep link targets.
+    expect(screen.getByLabelText("높이 H").closest("section")).toBe(
+      screen.getByLabelText("위치와 크기"),
+    );
+  });
+
+  it("remembers the artist's own header press across remounts, like other inspector sections", () => {
+    const element = {
+      id: "i",
+      type: "image",
+      src: "data:image/png;base64,AA==",
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 40,
+    } as ImageEl;
+    const first = render(
+      <StudioFigmaDesignPanel
+        metrics={resolveStudioFigmaSelectionLayoutMetrics([element])}
+        onChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^변형/u }));
+    first.unmount();
+
+    render(
+      <StudioFigmaDesignPanel
+        metrics={resolveStudioFigmaSelectionLayoutMetrics([element])}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^변형/u }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("높이 H")).toBeTruthy();
   });
 });

@@ -472,7 +472,6 @@ export function StudioInspectorSelectionSection({
               {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
                 <StudioInspectorSection
                   sectionId="element.layout"
-                  title="기울이기"
                   loadingLabel="기울이기를 여는 중..."
                 >
                     <StudioSkewPanel

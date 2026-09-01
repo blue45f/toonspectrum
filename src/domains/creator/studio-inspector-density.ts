@@ -84,6 +84,8 @@ export type StudioInspectorCanonicalKey =
   | "constraints"
   | "blend-extended"
   | "layout"
+  | "geometry"
+  | "skew"
   | "effect-lines"
   | "order-align"
   | "line-correction"
@@ -153,6 +155,8 @@ export const STUDIO_INSPECTOR_CANONICAL_LABELS: Readonly<
   constraints: "배치 제약",
   "blend-extended": "확장 블렌드",
   layout: "배치",
+  geometry: "위치와 크기",
+  skew: "기울이기",
   "effect-lines": "집중선·속도선",
   "order-align": "정렬·순서",
   "line-correction": "선 보정",
@@ -200,7 +204,9 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("opacity"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorSelectionSection.tsx:1",
+    // 2026-09-02 감사: 표는 SelectionSection 을 가리켰지만 실제 컨트롤은 위치·크기 패널의
+    // 필수 행에 있다. 출처를 실제 렌더 위치로 바로잡았다.
+    source: "StudioFigmaDesignPanel.tsx:1",
     rationale:
       "프록시 3 — CSP 레이어 팔레트·PS 레이어 패널의 기본 행에 항상 있다.",
     searchEntryId: "property.opacity",
@@ -343,14 +349,30 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     rationale: "이미지 선택 전용 확장 블렌드.",
   },
   {
+    /**
+     * 2026-09-02 감사 P0 결함: 이 행은 X·Y·너비·높이·회전 7개를 여기 접혀 있다고 기록했지만,
+     * 그 값들은 이미 StudioFigmaDesignPanel 로 옮겨 가 **접히지 않은 채 최상단에** 그려지고
+     * 이 섹션에는 기울이기만 남아 있었다 — 표가 통과해도 화면의 점진적 노출은 깨져 있었다.
+     * 표를 실제 렌더에 맞춘다: 이 행은 기울이기, 숫자 배치는 아래 `selection.geometry`.
+     */
     id: "element.layout",
-    canonical: "layout",
-    label: label("layout"),
+    canonical: "skew",
+    label: label("skew"),
     tier: "advanced",
-    leaves: 7,
+    leaves: 2,
     source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
-      "프록시 4 — X·Y·너비·높이·회전·기울이기는 캔버스 핸들로 직접 조작 가능하다. 숫자 입력은 보조 경로다.",
+      "프록시 4 — 기울이기 X·Y 는 자유 변형 핸들로도 조작 가능하다. 숫자 입력은 보조 경로다.",
+  },
+  {
+    id: "selection.geometry",
+    canonical: "geometry",
+    label: label("geometry"),
+    tier: "advanced",
+    leaves: 8,
+    source: "StudioFigmaDesignPanel.tsx:1",
+    rationale:
+      "프록시 4 — X·Y·너비·높이·회전은 캔버스 핸들로 직접 조작 가능하고, 확대·좌우/상하 반전은 ⇧F·⇧H·⇧V 코드가 있다. 패널은 요약 한 줄만 보이고 숫자 그리드는 펼쳐서 연다.",
     searchEntryId: "property.transform-numeric",
   },
   {
