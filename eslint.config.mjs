@@ -3,6 +3,12 @@ import js from '@eslint/js'
 import { globalIgnores } from 'eslint/config'
 import globals from 'globals'
 
+// 린트 예외 원장(ledger). 두 예외 블록의 파일 목록은 여기 단일 소스에 있고,
+// scripts/eslint-legacy-exceptions.test.mjs 가 "글롭이 실제 파일과 맞는가 / 개수가
+// 늘지 않았는가"를 래칫으로 지킨다. 목록이 설정 파일 안에 흩어져 있으면 "기계적 추출"
+// 상태가 영구 동결되는데, 밖으로 빼두면 정리할 때마다 줄어드는 게 diff 로 보인다.
+import legacyExceptions from './eslint.legacy-exceptions.json' with { type: 'json' }
+
 export default defineConfig(
   globalIgnores([
     '**/dist/**',
@@ -70,12 +76,7 @@ export default defineConfig(
   // v7 컴파일러 기반 진단 두 개는 탈락 컴포넌트의 수동 메모를 "보존 불가"로, 이벤트 핸들러의
   // Date.now 등을 "렌더 중 불순 호출"로 오탐하므로 이 파일에서만 끈다(다른 파일은 그대로).
   {
-    files: [
-      'src/domains/creator/StudioPage.tsx',
-      'src/domains/creator/StudioCuttoonEditorHost.tsx',
-      'src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers*.ts',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx',
-    ],
+    files: legacyExceptions.compilerOptOutFiles,
     rules: {
       'react-hooks/preserve-manual-memoization': 'off',
       'react-hooks/purity': 'off',
@@ -87,59 +88,7 @@ export default defineConfig(
   // so the original identifiers stay intact. Unused destructure slots are kept
   // because the next handler pass still closes over the same bag.
   {
-    files: [
-      'src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers*.ts',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorDialogs.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorPanels.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorSessionDialogs.tsx',
-      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorContextMenu.tsx',
-      'src/domains/creator/bg3d/studio-bg3d-editor-*-host.ts',
-      'src/domains/creator/bg3d/studio-bg3d-editor-*-view-model.ts',
-      'src/domains/creator/bg3d/studio-bg3d-editor-view-model.ts',
-      'src/domains/creator/bg3d/studio-bg3d-editor-attach-hosts.ts',
-      'src/domains/creator/bg3d/studio-bg3d-editor-host.ts',
-      'src/domains/creator/bg3d/studio-bg3d-editor-runtime-bindings.ts',
-      'src/domains/creator/bg3d/useStudioBg3dEditor*.ts',
-      'src/domains/creator/bg3d/StudioBg3dEditorModal.tsx',
-      'src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx',
-      'src/domains/creator/bg3d/StudioBg3dEditorSidebar.tsx',
-      'src/domains/creator/bg3d/StudioBg3dEditorSidebarExtras.tsx',
-      'src/domains/creator/bg3d/StudioBg3dEditorSceneGraph.tsx',
-      'src/domains/creator/vrm/useStudioVrmPoser*.ts',
-      'src/domains/creator/vrm/StudioVrmPoser*.tsx',
-      'src/domains/creator/vrm/StudioVrmActor.tsx',
-      'src/domains/creator/vrm/StudioVrmColorControl.tsx',
-      'src/domains/creator/vrm/StudioVrmLighting.tsx',
-      'src/domains/creator/vrm/StudioVrmPoseBoneOverlay.tsx',
-      'src/domains/creator/vrm/StudioVrmViewportHelpers.tsx',
-      'src/domains/creator/vrm/StudioVrmViewportUtils.ts',
-      'src/domains/creator/vrm/studio-vrm-poser-implementation-source.ts',
-      'src/domains/creator/canvas/StudioCanvasViewport*.tsx',
-      'src/domains/creator/canvas/StudioCanvasViewport*.ts',
-      'src/domains/creator/canvas/studio-canvas-viewport-*.ts',
-      'src/domains/creator/canvas/StudioCanvasControls.tsx',
-      'src/domains/creator/canvas/StudioCanvasInteractiveOverlays.tsx',
-      'src/domains/creator/canvas/StudioCanvasModalsOverlay.tsx',
-      'src/domains/creator/canvas/read-studio-canvas-viewport-stack.ts',
-      'src/domains/creator/StudioInspectorAside*.tsx',
-      'src/domains/creator/StudioInspector*Section.tsx',
-      'src/domains/creator/useStudioInspectorAsideModel.ts',
-      'src/domains/creator/live/studio-crdt-document-*.ts',
-      'src/domains/creator/live/studio-live-socket-transport-*.ts',
-      'src/domains/creator/export/studio-svg-export-*.ts',
-      'src/domains/creator/brush/studio-brush-dynamics-*.ts',
-      'src/domains/creator/StudioBrushSizePresetGrid.tsx',
-      'apps/api/src/modules/creator/studio-live-gateway-*.ts',
-      'src/domains/creator/vrm/StudioVrmPoserHost.ts',
-      'apps/api/src/modules/creator/studio-live.gateway.ts',
-      'src/domains/creator/bg3d/StudioBackground3D.tsx',
-    ],
+    files: legacyExceptions.closureBagFiles,
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

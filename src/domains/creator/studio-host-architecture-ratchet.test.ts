@@ -1,0 +1,267 @@
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Architecture contracts for the StudioCuttoonEditor host.
+ *
+ * 2026-09-02 아키텍처 리뷰 결론: "파일이 몇 줄인가"만 재는 게이트는 기계적 추출(closure bag을
+ * 넘기는 분할)로 손쉽게 통과되면서 결합도는 그대로 남긴다. 그래서 이 파일은 크기 대신
+ * *결합의 방향과 개수*를 고정한다 — 역방향 import, UI 컴포넌트가 받는 raw React setter 수,
+ * 공개 타입의 `any` 수, UI 레이어의 직접 브라우저 API 접근 수.
+ *
+ * 모든 임계값은 래칫이다: 측정한 현재 값으로 얼어 있고, 정리하면서 내려갈 수는 있어도
+ * 올라갈 수는 없다. 값을 올리려면 이 파일을 고쳐야 하고, 그 diff가 리뷰 대상이 된다.
+ */
+
+const CREATOR_DIR = fileURLToPath(new URL("./", import.meta.url));
+const SRC_DIR = path.resolve(CREATOR_DIR, "../..");
+
+const HOST_FILE = path.join(CREATOR_DIR, "StudioCuttoonEditorHost.tsx");
+const RAIL_FILE = path.join(CREATOR_DIR, "StudioLeftToolRail.tsx");
+const SESSION_CORE_FILE = path.join(
+  CREATOR_DIR,
+  "studio-cuttoon-editor/StudioCuttoonEditorViewSessionCore.ts",
+);
+const SESSION_REST_FILE = path.join(
+  CREATOR_DIR,
+  "studio-cuttoon-editor/StudioCuttoonEditorViewSessionRest.ts",
+);
+
+/** ratchet: may only decrease. 측정 2026-09-02 = 30,961줄. */
+const HOST_MAX_LINES = 31_000;
+
+/** ratchet: may only decrease. 측정 2026-09-02. */
+const SESSION_BAG_ANY_BASELINE = {
+  "StudioCuttoonEditorViewSessionCore.ts": 552,
+  "StudioCuttoonEditorViewSessionRest.ts": 552,
+} as const;
+
+/**
+ * ratchet: may only decrease.
+ * 측정 2026-09-02 = 17. Rail 이 호스트의 useState 세터를 그대로 17개 받는다는 뜻이고,
+ * 이것이 "props 로 위장한 호스트 상태 직결"의 정확한 개수다. 세터를 의미 있는 커맨드
+ * (`selectTool(...)`)로 바꿀 때마다 이 숫자를 함께 내린다.
+ */
+const RAIL_REACT_SETTER_PROPS_MAX = 17;
+
+/**
+ * ratchet: may only decrease.
+ * React 컴포넌트(.tsx)가 브라우저 플랫폼 API 를 직접 잡는 지점. 어댑터/서비스 뒤로
+ * 옮길 때마다 내려간다. 측정 2026-09-02.
+ */
+const CREATOR_BROWSER_API_BASELINE: Readonly<Record<string, number>> = {
+  "navigator.gpu": 1,
+  "navigator.storage": 2,
+  indexedDB: 0,
+  showOpenFilePicker: 0,
+  "new Worker(": 0,
+  "new OffscreenCanvas(": 0,
+  "new WebSocket(": 0,
+};
+
+const BROWSER_API_PREFILTER = Object.keys(CREATOR_BROWSER_API_BASELINE);
+
+const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "coverage", ".vite"]);
+
+function collectSourceFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".") || SKIPPED_DIRECTORIES.has(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectSourceFiles(full, out);
+      continue;
+    }
+    if (/\.tsx?$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
+function parseSource(file: string, source: string): ts.SourceFile {
+  return ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+}
+
+function moduleSpecifiers(sourceFile: ts.SourceFile): string[] {
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier
+      && ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length === 1
+      && ts.isStringLiteral(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return specifiers;
+}
+
+function countAnyKeywords(sourceFile: ts.SourceFile): number {
+  let total = 0;
+  const visit = (node: ts.Node): void => {
+    if (node.kind === ts.SyntaxKind.AnyKeyword) total += 1;
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return total;
+}
+
+function countBrowserApiAccess(sourceFile: ts.SourceFile, into: Record<string, number>): void {
+  const bump = (key: string) => {
+    into[key] = (into[key] ?? 0) + 1;
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isPropertyAccessExpression(node)) {
+      const owner = node.expression.getText();
+      const member = node.name.text;
+      if (member === "gpu" && /(^|\.)navigator$/.test(owner)) bump("navigator.gpu");
+      else if (member === "storage" && /(^|\.)navigator$/.test(owner)) bump("navigator.storage");
+      else if (member === "indexedDB") bump("indexedDB");
+      else if (member === "showOpenFilePicker") bump("showOpenFilePicker");
+    } else if (ts.isIdentifier(node) && !ts.isPropertyAccessExpression(node.parent)) {
+      // 전역 바인딩을 그대로 쓴 경우 (`indexedDB.open(...)`).
+      if (node.text === "indexedDB") bump("indexedDB");
+      else if (node.text === "showOpenFilePicker") bump("showOpenFilePicker");
+    }
+    if (ts.isNewExpression(node)) {
+      const constructed = node.expression.getText().split(".").pop();
+      if (constructed === "Worker") bump("new Worker(");
+      else if (constructed === "OffscreenCanvas") bump("new OffscreenCanvas(");
+      else if (constructed === "WebSocket") bump("new WebSocket(");
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+interface ScanResult {
+  readonly browserApiCounts: Record<string, number>;
+  readonly hostImporters: readonly string[];
+}
+
+/** src/ 전체를 한 번만 훑고, 파일당 한 번만 읽는다. */
+function scanSourceTree(): ScanResult {
+  const hostImporters: string[] = [];
+  const browserApiCounts: Record<string, number> = Object.fromEntries(
+    BROWSER_API_PREFILTER.map((key) => [key, 0]),
+  );
+  const creatorTsxRoot = `${CREATOR_DIR}`;
+
+  for (const file of collectSourceFiles(SRC_DIR)) {
+    const source = readFileSync(file, "utf8");
+    const mentionsHost = source.includes("StudioCuttoonEditorHost");
+    const isCreatorComponent =
+      file.startsWith(creatorTsxRoot)
+      && file.endsWith(".tsx")
+      && !/\.(test|spec)\.tsx$/.test(file);
+    const mentionsBrowserApi =
+      isCreatorComponent && BROWSER_API_PREFILTER.some((token) => source.includes(token));
+
+    if (!mentionsHost && !mentionsBrowserApi) continue;
+
+    const sourceFile = parseSource(file, source);
+    if (mentionsHost) {
+      const importsHost = moduleSpecifiers(sourceFile).some((specifier) =>
+        /(^|\/)StudioCuttoonEditorHost$/.test(specifier),
+      );
+      if (importsHost) hostImporters.push(path.relative(SRC_DIR, file).split(path.sep).join("/"));
+    }
+    if (mentionsBrowserApi) countBrowserApiAccess(sourceFile, browserApiCounts);
+  }
+
+  return { browserApiCounts, hostImporters: hostImporters.sort((a, b) => a.localeCompare(b)) };
+}
+
+const scan = scanSourceTree();
+
+describe("studio host architecture ratchet", () => {
+  it("keeps the editor host a leaf: only StudioPage may import it", () => {
+    // ratchet: may only decrease.
+    expect(scan.hostImporters).toEqual(["domains/creator/StudioPage.tsx"]);
+  });
+
+  it("forbids the extracted closure modules from importing their host back", () => {
+    // ratchet: may only decrease.
+    const reverseImports = scan.hostImporters.filter((relative) =>
+      relative.startsWith("domains/creator/studio-cuttoon-editor/"),
+    );
+    expect(reverseImports).toEqual([]);
+  });
+
+  it("keeps StudioPage the host's lazy orchestration owner", () => {
+    const page = readFileSync(path.join(CREATOR_DIR, "StudioPage.tsx"), "utf8");
+    const host = readFileSync(HOST_FILE, "utf8");
+    expect(page).toContain('from "./StudioCuttoonEditorHost"');
+    expect(page).toContain("export { StudioCuttoonEditor }");
+    expect(host).toContain("export function StudioCuttoonEditor");
+  });
+
+  it("holds the editor host under its frozen line ceiling", () => {
+    // ratchet: may only decrease.
+    const lines = readFileSync(HOST_FILE, "utf8").split("\n").length;
+    expect(lines).toBeLessThanOrEqual(HOST_MAX_LINES);
+  });
+
+  it("holds the session closure bags under their frozen `any` ceilings", () => {
+    // ratchet: may only decrease.
+    const measured = {
+      "StudioCuttoonEditorViewSessionCore.ts": countAnyKeywords(
+        parseSource(SESSION_CORE_FILE, readFileSync(SESSION_CORE_FILE, "utf8")),
+      ),
+      "StudioCuttoonEditorViewSessionRest.ts": countAnyKeywords(
+        parseSource(SESSION_REST_FILE, readFileSync(SESSION_REST_FILE, "utf8")),
+      ),
+    };
+    for (const [name, ceiling] of Object.entries(SESSION_BAG_ANY_BASELINE)) {
+      expect({ [name]: measured[name as keyof typeof measured] <= ceiling }).toEqual({
+        [name]: true,
+      });
+    }
+  });
+
+  it("holds the left tool rail under its frozen raw-React-setter prop ceiling", () => {
+    // ratchet: may only decrease.
+    const rail = parseSource(RAIL_FILE, readFileSync(RAIL_FILE, "utf8"));
+    let setterProps: number | null = null;
+    const visit = (node: ts.Node): void => {
+      if (ts.isInterfaceDeclaration(node) && node.name.text === "StudioLeftToolRailProps") {
+        setterProps = node.members.filter((member) => {
+          if (!ts.isPropertySignature(member) || !member.type) return false;
+          const typeText = member.type.getText();
+          return typeText.startsWith('import("react").Dispatch<') || typeText.startsWith("Dispatch<");
+        }).length;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(rail);
+
+    expect(setterProps).not.toBeNull();
+    expect(setterProps).toBeLessThanOrEqual(RAIL_REACT_SETTER_PROPS_MAX);
+  });
+
+  it("holds direct browser-API access in creator components under its frozen table", () => {
+    // ratchet: may only decrease.
+    const overBudget = Object.entries(CREATOR_BROWSER_API_BASELINE)
+      .filter(([api, ceiling]) => (scan.browserApiCounts[api] ?? 0) > ceiling)
+      .map(([api, ceiling]) => `${api}: ${scan.browserApiCounts[api]} > ${ceiling}`);
+    expect(overBudget).toEqual([]);
+  });
+});

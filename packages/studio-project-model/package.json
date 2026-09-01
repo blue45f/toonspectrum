@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 stable IR, CommandBus, append-only journal and crash recovery.",
+  "description": "ToonStudio canonical document IR, CommandBus, append-only journal and crash-recovery contracts.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

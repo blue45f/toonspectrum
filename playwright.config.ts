@@ -88,7 +88,7 @@ export default defineConfig({
   ],
   webServer: {
     command: `pnpm exec vite --host 127.0.0.1 --port ${STUDIO_E2E_PORT} --strictPort`,
-    url: `http://127.0.0.1:${STUDIO_E2E_PORT}/hybrid-dcc-e2e.html`,
+    url: `http://127.0.0.1:${STUDIO_E2E_PORT}/tools/browser-harnesses/hybrid-dcc-e2e.html`,
     // The dedicated red/green oracle must serve this checkout, never a long-lived local Vite
     // process whose module graph may predate the framebuffer fix. Its separate port also lets the
     // ordinary visual suite keep the convenient local reuse policy.
