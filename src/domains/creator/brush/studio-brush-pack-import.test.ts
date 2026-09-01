@@ -148,7 +148,6 @@ describe("libmypaint .myb import draws", () => {
     expect(snapshot.stabilizer).toBe(2);
 
     // The honest ledger: libmypaint settings with no drawable counterpart.
-    expect(result.unmapped).toContain("myb:hardness");
     expect(result.unmapped).toContain("myb:smudge");
     expect(result.unmapped).toContain("myb:dabs_per_actual_radius");
     expect(result.unmapped.every((entry) => entry.length > 0)).toBe(true);

@@ -1065,9 +1065,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             );
             return (
               <Group key={index} opacity={opacity} listening={false}>
-                {aliasPencilPasses.map((pass) => (
+                {aliasPencilPasses.map((pass, passIndex) => (
                   <KCircle
-                    key={pass.role}
+                    key={`${pass.role}-${passIndex}`}
                     x={points[0]}
                     y={points[1]}
                     radius={resolveStudioDrawTapRadius(
@@ -1995,14 +1995,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               if (aliasPencilPasses.length > 0) {
                 return (
                   <Group key={index} opacity={opacity} listening={false}>
-                    {aliasPencilPasses.map((pass) => {
+                    {aliasPencilPasses.map((pass, passIndex) => {
                       const passWidth = Math.max(
                         0.5,
                         aliasStrokeWidth * pass.widthScale,
                       );
                       return legacyTapDab ? (
                         <KCircle
-                          key={pass.role}
+                          key={`${pass.role}-${passIndex}`}
                           x={legacyTapDab.x}
                           y={legacyTapDab.y}
                           radius={resolveStudioDrawTapRadius(
@@ -2016,7 +2016,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         />
                       ) : (
                         <Line
-                          key={pass.role}
+                          key={`${pass.role}-${passIndex}`}
                           points={processStudioPencilAliasPassPoints(
                             renderPath.points,
                             pass.jitterRadius,
@@ -2086,9 +2086,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             if (tapDab) {
               return (
                 <Group key={index} opacity={opacity} listening={false}>
-                  {passes.map((pass) => (
+                  {passes.map((pass, passIndex) => (
                     <KCircle
-                      key={pass.role}
+                      key={`${pass.role}-${passIndex}`}
                       x={tapDab.x}
                       y={tapDab.y}
                       radius={resolveStudioDrawTapRadius(

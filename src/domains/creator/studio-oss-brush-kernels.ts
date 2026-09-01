@@ -29,6 +29,12 @@ export const STUDIO_OSS_BRUSH_PROVENANCE = Object.freeze({
   libmypaintModelling: "libmypaint tests/brushes/modelling.myb (ISC)",
   libmypaintCharcoal: "libmypaint tests/brushes/charcoal.myb (ISC)",
   libmypaintWetPaint: "Krita mypaint bundle Wet_Paint_Plus.myb hardness/opaque shape",
+  harmonyProximityWeb: "Harmony (mrdoob) sketchy & web procedural proximity coupling (clean-room math)",
+  fabricCrayonWaxTooth: "fabric-brushes (av01d) & p5.brush anisotropic wax crayon tooth (clean-room math)",
+  fabricLongFurStrand: "fabric-brushes (av01d) & Harmony tangent strand hair fiber ribbons (clean-room math)",
+  fabricSquaresMesh: "fabric-brushes (av01d) procedural square mosaic mesh (clean-room math)",
+  klecksSmudgeBlend: "Klecks (bitbof) smudge & blend canvas pixel color transfer (clean-room math)",
+  p5BrushFlowfield: "p5.brush (acapv) dynamic vector field curvature & flowfield curl (clean-room math)",
 } as const);
 
 export type StudioOssBrushProvenanceId =
@@ -438,5 +444,165 @@ export function studioOssOilBristleFilm(
     // paint-film darken amount only (never white lift)
     lift: (1 - ridge) * 0.35,
     ridge,
+  };
+}
+
+/**
+ * Harmony-style procedural proximity coupling (Sketchy / Web / Shaded math).
+ * Computes deterministic distance falloff and dynamic coupling weight between stroke points.
+ */
+export function studioOssHarmonyProximityCoupling(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  neighbourhoodRadius: number,
+  seed: number,
+  salt = 0,
+): Readonly<{ connected: boolean; opacity: number; distance: number; weight: number }> {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const distance = Math.hypot(dx, dy);
+  const radius = Math.max(1, neighbourhoodRadius);
+  if (distance > radius || distance < 1e-4) {
+    return { connected: false, opacity: 0, distance, weight: 0 };
+  }
+  const ratio = distance / radius;
+  const jitter = studioOssUnitHash(seed, salt, (distance * 10) | 0) * 0.25;
+  const weight = Math.max(0, Math.min(1, (1 - ratio * ratio) * (0.8 + jitter)));
+  const opacity = Math.max(0.04, Math.min(0.95, weight * 0.75));
+  return { connected: weight > 0.08, opacity, distance, weight };
+}
+
+/**
+ * fabric-brushes / p5.brush anisotropic wax crayon adhesion.
+ * Models microscopic wax tooth bite, scrape grooves, and pressure-dependent fiber transfer.
+ */
+export function studioOssFabricCrayonGrainAdhesion(
+  x: number,
+  y: number,
+  pressure: number,
+  velocity: number,
+  seed: number,
+): Readonly<{ deposit: number; toothBite: number; groove: number }> {
+  const p = Math.max(0.05, Math.min(1, pressure));
+  const v = Math.max(0, Math.min(50, velocity));
+  const roughness = studioOssValueNoise2d(x * 0.28, y * 0.28, seed ^ 0x6e31);
+  const toothBite = Math.max(0, Math.min(1, roughness * 0.65 + p * 0.45 - v * 0.008));
+  const grooveNoise = studioOssValueNoise2d(x * 0.85, y * 0.85, seed ^ 0x9a13);
+  const groove = Math.max(0, grooveNoise - (0.35 + p * 0.3));
+  const deposit = Math.max(0.05, Math.min(1, toothBite * (0.6 + p * 0.5) * (1 - groove * 0.4)));
+  return { deposit, toothBite, groove };
+}
+
+/**
+ * fabric-brushes Long Fur / Harmony Fur tangent strand offset.
+ * Emits continuous tangent-relative offsets for hair/fur strands with curl angle and length jitter.
+ */
+export function studioOssFabricLongFurTangentOffset(
+  strandIndex: number,
+  strandCount: number,
+  tangentAngle: number,
+  strandLength: number,
+  seed: number,
+  step = 0,
+): Readonly<{ offsetX: number; offsetY: number; angle: number; curl: number; opacity: number }> {
+  const count = Math.max(1, strandCount);
+  const u = (strandIndex / count) - 0.5;
+  const hash = studioOssUnitHash(seed, strandIndex, step);
+  const curl = (studioOssUnitHash(seed, strandIndex ^ 0x5a, step) - 0.5) * 0.6;
+  const length = strandLength * (0.7 + hash * 0.6);
+  const angle = tangentAngle + curl + (u * 0.3);
+  const normalAngle = tangentAngle + Math.PI / 2;
+  const lateralSpread = u * strandLength * 0.5;
+  const offsetX = Math.cos(normalAngle) * lateralSpread + Math.cos(angle) * length;
+  const offsetY = Math.sin(normalAngle) * lateralSpread + Math.sin(angle) * length;
+  const opacity = Math.max(0.08, Math.min(0.85, 0.45 + (1 - Math.abs(u * 2)) * 0.4));
+  return { offsetX, offsetY, angle, curl, opacity };
+}
+
+/**
+ * fabric-brushes Squares procedural mosaic mesh.
+ * Aligns square tiles to a local grid cell with controlled rotation jitter and pressure scaling.
+ */
+export function studioOssFabricSquaresMeshOffset(
+  x: number,
+  y: number,
+  tileSize: number,
+  pressure: number,
+  seed: number,
+  index = 0,
+): Readonly<{ tileX: number; tileY: number; size: number; rotation: number; opacity: number }> {
+  const size = Math.max(2, tileSize);
+  const p = Math.max(0.05, Math.min(1, pressure));
+  const gridX = Math.floor(x / size) * size + size * 0.5;
+  const gridY = Math.floor(y / size) * size + size * 0.5;
+  const jitterAngle = (studioOssUnitHash(seed, index, 0x3c) - 0.5) * 0.45;
+  const scale = size * (0.6 + p * 0.55 + studioOssUnitHash(seed, index, 0x7b) * 0.2);
+  const opacity = Math.max(0.1, Math.min(0.95, 0.4 + p * 0.5));
+  return {
+    tileX: gridX,
+    tileY: gridY,
+    size: scale,
+    rotation: jitterAngle,
+    opacity,
+  };
+}
+
+/**
+ * Klecks-style dynamic pigment smudge & blend transfer.
+ * Computes blending ratio between current brush color and sampled background canvas color.
+ */
+export function studioOssKlecksSmudgeColorBlend(
+  brushR: number,
+  brushG: number,
+  brushB: number,
+  sampledR: number,
+  sampledG: number,
+  sampledB: number,
+  sampledAlpha: number,
+  smudgeRate: number,
+  wetness: number,
+): Readonly<{ r: number; g: number; b: number; pickupRate: number }> {
+  const smudge = Math.max(0, Math.min(1, smudgeRate));
+  const wet = Math.max(0, Math.min(1, wetness));
+  const sA = Math.max(0, Math.min(1, sampledAlpha));
+  // Dynamic pickup is higher when canvas has pigment and brush is wet.
+  const pickupRate = smudge * (0.3 + wet * 0.7) * sA;
+  const r = Math.round(brushR * (1 - pickupRate) + sampledR * pickupRate);
+  const g = Math.round(brushG * (1 - pickupRate) + sampledG * pickupRate);
+  const b = Math.round(brushB * (1 - pickupRate) + sampledB * pickupRate);
+  return {
+    r: Math.max(0, Math.min(255, r)),
+    g: Math.max(0, Math.min(255, g)),
+    b: Math.max(0, Math.min(255, b)),
+    pickupRate,
+  };
+}
+
+/**
+ * p5.brush dynamic vector field curvature & flowfield curl.
+ * Calculates flowfield direction angle and natural curve divergence for watercolor flow.
+ */
+export function studioOssP5BrushFlowfieldVector(
+  x: number,
+  y: number,
+  scale: number,
+  force: number,
+  seed: number,
+): Readonly<{ angle: number; velocityX: number; velocityY: number; curlMagnitude: number }> {
+  const s = Math.max(0.001, scale);
+  const f = Math.max(0.1, Math.min(10, force));
+  const n1 = studioOssValueNoise2d(x * s, y * s, seed ^ 0x1f4a);
+  const n2 = studioOssValueNoise2d((x + 100) * s, (y + 100) * s, seed ^ 0x8b32);
+  const angle = n1 * Math.PI * 4;
+  const curlMagnitude = Math.abs(n2 - 0.5) * 2;
+  const velocityX = Math.cos(angle) * f * (0.5 + curlMagnitude * 0.5);
+  const velocityY = Math.sin(angle) * f * (0.5 + curlMagnitude * 0.5);
+  return {
+    angle,
+    velocityX,
+    velocityY,
+    curlMagnitude,
   };
 }

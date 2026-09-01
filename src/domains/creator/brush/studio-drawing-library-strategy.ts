@@ -437,7 +437,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
  * libraries, while GPL/proprietary references may be useful without being product dependencies.
  */
 export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
-  "studio-drawing-source-audit-v7" as const;
+  "studio-drawing-source-audit-v8" as const;
 
 export type StudioDrawingSourceKind =
   | "first-party"
@@ -978,6 +978,90 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     brushAuthorityOverlap: "scene-model-overlap",
     rationale:
       "A second retained object canvas duplicates Konva selection, serialization and hit-testing without improving the canonical brush carrier.",
+  }),
+  sourceAudit({
+    id: "harmony",
+    displayName: "Harmony",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/mrdoob/harmony",
+    versionEvidence: "procedural drawing experiments audited 2026-08; not installed",
+    license: "GPL-3.0-or-later",
+    activity: "stale",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Procedural sketchy, shaded and web proximity-connection algorithms serve as clean-room behavioral inspiration for ToonSpectrum's assist kit; code and assets are excluded.",
+  }),
+  sourceAudit({
+    id: "fabric-brushes",
+    displayName: "fabric-brushes",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/av01d/fabric-brushes",
+    versionEvidence: "fabric.js brush extensions audited 2026-08; not installed",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Geometric Crayon, Fur, Ribbon, Squares and Spray mathematical dab distributions provide algorithmic reference for clean-room assistive brushes.",
+  }),
+  sourceAudit({
+    id: "klecks",
+    displayName: "Klecks / Kleki",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/bitbof/klecks",
+    versionEvidence: "web painting app release line audited 2026-08; not installed",
+    license: "MIT (code only; Kleki brand excluded)",
+    activity: "active",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Reference for canvas pixel sampling under smudge/blend brushes, stabilizer-to-pressure pipeline order, and layered painting UX.",
+  }),
+  sourceAudit({
+    id: "minipaint",
+    displayName: "miniPaint",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/viliusle/miniPaint",
+    versionEvidence: "browser image editor audited 2026-08; not installed",
+    license: "MIT",
+    activity: "active",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Image editing UX, canvas zoom/pan transform math, and layer composition benchmark.",
+  }),
+  sourceAudit({
+    id: "brush-viewer",
+    displayName: "brush-viewer (ABR)",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/jlai/brush-viewer",
+    versionEvidence: "ABR parser implementation audited 2026-08; not installed",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "shape-style-only",
+    rationale:
+      "Photoshop .abr brush tip texture extraction reference informing format gateway's ABR import capabilities.",
+  }),
+  sourceAudit({
+    id: "mypaint-brushes",
+    displayName: "MyPaint Official Brushes",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/mypaint/mypaint-brushes",
+    versionEvidence: "v2.0.2 / OpenToonz brush collection CC0 presets",
+    license: "CC0-1.0 / Public Domain (brush settings)",
+    activity: "low-churn",
+    disposition: "adopted-active",
+    codePolicy: "runtime-import",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Authoritative natural-media brush presets (Classic, Deevad, Ramon, Tanda) imported through the format gateway into ToonSpectrum brush dynamics.",
   }),
 ]);
 

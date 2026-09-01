@@ -57,6 +57,8 @@ const MAPPED_SETTINGS = new Set([
   "radius_logarithmic",
   "opaque",
   "slow_tracking",
+  "hardness",
+  "dabs_per_radius",
 ]);
 
 export interface MybImportResult {
@@ -122,6 +124,9 @@ export function importMybBrush(
   const radius = document.settings["radius_logarithmic"];
   const opaque = document.settings["opaque"];
   const slowTracking = document.settings["slow_tracking"];
+  const hardness = document.settings["hardness"];
+  const dabsPerRadius = document.settings["dabs_per_radius"];
+  const smudge = document.settings["smudge"];
 
   const sizeDynamics: DynamicMappingIR[] = [];
   const flowDynamics: DynamicMappingIR[] = [];
@@ -133,6 +138,17 @@ export function importMybBrush(
   if (opaque && opaquePressure) {
     flowDynamics.push(pressureCurveToMapping(opaquePressure, opaque.base_value, 1));
   }
+
+  const tipHardness = hardness !== undefined
+    ? Math.min(1, Math.max(0, hardness.base_value))
+    : 1;
+
+  const tipSpacingPct = dabsPerRadius !== undefined && dabsPerRadius.base_value > 0
+    ? Math.min(1000, Math.max(1, Math.round(100 / (2 * Math.max(0.05, dabsPerRadius.base_value)))))
+    : 10;
+
+  const mixingKind = smudge && smudge.base_value > 0.05 ? "smudge" : "none";
+  const mixingStrength = smudge ? Math.min(1, Math.max(0, smudge.base_value)) : 0;
 
   const unmappedSettings = Object.keys(document.settings)
     .filter((name) => !MAPPED_SETTINGS.has(name))
@@ -149,6 +165,16 @@ export function importMybBrush(
     },
     sizeDynamics,
     flowDynamics,
+    tip: {
+      kind: "round",
+      hardness: tipHardness,
+      spacingPct: tipSpacingPct,
+      angleJitterDeg: 0,
+    },
+    mixing: {
+      kind: mixingKind,
+      strength: mixingStrength,
+    },
     providerPreference: ["hokusai-natural-media"],
     sourcePayload: {
       format: "myb-v3",

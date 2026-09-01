@@ -346,11 +346,17 @@ describe("studio drawing source adoption audit", () => {
     "drauu",
     "chickenpaint",
     "fabric",
+    "harmony",
+    "fabric-brushes",
+    "klecks",
+    "minipaint",
+    "brush-viewer",
+    "mypaint-brushes",
   ] as const;
 
   it("freezes the complete reviewed candidate set and provenance fields", () => {
     expect(STUDIO_DRAWING_SOURCE_AUDIT_VERSION)
-      .toBe("studio-drawing-source-audit-v7");
+      .toBe("studio-drawing-source-audit-v8");
     expect(STUDIO_DRAWING_SOURCE_AUDIT.map(({ id }) => id)).toEqual(
       candidateIds,
     );
@@ -377,6 +383,7 @@ describe("studio drawing source adoption audit", () => {
       "roughjs",
       "p5-brush",
       "konva",
+      "mypaint-brushes",
     ]) {
       expect(resolveStudioDrawingSourceAudit(id)?.disposition, id)
         .toBe("adopted-active");
@@ -425,6 +432,11 @@ describe("studio drawing source adoption audit", () => {
       "js-draw",
       "drauu",
       "chickenpaint",
+      "harmony",
+      "fabric-brushes",
+      "klecks",
+      "minipaint",
+      "brush-viewer",
     ]) {
       expect(resolveStudioDrawingSourceAudit(id)?.disposition, id)
         .toBe("reference-only");

@@ -331,13 +331,13 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
       pressures: [0.9, 0.85, 0.8],
     };
     const first = planStudioWetInkBrushReplay(pen, { phase: "committed" });
-    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error(`${first.reason}: ${first.detail}`);
     const wash = getStudioInkwashWash();
     expect(wash).not.toBeNull();
     const revision = wash!.session.revision;
     const digest = first.value.fieldDigest;
     const second = planStudioWetInkBrushReplay(pen, { phase: "committed" });
-    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error(`${second.reason}: ${second.detail}`);
     expect(getStudioInkwashWash()!.session.revision).toBe(revision);
     expect(second.value.fieldDigest).toBe(digest);
   });

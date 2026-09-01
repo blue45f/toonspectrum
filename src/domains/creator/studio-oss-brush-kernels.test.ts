@@ -10,9 +10,15 @@ import {
   STUDIO_OSS_OIL_FILM_RECIPE,
   studioOssApplyMaterialColorChannel,
   studioOssEqualAreaDiskOffset,
+  studioOssFabricCrayonGrainAdhesion,
+  studioOssFabricLongFurTangentOffset,
+  studioOssFabricSquaresMeshOffset,
+  studioOssHarmonyProximityCoupling,
   studioOssKlecksChalkCoverage,
+  studioOssKlecksSmudgeColorBlend,
   studioOssMaterialColorModeForProfile,
   studioOssOilBristleFilm,
+  studioOssP5BrushFlowfieldVector,
   studioOssSprayTipCoverage,
   studioOssWatercolorTipCoverage,
 } from "./studio-oss-brush-kernels";
@@ -114,5 +120,72 @@ describe("studio OSS brush kernels (verified hybrid)", () => {
     expect(oil.provenanceNotes.length).toBeGreaterThan(0);
     // Hybrid routing is family pin selection, not a cross-engine failure ladder.
     expect(oil.crossEngineProductFallbackAllowed).toBe(false);
+  });
+
+  it("evaluates Harmony proximity coupling with distance falloff", () => {
+    const near = studioOssHarmonyProximityCoupling(10, 10, 15, 12, 30, 0x42);
+    const far = studioOssHarmonyProximityCoupling(10, 10, 28, 28, 30, 0x42);
+    const outside = studioOssHarmonyProximityCoupling(10, 10, 100, 100, 30, 0x42);
+
+    expect(near.connected).toBe(true);
+    expect(near.weight).toBeGreaterThan(far.weight);
+    expect(near.opacity).toBeGreaterThan(far.opacity);
+    expect(outside.connected).toBe(false);
+    expect(outside.weight).toBe(0);
+  });
+
+  it("evaluates fabric-brushes crayon tooth bite and wax deposit under pressure", () => {
+    const light = studioOssFabricCrayonGrainAdhesion(50, 50, 0.2, 5, 0x19);
+    const heavy = studioOssFabricCrayonGrainAdhesion(50, 50, 0.9, 5, 0x19);
+
+    expect(heavy.deposit).toBeGreaterThan(light.deposit);
+    expect(heavy.toothBite).toBeGreaterThan(light.toothBite);
+    expect(light.deposit).toBeGreaterThan(0);
+    expect(heavy.deposit).toBeLessThanOrEqual(1);
+  });
+
+  it("emits continuous tangent-relative offsets for long fur ribbons", () => {
+    const strand0 = studioOssFabricLongFurTangentOffset(0, 6, 0, 15, 0x77);
+    const strand5 = studioOssFabricLongFurTangentOffset(5, 6, 0, 15, 0x77);
+
+    expect(strand0.offsetX).not.toEqual(strand5.offsetX);
+    expect(strand0.offsetY).not.toEqual(strand5.offsetY);
+    expect(strand0.opacity).toBeGreaterThan(0);
+    expect(strand5.opacity).toBeGreaterThan(0);
+  });
+
+  it("snaps square tiles to local grid with rotation jitter and pressure scaling", () => {
+    const tileA = studioOssFabricSquaresMeshOffset(35, 42, 16, 0.4, 0x12, 0);
+    const tileB = studioOssFabricSquaresMeshOffset(37, 44, 16, 0.4, 0x12, 0);
+    const tileHeavy = studioOssFabricSquaresMeshOffset(35, 42, 16, 0.9, 0x12, 0);
+
+    // Both points in the same 16px cell share the same cell center
+    expect(tileA.tileX).toEqual(tileB.tileX);
+    expect(tileA.tileY).toEqual(tileB.tileY);
+    expect(tileHeavy.size).toBeGreaterThan(tileA.size);
+    expect(tileHeavy.opacity).toBeGreaterThan(tileA.opacity);
+  });
+
+  it("blends brush color into sampled canvas color based on smudge rate and wetness", () => {
+    // Red brush (255, 0, 0), Blue canvas (0, 0, 255)
+    const dry = studioOssKlecksSmudgeColorBlend(255, 0, 0, 0, 0, 255, 1, 0, 0);
+    const wetSmudge = studioOssKlecksSmudgeColorBlend(255, 0, 0, 0, 0, 255, 1, 0.8, 0.9);
+
+    expect(dry.r).toBe(255);
+    expect(dry.b).toBe(0);
+    expect(wetSmudge.b).toBeGreaterThan(50);
+    expect(wetSmudge.r).toBeLessThan(200);
+    expect(wetSmudge.pickupRate).toBeGreaterThan(0.5);
+  });
+
+  it("evaluates p5.brush flowfield vector angle, velocity, and curl magnitude", () => {
+    const v1 = studioOssP5BrushFlowfieldVector(100, 100, 0.05, 3, 0x5a);
+    const v2 = studioOssP5BrushFlowfieldVector(500, 500, 0.05, 3, 0x5a);
+
+    expect(Number.isFinite(v1.angle)).toBe(true);
+    expect(Math.hypot(v1.velocityX, v1.velocityY)).toBeGreaterThan(0.5);
+    expect(v1.curlMagnitude).toBeGreaterThanOrEqual(0);
+    expect(v1.curlMagnitude).toBeLessThanOrEqual(2);
+    expect(v1.angle).not.toEqual(v2.angle);
   });
 });
