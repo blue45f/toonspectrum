@@ -1,9 +1,10 @@
 /**
- * CommandRegistry (V11 §2, E26 hybrid rule): the DOM shell and the canvas HUD
- * share one registry so a command behaves identically whether triggered from a
- * menu, a shortcut, the command palette or an on-canvas radial HUD.
+ * CommandRegistry: the DOM shell and the canvas HUD share one registry so a
+ * command id behaves identically whether it is triggered from a menu, a
+ * shortcut, the command palette or an on-canvas radial HUD.
+ * (design ref: V11 §2, E26 hybrid rule.)
  *
- * The command contract is V5 §15.4 (`StudioCommand`). The pre-§15.4
+ * The command contract is `StudioCommand` (design ref: V5 §15.4). The older
  * `CommandDefinition` shape is still accepted so existing call sites migrate
  * one at a time instead of in a single flag day.
  */
@@ -48,3 +49,24 @@ export type {
 } from "./types";
 
 export { alwaysAvailable, availableWhen } from "./availability";
+
+export {
+  createEditorClient,
+  createEditorSnapshotStore,
+  EDITOR_DISPATCH_OPTIONS_SERVICE_KEY,
+  EDITOR_REQUEST_SERVICE_KEY,
+} from "./editor-client";
+export type {
+  CommandDurableState,
+  CommandReceipt,
+  CommandReceiptStatus,
+  DispatchAbortSignal,
+  DispatchOptions,
+  EditorClient,
+  EditorClientOptions,
+  EditorCommandOutcomeHints,
+  EditorCommandRequest,
+  EditorCommandSource,
+  EditorSnapshotStore,
+  TileRegion,
+} from "./editor-client";
