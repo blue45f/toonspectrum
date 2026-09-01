@@ -141,6 +141,14 @@ const RECEIPT_SETTLE_BUDGET_MS = 1_500;
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
 /** Opt-in diagnostic sweep: keep auditing after a preset fails so one pass lists them all. */
 const DESKTOP_SURVEY_MODE = process.env.TOONSPECTRUM_BRUSH_SURVEY === "1";
+/**
+ * 장획 매트릭스의 시각 불변식을 루프 브레이커가 아니라 집계 실패로 낮춘다.
+ *
+ * 이 스위치가 없으면 10번째 브러시 하나가 나머지 181개의 증거를 통째로 가린다 — 아래 품질
+ * 리포트가 이미 같은 이유로 집계 방식을 쓰고 있다. 서베이가 아닐 때는 동작이 완전히 같다.
+ */
+const LONG_MATRIX_SURVEY_MODE =
+  DESKTOP_SURVEY_MODE || process.env.TOONSPECTRUM_BRUSH_LONG_SURVEY === "1";
 const surveyFailures: string[] = [];
 const ALL_BRUSH_LONG_MATRIX =
   process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1";
@@ -3269,6 +3277,22 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           });
         }
       }
+      /**
+       * 실패한 레인의 잔여 획이 다음 프리셋의 진단을 오염시키므로, 기록 후에는 반드시 페이지를
+       * 새로 세우고 넘어간다.
+       */
+      const surveySkip = async (message: string): Promise<boolean> => {
+        if (!LONG_MATRIX_SURVEY_MODE) return false;
+        surveyFailures.push(message);
+        log(`long SURVEY -> ${message}`);
+        await prepareStudioPage(page, studioUrl);
+        await activateDesktopPen(page);
+        return true;
+      };
+      if (
+        !hasMeaningfulPixelChange(coverage)
+        && await surveySkip(`${preset.id}: long stroke disappeared before commit`)
+      ) continue;
       invariant(hasMeaningfulPixelChange(coverage), `${preset.id}: long stroke disappeared before commit`);
       /*
        * A continuous carrier must cover every route segment. Intentionally discrete particle,
@@ -3279,10 +3303,11 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
        * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
        */
       if (operation === "erase" || qualityPolicy.kind !== "record-only-discrete") {
-        invariant(
-          coverage.visibleSegments === 6,
-          `${preset.id}: long stroke has missing visual segments (${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`,
-        );
+        const segmentFailure =
+          `${preset.id}: long stroke has missing visual segments `
+          + `(${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`;
+        if (coverage.visibleSegments !== 6 && await surveySkip(segmentFailure)) continue;
+        invariant(coverage.visibleSegments === 6, segmentFailure);
       }
       // Visual-quality findings are aggregate failures, not loop breakers. The exhaustive run must
       // still capture every remaining brush so one early scallop does not hide 213 later results.
@@ -3402,9 +3427,17 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       `long-brush quality report: ${qualityReportPath} · `
         + `${qualityFailureCount}/${qualityEvidence.length} continuous-policy failures`,
     );
+    if (LONG_MATRIX_SURVEY_MODE) {
+      log(`long SURVEY COMPLETE: ${surveyFailures.length} failing preset(s)`);
+      for (const failure of surveyFailures) log(`long SURVEY -> ${failure}`);
+    }
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "long-brush browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "long-brush browser received unexpected 5xx responses");
+    invariant(
+      surveyFailures.length === 0,
+      `long survey recorded ${surveyFailures.length} failing preset(s)`,
+    );
     const continuousSegmentCounts = evidence
       .filter((entry) => entry.qualityPolicy !== "record-only-discrete")
       .map((entry) => entry.visibleSegments);
