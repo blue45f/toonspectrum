@@ -84,17 +84,28 @@ export interface AdminBenchmarkSample {
   iterations: number;
   successCount: number;
   errorCount: number;
+  errorRate: number;
   durationMs: number;
   p50Ms: number;
   p95Ms: number;
+  p99Ms: number;
+  stdDevMs: number;
   minMs: number;
   maxMs: number;
   sampleSize?: number;
   error?: string;
 }
 
+export interface AdminBenchmarkMetadata {
+  iterations: number;
+  sampleCount: number;
+  warmup: boolean;
+  totalDurationMs: number;
+}
+
 export interface AdminBenchmarkResult {
   generatedAt: string;
+  metadata?: AdminBenchmarkMetadata;
   samples: AdminBenchmarkSample[];
 }
 

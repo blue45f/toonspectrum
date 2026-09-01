@@ -1,4 +1,4 @@
-import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle, ShieldAlert, Gauge } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, Download, DollarSign, Gauge, Play, RefreshCw, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -32,6 +32,82 @@ const CONTENT_KILL_SWITCHES = [
   { key: "showSynopsis", label: "시놉시스 원문", desc: "저작권(창작표현) · 끄면 숨김" },
   { key: "showRelatedInfo", label: "관련 정보(크롤 링크)", desc: "유튜브·뉴스·위키 · 끄면 숨김" },
 ] as const satisfies ReadonlyArray<{ key: keyof AppConfig; label: string; desc: string }>;
+
+const BENCHMARK_ITERATION_MIN = 1;
+const BENCHMARK_ITERATION_MAX = 10;
+const BENCHMARK_ITERATION_DEFAULT = 3;
+const BENCHMARK_PREVIOUS_RESULT_KEY = "admin.benchmark.previousResult";
+
+const normalizeIterations = (value: string) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return BENCHMARK_ITERATION_DEFAULT;
+  return Math.min(BENCHMARK_ITERATION_MAX, Math.max(BENCHMARK_ITERATION_MIN, parsed));
+};
+
+const quoteCsvCell = (value: unknown) => {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, "\"\"")}"`;
+};
+
+const buildBenchmarkCsv = (result: AdminBenchmarkResult) => {
+  const rows = [
+    [
+      "generatedAt",
+      "name",
+      "status",
+      "iterations",
+      "successCount",
+      "errorCount",
+      "errorRate",
+      "durationMs",
+      "p50Ms",
+      "p95Ms",
+      "p99Ms",
+      "stdDevMs",
+      "minMs",
+      "maxMs",
+      "metadataIterations",
+      "metadataSampleCount",
+      "metadataWarmup",
+      "metadataTotalDurationMs",
+      "sampleSize",
+      "error",
+    ],
+    ...result.samples.map((sample) => [
+      result.generatedAt,
+      sample.name,
+      sample.status,
+      sample.iterations,
+      sample.successCount,
+      sample.errorCount,
+      sample.errorRate,
+      sample.durationMs,
+      sample.p50Ms,
+      sample.p95Ms,
+      sample.p99Ms,
+      sample.stdDevMs,
+      sample.minMs,
+      sample.maxMs,
+      result.metadata?.iterations ?? "",
+      result.metadata?.sampleCount ?? "",
+      String(Boolean(result.metadata?.warmup)),
+      result.metadata?.totalDurationMs ?? "",
+      sample.sampleSize ?? "",
+      sample.error ?? "",
+    ]),
+  ];
+  return rows.map((row) => row.map(quoteCsvCell).join(",")).join("\n");
+};
+
+const downloadFile = (filename: string, content: string, type: string) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 interface IngestRunResult {
   runId: string;
@@ -488,14 +564,59 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AdminBenchmarkResult | null>(null);
+  const [previousResult, setPreviousResult] = useState<AdminBenchmarkResult | null>(null);
+  const [iterationsInput, setIterationsInput] = useState<string>(String(BENCHMARK_ITERATION_DEFAULT));
+  const [warmupEnabled, setWarmupEnabled] = useState(false);
   const t = useT();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(BENCHMARK_PREVIOUS_RESULT_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.generatedAt && Array.isArray(parsed.samples)) {
+        setPreviousResult(parsed as AdminBenchmarkResult);
+      }
+    } catch {
+      window.localStorage.removeItem(BENCHMARK_PREVIOUS_RESULT_KEY);
+    }
+  }, []);
 
   const run = async () => {
     if (loading) return;
+    const normalizedIterations = normalizeIterations(iterationsInput);
+    setIterationsInput(String(normalizedIterations));
+    const query = new URLSearchParams({
+      iterations: String(normalizedIterations),
+      warmup: warmupEnabled ? "1" : "0",
+    });
+
     setLoading(true);
     setError(null);
     try {
-      const next = await adminFetch<AdminBenchmarkResult>("/benchmark", uid);
+      const next = await adminFetch<AdminBenchmarkResult>(
+        `/benchmark?${query.toString()}`,
+        uid,
+      );
+
+      let previous = previousResult;
+      if (typeof window !== "undefined") {
+        const raw = window.localStorage.getItem(BENCHMARK_PREVIOUS_RESULT_KEY);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed?.generatedAt && Array.isArray(parsed.samples)) {
+              previous = parsed as AdminBenchmarkResult;
+            }
+          } catch {
+            window.localStorage.removeItem(BENCHMARK_PREVIOUS_RESULT_KEY);
+          }
+        }
+        window.localStorage.setItem(BENCHMARK_PREVIOUS_RESULT_KEY, JSON.stringify(next));
+      }
+
+      setPreviousResult(previous);
       setResult(next);
     } catch (e) {
       setError(await getApiErrorMessage(e, t("admin.ops.benchmarkError")));
@@ -504,47 +625,139 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
     }
   };
 
+  const exportJson = () => {
+    if (!result) return;
+    downloadFile(
+      `admin-benchmark-${new Date(result.generatedAt).toISOString()}.json`,
+      JSON.stringify(result, null, 2),
+      "application/json;charset=utf-8",
+    );
+  };
+
+  const exportCsv = () => {
+    if (!result) return;
+    downloadFile(
+      `admin-benchmark-${new Date(result.generatedAt).toISOString()}.csv`,
+      buildBenchmarkCsv(result),
+      "text/csv;charset=utf-8",
+    );
+  };
+
+  const formatDelta = (sample: AdminBenchmarkResult["samples"][number]) => {
+    const previous = previousResult?.samples.find((item) => item.name === sample.name);
+    if (!previous) return null;
+    const delta = sample.durationMs - previous.durationMs;
+    if (Number.isNaN(delta) || previous.durationMs === 0) return null;
+    const direction = delta === 0 ? "0" : delta > 0 ? `+${formatNum(delta)}ms` : `${formatNum(delta)}ms`;
+    const tone = delta > 0 ? "text-bad" : delta < 0 ? "text-good" : "text-fg-3";
+    return { direction, tone };
+  };
+
   return (
     <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        className={adminButtonClass("accent")}
-        onClick={() => void run()}
-        disabled={loading}
-      >
-        <Gauge size={15} /> {loading ? t("admin.ops.runningBenchmark") : t("admin.ops.runBenchmark")}
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <label className="min-w-0 flex-1">
+          <p className="text-xs text-fg-3">반복 횟수 (1~10)</p>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={BENCHMARK_ITERATION_MIN}
+            max={BENCHMARK_ITERATION_MAX}
+            step={1}
+            value={iterationsInput}
+            onChange={(e) => setIterationsInput(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg outline-none transition focus:border-accent"
+          />
+        </label>
+
+        <button
+          type="button"
+          className={adminButtonClass("accent")}
+          onClick={() => void run()}
+          disabled={loading}
+        >
+          <Gauge size={15} /> {loading ? t("admin.ops.runningBenchmark") : t("admin.ops.runBenchmark")}
+        </button>
+        <label className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs">
+          <input
+            type="checkbox"
+            className="size-3.5 accent-accent"
+            checked={warmupEnabled}
+            onChange={(e) => setWarmupEnabled(e.target.checked)}
+            disabled={loading}
+          />
+          <span className="text-fg-3">워밍업 1회 포함</span>
+        </label>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => void exportJson()}
+            disabled={!result || loading}
+            title="JSON 저장"
+          >
+            <Download size={15} /> JSON
+          </button>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => void exportCsv()}
+            disabled={!result || loading}
+            title="CSV 저장"
+          >
+            <Download size={15} /> CSV
+          </button>
+        </div>
+      </div>
 
       {error && <AdminNotice title={t("admin.ops.benchmarkError")} body={error} />}
 
       {result ? (
         <div className="rounded-xl border border-line bg-panel p-4">
-          <div className="flex items-center justify-between gap-2 text-xs">
+          <div className="flex flex-col gap-1 text-xs">
             <span className="font-medium text-fg">{t("admin.ops.benchmarkResult")}</span>
-            <span className="text-fg-3">{formatDateTime(result.generatedAt)}</span>
+            <span className="text-fg-3">
+              실행 시각 {formatDateTime(result.generatedAt)} · 반복 {formatNum(result.samples[0]?.iterations ?? 0)}
+              {result.metadata ? ` · 총 측정 시간 ${formatDuration(result.metadata.totalDurationMs)}` : null}
+              {result.metadata ? ` / 워밍업 ${result.metadata.warmup ? "ON" : "OFF"}` : null}
+              {previousResult ? ` / 이전 비교 기준 ${formatDateTime(previousResult.generatedAt)}` : null}
+            </span>
           </div>
           <ul className="mt-3 divide-y divide-line text-sm">
-            {result.samples.map((sample) => (
-              <li key={sample.name} className="py-2.5 first:pt-0 last:pb-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-fg-2">{sample.name}</span>
-                  <span
-                    className={["text-xs font-semibold", sample.status === "ok" ? "text-good" : "text-bad"]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {sample.status}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-3">
-                  <span>응답 {formatDuration(sample.durationMs)}</span>
-                  {sample.sampleSize != null && <span>샘플 수 {formatNum(sample.sampleSize)}</span>}
-                  {sample.status === "error" && sample.error && (
-                    <span className="text-bad break-all">오류: {sample.error}</span>
-                  )}
-                </div>
-              </li>
-            ))}
+            {result.samples.map((sample) => {
+              const delta = formatDelta(sample);
+              return (
+                <li key={sample.name} className="py-2.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-fg-2">{sample.name}</span>
+                    <span
+                      className={[
+                        "text-xs font-semibold",
+                        sample.status === "ok" ? "text-good" : sample.status === "partial" ? "text-warn" : "text-bad",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {sample.status}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+                    <span>응답 {formatDuration(sample.durationMs)}</span>
+                    {delta ? <span className={delta.tone}>({delta.direction})</span> : null}
+                    {sample.sampleSize != null && <span>샘플 수 {formatNum(sample.sampleSize)}</span>}
+                    <span>p50 {formatDuration(sample.p50Ms)}</span>
+                    <span>p95 {formatDuration(sample.p95Ms)}</span>
+                    <span>p99 {formatDuration(sample.p99Ms)}</span>
+                    <span>표준편차 {formatDuration(sample.stdDevMs)}</span>
+                    <span>실패율 {formatNum(sample.errorRate * 100)}%</span>
+                    {sample.status === "error" && sample.error && (
+                      <span className="text-bad break-all">오류: {sample.error}</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import net from "node:net";
 
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { eq, sql, type SQL, type Table } from "drizzle-orm";
@@ -127,6 +128,178 @@ export function parseBool(value: unknown, fallback = false) {
     return normalized === "1" || normalized === "true" || normalized === "on" || normalized === "yes" || normalized === "y";
   }
   return fallback;
+}
+
+export const ADMIN_BENCHMARK_ITERATIONS_MIN = 1;
+export const ADMIN_BENCHMARK_ITERATIONS_MAX = 10;
+export const ADMIN_BENCHMARK_ITERATIONS_DEFAULT = 3;
+
+export function parseIpAddress(value: unknown) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) throw new BadRequestException("IP 주소를 입력해 주세요.");
+
+  if (trimmed.includes("/")) {
+    const [address, cidr, ...rest] = trimmed.split("/");
+    if (!address || rest.length > 0) throw new BadRequestException("유효한 IP/CIDR 형식이 아닙니다.");
+
+    const addressType = net.isIP(address);
+    if (addressType === 0) throw new BadRequestException("유효한 IP 주소를 입력해 주세요.");
+
+    const parsedCidr = Number.parseInt(cidr, 10);
+    const maxCidr = addressType === 4 ? 32 : 128;
+    if (!Number.isInteger(parsedCidr) || parsedCidr < 0 || parsedCidr > maxCidr) {
+      throw new BadRequestException("CIDR 범위가 유효하지 않습니다.");
+    }
+    return `${address}/${parsedCidr}`;
+  }
+
+  if (net.isIP(trimmed) === 0) throw new BadRequestException("유효한 IP 주소를 입력해 주세요.");
+  return trimmed;
+}
+
+export function normalizeAdminBenchmarkQuery(
+  iterationsValue: unknown,
+  warmupValue: unknown = false,
+): { iterations: number; warmup: boolean } {
+  const parsed =
+    typeof iterationsValue === "number"
+      ? iterationsValue
+      : Number.parseFloat(String(iterationsValue ?? ""));
+  const iterations = Number.isFinite(parsed)
+    ? Math.min(
+        ADMIN_BENCHMARK_ITERATIONS_MAX,
+        Math.max(ADMIN_BENCHMARK_ITERATIONS_MIN, Math.floor(parsed)),
+      )
+    : ADMIN_BENCHMARK_ITERATIONS_DEFAULT;
+  return {
+    iterations,
+    warmup: parseBool(warmupValue, false),
+  };
+}
+
+export function isAdminBenchmarkWarmupEnabled(
+  warmupOrOptions: boolean | { warmup?: boolean } | undefined,
+): boolean {
+  if (warmupOrOptions === true) return true;
+  if (warmupOrOptions && typeof warmupOrOptions === "object") {
+    return warmupOrOptions.warmup === true;
+  }
+  return false;
+}
+
+export type AdminBenchmarkSampleStatus = "ok" | "partial" | "error";
+
+export type AdminBenchmarkAttempt = {
+  status: "ok" | "error";
+  durationMs: number;
+  error?: string;
+  sampleSize?: number;
+};
+
+export type AdminBenchmarkSample = {
+  name: string;
+  status: AdminBenchmarkSampleStatus;
+  iterations: number;
+  successCount: number;
+  errorCount: number;
+  errorRate: number;
+  durationMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  stdDevMs: number;
+  minMs: number;
+  maxMs: number;
+  sampleSize?: number;
+  error?: string;
+};
+
+export function adminBenchmarkPercentile(values: number[], ratio: number) {
+  if (!values.length) return 0;
+  const idx = Math.max(0, Math.min(values.length - 1, Math.ceil(ratio * values.length) - 1));
+  return values[idx] ?? 0;
+}
+
+export function summarizeAdminBenchmarkSample(
+  name: string,
+  attempts: AdminBenchmarkAttempt[],
+): AdminBenchmarkSample {
+  const successes = attempts.filter((entry) => entry.status === "ok");
+  const durations = successes.map((entry) => entry.durationMs).sort((a, b) => a - b);
+  const sampleSizes = successes
+    .map((entry) => entry.sampleSize)
+    .filter((size): size is number => typeof size === "number");
+
+  const sumMs = durations.reduce((total, value) => total + value, 0);
+  const meanMs = durations.length ? sumMs / durations.length : 0;
+  const varianceMs = durations.length
+    ? durations.reduce((total, value) => total + Math.pow(value - meanMs, 2), 0) / durations.length
+    : 0;
+  const stdDevMs = Math.round(Math.sqrt(varianceMs));
+  const minMs = durations[0] ?? 0;
+  const maxMs = durations[durations.length - 1] ?? 0;
+  const avgMs = Math.round(meanMs);
+  const successCount = successes.length;
+  const errorCount = attempts.length - successCount;
+  const errorRate = attempts.length ? Math.round((errorCount / attempts.length) * 1000) / 1000 : 0;
+  const sampleSize = sampleSizes[0];
+
+  if (successCount === 0) {
+    const firstError = attempts[0]?.error ?? "요청이 모두 실패했습니다.";
+    return {
+      name,
+      status: "error",
+      iterations: attempts.length,
+      successCount,
+      errorCount,
+      errorRate,
+      durationMs: 0,
+      p50Ms: 0,
+      p95Ms: 0,
+      p99Ms: 0,
+      stdDevMs: 0,
+      minMs: 0,
+      maxMs: 0,
+      error: firstError,
+    };
+  }
+
+  if (errorCount > 0) {
+    return {
+      name,
+      status: "partial",
+      iterations: attempts.length,
+      successCount,
+      errorCount,
+      errorRate,
+      durationMs: avgMs,
+      p50Ms: adminBenchmarkPercentile(durations, 0.5),
+      p95Ms: adminBenchmarkPercentile(durations, 0.95),
+      p99Ms: adminBenchmarkPercentile(durations, 0.99),
+      stdDevMs,
+      minMs,
+      maxMs,
+      sampleSize,
+      error: attempts.find((entry) => entry.error)?.error ?? "일부 요청이 실패했습니다.",
+    };
+  }
+
+  return {
+    name,
+    status: "ok",
+    iterations: attempts.length,
+    successCount,
+    errorCount,
+    errorRate,
+    durationMs: avgMs,
+    p50Ms: adminBenchmarkPercentile(durations, 0.5),
+    p95Ms: adminBenchmarkPercentile(durations, 0.95),
+    p99Ms: adminBenchmarkPercentile(durations, 0.99),
+    stdDevMs,
+    minMs,
+    maxMs,
+    sampleSize,
+  };
 }
 
 export function toPlainObject(value: unknown) {

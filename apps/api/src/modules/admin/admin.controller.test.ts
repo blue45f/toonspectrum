@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { AdminController } from "./admin.controller";
+import { AdminService } from "./admin.service";
 
-import type { AdminService } from "./admin.service";
+import type { AdminCampaignsService } from "./admin-campaigns.service";
+import type { AdminMembersService } from "./admin-members.service";
+import type { AdminMetricsService } from "./admin-metrics.service";
+import type { AdminModerationService } from "./admin-moderation.service";
+import type { AdminRevenueService } from "./admin-revenue.service";
 
 describe("AdminController", () => {
   const mockService = {
@@ -100,5 +105,38 @@ describe("AdminController", () => {
 
     const revoked = await controller.revokeAllSessions("admin-1");
     expect(revoked).toEqual({ ok: true, message: "Done" });
+  });
+
+  it("clamps benchmark iterations and forwards warmup into the shipped service", async () => {
+    const getDashboard = vi.fn().mockResolvedValue({ items: [] });
+    const metrics = {
+      getAdminMe: vi.fn().mockResolvedValue({ id: "admin-1" }),
+      getDashboard,
+      getPromos: vi.fn().mockResolvedValue({ items: [] }),
+      getAnnouncements: vi.fn().mockResolvedValue({ items: [] }),
+      getAuditLogs: vi.fn().mockResolvedValue({ items: [] }),
+      getSystemHealth: vi.fn().mockResolvedValue({ status: "ok" }),
+      getConfig: vi.fn().mockResolvedValue({}),
+    };
+    const service = new AdminService(
+      metrics as unknown as AdminMetricsService,
+      { listUsers: vi.fn().mockResolvedValue({ items: [] }) } as unknown as AdminMembersService,
+      { listCommunityPosts: vi.fn().mockResolvedValue({ items: [] }) } as unknown as AdminModerationService,
+      {
+        getRevenue: vi.fn().mockResolvedValue({ items: [] }),
+        getPlans: vi.fn().mockResolvedValue({ items: [] }),
+      } as unknown as AdminRevenueService,
+      { getCampaigns: vi.fn().mockResolvedValue({ items: [] }) } as unknown as AdminCampaignsService,
+    );
+    const liveController = new AdminController(service);
+
+    const warmed = await liveController.getBenchmark("admin-1", "0", "1");
+    expect(warmed.metadata).toMatchObject({ iterations: 1, warmup: true });
+    expect(getDashboard).toHaveBeenCalledTimes(2);
+
+    getDashboard.mockClear();
+    const clamped = await liveController.getBenchmark("admin-1", "99", "0");
+    expect(clamped.metadata).toMatchObject({ iterations: 10, warmup: false });
+    expect(getDashboard).toHaveBeenCalledTimes(10);
   });
 });

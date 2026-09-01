@@ -18,7 +18,7 @@ import { getAppConfig, setAppConfig } from "../../server/app-config";
 
 import { 
   DashboardResponse, 
-  toNumber, parsePositiveInt, requireAdminUser, countFrom, countDistinctActiveUsers, ensureAdminSchema, 
+  toNumber, parsePositiveInt, parseIpAddress, requireAdminUser, countFrom, countDistinctActiveUsers, ensureAdminSchema, 
   logAuditAction,
   DAY_MS, AppConfigPayload
 } from "./admin-types";
@@ -420,15 +420,15 @@ async getSecurityIpRules(userId: string) {
 async addSecurityIpRule(userId: string, ipAddress: string, reason = "보안 우려 IP 차단") {
     const admin = await requireAdminUser(userId);
     await ensureAdminSchema();
-    const trimmed = ipAddress.trim();
-    if (!trimmed) throw new BadRequestException("IP 주소를 입력해 주세요.");
+    const trimmedIp = parseIpAddress(ipAddress);
+    const trimmedReason = String(reason ?? "보안 우려 IP 차단").trim();
     const id = crypto.randomUUID();
     await dbClient.execute({
       sql: `INSERT INTO admin_security_policies (id, "ipAddress", reason, action, "createdBy", "createdAt") VALUES (?, ?, ?, 'block', ?, now()) ON CONFLICT ("ipAddress") DO NOTHING`,
-      args: [id, trimmed, reason, admin.id],
+      args: [id, trimmedIp, trimmedReason, admin.id],
     });
-    void logAuditAction(userId, "SECURITY_IP_BLOCK", "security", id, { ipAddress: trimmed, reason });
-    return { ok: true, id, ipAddress: trimmed };
+    void logAuditAction(userId, "SECURITY_IP_BLOCK", "security", id, { ipAddress: trimmedIp, reason: trimmedReason });
+    return { ok: true, id, ipAddress: trimmedIp };
   }
 
 async deleteSecurityIpRule(userId: string, id: string) {

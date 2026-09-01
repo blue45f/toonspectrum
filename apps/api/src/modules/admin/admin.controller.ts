@@ -12,6 +12,7 @@ import {
   Controller,
 } from "@nestjs/common";
 
+import { normalizeAdminBenchmarkQuery } from "./admin-types";
 import { AdminService } from "./admin.service";
 
 interface AppConfigPayload {
@@ -264,10 +265,11 @@ export class AdminController {
   async getBenchmark(
     @Headers("x-user-id") userId: string | undefined,
     @Query("iterations") iterationsValue?: string,
+    @Query("warmup") warmupValue?: string,
   ) {
     const uid = enforceUserOrError(userId);
-    const iterations = Number.parseInt(iterationsValue ?? "3", 10) || 3;
-    return this.adminService.getBenchmark(uid, iterations);
+    const { iterations, warmup } = normalizeAdminBenchmarkQuery(iterationsValue, warmupValue);
+    return this.adminService.getBenchmark(uid, iterations, warmup);
   }
 
   @Post("system/maintenance")
