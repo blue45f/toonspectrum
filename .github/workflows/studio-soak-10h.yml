@@ -1,0 +1,115 @@
+name: Studio 10h Soak QA
+
+on:
+  push:
+    branches:
+      - qa/studio-soak-10h-20260902
+  workflow_dispatch:
+    inputs:
+      phase_minutes:
+        description: Minutes per phase. Two phases run sequentially.
+        required: false
+        default: "310"
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: studio-soak-10h-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+  SOAK_AUTO_FILE_ISSUES: "true"
+  SOAK_REPEAT_THRESHOLD: "2"
+  JIRA_BASE_URL: https://blue45f-1781926536822.atlassian.net
+  JIRA_PROJECT_KEY: KAN
+
+jobs:
+  ux-persistence:
+    name: 1/2 UX · mobile · persistence soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium, Firefox and WebKit
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Validate soak orchestrator syntax
+        run: |
+          node --check scripts/qa/studio-soak-runner.mjs
+          node --check scripts/qa/verify-studio-cross-browser-matrix.mjs
+      - name: Build production Studio assets once
+        run: pnpm run build
+      - name: Run UX, mobile, lifecycle and persistence combinations
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOAK_PHASE: ux-persistence
+          SOAK_RESULTS_DIR: artifacts/studio-soak/ux-persistence
+          SOAK_DURATION_MINUTES: ${{ inputs.phase_minutes || '310' }}
+        run: node scripts/qa/studio-soak-runner.mjs
+      - name: Upload UX soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-soak-ux-persistence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/studio-soak/ux-persistence
+          if-no-files-found: warn
+          retention-days: 14
+
+  rendering-brush-3d:
+    name: 2/2 rendering · brush · 3D soak
+    needs: ux-persistence
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and Linux browser dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Validate soak orchestrator syntax
+        run: node --check scripts/qa/studio-soak-runner.mjs
+      - name: Build production Studio assets once
+        run: pnpm run build
+      - name: Run rendering, brush engine, WebGPU, WebGL2 and 3D combinations
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOAK_PHASE: rendering-brush-3d
+          SOAK_RESULTS_DIR: artifacts/studio-soak/rendering-brush-3d
+          SOAK_DURATION_MINUTES: ${{ inputs.phase_minutes || '310' }}
+        run: node scripts/qa/studio-soak-runner.mjs
+      - name: Upload rendering soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-soak-rendering-brush-3d-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/studio-soak/rendering-brush-3d
+          if-no-files-found: warn
+          retention-days: 14
