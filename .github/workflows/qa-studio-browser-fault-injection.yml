@@ -1,0 +1,73 @@
+name: QA Studio browser fault injection
+
+on:
+  push:
+    branches:
+      - qa/studio-browser-fault-injection-20260902
+    paths:
+      - scripts/qa-studio-browser-fault-injection.mjs
+      - .github/workflows/qa-studio-browser-fault-injection.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-browser-fault-injection-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fault-injection:
+    name: ${{ matrix.browser }} / WebGL failure + modal accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    env:
+      CI: true
+      QA_BROWSER: ${{ matrix.browser }}
+      QA_WEB_ORIGIN: http://127.0.0.1:5419
+      QA_REPORT_DIR: qa-results/studio-browser-faults/${{ matrix.browser }}
+      QA_EVIDENCE_DIR: artifacts/studio-browser-faults/${{ matrix.browser }}
+
+    steps:
+      - name: Checkout fault-injection branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Syntax-check fault injector
+        run: node --check scripts/qa-studio-browser-fault-injection.mjs
+
+      - name: Install ${{ matrix.browser }}
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run deterministic WebGL and compatibility-modal failures
+        run: node scripts/qa-studio-browser-fault-injection.mjs
+
+      - name: Upload reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-browser-faults-${{ matrix.browser }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-browser-faults/${{ matrix.browser }}
+            artifacts/studio-browser-faults/${{ matrix.browser }}
