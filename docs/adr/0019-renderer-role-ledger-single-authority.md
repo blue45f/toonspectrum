@@ -33,10 +33,19 @@ E01–E28 후보 조사(`manifest/providers.json`)에 기록돼 있지만, **어
    - **reference**: golden/oracle/parity 전용. 제품 권위 0개.
    - **lab**: 제품 import 사이트 0건. `src/`·`apps/`의 비테스트 코드가 `moduleSpecifiers`나 `productSymbols`를
      참조하면 테스트가 실패한다.
-3. 현재 상태(current)와 목표 상태(target)를 같은 원장에 적는다. 목표 primary는 권위별로 분리한다:
-   - 벡터 장면(`vector-scene`) 목표 primary = Vello Classic WebGPU/WASM (ADR-0018 유지).
-   - 래스터 브러시 커밋(`raster-brush-commit`) 목표 primary = raw WebGPU 브러시 런타임(검토 §5·§6).
-   - Vello CPU, CanvasKit, libmypaint = reference. Vello Hybrid/Sparse, WESL, Velato, Paper.js = lab.
+3. 현재 상태(current)와 목표 상태(target)를 같은 원장에 적는다. 권위는 잘게 나눈다:
+   - 문서 벡터 island(`document-vector-island`) primary = Vello Classic WebGPU/WASM. 2026-09-02 원장
+     작성 시점에 `studio-vello-hub-document-hybrid-v13`이 기본 활성이고 `documentAuthority=true`이므로
+     이미 현재 primary다(08-11 경계 감사의 "selection-overlay island 한정"은 stale). ADR-0018의 목표는 유지된다.
+   - 래스터 브러시 커밋(`raster-brush-commit`) 현재 primary = Canvas2D `StudioDrawNode`, 목표 primary =
+     raw WebGPU 브러시 런타임(검토 §5·§6). 목표 승격은 P2 shadow compositor 근거가 있어야 한다.
+   - 선택 오버레이 island(`selection-overlay-island`) primary = Pixi(상시 마운트 오버레이 호스트).
+   - 좁은 단독 권위는 그 소유자를 primary로 적는다: CanvasKit=`path-ops-quality`, perfect-freehand=
+     `stroke-geometry`, Rough.js=`shape-sketch`, Three=`scene-3d`, Babylon=`scene-3d-specialist`,
+     Hokusai=`natural-media`.
+   - Vello CPU, libmypaint = reference. p5.brush, Paper.js(동적 import 호출부 존재), raw WebGPU 브러시
+     런타임 = provider. Vello Hybrid sparse-strip(upstream), WESL, Velato = lab.
+   - `image-filter-island`는 소유자 없는 권위다(planner가 작업마다 provider 하나를 고른다).
    - Konva는 마이그레이션 동안 문서 표시·포인터 입력·선택/변형 chrome의 현재 primary이며, 브러시 픽셀
      권위에서 단계적으로 제거된다(로드맵 P3·P5).
 4. 엔진 문서는 손으로 쓰지 않는다. `docs/engines/renderer-roles.md`는 `scripts/generate-studio-renderer-roles.mts`가

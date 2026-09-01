@@ -16,3 +16,4 @@ export * from "./wgsl-sandbox";
 export * from "./wgsl-pipeline-cache";
 export * from "./wesl-compile";
 export * from "./external-filter-bridge";
+export * from "./renderer-roles";

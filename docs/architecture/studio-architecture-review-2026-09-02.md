@@ -37,8 +37,9 @@
 | 17 | `/studio`에 COOP/COEP/CSP `wasm-unsafe-eval`·Worker 허용이 이미 설정 | **확인** | `vercel.json` 55·67·68·74·75행 | 변경 없음(회귀 테스트 목록은 로드맵) |
 | 18 | Safe Mode·저장소 압박 복구가 제품 경로에 배선 | **확인** | `studio-safe-mode-runtime.ts`, `StudioReliabilityStatusRail.tsx`, `studio-recovery-guide.ts` | 변경 없음 |
 | 19 | libmypaint parity 코퍼스 2개, 대형 브러시는 프록시 | **부분** | `libmypaint-parity.test.ts`: 코퍼스 `wash-soft`·`ink-crisp` 2개, 프레임 192×96, large lane은 radius 상향 프록시(180px이라는 수치는 소스에 없음) | 1,000px·장시간 wet·smudge·random dynamics 게이트는 P4 로드맵 |
-| 20 | Pixi WebGPU는 성숙 중, Vello Hybrid는 초기 단계 | **확인(외부)** | 레포 경계 감사도 Hybrid/Sparse를 `unavailable-upstream-api`로 기록 | 역할 원장: Pixi=provider, Vello Hybrid=lab |
-| 21 | Vello CPU는 reference, Hybrid는 lab, Raw WebGPU가 GPU 주 권위 | **조정 필요** | ADR-0018(2026-08-31)은 Vello WebGPU/WASM을 2D 문서 벡터 픽셀의 목표 엔진으로 확정 | ADR-0019: 목표 primary를 권위별로 분리 — 벡터 장면=Vello Classic(ADR-0018 유지), 래스터 브러시 커밋=raw WebGPU 브러시 런타임, Vello CPU/CanvasKit=reference |
+| 20 | Pixi WebGPU는 성숙 중, Vello Hybrid는 초기 단계 | **확인(외부)** | upstream `vello_hybrid` sparse-strip은 `unavailable-upstream-api`. 제품의 "V13 Hybrid"는 Classic + FrameGraph compositor다 | 역할 원장: Pixi=선택 오버레이 island primary(상시 오버레이 호스트, 브러시/hit-test 권위 없음), upstream Vello Hybrid sparse=lab |
+| 21 | Vello CPU는 reference, Hybrid는 lab, Raw WebGPU가 GPU 주 권위 | **조정 필요** | ADR-0018(2026-08-31)은 Vello WebGPU/WASM을 2D 문서 픽셀 목표 엔진으로 확정. 원장 작성 시 `studio-vello-hub-document-hybrid-v13`이 기본 활성·`documentAuthority=true`임을 확인(08-11 경계 감사의 "selection overlay 한정"은 stale) | ADR-0019: 권위별 분리 — 문서 벡터 island=Vello Classic(현재 primary), 래스터 브러시 커밋=Canvas2D(현재)→raw WebGPU 브러시 런타임(목표), Vello CPU/libmypaint=reference, CanvasKit=`path-ops-quality` 단독 소유 |
+| 21a | Paper.js는 의존성만 있고 호출부 없음(검토 §8은 "편집 친화 기하"로 유지 권고) | **stale** | `studio-engine-vector-geometry-provider.ts`가 `import("paper")`로 지연 로드 | 원장: provider |
 | 22 | Hokusai route 수 문서 불일치 | **미확인** | 검토가 지목한 문서 위치를 찾지 못함 | 로드맵 P0 잔여로 기록 |
 | 23 | Three/Babylon/Pixi가 모두 3D scene owner가 되면 안 됨 | **확인** | Three(+three-vrm)가 `vrm/`·`bg3d/` 주 소유, Babylon은 `studio-bg3d-babylon-specialist-entry.ts` 전문 진입 | 역할 원장: Three=primary(scene-3d), Babylon=provider |
 | 24 | CRDT에 픽셀을 직접 넣지 않음 | **확인(현행 일치)** | `docs/studio-crdt-webgpu-architecture-2026-07-16.md`: 패치는 content-addressed PNG 에셋 | 변경 없음 |
@@ -50,8 +51,9 @@
 ### 반영(P0 + P1 착수)
 
 1. `.myb` spacing·smudge 계약 수정과 `MybSettingDisposition` 5분류, 실제 코퍼스 테스트 — ADR-0021.
-2. Renderer Role Ledger(`primary / provider / reference / lab`)와 lab 엔진 제품 import 0건 계약,
-   `docs/engines/renderer-roles.md` 자동 생성, 매뉴얼 문구 정정 — ADR-0019.
+2. Renderer Role Ledger(`primary / provider / reference / lab`, 18개 엔진, 12개 권위)와 lab 엔진 제품
+   import 0건 계약, `docs/engines/renderer-roles.md` 자동 생성(`verify:studio-renderer-roles`), 매뉴얼
+   문구 정정 — ADR-0019.
 3. `EditorClient` 계약(`getSnapshot/subscribe/dispatch → CommandReceipt`)과 React 훅
    (`useEditorSelector`, `useEditorCommand`) — ADR-0020. 호스트 배선은 P1 잔여.
 4. 툴 레일에서 `setTool` setter 제거(명명된 핸들러로 대체), setter·`any`·행수·브라우저 API 접근

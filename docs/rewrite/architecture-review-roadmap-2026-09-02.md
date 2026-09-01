@@ -57,7 +57,9 @@ signed URL 이미지·3D texture, marketplace asset, WebSocket·Realtime, servic
 
 | 검토 권고 | 이 저장소의 결정 | 이유 |
 | --- | --- | --- |
-| Vello CPU=reference, Hybrid=lab만 언급, Raw WebGPU가 GPU 주 권위 | 벡터 장면 목표 primary=Vello Classic(ADR-0018 유지), 래스터 브러시 커밋 목표 primary=raw WebGPU | 권위를 나누면 양립. ADR-0010은 차세대 엔진 리스크를 이미 수용 |
+| Vello CPU=reference, Hybrid=lab만 언급, Raw WebGPU가 GPU 주 권위 | 문서 벡터 island primary=Vello Classic(이미 기본 활성, ADR-0018 유지), 래스터 브러시 커밋은 Canvas2D(현재)→raw WebGPU(목표) | 권위를 나누면 양립. ADR-0010은 차세대 엔진 리스크를 이미 수용 |
+| Pixi는 Raw WebGPU와 분리된 overlay/provider | Pixi=선택 오버레이 island의 단독 primary | 상시 마운트 오버레이 호스트이고 브러시·hit-test 권위는 없음(원장 근거) |
+| Paper.js는 편집 친화 기하로 유지 | provider(동적 import 호출부 존재) | 검토가 본 "호출부 없음"은 stale |
 | `apps/studio-web` 신설 | in-place 이동으로 설계(병렬 앱·URL 금지) | ADR-0001·V11.1 §12.1 strangler 원칙 |
 | 호스트 61,947행 | 실측 30,961행 기준 ratchet | 수치 오류 정정 |
 | Quick Start "blocking modal" | 이미 pointer-through였음. 비모달 카드로 완전 전환 | 08-08 감사 이후 부분 수정이 있었음 |
