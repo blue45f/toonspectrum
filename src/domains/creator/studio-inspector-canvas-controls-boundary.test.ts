@@ -88,8 +88,12 @@ describe("Studio inspector canvas-controls boundary", () => {
 
   it("keeps authored frames when applying a template whose gutter topology is unsupported", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
-    const applyTemplateStart = page.indexOf("async function applyTemplate");
-    const applyTemplate = page.slice(applyTemplateStart, applyTemplateStart + 1_300);
+    const templateController = moduleEdges(
+      "./template/studio-template-layout-controller.ts"
+    ).source;
+    const combined = [page, templateController].join("\n");
+    const applyTemplateStart = combined.indexOf("async function applyTemplate");
+    const applyTemplate = combined.slice(applyTemplateStart, applyTemplateStart + 1_300);
 
     expect(applyTemplateStart).toBeGreaterThanOrEqual(0);
     expect(applyTemplate).toContain("regenerateTemplate(tpl, panelGutter, [])");

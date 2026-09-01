@@ -11,6 +11,24 @@ import { describe, expect, it } from "vitest";
  */
 
 const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const quickComicController = readFileSync(
+  new URL("./comipo/studio-quick-comic-controller.ts", import.meta.url),
+  "utf8",
+);
+const templateLayoutController = readFileSync(
+  new URL("./template/studio-template-layout-controller.ts", import.meta.url),
+  "utf8",
+);
+const checkpointsController = readFileSync(
+  new URL("./checkpoint/studio-checkpoints-controller.ts", import.meta.url),
+  "utf8",
+);
+const destructiveCombined = [
+  studioPage,
+  quickComicController,
+  templateLayoutController,
+  checkpointsController,
+].join("\n");
 const studioCuttoonEditorView = readFileSync(
   new URL("./studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx", import.meta.url),
   "utf8",
@@ -204,14 +222,14 @@ describe("Studio reliability product boundary", () => {
       "studioDeleteCheckpointRequest",
       "studioClearLivingInkRequest",
     ]) {
-      expect(studioPage, `${factory} is not wired`).toContain(`${factory}(`);
+      expect(destructiveCombined, `${factory} is not wired`).toContain(`${factory}(`);
     }
-    const confirms = studioPage.match(/confirmStudioDestructiveAction\(/g) ?? [];
+    const confirms = destructiveCombined.match(/confirmStudioDestructiveAction\(/g) ?? [];
     expect(confirms.length).toBe(10);
   });
 
   it("settles every approved destruction so a refused commit cannot vanish", () => {
-    const settles = studioPage.match(/settleStudioDestructiveCommit\(/g) ?? [];
+    const settles = destructiveCombined.match(/settleStudioDestructiveCommit\(/g) ?? [];
     // 승인 10건 중 이메레스·콜라주 등 분기가 있는 곳은 커밋 지점이 여러 개라 승인 수보다 많다.
     expect(settles.length).toBeGreaterThanOrEqual(10);
   });

@@ -191,16 +191,17 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(shotRecovery).toContain(
       'Object.prototype.hasOwnProperty.call(options, "indexedDB")',
     );
-    expect(page).toContain(
+    const checkpointsController = source("./checkpoint/studio-checkpoints-controller.ts");
+    expect(checkpointsController).toContain(
       "listDurableStudioCheckpoints(undefined, checkpointKey)",
     );
-    expect(page).toContain(
+    expect(checkpointsController).toContain(
       "createDurableStudioCheckpoint(undefined, checkpointKey",
     );
-    expect(page).toContain(
+    expect(checkpointsController).toContain(
       "deleteDurableStudioCheckpoint(undefined, checkpointKey",
     );
-    expect(page).not.toContain(
+    expect(checkpointsController).not.toContain(
       "listDurableStudioCheckpoints(globalThis.localStorage, checkpointKey)",
     );
     const helpCenter = source("./StudioHelpCenterDialog.tsx");

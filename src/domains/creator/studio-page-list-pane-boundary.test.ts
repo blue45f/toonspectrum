@@ -115,11 +115,13 @@ describe("Studio page-list pane module boundary", () => {
 
   it("wires multi-page bulk move/delete through pure studio-pages helpers", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const pageManagement = moduleShape("./page/studio-page-management-controller.ts");
     const pane = moduleShape("./StudioPageListPane.tsx");
+    const pageManagementCombined = [page.source, pageManagement.source].join("\n");
 
-    expect(page.source).toContain("deletePagesBulk as deletePagesBulkPure");
-    expect(page.source).toContain("movePagesBulk as movePagesBulkPure");
-    expect(page.source).toContain("computeNextActiveIdAfterBulkDelete");
+    expect(pageManagementCombined).toContain("deletePagesBulk as deletePagesBulkPure");
+    expect(pageManagementCombined).toContain("movePagesBulk as movePagesBulkPure");
+    expect(pageManagementCombined).toContain("computeNextActiveIdAfterBulkDelete");
     expect(page.source).toContain("deletePagesBulk,");
     expect(page.source).toContain("movePagesBulk,");
     expect(pane.source).toContain("deletePagesBulk: (ids: string[]) => void");

@@ -110,11 +110,7 @@ export function useStudioCheckpoints({
     if (!(await confirmStudioDestructiveAction(deleteRequest))) return;
     try {
       setCheckpoints(
-        await deleteDurableStudioCheckpoint(
-          undefined,
-          checkpointKey,
-          checkpoint.id
-        )
+        await deleteDurableStudioCheckpoint(undefined, checkpointKey, checkpoint.id)
       );
       settleStudioDestructiveCommit(deleteRequest, true);
       setCheckpointError(null);

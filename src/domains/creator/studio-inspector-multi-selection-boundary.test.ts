@@ -14,13 +14,18 @@ const pageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const selectionControllerSource = readFileSync(
+  new URL("./selection/studio-selection-transform-controller.ts", import.meta.url),
+  "utf8",
+);
+const selectionCombinedSource = [pageSource, selectionControllerSource].join("\n");
 
 function functionBody(name: string, nextName: string): string {
-  const start = pageSource.indexOf(`function ${name}`);
-  const end = pageSource.indexOf(`function ${nextName}`, start + 1);
+  const start = selectionCombinedSource.indexOf(`function ${name}`);
+  const end = selectionCombinedSource.indexOf(`function ${nextName}`, start + 1);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return pageSource.slice(start, end);
+  return selectionCombinedSource.slice(start, end);
 }
 
 describe("Studio inspector multi-selection scope", () => {
