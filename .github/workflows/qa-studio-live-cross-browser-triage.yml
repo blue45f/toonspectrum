@@ -1,0 +1,185 @@
+name: QA Studio live cross-browser triage
+
+on:
+  push:
+    branches:
+      - qa/studio-inapp-full-audit-20260902
+    paths:
+      - .github/workflows/qa-studio-live-cross-browser-triage.yml
+      - scripts/qa-studio-cross-browser-soak.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qa-studio-live-cross-browser-triage-v1
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    name: live / ${{ matrix.browser }} / ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        browser: [chromium, firefox, webkit]
+        profile: [compact-320, kakaotalk-360, instagram-390, naver-412]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps "${{ matrix.browser }}"
+      - name: Resolve mobile profile
+        shell: bash
+        run: |
+          case "${{ matrix.profile }}" in
+            compact-320)
+              echo 'QA_VIEWPORT_WIDTH=320' >> "$GITHUB_ENV"
+              echo 'QA_VIEWPORT_HEIGHT=568' >> "$GITHUB_ENV"
+              echo 'QA_USER_AGENT=Mozilla/5.0 (Linux; Android 13; SM-A536N Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.0.0 Mobile Safari/537.36' >> "$GITHUB_ENV"
+              ;;
+            kakaotalk-360)
+              echo 'QA_VIEWPORT_WIDTH=360' >> "$GITHUB_ENV"
+              echo 'QA_VIEWPORT_HEIGHT=592' >> "$GITHUB_ENV"
+              echo 'QA_USER_AGENT=Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.6478.71 Mobile Safari/537.36 KAKAOTALK 10.4.3' >> "$GITHUB_ENV"
+              ;;
+            instagram-390)
+              echo 'QA_VIEWPORT_WIDTH=390' >> "$GITHUB_ENV"
+              echo 'QA_VIEWPORT_HEIGHT=664' >> "$GITHUB_ENV"
+              echo 'QA_USER_AGENT=Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 Instagram 320.0.0.0.0 (iPhone15,3; iOS 17_4; ko_KR)' >> "$GITHUB_ENV"
+              ;;
+            naver-412)
+              echo 'QA_VIEWPORT_WIDTH=412' >> "$GITHUB_ENV"
+              echo 'QA_VIEWPORT_HEIGHT=700' >> "$GITHUB_ENV"
+              echo 'QA_USER_AGENT=Mozilla/5.0 (Linux; Android 13; SM-G991N Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.0.0 Mobile Safari/537.36 NAVER(inapp; search; 1000; 12.9.1)' >> "$GITHUB_ENV"
+              ;;
+          esac
+      - name: Run live six-minute triage
+        shell: bash
+        env:
+          QA_BROWSER: ${{ matrix.browser }}
+          QA_PROFILE_ID: ${{ matrix.profile }}
+          QA_SOAK_MINUTES: 6
+          QA_REPORT_DIR: qa-results/studio-live-triage/${{ matrix.browser }}-${{ matrix.profile }}
+          QA_EVIDENCE_DIR: artifacts/studio-live-triage/${{ matrix.browser }}-${{ matrix.profile }}
+          STUDIO_BASE_URL: https://www.toonstudio.cloud
+        run: |
+          set +e
+          mkdir -p "$QA_REPORT_DIR" "$QA_EVIDENCE_DIR"
+          node scripts/qa-studio-cross-browser-soak.mjs 2>&1 | tee "$QA_REPORT_DIR/run.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$QA_REPORT_DIR/exit-code.txt"
+          exit "$code"
+      - name: Upload triage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-live-triage-${{ matrix.browser }}-${{ matrix.profile }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-live-triage/${{ matrix.browser }}-${{ matrix.profile }}
+            artifacts/studio-live-triage/${{ matrix.browser }}-${{ matrix.profile }}
+
+  aggregate:
+    name: Aggregate live cross-browser triage
+    if: always()
+    needs: triage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: studio-live-triage-*
+          path: downloaded-live-triage
+          merge-multiple: true
+      - name: Aggregate summaries and recurring findings
+        run: |
+          mkdir -p qa-results/studio-live-triage/aggregate
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const summaries = [];
+          const visit = (dir) => {
+            if (!fs.existsSync(dir)) return;
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) visit(full);
+              else if (entry.name === 'summary.json') {
+                try { summaries.push(JSON.parse(fs.readFileSync(full, 'utf8'))); }
+                catch (error) { console.error(full, error); }
+              }
+            }
+          };
+          visit('downloaded-live-triage');
+          const findings = new Map();
+          for (const summary of summaries) {
+            for (const item of summary.recurring || []) {
+              const key = JSON.stringify({ failures: item.failures, warnings: item.warnings, routes: item.routes });
+              const current = findings.get(key) || { ...item, count: 0, environments: [] };
+              current.count += Number(item.count || 0);
+              current.environments.push(`${summary.browser}/${summary.profile}`);
+              findings.set(key, current);
+            }
+          }
+          const recurring = [...findings.values()].sort((a, b) => b.count - a.count);
+          const aggregate = {
+            generatedAt: new Date().toISOString(),
+            expectedJobs: 12,
+            completedJobs: summaries.length,
+            totalElapsedMinutes: summaries.reduce((sum, item) => sum + Number(item.elapsedMinutes || 0), 0),
+            totalCases: summaries.reduce((sum, item) => sum + Number(item.cases || 0), 0),
+            failedCases: summaries.reduce((sum, item) => sum + Number(item.failedCases || 0), 0),
+            warningCases: summaries.reduce((sum, item) => sum + Number(item.warningCases || 0), 0),
+            recurring,
+            summaries,
+          };
+          const out = 'qa-results/studio-live-triage/aggregate';
+          fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(aggregate, null, 2) + '\n');
+          fs.writeFileSync(path.join(out, 'report.md'), [
+            '# ToonStudio live cross-browser triage',
+            '',
+            `- Completed jobs: ${aggregate.completedJobs}/${aggregate.expectedJobs}`,
+            `- Total measured browser time: ${(aggregate.totalElapsedMinutes / 60).toFixed(2)} runner-hours`,
+            `- Route cases: ${aggregate.totalCases}`,
+            `- Hard-failure cases: ${aggregate.failedCases}`,
+            `- Warning cases: ${aggregate.warningCases}`,
+            '',
+            '## Recurrent signatures',
+            '',
+            ...recurring.slice(0, 40).flatMap((item) => [
+              `### ${item.count} occurrences — ${(item.routes || []).join(', ')}`,
+              '',
+              `- Environments: ${(item.environments || []).join(', ')}`,
+              `- Failures: ${(item.failures || []).join('; ') || 'none'}`,
+              `- Warnings: ${(item.warnings || []).join('; ') || 'none'}`,
+              '',
+            ]),
+          ].join('\n') + '\n');
+          console.log(JSON.stringify(aggregate, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-live-triage-aggregate
+          retention-days: 30
+          path: qa-results/studio-live-triage/aggregate
+      - name: Commit textual report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add qa-results/studio-live-triage/aggregate
+          git diff --cached --quiet && exit 0
+          git commit -m "test(qa): record live cross-browser triage [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
