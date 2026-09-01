@@ -110,7 +110,12 @@ describe("Studio canvas image I/O module boundary", () => {
     // 의도적 변경(2026-08-21, B-15): 에셋 업로드 핸들러(onUploadAsset)가
     // studio-cuttoon-editor/studio-asset-library-mutations.ts 로 추출되며 그 안의 load 1회가
     // 함께 이동 — StudioPage 4 → 3, 추출 모듈 1.
-    expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(3);
+    // 의도적 변경(2026-09-01): 클립보드 이미지 페이스트 핸들러가
+    // studio-page-clipboard-controller.ts 로 추출되며 그 안의 load 1회가
+    // 함께 이동 — StudioPage 3 → 2, 클립보드 모듈 1.
+    expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(2);
+    const clipboardController = moduleShape("../studio-page-clipboard-controller.ts");
+    expect(callCount(clipboardController.sourceFile, "loadStudioCanvasImageFile")).toBe(1);
     const assetLibraryMutations = moduleShape(
       "../studio-cuttoon-editor/studio-asset-library-mutations.ts"
     );

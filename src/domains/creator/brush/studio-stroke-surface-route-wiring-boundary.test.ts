@@ -107,7 +107,7 @@ describe("Studio stroke surface route wiring boundary", () => {
 
     const history = sourceSection(
       PAGE_SOURCE,
-      "const undo = () =>",
+      "function undo()",
       "const studioBrushCatalogHandlers =",
     );
     expect(history).toContain("pendingLivingInkHandoff");

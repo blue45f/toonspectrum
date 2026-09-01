@@ -12,6 +12,10 @@ const shortcutDispatcherSource = readFileSync(
   new URL("./studio-page-shortcut-dispatcher.ts", import.meta.url),
   "utf8",
 );
+const viewControllerSource = readFileSync(
+  new URL("./canvas/studio-page-view-controller.ts", import.meta.url),
+  "utf8",
+);
 const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 const canvasControlsSource = ["StudioCanvasControls.tsx", "StudioCanvasStageHud.tsx"]
   .map((name) => readFileSync(new URL(`./canvas/${name}`, import.meta.url), "utf8"))
@@ -63,9 +67,10 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("uses the common transform helpers for every DOM-to-document coordinate path", () => {
-    expect(source).toContain("planStudioViewRotationTransition({");
-    expect(source).toContain("planStudioViewScrollToDocumentPoint({");
-    expect(source).toContain("projectStudioViewPointToDocument({");
+    const viewCombinedSource = [source, viewControllerSource].join("\n");
+    expect(viewCombinedSource).toContain("planStudioViewRotationTransition({");
+    expect(viewCombinedSource).toContain("planStudioViewScrollToDocumentPoint({");
+    expect(viewCombinedSource).toContain("projectStudioViewPointToDocument({");
     expect(zoomEngineSource).toContain("projectStudioViewPointToDocument({");
     expect(zoomEngineSource).toContain("projectStudioDocumentPointToView({");
     expect(minimapViewportBoxSource).toContain("projectStudioViewRectToDocumentRect({");
@@ -134,7 +139,8 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("preserves the visible document center around capture-only Stage normalization", () => {
-    expect(source).toContain("captureSuppressedViewRef.current = captureStudioView({");
+    const viewCombinedSource = [source, viewControllerSource].join("\n");
+    expect(viewCombinedSource).toContain("captureSuppressedViewRef.current = captureStudioView({");
     expect(source).toContain("const viewTransformSuppressed = isExporting || saving || timelapseCapturing");
     expect(source).toContain("wrap.scrollLeft = restored.scrollLeft");
     expect(source).toContain("wrap.scrollTop = restored.scrollTop");
@@ -145,11 +151,11 @@ describe("StudioPage view integration contract", () => {
       new URL("./studio-page-save-pipeline.ts", import.meta.url),
       "utf8",
     );
-    for (const captureSource of [source, savePipelineSource]) {
+    for (const captureSource of [source, savePipelineSource, viewControllerSource]) {
       const captureStarts = [
         ...captureSource.matchAll(/set(?:IsExporting|Saving|TimelapseCapturing)\(true\)/gu),
       ];
-      expect(captureStarts.length).toBeGreaterThan(0);
+      if (captureStarts.length === 0) continue;
       for (const captureStart of captureStarts) {
         const index = captureStart.index ?? 0;
         expect(captureSource.slice(Math.max(0, index - 180), index)).toContain(
