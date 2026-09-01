@@ -1,0 +1,258 @@
+name: Extended Studio QA Matrix
+
+on:
+  push:
+    branches:
+      - qa/extended-matrix-20260902
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extended-studio-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  PLAYWRIGHT_CHANNEL: ""
+
+jobs:
+  browser-environment-matrix:
+    name: browser-environment-${{ matrix.browser }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        browser:
+          - chromium
+          - firefox
+          - webkit
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install selected Playwright browser
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Build production Studio assets
+        run: pnpm run build
+      - name: Run six-route environment and failure-state matrix
+        run: >-
+          pnpm exec playwright test
+          --config playwright.qa-matrix.config.ts
+          --project=${{ matrix.browser }}
+      - name: Upload browser matrix evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qa-browser-${{ matrix.browser }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/qa-matrix
+            test-results/qa-matrix
+          if-no-files-found: ignore
+          retention-days: 14
+
+  studio-gate-groups:
+    name: studio-gates-${{ matrix.group }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - shell
+          - persistence
+          - brush
+          - render
+          - 3d
+          - market
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production Studio assets
+        run: pnpm run build
+      - name: Run every gate in the selected group without short-circuiting
+        shell: bash
+        run: |
+          set -uo pipefail
+          failures=0
+
+          run_gate() {
+            local title="$1"
+            shift
+            echo "::group::${title}"
+            set +e
+            "$@"
+            local status=$?
+            set -e
+            echo "::endgroup::"
+            if [ "$status" -eq 0 ]; then
+              printf -- '- ✅ %s\n' "$title" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf -- '- ❌ %s (exit %s)\n' "$title" "$status" >> "$GITHUB_STEP_SUMMARY"
+              failures=$((failures + 1))
+            fi
+          }
+
+          case "${{ matrix.group }}" in
+            shell)
+              run_gate "Studio launch" pnpm run verify:studio-launch
+              run_gate "Studio lifecycle" pnpm run verify:studio-lifecycle
+              run_gate "Studio service worker" pnpm run verify:studio-service-worker
+              run_gate "Artist journey" pnpm run verify:studio-artist-journey
+              run_gate "Menus" pnpm run verify:studio-menus
+              run_gate "Canvas chrome" pnpm run verify:studio-canvas-chrome
+              run_gate "Canvas surfaces" pnpm run verify:studio-canvas-surfaces
+              run_gate "Icons" pnpm run verify:studio-icons
+              run_gate "Companion" pnpm run verify:studio-companion
+              run_gate "Inspector walkthrough" pnpm run verify:studio-inspector-walkthrough
+              run_gate "Filter dialog" pnpm run verify:studio-filter-dialog
+              run_gate "Creator logic" pnpm run verify:creator-logic
+              ;;
+            persistence)
+              run_gate "Autosave OPFS session" pnpm run verify:studio-autosave-opfs
+              run_gate "Autosave two-tab leader" pnpm run verify:studio-autosave-two-tab
+              run_gate "Groups" pnpm run verify:studio-groups
+              run_gate "Lifecycle repeat" pnpm run verify:studio-lifecycle
+              run_gate "Companion repeat" pnpm run verify:studio-companion
+              ;;
+            brush)
+              run_gate "Brush catalogue" pnpm run verify:studio-brushes
+              run_gate "Brush media" pnpm run verify:studio-brush-media
+              run_gate "Brush latency" pnpm run verify:studio-brush-latency
+              run_gate "Brush planner quality" pnpm run verify:studio-brush-planner-quality
+              run_gate "Brush engine selection" pnpm run verify:studio-brush-engine-selection
+              run_gate "Brush catalogue performance" pnpm run verify:studio-brush-catalogue-perf
+              run_gate "p5.brush real WebGL2 runtime" pnpm run verify:studio-p5-brush-real-runtime
+              run_gate "Hokusai WASM" pnpm run verify:studio-hokusai-wasm
+              run_gate "Hokusai natural media quality" pnpm run verify:studio-hokusai-natural-media-quality
+              run_gate "Hokusai live brush" pnpm run verify:studio-hokusai-live-brush
+              run_gate "Hokusai live integration" pnpm run verify:studio-hokusai-live-integration
+              run_gate "Living ink execution" pnpm run verify:studio-living-ink-execution
+              run_gate "Living ink integration" pnpm run verify:studio-living-ink-integration
+              ;;
+            render)
+              run_gate "Committed GPU parity" pnpm run verify:studio-gpu-committed-parity
+              run_gate "WebGPU brush parity" pnpm run verify:studio-engine-webgpu-brush-parity
+              run_gate "WebGPU filter parity" pnpm run verify:studio-engine-webgpu-filter-parity
+              run_gate "WebGPU presentation" pnpm run verify:studio-engine-webgpu-presentation
+              run_gate "WebGPU textured brush" pnpm run verify:studio-engine-webgpu-textured-brush
+              run_gate "WebGPU tile provider" pnpm run verify:studio-engine-webgpu-tile-provider
+              run_gate "Professional bristle WebGPU" pnpm run verify:studio-professional-bristle-webgpu
+              run_gate "Dynamic dual-tip WebGPU" pnpm run verify:studio-dynamic-dual-tip-webgpu
+              run_gate "Dynamic dual-tip WebGPU v2" pnpm run verify:studio-dynamic-dual-tip-webgpu-v2
+              run_gate "Tile storage OPFS v2" pnpm run verify:studio-engine-tile-storage-opfs-v2
+              run_gate "CanvasKit quality worker" pnpm run verify:studio-canvaskit-quality-worker
+              run_gate "Vello candidate" pnpm run verify:studio-vello-candidate
+              run_gate "GPU filters" pnpm run verify:studio-gpu-filters
+              run_gate "Native raster tools" pnpm run verify:studio-native-raster-tools
+              run_gate "UX task benchmark" pnpm run verify:studio-ux-task-benchmark
+              ;;
+            3d)
+              run_gate "BG3D WebGPU engine" pnpm run verify:studio-bg3d-webgpu-engine
+              run_gate "BG3D in-app editor" xvfb-run -a pnpm run verify:studio-bg3d-inapp-editor
+              run_gate "Hybrid DCC integration" pnpm run verify:studio-hybrid-dcc-integration
+              run_gate "GLB export" pnpm run verify:studio-glb-export
+              run_gate "BG3D physics" pnpm run verify:studio-bg3d-physics
+              run_gate "3D console" pnpm run verify:studio-3d-console
+              run_gate "3D visual frames" pnpm run verify:studio-3d-visual
+              run_gate "WebGPU gizmo rotation" xvfb-run -a pnpm run verify:studio-bg3d-webgpu-rotation
+              ;;
+            market)
+              run_gate "Marketplace browser E2E" pnpm run test:market:e2e
+              run_gate "Comprehensive browser audit" pnpm exec playwright test e2e/comprehensive-browser-audit.spec.ts --project=chromium
+              run_gate "Studio full browser verification" pnpm exec playwright test e2e/studio-full-verification.spec.ts --project=chromium
+              ;;
+          esac
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Failures: $failures" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$failures" -ne 0 ]; then
+            exit 1
+          fi
+      - name: Upload grouped QA evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qa-gates-${{ matrix.group }}-${{ github.run_attempt }}
+          path: |
+            /tmp/toonspectrum-*
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  authenticated-api-matrix:
+    name: authenticated-api-account-lifecycle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: webdex_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webdex -d webdex_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://webdex:webdex@127.0.0.1:5432/webdex_qa
+      TOONSPECTRUM_MARKET_LIVE_API_URL: http://127.0.0.1:4401
+      TOONSPECTRUM_MARKET_LIVE_E2E: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Generate an isolated disposable QA account
+        shell: bash
+        run: |
+          password="$(node -e "console.log('Qa!' + require('node:crypto').randomBytes(18).toString('base64url'))")"
+          echo "::add-mask::$password"
+          echo "TOONSPECTRUM_MARKET_LIVE_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "TOONSPECTRUM_MARKET_LIVE_EMAIL=qa-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.test" >> "$GITHUB_ENV"
+          echo "TOONSPECTRUM_MARKET_LIVE_NAME=격리 QA ${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+      - name: Run signup, validation, login, cookie, logout, and stale-session matrix
+        run: pnpm run test:market:live
+      - name: Upload authenticated API evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qa-authenticated-api-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
