@@ -662,6 +662,91 @@ describe("SQLite kv persistence", () => {
     }
   });
 
+  it("loads a catalog snapshot written by the pre-0520c7e1 release (retired fallback spellings)", async () => {
+    // Reconstruct exactly what the previous release persisted: no `providerUnavailable`
+    // key, a top-level `fallback: null`, and `requiredEvidence` still naming the retired
+    // `fallback` gate. Catalog key and revision were unchanged across that release, so this
+    // snapshot passes the revision check and every card must migrate — one rejected card
+    // would poison the whole (intentionally non-partial) load.
+    const database = await openMemoryDatabase();
+    try {
+      const store = database.asAsyncKeyValueStore(STUDIO_ASSET_METADATA_KV_NAMESPACE);
+      const current = [deriveMybCard(), deriveKppCard(), deriveSvgCard()];
+      const legacyAssets = current.map((card) => {
+        const { providerUnavailable, ...rest } = card;
+        const firstVariantId = providerUnavailable?.selectableRendererVariantIds[0] ?? null;
+        const firstVariant = rest.rendererVariants.find((variant) => variant.id === firstVariantId);
+        return {
+          ...rest,
+          // The retired automatic instruction the previous release wrote next to the evidence.
+          fallback: providerUnavailable === null
+            ? null
+            : {
+                strategy: "renderer-variant",
+                rendererVariantId: firstVariantId,
+                providerId: firstVariant?.providerId ?? null,
+                preservesNormalizedIr: providerUnavailable.retainsNormalizedIr,
+                reason: "Legacy automatic renderer substitution.",
+                limitations: providerUnavailable.limitations,
+              },
+          replacementCondition: rest.replacementCondition === null
+            ? null
+            : {
+                ...rest.replacementCondition,
+                requiredEvidence: rest.replacementCondition.requiredEvidence.map((token) =>
+                  token === "explicit-provider-selection" ? "fallback" : token,
+                ),
+              },
+        };
+      });
+      expect(
+        legacyAssets.some((asset) =>
+          asset.replacementCondition?.requiredEvidence.includes("fallback"),
+        ),
+      ).toBe(true);
+      expect(legacyAssets.some((asset) => asset.fallback !== null)).toBe(true);
+      await store.set(
+        STUDIO_ASSET_METADATA_CATALOG_KEY,
+        JSON.stringify({ revision: 1, assets: legacyAssets }),
+      );
+
+      const loaded = await StudioAssetMetadataRegistry.loadFrom(store);
+      expect(loaded.list().map((asset) => asset.id).sort()).toEqual(
+        current.map((asset) => asset.id).sort(),
+      );
+      for (const asset of loaded.list()) {
+        expect(asset).not.toHaveProperty("fallback");
+        expect(asset.replacementCondition?.requiredEvidence ?? []).not.toContain("fallback");
+      }
+      // Everything except the migration-authored `providerUnavailable.reason` text is the same
+      // canonical card the current derivers produce; the routing facts inside it match too.
+      for (const card of current) {
+        const migrated = loaded.get(card.id);
+        expect(migrated).not.toBeNull();
+        const { providerUnavailable: migratedUnavailable, ...migratedRest } = migrated!;
+        const { providerUnavailable: currentUnavailable, ...currentRest } = card;
+        expect(migratedRest).toEqual(currentRest);
+        if (currentUnavailable === null) {
+          expect(migratedUnavailable).toBeNull();
+        } else {
+          expect(migratedUnavailable).toMatchObject({
+            status: "unavailable",
+            retainsNormalizedIr: currentUnavailable.retainsNormalizedIr,
+            nextOperation: "select-provider",
+            selectableRendererVariantIds: currentUnavailable.selectableRendererVariantIds,
+            limitations: currentUnavailable.limitations,
+          });
+        }
+      }
+      // Saving the migrated catalog rewrites it in the current spelling, byte-identical on reload.
+      await loaded.saveTo(store);
+      const reloaded = await StudioAssetMetadataRegistry.loadFrom(store);
+      expect(reloaded.list()).toEqual(loaded.list());
+    } finally {
+      await database.close();
+    }
+  });
+
   it("loads an empty registry when no snapshot exists, and fails loudly on corruption", async () => {
     const database = await openMemoryDatabase();
     try {
