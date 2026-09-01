@@ -3,7 +3,7 @@ name: QA Studio authenticated cross-browser
 on:
   push:
     branches:
-      - qa/studio-soak-10h-20260902
+      - qa/studio-authenticated-browser-20260902
     paths:
       - scripts/qa-studio-authenticated-browser.mjs
       - .github/workflows/qa-studio-authenticated-browser.yml
