@@ -20,7 +20,7 @@ jobs:
   authenticated-browser:
     name: ${{ matrix.browser }} / ${{ matrix.profile }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -116,6 +116,30 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Apply numbered migrations to isolated QA database
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          mapfile -t migrations < <(
+            find apps/api/src/db/migrations -maxdepth 1 -type f \
+              -regextype posix-extended -regex '.*/[0-9]{4}_.+\.sql' \
+              | LC_ALL=C sort
+          )
+          if [[ ${#migrations[@]} -eq 0 ]]; then
+            echo "No numbered SQL migrations found" >&2
+            exit 1
+          fi
+          for migration in "${migrations[@]}"; do
+            echo "::group::Apply ${migration}"
+            psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$migration"
+            echo "::endgroup::"
+          done
+          echo "Applied ${#migrations[@]} numbered migrations."
 
       - name: Install ${{ matrix.browser }}
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
