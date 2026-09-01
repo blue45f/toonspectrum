@@ -2,11 +2,16 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from "react";
 
+import {
+  resolveStudioInitialPrimaryTool,
+  type StudioRememberedPrimaryTool,
+} from "./studio-initial-primary-tool";
 import { acquireProductStudioUiPreferencesRepository } from "./studio-legacy-editor-runtime-helpers";
 import { STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT } from "./studio-local-database-ownership";
 import {
@@ -726,6 +731,15 @@ export interface StudioUiBooleanPreferenceHydrationContext {
     Dispatch<SetStateAction<"loading" | "saved" | "session-only">>;
   readonly setMobileHintDismissed: Dispatch<SetStateAction<boolean>>;
   readonly setQuickStartDismissed: Dispatch<SetStateAction<boolean>>;
+  /**
+   * 유일한 비-불리언 승객. "마지막에 쓰던 기본 도구"는 코치·모바일 힌트와 같은 부팅 게이트
+   * (`uiBooleanPreferencesReady`) 뒤에서만 쓸모가 있어서, 별도 왕복을 하나 더 여는 대신 같은
+   * 배치에 얹는다. 늦은 로드가 사용자의 선택을 덮는 문제는 호출부가 "이미 도구를 활성화했는가"
+   * 로 막는다(이 값은 최초 1회 적용 이후 읽히지 않는다).
+   */
+  readonly setRememberedPrimaryTool: Dispatch<
+    SetStateAction<StudioRememberedPrimaryTool | null>
+  >;
   readonly setStudioCommentPinsHiddenState: Dispatch<SetStateAction<boolean>>;
   readonly setUiBooleanPreferencesReady: Dispatch<SetStateAction<boolean>>;
   readonly studioCommentPinsHiddenRef: MutableRefObject<boolean>;
@@ -745,6 +759,7 @@ function hydrateStudioUiBooleanPreferences(
     setAppSettingsPersistenceState,
     setMobileHintDismissed,
     setQuickStartDismissed,
+    setRememberedPrimaryTool,
     setStudioCommentPinsHiddenState,
     setUiBooleanPreferencesReady,
     studioCommentPinsHiddenRef,
@@ -754,13 +769,18 @@ function hydrateStudioUiBooleanPreferences(
   const revisionsAtStart = { ...uiBooleanPreferenceRevisionsRef.current };
   void acquireProductStudioUiPreferencesRepository()
     .then(async (repository) => {
-      const results = await Promise.allSettled([
+      const [primaryTool, ...results] = await Promise.allSettled([
+        repository.loadPrimaryTool(),
         repository.loadBooleanPreference("ai-notice-acknowledged"),
         repository.loadBooleanPreference("quick-start-dismissed"),
         repository.loadBooleanPreference("mobile-hint-dismissed"),
         repository.loadBooleanPreference("comment-pins-hidden"),
-      ]);
+      ] as const);
       if (cancelled) return;
+
+      // 실패는 조용히 "기억 없음"으로 접는다 — 시작 도구는 안전한 기본값이 있어서, 이 하나를
+      // 못 읽었다고 환경설정 전체를 session-only 로 강등할 이유가 없다.
+      if (primaryTool.status === "fulfilled") setRememberedPrimaryTool(primaryTool.value);
 
       let degraded = false;
       const reconcile = async (
@@ -844,4 +864,47 @@ export function useStudioUiBooleanPreferenceHydration(
     () => hydrateStudioUiBooleanPreferences(context),
   );
   useEffect(() => hydrateStudioUiBooleanPreferencesFromEffect(), []);
+}
+
+/** 마지막으로 쓴 기본 도구를 남긴다 — 다음 방문의 시작 도구가 된다. 실패는 조용히 넘긴다:
+ * 못 기억해도 안전한 기본값으로 열리므로 환경설정 전체를 강등할 이유가 없다. */
+export function persistStudioPrimaryTool(tool: StudioRememberedPrimaryTool): void {
+  void acquireProductStudioUiPreferencesRepository()
+    .then((repository) => repository.savePrimaryTool(tool))
+    .catch(() => undefined);
+}
+
+/**
+ * 첫 획까지의 거리 — 손님은 브러시로 바꾸는 조작 없이 바로 그릴 수 있어야 한다.
+ *
+ * 마운트가 아니라 코치와 같은 "부팅 완료" 게이트 뒤에서 딱 한 번 적용한다: 그 전에는 기억된
+ * 도구도, 문서에 내용이 있는지도 알 수 없어 잘못된 도구로 깜빡인다. 그 사이 사용자가 이미
+ * 도구를 골랐다면(`primaryToolActivatedRef`) 아무것도 하지 않는다. `select` 는 호스트의 마운트
+ * 상태와 같으므로 전이가 필요 없다 — 그래서 호출부는 "그리기로 시작하라"는 명령 하나만 준다.
+ */
+export function useStudioInitialPrimaryTool(context: {
+  readonly autosaveChecked: boolean;
+  readonly hasExistingContent: boolean;
+  readonly primaryToolActivatedRef: MutableRefObject<boolean>;
+  readonly rememberedPrimaryTool: StudioRememberedPrimaryTool | null;
+  readonly startDrawing: () => void;
+  readonly uiBooleanPreferencesReady: boolean;
+  readonly workHydrated: boolean;
+}): void {
+  const { autosaveChecked, uiBooleanPreferencesReady, workHydrated } = context;
+  const applyInitialPrimaryTool = useEffectEvent(() => {
+    if (context.primaryToolActivatedRef.current) return;
+    const next = resolveStudioInitialPrimaryTool({
+      rememberedTool: context.rememberedPrimaryTool,
+      hasExistingContent: context.hasExistingContent,
+    });
+    if (next === "draw") context.startDrawing();
+  });
+  const appliedRef = useRef(false);
+  useEffect(() => {
+    if (!uiBooleanPreferencesReady || !workHydrated || !autosaveChecked) return;
+    if (appliedRef.current) return;
+    appliedRef.current = true;
+    applyInitialPrimaryTool();
+  }, [autosaveChecked, uiBooleanPreferencesReady, workHydrated]);
 }

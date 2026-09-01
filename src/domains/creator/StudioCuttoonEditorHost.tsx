@@ -572,6 +572,7 @@ import {
   STUDIO_ASSET_DRAG_MIME,
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
+import type { StudioRememberedPrimaryTool } from "./studio-initial-primary-tool";
 import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   navigateStudioInspector,
@@ -958,6 +959,8 @@ import { useStudioMenuAssetLoader } from "./studio-page-menu-asset-loaders";
 import { buildStudioShortcutHandler } from "./studio-page-shortcut-dispatcher";
 import { createStudioPageVectorOps } from "./studio-page-vector-ops";
 import {
+  persistStudioPrimaryTool,
+  useStudioInitialPrimaryTool,
   useStudioPageWorkspacePersistence,
   useStudioUiBooleanPreferenceHydration,
   useStudioWorkspacePanelOpenOverrides,
@@ -5045,7 +5048,10 @@ export function StudioCuttoonEditor({
   const studioLifecycleDurablePendingFingerprintRef = useRef("");
   const studioLifecycleBaselineScopeRef = useRef<string | null>(null);
 
+  // hydration 전에는 기억된 도구도 문서 내용도 모른다 — 시작값은 `select`, 부팅 뒤
+  // `useStudioInitialPrimaryTool` 이 한 번만 갈아탄다(ref 는 사용자가 먼저 고른 경우의 방어).
   const [tool, setTool] = useState<Tool>("select");
+  const primaryToolActivatedRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [studioLayerLiftUi, setStudioLayerLiftUi] =
     useState<StudioLayerLiftUiState>(closedStudioLayerLiftUiState);
@@ -7844,6 +7850,9 @@ export function StudioCuttoonEditor({
   const aiNoticeAcknowledgedRef = useRef(aiNoticeAcknowledged);
   aiNoticeAcknowledgedRef.current = aiNoticeAcknowledged;
   const [uiBooleanPreferencesReady, setUiBooleanPreferencesReady] = useState(false);
+  // 돌아온 사용자의 마지막 기본 도구. `null` 이면 "기억 없음" — 빈 문서는 그리기로 연다.
+  const [rememberedPrimaryTool, setRememberedPrimaryTool] =
+    useState<StudioRememberedPrimaryTool | null>(null);
   useStudioUiBooleanPreferenceHydration({
     aiNoticeAcknowledgedRef,
     mobileHintDismissedRef,
@@ -7852,6 +7861,7 @@ export function StudioCuttoonEditor({
     setAppSettingsPersistenceState,
     setMobileHintDismissed,
     setQuickStartDismissed,
+    setRememberedPrimaryTool,
     setStudioCommentPinsHiddenState,
     setUiBooleanPreferencesReady,
     studioCommentPinsHiddenRef,
@@ -15807,10 +15817,12 @@ const puppetWarpArmed =
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
   // Auto-coach only while the page is still idle. Late work/autosave hydration must not
-  // cover the canvas after the artist already opened Draw, placed content, or operated any
-  // Studio control while the lazy coach/preferences were still loading. The eager interaction
-  // guard records that intent through the normal dismissal/revision fence before a late modal can
-  // steal focus; an explicit File > Quick start command still wins.
+  // cover the canvas after the artist already placed content or operated any Studio control
+  // while the lazy coach/preferences were still loading. The eager interaction guard records
+  // that intent through the normal dismissal/revision fence; an explicit File > Quick start
+  // command still wins.
+  // `tool !== "draw"` 는 빠졌다: 새 문서가 그리기로 열리는 이상 그 조건은 코치를 아예 못 보게
+  // 만들고, 비모달 카드는 그리기와 공존한다(첫 pointerdown 에 스스로 비킨다).
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
     (uiBooleanPreferencesReady
@@ -15819,8 +15831,7 @@ const puppetWarpArmed =
       && !hasAutosave
       && !quickStartDismissed
       && !menu
-      && elements.length === 0
-      && tool !== "draw")
+      && elements.length === 0)
   );
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
@@ -17382,6 +17393,20 @@ const puppetWarpArmed =
     assetMarketDeepLinkHandledRef.current = true;
     void openAssetMarketDeepLink();
   }, [uiBooleanPreferencesReady, workHydrated, autosaveChecked]);
+
+  // 빈 문서는 그리기로 열린다(감사 §2.1). 데스크톱만 펜 속성을 띄운다(모바일 시트 자동 열기 금지).
+  useStudioInitialPrimaryTool({
+    autosaveChecked,
+    hasExistingContent: hasAutosave || elements.length > 0,
+    primaryToolActivatedRef,
+    rememberedPrimaryTool,
+    startDrawing: () => {
+      activatePrimaryCanvasToolRef.current("draw");
+      if (!isMobile) openInspectorRoute({ primary: "properties" }, null);
+    },
+    uiBooleanPreferencesReady,
+    workHydrated,
+  });
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {
@@ -24186,6 +24211,9 @@ const puppetWarpArmed =
     nextDrawMode?: DrawMode,
     selectionWillReplaceToolSnapshot = false,
   ) {
+    // 기본 도구 전이의 단일 정본이므로, "무엇을 마지막으로 썼는가"의 기록도 여기 한 곳이다.
+    primaryToolActivatedRef.current = true;
+    persistStudioPrimaryTool(nextTool);
     const currentOperation = rememberedOperationForDrawMode(drawModeRef.current);
     const targetMode = nextTool === "draw"
       ? nextDrawMode ?? drawModeRef.current
@@ -28707,6 +28735,15 @@ function clearSelectionForEdit() {
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
     activatePrimaryCanvasTool,
+    // "UI 는 명령을 받는다, setter 를 받지 않는다" 의 첫 걸음 — 의미는 오늘과 동일하다.
+    toggleHandTool: () => {
+      primaryToolActivatedRef.current = true;
+      setTool((current) => (current === "hand" ? "select" : "hand"));
+    },
+    // 픽셀 선택 무장·"선택 후 변형" 복구 — 기본 도구 전이가 아니라 오늘과 같은 raw 전이다.
+    returnToSelectTool: () => {
+      setTool("select");
+    },
     fitCanvasToWidthWithFocus: () => {
       fitCanvasToWidth();
       if (!presentationPanelsHidden) {
