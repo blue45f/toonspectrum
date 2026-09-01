@@ -148,7 +148,7 @@ describe("studio inspector layout", () => {
       expect.objectContaining({
         id: "typography",
         focusTarget: "element.typography",
-        path: "속성 › 글자 › 타이포그래피",
+        path: "대상 › 글자 › 타이포그래피",
       }),
     ]);
     expect(textActions).toContainEqual(

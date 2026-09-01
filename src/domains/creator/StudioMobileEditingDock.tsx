@@ -23,6 +23,7 @@ import {
   Redo2,
   RotateCcw,
   Scissors,
+  Search,
   Shapes,
   SlidersHorizontal,
   Square,
@@ -55,6 +56,7 @@ import {
   StudioDockNavButton,
 } from "./studio-chrome-ui";
 import { elementLabel } from "./studio-element-label";
+import { requestStudioCommandSearch } from "./studio-help-center-channel";
 import { preloadStudioInspectorDrawingSurface } from "./studio-inspector-aside-loader";
 import { localizeStudioText } from "./studio-localize-text";
 import {
@@ -650,6 +652,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     dock: localizeStudioText(t, "스튜디오 모바일 도구막대", "studio.mobileDock.label"),
     drawingTools: localizeStudioText(t, "드로잉 도구", "studio.mobileDock.drawingTools"),
     workspaceTools: localizeStudioText(t, "작업 공간", "studio.mobileDock.workspaceTools"),
+    search: localizeStudioText(t, "찾기", "studio.mobileDock.tool.search"),
+    searchAria: localizeStudioText(t, "기능·설정 찾기", "studio.commandSearch.label"),
+    searchTitle: localizeStudioText(
+      t,
+      "기능·설정 찾기 · CSP·Photoshop 용어로도 검색",
+      "studio.mobileDock.tool.search.title",
+    ),
     select: localizeStudioText(t, "선택", "studio.settings.tool.select"),
     pen: localizeStudioText(t, "펜", "studio.settings.tool.pen"),
     pixel: localizeStudioText(t, "픽셀", "studio.mobileDock.tool.pixel"),
@@ -1925,7 +1934,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   title={
                     mobileSheet === "props"
                       ? "작업 패널 닫기"
-                      : "작업 패널 열기 · 속성·레이어·페이지·작품 정보"
+                      : "작업 패널 열기 · 대상·레이어·문서"
                   }
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet === "props"}
@@ -1947,6 +1956,21 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       },
                       "props"
                     );
+                  }}
+                />
+                {/*
+                  통합 검색(F1)의 트리거는 데스크톱 인스펙터 안에만 있어 모바일에서는 눈에 보이는
+                  진입점이 없었다(UX 감사 2026-09-02 §6). 도크의 '찾기'가 같은 다이얼로그를 연다.
+                */}
+                <StudioDockNavButton
+                  icon={Search}
+                  label={label.search}
+                  aria-label={label.searchAria}
+                  title={label.searchTitle}
+                  aria-haspopup="dialog"
+                  data-studio-mobile-search-trigger="true"
+                  onClick={() => {
+                    requestStudioCommandSearch({ scope: "all" });
                   }}
                 />
                 <StudioDockNavButton

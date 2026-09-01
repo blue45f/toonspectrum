@@ -18,6 +18,12 @@ import { createPortal } from "react-dom";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import { buildStudioSearchIndex, searchStudio } from "./studio-command-search";
+import {
+  STUDIO_COMMAND_SEARCH_SCOPE_KINDS,
+  STUDIO_COMMAND_SEARCH_SCOPE_LABELS,
+  STUDIO_COMMAND_SEARCH_SCOPES,
+  type StudioCommandSearchScope,
+} from "./studio-command-search-scope";
 
 import type {
   StudioSearchEntry,
@@ -53,7 +59,16 @@ export interface StudioCommandSearchDialogProps {
   onOpenHelp?: (helpNodeId: string, commandId: string) => void;
   /** Live Inspector context keeps selection-only search results honest. */
   inspectorContext?: StudioInspectorActionContext;
+  /**
+   * 첫 범위. 인스펙터의 찾기는 '현재 패널'로 열고, F1·메뉴·모바일 도크는 '전체'로 연다.
+   * 화면당 검색 표면은 하나이고(감사 §5.5) 진입점은 범위만 고른다.
+   */
+  initialScope?: StudioCommandSearchScope;
 }
+
+export type { StudioCommandSearchScope } from "./studio-command-search-scope";
+
+const SCOPE_LABELS = STUDIO_COMMAND_SEARCH_SCOPE_LABELS;
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -181,11 +196,14 @@ export function StudioCommandSearchDialog({
   onExpandPalette,
   onOpenHelp,
   inspectorContext,
+  initialScope = "all",
 }: StudioCommandSearchDialogProps) {
   const titleId = useId();
   const inputId = useId();
   const listboxId = useId();
+  const scopeGroupId = useId();
   const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<StudioCommandSearchScope>(initialScope);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -194,9 +212,21 @@ export function StudioCommandSearchDialog({
     () => buildStudioSearchIndex(inspectorContext),
     [inspectorContext],
   );
+  const scopeKinds = STUDIO_COMMAND_SEARCH_SCOPE_KINDS[scope];
   const outcome: StudioSearchOutcome = useMemo(
-    () => searchStudio(query, {}, searchIndex),
-    [query, searchIndex],
+    () => searchStudio(query, scopeKinds ? { kinds: scopeKinds } : {}, searchIndex),
+    [query, scopeKinds, searchIndex],
+  );
+  /**
+   * 좁힌 범위에서 아무것도 안 맞을 때 전체에서는 몇 건이 맞는지 — "현재 패널에는 없지만
+   * 명령에는 있다"를 말해 주지 않으면 좁은 범위가 곧 막다른 길이 된다(감사 §5.5).
+   */
+  const fallbackOutcome: StudioSearchOutcome | null = useMemo(
+    () =>
+      scopeKinds && query.trim().length > 0 && outcome.totalMatched === 0
+        ? searchStudio(query, {}, searchIndex)
+        : null,
+    [outcome.totalMatched, query, scopeKinds, searchIndex],
   );
 
   const available = useMemo<StudioCommandSearchHandlerAvailability>(
@@ -250,14 +280,15 @@ export function StudioCommandSearchDialog({
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [query]);
+  }, [query, scope]);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setScope(initialScope);
     const raf = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(raf);
-  }, [open]);
+  }, [initialScope, open]);
 
   // 활성 행을 시야에 유지한다. 포커스는 combobox 에 남으므로 브라우저가 자동으로
   // 스크롤해 주지 않는다 — activedescendant 패턴에서는 우리가 해야 한다.
@@ -412,7 +443,7 @@ export function StudioCommandSearchDialog({
             className={studioChromeIconClass({ tone: "muted" })}
           />
           <h2 id={titleId} className="sr-only">
-            명령·속성 통합 검색
+            기능·설정 찾기
           </h2>
           {/*
             콤보박스 계약(WAI-ARIA APG). `role="searchbox"` 였을 때는 결과 목록이
@@ -455,6 +486,39 @@ export function StudioCommandSearchDialog({
           </button>
         </div>
 
+        {/*
+          범위 칩. 검색 표면은 하나이고 여기서 범위만 바꾼다 — 인스펙터 안의 "패널 찾기"와
+          전역 검색이 따로 있던 것을 대신한다.
+        */}
+        <div
+          role="radiogroup"
+          aria-label="검색 범위"
+          id={scopeGroupId}
+          data-studio-command-search-scope={scope}
+          className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-1.5"
+        >
+          {STUDIO_COMMAND_SEARCH_SCOPES.map((candidate) => {
+            const checked = candidate === scope;
+            return (
+              <button
+                key={candidate}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                data-scope={candidate}
+                onClick={() => setScope(candidate)}
+                className={`min-h-8 rounded-full border px-2.5 text-[0.6875rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  checked
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-line text-fg-3 hover:bg-raised hover:text-fg"
+                }`}
+              >
+                {SCOPE_LABELS[candidate]}
+              </button>
+            );
+          })}
+        </div>
+
         <p role="status" aria-live="polite" className="sr-only">
           {query.trim().length === 0
             ? "검색어를 입력하세요."
@@ -469,9 +533,23 @@ export function StudioCommandSearchDialog({
               CSP·Photoshop·Krita·Procreate 용어를 우리 기능으로 이어 줍니다.
             </p>
           ) : outcome.sections.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-fg-3">
-              &ldquo;{query}&rdquo; 와 맞는 기능을 찾지 못했습니다.
-            </p>
+            <div className="px-2 py-6 text-center text-xs text-fg-3">
+              <p>
+                {scopeKinds
+                  ? `${SCOPE_LABELS[scope]} 범위에서 “${query}” 와 맞는 항목이 없습니다.`
+                  : `“${query}” 와 맞는 기능을 찾지 못했습니다.`}
+              </p>
+              {fallbackOutcome && fallbackOutcome.totalMatched > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setScope("all")}
+                  data-studio-command-search-widen="true"
+                  className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-semibold text-accent transition-colors hover:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  전체에서 {fallbackOutcome.totalMatched}건 보기
+                </button>
+              ) : null}
+            </div>
           ) : null}
           {/*
             콤보박스의 `aria-controls` 는 언제나 실재하는 id 를 가리켜야 하므로

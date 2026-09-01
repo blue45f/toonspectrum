@@ -246,7 +246,7 @@ async function selectPrimaryTab(page: Page, tab: string): Promise<boolean> {
 }
 
 function documentTab(page: Page, label: string): Locator {
-  return page.locator(`${NAVIGATOR} [role="tablist"][aria-label="페이지 설정"] [role="tab"]`, {
+  return page.locator(`${NAVIGATOR} [role="tablist"][aria-label="문서 설정"] [role="tab"]`, {
     hasText: label,
   }).first();
 }
@@ -332,7 +332,7 @@ async function walkDesktop(
     /* ---- A. 상단 크롬 --------------------------------------------------- */
 
     const searchTrigger = page.locator('[data-testid="studio-command-search-trigger"]');
-    const collapse = panel.locator('button[title="속성 패널 접기"]');
+    const collapse = panel.locator('button[title="작업 패널 접기"]');
     const chromeRow = panel.locator('[data-studio-command-search-row="true"]');
     const chromeRowCount = await chromeRow.count();
     record(rows, {
@@ -368,15 +368,16 @@ async function walkDesktop(
       defect: dialogOpen ? undefined : "F1 바인딩이 동작하지 않는다",
     });
 
-    // 기본 탭 4개 — 클릭 시 대응 탭패널이 실제로 보여야 한다.
-    // 페이지 탭이 어느 하위 탭으로 착지하는지는 활성 워크스페이스가 정한다
+    // 기본 탭 3개(대상·레이어·문서) — 클릭 시 대응 탭패널이 실제로 보여야 한다.
+    // 작품 정보는 상시 탭이 아니라 게시 CTA·파일 메뉴·검색이 여는 '게시 준비' 모드다
+    // (UX 감사 2026-09-02 §5.3); 아래 검색 시나리오가 그 경로를 따로 검증한다.
+    // 문서 탭이 어느 하위 탭으로 착지하는지는 활성 워크스페이스가 정한다
     // (기본 '스토리보드' 프로필은 미니맵으로 연다). 그래서 세 하위 패널 중
     // 하나가 보이면 통과로 본다 — 아래에서 착지 지점을 따로 기록한다.
     for (const [tab, label, panelLabels] of [
-      ["properties", "속성", ["선택 요소 속성", "시작 안내", "그리기 도구 설정", "전문 픽셀 도구"]],
+      ["properties", "대상", ["선택 요소 속성", "시작 안내", "그리기 도구 설정", "전문 픽셀 도구"]],
       ["layers", "레이어", ["레이어"]],
-      ["document", "페이지", ["캔버스 설정", "페이지 색보정", "미니맵과 페이지 탐색"]],
-      ["publish", "작품 정보", ["작품 정보"]],
+      ["document", "문서", ["캔버스 설정", "페이지 색보정", "미니맵과 페이지 탐색"]],
     ] as const) {
       const selected = await selectPrimaryTab(page, tab);
       const panel = await controlledPanel(page, primaryTab(page, tab), panelLabels);
@@ -418,32 +419,34 @@ async function walkDesktop(
       defect: movedTo === "layers" ? undefined : "방향키 순회가 동작하지 않는다",
     });
 
-    // 패널 찾기(로컬 검색) — 입력 후 Enter 가 실제로 라우팅해야 한다.
+    // 기능·설정 찾기(통합 검색, 범위 '현재 패널') — 입력 후 Enter 가 실제로 라우팅해야 한다.
+    // 인스펙터 안의 로컬 검색은 통합 다이얼로그로 합쳐졌다(감사 §5.5: 화면당 검색 하나).
     await selectPrimaryTab(page, "properties");
-    const localSearchToggle = page.locator(`${NAVIGATOR} button[aria-label="패널과 기능 찾기"]`);
-    await localSearchToggle.click();
-    const localInput = page.locator(`${NAVIGATOR} input[type="search"]`);
-    const localSearchOpened = await localInput
+    const unifiedSearchTrigger = page.locator('[data-testid="studio-command-search-trigger"]');
+    await unifiedSearchTrigger.click();
+    const unifiedDialog = page.getByRole("dialog", { name: "기능·설정 찾기" });
+    const localSearchOpened = await unifiedDialog
       .waitFor({ state: "visible", timeout: 3_000 })
       .then(() => true)
       .catch(() => false);
     let routedByLocalSearch = false;
     if (localSearchOpened) {
-      await localInput.fill("게시");
+      await unifiedDialog.getByRole("radio", { name: "현재 패널" }).click();
+      await unifiedDialog.getByRole("combobox").fill("작품 정보");
       await page.keyboard.press("Enter");
       routedByLocalSearch = await page
-        .locator(`${NAVIGATOR} [data-studio-inspector-primary-tab="publish"][aria-selected="true"]`)
-        .waitFor({ state: "attached", timeout: 3_000 })
+        .locator(`${NAVIGATOR} [data-studio-inspector-publish-mode="true"]`)
+        .waitFor({ state: "visible", timeout: 3_000 })
         .then(() => true)
         .catch(() => false);
     }
     record(rows, {
-      control: "패널 찾기 (인스펙터 로컬 검색)",
+      control: "기능·설정 찾기 (통합 검색 · 현재 패널 범위)",
       state: "항상",
-      path: "인스펙터 헤더 돋보기 → 검색어 → Enter",
+      path: "검색 행 → 범위 '현재 패널' → 검색어 → Enter",
       verdict: localSearchOpened && routedByLocalSearch ? "reachable" : "blocked",
       effect: routedByLocalSearch
-        ? "'게시' 입력 + Enter 가 게시 탭으로 실제 이동시켰다"
+        ? "'작품 정보' 입력 + Enter 가 게시 준비 모드로 실제 이동시켰다"
         : "검색은 열렸으나 Enter 가 라우팅하지 않았다",
       defect: localSearchOpened && !routedByLocalSearch ? "결과 Enter 가 no-op" : undefined,
     });
@@ -462,7 +465,7 @@ async function walkDesktop(
         [
           ...(document
             .querySelector<HTMLElement>(panelSelector)
-            ?.querySelectorAll<HTMLElement>('[role="tablist"][aria-label="페이지 설정"] [role="tab"]')
+            ?.querySelectorAll<HTMLElement>('[role="tablist"][aria-label="문서 설정"] [role="tab"]')
             ?? []),
         ].find((tab) => tab.getAttribute("aria-selected") === "true")?.textContent?.trim() ?? null,
       PANEL,
@@ -1058,7 +1061,7 @@ async function walkDesktop(
     /* ---- I. 접기/펼치기 왕복 ------------------------------------------- */
 
     await selectPrimaryTab(page, "properties");
-    const collapseButton = panel.locator('button[title="속성 패널 접기"]');
+    const collapseButton = panel.locator('button[title="작업 패널 접기"]');
     await collapseButton.click();
     const collapsedAway = await panel
       .waitFor({ state: "hidden", timeout: 5_000 })
