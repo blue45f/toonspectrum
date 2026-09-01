@@ -1,0 +1,294 @@
+name: QA Studio 10 runner-hour cross-browser soak
+
+on:
+  push:
+    branches:
+      - qa/studio-inapp-full-audit-20260902
+    paths:
+      - scripts/qa-studio-cross-browser-soak.mjs
+      - .github/workflows/qa-studio-10-runner-hour-soak.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qa-studio-10-runner-hour-soak-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Build production Studio once
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production assets
+        run: pnpm run build
+
+      - name: Upload production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-soak-production-build
+          path: dist
+          retention-days: 7
+
+  soak:
+    name: ${{ matrix.browser }} / ${{ matrix.profile }} / 50m
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        browser: [chromium, firefox, webkit]
+        include:
+          - browser: chromium
+            profile: compact-android-320
+            width: 320
+            height: 568
+            ua: Mozilla/5.0 (Linux; Android 13; SM-A536N Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.0.0 Mobile Safari/537.36
+          - browser: chromium
+            profile: kakaotalk-android-360
+            width: 360
+            height: 592
+            ua: Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.6478.71 Mobile Safari/537.36 KAKAOTALK 10.4.3
+          - browser: chromium
+            profile: instagram-ios-390
+            width: 390
+            height: 664
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 Instagram 320.0.0.0.0 (iPhone15,3; iOS 17_4; ko_KR)
+          - browser: chromium
+            profile: naver-android-412
+            width: 412
+            height: 700
+            ua: Mozilla/5.0 (Linux; Android 13; SM-G991N Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.0.0 Mobile Safari/537.36 NAVER(inapp; search; 1000; 12.9.1)
+          - browser: firefox
+            profile: compact-android-320
+            width: 320
+            height: 568
+            ua: Mozilla/5.0 (Linux; Android 13; Mobile; rv:129.0) Gecko/129.0 Firefox/129.0
+          - browser: firefox
+            profile: kakaotalk-android-360
+            width: 360
+            height: 592
+            ua: Mozilla/5.0 (Linux; Android 14; Mobile; rv:129.0) Gecko/129.0 Firefox/129.0 KAKAOTALK
+          - browser: firefox
+            profile: instagram-ios-390
+            width: 390
+            height: 664
+            ua: Mozilla/5.0 (Mobile; rv:129.0) Gecko/129.0 Firefox/129.0 Instagram
+          - browser: firefox
+            profile: naver-android-412
+            width: 412
+            height: 700
+            ua: Mozilla/5.0 (Linux; Android 13; Mobile; rv:129.0) Gecko/129.0 Firefox/129.0 NAVER(inapp)
+          - browser: webkit
+            profile: compact-ios-320
+            width: 320
+            height: 568
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 16_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148
+          - browser: webkit
+            profile: kakaotalk-ios-360
+            width: 360
+            height: 592
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 KAKAOTALK
+          - browser: webkit
+            profile: instagram-ios-390
+            width: 390
+            height: 664
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 Instagram
+          - browser: webkit
+            profile: naver-ios-412
+            width: 412
+            height: 700
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 NAVER(inapp)
+
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install ${{ matrix.browser }}
+        run: pnpm exec playwright install --with-deps "${{ matrix.browser }}"
+
+      - name: Download production build
+        uses: actions/download-artifact@v4
+        with:
+          name: studio-soak-production-build
+          path: dist
+
+      - name: Start local production preview
+        shell: bash
+        run: |
+          pnpm exec vite preview --host 127.0.0.1 --port 4173 > preview-${{ matrix.browser }}-${{ matrix.profile }}.log 2>&1 &
+          echo $! > preview.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/studio >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat preview-${{ matrix.browser }}-${{ matrix.profile }}.log
+          exit 1
+
+      - name: Run 50-minute cross-browser soak
+        shell: bash
+        env:
+          QA_BROWSER: ${{ matrix.browser }}
+          QA_PROFILE_ID: ${{ matrix.profile }}
+          QA_VIEWPORT_WIDTH: ${{ matrix.width }}
+          QA_VIEWPORT_HEIGHT: ${{ matrix.height }}
+          QA_USER_AGENT: ${{ matrix.ua }}
+          QA_SOAK_MINUTES: 50
+          QA_REPORT_DIR: qa-results/studio-cross-browser-soak/${{ matrix.browser }}-${{ matrix.profile }}
+          QA_EVIDENCE_DIR: artifacts/studio-cross-browser-soak/${{ matrix.browser }}-${{ matrix.profile }}
+          STUDIO_BASE_URL: http://127.0.0.1:4173
+        run: |
+          set +e
+          mkdir -p "$QA_REPORT_DIR" "$QA_EVIDENCE_DIR"
+          node scripts/qa-studio-cross-browser-soak.mjs 2>&1 | tee "$QA_REPORT_DIR/run.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$QA_REPORT_DIR/exit-code.txt"
+          exit "$code"
+
+      - name: Stop local preview
+        if: always()
+        run: kill "$(cat preview.pid)" 2>/dev/null || true
+
+      - name: Upload soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-soak-${{ matrix.browser }}-${{ matrix.profile }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-cross-browser-soak/${{ matrix.browser }}-${{ matrix.profile }}
+            artifacts/studio-cross-browser-soak/${{ matrix.browser }}-${{ matrix.profile }}
+            preview-${{ matrix.browser }}-${{ matrix.profile }}.log
+
+  aggregate:
+    name: Aggregate cross-browser soak evidence
+    if: always()
+    needs: [prepare, soak]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download every soak artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: studio-soak-*
+          path: downloaded-soak-artifacts
+          merge-multiple: true
+
+      - name: Build aggregate report
+        run: |
+          mkdir -p qa-results/studio-cross-browser-soak/aggregate
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = 'downloaded-soak-artifacts';
+          const summaries = [];
+          const walk = (directory) => {
+            if (!fs.existsSync(directory)) return;
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const full = path.join(directory, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (entry.name === 'summary.json') {
+                try { summaries.push(JSON.parse(fs.readFileSync(full, 'utf8'))); }
+                catch (error) { console.error(`Cannot parse ${full}:`, error); }
+              }
+            }
+          };
+          walk(root);
+          const totalElapsedMinutes = summaries.reduce((sum, item) => sum + Number(item.elapsedMinutes || 0), 0);
+          const totalCases = summaries.reduce((sum, item) => sum + Number(item.cases || 0), 0);
+          const failedCases = summaries.reduce((sum, item) => sum + Number(item.failedCases || 0), 0);
+          const warningCases = summaries.reduce((sum, item) => sum + Number(item.warningCases || 0), 0);
+          const aggregate = {
+            generatedAt: new Date().toISOString(),
+            expectedJobs: 12,
+            completedJobs: summaries.length,
+            totalElapsedMinutes,
+            totalRunnerHours: Number((totalElapsedMinutes / 60).toFixed(2)),
+            totalCases,
+            failedCases,
+            warningCases,
+            summaries,
+          };
+          const output = 'qa-results/studio-cross-browser-soak/aggregate';
+          fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify(aggregate, null, 2) + '\n');
+          const lines = [
+            '# ToonStudio 10 runner-hour cross-browser soak',
+            '',
+            `- Generated: ${aggregate.generatedAt}`,
+            `- Completed jobs: ${aggregate.completedJobs}/${aggregate.expectedJobs}`,
+            `- Total measured browser soak: ${aggregate.totalRunnerHours} runner-hours`,
+            `- Total route cases: ${aggregate.totalCases}`,
+            `- Cases with hard failures: ${aggregate.failedCases}`,
+            `- Cases with warnings: ${aggregate.warningCases}`,
+            '',
+            '## Matrix results',
+            '',
+            '| Browser | Profile | Minutes | Cycles | Cases | Hard-failure cases | Warning cases |',
+            '|---|---|---:|---:|---:|---:|---:|',
+            ...summaries.map((item) => `| ${item.browser} | ${item.profile} | ${item.elapsedMinutes} | ${item.cycles} | ${item.cases} | ${item.failedCases} | ${item.warningCases} |`),
+          ];
+          fs.writeFileSync(path.join(output, 'report.md'), lines.join('\n') + '\n');
+          console.log(JSON.stringify(aggregate, null, 2));
+          NODE
+
+      - name: Upload aggregate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-soak-aggregate
+          retention-days: 30
+          path: qa-results/studio-cross-browser-soak/aggregate
+
+      - name: Commit aggregate textual evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add qa-results/studio-cross-browser-soak/aggregate
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "test(qa): record 10 runner-hour Studio soak evidence [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
