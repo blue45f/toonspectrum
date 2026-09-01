@@ -277,6 +277,7 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
       distinctness: "engine-variant",
     });
     expect(isStudioInkwashFluidBrush("inkwash-pen")).toBe(true);
+    expect(isStudioInkwashFluidBrush("ink-wash")).toBe(true);
     expect(isStudioInkwashFluidBrush("watercolor")).toBe(false);
 
     const source = [

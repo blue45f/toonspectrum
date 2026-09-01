@@ -12,8 +12,10 @@ describe("studio thin-line ink input v1", () => {
     expect(isStudioThinLineInkBrush("fineliner")).toBe(true);
     expect(isStudioThinLineInkBrush("technical-pen")).toBe(true);
     expect(isStudioThinLineInkBrush("liner")).toBe(true);
+    expect(isStudioThinLineInkBrush("glass-pen")).toBe(true);
+    expect(isStudioThinLineInkBrush("dip-pen")).toBe(true);
+    expect(isStudioThinLineInkBrush("g-pen")).toBe(true);
     expect(isStudioThinLineInkBrush("pen")).toBe(false);
-    expect(isStudioThinLineInkBrush("gpen")).toBe(false);
     expect(isStudioThinLineInkBrush("marker")).toBe(false);
     expect(shouldFilterStudioThinLineInkInput({
       brushId: "fineliner",

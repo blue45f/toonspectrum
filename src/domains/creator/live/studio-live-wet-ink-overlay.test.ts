@@ -161,7 +161,7 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke([10, 10]))).toBe(false);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
       [10, 10],
-      { brush: "ink-wash" },
+      { brush: "watercolor" },
     ))).toBe(false);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
       [10, 10],
@@ -171,6 +171,10 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
       [10, 10],
       { mode: "eraser" },
     ))).toBe(false);
+    expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
+      [10, 10],
+      { brush: "ink-wash" },
+    ))).toBe(true);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
       [10, 10],
       { brush: "inkwash-pen" },

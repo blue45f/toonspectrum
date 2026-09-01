@@ -24,6 +24,9 @@ export const STUDIO_THIN_LINE_INK_BRUSH_IDS = Object.freeze([
   "gel-pen",
   "ballpoint",
   "mapping-pen",
+  "glass-pen",
+  "dip-pen",
+  "g-pen",
 ] as const);
 
 const THIN_LINE_INK_BRUSH_ID_SET = new Set<string>(STUDIO_THIN_LINE_INK_BRUSH_IDS);
