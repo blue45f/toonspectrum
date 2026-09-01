@@ -144,6 +144,20 @@ import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studi
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import { createStudioDeferredStrokeCommitEngine } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";
+import { remapStudioBg3dLtCopiedBundles } from "./bg3d/studio-bg3d-lt-copy-remap";
+import { useStudioPageClipboard } from "./studio-page-clipboard-controller";
+import { useStudioPageViewControls } from "./canvas/studio-page-view-controller";
+import { useStudioPageManagement } from "./page/studio-page-management-controller";
+import { useStudioSidecarDocuments } from "./history/studio-page-sidecars-controller";
+import {
+  useStudioVectorNodeBubbleEdit,
+  type BubbleShapePointerCaptureTarget,
+} from "./vector/studio-node-bubble-edit-controller";
+import { useStudioCropPanelSplitTools } from "./canvas/studio-crop-panel-split-controller";
+import { useStudioCheckpoints } from "./checkpoint/studio-checkpoints-controller";
+import { useStudioTemplateLayout } from "./template/studio-template-layout-controller";
+import { useStudioSelectionTransform } from "./selection/studio-selection-transform-controller";
+import { useStudioQuickComic } from "./comipo/studio-quick-comic-controller";
 import { StudioCuttoonEditorView } from "./studio-cuttoon-editor/StudioCuttoonEditorView";
 
 
@@ -205,12 +219,9 @@ import {
   EFFECT_EMOJIS,
   filterAssetsByLabel,
   filterBgSceneSections,
-  type BgPreset,
   type BubbleVariant,
   type TemplateSpec,
-  type FrameSpec,
 } from "./studio-assets";
-import { regenerateStudioTemplateFrames } from "./studio-template-gutter-layout";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
@@ -277,13 +288,7 @@ import {
   type StudioCharacterBible,
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
-import {
-  createDurableStudioCheckpoint,
-  deleteDurableStudioCheckpoint,
-  listDurableStudioCheckpoints,
-  studioCheckpointKey,
-  type StudioCheckpoint,
-} from "./studio-checkpoint-loader";
+import { studioCheckpointKey } from "./studio-checkpoint-loader";
 import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
@@ -354,13 +359,7 @@ import {
   initialCropRect,
   isCropRectNoop,
   planCropApply,
-  type CropAspectId,
-  type CropDragSession,
-  type CropRect,
 } from "./studio-crop";
-import {
-  NODE_SMOOTH_DEFAULT_STRENGTH,
-} from "./studio-curve-smoothing";
 import { resolveStudioDccRouteAccess } from "./hybrid-dcc/studio-dcc-route-access";
 import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
@@ -369,16 +368,8 @@ import {
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import {
   settleStudioDestructiveCommit,
-  studioApplyCollageRequest,
-  studioApplyPanelLayoutRequest,
-  studioApplyTemplateRequest,
   studioClearLivingInkRequest,
-  studioDeleteCheckpointRequest,
-  studioQuickComicReplaceRequest,
   studioRemoveEmeresUnderlaysRequest,
-  studioRestoreCheckpointRequest,
-  studioSceneSnapshotReplaceRequest,
-  studioStartFromExampleRequest,
 } from "./studio-destructive-command-catalog";
 import {
   applyDialogueTextEdit,
@@ -415,10 +406,9 @@ import {
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
-import { alignStudioSelection, type StudioAlignMode } from "./studio-cuttoon-editor/studio-align-selected";
 import { createStudioAutoActionsController } from "./studio-auto-actions-controller";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
-import { useStudioRafPreview } from "./studio-raf-preview";
+
 import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
 import {
   markAllStudioTeamCommentThreadsRead,
@@ -444,7 +434,6 @@ import { disposeStudioDynamicCoverageCommittedCache } from "./studio-dynamic-bru
 import {
   isStudioPasteScopeCurrent,
   resolveStudioEditAvailability,
-  shouldHandleStudioEditEvent,
 } from "./studio-edit-controls";
 import {
   isStudioCuttoonSourceFormat,
@@ -475,15 +464,6 @@ import {
 } from "./export/studio-publish-package-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
 import {
-  planStudioSelectionFlip,
-  planStudioSelectionLayoutPatch,
-  planStudioMultiSelectionLayoutPatch,
-  planStudioZoomToSelection,
-  selectStudioFigmaDesignTargets,
-  type StudioFigmaSelectionLayoutPatch,
-  unionStudioSelectionBounds,
-} from "./studio-figma-selection-ux";
-import {
   collectOverlappingStudioFillReferenceLayers,
   composeStudioFillReferenceImageWithPageReferences,
   type StudioFillPageReference,
@@ -491,12 +471,10 @@ import {
 } from "./studio-fill-reference";
 import {
   canFilterMask,
-  FILTER_MASK_BRUSH_HARDNESS_DEFAULT,
-  FILTER_MASK_BRUSH_RADIUS_DEFAULT,
-  FILTER_MASK_BRUSH_STRENGTH_DEFAULT,
   type FilterMaskPaintMode,
 } from "./filter/studio-filter-mask";
 import { StudioFilterMaskSurfaceHydrator } from "./filter/studio-filter-mask-surface-hydrator";
+import { useStudioRetouchMaskTools } from "./filter/studio-retouch-mask-tools-controller";
 import {
   applyStudioInlineFilterMaskMutation,
   collectStudioFilterMaskSurfaceIds,
@@ -530,7 +508,6 @@ import {
 } from "./studio-frame-folder";
 import {
   expandSelectionIdsToGroupUnits,
-  planAtomicSelectionTranslation,
   planGroupClickSelection,
   planGroupEnter,
   selectionShapeForIds,
@@ -542,25 +519,17 @@ import {
 } from "./studio-group-uniform-resize";
 import {
   planHealCloneDabs,
-  HEAL_CLONE_HARDNESS_DEFAULT,
-  HEAL_CLONE_OPACITY_DEFAULT,
-  HEAL_CLONE_RADIUS_DEFAULT,
-  type HealCloneMode,
 } from "./studio-heal-clone";
 import {
   bakeHistoryBrushStrokeToCanvas,
   planHistoryBrushDabs,
   resolveHistoryBrushSource,
-  HISTORY_BRUSH_HARDNESS_DEFAULT,
-  HISTORY_BRUSH_OPACITY_DEFAULT,
-  HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import {
   createStudioHistoryJournal,
   readStudioHistoryJournalRedoEntry,
   readStudioHistoryJournalUndoEntry,
   recordStudioHistoryJournalPagesSteps,
-  recordStudioHistoryJournalSidecarEdit,
   seekStudioHistoryJournalToPagesDepth,
   stepStudioHistoryJournal,
   studioHistoryJournalSidecarLabel,
@@ -636,9 +605,6 @@ import {
   canLayerMask,
   createLayerMaskCanvas,
   invertLayerMaskAlpha,
-  LAYER_MASK_BRUSH_HARDNESS_DEFAULT,
-  LAYER_MASK_BRUSH_RADIUS_DEFAULT,
-  LAYER_MASK_BRUSH_STRENGTH_DEFAULT,
   type LayerMaskPaintMode,
 } from "./layer/studio-layer-mask";
 import {
@@ -856,9 +822,7 @@ import {
   isNodeEditableKind,
   NODE_EDIT_DEFAULT_MAX_HANDLES,
   NODE_EDIT_DEFAULT_MIN_SPACING_PX,
-  type NodeDragSession,
   type NodeEditHandle,
-  type NodeEditTool,
 } from "./studio-node-edit";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 import {
@@ -878,7 +842,6 @@ import {
   requestStudioAutosaveClear,
   restoreStudioAutosaveRecovery,
 } from "./studio-page-autosave-runtime";
-import { comipoSeedsToEls } from "./studio-page-comipo-seeds";
 import {
   buildStudioCommentThreadPopoverScreenProjection,
   buildStudioCommentViewDocument,
@@ -887,7 +850,6 @@ import {
   createStudioCommentPinReanchor,
   createStudioTeamCommentLiveRefreshRuntime,
 } from "./studio-page-comments-runtime";
-import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   BRUSH_DELETE_UNDO_MS,
   STUDIO_SERVER_AUTOSAVE_IDLE_MS,
@@ -918,7 +880,6 @@ import {
   type StudioLivingInkOverlaySurfaceState,
   type StudioLivingInkPinnedStroke,
   type StudioPageHistoryJournal,
-  type StudioPageHistorySidecarEntry,
   type StudioQuickAccessIntegrationModule,
 } from "./studio-page-editor-types";
 import {
@@ -941,7 +902,6 @@ import {
 } from "./studio-page-grade";
 import {
   loadStudioCaptureReadinessRuntime,
-  loadStudioComipoAssembly,
   loadStudioComipoShipped,
   loadStudioTeamCommentClient,
   loadStudioTeamCommentMutationPlanner,
@@ -955,24 +915,12 @@ import {
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,
   preloadStudioTextEditOverlay,
-  type StudioComipoAssemblyModule,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
 import {
   PAGE_NAME_MAX,
   PAGE_NOTE_MAX,
-  buildClipboardPayload,
-  clipboardPayloadMatchesMembers,
-  collectCopyElements,
   pageDisplayName,
-  parseClipboardPayload,
-  planClipboardPaste,
-  readClipboardFallback,
-  serializeClipboardPayload,
-  studioClipboardFallbackStorageKey,
-  withPageMeta,
-  writeClipboardFallback,
-  type StudioClipboardPayload,
 } from "./studio-page-meta";
 import {
   isPageReviewLocked,
@@ -984,14 +932,12 @@ import { clearStudioWorkMetadataValidationError } from "./studio-work-metadata";
 import {
   clampZoom,
   closedStudioLayerLiftUiState,
-  createQuickSampleFrames,
   createStudioPageHistoryCommandJournalClient,
   type StudioLayerLiftUiState,
   isStudioAiReferenceCompatibleAsset,
   isStudioViewToolsHudEventTarget,
   publishPackageCreditsFromPack,
   publishPackageSettingsFromPack,
-  QUICK_SAMPLE_CANVAS_H,
   STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY,
   studioBrushQuickSlotsDeviceProfile,
   studioLinked3dCloudSaveRecoveryNotice,
@@ -1013,31 +959,11 @@ import {
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
 import {
-  appendPageState,
-  applyBackgroundToAllPages,
-  applyGradeToAllPages,
-  clearPage,
-  computeNextActiveIdAfterBulkDelete,
-  deletePagesBulk as deletePagesBulkPure,
-  duplicateMirroredPage,
-  duplicatePageState,
-  executeDeletePageTransition,
-  insertBlankPageAt,
-  movePage as movePagePure,
-  movePagesBulk as movePagesBulkPure,
-  reorderPages,
-} from "./studio-pages";
-import {
   STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS,
   type StudioPagesHistoryCommandJournalDurabilityStatus,
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal-client";
 import { createPalette } from "./studio-palette-library";
-import { withShotTag } from "./studio-panel-shot-tags";
-import type {
-  PanelSplitLine,
-  PanelSplitPreview,
-} from "./studio-panel-split";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
   normalizeStudioPaperSurfaceSettings,
@@ -1050,14 +976,13 @@ import {
 import {
   studioPaperVectorDocumentIneligibilityReason,
 } from "./brush/studio-paper-vector-document-adapter";
+import { insertBlankPageAt } from "./studio-pages";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
   type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
 import {
-  addVanishingPoint,
-  defaultVanishingPointPosition,
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
@@ -1104,7 +1029,6 @@ import {
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
 import {
-  parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
   type StudioProjectFile,
 } from "./studio-project-file";
@@ -1135,7 +1059,6 @@ import { normalizeStudioPublishPackSettings, validateStudioPublishPreflight } fr
 import {
   bakePuppetWarpToCanvas,
   isPuppetWarpNoop,
-  type PuppetPin,
 } from "./studio-puppet-warp";
 import type {
   StudioQuickActionId,
@@ -1147,12 +1070,6 @@ import {
   maskToSelection,
   quickMaskRasterSize,
   selectionToMask,
-  QUICK_MASK_BRUSH_HARDNESS_DEFAULT,
-  QUICK_MASK_BRUSH_OPACITY_DEFAULT,
-  QUICK_MASK_BRUSH_RADIUS_DEFAULT,
-  QUICK_MASK_TINT_COLOR_DEFAULT,
-  QUICK_MASK_TINT_OPACITY_DEFAULT,
-  type QuickMaskBrushMode,
 } from "./studio-quick-mask";
 import {
   anchorQuickShapePointsForLiveDrag,
@@ -1386,15 +1303,11 @@ import {
   type StudioAdvancedFillVirtualTarget,
 } from "./studio-vector-fill-reference";
 import {
-  captureStudioView,
-  fitStudioViewToWidth,
   planStudioViewRestore,
   planStudioViewRotationTransition,
   planStudioViewScrollToDocumentPoint,
   projectStudioViewPointToDocument,
   resolveStudioVisibleDocumentPlacement,
-  rotateStudioViewLeft,
-  rotateStudioViewRight,
   stepStudioViewZoom,
   stepStudioViewWheelZoom,
   type StudioViewRotation,
@@ -1600,9 +1513,6 @@ import type {
   StudioAutoActionSet,
 } from "./studio-auto-actions";
 import type { StudioClip } from "./studio-clips";
-import type {
-  ComipoAssemblyInput,
-} from "./studio-comipo-assembly";
 import type {
   StudioElementLike,
   StudioPageInsertState,
@@ -2908,105 +2818,21 @@ function StudioCuttoonEditor({
     setMasterState(next);
   };
   // ── 히스토리 밖 사이드카(캐릭터 바이블·Writer Room) ──
-  // 이 문서들은 `pagesHistory` 에 들어가지 않는다. 예전에는 그래서 사이드카를 고친 직후의 ⌘Z 가
-  // **화면 밖 캔버스 획**을 지웠다. 이제는 두 setter 가 통합 저널에 사이드카 항목을 남기므로
-  // ⌘Z 가 방금 만진 그 문서를 되돌린다 — 파괴도 없고, 되돌릴 수 없는 사이드카도 없다.
-  //
-  // 저널이 렌더 클로저가 아니라 ref 에서 이전 문서를 읽는 이유: 한 브라우저 태스크에서 두 번
-  // 고치면(패널의 연속 onChange) 렌더 전에 두 번째 편집이 첫 편집을 못 보고 같은 `before` 를
-  // 기록해 되돌림이 한 단계 새어 나간다.
-  const [characterBible, setCharacterBibleState] = useState<StudioCharacterBible>(() =>
-    normalizeStudioCharacterBible(undefined)
-  );
-  const characterBibleRef = useRef(characterBible);
-  characterBibleRef.current = characterBible;
-  const [writerRoom, setWriterRoomState] = useState<StudioWriterRoomDocument>(() =>
-    createEmptyStudioWriterRoomDocument()
-  );
-  const writerRoomRef = useRef(writerRoom);
-  writerRoomRef.current = writerRoom;
-  /**
-   * 사이드카 편집 한 건을 통합 저널에 남긴다.
-   *
-   * 대기 중인 지연 획 배치가 있으면 **먼저** 히스토리에 안착시킨다. 그러지 않으면 "획 → 사이드카"
-   * 순서로 한 일이 저널에는 "사이드카 → 획" 으로 뒤집혀 들어간다(배치는 나중에 flush 되므로).
-   * 잠금·저장 중이라 flush 가 실패하면 그대로 진행한다 — 그 경우 획은 아직 히스토리 밖이고,
-   * 순서를 지키자고 사이드카 편집 자체를 막는 건 더 나쁜 거래다.
-   */
-  function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {
-    if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
-    commitStudioHistoryJournal(
-      recordStudioHistoryJournalSidecarEdit(historyJournalRef.current, entry)
-    );
-  }
-  const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    const before = characterBibleRef.current;
-    const after = typeof next === "function" ? next(before) : next;
-    if (after === before) return;
-    characterBibleRef.current = after;
-    recordStudioSidecarHistoryEntry({
-      kind: "sidecar",
-      target: "characterBible",
-      before,
-      after,
-      at: Date.now(),
-    });
-    setCharacterBibleState(after);
-  };
-  const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    const before = writerRoomRef.current;
-    const after = typeof next === "function" ? next(before) : next;
-    if (after === before) return;
-    writerRoomRef.current = after;
-    recordStudioSidecarHistoryEntry({
-      kind: "sidecar",
-      target: "writerRoom",
-      before,
-      after,
-      at: Date.now(),
-    });
-    setWriterRoomState(after);
-  };
-  /**
-   * 저널의 사이드카 항목 한 건을 되돌리거나(⌘Z) 다시 적용한다(⇧⌘Z).
-   *
-   * 저널을 다시 건드리지 않도록 raw setter 로 간다. 다만 문서 변경 게이트(저장 중 거절·리비전
-   * 세대 증가)는 일반 편집과 똑같이 통과시킨다 — 되돌림도 문서 변경이다.
-   */
-  function restoreStudioSidecarDocument(
-    entry: StudioPageHistorySidecarEntry,
-    direction: "undo" | "redo"
-  ): boolean {
-    if (!markStudioDocumentChanged()) return false;
-    if (entry.target === "characterBible") {
-      const value = direction === "undo" ? entry.before : entry.after;
-      characterBibleRef.current = value;
-      setCharacterBibleState(value);
-    } else {
-      const value = direction === "undo" ? entry.before : entry.after;
-      writerRoomRef.current = value;
-      setWriterRoomState(value);
-    }
-    return true;
-  }
-  /**
-   * 문서 전체 수화(임시저장 복구·프로젝트 스냅샷 복원)로 사이드카를 통째로 갈아끼운다.
-   *
-   * 사용자가 만든 사이드카 편집이 아니므로 저널 항목을 남기지 않는다 — 예전 배리어를 여기서
-   * 내려 주던 것과 같은 이유다. 프로젝트 교체는 예전 계약 그대로 `pages` 단계 하나로 남는다.
-   */
-  function hydrateStudioSidecarDocuments(input: {
-    readonly characterBible: StudioCharacterBible;
-    readonly writerRoom: StudioWriterRoomDocument;
-  }): void {
-    if (!markStudioDocumentChanged()) return;
-    characterBibleRef.current = input.characterBible;
-    writerRoomRef.current = input.writerRoom;
-    setCharacterBibleState(input.characterBible);
-    setWriterRoomState(input.writerRoom);
-  }
+  const {
+    characterBible,
+    writerRoom,
+    setCharacterBible,
+    setWriterRoom,
+    restoreStudioSidecarDocument,
+    hydrateStudioSidecarDocuments,
+  } = useStudioSidecarDocuments({
+    markStudioDocumentChanged,
+    onBeforeRecordSidecar: () => {
+      if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
+    },
+    historyJournalRef,
+    commitStudioHistoryJournal,
+  });
   const [aiProvenance, setAiProvenanceState] = useState<StudioAiProvenanceDocument>(() =>
     createEmptyStudioAiProvenanceDocument()
   );
@@ -3886,7 +3712,6 @@ function StudioCuttoonEditor({
   const [translateDraft, setTranslateDraft] = useState<Map<string, string> | null>(null);
   // 작업 내역(히스토리) 패널 — 단계 목록 클릭으로 특정 시점 점프(포토샵 히스토리식).
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
-  const [checkpointPanelOpen, setCheckpointPanelOpen] = useState(false);
   const [sceneSnapshotOpen, setSceneSnapshotOpen] = useState(false);
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
@@ -4293,68 +4118,6 @@ function StudioCuttoonEditor({
     setDialogueBatchOpen(false);
     setDialogueTranslateOpen(false);
   }, [collaborationDocumentLocked]);
-  const [checkpoints, setCheckpoints] = useState<StudioCheckpoint[]>([]);
-  const [checkpointError, setCheckpointError] = useState<string | null>(null);
-  const [serverRevisions, setServerRevisions] = useState<WorkRevisionSummary[]>([]);
-  const [serverRevisionLoading, setServerRevisionLoading] = useState(false);
-  const [serverRevisionError, setServerRevisionError] = useState<string | null>(null);
-  const serverRevisionRequestRef = useRef(0);
-  useEffect(() => {
-    if (!checkpointPanelOpen) return;
-    let checkpointLoadActive = true;
-    void listDurableStudioCheckpoints(undefined, checkpointKey)
-      .then((storedCheckpoints) => {
-        if (checkpointLoadActive) setCheckpoints(storedCheckpoints);
-      })
-      .catch((cause) => {
-        if (checkpointLoadActive) {
-          setCheckpointError(cause instanceof Error ? cause.message : "복구 지점을 불러오지 못했어요.");
-        }
-      });
-    setCheckpointError(null);
-    if (!workId || !studioAuthUserId || !serverCurrentRevision || sharedDocument?.role !== "owner" || !loggedIn) {
-      setServerRevisions([]);
-      setServerRevisionError(null);
-      setServerRevisionLoading(false);
-      return () => {
-        checkpointLoadActive = false;
-      };
-    }
-    const controller = new AbortController();
-    const requestId = serverRevisionRequestRef.current + 1;
-    serverRevisionRequestRef.current = requestId;
-    const requestScope = { authScopeKey: studioAuthUserId, workId };
-    const requestIsCurrent = () =>
-      requestId === serverRevisionRequestRef.current &&
-      isStudioEditorAsyncScopeCurrent(requestScope, {
-        ...currentStudioDocumentScopeRef.current,
-        mounted: editorMountedRef.current,
-        aborted: controller.signal.aborted,
-      });
-    setServerRevisionLoading(true);
-    setServerRevisionError(null);
-    void import("@/src/infrastructure/creator-client")
-      .then(({ listWorkRevisions }) => {
-        if (!requestIsCurrent()) return null;
-        return listWorkRevisions(workId, 20, controller.signal);
-      })
-      .then((revisions) => {
-        if (revisions && requestIsCurrent()) setServerRevisions(revisions);
-      })
-      .catch((cause) => {
-        if (!requestIsCurrent()) return;
-        setServerRevisionError(cause instanceof Error ? cause.message : "서버 버전 목록을 불러오지 못했어요.");
-      })
-      .finally(() => {
-        if (editorMountedRef.current && requestId === serverRevisionRequestRef.current) {
-          setServerRevisionLoading(false);
-        }
-      });
-    return () => {
-      checkpointLoadActive = false;
-      controller.abort();
-    };
-  }, [checkpointKey, checkpointPanelOpen, loggedIn, serverCurrentRevision, sharedDocument?.role, studioAuthUserId, workId]);
   useEffect(() => {
     const availableIds = new Set(pages.map((page) => page.id));
     const fallbackId = availableIds.has(currentPageId) ? currentPageId : pages[0]?.id;
@@ -8670,304 +8433,6 @@ function StudioCuttoonEditor({
   // are available. A second dragBound snap used to quantize the node origin first and then snap
   // its edges again in the same frame, which made the pointer feel detached from the object.
   const snapBoundFunc = (pos: { x: number; y: number }) => pos;
-  const canvasEditingGestureIsOwned = () => Boolean(
-    drawingRef.current
-    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
-    || isPanningRef.current
-    || KonvaRuntime.isDragging()
-    || KonvaRuntime.isTransforming()
-    || groupDragRef.current
-    || marqueeStartRef.current
-    || advancedFillTapGestureRef.current
-    || liquifyDragRef.current
-    || smudgeDragRef.current
-    || dodgeBurnDragRef.current
-    || wetMixDragRef.current
-    || pixelDragRef.current
-    || pendingPixelSelectionRasterGestureRef.current
-    || cropDragRef.current
-    || panelSplitDragRef.current
-    || nodeEditDragRef.current
-    || bubbleShapeDragRef.current
-    || healCloneDragRef.current
-    || historyBrushDragRef.current
-    || layerMaskDragRef.current
-    || quickMaskDragRef.current
-  );
-  const canvasPointerGestureIsOwned = () => Boolean(
-    drawingRef.current
-    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
-    || isPanningRef.current
-    || touchViewPanActiveRef.current
-    || KonvaRuntime.isDragging()
-    || KonvaRuntime.isTransforming()
-    || groupDragRef.current
-    || marqueeStartRef.current
-    || advancedFillTapGestureRef.current
-    || liquifyDragRef.current
-    || smudgeDragRef.current
-    || dodgeBurnDragRef.current
-    || wetMixDragRef.current
-    || pixelDragRef.current
-    || pendingPixelSelectionRasterGestureRef.current
-    || cropDragRef.current
-    || panelSplitDragRef.current
-    || nodeEditDragRef.current
-    || bubbleShapeDragRef.current
-    || healCloneDragRef.current
-    || historyBrushDragRef.current
-    || layerMaskDragRef.current
-    || quickMaskDragRef.current
-  );
-  // 휠 동작 — 마우스 휠 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
-  useEffect(() => {
-    const node = wrapRef.current;
-    if (!node) return;
-    const onWheel = (e: WheelEvent) => {
-      const gestureDisposition = resolveStudioCanvasGestureDisposition({
-        gestureOwned: canvasPointerGestureIsOwned(),
-        viewTransformSuppressed: viewTransformSuppressedRef.current,
-        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
-      });
-      // A contact-owned edit must see an immutable view transform from pointerdown to pointerup.
-      // Trackpad/wheel noise during pen contact otherwise changes both the visual anchor and the
-      // document coordinate scale midway through one stroke. Consume it even over nested HUD UI.
-      if (gestureDisposition === "consume-owned") {
-        e.preventDefault();
-        return;
-      }
-      if (gestureDisposition !== "handle-canvas") return;
-      const prefs = appSettingsRef.current.mouse;
-      const modZoom = e.ctrlKey || e.metaKey;
-      const wheelMode = modZoom ? "zoom" : prefs.wheel;
-      if (wheelMode === "zoom") {
-        e.preventDefault();
-        if (zoomLockedRef.current) return;
-        // 틱마다 리렌더하지 않는다 — 제스처 transform 으로 즉시 반응하고 정착 시 한 번만 커밋.
-        stepZoomGestureRef.current(
-          (target) => stepStudioViewWheelZoom(
-            target,
-            e.deltaY,
-            e.deltaMode,
-            prefs.reverseWheel,
-            node.clientHeight
-          ),
-          e.clientX,
-          e.clientY
-        );
-        return;
-      }
-      if (wheelMode === "brush-size") {
-        e.preventDefault();
-        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
-        setStrokeWidth((w) => adjustStudioBrushWidth(w, dir * (e.shiftKey ? 5 : 1)));
-        return;
-      }
-      if (wheelMode === "pan") {
-        e.preventDefault();
-        const mul = prefs.reverseWheel ? -1 : 1;
-        node.scrollLeft += e.deltaX * mul;
-        node.scrollTop += e.deltaY * mul;
-      }
-    };
-    node.addEventListener("wheel", onWheel, { passive: false });
-    return () => node.removeEventListener("wheel", onWheel);
-  }, []);
-
-  // 모바일 핀치 줌 — 두 손가락 거리 변화를 zoom에 반영(한 손가락 스크롤=네이티브 패닝은 그대로).
-  useEffect(() => {
-    const node = wrapRef.current;
-    if (!node) return;
-    let pinchStartDist = 0;
-    let pinchStartZoom = 1;
-    let pinchStartCenter = { x: 0, y: 0 };
-    let pinchGestureActive = false;
-    let oneFingerPan: {
-      identifier: number;
-      lastX: number;
-      lastY: number;
-    } | null = null;
-    const clearOneFingerPan = () => {
-      oneFingerPan = null;
-      touchViewPanActiveRef.current = false;
-    };
-    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-    const center = (t: TouchList) => ({
-      x: (t[0].clientX + t[1].clientX) / 2,
-      y: (t[0].clientY + t[1].clientY) / 2,
-    });
-    // 정확히 두 손가락일 때만 기준선을 잡는다. 손가락 수가 바뀌면(예: 2→3→2) 기준선을 버려
-    // 다음 두-손가락 프레임에서 새로 잡게 해 줌이 튀지 않도록 한다.
-    const arm = (e: TouchEvent) => {
-      if (e.touches.length !== 1) clearOneFingerPan();
-      if (viewTransformSuppressedRef.current) {
-        pinchStartDist = 0;
-        return;
-      }
-      if (isStudioViewToolsHudEventTarget(e.target)) {
-        pinchStartDist = 0;
-        return;
-      }
-      if (
-        e.touches.length === 1
-        && appSettingsRef.current.touch.oneFingerDrag === "pan"
-        && !canvasPointerGestureIsOwned()
-      ) {
-        const touch = e.touches[0]!;
-        oneFingerPan = {
-          identifier: touch.identifier,
-          lastX: touch.clientX,
-          lastY: touch.clientY,
-        };
-        touchViewPanActiveRef.current = true;
-        pinchStartDist = 0;
-        return;
-      }
-      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
-        pinchStartDist = 0;
-        return;
-      }
-      if (canvasPointerGestureIsOwned()) {
-        pinchStartDist = 0;
-        return;
-      }
-      if (e.touches.length === 2) {
-        pinchStartDist = dist(e.touches);
-        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
-        pinchStartCenter = center(e.touches);
-      } else {
-        pinchStartDist = 0;
-      }
-    };
-    const onTouchStart = arm;
-    const onTouchMove = (e: TouchEvent) => {
-      // A finger-pan may have started before a pen or edit tool acquired the canvas. The editing
-      // contact wins immediately; otherwise the old finger session can still scroll the viewport
-      // underneath a new stroke before the shared ownership resolver is reached.
-      if (oneFingerPan && canvasEditingGestureIsOwned()) {
-        clearOneFingerPan();
-        pinchStartDist = 0;
-        e.preventDefault();
-        return;
-      }
-      if (oneFingerPan) {
-        const touch = Array.from(e.touches).find(
-          (candidate) => candidate.identifier === oneFingerPan?.identifier
-        );
-        if (e.touches.length === 1 && touch) {
-          e.preventDefault();
-          const deltaX = touch.clientX - oneFingerPan.lastX;
-          const deltaY = touch.clientY - oneFingerPan.lastY;
-          oneFingerPan.lastX = touch.clientX;
-          oneFingerPan.lastY = touch.clientY;
-          node.scrollLeft -= deltaX;
-          node.scrollTop -= deltaY;
-          updateScrollPosRef.current();
-          return;
-        }
-        clearOneFingerPan();
-      }
-      const gestureDisposition = resolveStudioCanvasGestureDisposition({
-        gestureOwned: canvasPointerGestureIsOwned(),
-        viewTransformSuppressed: viewTransformSuppressedRef.current,
-        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
-      });
-      if (gestureDisposition === "consume-owned") {
-        pinchStartDist = 0;
-        e.preventDefault();
-        return;
-      }
-      if (gestureDisposition === "pass-suppressed") {
-        pinchStartDist = 0;
-        return;
-      }
-      if (gestureDisposition === "pass-view-tools-hud") return;
-      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
-        pinchStartDist = 0;
-        return;
-      }
-      if (e.touches.length !== 2) {
-        pinchStartDist = 0; // 요소 드래그 중이거나 두 손가락이 아니면 핀치 비활성
-        return;
-      }
-      if (pinchStartDist === 0) {
-        // 두 손가락이 막 모인 첫 프레임 — 기준선만 잡고 이번 프레임은 줌하지 않는다.
-        pinchStartDist = dist(e.touches);
-        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
-        pinchStartCenter = center(e.touches);
-        return;
-      }
-      e.preventDefault(); // 브라우저 페이지 줌 차단
-      const target = zoomLockedRef.current
-        ? pinchStartZoom
-        : clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
-      const currentCenter = center(e.touches);
-      // 프레임마다 리렌더하지 않는다. 거리 변화는 줌, 중심점 이동은 두 손가락 팬으로 같은
-      // transform에 합쳐 실제 pan-zoom 설정과 경쟁 드로잉 앱의 제스처를 일치시킨다.
-      stepZoomGestureRef.current(() => target, currentCenter.x, currentCenter.y, {
-        followClient: true,
-        originClientX: pinchStartCenter.x,
-        originClientY: pinchStartCenter.y,
-      });
-      pinchGestureActive = true;
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length === 0) clearOneFingerPan();
-      if (e.touches.length !== 2) {
-        pinchStartDist = 0;
-        if (pinchGestureActive) {
-          pinchGestureActive = false;
-          // 손가락이 떨어지면 바로 정착시켜 흐릿한 transform 프리뷰를 즉시 크리스프하게 만든다.
-          settleZoomGestureRef.current();
-        }
-      }
-    };
-    const onTouchCancel = () => {
-      clearOneFingerPan();
-      pinchStartDist = 0;
-      if (!pinchGestureActive) return;
-      pinchGestureActive = false;
-      settleZoomGestureRef.current();
-    };
-    node.addEventListener("touchstart", onTouchStart, { passive: true });
-    node.addEventListener("touchmove", onTouchMove, { passive: false });
-    node.addEventListener("touchend", onTouchEnd, { passive: true });
-    node.addEventListener("touchcancel", onTouchCancel, { passive: true });
-    return () => {
-      clearOneFingerPan();
-      node.removeEventListener("touchstart", onTouchStart);
-      node.removeEventListener("touchmove", onTouchMove);
-      node.removeEventListener("touchend", onTouchEnd);
-      node.removeEventListener("touchcancel", onTouchCancel);
-    };
-  }, []);
-
-  // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (shouldStartStudioSpacePan({
-        code: e.code,
-        editing: Boolean(editing),
-        isSpacePressed,
-        target: e.target,
-      })) {
-        e.preventDefault();
-        setIsSpacePressed(true);
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        setIsSpacePressed(false);
-        setIsPanning(false);
-      }
-    };
-    globalThis.addEventListener("keydown", handleKeyDown);
-    globalThis.addEventListener("keyup", handleKeyUp);
-    return () => {
-      globalThis.removeEventListener("keydown", handleKeyDown);
-      globalThis.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [isSpacePressed, editing]);
 
   // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶는다.
   //
@@ -14009,429 +13474,110 @@ function StudioCuttoonEditor({
     clearPendingPixelSelectionRasterGesture,
     selectedImageElementId,
   ]);
-  // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
-  // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
-  const [cropRect, setCropRect] = useState<CropRect | null>(null);
-  // 페이지 합성본을 만든 같은 명령에서 크롭을 이어갈 때 selectedId 전환 effect가 방금 만든
-  // 초기 cropRect를 지우지 않도록, 정확한 새 소유자 한 번만 통과시키는 토큰이다.
-  const cropAutoTargetRef = useRef<string | null>(null);
-  // 퍼펫 워프 — 핀 배열은 이미지 요소 1개에 귀속되지만 crop과 동일하게 elId를 별도로 추적하지
-  // 않는다(적용 시점의 selected를 그대로 대상으로 삼는다).
-  const [puppetWarpActive, setPuppetWarpActive] = useState(false);
-  const [puppetWarpPins, setPuppetWarpPins] = useState<PuppetPin[]>([]);
-  const [puppetWarpBusy, setPuppetWarpBusy] = useState(false);
-  const [cropAspect, setCropAspect] = useState<CropAspectId>("free");
-  const [cropBusy, setCropBusy] = useState(false);
-  // 진행 중 크롭 드래그 — ref 가 원본(포인터마다 갱신), rect 상태 반영은 RAF 로 합친다
-  // (픽셀 선택 미리보기와 동일 패턴). frame 은 드래그 시작 시점 스냅샷.
-  const cropDragRef = useRef<{ elId: string; frame: SelectionFrame; session: CropDragSession } | null>(null);
-  const cropRafRef = useRef<number | null>(null);
-  const pendingCropRectRef = useRef<CropRect | null>(null);
-  const scheduleCropRect = (next: CropRect) => {
-    pendingCropRectRef.current = next;
-    if (cropRafRef.current !== null) return;
-    cropRafRef.current = globalThis.requestAnimationFrame(() => {
-      cropRafRef.current = null;
-      if (pendingCropRectRef.current) setCropRect(pendingCropRectRef.current);
-    });
-  };
-  // 드래그 종료 시 RAF 대기분을 즉시 반영 — 마지막 이동이 유실되지 않는다.
-  const flushCropRect = () => {
-    if (cropRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(cropRafRef.current);
-      cropRafRef.current = null;
-    }
-    if (pendingCropRectRef.current) {
-      setCropRect(pendingCropRectRef.current);
-      pendingCropRectRef.current = null;
-    }
-  };
-  useEffect(
-    () => () => {
-      if (cropRafRef.current !== null) globalThis.cancelAnimationFrame(cropRafRef.current);
-    },
-    []
-  );
-  // ── 패널 손그림 컷(임의 각도 절단선) — studio-panel-split 통합 상태. 크롭과 동일한
-  // 드래그 세션+RAF 스로틀 패턴이지만, 대상은 이미지가 아니라 선택된 FrameEl.
-  const [panelSplitActive, setPanelSplitActive] = useState(false);
-  const [panelSplitHint, setPanelSplitHint] = useState<string | null>(null);
-  const [panelSplitPreview, setPanelSplitPreview] = useState<PanelSplitPreview | null>(null);
-  const panelSplitDragRef = useRef<{ targetFrameId: string; start: { x: number; y: number } } | null>(null);
-  // previewPanelSplit 의 반환값은 계산에 쓰인 line 을 보존하지 않으므로, pointerup 에서
-  // planPanelSplit 을 다시 부르려면 마지막 드래그 line 을 따로 기억해둬야 한다.
-  const panelSplitLastLineRef = useRef<PanelSplitLine | null>(null);
-  const panelSplitRafRef = useRef<number | null>(null);
-  const pendingPanelSplitPreviewRef = useRef<PanelSplitPreview | null>(null);
-  const schedulePanelSplitPreview = (next: PanelSplitPreview | null) => {
-    pendingPanelSplitPreviewRef.current = next;
-    if (panelSplitRafRef.current !== null) return;
-    panelSplitRafRef.current = globalThis.requestAnimationFrame(() => {
-      panelSplitRafRef.current = null;
-      setPanelSplitPreview(pendingPanelSplitPreviewRef.current);
-    });
-  };
-  const flushPanelSplitPreview = () => {
-    if (panelSplitRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(panelSplitRafRef.current);
-      panelSplitRafRef.current = null;
-    }
-    setPanelSplitPreview(pendingPanelSplitPreviewRef.current);
-  };
-  useEffect(
-    () => () => {
-      if (panelSplitRafRef.current !== null) globalThis.cancelAnimationFrame(panelSplitRafRef.current);
-    },
-    []
-  );
-  // ── 벡터 노드 편집(자유선 점 이동·굵기) — studio-node-edit 통합 상태 ──
-  const [nodeEditTool, setNodeEditTool] = useState<NodeEditTool | null>(null);
-  const nodeEditDragRef = useRef<{ elId: string; session: NodeDragSession } | null>(null);
-  const nodeEditRafRef = useRef<number | null>(null);
-  const pendingNodeEditDraftRef = useRef<{ elId: string; points: number[]; pressures: number[] } | null>(null);
-  const [nodeEditDraft, setNodeEditDraft] = useState<{ elId: string; points: number[]; pressures: number[] } | null>(null);
-  const scheduleNodeEditDraft = (next: { elId: string; points: number[]; pressures: number[] }) => {
-    pendingNodeEditDraftRef.current = next;
-    if (nodeEditRafRef.current !== null) return;
-    nodeEditRafRef.current = globalThis.requestAnimationFrame(() => {
-      nodeEditRafRef.current = null;
-      if (pendingNodeEditDraftRef.current) setNodeEditDraft(pendingNodeEditDraftRef.current);
-    });
-  };
-  useEffect(() => () => {
-    if (nodeEditRafRef.current !== null) globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-  }, []);
-  useEffect(() => {
-    void selectedId;
-    nodeEditDragRef.current = null;
-    pendingNodeEditDraftRef.current = null;
-    if (nodeEditRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-      nodeEditRafRef.current = null;
-    }
-    setNodeEditDraft(null);
-    setNodeEditTool(null);
-  }, [selectedId]);
-  // 벡터 노드 편집 "스무딩" 도구 전용 상태 — studio-curve-smoothing 통합.
-  // nodeSmoothStrength 는 healCloneRadius/Hardness/Opacity 와 동일한 "사용자 선호값" 관례를 따른다
-  // (요소·선택이 바뀌어도 리셋하지 않는다 — 그래서 위 useEffect 의 selectedId 리셋 목록에 넣지
-  // 않았다: 사용자가 이전에 맞춘 강도를 다음 스트로크에도 그대로 이어 쓰길 기대한다).
-  const [nodeSmoothStrength, setNodeSmoothStrength] = useState(NODE_SMOOTH_DEFAULT_STRENGTH);
-  // "스무딩" 핸들 드래그 시작 시점의 강도 스냅샷 — updateSmoothStrengthDrag 의 기준선(baseline).
-  // NodeDragSession.startPressure 는 "너비" 도구의 필압 개념이라 스무딩 강도를 담을 자리가 없어
-  // (studio-node-edit.ts 는 이 배치에서 수정하지 않는다) 별도 ref 로 스냅샷한다.
-  const nodeSmoothStrengthAtDragStartRef = useRef(NODE_SMOOTH_DEFAULT_STRENGTH);
-  // ── 말풍선 커스텀 모양(폴리곤 점 편집) — studio-bubble-custom-shape 통합 상태. nodeEditDraft와
-  // 동일한 구조(드래그 세션 ref + rAF 배칭 draft) — 좌표계만 다르다(말풍선 로컬, 회전 포함).
-  type BubbleShapePointerCaptureTarget = {
-    releasePointerCapture?: (pointerId: number) => void;
-  };
-  const [bubbleShapeEditActive, setBubbleShapeEditActive] = useState(false);
-  const [bubbleShapeSelectedPointIndex, setBubbleShapeSelectedPointIndex] = useState<number | null>(null);
-  const bubbleShapeDragRef = useRef<{
-    captureTarget: BubbleShapePointerCaptureTarget | null;
-    elId: string;
-    pointerId: number;
-    session: NodeDragSession;
-  } | null>(null);
-  const bubbleShapeRafRef = useRef<number | null>(null);
-  const pendingBubbleShapeDraftRef = useRef<{ elId: string; points: number[] } | null>(null);
-  const [bubbleShapeDraft, setBubbleShapeDraft] = useState<{ elId: string; points: number[] } | null>(null);
-  function releaseBubbleShapePointerCapture(
-    drag: NonNullable<typeof bubbleShapeDragRef.current> | null = bubbleShapeDragRef.current
-  ) {
-    if (!drag?.captureTarget?.releasePointerCapture) return;
-    try {
-      drag.captureTarget.releasePointerCapture(drag.pointerId);
-    } catch {
-      // Browser may release capture before pointercancel/lost-capture cleanup reaches Konva.
-    }
-  }
-  const scheduleBubbleShapeDraft = (next: { elId: string; points: number[] }) => {
-    pendingBubbleShapeDraftRef.current = next;
-    if (bubbleShapeRafRef.current !== null) return;
-    bubbleShapeRafRef.current = globalThis.requestAnimationFrame(() => {
-      bubbleShapeRafRef.current = null;
-      if (pendingBubbleShapeDraftRef.current) setBubbleShapeDraft(pendingBubbleShapeDraftRef.current);
-    });
-  };
-  useEffect(() => () => {
-    if (bubbleShapeRafRef.current !== null) globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-  }, []);
-  useEffect(() => {
-    const cancelBubbleShapeDragOutsideStage = (event: PointerEvent) => {
-      const drag = bubbleShapeDragRef.current;
-      if (!drag) return;
-      const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 1;
-      if (drag.pointerId !== pointerId) return;
-      releaseBubbleShapePointerCapture(drag);
-      bubbleShapeDragRef.current = null;
-      pendingBubbleShapeDraftRef.current = null;
-      if (bubbleShapeRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-        bubbleShapeRafRef.current = null;
-      }
-      setBubbleShapeDraft(null);
-    };
-    // Native capture normally routes the release back to Konva. This window safety net cancels the
-    // preview if an older WebView rejects capture and the pen/mouse is released outside the Stage.
-    globalThis.addEventListener("pointerup", cancelBubbleShapeDragOutsideStage);
-    globalThis.addEventListener("pointercancel", cancelBubbleShapeDragOutsideStage);
-    return () => {
-      globalThis.removeEventListener("pointerup", cancelBubbleShapeDragOutsideStage);
-      globalThis.removeEventListener("pointercancel", cancelBubbleShapeDragOutsideStage);
-    };
-  }, []);
-  useEffect(() => {
-    void selectedId;
-    releaseBubbleShapePointerCapture();
-    bubbleShapeDragRef.current = null;
-    pendingBubbleShapeDraftRef.current = null;
-    if (bubbleShapeRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-      bubbleShapeRafRef.current = null;
-    }
-    setBubbleShapeDraft(null);
-    setBubbleShapeEditActive(false);
-    setBubbleShapeSelectedPointIndex(null);
-  }, [selectedId]);
-  // ── 복구 브러시/도장(heal/clone) — studio-heal-clone 통합 상태 ──
-  // 모드(healCloneTool)는 pixelTool과 동일하게 요소가 바뀌어도 유지(사용자 선호), 소스 앵커/
-  // 오프셋은 pixelSel과 동일하게 "이미지 요소 1개 귀속"이라 요소가 바뀌면 해제한다.
-  const [healCloneTool, setHealCloneTool] = useState<HealCloneMode | null>(null);
-  const [healCloneRadius, setHealCloneRadius] = useState(HEAL_CLONE_RADIUS_DEFAULT);
-  const [healCloneHardness, setHealCloneHardness] = useState(HEAL_CLONE_HARDNESS_DEFAULT);
-  const [healCloneOpacity, setHealCloneOpacity] = useState(HEAL_CLONE_OPACITY_DEFAULT);
-  const [healCloneAligned, setHealCloneAligned] = useState(true);
-  const [healCloneSourceAnchor, setHealCloneSourceAnchor] = useState<SelPoint | null>(null);
-  const [healCloneBusy, setHealCloneBusy] = useState(false);
-  const healCloneAbortRef = useRef<AbortController | null>(null);
-  // aligned 모드에서 스트로크를 넘어 유지되는 오프셋(정규화). React 상태가 아님 — 표시에 안 쓰인다.
-  const healCloneOffsetRef = useRef<SelPoint | null>(null);
-  // 인스펙터 자식에서 ref-prop을 직접 변이하지 않도록 소스 해제는 에디터 핸들러로 승격.
-  function clearHealCloneSource() {
-    setHealCloneSourceAnchor(null);
-    healCloneOffsetRef.current = null;
-  }
-  // 진행 중 드래그 — pixelDragRef와 동일 패턴(frame은 드래그 시작 스냅샷, radiusNorm도 함께 스냅샷
-  // 해서 move 중 selected를 다시 읽지 않는다).
-  const healCloneDragRef = useRef<{
-    elId: string;
-    frame: SelectionFrame;
-    offset: SelPoint;
-    radiusNorm: number;
-    points: SelPoint[];
-  } | null>(null);
-  const healClonePreviewLineRef = useRef<Konva.Line>(null);
-  const healCloneRafRef = useRef<number | null>(null);
-  const pendingHealCloneDragRef = useRef<{
-    frame: SelectionFrame;
-    radiusNorm: number;
-    points: SelPoint[];
-  } | null>(null);
-  const [healCloneDragPreview, setHealCloneDragPreview] = useState<{
-    points: SelPoint[];
-    lineRef: import("react").RefObject<Konva.Line | null>;
-  } | null>(null);
-  // 브러시 원/소스 크로스헤어 호버 커서 — brushCursorRef(펜 도구)와 동일 기법: ref 직접 갱신,
-  // React 리렌더 없음. 드래그 중에도(스트로크 반경 원이 그대로 따라오게) 계속 갱신한다.
-  const healCloneCursorRef = useRef<Konva.Circle>(null);
-  const healCloneSourceCursorRef = useRef<Konva.Circle>(null);
-  // 드래그 선은 최근 꼬리만 Konva 노드에 직접 반영한다. 전체 궤적은 굽기용 ref에 그대로 남지만,
-  // move마다 growing array를 React state로 복사하거나 Studio 루트를 다시 렌더하지 않는다.
-  const scheduleHealCloneDragPreview = (session: {
-    frame: SelectionFrame;
-    radiusNorm: number;
-    points: SelPoint[];
-  }) => {
-    pendingHealCloneDragRef.current = session;
-    if (healCloneRafRef.current !== null) return;
-    healCloneRafRef.current = globalThis.requestAnimationFrame(() => {
-      healCloneRafRef.current = null;
-      const pending = pendingHealCloneDragRef.current;
-      const line = healClonePreviewLineRef.current;
-      if (!pending || !line) return;
-      const tailStart = Math.max(0, pending.points.length - 64);
-      const flat: number[] = [];
-      for (let index = tailStart; index < pending.points.length; index += 1) {
-        const point = pending.points[index]!;
-        flat.push(point.x * pending.frame.width, point.y * pending.frame.height);
-      }
-      if (flat.length === 2) flat.push(flat[0]!, flat[1]!);
-      line.points(flat);
-      line.strokeWidth(2 * pending.radiusNorm * pending.frame.width);
-      line.visible(flat.length > 0);
-      line.getLayer()?.batchDraw();
-    });
-  };
-  const clearHealCloneDragPreview = () => {
-    pendingHealCloneDragRef.current = null;
-    if (healCloneRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(healCloneRafRef.current);
-      healCloneRafRef.current = null;
-    }
-    const line = healClonePreviewLineRef.current;
-    if (line) {
-      line.points([]);
-      line.visible(false);
-      line.getLayer()?.batchDraw();
-    }
-    setHealCloneDragPreview(null);
-  };
-  useEffect(() => () => {
-    if (healCloneRafRef.current !== null) globalThis.cancelAnimationFrame(healCloneRafRef.current);
-    healCloneAbortRef.current?.abort();
-    healCloneAbortRef.current = null;
-  }, []);
-  // 선택 요소가 바뀌면 소스 앵커·진행 중 드래그·busy를 해제(모드는 유지 — pixelTool과 동일 정책).
-  useEffect(() => {
-    void selectedId;
-    healCloneAbortRef.current?.abort();
-    healCloneAbortRef.current = null;
-    healCloneDragRef.current = null;
-    clearHealCloneDragPreview();
-    setHealCloneSourceAnchor(null);
-    healCloneOffsetRef.current = null;
-    setHealCloneBusy(false);
-  }, [selectedId]);
-  // ── 히스토리 브러시 — studio-history-brush 통합 상태 ──
-  // 모드 없음(항상 단일 "복원" 동작) — active 만 있으면 된다(heal-clone 의 mode 와 달리 heal/clone
-  // 두 갈래가 없다). 소스(sourceIndex/sourceSrc)는 pixelSel/cropRect 와 마찬가지로 "선택된 이미지
-  // 요소 1개 귀속"이라 요소가 바뀌면 해제한다(§3.7 useEffect 참고).
-  const [historyBrushActive, setHistoryBrushActive] = useState(false);
-  const [historyBrushRadius, setHistoryBrushRadius] = useState(HISTORY_BRUSH_RADIUS_DEFAULT);
-  const [historyBrushHardness, setHistoryBrushHardness] = useState(HISTORY_BRUSH_HARDNESS_DEFAULT);
-  const [historyBrushOpacity, setHistoryBrushOpacity] = useState(HISTORY_BRUSH_OPACITY_DEFAULT);
-  // 표시용(작업 내역 패널의 하이라이트 행) — 실제 굽기엔 안 쓰인다. pagesHistory 가 트렁케이트되면
-  // 가리키는 의미가 사라질 수 있어 별도 useEffect(§3.8)로 함께 정리한다.
-  const [historyBrushSourceIndex, setHistoryBrushSourceIndex] = useState<number | null>(null);
-  // 실제 굽기에 쓰이는 데이터 — 지정 시점에 resolveHistoryBrushSource 로 1회 해석해 둔 결과(그
-  // 이후 pagesHistory 가 어떻게 변하든 이 문자열 자체는 영향받지 않는다).
-  const [historyBrushSourceSrc, setHistoryBrushSourceSrc] = useState<string | null>(null);
-  const [historyBrushBusy, setHistoryBrushBusy] = useState(false);
-  // 진행 중 드래그 — healCloneDragRef 와 동일 패턴(frame 은 드래그 시작 스냅샷). offset 이 없어
-  // healCloneDragRef 보다 필드가 하나 적다.
-  const historyBrushDragRef = useRef<{
-    elId: string;
-    frame: SelectionFrame;
-    radiusNorm: number;
-    points: SelPoint[];
-  } | null>(null);
+  // ── 이미지 크롭 도구 · 퍼펫 워프 · 패널 손그림 컷 상태 ──
   const {
-    preview: historyBrushDragPreview,
-    schedule: scheduleHistoryBrushDragPreview,
-    clear: clearHistoryBrushDragPreview,
-  } = useStudioRafPreview<{ points: SelPoint[] }>();
-  // 브러시 원 호버 커서 — healCloneCursorRef 와 동일 기법(ref 직접 갱신, React 리렌더 없음). 소스
-  // 크로스헤어가 없어 healCloneSourceCursorRef 에 대응하는 두 번째 ref 는 없다.
-  const historyBrushCursorRef = useRef<Konva.Circle>(null);
-  // 선택 요소가 바뀌면 소스·진행 중 드래그·busy 를 해제(모드는 유지 — heal-clone 과 동일 정책).
-  useEffect(() => {
-    void selectedId;
-    historyBrushDragRef.current = null;
-    clearHistoryBrushDragPreview();
-    setHistoryBrushSourceIndex(null);
-    setHistoryBrushSourceSrc(null);
-    setHistoryBrushBusy(false);
-  }, [selectedId, clearHistoryBrushDragPreview]);
-  // pagesHistory 가 트렁케이트/갱신되어 지정해 둔 인덱스가 더는 그 스냅샷을 가리키지 않게 되면
-  // 하이라이트만 조용히 해제한다(실제 굽기용 historyBrushSourceSrc 는 이미 해석 완료된 문자열이라
-  // 영향받지 않지만, "하이라이트된 행"이 엉뚱한 스냅샷을 가리키는 건 혼란스러우므로 인덱스만 함께
-  // 정리한다 — src 는 유지해 사용자가 계속 그 색으로 칠할 수 있게 둔다).
-  useEffect(() => {
-    if (historyBrushSourceIndex !== null && historyBrushSourceIndex >= pagesHistory.length) {
-      setHistoryBrushSourceIndex(null);
-    }
-  }, [pagesHistory.length, historyBrushSourceIndex]);
-  // ── 레이어 마스크 브러시 — studio-layer-mask 통합 상태 ──
-  // paintActive/paintMode/radius/hardness/strength는 pixelTool과 동일하게 요소가 바뀌어도 유지.
-  const [layerMaskPaintActive, setLayerMaskPaintActive] = useState(false);
-  const [layerMaskPaintMode, setLayerMaskPaintMode] = useState<LayerMaskPaintMode>("reveal");
-  const [layerMaskRadius, setLayerMaskRadius] = useState(LAYER_MASK_BRUSH_RADIUS_DEFAULT);
-  const [layerMaskHardness, setLayerMaskHardness] = useState(LAYER_MASK_BRUSH_HARDNESS_DEFAULT);
-  const [layerMaskStrength, setLayerMaskStrength] = useState(LAYER_MASK_BRUSH_STRENGTH_DEFAULT);
-  const [layerMaskBusy, setLayerMaskBusy] = useState(false);
-  // 진행 중 드래그 — healCloneDragRef와 동일 패턴(frame은 드래그 시작 스냅샷).
-  const layerMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+    cropRect, setCropRect,
+    cropAutoTargetRef,
+    puppetWarpActive, setPuppetWarpActive,
+    puppetWarpPins, setPuppetWarpPins,
+    puppetWarpBusy, setPuppetWarpBusy,
+    cropAspect, setCropAspect,
+    cropBusy, setCropBusy,
+    cropDragRef,
+    scheduleCropRect, flushCropRect,
+    panelSplitActive, setPanelSplitActive,
+    panelSplitHint, setPanelSplitHint,
+    panelSplitPreview, setPanelSplitPreview,
+    panelSplitDragRef, panelSplitLastLineRef,
+    schedulePanelSplitPreview, flushPanelSplitPreview,
+  } = useStudioCropPanelSplitTools({
+    selectedId,
+  });
+  // ── 벡터 노드 편집(자유선 점 이동·굵기) & 말풍선 커스텀 모양 ──
   const {
-    preview: layerMaskDragPreview,
-    schedule: scheduleLayerMaskDragPreview,
-    clear: clearLayerMaskDragPreview,
-  } = useStudioRafPreview<{ points: SelPoint[] }>();
-  // 브러시 반경 호버 커서 — smudgeCursorRef와 동일 기법(ref 직접 갱신, React 리렌더 없음).
-  const layerMaskCursorRef = useRef<Konva.Circle>(null);
-  // 선택 요소가 바뀌면 진행 중 드래그·busy를 해제(모드/브러시 설정은 유지 — heal-clone과 동일 정책).
-  useEffect(() => {
-    void selectedId;
-    layerMaskDragRef.current = null;
-    clearLayerMaskDragPreview();
-    setLayerMaskBusy(false);
-  }, [selectedId, clearLayerMaskDragPreview]);
-  // ── 필터 마스크 브러시 — studio-filter-mask 통합 상태(레이어 마스크의 정확한 쌍둥이). ──
-  // 마스크 인코딩이 동일해 굽기 파이프라인(bakeLayerMaskStroke/createLayerMaskCanvas/
-  // invertLayerMaskAlpha)을 그대로 재사용한다. 레이어 마스크와 상호배제(disarmAllPixelTools).
-  const [filterMaskPaintActive, setFilterMaskPaintActive] = useState(false);
-  const [filterMaskPaintMode, setFilterMaskPaintMode] = useState<FilterMaskPaintMode>("reveal");
-  const [filterMaskRadius, setFilterMaskRadius] = useState(FILTER_MASK_BRUSH_RADIUS_DEFAULT);
-  const [filterMaskHardness, setFilterMaskHardness] = useState(FILTER_MASK_BRUSH_HARDNESS_DEFAULT);
-  const [filterMaskStrength, setFilterMaskStrength] = useState(FILTER_MASK_BRUSH_STRENGTH_DEFAULT);
-  const [filterMaskBusy, setFilterMaskBusy] = useState(false);
-  const filterMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+    nodeEditTool,
+    setNodeEditTool,
+    nodeEditDragRef,
+    nodeEditRafRef,
+    pendingNodeEditDraftRef,
+    nodeEditDraft,
+    setNodeEditDraft,
+    scheduleNodeEditDraft,
+    nodeSmoothStrength,
+    setNodeSmoothStrength,
+    nodeSmoothStrengthAtDragStartRef,
+    bubbleShapeEditActive,
+    setBubbleShapeEditActive,
+    bubbleShapeSelectedPointIndex,
+    setBubbleShapeSelectedPointIndex,
+    bubbleShapeDragRef,
+    bubbleShapeRafRef,
+    pendingBubbleShapeDraftRef,
+    bubbleShapeDraft,
+    setBubbleShapeDraft,
+    releaseBubbleShapePointerCapture,
+    scheduleBubbleShapeDraft,
+    resetBubbleShapeSession,
+  } = useStudioVectorNodeBubbleEdit({
+    selectedId,
+  });
+  // ── 복구/마스크 브러시 통합 상태 (heal/clone · history brush · layer/filter/quick mask) ──
   const {
-    preview: filterMaskDragPreview,
-    schedule: scheduleFilterMaskDragPreview,
-    clear: clearFilterMaskDragPreview,
-  } = useStudioRafPreview<{ points: SelPoint[] }>();
-  const filterMaskCursorRef = useRef<Konva.Circle>(null);
-  useEffect(() => {
-    void selectedId;
-    filterMaskDragRef.current = null;
-    clearFilterMaskDragPreview();
-    setFilterMaskBusy(false);
-  }, [selectedId, clearFilterMaskDragPreview]);
-  // ── 퀵 마스크(Q) — 픽셀 선택을 편집 가능한 알파 래스터로 잠시 전환하는 모달 세션. ──
-  const [quickMaskActive, setQuickMaskActive] = useState(false);
-  const [quickMaskBrushMode, setQuickMaskBrushMode] = useState<QuickMaskBrushMode>("paint");
-  const [quickMaskRadius, setQuickMaskRadius] = useState(QUICK_MASK_BRUSH_RADIUS_DEFAULT);
-  const [quickMaskHardness, setQuickMaskHardness] = useState(QUICK_MASK_BRUSH_HARDNESS_DEFAULT);
-  const [quickMaskOpacity, setQuickMaskOpacity] = useState(QUICK_MASK_BRUSH_OPACITY_DEFAULT);
-  const [quickMaskTintColor, setQuickMaskTintColor] = useState(QUICK_MASK_TINT_COLOR_DEFAULT);
-  const [quickMaskTintOpacity, setQuickMaskTintOpacity] = useState(QUICK_MASK_TINT_OPACITY_DEFAULT);
-  // 세션 원본(마스크 버퍼) — 프레임당 갱신은 이 ref에만(핫패스 규약), React 반영은 스트로크당 1회.
-  const quickMaskSessionRef = useRef<{
-    elId: string; maskW: number; maskH: number; featherScale: number; mask: Uint8ClampedArray;
-  } | null>(null);
-  const quickMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
-  const {
-    preview: quickMaskDragPreview,
-    schedule: scheduleQuickMaskDragPreview,
-    clear: clearQuickMaskDragPreview,
-  } = useStudioRafPreview<{ points: SelPoint[] }>();
-  const [quickMaskTintCanvas, setQuickMaskTintCanvas] = useState<HTMLCanvasElement | null>(null);
-  // 요소가 바뀌면 퀵 마스크 세션을 폐기한다 — 선택(pixelSel)과 동일한 "요소 1개 귀속" 규약.
-  useEffect(() => {
-    const session = quickMaskSessionRef.current;
-    if (session && selectedId !== session.elId) {
-      quickMaskSessionRef.current = null;
-      quickMaskDragRef.current = null;
-      clearQuickMaskDragPreview();
-      setQuickMaskTintCanvas(null);
-      setQuickMaskActive(false);
-    }
-  }, [selectedId, clearQuickMaskDragPreview]);
-  // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
-  useEffect(() => {
-    const keepAutoTargetCrop = cropAutoTargetRef.current === selectedId;
-    cropAutoTargetRef.current = null;
-    cropDragRef.current = null;
-    pendingCropRectRef.current = null;
-    if (cropRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(cropRafRef.current);
-      cropRafRef.current = null;
-    }
-    if (!keepAutoTargetCrop) setCropRect(null);
-    setCropBusy(false);
-  }, [selectedId]);
+    healCloneTool, setHealCloneTool,
+    healCloneRadius, setHealCloneRadius,
+    healCloneHardness, setHealCloneHardness,
+    healCloneOpacity, setHealCloneOpacity,
+    healCloneAligned, setHealCloneAligned,
+    healCloneSourceAnchor, setHealCloneSourceAnchor,
+    healCloneBusy, setHealCloneBusy,
+    healCloneAbortRef, healCloneOffsetRef,
+    clearHealCloneSource,
+    healCloneDragRef, healClonePreviewLineRef,
+    healCloneDragPreview, setHealCloneDragPreview,
+    healCloneCursorRef, healCloneSourceCursorRef,
+    scheduleHealCloneDragPreview, clearHealCloneDragPreview,
+    historyBrushActive, setHistoryBrushActive,
+    historyBrushRadius, setHistoryBrushRadius,
+    historyBrushHardness, setHistoryBrushHardness,
+    historyBrushOpacity, setHistoryBrushOpacity,
+    historyBrushSourceIndex, setHistoryBrushSourceIndex,
+    historyBrushSourceSrc, setHistoryBrushSourceSrc,
+    historyBrushBusy, setHistoryBrushBusy,
+    historyBrushDragRef,
+    historyBrushDragPreview, scheduleHistoryBrushDragPreview, clearHistoryBrushDragPreview,
+    historyBrushCursorRef,
+    layerMaskPaintActive, setLayerMaskPaintActive,
+    layerMaskPaintMode, setLayerMaskPaintMode,
+    layerMaskRadius, setLayerMaskRadius,
+    layerMaskHardness, setLayerMaskHardness,
+    layerMaskStrength, setLayerMaskStrength,
+    layerMaskBusy, setLayerMaskBusy,
+    layerMaskDragRef,
+    layerMaskDragPreview, scheduleLayerMaskDragPreview, clearLayerMaskDragPreview,
+    layerMaskCursorRef,
+    filterMaskPaintActive, setFilterMaskPaintActive,
+    filterMaskPaintMode, setFilterMaskPaintMode,
+    filterMaskRadius, setFilterMaskRadius,
+    filterMaskHardness, setFilterMaskHardness,
+    filterMaskStrength, setFilterMaskStrength,
+    filterMaskBusy, setFilterMaskBusy,
+    filterMaskDragRef,
+    filterMaskDragPreview, scheduleFilterMaskDragPreview, clearFilterMaskDragPreview,
+    filterMaskCursorRef,
+    quickMaskActive, setQuickMaskActive,
+    quickMaskBrushMode, setQuickMaskBrushMode,
+    quickMaskRadius, setQuickMaskRadius,
+    quickMaskHardness, setQuickMaskHardness,
+    quickMaskOpacity, setQuickMaskOpacity,
+    quickMaskTintColor, setQuickMaskTintColor,
+    quickMaskTintOpacity, setQuickMaskTintOpacity,
+    quickMaskSessionRef, quickMaskDragRef,
+    quickMaskDragPreview, scheduleQuickMaskDragPreview, clearQuickMaskDragPreview,
+    quickMaskTintCanvas, setQuickMaskTintCanvas,
+  } = useStudioRetouchMaskTools({
+    selectedId,
+    pagesHistoryLength: pagesHistory.length,
+  });
   // 색상 휠(롱프레스 팝업 원형 퀵픽) — 10번째 armed 상태. center 는 뷰포트 clientX/clientY
   // 기준(캔버스 정규화 좌표 아님 — StudioColorWheelOverlay 가 fixed 오버레이라서).
   const [colorWheelOpen, setColorWheelOpen] = useState(false);
@@ -14445,6 +13591,322 @@ function StudioCuttoonEditor({
   useLayoutEffect(() => {
     viewTransformSuppressedRef.current = viewTransformSuppressed;
   }, [viewTransformSuppressed]);
+  const canvasEditingGestureIsOwned = useCallback(() => Boolean(
+    drawingRef.current
+    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
+    || isPanningRef.current
+    || KonvaRuntime.isDragging()
+    || KonvaRuntime.isTransforming()
+    || groupDragRef.current
+    || marqueeStartRef.current
+    || advancedFillTapGestureRef.current
+    || liquifyDragRef.current
+    || smudgeDragRef.current
+    || dodgeBurnDragRef.current
+    || wetMixDragRef.current
+    || pixelDragRef.current
+    || pendingPixelSelectionRasterGestureRef.current
+    || cropDragRef.current
+    || panelSplitDragRef.current
+    || nodeEditDragRef.current
+    || bubbleShapeDragRef.current
+    || healCloneDragRef.current
+    || historyBrushDragRef.current
+    || layerMaskDragRef.current
+    || quickMaskDragRef.current
+  ), [
+    bubbleShapeDragRef,
+    cropDragRef,
+    healCloneDragRef,
+    historyBrushDragRef,
+    layerMaskDragRef,
+    nodeEditDragRef,
+    panelSplitDragRef,
+    quickMaskDragRef,
+  ]);
+  const canvasPointerGestureIsOwned = useCallback(() => Boolean(
+    drawingRef.current
+    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
+    || isPanningRef.current
+    || touchViewPanActiveRef.current
+    || KonvaRuntime.isDragging()
+    || KonvaRuntime.isTransforming()
+    || groupDragRef.current
+    || marqueeStartRef.current
+    || advancedFillTapGestureRef.current
+    || liquifyDragRef.current
+    || smudgeDragRef.current
+    || dodgeBurnDragRef.current
+    || wetMixDragRef.current
+    || pixelDragRef.current
+    || pendingPixelSelectionRasterGestureRef.current
+    || cropDragRef.current
+    || panelSplitDragRef.current
+    || nodeEditDragRef.current
+    || bubbleShapeDragRef.current
+    || healCloneDragRef.current
+    || historyBrushDragRef.current
+    || layerMaskDragRef.current
+    || quickMaskDragRef.current
+  ), [
+    bubbleShapeDragRef,
+    cropDragRef,
+    healCloneDragRef,
+    historyBrushDragRef,
+    layerMaskDragRef,
+    nodeEditDragRef,
+    panelSplitDragRef,
+    quickMaskDragRef,
+  ]);
+  // 휠 동작 — 마우스 휠 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+    const onWheel = (e: WheelEvent) => {
+      const gestureDisposition = resolveStudioCanvasGestureDisposition({
+        gestureOwned: canvasPointerGestureIsOwned(),
+        viewTransformSuppressed: viewTransformSuppressedRef.current,
+        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
+      });
+      // A contact-owned edit must see an immutable view transform from pointerdown to pointerup.
+      // Trackpad/wheel noise during pen contact otherwise changes both the visual anchor and the
+      // document coordinate scale midway through one stroke. Consume it even over nested HUD UI.
+      if (gestureDisposition === "consume-owned") {
+        e.preventDefault();
+        return;
+      }
+      if (gestureDisposition !== "handle-canvas") return;
+      const prefs = appSettingsRef.current.mouse;
+      const modZoom = e.ctrlKey || e.metaKey;
+      const wheelMode = modZoom ? "zoom" : prefs.wheel;
+      if (wheelMode === "zoom") {
+        e.preventDefault();
+        if (zoomLockedRef.current) return;
+        // 틱마다 리렌더하지 않는다 — 제스처 transform 으로 즉시 반응하고 정착 시 한 번만 커밋.
+        stepZoomGestureRef.current(
+          (target) => stepStudioViewWheelZoom(
+            target,
+            e.deltaY,
+            e.deltaMode,
+            prefs.reverseWheel,
+            node.clientHeight
+          ),
+          e.clientX,
+          e.clientY
+        );
+        return;
+      }
+      if (wheelMode === "brush-size") {
+        e.preventDefault();
+        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
+        setStrokeWidth((w) => adjustStudioBrushWidth(w, dir * (e.shiftKey ? 5 : 1)));
+        return;
+      }
+      if (wheelMode === "pan") {
+        e.preventDefault();
+        const mul = prefs.reverseWheel ? -1 : 1;
+        node.scrollLeft += e.deltaX * mul;
+        node.scrollTop += e.deltaY * mul;
+      }
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [canvasPointerGestureIsOwned]);
+
+  // 모바일 핀치 줌 — 두 손가락 거리 변화를 zoom에 반영(한 손가락 스크롤=네이티브 패닝은 그대로).
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    let pinchStartCenter = { x: 0, y: 0 };
+    let pinchGestureActive = false;
+    let oneFingerPan: {
+      identifier: number;
+      lastX: number;
+      lastY: number;
+    } | null = null;
+    const clearOneFingerPan = () => {
+      oneFingerPan = null;
+      touchViewPanActiveRef.current = false;
+    };
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const center = (t: TouchList) => ({
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    });
+    // 정확히 두 손가락일 때만 기준선을 잡는다. 손가락 수가 바뀌면(예: 2→3→2) 기준선을 버려
+    // 다음 두-손가락 프레임에서 새로 잡게 해 줌이 튀지 않도록 한다.
+    const arm = (e: TouchEvent) => {
+      if (e.touches.length !== 1) clearOneFingerPan();
+      if (viewTransformSuppressedRef.current) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (isStudioViewToolsHudEventTarget(e.target)) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (
+        e.touches.length === 1
+        && appSettingsRef.current.touch.oneFingerDrag === "pan"
+        && !canvasPointerGestureIsOwned()
+      ) {
+        const touch = e.touches[0]!;
+        oneFingerPan = {
+          identifier: touch.identifier,
+          lastX: touch.clientX,
+          lastY: touch.clientY,
+        };
+        touchViewPanActiveRef.current = true;
+        pinchStartDist = 0;
+        return;
+      }
+      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (canvasPointerGestureIsOwned()) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (e.touches.length === 2) {
+        pinchStartDist = dist(e.touches);
+        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
+        pinchStartCenter = center(e.touches);
+      } else {
+        pinchStartDist = 0;
+      }
+    };
+    const onTouchStart = arm;
+    const onTouchMove = (e: TouchEvent) => {
+      // A finger-pan may have started before a pen or edit tool acquired the canvas. The editing
+      // contact wins immediately; otherwise the old finger session can still scroll the viewport
+      // underneath a new stroke before the shared ownership resolver is reached.
+      if (oneFingerPan && canvasEditingGestureIsOwned()) {
+        clearOneFingerPan();
+        pinchStartDist = 0;
+        e.preventDefault();
+        return;
+      }
+      if (oneFingerPan) {
+        const touch = Array.from(e.touches).find(
+          (candidate) => candidate.identifier === oneFingerPan?.identifier
+        );
+        if (e.touches.length === 1 && touch) {
+          e.preventDefault();
+          const deltaX = touch.clientX - oneFingerPan.lastX;
+          const deltaY = touch.clientY - oneFingerPan.lastY;
+          oneFingerPan.lastX = touch.clientX;
+          oneFingerPan.lastY = touch.clientY;
+          node.scrollLeft -= deltaX;
+          node.scrollTop -= deltaY;
+          updateScrollPosRef.current();
+          return;
+        }
+        clearOneFingerPan();
+      }
+      const gestureDisposition = resolveStudioCanvasGestureDisposition({
+        gestureOwned: canvasPointerGestureIsOwned(),
+        viewTransformSuppressed: viewTransformSuppressedRef.current,
+        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
+      });
+      if (gestureDisposition === "consume-owned") {
+        pinchStartDist = 0;
+        e.preventDefault();
+        return;
+      }
+      if (gestureDisposition === "pass-suppressed") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (gestureDisposition === "pass-view-tools-hud") return;
+      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (e.touches.length !== 2) {
+        pinchStartDist = 0; // 요소 드래그 중이거나 두 손가락이 아니면 핀치 비활성
+        return;
+      }
+      if (pinchStartDist === 0) {
+        // 두 손가락이 막 모인 첫 프레임 — 기준선만 잡고 이번 프레임은 줌하지 않는다.
+        pinchStartDist = dist(e.touches);
+        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
+        pinchStartCenter = center(e.touches);
+        return;
+      }
+      e.preventDefault(); // 브라우저 페이지 줌 차단
+      const target = zoomLockedRef.current
+        ? pinchStartZoom
+        : clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
+      const currentCenter = center(e.touches);
+      // 프레임마다 리렌더하지 않는다. 거리 변화는 줌, 중심점 이동은 두 손가락 팬으로 같은
+      // transform에 합쳐 실제 pan-zoom 설정과 경쟁 드로잉 앱의 제스처를 일치시킨다.
+      stepZoomGestureRef.current(() => target, currentCenter.x, currentCenter.y, {
+        followClient: true,
+        originClientX: pinchStartCenter.x,
+        originClientY: pinchStartCenter.y,
+      });
+      pinchGestureActive = true;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) clearOneFingerPan();
+      if (e.touches.length !== 2) {
+        pinchStartDist = 0;
+        if (pinchGestureActive) {
+          pinchGestureActive = false;
+          // 손가락이 떨어지면 바로 정착시켜 흐릿한 transform 프리뷰를 즉시 크리스프하게 만든다.
+          settleZoomGestureRef.current();
+        }
+      }
+    };
+    const onTouchCancel = () => {
+      clearOneFingerPan();
+      pinchStartDist = 0;
+      if (!pinchGestureActive) return;
+      pinchGestureActive = false;
+      settleZoomGestureRef.current();
+    };
+    node.addEventListener("touchstart", onTouchStart, { passive: true });
+    node.addEventListener("touchmove", onTouchMove, { passive: false });
+    node.addEventListener("touchend", onTouchEnd, { passive: true });
+    node.addEventListener("touchcancel", onTouchCancel, { passive: true });
+    return () => {
+      clearOneFingerPan();
+      node.removeEventListener("touchstart", onTouchStart);
+      node.removeEventListener("touchmove", onTouchMove);
+      node.removeEventListener("touchend", onTouchEnd);
+      node.removeEventListener("touchcancel", onTouchCancel);
+    };
+  }, [canvasEditingGestureIsOwned, canvasPointerGestureIsOwned]);
+
+  // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (shouldStartStudioSpacePan({
+        code: e.code,
+        editing: Boolean(editing),
+        isSpacePressed,
+        target: e.target,
+      })) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+        setIsPanning(false);
+      }
+    };
+    globalThis.addEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keyup", handleKeyUp);
+    return () => {
+      globalThis.removeEventListener("keydown", handleKeyDown);
+      globalThis.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [isSpacePressed, editing]);
   useEffect(() => {
     if (viewTransformSuppressed) {
       closeViewToolWithFocusRef.current({ preferCanvas: true });
@@ -16220,17 +15682,9 @@ const cropArmed =
   );
   useEffect(() => {
     if (!bubbleShapeArmed) {
-      releaseBubbleShapePointerCapture();
-      bubbleShapeDragRef.current = null;
-      pendingBubbleShapeDraftRef.current = null;
-      if (bubbleShapeRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-        bubbleShapeRafRef.current = null;
-      }
-      setBubbleShapeDraft(null);
-      setBubbleShapeSelectedPointIndex(null);
+      resetBubbleShapeSession();
     }
-  }, [bubbleShapeArmed]);
+  }, [bubbleShapeArmed, resetBubbleShapeSession]);
   function addBubbleShapePointFromInspector(): void {
     if (
       !bubbleShapeArmed ||
@@ -16577,10 +16031,10 @@ const puppetWarpArmed =
         const hydratedWriterRoom = remixId
           ? createEmptyStudioWriterRoomDocument()
           : normalizeStudioWriterRoomDocument(doc?.writerRoom);
-        characterBibleRef.current = hydratedCharacterBible;
-        writerRoomRef.current = hydratedWriterRoom;
-        setCharacterBibleState(hydratedCharacterBible);
-        setWriterRoomState(hydratedWriterRoom);
+        hydrateStudioSidecarDocuments({
+          characterBible: hydratedCharacterBible,
+          writerRoom: hydratedWriterRoom,
+        });
         setAiProvenanceState(
           remixId
             ? resetStudioAiProvenanceForRemix()
@@ -16626,7 +16080,7 @@ const puppetWarpArmed =
       alive = false;
       controller.abort();
     };
-  }, [remixId, workAuthScopeKey, workId]);
+  }, [hydrateStudioSidecarDocuments, remixId, workAuthScopeKey, workId]);
 
   // 시리즈·챌린지 딥링크로 들어온 경우 게시 맥락 배너를 채운다.
   useEffect(() => {
@@ -19213,146 +18667,33 @@ const puppetWarpArmed =
     announceDrawingShortcut,
   });
   // ── 페이지 관련 명령 조작 (pure studio-pages로 위임 — 동일 동작 유지 + 고도화) ──────────────────────────────────────────────
-  function latestStudioPagesSnapshot(): PageState[] {
-    const history = pagesHistoryRef.current;
-    const index = Math.max(0, Math.min(pagesHiRef.current, Math.max(0, history.length - 1)));
-    return history[index] ?? pages;
-  }
-  function addPage() {
-    // thin wrapper over pure shipped command + commit (behavior unchanged)
-    const baseH = activePage.canvasH || 1080;
-    const { nextPages, newPageId } = appendPageState(pages, uid, baseH);
-    if (!commitPages(nextPages)) return;
-    setCurrentPageId(newPageId);
-  }
-  function insertPageBefore(pageId: string) {
-    const idx = findPageIndexInPages(pageId);
-    if (idx < 0) return;
-    const baseH = pages[idx]?.canvasH || 1080;
-    const nextPages = insertBlankPageAt(pages, idx, uid, baseH);
-    if (!commitPages(nextPages)) return;
-    // 새로 삽입된 것을 활성으로
-    const inserted = nextPages[idx];
-    if (inserted) setCurrentPageId(inserted.id);
-  }
-  function insertPageAfter(pageId: string) {
-    const idx = findPageIndexInPages(pageId);
-    if (idx < 0) return;
-    const baseH = pages[idx]?.canvasH || 1080;
-    const nextPages = insertBlankPageAt(pages, idx + 1, uid, baseH);
-    if (!commitPages(nextPages)) return;
-    const inserted = nextPages[idx + 1];
-    if (inserted) setCurrentPageId(inserted.id);
-  }
-  function duplicatePage(pageId: string) {
-    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return;
-    const basePages = latestStudioPagesSnapshot();
-    const pageToDup = basePages.find((p) => p.id === pageId);
-    if (!pageToDup) return;
-    const newPage = { ...duplicatePageState(pageToDup, uid), review: undefined };
-    const idx = basePages.findIndex((p) => p.id === pageId);
-    const nextPages = [...basePages];
-    nextPages.splice(idx + 1, 0, newPage);
-    if (commitPages(nextPages)) setCurrentPageId(newPage.id);
-  }
-  function duplicatePageMirrored(pageId: string) {
-    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return;
-    const basePages = latestStudioPagesSnapshot();
-    const pageToDup = basePages.find((p) => p.id === pageId);
-    if (!pageToDup) return;
-    const mir = { ...duplicateMirroredPage(pageToDup, uid, CANVAS_W), review: undefined };
-    const idx = basePages.findIndex((p) => p.id === pageId);
-    const nextPages = [...basePages];
-    nextPages.splice(idx + 1, 0, mir);
-    if (commitPages(nextPages)) setCurrentPageId(mir.id);
-  }
-  function deletePage(pageId: string) {
-    if (pages.length <= 1) return;
-    // thin wrapper over pure shipped transition + commit (behavior unchanged)
-    const { nextPages, nextActiveId } = executeDeletePageTransition(pages, pageId, currentPageId);
-    if (!commitPages(nextPages)) return;
-    if (currentPageId === pageId && nextActiveId) {
-      const found = nextPages.find((p) => p.id === nextActiveId);
-      if (found) setCurrentPageId(found.id);
-      else if (nextPages[0]) setCurrentPageId(nextPages[0].id);
-    }
-  }
-  function deletePagesBulk(ids: string[]) {
-    if (pages.length <= 1 || ids.length === 0) return;
-    const { nextPages, removedIds } = deletePagesBulkPure(pages, ids);
-    if (removedIds.length === 0) return;
-    if (!commitPages(nextPages)) return;
-    const nextActiveId = computeNextActiveIdAfterBulkDelete(pages, nextPages, currentPageId);
-    if (nextActiveId && nextActiveId !== currentPageId) {
-      setCurrentPageId(nextActiveId);
-    }
-  }
-  function movePageUp(pageId: string) {
-    const idx = pages.findIndex((p) => p.id === pageId);
-    if (idx <= 0) return; // boundary early return (prevents redundant history like pre-refactor)
-    const nextPages = movePagePure(pages, pageId, -1);
-    commitPages(nextPages);
-  }
-  function movePageDown(pageId: string) {
-    const idx = pages.findIndex((p) => p.id === pageId);
-    if (idx === -1 || idx >= pages.length - 1) return; // boundary early return
-    const nextPages = movePagePure(pages, pageId, 1);
-    commitPages(nextPages);
-  }
-  function movePagesBulk(ids: string[], delta: number) {
-    if (ids.length === 0 || !Number.isFinite(delta) || delta === 0) return;
-    const nextPages = movePagesBulkPure(pages, ids, delta);
-    if (
-      nextPages.length === pages.length
-      && nextPages.every((page, index) => page.id === pages[index]?.id)
-    ) {
-      return;
-    }
-    commitPages(nextPages);
-  }
-  function clearPageFor(pageId: string) {
-    const target = pages.find((p) => p.id === pageId);
-    if (!target || target.elements.length === 0) return; // no-op guard, no history pollution
-    const nextPages = clearPage(pages, pageId);
-    commitPages(nextPages, { pendingStrokePolicy: "drop" });
-  }
-  function applyGradeToAll() {
-    const cur = JSON.stringify(activePage.grade ?? null);
-    const allSame = pages.every((p) => JSON.stringify(p.grade ?? null) === cur);
-    if (allSame) return; // no-op guard
-    const nextPages = applyGradeToAllPages(pages, activePage.grade);
-    commitPages(nextPages);
-  }
-  function applyBgToAll() {
-    const curBg = activePage.bg;
-    const curGrad = JSON.stringify(activePage.bgGrad ?? null);
-    const allSame = pages.every((p) => p.bg === curBg && JSON.stringify(p.bgGrad ?? null) === curGrad);
-    if (allSame) return; // no-op guard
-    const nextPages = applyBackgroundToAllPages(pages, activePage.bg, activePage.bgGrad);
-    commitPages(nextPages);
-  }
-  // helper for index (pure not needed for this thin wrapper)
-  function findPageIndexInPages(pageId: string) {
-    return pages.findIndex((p) => p.id === pageId);
-  }
-  // Arbitrary reorder using the pure (high-value; addresses gap)
-  function movePageToTop(pageId: string) {
-    const from = findPageIndexInPages(pageId);
-    if (from <= 0) return;
-    const nextPages = reorderPages(pages, from, 0);
-    commitPages(nextPages);
-  }
-  function movePageToBottom(pageId: string) {
-    const from = findPageIndexInPages(pageId);
-    const last = pages.length - 1;
-    if (from < 0 || from === last) return;
-    const nextPages = reorderPages(pages, from, last);
-    commitPages(nextPages);
-  }
-  // 페이지 스트립 드래그 재배열(PPT식) — 슬롯 계산·상태는 useStudioPageDnd, 실제 재배치는 reorderPages 재사용.
-  // 키보드/터치 대체 수단은 위의 이동 버튼(movePage*)이 그대로 유지된다(a11y).
-  const pageDnd = useStudioPageDnd(pages.length, (from, to) => {
-    commitPages(reorderPages(pages, from, to));
+  const {
+    addPage,
+    insertPageBefore,
+    insertPageAfter,
+    duplicatePage,
+    duplicatePageMirrored,
+    deletePage,
+    deletePagesBulk,
+    movePageUp,
+    movePageDown,
+    movePagesBulk,
+    clearPageFor,
+    applyGradeToAll,
+    applyBgToAll,
+    movePageToTop,
+    movePageToBottom,
+    pageDnd,
+  } = useStudioPageManagement({
+    pages,
+    pagesHistoryRef,
+    pagesHiRef,
+    activePage,
+    currentPageId,
+    setCurrentPageId,
+    pendingStrokeCommitsRef,
+    flushPendingStrokeCommitsRef,
+    commitPages,
   });
   function addRenderedImage(
     src: string,
@@ -20041,172 +19382,42 @@ const puppetWarpArmed =
       titleInputRef.current?.focus({ preventScroll: true });
     });
   }
-  function captureDeferredComipoAction() {
-    return {
-      mutationTicket: captureStudioMutationTicket(),
-      history: pagesHistoryRef.current,
-      historyIndex: pagesHiRef.current,
-    };
-  }
-  function canApplyDeferredComipoAction(
-    action: ReturnType<typeof captureDeferredComipoAction>
-  ): boolean {
-    if (!canApplyStudioMutation(action.mutationTicket)) return false;
-    if (
-      pagesHistoryRef.current !== action.history ||
-      pagesHiRef.current !== action.historyIndex
-    ) {
-      setError("원고가 바뀌어 오래된 템플릿 결과를 적용하지 않았어요. 다시 실행해 주세요.");
-      return false;
-    }
-    return true;
-  }
-  async function applyQuickComicInput(input: ComipoAssemblyInput) {
-    if (collaborationDocumentLocked) {
-      setError(collaborationLockMessage());
-      return;
-    }
-    if (comipoActionBusyRef.current) return;
-    const quickComicRequest = studioQuickComicReplaceRequest(elements.length);
-    if (elements.length > 0 && !(await confirmStudioDestructiveAction(quickComicRequest))) {
-      return;
-    }
-
-    const deferredAction = captureDeferredComipoAction();
-    comipoActionBusyRef.current = true;
-    try {
-      const { assembleComipoPage } = await loadStudioComipoAssembly();
-      if (!canApplyDeferredComipoAction(deferredAction)) return;
-      const assembled = assembleComipoPage(input);
-      if (!assembled?.composable) {
-        setError("컷 안에 장면과 대사를 배치하지 못했어요. 이전 단계에서 구성을 조정해 주세요.");
-        return;
-      }
-      setCanvasH(assembled.canvasH);
-      setBg("#ffffff");
-      setBgGrad(null);
-      setWebtoonTheme("soft");
-      setCurrentTemplate(null);
-      setTool("select");
-      setMenu(null);
-      setSelectedId(null);
-      if (
-        !settleStudioDestructiveCommit(
-          quickComicRequest,
-          commit(comipoSeedsToEls(assembled.seeds)),
-          undo
-        )
-      ) return;
-      setQuickComicOpen(false);
-      announceDrawingShortcut(
-        `빠른 웹툰 완성 · ${assembled.frameCount}컷 · 말풍선 ${assembled.bubbleCount}개`
-      );
-    } catch (error) {
-      console.error("Failed to apply the Quick Comic assembly:", error);
-      if (canApplyDeferredComipoAction(deferredAction)) {
-        setError("빠른 웹툰 조립 엔진을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
-      }
-    } finally {
-      comipoActionBusyRef.current = false;
-    }
-  }
-  async function applySceneSnapshot(
-    snapshot: import("./studio-scene-snapshot-library").StudioSceneSnapshot
-  ) {
-    if (collaborationDocumentLocked) {
-      setError(collaborationLockMessage());
-      return;
-    }
-    const sceneSnapshotRequest = studioSceneSnapshotReplaceRequest({
-      pageName: pageDisplayName(activePage, activePageIndex),
-      sceneName: snapshot.name,
-      currentElementCount: activePage.elements.length,
-      incomingElementCount: snapshot.page.elements.length,
-    });
-    if (!(await confirmStudioDestructiveAction(sceneSnapshotRequest))) return;
-    const restoredPage: PageState = {
-      ...snapshot.page,
-      id: activePage.id,
-    };
-    const nextPages = pages.map((page) =>
-      page.id === activePage.id ? restoredPage : page
-    );
-    if (
-      !settleStudioDestructiveCommit(
-        sceneSnapshotRequest,
-        commitPages(nextPages),
-        undo
-      )
-    ) return;
-    setWebtoonTheme(snapshot.theme);
-    setSelectedId(null);
-    setMarqueeIds([]);
-    setTool("select");
-    setMenu(null);
-    setSceneSnapshotOpen(false);
-    announceDrawingShortcut(
-      `장면 스냅샷 적용 · ${snapshot.name} · 레이어 ${restoredPage.elements.length}개`
-    );
-  }
-  async function startFromExample() {
-    if (collaborationDocumentLocked) {
-      setError(collaborationLockMessage());
-      return;
-    }
-    if (comipoActionBusyRef.current) return;
-    const exampleRequest = studioStartFromExampleRequest(elements.length);
-    if (elements.length > 0 && !(await confirmStudioDestructiveAction(exampleRequest))) return;
-
-    const deferredAction = captureDeferredComipoAction();
-    comipoActionBusyRef.current = true;
-    let assembled: ReturnType<StudioComipoAssemblyModule["assembleComipoPage"]> = null;
-    try {
-      const { assembleComipoPage } = await loadStudioComipoAssembly();
-      if (!canApplyDeferredComipoAction(deferredAction)) return;
-      assembled = assembleComipoPage({
-        layoutId: "layout_talk_2_bubbles",
-        sceneTemplateId: "confession",
-        dialogueScript: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터·말풍선·컷 템플릿을 바로 써 보세요.",
-      });
-    } catch (error) {
-      console.error("Failed to load the Studio example assembler:", error);
-      if (!canApplyDeferredComipoAction(deferredAction)) return;
-      setError("고급 예시 장면을 불러오지 못해 기본 컷으로 시작했어요.");
-    } finally {
-      comipoActionBusyRef.current = false;
-    }
-    if (!assembled) {
-      setCanvasH(QUICK_SAMPLE_CANVAS_H);
-      setBg("#ffffff");
-      setBgGrad(null);
-      setWebtoonTheme("soft");
-      setTool("select");
-      setMenu(null);
-      setSelectedId(null);
-      settleStudioDestructiveCommit(
-        exampleRequest,
-        commit([...createQuickSampleFrames()]),
-        undo
-      );
-      dismissQuickStart();
-      return;
-    }
-    if (!assembled.composable) {
-      setError("예시 페이지를 조립하지 못했습니다. 레이아웃을 다시 시도해 주세요.");
-      return;
-    }
-    const sample: El[] = comipoSeedsToEls(assembled.seeds);
-
-    setCanvasH(assembled.canvasH);
-    setBg("#ffffff");
-    setBgGrad(null);
-    setWebtoonTheme("soft");
-    setTool("select");
-    setMenu(null);
-    setSelectedId(null);
-    settleStudioDestructiveCommit(exampleRequest, commit(sample), undo);
-    dismissQuickStart();
-  }
+  const {
+    captureDeferredComipoAction,
+    canApplyDeferredComipoAction,
+    applyQuickComicInput,
+    applySceneSnapshot,
+    startFromExample,
+  } = useStudioQuickComic({
+    elements,
+    pages,
+    activePage,
+    activePageIndex,
+    collaborationDocumentLocked,
+    collaborationLockMessage,
+    pagesHistoryRef,
+    pagesHiRef,
+    comipoActionBusyRef,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    setCanvasH,
+    setBg,
+    setBgGrad,
+    setWebtoonTheme,
+    setCurrentTemplate,
+    setTool,
+    setMenu,
+    setSelectedId,
+    setMarqueeIds,
+    setQuickComicOpen,
+    setSceneSnapshotOpen,
+    dismissQuickStart,
+    commit,
+    commitPages,
+    undo,
+    announceDrawingShortcut,
+    setError,
+  });
   function removeSelected() {
     if (marqueeIds.length > 0) {
       deleteLayerElements(marqueeIds);
@@ -20253,211 +19464,72 @@ const puppetWarpArmed =
     if (next === elements) return;
     commit(next);
   }
-  function detachStudioBg3dLtCopy(element: El): El {
-    if (element.type !== "image" || !element.bg3dLtBundleId) return element;
-    return {
-      ...element,
-      groupId: undefined,
-      bg3dScene: undefined,
-      bg3dLtBundleId: undefined,
-      bg3dLtRole: undefined,
-      bg3dLtRenderMode: undefined,
-      name: `${element.name?.trim() || "3D LT 레이어"} · 복사본`,
-    };
-  }
-  function remapStudioBg3dLtCopiedBundles(copies: El[], snapshotOnly: boolean): El[] {
-    const anchorCounts = new Map<string, number>();
-    for (const element of copies) {
-      if (element.type !== "image" || !element.bg3dLtBundleId) continue;
-      if (element.bg3dScene !== undefined) {
-        anchorCounts.set(
-          element.bg3dLtBundleId,
-          (anchorCounts.get(element.bg3dLtBundleId) ?? 0) + 1
-        );
-      }
-    }
-    const bundleIdMap = new Map<string, string>();
-    return copies.map((element) => {
-      if (element.type !== "image" || !element.bg3dLtBundleId) return element;
-      if (
-        snapshotOnly ||
-        !element.groupId ||
-        anchorCounts.get(element.bg3dLtBundleId) !== 1
-      ) {
-        return detachStudioBg3dLtCopy(element);
-      }
-      const sourceBundleId = element.bg3dLtBundleId;
-      let bundleId = bundleIdMap.get(sourceBundleId);
-      if (!bundleId) {
-        bundleId = uid();
-        bundleIdMap.set(sourceBundleId, bundleId);
-      }
-      return { ...element, bg3dLtBundleId: bundleId };
-    });
-  }
-  function duplicateSelected() {
-    // 복제도 복사/붙여넣기와 같은 검증·ID 재매핑 파이프라인을 사용한다. 그래야 그룹 메타,
-    // 애니메이션 트랙, 3D LT 번들이 빠지거나 복제본이 원본 그룹에 섞이는 일이 없다.
-    const captured = captureSelectedStudioClipboard();
-    if (!captured) return;
-    applyStudioClipboardPayload(captured.payload, "cascade", "복제");
-  }
-  function nudgeSelected(dx: number, dy: number) {
-    if (marqueeIds.length > 0) {
-      const next = planAtomicSelectionTranslation({
-        items: elements,
-        selectedIds: marqueeIds,
-        deltaX: dx,
-        deltaY: dy,
-        isLocked: (element) => isEffectivelyLocked(element, groups),
-      });
-      if (!next.some((element, index) => element !== elements[index])) {
-        setError("잠긴 멤버가 포함된 선택은 일부만 이동하지 않아요. 잠금을 먼저 해제하세요.");
-        return;
-      }
-      commitCoalesced(next, "nudge-multi");
-      return;
-    }
-    if (!selected || isEffectivelyLocked(selected, groups)) return;
-    const id = selected.id;
-    const next = elements.map((e) =>
-      e.id !== id
-        ? e
-        : e.type === "draw"
-          ? ({ ...e, points: e.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
-          : ({ ...e, x: (e as { x: number }).x + dx, y: (e as { y: number }).y + dy } as El)
-    );
-    commitCoalesced(next, `nudge:${id}`); // 연속 방향키는 한 번의 실행취소로 합침
-  }
-  // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
-  // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하 / 다중 분배.
-  function alignSelected(mode: StudioAlignMode) {
-    alignStudioSelection(mode, {
-      elements,
-      marqueeIds,
-      selected,
-      groups,
-      activeGroupIdRef,
-      canvasH,
-      completeSelectedGroupId,
-      commit,
-      patchEl,
-      setError,
-    });
-  }
-
-  /**
-   * Frame the current selection in the viewport (Figma "zoom to selection", ⇧F here —
-   * ⇧1–6 already belongs to the brush slots, so the Figma ⇧2 chord is not available).
-   */
-  function zoomToSelection() {
-    if (viewTransformSuppressed || zoomLockedRef.current) return;
-    const selectedEls = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
-    if (selectedEls.length === 0) {
-      announceDrawingShortcut("확대할 요소를 먼저 선택하세요");
-      return;
-    }
-    const bounds = unionStudioSelectionBounds(selectedEls);
-    const wrap = wrapRef.current;
-    if (!bounds || !wrap) return;
-    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
-    const plan = planStudioZoomToSelection({
-      bounds,
-      viewportWidth: wrap.clientWidth,
-      viewportHeight: wrap.clientHeight,
-      documentWidth: CANVAS_W,
-      documentHeight: canvasH,
-      canvasFlipH,
-      canvasRotation,
-      maxScale: maximumScale,
-      minScale: 0.15,
-    });
-    if (!plan) return;
-    // Drop any in-flight wheel/pinch gesture first: with zoom already at 1, setZoom(1) bails out,
-    // so the cancel layout effect never runs and the gesture's leftover CSS transform plus its
-    // 170ms settle would undo this framing.
-    const pendingZoomGesture = zoomGestureRef.current;
-    if (pendingZoomGesture) {
-      zoomGestureRef.current = null;
-      if (pendingZoomGesture.raf) globalThis.cancelAnimationFrame(pendingZoomGesture.raf);
-      if (pendingZoomGesture.settleTimer) globalThis.clearTimeout(pendingZoomGesture.settleTimer);
-      zoomSettleAnchorRef.current = null;
-      const zoomHost = zoomHostRef.current;
-      if (zoomHost) {
-        zoomHost.style.transform = "";
-        zoomHost.style.willChange = "";
-      }
-    }
-    setScale(plan.scale);
-    setZoom(1);
-    requestAnimationFrame(() => {
-      const host = wrapRef.current;
-      if (!host) return;
-      host.scrollLeft = plan.scrollLeft;
-      host.scrollTop = plan.scrollTop;
-    });
-    announceDrawingShortcut("선택 영역으로 확대 · ⇧F");
-  }
-
-  /** Figma Flip H/V around the selection AABB center. */
-  function flipSelected(axis: "horizontal" | "vertical") {
-    const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
-    if (targets.length === 0) return;
-    if (targets.some((element) => isEffectivelyLocked(element, groups))) {
-      setError("잠긴 레이어는 반전할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
-      return;
-    }
-    const next = planStudioSelectionFlip(
-      elements,
-      targets.map((element) => element.id),
-      axis,
-    );
-    if (!next) return;
-    if (next.every((element, index) => element === elements[index])) {
-      announceDrawingShortcut("이 선택은 반전할 수 없어요 · 이미지나 여러 요소를 골라 보세요");
-      return;
-    }
-    // commit() refuses (and explains why via setError) while saving, review-locked or
-    // collaboration-locked — announcing a flip it rejected would be a lie to the live region.
-    if (!commit(next)) return;
-    announceDrawingShortcut(axis === "horizontal" ? "좌우 반전" : "상하 반전");
-  }
-
-  function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
-    const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
-    if (targets.length > 1) {
-      if (targets.some((element) => isEffectivelyLocked(element, groups))) {
-        setError("잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
-        return;
-      }
-      const next = planStudioMultiSelectionLayoutPatch(elements, marqueeIds, patch);
-      if (!next || !commit(next)) return;
-      announceDrawingShortcut(`${targets.length}개 요소 속성을 함께 변경했어요`);
-      return;
-    }
-    const target = targets[0];
-    if (!target) return;
-    if (isEffectivelyLocked(target, groups)) {
-      setError("잠긴 레이어는 수정할 수 없어요.");
-      return;
-    }
-    const next = planStudioSelectionLayoutPatch(target, patch);
-    if (!next) return;
-    patchEl(target.id, next);
-  }
-
-  function reorder(dir: "front" | "back" | "forward" | "backward") {
-    if (marqueeIds.length > 0) {
-      reorderSelectedElements(dir);
-      return;
-    }
-    if (!selectedId) return;
-    const next = reorderLayerItem(elements, selectedId, dir);
-    if (next === elements) return;
-    commit(next);
-  }
+  const {
+    metaEditPageId,
+    setMetaEditPageId,
+    commitPageMeta,
+    commitShotTag,
+    copySelectedElements,
+    cutSelectedElements,
+    pasteStudioElementsFromClipboard,
+    duplicateSelected,
+  } = useStudioPageClipboard({
+    activePage,
+    pages,
+    masterEditMode,
+    activeSurfaceReviewLocked,
+    activeSurfaceReviewLockedRef,
+    collaborationDocumentLocked,
+    collaborationLockMessage,
+    elements,
+    selectedId,
+    marqueeIds,
+    groups,
+    animTimeline,
+    canvasH,
+    editing,
+    timelapseCapturing,
+    studioAuthUserId,
+    workId,
+    currentPageIdRef,
+    masterEditModeRef,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    deleteLayerElements,
+    commit,
+    commitPages,
+    nextAssetInsertionPlacement,
+    addRenderedImage,
+    setMarqueeIds,
+    setSelectedId,
+    setTool,
+    announceDrawingShortcut,
+    setError,
+  });
+  const {
+    nudgeSelected,
+    alignSelected,
+    flipSelected,
+    applyFigmaSelectionLayoutPatch,
+    reorder,
+  } = useStudioSelectionTransform({
+    elements,
+    selectedId,
+    selected,
+    marqueeIds,
+    groups,
+    activeGroupIdRef,
+    canvasH,
+    completeSelectedGroupId,
+    commit,
+    commitCoalesced,
+    patchEl,
+    reorderSelectedElements,
+    setError,
+    announceDrawingShortcut,
+  });
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
-  const undo = () => {
+  function undo() {
     if (masterEditMode || collaborationDocumentLocked) return;
     const pendingLivingInkHandoff = livingInkCanonicalHandoffRef.current;
     if (pendingLivingInkHandoff) {
@@ -20570,8 +19642,8 @@ const puppetWarpArmed =
       commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "undo"));
     }
     setPagesHi(nextIndex);
-  };
-  const redo = () => {
+  }
+  function redo() {
     if (masterEditMode || collaborationDocumentLocked) return;
     const pendingLivingInkHandoff = livingInkCanonicalHandoffRef.current;
     if (pendingLivingInkHandoff) {
@@ -20647,13 +19719,57 @@ const puppetWarpArmed =
     if (!studioHistoryCanRedo) return;
     redo();
   };
-  function fitCanvasToWidth() {
-    if (viewTransformSuppressed || zoomLockedRef.current) return;
-    const wrap = wrapRef.current;
-    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
-    if (wrap) setScale(fitStudioViewToWidth(wrap.clientWidth, studioViewDocumentWidth, maximumScale));
-    setZoom(1);
-  }
+  const {
+    fitCanvasToWidth,
+    preserveStudioViewBeforeCapture,
+    resetView,
+    setActualPixelView,
+    toggleHorizontalCanvasView,
+    rotateCanvasView,
+    resetCanvasViewRotation,
+    toggleGrayscaleView,
+    saveCurrentStudioView,
+    restoreSavedStudioView,
+    togglePerspectiveGuideView,
+    zoomToSelection,
+  } = useStudioPageViewControls({
+    viewTransformSuppressed,
+    viewTransformSuppressedRef,
+    zoomLockedRef,
+    wrapRef,
+    isFullscreen,
+    maximized,
+    mobileImmersive,
+    canvasOnlyMode,
+    activePage,
+    scale,
+    setScale,
+    zoom,
+    setZoom,
+    effScale,
+    canvasH,
+    canvasFlipH,
+    setCanvasFlipH,
+    canvasRotation,
+    setCanvasRotation,
+    pendingCanvasRotationScrollRef,
+    captureSuppressedViewRef,
+    savedStudioView,
+    setSavedStudioView,
+    colorPreviewBeforeGrayscaleRef,
+    setColorBlindPreview,
+    announceDrawingShortcut,
+    currentStudioDrawingAssistDocument,
+    commitStudioDrawingAssistDocument,
+    setTool,
+    elements,
+    marqueeIds,
+    selected,
+    studioViewDocumentWidth,
+    zoomGestureRef,
+    zoomHostRef,
+    zoomSettleAnchorRef,
+  });
   function executeQuickAction(action: StudioQuickActionId) {
     setQuickActionsOpen(false);
     setMenu(null);
@@ -20798,7 +19914,7 @@ const puppetWarpArmed =
       node.removeEventListener("touchend", onTouchEnd);
       node.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [isMobile]);
+  }, [isMobile, canvasPointerGestureIsOwned]);
   // 히스토리 목록 점프 — undo/redo 와 동일하게 pagesHi 인덱스만 이동(스냅샷 배열은 그대로 유지).
   const jumpToHistoryIndex = (index: number) => {
     if (masterEditMode || collaborationDocumentLocked) return;
@@ -20823,198 +19939,6 @@ const puppetWarpArmed =
     );
     setPagesHi(nextIndex);
   };
-
-  // 화면 리셋 — 줌·너비맞춤 스케일·좌우 반전(뷰 전용, 문서 데이터 아님)을 기본값으로,
-  // 스크롤 위치도 좌상단으로 되돌린다. "100%"/"맞춤" 버튼은 줌만 건드리고 반전·스크롤은
-  // 그대로 둬서, 확대·회전한 채로 자리를 잃었을 때 한 번에 돌아올 방법이 없었다.
-  function preserveStudioViewBeforeCapture() {
-    if (viewTransformSuppressed || captureSuppressedViewRef.current) return;
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    captureSuppressedViewRef.current = captureStudioView({
-      pageId: activePage.id,
-      scale,
-      zoom,
-      scrollLeft: wrap.scrollLeft,
-      scrollTop: wrap.scrollTop,
-      viewportWidth: wrap.clientWidth,
-      viewportHeight: wrap.clientHeight,
-      canvasWidth: CANVAS_W,
-      canvasHeight: canvasH,
-      canvasFlipH,
-      canvasRotation,
-    });
-    viewTransformSuppressedRef.current = true;
-  }
-
-  function resetView() {
-    if (viewTransformSuppressed || zoomLockedRef.current) return;
-    const wrap = wrapRef.current;
-    if (wrap) {
-      const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
-      setScale(fitStudioViewToWidth(wrap.clientWidth, CANVAS_W, maximumScale));
-      wrap.scrollLeft = 0;
-      wrap.scrollTop = 0;
-    }
-    setZoom(1);
-    setCanvasFlipH(false);
-    pendingCanvasRotationScrollRef.current = null;
-    setCanvasRotation(0);
-  }
-
-  function setActualPixelView() {
-    if (viewTransformSuppressed || zoomLockedRef.current) return;
-    // effScale = scale × zoom. 두 값을 1로 맞춰 문서 1px을 CSS 1px로 정확히 표시한다.
-    setScale(1);
-    setZoom(1);
-  }
-
-  function toggleHorizontalCanvasView() {
-    if (viewTransformSuppressed) return;
-    setCanvasFlipH((current) => {
-      const next = !current;
-      announceDrawingShortcut(next ? "캔버스 좌우 반전" : "캔버스 반전 해제");
-      return next;
-    });
-  }
-
-  function setCanvasViewRotationPreservingCenter(next: StudioViewRotation) {
-    if (viewTransformSuppressed) return;
-    if (next === canvasRotation) {
-      pendingCanvasRotationScrollRef.current = null;
-      return;
-    }
-    const wrap = wrapRef.current;
-    pendingCanvasRotationScrollRef.current = wrap
-      ? planStudioViewRotationTransition({
-          documentWidth: CANVAS_W,
-          documentHeight: canvasH,
-          canvasFlipH,
-          canvasRotation,
-          nextCanvasRotation: next,
-          scale: effScale,
-          scrollLeft: wrap.scrollLeft,
-          scrollTop: wrap.scrollTop,
-          viewportWidth: wrap.clientWidth,
-          viewportHeight: wrap.clientHeight,
-        })
-      : null;
-    setCanvasRotation(next);
-  }
-
-  function rotateCanvasView(direction: "left" | "right") {
-    const next = direction === "left"
-      ? rotateStudioViewLeft(canvasRotation)
-      : rotateStudioViewRight(canvasRotation);
-    setCanvasViewRotationPreservingCenter(next);
-    announceDrawingShortcut(`캔버스 ${direction === "left" ? "왼쪽" : "오른쪽"} 회전 · ${next}°`);
-  }
-
-  function resetCanvasViewRotation() {
-    setCanvasViewRotationPreservingCenter(0);
-    announceDrawingShortcut("보기 회전 초기화");
-  }
-
-  function toggleGrayscaleView() {
-    setColorBlindPreview((current) => {
-      const next = current === "grayscale"
-        ? colorPreviewBeforeGrayscaleRef.current
-        : "grayscale";
-      announceDrawingShortcut(next === "grayscale" ? "흑백 보기" : "흑백 보기 해제");
-      return next;
-    });
-  }
-
-  function saveCurrentStudioView() {
-    if (viewTransformSuppressed) return;
-    const wrap = wrapRef.current;
-    if (!wrap) {
-      announceDrawingShortcut("현재 보기를 저장할 수 없습니다");
-      return;
-    }
-    setSavedStudioView(captureStudioView({
-      pageId: activePage.id,
-      scale,
-      zoom,
-      scrollLeft: wrap.scrollLeft,
-      scrollTop: wrap.scrollTop,
-      viewportWidth: wrap.clientWidth,
-      viewportHeight: wrap.clientHeight,
-      canvasWidth: CANVAS_W,
-      canvasHeight: canvasH,
-      canvasFlipH,
-      canvasRotation,
-    }));
-    announceDrawingShortcut("현재 보기 저장");
-  }
-
-  function restoreSavedStudioView() {
-    if (viewTransformSuppressed || zoomLockedRef.current) return;
-    const wrap = wrapRef.current;
-    if (!savedStudioView || !wrap) {
-      announceDrawingShortcut("저장된 보기가 없습니다");
-      return;
-    }
-    const initialPlan = planStudioViewRestore({
-      snapshot: savedStudioView,
-      pageId: activePage.id,
-      viewportWidth: wrap.clientWidth,
-      viewportHeight: wrap.clientHeight,
-      canvasWidth: CANVAS_W,
-      canvasHeight: canvasH,
-    });
-    if (!initialPlan) {
-      announceDrawingShortcut("이 페이지에 저장된 보기가 없습니다");
-      return;
-    }
-
-    setScale(initialPlan.scale);
-    setZoom(initialPlan.zoom);
-    setCanvasFlipH(initialPlan.canvasFlipH);
-    setCanvasRotation(initialPlan.canvasRotation);
-    const restoreScroll = () => {
-      const currentWrap = wrapRef.current;
-      if (!currentWrap) return;
-      const plan = planStudioViewRestore({
-        snapshot: savedStudioView,
-        pageId: activePage.id,
-        viewportWidth: currentWrap.clientWidth,
-        viewportHeight: currentWrap.clientHeight,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-      });
-      if (!plan) return;
-      currentWrap.scrollLeft = plan.scrollLeft;
-      currentWrap.scrollTop = plan.scrollTop;
-    };
-    if (typeof globalThis.requestAnimationFrame === "function") {
-      globalThis.requestAnimationFrame(restoreScroll);
-    } else {
-      restoreScroll();
-    }
-    announceDrawingShortcut("보기 복원");
-  }
-
-  function togglePerspectiveGuideView() {
-    const current = currentStudioDrawingAssistDocument();
-    if (!current) return;
-    const active = !current.document.perspective.active;
-    const committed = commitStudioDrawingAssistDocument((document) => {
-      let points = document.perspective.points;
-      if (active && points.length === 0) {
-        const position = defaultVanishingPointPosition(points, CANVAS_W, current.page.canvasH);
-        points = addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
-      }
-      return {
-        ...document,
-        perspective: { ...document.perspective, active, points },
-        isometric: active ? { ...document.isometric, active: false } : document.isometric,
-      };
-    });
-    if (!committed) return;
-    if (active) setTool("draw");
-    announceDrawingShortcut(active ? "원근 도우미 표시" : "원근 도우미 숨김");
-  }
 
   function beginSharedGutterDrag(segment: SharedGutterSegment) {
     sharedGutterDragBaseRef.current = {
@@ -21264,353 +20188,6 @@ const puppetWarpArmed =
     const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
-  }, []);
-
-  // ── 페이지 메타(이름·콘티 메모) + 요소 클립보드(⌘C/⌘V) ──────────────────────
-  // 메타 편집 중인 페이지 id(스트립 인라인 편집). 커밋은 blur/Enter에서 1회 —
-  // withPageMeta가 실질 무변화 시 원본 참조를 돌려줘 undo 히스토리 오염을 막는다.
-  const [metaEditPageId, setMetaEditPageId] = useState<string | null>(null);
-  function commitPageMeta(pageId: string, patch: { name?: string | null; note?: string | null }) {
-    const next = withPageMeta(pages, pageId, patch);
-    if (next !== pages) commitPages(next);
-  }
-  // 샷 타입/카메라 앵글 태그 커밋 — commitPageMeta와 동일 계약(무변화 시 withShotTag가
-  // 원본 참조를 돌려주므로 그때만 undo 히스토리에 push한다).
-  function commitShotTag(pageId: string, patch: { shotType?: string | null; cameraAngle?: string | null }) {
-    const next = withShotTag(pages, pageId, patch);
-    if (next !== pages) commitPages(next);
-  }
-  // 연속 붙여넣기 캐스케이드(PPT식 계단 배치) 카운터 — 페이로드·대상 페이지 조합별로 초기화.
-  const pasteSeqRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
-  // 시스템 클립보드 권한이 막혀도 이 편집기 세션 안에서 Cut/Paste가 반드시 왕복하도록 메모리 사본을
-  // 보존한다. 영구 localStorage 대신 탭 sessionStorage를 써 로그아웃 뒤 다른 계정으로 새지 않게 한다.
-  const studioClipboardPayloadRef = useRef<StudioClipboardPayload | null>(null);
-  const studioClipboardScopeKey = studioClipboardFallbackStorageKey({
-    authScopeKey: studioAuthUserId,
-    workId,
-  });
-  const studioClipboardScopeRef = useRef(studioClipboardScopeKey);
-  if (studioClipboardScopeRef.current !== studioClipboardScopeKey) {
-    studioClipboardScopeRef.current = studioClipboardScopeKey;
-    studioClipboardPayloadRef.current = null;
-    pasteSeqRef.current = { key: "", count: 0 };
-  }
-
-  function studioClipboardSessionStorage(): Storage | null {
-    try {
-      return typeof globalThis.sessionStorage === "undefined" ? null : globalThis.sessionStorage;
-    } catch {
-      // Sandboxed/blocked storage contexts still retain the in-memory clipboard below.
-      return null;
-    }
-  }
-
-  function captureSelectedStudioClipboard(): {
-    payload: StudioClipboardPayload;
-    memberIds: string[];
-  } | null {
-    const members = collectCopyElements(elements, selectedId, marqueeIds);
-    if (members.length === 0) return null;
-    const memberIds = members.map((member) => member.id);
-    const expectedGroupIds = masterEditMode
-      ? []
-      : [...new Set(
-          members.flatMap((member) =>
-            member.groupId && groups.some((group) => group.id === member.groupId)
-              ? [member.groupId]
-              : []
-          )
-        )];
-    const expectedTrackIds = masterEditMode
-      ? []
-      : members
-          .filter((member) => member.type === "image" && hasTrack(animTimeline, member.id))
-          .map((member) => member.id);
-    const payload = buildClipboardPayload(members, {
-        canvasW: CANVAS_W,
-        canvasH,
-        pageId: activePage.id,
-      }, Date.now(), masterEditMode ? undefined : {
-        groups,
-        animationTimeline: animTimeline,
-      });
-    if (!clipboardPayloadMatchesMembers(payload, memberIds, {
-      groupIds: expectedGroupIds,
-      trackIds: expectedTrackIds,
-    })) {
-      setError("선택한 레이어 중 안전하게 복사할 수 없는 데이터가 있어 작업을 취소했습니다.");
-      return null;
-    }
-    return {
-      payload,
-      memberIds,
-    };
-  }
-
-  function persistStudioClipboardPayload(payload: StudioClipboardPayload) {
-    studioClipboardPayloadRef.current = payload;
-    writeClipboardFallback(
-      studioClipboardSessionStorage(),
-      payload,
-      studioClipboardScopeKey
-    );
-    void globalThis.navigator?.clipboard
-      ?.writeText(serializeClipboardPayload(payload))
-      .catch(() => {});
-    pasteSeqRef.current = { key: "", count: 0 };
-  }
-
-  // 선택 요소 복사(⌘C): 그룹 단일 선택은 collectCopyElements 계약대로 그룹 전체를 복사한다.
-  function copySelectedElements(): boolean {
-    const captured = captureSelectedStudioClipboard();
-    if (!captured) return false;
-    persistStudioClipboardPayload(captured.payload);
-    return true;
-  }
-
-  // 잘라내기는 복사한 정확한 멤버 ID를 한 번의 commit으로 제거한다. 그룹 안의 한 멤버만 지워지는
-  // copySelectedElements()+removeSelected 조합을 피하고, 시스템 clipboard 실패에도 메모리 사본을 보장한다.
-  function cutSelectedElements(): boolean {
-    if (activeSurfaceReviewLocked) return false;
-    const captured = captureSelectedStudioClipboard();
-    if (!captured) return false;
-    persistStudioClipboardPayload(captured.payload);
-    if (!deleteLayerElements(captured.memberIds)) return false;
-    announceDrawingShortcut("잘라내기");
-    return true;
-  }
-
-  function applyStudioClipboardPayload(
-    payload: StudioClipboardPayload,
-    placement: "cascade" | "in-place",
-    announcement?: string,
-  ): boolean {
-    if (activeSurfaceReviewLocked) return false;
-    const samePage = payload.source.pageId === activePage.id;
-    const seqKey = `${payload.copiedAt}:${activePage.id}`;
-    let nextPasteSequence: { key: string; count: number } | null = null;
-    let offsetSteps: number | undefined;
-    if (placement === "in-place") {
-      offsetSteps = 0;
-    } else if (samePage) {
-      const count = pasteSeqRef.current.key === seqKey ? pasteSeqRef.current.count + 1 : 1;
-      nextPasteSequence = { key: seqKey, count };
-      offsetSteps = count;
-    }
-    const plan = planClipboardPaste(
-      payload,
-      { canvasW: CANVAS_W, canvasH, pageId: activePage.id },
-      uid,
-      offsetSteps === undefined ? undefined : { offsetSteps }
-    );
-    if (!plan) return false;
-    const plannedElements = plan.els as unknown as El[];
-    const insertedElements = remapStudioBg3dLtCopiedBundles(plannedElements, masterEditMode);
-    const insertedGroupIds = new Set(
-      insertedElements.flatMap((element) => element.groupId ? [element.groupId] : [])
-    );
-    const preservedPastedGroups = plan.groups.filter((group) => insertedGroupIds.has(group.id));
-    const pastedGroups = masterEditMode
-      ? []
-      : [
-          ...preservedPastedGroups,
-          ...missingLayerGroupIds(insertedElements, [...groups, ...preservedPastedGroups]).map(
-            (groupId, index) =>
-              createLayerGroup(
-                groupId,
-                `붙여넣은 그룹 ${groups.length + preservedPastedGroups.length + index + 1}`
-              )
-          ),
-        ];
-    const hasPastedAnimationTracks = !masterEditMode && Object.keys(plan.animationTracks).length > 0;
-    const nextAnimationTimeline = hasPastedAnimationTracks
-      ? normalizeAnimationTimelineDoc({
-          ...animTimeline,
-          frameCount: Math.max(animTimeline.frameCount, plan.animationFrameCount ?? 1),
-          tracks: { ...animTimeline.tracks, ...plan.animationTracks },
-        })
-      : animTimeline;
-    const extraPatch: Partial<Omit<PageState, "id" | "elements">> = {
-      ...(pastedGroups.length > 0 ? { groups: [...groups, ...pastedGroups] } : {}),
-      ...(hasPastedAnimationTracks ? { animTimeline: nextAnimationTimeline } : {}),
-    };
-    if (!commit(
-      [...elements, ...insertedElements],
-      Object.keys(extraPatch).length > 0 ? extraPatch : undefined
-    )) return false;
-    if (nextPasteSequence) pasteSeqRef.current = nextPasteSequence;
-    setMarqueeIds(plan.ids.length > 1 ? plan.ids : []);
-    setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
-    setTool("select");
-    announceDrawingShortcut(
-      announcement ?? (placement === "in-place" ? "현재 위치에 붙여넣기" : "붙여넣기")
-    );
-    return true;
-  }
-
-  async function pasteStudioElementsFromClipboard(
-    placement: "cascade" | "in-place"
-  ): Promise<boolean> {
-    if (activeSurfaceReviewLocked) {
-      setError(
-        collaborationDocumentLocked
-          ? collaborationLockMessage()
-          : "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 붙여넣어 주세요."
-      );
-      return false;
-    }
-    const mutationTicket = captureStudioMutationTicket();
-    const targetPageId = activePage.id;
-    const targetMasterEditMode = masterEditMode;
-
-    let systemInspected = false;
-    let unsupportedSystemContent = false;
-    let systemPayload: StudioClipboardPayload | null = null;
-    const clipboard = globalThis.navigator?.clipboard;
-    try {
-      if (clipboard && typeof clipboard.read === "function") {
-        const items = await clipboard.read();
-        systemInspected = true;
-        for (const item of items) {
-          if (item.types.includes("text/plain")) {
-            const text = await (await item.getType("text/plain")).text();
-            systemPayload = parseClipboardPayload(text);
-            if (!systemPayload && text.trim()) unsupportedSystemContent = true;
-          }
-          if (item.types.some((type) => type.startsWith("image/"))) {
-            unsupportedSystemContent = true;
-          }
-          if (systemPayload) break;
-        }
-      } else if (clipboard && typeof clipboard.readText === "function") {
-        const text = await clipboard.readText();
-        systemInspected = true;
-        systemPayload = parseClipboardPayload(text);
-        unsupportedSystemContent = !systemPayload && text.trim().length > 0;
-      }
-    } catch {
-      // Clipboard read permission is optional. The in-memory/session fallback remains authoritative.
-    }
-
-    if (!isStudioPasteScopeCurrent({
-      mutationAllowed: canApplyStudioMutation(mutationTicket),
-      reviewLocked: activeSurfaceReviewLockedRef.current,
-      targetPageId,
-      currentPageId: currentPageIdRef.current,
-      targetMasterEditMode,
-      currentMasterEditMode: masterEditModeRef.current,
-    })) {
-      announceDrawingShortcut("페이지나 원고 상태가 바뀌어 붙여넣기를 취소했습니다");
-      return false;
-    }
-
-    if (systemPayload) return applyStudioClipboardPayload(systemPayload, placement);
-    if (systemInspected && unsupportedSystemContent) {
-      announceDrawingShortcut("외부 이미지·텍스트는 ⌘V 또는 이미지 파일 붙여넣기를 사용하세요");
-      return false;
-    }
-    const fallback =
-      studioClipboardPayloadRef.current ??
-      readClipboardFallback(studioClipboardSessionStorage(), studioClipboardScopeKey);
-    if (fallback) return applyStudioClipboardPayload(fallback, placement);
-    announceDrawingShortcut("붙여넣을 Studio 요소가 없습니다");
-    return false;
-  }
-
-  // 클립보드 이미지 붙여넣기(⌘V): 스크린샷·외부 그림을 바로 캔버스에 추가.
-  // shortcutRef와 같은 방식으로 최신 상태/함수를 ref로 흘린다.
-  const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});
-  useEffect(() => {
-    pasteRef.current = (e: ClipboardEvent) => {
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      const typing = !!target && (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT" ||
-        target.isContentEditable ||
-        target.getAttribute("role") === "textbox"
-      );
-      const insideShortcutBoundary = target !== null &&
-        target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
-      const modalOpen = typeof document !== "undefined" && [
-        ...document.querySelectorAll<HTMLElement>("[aria-modal='true']"),
-      ].some((modal) => !modal.hidden && !modal.inert && modal.getClientRects().length > 0);
-      if (
-        !e.isTrusted ||
-        !shouldHandleStudioEditEvent({
-          defaultPrevented: e.defaultPrevented,
-          typing,
-          editing: Boolean(editing),
-          insideShortcutBoundary,
-          // No undoRedoIntent here: this is the paste route and `e` is a ClipboardEvent — a
-          // paste can never be the history chord, so the panel-scope exemption stays keydown-only.
-          modalOpen,
-          timelapseCapturing,
-        })
-      ) {
-        return;
-      }
-      // 스튜디오 요소 붙여넣기: 복사 페이로드(텍스트) 우선. 이미지가 없을 때만 세션 폴백
-      // (시스템 클립보드 기록이 차단된 환경) — 외부에서 복사한 이미지 붙여넣기는 그대로 존중한다.
-      const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
-      const clipboardItems = Array.from(e.clipboardData?.items ?? []);
-      const hasClipboardImage = clipboardItems.some((item) => item.type.startsWith("image/"));
-      const elementPayload =
-        parseClipboardPayload(clipboardText) ??
-        (clipboardText.trim() || hasClipboardImage
-          ? null
-          : studioClipboardPayloadRef.current ?? readClipboardFallback(
-              studioClipboardSessionStorage(),
-              studioClipboardScopeKey
-            ));
-      if (elementPayload && applyStudioClipboardPayload(elementPayload, "cascade")) {
-        e.preventDefault();
-        return;
-      }
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (!item.type.startsWith("image/")) continue;
-        const file = item.getAsFile();
-        if (!file) continue;
-        e.preventDefault();
-        const mutationTicket = captureStudioMutationTicket();
-        const targetPageId = activePage.id;
-        const targetMasterEditMode = masterEditMode;
-        const insertionPlacement = nextAssetInsertionPlacement();
-        void (async () => {
-          try {
-            const { src, width, height, isAnimatedGif } = await loadStudioCanvasImageFile(file);
-            if (!isStudioPasteScopeCurrent({
-              mutationAllowed: canApplyStudioMutation(mutationTicket),
-              reviewLocked: activeSurfaceReviewLockedRef.current,
-              targetPageId,
-              currentPageId: currentPageIdRef.current,
-              targetMasterEditMode,
-              currentMasterEditMode: masterEditModeRef.current,
-            })) return;
-            addRenderedImage(
-              src,
-              width,
-              height,
-              undefined,
-              isAnimatedGif,
-              undefined,
-              insertionPlacement
-            );
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "이미지 붙여넣기 실패");
-          }
-        })();
-        return;
-      }
-    };
-  });
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => pasteRef.current(e);
-    globalThis.addEventListener("paste", onPaste);
-    return () => globalThis.removeEventListener("paste", onPaste);
   }, []);
 
   function studioInsertState(): StudioPageInsertState {
@@ -22274,7 +20851,7 @@ const puppetWarpArmed =
     }
     if (newEls.length === 0) return;
     if (scenarioApplyTarget === "new-page") {
-      const currentIndex = Math.max(0, pages.findIndex((page) => page.id === activePage.id));
+      const currentIndex = Math.max(0, pages.findIndex((page: PageState) => page.id === activePage.id));
       const nextPages = insertBlankPageAt(
         pages,
         currentIndex + 1,
@@ -22282,7 +20859,7 @@ const puppetWarpArmed =
         Math.max(1080, scenarioResult.nextCanvasH)
       );
       const insertedPage = nextPages[currentIndex + 1];
-      const populatedPages = nextPages.map((page) =>
+      const populatedPages = nextPages.map((page: PageState) =>
         page.id === insertedPage.id
           ? { ...page, elements: newEls, canvasH: Math.max(1080, scenarioResult.nextCanvasH) }
           : page
@@ -23102,193 +21679,34 @@ const puppetWarpArmed =
       (current) => deleteSavedClipInMemory(current, id),
     );
   }
-  function instantiateTemplateFrames(
-    nextFrames: readonly FrameSpec[],
-    currentEls: El[],
-  ): El[] {
-    const nonFrames = currentEls.filter((el) => el.type !== "frame");
-    const newFrames = nextFrames.map((f) => ({
-      id: uid(),
-      type: "frame" as const,
-      x: f.x,
-      y: f.y,
-      width: f.width,
-      height: f.height,
-    }));
-
-    return [...newFrames, ...nonFrames];
-  }
-
-  function regenerateTemplate(
-    tpl: TemplateSpec,
-    gutter: number,
-    currentEls: El[] = elements,
-  ): El[] | null {
-    const nextFrames = regenerateStudioTemplateFrames(tpl, gutter);
-    return nextFrames ? instantiateTemplateFrames(nextFrames, currentEls) : null;
-  }
-
-  async function applyTemplate(tpl: TemplateSpec) {
-    // 승인 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
-    const templateRequest = studioApplyTemplateRequest({
-      elementCount: elements.length,
-      frameCount: tpl.frames.length,
-    });
-    if (elements.length > 0 && !(await confirmStudioDestructiveAction(templateRequest))) return;
-    setMenu(null);
-    setCanvasH(tpl.canvasH);
-    setBg("#ffffff");
-    setBgGrad(null);
-    setCurrentTemplate(tpl);
-    // Irregular templates keep their authored frames. They are intentionally excluded from the
-    // gutter slider because regenerating their geometry would require destructive guesswork.
-    const nextEls = regenerateTemplate(tpl, panelGutter, [])
-      ?? instantiateTemplateFrames(tpl.frames, []);
-    settleStudioDestructiveCommit(templateRequest, commit(nextEls), undo);
-    setSelectedId(null);
-    announceDrawingShortcut(
-      tpl.frames.length > 0
-        ? `「${tpl.label}」템플릿 · 컷 ${tpl.frames.length}개`
-        : `「${tpl.label}」빈 캔버스`
-    );
-  }
-  // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
-  async function applyPanelLayout(layout: PanelLayoutPreset) {
-    if (comipoActionBusyRef.current) return;
-    const panelLayoutRequest = studioApplyPanelLayoutRequest({
-      layoutName: layout.label,
-      elementCount: elements.length,
-    });
-    if (elements.length > 0 && !(await confirmStudioDestructiveAction(panelLayoutRequest))) return;
-    const deferredAction = captureDeferredComipoAction();
-    const script = dialogueScript.trim() || undefined;
-    comipoActionBusyRef.current = true;
-    try {
-      const { assembleComipoPage } = await loadStudioComipoAssembly();
-      if (!canApplyDeferredComipoAction(deferredAction)) return;
-      const assembled = assembleComipoPage({
-        layoutId: layout.id,
-        dialogueScript: script,
-      });
-      if (!assembled?.composable) {
-        setError("컷 템플릿을 배치하지 못했습니다. 대사 길이를 줄이거나 레이아웃을 바꿔 보세요.");
-        return;
-      }
-      setMenu(null);
-      setCanvasH(assembled.canvasH);
-      setBg("#ffffff");
-      setBgGrad(null);
-      setCurrentTemplate(null);
-      settleStudioDestructiveCommit(
-        panelLayoutRequest,
-        commit(comipoSeedsToEls(assembled.seeds)),
-        undo
-      );
-      setSelectedId(null);
-      announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
-    } catch (error) {
-      console.error("Failed to load the Studio panel assembly engine:", error);
-      if (canApplyDeferredComipoAction(deferredAction)) {
-        setError("컷 템플릿 엔진을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-      }
-    } finally {
-      comipoActionBusyRef.current = false;
-    }
-  }
-
-  /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
-  async function applyCollage(payload: {
-    canvasH: number;
-    canvasBg: string;
-    frames: readonly {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      bg: string;
-      stroke: string;
-      strokeWidth: number;
-      name: string;
-      groupId: string;
-    }[];
-    groupId: string;
-    imagePlacements: readonly {
-      imageId: string;
-      slotIndex: number;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }[];
-    replaceExisting: boolean;
-  }) {
-    setMenu(null);
-    const collageRequest = studioApplyCollageRequest({
-      elementCount: elements.length,
-      frameCount: payload.frames.length,
-    });
-    if (
-      payload.replaceExisting
-      && elements.length > 0
-      && !(await confirmStudioDestructiveAction(collageRequest))
-    ) {
-      return;
-    }
-    setCanvasH(payload.canvasH);
-    setBg(payload.canvasBg);
-    setBgGrad(null);
-    setCurrentTemplate(null);
-
-    const groupId = `${payload.groupId}-${uid()}`;
-    const frameEls: El[] = payload.frames.map((frame) => ({
-      id: uid(),
-      type: "frame" as const,
-      x: frame.x,
-      y: frame.y,
-      width: frame.width,
-      height: frame.height,
-      bg: frame.bg,
-      bgColor: frame.bg,
-      stroke: frame.strokeWidth > 0 && frame.stroke !== "transparent" ? frame.stroke : undefined,
-      strokeWidth: frame.strokeWidth > 0 ? frame.strokeWidth : undefined,
-      name: frame.name,
-      groupId,
-    }));
-
-    const imageById = new Map(
-      elements.filter((el) => el.type === "image").map((el) => [el.id, el])
-    );
-    const placedImages: El[] = [];
-    for (const placement of payload.imagePlacements) {
-      const source = imageById.get(placement.imageId);
-      if (!source || source.type !== "image") continue;
-      placedImages.push({
-        ...source,
-        x: placement.x,
-        y: placement.y,
-        width: placement.width,
-        height: placement.height,
-        rotation: 0,
-        noClip: false,
-        groupId,
-        name: source.name ?? `콜라주 사진 ${placement.slotIndex + 1}`,
-      });
-    }
-
-    if (payload.replaceExisting) {
-      settleStudioDestructiveCommit(
-        collageRequest,
-        commit([...frameEls, ...placedImages]),
-        undo
-      );
-    } else {
-      const placedIds = new Set(placedImages.map((el) => el.id));
-      const kept = elements.filter((el) => !placedIds.has(el.id));
-      commit([...kept, ...frameEls, ...placedImages]);
-    }
-    setSelectedId(null);
-    announceDrawingShortcut(`${payload.frames.length}칸 콜라주를 적용했어요.`);
-  }
+  const {
+    regenerateTemplate,
+    applyTemplate,
+    applyPanelLayout,
+    applyCollage,
+    applyBgPreset,
+    applyStudioBackgroundFill,
+  } = useStudioTemplateLayout({
+    elements,
+    panelGutter,
+    canvasH,
+    dialogueScript,
+    uid,
+    setMenu,
+    setCanvasH,
+    setBg,
+    setBgGrad,
+    setCurrentTemplate,
+    commit,
+    undo,
+    setSelectedId,
+    setError,
+    announceDrawingShortcut,
+    comipoActionBusyRef,
+    captureDeferredComipoAction,
+    canApplyDeferredComipoAction,
+    markStudioDocumentChanged,
+  });
 
   function addCatalogElement(item: { svg: string; width: number; height: number; label: string }) {
     setMenu(null);
@@ -23332,113 +21750,6 @@ const puppetWarpArmed =
     setBg3dSeedTemplateId(null);
     setBg3dSeedPrimitiveKind(null);
     setPoserSeedPropId(null);
-  }
-
-  function applyBgPreset(p: BgPreset) {
-    if (!p.grad && !p.fill) return;
-    if (!markStudioDocumentChanged()) return;
-    if (p.grad) setBgGrad(p.grad);
-    else if (p.fill) {
-      setBg(p.fill);
-      setBgGrad(null);
-    }
-  }
-
-  /**
-   * PicsArt-class page fill: solid/gradient → page bg fields;
-   * pattern/atmosphere/horizontal gradient → locked full-bleed image under content.
-   */
-  async function applyStudioBackgroundFill(payload: {
-    kind: "solid" | "gradient" | "svg";
-    color?: string;
-    stops?: string[];
-    direction?: "vertical" | "horizontal";
-    svg?: string;
-    width?: number;
-    height?: number;
-    label?: string;
-    presetId?: string;
-  }) {
-    setMenu(null);
-    // 모든 분기가 페이지 배경 필드나 fill 레이어를 커밋하므로 진입에서 한 번만 범프한다.
-    if (!markStudioDocumentChanged()) return;
-    const {
-      buildStudioBackgroundGradientSvg,
-      isStudioBackgroundFillLayerName,
-      STUDIO_BG_FILL_LAYER_PREFIX,
-    } = await import("./studio-background-presets");
-    const stripFillLayers = (list: El[]) =>
-      list.filter((el) => !isStudioBackgroundFillLayerName(el.name));
-
-    if (payload.kind === "solid" && payload.color) {
-      setBg(payload.color);
-      setBgGrad(null);
-      const next = stripFillLayers(elements);
-      if (next.length !== elements.length) commit(next);
-      announceDrawingShortcut("단색 배경을 적용했어요.");
-      return;
-    }
-
-    if (payload.kind === "gradient" && payload.stops && payload.stops.length > 0) {
-      const direction = payload.direction ?? "vertical";
-      if (direction === "vertical") {
-        setBg(payload.stops[0] ?? "#ffffff");
-        setBgGrad([...payload.stops]);
-        const next = stripFillLayers(elements);
-        if (next.length !== elements.length) commit(next);
-        announceDrawingShortcut("그라데이션 배경을 적용했어요.");
-        return;
-      }
-      // Horizontal: bake as full-bleed SVG (page bg field is vertical-only).
-      const svg = buildStudioBackgroundGradientSvg(
-        CANVAS_W,
-        canvasH,
-        payload.stops,
-        "horizontal"
-      );
-      const src = svgToDataUrl(svg);
-      setBg("#ffffff");
-      setBgGrad(null);
-      const bgEl: El = {
-        id: uid(),
-        type: "image",
-        src,
-        x: 0,
-        y: 0,
-        width: CANVAS_W,
-        height: canvasH,
-        rotation: 0,
-        locked: true,
-        noClip: true,
-        name: `${STUDIO_BG_FILL_LAYER_PREFIX} · ${payload.label ?? "가로 그라데이션"}`,
-      };
-      commit([bgEl, ...stripFillLayers(elements)]);
-      announceDrawingShortcut("가로 그라데이션 배경을 적용했어요.");
-      return;
-    }
-
-    if (payload.kind === "svg" && payload.svg) {
-      const src = svgToDataUrl(payload.svg);
-      const w = payload.width ?? CANVAS_W;
-      const h = payload.height ?? canvasH;
-      setBg("#ffffff");
-      setBgGrad(null);
-      const bgEl: El = {
-        id: uid(),
-        type: "image",
-        src,
-        x: 0,
-        y: 0,
-        width: w,
-        height: h,
-        rotation: 0,
-        locked: true,
-        noClip: true,
-        name: `${STUDIO_BG_FILL_LAYER_PREFIX} · ${payload.label ?? "패턴"}`,
-      };
-      commit([bgEl, ...stripFillLayers(elements)]);
-      announceDrawingShortcut("패턴·분위기 배경을 적용했어요.");
-    }
   }
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -26492,10 +24803,22 @@ const puppetWarpArmed =
         && !dynamicSelected
         && !pixelDirect
         && isDirectLiveDraftEl(next);
+      const isExplicitWebGpu = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "webgpu";
+      const isExplicitCanvas2d = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "canvas2d";
+      const isGpuHardwareReady =
+        webGpuBackendRef.current === "webgpu"
+        && webGpuCanvasHandleRef.current?.isBackendAvailable() === true;
       const gpuSelected = genericDirectSelected
-        && STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu";
-      const canvas2dSelected = genericDirectSelected
-        && STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "canvas2d";
+        && !isExplicitCanvas2d
+        && (
+          isExplicitWebGpu
+          || (
+            STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+            && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED
+            && isGpuHardwareReady
+          )
+        );
+      const canvas2dSelected = genericDirectSelected && !gpuSelected;
 
       if (pendingGpuAuthorityBlocksNewSurface) {
         return rejectSelectedSurface(
@@ -26548,8 +24871,8 @@ const puppetWarpArmed =
         : null;
       const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null;
       const liveInkBackendDecision = decideStudioLiveInkBackend({
-        preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
-        selectionEnabled: STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
+        preference: gpuSelected ? "webgpu" : "canvas2d",
+        selectionEnabled: gpuSelected ? STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED : true,
         resolvedBackend: webGpuBackendRef.current,
         // Missing preparation is an unavailable WebGPU selection, never permission for Canvas2D.
         direct: overlayCandidate && gpuStartPlan !== null,
@@ -26685,8 +25008,7 @@ const puppetWarpArmed =
       const direct =
         (
           strokeSurfaceRoute.kind === "konva"
-          && next.mode === "eraser"
-          && isDirectLiveDraftEl(next)
+          && (isDirectLiveDraftEl(next) || next.mode === "eraser")
         )
         || strokeSurfaceRoute.kind === "living-ink"
         || hokusaiPinned
@@ -29761,60 +28083,70 @@ function clearSelectionForEdit() {
     );
   }
 
-  async function saveNamedCheckpoint(name: string): Promise<boolean> {
-    if (!ensureSharedDocumentAvailableForExport()) return false;
-    try {
-      setCheckpoints(
-        await createDurableStudioCheckpoint(undefined, checkpointKey, {
-          name,
-          payload: currentStudioProjectSnapshot(),
-        })
-      );
-      setCheckpointError(null);
-      return true;
-    } catch (error) {
-      setCheckpointError(error instanceof Error ? error.message : "복구 지점을 저장하지 못했어요.");
-      return false;
-    }
-  }
+  const {
+    checkpointPanelOpen,
+    setCheckpointPanelOpen,
+    checkpoints,
+    checkpointError,
+    saveNamedCheckpoint,
+    createNamedCheckpoint,
+    restoreNamedCheckpoint,
+    removeNamedCheckpoint,
+  } = useStudioCheckpoints({
+    checkpointKey,
+    pages,
+    ensureSharedDocumentAvailableForExport,
+    currentStudioProjectSnapshot,
+    applyStudioProjectSnapshot,
+    undo,
+  });
 
-  function createNamedCheckpoint(name: string) {
-    void saveNamedCheckpoint(name);
-  }
-
-  async function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    const restoreRequest = studioRestoreCheckpointRequest({
-      checkpointName: checkpoint.name,
-      currentPageCount: pages.length,
-    });
-    if (!(await confirmStudioDestructiveAction(restoreRequest))) return;
-    try {
-      const applied = await applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
-      if (!settleStudioDestructiveCommit(restoreRequest, applied, undo)) return;
-      setCheckpointPanelOpen(false);
-      setCheckpointError(null);
-    } catch (error) {
-      setCheckpointError(error instanceof Error ? error.message : "복구 지점을 읽지 못했어요.");
+  const [serverRevisions, setServerRevisions] = useState<WorkRevisionSummary[]>([]);
+  const [serverRevisionLoading, setServerRevisionLoading] = useState(false);
+  const [serverRevisionError, setServerRevisionError] = useState<string | null>(null);
+  const serverRevisionRequestRef = useRef(0);
+  useEffect(() => {
+    if (!checkpointPanelOpen) return;
+    if (!workId || !studioAuthUserId || !serverCurrentRevision || sharedDocument?.role !== "owner" || !loggedIn) {
+      setServerRevisions([]);
+      setServerRevisionError(null);
+      setServerRevisionLoading(false);
+      return;
     }
-  }
-
-  async function removeNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    // 되돌릴 수 없는 유일한 파괴적 명령 — 저장소에서 스냅샷을 지우며 히스토리 커밋이 없다.
-    const deleteRequest = studioDeleteCheckpointRequest({
-      checkpointName: checkpoint.name,
-      savedAtLabel: checkpoint.createdAt,
-    });
-    if (!(await confirmStudioDestructiveAction(deleteRequest))) return;
-    try {
-      setCheckpoints(
-        await deleteDurableStudioCheckpoint(undefined, checkpointKey, checkpoint.id)
-      );
-      settleStudioDestructiveCommit(deleteRequest, true);
-      setCheckpointError(null);
-    } catch (error) {
-      setCheckpointError(error instanceof Error ? error.message : "복구 지점을 삭제하지 못했어요.");
-    }
-  }
+    const controller = new AbortController();
+    const requestId = serverRevisionRequestRef.current + 1;
+    serverRevisionRequestRef.current = requestId;
+    const requestScope = { authScopeKey: studioAuthUserId, workId };
+    const requestIsCurrent = () =>
+      requestId === serverRevisionRequestRef.current &&
+      isStudioEditorAsyncScopeCurrent(requestScope, {
+        ...currentStudioDocumentScopeRef.current,
+        mounted: editorMountedRef.current,
+        aborted: controller.signal.aborted,
+      });
+    setServerRevisionLoading(true);
+    setServerRevisionError(null);
+    void import("@/src/infrastructure/creator-client")
+      .then(({ listWorkRevisions }) => {
+        if (!requestIsCurrent()) return null;
+        return listWorkRevisions(workId, 20, controller.signal);
+      })
+      .then((revisions) => {
+        if (revisions && requestIsCurrent()) setServerRevisions(revisions);
+      })
+      .catch((cause) => {
+        if (!requestIsCurrent()) return;
+        setServerRevisionError(cause instanceof Error ? cause.message : "서버 버전 목록을 불러오지 못했어요.");
+      })
+      .finally(() => {
+        if (editorMountedRef.current && requestId === serverRevisionRequestRef.current) {
+          setServerRevisionLoading(false);
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [checkpointKey, checkpointPanelOpen, loggedIn, serverCurrentRevision, sharedDocument?.role, studioAuthUserId, workId]);
 
   async function openOwnerFxPanel() {
     if (loadedWork && !sharedDocument) {

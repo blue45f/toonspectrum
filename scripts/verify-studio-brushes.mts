@@ -806,15 +806,20 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
 }
 
 async function activateDesktopPen(page: Page): Promise<void> {
-  await page.keyboard.press("b");
+  const penRail = page.locator('button[data-studio-rail-tool-id="pen"]');
+  if (await penRail.count() > 0) {
+    await penRail.first().click();
+  } else {
+    await page.keyboard.press("b");
+  }
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   await toolbar.waitFor({ state: "visible", timeout: 8_000 });
   const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  if (await pen.count() > 0 && (await pen.getAttribute("aria-pressed") !== "true")) {
+    await pen.click();
+  }
   await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
 
-  // Studio remembers the inspector's last route. Select the drawing properties route through
-  // its public tab UI so the verifier is deterministic without reaching into persisted state.
   const inspectorNavigator = page.getByTestId("studio-inspector-navigator");
   await inspectorNavigator.waitFor({ state: "visible" });
   const propertiesTab = inspectorNavigator.locator(
@@ -1570,12 +1575,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       log(`DEBUG global __debugPerfectInk=${String(flag)}`);
     }
 
-    const inspector = page.locator('[role="tabpanel"][aria-label="그리기 도구 설정"]');
-    await inspector.waitFor({ state: "attached" });
-    const inspectorSummaryCount = await inspector
-      .locator('[data-studio-inspector-brush-summary="true"]')
-      .count();
-    const inspectorQuickTrayCount = await inspector
+    const summary = page.locator('[data-studio-inspector-brush-summary="true"]');
+    await summary.waitFor({ state: "attached", timeout: 20_000 });
+    const inspectorSummaryCount = await summary.count();
+    const inspectorQuickTrayCount = await page
+      .locator('[data-testid="studio-inspector-context-drawing"]')
       .locator('[data-studio-brush-tray="true"], [data-studio-open-brush-library="true"]')
       .count();
     invariant(inspectorSummaryCount === 1, "desktop inspector is missing its read-only brush summary");
