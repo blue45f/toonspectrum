@@ -1,0 +1,177 @@
+name: QA Studio targeted browser reproductions
+run-name: Studio targeted repro · ${{ github.run_number }}
+
+on:
+  push:
+    branches:
+      - qa/studio-soak-10h-20260902
+    paths:
+      - .github/workflows/qa-studio-targeted-repro.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-targeted-repro-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  prepare:
+    name: Build production Studio once
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build production assets
+        run: pnpm run build
+      - name: Upload production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-targeted-production-build
+          path: dist
+          retention-days: 3
+
+  reproduce:
+    name: ${{ matrix.id }} · 2 attempts
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - id: filter-dialog
+            command: pnpm run verify:studio-filter-dialog
+          - id: native-raster-tools
+            command: pnpm run verify:studio-native-raster-tools
+          - id: brush-latency
+            command: pnpm run verify:studio-brush-latency
+          - id: living-ink
+            command: pnpm run verify:studio-living-ink-execution
+          - id: webgpu-presentation
+            command: pnpm run verify:studio-engine-webgpu-presentation
+          - id: bg3d-inapp
+            command: pnpm run verify:studio-bg3d-inapp-editor
+          - id: bg3d-webgpu
+            command: pnpm run verify:studio-bg3d-webgpu-engine
+          - id: lifecycle-persistence
+            command: pnpm run verify:studio-launch && pnpm run verify:studio-lifecycle && pnpm run verify:studio-autosave-opfs && pnpm run verify:studio-autosave-two-tab
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and Linux browser dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Download production build
+        uses: actions/download-artifact@v4
+        with:
+          name: studio-targeted-production-build
+          path: dist
+
+      - name: Execute two isolated browser attempts
+        shell: bash
+        env:
+          REPRO_ID: ${{ matrix.id }}
+          REPRO_COMMAND: ${{ matrix.command }}
+        run: |
+          set -u
+          root="$PWD/artifacts/studio-targeted-repro/$REPRO_ID"
+          mkdir -p "$root"
+          for attempt in 1 2; do
+            out="$root/attempt-$attempt"
+            mkdir -p "$out"
+            echo "::group::$REPRO_ID attempt $attempt"
+            set +e
+            if [[ "$REPRO_ID" == "filter-dialog" && "$attempt" == "2" ]]; then
+              TOONSPECTRUM_FILTER_DIALOG_SURVEY=1 \
+              TOONSPECTRUM_VERIFY_DIR="$out" \
+              bash -lc "$REPRO_COMMAND" 2>&1 | tee "$out/console.log"
+            else
+              TOONSPECTRUM_VERIFY_DIR="$out" \
+              bash -lc "$REPRO_COMMAND" 2>&1 | tee "$out/console.log"
+            fi
+            code=${PIPESTATUS[0]}
+            set -e
+            printf '%s\n' "$code" > "$out/exit-code.txt"
+            echo "attempt=$attempt exit=$code" | tee -a "$root/attempts.tsv"
+            echo "::endgroup::"
+          done
+
+      - name: Build reproduction summary and enforce repeat threshold
+        if: always()
+        shell: bash
+        env:
+          REPRO_ID: ${{ matrix.id }}
+        run: |
+          root="$PWD/artifacts/studio-targeted-repro/$REPRO_ID"
+          node - "$root" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = process.argv[2];
+          const attempts = [1, 2].map((number) => {
+            const dir = path.join(root, `attempt-${number}`);
+            const codePath = path.join(dir, 'exit-code.txt');
+            const logPath = path.join(dir, 'console.log');
+            const exitCode = fs.existsSync(codePath) ? Number(fs.readFileSync(codePath, 'utf8').trim()) : 999;
+            const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
+            return {
+              attempt: number,
+              exitCode,
+              ok: exitCode === 0,
+              errorTail: log.split(/\r?\n/u).filter(Boolean).slice(-80),
+            };
+          });
+          const summary = {
+            generatedAt: new Date().toISOString(),
+            id: path.basename(root),
+            attempts,
+            failures: attempts.filter((attempt) => !attempt.ok).length,
+            repeatedFailure: attempts.every((attempt) => !attempt.ok),
+          };
+          fs.writeFileSync(path.join(root, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
+          const md = [
+            `# ${summary.id} targeted reproduction`,
+            '',
+            `- Failures: ${summary.failures}/2`,
+            `- Repeated failure: ${summary.repeatedFailure}`,
+            '',
+            '| Attempt | Result | Exit |',
+            '|---:|---|---:|',
+            ...attempts.map((attempt) => `| ${attempt.attempt} | ${attempt.ok ? 'PASS' : 'FAIL'} | ${attempt.exitCode} |`),
+            '',
+          ].join('\n');
+          fs.writeFileSync(path.join(root, 'report.md'), `${md}\n`);
+          if (summary.repeatedFailure) process.exitCode = 1;
+          NODE
+
+      - name: Upload targeted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-targeted-${{ matrix.id }}-${{ github.run_id }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: artifacts/studio-targeted-repro/${{ matrix.id }}
