@@ -89,6 +89,50 @@ async function expectOpcError(
 }
 
 describe("studio-will-v1-opc-interchange", () => {
+  it("encodes a strokes part above the 1 MiB direct CRC slice with the default execution mode", async () => {
+    // The bounded profile admits a 32 MiB strokes part, but the default `direct-bounded` CRC used
+    // to refuse anything above one 1 MiB task — so a document that passed every profile check
+    // failed at archive time. Build a real multi-MiB path list and require the default route to
+    // accept it and round-trip.
+    const paths: StudioWillV1OpcExportInput["paths"] = [];
+    let totalPoints = 0;
+    for (let pathIndex = 0; pathIndex < 48; pathIndex += 1) {
+      const points: Array<{ x: number; y: number }> = [];
+      const strokeWidths: number[] = [];
+      for (let pointIndex = 0; pointIndex < 4_000; pointIndex += 1) {
+        // Non-repeating fractional coordinates so delta coding cannot collapse the payload, kept
+        // under ~1,500 so 6-decimal fixed point stays inside the signed 32-bit range.
+        points.push({
+          x: 12.345678 + pathIndex * 3.14159 + pointIndex * 0.31 + Math.sin(pointIndex * 0.37) * 5,
+          y: 98.765432 + pathIndex * 2.71828 + pointIndex * 0.29 + Math.cos(pointIndex * 0.41) * 7,
+        });
+        strokeWidths.push(1.5 + ((pointIndex * 7 + pathIndex) % 23) * 0.173);
+      }
+      totalPoints += points.length;
+      paths.push({
+        points,
+        strokeWidths,
+        strokeColor: { r: (pathIndex * 37) & 0xff, g: (pathIndex * 59) & 0xff, b: 40, a: 255 },
+        decimalPrecision: 6,
+        startParameter: 0,
+        endParameter: 1,
+      });
+    }
+    expect(totalPoints).toBe(192_000);
+
+    const built = await buildStudioWillV1OpcBytes({ ...SAMPLE, paths });
+    const entries = await entriesOf(built.bytes);
+    const strokes = entries.get(STUDIO_WILL_V1_OPC_PARTS.strokes);
+    expect(strokes).toBeDefined();
+    // Guard the premise: this fixture really crosses the direct slice boundary.
+    expect(strokes!.byteLength).toBeGreaterThan(1024 * 1024);
+    expect(strokes!.byteLength).toBeLessThanOrEqual(32 * 1024 * 1024);
+
+    const imported = await importStudioWillV1Opc(built.bytes);
+    expect(imported.paths).toHaveLength(paths.length);
+    expect(imported.paths.reduce((sum, path) => sum + path.points.length, 0)).toBe(totalPoints);
+  }, 60_000);
+
   it("builds deterministic seven-part OPC bytes and round-trips Annex A paths", async () => {
     const first = await buildStudioWillV1OpcBytes(SAMPLE);
     const second = await buildStudioWillV1OpcBytes(SAMPLE);
