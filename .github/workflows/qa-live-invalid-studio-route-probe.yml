@@ -1,0 +1,56 @@
+name: QA live invalid Studio route probe
+
+on:
+  push:
+    branches:
+      - qa/extended-matrix-20260902
+    paths:
+      - scripts/qa-live-invalid-studio-route-probe.mjs
+      - .github/workflows/qa-live-invalid-studio-route-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Invalid Studio route across Korean in-app profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QA_OUTPUT_DIR: qa-results/live-invalid-route
+      QA_PROBE_ROUNDS: "3"
+      TOONSTUDIO_LIVE_URL: https://www.toonstudio.cloud
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Probe invalid Studio route repeatedly
+        run: node scripts/qa-live-invalid-studio-route-probe.mjs
+
+      - name: Upload screenshots and structured evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-invalid-studio-route-probe
+          retention-days: 14
+          if-no-files-found: error
+          path: qa-results/live-invalid-route
