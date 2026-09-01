@@ -13,6 +13,7 @@
 import { STUDIO_LIVING_INK_FIELD_VERSION } from "../studio-living-ink-field";
 import { STUDIO_LIVING_INK_GPU_PROTOCOL_VERSION } from "../studio-living-ink-gpu-protocol";
 
+import { isStudioInkwashFluidBrush } from "./studio-inkwash-fluid-brushes";
 import {
   planStudioWetInkBrushReplay,
   studioWetInkBrushRuntimeSupportsElement,
@@ -98,6 +99,12 @@ export function planStudioInteractiveWetInkBrushReplay(
   element: DrawEl,
   options: StudioWetInkBrushReplayOptions,
 ): StudioWetInkBrushReplayPlanResult | null {
+  if (
+    isStudioInkwashFluidBrush(element.brush)
+    && studioWetInkBrushRuntimeSupportsElement(element)
+  ) {
+    return planStudioWetInkBrushReplay(element, options);
+  }
   if (!studioWetInkInteractiveBackendSupportsElement(element)) return null;
   return planStudioWetInkBrushReplay(element, options);
 }

@@ -85,7 +85,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 계획된다. 그래서 substrate 물리를 고치면서 획에 세대 키를 남기지 않으면 이미 완성된
     // 페이지가 다음에 열릴 때 조용히 다시 칠해진다. `pressureModel`·`paintModel`과 정확히
     // 같은 이유·같은 모양의 capture 정책이며, 렌더러·브라우저 소유권은 여전히 밖에 있다.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(340);
+    // 의도적 변경(2026-09-01): InkWash pen/water는 dab dynamics를 건너뛰고 wet/fluid로 시작한다.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(342);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

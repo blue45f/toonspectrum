@@ -10,6 +10,7 @@
     "frameBudget",
     "grainSpectrum",
     "incompressibility",
+    "inkwashFluidUsesShippedStam",
     "mobilityGating",
     "productAxes",
     "vorticityPreservation"
@@ -83,67 +84,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 7.024416999999971
+            "milliseconds": 5.956125000000043
           },
           {
             "iterations": 1,
             "reduction": 0.09157809105755532,
-            "milliseconds": 4.149959000000081
+            "milliseconds": 8.771583000000078
           },
           {
             "iterations": 2,
             "reduction": 0.1710620993891092,
-            "milliseconds": 15.154749999999922
+            "milliseconds": 7.739208000000076
           },
           {
             "iterations": 4,
             "reduction": 0.30219825390513855,
-            "milliseconds": 5.545499999999947
+            "milliseconds": 10.47179200000005
           },
           {
             "iterations": 6,
             "reduction": 0.40425424418057165,
-            "milliseconds": 7.956084000000033
+            "milliseconds": 6.733375000000024
           },
           {
             "iterations": 8,
             "reduction": 0.4843866060113574,
-            "milliseconds": 0.7194170000000213
+            "milliseconds": 2.18425000000002
           },
           {
             "iterations": 10,
             "reduction": 0.5477456922481041,
-            "milliseconds": 0.8071669999999358
+            "milliseconds": 0.8639160000000174
           },
           {
             "iterations": 12,
             "reduction": 0.5981555168352946,
-            "milliseconds": 0.9315000000000282
+            "milliseconds": 0.9422080000000506
           },
           {
             "iterations": 16,
             "reduction": 0.671024677911479,
-            "milliseconds": 1.0771669999999176
+            "milliseconds": 1.2396250000000464
           },
           {
             "iterations": 22,
             "reduction": 0.7367943246945253,
-            "milliseconds": 1.3549580000000105
+            "milliseconds": 1.4109159999999292
           },
           {
             "iterations": 32,
             "reduction": 0.7915652504810287,
-            "milliseconds": 4.941792000000078
+            "milliseconds": 2.214207999999985
           },
           {
             "iterations": 48,
             "reduction": 0.8296844726518429,
-            "milliseconds": 2.7148750000000064
+            "milliseconds": 4.006541999999968
           },
           {
             "iterations": 64,
             "reduction": 0.8486755997786537,
-            "milliseconds": 3.45150000000001
+            "milliseconds": 3.4601670000000695
           }
         ]
       },
@@ -153,67 +154,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 0.39333299999998417
+            "milliseconds": 0.3546250000000555
           },
           {
             "iterations": 1,
             "reduction": 0.30563398215041204,
-            "milliseconds": 0.47229200000003857
+            "milliseconds": 0.40650000000005093
           },
           {
             "iterations": 2,
             "reduction": 0.2962978357841195,
-            "milliseconds": 0.5892920000000004
+            "milliseconds": 0.46887500000002547
           },
           {
             "iterations": 4,
             "reduction": 0.3355845897673906,
-            "milliseconds": 0.5368339999999989
+            "milliseconds": 0.5591670000000022
           },
           {
             "iterations": 6,
             "reduction": 0.34731879499911156,
-            "milliseconds": 0.6549169999999549
+            "milliseconds": 0.6122919999999112
           },
           {
             "iterations": 8,
             "reduction": 0.35215282069056286,
-            "milliseconds": 0.720957999999996
+            "milliseconds": 0.7450420000000122
           },
           {
             "iterations": 10,
             "reduction": 0.3545482622428314,
-            "milliseconds": 0.8317499999999427
+            "milliseconds": 0.8482909999999038
           },
           {
             "iterations": 12,
             "reduction": 0.3558880952814777,
-            "milliseconds": 0.8914170000000468
+            "milliseconds": 0.9188329999999496
           },
           {
             "iterations": 16,
             "reduction": 0.35723549964096657,
-            "milliseconds": 1.117666999999983
+            "milliseconds": 1.0571249999999281
           },
           {
             "iterations": 22,
             "reduction": 0.35804519083805164,
-            "milliseconds": 1.785250000000019
+            "milliseconds": 1.4483749999999418
           },
           {
             "iterations": 32,
             "reduction": 0.3585113316963854,
-            "milliseconds": 1.827083000000016
+            "milliseconds": 1.7984589999999798
           },
           {
             "iterations": 48,
             "reduction": 0.3587356221652306,
-            "milliseconds": 2.934750000000008
+            "milliseconds": 2.446458000000007
           },
           {
             "iterations": 64,
             "reduction": 0.3588133146187308,
-            "milliseconds": 4.706625000000031
+            "milliseconds": 3.192625000000021
           }
         ]
       }
@@ -518,5 +519,12 @@
         "ratio": 0.5442708333333334
       }
     ]
+  },
+  "inkwashFluidUsesShippedStam": {
+    "pressureResidualRatio": 0.6820457524550311,
+    "steppedDivergence": {
+      "divergenceBefore": 4.697857009418942,
+      "divergenceAfter": 2.945045768924066
+    }
   }
 }

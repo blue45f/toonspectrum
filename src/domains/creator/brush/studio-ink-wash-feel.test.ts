@@ -1,8 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { StudioLiveWetInkOverlayRenderer } from "../live/studio-live-wet-ink-overlay";
+import { BRUSH_PRESETS } from "../studio-brush";
+
+import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
+  planStudioDrawPointerStart,
+  type StudioDrawPointerStartInput,
+} from "./studio-draw-pointer-start-plan";
+import {
+  createStudioInkwashFluidSession,
+  depositStudioInkwashFluidStamp,
+  getStudioInkwashWash,
   planStudioWetInkBrushReplay,
+  readStudioInkwashFluidCell,
+  readStudioInkwashWashDocumentCell,
+  resetStudioInkwashWash,
   resolveStudioWetInkBrushPhysicalRecipe,
+  stepStudioInkwashFluid,
+  studioWetInkBrushRuntimeSupportsElement,
+  type StudioWetInkBrushSurface,
+  type StudioWetInkBrushSurfaceFactory,
 } from "./studio-wet-ink-brush-runtime";
 import {
   createStudioWetInkField,
@@ -12,6 +30,7 @@ import {
   simulateStudioWetInkField,
 } from "./studio-wet-ink-field";
 
+import type { StudioLiveInkSurface } from "../live/studio-live-ink-overlay";
 import type { DrawEl } from "../studio-element-model";
 
 function inkWashStroke(overrides: Partial<DrawEl> = {}): DrawEl {
@@ -156,3 +175,184 @@ describe("ink-wash feel on the shipped Studio wet-ink path", () => {
     expect(first.value.simulationSteps).toBeGreaterThan(0);
   });
 });
+
+function pointerStartInput(
+  overrides: Partial<StudioDrawPointerStartInput> = {},
+): StudioDrawPointerStartInput {
+  return {
+    id: "inkwash-feel-start",
+    position: { x: 12, y: 16 },
+    pointer: { pointerType: "pen", pressure: 0.8, timeStamp: 1 },
+    drawMode: "pen",
+    drawShape: "line",
+    shapeFill: false,
+    color: "#16161e",
+    strokeWidth: 10,
+    brushOpacity: 1,
+    brush: "inkwash-pen",
+    stampTuning: null,
+    brushDynamics: {},
+    stabilizer: 0,
+    stabilizerMode: "standard",
+    velocitySensitivity: 0.65,
+    pressureCurve: 1,
+    positionScale: 2,
+    brushTip: { tiltEnabled: false, angleDeg: 0, roundness: 1 },
+    symmetry: { type: "none", centerX: 0, centerY: 0, radialCount: 6 },
+    ...overrides,
+  };
+}
+
+function productInkwashStart(brushId: "inkwash-pen" | "inkwash-water-brush") {
+  const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+  if (!preset) throw new Error(`missing ${brushId}`);
+  const selection = studioCoreBrushCatalogSelection(preset);
+  const plan = planStudioDrawPointerStart(pointerStartInput({
+    id: `${brushId}-start`,
+    brush: brushId,
+    brushCatalogId: selection.catalogId,
+    brushCatalogName: selection.catalogName,
+    brushDynamics: selection.brushDynamics,
+    brushOpacity: selection.defaultOpacity,
+    strokeWidth: selection.defaultWidth,
+  }));
+  return {
+    ...plan.element,
+    points: [10, 16, 22, 16, 34, 16],
+    pressures: [0.85, 0.9, 0.7],
+  };
+}
+
+describe("InkWash pen/water product start on the shipped wet/fluid path", () => {
+  beforeEach(() => {
+    resetStudioInkwashWash();
+  });
+
+  it("accepts pointer-start snapshots and keeps water from depositing ink", () => {
+    const pen = productInkwashStart("inkwash-pen");
+    const water = productInkwashStart("inkwash-water-brush");
+    expect(studioWetInkBrushRuntimeSupportsElement(pen)).toBe(true);
+    expect(studioWetInkBrushRuntimeSupportsElement(water)).toBe(true);
+    const penRecipe = resolveStudioWetInkBrushPhysicalRecipe(pen);
+    const waterRecipe = resolveStudioWetInkBrushPhysicalRecipe(water);
+    expect(penRecipe).not.toBeNull();
+    expect(waterRecipe).not.toBeNull();
+    expect(waterRecipe!.material.pigmentLoad).toBe(0);
+    expect(penRecipe!.material.wetnessLoad).toBeGreaterThan(0.14);
+    expect(penRecipe!.material.wetnessLoad).toBeLessThan(0.4);
+    expect(penRecipe!.material.pigmentLoad).toBeGreaterThan(1);
+    const replay = planStudioWetInkBrushReplay(pen, { phase: "committed" });
+    expect(replay.ok).toBe(true);
+  });
+
+  it("shares one wash field so water moves unfixed pen ink and dry paper stays still", () => {
+    const session = createStudioInkwashFluidSession({ width: 48, height: 32 });
+    depositStudioInkwashFluidStamp(session, {
+      x: 12,
+      y: 16,
+      radius: 2.2,
+      pigment: [1.1, 1.05, 0.95],
+      wetness: 0,
+      velocity: [0, 0],
+    });
+    const dryOrigin = readStudioInkwashFluidCell(session, 12, 16)!;
+    expect(stepStudioInkwashFluid(session, 10).divergenceAfter).toBeGreaterThanOrEqual(0);
+    const dryFar = readStudioInkwashFluidCell(session, 28, 16)!;
+    expect(dryFar.mobile[0] + dryFar.mobile[2]).toBe(0);
+    expect(readStudioInkwashFluidCell(session, 12, 16)!.mobile[0]).toBeCloseTo(dryOrigin.mobile[0], 5);
+
+    const pen = {
+      ...productInkwashStart("inkwash-pen"),
+      id: "inkwash-pen-shared",
+      points: [12, 20, 16, 20, 20, 20],
+      pressures: [0.95, 0.9, 0.85],
+    };
+    const water = {
+      ...productInkwashStart("inkwash-water-brush"),
+      id: "inkwash-water-follow",
+      points: [20, 20, 32, 20, 44, 20],
+      pressures: [0.9, 0.85, 0.8],
+    };
+
+    const { renderer } = attachedInkwashOverlay();
+    expect(renderer.begin(pen, { pageEpoch: "feel" }).status).toBe("started");
+    expect(renderer.end(pen, { pageEpoch: "feel" }).status).toBe("settled");
+    expect(renderer.begin(water, { pageEpoch: "feel" }).status).toBe("started");
+    expect(renderer.end(water, { pageEpoch: "feel" }).status).toBe("settled");
+
+    const planned = planStudioWetInkBrushReplay(water, { phase: "committed" });
+    expect(planned.ok).toBe(true);
+    const wash = getStudioInkwashWash();
+    expect(wash).not.toBeNull();
+    const onPen = readStudioInkwashWashDocumentCell(wash!, 16, 20);
+    const offPen = readStudioInkwashWashDocumentCell(wash!, 28, 20);
+    const dryPaper = readStudioInkwashWashDocumentCell(wash!, 16, 8);
+    expect(onPen).not.toBeNull();
+    expect((onPen!.mobile[0] + onPen!.fixed[0])).toBeGreaterThan(0);
+    expect(onPen!.fixed[0]).toBeGreaterThan(onPen!.mobile[0]);
+    expect(offPen).not.toBeNull();
+    expect((offPen!.mobile[0] + offPen!.fixed[0])).toBeGreaterThan(0);
+    expect((dryPaper?.mobile[0] ?? 0) + (dryPaper?.fixed[0] ?? 0)).toBeLessThan(1e-12);
+  });
+});
+
+function attachedInkwashOverlay() {
+  const activeCanvas = {
+    width: 320,
+    height: 240,
+    style: { opacity: "1" },
+    getContext: () => ({
+      save: () => undefined,
+      restore: () => undefined,
+      setTransform: () => undefined,
+      clearRect: () => undefined,
+      drawImage: () => undefined,
+      get globalAlpha() { return 1; },
+      set globalAlpha(_value: number) { /* no-op mock */ },
+      get globalCompositeOperation() { return "source-over"; },
+      set globalCompositeOperation(_value: string) { /* no-op mock */ },
+    }),
+  } as unknown as HTMLCanvasElement;
+  const settledCanvas = {
+    width: 320,
+    height: 240,
+    style: { opacity: "1" },
+    getContext: () => ({
+      save: () => undefined,
+      restore: () => undefined,
+      setTransform: () => undefined,
+      clearRect: () => undefined,
+      drawImage: () => undefined,
+      get globalAlpha() { return 1; },
+      set globalAlpha(_value: number) { /* no-op mock */ },
+      get globalCompositeOperation() { return "source-over"; },
+      set globalCompositeOperation(_value: string) { /* no-op mock */ },
+    }),
+  } as unknown as HTMLCanvasElement;
+  const surfaceFactory: StudioWetInkBrushSurfaceFactory = (width, height) => ({
+    width,
+    height,
+    getContext: () => ({
+      createImageData: (imageWidth: number, imageHeight: number) => ({
+        width: imageWidth,
+        height: imageHeight,
+        colorSpace: "srgb",
+        data: new Uint8ClampedArray(imageWidth * imageHeight * 4),
+      }) as ImageData,
+      putImageData: () => undefined,
+    }),
+  } as unknown as StudioWetInkBrushSurface);
+  const renderer = new StudioLiveWetInkOverlayRenderer({ surfaceFactory });
+  renderer.attach({ activeCanvas, settledCanvas });
+  const surface: StudioLiveInkSurface = {
+    left: 0,
+    top: 0,
+    width: 320,
+    height: 240,
+    documentScale: 1,
+    documentWidth: 320,
+    flipX: false,
+  };
+  renderer.setSurface(surface);
+  return { renderer };
+}

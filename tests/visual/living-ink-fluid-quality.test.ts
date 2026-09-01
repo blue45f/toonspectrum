@@ -4,6 +4,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  createStudioInkwashFluidSession,
+  depositStudioInkwashFluidStamp,
+  stepStudioInkwashFluid,
+  studioInkwashFluidProject,
+} from "../../src/domains/creator/brush/studio-inkwash-fluid";
+import {
   STUDIO_LIVING_INK_EXECUTION_LIMITS,
   STUDIO_LIVING_INK_FLUID_AXES,
   STUDIO_LIVING_INK_FLUID_DEFAULTS,
@@ -771,6 +777,28 @@ describe("living ink fluid quality", () => {
         "Analytic cell-write budget per fixed tick; the CPU reference timings in "
         + "incompressibility.curves are solver cost, not GPU cost.",
       shapes: budget,
+    };
+  });
+
+  it("is the Stam solver the InkWash pen and water brushes actually step", () => {
+    const session = createStudioInkwashFluidSession({ width: 48, height: 48, coarseBase: 48 });
+    session.fluid.wet.fill(1);
+    seedStudioLivingInkReferenceVortex(session.fluid, 1.1);
+    const projected = studioInkwashFluidProject(session, INTERACTIVE);
+    expect(projected.after).toBeLessThan(projected.before);
+    depositStudioInkwashFluidStamp(session, {
+      x: 16,
+      y: 24,
+      radius: 3,
+      pigment: [0.9, 0.9, 0.9],
+      wetness: 1,
+      velocity: [0.6, 0],
+    });
+    const stepped = stepStudioInkwashFluid(session, 1, BASE_PARAMS);
+    expect(stepped.divergenceAfter).toBeLessThan(stepped.divergenceBefore);
+    measurements.inkwashFluidUsesShippedStam = {
+      pressureResidualRatio: projected.after / Math.max(1e-12, projected.before),
+      steppedDivergence: stepped,
     };
   });
 });

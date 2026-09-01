@@ -17,6 +17,29 @@ import {
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasWatercolorPlanSettings,
 } from "./studio-brush-alias-profile";
+import {
+  depositStudioInkwashFluidStroke,
+  stepStudioInkwashFluid,
+  studioInkwashFluidDigest,
+  studioInkwashFluidStepParams,
+  type StudioInkwashFluidSession,
+} from "./studio-inkwash-fluid";
+import {
+  isStudioInkwashFluidBrush,
+  type StudioInkwashFluidBrushId,
+} from "./studio-inkwash-fluid-brushes";
+import {
+  commitStudioInkwashWash,
+  ensureStudioInkwashWash,
+  getStudioInkwashWash,
+  markStudioInkwashWashDeposited,
+  studioInkwashDocumentToField,
+  studioInkwashWashDigest,
+  studioInkwashWashDisplay,
+  studioInkwashWashNeedsDeposit,
+  studioInkwashWashVisualOwnerId,
+  upsertStudioInkwashWashStroke,
+} from "./studio-inkwash-wash";
 import { watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
 import {
   createStudioWetInkField,
@@ -58,8 +81,8 @@ export type StudioWetInkBrushReplayPhase = "live" | "committed";
 
 export interface StudioWetInkBrushReplayOptions {
   /**
-   * Phase is diagnostic only. It is intentionally excluded from the physical plan so the same
-   * immutable snapshot has the same seed, field version and digest on both sides of handoff.
+   * Live vs committed. Watercolor/ink-wash keep byte-identical physics across phases.
+   * InkWash pen/water use committed as the dry-commit (fix/settle) of the shared wash.
    */
   readonly phase: StudioWetInkBrushReplayPhase;
 }
@@ -415,7 +438,7 @@ function fieldMaterial(
       granulation: 0.55,
       hardness: 0.2,
       paperRoughness: 0.62,
-      pigmentLoad: 0.08,
+      pigmentLoad: 0,
       waterLoad: 1.55,
       wetnessLoad: 1,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["indigo-wash"],
@@ -451,7 +474,7 @@ function fieldMaterial(
       paperRoughness: 0.58,
       pigmentLoad: 1.45,
       waterLoad: 0.32,
-      wetnessLoad: 0.22,
+      wetnessLoad: 0.16,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
     };
   }
@@ -508,6 +531,61 @@ function fieldMaterial(
   };
 }
 
+export function isStudioInkwashFluidElement(element: DrawEl): boolean {
+  return studioWetInkBrushRuntimeSupportsElement(element)
+    && isStudioInkwashFluidBrush(element.brush);
+}
+
+export function depositStudioInkwashWashElement(
+  session: StudioInkwashFluidSession,
+  element: DrawEl,
+): boolean {
+  const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
+  if (!recipe || !isStudioInkwashFluidBrush(recipe.brushId)) return false;
+  const pointCount = Math.floor(element.points.length / 2);
+  if (pointCount < 1) return false;
+  const pressures = mapStudioBrushAliasPressureSamples(
+    recipe.brushId,
+    element.pressures,
+    pointCount,
+    0.55,
+  );
+  const samples = Array.from({ length: pointCount }, (_, index) => ({
+    x: element.points[index * 2]!,
+    y: element.points[index * 2 + 1]!,
+    pressure: clamp01(pressures[index] ?? 0.55),
+    timeMs: index * (1_000 / STUDIO_WET_INK_BRUSH_FIXED_RATE_HZ),
+  }));
+  depositStudioInkwashFluidStroke(session, {
+    tool: recipe.brushId === "inkwash-water-brush" ? "water" : "pen",
+    samples,
+    radius: recipe.baseWidth * 0.5,
+    pigmentLoad: recipe.material.pigmentLoad,
+    wetnessLoad: recipe.material.wetnessLoad,
+    spectralAbsorption: recipe.material.spectralAbsorption,
+    inkColor: recipe.inkColor,
+  });
+  return true;
+}
+
+export {
+  createStudioInkwashFluidSession,
+  depositStudioInkwashFluidStamp,
+  fixStudioInkwashFluid,
+  readStudioInkwashFluidCell,
+  stepStudioInkwashFluid,
+} from "./studio-inkwash-fluid";
+export {
+  commitStudioInkwashWash,
+  getStudioInkwashWash,
+  readStudioInkwashWashDocumentCell,
+  resetStudioInkwashWash,
+  STUDIO_INKWASH_WASH_KEY,
+} from "./studio-inkwash-wash";
+
+export type { StudioInkwashFluidSession } from "./studio-inkwash-fluid";
+export type { StudioInkwashFluidBrushId };
+
 export function resolveStudioWetInkBrushPhysicalRecipe(
   element: DrawEl,
 ): StudioWetInkBrushPhysicalRecipe | null {
@@ -545,6 +623,100 @@ export function resolveStudioWetInkBrushPhysicalRecipe(
       b: Math.round(parsedColor[2] * 255),
     },
     material: fieldMaterial(brushId),
+  };
+}
+
+function applyInkwashElementToWash(
+  element: DrawEl,
+  recipe: StudioWetInkBrushPhysicalRecipe,
+  geometry: WetInkGeometry,
+): ReturnType<typeof getStudioInkwashWash> {
+  const wash = ensureStudioInkwashWash({
+    originX: geometry.originCellX / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+    originY: geometry.originCellY / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+    width: geometry.width,
+    height: geometry.height,
+    fieldScale: STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+  });
+  upsertStudioInkwashWashStroke(element);
+  if (studioInkwashWashNeedsDeposit(element)) {
+    const samples = geometry.samples.map((sample) => {
+      const documentX = (sample.x + geometry.originCellX) / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+      const documentY = (sample.y + geometry.originCellY) / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+      const field = studioInkwashDocumentToField(wash, documentX, documentY);
+      return {
+        x: field.x,
+        y: field.y,
+        pressure: sample.pressure,
+        timeMs: sample.timeMs,
+      };
+    });
+    depositStudioInkwashFluidStroke(wash.session, {
+      tool: recipe.brushId === "inkwash-water-brush" ? "water" : "pen",
+      samples,
+      radius: recipe.baseWidth * STUDIO_WET_INK_BRUSH_FIELD_SCALE * 0.5,
+      pigmentLoad: recipe.material.pigmentLoad,
+      wetnessLoad: recipe.material.wetnessLoad,
+      spectralAbsorption: recipe.material.spectralAbsorption,
+      inkColor: recipe.inkColor,
+    });
+    markStudioInkwashWashDeposited(element);
+  }
+  stepStudioInkwashFluid(
+    wash.session,
+    STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+    studioInkwashFluidStepParams({
+      bleed: recipe.material.bleed,
+      dryRate: recipe.material.dryingRate,
+      chromaticSeparation: recipe.material.chromatography ?? 0.5,
+    }),
+  );
+  return getStudioInkwashWash();
+}
+
+function planInkwashFluidReplay(input: Readonly<{
+  element: DrawEl;
+  options: StudioWetInkBrushReplayOptions;
+  recipe: StudioWetInkBrushPhysicalRecipe;
+  brushId: StudioWetInkBrushId;
+  geometry: WetInkGeometry;
+}>): StudioWetInkBrushReplayPlanResult {
+  const { element, options, recipe, brushId, geometry } = input;
+  const cells = geometry.width * geometry.height;
+  if (cells > STUDIO_WET_INK_BRUSH_MAX_CELLS) {
+    return planFailure("field-budget", "InkWash fluid field exceeds the cell budget.");
+  }
+  const wash = applyInkwashElementToWash(element, recipe, geometry);
+  if (!wash) {
+    return planFailure("field-budget", "InkWash shared wash is unavailable.");
+  }
+  if (options.phase === "committed" && brushId === "inkwash-water-brush") {
+    commitStudioInkwashWash();
+  }
+  const ownerId = studioInkwashWashVisualOwnerId();
+  const silent = ownerId !== null && ownerId !== element.id;
+  const upload = silent ? null : studioInkwashWashDisplay();
+  if (upload && upload.rgba.byteLength > STUDIO_WET_INK_BRUSH_MAX_UPLOAD_BYTES) {
+    return planFailure("upload-budget", "InkWash fluid upload exceeds the byte budget.");
+  }
+  return {
+    ok: true,
+    value: {
+      runtimeVersion: STUDIO_WET_INK_BRUSH_RUNTIME_VERSION,
+      phase: options.phase,
+      brushId,
+      strokeId: element.id,
+      revision: snapshotRevision(element),
+      seed: recipe.seed,
+      fieldDigest: studioInkwashWashDigest() ?? studioInkwashFluidDigest(wash.session),
+      fieldScale: STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+      originX: wash.originX,
+      originY: wash.originY,
+      compositeOpacity: recipe.compositeOpacity,
+      uploads: upload && !silent ? [upload] : [],
+      allocatedCells: wash.session.fluid.width * wash.session.fluid.height,
+      simulationSteps: STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+    },
   };
 }
 
@@ -597,6 +769,16 @@ export function planStudioWetInkBrushReplay(
   const geometry = wetInkGeometry(element, aliasSettings.baseWidth, pressures);
   if (!geometry) {
     return planFailure("invalid-geometry", "Wet-ink stroke geometry is invalid or too large.");
+  }
+
+  if (isStudioInkwashFluidBrush(brushId)) {
+    return planInkwashFluidReplay({
+      element,
+      options,
+      recipe,
+      brushId,
+      geometry,
+    });
   }
 
   const seed = recipe.seed;

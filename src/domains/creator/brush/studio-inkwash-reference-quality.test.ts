@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { seedStudioLivingInkReferenceVortex } from "../studio-living-ink-fluid-reference";
 
 import {
+  createStudioInkwashFluidSession,
+  depositStudioInkwashFluidStamp,
+  fixStudioInkwashFluid,
+  readStudioInkwashFluidCell,
+  resolveStudioInkwashFluidDisplay,
+  stepStudioInkwashFluid,
+  studioInkwashFluidProject,
+} from "./studio-inkwash-fluid";
+import {
+  resetStudioInkwashWash,
   resolveStudioWetInkBrushPhysicalRecipe,
 } from "./studio-wet-ink-brush-runtime";
 import {
@@ -31,6 +43,10 @@ function stroke(brush: DrawEl["brush"]): DrawEl {
 }
 
 describe("InkWash reference wet-ink quality", () => {
+  beforeEach(() => {
+    resetStudioInkwashWash();
+  });
+
   it("matches Johno Whitaker display knobs: Beer-Lambert 1.9, edge 1.35, grain 0.55", () => {
     expect(STUDIO_WET_INK_INKWASH_DISPLAY.beerLambertStrength).toBe(1.9);
     expect(STUDIO_WET_INK_INKWASH_DISPLAY.edgeDarkeningGain).toBe(1.35);
@@ -130,5 +146,143 @@ describe("InkWash reference wet-ink quality", () => {
     }, 0) / blues.length;
     expect(meanB).toBeGreaterThan(0);
     expect(mean(core, "lum")).toBeLessThan(200);
+  });
+
+  it("steps the shipped Stam solver: wet-gated flow, pressure, vorticity, chromatography", () => {
+    const dry = createStudioInkwashFluidSession({ width: 48, height: 48, coarseBase: 48 });
+    seedStudioLivingInkReferenceVortex(dry.fluid, 1.2);
+    stepStudioInkwashFluid(dry, 4);
+    let dryFlow = 0;
+    for (let index = 0; index < dry.fluid.velocity.length; index += 1) {
+      dryFlow += Math.abs(dry.fluid.velocity[index] ?? 0);
+    }
+    expect(dryFlow).toBeLessThan(1e-3);
+
+    const wet = createStudioInkwashFluidSession({ width: 48, height: 48, coarseBase: 48 });
+    wet.fluid.wet.fill(1);
+    seedStudioLivingInkReferenceVortex(wet.fluid, 1.2);
+    const before = studioInkwashFluidProject(wet, 0);
+    const after = studioInkwashFluidProject(wet, 12);
+    expect(after.after).toBeLessThan(after.before);
+    expect(after.after).toBeLessThan(before.before);
+
+    const swirlOn = createStudioInkwashFluidSession({ width: 48, height: 48, coarseBase: 48 });
+    const swirlOff = createStudioInkwashFluidSession({ width: 48, height: 48, coarseBase: 48 });
+    swirlOn.fluid.wet.fill(1);
+    swirlOff.fluid.wet.fill(1);
+    seedStudioLivingInkReferenceVortex(swirlOn.fluid, 0.9);
+    seedStudioLivingInkReferenceVortex(swirlOff.fluid, 0.9);
+    stepStudioInkwashFluid(swirlOn, 20, {
+      dt: 1 / 60,
+      flow: 0.72,
+      bleed: 0.2,
+      dryRate: 0,
+      chromaticSeparation: 0,
+      vorticity: 1,
+      capillaryCreep: 0,
+      pressureIterations: 12,
+      confinement: true,
+      transport: false,
+    });
+    stepStudioInkwashFluid(swirlOff, 20, {
+      dt: 1 / 60,
+      flow: 0.72,
+      bleed: 0.2,
+      dryRate: 0,
+      chromaticSeparation: 0,
+      vorticity: 0,
+      capillaryCreep: 0,
+      pressureIterations: 12,
+      confinement: false,
+      transport: false,
+    });
+    const enstrophy = (session: ReturnType<typeof createStudioInkwashFluidSession>): number => {
+      const { coarseWidth: w, coarseHeight: h, velocity } = session.fluid;
+      let total = 0;
+      for (let y = 1; y < h - 1; y += 1) {
+        for (let x = 1; x < w - 1; x += 1) {
+          const leftY = velocity[(y * w + x - 1) * 2 + 1] ?? 0;
+          const rightY = velocity[(y * w + x + 1) * 2 + 1] ?? 0;
+          const lowerX = velocity[((y - 1) * w + x) * 2] ?? 0;
+          const upperX = velocity[((y + 1) * w + x) * 2] ?? 0;
+          const curl = 0.5 * ((rightY - leftY) - (upperX - lowerX));
+          total += curl * curl;
+        }
+      }
+      return total;
+    };
+    expect(enstrophy(swirlOn)).toBeGreaterThan(enstrophy(swirlOff) * 1.15);
+
+    const chroma = createStudioInkwashFluidSession({ width: 48, height: 32 });
+    chroma.fluid.wet.fill(1);
+    depositStudioInkwashFluidStamp(chroma, {
+      x: 12,
+      y: 16,
+      radius: 2.4,
+      pigment: [1.2, 1.2, 1.2],
+      wetness: 1,
+      velocity: [0, 0],
+    });
+    stepStudioInkwashFluid(chroma, 16, {
+      dt: 1 / 60,
+      flow: 0.5,
+      bleed: 0.7,
+      dryRate: 0,
+      chromaticSeparation: 0.85,
+      vorticity: 0.18,
+      capillaryCreep: 0.34,
+      pressureIterations: 12,
+    });
+    const neighbor = readStudioInkwashFluidCell(chroma, 18, 16)!;
+    expect(neighbor.mobile[0]).toBeGreaterThan(neighbor.mobile[2]);
+  });
+
+  it("deepens overlapping wet deposits with Beer-Lambert and keeps settled ink under a later wash", () => {
+    const session = createStudioInkwashFluidSession({ width: 32, height: 32 });
+    const dab = {
+      x: 16,
+      y: 16,
+      radius: 3,
+      pigment: [0.55, 0.52, 0.48] as const,
+      wetness: 0.8,
+      velocity: [0, 0] as const,
+    };
+    depositStudioInkwashFluidStamp(session, dab);
+    const once = readStudioInkwashFluidCell(session, 16, 16)!;
+    depositStudioInkwashFluidStamp(session, dab);
+    const twice = readStudioInkwashFluidCell(session, 16, 16)!;
+    expect(twice.mobile[0]).toBeGreaterThan(once.mobile[0] * 1.6);
+    const transOnce = Math.exp(-once.mobile[0] * 1.9);
+    const transTwice = Math.exp(-twice.mobile[0] * 1.9);
+    expect(transTwice).toBeLessThan(transOnce);
+    const displayOnce = resolveStudioInkwashFluidDisplay(session);
+    expect(displayOnce.rgba[(16 * 32 + 16) * 4 + 3] ?? 0).toBeGreaterThan(20);
+
+    const settled = createStudioInkwashFluidSession({ width: 48, height: 32 });
+    depositStudioInkwashFluidStamp(settled, {
+      x: 14,
+      y: 16,
+      radius: 2.5,
+      pigment: [1.4, 1.3, 1.15],
+      wetness: 0.2,
+      velocity: [0, 0],
+    });
+    const beforeFix = readStudioInkwashFluidCell(settled, 14, 16)!;
+    fixStudioInkwashFluid(settled);
+    const afterFix = readStudioInkwashFluidCell(settled, 14, 16)!;
+    expect(afterFix.mobile[0]).toBe(0);
+    expect(afterFix.fixed[0]).toBeGreaterThan(beforeFix.mobile[0] * 0.9);
+    depositStudioInkwashFluidStamp(settled, {
+      x: 22,
+      y: 16,
+      radius: 4,
+      pigment: [0, 0, 0],
+      wetness: 1,
+      velocity: [0.8, 0],
+    });
+    stepStudioInkwashFluid(settled, 12);
+    const settledCore = readStudioInkwashFluidCell(settled, 14, 16)!;
+    expect(settledCore.fixed[0]).toBeGreaterThan(beforeFix.mobile[0] * 0.85);
+    expect(settledCore.mobile[0]).toBeLessThan(0.05);
   });
 });

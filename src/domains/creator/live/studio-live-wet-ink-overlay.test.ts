@@ -1,7 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getStudioInkwashWash,
   planStudioWetInkBrushReplay,
+  readStudioInkwashWashDocumentCell,
+  resetStudioInkwashWash,
   STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
 } from "../brush/studio-wet-ink-brush-runtime";
 
@@ -141,6 +144,10 @@ afterEach(() => {
 });
 
 describe("StudioLiveWetInkOverlayRenderer", () => {
+  beforeEach(() => {
+    resetStudioInkwashWash();
+  });
+
   it("keeps the interactive tile overlay fail-closed until its async backend is available", () => {
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke([10, 10]))).toBe(false);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
@@ -155,6 +162,73 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
       [10, 10],
       { mode: "eraser" },
     ))).toBe(false);
+    expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
+      [10, 10],
+      { brush: "inkwash-pen" },
+    ))).toBe(true);
+    expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
+      [10, 10],
+      { brush: "inkwash-water-brush" },
+    ))).toBe(true);
+    expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
+      [10, 10],
+      { brush: "inkwash-pen", watercolorPipeline: undefined },
+    ))).toBe(false);
+  });
+
+  it("keeps InkWash pen and water on one live wash field", () => {
+    const { renderer } = attachedRenderer();
+    const penStart = wetStroke([24, 30], { brush: "inkwash-pen", id: "inkwash-pen-live" });
+    const pen = wetStroke([24, 30, 32, 30, 40, 30], {
+      brush: "inkwash-pen",
+      id: "inkwash-pen-live",
+    });
+    const water = wetStroke([40, 30, 56, 30, 80, 30], {
+      brush: "inkwash-water-brush",
+      id: "inkwash-water-live",
+    });
+    expect(renderer.begin(penStart, { pageEpoch: 3 }).status).toBe("started");
+    expect(renderer.appendFrom(pen, { pageEpoch: 3 }).status).toBe("appended");
+    expect(renderer.end(pen, { pageEpoch: 3 }).status).toBe("settled");
+    expect(renderer.begin(water, { pageEpoch: 3 }).status).toBe("started");
+    expect(renderer.end(water, { pageEpoch: 3 }).status).toBe("settled");
+    expect(renderer.hasSettledStrokes).toBe(true);
+    expect(planStudioWetInkBrushReplay(water, { phase: "committed" }).ok).toBe(true);
+    const wash = getStudioInkwashWash();
+    expect(wash).not.toBeNull();
+    const onPen = readStudioInkwashWashDocumentCell(wash!, 32, 30);
+    const offPen = readStudioInkwashWashDocumentCell(wash!, 46, 30);
+    expect((onPen?.mobile[0] ?? 0) + (onPen?.fixed[0] ?? 0)).toBeGreaterThan(0);
+    expect((offPen?.mobile[0] ?? 0) + (offPen?.fixed[0] ?? 0)).toBeGreaterThan(0);
+    expect(onPen!.fixed[0]).toBeGreaterThan(onPen!.mobile[0]);
+  });
+
+  it("grows the wash after a one-point begin so a long append is not clipped", () => {
+    const { renderer } = attachedRenderer();
+    const start = wetStroke([20, 40], { brush: "inkwash-pen", id: "inkwash-pen-long" });
+    const long = wetStroke([20, 40, 80, 40, 140, 40, 220, 40], {
+      brush: "inkwash-pen",
+      id: "inkwash-pen-long",
+    });
+    expect(renderer.begin(start, { pageEpoch: 11 }).status).toBe("started");
+    expect(renderer.appendFrom(long, { pageEpoch: 11 }).status).toBe("appended");
+    expect(renderer.end(long, { pageEpoch: 11 }).status).toBe("settled");
+    expect(planStudioWetInkBrushReplay(long, { phase: "committed" }).ok).toBe(true);
+    const wash = getStudioInkwashWash();
+    expect(wash).not.toBeNull();
+    const nearStart = readStudioInkwashWashDocumentCell(wash!, 20, 40);
+    const far = readStudioInkwashWashDocumentCell(wash!, 200, 40);
+    expect((nearStart?.mobile[0] ?? 0) + (nearStart?.fixed[0] ?? 0)).toBeGreaterThan(0);
+    expect((far?.mobile[0] ?? 0) + (far?.fixed[0] ?? 0)).toBeGreaterThan(0);
+  });
+
+  it("cancels an in-flight InkWash stroke with resetActive", () => {
+    const { renderer } = attachedRenderer();
+    const pen = wetStroke([24, 30, 40, 30], { brush: "inkwash-pen" });
+    expect(renderer.begin(pen, { pageEpoch: 4 }).status).toBe("started");
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.resetActive()).toBe(true);
+    expect(renderer.isActive).toBe(false);
   });
 
   it("reads only the unseen suffix and uploads dirty physical tiles", () => {

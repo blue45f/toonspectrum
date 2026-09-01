@@ -43,6 +43,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { isStudioInkwashFluidBrush } from "./studio-inkwash-fluid-brushes";
 import { resolveStudioPaperBrushMedium } from "./studio-paper-brush-response";
 import { STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2 } from "./studio-paper-substrate-model";
 import {
@@ -147,7 +148,10 @@ export function planStudioDrawPointerStart(
   // Eraser/pixel input contracts do not carry the currently selected pen's whole-stroke dynamics.
   // Letting that unrelated brush id affect eligibility sent the eraser through the slower legacy
   // stabilizer whenever an artist happened to switch from a dynamics brush.
+  const inkwashFluidStroke = drawMode === "pen" && isStudioInkwashFluidBrush(brush);
+  // InkWash pen/water skip dab dynamics so pointer-start opts into the shared wet/fluid runtime.
   const hasBrushDynamics = drawMode === "pen"
+    && !inkwashFluidStroke
     && resolveStudioBrushDynamicsSelectionPresetId(brush, input.brushDynamics) !== null;
   const causalWatercolor = drawMode === "pen"
     && brushFamily === "watercolor"

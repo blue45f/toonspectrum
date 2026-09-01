@@ -27,6 +27,7 @@ import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
 } from "./studio-stroke-paint-model";
+import { studioWetInkBrushRuntimeSupportsElement } from "./studio-wet-ink-brush-runtime";
 
 function input(
   overrides: Partial<StudioDrawPointerStartInput> = {}
@@ -661,12 +662,10 @@ describe("planStudioDrawPointerStart", () => {
     expect(watercolor.element.stampPipeline).toBeUndefined();
   });
 
-  it("authors every core wet preset as one bounded dynamic stroke while preserving legacy walkers", () => {
+  it("authors remaining core wet presets as bounded dynamic strokes while preserving legacy walkers", () => {
     const wetBrushIds = [
       "watercolor",
       "ink-wash",
-      "inkwash-pen",
-      "inkwash-water-brush",
       "inkwash-bleed-wash",
       "inkwash-white-ink",
     ] as const;
@@ -703,6 +702,32 @@ describe("planStudioDrawPointerStart", () => {
     expect(legacy.element.brushDynamics).toBeUndefined();
     expect(legacy.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(legacy.capturePointerDynamics).toBe(false);
+  });
+
+  it("starts InkWash pen and water on the wet/fluid runtime instead of dab engines", () => {
+    for (const brushId of ["inkwash-pen", "inkwash-water-brush"] as const) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+      const plan = planStudioDrawPointerStart(input({
+        brush: brushId,
+        brushCatalogId: selection.catalogId,
+        brushCatalogName: selection.catalogName,
+        brushDynamics: selection.brushDynamics,
+        brushOpacity: selection.defaultOpacity,
+        strokeWidth: selection.defaultWidth,
+      }));
+
+      expect(plan.element.watercolorPipeline, `${brushId}: wet pipeline`).toBe("causal-walker-v2");
+      expect(plan.element.brushDynamics, `${brushId}: dab dynamics leaked`).toBeUndefined();
+      expect(plan.element.paintModel, `${brushId}: bounded dab paint`).toBeUndefined();
+      expect(plan.capturePointerDynamics, `${brushId}: dab sensor capture`).toBe(false);
+      expect(
+        studioWetInkBrushRuntimeSupportsElement(plan.element),
+        `${brushId}: wet/fluid runtime rejected the product start snapshot`,
+      ).toBe(true);
+    }
   });
 
   it("applies CSP pressure min size to residual pen first samples", () => {
