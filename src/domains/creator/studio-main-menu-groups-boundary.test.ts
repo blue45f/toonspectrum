@@ -128,7 +128,7 @@ describe("studio main-menu catalogue ownership boundary", () => {
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const companion = source("./studio-tools-companion.ts");
     const companionRuntime = source("./studio-tools-companion-runtime.ts");
     const start = page.indexOf("const studioMainMenuGroups = useMemo(");

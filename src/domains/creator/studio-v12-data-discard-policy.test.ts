@@ -113,7 +113,7 @@ describe("V12 in-place cutover data-discard policy", () => {
   it("requires explicit developer policy before any legacy import helper runs", () => {
     const brush = source("./brush/studio-brush-library-sqlite-repository.ts");
     const workspace = source("./studio-workspaces.ts");
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const filter = source("./filter/studio-filter-library-sqlite-repository.ts");
     expect(brush).toContain('options.legacyDataPolicy === "import-explicit"');
     expect(workspace).toContain(
@@ -172,7 +172,7 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(palettePanel).toContain("getProductStudioPaletteSqliteRepository");
     const brandKitPanel = source("./StudioBrandKitPanel.tsx");
     expect(brandKitPanel).toContain("getProductStudioBrandKitSqliteRepository");
-    const studioPage = source("./StudioPage.tsx");
+    const studioPage = source("./StudioCuttoonEditorHost.tsx");
     expect(studioPage).toContain("getProductStudioSavedClipSqliteRepository");
     const crdtOutbox = source("./live/studio-crdt-outbox.ts");
     expect(crdtOutbox).toContain("acquireStudioLocalDatabase");

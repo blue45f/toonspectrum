@@ -82,8 +82,8 @@ function functionSource(relativePath: string, name: string): string {
 
 describe("Studio server-revision restore controller boundary", () => {
   it("keeps StudioPage as a direct adapter without re-inlining the restore transaction", () => {
-    const page = moduleShape("./StudioPage.tsx");
-    const wrapper = functionSource("./StudioPage.tsx", "restoreServerRevision");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
+    const wrapper = functionSource("./StudioCuttoonEditorHost.tsx", "restoreServerRevision");
 
     expect(
       page.valueImports.filter(

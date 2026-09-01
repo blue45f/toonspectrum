@@ -26,7 +26,7 @@ describe("Studio product UI preference authority", () => {
 
   it("hydrates page-owned UI preferences from SQLite/OPFS with late-load fences", () => {
     const page = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
+      resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
       "utf8",
     );
     const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");

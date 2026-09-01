@@ -51,7 +51,7 @@ describe("Studio asset placement UI boundary", () => {
   });
 
   it("routes click, touch, and native drop placement through the same safe target contract", () => {
-    const studioPage = read("./StudioPage.tsx");
+    const studioPage = read("./StudioCuttoonEditorHost.tsx");
 
     expect(studioPage).toContain("resolveStudioInsertTarget");
     expect(studioPage).toContain("consumeStudioInsertDropTransfer");

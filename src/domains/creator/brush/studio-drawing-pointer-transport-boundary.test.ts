@@ -13,7 +13,7 @@ interface ModuleFacts {
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = fileName.endsWith("StudioPage.tsx")
+  const source = fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")
     ? readStudioCuttoonEditorSource()
     : rawSource;
   const file = ts.createSourceFile(
@@ -53,7 +53,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
 
   it("moves drawing session, capture, safety listeners, and native-end dedupe out of StudioPage", () => {
     const transport = moduleFacts("./studio-drawing-pointer-transport.ts").source;
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
 
     expect(page).toContain('from "./brush/studio-drawing-pointer-transport"');
     for (const formerPageOwner of [
@@ -87,7 +87,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
   });
 
   it("leaves Stage facades and the full finish/CRDT/draft/pending/lease coordinator in the Page", () => {
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
 
     for (const pageOwner of [
       "function onStageDown",
@@ -116,7 +116,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
   });
 
   it("restores the authoritative fixed-rate clock after previewing future pen samples", () => {
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
     const predictionStart = page.indexOf("const authoritativePerspectiveRay =");
     const predictionEnd = page.indexOf("drawingVelocityRef.current = authoritativeVelocity", predictionStart);
     const predictionBlock = page.slice(predictionStart, predictionEnd);

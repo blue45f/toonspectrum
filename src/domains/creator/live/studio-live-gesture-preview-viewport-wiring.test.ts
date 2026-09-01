@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
 
+
 import { describe, expect, it } from "vitest";
 
 import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 
 
-const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readStudioPageCompositionSource();
 // Intentional change: the live-room rotation callbacks moved from StudioPage.tsx into the
 // extracted collaboration wiring hook — the rotation-ordering pins now scan that file.
 const collaborationWiringSource = readFileSync(

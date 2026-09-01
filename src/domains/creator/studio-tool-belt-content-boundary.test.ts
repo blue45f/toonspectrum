@@ -178,7 +178,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
 
 describe("Studio ToolBelt content module boundary", () => {
   it("keeps StudioPage as the one-way static owner", () => {
-    const _page = moduleShape("./StudioPage.tsx");
+    const _page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
 
@@ -192,7 +192,7 @@ describe("Studio ToolBelt content module boundary", () => {
   });
 
   it("moves the memo component and public contracts out of StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
 
     for (const declaration of [
@@ -210,7 +210,7 @@ describe("Studio ToolBelt content module boundary", () => {
   });
 
   it("preserves all 73 stable handlers without key drift", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const handlerNames = propertyNames(
       findInterface(toolBelt, "StudioToolBeltContentHandlers").members
@@ -234,7 +234,7 @@ describe("Studio ToolBelt content module boundary", () => {
   // 계약 변경(2026-08, docs/rewrite/ux-audit-v5.md §2.4): 벨트가 disarm+setTool 을 직접 조합하면
   // 진행 중인 획 취소가 이 경로에서만 빠진다. 레일·키보드·컴패니언과 같은 정본 전이를 쓴다.
   it("routes mobile select, pen, and eraser through the stroke-safe primary transition", () => {
-    const page = moduleShape("./StudioPage.tsx").source;
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx").source;
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
     const createModeGroups = moduleShape("./StudioToolBeltCreateModeGroups.tsx").source;
 
@@ -263,7 +263,7 @@ describe("Studio ToolBelt content module boundary", () => {
   });
 
   it("keeps menu ownership and the body-portal dismissal contract in StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx").source;
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx").source;
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
     const createModeGroups = moduleShape("./StudioToolBeltCreateModeGroups.tsx").source;
     const insertTools = moduleShape("./StudioToolBeltCreateModeInsertTools.tsx").source;

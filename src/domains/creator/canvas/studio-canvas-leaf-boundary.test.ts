@@ -64,7 +64,7 @@ describe("Studio canvas leaf boundaries", () => {
   });
 
   it("keeps context-menu state, outside-click lifecycle, and 3D parsing in StudioPage", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleEdges("./StudioCanvasViewportStageHost.tsx");
     const menu = moduleEdges("./StudioCanvasContextMenu.tsx");
 

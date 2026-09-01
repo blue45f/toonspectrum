@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
 const facadeSource = readFileSync(
   new URL("./studio-work-asset-hydrator.ts", import.meta.url),
   "utf8"
@@ -10,7 +13,7 @@ const runtimeSource = readFileSync(
   new URL("./studio-work-asset-hydrator-runtime.ts", import.meta.url),
   "utf8"
 );
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
 
 describe("Studio work-asset hydrator lazy boundary", () => {

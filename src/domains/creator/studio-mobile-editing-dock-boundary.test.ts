@@ -91,7 +91,7 @@ function moduleShape(relativePath: string): ModuleShape {
 
 describe("Studio mobile editing dock module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner behind a mobile-only lazy boundary", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const loader = moduleShape("./studio-mobile-editing-dock-loader.ts");
@@ -114,7 +114,7 @@ describe("Studio mobile editing dock module boundary", () => {
   });
 
   it("moves the dock and its presentation contracts out of the page monolith", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
 
     for (const declaration of [
@@ -130,7 +130,7 @@ describe("Studio mobile editing dock module boundary", () => {
   });
 
   it("preserves the lazy registry and excludes canvas runtime dependencies", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const dockUi = moduleShape("./studio-mobile-dock-presets-config.ts");
@@ -193,7 +193,7 @@ describe("Studio mobile editing dock module boundary", () => {
   });
 
   it("routes mobile brush default restore through the page-owned baseline controller", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
 
@@ -232,7 +232,7 @@ describe("Studio mobile editing dock module boundary", () => {
   });
 
   it("leaves modal, focus, and stable-handler lifecycle in StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
 
     for (const controllerContract of [

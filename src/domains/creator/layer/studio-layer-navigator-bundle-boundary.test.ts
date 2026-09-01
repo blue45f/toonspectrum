@@ -73,7 +73,7 @@ function moduleEdges(relativePath: string) {
 
 describe("Studio layer navigator bundle boundary", () => {
   it("keeps the optional layer navigator behind one registry-owned lazyRetry import", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const inspector = moduleEdges("../StudioInspectorAsideShell.tsx");
     const navigator = moduleEdges("./StudioLayerNavigator.tsx");
     const itemRow = moduleEdges("./StudioLayerNavigatorItemRow.tsx");

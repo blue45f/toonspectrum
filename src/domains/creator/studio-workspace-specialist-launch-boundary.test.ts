@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const pageSource = readStudioPageCompositionSource();
 const menuSource = readFileSync(
   new URL("./StudioWorkspaceMenu.tsx", import.meta.url),
   "utf8",

@@ -116,7 +116,7 @@ describe("Studio publication analytics lazy boundary", () => {
 
   it("keeps the full parser and aggregator behind the loader in StudioPage", () => {
     const loaderImports = moduleImports("./studio-publication-analytics-loader.ts");
-    const studioImports = moduleImports("./StudioPage.tsx");
+    const studioImports = moduleImports("./StudioCuttoonEditorHost.tsx");
 
     expect(loaderImports.valueImports).not.toContain("./studio-publication-analytics");
     expect(loaderImports.dynamicImports).toEqual(["./studio-publication-analytics"]);
@@ -125,7 +125,7 @@ describe("Studio publication analytics lazy boundary", () => {
   });
 
   it("normalizes both deferred document domains before crossing one mutation barrier", () => {
-    const studioSource = moduleImports("./StudioPage.tsx").source;
+    const studioSource = moduleImports("./StudioCuttoonEditorHost.tsx").source;
 
     expect(studioSource).toMatch(
       /Promise\.all\(\[\s*loadStudioReleaseScheduleRuntime\(\),\s*normalizeStudioPublicationAnalyticsDeferred\(projectData\.publicationAnalytics\)/,
@@ -139,7 +139,7 @@ describe("Studio publication analytics lazy boundary", () => {
   });
 
   it("does not make analytics-free server hydration depend on the optional engine", () => {
-    const studioSource = moduleImports("./StudioPage.tsx").source;
+    const studioSource = moduleImports("./StudioCuttoonEditorHost.tsx").source;
 
     expect(studioSource).toMatch(
       /remixId\s+\? createEmptyStudioPublicationAnalyticsSnapshot\(\)\s+: await normalizeStudioPublicationAnalyticsDeferred\(doc\?\.publicationAnalytics\)/,

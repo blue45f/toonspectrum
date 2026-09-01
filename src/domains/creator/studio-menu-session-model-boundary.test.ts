@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MODEL_PATH = resolve(HERE, "studio-menu-session-model.ts");
-const PAGE_PATH = resolve(HERE, "StudioPage.tsx");
+const PAGE_PATH = resolve(HERE, "StudioCuttoonEditorHost.tsx");
 
 function modelSource() {
   const source = readFileSync(MODEL_PATH, "utf8");

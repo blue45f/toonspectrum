@@ -72,6 +72,7 @@ export default defineConfig(
   {
     files: [
       'src/domains/creator/StudioPage.tsx',
+      'src/domains/creator/StudioCuttoonEditorHost.tsx',
       'src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers*.ts',
       'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx',
     ],

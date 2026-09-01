@@ -58,7 +58,7 @@ describe("Studio companion layout bundle boundary", () => {
   });
 
   it("keeps companion-only layout modules out of the main Studio canvas graph", () => {
-    const page = readModuleImports("./StudioPage.tsx");
+    const page = readModuleImports("./StudioCuttoonEditorHost.tsx");
 
     for (const specifier of LAYOUT_MODULES) {
       expect(page.static, `${specifier} must not be statically imported by StudioPage`).not.toContain(

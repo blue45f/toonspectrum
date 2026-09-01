@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
 
+
 import { describe, expect, it } from "vitest";
 
 import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const source = readStudioPageCompositionSource();
 // 의도된 변경(2026-08, B-06): 전역 keydown 디스패처(보기 리졸버·flip 화음 분기 포함)가
 // studio-page-shortcut-dispatcher.ts 로 추출되어, 단축키 분기 검증은 그 파일을 읽는다.
 const shortcutDispatcherSource = readFileSync(

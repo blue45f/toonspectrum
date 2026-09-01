@@ -37,6 +37,16 @@ export function readStudioCuttoonStagePointersSource(): string {
  * handlers. Pointer/view extracts live beside the page, so tests should
  * read the composed editor surface instead of a single file.
  */
+/** Page entry + extracted editor host. Boundary scans that used to read only StudioPage.tsx. */
+export function readStudioPageCompositionSource(): string {
+  return [
+    resolve(baseDir, "../StudioPage.tsx"),
+    resolve(baseDir, "../StudioCuttoonEditorHost.tsx"),
+  ]
+    .map((filePath) => readFileSync(filePath, "utf8"))
+    .join("\n");
+}
+
 export function readStudioCuttoonEditorSource(): string {
   return [
     // Extracted pure helpers come first so source slices that start at an
@@ -84,6 +94,7 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../template/studio-template-layout-controller.ts"),
     resolve(baseDir, "../selection/studio-selection-transform-controller.ts"),
     resolve(baseDir, "../comipo/studio-quick-comic-controller.ts"),
+    resolve(baseDir, "../StudioCuttoonEditorHost.tsx"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
     resolve(baseDir, "../ai/studio-scenario-image-generation.ts"),

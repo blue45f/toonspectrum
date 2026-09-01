@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const studioPage = readStudioPageCompositionSource();
 const autosaveSession = readFileSync(
   new URL("./studio-autosave-opfs-session.ts", import.meta.url),
   "utf8",

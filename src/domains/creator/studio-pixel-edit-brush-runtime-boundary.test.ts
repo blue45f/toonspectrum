@@ -14,7 +14,7 @@ interface ModuleEdges {
 function moduleEdges(relativePath: string): ModuleEdges {
   const fileUrl = new URL(relativePath, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = relativePath.endsWith("StudioPage.tsx")
+  const source = relativePath.endsWith("StudioPage.tsx") || relativePath.endsWith("StudioCuttoonEditorHost.tsx")
     ? readStudioCuttoonEditorSource()
     : rawSource;
   const file = ts.createSourceFile(
@@ -83,7 +83,7 @@ const BROWSER_ORCHESTRATORS = [
 
 describe("Studio pixel-edit brush runtime boundary", () => {
   it("keeps one cached intent boundary out of the Studio static graph", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const runtimeLoaders = moduleEdges("./studio-page-editor-runtime-loaders.ts");
     const runtime = moduleEdges("./studio-pixel-edit-brush-runtime.ts");
 
@@ -109,7 +109,7 @@ describe("Studio pixel-edit brush runtime boundary", () => {
   });
 
   it("awaits the shared runtime inside every async pixel mutation guard", () => {
-    const { source } = moduleEdges("./StudioPage.tsx");
+    const { source } = moduleEdges("./StudioCuttoonEditorHost.tsx");
 
     expect(source).toContain(
       "const { magicWandScanFromImage } = await loadStudioPixelEditBrushRuntime();"
@@ -145,7 +145,7 @@ describe("Studio pixel-edit brush runtime boundary", () => {
   });
 
   it("keeps heal/clone completion cancellable and its pointer-move preview off React state", () => {
-    const { source } = moduleEdges("./StudioPage.tsx");
+    const { source } = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const bakeStart = source.indexOf("async function bakeHealCloneDragStroke");
     const bakeEnd = source.indexOf("// ── 히스토리 브러시 소스 지정", bakeStart);
     expect(bakeStart).toBeGreaterThanOrEqual(0);

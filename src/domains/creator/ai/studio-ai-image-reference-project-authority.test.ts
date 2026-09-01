@@ -39,7 +39,7 @@ const LEGACY_REFERENCE_STORAGE_PREFIX =
   "toonspectrum-studio-ai-image-references:v1";
 
 const studioPageSource = readFileSync(
-  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   "utf8",
 );
 const legacyStorageSource = readFileSync(

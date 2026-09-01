@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { formatStudioDestructivePreview } from "../studio-destructive-action-preview";
 import {
   studioSharePoseConsentRequest,
@@ -15,7 +16,7 @@ const source = [
   readFileSync(new URL("./StudioVrmPoseBoneOverlay.tsx", import.meta.url), "utf8"),
   readStudioVrmPoserImplementationSource(),
 ].join("\n");
-const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 const studioLazyPanelStackSource = readFileSync(
   new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"

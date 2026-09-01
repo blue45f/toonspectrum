@@ -14,7 +14,7 @@ function source(file: string): string {
 describe("Studio checkpoint lazy product boundary", () => {
   it("keeps the durable SQLite implementation behind a dynamic import", () => {
     const loader = source("./studio-checkpoint-loader.ts");
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
 
     expect(loader).toContain('import("./studio-checkpoints")');
     expect(loader).not.toMatch(/from\s+["']\.\/studio-checkpoints["']/u);

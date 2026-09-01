@@ -85,7 +85,7 @@ describe("Studio stage pointer mapper React lifecycle", () => {
 
   it("keeps StudioPage cache acquisition in effect setup instead of render", () => {
     const source = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
+      resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
       "utf8"
     );
 

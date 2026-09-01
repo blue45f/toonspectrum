@@ -1,6 +1,7 @@
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  Download,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -374,6 +375,7 @@ export interface StudioMobileEditingDockHandlers {
   toggleSelectionLock: () => void;
   toggleStudioCommentPinPlacement: () => void;
   undo: () => void;
+  handleDownload?: () => void;
 }
 
 export interface StudioMobileEditingDockUi {
@@ -634,6 +636,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     toggleSelectionLock,
     toggleStudioCommentPinPlacement,
     undo,
+    handleDownload,
   } = stableHandlers;
   const t = useT();
   const localizedWorkspaceToggle = localizeStudioText(
@@ -1622,6 +1625,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Pencil}
                 label={label.pen}
+                data-studio-primary-action="draw"
                 hintDescription={penModeActive
                   ? drawSettingsOpen
                     ? "열려 있는 브러시 설정을 닫고 펜으로 그리던 캔버스로 돌아갑니다."
@@ -1739,6 +1743,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Undo2}
                 label={label.undo}
+                data-studio-primary-action="undo"
                 hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
                 hintUnavailableReason={undoDisabled ? undoUnavailableTitle : undefined}
                 disabled={undoDisabled}
@@ -1752,6 +1757,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Redo2}
                 label={label.redo}
+                data-studio-primary-action="redo"
                 hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
                 hintUnavailableReason={redoDisabled ? redoUnavailableTitle : undefined}
                 disabled={redoDisabled}
@@ -1762,6 +1768,33 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 }}
                 aria-label={label.redoAria}
               />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Files}
+                label="페이지"
+                hintDescription="페이지 목록을 열어 추가·복제·순서를 바꿉니다."
+                data-studio-primary-action="pages"
+                active={mobileSheet === "pages"}
+                aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                aria-pressed={mobileSheet === "pages"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  setMobileSheet((s) => (s === "pages" ? null : "pages"));
+                }}
+              />
+              {handleDownload ? (
+                <StudioDockButton
+                  icon={Download}
+                  label="내보내기"
+                  hintDescription="현재 페이지를 선택한 배율과 이미지 형식으로 즉시 내보냅니다."
+                  data-studio-primary-action="export"
+                  aria-label="현재 페이지 다운로드"
+                  onClick={() => {
+                    setWorkspaceDockExpanded(false);
+                    void handleDownload();
+                  }}
+                />
+              ) : null}
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 ref={mobileBrushDockButtonRef}

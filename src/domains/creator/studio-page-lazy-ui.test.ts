@@ -76,7 +76,7 @@ const USER_TRIGGERED_STUDIO_RUNTIMES = [
 
 describe("StudioPage optional UI registry", () => {
   it("keeps StudioPage orchestration separate from the optional loader catalog", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
 
     expect(page.valueImports).toContain("./studio-page-lazy-ui");
     for (const specifier of REPRESENTATIVE_OPTIONAL_SURFACES) {
@@ -100,7 +100,7 @@ describe("StudioPage optional UI registry", () => {
   });
 
   it("defers capture readiness and save projection until user intent", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     // Intentional change (2026-08, B-09): the save orchestration that consumes the
     // save-payload runtime moved to studio-page-save-pipeline.ts — the lazy-chunk
     // contract now covers both the page and the extracted pipeline.
@@ -220,7 +220,7 @@ describe("StudioPage optional UI registry", () => {
     expect(registry.source).toContain("studioCommentsPanelSessionLoader.load");
     expect(registry.source).toContain("studioCommentsPanelSessionLoader.preload()");
     expect(registry.source).toContain("preloadStudioCommentsPanelSession");
-    expect(moduleEdges("./StudioPage.tsx").source).toContain(
+    expect(moduleEdges("./StudioCuttoonEditorHost.tsx").source).toContain(
       "preloadStudioCommentsPanelSession();"
     );
   });

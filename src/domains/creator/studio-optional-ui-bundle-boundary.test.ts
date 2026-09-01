@@ -80,7 +80,7 @@ const STUDIO_LAZY_UI_OPTIONAL_MODULES = [
 
 describe("Studio optional UI bundle boundaries", () => {
   it("owns optional inspector and canvas-tool surfaces in the neutral lazy registry", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const inspector = moduleEdges("./StudioInspectorAside.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
@@ -101,7 +101,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("shares one PanelSplit module loader between the inspector panel and canvas overlay", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
     expect(page.dynamicImports).not.toContain("./StudioPanelSplitTool");
@@ -131,7 +131,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("keeps the heavy workspace manager behind the lightweight intent gate", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const gate = moduleEdges("./StudioWorkspaceMenuGate.tsx");
 

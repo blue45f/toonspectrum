@@ -85,7 +85,7 @@ function moduleShape(relativePath: string): ModuleShape {
 
 describe("Studio left tool rail module boundary", () => {
   it("keeps StudioPage as the one-way lazy orchestration owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const lazyUi = moduleShape("./studio-page-modal-lazy-boundaries.ts");
     const rail = moduleShape("./StudioLeftToolRail.tsx");
 
@@ -98,7 +98,7 @@ describe("Studio left tool rail module boundary", () => {
   });
 
   it("exports the component and stable handler contract from their new owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const rail = moduleShape("./StudioLeftToolRail.tsx");
 
     expect(rail.exportedDeclarations.has("StudioLeftToolRail")).toBe(true);

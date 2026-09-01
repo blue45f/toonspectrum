@@ -16,7 +16,7 @@ interface ModuleEdges {
 function moduleEdges(relativePath: string): ModuleEdges {
   const fileUrl = new URL(relativePath, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = relativePath.endsWith("StudioPage.tsx")
+  const source = relativePath.endsWith("StudioPage.tsx") || relativePath.endsWith("StudioCuttoonEditorHost.tsx")
     ? readStudioCuttoonEditorSource()
     : rawSource;
   const file = ts.createSourceFile(
@@ -110,7 +110,7 @@ const EXTRACTED_FUNCTIONS = [
 
 describe("studio draw rendering ownership boundary", () => {
   it("keeps one-way ownership from StudioPage to the pure Canvas2D helper module", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
@@ -149,7 +149,7 @@ describe("studio draw rendering ownership boundary", () => {
   });
 
   it("keeps the React-Konva node and draft preview runtime in one-way modules", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
     const documentLayer = moduleEdges("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const toolLayers = moduleEdges("../canvas/StudioCanvasViewportToolLayers.tsx");
@@ -213,7 +213,7 @@ describe("studio draw rendering ownership boundary", () => {
   });
 
   it("synchronizes retained DOM ink before admitting the next backdrop sample and bounds canvases", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
     const stageHost = moduleEdges("../canvas/StudioCanvasViewportStageHost.tsx");
     const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");

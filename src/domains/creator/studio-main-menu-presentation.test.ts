@@ -32,16 +32,17 @@ describe("createStudioMainMenuPresentation", () => {
 
     expect(presentation.groups.map((group) => group.id)).toEqual([
       ...STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER,
-      "brush",
       "text",
       "canvas",
       "transform",
       "vector",
+      "animation",
+      "filter",
       "3d",
       "collaboration",
       "ai",
     ]);
-    expect(presentation.specialistBoundaryGroupId).toBe("brush");
+    expect(presentation.specialistBoundaryGroupId).toBe("text");
   });
 
   it("keeps unknown specialist groups after every known id, in source order", () => {
@@ -65,7 +66,6 @@ describe("createStudioMainMenuPresentation", () => {
       "future-b",
     ]);
     expect(presentation.specialistGroupIds).toEqual([
-      "brush",
       "canvas",
       "ai",
       "future-a",

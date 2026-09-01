@@ -25,7 +25,7 @@ describe("/studio SVG product wiring boundary", () => {
   });
 
   it("keeps the original SVG as placement authority and excludes GPU readback", () => {
-    const page = read("./StudioPage.tsx");
+    const page = read("./StudioCuttoonEditorHost.tsx");
     const elements = read("./StudioElementsPanel.tsx");
     const router = read("./studio-svg-vello-product-router.ts");
 

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { isStudioEditorMutationContinuationAllowed } from "./studio-editor-scope";
 import {
   beginStudioMarketplaceDeepLinkOperation,
@@ -20,10 +21,8 @@ import {
 import type { StudioMarketplaceInstallGuard } from "./studio-marketplace-deep-link";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+
+const studioPageSource = readStudioPageCompositionSource();
 const studioChromeSource = readFileSync(
   new URL("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx", import.meta.url),
   "utf8",

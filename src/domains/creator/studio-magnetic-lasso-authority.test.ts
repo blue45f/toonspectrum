@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   resolveStudioMagneticLassoGesture,
   studioMagneticLassoFieldKey,
@@ -65,7 +66,7 @@ describe("Studio magnetic-lasso execution authority", () => {
   });
 
   it("wires lasso and polygon lasso through the pre-gesture rejection boundary", () => {
-    const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const pageSource = readStudioPageCompositionSource();
     const pointerSource = readFileSync(
       new URL(
         "./studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-pixel.ts",

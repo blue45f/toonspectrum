@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const studioPage = [
-  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   new URL("../studio-page-editor-runtime-loaders.ts", import.meta.url),
   new URL("../studio-page-shell-runtime.ts", import.meta.url),
 ]

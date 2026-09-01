@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioPageCompositionSource();
 const layerLiftCompositorSource = readFileSync(
   new URL("./layer/studio-layer-lift-compositor.ts", import.meta.url),
   "utf8",

@@ -23,7 +23,7 @@ describe("remaining durable creative data uses the shared V12 SQLite authority",
 
   it("routes every shipped Emeres read and write to SQLite without a localStorage fallback", () => {
     const panel = source("./StudioEmeresLibraryPanel.tsx");
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const repository = source("./studio-emeres-sqlite-repository.ts");
 
     expect(panel).toContain("getProductStudioEmeresSqliteRepository");

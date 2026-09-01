@@ -51,7 +51,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 describe("Paper vector refinement production entry boundary", () => {
   it("keeps the Paper Worker graph behind one analyzable dynamic import", () => {
     // The async refinement body moved verbatim into the StudioPage vector-ops factory module.
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const vectorOps = moduleEdges("../studio-page-vector-ops.ts");
     const workerClient = "./brush/studio-paper-vector-refinement-worker-client";
 
@@ -135,7 +135,7 @@ describe("Paper vector refinement production entry boundary", () => {
   });
 
   it("does not recycle the Paper Worker for an outer history-array identity change", () => {
-    const page = moduleEdges("../StudioPage.tsx").source;
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx").source;
     const effectStart = page.indexOf(
       "if (pathBooleanActiveRef.current) {",
     );

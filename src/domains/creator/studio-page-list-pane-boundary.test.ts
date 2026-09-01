@@ -95,7 +95,7 @@ function moduleShape(relativePath: string): ModuleShape {
 
 describe("Studio page-list pane module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const modalLazyBoundary = moduleShape("./studio-page-modal-lazy-boundaries.ts");
@@ -114,7 +114,7 @@ describe("Studio page-list pane module boundary", () => {
   });
 
   it("wires multi-page bulk move/delete through pure studio-pages helpers", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const pageManagement = moduleShape("./page/studio-page-management-controller.ts");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const pageManagementCombined = [page.source, pageManagement.source].join("\n");
@@ -131,7 +131,7 @@ describe("Studio page-list pane module boundary", () => {
   });
 
   it("moves the component and both contracts out of the page monolith", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
 
     expect(pane.exportedDeclarations).toContain("StudioPageListPaneHandlers");
@@ -158,7 +158,7 @@ describe("Studio page-list pane module boundary", () => {
   });
 
   it("keeps resize handles accessible without creating a shared startup chunk", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const resizeHandle = moduleShape("./StudioPanelResizeHandle.tsx");

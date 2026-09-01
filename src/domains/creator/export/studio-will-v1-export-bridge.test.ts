@@ -60,7 +60,7 @@ beforeEach(() => {
 describe("Studio WILL v1 page export bridge", () => {
   it("keeps the Studio click path on a static bridge import instead of an unbounded chunk request", () => {
     const studioPage = readFileSync(
-      new URL("../StudioPage.tsx", import.meta.url),
+      new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
       "utf8",
     );
 

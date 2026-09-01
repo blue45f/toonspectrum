@@ -67,7 +67,7 @@ function pathBooleanHandler(): string {
 
 describe("CanvasKit PathOps product entry boundary", () => {
   it("keeps the heavy Worker client graph behind one analyzable dynamic import", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const vectorOps = moduleEdges("../studio-page-vector-ops.ts");
     const workerClient = "./studio-quality-worker-client";
 
@@ -126,7 +126,7 @@ describe("CanvasKit PathOps product entry boundary", () => {
   });
 
   it("owns cancellation, Worker lifetime, timeline cleanup, and selection ref synchronization", () => {
-    const page = moduleEdges("../StudioPage.tsx").source;
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx").source;
     const handler = pathBooleanHandler();
 
     expect(page).toContain("pathBooleanAbortRef.current?.abort()");

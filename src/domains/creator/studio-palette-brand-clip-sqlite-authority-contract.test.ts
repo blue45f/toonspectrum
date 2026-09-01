@@ -23,7 +23,7 @@ describe("palette, Brand Kit and clip product SQLite authority", () => {
   });
 
   it("routes StudioPage AI palette and clip list/save/delete to queued repositories", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
 
     expect(page).toMatch(/import\(\s*["']\.\/studio-palette-sqlite-repository["']\s*\)/u);
     expect(page).toMatch(/import\(\s*["']\.\/studio-saved-clip-sqlite-repository["']\s*\)/u);
@@ -56,7 +56,7 @@ describe("palette, Brand Kit and clip product SQLite authority", () => {
   it("keeps durable failure, memory-only state and stale-generation rejection visible", () => {
     const palettePanel = source("./StudioPaletteLibraryPanel.tsx");
     const brandPanel = source("./StudioBrandKitPanel.tsx");
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
 
     expect(palettePanel).toContain("data-studio-palette-authority");
     expect(palettePanel).toContain("현재 탭 메모리 임시");

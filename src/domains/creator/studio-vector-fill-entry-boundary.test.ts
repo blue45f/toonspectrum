@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 
-const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const pageUrl = new URL("./StudioCuttoonEditorHost.tsx", import.meta.url);
 const previewUrl = new URL("./studio-advanced-fill-preview.ts", import.meta.url);
 const source = readFileSync(pageUrl, "utf8");
 const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");

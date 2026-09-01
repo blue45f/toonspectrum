@@ -8,7 +8,7 @@ function source(fileName: string): string {
 
 describe("unsaved Studio collaboration identity wiring", () => {
   it("uses the stable local draft ID before the per-tab fallback without eagerly requiring a server room", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain("loadOrCreateStudioDraftCollaborationIdentity(");
     expect(page).toContain("documentScopeKey: autosaveKey");

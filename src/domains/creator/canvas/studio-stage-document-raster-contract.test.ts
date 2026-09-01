@@ -24,9 +24,11 @@ import { readFileSync } from "node:fs";
 
 
 
+
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createStudioRasterExportOrchestration } from "../render/studio-raster-export-orchestration-runtime";
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { DEFAULT_PAGE_GRADE } from "../studio-page-grade";
 import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "../studio-view-controls";
 
@@ -619,7 +621,7 @@ describe("readStudioStageInDocumentView", () => {
  * ships a silently cropped export, and it is invisible to every behavioural test in the repo.
  */
 describe("every stage raster read goes through a choke point", () => {
-  const editorSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+  const editorSource = readStudioPageCompositionSource();
 
   it("routes each StudioPage stage read through a document-view restore or a capture render", () => {
     // 의도적 변경(2026-08, B-09): handleSave 의 페이지 캡처 읽기(stage.toDataURL)는

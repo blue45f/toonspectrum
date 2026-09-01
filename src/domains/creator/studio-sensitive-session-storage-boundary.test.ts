@@ -26,7 +26,7 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("keeps recent AI prompts in the current tab and never imports the old durable value", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const toolPopover = source("./ai/StudioAiToolPopoverBody.tsx");
     expect(page).toContain(
       "loadStudioAiRecentPrompts(globalThis.sessionStorage)",

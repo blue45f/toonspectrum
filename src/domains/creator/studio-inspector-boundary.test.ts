@@ -78,7 +78,7 @@ function moduleShape(relativePath: string): ModuleShape {
 
 describe("Studio inspector module boundary", () => {
   it("keeps StudioPage as the orchestration owner while deferring the heavy inspector surface", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
     const loader = moduleShape("./studio-inspector-aside-loader.ts");
@@ -111,7 +111,7 @@ describe("Studio inspector module boundary", () => {
   });
 
   it("moves the handler contract and component while leaving page orchestration behind", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
 

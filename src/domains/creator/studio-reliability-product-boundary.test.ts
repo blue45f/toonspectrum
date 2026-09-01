@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
 /**
  * "조용한 실패 부재" 계약 — Wave E 의 존재 이유를 소스로 고정한다.
  *
@@ -10,7 +13,7 @@ import { describe, expect, it } from "vitest";
  * 무음이 되는 것**은 호출부가 배선을 떼어낼 때 일어난다. 그래서 접합점 자체를 고정한다.
  */
 
-const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPage = readStudioPageCompositionSource();
 const quickComicController = readFileSync(
   new URL("./comipo/studio-quick-comic-controller.ts", import.meta.url),
   "utf8",

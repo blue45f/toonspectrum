@@ -12,7 +12,7 @@ const trackedServerTextCalls = new Set([
 ]);
 
 function trackedCallSources(): Map<string, string[]> {
-  const fileUrl = new URL("../StudioPage.tsx", import.meta.url);
+  const fileUrl = new URL("../StudioCuttoonEditorHost.tsx", import.meta.url);
   const source = readFileSync(fileUrl, "utf8");
   const file = ts.createSourceFile(
     fileUrl.pathname,

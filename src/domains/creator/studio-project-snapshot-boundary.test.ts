@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
 
+
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 const source = readFileSync(new URL("./studio-project-snapshot.ts", import.meta.url), "utf8");
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readStudioPageCompositionSource();
 const moduleSpecifiers = [
   ...source.matchAll(/\bfrom\s+["']([^"']+)["']/gu),
 ].map((match) => match[1]);

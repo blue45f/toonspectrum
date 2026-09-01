@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
+
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 
 import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 import { createStudioBg3dCameraUpForDutchRoll } from "./studio-bg3d-camera-orientation";
@@ -8,7 +9,6 @@ import {
   deriveStudioBg3dVanishingPoints,
   mapStudioBg3dVanishingPointsToCanvas,
 } from "./studio-bg3d-perspective-bridge";
-
 
 const FRONT_CAMERA = {
   position: [0, 0, 5] as const,
@@ -20,7 +20,7 @@ const FRONT_CAMERA = {
 };
 
 const backgroundSource = readStudioBg3dEditorSource();
-const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 
 describe("studio-bg3d-perspective-bridge", () => {
   it("derives a one-point guide for a camera aligned to the world z axis", () => {

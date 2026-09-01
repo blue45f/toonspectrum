@@ -63,7 +63,7 @@ describe("vite migration", () => {
   });
 
   it("keeps optional Studio asset packs out of the Studio route entry chunk", () => {
-    const studio = readFileSync(join(process.cwd(), "src/domains/creator/StudioPage.tsx"), "utf8");
+    const studio = readFileSync(join(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"), "utf8");
     const optionalAssetModules = [
       "studio-bg-scenes",
       "studio-bg-scenes-extra",

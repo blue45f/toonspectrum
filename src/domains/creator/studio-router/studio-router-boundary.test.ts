@@ -12,7 +12,7 @@ const appRouterSource = readFileSync(
   "utf8",
 );
 const legacyEditorSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
+  resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
   "utf8",
 );
 const legacyEditorAdapterSource = readFileSync(

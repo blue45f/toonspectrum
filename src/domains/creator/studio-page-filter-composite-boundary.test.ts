@@ -7,7 +7,7 @@ import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewp
 import { STUDIO_FILTER_MENU_KINDS } from "./filter/studio-filter-menu";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const pageUrl = new URL("./StudioCuttoonEditorHost.tsx", import.meta.url);
 const editorViewUrl = new URL("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url);
 const sessionDialogsUrl = new URL(
   "./studio-cuttoon-editor/StudioCuttoonEditorSessionDialogs.tsx",

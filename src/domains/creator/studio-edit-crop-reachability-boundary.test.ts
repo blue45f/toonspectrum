@@ -97,7 +97,7 @@ describe("Studio edit crop reachability boundary", () => {
   });
 
   it("wires StudioPage raster preparation availability into the edit menu matrix", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const pageFile = ts.createSourceFile(
       "StudioPage.tsx",
       page,
@@ -124,7 +124,7 @@ describe("Studio edit crop reachability boundary", () => {
   });
 
   it("scopes crop/retouch preparation to the selected non-image layer when present", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     expect(page).toContain("sourceIds: [selected.id]");
     expect(page).toContain("선택 선화 편집 복사본");
     expect(page).toContain("선택한 레이어만 원본 보존 래스터로 준비하고 있어요");

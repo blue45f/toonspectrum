@@ -34,7 +34,7 @@ describe("studio save payload ownership boundary", () => {
   });
 
   it("keeps capture, freshness, transport, CRDT, and cleanup ordering in the save pipeline", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     // Intentional change (2026-08, B-09): the handleSave orchestration moved to
     // studio-page-save-pipeline.ts; StudioPage keeps only the deps-forwarding
     // wrapper, so the ordering contract reads the extracted pipeline function.

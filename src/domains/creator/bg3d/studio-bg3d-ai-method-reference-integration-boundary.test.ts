@@ -6,7 +6,7 @@ import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 
 const backgroundSource = readStudioBg3dEditorSource();
 const pageSource = readFileSync(
-  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   "utf8",
 );
 const previewStackSource = readFileSync(

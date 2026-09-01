@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioPageCompositionSource();
 const rasterExportSource = readFileSync(
   new URL("./render/studio-raster-export-orchestration-runtime.ts", import.meta.url),
   "utf8",

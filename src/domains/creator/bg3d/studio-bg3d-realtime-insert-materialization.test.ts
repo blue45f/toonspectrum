@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { createStudioShared3dSceneSessionFromElements } from "../studio-shared-3d-scene-bridge";
 import {
   resolveStudioShared3dStageCollectionForBundle,
@@ -16,7 +15,7 @@ import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document
 import type { StudioBackground3DInsertResult } from "../scene-3d/studio-3d-insert-contract";
 import type { El } from "../studio-element-model";
 
-const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 const VALID_COLOR_PNG = "data:image/png;base64,Y29sb3I=";
 const VALID_COMPOSITE_PNG = "data:image/png;base64,Y29tcG9zaXRl";
 const VALID_UPDATED_PNG = "data:image/png;base64,dXBkYXRlZA==";

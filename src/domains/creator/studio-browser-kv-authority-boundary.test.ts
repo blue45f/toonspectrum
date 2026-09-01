@@ -389,9 +389,9 @@ const HISTORY_LEGACY_IDB_PROOF =
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   // Intentional change (2026-08, B-17): the recovery-banner "clear" browser-mirror cleanup moved
   // with clearAutosaveRecord into studio-page-autosave-runtime.ts. Same three deletions, same
   // durable-tombstone-first ordering — only the file changed.
@@ -403,7 +403,7 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "STUDIO_AI_RECENT_PROMPTS_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "STUDIO_AI_RECENT_PROMPTS_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   // Intentional change (2026-08): clipboard remnant cleanup moved with poser state
   // into useStudioVrmPoserState.ts. Same two deletions — only the file changed.
   allow("src/domains/creator/vrm/useStudioVrmPoserState.ts", "local-storage-cleanup", '"studio_pose_clipboard"', 1, CLEANUP_ONLY, CLEANUP_PROOF),

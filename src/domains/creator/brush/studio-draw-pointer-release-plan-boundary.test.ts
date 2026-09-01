@@ -13,7 +13,7 @@ interface ModuleFacts {
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = fileName.endsWith("StudioPage.tsx")
+  const source = fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")
     ? readStudioCuttoonEditorSource()
     : rawSource;
   const file = ts.createSourceFile(
@@ -77,7 +77,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
   });
 
   it("leaves release capture, CRDT sealing, surfaces, commit recovery, and cleanup in StudioPage", () => {
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
     const start = page.indexOf("function finishDrawingPointer");
     const end = page.indexOf("function onStagePointerCancel", start);
     const finish = page.slice(start, end);
@@ -137,7 +137,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
   });
 
   it("keeps a short Living Ink stroke hidden until its own receipt without a vector substitute", () => {
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
     const clearStart = page.indexOf("function clearStudioLivingInkRetainedDraftPixels");
     const failStart = page.indexOf("function failStudioLivingInkStroke", clearStart);
     const discardStart = page.indexOf("function discardStudioLivingInkStroke", failStart);

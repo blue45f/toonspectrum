@@ -92,7 +92,7 @@ describe("studio Konva runtime ownership boundary", () => {
   });
 
   it("keeps StudioPage as a consumer instead of a second runtime owner", () => {
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
 
     expect(
       page.valueImports.filter((specifier) => specifier === "./render/studio-konva-runtime"),
@@ -110,7 +110,7 @@ describe("studio Konva runtime ownership boundary", () => {
 
   it("does not eager-load heavy filters and preserves both literal intent boundaries", () => {
     const runtime = moduleEdges("./studio-konva-runtime.ts");
-    const page = moduleEdges("../StudioPage.tsx");
+    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
     const imageNode = moduleEdges("../StudioKonvaImageNode.tsx");
 
     expect(runtime.dynamicImports).toEqual([]);

@@ -87,7 +87,7 @@ describe("Studio inspector canvas-controls boundary", () => {
   });
 
   it("keeps authored frames when applying a template whose gutter topology is unsupported", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const templateController = moduleEdges(
       "./template/studio-template-layout-controller.ts"
     ).source;

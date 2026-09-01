@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 
+
 import { describe, expect, it } from "vitest";
 
 import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics";
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "../brush/studio-ink-pressure-model";
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 import {
   createStudioRasterHandoffAuthorityKey,
@@ -306,7 +308,7 @@ describe("studio raster handoff authority", () => {
   });
 
   it("pins the StudioPage gate matrix wiring for the M2 view-tool slice", () => {
-    const source = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+    const source = readStudioPageCompositionSource();
     const memoStart = source.indexOf("const studioRasterHandoffGates = useMemo");
     expect(memoStart).toBeGreaterThan(-1);
     const memo = source.slice(memoStart, source.indexOf("]);", memoStart));

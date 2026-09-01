@@ -216,7 +216,7 @@ describe("Studio canvas guide layer ownership boundary", () => {
   });
 
   it("moves every guide node implementation while retaining Stage pointer guards", () => {
-    const page = moduleShape("../StudioPage.tsx").source;
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx").source;
     const stagePointers = readStudioCuttoonStagePointersSource();
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx").source;
 

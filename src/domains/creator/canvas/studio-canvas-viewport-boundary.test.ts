@@ -125,7 +125,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("moves the renderer and both public contracts out of the page monolith", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const viewportTypes = moduleShape("./StudioCanvasViewportTypes.ts");
 
@@ -141,7 +141,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("preserves the existing memoized Stage hot-surface contract", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(page.source).toContain(
@@ -155,7 +155,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("stabilizes compiler-opted-out viewport projections and event bridges", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
     const viewportTypes = moduleShape("./StudioCanvasViewportTypes.ts");
 
@@ -193,7 +193,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("keeps transient shortcut notices below the memoized Stage boundary", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     // 2026-08-21 intentional: the notice layer moved verbatim out of StudioCanvasViewport.tsx into
     // its own leaf module. The boundary being guarded is unchanged — the store still lives in
@@ -304,7 +304,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("shares only leaf utilities with the orchestration owner", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const shared = moduleShape("./studio-canvas-shared-runtime.ts");
 

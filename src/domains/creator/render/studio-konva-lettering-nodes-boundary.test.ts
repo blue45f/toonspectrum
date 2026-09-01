@@ -312,7 +312,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("keeps the transform commit and unconditional live-lock release in the parent", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(page.source).toContain("function commitTextTransformEnd(");

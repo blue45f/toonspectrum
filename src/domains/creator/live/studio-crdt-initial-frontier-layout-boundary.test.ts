@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const source = readStudioPageCompositionSource();
 
 describe("Studio initial CRDT frontier layout boundary", () => {
   it("projects the authoritative frontier before the first editable canvas paint", () => {

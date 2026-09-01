@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 
-const fileUrl = new URL("../StudioPage.tsx", import.meta.url);
+const fileUrl = new URL("../StudioCuttoonEditorHost.tsx", import.meta.url);
 // The scenario image executors moved verbatim into the ctx-parameterized factory module.
 const scenarioModuleUrl = new URL("./studio-scenario-image-generation.ts", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");

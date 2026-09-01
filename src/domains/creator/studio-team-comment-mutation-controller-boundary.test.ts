@@ -85,9 +85,9 @@ function functionSource(relativePath: string, name: string): string {
 
 describe("Studio team-comment mutation controller boundary", () => {
   it("keeps StudioPage as a thin state adapter without re-inlining the remote transaction", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const wrapper = functionSource(
-      "./StudioPage.tsx",
+      "./StudioCuttoonEditorHost.tsx",
       "executeStudioTeamCommentMutationPlan",
     );
 

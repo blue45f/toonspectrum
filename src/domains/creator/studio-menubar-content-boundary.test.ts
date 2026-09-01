@@ -60,7 +60,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio menubar ownership boundary", () => {
   it("keeps StudioPage as the single lazy parent and forbids a reverse dependency", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const modalLazyBoundary = moduleEdges("./studio-page-modal-lazy-boundaries.ts");
@@ -95,7 +95,7 @@ describe("Studio menubar ownership boundary", () => {
   });
 
   it("loads heavy application menus only through the neutral lazy registry", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
@@ -117,7 +117,7 @@ describe("Studio menubar ownership boundary", () => {
   });
 
   it("preserves the two-lane chrome, accessible portal selectors, and Page-owned focus refs", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
 
     expect(menubar).toContain('data-studio-menubar-primary="true"');
@@ -138,7 +138,7 @@ describe("Studio menubar ownership boundary", () => {
   });
 
   it("keeps handler identity stable while render-time lock copy remains a normal prop", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
     const handlerContract = menubar.slice(
@@ -158,7 +158,7 @@ describe("Studio menubar ownership boundary", () => {
   });
 
   it("wires multi-page range capture through indices mode (not all-then-slice residual)", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
     const rasterIntent = moduleEdges("./useStudioRasterExportOrchestration.ts").source;
     const rasterRuntime = moduleEdges(

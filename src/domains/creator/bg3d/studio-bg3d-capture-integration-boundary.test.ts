@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
 import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 
 const background3dSource = readStudioBg3dEditorSource();
@@ -9,7 +12,7 @@ const actionFooterSource = readFileSync(
   new URL("./StudioBg3dActionFooter.tsx", import.meta.url),
   "utf8",
 );
-const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 const studioLazyPanelStackSource = readFileSync(
   new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"

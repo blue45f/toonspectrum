@@ -132,7 +132,7 @@ describe("Studio 3D insert controller boundary", () => {
   });
 
   it("keeps StudioPage as the single static orchestration owner", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const controllerTest = moduleShape("./studio-3d-insert-controller.test.ts");
 
     expect(
@@ -186,7 +186,7 @@ describe("Studio 3D insert controller boundary", () => {
     expect(previewStack).not.toContain("applyBg3dRenderedImage");
     expect(previewStack).not.toContain("addRenderedImage");
     expect(previewStack).not.toContain("patchEl");
-    const page = moduleShape("../StudioPage.tsx").source;
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx").source;
     const insertHandlerStart = page.indexOf("insertBg3dResult: (result) => {");
     const insertHandlerEnd = page.indexOf("insertVrmResult:", insertHandlerStart);
     const insertHandler = page.slice(insertHandlerStart, insertHandlerEnd);
@@ -199,7 +199,7 @@ describe("Studio 3D insert controller boundary", () => {
   });
 
   it("wires fail-closed commit results before selection, tool, and guide side effects", () => {
-    const page = moduleShape("../StudioPage.tsx").source;
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx").source;
     const addStart = page.indexOf("function addEl(el: El): boolean");
     const addEnd = page.indexOf("// ── 레이어 그룹", addStart);
     const addElement = page.slice(addStart, addEnd);

@@ -9,7 +9,7 @@ function source(relative: string): string {
 describe("/studio custom-font V12 product authority boundary", () => {
   it("mounts the once-dormant panel in the existing lazy typography inspector", () => {
     const inspector = source("./StudioInspectorTypographySection.tsx");
-    const page = source("./StudioPage.tsx");
+    const page = source("./StudioCuttoonEditorHost.tsx");
     const lazyRegistry = source("./studio-page-lazy-ui.ts");
 
     // The panel only renders for a selected text element, so it sits one boundary deeper than the

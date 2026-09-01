@@ -160,7 +160,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "cta-changed-state",
         clauses: [
           {
-            file: "src/domains/creator/StudioPage.tsx",
+            file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
             allOf: [
               "materializeStudioEditableRasterCopy",
               "setSelectedId(composite.id)",
@@ -173,7 +173,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "target-selectable-after-cta",
         clauses: [
           {
-            file: "src/domains/creator/StudioPage.tsx",
+            file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
             allOf: [
               'case "activate-selection"',
               "applyPixelSelectionActivation(resumePlan.selectionTool)",
@@ -186,7 +186,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "entry-visible-after-target-selection",
         clauses: [
           {
-            file: "src/domains/creator/StudioPage.tsx",
+            file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
             allOf: [
               'case "arm-retouch"',
               "openInspectorRoute(",
@@ -218,7 +218,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "prerequisite-explained",
         clauses: [{
-          file: "src/domains/creator/StudioPage.tsx",
+          file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
           allOf: ["자유선 펜 획 하나를 선택하세요.", "paperVectorRefinementUnavailableReason"],
         }],
       },
@@ -312,7 +312,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "cta-changed-state",
         clauses: [{
-          file: "src/domains/creator/StudioPage.tsx",
+          file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
           allOf: [
             "onRequestPixelSelection: () => {",
             'activatePixelSelectionToolFromInspector("rect")',
@@ -330,7 +330,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "entry-visible-after-target-selection",
         clauses: [{
-          file: "src/domains/creator/StudioPage.tsx",
+          file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
           allOf: ["openPixelSelectionTransform", "openInspectorRoute("],
         }],
       },
@@ -362,7 +362,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "cta-changed-state",
         clauses: [{
-          file: "src/domains/creator/StudioPage.tsx",
+          file: "src/domains/creator/StudioCuttoonEditorHost.tsx",
           allOf: [
             "onRequestSelectImage: () => {",
             'setTool("select")',

@@ -128,7 +128,7 @@ describe("Studio background 3D bundle boundary", () => {
   });
 
   it("keeps StudioPage tool detection on the Three-free metadata module", () => {
-    const imports = moduleImports("./StudioPage.tsx");
+    const imports = moduleImports("./StudioCuttoonEditorHost.tsx");
 
     expect(imports.valueImports).toContain("./studio-background-3d-metadata");
     expect(imports.valueImports).not.toContain("./studio-background-3d-primitives");

@@ -117,7 +117,7 @@ describe("procedural artistic brush inspector boundary", () => {
 
   it("enforces locks, bounded dimensions, monotonic requests and canonical insertion", () => {
     const inspector = readStudioInspectorAsideSurface();
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const source = moduleEdges(
       "./StudioProceduralArtisticBrushInspectorSection.tsx",
     ).source;

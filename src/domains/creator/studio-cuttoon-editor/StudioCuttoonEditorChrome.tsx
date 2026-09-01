@@ -447,6 +447,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           studioMainMenuGroups={studioMainMenuGroups}
           title={title}
           undoDisabled={menuEditUndoDisabled}
+          pageSequenceOpen={s.pageSequenceOpen}
           watermark={watermark}
           workId={workId}
           workspaceMenuEpoch={workspaceMenuEpoch}

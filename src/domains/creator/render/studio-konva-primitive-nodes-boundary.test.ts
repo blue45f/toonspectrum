@@ -128,7 +128,7 @@ const RESIZABLE_PROPS = [
 
 describe("Studio Konva primitive node boundary", () => {
   it("owns every primitive implementation outside StudioPage", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 

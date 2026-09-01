@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const pageSource = readStudioPageCompositionSource();
 
 describe("Studio pixel-selection pointer lifecycle", () => {
   it("captures the owning pointer and keeps global release/cancel safety nets", () => {

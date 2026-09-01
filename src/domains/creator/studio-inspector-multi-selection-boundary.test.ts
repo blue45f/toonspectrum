@@ -11,7 +11,7 @@ const shellSource = readFileSync(
   "utf8",
 );
 const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
+  new URL("./StudioCuttoonEditorHost.tsx", import.meta.url),
   "utf8",
 );
 const selectionControllerSource = readFileSync(

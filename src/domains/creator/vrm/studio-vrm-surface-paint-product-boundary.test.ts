@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
 import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 
 const poserSource = readStudioVrmPoserImplementationSource();
-const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readStudioPageCompositionSource();
 const toolSource = readFileSync(
   new URL("./studio-vrm-surface-paint-tool.ts", import.meta.url),
   "utf8",

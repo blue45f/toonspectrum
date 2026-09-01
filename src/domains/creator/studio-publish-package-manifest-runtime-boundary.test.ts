@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const studioPage = readStudioPageCompositionSource();
 // 의도된 변경(2026-08, B-04): 게시 패키지 내보내기·manifest 다운로드가 StudioPage.tsx 에서
 // export/studio-publish-package-export.ts 로 추출되어, 런타임 동적 import 소유권도 함께 이동했다.
 const publishPackageExport = readFileSync(

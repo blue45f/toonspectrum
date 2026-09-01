@@ -12,7 +12,7 @@ function source(path: string): string {
 
 describe("Studio live dynamic brush integration boundary", () => {
   it("arms the suffix renderer at pointer-down and routes pointer frames through appendFrom", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const pointerStart = page.slice(
       page.indexOf("const dynamicBrushDirect ="),
       page.indexOf("const predictionTailEligible =", page.indexOf("const dynamicBrushDirect =")),
@@ -43,7 +43,7 @@ describe("Studio live dynamic brush integration boundary", () => {
   });
 
   it("seals exact material on the overlay until the committed-draw receipt", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const finish = source("../studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts");
     const seal = finish.indexOf("liveDynamicBrushOverlayRendererRef.current.end(finished)");
     const reject = finish.indexOf(
@@ -73,7 +73,7 @@ describe("Studio live dynamic brush integration boundary", () => {
   });
 
   it("seals stamp overlay pixels before the draft FIFO so pointer-up cannot blank the stroke", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const clear = page.slice(
       page.indexOf("const clearDraftPreview ="),
       page.indexOf("const DEFERRED_STROKE_COMMIT_IDLE_MS"),

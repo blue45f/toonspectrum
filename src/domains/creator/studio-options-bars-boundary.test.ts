@@ -84,7 +84,7 @@ function moduleShape(relativePath: string): ModuleShape {
 
 describe("Studio options-bars module boundary", () => {
   it("keeps StudioPage as the one-way static orchestration owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const optionsBars = moduleShape("./StudioOptionsBars.tsx");
 
@@ -103,7 +103,7 @@ describe("Studio options-bars module boundary", () => {
   });
 
   it("moves the component and presentation contracts out of the page monolith", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
     const optionsBars = moduleShape("./StudioOptionsBars.tsx");
 
     for (const declaration of [
@@ -159,7 +159,7 @@ describe("Studio options-bars module boundary", () => {
   });
 
   it("keeps persistence and stateful option actions in the parent controller", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("./StudioCuttoonEditorHost.tsx");
 
     for (const contract of [
       "assignStudioBrushSlot(prev, index",

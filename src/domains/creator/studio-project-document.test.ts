@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
 
+
 import { describe, expect, it } from "vitest";
 
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
 } from "./ai/studio-ai-provenance";
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   createCanonicalStudioDocumentEnvelope,
   serializeCanonicalStudioDocumentEnvelope,
@@ -22,10 +24,7 @@ import {
   STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE,
 } from "./studio-project-document";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8"
-);
+const studioPageSource = readStudioPageCompositionSource();
 const projectArchiveSource = readFileSync(
   new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
   "utf8",

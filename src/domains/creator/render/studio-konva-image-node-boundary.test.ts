@@ -180,7 +180,7 @@ const MOVED_DECLARATIONS = [
 
 describe("Studio Konva image node boundary", () => {
   it("moves the image renderer and its cache ownership out of StudioPage", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
@@ -227,7 +227,7 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("keeps filters and the worker behind literal image-node intent boundaries", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
     expect(imageNode.dynamicImports).toEqual([

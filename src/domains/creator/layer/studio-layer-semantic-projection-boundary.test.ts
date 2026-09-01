@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const studioPageSource = readFileSync(
-  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   "utf8",
 );
 

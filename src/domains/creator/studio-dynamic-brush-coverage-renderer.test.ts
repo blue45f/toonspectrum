@@ -1264,7 +1264,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
 
   it("binds cache disposal to the keyed editor work/auth lifecycle", () => {
     const studioPageSource = readFileSync(
-      new URL("./StudioPage.tsx", import.meta.url),
+      new URL("./StudioCuttoonEditorHost.tsx", import.meta.url),
       "utf8",
     );
 

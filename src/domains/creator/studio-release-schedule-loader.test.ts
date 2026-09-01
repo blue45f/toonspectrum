@@ -83,7 +83,7 @@ describe("Studio release schedule lazy boundary", () => {
 
   it("keeps the full planner behind the loader in StudioPage", () => {
     const loaderImports = moduleImports("./studio-release-schedule-loader.ts");
-    const studioImports = moduleImports("./StudioPage.tsx");
+    const studioImports = moduleImports("./StudioCuttoonEditorHost.tsx");
 
     expect(loaderImports.valueImports).not.toContain("./studio-release-schedule");
     expect(loaderImports.dynamicImports).toEqual(["./studio-release-schedule"]);

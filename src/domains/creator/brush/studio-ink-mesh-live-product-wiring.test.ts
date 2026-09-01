@@ -6,12 +6,12 @@ import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-view
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(file: string): string {
-  if (file.endsWith("StudioPage.tsx")) return readStudioCuttoonEditorSource();
+  if (file.endsWith("StudioPage.tsx") || file.endsWith("StudioCuttoonEditorHost.tsx")) return readStudioCuttoonEditorSource();
   return readFileSync(new URL(file, import.meta.url), "utf8");
 }
 
 describe("Google Ink mesh actual /studio product wiring", () => {
-  const page = source("../StudioPage.tsx");
+  const page = source("../StudioCuttoonEditorHost.tsx");
   const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
   const host = source("../StudioInkMeshLivePreviewHost.tsx");
   const runtime = source("./studio-ink-mesh-live-preview.ts");

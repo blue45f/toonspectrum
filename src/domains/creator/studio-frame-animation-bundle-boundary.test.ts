@@ -62,7 +62,7 @@ describe("Studio frame animation lazy export boundary", () => {
   });
 
   it("does not import the export runtime from the Studio route entry", () => {
-    const studio = moduleEdges("./StudioPage.tsx");
+    const studio = moduleEdges("./StudioCuttoonEditorHost.tsx");
 
     expect(studio.valueImports).toContain("./studio-frame-animation");
     expect(studio.valueImports).not.toContain("./export/studio-frame-animation-export");

@@ -9,12 +9,11 @@
 export const STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER = [
   "file",
   "edit",
+  "brush",
   "comic",
-  "animation",
   "layer",
   "select",
   "view",
-  "filter",
   "window",
   "help",
 ] as const;
@@ -24,17 +23,18 @@ export const STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER = [
  *
  * The command catalogue lists specialist groups in §15.3 source order, but that
  * order hides the artist's primary acts behind the menubar overflow at laptop
- * widths: 그리기(브러시·지우개·채우기) and 텍스트(대사·말풍선) sat third/fifth while
- * rarer surfaces stayed visible. Presentation promotes them to the front so the
- * most-used creative menus survive geometry-based clipping; unknown/future
- * groups still append after every known id, in source-relative order.
+ * widths. 그리기 (brush) joined the familiar core so Draw survives clipping;
+ * 텍스트 and rarer surfaces stay specialist, with known ids still promoted to
+ * the front of that tier. Unknown/future groups still append after every known
+ * id, in source-relative order.
  */
 export const STUDIO_MAIN_MENU_SPECIALIST_ORDER = [
-  "brush",
   "text",
   "canvas",
   "transform",
   "vector",
+  "animation",
+  "filter",
   "3d",
   "collaboration",
   "ai",

@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-
-
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,6 +20,7 @@ import {
   type StudioCanonicalVNextDryMediaPresentationSurfaceBoundary,
   type StudioCanonicalVNextDryMediaTexturedRuntimeBoundary,
 } from "./studio-canonical-vnext-dry-media-presentation-controller";
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 import type {
   StudioEngineWebGpuPresentationFrameLease,
@@ -537,7 +535,7 @@ function boundaries() {
 
 describe("canonical vNext dry-media presentation controller", () => {
   it("stays unmounted until a product host can atomically gate fallback visibility", () => {
-    const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const page = readStudioPageCompositionSource();
     const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
     expect(page).not.toContain("StudioCanonicalVNextDryMediaPresentationController");
     expect(viewport).not.toContain("StudioCanonicalVNextDryMediaPresentationController");

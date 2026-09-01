@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+
+const source = readStudioPageCompositionSource();
 
 describe("shared asset lazy-content integration boundary", () => {
   it("click insert가 await 이전 page/master scope를 캡처하고 같은 scope일 때만 커밋한다", () => {

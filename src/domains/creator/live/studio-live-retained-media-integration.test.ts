@@ -10,7 +10,7 @@ function source(path: string): string {
 
 describe("Studio live retained-media overlay integration", () => {
   it("seals oil/pencil before commit and waits for the committed-draw receipt", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const editor = readStudioCuttoonEditorSource();
     const finish = editor.slice(
       editor.indexOf("function finishDrawingPointer("),

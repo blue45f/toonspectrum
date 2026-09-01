@@ -170,6 +170,11 @@ const MENUBAR_HINTS = {
     previewVariant: "open-library",
     tip: "배치 후 우측 속성에서 꼬리, 테두리, 여백과 대사를 정교하게 다듬을 수 있어요.",
   },
+  pages: {
+    id: "menubar-pages",
+    title: "페이지",
+    description: "페이지 목록을 열어 추가·복제·순서를 바꿉니다.",
+  },
   download: {
     id: "menubar-download",
     title: "현재 페이지 다운로드",
@@ -454,6 +459,7 @@ function StudioMenubarCommandBar({
                   aria-label={accessibleName}
                   data-studio-command-bar-slot={index}
                   data-studio-command-bar-command={slot}
+                  data-studio-primary-action={slot === "undo" || slot === "redo" ? slot : undefined}
                   className={buttonClass({
                     size: "sm",
                     variant: "quiet",
@@ -896,6 +902,7 @@ export interface StudioMenubarContentHandlers extends StudioProjectReviewActionH
    * bar's zoom-fit slot disables itself with a reason while the host has not provided it.
    */
   zoomToFit?: () => void;
+  togglePageSequence?: () => void;
 }
 
 export interface StudioMenubarContentProps {
@@ -971,6 +978,7 @@ export interface StudioMenubarContentProps {
   studioMainMenuGroups: ComponentProps<typeof StudioMainMenu>["groups"];
   title: string;
   undoDisabled: boolean;
+  pageSequenceOpen?: boolean;
   watermark: WatermarkSettings;
   workId: string | null;
   workspaceMenuEpoch: number;
@@ -1050,6 +1058,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   studioMainMenuGroups,
   title,
   undoDisabled,
+  pageSequenceOpen = false,
   watermark,
   workId,
   workspaceMenuEpoch,
@@ -1093,6 +1102,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     openContinuityCheck,
     toggleDocumentComments,
     openPageReview,
+    togglePageSequence,
   } = stableHandlers;
   const commentsLocked =
     collaborationDocumentLocked && !sharedDocument?.capabilities.view;
@@ -1528,11 +1538,37 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               </span>
             </>
           ) : null}
-          <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
+          {togglePageSequence ? (
+            <StudioToolHintTarget
+              hint={MENUBAR_HINTS.pages}
+              preferredSide="bottom"
+            >
+              <button
+                type="button"
+                onClick={() => togglePageSequence()}
+                data-studio-primary-action="pages"
+                aria-pressed={pageSequenceOpen}
+                aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                className={cn(
+                  buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 gap-1.5" }),
+                  isMobile && "min-h-11",
+                )}
+              >
+                <Files size={14} aria-hidden />
+                <span className="max-xl:sr-only">페이지</span>
+              </button>
+            </StudioToolHintTarget>
+          ) : null}
+          <div
+            ref={exportMenuRef}
+            className="relative flex shrink-0 items-center"
+            data-studio-primary-action="export"
+          >
             <StudioToolHintTarget hint={MENUBAR_HINTS.download} preferredSide="bottom">
               <button
                 type="button"
                 onClick={() => handleDownload()}
+                data-studio-primary-action="export"
                 aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),

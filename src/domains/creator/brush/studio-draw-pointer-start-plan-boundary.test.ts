@@ -13,7 +13,7 @@ interface ModuleFacts {
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = fileName.endsWith("StudioPage.tsx")
+  const source = fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")
     ? readStudioCuttoonEditorSource()
     : rawSource;
   const file = ts.createSourceFile(
@@ -89,7 +89,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
-    const page = moduleFacts("../StudioPage.tsx").source;
+    const page = moduleFacts("../StudioCuttoonEditorHost.tsx").source;
     const start = page.indexOf("function onStageDown");
     const drawStart = page.indexOf("function tryStageDownDraw");
     const end = page.indexOf("// 복구 브러시/도장 호버 커서", start);

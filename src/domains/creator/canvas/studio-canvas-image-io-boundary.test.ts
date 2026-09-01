@@ -74,7 +74,7 @@ const MOVED_FUNCTIONS = [
 
 describe("Studio canvas image I/O module boundary", () => {
   it("owns the browser image and pixel helpers outside StudioPage", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
     const runtimeHelpers = moduleShape("../studio-legacy-editor-runtime-helpers.ts");
     const imageIo = moduleShape("./studio-canvas-image-io.ts");
 
@@ -105,7 +105,7 @@ describe("Studio canvas image I/O module boundary", () => {
   });
 
   it("preserves every StudioPage consumer call after extraction", () => {
-    const page = moduleShape("../StudioPage.tsx");
+    const page = moduleShape("../StudioCuttoonEditorHost.tsx");
 
     // 의도적 변경(2026-08-21, B-15): 에셋 업로드 핸들러(onUploadAsset)가
     // studio-cuttoon-editor/studio-asset-library-mutations.ts 로 추출되며 그 안의 load 1회가

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+
 import { describe, expect, it } from "vitest";
 
 import { buildStudioLiveShareHref } from "../creator-studio-links";
@@ -7,6 +8,7 @@ import {
   presentStudioAutosaveDocumentLeadership,
   studioAutosaveLeadershipAllowsLocalEdit,
 } from "../studio-autosave-document-leader";
+import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { createNativePluralShared3dStageFixture } from "../studio-shared-3d-stage-test-fixture";
 
 import {
@@ -397,7 +399,7 @@ describe("Studio Magma/Figma live collaboration session", () => {
   });
 
   it("wires the Studio work page to the shipped live-collaboration host and share URL", () => {
-    const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+    const pageSource = readStudioPageCompositionSource();
     const editorViewSource = [
       readFileSync(
         new URL("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),

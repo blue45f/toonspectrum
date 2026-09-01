@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const pageUrl = new URL("./StudioCuttoonEditorHost.tsx", import.meta.url);
 const source = readFileSync(pageUrl, "utf8");
 const file = ts.createSourceFile(
   pageUrl.pathname,

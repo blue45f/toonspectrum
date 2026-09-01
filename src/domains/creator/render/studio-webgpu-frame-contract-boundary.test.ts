@@ -25,7 +25,7 @@ describe("studio WebGPU frame contract boundary", () => {
   it("leaves engine behavior in place while removing consumer type back-edges", () => {
     const engine = source("./studio-webgpu-engine.ts");
     const canvas = source("../StudioWebGpuCanvas.tsx");
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(engine).toContain('from "./studio-webgpu-frame-contract"');
     expect(engine).toMatch(

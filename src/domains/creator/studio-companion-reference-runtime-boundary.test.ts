@@ -288,7 +288,7 @@ describe("Studio companion Reference runtime boundaries", () => {
   });
 
   it("publishes only one atomically committed Reference snapshot outside React", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     const committedRef = "referenceBoardCommittedSnapshotRef";
     const writes = refCurrentAssignments(page.sourceFile, committedRef);
 

@@ -14,9 +14,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+import { readStudioCuttoonEditorSource, readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioPageCompositionSource();
 // Intentional change: the deferred-stroke commit engine (commit/commitCoalesced/
 // expandDeferredStrokeCommitHistory/commitPages) moved into
 // studio-cuttoon-editor/studio-deferred-stroke-commit.ts. Slices that start at an extracted

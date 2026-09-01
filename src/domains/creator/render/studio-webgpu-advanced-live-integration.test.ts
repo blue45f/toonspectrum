@@ -6,7 +6,7 @@ import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-view
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(fileName: string): string {
-  if (fileName.endsWith("StudioPage.tsx")) return readStudioCuttoonEditorSource();
+  if (fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")) return readStudioCuttoonEditorSource();
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
 
@@ -52,7 +52,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("pins one exactly prepared provider and rejects it without a runtime substitute", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain('import("./render/studio-webgpu-live-stroke-plan")');
     expect(page).not.toContain('import { planStudioGpuLiveStroke } from "./studio-webgpu-stroke"');
@@ -98,7 +98,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("keeps Canvas hidden for a WebGPU-selected operation until an exact GPU receipt", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const applyStart = page.indexOf(
       "function applyLiveStrokeBackendPresentationEffects()"
@@ -152,7 +152,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("starts one compact journal root and submits every symmetry suffix atomically", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain(
       'if (outcome.status === "rejected") {'
@@ -181,7 +181,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("seals the release endpoint and rejects without publishing a Konva draft", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain("appendGpuLiveSourceJournalSuffix(source, true)");
     const settleStart = page.indexOf("const settleGpuLiveStroke =");
@@ -199,7 +199,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("fails closed synchronously when the selected engine rejects a compact command", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 
     expect(page).toContain('if (outcome.status === "rejected") {');
@@ -236,7 +236,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("cancels selected wet, dynamic, and retained-media operations without a Konva publish", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const flushStart = page.indexOf("const flushDirectLiveDraft = () => {");
     const flushEnd = page.indexOf("const flushDirectLiveDraftNow", flushStart);
     const flushSource = page.slice(flushStart, flushEnd);
@@ -255,7 +255,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("assigns live operations a monotonic terminal key independent of random element ids", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain('const STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX = "\\uffffstudio-live:"');
     expect(page).toContain("nextGpuLiveOperationOrderKey()");
@@ -265,7 +265,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("gates pointer-up commit and durability on the exact terminal WebGPU receipt", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const settleStart = page.indexOf("const settleGpuLiveStroke =");
     const settleEnd = page.indexOf("const flushDirectLiveDraft =", settleStart);
     const settleSource = page.slice(settleStart, settleEnd);
@@ -329,7 +329,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("marks surface loss unavailable without handing authority to Canvas or Konva", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const handleStart = page.indexOf("function setWebGpuCanvasHandle(");
     const handleEnd = page.indexOf("function onWebGpuBackendChange", handleStart);
     const handleSource = page.slice(handleStart, handleEnd);
@@ -352,7 +352,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("normalizes symmetry releases and preserves the original handoff queue on invariant failure", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const releaseStart = page.indexOf("function releaseCommittedInkSurfaceCounts(");
     const releaseEnd = page.indexOf("function scheduleCommittedInkSurfaceHandoffRetry", releaseStart);
     const releaseSource = page.slice(releaseStart, releaseEnd);
@@ -410,7 +410,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("schedules a post-commit handoff pass after installing the ref-only queue", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const queueStart = page.indexOf("function queueCommittedStrokeSurfaceHandoff(");
     const queueEnd = page.indexOf("function queueDeferredStrokeCommit(", queueStart);
     const queueSource = page.slice(queueStart, queueEnd);
@@ -426,7 +426,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("requires the full active journal identity before rebaselining a settled prefix", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const matchStart = page.indexOf("function activeGpuLiveSourceJournalMatchesPlan(");
     const matchEnd = page.indexOf("function beginGpuLiveSourceJournal(", matchStart);
     const matchSource = page.slice(matchStart, matchEnd);
@@ -441,7 +441,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("keeps a ready retained head installed and retries it with a bounded invariant epoch", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const processStart = page.indexOf("processCommittedInkSurfaceHandoffsRef.current = () => {");
     const processEnd = page.indexOf("useLayoutEffect(() => {", processStart);
     const processSource = page.slice(processStart, processEnd);
@@ -464,7 +464,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
   });
 
   it("keeps the mutable source private so coalesced GPU input does not copy its full prefix", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
 
     expect(page).toContain(
       "const ownsCurrentArrays = !mutateDirectly\n      && current.points === drawingFixedRateOwnedPointsRef.current;"

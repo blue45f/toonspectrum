@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 
 const pageSource = readFileSync(
-  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   "utf8",
 );
 const inspectorSource = readStudioInspectorAsideSurface();

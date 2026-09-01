@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const pageSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
+  resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
   "utf8",
 );
 

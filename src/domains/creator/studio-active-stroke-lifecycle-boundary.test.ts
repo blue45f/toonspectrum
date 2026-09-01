@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const source = readStudioPageCompositionSource();
 
 function sourceBetween(startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);

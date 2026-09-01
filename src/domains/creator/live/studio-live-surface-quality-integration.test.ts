@@ -12,7 +12,7 @@ function source(path: string): string {
 
 describe("Studio native live-surface quality integration", () => {
   it("lets only a native-DPR Canvas overlay with a successful begin own the draft", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const start = page.slice(
       page.indexOf("const overlayCandidate ="),
       page.indexOf("const predictionTailEligible ="),
@@ -45,7 +45,7 @@ describe("Studio native live-surface quality integration", () => {
   });
 
   it("paints the live eraser draft on the main layer with destination-out for real pixel lifting", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const flushStart = page.indexOf("const flushDirectLiveDraft =");
     const flushEnd = page.indexOf("const flushDirectLiveDraftNow =", flushStart);
@@ -64,7 +64,7 @@ describe("Studio native live-surface quality integration", () => {
   });
 
   it("does not admit prediction or block the exact dynamic fallback from a mere candidate", () => {
-    const page = source("../StudioPage.tsx");
+    const page = source("../StudioCuttoonEditorHost.tsx");
     const start = page.slice(
       page.indexOf("const overlayCandidate ="),
       page.indexOf("armTransientPenInkSurfaces({"),
