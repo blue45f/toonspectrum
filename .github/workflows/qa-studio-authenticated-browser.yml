@@ -1,0 +1,135 @@
+name: QA Studio authenticated cross-browser
+
+on:
+  push:
+    branches:
+      - qa/studio-soak-10h-20260902
+    paths:
+      - scripts/qa-studio-authenticated-browser.mjs
+      - .github/workflows/qa-studio-authenticated-browser.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-authenticated-browser-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  authenticated-browser:
+    name: ${{ matrix.browser }} / ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - browser: chromium
+            profile: desktop-1440
+            width: 1440
+            height: 900
+            touch: "0"
+            mobile: "0"
+            ua: ""
+          - browser: chromium
+            profile: kakaotalk-android-360
+            width: 360
+            height: 740
+            touch: "1"
+            mobile: "1"
+            ua: Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.6478.71 Mobile Safari/537.36 KAKAOTALK 10.4.3
+          - browser: firefox
+            profile: desktop-1366
+            width: 1366
+            height: 768
+            touch: "0"
+            mobile: "0"
+            ua: ""
+          - browser: firefox
+            profile: compact-touch-390
+            width: 390
+            height: 844
+            touch: "1"
+            mobile: "0"
+            ua: Mozilla/5.0 (Android 14; Mobile; rv:129.0) Gecko/129.0 Firefox/129.0
+          - browser: webkit
+            profile: desktop-1440
+            width: 1440
+            height: 900
+            touch: "0"
+            mobile: "0"
+            ua: ""
+          - browser: webkit
+            profile: instagram-ios-390
+            width: 390
+            height: 844
+            touch: "1"
+            mobile: "0"
+            ua: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/21E236 Instagram 320.0.0.0.0 (iPhone15,3; iOS 17_4; ko_KR)
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: toonspectrum_qa_auth
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d toonspectrum_qa_auth"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CI: true
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/toonspectrum_qa_auth
+      QA_API_ORIGIN: http://127.0.0.1:4301
+      QA_WEB_ORIGIN: http://127.0.0.1:5319
+      QA_BROWSER: ${{ matrix.browser }}
+      QA_PROFILE_ID: ${{ matrix.profile }}
+      QA_VIEWPORT_WIDTH: ${{ matrix.width }}
+      QA_VIEWPORT_HEIGHT: ${{ matrix.height }}
+      QA_HAS_TOUCH: ${{ matrix.touch }}
+      QA_IS_MOBILE: ${{ matrix.mobile }}
+      QA_USER_AGENT: ${{ matrix.ua }}
+      QA_REPORT_DIR: qa-results/studio-authenticated-browser/${{ matrix.browser }}-${{ matrix.profile }}
+      QA_EVIDENCE_DIR: artifacts/studio-authenticated-browser/${{ matrix.browser }}-${{ matrix.profile }}
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install ${{ matrix.browser }}
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run real signup, session, multi-tab, failure-recovery, and Studio interaction checks
+        run: node scripts/qa-studio-authenticated-browser.mjs
+
+      - name: Upload authenticated-browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-authenticated-${{ matrix.browser }}-${{ matrix.profile }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-authenticated-browser/${{ matrix.browser }}-${{ matrix.profile }}
+            artifacts/studio-authenticated-browser/${{ matrix.browser }}-${{ matrix.profile }}
