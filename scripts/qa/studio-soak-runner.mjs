@@ -23,6 +23,8 @@ const jiraBase = (process.env.JIRA_BASE_URL ?? "").replace(/\/$/, "");
 const jiraEmail = process.env.JIRA_EMAIL ?? "";
 const jiraToken = process.env.JIRA_API_TOKEN ?? "";
 const jiraProject = process.env.JIRA_PROJECT_KEY ?? "KAN";
+// ANSI CSI/OSC 시퀀스를 벗겨내는 정규식이라 제어문자가 의도된 것이다.
+// eslint-disable-next-line no-control-regex
 const ansi = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/g;
 
 const variants = [
