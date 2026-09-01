@@ -94,7 +94,7 @@ describe("studio-will-v1-opc-interchange", () => {
     // to refuse anything above one 1 MiB task — so a document that passed every profile check
     // failed at archive time. Build a real multi-MiB path list and require the default route to
     // accept it and round-trip.
-    const paths: StudioWillV1OpcExportInput["paths"] = [];
+    const paths: Array<StudioWillV1OpcExportInput["paths"][number]> = [];
     let totalPoints = 0;
     for (let pathIndex = 0; pathIndex < 48; pathIndex += 1) {
       const points: Array<{ x: number; y: number }> = [];
