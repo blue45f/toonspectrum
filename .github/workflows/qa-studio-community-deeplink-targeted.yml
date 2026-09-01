@@ -1,0 +1,77 @@
+name: QA Studio community marketplace deep-link targeted
+
+on:
+  push:
+    branches:
+      - qa/studio-inapp-full-audit-20260902
+    paths:
+      - .github/workflows/qa-studio-community-deeplink-targeted.yml
+      - e2e/comprehensive-browser-audit.spec.ts
+      - e2e/market.spec.ts
+      - src/domains/creator/StudioCuttoonEditorHost.tsx
+      - src/domains/creator/StudioAssetMenuPanel.tsx
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-community-deeplink-targeted-v1
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      RESULT_DIR: qa-results/studio-community-deeplink-targeted-2026-09-02
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
+      - name: Run only Studio community marketplace deep-link tests
+        shell: bash
+        run: |
+          mkdir -p "$RESULT_DIR"
+          set +e
+          pnpm exec playwright test \
+            e2e/comprehensive-browser-audit.spec.ts \
+            e2e/market.spec.ts \
+            --project=chromium \
+            --workers=1 \
+            --grep='커뮤니티 마켓|마켓 딥링크' \
+            --trace=retain-on-failure \
+            2>&1 | tee "$RESULT_DIR/run.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$RESULT_DIR/exit-code.txt"
+          exit "$code"
+      - name: Capture source contract
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '# Deep-link source contract'
+            echo
+            grep -n -A20 -B10 'openAssetMarketDeepLink' src/domains/creator/StudioCuttoonEditorHost.tsx || true
+            echo
+            grep -n -A10 -B10 'assetTab === "community"' src/domains/creator/StudioAssetMenuPanel.tsx || true
+          } > "$RESULT_DIR/source-contract.txt"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-community-deeplink-targeted-2026-09-02
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            ${{ env.RESULT_DIR }}
+            playwright-report
+            test-results
