@@ -107,6 +107,44 @@ describe("canonical dry-media viewport authority", () => {
     expect(studioCanonicalDryMediaOwnsDocumentElement(element.id, null)).toBe(false);
   });
 
+  it("refuses a retained last-good frame whose own layout differs from the current layout", () => {
+    // The envelope is stamped with the *current* layout at publish time; only the snapshot's own
+    // layoutKey reveals that the bitmap was receipted at a different surface size/scale/DPR.
+    const staleFrame = { ...authorized(), layoutKey: "layout:1" };
+    const unavailable: StudioCanonicalVNextDryMediaCanvasAuthority = {
+      kind: "studio-canonical-vnext-dry-media-canvas-authority",
+      version: 1,
+      status: "unavailable",
+      element,
+      layoutKey: "layout:2",
+      reason: "presentation:runtime-rejected",
+      retainsLastGoodFrame: true,
+      lastPresented: staleFrame,
+      retryPolicy: "explicit-next-selection-only",
+    };
+
+    const resolved = resolveStudioCanonicalDryMediaViewportAuthority(
+      unavailable,
+      element,
+      "layout:2",
+    );
+    expect(resolved).toMatchObject({
+      canvasVisible: false,
+      hiddenElementId: null,
+      authorized: null,
+      unavailable: { reason: "presentation:runtime-rejected" },
+    });
+    expect(studioCanonicalDryMediaOwnsDocumentElement(element.id, resolved.hiddenElementId))
+      .toBe(false);
+
+    // Same envelope, but the frame really was receipted in this layout → ownership stays.
+    expect(resolveStudioCanonicalDryMediaViewportAuthority(
+      { ...unavailable, lastPresented: { ...staleFrame, layoutKey: "layout:2" } },
+      element,
+      "layout:2",
+    ).hiddenElementId).toBe(element.id);
+  });
+
   it("rejects stale layout and DrawEl identities before changing document ownership", () => {
     const authority = authorized();
     const replacedElement = { ...element };

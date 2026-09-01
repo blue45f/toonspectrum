@@ -305,10 +305,12 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    expect(authorities.at(-1)).toMatchObject({
-      status: "authorized",
-      layoutKey: baseProps.layoutKey,
-    });
+    // The layout change relinquishes the layout:1 authority synchronously; nothing for layout:2
+    // may be published until its own frame is receipted.
+    expect(authorities.at(-1)).toBeNull();
+    expect(
+      authorities.some((authority) => authority?.layoutKey === "page:layout:2"),
+    ).toBe(false);
     expect(canvas?.style.visibility).toBe("hidden");
 
     view.rerender(
@@ -403,10 +405,12 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     }));
     harness.failPresentations = 1;
 
+    // Same DrawEl, same layout: re-running the epoch (a flip toggle changes only the render input
+    // here) and failing presentation keeps the exact last-good frame for this geometry.
     view.rerender(
       <StudioCanonicalVNextDryMediaCanvas
         {...baseProps}
-        layoutKey="page:layout:2"
+        flipX
         onAuthorityChange={(authority) => authorities.push(authority)}
         visible
       />,
@@ -416,6 +420,8 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       status: "unavailable",
       reason: "presentation:runtime-rejected",
       retainsLastGoodFrame: true,
+      layoutKey: baseProps.layoutKey,
+      lastPresented: { layoutKey: baseProps.layoutKey },
     }));
     expect(view.container.querySelector<HTMLCanvasElement>(
       "canvas[data-studio-canonical-vnext-dry-media='true']",
@@ -424,6 +430,57 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
     )?.style.visibility).toBe("visible");
     expect(harness.createSurfaceCalls).toBe(1);
+  });
+
+  it("drops a retained frame when the layout changes instead of stretching it into the new bounds", async () => {
+    const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
+    const view = render(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        visible
+        onAuthorityChange={(authority) => authorities.push(authority)}
+      />,
+    );
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "authorized",
+      layoutKey: baseProps.layoutKey,
+    }));
+    const snapshot = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
+    );
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.width).toBeGreaterThan(0);
+    harness.failPresentations = 1;
+
+    // Resize: same DrawEl, new layout, and the fresh presentation fails. The old bitmap was
+    // receipted for 640px-wide bounds — it must not be shown at 520px.
+    view.rerender(
+      <StudioCanonicalVNextDryMediaCanvas
+        {...baseProps}
+        layoutKey="page:layout:2"
+        surfaceBounds={{ ...baseProps.surfaceBounds, width: 520 }}
+        onAuthorityChange={(authority) => authorities.push(authority)}
+        visible
+      />,
+    );
+
+    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
+      status: "unavailable",
+      reason: "presentation:runtime-rejected",
+      retainsLastGoodFrame: false,
+      lastPresented: null,
+      layoutKey: "page:layout:2",
+    }));
+    // The layout change itself relinquished the stale authority before the new epoch ran.
+    expect(authorities).toContain(null);
+    expect(snapshot!.width).toBe(0);
+    expect(snapshot!.style.visibility).toBe("hidden");
+    expect(view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media='true']",
+    )?.style.visibility).toBe("hidden");
+    expect(view.getByRole("alert").textContent).toContain(
+      "다른 렌더러로 자동 전환하지 않았습니다",
+    );
   });
 
   it("fails closed on initial create and retries only after an explicit reselection", async () => {
