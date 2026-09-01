@@ -1,4 +1,5 @@
 name: QA Studio authenticated cross-browser
+run-name: Authenticated Studio matrix · ${{ github.run_number }}
 
 on:
   push:
