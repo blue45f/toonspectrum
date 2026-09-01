@@ -474,7 +474,21 @@ function MenuDropdown({
                 ? `${panelId}-item-${itemIndex}-unavailable-reason`
                 : undefined;
               return (
-                <div key={item.id}>
+                // Composite titles (삽입·도구) concatenate rows from several catalogue
+                // groups; ids are only unique per source group, so the key carries the index.
+                <div key={`${item.id}:${itemIndex}`}>
+                  {item.sectionLabel ? (
+                    // Visual caption only. A `menu` may hold nothing but menu items, so the
+                    // caption stays out of the accessibility tree; the row label itself is
+                    // unchanged and the hint bubble still names the origin group.
+                    <div
+                      aria-hidden
+                      data-studio-main-menu-section={item.sectionLabel}
+                      className="mx-3 mb-0.5 mt-1.5 truncate text-[0.6875rem] font-bold uppercase tracking-wider text-fg-3 first:mt-0.5"
+                    >
+                      {item.sectionLabel}
+                    </div>
+                  ) : null}
                   <StudioToolHintTarget
                     hint={hint}
                     unavailableReason={item.unavailableReason}

@@ -1107,7 +1107,17 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   const commentsLocked =
     collaborationDocumentLocked && !sharedDocument?.capabilities.view;
 
-  const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups);
+  // Composite titles take a shipped translation when the pack has one and fall back to
+  // the catalogue's own language otherwise (same escape hatch the Help group uses).
+  const menuT = useT();
+  const compositeMenuLabel = (id: "insert" | "tools"): string | undefined => {
+    const key = `studio.mainMenu.group.${id}.label`;
+    const translated = menuT(key);
+    return translated === key ? undefined : translated;
+  };
+  const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups, {
+    labels: { insert: compositeMenuLabel("insert"), tools: compositeMenuLabel("tools") },
+  });
   const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
 
   const menubarLaneRef = useRef<HTMLDivElement | null>(null);

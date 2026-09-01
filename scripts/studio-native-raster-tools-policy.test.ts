@@ -636,7 +636,8 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain('page.keyboard.down("Alt")');
     expect(source).toContain("TOONSPECTRUM_NATIVE_RASTER_CANVAS_HEIGHT");
     expect(source).toContain("setCanvasHeightThroughShippedUi");
-    expect(source).toContain('[data-studio-main-menu-trigger="canvas"]');
+    // 캔버스 그룹은 '도구' 복합 타이틀 아래 한 구획으로 표시된다(2026-09-02 IA 정리).
+    expect(source).toContain('[data-studio-main-menu-trigger="tools"]');
     expect(source).toContain('name: "캔버스 크기 · 문서 설정…"');
     expect(source).toContain("Open background editor · resize tool");
     expect(source).toContain('[data-studio-background-panel="true"]');

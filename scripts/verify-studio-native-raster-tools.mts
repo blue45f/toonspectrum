@@ -463,7 +463,9 @@ async function installCleanStudioState(page: Page): Promise<void> {
 
 async function setCanvasHeightThroughShippedUi(page: Page, height: number): Promise<void> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
-  const canvasTrigger = mainMenu.locator('[data-studio-main-menu-trigger="canvas"]');
+  // 캔버스 그룹은 2026-09-02 IA 정리로 '도구' 복합 메뉴 안의 한 구획으로 표시된다
+  // (studio-main-menu-presentation.ts). 항목 id·라벨은 그대로라 아래 menuitem 선택은 유지된다.
+  const canvasTrigger = mainMenu.locator('[data-studio-main-menu-trigger="tools"]');
   await canvasTrigger.waitFor({ state: "visible", timeout: 16_000 });
   await canvasTrigger.click();
   const menu = page.locator('[role="menu"][data-studio-main-menu-panel="true"]');
