@@ -125,6 +125,7 @@ test.describe("isolated auth account lifecycle matrix", () => {
 
         const unsupportedProvider = await badOriginClient.post(
           "/api/auth/oauth/not-a-provider/demo",
+          { headers: mutationHeaders },
         );
         expect(unsupportedProvider.status(), await unsupportedProvider.text()).toBe(400);
       } finally {
