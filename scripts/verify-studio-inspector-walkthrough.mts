@@ -776,10 +776,9 @@ async function walkDesktop(
     const coach = page.locator('[data-testid="studio-inspector-empty-coach"]');
     const coachVisible = await coach.isVisible().catch(() => false);
     if (coachVisible) {
+      // 시작 안내는 세 카드다(UX 감사 2026-09-02 §5.8) — 선택 도구·레이어 패널 카드는 탭과 단축키로 대체됐다.
       for (const [name, accessibleName] of [
         ["펜으로 그리기", "펜으로 그리기"],
-        ["선택 도구", "선택 도구"],
-        ["레이어 패널", "레이어 패널 열기"],
         ["이미지 편집", "이미지 편집 · 전문 도구 열기"],
         ["사용법 따라 하기", "스튜디오 사용법 따라 하기"],
       ] as const) {

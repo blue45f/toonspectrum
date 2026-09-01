@@ -1146,6 +1146,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="frame-anim"
+              launcher
               icon={Film}
               label={frameAnimationRecoveryAvailable ? "이미지 선택하기" : "프레임 애니메이션"}
               description={
@@ -1173,6 +1174,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {isRailToolVisible("mannequin3d") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="mannequin3d"
+              launcher
               icon={PersonStanding}
               label="3D 데생 인형"
               description="모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다."
@@ -1184,6 +1186,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {isRailToolVisible("vrm3d") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="vrm3d"
+              launcher
               icon={UsersRound}
               label="3D 캐릭터"
               description="베이스 캐릭터를 고른 뒤 포즈, 표정, 의상과 색상을 조정해 투명 배경 이미지로 추가합니다."
@@ -1195,6 +1198,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {isRailToolVisible("bg3d") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="bg3d"
+              launcher
               icon={Boxes}
               label="3D 배경"
               description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
@@ -1206,6 +1210,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {isRailToolVisible("hybrid-dcc") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="hybrid-dcc"
+              launcher
               icon={Box}
               label="Hybrid 3D DCC"
               description="메시·불리언·CAD/스컬프/클로스·샷·.toon3d 하이브리드 워크스페이스를 엽니다. 웹툰 세트장 구축과 컷 연출을 한 화면에서 처리합니다."
@@ -1217,6 +1222,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
               <StudioRailToolButton
               data-studio-rail-tool-id="reference"
+                launcher
                 icon={PictureInPicture2}
                 label="참고 이미지"
                 description="캔버스와 분리된 참고 이미지를 띄워 구도·색·의상을 보면서 작업합니다. 완성 원고에는 포함되지 않아요."

@@ -297,6 +297,20 @@ describe("studio chrome UI", () => {
     expect(html).toContain("100%");
   });
 
+  it("tells launchers apart from direct tools on the rail (감사 §4.3)", () => {
+    const html = renderToStaticMarkup(
+      <StudioVerticalToolRail>
+        <StudioRailToolButton icon={Pencil} label="펜 (B)" />
+        <StudioRailToolButton icon={Pencil} label="3D 캐릭터" launcher />
+      </StudioVerticalToolRail>
+    );
+    expect(html.match(/data-studio-rail-launcher="true"/g)).toHaveLength(1);
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(1);
+    // The direct tool keeps the pill radius; the launcher squares off with a dashed edge.
+    expect(html).toContain("rounded-2xl");
+    expect(html).toContain("border-dashed");
+  });
+
   it("lets the canvas owner offset the status bar above a measured drawing dock", () => {
     const bottom =
       "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)";
