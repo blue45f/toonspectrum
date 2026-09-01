@@ -522,6 +522,129 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       + "실측)이고 라이브 스탬프 미리보기는 같은 탭을 134px 로 그려 릴리스 때 증발합니다 — "
       + "watercolor · wash-brush 가 그룹 내 대안(지침 6).",
 
+    // -----------------------------------------------------------------------
+    // 2026-09-02 feel-cull (ChatGPT 소스 보고서 + 사용자 지시: 비슷한 느낌 줄이기).
+    // Listed uniqueness: execution signature unless a real renderer branch (alias wash/
+    // pressure, calligraphy nib, Stam fluid) distinguishes the pair; pro pack tip
+    // footprint (runtime + motif/alpha + layers + 45° angle). Keep one representative
+    // per colliding group. Experimental mypaint pins resolved first.
+    // -----------------------------------------------------------------------
+
+    "fineliner":
+      "pen 과 실행 서명이 동일(causal-ink:round) — 직경 스케일 0.48 은 굵기 슬라이더로 "
+      + "재현됩니다. 대안: pen(지침 6).",
+    "marker-bold":
+      "marker 와 실행 서명이 동일하고 거의 평탄한 필압만 더 넓습니다. 대안: marker(지침 6).",
+    "pencil-6b":
+      "pencil 과 실행 서명이 동일(pencil-path:jitter) — 소프트 에지 패스는 노출 "
+      + "soft-pencil 레인과 겹칩니다. 대안: pencil(지침 6).",
+    "colored-pencil":
+      "pencil 과 실행 서명이 같고 한 패스 코어만 있어 색연필 재료가 실재하지 않습니다. "
+      + "대안: pencil(지침 6).",
+    "flat-brush":
+      "brush 와 실행 서명이 동일(angled-ribbon:minus-30deg) — 굵기 18/10 차이뿐입니다. "
+      + "대안: brush(지침 6).",
+    "crosshatch":
+      "screentone 와 실행 서명이 동일(screentone-dots:global-grid) — 교차 해칭으로 "
+      + "분기하는 렌더러가 없습니다. 실제 교차선은 web-cross-hatch-pen, 톤은 screentone"
+      + "(지침 6).",
+    "mypaint-cc0--kabura":
+      "ink-brush 와 실행 서명이 동일(stamp-dabs:ink) — 굵기 6/8 의 같은 잉크 스탬프. "
+      + "대안: ink-brush(지침 6).",
+    "mypaint-cc0--marker-fat":
+      "ink-brush 와 실행 서명이 동일 — 굵기 24 의 같은 잉크 스탬프. 대안: ink-brush(지침 6).",
+    "mypaint-cc0--splatter":
+      "airbrush-fine 과 실행 서명이 동일(stamp-dabs:airbrush). 대안: airbrush-fine · "
+      + "splatter(지침 6).",
+    "mypaint-cc0--dry-brush":
+      "charcoal--mypaint-stamp 와 실행 서명이 동일(stamp-dabs:charcoal). 대안: "
+      + "charcoal--mypaint-stamp · charcoal(지침 6).",
+    "mypaint-cc0--2b-pencil":
+      "pencil-grain 과 실행 서명이 동일(stamp-dabs:pencil). 대안: pencil-grain · "
+      + "pencil(지침 6).",
+
+    "rock-texture":
+      "dry-media/sponge 발자국을 velvet-charcoal 과 공유합니다. 대안: velvet-charcoal(지침 6).",
+    "compressed-charcoal-edge":
+      "dry-media/sponge 발자국을 velvet-charcoal 과 공유합니다. 대안: velvet-charcoal(지침 6).",
+    "pastel-paper-soft":
+      "dry-media/sponge 발자국을 velvet-charcoal 과 공유합니다. 대안: velvet-charcoal · "
+      + "pastel(지침 6).",
+    "sponge-stipple-dab":
+      "dry-media/sponge 발자국을 velvet-charcoal 과 공유합니다. 대안: velvet-charcoal(지침 6).",
+    "technical-needle-ink":
+      "ink-particle/hard 발자국을 core-round 와 공유합니다. 대안: core-round(지침 6).",
+    "maru-pen-fine":
+      "ink-particle/hard 발자국을 core-round 와 공유합니다. 대안: core-round · maru-pen(지침 6).",
+    "ink-splatter-burst":
+      "ink-particle/hard 발자국을 core-round 와 공유합니다. 대안: core-round · splatter(지침 6).",
+    "stage-safe-splatter":
+      "ink-particle/hard 발자국을 core-round 와 공유합니다. 대안: core-round · splatter(지침 6).",
+    "round-shading":
+      "ink-particle/round 발자국을 g-pen-flex 와 공유합니다. 대안: g-pen-flex(지침 6).",
+    "hard-oval":
+      "ink-particle/round 발자국을 g-pen-flex 와 공유합니다. 대안: g-pen-flex(지침 6).",
+    "smooth-oval":
+      "ink-particle/round 발자국을 g-pen-flex 와 공유합니다. 대안: g-pen-flex(지침 6).",
+    "spoon-pen-round":
+      "ink-particle/round 발자국을 g-pen-flex 와 공유합니다. 대안: g-pen-flex · maru-pen(지침 6).",
+    "bokeh-scatter":
+      "airbrush/soft 발자국을 mist-soft 와 공유합니다. 대안: mist-soft(지침 6).",
+    "watercolor-wet-bleed":
+      "airbrush/soft 발자국을 mist-soft 와 공유하고 airbrush 런타임이라 웻엣지가 없습니다. "
+      + "대안: mist-soft · watercolor(지침 6).",
+    "marker-colorless-blender":
+      "airbrush/soft 발자국을 mist-soft 와 공유합니다. 대안: mist-soft · marker(지침 6).",
+    "bumpy-grain":
+      "dry-media/grain 발자국을 precision-pencil 과 공유합니다. 대안: precision-pencil(지침 6).",
+    "pencil-4b-rough":
+      "dry-media/grain 발자국을 precision-pencil 과 공유합니다. 대안: precision-pencil · "
+      + "pencil(지침 6).",
+    "crayon-wax-bold":
+      "dry-media/grain 발자국을 precision-pencil 과 공유합니다. 대안: precision-pencil · "
+      + "crayon(지침 6).",
+    "calligraphy-tilt-nib":
+      "ink-particle 사선 촉 알파맵을 horizontal-blade 와 공유합니다. 대안: "
+      + "horizontal-blade · calligraphy(지침 6).",
+    "marker-wide-chisel":
+      "ink-particle 사선 촉 알파맵을 horizontal-blade 와 공유합니다. 대안: "
+      + "horizontal-blade · marker(지침 6).",
+    "taper-brush-marker":
+      "dry-media/bristle 발자국을 oil-linen-filbert 와 공유합니다. 대안: "
+      + "oil-linen-filbert · marker(지침 6).",
+    "oil-dry-scumble":
+      "dry-media/bristle 발자국을 oil-linen-filbert 와 공유합니다. 대안: "
+      + "oil-linen-filbert · oil(지침 6).",
+    "side-graphite-shade":
+      "dry-media 사선 촉 알파맵을 directional-flat 과 공유합니다. 대안: "
+      + "directional-flat · pencil(지침 6).",
+    "gouache-grain-flat":
+      "dry-media 사선 촉 알파맵을 directional-flat 과 공유합니다. 대안: "
+      + "directional-flat · gouache(지침 6).",
+    "dust-mote-depth":
+      "airbrush/grain 발자국을 particle-scatter 와 공유합니다. 대안: particle-scatter(지침 6).",
+    "cloud-billow-soft":
+      "airbrush/sponge 발자국을 bleeding-stain 과 공유합니다. 대안: bleeding-stain(지침 6).",
+    "bristle-flat-streak":
+      "dry-media 레이크 알파맵을 hatching-contour-rake 와 공유합니다. 대안: "
+      + "hatching-contour-rake(지침 6).",
+    "wood-knot-rake":
+      "dry-media 레이크 레이어 발자국을 dry-rake 와 공유합니다. 대안: dry-rake(지침 6).",
+    "sumi-wash-fray":
+      "dry-media/sumi 발자국을 rough-ink 와 공유합니다. 대안: rough-ink(지침 6).",
+    "bristle-round-loaded":
+      "ink-particle/bristle 발자국을 oil-impasto-heavy 와 공유합니다. 대안: "
+      + "oil-impasto-heavy · oil(지침 6).",
+    "snow-flurry-flake":
+      "ink-particle/flake 발자국을 free-stamp 와 공유합니다. 대안: free-stamp(지침 6).",
+    "leaf-fall-flurry":
+      "잎 레이어 발자국을 long-leaf 와 공유합니다. 대안: long-leaf · leaf-cluster(지침 6).",
+    "sparkle-glint-cross":
+      "ink-particle/star 발자국을 stardust-star-scatter 와 공유합니다. 대안: "
+      + "stardust-star-scatter · glitter(지침 6).",
+    "brush-pen-ink":
+      "ink-particle/sumi 발자국을 flex-ink 와 공유합니다. 대안: flex-ink · brush-pen(지침 6).",
+
     // ── 2026-08-27 web-soft-cloud: 같은 날 격리 후 같은 날 복귀(DELISTED) ────────────────
     // 격리 사유였던 "장경로 520px 획이 화면에 총 8px@delta6"는 web-drawing 키트 브리지의
     // 희소 경로 미보간이 원인이었습니다: 이 레인은 경로 스테이션마다 입자를 뿌리는데 희소

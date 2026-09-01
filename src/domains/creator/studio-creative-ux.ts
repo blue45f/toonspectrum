@@ -33,9 +33,10 @@ import type {
 
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
-  // 선 — 굵기·필압 순 (pen 대표 → 세필 → 필압 → 펜촉)
+  // 선 — 굵기·필압 순 (pen 대표 → 필압 G펜 → 펜촉)
+  // 2026-09-02 feel-cull: fineliner 는 pen 과 실행 서명이 같아 격리. 빈 히스토리 퀵 셸프
+  // 첫 8(펜→수채→에어)은 그대로 유지한다.
   "pen",
-  "fineliner",
   "gpen",
   "fountain-pen",
   // 워시/에어 — 번짐 축 (빈 히스토리 퀵 셸프 첫 8 안에 유지 계약)

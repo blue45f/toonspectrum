@@ -70,7 +70,7 @@ const watercolorExtended: StudioSavedBrush = {
   id: "saved-watercolor-extended",
   name: "번짐 수채",
   brushId: "watercolor",
-  sourcePresetId: "watercolor-wet-bleed",
+  sourcePresetId: "watercolor--granular",
   pinned: false,
 };
 
@@ -625,7 +625,7 @@ describe("StudioBrushLibraryPanel", () => {
   it("전체 보기는 격리 프리셋만 제외하고 핵심·확장·실험 저장 브러시를 모두 나열한다", async () => {
     expect(brushLifecycleStageOf("pen")).toBe("core");
     expect(brushLifecycleStageOf("watercolor")).toBe("core");
-    expect(brushLifecycleStageOf("watercolor-wet-bleed")).toBe("extended");
+    expect(brushLifecycleStageOf("watercolor--granular")).toBe("extended");
     expect(brushLifecycleStageOf("watercolor--edge-bloom")).toBe("experimental");
     const repositoryFactory = seededRepositoryFactory([
       saved,

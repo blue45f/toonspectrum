@@ -41,6 +41,7 @@ interface StudioInkwashWashRecord {
   fieldScale: number;
   journal: DrawEl[];
   applied: Map<string, string>;
+  displayCache: { revision: number; upload: ReturnType<typeof resolveStudioInkwashFluidDisplay> } | null;
 }
 
 const washes = new Map<string, StudioInkwashWashRecord>();
@@ -171,6 +172,7 @@ export function ensureStudioInkwashWash(input: Readonly<{
     fieldScale,
     journal: existing?.journal ?? [],
     applied: existing?.applied ?? new Map(),
+    displayCache: null,
   };
   washes.set(key, record);
   return snapshot(record);
@@ -255,10 +257,24 @@ export function studioInkwashWashDigest(
   return record ? studioInkwashFluidDigest(record.session) : null;
 }
 
-export function studioInkwashWashDisplay(key: string = STUDIO_INKWASH_WASH_KEY) {
+export function studioInkwashWashDisplay(
+  key: string = STUDIO_INKWASH_WASH_KEY,
+  clip?: Readonly<{ x: number; y: number; width: number; height: number }>,
+) {
   const record = washes.get(key);
   if (!record) return null;
-  return resolveStudioInkwashFluidDisplay(record.session);
+  if (
+    !clip
+    && record.displayCache
+    && record.displayCache.revision === record.session.revision
+  ) {
+    return record.displayCache.upload;
+  }
+  const upload = resolveStudioInkwashFluidDisplay(record.session, clip ? { clip } : undefined);
+  if (!clip) {
+    record.displayCache = { revision: record.session.revision, upload };
+  }
+  return upload;
 }
 
 export function studioInkwashWashVisualOwnerId(

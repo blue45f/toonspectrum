@@ -9,7 +9,10 @@
  */
 
 import { mapStudioBrushAliasPressure } from "../brush/studio-brush-alias-profile";
-import { depositStudioInkwashFluidStroke } from "../brush/studio-inkwash-fluid";
+import {
+  depositStudioInkwashFluidStroke,
+  studioInkwashFluidStepParams,
+} from "../brush/studio-inkwash-fluid";
 import { isStudioInkwashFluidBrush } from "../brush/studio-inkwash-fluid-brushes";
 import {
   commitStudioInkwashWash,
@@ -214,6 +217,8 @@ interface ActiveInkwashStroke {
   consumedSourcePoints: number;
   previousSourceX: number;
   previousSourceY: number;
+  /** Document-space x,y pairs for the live polyline. Physics waits until pointer-up. */
+  readonly livePoints: number[];
 }
 
 interface PreparedUpload {
@@ -330,11 +335,15 @@ function inkwashStrokeFieldGeometry(
     maxY = Math.max(maxY, y);
   }
   const scale = STUDIO_WET_INK_BRUSH_FIELD_SCALE;
-  const margin = Math.max(24, recipe.baseWidth * 4);
-  const originX = minX - margin;
-  const originY = minY - margin;
-  const width = Math.ceil((maxX - minX + margin * 2) * scale);
-  const height = Math.ceil((maxY - minY + margin * 2) * scale);
+  const radiusCells = Math.ceil(recipe.baseWidth * scale * 0.72);
+  const marginCells = Math.max(
+    scale * 2,
+    radiusCells + STUDIO_WET_INK_BRUSH_SIMULATION_STEPS + 2,
+  );
+  const originX = minX - marginCells / scale;
+  const originY = minY - marginCells / scale;
+  const width = Math.ceil((maxX - minX) * scale) + marginCells * 2 + 1;
+  const height = Math.ceil((maxY - minY) * scale) + marginCells * 2 + 1;
   if (width <= 0 || height <= 0 || !Number.isSafeInteger(width * height)) return null;
   return { originX, originY, width, height };
 }
@@ -1039,12 +1048,13 @@ export class StudioLiveWetInkOverlayRenderer {
     }
     const active = this.active;
     if (this.activeInkwash) {
-      if (!this.drawInkwashWash()) {
+      const recipe = this.activeInkwash.recipe;
+      if (!this.paintInkwashLivePolyline(this.activeInkwash.livePoints, recipe)) {
         this.failActive("surface-render");
         return;
       }
       this.lastFailureReason = null;
-      this.setActiveCanvasOpacity(this.activeInkwash.recipe.compositeOpacity);
+      this.setActiveCanvasOpacity(recipe.compositeOpacity);
       return;
     }
     if (!active) return;
@@ -1092,9 +1102,6 @@ export class StudioLiveWetInkOverlayRenderer {
       && !Object.is(existing.pageEpoch, authority.pageEpoch)) {
       resetStudioInkwashWash();
     }
-    if (!this.growInkwashWash(element, recipe, authority.pageEpoch)) {
-      return wetInkOperationFailure("field-budget");
-    }
     this.inkwashOverlayOwned = true;
     this.resetActiveState();
     this.clearActiveRect();
@@ -1105,6 +1112,7 @@ export class StudioLiveWetInkOverlayRenderer {
       consumedSourcePoints: 0,
       previousSourceX: firstX,
       previousSourceY: firstY,
+      livePoints: [],
     };
     this.setActiveCanvasOpacity(recipe.compositeOpacity);
     const painted = this.paintInkwashSuffix(element, 0);
@@ -1122,7 +1130,7 @@ export class StudioLiveWetInkOverlayRenderer {
     authority: StudioLiveWetInkAuthority,
   ): StudioLiveWetInkAppendResult {
     const active = this.activeInkwash;
-    if (!active || !getStudioInkwashWash()) {
+    if (!active) {
       return wetInkOperationFailure("surface-unavailable");
     }
     const guarded = authorityGuard(authority);
@@ -1163,17 +1171,16 @@ export class StudioLiveWetInkOverlayRenderer {
     authority: StudioLiveWetInkAuthority,
   ): StudioLiveWetInkEndResult {
     const active = this.activeInkwash;
-    if (!active || !getStudioInkwashWash()) {
+    if (!active) {
       return wetInkOperationFailure("surface-unavailable");
     }
     const appended = this.appendInkwash(element, authority);
     if (appended.status === "unavailable" || appended.status === "rejected") return appended;
     const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
-    if (!recipe || !this.growInkwashWash(element, recipe, active.pageEpoch)) {
+    if (!recipe) return this.failActive("stroke-identity");
+    if (!this.settleInkwashStroke(element, recipe, active.pageEpoch)) {
       return this.failActive("field-budget");
     }
-    upsertStudioInkwashWashStroke(element);
-    markStudioInkwashWashDeposited(element);
     const exact = planStudioWetInkBrushReplay(element, { phase: "live" });
     if (!exact.ok) return this.failActive("exact-replay");
     this.clearSettledRect();
@@ -1196,14 +1203,72 @@ export class StudioLiveWetInkOverlayRenderer {
     return result;
   }
 
+  /**
+   * Grow + deposit + capped Stam once, from the full polyline. Live frames must not call this.
+   * Marking deposited here lets the live-phase planner skip a second deposit.
+   */
+  private settleInkwashStroke(
+    element: DrawEl,
+    recipe: StudioWetInkBrushPhysicalRecipe,
+    pageEpoch: string | number,
+  ): boolean {
+    const wash = this.growInkwashWash(element, recipe, pageEpoch);
+    if (!wash) return false;
+    const total = Math.floor(element.points.length / 2);
+    if (total < 1) return false;
+    const samples: Array<{ x: number; y: number; pressure: number; timeMs: number }> = [];
+    for (let index = 0; index < total; index += 1) {
+      const x = finiteCoordinate(element.points[index * 2]);
+      const y = finiteCoordinate(element.points[index * 2 + 1]);
+      if (x === null || y === null) return false;
+      const field = studioInkwashDocumentToField(wash, x, y);
+      samples.push({
+        x: field.x,
+        y: field.y,
+        pressure: mapStudioBrushAliasPressure(
+          recipe.brushId,
+          element.pressures?.[index],
+          0.55,
+        ),
+        timeMs: index * (1_000 / 240),
+      });
+    }
+    depositStudioInkwashFluidStroke(wash.session, {
+      tool: recipe.brushId === "inkwash-water-brush" ? "water" : "pen",
+      samples,
+      radius: recipe.baseWidth * STUDIO_WET_INK_BRUSH_FIELD_SCALE * 0.5,
+      pigmentLoad: recipe.material.pigmentLoad,
+      wetnessLoad: recipe.material.wetnessLoad,
+      spectralAbsorption: recipe.material.spectralAbsorption,
+      inkColor: recipe.inkColor,
+    });
+    upsertStudioInkwashWashStroke(element);
+    markStudioInkwashWashDeposited(element);
+    const cells = wash.session.fluid.width * wash.session.fluid.height;
+    // Live frames never Stam. Pointer-up may, once, and only if the stroke-local field
+    // still fits the main-thread cap. Short washes need the full 16-step settle so water
+    // can carry unfixed pen ink; a 2048² field stays deposit-only.
+    const steps = cells <= 512 * 512 ? STUDIO_WET_INK_BRUSH_SIMULATION_STEPS : 0;
+    if (steps > 0) {
+      stepStudioInkwashFluid(
+        wash.session,
+        steps,
+        studioInkwashFluidStepParams({
+          bleed: recipe.material.bleed,
+          dryRate: recipe.material.dryingRate,
+          chromaticSeparation: recipe.material.chromatography ?? 0.5,
+        }),
+      );
+    }
+    return true;
+  }
+
   private paintInkwashSuffix(
     element: DrawEl,
     fromIndex: number,
   ): StudioLiveWetInkAppendResult {
     const active = this.activeInkwash;
     if (!active) return wetInkOperationFailure("surface-unavailable");
-    const wash = this.growInkwashWash(element, active.recipe, active.pageEpoch);
-    if (!wash) return this.failActive("field-budget");
     const total = Math.floor(element.points.length / 2);
     if (total < fromIndex) return this.failActive("source-prefix");
     if (total === fromIndex) {
@@ -1214,43 +1279,112 @@ export class StudioLiveWetInkOverlayRenderer {
         uploadedTiles: 0,
       };
     }
-    const samples: Array<{ x: number; y: number; pressure: number; timeMs: number }> = [];
+    const samples: Array<{ x: number; y: number; pressure: number }> = [];
+    if (fromIndex > 0) {
+      samples.push({
+        x: active.previousSourceX,
+        y: active.previousSourceY,
+        pressure: 0.55,
+      });
+    }
     for (let index = fromIndex; index < total; index += 1) {
       const x = finiteCoordinate(element.points[index * 2]);
       const y = finiteCoordinate(element.points[index * 2 + 1]);
       if (x === null || y === null) return this.failActive("invalid-sample");
-      const field = studioInkwashDocumentToField(wash, x, y);
       samples.push({
-        x: field.x,
-        y: field.y,
+        x,
+        y,
         pressure: mapStudioBrushAliasPressure(
           active.recipe.brushId,
           element.pressures?.[index],
           0.55,
         ),
-        timeMs: index * (1_000 / 240),
       });
+      active.livePoints.push(x, y);
       active.previousSourceX = x;
       active.previousSourceY = y;
     }
-    depositStudioInkwashFluidStroke(wash.session, {
-      tool: active.recipe.brushId === "inkwash-water-brush" ? "water" : "pen",
-      samples,
-      radius: active.recipe.baseWidth * STUDIO_WET_INK_BRUSH_FIELD_SCALE * 0.5,
-      pigmentLoad: active.recipe.material.pigmentLoad,
-      wetnessLoad: active.recipe.material.wetnessLoad,
-      spectralAbsorption: active.recipe.material.spectralAbsorption,
-      inkColor: active.recipe.inkColor,
-    });
-    stepStudioInkwashFluid(wash.session, 4);
     active.consumedSourcePoints = total;
-    if (!this.drawInkwashWash()) return this.failActive("surface-render");
+    if (!this.paintInkwashLiveStroke(samples, active.recipe.baseWidth * 0.5, active.recipe)) {
+      return this.failActive("surface-render");
+    }
     return {
       status: "appended",
       consumedSourcePoints: total,
       appendedDabs: samples.length,
       uploadedTiles: 1,
     };
+  }
+
+  private paintInkwashLivePolyline(
+    points: readonly number[],
+    recipe: StudioWetInkBrushPhysicalRecipe,
+  ): boolean {
+    const samples: Array<{ x: number; y: number; pressure: number }> = [];
+    for (let index = 0; index + 1 < points.length; index += 2) {
+      samples.push({
+        x: points[index]!,
+        y: points[index + 1]!,
+        pressure: 0.55,
+      });
+    }
+    if (samples.length === 0) return true;
+    return this.paintInkwashLiveStroke(samples, recipe.baseWidth * 0.5, recipe);
+  }
+
+  /**
+   * Live preview is a round-cap polyline in document space. Physics (grow/deposit/Stam)
+   * waits for pointer-up so a drag never copies or solves the wash field.
+   */
+  private paintInkwashLiveStroke(
+    samples: ReadonlyArray<{ x: number; y: number; pressure: number }>,
+    documentRadius: number,
+    recipe: StudioWetInkBrushPhysicalRecipe,
+  ): boolean {
+    const context = this.preparedActive();
+    if (!context) return false;
+    if (samples.length === 0) {
+      context.restore();
+      return false;
+    }
+    const canStroke = typeof context.beginPath === "function"
+      && typeof context.stroke === "function"
+      && typeof context.moveTo === "function"
+      && typeof context.lineTo === "function";
+    if (!canStroke) {
+      // Recording mocks used by overlay tests do not implement path APIs. Keep the
+      // overlay started so pointer-up can still settle the wash.
+      context.restore();
+      return true;
+    }
+    try {
+      context.imageSmoothingEnabled = true;
+      const isWater = recipe.brushId === "inkwash-water-brush";
+      const width = Math.max(1.2, documentRadius * 2);
+      const color = recipe.inkColor;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.lineWidth = width;
+      context.strokeStyle = isWater
+        ? "rgba(120, 150, 180, 0.18)"
+        : `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.max(0.35, recipe.compositeOpacity)})`;
+      context.beginPath();
+      for (let index = 0; index < samples.length; index += 1) {
+        const x = samples[index]!.x;
+        const y = samples[index]!.y;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      if (samples.length === 1) {
+        context.lineTo(samples[0]!.x + 0.01, samples[0]!.y);
+      }
+      context.stroke();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      context.restore();
+    }
   }
 
   private drawInkwashWash(): boolean {
@@ -1266,17 +1400,25 @@ export class StudioLiveWetInkOverlayRenderer {
       return false;
     }
     try {
+      context.imageSmoothingEnabled = true;
+      const destinationX = wash.originX + upload.x / wash.fieldScale;
+      const destinationY = wash.originY + upload.y / wash.fieldScale;
       const destinationWidth = upload.width / wash.fieldScale;
       const destinationHeight = upload.height / wash.fieldScale;
-      context.clearRect(wash.originX, wash.originY, destinationWidth, destinationHeight);
+      context.clearRect(
+        wash.originX,
+        wash.originY,
+        wash.session.fluid.width / wash.fieldScale,
+        wash.session.fluid.height / wash.fieldScale,
+      );
       context.drawImage(
         prepared[0]!.surface,
         0,
         0,
         upload.width,
         upload.height,
-        wash.originX,
-        wash.originY,
+        destinationX,
+        destinationY,
         destinationWidth,
         destinationHeight,
       );

@@ -21,6 +21,9 @@ import {
   studioBrushDynamicsSettingsForBrushId,
   studioDryMediaUnionComposableProgramPin,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
+import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
+import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
 import {
   STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1,
   resolveStudioDryMediaAnisotropicDabResponseV1,
@@ -31,7 +34,12 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   studioDryMediaDynamicBridgeMarkMultiplier,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  STUDIO_DRY_MEDIA_KERNEL_TIP_ASPECT_BAND_REPRESENTATIVES,
+  studioDryMediaKernelTipAspectBand,
+} from "./studio-dry-media-kernel-tip";
 import { planStudioDryMediaUnionRibbonCarrier } from "./studio-dry-media-union-ribbon-carrier";
+import { isStudioInkwashFluidBrush } from "./studio-inkwash-fluid-brushes";
 import { planStudioOilRibbonCarrier } from "./studio-oil-ribbon-carrier";
 import {
   resolveStudioWetInkBrushPhysicalRecipe,
@@ -241,5 +249,58 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
         resolveStudioDynamicBrushMaterialIdentity("g-pen"),
       ),
     ).toBe(1);
+  });
+
+  it("keeps remaining listed wet/oil/dry representatives on distinct shipped paths", () => {
+    for (const id of [
+      "oil",
+      "watercolor",
+      "gouache",
+      "inkwash-pen",
+      "inkwash-water-brush",
+      "crayon",
+      "crayon--klecks-stamp",
+      "chalk--klecks-stamp",
+      "charcoal--mypaint-stamp",
+    ] as const) {
+      expect(isStudioBrushQuarantinedPresetId(id), id).toBe(false);
+    }
+
+    expect(resolveStudioBrushRuntimeContract("inkwash-pen")).toMatchObject({
+      engine: "watercolor-dabs",
+      engineVariant: "stam-fluid-pen",
+      distinctness: "engine-variant",
+    });
+    expect(resolveStudioBrushRuntimeContract("inkwash-water-brush")).toMatchObject({
+      engine: "watercolor-dabs",
+      engineVariant: "stam-fluid-water",
+      distinctness: "engine-variant",
+    });
+    expect(isStudioInkwashFluidBrush("inkwash-pen")).toBe(true);
+    expect(isStudioInkwashFluidBrush("watercolor")).toBe(false);
+
+    const source = [
+      { x: 0, y: 0, radius: 10, opacity: 0.55, role: "core" as const },
+      { x: 0, y: 0, radius: 10, opacity: 0.35, role: "diffuse" as const },
+    ];
+    const watercolorWash = applyStudioBrushAliasWatercolorMaterial("watercolor", source);
+    const gouacheWash = applyStudioBrushAliasWatercolorMaterial("gouache", source);
+    const watercolorCore = watercolorWash.find((dab) => dab.role === "core")!;
+    const gouacheCore = gouacheWash.find((dab) => dab.role === "core")!;
+    expect(gouacheCore.opacity).not.toBe(watercolorCore.opacity);
+    expect(gouacheCore.radius).not.toBe(watercolorCore.radius);
+    const watercolorPlan = resolveStudioBrushAliasWatercolorPlanSettings("watercolor", 24)!;
+    const gouachePlan = resolveStudioBrushAliasWatercolorPlanSettings("gouache", 24)!;
+    expect(gouachePlan.spacing).toBeGreaterThan(watercolorPlan.spacing);
+
+    const klecksCrayon = resolveStudioBrushEngineLaneStampTuning("crayon--klecks-stamp");
+    const klecksChalk = resolveStudioBrushEngineLaneStampTuning("chalk--klecks-stamp");
+    expect(klecksCrayon?.spacingRatio).toBeLessThanOrEqual(0.2);
+    expect(klecksChalk?.spacingRatio).toBeLessThanOrEqual(0.2);
+    expect(klecksCrayon?.spacingRatio).not.toBe(klecksChalk?.spacingRatio);
+
+    expect(studioDryMediaKernelTipAspectBand("crayon", 0.25)).toBe(0);
+    expect(studioDryMediaKernelTipAspectBand("chalk", 0.25)).toBeGreaterThan(0);
+    expect(STUDIO_DRY_MEDIA_KERNEL_TIP_ASPECT_BAND_REPRESENTATIVES.length).toBe(3);
   });
 });

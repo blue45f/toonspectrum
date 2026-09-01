@@ -76,6 +76,19 @@ describe("live wet-ink product boundary", () => {
     expect(overlaySource).not.toContain('status: "fallback"');
   });
 
+  it("keeps InkWash pointer frames off grow/deposit/Stam", () => {
+    const suffixStart = overlaySource.indexOf("private paintInkwashSuffix(");
+    const suffixEnd = overlaySource.indexOf("private paintInkwashLivePolyline(");
+    expect(suffixStart).toBeGreaterThan(0);
+    expect(suffixEnd).toBeGreaterThan(suffixStart);
+    const suffix = overlaySource.slice(suffixStart, suffixEnd);
+    expect(suffix).not.toContain("growInkwashWash");
+    expect(suffix).not.toContain("depositStudioInkwashFluidStroke");
+    expect(suffix).not.toContain("stepStudioInkwashFluid");
+    expect(suffix).not.toContain("markStudioInkwashWashDeposited");
+    expect(overlaySource).toContain("private settleInkwashStroke(");
+  });
+
   it("requires wet-ink seal before commit and never settles a rejected/unavailable operation", () => {
     const beginStart = studioPageSource.indexOf("const wetInkOverlayStarted =");
     const beginEnd = studioPageSource.indexOf("const retainedMediaDirect =", beginStart);

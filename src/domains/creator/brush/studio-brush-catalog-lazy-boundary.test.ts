@@ -49,7 +49,7 @@ describe("Studio brush catalogue lazy boundary", () => {
     ).toEqual([
       ["pen", "favorite"],
       ["marker", "recent"],
-      ["fineliner", "starter"],
+      ["gpen", "starter"],
     ]);
   });
 

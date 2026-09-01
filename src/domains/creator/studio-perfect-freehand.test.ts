@@ -98,6 +98,11 @@ describe("resolveStudioPerfectFreehandProfile", () => {
         STUDIO_PERFECT_FREEHAND_PROFILES.gpen
       );
     }
+    expect(resolveStudioPerfectFreehandProfile("maru-pen")).toBe(
+      STUDIO_PERFECT_FREEHAND_PROFILES["maru-pen"]
+    );
+    expect(STUDIO_PERFECT_FREEHAND_PROFILES["maru-pen"].thinning)
+      .toBeGreaterThan(STUDIO_PERFECT_FREEHAND_PROFILES.gpen.thinning);
     expect(resolveStudioPerfectFreehandProfile("pen")).toBeNull();
     expect(resolveStudioPerfectFreehandProfile("calligraphy")).toBeNull();
     expect(resolveStudioPerfectFreehandProfile("")).toBeNull();
@@ -738,10 +743,14 @@ describe("perfect-outline 레인 계약", () => {
     for (const row of rows) {
       const resolved = resolveStudioPerfectFreehandProfile(row.id);
       expect(resolved, `${row.id} 가 perfect-freehand 프로필을 해석하지 못한다`).not.toBeNull();
-      // 프로필은 행이 canonicalId 로 지목한 브러시의 것과 같아야 한다. 어떤 프로필이든
-      // 붙기만 하면 통과하는 게이트는, 잘못된 프로필이 붙는 경우를 잡지 못한다.
+      // Profile-variants share the canonical geometry, except maru-pen: remaining listed
+      // hairline nib gets its own captured outline profile (persisted snapshots keep the
+      // G-pen numbers they already stored).
+      const expectedId = row.id === "maru-pen"
+        ? "maru-pen"
+        : resolveStudioPerfectFreehandProfile(row.canonicalId)?.id;
       expect(resolved!.id, `${row.id} 의 프로필이 canonicalId 와 어긋난다`)
-        .toBe(resolveStudioPerfectFreehandProfile(row.canonicalId)?.id);
+        .toBe(expectedId);
     }
   });
 });

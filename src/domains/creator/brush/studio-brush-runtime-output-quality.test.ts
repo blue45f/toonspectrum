@@ -198,6 +198,27 @@ describe("shipped brush runtime output quality", () => {
     expect(sparseBounds.height / denseBounds.height).toBeLessThan(1.1);
   });
 
+  it("keeps remaining ink/line outlines pressure-aware: G-pen swells, maru-pen stays a hairline", () => {
+    const strokeWidth = 11;
+    const outlineAt = (
+      profile: (typeof STUDIO_PERFECT_FREEHAND_PROFILES)["gpen"],
+      pressure: number,
+    ) => buildStudioPerfectFreehandOutline(stroker, {
+      points: [8, 40, 80, 40, 160, 40],
+      pressures: [pressure, pressure, pressure],
+      profile,
+      strokeWidth,
+    });
+    const gpenLight = bounds(outlineAt(STUDIO_PERFECT_FREEHAND_PROFILES.gpen, 0.12));
+    const gpenHeavy = bounds(outlineAt(STUDIO_PERFECT_FREEHAND_PROFILES.gpen, 0.94));
+    expect(gpenHeavy.height).toBeGreaterThan(gpenLight.height * 1.45);
+
+    const maruLight = bounds(outlineAt(STUDIO_PERFECT_FREEHAND_PROFILES["maru-pen"], 0.12));
+    const maruHeavy = bounds(outlineAt(STUDIO_PERFECT_FREEHAND_PROFILES["maru-pen"], 0.94));
+    expect(maruLight.height).toBeLessThan(gpenLight.height);
+    expect(maruHeavy.height).toBeGreaterThan(maruLight.height * 1.6);
+  });
+
   it("keeps soft airbrush arc-length cadence stable when pointer speed changes", () => {
     const settings = studioBrushDynamicsPresetSettings("airbrush");
     const planAtSpeed = (speed: number) => planNormalizedStudioDynamicBrushDabs({

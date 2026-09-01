@@ -63,7 +63,7 @@ const STUDIO_SUB_TOOL_PALETTE_CATEGORY_SEEDS: readonly StudioSubToolPaletteCateg
     id: "pencil",
     label: "연필",
     drawMode: "pen",
-    presetIds: ["pencil", "pencil-2b", "pencil-6b", "soft-pencil", "colored-pencil"],
+    presetIds: ["pencil", "pencil-grain", "erodible-pencil", "pencil--side-shade"],
   },
   {
     id: "brush",

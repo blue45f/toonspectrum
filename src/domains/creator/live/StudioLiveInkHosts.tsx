@@ -11,7 +11,6 @@ import {
 } from "react";
 
 import { studioPressureHudRatio } from "../brush/studio-draw-hud";
-import { STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY } from "../brush/studio-wet-ink-backend-capability";
 import { StudioHudPill } from "../studio-chrome-ui";
 
 import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
@@ -207,16 +206,14 @@ export const StudioLiveWetInkOverlayHost = memo(
     documentWidth,
     flipX,
   }: StudioLiveInkSurface & { renderer: StudioLiveWetInkOverlayRenderer }) {
-    const backendAvailable =
-      STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY.availability === "available";
+    // InkWash pen/water run the CPU Stam wash on these canvases without a GPU receipt.
+    // Generic watercolor still cannot begin() here — studioLiveWetInkOverlaySupportsElement
+    // keeps it behind the async backend. Unmounting the host made InkWash reject every stroke
+    // with "선택한 습식 표면을 시작하지 못했습니다."
     const activeCanvasRef = useRef<HTMLCanvasElement>(null);
     const settledCanvasRef = useRef<HTMLCanvasElement>(null);
     useLayoutEffect(() => {
-      if (
-        !backendAvailable
-        || !activeCanvasRef.current
-        || !settledCanvasRef.current
-      ) {
+      if (!activeCanvasRef.current || !settledCanvasRef.current) {
         renderer.attach(null);
         return undefined;
       }
@@ -225,22 +222,10 @@ export const StudioLiveWetInkOverlayHost = memo(
         settledCanvas: settledCanvasRef.current,
       });
       return () => renderer.attach(null);
-    }, [backendAvailable, renderer]);
+    }, [renderer]);
     useLayoutEffect(() => {
-      if (!backendAvailable) return;
       renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
-    }, [
-      backendAvailable,
-      documentScale,
-      documentWidth,
-      flipX,
-      height,
-      left,
-      renderer,
-      top,
-      width,
-    ]);
-    if (!backendAvailable) return null;
+    }, [documentScale, documentWidth, flipX, height, left, renderer, top, width]);
     return (
       <>
         <canvas

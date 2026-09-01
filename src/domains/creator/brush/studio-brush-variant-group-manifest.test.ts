@@ -121,12 +121,9 @@ describe("studio brush variant group manifest", () => {
       "brush--bristle-depletion",
       // 2026-08-27: oil-pastel--wgm-mix and mypaint-cc0--watercolor-fringe pins RESOLVED to the
       // quarantine ledger — the browser lab's committed-tap measurements answered "no shelf slot".
-      "mypaint-cc0--2b-pencil",
-      "mypaint-cc0--dry-brush",
-      "mypaint-cc0--splatter",
+      // 2026-09-02 feel-cull: 2b-pencil · dry-brush · splatter · kabura · marker-fat pins
+      // RESOLVED — each shared a stamp signature with a listed core stamp.
       "mypaint-cc0--ink-blot",
-      "mypaint-cc0--kabura",
-      "mypaint-cc0--marker-fat",
       "gpen--croquis-capsule",
       "pen--croquis-stabilized",
       "ink-wash--living-bake",
@@ -245,6 +242,11 @@ describe("studio brush variant group manifest", () => {
     // 2026-09-01 inkwash-pen · inkwash-water-brush DELISTED: they no longer share watercolor's
     // dab wash. Pointer-start consumes the dedicated Stam fluid wash, so picker exposure returns.
     // 234 -> 236 listed.
+    //
+    // 2026-09-02 feel-cull: 45 more ids (11 core/lane + 34 pro footprint siblings). Listed
+    // uniqueness is execution signature unless a real renderer branch distinguishes the pair,
+    // plus pack tip footprint (runtime + motif/alpha + layers + 45° angle). 236 listed all
+    // (234 paint) -> 191 listed all (189 paint).
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -341,6 +343,51 @@ describe("studio brush variant group manifest", () => {
         "charcoal--vine-soft",
         "oil-pastel--wgm-mix",
         "mypaint-cc0--watercolor-fringe",
+        "fineliner",
+        "marker-bold",
+        "pencil-6b",
+        "colored-pencil",
+        "flat-brush",
+        "crosshatch",
+        "mypaint-cc0--kabura",
+        "mypaint-cc0--marker-fat",
+        "mypaint-cc0--splatter",
+        "mypaint-cc0--dry-brush",
+        "mypaint-cc0--2b-pencil",
+        "rock-texture",
+        "compressed-charcoal-edge",
+        "pastel-paper-soft",
+        "sponge-stipple-dab",
+        "technical-needle-ink",
+        "maru-pen-fine",
+        "ink-splatter-burst",
+        "stage-safe-splatter",
+        "round-shading",
+        "hard-oval",
+        "smooth-oval",
+        "spoon-pen-round",
+        "bokeh-scatter",
+        "watercolor-wet-bleed",
+        "marker-colorless-blender",
+        "bumpy-grain",
+        "pencil-4b-rough",
+        "crayon-wax-bold",
+        "calligraphy-tilt-nib",
+        "marker-wide-chisel",
+        "taper-brush-marker",
+        "oil-dry-scumble",
+        "side-graphite-shade",
+        "gouache-grain-flat",
+        "dust-mote-depth",
+        "cloud-billow-soft",
+        "bristle-flat-streak",
+        "wood-knot-rake",
+        "sumi-wash-fray",
+        "bristle-round-loaded",
+        "snow-flurry-flake",
+        "leaf-fall-flurry",
+        "sparkle-glint-cross",
+        "brush-pen-ink",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

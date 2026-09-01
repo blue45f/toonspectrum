@@ -62,7 +62,6 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "inkwash-pen",
   "inkwash-water-brush",
   "airbrush",
-  "fineliner",
   "pencil",
   "marker",
   "brush",
@@ -70,19 +69,20 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "fountain-pen",
   // 2026-08-22 제2차 로스터 축소: ballpoint·felt-tip 은 causal-ink:round 서명의 굵기 중간값이라
   // 격리 원장(A′)으로 delist 됐습니다 — 스타터 키트에서도 함께 뺐습니다.
+  // 2026-09-02 feel-cull: fineliner · pencil-6b · colored-pencil · flat-brush · crosshatch 격리.
   "standard-eraser",
   "kneaded-eraser",
   // 서브 툴 팔레트 — 펜
   "maru-pen",
   "calligraphy",
-  // 서브 툴 팔레트 — 연필
-  "pencil-6b",
-  "colored-pencil",
+  // 서브 툴 팔레트 — 연필 (2026-09-02 feel-cull: 6b·colored-pencil 격리, 남은 연필 레인 유지)
+  "pencil-grain",
+  "erodible-pencil",
+  "pencil--side-shade",
   // 서브 툴 팔레트 — 붓 (2026-08-22: ink-wash 는 watercolor 와 같은 서명이라 격리 D′로 delist)
   "ink-brush",
   "gouache",
   "oil",
-  "flat-brush",
   // 서브 툴 팔레트 — 에어브러시
   "hard-airbrush",
   "airbrush-fine",
@@ -92,7 +92,6 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "web-radial-burst",
   "screentone",
   "web-dot-tone",
-  "crosshatch",
   "web-cross-hatch-pen",
 ]);
 

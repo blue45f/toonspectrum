@@ -918,7 +918,7 @@ describe("StudioBrushLibrarySheet", () => {
     });
 
     expect(html).toMatch(/aria-label="펜\(매끈\) 선택" aria-pressed="true"/);
-    expect(html).toMatch(/aria-label="파인라이너 선택" aria-pressed="false"/);
+    expect(html).toMatch(/aria-label="G펜\(필압\) 선택" aria-pressed="false"/);
     expect(html).toContain('aria-label="펜(매끈) 즐겨찾기 해제"');
     expect(html).toContain('fill="currentColor"');
   });

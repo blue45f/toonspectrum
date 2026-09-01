@@ -32,7 +32,11 @@ export type StudioPerfectFreehandStroker = (
 // 브러시 프로필 — 카탈로그 id → getStroke 옵션 튜닝(단일 정의처)
 // ---------------------------------------------------------------------------
 
-export type StudioPerfectFreehandProfileId = "perfect-ink" | "perfect-marker" | "gpen";
+export type StudioPerfectFreehandProfileId =
+  | "perfect-ink"
+  | "perfect-marker"
+  | "gpen"
+  | "maru-pen";
 
 // ---------------------------------------------------------------------------
 // D-08 — 아웃라인 크기 다이내믹스 프리매핑 (패키지 레인 D-03 포팅)
@@ -134,9 +138,9 @@ export function studioPerfectFreehandEncodeDynamicsPressure(
 /**
  * Selectable brushes backed by the outline stroker.
  *
- * The four manga nibs deliberately share one geometry profile: their exact diameter and pressure
- * response still comes from `studio-brush-alias-profile.ts`. Keeping the geometric smoothing in one
- * profile prevents the aliases from drifting back to the old per-segment capsule renderer.
+ * G-pen siblings share one geometry profile except maru-pen, which keeps a hairline outline
+ * captured into the outline-stroke snapshot so persisted pre-change strokes stay on the G-pen
+ * numbers they already stored.
  */
 export type StudioPerfectFreehandBrushId =
   | StudioPerfectFreehandProfileId
@@ -218,6 +222,19 @@ export const STUDIO_PERFECT_FREEHAND_PROFILES: Readonly<
     capStart: true,
     capEnd: true,
   },
+  "maru-pen": {
+    id: "maru-pen",
+    // Hairline manga nib: stronger thinning so light pressure stays a thread and deliberate
+    // pressure opens late. New strokes snapshot these numbers; older elements keep the G-pen
+    // snapshot they already stored.
+    thinning: 0.88,
+    smoothing: 0.74,
+    streamline: 0.05,
+    taperStartFactor: 0.95,
+    taperEndFactor: 1.4,
+    capStart: true,
+    capEnd: true,
+  },
 };
 
 const STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH: Readonly<
@@ -227,7 +244,7 @@ const STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH: Readonly<
   "perfect-marker": "perfect-marker",
   gpen: "gpen",
   "school-pen": "gpen",
-  "maru-pen": "gpen",
+  "maru-pen": "maru-pen",
   "mapping-pen": "gpen",
   kaburapen: "gpen",
   liner: "gpen",

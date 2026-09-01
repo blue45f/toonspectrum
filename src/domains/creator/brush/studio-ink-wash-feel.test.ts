@@ -321,6 +321,26 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     expect((offPen!.mobile[0] + offPen!.fixed[0])).toBeGreaterThan(0);
     expect((dryPaper?.mobile[0] ?? 0) + (dryPaper?.fixed[0] ?? 0)).toBeLessThan(1e-12);
   });
+
+  it("does not restep the shared wash when the same stroke is planned again", () => {
+    resetStudioInkwashWash();
+    const pen = {
+      ...productInkwashStart("inkwash-pen"),
+      id: "inkwash-pen-restep",
+      points: [12, 16, 28, 16, 44, 16],
+      pressures: [0.9, 0.85, 0.8],
+    };
+    const first = planStudioWetInkBrushReplay(pen, { phase: "committed" });
+    expect(first.ok).toBe(true);
+    const wash = getStudioInkwashWash();
+    expect(wash).not.toBeNull();
+    const revision = wash!.session.revision;
+    const digest = first.value.fieldDigest;
+    const second = planStudioWetInkBrushReplay(pen, { phase: "committed" });
+    expect(second.ok).toBe(true);
+    expect(getStudioInkwashWash()!.session.revision).toBe(revision);
+    expect(second.value.fieldDigest).toBe(digest);
+  });
 });
 
 function attachedInkwashOverlay() {
@@ -334,6 +354,15 @@ function attachedInkwashOverlay() {
       setTransform: () => undefined,
       clearRect: () => undefined,
       drawImage: () => undefined,
+      beginPath: () => undefined,
+      moveTo: () => undefined,
+      lineTo: () => undefined,
+      stroke: () => undefined,
+      imageSmoothingEnabled: true,
+      lineCap: "butt",
+      lineJoin: "miter",
+      lineWidth: 1,
+      strokeStyle: "#000",
       get globalAlpha() { return 1; },
       set globalAlpha(_value: number) { /* no-op mock */ },
       get globalCompositeOperation() { return "source-over"; },
@@ -350,6 +379,15 @@ function attachedInkwashOverlay() {
       setTransform: () => undefined,
       clearRect: () => undefined,
       drawImage: () => undefined,
+      beginPath: () => undefined,
+      moveTo: () => undefined,
+      lineTo: () => undefined,
+      stroke: () => undefined,
+      imageSmoothingEnabled: true,
+      lineCap: "butt",
+      lineJoin: "miter",
+      lineWidth: 1,
+      strokeStyle: "#000",
       get globalAlpha() { return 1; },
       set globalAlpha(_value: number) { /* no-op mock */ },
       get globalCompositeOperation() { return "source-over"; },

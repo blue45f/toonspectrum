@@ -111,12 +111,9 @@ export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Obje
   // 2026-08-27 oil-pastel--wgm-mix 핀 RESOLVED: 랩의 답은 "영구 진열대 부적격" — contact-tooth
   // 결합에서 커밋 탭이 알파 0.014 로 붕괴(실측). 격리 원장으로 이동.
   // 2026-08-13 wave 3 (2026-08-21 웨이브에서 중복 12종의 핀을 해제하고 격리 원장으로 옮김)
-  "mypaint-cc0--2b-pencil",
-  "mypaint-cc0--dry-brush",
-  "mypaint-cc0--splatter",
+  // 2026-09-02 feel-cull: 2b-pencil · dry-brush · splatter · kabura · marker-fat
+  // 핀 RESOLVED — 같은 stamp 서명을 이미 노출 중인 코어 스탬프와 공유해 격리 원장으로 이동.
   "mypaint-cc0--ink-blot",
-  "mypaint-cc0--kabura",
-  "mypaint-cc0--marker-fat",
   // 2026-08-27 mypaint-cc0--watercolor-fringe 핀 RESOLVED: 커밋 스탬프 워시 탭 16px@delta3
   // 결정적 불가시(실측). 격리 원장으로 이동.
   "gpen--croquis-capsule",

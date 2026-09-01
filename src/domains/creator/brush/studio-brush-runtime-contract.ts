@@ -154,8 +154,8 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "flat-brush", family: "brush", engine: "angled-ribbon", engineVariant: "minus-30deg", canonicalId: "brush", preview: "wavy", tip: "angled-ribbon", texture: "none", dynamics: "ribbon-pressure", distinctness: "profile-variant" },
   { id: "watercolor", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "unique" },
   { id: "ink-wash", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
-  { id: "inkwash-pen", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
-  { id: "inkwash-water-brush", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
+  { id: "inkwash-pen", family: "watercolor", engine: "watercolor-dabs", engineVariant: "stam-fluid-pen", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "engine-variant" },
+  { id: "inkwash-water-brush", family: "watercolor", engine: "watercolor-dabs", engineVariant: "stam-fluid-water", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "engine-variant" },
   { id: "inkwash-bleed-wash", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
   { id: "inkwash-white-ink", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
   { id: "gouache", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
@@ -322,6 +322,9 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     // 2026-08-13 wave 3: studio-living-ink-settled-bake-v1 정착 베이크 프로그램을 태우는 2개 레인.
     "living-ink-settled-bake": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
     "fluid-feather-bake": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    // 2026-09-01 Stam fluid wash (pointer-start owns the path; ids stay in watercolor family).
+    "stam-fluid-pen": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "stam-fluid-water": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure" },
   },
   "oil-ribbon": {
     "bristle-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },

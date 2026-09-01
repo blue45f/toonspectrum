@@ -626,10 +626,21 @@ export function resolveStudioWetInkBrushPhysicalRecipe(
   };
 }
 
+/** Skip CPU Stam on huge fields — a 2048² × 16-step tick on every Konva render froze the tab. */
+const INKWASH_CPU_STAM_CELL_CAP = 512 * 512;
+const INKWASH_CPU_STAM_STEPS = 4;
+
+function inkwashCpuStamSteps(session: { fluid: { width: number; height: number } }): number {
+  const cells = session.fluid.width * session.fluid.height;
+  if (cells > INKWASH_CPU_STAM_CELL_CAP) return 0;
+  return INKWASH_CPU_STAM_STEPS;
+}
+
 function applyInkwashElementToWash(
   element: DrawEl,
   recipe: StudioWetInkBrushPhysicalRecipe,
   geometry: WetInkGeometry,
+  phase: StudioWetInkBrushReplayPhase,
 ): ReturnType<typeof getStudioInkwashWash> {
   const wash = ensureStudioInkwashWash({
     originX: geometry.originCellX / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
@@ -661,16 +672,24 @@ function applyInkwashElementToWash(
       inkColor: recipe.inkColor,
     });
     markStudioInkwashWashDeposited(element);
+    // Live Konva/DrawNode replays must not Stam. Overlay owns the pointer-frame field.
+    // Committed plans Stam once when this snapshot first lands, and only if the field is small
+    // enough for the main thread.
+    if (phase !== "live") {
+      const steps = inkwashCpuStamSteps(wash.session);
+      if (steps > 0) {
+        stepStudioInkwashFluid(
+          wash.session,
+          steps,
+          studioInkwashFluidStepParams({
+            bleed: recipe.material.bleed,
+            dryRate: recipe.material.dryingRate,
+            chromaticSeparation: recipe.material.chromatography ?? 0.5,
+          }),
+        );
+      }
+    }
   }
-  stepStudioInkwashFluid(
-    wash.session,
-    STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
-    studioInkwashFluidStepParams({
-      bleed: recipe.material.bleed,
-      dryRate: recipe.material.dryingRate,
-      chromaticSeparation: recipe.material.chromatography ?? 0.5,
-    }),
-  );
   return getStudioInkwashWash();
 }
 
@@ -686,7 +705,7 @@ function planInkwashFluidReplay(input: Readonly<{
   if (cells > STUDIO_WET_INK_BRUSH_MAX_CELLS) {
     return planFailure("field-budget", "InkWash fluid field exceeds the cell budget.");
   }
-  const wash = applyInkwashElementToWash(element, recipe, geometry);
+  const wash = applyInkwashElementToWash(element, recipe, geometry, options.phase);
   if (!wash) {
     return planFailure("field-budget", "InkWash shared wash is unavailable.");
   }

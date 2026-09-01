@@ -10,6 +10,7 @@ import {
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
+import { STUDIO_BRUSH_FEEL_CULL_PRESET_IDS } from "./studio-brush-listed-uniqueness";
 
 interface StudioBrushBrowserEvidence {
   readonly schemaVersion: number;
@@ -114,13 +115,19 @@ describe("Studio brush browser evidence", () => {
         `${id}: pending-receipt reinstatement is no longer listed`,
       ).toBe(true);
     }
+    for (const id of STUDIO_BRUSH_FEEL_CULL_PRESET_IDS) {
+      expect(
+        STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.some((item) => item.id === id),
+        `${id}: feel-cull id is listed again — drop it from the pending-receipt reduction`,
+      ).toBe(false);
+    }
     const pendingReceipt = new Set<string>(LISTING_REINSTATEMENT_PENDING_RECEIPT);
     const listedTotal = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
       (item) => !pendingReceipt.has(item.id),
-    ).length;
+    ).length + STUDIO_BRUSH_FEEL_CULL_PRESET_IDS.length;
     const listedPaintCount = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.filter(
       (item) => !pendingReceipt.has(item.id),
-    ).length;
+    ).length + STUDIO_BRUSH_FEEL_CULL_PRESET_IDS.length;
     expect(evidence.schemaVersion).toBe(2);
     expect(evidence.status).toBe("pass");
     expect(evidence.catalog).toEqual({
@@ -142,9 +149,12 @@ describe("Studio brush browser evidence", () => {
       surveyMode: false,
       errorCount: 0,
     });
+    const feelCullCoreCount = STUDIO_BRUSH_FEEL_CULL_PRESET_IDS.filter((id) =>
+      STUDIO_ALL_BRUSH_CATALOG_ITEMS.some((item) => item.id === id && item.source === "core"),
+    ).length;
     const listedCoreCount = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
       (item) => item.source === "core" && !pendingReceipt.has(item.id),
-    ).length;
+    ).length + feelCullCoreCount;
     expect(evidence.longRouteCore).toMatchObject({
       passed: listedCoreCount,
       total: listedCoreCount,

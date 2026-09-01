@@ -419,36 +419,61 @@ export function resolveStudioInkwashFluidDisplay(
   options?: Readonly<{
     originX?: number;
     originY?: number;
+    /** Field-cell rectangle to rasterize. Omit to dump the whole field. */
+    clip?: Readonly<{ x: number; y: number; width: number; height: number }>;
   }>,
 ): StudioWetInkTileUpload {
   const { fluid, fixed } = session;
   const { width, height, pigment, wet } = fluid;
-  const rgba = new Uint8ClampedArray(width * height * 4);
+  const clip = options?.clip;
+  const x0 = clip
+    ? Math.max(0, Math.floor(clip.x))
+    : 0;
+  const y0 = clip
+    ? Math.max(0, Math.floor(clip.y))
+    : 0;
+  const x1 = clip
+    ? Math.min(width, Math.ceil(clip.x + clip.width))
+    : width;
+  const y1 = clip
+    ? Math.min(height, Math.ceil(clip.y + clip.height))
+    : height;
+  const outW = Math.max(1, x1 - x0);
+  const outH = Math.max(1, y1 - y0);
+  const rgba = new Uint8ClampedArray(outW * outH * 4);
   const strength = STUDIO_WET_INK_INKWASH_DISPLAY.beerLambertStrength;
   const sheen = STUDIO_WET_INK_INKWASH_DISPLAY.wetSheen;
   const { lo, hi } = STUDIO_WET_INK_INKWASH_DISPLAY.wetSheenGate;
-  for (let index = 0; index < width * height; index += 1) {
-    const base = index * 4;
-    const densityR = (pigment[base] ?? 0) + (fixed[base] ?? 0);
-    const densityG = (pigment[base + 1] ?? 0) + (fixed[base + 1] ?? 0);
-    const densityB = (pigment[base + 2] ?? 0) + (fixed[base + 2] ?? 0);
-    const wetness = wet[index] ?? 0;
-    const wetGate = clamp01((wetness - lo) / Math.max(1e-8, hi - lo));
-    const transR = Math.exp(-densityR * strength) * (1 - wetGate * sheen.r);
-    const transG = Math.exp(-densityG * strength) * (1 - wetGate * sheen.g);
-    const transB = Math.exp(-densityB * strength) * (1 - wetGate * sheen.b);
-    rgba[base] = clampByte(PAPER.r * transR * 255);
-    rgba[base + 1] = clampByte(PAPER.g * transG * 255);
-    rgba[base + 2] = clampByte(PAPER.b * transB * 255);
-    rgba[base + 3] = clampByte((1 - Math.min(transR, transG, transB)) * 255);
+  for (let y = 0; y < outH; y += 1) {
+    const srcY = y0 + y;
+    if (srcY < 0 || srcY >= height) continue;
+    for (let x = 0; x < outW; x += 1) {
+      const srcX = x0 + x;
+      if (srcX < 0 || srcX >= width) continue;
+      const index = srcY * width + srcX;
+      const base = index * 4;
+      const dest = (y * outW + x) * 4;
+      const densityR = (pigment[base] ?? 0) + (fixed[base] ?? 0);
+      const densityG = (pigment[base + 1] ?? 0) + (fixed[base + 1] ?? 0);
+      const densityB = (pigment[base + 2] ?? 0) + (fixed[base + 2] ?? 0);
+      const wetness = wet[index] ?? 0;
+      const wetGate = clamp01((wetness - lo) / Math.max(1e-8, hi - lo));
+      const transR = Math.exp(-densityR * strength) * (1 - wetGate * sheen.r);
+      const transG = Math.exp(-densityG * strength) * (1 - wetGate * sheen.g);
+      const transB = Math.exp(-densityB * strength) * (1 - wetGate * sheen.b);
+      rgba[dest] = clampByte(PAPER.r * transR * 255);
+      rgba[dest + 1] = clampByte(PAPER.g * transG * 255);
+      rgba[dest + 2] = clampByte(PAPER.b * transB * 255);
+      rgba[dest + 3] = clampByte((1 - Math.min(transR, transG, transB)) * 255);
+    }
   }
   return {
     tileX: 0,
     tileY: 0,
-    x: options?.originX ?? 0,
-    y: options?.originY ?? 0,
-    width,
-    height,
+    x: (options?.originX ?? 0) + x0,
+    y: (options?.originY ?? 0) + y0,
+    width: outW,
+    height: outH,
     revision: session.revision,
     rgba,
   };

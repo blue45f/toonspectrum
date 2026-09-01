@@ -49,6 +49,15 @@ function recordingCanvas(): RecordingCanvas {
       composite = state.composite;
     },
     setTransform: () => undefined,
+    beginPath: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    stroke: () => undefined,
+    imageSmoothingEnabled: true,
+    lineCap: "butt" as CanvasLineCap,
+    lineJoin: "miter" as CanvasLineJoin,
+    lineWidth: 1,
+    strokeStyle: "#000",
     clearRect: (...args: number[]) => {
       clears.push(args);
     },
@@ -229,6 +238,40 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     expect(renderer.isActive).toBe(true);
     expect(renderer.resetActive()).toBe(true);
     expect(renderer.isActive).toBe(false);
+  });
+
+  it("does not grow or deposit the wash field while an InkWash stroke is live", () => {
+    const { renderer } = attachedRenderer();
+    const start = wetStroke([24, 30], { brush: "inkwash-pen", id: "inkwash-live-cheap" });
+    const live = wetStroke(
+      Array.from({ length: 40 }, (_, index) => (index % 2 === 0 ? 24 + index * 4 : 30)),
+      { brush: "inkwash-pen", id: "inkwash-live-cheap" },
+    );
+    expect(renderer.begin(start, { pageEpoch: 9 }).status).toBe("started");
+    expect(renderer.appendFrom(live, { pageEpoch: 9 }).status).toBe("appended");
+    expect(getStudioInkwashWash()).toBeNull();
+
+    expect(renderer.end(live, { pageEpoch: 9 }).status).toBe("settled");
+    const afterPen = getStudioInkwashWash();
+    expect(afterPen).not.toBeNull();
+    const revision = afterPen!.session.revision;
+    const width = afterPen!.session.fluid.width;
+
+    const waterStart = wetStroke([40, 30], {
+      brush: "inkwash-water-brush",
+      id: "inkwash-live-cheap-water",
+    });
+    const water = wetStroke([40, 30, 80, 30, 120, 30, 180, 30], {
+      brush: "inkwash-water-brush",
+      id: "inkwash-live-cheap-water",
+    });
+    expect(renderer.begin(waterStart, { pageEpoch: 9 }).status).toBe("started");
+    expect(renderer.appendFrom(water, { pageEpoch: 9 }).status).toBe("appended");
+    const duringWater = getStudioInkwashWash();
+    expect(duringWater).not.toBeNull();
+    expect(duringWater!.session.revision).toBe(revision);
+    expect(duringWater!.session.fluid.width).toBe(width);
+    expect(renderer.end(water, { pageEpoch: 9 }).status).toBe("settled");
   });
 
   it("reads only the unseen suffix and uploads dirty physical tiles", () => {
