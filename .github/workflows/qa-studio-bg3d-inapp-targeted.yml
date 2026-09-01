@@ -1,0 +1,69 @@
+name: QA Studio targeted BG3D in-app verification
+
+on:
+  push:
+    branches:
+      - qa/studio-inapp-full-audit-20260902
+    paths:
+      - .github/workflows/qa-studio-bg3d-inapp-targeted.yml
+      - scripts/verify-studio-bg3d-inapp-editor.mts
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qa-studio-bg3d-inapp-targeted-v1
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RESULT_DIR: qa-results/studio-bg3d-inapp-targeted-2026-09-02
+      TOONSPECTRUM_BG3D_INAPP_VERIFY_DIR: ${{ github.workspace }}/qa-results/studio-bg3d-inapp-targeted-2026-09-02/evidence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
+      - name: Run targeted in-app BG3D verifier
+        shell: bash
+        run: |
+          mkdir -p "$RESULT_DIR/evidence"
+          set +e
+          pnpm run verify:studio-bg3d-inapp-editor 2>&1 | tee "$RESULT_DIR/run.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$RESULT_DIR/exit-code.txt"
+          exit 0
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-bg3d-inapp-targeted-2026-09-02
+          retention-days: 30
+          if-no-files-found: warn
+          path: ${{ env.RESULT_DIR }}
+      - name: Commit textual and JSON evidence
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$RESULT_DIR"
+          git diff --cached --quiet && exit 0
+          git commit -m "test(qa): record targeted BG3D in-app evidence [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Enforce verifier result
+        if: always()
+        run: |
+          test "$(cat "$RESULT_DIR/exit-code.txt")" = "0"
