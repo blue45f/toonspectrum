@@ -101,7 +101,26 @@ describe("Studio brush browser evidence", () => {
     // preserved for persisted documents) from the LISTED matrix the shipped UI can actually
     // select — quarantined ids are registered but never selectable, so every UI-driven counter
     // pins the listed set.
-    const listedTotal = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length;
+    //
+    // 2026-09-01 InkWash reinstatement: inkwash-pen · inkwash-water-brush left quarantine so
+    // the picker can offer the Stam fluid tools. The 2026-08-27 receipt still measured the
+    // 234-id listed matrix. Subtract only those two when comparing to that receipt — a red
+    // evidence gate on the whole catalogue would hide the next regression (2026-08-16 note).
+    // Drop this list the next time `pnpm verify:studio-brushes` authors a fresh receipt.
+    const LISTING_REINSTATEMENT_PENDING_RECEIPT = ["inkwash-pen", "inkwash-water-brush"] as const;
+    for (const id of LISTING_REINSTATEMENT_PENDING_RECEIPT) {
+      expect(
+        STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.some((item) => item.id === id),
+        `${id}: pending-receipt reinstatement is no longer listed`,
+      ).toBe(true);
+    }
+    const pendingReceipt = new Set<string>(LISTING_REINSTATEMENT_PENDING_RECEIPT);
+    const listedTotal = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => !pendingReceipt.has(item.id),
+    ).length;
+    const listedPaintCount = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.filter(
+      (item) => !pendingReceipt.has(item.id),
+    ).length;
     expect(evidence.schemaVersion).toBe(2);
     expect(evidence.status).toBe("pass");
     expect(evidence.catalog).toEqual({
@@ -124,7 +143,7 @@ describe("Studio brush browser evidence", () => {
       errorCount: 0,
     });
     const listedCoreCount = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
-      (item) => item.source === "core",
+      (item) => item.source === "core" && !pendingReceipt.has(item.id),
     ).length;
     expect(evidence.longRouteCore).toMatchObject({
       passed: listedCoreCount,
@@ -165,7 +184,7 @@ describe("Studio brush browser evidence", () => {
     );
     expect(evidence.smartShapes).toMatchObject({ passed: 6, total: 6, errorCount: 0 });
     expect(evidence.mobile).toMatchObject({
-      paintSelections: STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
+      paintSelections: listedPaintCount,
       eraserSelections: STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length,
       undersizedTargets: 0,
       errorCount: 0,

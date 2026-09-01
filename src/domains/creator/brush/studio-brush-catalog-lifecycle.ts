@@ -59,6 +59,8 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "pen",
   "gpen",
   "watercolor",
+  "inkwash-pen",
+  "inkwash-water-brush",
   "airbrush",
   "fineliner",
   "pencil",

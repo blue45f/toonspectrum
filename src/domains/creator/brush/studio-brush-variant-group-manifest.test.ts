@@ -241,6 +241,10 @@ describe("studio brush variant group manifest", () => {
     // ribbon with two chisel stamps for a 520px route - was fixed by gap densification in
     // studio-web-drawing-stroke-bridge.ts and each lane re-verified 6/6 on the long-route gate.
     // 234 listed again after the round trips.
+    //
+    // 2026-09-01 inkwash-pen · inkwash-water-brush DELISTED: they no longer share watercolor's
+    // dab wash. Pointer-start consumes the dedicated Stam fluid wash, so picker exposure returns.
+    // 234 -> 236 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -261,8 +265,6 @@ describe("studio brush variant group manifest", () => {
         "kaburapen",
         "soft-pencil",
         "pencil-2b",
-        "inkwash-pen",
-        "inkwash-water-brush",
         "inkwash-bleed-wash",
         "ink-wash",
         "watercolor--granulating",

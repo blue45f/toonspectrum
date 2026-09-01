@@ -47,6 +47,10 @@ export const STUDIO_BEGINNER_BRUSH_IDS = [
   // 드로잉
   "pencil",
   "highlighter",
+  // 2026-09-01 InkWash 유체 도구: 기본 탭 기본 목록에 올려 피커에서 바로 고르게 합니다.
+  // 퀵 셸프 첫 8(펜→수채→에어)은 그대로 두고, 기본 키트 본문 뒤에 둡니다.
+  "inkwash-pen",
+  "inkwash-water-brush",
   // 2026-08-21 로스터 축소: gel-pen·school-pen 을 스타터 키트에서 뺐습니다. 둘 다 pen/gpen 과
   // 실행 서명이 같아(굵기만 다름) 초보 키트 한 줄에 같은 선이 다섯 번 보이던 자리였습니다.
   // 두 id 는 격리 원장으로 옮겼고, 저장된 문서는 계속 원래 브러시로 재생됩니다.

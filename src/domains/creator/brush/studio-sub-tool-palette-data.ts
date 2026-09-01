@@ -69,7 +69,15 @@ const STUDIO_SUB_TOOL_PALETTE_CATEGORY_SEEDS: readonly StudioSubToolPaletteCateg
     id: "brush",
     label: "붓",
     drawMode: "pen",
-    presetIds: ["watercolor", "ink-wash", "ink-brush", "gouache", "oil", "flat-brush"],
+    presetIds: [
+      "watercolor",
+      "inkwash-pen",
+      "inkwash-water-brush",
+      "ink-brush",
+      "gouache",
+      "oil",
+      "flat-brush",
+    ],
   },
   {
     id: "airbrush",

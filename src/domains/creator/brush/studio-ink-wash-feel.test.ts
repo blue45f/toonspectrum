@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { StudioLiveWetInkOverlayRenderer } from "../live/studio-live-wet-ink-overlay";
 import { BRUSH_PRESETS } from "../studio-brush";
 
+import { filterStudioBrushCatalogItems } from "./studio-brush-catalog";
+import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
+import { STUDIO_SUB_TOOL_PALETTE_CATEGORIES } from "./studio-sub-tool-palette-data";
 import {
   createStudioInkwashFluidSession,
   depositStudioInkwashFluidStamp,
@@ -226,6 +229,30 @@ function productInkwashStart(brushId: "inkwash-pen" | "inkwash-water-brush") {
 describe("InkWash pen/water product start on the shipped wet/fluid path", () => {
   beforeEach(() => {
     resetStudioInkwashWash();
+  });
+
+  it("lists the pen and water brush in the picker, search, and 붓 palette", () => {
+    for (const id of ["inkwash-pen", "inkwash-water-brush"] as const) {
+      expect(isStudioBrushQuarantinedPresetId(id), id).toBe(false);
+      expect(
+        filterStudioBrushCatalogItems({ category: "beginner" }).some((item) => item.id === id),
+        `${id}: missing from the default 기본 tab`,
+      ).toBe(true);
+      expect(
+        filterStudioBrushCatalogItems({ category: "watercolor" }).some((item) => item.id === id),
+        `${id}: missing from the 수채 tab`,
+      ).toBe(true);
+    }
+    expect(
+      filterStudioBrushCatalogItems({ query: "잉크펜" }).some((item) => item.id === "inkwash-pen"),
+    ).toBe(true);
+    expect(
+      filterStudioBrushCatalogItems({ query: "물붓" }).some((item) => item.id === "inkwash-water-brush"),
+    ).toBe(true);
+    const brushTab = STUDIO_SUB_TOOL_PALETTE_CATEGORIES.find((category) => category.id === "brush");
+    expect(brushTab?.tools.map((tool) => tool.id)).toEqual(
+      expect.arrayContaining(["inkwash-pen", "inkwash-water-brush"]),
+    );
   });
 
   it("accepts pointer-start snapshots and keeps water from depositing ink", () => {

@@ -184,12 +184,11 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // ── D. watercolor-dabs:diffuse:soft-diffuse:wet-edge — 한 서명에 7종 ──────────
     // watercolor(수채) · gouache(과슈) · inkwash-white-ink(화이트)만 남깁니다. (2026-08-22
     // 제2차 축소로 코어 ink-wash 도 아래 D′ 항목으로 delist 됐습니다 — 수묵은 전용 레인이 대안.)
-    "inkwash-pen":
-      "이름은 딥펜이지만 watercolor 와 실행 서명이 동일한 확산 워시입니다(선언과 실재 불일치). "
-      + "실제 펜이 필요하면 pen·gpen, 워시가 필요하면 watercolor 가 대안(지침 6).",
-    "inkwash-water-brush":
-      "watercolor 와 실행 서명이 동일하고 굵기 32/농도 0.6 으로 watercolor(28/0.55)와 같은 그림. "
-      + "대안: watercolor(지침 6).",
+    // 2026-09-01 inkwash-pen · inkwash-water-brush 복귀(DELISTED): 격리 사유였던
+    // "watercolor 와 실행 서명이 동일한 확산 워시"는 더 이상 참이 아닙니다. 두 id 는
+    // 포인터 시작부터 전용 Stam 유체 워시(studio-inkwash-fluid)를 타고, 물붓은 색소를
+    // 올리지 않으며 공유 워시에서 미정착 잉크를 움직입니다. 복귀 조건(전용 실행 경로)이
+    // 충족됐으므로 피커 노출을 되돌립니다. 같은 서명에 남은 bleed-wash 만 계속 격리합니다.
     "inkwash-bleed-wash":
       "ink-wash 와 실행 서명이 동일하고 농도까지 0.5 로 같아 굵기 36/30 차이만 남습니다. "
       + "대안: watercolor(지침 6).",
