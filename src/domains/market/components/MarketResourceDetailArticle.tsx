@@ -1,4 +1,5 @@
 import {
+  Box,
   CheckCircle2,
   Cpu,
   Download,
@@ -41,6 +42,8 @@ import { MarketResourceCard } from "./MarketResourceCard";
 import { MarketResourceReleaseHistory } from "./MarketResourceReleaseHistory";
 import { MarketScene3dPreview } from "./MarketScene3dPreview";
 import { MarketTemplatePreview } from "./MarketTemplatePreview";
+import { MarketWebtoon3dViewerModal } from "./MarketWebtoon3dViewerModal";
+import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
 import { StaleNoticeBar } from "./StaleNoticeBar";
 
 import type { CreatorMarketplaceInstallReceipt } from "@/lib/creator-marketplace-install-receipt";
@@ -243,6 +246,7 @@ export function MarketResourceDetailArticle({
     record,
     installReceiptSnapshot.receipt,
   );
+  const [viewer3dOpen, setViewer3dOpen] = useState(false);
 
   useEffect(() => {
     setSelectedPreviewIndex(0);
@@ -311,6 +315,26 @@ export function MarketResourceDetailArticle({
             {record.description}
           </p>
         ) : null}
+
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <MarketWebtoonSpecBadge
+            format={record.kind.startsWith("3d") ? "glb" : "portable-json"}
+            polycountGrade="optimal-webtoon"
+            hasLineExtraction={true}
+            isNoAiProtected={!record.containsAi}
+            licenseTier="solo-creator"
+          />
+          {record.kind.startsWith("3d") ? (
+            <button
+              type="button"
+              onClick={() => setViewer3dOpen(true)}
+              className="inline-flex min-h-6 items-center gap-1 rounded-md bg-accent/20 border border-accent/40 px-2 text-xs font-bold text-accent hover:bg-accent/30 transition-colors"
+            >
+              <Box className="size-3" />
+              <span>3D 인터랙티브 뷰어 (은선·셀셰이딩·조명)</span>
+            </button>
+          ) : null}
+        </div>
         <KindIcon strokeWidth={1} aria-hidden="true" className="pointer-events-none absolute -right-4 -top-4 h-36 w-36 text-fg/10" />
       </header>
 
@@ -854,6 +878,16 @@ export function MarketResourceDetailArticle({
           )}
         </div>
       </div>
+
+      <MarketWebtoon3dViewerModal
+        open={viewer3dOpen}
+        onClose={() => setViewer3dOpen(false)}
+        assetTitle={record.name}
+        format="glb"
+        onImportToStudio={() => {
+          setViewer3dOpen(false);
+        }}
+      />
     </article>
   );
 }
