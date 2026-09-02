@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-02",
+  "purpose": "Primary-source research registry for rendering, brush simulation, differentiable 2D graphics, co-creative painting, animation, and 3D authoring ideas that can be turned into measured ToonSpectrum Studio prototypes. Seed papers provide stable anchors and arXiv queries keep the intake open during the saturation campaign.",
+  "papers": [
+    {
+      "id": "dripping-thin-films-2026",
+      "title": "Dripping Thin Films for Real-time Digital Painting",
+      "publishedAt": "2026-03-30",
+      "officialUrl": "https://research.adobe.com/publication/dripping-thin-films-for-real-time-digital-painting/",
+      "watchUrl": "https://doi.org/10.1111/cgf.70416",
+      "priority": "P0",
+      "focus": ["thin-film", "watercolor", "pigment-advection", "pigment-diffusion", "dripping", "real-time"]
+    },
+    {
+      "id": "mixwell-2026",
+      "title": "Mixwell: Sharp 2D Fluid Brushes for Progressive Physics-Based Mixing",
+      "publishedAt": "2026-07-01",
+      "officialUrl": "https://dougjam.github.io/mixwell-2026/",
+      "watchUrl": "https://github.com/dougjam/mixwell-2026",
+      "priority": "P0",
+      "focus": ["fluid-brush", "reverse-drift", "resolution-independent", "gpu-shader", "progressive-mixing"]
+    },
+    {
+      "id": "cubic-splat-2026",
+      "title": "CubicSplat: Differentiable Vector Graphics via Error-Bounded Forward Relaxation",
+      "publishedAt": "2026-08-21",
+      "officialUrl": "https://arxiv.org/abs/2608.20803",
+      "watchUrl": "https://arxiv.org/abs/2608.20803",
+      "priority": "P0",
+      "focus": ["differentiable-vector", "bezier", "error-bound", "visibility", "vectorization"]
+    },
+    {
+      "id": "nurbs-splatting-2026",
+      "title": "NURBS Splatting: A Unified Differentiable Rendering Framework for Vector Graphics",
+      "publishedAt": "2026-06-30",
+      "officialUrl": "https://arxiv.org/abs/2606.31764",
+      "watchUrl": "https://arxiv.org/abs/2606.31764",
+      "priority": "P0",
+      "focus": ["nurbs", "differentiable-vector", "long-spline", "closed-fill", "calligraphy"]
+    },
+    {
+      "id": "diffbmp-2026",
+      "title": "DiffBMP: Differentiable Rendering with Bitmap Primitives",
+      "publishedAt": "2026-02-26",
+      "officialUrl": "https://arxiv.org/abs/2602.22625",
+      "watchUrl": "https://diffbmp.com/",
+      "priority": "P0",
+      "focus": ["bitmap-primitives", "layered-export", "differentiable-rendering", "layout-optimization", "creative-workflow"]
+    },
+    {
+      "id": "paint-copilot-2026",
+      "title": "PaintCopilot: Modeling Painting as Autonomous Artistic Continuation",
+      "publishedAt": "2026-05-20",
+      "officialUrl": "https://arxiv.org/abs/2605.20941",
+      "watchUrl": "https://arxiv.org/abs/2605.20941",
+      "priority": "P0",
+      "focus": ["co-creative-painting", "stroke-history", "stroke-completion", "region-inpainting", "dynamic-brush"]
+    },
+    {
+      "id": "stroke-diff-2026",
+      "title": "Data-Efficient Brushstroke Generation with Diffusion Models for Oil Painting",
+      "publishedAt": "2026-07-15",
+      "officialUrl": "https://doi.org/10.1145/3822182",
+      "watchUrl": "https://doi.org/10.1145/3822182",
+      "priority": "P1",
+      "focus": ["brushstroke-generation", "small-data", "diffusion", "oil-paint", "controllable-primitive"]
+    },
+    {
+      "id": "dq-transformer-oil-painting-2026",
+      "title": "Look, Compare and Draw: Differential Query Transformer for Automatic Oil Painting",
+      "publishedAt": "2026-07-01",
+      "officialUrl": "https://doi.org/10.1109/TVCG.2026.3669142",
+      "watchUrl": "https://pubmed.ncbi.nlm.nih.gov/41770973/",
+      "priority": "P1",
+      "focus": ["stroke-planning", "differential-query", "oil-paint", "fewer-strokes", "local-detail"]
+    },
+    {
+      "id": "bezier-splatting-2025",
+      "title": "Bezier Splatting for Fast and Differentiable Vector Graphics",
+      "publishedAt": "2025-03-20",
+      "officialUrl": "https://arxiv.org/abs/2503.16424",
+      "watchUrl": "https://arxiv.org/abs/2503.16424",
+      "priority": "P1",
+      "focus": ["bezier", "gaussian-splatting", "vector-rasterizer", "adaptive-pruning", "fast-optimization"]
+    },
+    {
+      "id": "ink-brush-training-2026",
+      "title": "An intelligent HMM-based system for training brush techniques in ink painting",
+      "publishedAt": "2026-05-01",
+      "officialUrl": "https://doi.org/10.1038/s41598-026-44582-6",
+      "watchUrl": "https://doi.org/10.1038/s41598-026-44582-6",
+      "priority": "P1",
+      "focus": ["brush-gesture", "hmm", "ink-painting", "training-feedback", "three-d-input"]
+    },
+    {
+      "id": "synthetic-gestures-2026",
+      "title": "Synthetic Gestures: An Evolutionary Sketching Machine",
+      "publishedAt": "2026-07-13",
+      "officialUrl": "https://doi.org/10.1145/3803784.3809282",
+      "watchUrl": "https://doi.org/10.1145/3803784.3809282",
+      "priority": "P1",
+      "focus": ["sketch-synthesis", "evolution-strategy", "plotter", "implicit-gesture", "artist-control"]
+    },
+    {
+      "id": "real-time-ink-animation-2026",
+      "title": "Research on Real Time Ink Animation Generation Method Based on Multi Perspective Stereoscopic Vision",
+      "publishedAt": "2026-08-13",
+      "officialUrl": "https://doi.org/10.7716/aem.v15i3.3988",
+      "watchUrl": "https://www.aemjournal.org/index.php/AEM/article/view/3988",
+      "priority": "P2",
+      "focus": ["ink-animation", "multi-view", "three-d-reconstruction", "line-extraction", "temporal-consistency"]
+    }
+  ],
+  "queries": [
+    {
+      "id": "digital-painting",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22digital+painting%22+OR+all:%22brush+simulation%22",
+      "maxResults": 20,
+      "focus": ["brush-engine", "natural-media"]
+    },
+    {
+      "id": "differentiable-two-d",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22differentiable+vector%22+OR+all:%22differentiable+rendering%22",
+      "maxResults": 25,
+      "focus": ["vector-engine", "layer-optimization"]
+    },
+    {
+      "id": "creative-tools",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22creative+tool%22+OR+all:%22co-creative%22+OR+all:%22drawing+assistant%22",
+      "maxResults": 25,
+      "focus": ["ai-assist", "human-in-the-loop"]
+    },
+    {
+      "id": "animation-authoring",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22animation+authoring%22+OR+all:%22motion+graphics%22+OR+all:%22storyboard%22",
+      "maxResults": 25,
+      "focus": ["timeline", "storyboard", "camera"]
+    },
+    {
+      "id": "texture-painting",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22texture+painting%22+OR+all:%22surface+painting%22+OR+all:%22uv+painting%22",
+      "maxResults": 20,
+      "focus": ["three-d-paint", "texture-export"]
+    },
+    {
+      "id": "comic-generation",
+      "endpoint": "https://export.arxiv.org/api/query",
+      "searchQuery": "all:%22comic+generation%22+OR+all:%22manga+generation%22+OR+all:%22webtoon%22",
+      "maxResults": 25,
+      "focus": ["comic-layout", "character-consistency", "dialogue"]
+    }
+  ]
+}
