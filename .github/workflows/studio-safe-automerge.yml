@@ -108,6 +108,19 @@ jobs:
               continue
             fi
 
+            main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
+            comparison_status="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "repos/${REPOSITORY}/compare/${main_sha}...${head_sha}" \
+                --jq '.status // "unknown"'
+            )"
+            if [[ "$comparison_status" != "ahead" && "$comparison_status" != "identical" ]]; then
+              echo "PR #${pull_number} does not contain current main ${main_sha} (${comparison_status}); skipping until it is updated and revalidated."
+              continue
+            fi
+
             if [[ "$head_ref" == codex/campaign-* ]]; then
               required_workflows=(
                 "Studio campaign release gate"
@@ -147,6 +160,24 @@ jobs:
 
             if [[ "$all_green" != "true" ]]; then
               echo "PR #${pull_number} remains open because at least one release gate is not green."
+              continue
+            fi
+
+            # Re-read both the PR and main immediately before merge. A completed check does not
+            # authorize a stale head or a branch that fell behind while this job was running.
+            pull_json="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
+            current_head_sha="$(jq -r '.head.sha' <<< "$pull_json")"
+            current_main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
+            if [[ "$current_head_sha" != "$head_sha" ]]; then
+              echo "PR #${pull_number} head changed from ${head_sha} to ${current_head_sha}; skipping."
+              continue
+            fi
+            current_status="$(
+              gh api "repos/${REPOSITORY}/compare/${current_main_sha}...${head_sha}" \
+                --jq '.status // "unknown"'
+            )"
+            if [[ "$current_status" != "ahead" && "$current_status" != "identical" ]]; then
+              echo "PR #${pull_number} fell behind current main ${current_main_sha} (${current_status}); skipping."
               continue
             fi
 
