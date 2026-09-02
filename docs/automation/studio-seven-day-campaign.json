@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "campaignId": "studio-saturation-2026-09-02",
+  "startAt": "2026-09-02T11:30:00Z",
+  "endAt": "2026-09-09T11:30:00Z",
+  "cadenceMinutes": 180,
+  "trackingIssue": 555,
+  "maxOpenCampaignPullRequests": 1,
+  "branchPrefix": "codex/campaign-",
+  "pullRequestMarker": "<!-- studio-automerge -->",
+  "issueQueue": [557, 558, 559, 560, 561, 562, 563],
+  "fallbackTracks": [
+    "production-bug-and-ci-repair",
+    "canvas-and-input-quality",
+    "document-recovery-and-history",
+    "webgpu-rendering-and-memory",
+    "brush-and-natural-media",
+    "vector-and-smart-shape",
+    "non-destructive-effects",
+    "three-d-authoring",
+    "animation-and-storyboard",
+    "structured-ai-assist",
+    "mobile-accessibility-and-workspace",
+    "emerging-product-parity",
+    "research-prototype"
+  ],
+  "agent": {
+    "provider": "openai-codex-action",
+    "actionCommit": "86365089eb2b84e0a8fb0717b304f8bdcb13b20e",
+    "codexVersion": "0.152.1",
+    "model": "gpt-5.3-codex",
+    "effort": "high",
+    "permissionProfile": ":workspace",
+    "maxChangedFiles": 24,
+    "maxChangedLines": 3200
+  },
+  "quality": {
+    "requireTestForSourceChange": true,
+    "forbidWorkflowMutationByAgent": true,
+    "forbidDependencyMutationByAgent": true,
+    "requireGitDiffCheck": true,
+    "requireLintQuick": true,
+    "requireTypecheck": true,
+    "requirePullRequestRiskGate": true,
+    "requireMainDeploymentSmoke": true
+  }
+}
