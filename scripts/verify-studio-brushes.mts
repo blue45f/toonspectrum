@@ -2319,6 +2319,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 }
 
 interface PersistedDrawElement {
+  id: string | null;
   brush: string | null;
   brushCatalogId: string | null;
   brushCatalogName: string | null;
@@ -2376,6 +2377,30 @@ async function persistedStudioDocument(page: Page): Promise<PersistedStudioDocum
   }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl });
 }
 
+/**
+ * 서베이가 실패한 레인을 버리고 다음 프리셋으로 갈 때 자동저장에 남은 획을 지운다.
+ *
+ * installCleanStudioState 는 탭 세션당 한 번만(sessionStorage 플래그) localStorage 자동저장을
+ * 비우고, 문서의 실제 저장소는 SQLite 스토어라 페이지를 다시 세워도 그대로 남는다. 그래서 한
+ * 프리셋이 지속성 대기에서 죽으면 그 획이 다음 190개 프리셋의 "정확히 N개" 판정을 전부 오염시켰다
+ * (실측: standard-eraser 이후 maru-pen·calligraphy·parallel-pen·perfect-ink 가 같은 메시지로 연쇄).
+ */
+async function wipePersistedStudioDocument(page: Page): Promise<void> {
+  const moduleUrl = new URL(resolveBuiltAutosaveSqliteModulePath(), page.url()).href;
+  await page.evaluate(async ({ autosaveKey, sqliteModuleUrl, cleanSessionKey }) => {
+    const sqliteModule = await import(/* @vite-ignore */ sqliteModuleUrl) as {
+      acquireStudioAutosaveSqliteStore?: () => Promise<{
+        clear(key: string): Promise<void>;
+      }>;
+    };
+    if (typeof sqliteModule.acquireStudioAutosaveSqliteStore === "function") {
+      await (await sqliteModule.acquireStudioAutosaveSqliteStore()).clear(autosaveKey);
+    }
+    // 다음 내비게이션의 init 스크립트가 localStorage 자동저장도 다시 비우게 한다.
+    window.sessionStorage.removeItem(cleanSessionKey);
+  }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl, cleanSessionKey: CLEAN_SESSION_KEY });
+}
+
 function drawElementsFromPersistedDocument(
   document: PersistedStudioDocument | null,
 ): PersistedDrawElement[] {
@@ -2392,6 +2417,7 @@ function drawElementsFromPersistedDocument(
       ? (shapeParams as Record<string, number>).polygonSides
       : null;
     return [{
+      id: typeof record.id === "string" ? record.id : null,
       brush: typeof record.brush === "string" ? record.brush : null,
       brushCatalogId: typeof record.brushCatalogId === "string"
         ? record.brushCatalogId
@@ -2439,9 +2465,35 @@ async function waitForPersistedDrawElements(
     }
     await page.waitForTimeout(100);
   }
+  // 타임아웃 메시지에 "몇 개"만 남기면 어떤 획이 왜 남아 있는지 알 수 없어, 같은 원인이
+  // 다음 190개 프리셋으로 번져도 원인을 못 잡는다. 남아 있는 획의 정체를 함께 적는다.
+  // 그림 요소로 해석되지 않은 것까지 포함해 페이지에 실제로 무엇이 저장됐는지 종류별로 센다 —
+  // 지우개가 draw 가 아닌 다른 종류로 저장되기 시작했다면 그 사실이 여기서만 보인다.
+  const rawKinds = await persistedStudioDocument(page)
+    .then((document) => {
+      const pageRecord = document?.pagesList?.find((candidate) => candidate.id === document?.currentPageId)
+        ?? document?.pagesList?.[0];
+      const counts = new Map<string, number>();
+      for (const element of pageRecord?.elements ?? []) {
+        const record = element as { type?: unknown; mode?: unknown; kind?: unknown } | null;
+        const key = `${String(record?.type ?? "?")}${record?.mode ? `:${String(record.mode)}` : ""}${record?.kind ? `:${String(record.kind)}` : ""}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return [...counts.entries()].map(([key, count]) => `${key}×${count}`).join(", ") || "none";
+    })
+    .catch((cause: unknown) => `unreadable: ${cause instanceof Error ? cause.message : String(cause)}`);
+  const durable = latest.map((draw) => [
+    draw.id,
+    draw.brush,
+    draw.mode,
+    `pts=${draw.points.length}`,
+    draw.hidden ? "hidden" : "",
+    draw.groupId !== null ? `group=${draw.groupId}` : "",
+    draw.hasLivingInkReceipt ? "living-ink-receipt" : "",
+  ].filter(Boolean).join("/")).join(" | ");
   const suffix = lastFailure instanceof Error
     ? `; last SQLite read failed: ${lastFailure.message}`
-    : `; last durable draw count: ${latest.length}`;
+    : `; last durable draw count: ${latest.length} [${durable}] raw=[${rawKinds}]`;
   throw new Error(`${label} timed out after ${timeoutMilliseconds}ms${suffix}`);
 }
 
@@ -3300,6 +3352,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           if (!LONG_MATRIX_SURVEY_MODE) return false;
           surveyFailures.push(message);
           log(`long SURVEY -> ${message}`);
+          await wipePersistedStudioDocument(page).catch(() => undefined);
           await prepareStudioPage(page, studioUrl);
           await activateDesktopPen(page);
           return true;
@@ -3440,6 +3493,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         const message = error instanceof Error ? error.message : String(error);
         surveyFailures.push(message.startsWith(`${preset.id}:`) ? message : `${preset.id}: ${message}`);
         log(`long SURVEY -> ${message}`);
+        await wipePersistedStudioDocument(page).catch(() => undefined);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
         return "skipped";
