@@ -1342,12 +1342,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
       className="flex min-w-0 flex-1 flex-col"
     >
       {/* 1행 — 문서 맥락 · 상위 메뉴 · 파일 액션. 여기 폭이 곧 §15.3 메뉴 18개의 가시성이다. */}
-      <div className="flex min-w-0 flex-nowrap items-center gap-2">
+      <div
+        data-testid="studio-menubar-row"
+        className="flex min-w-0 flex-nowrap items-center gap-2"
+      >
         {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
             메뉴바 lazy 청크/패널 게이트와 무관하게 파일 메뉴·프로젝트 도구 버튼이 같은 ref 를 클릭한다.
             (2026-07-24: 패널 안 조건부 마운트 → 무반응 버그 수정 후, lazy menubar 레이스까지 제거) */}
         <div
           ref={menubarLaneRef}
+          data-testid="studio-menubar-primary"
           data-studio-menubar-primary="true"
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -1478,6 +1482,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
         <StudioMenubarOverflowMenu groups={overflowMenuGroups} onReveal={revealMenuGroup} />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
+          data-testid="studio-menubar-actions"
           data-studio-menubar-actions="true"
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
@@ -1500,20 +1505,21 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     ? "전체 화면 드로잉 종료"
                     : "전체 화면 드로잉"
                 }
+                data-testid="studio-mobile-immersive-toggle"
                 data-studio-mobile-app-mode
                 className={cn(
                   buttonClass({
                     size: "sm",
                     // Quiet exit reads as chrome chrome, not a second primary CTA next to Publish.
                     variant: mobileImmersive ? "quiet" : "quiet",
-                    className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                    className: "size-11 min-h-11 min-w-11 shrink-0 justify-center gap-1.5 whitespace-nowrap px-0",
                   }),
                   // Windowed: sticky exit keeps the control reachable while the long title lane
                   // scrolls. Immersive: no sticky/ring — the compact pill has no scroll sibling.
                   !mobileImmersive &&
-                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
+                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]",
                   mobileImmersive &&
-                    "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
+                    "rounded-full border border-line/70 bg-raised/80 text-fg"
                 )}
               >
                 {mobileImmersive ? (
@@ -1521,7 +1527,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 ) : (
                   <Maximize2 size={15} aria-hidden />
                 )}
-                <span className={!mobileImmersive ? "max-[359px]:sr-only" : undefined}>
+                <span className="sr-only">
                   {mobileImmersive ? "종료" : "전체화면"}
                 </span>
               </button>
@@ -1546,12 +1552,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               <button
                 type="button"
                 onClick={() => togglePageSequence()}
+                data-testid="studio-page-list-toggle"
                 data-studio-primary-action="pages"
                 aria-pressed={pageSequenceOpen}
                 aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 gap-1.5" }),
-                  isMobile && "min-h-11",
+                  isMobile && "size-11 min-h-11 min-w-11 justify-center px-0",
                 )}
               >
                 <Files size={14} aria-hidden />
@@ -1568,11 +1575,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               <button
                 type="button"
                 onClick={() => handleDownload()}
+                data-testid="studio-page-download"
                 data-studio-primary-action="export"
                 aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                  isMobile && "min-h-11"
+                  isMobile && "size-11 min-h-11 min-w-11 justify-center px-0"
                 )}
               >
                 <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
@@ -1594,11 +1602,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 }}
                 onMouseEnter={preloadStudioExportMenuPanel}
                 onFocus={preloadStudioExportMenuPanel}
+                data-testid="studio-export-options-toggle"
                 aria-expanded={exportMenuOpen}
                 aria-label="내보내기 옵션"
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
-                  isMobile && "min-h-11 min-w-11"
+                  isMobile && "hidden"
                 )}
               >
                 <ChevronDown
@@ -1669,17 +1678,21 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   setExportMenuOpen(false);
                   setProjectActionsOpen((open) => !open);
                 }}
+                data-testid="studio-project-actions-toggle"
                 aria-label="프로젝트 작업"
                 aria-haspopup="dialog"
                 aria-expanded={projectActionsOpen}
                 aria-controls="studio-project-actions-menu"
-                className={buttonClass({
-                  size: "sm",
-                  variant: "quiet",
-                  // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
-                  // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
-                  className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
-                })}
+                className={cn(
+                  buttonClass({
+                    size: "sm",
+                    variant: "quiet",
+                    // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
+                    // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
+                    className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
+                  }),
+                  isMobile && "size-11 justify-center px-0",
+                )}
               >
                 <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
                 {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
@@ -1689,7 +1702,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <ChevronDown
                   size={13}
                   className={cn(
-                    "transition-transform motion-reduce:transition-none max-sm:hidden",
+                    "transition-transform motion-reduce:transition-none max-lg:hidden",
                     projectActionsOpen && "rotate-180"
                   )}
                   aria-hidden
@@ -1727,6 +1740,27 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     </button>
                   </span>
                 </div>
+                {isMobile ? (
+                  <button
+                    type="button"
+                    data-testid="studio-project-export-options"
+                    onMouseEnter={preloadStudioExportMenuPanel}
+                    onFocus={preloadStudioExportMenuPanel}
+                    onClick={async () => {
+                      preloadStudioExportMenuPanel();
+                      await ensureWatermarkLoaded();
+                      setProjectActionsOpen(false);
+                      setExportMenuOpen(true);
+                    }}
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "quiet",
+                      className: "shrink-0 whitespace-nowrap gap-1.5",
+                    })}
+                  >
+                    <SlidersHorizontal size={14} aria-hidden /> 내보내기 옵션
+                  </button>
+                ) : null}
           {pageCount > 1 && (
             <button
               type="button"
@@ -2131,6 +2165,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               type="button"
               onClick={() => handleSave("draft")}
               disabled={saving || collaborationDocumentLocked}
+              data-testid="studio-draft-save"
               aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               className={cn(
                 buttonClass({
@@ -2139,16 +2174,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                 }),
                 isMobile &&
-                  "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
-                mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
+                  "size-11 min-h-11 min-w-11 justify-center px-0",
+                mobileImmersive && "rounded-full border border-line/70 bg-raised/80"
               )}
             >
               {saving ? (
                 <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
               ) : (
-                <Save size={14} className="hidden max-[359px]:block" aria-hidden />
+                <Save size={14} className={isMobile ? undefined : "hidden"} aria-hidden />
               )}
-              <span className="max-[359px]:sr-only">
+              <span className={isMobile ? "sr-only" : undefined}>
                 {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               </span>
             </button>
@@ -2173,6 +2208,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 type="button"
                 onClick={() => handleSave("published")}
                 disabled={saving || collaborationDocumentLocked}
+                data-testid="studio-publish"
                 aria-label={workId ? "수정 게시" : "게시하기"}
                 className={cn(
                   buttonClass({
@@ -2181,16 +2217,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                   }),
                   isMobile &&
-                    "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
-                  mobileImmersive && "rounded-full px-3 shadow-none"
+                    "size-11 min-h-11 min-w-11 justify-center px-0",
+                  mobileImmersive && "rounded-full shadow-none"
                 )}
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
                 ) : (
-                  <Send size={14} className="hidden max-[359px]:block" aria-hidden />
+                  <Send size={14} className={isMobile ? undefined : "hidden"} aria-hidden />
                 )}
-                <span className="max-[359px]:sr-only">
+                <span className={isMobile ? "sr-only" : undefined}>
                   {workId ? "수정 게시" : "게시하기"}
                 </span>
               </button>

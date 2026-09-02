@@ -518,17 +518,53 @@ describe("StudioMenubarContent", () => {
   it("keeps every windowed action touchable while exposing the primary lane at 320px", () => {
     render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
 
+    const actionContracts = [
+      ["전체 화면 드로잉", "studio-mobile-immersive-toggle"],
+      ["페이지 목록 열기", "studio-page-list-toggle"],
+      ["다운로드 2× PNG · 현재 페이지", "studio-page-download"],
+      ["프로젝트 작업", "studio-project-actions-toggle"],
+      ["초안 저장", "studio-draft-save"],
+      ["게시하기", "studio-publish"],
+    ] as const;
+    for (const [name, testId] of actionContracts) {
+      const action = screen.getByRole("button", { name });
+      expect(screen.getByTestId(testId)).toBe(action);
+      expect(action.className).toContain("size-11");
+    }
+
     for (const name of ["전체 화면 드로잉", "초안 저장", "게시하기"] as const) {
       const action = screen.getByRole("button", { name });
-      expect(action.className).toContain("max-[359px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
         span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
       );
-      expect(label?.className).toContain("max-[359px]:sr-only");
+      expect(label?.className).toContain("sr-only");
     }
 
-    expect(screen.getByRole("button", { name: "프로젝트 작업" }).className)
-      .toContain("min-w-11");
+    expect(screen.getByTestId("studio-export-options-toggle").className).toContain("hidden");
+  });
+
+  it("moves mobile export options into the project sheet without adding a seventh top action", async () => {
+    const stableHandlers = createHandlers();
+    const setExportMenuOpen = vi.fn();
+    const setProjectActionsOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          isMobile: true,
+          projectActionsOpen: true,
+          setExportMenuOpen,
+          setProjectActionsOpen,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const mobileExport = screen.getByTestId("studio-project-export-options");
+    fireEvent.click(mobileExport);
+
+    await waitFor(() => expect(stableHandlers.ensureWatermarkLoaded).toHaveBeenCalledOnce());
+    expect(setProjectActionsOpen).toHaveBeenCalledWith(false);
+    expect(setExportMenuOpen).toHaveBeenCalledWith(true);
   });
 
   it("switches the mobile immersive coach from entering to exiting", () => {

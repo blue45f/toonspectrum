@@ -1134,6 +1134,7 @@ export function StudioWorkspaceMenu({
         ref={triggerRef}
         type="button"
         onClick={handleTriggerClick}
+        data-testid="studio-workspace-menu-toggle"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={dialogId}

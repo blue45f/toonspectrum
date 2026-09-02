@@ -84,6 +84,7 @@ function StudioWorkspaceMenuTrigger({
         onPointerEnter={preloadStudioWorkspaceMenu}
         onPointerDown={preloadStudioWorkspaceMenu}
         onFocus={preloadStudioWorkspaceMenu}
+        data-testid="studio-workspace-toggle"
         aria-haspopup="dialog"
         aria-expanded={false}
         aria-busy={busy || undefined}

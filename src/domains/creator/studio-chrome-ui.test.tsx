@@ -124,7 +124,11 @@ describe("studio chrome UI", () => {
         <span>스튜디오</span>
       </StudioAppMenubar>
     );
+    expect(html).toContain('data-testid="studio-menubar"');
+    expect(html).toContain('data-testid="studio-menubar-scroll"');
     expect(html).toContain('data-studio-app-menubar="true"');
+    expect(html).toContain("max-md:overflow-visible");
+    expect(html).toContain("md:overflow-hidden");
     expect(html).toContain("h-11");
     expect(html).toContain("스튜디오");
   });
