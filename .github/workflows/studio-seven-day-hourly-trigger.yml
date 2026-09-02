@@ -1,77 +1,59 @@
-name: Studio parallel campaign coordinator
-run-name: Studio thirty-lane coordinator · ${{ github.run_number }}
+name: Studio API-free campaign coordinator
+run-name: Studio API-free coordinator · ${{ github.run_number }}
 
 on:
   schedule:
-    # Event-driven continuation is primary; this twice-hourly run is the recovery watchdog.
+    # Connected ChatGPT/Codex sessions author code. This twice-hourly run audits and recovers CI.
     - cron: "2,32 * * * *"
   workflow_dispatch:
 
 permissions:
   actions: write
   contents: read
-  issues: write
+  issues: read
   pull-requests: read
 
 concurrency:
-  group: studio-parallel-campaign-coordinator
+  group: studio-api-free-campaign-coordinator
   cancel-in-progress: true
 
 jobs:
-  coordinate:
+  audit-and-reconcile:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
-      CAMPAIGN_WORKFLOW: studio-thirty-lane-worker.yml
+      CAMPAIGN_DIR: ${{ runner.temp }}/studio-api-free-campaign
       GATE_DISPATCHER_WORKFLOW: studio-campaign-gate-dispatcher.yml
-      TRACKING_ISSUE: "555"
     steps:
       - uses: actions/checkout@v6
         with:
           ref: main
+          fetch-depth: 1
           persist-credentials: false
 
-      - name: Detect optional Codex authoring credential
-        id: authoring
-        shell: bash
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          fi
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
-      - name: Report missing authoring configuration once
-        if: ${{ steps.authoring.outputs.present != 'true' }}
+      - name: Validate API-free campaign contracts
         shell: bash
         run: |
           set -euo pipefail
-          marker='<!-- studio-parallel-campaign-key-missing -->'
-          existing="$(
-            gh api --paginate \
-              "repos/${REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
-              --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
-              | sed -n '1p'
-          )"
-          if [[ -n "$existing" ]]; then
-            echo "Missing-key notice already exists."
-            exit 0
-          fi
-          {
-            echo "$marker"
-            echo "The up-to-thirty-lane Studio coordinator is installed, but authoring dispatch is paused because OPENAI_API_KEY is not configured as a repository Actions secret."
-            echo "Benchmarking, existing PR gates, safe merge, deployment, and branch cleanup remain independent."
-          } > "$RUNNER_TEMP/studio-parallel-key.md"
-          gh issue comment "$TRACKING_ISSUE" \
-            --repo "$REPOSITORY" \
-            --body-file "$RUNNER_TEMP/studio-parallel-key.md"
+          node --test scripts/studio-seven-day-campaign.test.mjs
+          node --test scripts/studio-autonomous-change-plan.test.mjs
+          node --test scripts/studio-campaign-patch-policy.test.mjs
+          node --test scripts/validate-studio-competitor-registry.test.mjs
+          node --test scripts/studio-competitor-watch.test.mjs
+          node --test scripts/studio-emerging-product-watch.test.mjs
+          node --test scripts/studio-research-watch.test.mjs
+          node --test scripts/validate-studio-third-party-reuse.test.mjs
+          node scripts/validate-studio-competitor-registry.mjs
+          node scripts/validate-studio-third-party-reuse.mjs
 
-      - name: Fill every free implementation lane
-        if: ${{ steps.authoring.outputs.present == 'true' }}
+      - name: Resolve the configured campaign window
+        id: window
         shell: bash
         run: |
           set -euo pipefail
@@ -81,153 +63,107 @@ jobs:
           now_epoch="$(date -u +%s)"
           start_epoch="$(date -u -d "$start_at" +%s)"
           end_epoch="$(date -u -d "$end_at" +%s)"
-
-          if [[ "$now_epoch" -lt "$start_epoch" || "$now_epoch" -ge "$end_epoch" ]]; then
-            echo "Outside campaign window: ${start_at} .. ${end_at}."
-            exit 0
+          active=false
+          if [[ "$now_epoch" -ge "$start_epoch" && "$now_epoch" -lt "$end_epoch" ]]; then
+            active=true
           fi
+          echo "active=$active" >> "$GITHUB_OUTPUT"
+          echo "start_at=$start_at" >> "$GITHUB_OUTPUT"
+          echo "end_at=$end_at" >> "$GITHUB_OUTPUT"
 
-          lane_count="$(jq '.lanes | length' "$config")"
-          max_concurrent="$(jq -r '.maxConcurrentAuthoringRuns' "$config")"
-          max_research="$(jq -r '.maxParallelResearchRefreshes' "$config")"
-          if [[ "$lane_count" -ne 30 ]]; then
-            echo "::error::Expected exactly 30 configured lanes, found ${lane_count}."
-            exit 1
-          fi
-          if [[ ! "$max_concurrent" =~ ^[1-9][0-9]*$ ]] \
-            || [[ "$max_concurrent" -gt 30 ]] \
-            || [[ "$max_concurrent" -gt "$lane_count" ]]; then
-            echo "::error::maxConcurrentAuthoringRuns must be between 1 and 30 and no greater than lane count."
-            exit 1
-          fi
-          if [[ ! "$max_research" =~ ^[1-9][0-9]*$ ]] || [[ "$max_research" -gt 3 ]]; then
-            echo "::error::maxParallelResearchRefreshes must be between 1 and 3."
-            exit 1
-          fi
+      - name: Record the thirty-lane backlog state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CAMPAIGN_DIR"
+          jq '{
+            campaignId,
+            startAt,
+            endAt,
+            laneCount: (.lanes | length),
+            lanes: [.lanes[] | {
+              id,
+              title,
+              issueQueue,
+              fallbackTracks,
+              focusTerms,
+              pathHints
+            }]
+          }' docs/automation/studio-seven-day-campaign.json \
+            > "$CAMPAIGN_DIR/lane-backlog.json"
+          cp docs/automation/studio-api-free-runtime.json \
+            "$CAMPAIGN_DIR/runtime.json"
 
-          pulls_json="$(
-            gh api "repos/${REPOSITORY}/pulls?state=open&per_page=100"
-          )"
-          runs_json="$(
-            gh api \
-              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=100"
-          )"
+      - name: Refresh official product and research signals
+        if: ${{ steps.window.outputs.active == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/studio-competitor-watch.mjs \
+            --all \
+            --concurrency 4 \
+            --timeout-ms 15000 \
+            --output "$CAMPAIGN_DIR/mature-products.json" \
+            --markdown "$CAMPAIGN_DIR/mature-products.md"
+          node scripts/studio-emerging-product-watch.mjs \
+            --concurrency 4 \
+            --timeout-ms 15000 \
+            --output "$CAMPAIGN_DIR/emerging-products.json" \
+            --markdown "$CAMPAIGN_DIR/emerging-products.md"
+          node scripts/studio-research-watch.mjs \
+            --concurrency 4 \
+            --timeout-ms 20000 \
+            --output "$CAMPAIGN_DIR/research.json" \
+            --markdown "$CAMPAIGN_DIR/research.md"
 
-          active_filter='
-            .status == "queued"
-            or .status == "in_progress"
-            or .status == "requested"
-            or .status == "waiting"
-            or .status == "pending"
-          '
+      - name: Materialize inactive-window reports
+        if: ${{ steps.window.outputs.active != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"results":[],"aggregateHash":"inactive"}' \
+            > "$CAMPAIGN_DIR/mature-products.json"
+          printf '%s\n' '{"results":[],"aggregateHash":"inactive"}' \
+            > "$CAMPAIGN_DIR/emerging-products.json"
+          printf '%s\n' '{"entries":[],"queryReports":[],"aggregateHash":"inactive"}' \
+            > "$CAMPAIGN_DIR/research.json"
 
-          busy_count=0
-          free_lanes=()
-          while IFS= read -r lane_id; do
-            branch_prefix="codex/campaign-${lane_id}-"
-            run_prefix="Studio campaign [${lane_id}]"
-
-            open_count="$(
-              jq -r --arg repo "$REPOSITORY" --arg prefix "$branch_prefix" '
-                [.[] |
-                  select(.base.ref == "main") |
-                  select(.head.repo.full_name == $repo) |
-                  select(.head.ref | startswith($prefix))
-                ] | length
-              ' <<< "$pulls_json"
-            )"
-            active_count="$(
-              jq -r --arg prefix "$run_prefix" "
-                [.workflow_runs[] |
-                  select(${active_filter}) |
-                  select((.display_title // \"\") | startswith(\$prefix))
-                ] | length
-              " <<< "$runs_json"
-            )"
-
-            if [[ "$open_count" -gt 0 || "$active_count" -gt 0 ]]; then
-              busy_count=$((busy_count + 1))
-              echo "Lane ${lane_id} busy: open_prs=${open_count}, active_runs=${active_count}."
-            else
-              free_lanes+=("$lane_id")
-              echo "Lane ${lane_id} free."
-            fi
-          done < <(jq -r '.lanes[].id' "$config")
-
-          capacity=$((max_concurrent - busy_count))
-          if [[ "$capacity" -le 0 ]]; then
-            echo "All configured authoring capacity is occupied."
-            exit 0
-          fi
-
-          research_active="$(
-            jq -r "
-              [.workflow_runs[] |
-                select(${active_filter}) |
-                select((.display_title // \"\") | contains(\"research=true\"))
-              ] | length
-            " <<< "$runs_json"
-          )"
-          research_remaining=$((max_research - research_active))
-          if [[ "$research_remaining" -lt 0 ]]; then
-            research_remaining=0
-          fi
-
-          dispatched=0
-          for lane_id in "${free_lanes[@]}"; do
-            if [[ "$dispatched" -ge "$capacity" ]]; then
-              break
-            fi
-
-            refresh_research=false
-            if [[ "$research_remaining" -gt 0 ]]; then
-              refresh_research=true
-              research_remaining=$((research_remaining - 1))
-            fi
-
-            jq -n \
-              --arg ref "main" \
-              --arg lane_id "$lane_id" \
-              --arg refresh_research "$refresh_research" \
-              '{
-                ref: $ref,
-                inputs: {
-                  lane_id: $lane_id,
-                  mode: "author",
-                  refresh_research: $refresh_research,
-                  force_active: "false"
-                }
-              }' \
-              | gh api \
-                  --method POST \
-                  "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
-                  --input -
-
-            echo "Dispatched lane ${lane_id}; refresh_research=${refresh_research}."
-            dispatched=$((dispatched + 1))
-          done
-
-          {
-            echo "## Thirty-lane campaign coordination"
-            echo
-            echo "- Configured lanes: ${lane_count}"
-            echo "- Busy lanes before dispatch: ${busy_count}"
-            echo "- Free lanes before dispatch: ${#free_lanes[@]}"
-            echo "- Requested authoring concurrency: ${max_concurrent}"
-            echo "- Newly dispatched lanes: ${dispatched}"
-            echo "- Research refreshes active before dispatch: ${research_active}"
-            echo
-            echo "GitHub may queue excess jobs when the account-level hosted-runner concurrency is lower than the requested 30 lanes."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Reconcile release gates for every open campaign PR
-        if: ${{ always() }}
+      - name: Reconcile release gates for open campaign pull requests
         shell: bash
         run: |
           set -euo pipefail
           jq -n '{ref: "main"}' \
             | gh api \
                 --method POST \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
                 "repos/${REPOSITORY}/actions/workflows/${GATE_DISPATCHER_WORKFLOW}/dispatches" \
                 --input -
-          echo "Dispatched campaign gate reconciliation."
+
+      - name: Publish API-free coordinator summary
+        shell: bash
+        env:
+          WINDOW_ACTIVE: ${{ steps.window.outputs.active }}
+          START_AT: ${{ steps.window.outputs.start_at }}
+          END_AT: ${{ steps.window.outputs.end_at }}
+        run: |
+          {
+            echo "## Studio API-free campaign"
+            echo
+            echo "- Connected-session code authoring: enabled"
+            echo "- GitHub-hosted AI authoring: disabled"
+            echo "- OPENAI_API_KEY required: no"
+            echo "- Logical implementation lanes: 30"
+            echo "- Campaign window active: ${WINDOW_ACTIVE}"
+            echo "- Window: ${START_AT} .. ${END_AT}"
+            echo "- Automated responsibilities: research audit, CI reconciliation, safe merge, deployment, branch cleanup"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-api-free-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-api-free-campaign/
+          retention-days: 21
+          if-no-files-found: error
