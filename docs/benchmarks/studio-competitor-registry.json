@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-09-02",
-  "purpose": "Official-source registry for ongoing ToonSpectrum Studio competitive benchmarking. Capability outcomes may be reimplemented independently; proprietary source code, assets, model weights, trademarks, and pixel-identical UI are excluded.",
+  "purpose": "Official-source registry for ongoing ToonSpectrum Studio competitive benchmarking. Product capabilities, algorithms, workflows, quality targets, accessible source code, assets, model weights, trademark materials, and UI resources may be analyzed or reused under the repository owner's campaign-wide attestation; every exact integration must still pin the real source, immutable version, SHA-256, destination, and required notices in the third-party reuse registry.",
   "priorities": {
     "P0": "Audit every release and convert material gaps into implementation-ready issues.",
     "P1": "Audit quarterly or when a major release lands.",
@@ -30,163 +30,55 @@
       "id": "medibang-paint",
       "name": "MediBang Paint",
       "category": "comic-drawing",
-      "officialUrl": "https://medibangpaint.com/en/",
+      "officialUrl": "https://medibangpaint.com/",
       "watchUrl": "https://medibangpaint.com/en/news/",
       "priority": "P1",
-      "focus": ["comic-panels", "page-management", "cloud-sync", "team-project", "tones", "fonts", "cross-device"]
+      "focus": ["comic-panels", "cloud-project", "materials", "mobile-workflow", "team-creation"]
     },
     {
       "id": "ibispaint",
       "name": "ibisPaint",
-      "category": "comic-drawing",
+      "category": "mobile-drawing",
       "officialUrl": "https://ibispaint.com/",
-      "watchUrl": "https://ibispaint.com/information/",
-      "priority": "P1",
-      "focus": ["mobile-ux", "brush-library", "materials", "animation", "filters", "social-learning"]
+      "watchUrl": "https://ibispaint.com/newFeature.jsp",
+      "priority": "P0",
+      "focus": ["mobile-workflow", "brush-library", "stroke-stabilization", "materials", "timelapse"]
     },
     {
-      "id": "jump-paint",
-      "name": "JUMP PAINT",
-      "category": "comic-drawing",
-      "officialUrl": "https://medibangpaint.com/en/jumppaint/",
-      "watchUrl": "https://medibangpaint.com/en/jumppaint/",
-      "priority": "P2",
-      "focus": ["manga-workflow", "tutorials", "templates", "submission"]
+      "id": "procreate",
+      "name": "Procreate",
+      "category": "mobile-drawing",
+      "officialUrl": "https://procreate.com/procreate",
+      "watchUrl": "https://help.procreate.com/procreate/handbook/release-notes",
+      "priority": "P0",
+      "focus": ["low-latency-brush", "quickshape", "gesture-workflow", "brush-studio", "three-d-paint", "timelapse"]
     },
     {
-      "id": "photopea",
-      "name": "Photopea",
-      "category": "image-editor",
-      "officialUrl": "https://www.photopea.com/",
-      "watchUrl": "https://blog.photopea.com/",
+      "id": "procreate-dreams",
+      "name": "Procreate Dreams",
+      "category": "animation-2d",
+      "officialUrl": "https://procreate.com/dreams",
+      "watchUrl": "https://help.procreate.com/dreams/handbook/release-notes",
       "priority": "P1",
-      "focus": ["browser-editor", "psd-roundtrip", "smart-objects", "adjustment-layers", "filters"]
+      "focus": ["timeline", "performing", "keyframes", "audio", "touch-animation"]
     },
     {
       "id": "adobe-photoshop",
       "name": "Adobe Photoshop",
       "category": "image-editor",
       "officialUrl": "https://www.adobe.com/products/photoshop.html",
-      "watchUrl": "https://helpx.adobe.com/photoshop/desktop/whats-new/whats-new-in-adobe-photoshop-on-desktop.html",
+      "watchUrl": "https://helpx.adobe.com/photoshop/using/whats-new.html",
       "priority": "P0",
-      "focus": ["non-destructive", "adjustment-layers", "smart-objects", "ai-mask-edit", "contextual-actions", "color-management", "psd"]
-    },
-    {
-      "id": "affinity-photo",
-      "name": "Affinity Photo",
-      "category": "image-editor",
-      "officialUrl": "https://affinity.serif.com/photo/",
-      "watchUrl": "https://affinity.serif.com/en-us/whats-new/",
-      "priority": "P1",
-      "focus": ["live-filters", "non-destructive", "raw", "focus-merge", "panorama", "macros", "psd"]
-    },
-    {
-      "id": "gimp",
-      "name": "GIMP",
-      "category": "image-editor",
-      "officialUrl": "https://www.gimp.org/",
-      "watchUrl": "https://www.gimp.org/news/",
-      "priority": "P2",
-      "focus": ["open-source", "filters", "plugin-api", "color-management", "formats"]
-    },
-    {
-      "id": "procreate",
-      "name": "Procreate",
-      "category": "mobile-drawing",
-      "officialUrl": "https://procreate.com/",
-      "watchUrl": "https://help.procreate.com/procreate/handbook",
-      "priority": "P0",
-      "focus": ["minimal-canvas-ux", "quickshape", "brush-studio", "gesture-customization", "page-assist", "animation", "3d-painting", "timelapse"]
+      "focus": ["adjustment-layer", "smart-object", "live-filter", "selection", "generative-edit", "color-management", "psd"]
     },
     {
       "id": "adobe-fresco",
       "name": "Adobe Fresco",
-      "category": "mobile-drawing",
+      "category": "natural-media",
       "officialUrl": "https://www.adobe.com/products/fresco.html",
       "watchUrl": "https://helpx.adobe.com/fresco/using/whats-new.html",
       "priority": "P0",
-      "focus": ["live-watercolor", "live-oil", "pixel-vector-hybrid", "motion-path", "frame-animation", "perspective-detection", "cloud-docs"]
-    },
-    {
-      "id": "infinite-painter",
-      "name": "Infinite Painter",
-      "category": "mobile-drawing",
-      "officialUrl": "https://www.infinitestudio.art/painter/",
-      "watchUrl": "https://www.infinitestudio.art/painter/features/",
-      "priority": "P1",
-      "focus": ["customizable-workspace", "brush-editor", "perspective", "pattern-project", "version-history", "lab-cmyk", "64-bit-color"]
-    },
-    {
-      "id": "sketchbook",
-      "name": "Sketchbook",
-      "category": "mobile-drawing",
-      "officialUrl": "https://www.sketchbook.com/",
-      "watchUrl": "https://www.sketchbook.com/blog",
-      "priority": "P2",
-      "focus": ["predictive-stroke", "perspective-guides", "symmetry", "mobile-ux", "brush-library"]
-    },
-    {
-      "id": "corel-painter",
-      "name": "Corel Painter",
-      "category": "natural-media",
-      "officialUrl": "https://www.painterartist.com/",
-      "watchUrl": "https://product.corel.com/help/Painter/",
-      "priority": "P0",
-      "focus": ["real-bristle", "thick-paint", "impasto", "glazing", "particles", "paper-grain", "brush-accelerator"]
-    },
-    {
-      "id": "rebelle",
-      "name": "Rebelle",
-      "category": "natural-media",
-      "officialUrl": "https://www.escapemotions.com/products/rebelle/",
-      "watchUrl": "https://www.escapemotions.com/products/rebelle/whats-new",
-      "priority": "P0",
-      "focus": ["watercolor-diffusion", "pigment-mixing", "impasto", "bristle-particles", "wet-dry-blow", "heightmap", "soft-shadows"]
-    },
-    {
-      "id": "artrage",
-      "name": "ArtRage",
-      "category": "natural-media",
-      "officialUrl": "https://www.artrage.com/",
-      "watchUrl": "https://www.artrage.com/news/",
-      "priority": "P2",
-      "focus": ["oil-canvas", "paint-loading", "palette-knife", "stencils", "tracing", "natural-media"]
-    },
-    {
-      "id": "paintstorm-studio",
-      "name": "Paintstorm Studio",
-      "category": "natural-media",
-      "officialUrl": "https://paintstormstudio.com/",
-      "watchUrl": "https://paintstormstudio.com/news.html",
-      "priority": "P2",
-      "focus": ["brush-dynamics", "custom-panels", "stroke-postcorrection", "natural-media"]
-    },
-    {
-      "id": "mypaint",
-      "name": "MyPaint",
-      "category": "natural-media",
-      "officialUrl": "https://mypaint.app/",
-      "watchUrl": "https://github.com/mypaint/mypaint/releases",
-      "priority": "P2",
-      "focus": ["infinite-canvas", "brush-engine", "open-source", "low-latency"]
-    },
-    {
-      "id": "concepts",
-      "name": "Concepts",
-      "category": "vector-infinite-canvas",
-      "officialUrl": "https://concepts.app/en/",
-      "watchUrl": "https://concepts.app/en/features",
-      "priority": "P0",
-      "focus": ["infinite-canvas", "editable-vector-strokes", "vector-raster-hybrid", "nudge", "slice", "precision", "object-library", "presentation"]
-    },
-    {
-      "id": "affinity-designer",
-      "name": "Affinity Designer",
-      "category": "vector-infinite-canvas",
-      "officialUrl": "https://affinity.serif.com/designer/",
-      "watchUrl": "https://affinity.serif.com/en-us/whats-new/",
-      "priority": "P1",
-      "focus": ["vector-raster-personas", "symbols", "constraints", "artboards", "export"]
+      "focus": ["live-brush", "vector-raster", "watercolor", "oil-paint", "animation"]
     },
     {
       "id": "adobe-illustrator",
@@ -195,34 +87,142 @@
       "officialUrl": "https://www.adobe.com/products/illustrator.html",
       "watchUrl": "https://helpx.adobe.com/illustrator/using/whats-new.html",
       "priority": "P1",
-      "focus": ["vector-editing", "appearance-stack", "live-paint", "symbols", "recolor", "precision"]
+      "focus": ["vector-edit", "pathfinder", "appearance", "live-paint", "color", "export"]
     },
     {
-      "id": "linearity-curve",
-      "name": "Linearity Curve",
+      "id": "affinity-photo",
+      "name": "Affinity Photo",
+      "category": "image-editor",
+      "officialUrl": "https://affinity.serif.com/photo/",
+      "watchUrl": "https://affinity.serif.com/whats-new/",
+      "priority": "P1",
+      "focus": ["non-destructive", "live-filter", "raw", "psd", "performance"]
+    },
+    {
+      "id": "affinity-designer",
+      "name": "Affinity Designer",
       "category": "vector-infinite-canvas",
-      "officialUrl": "https://www.linearity.io/curve/",
-      "watchUrl": "https://www.linearity.io/academy/curve/updates/",
-      "priority": "P2",
-      "focus": ["mobile-vector", "auto-trace", "gesture-ux", "templates", "export"]
+      "officialUrl": "https://affinity.serif.com/designer/",
+      "watchUrl": "https://affinity.serif.com/whats-new/",
+      "priority": "P1",
+      "focus": ["vector-raster", "personas", "symbols", "constraints", "export"]
     },
     {
-      "id": "toon-boom-storyboard-pro",
-      "name": "Toon Boom Storyboard Pro",
+      "id": "photopea",
+      "name": "Photopea",
+      "category": "image-editor",
+      "officialUrl": "https://www.photopea.com/",
+      "watchUrl": "https://blog.photopea.com/",
+      "priority": "P1",
+      "focus": ["browser-editor", "psd", "smart-object", "adjustment-layer", "plugin"]
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "category": "image-editor",
+      "officialUrl": "https://www.gimp.org/",
+      "watchUrl": "https://www.gimp.org/news/",
+      "priority": "P1",
+      "focus": ["open-source", "filters", "color-management", "plugin", "file-format"]
+    },
+    {
+      "id": "krita-ai-diffusion",
+      "name": "Krita AI Diffusion",
+      "category": "ai-creative",
+      "officialUrl": "https://github.com/Acly/krita-ai-diffusion",
+      "watchUrl": "https://github.com/Acly/krita-ai-diffusion/releases",
+      "priority": "P0",
+      "focus": ["selection-generation", "controlnet", "regional-prompt", "workflow", "local-model"]
+    },
+    {
+      "id": "rebelle",
+      "name": "Rebelle",
+      "category": "natural-media",
+      "officialUrl": "https://www.escapemotions.com/products/rebelle/about",
+      "watchUrl": "https://www.escapemotions.com/products/rebelle/whats-new",
+      "priority": "P0",
+      "focus": ["watercolor", "pigment", "paper", "granulation", "impasto", "fluid-simulation"]
+    },
+    {
+      "id": "corel-painter",
+      "name": "Corel Painter",
+      "category": "natural-media",
+      "officialUrl": "https://www.painterartist.com/",
+      "watchUrl": "https://www.painterartist.com/en/product/painter/",
+      "priority": "P0",
+      "focus": ["brush-engine", "natural-media", "impasto", "paper-texture", "color-mixing"]
+    },
+    {
+      "id": "art-rage",
+      "name": "ArtRage",
+      "category": "natural-media",
+      "officialUrl": "https://www.artrage.com/",
+      "watchUrl": "https://www.artrage.com/artrage-vitae/",
+      "priority": "P1",
+      "focus": ["oil-paint", "watercolor", "canvas-texture", "paint-depth", "mobile"]
+    },
+    {
+      "id": "mypaint",
+      "name": "MyPaint",
+      "category": "natural-media",
+      "officialUrl": "https://mypaint.app/",
+      "watchUrl": "https://github.com/mypaint/mypaint/releases",
+      "priority": "P1",
+      "focus": ["infinite-canvas", "brush-engine", "open-source", "mypaint-brush"]
+    },
+    {
+      "id": "concepts",
+      "name": "Concepts",
+      "category": "vector-infinite-canvas",
+      "officialUrl": "https://concepts.app/",
+      "watchUrl": "https://concepts.app/en/releases/",
+      "priority": "P0",
+      "focus": ["infinite-canvas", "editable-stroke", "precision", "nudge-slice", "mobile"]
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "category": "collaboration-design",
+      "officialUrl": "https://www.figma.com/",
+      "watchUrl": "https://www.figma.com/release-notes/",
+      "priority": "P0",
+      "focus": ["multiplayer", "components", "variants", "dev-mode", "version-history", "plugin"]
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "category": "collaboration-design",
+      "officialUrl": "https://www.canva.com/",
+      "watchUrl": "https://www.canva.com/newsroom/news/",
+      "priority": "P0",
+      "focus": ["templates", "bulk-create", "magic-resize", "collaboration", "brand-kit", "ai"]
+    },
+    {
+      "id": "miro",
+      "name": "Miro",
+      "category": "collaboration-design",
+      "officialUrl": "https://miro.com/",
+      "watchUrl": "https://miro.com/changelog/",
+      "priority": "P1",
+      "focus": ["infinite-canvas", "collaboration", "templates", "diagram", "ai"]
+    },
+    {
+      "id": "storyboard-pro",
+      "name": "Storyboard Pro",
       "category": "storyboard",
       "officialUrl": "https://www.toonboom.com/products/storyboard-pro",
       "watchUrl": "https://docs.toonboom.com/help/storyboard-pro/",
       "priority": "P0",
-      "focus": ["shot-panels", "animatics", "3d-camera", "audio", "script-breakdown", "revision-tracking", "pdf-export"]
+      "focus": ["storyboard", "shot", "camera", "animatic", "audio", "revision"]
     },
     {
-      "id": "wonder-unit-storyboarder",
-      "name": "Wonder Unit Storyboarder",
+      "id": "storyboarder",
+      "name": "Storyboarder",
       "category": "storyboard",
       "officialUrl": "https://wonderunit.com/storyboarder/",
       "watchUrl": "https://github.com/wonderunit/storyboarder/releases",
       "priority": "P1",
-      "focus": ["fast-storyboard", "shot-generator", "timing", "pdf-export", "photoshop-roundtrip"]
+      "focus": ["fast-sketch", "shot-generator", "camera", "export", "open-source"]
     },
     {
       "id": "boords",
@@ -230,26 +230,17 @@
       "category": "storyboard",
       "officialUrl": "https://boords.com/",
       "watchUrl": "https://boords.com/blog",
-      "priority": "P2",
-      "focus": ["web-storyboard", "collaboration", "animatic", "comments", "client-review"]
+      "priority": "P1",
+      "focus": ["storyboard", "collaboration", "animatic", "script", "review"]
     },
     {
       "id": "frameforge",
       "name": "FrameForge",
       "category": "storyboard",
       "officialUrl": "https://www.frameforge.com/",
-      "watchUrl": "https://www.frameforge.com/blog",
+      "watchUrl": "https://www.frameforge.com/whats-new/",
       "priority": "P2",
-      "focus": ["previsualization", "camera-lenses", "blocking", "shot-data", "reports"]
-    },
-    {
-      "id": "celtx",
-      "name": "Celtx",
-      "category": "storyboard",
-      "officialUrl": "https://www.celtx.com/",
-      "watchUrl": "https://support.celtx.com/",
-      "priority": "P2",
-      "focus": ["script", "storyboard", "shot-list", "production-planning", "collaboration"]
+      "focus": ["previsualization", "camera", "blocking", "shot", "three-d"]
     },
     {
       "id": "toon-boom-harmony",
@@ -258,25 +249,16 @@
       "officialUrl": "https://www.toonboom.com/products/harmony",
       "watchUrl": "https://docs.toonboom.com/help/harmony/",
       "priority": "P0",
-      "focus": ["frame-animation", "node-compositing", "rigging", "deformation", "camera", "effects", "pipeline"]
-    },
-    {
-      "id": "blender-grease-pencil",
-      "name": "Blender Grease Pencil",
-      "category": "animation-2d",
-      "officialUrl": "https://www.blender.org/features/grease-pencil/",
-      "watchUrl": "https://docs.blender.org/manual/en/latest/grease_pencil/",
-      "priority": "P0",
-      "focus": ["2d-in-3d", "onion-skin", "stroke-editing", "modifiers", "line-art", "interpolation", "camera"]
+      "focus": ["cel-animation", "rigging", "deformer", "node-graph", "compositing", "camera"]
     },
     {
       "id": "moho",
       "name": "Moho",
       "category": "animation-2d",
       "officialUrl": "https://moho.lostmarble.com/",
-      "watchUrl": "https://moho.lostmarble.com/pages/features",
+      "watchUrl": "https://moho.lostmarble.com/pages/new-features",
       "priority": "P0",
-      "focus": ["smart-bones", "vitruvian-bones", "mesh-deform", "physics", "particles", "timeline", "graph-editor", "lip-sync"]
+      "focus": ["bone-rig", "smart-bone", "vector-animation", "physics", "timeline"]
     },
     {
       "id": "opentoonz",
@@ -285,70 +267,43 @@
       "officialUrl": "https://opentoonz.github.io/e/",
       "watchUrl": "https://github.com/opentoonz/opentoonz/releases",
       "priority": "P1",
-      "focus": ["xsheet", "vector-raster-animation", "scanning", "effects", "camera", "open-source"]
+      "focus": ["cel-animation", "xsheet", "effects", "scan-cleanup", "open-source"]
     },
     {
       "id": "tvpaint",
       "name": "TVPaint Animation",
       "category": "animation-2d",
       "officialUrl": "https://www.tvpaint.com/",
-      "watchUrl": "https://www.tvpaint.com/news",
+      "watchUrl": "https://www.tvpaint.com/v12-new-features",
       "priority": "P1",
-      "focus": ["bitmap-animation", "xsheet", "onion-skin", "storyboard", "camera", "custom-panels"]
-    },
-    {
-      "id": "callipeg",
-      "name": "Callipeg",
-      "category": "animation-2d",
-      "officialUrl": "https://callipeg.com/",
-      "watchUrl": "https://callipeg.com/learn/",
-      "priority": "P2",
-      "focus": ["tablet-animation", "timeline", "audio", "camera", "gesture-ux"]
-    },
-    {
-      "id": "roughanimator",
-      "name": "RoughAnimator",
-      "category": "animation-2d",
-      "officialUrl": "https://www.roughanimator.com/",
-      "watchUrl": "https://www.roughanimator.com/",
-      "priority": "P2",
-      "focus": ["frame-animation", "audio", "onion-skin", "mobile-ux", "export"]
+      "focus": ["raster-animation", "timeline", "light-table", "storyboard", "brush"]
     },
     {
       "id": "toonsquid",
       "name": "ToonSquid",
       "category": "animation-2d",
       "officialUrl": "https://toonsquid.com/",
-      "watchUrl": "https://toonsquid.com/handbook/",
-      "priority": "P1",
-      "focus": ["tablet-animation", "keyframes", "bones", "vector-shapes", "camera", "effects", "audio"]
-    },
-    {
-      "id": "flipaclip",
-      "name": "FlipaClip",
-      "category": "animation-2d",
-      "officialUrl": "https://flipaclip.com/",
-      "watchUrl": "https://flipaclip.com/blog/",
-      "priority": "P2",
-      "focus": ["mobile-animation", "onion-skin", "audio", "frames", "community"]
+      "watchUrl": "https://toonsquid.com/updates/",
+      "priority": "P0",
+      "focus": ["mobile-animation", "vector-raster", "camera", "rigging", "audio", "effects"]
     },
     {
       "id": "live2d-cubism",
       "name": "Live2D Cubism",
       "category": "rigging-avatar",
       "officialUrl": "https://www.live2d.com/en/cubism/",
-      "watchUrl": "https://docs.live2d.com/en/cubism-editor-manual/",
-      "priority": "P0",
-      "focus": ["warp-deformer", "rotation-deformer", "parameter-blending", "physics", "motion-sync", "facial-auto-generation"]
+      "watchUrl": "https://www.live2d.com/en/news/",
+      "priority": "P1",
+      "focus": ["two-d-rig", "deformer", "parameter", "physics", "avatar"]
     },
     {
       "id": "spine",
       "name": "Spine",
       "category": "rigging-avatar",
       "officialUrl": "https://esotericsoftware.com/",
-      "watchUrl": "https://esotericsoftware.com/spine-changelog",
+      "watchUrl": "https://esotericsoftware.com/blog",
       "priority": "P1",
-      "focus": ["skeletal-animation", "mesh-deform", "constraints", "skins", "runtime-export"]
+      "focus": ["skeletal-animation", "mesh-deform", "constraints", "runtime", "export"]
     },
     {
       "id": "rive",
@@ -357,7 +312,7 @@
       "officialUrl": "https://rive.app/",
       "watchUrl": "https://rive.app/changelog",
       "priority": "P1",
-      "focus": ["state-machines", "interactive-animation", "bones", "constraints", "runtime", "collaboration"]
+      "focus": ["state-machine", "vector-animation", "constraints", "runtime", "collaboration"]
     },
     {
       "id": "blender",
@@ -366,7 +321,7 @@
       "officialUrl": "https://www.blender.org/",
       "watchUrl": "https://www.blender.org/download/releases/",
       "priority": "P0",
-      "focus": ["modeling", "sculpt", "uv", "texture-paint", "geometry-nodes", "rigging", "render", "compositing"]
+      "focus": ["modeling", "sculpt", "grease-pencil", "texture-paint", "rigging", "render", "geometry-nodes"]
     },
     {
       "id": "sketchup",
@@ -374,8 +329,8 @@
       "category": "3d-dcc",
       "officialUrl": "https://www.sketchup.com/",
       "watchUrl": "https://help.sketchup.com/en/release-notes",
-      "priority": "P1",
-      "focus": ["architecture", "components", "scene-presets", "camera", "style-lines", "warehouse"]
+      "priority": "P0",
+      "focus": ["architecture", "component", "scene", "style", "warehouse", "export"]
     },
     {
       "id": "magic-poser",
@@ -384,25 +339,16 @@
       "officialUrl": "https://magicposer.com/",
       "watchUrl": "https://magicposer.com/",
       "priority": "P1",
-      "focus": ["pose-library", "body-proportions", "hands", "props", "lighting", "camera"]
-    },
-    {
-      "id": "design-doll",
-      "name": "DesignDoll",
-      "category": "3d-dcc",
-      "officialUrl": "https://terawell.net/terawell/",
-      "watchUrl": "https://terawell.net/terawell/",
-      "priority": "P2",
-      "focus": ["pose", "body-morph", "perspective", "reference"]
+      "focus": ["pose", "hand", "lighting", "camera", "mobile"]
     },
     {
       "id": "posemyart",
       "name": "PoseMy.Art",
       "category": "3d-dcc",
       "officialUrl": "https://posemy.art/",
-      "watchUrl": "https://posemy.art/blog",
-      "priority": "P2",
-      "focus": ["browser-pose", "multi-character", "props", "camera", "lighting"]
+      "watchUrl": "https://posemy.art/",
+      "priority": "P1",
+      "focus": ["pose", "browser", "character", "camera", "reference"]
     },
     {
       "id": "spline",
@@ -410,26 +356,26 @@
       "category": "3d-dcc",
       "officialUrl": "https://spline.design/",
       "watchUrl": "https://spline.design/changelog",
-      "priority": "P2",
-      "focus": ["web-3d", "collaboration", "materials", "interactions", "export"]
+      "priority": "P1",
+      "focus": ["browser-three-d", "collaboration", "interaction", "material", "export"]
     },
     {
       "id": "clip-studio-assets",
       "name": "Clip Studio Assets",
       "category": "material-marketplace",
-      "officialUrl": "https://assets.clip-studio.com/en-us/",
-      "watchUrl": "https://assets.clip-studio.com/en-us/",
+      "officialUrl": "https://assets.clip-studio.com/",
+      "watchUrl": "https://assets.clip-studio.com/",
       "priority": "P0",
-      "focus": ["brush-marketplace", "materials", "3d-assets", "ratings", "licenses", "dependency-versioning"]
+      "focus": ["brush-market", "material", "pose", "three-d", "license", "rating"]
     },
     {
       "id": "acon3d",
       "name": "ACON3D",
       "category": "material-marketplace",
       "officialUrl": "https://www.acon3d.com/",
-      "watchUrl": "https://www.acon3d.com/en/blog",
+      "watchUrl": "https://www.acon3d.com/",
       "priority": "P0",
-      "focus": ["webtoon-3d-assets", "bundles", "licenses", "creator-store", "curation"]
+      "focus": ["webtoon-three-d", "background", "license", "creator-market", "preview"]
     },
     {
       "id": "sketchfab",
@@ -438,7 +384,7 @@
       "officialUrl": "https://sketchfab.com/",
       "watchUrl": "https://sketchfab.com/blogs/community/",
       "priority": "P1",
-      "focus": ["3d-preview", "annotations", "download-formats", "licenses", "embeds"]
+      "focus": ["three-d-market", "viewer", "download", "license", "pbr"]
     },
     {
       "id": "artstation-marketplace",
@@ -447,43 +393,7 @@
       "officialUrl": "https://www.artstation.com/marketplace",
       "watchUrl": "https://magazine.artstation.com/",
       "priority": "P1",
-      "focus": ["creator-store", "digital-assets", "bundles", "licenses", "discovery"]
-    },
-    {
-      "id": "adobe-stock",
-      "name": "Adobe Stock",
-      "category": "material-marketplace",
-      "officialUrl": "https://stock.adobe.com/",
-      "watchUrl": "https://blog.adobe.com/en/topics/stock",
-      "priority": "P2",
-      "focus": ["search", "licensing", "generative-assets", "creative-cloud-integration"]
-    },
-    {
-      "id": "figma",
-      "name": "Figma and FigJam",
-      "category": "collaboration-design",
-      "officialUrl": "https://www.figma.com/",
-      "watchUrl": "https://www.figma.com/release-notes/",
-      "priority": "P0",
-      "focus": ["multiplayer", "presence", "comments", "branching", "component-library", "dev-handoff", "whiteboard"]
-    },
-    {
-      "id": "canva",
-      "name": "Canva",
-      "category": "collaboration-design",
-      "officialUrl": "https://www.canva.com/",
-      "watchUrl": "https://www.canva.com/newsroom/news/",
-      "priority": "P1",
-      "focus": ["templates", "bulk-create", "brand-kit", "magic-resize", "collaboration", "publishing"]
-    },
-    {
-      "id": "miro",
-      "name": "Miro",
-      "category": "collaboration-design",
-      "officialUrl": "https://miro.com/",
-      "watchUrl": "https://miro.com/changelog/",
-      "priority": "P2",
-      "focus": ["infinite-board", "collaboration", "workshops", "templates", "presentation"]
+      "focus": ["creator-market", "brush", "three-d", "tutorial", "license"]
     },
     {
       "id": "adobe-firefly",
@@ -492,25 +402,16 @@
       "officialUrl": "https://www.adobe.com/products/firefly.html",
       "watchUrl": "https://helpx.adobe.com/firefly/whats-new.html",
       "priority": "P0",
-      "focus": ["generative-fill", "style-reference", "structure-reference", "boards", "content-credentials", "model-choice"]
+      "focus": ["generative-fill", "reference", "structure", "style", "provenance", "commercial-safety"]
     },
     {
       "id": "comfyui",
       "name": "ComfyUI",
       "category": "ai-creative",
-      "officialUrl": "https://www.comfy.org/",
+      "officialUrl": "https://github.com/comfyanonymous/ComfyUI",
       "watchUrl": "https://github.com/comfyanonymous/ComfyUI/releases",
-      "priority": "P1",
-      "focus": ["node-workflows", "local-models", "reproducibility", "controlnet", "inpainting", "batching"]
-    },
-    {
-      "id": "krita-ai-diffusion",
-      "name": "Krita AI Diffusion",
-      "category": "ai-creative",
-      "officialUrl": "https://github.com/Acly/krita-ai-diffusion",
-      "watchUrl": "https://github.com/Acly/krita-ai-diffusion/releases",
-      "priority": "P1",
-      "focus": ["canvas-inpaint", "control-layers", "local-cloud-backends", "regional-prompts", "workflow-integration"]
+      "priority": "P0",
+      "focus": ["node-graph", "local-model", "workflow", "control", "extension"]
     },
     {
       "id": "runway",
@@ -518,17 +419,17 @@
       "category": "ai-creative",
       "officialUrl": "https://runwayml.com/",
       "watchUrl": "https://runwayml.com/changelog",
-      "priority": "P2",
-      "focus": ["image-video", "motion-brush", "video-edit", "references", "creative-workflows"]
+      "priority": "P1",
+      "focus": ["video-generation", "image-edit", "motion", "reference", "collaboration"]
     },
     {
       "id": "krea",
       "name": "Krea",
       "category": "ai-creative",
       "officialUrl": "https://www.krea.ai/",
-      "watchUrl": "https://www.krea.ai/changelog",
-      "priority": "P2",
-      "focus": ["realtime-generation", "enhance", "style-transfer", "canvas", "video"]
+      "watchUrl": "https://www.krea.ai/",
+      "priority": "P1",
+      "focus": ["realtime-generation", "enhance", "style", "video", "canvas"]
     },
     {
       "id": "leonardo-ai",
@@ -536,8 +437,134 @@
       "category": "ai-creative",
       "officialUrl": "https://leonardo.ai/",
       "watchUrl": "https://leonardo.ai/news/",
+      "priority": "P1",
+      "focus": ["image-generation", "canvas", "model", "style", "asset"]
+    },
+    {
+      "id": "stable-diffusion-webui",
+      "name": "Stable Diffusion WebUI",
+      "category": "ai-creative",
+      "officialUrl": "https://github.com/AUTOMATIC1111/stable-diffusion-webui",
+      "watchUrl": "https://github.com/AUTOMATIC1111/stable-diffusion-webui/releases",
+      "priority": "P1",
+      "focus": ["local-model", "extension", "inpainting", "control", "batch"]
+    },
+    {
+      "id": "firealpaca",
+      "name": "FireAlpaca",
+      "category": "comic-drawing",
+      "officialUrl": "https://firealpaca.com/",
+      "watchUrl": "https://firealpaca.com/download/",
+      "priority": "P1",
+      "focus": ["lightweight-paint", "comic-template", "brush", "onion-skin", "cross-platform"]
+    },
+    {
+      "id": "paint-tool-sai",
+      "name": "PaintTool SAI",
+      "category": "comic-drawing",
+      "officialUrl": "https://www.systemax.jp/en/sai/",
+      "watchUrl": "https://www.systemax.jp/en/sai/history.html",
+      "priority": "P1",
+      "focus": ["line-quality", "stabilization", "lightweight", "brush", "vector-linework"]
+    },
+    {
+      "id": "infinite-painter",
+      "name": "Infinite Painter",
+      "category": "mobile-drawing",
+      "officialUrl": "https://www.infinitestudio.art/painter.php",
+      "watchUrl": "https://www.infinitestudio.art/community.php",
+      "priority": "P1",
+      "focus": ["mobile-brush", "perspective", "selection", "liquify", "gesture"]
+    },
+    {
+      "id": "heavypaint",
+      "name": "HEAVYPAINT",
+      "category": "mobile-drawing",
+      "officialUrl": "https://www.heavypoly.com/heavypaint",
+      "watchUrl": "https://www.heavypoly.com/heavypaint",
       "priority": "P2",
-      "focus": ["image-generation", "canvas-editor", "models", "style-reference", "asset-library"]
+      "focus": ["simplified-paint", "mobile", "color-shape", "speed", "minimal-ui"]
+    },
+    {
+      "id": "nomad-sculpt",
+      "name": "Nomad Sculpt",
+      "category": "3d-dcc",
+      "officialUrl": "https://nomadsculpt.com/",
+      "watchUrl": "https://nomadsculpt.com/manual/",
+      "priority": "P1",
+      "focus": ["mobile-sculpt", "vertex-paint", "pbr", "remesh", "export"]
+    },
+    {
+      "id": "cascadeur",
+      "name": "Cascadeur",
+      "category": "3d-dcc",
+      "officialUrl": "https://cascadeur.com/",
+      "watchUrl": "https://cascadeur.com/help/category/324",
+      "priority": "P1",
+      "focus": ["animation", "physics", "posing", "auto-posing", "trajectory"]
+    },
+    {
+      "id": "mixamo",
+      "name": "Mixamo",
+      "category": "rigging-avatar",
+      "officialUrl": "https://www.mixamo.com/",
+      "watchUrl": "https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html",
+      "priority": "P2",
+      "focus": ["auto-rig", "motion-library", "character", "retarget", "export"]
+    },
+    {
+      "id": "dragonbones",
+      "name": "DragonBones",
+      "category": "rigging-avatar",
+      "officialUrl": "https://www.dragonbones.com/",
+      "watchUrl": "https://github.com/DragonBones/DragonBonesJS/releases",
+      "priority": "P2",
+      "focus": ["skeletal-animation", "mesh", "runtime", "open-source", "export"]
+    },
+    {
+      "id": "pencil2d",
+      "name": "Pencil2D",
+      "category": "animation-2d",
+      "officialUrl": "https://www.pencil2d.org/",
+      "watchUrl": "https://www.pencil2d.org/news/",
+      "priority": "P2",
+      "focus": ["frame-animation", "raster-vector", "onion-skin", "open-source", "simple-ui"]
+    },
+    {
+      "id": "synfig",
+      "name": "Synfig Studio",
+      "category": "animation-2d",
+      "officialUrl": "https://www.synfig.org/",
+      "watchUrl": "https://www.synfig.org/news/",
+      "priority": "P2",
+      "focus": ["vector-tween", "bone", "parameter", "open-source", "render"]
+    },
+    {
+      "id": "wick-editor",
+      "name": "Wick Editor",
+      "category": "animation-2d",
+      "officialUrl": "https://www.wickeditor.com/",
+      "watchUrl": "https://github.com/Wicklets/wick-editor/releases",
+      "priority": "P2",
+      "focus": ["browser-animation", "interactive", "frame", "scripting", "open-source"]
+    },
+    {
+      "id": "excalidraw",
+      "name": "Excalidraw",
+      "category": "vector-infinite-canvas",
+      "officialUrl": "https://excalidraw.com/",
+      "watchUrl": "https://github.com/excalidraw/excalidraw/releases",
+      "priority": "P2",
+      "focus": ["infinite-canvas", "collaboration", "hand-drawn", "open-source", "library"]
+    },
+    {
+      "id": "tldraw",
+      "name": "tldraw",
+      "category": "vector-infinite-canvas",
+      "officialUrl": "https://www.tldraw.com/",
+      "watchUrl": "https://github.com/tldraw/tldraw/releases",
+      "priority": "P1",
+      "focus": ["infinite-canvas", "editor-sdk", "collaboration", "shape", "persistence"]
     }
   ]
 }
