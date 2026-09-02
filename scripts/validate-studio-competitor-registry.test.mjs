@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   STUDIO_COMPETITOR_CATEGORIES,
   STUDIO_COMPETITOR_REGISTRY_PATH,
+  shareStudioOfficialDomainFamily,
   summarizeStudioCompetitorRegistry,
   validateStudioCompetitorRegistry,
 } from "./validate-studio-competitor-registry.mjs";
@@ -17,8 +18,17 @@ test("the committed registry remains broad, unique, and schema-valid", () => {
 
   const summary = summarizeStudioCompetitorRegistry(registry);
   assert.ok(summary.productCount >= 50);
-  assert.equal(Object.values(summary.byCategory).filter((count) => count > 0).length, STUDIO_COMPETITOR_CATEGORIES.length);
+  assert.equal(
+    Object.values(summary.byCategory).filter((count) => count > 0).length,
+    STUDIO_COMPETITOR_CATEGORIES.length,
+  );
   assert.ok(summary.byPriority.P0 >= 10);
+});
+
+test("explicit vendor families recognize Adobe Mixamo without trusting unrelated hosts", () => {
+  assert.equal(shareStudioOfficialDomainFamily("www.mixamo.com", "helpx.adobe.com"), true);
+  assert.equal(shareStudioOfficialDomainFamily("www.adobe.com", "helpx.adobe.com"), true);
+  assert.equal(shareStudioOfficialDomainFamily("www.mixamo.com", "unrelated.example"), false);
 });
 
 test("duplicate ids, names, and focus tags are rejected", () => {
