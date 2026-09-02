@@ -1,0 +1,109 @@
++                    className={buttonClass({
++                      size: "sm",
++                      variant: "quiet",
++                      className: "shrink-0 whitespace-nowrap gap-1.5",
++                    })}
++                  >
++                    <SlidersHorizontal size={14} aria-hidden /> 내보내기 옵션
++                  </button>
++                ) : null}
+           {pageCount > 1 && (
+             <button
+               type="button"
+@@ -2131,6 +2165,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
+               type="button"
+               onClick={() => handleSave("draft")}
+               disabled={saving || collaborationDocumentLocked}
++              data-testid="studio-draft-save"
+               aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
+               className={cn(
+                 buttonClass({
+@@ -2139,16 +2174,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
+                   className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                 }),
+                 isMobile &&
+-                  "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
+-                mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
++                  "size-11 min-h-11 min-w-11 justify-center px-0",
++                mobileImmersive && "rounded-full border border-line/70 bg-raised/80"
+               )}
+             >
+               {saving ? (
+                 <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+               ) : (
+-                <Save size={14} className="hidden max-[359px]:block" aria-hidden />
++                <Save size={14} className={isMobile ? undefined : "hidden"} aria-hidden />
+               )}
+-              <span className="max-[359px]:sr-only">
++              <span className={isMobile ? "sr-only" : undefined}>
+                 {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
+               </span>
+             </button>
+@@ -2173,6 +2208,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
+                 type="button"
+                 onClick={() => handleSave("published")}
+                 disabled={saving || collaborationDocumentLocked}
++                data-testid="studio-publish"
+                 aria-label={workId ? "수정 게시" : "게시하기"}
+                 className={cn(
+                   buttonClass({
+@@ -2181,16 +2217,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
+                     className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                   }),
+                   isMobile &&
+-                    "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
+-                  mobileImmersive && "rounded-full px-3 shadow-none"
++                    "size-11 min-h-11 min-w-11 justify-center px-0",
++                  mobileImmersive && "rounded-full shadow-none"
+                 )}
+               >
+                 {saving ? (
+                   <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                 ) : (
+-                  <Send size={14} className="hidden max-[359px]:block" aria-hidden />
++                  <Send size={14} className={isMobile ? undefined : "hidden"} aria-hidden />
+                 )}
+-                <span className="max-[359px]:sr-only">
++                <span className={isMobile ? "sr-only" : undefined}>
+                   {workId ? "수정 게시" : "게시하기"}
+                 </span>
+               </button>
+diff --git a/src/domains/creator/StudioWorkspaceMenu.test.tsx b/src/domains/creator/StudioWorkspaceMenu.test.tsx
+index 95973ab..f4a9f54 100644
+--- a/src/domains/creator/StudioWorkspaceMenu.test.tsx
++++ b/src/domains/creator/StudioWorkspaceMenu.test.tsx
+@@ -61,6 +61,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
+     const html = renderMenu();
+ 
+     expect(html).toContain('data-testid="studio-workspace-menu"');
++    expect(html).toContain('data-testid="studio-workspace-menu-toggle"');
+     expect(html.match(/data-studio-shortcut-boundary="true"/g)).toHaveLength(2);
+     expect(html).toContain('aria-haspopup="dialog"');
+     expect(html).toContain('aria-expanded="false"');
+diff --git a/src/domains/creator/StudioWorkspaceMenu.tsx b/src/domains/creator/StudioWorkspaceMenu.tsx
+index bcaf8b3..c6731e2 100644
+--- a/src/domains/creator/StudioWorkspaceMenu.tsx
++++ b/src/domains/creator/StudioWorkspaceMenu.tsx
+@@ -1134,6 +1134,7 @@ export function StudioWorkspaceMenu({
+         ref={triggerRef}
+         type="button"
+         onClick={handleTriggerClick}
++        data-testid="studio-workspace-menu-toggle"
+         aria-haspopup="dialog"
+         aria-expanded={open}
+         aria-controls={dialogId}
+diff --git a/src/domains/creator/StudioWorkspaceMenuGate.test.tsx b/src/domains/creator/StudioWorkspaceMenuGate.test.tsx
+index ad32b35..8f1d8d9 100644
+--- a/src/domains/creator/StudioWorkspaceMenuGate.test.tsx
++++ b/src/domains/creator/StudioWorkspaceMenuGate.test.tsx
+@@ -32,6 +32,7 @@ describe("StudioWorkspaceMenuGate", () => {
+     const html = renderGate();
+ 
+     expect(html).toContain('data-testid="studio-workspace-menu-gate"');
++    expect(html).toContain('data-testid="studio-workspace-toggle"');
+     expect(html).toContain('aria-haspopup="dialog"');
+     expect(html).toContain('aria-expanded="false"');
+     expect(html).toContain("작업공간: 스토리보드, 이 기기 저장 확인됨");
+diff --git a/src/domains/creator/StudioWorkspaceMenuGate.tsx b/src/domains/creator/StudioWorkspaceMenuGate.tsx
+index b74ea8c..8d6d816 100644
+--- a/src/domains/creator/StudioWorkspaceMenuGate.tsx
