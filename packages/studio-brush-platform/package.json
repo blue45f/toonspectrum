@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 input pipeline, stabilizer and stroke-geometry brush platform (Phase 2 baseline).",
+  "description": "Engine-neutral pointer input, stabilizer and stroke-geometry brush platform: raw pointer samples through to compiled vector and raster stroke geometry.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

@@ -32,21 +32,58 @@ function createHandlers() {
   };
 }
 
+function quickStartCard(): HTMLElement {
+  return screen.getByRole("region", { name: "처음이라면 이 순서로 시작하세요" });
+}
+
 describe("StudioQuickStartPanel", () => {
-  it("dismisses on Escape and backdrop click for low-friction first paint", () => {
+  it("is a non-modal card: no aria-modal, no full-canvas backdrop", () => {
+    // 감사 근거(docs/rewrite/ux-audit-v5.md §2.1 · 2026-09-02 아키텍처 리뷰 P0): 코치가 모달이라
+    // 첫 획 전에 "닫기"가 강제됐다. 계약이 뒤집혔음을 구조로 고정한다.
     const handlers = createHandlers();
-    render(<StudioQuickStartPanel {...handlers} />);
+    const view = render(<StudioQuickStartPanel {...handlers} />);
 
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+    const card = quickStartCard();
+    expect(card.hasAttribute("aria-modal")).toBe(false);
+    expect(view.container.querySelector('[aria-modal="true"]')).toBeNull();
+    expect(view.container.querySelector('[role="dialog"]')).toBeNull();
 
-    handlers.onDismiss.mockClear();
-    fireEvent.click(document.querySelector('[data-studio-quickstart-backdrop="true"]')!);
-    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+    // 캔버스를 통째로 덮던 스크림이 사라졌다 — 흐림도, inset-0 오버레이도 없다.
+    // (`before:inset-0` 같은 의사요소 장식은 오버레이가 아니므로 유틸리티 경계로 판정한다.)
+    for (const element of view.container.querySelectorAll("*")) {
+      const classes = element.getAttribute("class") ?? "";
+      expect(classes).not.toMatch(/(?:^|\s)inset-0(?:\s|$)/u);
+      expect(classes).not.toContain("backdrop-blur-[1px]");
+    }
+    // 루트는 자기 상자만 차지하고, 그 상자마저 포인터를 먹지 않는다(카드만 pointer-events-auto).
+    const root = view.container.querySelector<HTMLElement>(
+      '[data-studio-creative-starter="true"]',
+    );
+    expect(root?.className).toContain("pointer-events-none");
+    expect(root?.className).toContain("absolute");
+    expect(card.className).toContain("pointer-events-auto");
   });
 
-  it("yields instead of stealing focus when another modal is already open", () => {
-    // 자동 코치가 이미 열린 다이얼로그 위로 뒤늦게 마운트되는 실측 경로(2026-08-21).
+  it("never steals focus when it mounts", () => {
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+
+    const handlers = createHandlers();
+    try {
+      render(<StudioQuickStartPanel {...handlers} />);
+
+      expect(document.activeElement).toBe(outside);
+      expect(handlers.onDismiss).not.toHaveBeenCalled();
+    } finally {
+      outside.remove();
+    }
+  });
+
+  it("mounts harmlessly under a modal that is already open instead of yielding", () => {
+    // 예전에는 모달 계약이 남의 다이얼로그에서 포커스를 빼앗아서, 코치가 스스로 즉시 dismiss
+    // 하는 회피가 필요했다(2026-08-21 verify-studio-launch). 이제 아무것도 빼앗지 않으므로
+    // 회피도 필요 없다 — 코치는 그대로 남고 포커스는 그 다이얼로그에 머문다.
     const foreign = document.createElement("section");
     foreign.setAttribute("role", "dialog");
     foreign.setAttribute("aria-modal", "true");
@@ -60,46 +97,107 @@ describe("StudioQuickStartPanel", () => {
     try {
       render(<StudioQuickStartPanel {...handlers} />);
 
-      expect(handlers.onDismiss).toHaveBeenCalledOnce();
+      expect(handlers.onDismiss).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(foreignControl);
     } finally {
       foreign.remove();
     }
   });
 
-  it("keeps its modal contract armed when it is the only modal on screen", () => {
-    // jsdom 은 레이아웃이 없어 실제 초기 포커스 착지를 재현하지 못한다. 대신 계약이
-    // 살아 있다는 관측 가능한 신호(자동 양보 없음 + Esc 처리)를 확인한다.
+  it("dismisses on Escape only while focus is inside the card", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);
 
-    expect(handlers.onDismiss).not.toHaveBeenCalled();
+    // 빈 캔버스에서 누른 Esc 는 아무것도 바꾸지 않는다 — 비모달 카드의 계약.
+    document.body.focus();
     fireEvent.keyDown(document, { key: "Escape" });
+    expect(handlers.onDismiss).not.toHaveBeenCalled();
+
+    const close = within(quickStartCard()).getByRole("button", { name: /빠른 시작 닫기/u });
+    close.focus();
+    fireEvent.keyDown(close, { key: "Escape" });
     expect(handlers.onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("hands keyboard focus to the menubar when it closes from inside the card", () => {
+    // 스스로 뜬 코치에는 돌려줄 트리거가 없어서, 카드 안에서 닫으면 포커스가 BODY 로 떨어진다.
+    // 카드 안에 포커스가 있었을 때만 메뉴바 착지점으로 옮긴다(밖에 있으면 건드리지 않는다).
+    const originalGetClientRects = Element.prototype.getClientRects;
+    Element.prototype.getClientRects = function getClientRects() {
+      return [
+        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
+      ] as unknown as DOMRectList;
+    };
+    const anchor = document.createElement("button");
+    anchor.setAttribute("data-studio-main-menu-trigger", "file");
+    document.body.append(anchor);
+
+    const handlers = createHandlers();
+    try {
+      render(<StudioQuickStartPanel {...handlers} />);
+
+      const close = within(quickStartCard()).getByRole("button", {
+        name: /빠른 시작 닫기/u,
+      });
+      close.focus();
+      fireEvent.click(close);
+
+      expect(handlers.onDismiss).toHaveBeenCalledOnce();
+      expect(document.activeElement).toBe(anchor);
+    } finally {
+      anchor.remove();
+      Element.prototype.getClientRects = originalGetClientRects;
+    }
+  });
+
+  it("leaves outside focus alone when it is dismissed by a canvas pointerdown", async () => {
+    const originalGetClientRects = Element.prototype.getClientRects;
+    Element.prototype.getClientRects = function getClientRects() {
+      return [
+        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
+      ] as unknown as DOMRectList;
+    };
+    const anchor = document.createElement("button");
+    anchor.setAttribute("data-studio-main-menu-trigger", "file");
+    document.body.append(anchor);
+    const canvas = document.createElement("div");
+    canvas.setAttribute("data-studio-canvas-viewport", "true");
+    document.body.append(canvas);
+
+    const handlers = createHandlers();
+    try {
+      render(<StudioQuickStartPanel {...handlers} />);
+
+      // 캔버스로 향한 첫 pointerdown 은 그리려는 동작이다 — 코치만 비키고 포커스는 손대지 않는다.
+      fireEvent.pointerDown(canvas);
+      await Promise.resolve();
+      expect(handlers.onDismiss).toHaveBeenCalledOnce();
+      expect(document.activeElement).not.toBe(anchor);
+    } finally {
+      canvas.remove();
+      anchor.remove();
+      Element.prototype.getClientRects = originalGetClientRects;
+    }
   });
 
   it("presents the familiar four-step workflow in order and opens immediate actions", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);
 
-    const dialog = screen.getByRole("dialog", {
-      name: "처음이라면 이 순서로 시작하세요",
-    });
+    const card = quickStartCard();
 
-    expect(within(dialog).getByText("기능을 열면 바로 작업")).toBeTruthy();
+    expect(within(card).getByText("기능을 열면 바로 작업")).toBeTruthy();
+    expect(within(card).getByText(/도구를 열면 바로 캔버스에서 작업해요/u)).toBeTruthy();
     expect(
-      within(dialog).getByText(/도구를 열면 바로 캔버스에서 작업해요|Esc 또는 바깥 클릭/u),
-    ).toBeTruthy();
-    expect(
-      Array.from(dialog.querySelectorAll<HTMLElement>("[data-studio-quickstart-step]"), (step) =>
+      Array.from(card.querySelectorAll<HTMLElement>("[data-studio-quickstart-step]"), (step) =>
         step.getAttribute("data-studio-quickstart-step"),
       ),
     ).toEqual(["select", "draw", "dialogue", "save-undo"]);
-    expect(within(dialog).getByText(/V · 클릭하거나 드래그해 고르기/u)).toBeTruthy();
-    expect(within(dialog).getByText("Ctrl/⌘S 저장 · ⌘·Z 되돌리기")).toBeTruthy();
+    expect(within(card).getByText(/V · 클릭하거나 드래그해 고르기/u)).toBeTruthy();
+    expect(within(card).getByText("Ctrl/⌘S 저장 · ⌘·Z 되돌리기")).toBeTruthy();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /2\. 그리기/u }));
-    fireEvent.click(within(dialog).getByRole("button", { name: /3\. 말풍선·텍스트/u }));
+    fireEvent.click(within(card).getByRole("button", { name: /2\. 그리기/u }));
+    fireEvent.click(within(card).getByRole("button", { name: /3\. 말풍선·텍스트/u }));
 
     expect(handlers.onStartDraw).toHaveBeenCalledOnce();
     expect(handlers.onOpenBubble).toHaveBeenCalledOnce();
@@ -153,17 +251,15 @@ describe("StudioQuickStartPanel", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);
 
-    const dialog = screen.getByRole("dialog", {
-      name: "처음이라면 이 순서로 시작하세요",
-    });
-    const scrollArea = dialog.querySelector<HTMLElement>("[data-studio-quickstart-scroll]");
+    const card = quickStartCard();
+    const scrollArea = card.querySelector<HTMLElement>("[data-studio-quickstart-scroll]");
 
-    expect(dialog.className).toContain("max-h-[min(60dvh,calc(100svh-5rem))]");
-    expect(dialog.className).toContain("rounded-lg");
-    expect(dialog.className).not.toContain("rounded-2xl");
+    expect(card.className).toContain("max-h-[min(60dvh,calc(100svh-5rem))]");
+    expect(card.className).toContain("rounded-lg");
+    expect(card.className).not.toContain("rounded-2xl");
     expect(scrollArea?.className).toContain("overflow-y-auto");
 
-    for (const target of dialog.querySelectorAll<HTMLElement>("button, summary")) {
+    for (const target of card.querySelectorAll<HTMLElement>("button, summary")) {
       expect(
         ["size-11", "min-h-11", "min-h-12", "min-h-[4.5rem]"].some((token) =>
           target.className.includes(token),
@@ -171,56 +267,27 @@ describe("StudioQuickStartPanel", () => {
       ).toBe(true);
     }
 
-    const close = within(dialog).getByRole("button", { name: /빠른 시작 닫기/u });
+    const close = within(card).getByRole("button", { name: /빠른 시작 닫기/u });
     expect(close.getAttribute("data-studio-quickstart-dismiss")).toBe("true");
+    // 스크림이 사라지면서 Playwright 검증 스크립트가 쓰는 backdrop 선택자를 닫기 버튼이 잇는다.
+    expect(close.getAttribute("data-studio-quickstart-backdrop")).toBe("true");
     fireEvent.click(close);
     expect(handlers.onDismiss).toHaveBeenCalledOnce();
   });
 
-  it("honours its aria-modal contract by trapping Tab inside the dialog", () => {
-    // 감사 근거(docs/rewrite/ux-audit-v5.md §2.9): aria-modal="true" 인데 Tab 한 번에 포커스가
-    // 다이얼로그 밖 `크리에이티브 모드` 버튼으로 새어 나갔다(WCAG 2.1 2.4.3 위반).
-    // jsdom은 레이아웃을 계산하지 않아 getClientRects()가 항상 비어 있다. 포커스 가능 판정이
-    // 실제 브라우저와 같아지도록 이 테스트 동안만 가시 사각형을 흉내 낸다.
-    const originalGetClientRects = Element.prototype.getClientRects;
-    Element.prototype.getClientRects = function getClientRects() {
-      return [
-        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
-      ] as unknown as DOMRectList;
-    };
-
-    const outside = document.createElement("button");
-    outside.textContent = "배경 버튼";
-    document.body.append(outside);
+  it("floats bottom-right on wide screens and stays clear of the mobile dock", () => {
     const handlers = createHandlers();
-    render(<StudioQuickStartPanel {...handlers} />);
+    const view = render(<StudioQuickStartPanel {...handlers} />);
 
-    const dialog = screen.getByRole("dialog", {
-      name: "처음이라면 이 순서로 시작하세요",
-    });
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
-
-    outside.focus();
-    // focusin 되돌리기: 다이얼로그 밖으로 옮겨간 포커스는 다시 안으로 끌려온다.
-    fireEvent.focusIn(outside);
-    expect(dialog.contains(document.activeElement)).toBe(true);
-
-    // Tab/⇧Tab은 다이얼로그 안에서 순환하고 배경으로 넘어가지 않는다.
-    const focusables = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled])")];
-    const first = focusables[0];
-    const last = focusables.at(-1);
-    expect(focusables.length).toBeGreaterThan(1);
-
-    last?.focus();
-    // fireEvent 반환 false = preventDefault 됨 = 네이티브 탭 이동이 일어나지 않음
-    expect(fireEvent.keyDown(document, { key: "Tab" })).toBe(false);
-    expect(document.activeElement).toBe(first);
-
-    expect(fireEvent.keyDown(document, { key: "Tab", shiftKey: true })).toBe(false);
-    expect(document.activeElement).toBe(last);
-
-    outside.remove();
-    Element.prototype.getClientRects = originalGetClientRects;
+    const root = view.container.querySelector<HTMLElement>(
+      '[data-studio-creative-starter="true"]',
+    );
+    // 작은 화면: 위쪽(하단 모바일 독을 비켜서). ≥sm: 우하단 카드 + 그리기 옵션 바 높이만큼 상승.
+    expect(root?.className).toContain("top-16");
+    expect(root?.className).toContain("sm:right-4");
+    expect(root?.className).toContain("sm:top-auto");
+    expect(root?.className).toContain("sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem)]");
+    expect(root?.className).toContain("sm:w-[min(22rem,calc(100%-2rem))]");
   });
 
   it("treats the first interaction outside the coach as a real dismissal", async () => {
@@ -254,55 +321,15 @@ describe("StudioQuickStartPanel", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);
 
-    const dialog = screen.getByRole("dialog", {
-      name: "처음이라면 이 순서로 시작하세요",
-    });
-    fireEvent.click(within(dialog).getByRole("button", { name: /2\. 그리기/u }));
+    const card = quickStartCard();
+    fireEvent.click(within(card).getByRole("button", { name: /2\. 그리기/u }));
     await Promise.resolve();
     expect(handlers.onDismiss).not.toHaveBeenCalled();
 
-    // 배경(scrim)은 자기 onClick 으로 한 번만 닫는다 — 바깥 감시자가 겹쳐 두 번 부르면 안 된다.
-    fireEvent.click(document.querySelector('[data-studio-quickstart-backdrop="true"]')!);
+    // 닫기 버튼은 자기 onClick 으로 한 번만 닫는다 — 바깥 감시자가 겹쳐 두 번 부르면 안 된다.
+    fireEvent.click(within(card).getByRole("button", { name: /빠른 시작 닫기/u }));
     await Promise.resolve();
     expect(handlers.onDismiss).toHaveBeenCalledOnce();
-  });
-
-  it("lands keyboard focus on the menubar instead of the document body when it closes", () => {
-    // 스스로 뜬 코치에는 "열어 준 컨트롤"이 없어서 실측상 Esc 뒤 포커스가 BODY 로 떨어졌다.
-    // 키보드 사용자가 문서 맨 앞부터 다시 Tab 하지 않도록 메뉴바 첫 트리거로 착지시킨다.
-    const originalGetClientRects = Element.prototype.getClientRects;
-    Element.prototype.getClientRects = function getClientRects() {
-      return [
-        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
-      ] as unknown as DOMRectList;
-    };
-
-    const anchor = document.createElement("button");
-    anchor.setAttribute("data-studio-main-menu-trigger", "file");
-    document.body.append(anchor);
-    const handlers = createHandlers();
-    const view = render(<StudioQuickStartPanel {...handlers} />);
-
-    expect(document.activeElement?.getAttribute("data-studio-quickstart-dismiss")).toBe(
-      "true",
-    );
-
-    view.unmount();
-    expect(document.activeElement).toBe(anchor);
-
-    anchor.remove();
-    Element.prototype.getClientRects = originalGetClientRects;
-  });
-
-  it("keeps the scrim clickable while the modal isolator runs", () => {
-    const handlers = createHandlers();
-    render(<StudioQuickStartPanel {...handlers} />);
-
-    const backdrop = document.querySelector<HTMLElement>(
-      '[data-studio-quickstart-backdrop="true"]',
-    );
-    expect(backdrop?.getAttribute("data-studio-modal-backdrop")).toBe("true");
-    expect(backdrop?.hasAttribute("inert")).toBe(false);
   });
 
   it("shows the current shortcut remap and uses 미지정 for an empty binding", () => {

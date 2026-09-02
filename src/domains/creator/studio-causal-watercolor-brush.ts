@@ -12,6 +12,12 @@
  */
 
 import {
+  DEFAULT_STUDIO_STROKE_BUDGET,
+  resolveStrokeDabCapacity,
+  STUDIO_CAUSAL_WATERCOLOR_DAB_RESIDENT_BYTES,
+} from "@toonspectrum/studio-brush-platform";
+
+import {
   normalizeWatercolorBrushPlanSettings,
   type WatercolorBrushDab,
   type WatercolorBrushPlanSettings,
@@ -24,9 +30,16 @@ const POINT_EPSILON = 1e-6;
 const TAU = Math.PI * 2;
 const PIGMENT_NOISE_STATION_PERIOD = 12;
 
+/**
+ * 상한은 StrokeBudget 파생값이다(2026-09-02 아키텍처 리뷰). 기본 예산 4 MiB / dab 당 128 B =
+ * 32,768 로, 지금 출하 중인 값과 동일하다 — 동작 중립 파생.
+ */
 export const STUDIO_CAUSAL_WATERCOLOR_DAB_CAP_RANGE = {
   min: 2,
-  max: 32_768,
+  max: resolveStrokeDabCapacity({
+    budget: DEFAULT_STUDIO_STROKE_BUDGET,
+    bytesPerDab: STUDIO_CAUSAL_WATERCOLOR_DAB_RESIDENT_BYTES,
+  }),
 } as const;
 
 export const DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS = 16_384;

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 Skia CanvasKit renderer adapter: SceneIR to CPU raster pixels/PNG plus the skia-canvaskit provider descriptor.",
+  "description": "Skia CanvasKit renderer adapter: SceneIR to raster pixels/PNG, plus the CanvasKit CPU, GPU-island and Graphite/WebGPU provider descriptors.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

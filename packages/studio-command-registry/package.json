@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 CommandRegistry shared by DOM UI and canvas HUD.",
+  "description": "CommandRegistry shared by the DOM shell and the canvas HUD so one command id behaves identically from menu, shortcut, palette and radial HUD.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

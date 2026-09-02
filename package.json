@@ -93,6 +93,8 @@
     "verify:studio-brush-engine-selection": "tsx scripts/verify-studio-brush-engine-selection.mts",
     "verify:studio-brush-catalogue-perf": "tsx scripts/studio-brush-catalogue-perf-matrix.ts",
     "verify:studio-p5-brush-real-runtime": "node scripts/verify-studio-p5-brush-real-runtime.mjs",
+    "generate:studio-renderer-roles": "tsx scripts/generate-studio-renderer-roles.mts",
+    "verify:studio-renderer-roles": "tsx scripts/generate-studio-renderer-roles.mts --check",
     "verify:studio-groups": "tsx scripts/verify-studio-groups.mts",
     "verify:studio-gpu-committed-parity": "tsx scripts/verify-studio-gpu-committed-parity.mts",
     "verify:studio-engine-webgpu-brush-parity": "node scripts/verify-studio-engine-webgpu-brush-parity.mjs",

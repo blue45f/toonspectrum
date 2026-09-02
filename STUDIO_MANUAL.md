@@ -23,7 +23,7 @@ ToonSpectrum 스튜디오는 2D 드로잉, 3D 마네킹/CAD 배경 선화 추출
 ToonSpectrum 스튜디오는 크게 4개의 핵심 영역으로 구성되어 있습니다:
 
 - **좌측 툴바 (Tool Rail)**: 브러시, 지우개, 채우기(Fill), 3D 카메라, 레이소(Lasso) 선택, 텍스트 및 3D 씬 삽입 도구.
-- **중앙 캔버스 (Canvas)**: WebGPU 기반 고성능 래스터 캔버스로 무제한 줌 및 회전, R8 알파 맵 브러시 스트로크 렌더링 지원.
+- **중앙 캔버스 (Canvas)**: 문서 표시와 포인터 입력은 Konva Stage가, 획 픽셀 커밋은 그 위의 Canvas2D 종단 경로가 소유합니다. WebGPU/WASM 엔진은 게이트된 island에서만 동작합니다 — 전용 WebGPU 브러시 레인, Hokusai 자연매체(WASM), Vello 문서 벡터 island, Pixi 선택 오버레이. 무제한 줌 및 회전, R8 알파 맵 브러시 스트로크 렌더링을 지원합니다. 어떤 엔진이 무엇을 소유하는지는 생성 문서 [docs/engines/renderer-roles.md](docs/engines/renderer-roles.md)가 단일 진실 원천입니다.
 - **우측 레이어 및 3D 속성 패널 (Inspector)**: 래스터 레이어 합성, 3D VRM 마네킹 조명, 카메라 시점, FX 필터 조절.
 - **하단 타임라인 & 3D 컨트롤 바 (Control Bar)**: 컷 애니메이션, 웹캠 포즈 스트리밍 상태, 프레임 레이트 및 프리셋 가젯.
 

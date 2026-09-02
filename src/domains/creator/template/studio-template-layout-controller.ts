@@ -13,8 +13,9 @@ import { type El } from "../studio-element-model";
 import { comipoSeedsToEls } from "../studio-page-comipo-seeds";
 import { loadStudioComipoAssembly } from "../studio-page-lazy-ui";
 import { type PageState } from "../studio-page-state";
-import { type PanelLayoutPreset } from "../studio-panel-layouts";
 import { regenerateStudioTemplateFrames } from "../studio-template-gutter-layout";
+
+import type { PanelLayoutPreset } from "../studio-panel-layouts";
 
 export interface StudioCollagePayload {
   canvasH: number;

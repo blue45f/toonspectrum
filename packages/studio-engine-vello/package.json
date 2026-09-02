@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 Vello CPU provider wrapper over crates/studio-engine-vello wasm (deterministic reference renderer).",
+  "description": "Vello provider wrapper over the crates/studio-engine-vello wasm: deterministic CPU reference renderer plus the WebGPU browser path.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
