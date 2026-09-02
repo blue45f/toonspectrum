@@ -177,4 +177,16 @@ jobs:
             fi
 
             echo "Merged PR #${pull_number} at $(jq -r '.sha' <<< "$result")."
+
+            # The merge is already durable on main. Branch cleanup is best-effort and never turns a
+            # successful release into a false failed merge. The scheduled cleanup workflow retries
+            # any branch that GitHub temporarily refuses to remove.
+            ref_path="repos/${REPOSITORY}/git/refs/heads/${head_ref}"
+            if gh api --method DELETE "$ref_path" >/dev/null 2>&1; then
+              echo "Deleted merged branch ${head_ref}."
+            elif gh api "$ref_path" >/dev/null 2>&1; then
+              echo "::warning::Merged branch ${head_ref} remains; scheduled cleanup will retry."
+            else
+              echo "Merged branch ${head_ref} is already absent."
+            fi
           done
