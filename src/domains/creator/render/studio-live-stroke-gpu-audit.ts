@@ -63,7 +63,7 @@ export type StudioLiveStrokeGpuAuditReceiptOutcome =
 /** 라이브 스트로크 GPU 감사 배선이 StudioPage 에 되돌려 주는 표면. */
 export interface StudioLiveStrokeGpuAudit {
   readonly applyLiveStrokeBackendPresentationEffects: () => void;
-  readonly armGpuPinnedRequestWatchdog: (requestId: string) => void;
+  readonly armGpuPinnedRequestWatchdog: (requestId: string, timeoutMs?: number) => void;
   readonly armLiveStrokeCanonicalCanvasAudit: (
     strokeIds: readonly string[],
     requestId: string
@@ -615,9 +615,9 @@ export function createStudioLiveStrokeGpuAudit(
   function cancelGpuPinnedRequestWatchdog(): void {
     gpuPinReceiptWatchdogRef.current?.cancel();
   }
-  function armGpuPinnedRequestWatchdog(requestId: string): void {
+  function armGpuPinnedRequestWatchdog(requestId: string, timeoutMs?: number): void {
     if (!gpuLiveInkPinnedRef.current) return;
-    gpuPinReceiptWatchdog().request(requestId);
+    gpuPinReceiptWatchdog().request(requestId, timeoutMs);
   }
   function beginGpuPinnedReceiptEpoch(requestId: string): void {
     if (!gpuLiveInkPinnedRef.current) return;
