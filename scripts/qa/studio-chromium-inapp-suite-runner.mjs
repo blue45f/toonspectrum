@@ -7,6 +7,21 @@ import path from "node:path";
 import process from "node:process";
 
 const SUITE = process.env.QA_SUITE ?? "ui-inapp";
+const REQUESTED_CASES = Object.freeze(
+  (process.env.QA_CASE ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
+const CASE_PATTERN = (() => {
+  const source = (process.env.QA_CASE_PATTERN ?? "").trim();
+  if (!source) return null;
+  try {
+    return new RegExp(source, "u");
+  } catch (error) {
+    throw new Error(`Invalid QA_CASE_PATTERN ${JSON.stringify(source)}: ${String(error)}`);
+  }
+})();
 const ROOT = path.resolve(
   process.env.QA_RESULTS_DIR ?? `qa-results/studio-chromium-inapp/${SUITE}`,
 );
@@ -125,6 +140,76 @@ function knownJiraFor(value) {
   return KNOWN_JIRA.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
 }
 
+const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function processGroupExists(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    if (error?.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+function signalProcessGroup(pid, signal) {
+  if (!processGroupExists(pid)) return false;
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    throw error;
+  }
+}
+
+async function waitForProcessGroupExit(pid, timeoutMilliseconds) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    if (!processGroupExists(pid)) return true;
+    await sleep(100);
+  }
+  return !processGroupExists(pid);
+}
+
+/**
+ * Every verifier is launched in a dedicated process group. Vite preview, Xvfb and Chromium can
+ * outlive their shell after an otherwise successful command, so cleanup is mandatory on both
+ * success and failure; only cleaning on timeout slowly exhausts the runner's RAM/GPU resources.
+ */
+async function terminateProcessGroup(pid, reason, graceMilliseconds = 2_000) {
+  if (!processGroupExists(pid)) return;
+  console.log(`[chromium-inapp-suite] CLEANUP pid=${pid} reason=${reason}`);
+  signalProcessGroup(pid, "SIGTERM");
+  if (await waitForProcessGroupExit(pid, graceMilliseconds)) return;
+  console.warn(`[chromium-inapp-suite] FORCE CLEANUP pid=${pid} reason=${reason}`);
+  signalProcessGroup(pid, "SIGKILL");
+  await waitForProcessGroupExit(pid, 2_000);
+}
+
+function selectCases(suite) {
+  const requested = new Set(REQUESTED_CASES);
+  const selected = suite.filter((testCase) => {
+    if (requested.size > 0 && !requested.has(testCase.id)) return false;
+    if (CASE_PATTERN && !CASE_PATTERN.test(testCase.id)) return false;
+    return true;
+  });
+  if (selected.length === 0) {
+    const available = suite.map((testCase) => testCase.id).join(", ");
+    throw new Error(
+      `No QA cases selected for suite ${SUITE}; QA_CASE=${JSON.stringify(REQUESTED_CASES.join(","))} ` +
+        `QA_CASE_PATTERN=${JSON.stringify(CASE_PATTERN?.source ?? "")} available=[${available}]`,
+    );
+  }
+  const missing = REQUESTED_CASES.filter((id) => !suite.some((testCase) => testCase.id === id));
+  if (missing.length > 0) {
+    throw new Error(`Unknown QA_CASE for suite ${SUITE}: ${missing.join(", ")}`);
+  }
+  return selected;
+}
+
 function tailForIssue(output, lines = 35) {
   const cleaned = clean(output);
   return cleaned.split("\n").slice(-lines).join("\n").slice(-12_000);
@@ -158,26 +243,18 @@ async function runCommand(testCase) {
   child.stderr.on("data", collect);
 
   let timedOut = false;
+  let timeoutCleanup = Promise.resolve();
   const timer = setTimeout(() => {
     timedOut = true;
-    try {
-      process.kill(-child.pid, "SIGTERM");
-    } catch {
-      // Process already exited.
-    }
-    setTimeout(() => {
-      try {
-        process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // Process already exited.
-      }
-    }, 10_000).unref();
+    timeoutCleanup = terminateProcessGroup(child.pid, `timeout:${testCase.id}`, 10_000);
   }, testCase.timeoutMinutes * 60_000);
 
   const exitCode = await new Promise((resolve) => {
     child.once("close", (code, signal) => resolve(code ?? (signal ? 128 : 1)));
   });
   clearTimeout(timer);
+  await timeoutCleanup;
+  await terminateProcessGroup(child.pid, `completed:${testCase.id}`);
   await writeFile(logPath, output, "utf8");
 
   const detail = timedOut
@@ -390,11 +467,15 @@ async function updateJira(results) {
 async function main() {
   const suite = SUITES[SUITE];
   if (!suite) throw new Error(`Unknown QA_SUITE: ${SUITE}`);
+  const selectedCases = selectCases(suite);
   await mkdir(ROOT, { recursive: true });
   await mkdir(EVIDENCE_ROOT, { recursive: true });
 
   const results = [];
-  for (const testCase of suite) {
+  console.log(
+    `[chromium-inapp-suite] SELECTED suite=${SUITE} cases=${selectedCases.map((item) => item.id).join(",")}`,
+  );
+  for (const testCase of selectedCases) {
     console.log(`\n[chromium-inapp-suite] START ${testCase.id}: ${testCase.shell}`);
     const result = await runCommand(testCase);
     results.push(result);
@@ -409,6 +490,8 @@ async function main() {
   const summary = {
     generatedAt: new Date().toISOString(),
     suite: SUITE,
+    requestedCases: REQUESTED_CASES,
+    casePattern: CASE_PATTERN?.source ?? null,
     browserScope: "Chromium/Chrome and Chromium-based in-app UA/viewport emulation only",
     physicalDeviceVerified: false,
     commandCount: results.length,
