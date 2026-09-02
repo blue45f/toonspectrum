@@ -17,18 +17,21 @@ const config = JSON.parse(fs.readFileSync(STUDIO_SEVEN_DAY_CAMPAIGN_CONFIG_PATH,
 test("committed campaign config is a bounded exact seven-day program", () => {
   assert.deepEqual(validateStudioSevenDayCampaignConfig(config), []);
   assert.equal(Date.parse(config.endAt) - Date.parse(config.startAt), 7 * 24 * 60 * 60 * 1_000);
+  assert.equal(config.startAt, "2026-09-03T00:00:00Z");
+  assert.equal(config.endAt, "2026-09-10T00:00:00Z");
+  assert.equal(config.cadenceMinutes, 60);
   assert.equal(config.maxOpenCampaignPullRequests, 1);
   assert.equal(config.agent.permissionProfile, ":workspace");
   assert.match(config.agent.actionCommit, /^[0-9a-f]{40}$/u);
 });
 
 test("campaign window resolves before, active, and complete phases deterministically", () => {
-  assert.equal(resolveStudioCampaignWindow(config, "2026-09-02T11:29:59Z").phase, "before");
-  const active = resolveStudioCampaignWindow(config, "2026-09-05T11:30:00Z");
+  assert.equal(resolveStudioCampaignWindow(config, "2026-09-02T23:59:59Z").phase, "before");
+  const active = resolveStudioCampaignWindow(config, "2026-09-06T00:00:00Z");
   assert.equal(active.phase, "active");
   assert.equal(active.active, true);
   assert.equal(active.dayIndex, 4);
-  assert.equal(resolveStudioCampaignWindow(config, "2026-09-09T11:30:00Z").phase, "after");
+  assert.equal(resolveStudioCampaignWindow(config, "2026-09-10T00:00:00Z").phase, "after");
 });
 
 test("selects the first open queue issue not already claimed by an open pull request", () => {
