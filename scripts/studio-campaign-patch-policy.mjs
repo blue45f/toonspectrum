@@ -21,6 +21,10 @@ const FORBIDDEN_PATH_RULES = Object.freeze([
   /(^|\/)\.env(?:\.|$)/u,
   /^deploy\//u,
   /^vercel\.json$/u,
+  /^apps\/api\/src\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
+  /^lib\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
+  /^scripts\/(?:production-database-migrations|run-production-database-migrations|verify-production-database-capabilities)/u,
+  /^drizzle(?:\.|\/|$)/u,
   /^scripts\/studio-(?:seven-day-campaign|campaign-patch-policy|safe-automerge|merged-branch-cleanup)/u,
   /^docs\/automation\/studio-seven-day-campaign\.json$/u,
 ]);
