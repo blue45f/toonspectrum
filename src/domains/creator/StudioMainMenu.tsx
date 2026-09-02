@@ -31,6 +31,7 @@ import {
 } from "./studio-chrome-ui";
 import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
 import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
+import { preloadStudioMainMenuGroupRuntime } from "./studio-main-menu-intent-preload";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -616,7 +617,11 @@ function MenuDropdown({
           // APG roving tabindex: the menubar is one tab stop, and arrows move between the
           // 18 groups. Before this, reaching the canvas by keyboard cost 18 Tab presses.
           tabIndex={isTabStop ? 0 : -1}
-          onFocus={onFocusTrigger}
+          onPointerEnter={() => preloadStudioMainMenuGroupRuntime(group.id)}
+          onFocus={() => {
+            preloadStudioMainMenuGroupRuntime(group.id);
+            onFocusTrigger();
+          }}
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
