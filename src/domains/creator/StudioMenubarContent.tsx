@@ -1561,7 +1561,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 gap-1.5" }),
-                  isMobile && "min-h-11",
+                  // 라벨이 `max-xl:sr-only` 로 접히면 아이콘+패딩만 남아 42px 였다 —
+                  // `verify:studio-mobile-top` 이 320~430px 전부에서 잡은 44px 미달(CI 실패).
+                  isMobile && "min-h-11 min-w-11 justify-center",
                 )}
               >
                 <Files size={14} aria-hidden />
@@ -1582,7 +1584,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                  isMobile && "min-h-11"
+                  // 같은 42px 미달 — 배율 텍스트가 `max-xl:hidden` 이라 아이콘만 남는다.
+                  isMobile && "min-h-11 min-w-11 justify-center"
                 )}
               >
                 <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>

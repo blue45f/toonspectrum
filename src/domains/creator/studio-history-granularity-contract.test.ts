@@ -94,7 +94,7 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
   });
 
   it("undo 는 대기 배치를 폐기하지 않고 먼저 히스토리에 안착시킨다", () => {
-    const undo = sourceBetween("const undo = () => {", "const redo = () => {");
+    const undo = sourceBetween("  function undo() {", "  function redo() {");
 
     expect(undo).toContain(
       "if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current())",
@@ -165,14 +165,16 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
     expect(studioPageSource).not.toContain("실행 취소(⌘Z) 대상이 아니에요");
 
     for (const target of ["characterBible", "writerRoom"]) {
+      // 사이드카 setter 는 history/studio-page-sidecars-controller.ts 로 추출됐다(페이지 분할 웨이브).
+      // 계약은 그대로이고 읽는 파일만 합성 에디터 소스로 바뀐다.
       const setter = target === "characterBible"
-        ? sourceBetween(
+        ? editorSourceBetween(
             "const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {",
             "const setWriterRoom = (next:",
           )
-        : sourceBetween(
+        : editorSourceBetween(
             "const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {",
-            "  /**\n   * 저널의 사이드카 항목 한 건을",
+            "function restoreStudioSidecarDocument(",
           );
 
       // 렌더 클로저가 아니라 ref 에서 읽어야 한 태스크의 연속 편집이 같은 `before` 를 겹쳐 쓰지 않는다.
@@ -185,20 +187,24 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
   });
 
   it("사이드카 기록은 대기 획 배치를 먼저 안착시켜 시간 순서를 지킨다", () => {
-    const record = sourceBetween(
+    const record = editorSourceBetween(
       "function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {",
       "const setCharacterBible =",
     );
 
     // 배치는 나중에 flush 된다 — 먼저 안착시키지 않으면 "획 → 사이드카" 가 저널에서 뒤집힌다.
-    expect(record).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
-    expect(record.indexOf("flushPendingStrokeCommitsRef")).toBeLessThan(
+    // 컨트롤러는 flush 를 직접 알지 못하고 `onBeforeRecordSidecar` 훅으로 받는다; 호스트가 그 훅에
+    // 대기 획 flush 를 꽂는다. 두 조각을 각각 고정해야 어느 한쪽이 빠져도 여기서 드러난다.
+    expect(record).toContain("onBeforeRecordSidecar?.();");
+    expect(record.indexOf("onBeforeRecordSidecar?.()")).toBeLessThan(
       record.indexOf("recordStudioHistoryJournalSidecarEdit"),
     );
+    const hostHook = sourceBetween("onBeforeRecordSidecar: () => {", "historyJournalRef,");
+    expect(hostHook).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
   });
 
   it("undo 는 최신 항목이 사이드카면 문서만 되돌리고 pagesHi 는 건드리지 않는다", () => {
-    const undo = sourceBetween("const undo = () => {", "const redo = () => {");
+    const undo = sourceBetween("  function undo() {", "  function redo() {");
     const flushIndex = undo.indexOf("if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current())");
     const journalIndex = undo.indexOf("const undoEntry = readStudioHistoryJournalUndoEntry(historyJournalRef.current)");
     const historyIndex = undo.indexOf("const undoHistory = pagesHistoryRef.current");
@@ -218,7 +224,7 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
   });
 
   it("redo 가 undo 를 거울처럼 되짚는다", () => {
-    const redo = sourceBetween("const redo = () => {", "companionHistoryHandlerRef.current =");
+    const redo = sourceBetween("  function redo() {", "companionHistoryHandlerRef.current =");
 
     expect(redo).toContain("readStudioHistoryJournalRedoEntry(historyJournalRef.current)");
     expect(redo).toContain('restoreStudioSidecarDocument(redoEntry, "redo")');
@@ -256,9 +262,9 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
     expect(restore).toContain("resetStudioHistoryJournal();");
     expect(restore).toContain("hydrateStudioSidecarDocuments({");
 
-    const hydrate = sourceBetween(
+    const hydrate = editorSourceBetween(
       "function hydrateStudioSidecarDocuments(input: {",
-      "const [aiProvenance, setAiProvenanceState]",
+      "\n  return {",
     );
     // 수화는 사용자의 편집이 아니다 — raw setter 로 가고 저널 항목을 만들지 않는다.
     expect(hydrate).toContain("setCharacterBibleState(input.characterBible);");

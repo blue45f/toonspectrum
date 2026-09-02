@@ -71,7 +71,7 @@
 | 이미지 탭 canonical ≠ 표시 순서 | 해소(단일 정본에서 파생) |
 | 불투명/투명도/불투명도 혼재 | 해소 |
 | 도움말이 마지막 아님 | 해소 |
-| 인스펙터 라벨 하드코딩 한국어 | 부분 해소 — 내비게이터 문구를 `studio.inspector.*` 키 + 한국어 폴백 표로 옮겼다. 팩에 키가 실리면 그 번역이 이긴다. 다른 섹션은 그대로. |
+| 인스펙터 라벨 하드코딩 한국어 | 부분 해소 — 내비게이터 문구를 `studio.inspector.*` 키 + 한국어 폴백 표로 옮겼다. 팩에 키가 실리면 그 번역이 이긴다. 모바일 도크의 마지막 리터럴(페이지·내보내기)은 팩 키로 교체했다. 다른 섹션은 그대로. |
 | 레일 도구/실행기 동일 문법 | 해소 |
 | 프로젝트 작업 팝오버 = 대형 허브 | 미해소(보류) |
 | inspector layout 기억 → 타입 전환 시 하위 탭 잔존 | 미해소(보류) |
@@ -109,14 +109,34 @@
 6. **폭 적응형 2단계(P1-7 잔여).** 텍스트·말풍선 340~380, 이미지 고급 380~480 자동 전환.
 7. **전체 상태 DOM 밀도 계수.** `scripts/verify-studio-inspector-walkthrough.mts` 에서
    `auditStudioInspectorDensity` 를 호출해 텍스트·말풍선·이미지·프레임·다중 선택·모바일 상태를 실브라우저로 센다.
-8. **로케일 팩 키.** `studio.inspector.*`, `studio.mainMenu.group.insert/tools.label`, `studio.mobileDock.tool.search*`
-   를 75개 팩에 싣는다. 실리기 전까지는 한국어(제품 목소리) 폴백이다.
+8. **로케일 팩 키(잔여).** 도크·검색·도구 메뉴 키는 이번 회차에 75개 팩에 실었다. 내비게이터의 `studio.inspector.*`
+   키는 아직 코드 폴백표(한국어)만 있다 — 팩에 실으면 그 번역이 이긴다.
 
 ## 4. 검증
 
-- 단위·계약: `pnpm vitest run` 전체(이 브랜치에서 실행). 기존에 실패하던 `StudioMobileEditingDock.test.tsx › renders the
-  drawing tool row in the active locale` 1건은 이번 변경 이전(커밋 기준선)에서도 실패하는 로케일 번들 의존 결함으로,
-  본 회차 범위 밖이다.
+### 4.1 같은 회차에 정리한 기존 결함(main 기준선부터 실패)
+
+main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전체 vitest 에서 잡힌 기준선 실패를 원인별로 정리했다.
+
+| 결함 | 원인 | 처리 |
+| --- | --- | --- |
+| `StudioMobileEditingDock` 로케일 테스트 | 드로잉 도구 행의 페이지·내보내기 라벨이 한국어 리터럴 | 팩 키로 교체, 8키를 75팩에 추가, 래칫 1,325→1,333 |
+| 프로덕션 마이그레이션 스크립트 테스트 3종 | `0035_creator_marketplace_3d_asset_kind.sql` 이 매니페스트에 미등록(e90aadbe) | 매니페스트 등록, 래칫 34→35, 필수 전진 목록 갱신 |
+| `.myb` 자산 메타데이터 테스트 | 커널 웨이브(66bc25b4)가 `hardness` 를 팁으로 매핑했는데 테스트는 미매핑을 기대 | 매핑 계약으로 갱신(미매핑 예시는 `anti_aliasing`) |
+| 히스토리 세분화 계약 | 페이지 분할(d2d80130) 뒤 undo/redo 가 `function`, 사이드카 setter·수화가 컨트롤러로 이동, flush 는 `onBeforeRecordSidecar` 주입 | 마커를 합성 에디터 소스와 호스트 훅으로 재지정 |
+| 포인터 시작 플랜(ink-wash) | b871ff48 이 ink-wash·inkwash-bleed-wash 를 유체 잉크 브러시로 편입 → dab 다이내믹스 제외가 의도 | bounded 목록에서 제외하고 유체 계약을 별도 단언 |
+| `StudioDrawNode` 펜슬 3건 | e90aadbe 가 리본 셀을 알파 버킷별 복합 경로로 배치 → 스텁이 fill 당 마지막 서브패스만 기록 | 스텁에 서브패스 기록(`fillSubpaths`) 추가, 셀 단언을 서브패스 기준으로 |
+| `StudioDrawNode` ink-wash 리테인드 워터컬러 | 유체 브러시는 커밋 렌더가 wet-ink 리플레이로 위임 | 유체 위임 단언 + 리테인드 캐리어는 비유체 `inkwash-white-ink` 로 검증 |
+| 검수 진입점 뷰포트 스냅샷 | 430px 몰입 모드에서 내보내기 옵션 셰브론이 44px 타깃으로 승격됐는데 스냅샷은 이전 값 | 스냅샷 갱신 |
+| `verify:studio-mobile-top`(inapp-browser CI) | 모바일 메뉴바 페이지 목록·다운로드 버튼이 42px 폭 | `min-w-11 justify-center` |
+
+남은 CI 붉은 항목: `studio-3d-visual`(peakColorTileDelta 타이밍 회귀, Playwright 3D)과 `oil-ribbon impasto` 스냅샷(부하 시 간헐) — 이번 회차 범위 밖으로 기록만 남긴다.
+
+- 단위·계약: `pnpm vitest run` 전체(이 브랜치에서 실행).
+- 기존 결함 수정: `StudioMobileEditingDock.test.tsx › renders the drawing tool row in the active locale` 는 변경 이전
+  기준선에서도 실패하던 결함이었다 — 드로잉 도구 행의 페이지·내보내기 버튼이 한국어 리터럴이라 `en` 로케일에서도
+  한글이 남았다. 두 버튼과 새 진입점(찾기·기능·설정 찾기), 도구 복합 메뉴 제목의 키를 75개 팩 전부에 실었고
+  (미번역 로케일은 영어 pending-translation 관례), 키 수 래칫을 1,325 → 1,333 으로 올렸다.
 - 타입·린트: pre-push 훅(`validate:architecture` · `tsc` · `lint-changed`).
 - 브라우저 검증기 갱신: `scripts/verify-studio-inspector-walkthrough.mts`(3탭·게시 준비 모드·통합 검색 범위·3카드 코치),
   `scripts/verify-studio-native-raster-tools.mts`(캔버스 메뉴 → 도구 복합 메뉴).

@@ -135,6 +135,15 @@ class AliasSceneContext {
   readonly fillAlphas: number[] = [];
   readonly fillCompoundPaths: number[][] = [];
   readonly fillPolygons: number[][] = [];
+  /**
+   * Every closed sub-path of every `fill()`, one entry per `moveTo` run. The pencil ribbon now
+   * batches its cells into one compound path per alpha bucket (e90aadbe), so `fillPolygons`
+   * — the *last* sub-path of each fill — no longer lists the cells. Tests that reason about
+   * individual mesh cells read this instead; `fillSubpathAlphas` is the fill alpha repeated
+   * per sub-path so cell → alpha stays a parallel array.
+   */
+  readonly fillSubpaths: number[][] = [];
+  readonly fillSubpathAlphas: number[] = [];
   readonly fillRects: Array<{
     alpha: number;
     height: number;
@@ -153,12 +162,14 @@ class AliasSceneContext {
   strokeStyle: string | CanvasGradient | CanvasPattern = "";
   private activePolygon: number[] = [];
   private activeCompoundPath: number[] = [];
+  private activeSubpaths: number[][] = [];
 
   save(): void {}
   restore(): void {}
   beginPath(): void {
     this.activePolygon = [];
     this.activeCompoundPath = [];
+    this.activeSubpaths = [];
   }
   closePath(): void {}
   fill(): void {
@@ -166,9 +177,15 @@ class AliasSceneContext {
       this.fillPolygons.push([...this.activePolygon]);
       this.fillCompoundPaths.push([...this.activeCompoundPath]);
       this.fillAlphas.push(this.globalAlpha);
+      for (const subpath of [...this.activeSubpaths, this.activePolygon]) {
+        if (subpath.length < 6) continue;
+        this.fillSubpaths.push([...subpath]);
+        this.fillSubpathAlphas.push(this.globalAlpha);
+      }
     }
   }
   moveTo(x: number, y: number): void {
+    if (this.activePolygon.length >= 6) this.activeSubpaths.push(this.activePolygon);
     this.activePolygon = [x, y];
     this.activeCompoundPath.push(x, y);
   }
@@ -983,7 +1000,7 @@ describe("StudioDrawNode orchestration", () => {
       { x: 3, y: 4, radius: 12, opacity: 0.2, role: "diffuse" },
     ] as const;
     watercolorCapture.causalPlan.mockReturnValueOnce([...authoredDabs]);
-    render(
+    const fluidView = render(
       <StudioDrawNode
         el={drawEl({
           brush: "ink-wash",
@@ -1007,6 +1024,33 @@ describe("StudioDrawNode orchestration", () => {
     ]);
     expect(planInput?.pressures?.[0]).toBeGreaterThan(0.5);
     expect(finalize).toBe(true);
+    const fluidContext = new AliasSceneContext();
+    const fluidSceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    fluidSceneFunc(fluidContext as unknown as CanvasRenderingContext2D);
+    // ink-wash is a fluid wet-ink brush since b871ff48: the committed Shape hands off to the
+    // wet-ink replay and never falls back to the compatibility dab/ribbon renderer.
+    expect(fluidContext.arcs).toHaveLength(0);
+    expect(fluidContext.fillPolygons).toHaveLength(0);
+    fluidView.unmount();
+    konvaCapture.nodes.length = 0;
+
+    // The retained wet-ribbon carrier is still the committed renderer for the non-fluid wet
+    // aliases; inkwash-white-ink shares the watercolor family and its own alias material.
+    watercolorCapture.causalPlan.mockReturnValueOnce([...authoredDabs]);
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "inkwash-white-ink",
+          mode: "pen",
+          points: [0, 0, 8, 0],
+          pressures: [0.5, 0.5],
+          strokeWidth: 20,
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
     const context = new AliasSceneContext();
     const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
       context: CanvasRenderingContext2D
@@ -1014,7 +1058,7 @@ describe("StudioDrawNode orchestration", () => {
     sceneFunc(context as unknown as CanvasRenderingContext2D);
     expect(context.arcs).toHaveLength(0);
     const retainedPlan = planStudioWetRibbonCarrier(
-      applyStudioBrushAliasWatercolorMaterial("ink-wash", authoredDabs),
+      applyStudioBrushAliasWatercolorMaterial("inkwash-white-ink", authoredDabs),
     );
     expect(retainedPlan.batches.length).toBeGreaterThan(4);
     expect(retainedPlan.batches.length).toBeLessThanOrEqual(4 * STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT);
@@ -1040,8 +1084,10 @@ describe("StudioDrawNode orchestration", () => {
     );
     expect(diffuseOuterBatchIndex).toBeGreaterThanOrEqual(0);
     expect(coreBatchIndex).toBeGreaterThan(diffuseOuterBatchIndex);
+    // The diffuse ring paints first and spans wider than the core. (The old 2× factor was
+    // ink-wash's halo material; white ink keeps a tighter halo, so the ordering is the contract.)
     expect(polygonSpan(context.fillPolygons[diffuseOuterBatchIndex]!))
-      .toBeGreaterThan(polygonSpan(context.fillPolygons[coreBatchIndex]!) * 2);
+      .toBeGreaterThan(polygonSpan(context.fillPolygons[coreBatchIndex]!));
   });
 
   it("renders soft pencil as a pale wide skirt plus a rough core", () => {
@@ -1114,12 +1160,13 @@ describe("StudioDrawNode orchestration", () => {
               context: CanvasRenderingContext2D
             ) => void;
             sceneFunc(context as unknown as CanvasRenderingContext2D);
-            const ribbonCells = context.fillPolygons.filter(
+            // Cells arrive batched per alpha bucket since e90aadbe — read the sub-paths.
+            const ribbonCells = context.fillSubpaths.filter(
               (polygon) => polygon.length === 8,
             );
             return {
               arcs: context.arcs,
-              strokeAlphas: context.fillAlphas,
+              strokeAlphas: context.fillSubpathAlphas,
               strokeCaps: context.strokeCaps,
               strokeWidths: ribbonCells.map((polygon) => Math.max(
                 Math.hypot(
@@ -1131,7 +1178,7 @@ describe("StudioDrawNode orchestration", () => {
                   polygon[3]! - polygon[5]!,
                 ),
               )),
-              terminalCapCount: context.fillPolygons.filter(
+              terminalCapCount: context.fillSubpaths.filter(
                 (polygon) => polygon.length > 8,
               ).length,
             };
@@ -1220,10 +1267,12 @@ describe("StudioDrawNode orchestration", () => {
     const roundCoordinates = (points: readonly number[]) => points.map(
       (coordinate) => Math.round(coordinate * 100) / 100 + 0,
     );
-    const canvasCells = context.fillPolygons
+    // The Canvas side batches cells into one compound path per alpha bucket, so the mesh is
+    // read back per sub-path; the SVG side still emits one <path> per cell.
+    const canvasCells = context.fillSubpaths
       .filter((polygon) => polygon.length === 8)
       .map(roundCoordinates);
-    const canvasCaps = context.fillPolygons
+    const canvasCaps = context.fillSubpaths
       .filter((polygon) => polygon.length > 8)
       .map(roundCoordinates);
 
@@ -1755,8 +1804,8 @@ describe("StudioDrawNode orchestration", () => {
       }
       const result = {
         circles: captured("Circle").length,
-        polygons: context.fillPolygons.map((polygon) => [...polygon]),
-        alphas: [...context.fillAlphas],
+        polygons: context.fillSubpaths.map((polygon) => [...polygon]),
+        alphas: [...context.fillSubpathAlphas],
       };
       view.unmount();
       konvaCapture.nodes.length = 0;

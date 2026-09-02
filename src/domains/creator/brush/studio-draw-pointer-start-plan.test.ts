@@ -663,10 +663,11 @@ describe("planStudioDrawPointerStart", () => {
   });
 
   it("authors remaining core wet presets as bounded dynamic strokes while preserving legacy walkers", () => {
+    // ink-wash and inkwash-bleed-wash joined the fluid wet-ink brushes (b871ff48): pointer-start
+    // opts them out of dab dynamics so the shared wet/fluid runtime owns live and committed
+    // rendering. Only the non-fluid wet presets are bounded dynamic strokes now.
     const wetBrushIds = [
       "watercolor",
-      "ink-wash",
-      "inkwash-bleed-wash",
       "inkwash-white-ink",
     ] as const;
 
@@ -702,6 +703,30 @@ describe("planStudioDrawPointerStart", () => {
     expect(legacy.element.brushDynamics).toBeUndefined();
     expect(legacy.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(legacy.capturePointerDynamics).toBe(false);
+
+    // Fluid wet-ink brushes plan like the legacy walker even when the catalogue carries
+    // dynamics: the dab dynamics stay off so the fluid runtime is the single renderer.
+    for (const brushId of ["ink-wash", "inkwash-bleed-wash"] as const) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+      const fluid = planStudioDrawPointerStart(input({
+        brush: brushId,
+        brushCatalogId: selection.catalogId,
+        brushCatalogName: selection.catalogName,
+        brushDynamics: selection.brushDynamics,
+        brushOpacity: selection.defaultOpacity,
+        strokeWidth: selection.defaultWidth,
+      }));
+      expect(fluid.element.paintModel, `${brushId}: fluid strokes carry no dab paint model`)
+        .toBeUndefined();
+      expect(fluid.element.brushDynamics, `${brushId}: fluid strokes carry no dab dynamics`)
+        .toBeUndefined();
+      expect(fluid.element.watercolorPipeline, `${brushId}: compatibility walker`)
+        .toBe("causal-walker-v2");
+      expect(fluid.capturePointerDynamics, `${brushId}: sensor channels`).toBe(false);
+    }
   });
 
   it("starts InkWash pen and water on the wet/fluid runtime instead of dab engines", () => {

@@ -652,6 +652,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     dock: localizeStudioText(t, "스튜디오 모바일 도구막대", "studio.mobileDock.label"),
     drawingTools: localizeStudioText(t, "드로잉 도구", "studio.mobileDock.drawingTools"),
     workspaceTools: localizeStudioText(t, "작업 공간", "studio.mobileDock.workspaceTools"),
+    pages: localizeStudioText(t, "페이지", "studio.mobileDock.tool.pages"),
+    pagesOpen: localizeStudioText(t, "페이지 목록 열기", "studio.mobileDock.tool.pagesOpen"),
+    pagesClose: localizeStudioText(t, "페이지 목록 닫기", "studio.mobileDock.tool.pagesClose"),
+    export: localizeStudioText(t, "내보내기", "studio.mobileDock.tool.export"),
+    exportAria: localizeStudioText(t, "현재 페이지 다운로드", "studio.commandBar.command.download"),
     search: localizeStudioText(t, "찾기", "studio.mobileDock.tool.search"),
     searchAria: localizeStudioText(t, "기능·설정 찾기", "studio.commandSearch.label"),
     searchTitle: localizeStudioText(
@@ -1780,11 +1785,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 icon={Files}
-                label="페이지"
+                label={label.pages}
                 hintDescription="페이지 목록을 열어 추가·복제·순서를 바꿉니다."
                 data-studio-primary-action="pages"
                 active={mobileSheet === "pages"}
-                aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                aria-label={mobileSheet === "pages" ? label.pagesClose : label.pagesOpen}
                 aria-pressed={mobileSheet === "pages"}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
@@ -1794,10 +1799,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               {handleDownload ? (
                 <StudioDockButton
                   icon={Download}
-                  label="내보내기"
+                  label={label.export}
                   hintDescription="현재 페이지를 선택한 배율과 이미지 형식으로 즉시 내보냅니다."
                   data-studio-primary-action="export"
-                  aria-label="현재 페이지 다운로드"
+                  aria-label={label.exportAria}
                   onClick={() => {
                     setWorkspaceDockExpanded(false);
                     void handleDownload();
@@ -1975,8 +1980,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 />
                 <StudioDockNavButton
                   icon={Files}
-                  label="페이지"
-                  aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                  label={label.pages}
+                  aria-label={mobileSheet === "pages" ? label.pagesClose : label.pagesOpen}
                   aria-controls={STUDIO_MOBILE_PAGES_SHEET_ID}
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet === "pages"}

@@ -33,9 +33,11 @@ describe("Studio lazy i18n assets", () => {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
       // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
-      // (studio.toolsCompanion.exit.disconnected / .editor). 이 숫자는 래칫이므로 키를
-      // 늘리거나 줄이는 변경은 여기서 한 번 더 눈에 띄어야 한다.
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_325);
+      // (studio.toolsCompanion.exit.disconnected / .editor).
+      // 1_325 → 1_333: 모바일 도크의 마지막 한국어 리터럴(페이지·내보내기)과 통합 검색 진입점
+      // (찾기·기능·설정 찾기), 도구 복합 메뉴 제목 — UX 감사 2026-09-02 반영분.
+      // 이 숫자는 래칫이므로 키를 늘리거나 줄이는 변경은 여기서 한 번 더 눈에 띄어야 한다.
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_333);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
@@ -45,7 +47,13 @@ describe("Studio lazy i18n assets", () => {
       "studio.mobileDock.tool.shape",
       "studio.mobileDock.tool.undo",
       "studio.mobileDock.tool.redo",
+      "studio.mobileDock.tool.pages",
+      "studio.mobileDock.tool.pagesOpen",
+      "studio.mobileDock.tool.pagesClose",
+      "studio.mobileDock.tool.export",
+      "studio.mobileDock.tool.search",
       "studio.mobileDock.brushSettings",
+      "studio.commandSearch.label",
       "studio.creativeModes.title",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
