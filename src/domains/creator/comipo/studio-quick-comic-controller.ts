@@ -1,5 +1,4 @@
 import { type TemplateSpec } from "../studio-assets";
-import { type ComipoAssemblyInput } from "../studio-comipo-assembly";
 import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   settleStudioDestructiveCommit,
@@ -22,6 +21,8 @@ import {
 } from "../studio-page-shell-runtime";
 import { type PageState } from "../studio-page-state";
 import { type StudioSceneSnapshot } from "../studio-scene-snapshot-library";
+
+import type { ComipoAssemblyInput } from "../studio-comipo-assembly";
 
 export interface StudioQuickComicOptions {
   elements: El[];
