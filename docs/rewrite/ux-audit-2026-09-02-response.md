@@ -133,9 +133,13 @@ main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전
 | core CI `check:studio-bundle` | 페이지 분할 웨이브가 남긴 all-type 인라인 import(`import { type X }`) 64건이 `verbatimModuleSyntax` 아래서 런타임 edge 로 남아 comipo-assembly·scene-templates 를 Studio 정적 그래프에 되돌림(studio-gates §1 함정). vitest 가 붉어 main 에서는 이 단계까지 못 갔다 | 24파일 전부 `import type` 으로 재작성, 탐지기 0건, 로컬 재빌드 게이트 통과 |
 | `verify:studio-mobile-top` 레인 넘침(320~430px) | 모바일 액션 클러스터가 44px 버튼 7개(332px)라 레인(overflow-hidden)을 넘쳐 게시하기·전체화면 종료가 잘림 | 도크가 이미 가진 페이지·다운로드 사본을 모바일에서 숨기고, 전체화면·초안 저장·게시하기 라벨을 ≤429px 에서 아이콘 전용(44px)으로 접음 |
 
+| `studio-3d-visual` CI(2026-08-31 19:53Z 부터 적색) | ADR-0018(0520c7e1)이 BG3D 의 자동 WebGL2 mount 를 제거했는데 Playwright 스펙은 "WebGPU 가 없으면 WebGL2 로 내려간다" 를 전제 → SwiftShader 레인(WebGPU 어댑터 없음)에서 뷰포트가 "WebGPU 사용 불가" 게이트 뒤에 빈 채로 남고, 진입 경로 테스트는 "컬러 배경 추가" 가 "캡처할 3D 장면이 아직 준비되지 않았습니다" 로 닫히지 않아 실패 | 스펙에 `ensureBg3dWebGl2`(보기 탭에서 WebGL2 를 직접 선택, 배지 `WebGL2 사용 중`·게이트 부재 단언) 를 넣어 첫 열기·재열기마다 호출. 이전의 배지 검사는 `count()` 가드로 빈 뷰포트에서도 통과하던 공허 단언이었다 |
+| `studio-inapp-browser` CI "Open the 3D editor" 단계 | 같은 원인 — 인앱 WebView 는 WebGPU 가 차단(`inapp-browser-blocked`)되고 자동 폴백이 없어 `verify-studio-bg3d-inapp-editor.mts` 가 45초 동안 canvas 를 기다리다 실패. main 에선 앞 단계(라우트 스윕)가 먼저 깨져 이 단계가 skipped 였기 때문에 드러나지 않았다 | 검증기에 `selectWebGl2Engine`(보기 탭 → WebGL2 → `WebGL2 사용 중` 대기 → 원래 탭 복귀) 추가, 사라진 `auto` 옵션 제거, CI 주석 갱신 |
+
 로컬 재검증(병합 트리 프로덕션 빌드): `verify:studio-mobile-top` 8/8 OK, `verify:studio-inapp-browser` 32/32 OK — 스윕이 잡던
-빠른 시작 패널 390px 넘침도 같은 레인 넘침의 파생이었다. 남은 CI 붉은 항목: `studio-3d-visual`(peakColorTileDelta 타이밍 회귀,
-Playwright 3D)과 `oil-ribbon impasto` 스냅샷(부하 시 간헐) — 이번 회차 범위 밖으로 기록만 남긴다.
+빠른 시작 패널 390px 넘침도 같은 레인 넘침의 파생이었다. 3D 는 CI 와 같은 조건(Playwright 번들 Chromium headless, ANGLE/SwiftShader,
+`navigator.gpu` 없음)에서 `verify:studio-3d-visual` 을 돌려 진입 경로 테스트 통과를 확인했다. 남은 기록 항목: `oil-ribbon impasto`
+스냅샷(부하 시 간헐) 은 이번 회차 범위 밖으로 기록만 남긴다.
 
 - 단위·계약: `pnpm vitest run` 전체(이 브랜치에서 실행).
 - 기존 결함 수정: `StudioMobileEditingDock.test.tsx › renders the drawing tool row in the active locale` 는 변경 이전

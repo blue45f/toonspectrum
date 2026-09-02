@@ -290,6 +290,33 @@ async function forceBg3dWebGpu(page: Page): Promise<void> {
 }
 
 /**
+ * ADR-0018 §6: BG3D never mounts WebGL2 on its own. The software-GPU lane (ANGLE over
+ * SwiftShader, no WebGPU adapter) therefore sits behind the "WebGPU 사용 불가" gate with no
+ * canvas until the artist selects WebGL2 in the 보기 tab — exactly what a browser without WebGPU
+ * shows. Selecting it here is the explicit choice the policy requires, not a fallback. Asserting
+ * the active-backend badge and the absence of the gate keeps every frame assertion that follows
+ * from passing vacuously against the alert chrome of an unmounted viewport.
+ */
+async function ensureBg3dWebGl2(page: Page): Promise<void> {
+  const backend = page.locator('[data-testid="studio-bg3d-engine-active-backend"]').first();
+  await page.getByRole("tab", { name: "보기", exact: true }).click();
+  const webgl2Preference = page
+    .locator('[data-testid="studio-bg3d-engine-preference-webgl2"]')
+    .first();
+  await expect(webgl2Preference).toBeVisible();
+  // The preference persists per profile, so a reopened editor may already be on WebGL2.
+  if (await webgl2Preference.getAttribute("aria-pressed") !== "true") {
+    await expect(webgl2Preference).toBeEnabled({ timeout: 120_000 });
+    await webgl2Preference.click();
+  }
+  await expect(webgl2Preference).toHaveAttribute("aria-pressed", "true");
+  await expect(backend).toHaveText(/WebGL2 사용 중/, { timeout: 120_000 });
+  await expect(page.locator('[data-testid="studio-bg3d-engine-unavailable"]')).toHaveCount(0);
+  await page.getByRole("tab", { name: "도형", exact: true }).click();
+  await page.waitForTimeout(1_000);
+}
+
+/**
  * 같은 시작/끝과 같은 총 시간을 쓰되, 하나는 24개 중간 자세를 실제로 그리고 다른 하나는
  * 최종 자세만 그린다. mouse-up 뒤 WebGPU compositor가 버퍼를 정리하므로 반드시 누른 채 캡처한다.
  */
@@ -437,15 +464,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     await openBg3d(page);
 
-    // 엔진은 선택한 백엔드로 정착해야 한다. WebGPU가 없으면 WebGL2로 내려간다. 능력 probe가
-    // 끝나기 전 배지는 "확인 중"이므로, 한 번 읽지 않고 정착할 때까지 폴링한다 — 영원히 "확인 중"에
-    // 머무는 것 자체가 이 스위트가 잡아야 할 회귀다.
-    const backendBadge = page
-      .locator('[data-testid="studio-bg3d-engine-active-backend"]')
-      .first();
-    if (await backendBadge.count()) {
-      await expect(backendBadge).toHaveText(/WebGL2|WebGPU/, { timeout: 120_000 });
-    }
+    // 엔진은 직접 선택한 백엔드로 정착해야 한다. WebGPU가 없어도 WebGL2로 내려가지 않으므로
+    // (ADR-0018) 이 레인은 WebGL2를 명시적으로 고른다. 능력 probe가 끝나기 전 배지는 "확인 중"
+    // 이므로 정착할 때까지 폴링한다 — 영원히 "확인 중"에 머무는 것 자체가 잡아야 할 회귀다.
+    await ensureBg3dWebGl2(page);
 
     // 빈 장면에도 접지 그리드가 있어 완전한 단색이 아니다 — 즉 렌더 루프가 살아 있다.
     const empty = await frameStats(page, BG3D_VIEWPORT);
@@ -533,6 +555,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const fatal = collectFatalErrors(page);
     await openStudio(page);
     await openBg3d(page);
+    await ensureBg3dWebGl2(page);
 
     const roomShell = page.locator(`${BG3D_DIALOG} [aria-label="오픈 룸 셸 장면에 추가"]`).first();
     await roomShell.scrollIntoViewIfNeeded();
@@ -568,6 +591,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     const emptyCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
     await openBg3d(page);
+    // 진입 경로 자체는 엔진과 무관하다. 다만 렌더된 프레임이 없으면 "컬러 배경 추가"가
+    // "캡처할 3D 장면이 아직 준비되지 않았습니다"로 닫히지 않고 남으므로 먼저 엔진을 고른다.
+    await ensureBg3dWebGl2(page);
 
     const emptyScene = await frameStats(page, BG3D_VIEWPORT);
     await page.locator('[aria-label="상자 추가"]').first().click();
@@ -640,6 +666,8 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
+    await ensureBg3dWebGl2(page);
     await page.getByRole("tab", { name: "레이어" }).click();
     await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
     const restoredViewport = await frameStats(page, BG3D_VIEWPORT);
@@ -724,6 +752,8 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
+    await ensureBg3dWebGl2(page);
     await page.getByRole("tab", { name: "레이어" }).click();
     await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "구 1", exact: true })).toBeVisible();

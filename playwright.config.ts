@@ -58,8 +58,9 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         // Headless CI machines have no GPU, and the 3D suites assert on real rendered frames.
-        // ANGLE over SwiftShader gives a conformant software WebGL2, which is what the BG3D and
-        // VRM surfaces fall back to in browsers without WebGPU anyway.
+        // ANGLE over SwiftShader gives a conformant software WebGL2. Since ADR-0018 nothing falls
+        // back to it on its own: the specs select WebGL2 explicitly, as an artist without WebGPU
+        // would, and WebGPU-only cases run in the separate STUDIO_BG3D_WEBGPU_GIZMO lane.
         ...(BG3D_WEBGPU_GIZMO_GATE
           ? {
               // The rotation accumulation exists only while TransformControls keeps the WebGPU

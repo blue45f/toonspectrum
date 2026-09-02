@@ -63,8 +63,10 @@ jobs:
       - name: Open the 3D editor inside those same in-app browsers
         # The route sweep above proves every Studio route survives an embedded WebView; it never
         # opens the 3D editor, which is where the engine-selection policy has to hold. This drives
-        # the routed bg3d surface at phone widths and reads the composited canvas back, failing on
-        # a blank viewport, an engine badge that is not WebGL2, a touch target under 44px,
+        # the routed bg3d surface at phone widths, selects WebGL2 explicitly in the 보기 tab (the
+        # WebView blocks WebGPU and ADR-0018 forbids an automatic fallback), then reads the
+        # composited canvas back, failing on a blank viewport, an engine badge that is not WebGL2,
+        # a touch target under 44px,
         # horizontal overflow, a viewport notice with no readable surface, or any page error.
         #
         # It belongs beside the route sweep rather than in the 3D runtime job: same browser matrix
