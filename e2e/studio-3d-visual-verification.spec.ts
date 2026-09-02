@@ -718,6 +718,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 원본 전달이 빠지면 빈 insert 장면과 "컬러 배경 추가" footer가 나타난다.
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    // 편집기는 정확히 하나여야 한다. 두 번째 인스턴스가 붙으면 아래 단언들은 업데이트 편집기를
+    // 보면서 닫기도 그쪽에만 걸리고, 남은 빈 insert 편집기 때문에 닫힘 단언이 계속 1을 본다 —
+    // 러너에서 실제로 관측된 실패 모양이므로 원인 위치를 여기서 고정한다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
     // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
     await ensureBg3dWebGl2(page);
@@ -811,6 +815,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 통과하고 아래 raster만 같다면 metadata update와 image capture 사이 결함이다.
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    // 편집기는 정확히 하나여야 한다. 두 번째 인스턴스가 붙으면 아래 단언들은 업데이트 편집기를
+    // 보면서 닫기도 그쪽에만 걸리고, 남은 빈 insert 편집기 때문에 닫힘 단언이 계속 1을 본다 —
+    // 러너에서 실제로 관측된 실패 모양이므로 원인 위치를 여기서 고정한다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
     // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
     await ensureBg3dWebGl2(page);
@@ -821,7 +829,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.getByRole("tab", { name: "도형", exact: true }).click();
     await expect(page.getByRole("spinbutton", { name: "위치 X" }).first()).toHaveValue("2.5");
     await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
-    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0);
+    // 이 스위트의 다른 닫힘 단언과 같은 예산을 준다. 닫기 버튼은 캡처 중 비활성이고, 느린
+    // 소프트웨어 래스터라이저에서는 마지막 캡처가 끝나기까지 기본 30초를 넘길 수 있다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0, { timeout: 120_000 });
 
     // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다. 고정 대기는
     // 러너 속도에 판정을 거는 셈이므로 프레임이 정착할 때까지 폴링한다.
