@@ -149,7 +149,7 @@ export function planStudioDrawPointerStart(
   // Letting that unrelated brush id affect eligibility sent the eraser through the slower legacy
   // stabilizer whenever an artist happened to switch from a dynamics brush.
   const inkwashFluidStroke = drawMode === "pen" && isStudioInkwashFluidBrush(brush);
-  // InkWash pen/water skip dab dynamics so pointer-start opts into the shared wet/fluid runtime.
+  // Listed InkWash fluid presets skip dab dynamics so pointer-start opts into the wet/fluid runtime.
   const hasBrushDynamics = drawMode === "pen"
     && !inkwashFluidStroke
     && resolveStudioBrushDynamicsSelectionPresetId(brush, input.brushDynamics) !== null;
