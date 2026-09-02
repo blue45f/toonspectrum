@@ -32,9 +32,12 @@
  *   TOONSPECTRUM_LONG_STROKE_BRUSH           브러시 이름(기본: 카탈로그 첫 paint 브러시; preview 에선 활성 펜)
  *   TOONSPECTRUM_LONG_STROKE_DPR             deviceScaleFactor(기본 1)
  *   TOONSPECTRUM_LONG_STROKE_WEBGPU=1        --enable-unsafe-webgpu 를 켠다(기본 꺼짐 = Konva/CPU 경로). 헤드리스
- *                                            SwiftShader WebGPU 는 텍스처 생성이 실패해 획이 통째로 사라진다(2026-09-02
- *                                            실측: ink-committed FAIL, 커밋 점 0, gpuValidationWarnings 15~33). 게이트가
- *                                            CI 러너에서 GPU 드라이버 상태를 재는 도구가 되지 않도록 기본은 끈다.
+ *                                            SwiftShader WebGPU 는 텍스처 생성이 실패해 선택 provider 가 획을 확정하지
+ *                                            못한다(2026-09-02 실측: ink-committed FAIL, 커밋 점 0, gpuValidationWarnings
+ *                                            15~33). 그 획은 이제 문서에서 지워지지 않고 복구 레코드로 남아 상태 레일의
+ *                                            '획 복구'로 되살릴 수 있지만(studio-rejected-stroke-recovery.ts), 자동으로는
+ *                                            커밋되지 않으므로(ADR 0018) 이 게이트의 ink-committed 는 여전히 실패한다.
+ *                                            게이트가 CI 러너에서 GPU 드라이버 상태를 재는 도구가 되지 않도록 기본은 끈다.
  *   TOONSPECTRUM_LONG_STROKE_LONG_TASK_MAX   50ms 초과 longtask 허용 개수(기본 6 — 상수 주석 참고)
  *   TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW=1 vite preview 를 직접 띄운다(pnpm build 선행)
  *   TOONSPECTRUM_VERIFY_DIR                  산출물 루트(기본 os tmpdir) → <dir>/studio-long-stroke/report.json

@@ -373,7 +373,9 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("studioCrdtDocumentRef.current?.replaceStroke(");
     expect(page.indexOf("hasExactSelectedGpuFinalReceipt(strokeId)"))
       .toBeLessThan(page.indexOf("studioCrdtDocumentRef.current?.replaceStroke("));
-    expect(page).toContain("cancelRejectedSelectedGpuPendingStroke(strokeId)");
+    // The rejection still removes the uncommitted operation; since 2026-09-02 it carries the
+    // provider reason so the parked recovery record can explain itself in the reliability rail.
+    expect(page).toContain("cancelRejectedSelectedGpuPendingStroke(strokeId, reason)");
     expect(page).toContain("drawingCrdtPublisherRef.current.cancel(strokeId)");
     expect(page).toContain("studioCrdtDocumentRef.current?.deleteStroke(strokeId)");
     expect(page).not.toContain("promotePendingGpuAuthoritiesToKonva");
