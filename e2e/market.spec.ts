@@ -19,6 +19,7 @@ const KIND_HREFS = [
   "/market/browse?kind=palette",
   "/market/browse?kind=template",
   "/market/browse?kind=3d-preset",
+  "/market/browse?kind=3d-asset",
   "/market/browse?kind=asset",
 ];
 
@@ -141,8 +142,8 @@ test("마켓 탐색은 종류 칩 필터와 라이선스 필터를 제공한다"
 
   const kindGroup = page.getByRole("group", { name: "리소스 종류 필터" });
   await expect(kindGroup.getByRole("button", { name: "전체" })).toBeVisible();
-  for (const label of ["브러시", "필터", "팔레트", "템플릿", "3D", "에셋"]) {
-    await expect(kindGroup.getByRole("button", { name: new RegExp(label) })).toBeVisible();
+  for (const label of ["브러시", "필터", "팔레트", "템플릿", "3D 프리셋", "3D 에셋", "에셋"]) {
+    await expect(kindGroup.getByRole("button", { name: label, exact: true })).toBeVisible();
   }
 
   const licenseGroup = page.getByRole("group", { name: "라이선스 필터" });
