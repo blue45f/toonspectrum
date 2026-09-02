@@ -2605,11 +2605,25 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const dabs = oilDraftPlannersRetained
               ? planOilBrushDabsIncremental(el.id, index, oilPlanInput)
               : planOilBrushDabs(oilPlanInput);
-            // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
-            // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
-            // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
-            // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
-            // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
+            // 유화 기계 프로그램의 정본은 studioOilRibbonProgramsForBrush 의 id 매트릭스다. 아래는 그 요약이며
+            // 매트릭스를 고치면 같이 고친다 — "bristle-physics 레인만 시뮬" 이던 2026-08-13 wave 3 서술이 확장
+            // 뒤에도 남아 브러시 통합 검토를 오도한 전례가 있다. 2026-09-02 기준:
+            // - WetBrush-2D 강모 물리 시뮬(bristlePhysics): brush--bristle-physics · oil--filbert-ribbon ·
+            //   oil--impasto-ribbon · 기본 유화 6종(oil · acrylic · fluid-paint · fluid-paint-fine ·
+            //   fluid-paint-load · fluid-paint-rake — 이 중 카탈로그 프리셋은 oil·acrylic 뿐이고 fluid-paint
+            //   4종은 어느 카탈로그에도 등록되지 않은 행이다). 2026-08-13 wave 3 에는 bristle-physics
+            //   전용이었고 2026-08-15 에 filbert·impasto-ribbon, 2026-08-20 에 기본 유화로 확장됐다
+            //   (그때 함께 들어온 미출하 별칭 oil--fluid-paint-* 2행은 2026-09-02 에 제거).
+            // - v1 강모 고갈 다이내믹(bristleLoadDynamics, 갈필): brush--bristle-physics ·
+            //   brush--bristle-depletion · 기본 유화 6종.
+            // - dli GGX 릴리프 오버레이(impastoRelief): brush--impasto-relief · oil--impasto-ribbon · 기본 유화 6종.
+            // 고유한 것은 조합이다: 고갈만 = bristle-depletion, 시뮬만 = filbert-ribbon, 릴리프만 =
+            // impasto-relief, 시뮬+고갈(릴리프 없음) = bristle-physics, 시뮬+릴리프(고갈 없음) = impasto-ribbon,
+            // 셋 다 = 기본 유화 6종. 매트릭스 밖의 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하고,
+            // 저장된 브러시의 프로그램 세트(brushEnginePrograms.oil)는 매트릭스를 병합이 아니라 대체한다.
+            // SVG 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다. 라이브 retained
+            // 오버레이(studio-live-retained-media-overlay)는 같은 매트릭스를 부르지만 대브 입력(원시 점·
+            // 비alias 폭)이 달라 이 패리티 주장의 범위 밖이다.
             const oilPrograms = studioOilRibbonProgramsForBrush(
               brush,
               fxBrushSeedFromKey(el.id),

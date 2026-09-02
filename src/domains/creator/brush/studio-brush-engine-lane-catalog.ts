@@ -235,7 +235,9 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     // planner fingerprint를 형제 캡슐 레인(불투명 1.0)과 구분하는 정직한 기본값 차등.
     r("pen--croquis-stabilized", "펜 · 크로키 안정화", "pen", "capsule-outline", 8, 0.96, ["크로키 안정화 펜", "croquis stabilized pen", "풀드 스트링 펜"], "gpen", "capsule-outline", "croquis-capsule-pulled-string", "gpen--croquis-capsule", "calligraphy", "pressure-round", "none", "outline-pressure", "engine-variant"),
     // 물리 질감 레인: 리빙잉크 정착 베이크(수묵/수채, 프로그램 핀은 워터컬러 재질 행) +
-    // WetBrush-2D 강모 물리(유화, 캐리어 옵션은 렌더러 양쪽에서 레인 id 리터럴로 게이트).
+    // WetBrush-2D 강모 물리(유화 — 캐리어 옵션은 studioOilRibbonProgramsForBrush 의 id 매트릭스,
+    // 또는 저장 브러시의 프로그램 세트가 정하고 두 렌더러가 같은 리졸버를 부른다. 2026-08-15 이후
+    // 이 레인만의 옵션이 아니다).
     r("ink-wash--living-bake", "수묵 · 정착 건조", "ink-wash", "wet-dabs", 30, 0.66, ["리빙잉크 수묵", "living ink bake", "리빙잉크 베이크", "들면 마르는 수묵"], "watercolor", "watercolor-dabs", "living-ink-settled-bake", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
     r("watercolor--fluid-feather", "수채 · 유체 페더", "watercolor", "wet-dabs", 28, 0.52, ["유체 페더", "fluid feather"], "watercolor", "watercolor-dabs", "fluid-feather-bake", "watercolor", "soft", "sponge", "wet-edge", "watercolor-pressure", "engine-variant"),
     r("brush--bristle-physics", "유화 · 물리 강모 갈필", "brush", "oil-ribbon", 18, 0.92, ["물리 강모 붓", "physics bristle", "WetBrush", "붓 · 물리 강모"], "oil", "oil-ribbon", "bristle-physics-tuft", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
