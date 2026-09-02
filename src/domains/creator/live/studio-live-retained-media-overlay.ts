@@ -21,6 +21,12 @@ import {
   studioOilRibbonProgramsForBrush,
   type StudioOilRibbonPaintContext,
 } from "../brush/studio-oil-ribbon-carrier";
+import {
+  STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT,
+  studioPencilAliasPasses,
+  studioPencilAliasPassPoints,
+  studioPencilRibbonAlphaBucket,
+} from "../brush/studio-pencil-alias-passes";
 import { isStudioBoundedFlowPaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   createStudioIncrementalCalligraphySegmentBuilder,
@@ -351,8 +357,11 @@ interface ActiveRetainedStroke {
    * own builder and pays one full O(n) build instead of per-move ones.
    */
   calligraphySegments?: StudioIncrementalCalligraphySegmentBuilder;
-  /** Per-stroke incremental pencil pressure-curve state — same lifecycle as `calligraphySegments`. */
-  pencilCurve?: StudioIncrementalRetainedMediaCurveBuilder;
+  /**
+   * One incremental pressure-curve builder per pencil alias pass — same lifecycle as
+   * `calligraphySegments`. A pass owns its own jittered polyline, so it needs its own builder.
+   */
+  pencilCurves?: StudioIncrementalRetainedMediaCurveBuilder[];
 }
 
 export class StudioLiveRetainedMediaOverlayRenderer {
@@ -617,7 +626,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     finalize = false,
   ): boolean {
     if (active.kind === "oil") return this.paintOilSuffix(active, element, target, finalize);
-    if (active.kind === "pencil") return this.paintPencilSuffix(active, element, target);
+    if (active.kind === "pencil") {
+      return this.paintPencilSuffix(active, element, target, finalize);
+    }
     if (active.kind === "calligraphy") {
       return this.paintCalligraphySuffix(active, element, target);
     }
@@ -748,6 +759,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     active: ActiveRetainedStroke,
     element: DrawEl,
     target: CanvasRenderingContext2D | null,
+    /** Pointer-up. Only then is the tip's round cap final and safe to lay down once. */
+    finalize = false,
   ): boolean {
     const context = this.prepared(target);
     if (!context) return false;
@@ -793,73 +806,131 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       // 증분 곡선 빌더 + suffix 리본: 매 이동 전체 곡선·리본을 다시 세우던 O(n)/이동을 새 점
       // 수에만 비례하게 만든다. 리본은 이미 칠한 선분 경계부터의 suffix만 계획한다 — 아래
       // 셀 필터·start 캡 스킵과 같은 경계 규약이라 칠해지는 픽셀은 종전과 같다.
-      const pencilCurve = active.pencilCurve
-        ??= createStudioIncrementalRetainedMediaCurveBuilder(
-          profile,
-          { minimumDiameterRatio: element.materialMinimumDiameterRatio },
-        );
-      const curve = pencilCurve.append(
-        element.points,
-        element.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
-          ? element.pressures
-          : undefined,
-      );
+      // 커밋 렌더러와 같은 별칭 패스를 돈다. 예전에는 여기서 패스를 무시하고 기본 폭 리본
+      // 하나만 칠했고, 그래서 화가가 그리는 동안 본 것과 손을 뗀 결과가 달랐다 — 측면 음영은
+      // 라이브에서 평범한 연필이었다가 릴리스에서 넓고 옅은 치마가 생겼다(실측 14px→24px,
+      // 농도 95→32). 패스 목록과 지터는 studio-pencil-alias-passes 가 두 렌더러에 공급한다.
+      const passes = studioPencilAliasPasses(brush);
+      const curves = active.pencilCurves ??= [];
       const startSegment = active.paintedSourceSegments === 0
         ? 0
         : Math.max(0, active.paintedSourceSegments - 1);
-      const ribbon = planStudioRetainedMediaRibbon(
-        startSegment === 0
-          ? curve
-          : { ...curve, segments: curve.segments.slice(startSegment) },
-        Math.max(0.5, width),
-      );
-      const paintMark = (
+      const passPlans = passes.map((pass, passIndex) => {
+        const builder = curves[passIndex]
+          ??= createStudioIncrementalRetainedMediaCurveBuilder(
+            profile,
+            { minimumDiameterRatio: element.materialMinimumDiameterRatio },
+          );
+        const passCurve = builder.append(
+          studioPencilAliasPassPoints(element.points, pass.jitterRadius),
+          element.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ? element.pressures
+            : undefined,
+        );
+        return {
+          pass,
+          curve: passCurve,
+          ribbon: planStudioRetainedMediaRibbon(
+            startSegment === 0
+              ? passCurve
+              : { ...passCurve, segments: passCurve.segments.slice(startSegment) },
+            Math.max(0.5, width * pass.widthScale),
+          ),
+        };
+      });
+      const curve = passPlans[0]!.curve;
+      // 커밋 렌더러와 같은 알파 사다리로 묶어 **버킷당 한 번** 칠한다. 셀을 하나씩 칠하면
+      // 겹치는 셀끼리 다시 합성돼 라이브가 커밋보다 진해졌다(실측: 같은 커버리지에서 농도
+      // 88.1 vs 71.7). 한 번의 fill 안에서 겹침은 합집합이다.
+      const buckets = new Map<number, number[]>();
+      const collectMark = (
         points: readonly number[],
         opacityScale: number,
         flowScale: number,
-        inherited: number,
+        passOpacityScale: number,
       ) => {
-        const [firstX, firstY, ...rest] = points;
-        if (firstX === undefined || firstY === undefined) return;
-        context.globalAlpha = inherited * Math.min(
+        if (points.length < 6) return;
+        const alpha = Math.min(
           1,
-          (element.opacity ?? 1) * Math.sqrt(opacityScale * flowScale),
+          (element.opacity ?? 1)
+          * passOpacityScale
+          * Math.sqrt(opacityScale * flowScale),
         );
-        context.beginPath();
-        context.moveTo(firstX, firstY);
-        for (let offset = 0; offset < rest.length; offset += 2) {
-          const x = rest[offset];
-          const y = rest[offset + 1];
-          if (x === undefined || y === undefined) break;
-          context.lineTo(x, y);
+        const rung = studioPencilRibbonAlphaBucket(alpha);
+        if (rung === 0) return;
+        let bucket = buckets.get(rung);
+        if (!bucket) {
+          bucket = [];
+          buckets.set(rung, bucket);
         }
-        context.closePath();
-        context.fill();
+        for (let index = 0; index < points.length; index += 1) {
+          bucket.push(points[index]!);
+        }
+        bucket.push(Number.NaN);
+      };
+      const flushBuckets = (inherited: number) => {
+        for (const [rung, coords] of [...buckets.entries()].sort((a, b) => a[0] - b[0])) {
+          context.globalAlpha = inherited * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT);
+          context.beginPath();
+          let start = 0;
+          for (let index = 0; index <= coords.length; index += 1) {
+            if (index === coords.length || Number.isNaN(coords[index])) {
+              for (let offset = start; offset + 1 < index; offset += 2) {
+                const x = coords[offset]!;
+                const y = coords[offset + 1]!;
+                if (offset === start) context.moveTo(x, y);
+                else context.lineTo(x, y);
+              }
+              if (index > start) context.closePath();
+              start = index + 1;
+            }
+          }
+          context.fill();
+        }
+        buckets.clear();
       };
       context.fillStyle = element.stroke;
       context.strokeStyle = element.stroke;
       const inherited = context.globalAlpha;
+      // 계획은 startSegment(이미 칠한 마지막 구간)부터 세워 조인 연속성을 얻지만, 칠하기는
+      // **아직 칠하지 않은 구간만** 한다. 예전에는 경계 구간을 매 프레임 다시 칠해서 그 구간의
+      // 알파가 1-(1-a)^2 로 쌓였고, 그래서 라이브가 커밋보다 진하고 두꺼웠다(실측: 연필 라이브
+      // 2911px/86.3 vs 커밋 2298px/70.0). 한 셀은 정확히 한 번만 칠한다.
+      const paintFromSegment = active.paintedSourceSegments;
       let paintedCells = 0;
-      for (const run of ribbon.runs) {
-        for (const cell of run.cells) {
-          if (cell.sourceSegmentIndex < startSegment) continue;
-          paintMark(cell.points, cell.opacityScale, cell.flowScale, inherited);
-          paintedCells += 1;
+      for (const { pass, ribbon } of passPlans) {
+        let passCells = 0;
+        for (const run of ribbon.runs) {
+          for (const cell of run.cells) {
+            if (cell.sourceSegmentIndex < paintFromSegment) continue;
+            collectMark(cell.points, cell.opacityScale, cell.flowScale, pass.opacityScale);
+            passCells += 1;
+          }
+          for (const cap of run.caps) {
+            if (cap.role === "start" && active.paintedSourceSegments > 0) continue;
+            // 끝 캡은 손을 뗄 때 한 번만. 그리는 동안 매 프레임 찍으면 자라나는 팁마다 캡이
+            // 하나씩 남아 경로 전체에 알파가 겹겹이 쌓였다 — 라이브가 커밋보다 진해 보이던
+            // 나머지 절반이다. 움직이는 팁의 뭉툭한 끝은 다음 프레임이 곧 덮는다.
+            if (cap.role === "end" && !finalize) continue;
+            collectMark(cap.points, cap.opacityScale, cap.flowScale, pass.opacityScale);
+          }
         }
-        for (const cap of run.caps) {
-          if (cap.role === "start" && active.paintedSourceSegments > 0) continue;
-          if (cap.role === "end" && paintedCells === 0) continue;
-          paintMark(cap.points, cap.opacityScale, cap.flowScale, inherited);
-        }
+        paintedCells = Math.max(paintedCells, passCells);
       }
+      flushBuckets(inherited);
       // 원시 꼬리 폴리라인: 검증된 점 개수는 곡선 빌더가 이미 알고 있으므로(sourcePointCount)
       // 점 배열을 다시 스캔하지 않고 suffix 인덱스만 직접 읽는다.
+      // 꼬리 폴리라인은 **곡선이 아직 세그먼트로 만들지 못한 원시 점들만** 잇는다. 예전에는
+      // 이미 칠한 구간 번호부터 이었는데, 그 구간들은 방금 리본이 칠한 자리와 같아서 매
+      // 프레임 같은 자리에 전체 알파의 선을 한 번 더 그었다 — 라이브가 커밋보다 진하고
+      // 두꺼워 보인 주된 이유다(실측: 연필 라이브 2911px/86.2 vs 커밋 2370px/71.0).
       const validPointCount = curve.sourcePointCount;
       if (validPointCount >= 2) {
-        const from = active.paintedSourceSegments === 0
-          ? 0
-          : Math.min(active.paintedSourceSegments, validPointCount - 1);
-        if (from < validPointCount - 1 || from === 0) {
+        const from = Math.min(
+          Math.max(0, curve.segments.length),
+          validPointCount - 1,
+        );
+        if (from < validPointCount - 1) {
           const liveWidth = 2 * studioLiveVisibleTapDocumentRadius(
             Math.max(0.35, width / 2),
             this.surface?.documentScale ?? 1,
@@ -908,8 +979,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         context.beginPath();
         context.arc(firstX, firstY, radius, 0, Math.PI * 2);
         context.fill();
+        // 탭은 아직 어떤 **구간도** 칠하지 않았다. 여기서 1을 세워 두면 아래 suffix 가
+        // 첫 구간을 이미 칠한 것으로 오해하고 건너뛴다. 탭 재진입은 paintedPencilMarks 가
+        // 막으므로 이 값은 0으로 남겨야 정확하다.
         active.paintedPencilMarks = 1;
-        active.paintedSourceSegments = 1;
         return true;
       }
       // 증분 빌더: 이동마다 전체 스트로크의 선분을 다시 세우던 O(n)/이동을 새 점 수에만
@@ -932,9 +1005,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           twist: twists?.[index],
         }),
       );
-      const start = active.paintedSourceSegments === 0
-        ? 0
-        : Math.max(0, active.paintedSourceSegments - 1);
+      // 아직 칠하지 않은 구간만 계획한다. 경계 구간을 다시 넣으면 그 구간이 프레임마다 한 번
+      // 더 칠해져 반투명 획의 알파가 1-(1-a)^2 로 쌓였다 — 같은 파일의 연필 경로가 실측으로
+      // 잡아낸 것과 같은 결함이다(라이브 86.3 vs 커밋 70.0). 다시 넣어도 조인이 더 덮이지도
+      // 않는다: run 의 outline 은 구간별 커버리지 폴리곤의 합집합이고 각 구간이 자기 양 끝
+      // nib 발자국을 이미 내므로, 경계의 앞 구간 몫은 직전 프레임이 이미 칠했다.
+      const start = active.paintedSourceSegments;
       const ribbon = planStudioCalligraphyRibbon(segments.slice(start));
       context.fillStyle = element.stroke;
       context.globalAlpha = Math.min(1, element.opacity ?? 1);

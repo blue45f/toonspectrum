@@ -241,7 +241,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
     // 2026-08-25: 크리에이티브 모드 해체 → 메뉴 재배치 5행 (188 → 193).
     // 2026-08-27: View 중복 검수·미리보기 3행 + 참고 이미지/앱 설정 중복 2행 제거 (193 → 188).
-    measuredCount: 188,
+    // 2026-09-03: 웹툰 창작 보조 센터 + AI 슈퍼 스위트 추가 (188 → 190).
+    measuredCount: 190,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -460,6 +461,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "comic/continuity",
   "comic/scroll-preview",
   "comic/animatic",
+  "comic/webtoon-assistant",
+  "comic/ai-super-suite",
   // animation (3) — the group left the never-rendered list in Wave E
   "animation/timeline",
   "animation/frame-anim",
@@ -2294,6 +2297,30 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("애니매틱 타임라인", "컷 길이와 카메라 이동을 미리 재생합니다."), en("Animatic timeline")],
       aliases: [ours("애니매틱")],
       origins: [menu("comic/animatic")],
+    }),
+    defineCommand({
+      id: "comic.webtoon-assistant",
+      labels: [
+        ko(
+          "웹툰 창작 보조 센터",
+          "플랫폼 규격 검사, 자동 슬라이서, 스크롤 페이싱, 효과음 사전, 컬러 조화, 포커스 타이머를 제공합니다.",
+        ),
+        en("Webtoon Creator Assistant"),
+      ],
+      aliases: [ours("웹툰 보조 툴킷"), ours("웹툰 어시스턴트")],
+      origins: [menu("comic/webtoon-assistant")],
+    }),
+    defineCommand({
+      id: "comic.ai-super-suite",
+      labels: [
+        ko(
+          "AI 웹툰 생성 슈퍼 스위트",
+          "네이버 툰필터 화풍 변환, CSP 음영 어시스트, 고화질 프롬프트 증강, TooNat 콘티 디렉터, 투닝 감정 말풍선을 제공합니다.",
+        ),
+        en("Webtoon AI Super Suite"),
+      ],
+      aliases: [ours("AI 슈퍼 스위트"), ours("툰필터"), ours("AI 음영"), ours("AI 콘티")],
+      origins: [menu("comic/ai-super-suite")],
     }),
     defineCommand({
       id: "animation.timeline",

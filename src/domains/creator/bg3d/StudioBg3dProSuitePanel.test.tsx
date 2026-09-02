@@ -30,6 +30,24 @@ describe("StudioBg3dProSuitePanel", () => {
     expect(markup).toContain("손가락 쥐는 악력 (Tightness)");
   });
 
+  it("renders new startup-benchmarked webtoon tools: SHAPER, Tooning, Speedlines, Webtoon Filters, Foot Contact Lock", () => {
+    const markup = renderToStaticMarkup(<StudioBg3dProSuitePanel />);
+
+    expect(markup).toContain("셰이퍼 3D");
+    expect(markup).toContain("투닝 연출");
+    expect(markup).toContain("2.5D 집중선");
+    expect(markup).toContain("웹툰 필터");
+    expect(markup).toContain("지면 착지락");
+
+    // Category navigation and search
+    expect(markup).toContain("전체 (20)");
+    expect(markup).toContain("캐릭터/포즈");
+    expect(markup).toContain("연출/스토리");
+    expect(markup).toContain("필터/이펙트");
+    expect(markup).toContain("오브젝트/에셋");
+    expect(markup).toContain("3D 프로 툴 검색");
+  });
+
   it("renders properly in disabled mode", () => {
     const markup = renderToStaticMarkup(<StudioBg3dProSuitePanel disabled />);
     expect(markup).toContain("disabled");

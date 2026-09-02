@@ -230,3 +230,13 @@ export function isStudioAiReferenceCompatibleAsset(asset: Pick<StudioAsset, "dat
 }
 
 export const STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS = 300;
+/**
+ * Budget for the request that carries a FINISHED stroke's terminal receipt.
+ *
+ * 300 ms is a live-latency budget and the right answer for a pointer frame. After pointer-up the
+ * stroke is complete and nothing animates, so the same 300 ms only measured how busy the main
+ * thread happened to be — a deferred commit render routinely overran it and the product then
+ * deleted the finished stroke ("현재 획을 취소했습니다"). A lost receipt is still caught, just not
+ * confused with a busy frame.
+ */
+export const STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS = 2_000;

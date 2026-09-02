@@ -153,6 +153,12 @@ import {
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
+import {
+  STUDIO_PENCIL_DEFAULT_ALIAS_PASS,
+  STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT,
+  studioPencilAliasPassPoints,
+  studioPencilRibbonAlphaBucket,
+} from "./studio-pencil-alias-passes";
 import { rasterizeStudioCoverageBands } from "./studio-stroke-coverage-raster";
 import {
   planStudioAngledNibStrokeLocalCoverage,
@@ -192,6 +198,8 @@ import type { StudioPatternSpec } from "../studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "../studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "../studio-rough-shape";
 
+export { STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT };
+
 type PerfectInkDebugState = {
   brush: string;
   pointCount: number;
@@ -212,47 +220,6 @@ function setPerfectInkDebugState(state: PerfectInkDebugState | null): void {
     state;
 }
 
-const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
-
-/**
- * `processPencilPoints` is the frozen legacy 0.75 px graphite texture. Alias profiles scale its
- * deterministic offsets instead of introducing another random source, so collaboration replay and
- * retained rendering keep identical pixels while each pencil pass can have its own grain spread.
- */
-function processStudioPencilAliasPassPoints(
-  points: number[],
-  jitterRadius: number,
-): number[] {
-  const jittered = processPencilPoints(points);
-  if (jitterRadius === STUDIO_PENCIL_DEFAULT_JITTER_RADIUS) return jittered;
-  const scale = jitterRadius / STUDIO_PENCIL_DEFAULT_JITTER_RADIUS;
-  return jittered.map((value, coordinateIndex) => {
-    const source = points[coordinateIndex];
-    return source === undefined ? value : source + (value - source) * scale;
-  });
-}
-
-/**
- * Pencil ribbon cells are batched into one compound fill per quantized alpha level (2026-09-02
- * long-stroke batching): a stroke costs at most this many `fill()` calls per pass instead of one
- * per cell. The ladder resolution is a fidelity contract, not a tuning knob — cell alpha is
- * pressure-driven and continuous, and at 16 levels every cell under 1/32 rounded into the empty
- * bucket and was never drawn: soft-pencil's 0.18-scale skirt lost 40 of its 45 cells at light
- * pressure while the SVG export kept them. 128 levels (the wet-ribbon carrier precedent) keep the
- * quantization error under one 8-bit alpha step (1/256), so Canvas and SVG agree on every cell
- * that can change a pixel, while the fill count stays bounded by the ladder.
- */
-export const STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT = 128;
-
-function pencilRibbonAlphaBucket(alpha: number): number {
-  return Math.max(
-    0,
-    Math.min(
-      STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT,
-      Math.round(alpha * STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
-    ),
-  );
-}
 
 // 손그림(스케치) 도형용 rough.js generator 훅 — 스케치가 켜진 도형이 처음 보일 때만
 // 동적 import로 로드한다(Studio eager 청크에 rough.js 미포함). 로드 전에는 null을 반환해
@@ -2020,7 +1987,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       ) : (
                         <Line
                           key={`${pass.role}-${passIndex}`}
-                          points={processStudioPencilAliasPassPoints(
+                          points={studioPencilAliasPassPoints(
                             renderPath.points,
                             pass.jitterRadius,
                           )}
@@ -2071,12 +2038,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               ?? "pencil";
             const passes = aliasPencilPasses.length > 0
               ? aliasPencilPasses
-              : [{
-                  role: "core" as const,
-                  widthScale: 1,
-                  opacityScale: 1,
-                  jitterRadius: 0.75,
-                }];
+              : [STUDIO_PENCIL_DEFAULT_ALIAS_PASS];
             // Detected on the accepted geometry, never on the per-pass grain jitter: a tap whose
             // samples the jitter has nudged apart would otherwise be planned as a sub-pixel ribbon
             // sliver instead of the nib the user pressed down, and read as an unresponsive canvas.
@@ -2118,7 +2080,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             }
             const passPlans = passes.map((pass) => {
               const curve = planStudioRetainedMediaPressureCurve(
-                processStudioPencilAliasPassPoints(
+                studioPencilAliasPassPoints(
                   renderPath.points,
                   pass.jitterRadius,
                 ),
@@ -2162,7 +2124,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           pass.opacityScale
                           * Math.sqrt(cell.opacityScale * cell.flowScale),
                         );
-                        const bIndex = pencilRibbonAlphaBucket(alpha);
+                        const bIndex = studioPencilRibbonAlphaBucket(alpha);
                         if (bIndex > 0) {
                           const bucket = buckets[bIndex]!;
                           for (let ci = 0; ci < cell.points.length; ci += 1) {
@@ -2178,7 +2140,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           pass.opacityScale
                           * Math.sqrt(cap.opacityScale * cap.flowScale),
                         );
-                        const bIndex = pencilRibbonAlphaBucket(alpha);
+                        const bIndex = studioPencilRibbonAlphaBucket(alpha);
                         if (bIndex > 0) {
                           const bucket = buckets[bIndex]!;
                           for (let ci = 0; ci < cap.points.length; ci += 1) {

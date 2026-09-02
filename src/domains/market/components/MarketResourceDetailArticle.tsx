@@ -1,8 +1,10 @@
 import {
+  Box,
   CheckCircle2,
   Cpu,
   Download,
   FileJson,
+  Heart,
   Layers,
   Lightbulb,
   Link2,
@@ -10,12 +12,12 @@ import {
   ShieldCheck,
   Sliders,
   Sparkles,
-  Star,
-  ThumbsUp,
   Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useMarketLibrary } from "../hooks/use-market-library";
+import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import {
   formatMarketByteSize,
   formatMarketDate,
@@ -33,14 +35,21 @@ import {
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
 import { Market3dAssetPreview } from "./Market3dAssetPreview";
+import { MarketAcquisitionModal } from "./MarketAcquisitionModal";
 import { MarketAssetRecipePreview } from "./MarketAssetRecipePreview";
 import { MarketBrushPreview } from "./MarketBrushPreview";
+import { MarketCommentsSection } from "./MarketCommentsSection";
+import { MarketDetailStickyBar } from "./MarketDetailStickyBar";
+import { MarketEditResourceModal } from "./MarketEditResourceModal";
 import { MarketFilterPreview } from "./MarketFilterPreview";
 import { MarketPalettePreview } from "./MarketPalettePreview";
 import { MarketResourceCard } from "./MarketResourceCard";
 import { MarketResourceReleaseHistory } from "./MarketResourceReleaseHistory";
+import { MarketReviewsSection } from "./MarketReviewsSection";
 import { MarketScene3dPreview } from "./MarketScene3dPreview";
 import { MarketTemplatePreview } from "./MarketTemplatePreview";
+import { MarketWebtoon3dViewerModal } from "./MarketWebtoon3dViewerModal";
+import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
 import { StaleNoticeBar } from "./StaleNoticeBar";
 
 import type { CreatorMarketplaceInstallReceipt } from "@/lib/creator-marketplace-install-receipt";
@@ -55,6 +64,7 @@ import {
   resolveCreatorMarketplaceInstallReceiptState,
 } from "@/lib/creator-marketplace-install-receipt";
 import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 
 const ENGINE_LABELS: Record<string, string> = {
@@ -243,6 +253,19 @@ export function MarketResourceDetailArticle({
     record,
     installReceiptSnapshot.receipt,
   );
+  const [viewer3dOpen, setViewer3dOpen] = useState(false);
+
+  const [currentRecord, setCurrentRecord] = useState(record);
+  const [acquisitionModalOpen, setAcquisitionModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const { isAcquired } = useMarketLibrary();
+  const { isWishlisted, toggleWishlist } = useMarketWishlist();
+  const acquired = isAcquired(currentRecord.id);
+  const wishlisted = isWishlisted(currentRecord.id);
+
+  useEffect(() => {
+    setCurrentRecord(record);
+  }, [record]);
 
   useEffect(() => {
     setSelectedPreviewIndex(0);
@@ -311,6 +334,26 @@ export function MarketResourceDetailArticle({
             {record.description}
           </p>
         ) : null}
+
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <MarketWebtoonSpecBadge
+            format={record.kind.startsWith("3d") ? "glb" : "portable-json"}
+            polycountGrade="optimal-webtoon"
+            hasLineExtraction={true}
+            isNoAiProtected={!record.containsAi}
+            licenseTier="solo-creator"
+          />
+          {record.kind.startsWith("3d") ? (
+            <button
+              type="button"
+              onClick={() => setViewer3dOpen(true)}
+              className="inline-flex min-h-6 items-center gap-1 rounded-md bg-accent/20 border border-accent/40 px-2 text-xs font-bold text-accent hover:bg-accent/30 transition-colors"
+            >
+              <Box className="size-3" />
+              <span>3D 인터랙티브 뷰어 (은선·셀셰이딩·조명)</span>
+            </button>
+          ) : null}
+        </div>
         <KindIcon strokeWidth={1} aria-hidden="true" className="pointer-events-none absolute -right-4 -top-4 h-36 w-36 text-fg/10" />
       </header>
 
@@ -614,43 +657,14 @@ export function MarketResourceDetailArticle({
             </div>
           </section>
 
-          {/* Artist Reviews & Usage Tips (ArtStation / Gumroad Benchmark) */}
-          <section aria-labelledby="market-reviews-heading" className="rounded-xl border border-line bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-              <div>
-                <h2 id="market-reviews-heading" className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
-                  작가 평점 & 활용 리뷰
-                </h2>
-                <p className="mt-0.5 text-xs text-fg-3">실제 스튜디오에서 소재를 활용한 웹툰 작가들의 피드백</p>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg bg-raised px-3 py-1.5">
-                <div className="flex text-amber-400 text-xs">
-                  {"★★★★★"}
-                </div>
-                <span className="text-sm font-bold text-fg">4.9</span>
-                <span className="text-xs text-fg-3">/ 5.0</span>
-              </div>
-            </div>
+          {/* Artist Reviews & Ratings (Real interactive submission & feedback) */}
+          <MarketReviewsSection resourceId={currentRecord.id} />
 
-            <div className="mt-3.5 space-y-3">
-              <div className="rounded-lg border border-line/50 bg-panel/40 p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-fg">현역 웹툰 어시스턴트 작가</span>
-                  <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-good">
-                    <ThumbsUp className="h-3 w-3" aria-hidden="true" /> 추천
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs leading-relaxed text-fg-2">
-                  {record.kind === "3d-asset" || record.kind === "3d-preset"
-                    ? "3D 앵글을 자유자재로 돌려가며 컷 구도를 잡을 수 있어서 콘티 및 선화 작업 속도가 2배 이상 빨라졌습니다. 레이어 분리 추출도 깔끔합니다."
-                    : record.kind === "brush"
-                      ? "필압 반응이 아주 자연스럽고 손떨림 보정이 매끄럽게 먹힙니다. 메인 선화용으로 강력 추천합니다."
-                      : "색감 매칭과 연출 퀄리티를 한 단계 끌어올려 주는 필수 리소스입니다."}
-                </p>
-              </div>
-            </div>
-          </section>
+          {/* Q&A Comments & Threaded Replies (Real interactive threaded discussions) */}
+          <MarketCommentsSection
+            resourceId={currentRecord.id}
+            publisherId={currentRecord.publisher.id}
+          />
 
           {/* Tags */}
           {record.tags.length > 0 ? (
@@ -721,6 +735,64 @@ export function MarketResourceDetailArticle({
               <Download className="h-4 w-4" aria-hidden="true" />
               {studioActionLabel}
             </Link>
+            {acquired ? (
+              <Link
+                href="/market/library"
+                className={buttonClass({
+                  variant: "outline",
+                  size: "sm",
+                  className: "w-full gap-1.5 border-good/40 text-good hover:bg-good/10",
+                })}
+              >
+                <CheckCircle2 className="size-3.5" />
+                <span>내 보관함에 보관됨 (보관함 이동)</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAcquisitionModalOpen(true)}
+                className={buttonClass({
+                  variant: "outline",
+                  size: "sm",
+                  className: "w-full gap-1.5 border-accent text-accent hover:bg-accent/10",
+                })}
+              >
+                <Download className="size-3.5" />
+                <span>무료 소장하기 (보관함 추가)</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => toggleWishlist(currentRecord)}
+              className={buttonClass({
+                variant: "outline",
+                size: "sm",
+                className: cn(
+                  "w-full gap-1.5",
+                  wishlisted && "border-warn/40 bg-warn/10 text-warn hover:bg-warn/20",
+                ),
+              })}
+            >
+              <Heart
+                className={cn("size-3.5", wishlisted && "fill-warn text-warn")}
+                aria-hidden="true"
+              />
+              <span>{wishlisted ? "찜한 에셋에서 제거" : "찜 목록에 추가"}</span>
+            </button>
+            {currentRecord.isOwner ? (
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(true)}
+                className={buttonClass({
+                  variant: "outline",
+                  size: "sm",
+                  className: "w-full gap-1.5 border-accent/60 text-accent hover:bg-accent/10",
+                })}
+              >
+                <Sliders className="size-3.5" />
+                <span>에셋 정보 수정 / 판올림</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => downloadMetadataSnapshot(record)}
@@ -854,6 +926,34 @@ export function MarketResourceDetailArticle({
           )}
         </div>
       </div>
+
+      <MarketWebtoon3dViewerModal
+        open={viewer3dOpen}
+        onClose={() => setViewer3dOpen(false)}
+        assetTitle={record.name}
+        format="glb"
+        onImportToStudio={() => {
+          setViewer3dOpen(false);
+        }}
+      />
+
+      <MarketDetailStickyBar
+        record={currentRecord}
+        onOpenAcquisition={() => setAcquisitionModalOpen(true)}
+      />
+
+      <MarketAcquisitionModal
+        open={acquisitionModalOpen}
+        onClose={() => setAcquisitionModalOpen(false)}
+        record={currentRecord}
+      />
+
+      <MarketEditResourceModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        record={currentRecord}
+        onSaved={(updated) => setCurrentRecord(updated)}
+      />
     </article>
   );
 }

@@ -1005,6 +1005,33 @@ export function StudioBg3dEditorViewport({ h }) {
                       <Aperture size={16} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={{
+                      id: "bg3d:viewport:prosuite",
+                      title: "웹툰 프로 툴 (20종)",
+                      description: "셰이퍼 3D 체형, 투닝 말풍선/이모트, 2.5D 집중선, 스냅툰/에이블러 웹툰 필터, 지면 착지락 등 20종 전문 제작 툴을 엽니다.",
+                      preview: "camera-orbit",
+                    }}
+                    preferredSide="left"
+                  >
+                    <button
+                      type="button"
+                      aria-label="웹툰 프로 툴 열기"
+                      data-testid="bg3d-prosuite-quick-open"
+                      className={cx(
+                        VIEWPORT_BTN,
+                        activePanelTab === "view" &&
+                          viewEditorSection === "prosuite" &&
+                          "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                      )}
+                      onClick={() => {
+                        handlePanelTabChange("view");
+                        setViewEditorSection("prosuite");
+                      }}
+                    >
+                      <WandSparkles size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
                 </div>
 
                 {surfaceSnapStatus && !immersiveSceneActive ? (

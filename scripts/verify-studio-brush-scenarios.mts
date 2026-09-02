@@ -7,7 +7,10 @@
  *
  *   curve        an S-curve — the live overlay must match the committed stroke along a bend;
  *   cross        two strokes of the same brush crossing — the crossing must not blink, drift or
- *                change tone between the live composite and the committed one;
+ *                change tone between the live composite and the committed one. Crossing and corner
+ *                regions are judged against the LAST pointer-down frame: the mid-gesture frame is
+ *                taken at 60% of the path, and a region the pointer has not reached yet is empty
+ *                there for every brush (that read particle-scatter as a 72% renderer drift);
  *   mixed-over   a partner brush first, this brush across it (wet over dry, dry over wet);
  *   mixed-under  this brush first, the partner across it;
  *   endpoints    a tap, a short flick and a medium stroke — pointer-down and pointer-up caps
@@ -22,6 +25,11 @@
  * Every stroke captures baseline / live (mid-gesture) / released (immediately after pointer-up)
  * / a post-release frame series (blink detection) / settled frames, and samples main-thread long
  * tasks and animation-frame stalls while the gesture runs.
+ *
+ * It also records every frame the compositor presented WHILE the pointer was down, over CDP
+ * screencast. Screenshots cannot do that job: each one blocks the renderer for ~100 ms, so a
+ * screenshot series is a series of frozen frames, and the single mid-gesture screenshot this
+ * harness used to take was structurally blind to a line that blinks as the artist draws it.
  *
  *   TOONSPECTRUM_SCENARIO_IDS=pen,watercolor   brush subset (default: one per engine family)
  *   TOONSPECTRUM_SCENARIOS=curve,cross          scenario subset
@@ -40,7 +48,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { decodePng } from "image-js";
+import { decodeJpeg, decodePng } from "image-js";
 
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/brush/studio-brush-carrier-quality";
 import {
@@ -65,8 +73,11 @@ import { classifyStudioLongBrushQualityPolicy } from "./studio-brush-long-matrix
 import {
   analyzeStudioBrushScenarioDiscrepancy,
   analyzeStudioBrushScenarioFlicker,
+  analyzeStudioBrushScenarioInStroke,
+  judgeStudioBrushScenarioBuildupLadder,
   judgeStudioBrushScenarioDiscrepancy,
   judgeStudioBrushScenarioFlicker,
+  judgeStudioBrushScenarioInStroke,
   judgeStudioBrushScenarioPerf,
   studioBrushScenarioInkMask,
   studioBrushScenarioMaskStats,
@@ -74,6 +85,8 @@ import {
   type StudioBrushScenarioDiscrepancy,
   type StudioBrushScenarioFinding,
   type StudioBrushScenarioFlickerAnalysis,
+  type StudioBrushScenarioInStrokeAnalysis,
+  type StudioBrushScenarioInStrokeFrame,
   type StudioBrushScenarioPerfSample,
   type StudioBrushScenarioRegion,
 } from "./studio-brush-scenario-quality";
@@ -88,6 +101,8 @@ const SCENARIO_NAMES = [
   "curve",
   "circle",
   "corners",
+  "buildup",
+  "slow-fast",
   "cross",
   "mixed-over",
   "mixed-under",
@@ -113,7 +128,6 @@ const DEFAULT_IDS = [
   "inkwash-water-brush",
   "ink-wash--sumi-core",
   "oil",
-  "acrylic",
   "airbrush",
   "spray",
   "glow",
@@ -127,6 +141,7 @@ const DEFAULT_IDS = [
 const OUTPUT_DIR = process.env.TOONSPECTRUM_SCENARIO_DIR?.trim()
   || join(tmpdir(), `toonspectrum-brush-scenarios-${Date.now()}`);
 const STRICT = process.env.TOONSPECTRUM_SCENARIO_STRICT === "1";
+const LAYER_PROBE = process.env.TOONSPECTRUM_SCENARIO_LAYER_PROBE === "1";
 const CHANNEL = process.env.TOONSPECTRUM_SCENARIO_CHANNEL?.trim() || "chromium";
 /**
  * Pause between consecutive strokes of one scenario. Artists hatch at well under a second, so the
@@ -143,9 +158,33 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+/**
+ * Resolve the brush set before the browser opens.
+ *
+ * An id that is no longer listed used to surface as an exception on the brush it reached, which
+ * meant a default run spent a quarter of an hour measuring fifteen brushes and then threw
+ * (`"acrylic" is not a listed product brush id`) with nothing written. Two different mistakes were
+ * being conflated: the default list drifting behind the catalogue, which the harness should
+ * survive, and a caller naming a brush that does not exist, which it should refuse.
+ */
 function requestedIds(): readonly string[] {
   const raw = process.env.TOONSPECTRUM_SCENARIO_IDS?.trim();
-  return raw ? raw.split(",").map((value) => value.trim()).filter(Boolean) : DEFAULT_IDS;
+  const listed = (id: string) => STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.some((entry) => entry.id === id);
+  if (!raw) {
+    const [live, dropped] = DEFAULT_IDS.reduce<[string[], string[]]>(
+      ([keep, skip], id) => (listed(id) ? [[...keep, id], skip] : [keep, [...skip, id]]),
+      [[], []],
+    );
+    if (dropped.length > 0) log(`skipping ${dropped.join(", ")} — no longer listed in the catalogue`);
+    return live;
+  }
+  const ids = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  const unknown = ids.filter((id) => !listed(id));
+  invariant(
+    unknown.length === 0,
+    `not listed product brush ids (quarantined or unknown): ${unknown.join(", ")}`,
+  );
+  return ids;
 }
 
 function requestedScenarios(): readonly ScenarioName[] {
@@ -466,6 +505,12 @@ interface CapturedStroke {
   readonly gestureMs: number;
   /** Product alerts that say a stroke was refused, read right after this gesture. */
   readonly refusals: readonly string[];
+  /** Presented frames while the pointer was down, in presentation order. */
+  readonly inStroke: readonly StudioBrushScenarioInStrokeFrame[];
+  /** Per-canvas ink over the gesture, when TOONSPECTRUM_SCENARIO_LAYER_PROBE=1. */
+  readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
+  /** The presented frames themselves, so a detected blink can be written out to look at. */
+  readonly presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>;
 }
 
 async function installPerfProbe(page: Page): Promise<void> {
@@ -521,6 +566,155 @@ async function readPerfProbe(page: Page): Promise<RawPerfSample> {
   })()`) as RawPerfSample;
 }
 
+interface ScreencastRecording {
+  /** Stop the cast and return the frames it presented, oldest first. */
+  readonly stop: () => Promise<ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>>;
+}
+
+/**
+ * Record presented frames over CDP. Frames arrive as viewport-sized JPEGs at the compositor's own
+ * rate, so they show what the artist saw rather than what a blocking screenshot could catch. The
+ * cap bounds memory on a long gesture; it is far above the ~200 frames a scenario stroke presents.
+ */
+async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<ScreencastRecording> {
+  const session = await page.context().newCDPSession(page);
+  const frames: Array<{ tMs: number; data: Buffer }> = [];
+  let origin: number | null = null;
+  session.on("Page.screencastFrame", (event: {
+    data: string;
+    sessionId: number;
+    metadata: { timestamp?: number };
+  }) => {
+    const stamp = (event.metadata.timestamp ?? 0) * 1_000;
+    origin = origin === null ? stamp : Math.min(origin, stamp);
+    if (frames.length < maxFrames) frames.push({ tMs: stamp, data: Buffer.from(event.data, "base64") });
+    // Chromium presents the next frame only once the previous one is acknowledged.
+    void session.send("Page.screencastFrameAck", { sessionId: event.sessionId }).catch(() => {});
+  });
+  await session.send("Page.startScreencast", {
+    format: "jpeg",
+    quality: 90,
+    maxWidth: VIEWPORT.width,
+    maxHeight: VIEWPORT.height,
+    everyNthFrame: 1,
+  });
+  return {
+    stop: async () => {
+      try {
+        await session.send("Page.stopScreencast");
+      } finally {
+        await session.detach().catch(() => {});
+      }
+      // Frame metadata timestamps do not arrive in order — an out-of-order frame put the deepest
+      // dip at -103 ms, i.e. before the cast opened. Order by presentation time before anything
+      // reads the series as a timeline.
+      const first = origin ?? 0;
+      return frames
+        .map((frame) => ({ tMs: frame.tMs - first, data: frame.data }))
+        .sort((left, right) => left.tMs - right.tMs);
+    },
+  };
+}
+
+/**
+ * Per-canvas ink, sampled once per animation frame.
+ *
+ * The presented-frame series says a stroke blinked; it cannot say which layer went blank. This
+ * reads every canvas under the stage separately — compositing each into one small scratch canvas
+ * so a WebGL or WebGPU layer is measured the same way a 2D one is — and reports each layer's ink
+ * over time. Opt in with TOONSPECTRUM_SCENARIO_LAYER_PROBE=1; it costs a readback per layer per
+ * frame, which is too much to leave on for a whole matrix run.
+ */
+async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
+  await page.evaluate(`((clip) => {
+    // The live overlays are siblings of the Konva stage, not children of it, and a GPU-lane brush
+    // draws on neither — its pixels are on the WebGPU compositor child. A probe rooted only at
+    // .konvajs-content reported "no layer changed" for a whole pen gesture whose every pixel was on
+    // that compositor, which is what sent one investigation in circles. Watch all three families.
+    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-gpu-compositor]"));
+    if (roots.length === 0) return;
+    const collect = () => roots.flatMap((root) =>
+      root instanceof HTMLCanvasElement ? [root] : Array.from(root.querySelectorAll("canvas")));
+    const SIZE = 96;
+    const scratch = document.createElement("canvas");
+    scratch.width = SIZE;
+    scratch.height = SIZE;
+    const scratchContext = scratch.getContext("2d", { willReadFrequently: true });
+    const state = { samples: [], raf: 0, labels: [], references: new WeakMap() };
+    // Ink is measured as CHANGE against each layer's first sample, not as alpha: the paper layer
+    // is fully opaque, so an alpha count says "covered" on every frame and can never show a stroke.
+    const sampleOf = (canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return -1;
+      scratchContext.clearRect(0, 0, SIZE, SIZE);
+      try {
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        scratchContext.drawImage(
+          canvas,
+          (clip.x - rect.left) * scaleX, (clip.y - rect.top) * scaleY,
+          clip.width * scaleX, clip.height * scaleY,
+          0, 0, SIZE, SIZE,
+        );
+      } catch {
+        return -2;
+      }
+      const { data } = scratchContext.getImageData(0, 0, SIZE, SIZE);
+      const reference = state.references.get(canvas);
+      if (!reference) {
+        state.references.set(canvas, Uint8ClampedArray.from(data));
+        return 0;
+      }
+      let changed = 0;
+      for (let index = 0; index < data.length; index += 4) {
+        if (Math.abs(data[index] - reference[index]) > 12
+          || Math.abs(data[index + 1] - reference[index + 1]) > 12
+          || Math.abs(data[index + 2] - reference[index + 2]) > 12
+          || Math.abs(data[index + 3] - reference[index + 3]) > 12) changed += 1;
+      }
+      return changed;
+    };
+    const tick = (now) => {
+      const canvases = collect();
+      state.labels = canvases.map((canvas, index) => {
+        const rect = canvas.getBoundingClientRect();
+        const role = canvas.dataset.studioLiveInkOverlay ? "live-ink"
+          : canvas.dataset.studioLiveRetainedActive ? "retained-active"
+          : canvas.dataset.studioLiveRetainedSettled ? "retained-settled"
+          : canvas.dataset.studioGpuSurface ? "gpu-" + canvas.dataset.studioGpuSurface
+          : "konva";
+        return index + ":" + role + ":store" + canvas.width + "x" + canvas.height
+          + ":css" + Math.round(rect.width) + "x" + Math.round(rect.height);
+      });
+      // A hidden surface still reads back its pixels, so ink alone cannot explain a blank frame.
+      // The compositor root is CSS-hidden between a GPU submission and its receipt; record that.
+      const compositor = document.querySelector("[data-studio-gpu-compositor]");
+      const shown = compositor ? getComputedStyle(compositor) : null;
+      state.samples.push([
+        Math.round(now),
+        canvases.map(sampleOf),
+        shown ? (shown.visibility === "hidden" || shown.opacity === "0" ? 0 : 1) : -1,
+      ]);
+      state.raf = requestAnimationFrame(tick);
+    };
+    state.raf = requestAnimationFrame(tick);
+    window.__scenarioLayers = state;
+  })(${JSON.stringify(clip)})`);
+}
+
+async function readLayerProbe(page: Page): Promise<{
+  labels: string[];
+  samples: Array<[number, number[], number]>;
+}> {
+  return await page.evaluate(`(() => {
+    const state = window.__scenarioLayers;
+    if (!state) return { labels: [], samples: [] };
+    cancelAnimationFrame(state.raf);
+    delete window.__scenarioLayers;
+    return { labels: state.labels, samples: state.samples };
+  })()`) as { labels: string[]; samples: Array<[number, number[], number]> };
+}
+
 async function shot(page: Page, clip: Clip): Promise<Buffer> {
   const started = await page.evaluate("performance.now()") as number;
   const buffer = await page.screenshot({ animations: "disabled", clip });
@@ -539,12 +733,20 @@ async function drawAndCapture(
   page: Page,
   clip: Clip,
   points: readonly Point[],
-  options: { liveAt?: number; settleMs?: number; postFrames?: number } = {},
+  options: {
+    liveAt?: number;
+    settleMs?: number;
+    postFrames?: number;
+    /** Pause between pointer moves — a slow hand for the speed comparison. */
+    stepDelayMs?: number;
+  } = {},
 ): Promise<CapturedStroke> {
   invariant(points.length >= 1, "a gesture needs at least one point");
   const liveAt = Math.min(points.length - 1, Math.max(0, Math.floor((options.liveAt ?? 0.6) * (points.length - 1))));
   const baseline = await shot(page, clip);
   await installPerfProbe(page);
+  const cast = await recordPresentedFrames(page);
+  if (LAYER_PROBE) await installLayerProbe(page, clip);
   const started = Date.now();
   const first = points[0]!;
   await page.mouse.move(first.x, first.y);
@@ -557,6 +759,7 @@ async function drawAndCapture(
   for (let index = 1; index < points.length; index += 1) {
     const point = points[index]!;
     await page.mouse.move(point.x, point.y, { steps: 2 });
+    if (options.stepDelayMs) await page.waitForTimeout(options.stepDelayMs);
     if (index === liveAt) {
       await page.waitForTimeout(30);
       live = await shot(page, clip);
@@ -565,6 +768,8 @@ async function drawAndCapture(
   await page.waitForTimeout(30);
   const liveEnd = await shot(page, clip);
   if (!live) live = liveEnd;
+  const presented = await cast.stop();
+  const layers = LAYER_PROBE ? await readLayerProbe(page) : null;
   await page.mouse.up();
   const gestureMs = Date.now() - started;
   const released = await shot(page, clip);
@@ -579,7 +784,7 @@ async function drawAndCapture(
   const { app: perf, captureInduced } = attributePerf(await readPerfProbe(page));
   const refusals = await page.evaluate(`Array.from(document.querySelectorAll('[role="alert"]'))
     .map((element) => (element.textContent || "").trim())
-    .filter((text) => text.includes("획을 시작하지 않았습니다"))`) as string[];
+    .filter((text) => text.includes("획을 시작하지 않았습니다") || text.includes("현재 획을 취소했습니다"))`) as string[];
   return {
     baseline,
     live,
@@ -591,7 +796,46 @@ async function drawAndCapture(
     captureInducedLongTasks: captureInduced,
     gestureMs,
     refusals,
+    inStroke: measurePresentedInk(presented, clip),
+    layers,
+    presented,
   };
+}
+
+/**
+ * Ink pixels inside the canvas clip for each presented frame, measured against the frame the cast
+ * opened with. Screencast frames cover the whole viewport, so the clip is applied as a region
+ * rather than by cropping; the first frame is the pre-gesture reference by construction.
+ */
+function measurePresentedInk(
+  presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>,
+  clip: Clip,
+): StudioBrushScenarioInStrokeFrame[] {
+  if (presented.length < 2) return [];
+  const toImage = (data: Buffer): StudioBrushMediaPixelImage => {
+    const image = decodeJpeg(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    const raw = image.getRawImage();
+    return { width: image.width, height: image.height, channels: image.channels, data: raw.data };
+  };
+  const reference = toImage(presented[0]!.data);
+  const region = { x: clip.x, y: clip.y, width: clip.width, height: clip.height };
+  const measured: StudioBrushScenarioInStrokeFrame[] = [];
+  for (let index = 1; index < presented.length; index += 1) {
+    const frame = presented[index]!;
+    let image: StudioBrushMediaPixelImage;
+    try {
+      image = toImage(frame.data);
+    } catch {
+      continue; // a truncated frame is the cast's problem, not the renderer's
+    }
+    if (image.width !== reference.width || image.height !== reference.height) continue;
+    const mask = studioBrushScenarioInkMask(reference, image);
+    measured.push({
+      tMs: frame.tMs,
+      ink: studioBrushScenarioMaskStats(mask, reference.width, reference.height, region).count,
+    });
+  }
+  return measured;
 }
 
 /**
@@ -632,6 +876,8 @@ interface StrokeRecord {
   readonly inkReleased: number;
   readonly inkSettled: number;
   readonly flicker: StudioBrushScenarioFlickerAnalysis;
+  readonly inStroke: StudioBrushScenarioInStrokeAnalysis;
+  readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
   readonly regions: Readonly<Record<string, StudioBrushScenarioDiscrepancy>>;
   readonly perf: {
     longTasks: number;
@@ -666,11 +912,23 @@ function saveFrames(
 ): Record<string, string> {
   mkdirSync(directory, { recursive: true });
   const artifacts: Record<string, string> = {};
-  const save = (name: string, buffer: Buffer) => {
-    const path = join(directory, `${prefix}-${name}.png`);
+  const save = (name: string, buffer: Buffer, extension: "png" | "jpg" = "png") => {
+    const path = join(directory, `${prefix}-${name}.${extension}`);
     writeFileSync(path, buffer);
     artifacts[name] = path;
   };
+  // A blink is only actionable if you can see what went missing, so the deepest dip and the
+  // frames either side of it are written out whenever the presented series contains one.
+  const inStroke = analyzeStudioBrushScenarioInStroke(captured.inStroke);
+  if (inStroke.verdict === "blink" && inStroke.worstDropAtMs !== null) {
+    const dip = captured.presented.findIndex((frame) => frame.tMs >= inStroke.worstDropAtMs!);
+    if (dip >= 0) {
+      for (const [suffix, offset] of [["before", -1], ["dip", 0], ["after", 1]] as const) {
+        const frame = captured.presented[dip + offset];
+        if (frame) save(`05-blink-${suffix}`, frame.data, "jpg");
+      }
+    }
+  }
   save("00-baseline", captured.baseline);
   save("01-live", captured.live);
   save("01-live-end", captured.liveEnd);
@@ -702,6 +960,10 @@ function analyzeStroke(
   const released = decode(captured.released);
   const settled = decode(captured.settled);
   const judgement = { softWet: profile.softWet, transparent: profile.transparent };
+  // An eraser stroke on paper that carries no base removes nothing, so "there is no ink" is a
+  // statement about the scenario, not about the renderer. It used to be reported as
+  // post-release-empty on every eraser preset the curve scenario ran.
+  const judgesInk = options.flicker !== false && !(profile.eraser && options.expectGap == null);
   const findings: StudioBrushScenarioFinding[] = [];
   const stats = (frame: StudioBrushMediaPixelImage) =>
     studioBrushScenarioMaskStats(studioBrushScenarioInkMask(baseline, frame), baseline.width, baseline.height).count;
@@ -709,7 +971,9 @@ function analyzeStroke(
     baseline,
     [released, ...captured.postRelease.map(decode), settled],
   );
-  if (options.flicker !== false) findings.push(...judgeStudioBrushScenarioFlicker(flicker, judgement));
+  if (judgesInk) findings.push(...judgeStudioBrushScenarioFlicker(flicker, judgement));
+  const inStroke = analyzeStudioBrushScenarioInStroke(captured.inStroke);
+  if (judgesInk) findings.push(...judgeStudioBrushScenarioInStroke(inStroke, judgement));
   const regionResults: Record<string, StudioBrushScenarioDiscrepancy> = {};
   for (const spec of regions) {
     const discrepancy = analyzeStudioBrushScenarioDiscrepancy(
@@ -760,6 +1024,8 @@ function analyzeStroke(
     inkReleased: stats(released),
     inkSettled: stats(settled),
     flicker,
+    inStroke,
+    layers: captured.layers,
     regions: regionResults,
     perf: {
       longTasks: captured.perf.longTasks.length,
@@ -850,8 +1116,141 @@ async function runScenario(
       strokes.push(analyzeStroke("corners", captured, corners.map((corner, index) => ({
         name: `corner-${index}`,
         code: "crossing-live-commit-drift" as const,
+        frame: "end" as const,
         region: studioBrushScenarioPointRegion(toClipSpace(corner, clip), crossRadius + 6, clip),
       })), profile, saveFrames(directory, prefix("corners"), captured)));
+      break;
+    }
+    case "buildup": {
+      // 문서 표준 테스트: 같은 위치 20회 중첩. 판정은 각 패스의 델타가 아니라 최초 baseline
+      // 대비 누적으로 한다 — 불투명 브러시는 2회차부터 더할 것이 없고 그것은 결함이 아니다.
+      const path = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.5 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.5 },
+        30,
+      );
+      const passes = 20;
+      const base = decode(scenarioBaseline);
+      const cumulativeInk: number[] = [];
+      const meanDarkness: number[] = [];
+      for (let pass = 0; pass < passes; pass += 1) {
+        const captured = await drawAndCapture(page, clip, path, {
+          postFrames: 1,
+          settleMs: pass === passes - 1 ? 2_000 : STROKE_GAP_MS,
+        });
+        undoCount += 1;
+        const settled = decode(captured.settled);
+        const mask = studioBrushScenarioInkMask(base, settled);
+        cumulativeInk.push(studioBrushScenarioMaskStats(mask, base.width, base.height).count);
+        let darknessSum = 0;
+        let darknessCount = 0;
+        for (let index = 0; index < mask.length; index += 1) {
+          if (mask[index] === 0) continue;
+          const offset = index * settled.channels;
+          darknessSum += 255 - (
+            settled.data[offset]! + settled.data[offset + 1]! + settled.data[offset + 2]!
+          ) / 3;
+          darknessCount += 1;
+        }
+        meanDarkness.push(darknessCount === 0 ? 0 : darknessSum / darknessCount);
+        if (pass === 0 || pass === passes - 1) {
+          strokes.push(analyzeStroke(
+            `pass-${pass + 1}`,
+            captured,
+            [],
+            profile,
+            saveFrames(directory, prefix(`pass-${pass + 1}`), captured),
+            { flicker: pass === 0 },
+          ));
+        }
+      }
+      const buildupFindings: StudioBrushScenarioFinding[] = [];
+      const firstInk = cumulativeInk[0] ?? 0;
+      const finalInk = cumulativeInk.at(-1) ?? 0;
+      const firstDarkness = meanDarkness[0] ?? 0;
+      const finalDarkness = meanDarkness.at(-1) ?? 0;
+      const worstShrink = cumulativeInk.reduce(
+        (worst, value) => Math.max(worst, firstInk === 0 ? 0 : 1 - value / firstInk),
+        0,
+      );
+      if (!profile.transparent && finalInk < firstInk * 0.9) {
+        buildupFindings.push({
+          level: "error",
+          code: "buildup-lost",
+          message: `20 passes ended at ${finalInk} px against the first pass's ${firstInk} px`,
+        });
+      } else if (worstShrink > 0.25) {
+        buildupFindings.push({
+          level: "warning",
+          code: "buildup-lost",
+          message: `a pass dropped to ${(100 - worstShrink * 100).toFixed(0)}% of the first pass's `
+            + `coverage (${cumulativeInk.join(",")})`,
+        });
+      }
+      if (!profile.transparent && firstDarkness > 0 && finalDarkness < firstDarkness * 1.05) {
+        buildupFindings.push({
+          level: "warning",
+          code: "buildup-lost",
+          message: "mean darkness barely moved over 20 passes "
+            + `(${firstDarkness.toFixed(1)} → ${finalDarkness.toFixed(1)})`,
+        });
+      }
+      // 위의 첫/끝 비교만으로는 3회차에 이미 포화한 사다리를 잡지 못한다(연필 82.9 → 98.4 는
+      // 1.19배라 통과했다). 사다리 자체를 판정한다.
+      buildupFindings.push(...judgeStudioBrushScenarioBuildupLadder(meanDarkness, {
+        transparent: profile.transparent,
+        softWet: profile.softWet,
+      }));
+      strokes.push({
+        label: "buildup-summary",
+        inkLive: firstInk,
+        inkReleased: finalInk,
+        inkSettled: finalInk,
+        flicker: {
+          counts: cumulativeInk,
+          maxDropRatio: worstShrink,
+          dipFrame: null,
+          verdict: "stable",
+        },
+        inStroke: {
+          frameCount: cumulativeInk.length,
+          peakInk: finalInk,
+          worstDropRatio: worstShrink,
+          worstDropAtMs: null,
+          blinkCount: 0,
+          verdict: "stable",
+        },
+        layers: null,
+        regions: {},
+        perf: {
+          longTasks: 0,
+          worstTaskMs: 0,
+          worstFrameGapMs: 0,
+          captureInducedLongTasks: 0,
+          gestureMs: 0,
+        },
+        findings: buildupFindings,
+        artifacts: { darkness: meanDarkness.map((value) => value.toFixed(1)).join(",") },
+      });
+      break;
+    }
+    case "slow-fast": {
+      const slowPath = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.34 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.34 },
+        90,
+      );
+      const fastPath = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.66 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.66 },
+        6,
+      );
+      const slow = await drawAndCapture(page, clip, slowPath, { stepDelayMs: 12 });
+      undoCount += 1;
+      strokes.push(analyzeStroke("slow", slow, [], profile, saveFrames(directory, prefix("slow"), slow)));
+      const fast = await drawAndCapture(page, clip, fastPath);
+      undoCount += 1;
+      strokes.push(analyzeStroke("fast", fast, [], profile, saveFrames(directory, prefix("fast"), fast)));
       break;
     }
     case "cross": {
@@ -861,7 +1260,7 @@ async function runScenario(
       const second = await drawAndCapture(page, clip, diagonalB);
       undoCount += 1;
       strokes.push(analyzeStroke("second", second, [
-        { name: "crossing", code: "crossing-live-commit-drift", region: crossingRegion(clip, center, crossRadius) },
+        { name: "crossing", code: "crossing-live-commit-drift", frame: "end", region: crossingRegion(clip, center, crossRadius) },
       ], profile, saveFrames(directory, prefix("second"), second)));
       break;
     }
@@ -878,7 +1277,7 @@ async function runScenario(
       const over = await drawAndCapture(page, clip, diagonalB);
       undoCount += 1;
       strokes.push(analyzeStroke(`over:${overProfile.item.id}`, over, [
-        { name: "crossing", code: "crossing-live-commit-drift", region: crossingRegion(clip, center, Math.max(crossRadius, partner.defaultWidth * 1.6 + 8)) },
+        { name: "crossing", code: "crossing-live-commit-drift", frame: "end", region: crossingRegion(clip, center, Math.max(crossRadius, partner.defaultWidth * 1.6 + 8)) },
       ], overProfile, saveFrames(directory, prefix("over"), over)));
       await selectBrush(page, profile);
       break;
@@ -916,7 +1315,7 @@ async function runScenario(
       undoCount += 1;
       const region = crossingRegion(clip, center, crossRadius);
       strokes.push(analyzeStroke("eraser", erase, [
-        { name: "crossing", code: "eraser-live-commit-drift", region },
+        { name: "crossing", code: "eraser-live-commit-drift", frame: "end", region },
       ], { ...profile, transparent: false, softWet: profile.softWet }, saveFrames(directory, prefix("eraser"), erase), {
         flicker: false,
         expectGap: region,
@@ -971,6 +1370,8 @@ async function runBrush(
         && scenario !== "curve"
         && scenario !== "circle"
         && scenario !== "corners"
+        && scenario !== "buildup"
+        && scenario !== "slow-fast"
       ) {
         records.push({ scenario, partner: null, strokes: [], findings: [], skipped: "eraser presets only run curve, endpoints and eraser-cross" });
         continue;

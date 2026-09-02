@@ -354,6 +354,10 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
+import {
+  commitPendingStrokeBatchForAdmission,
+  studioLiveInkLaneSelectsGpu,
+} from "./live/studio-live-ink-lane-admission";
 import { useStudioCollaborationWiring } from "./live/studio-collaboration-wiring";
 import { studioDrawElementToCrdtStroke } from "./live/studio-crdt-draw-bridge";
 import { StudioCrdtLiveStrokePublisher } from "./live/studio-crdt-live-stroke-publisher";
@@ -394,6 +398,8 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
+import { StudioAiSuperSuiteModal } from "./ai/StudioAiSuperSuiteModal";
+import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
 import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
@@ -957,6 +963,7 @@ import {
   STUDIO_RAW_PEN_INK_PREVIEW_ENABLED,
   STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
   STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
+  STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS,
 } from "./studio-page-shell-runtime";
 import { useStudioAdvancedFill } from "./studio-page-advanced-fill";
 import { useStudioCompanionRuntime } from "./studio-page-companion-runtime";
@@ -7643,6 +7650,8 @@ export function StudioCuttoonEditor({
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
+  const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
+  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(false);
   // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
@@ -11966,7 +11975,7 @@ export function StudioCuttoonEditor({
       return "rejected";
     }
     gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
-    armGpuPinnedRequestWatchdog(outcome.requestId);
+    armGpuPinnedRequestWatchdog(outcome.requestId, STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS);
     applyLiveStrokeBackendPresentationEffects();
     return "advanced";
   }
@@ -12009,7 +12018,7 @@ export function StudioCuttoonEditor({
         return false;
       }
       gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
-      armGpuPinnedRequestWatchdog(outcome.requestId);
+      armGpuPinnedRequestWatchdog(outcome.requestId, STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS);
       applyLiveStrokeBackendPresentationEffects();
       finalRequestId = outcome.requestId;
     }
@@ -24813,6 +24822,12 @@ const puppetWarpArmed =
       // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
       // gated for future experiments, while production post-correction runs once on release.
       // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
+      commitPendingStrokeBatchForAdmission(
+        pendingStrokeCommitsRef.current !== null
+          && (pendingGpuStrokesRef.current.length > 0 || pendingGpuDrawAuthoritiesRef.current.length > 0),
+        strokeAdmissionCommitFlushRef,
+        () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+      );
       const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
       const causalPostCorrectionEligible = !pixelDirect
         && studioPostCorrectionRunsDuringPointerContact()
@@ -24881,38 +24896,14 @@ const puppetWarpArmed =
         && !dynamicSelected
         && !pixelDirect
         && isDirectLiveDraftEl(next);
-      const isExplicitWebGpu = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "webgpu";
-      const isExplicitCanvas2d = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "canvas2d";
-      const isGpuHardwareReady =
-        webGpuBackendRef.current === "webgpu"
-        && webGpuCanvasHandleRef.current?.isBackendAvailable() === true;
-      // 반투명 획은 WebGPU 레인이 준비 증명 없이는 그릴 수 없고(studio-live-ink-backend 의
-      // `opacity` 판정), 플래너도 그 증명을 만들지 않는다. 그런데도 GPU 를 선택해 두면 아래
-      // 결정이 not-ready 를 돌려주고 획이 통째로 거절됐다 — GPU 있는 브라우저에서 마커·볼펜
-      // 같은 반투명 직접잉크 브러시가 아무것도 그리지 않았다(실측 0px + "선택 거부 사유:
-      // opacity" 배너, 그 배너가 캔버스를 38px 밀어 그리는 중에 화면이 튀기까지 했다).
-      // 헤드리스 셸(SwiftShader)에서는 GPU 가 애초에 선택되지 않아 장획 게이트가 못 잡았다.
-      // 렌더할 수 없는 스타일은 처음부터 고르지 않는다 — 실패 뒤 넘기는 것이 아니라 선택 전에.
-      const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999
-        // 지우개도 같은 함정이었다 — GPU 획 뒤 지우개를 대면 "선택 거부 사유: eraser" 로
-        // 거절됐다. 이 레인의 준비는 항상 transparent-overlay 라 destination-out 이 아래
-        // 커밋 캔버스를 지울 수 없고, 그래서 결정이 절대 ready 를 돌려주지 않는다.
-        && next.mode !== "eraser"
-        // 채우기는 준비 여부와 무관하게 이 레인이 받지 않는다(studio-live-ink-backend `fill`).
-        && !next.fill
-        // 대칭은 확장된 준비 증명이 있어야 하는데 플래너가 만들지 않는다.
-        && (next.symmetry?.type ?? "none") === "none";
-      const gpuSelected = genericDirectSelected
-        && !isExplicitCanvas2d
-        && gpuStyleRenderable
-        && (
-          isExplicitWebGpu
-          || (
-            STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
-            && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED
-            && isGpuHardwareReady
-          )
-        );
+      const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({
+        element: next,
+        explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND,
+        hardwareReady: webGpuBackendRef.current === "webgpu"
+          && webGpuCanvasHandleRef.current?.isBackendAvailable() === true,
+        rolloutPrefersGpu: STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+          && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
+      });
       const canvas2dSelected = genericDirectSelected && !gpuSelected;
 
       if (pendingGpuAuthorityBlocksNewSurface) {
@@ -27248,6 +27239,8 @@ function clearSelectionForEdit() {
       openScrollPreview: () => setScrollPreviewOpen(true),
       openContinuityCheck: () => setContinuityOpen(true),
       openProductionBible: () => setProductionBibleOpen(true),
+      openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
+      openAiSuperSuite: () => setAiSuperSuiteOpen(true),
       openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
@@ -31064,6 +31057,21 @@ function clearSelectionForEdit() {
       onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
     >
       {editorSurface}
+      <StudioWebtoonAssistantModal
+        open={webtoonAssistantOpen}
+        onClose={() => setWebtoonAssistantOpen(false)}
+        canvasWidth={CANVAS_W}
+        canvasHeight={canvasH}
+      />
+      <StudioAiSuperSuiteModal
+        open={aiSuperSuiteOpen}
+        onClose={() => setAiSuperSuiteOpen(false)}
+        onApplyPrompt={(prompt) => {
+          setAiBgPrompt(prompt);
+          setAiAssistTool("background");
+          setAiSuperSuiteOpen(false);
+        }}
+      />
     </StudioDccWorkbenchRoute>
   );
 }

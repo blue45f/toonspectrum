@@ -107,19 +107,29 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expectInOrder(liveSurfaceStart, [
-      "const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999",
-      'next.mode !== "eraser"',
-      "!next.fill",
-      '(next.symmetry?.type ?? "none") === "none"',
-      "const gpuSelected = genericDirectSelected",
-      "&& gpuStyleRenderable",
+      "const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({",
+      "explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND",
+      "hardwareReady:",
+      "rolloutPrefersGpu:",
       "const canvas2dSelected = genericDirectSelected && !gpuSelected",
     ]);
     // The style gate decides BEFORE the lane is entered, so this remains a selection rule rather
     // than a hand-over after a GPU failure — the refusal below still owns real GPU failures.
-    expect(liveSurfaceStart.indexOf("const gpuStyleRenderable"))
+    expect(liveSurfaceStart.indexOf("studioLiveInkLaneSelectsGpu({"))
       .toBeLessThan(liveSurfaceStart.indexOf("const gpuStartEligible ="));
     expect(liveSurfaceStart).toContain('rejectSelectedSurface(\n          "WebGPU 라이브 잉크"');
+    // The rule itself lives next to the decision it mirrors.
+    const admission = source("../live/studio-live-ink-lane-admission.ts");
+    expectInOrder(admission, [
+      "export function studioLiveInkLaneAdmitsStyle",
+      "(element.opacity ?? 1) >= 0.999",
+      'element.mode !== "eraser"',
+      "!element.fill",
+      '(element.symmetry?.type ?? "none") === "none"',
+      "export function studioLiveInkLaneSelectsGpu",
+      'input.explicitBackend === "canvas2d"',
+      "studioLiveInkLaneAdmitsStyle(input.element)",
+    ]);
   });
 
   it("commits a pending WebGPU authority at admission instead of refusing the next stroke", () => {
@@ -132,17 +142,23 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function beginStudioDrawLiveSurfaces("),
       page.indexOf("function onStageDown("),
     );
-    const flushIndex = liveSurfaceStart.indexOf("strokeAdmissionCommitFlushRef.current = true");
+    const flushIndex = liveSurfaceStart.indexOf("commitPendingStrokeBatchForAdmission(");
     const guardIndex = liveSurfaceStart.indexOf("const pendingGpuAuthorityBlocksNewSurface =");
     expect(flushIndex).toBeGreaterThan(-1);
     expect(guardIndex).toBeGreaterThan(flushIndex);
-    expectInOrder(liveSurfaceStart.slice(flushIndex - 400, guardIndex), [
+    expectInOrder(liveSurfaceStart.slice(flushIndex, guardIndex), [
       "pendingGpuStrokesRef.current.length > 0",
       "pendingGpuDrawAuthoritiesRef.current.length > 0",
-      "strokeAdmissionCommitFlushRef.current = true",
-      "flushSync(",
-      "flushPendingStrokeCommitsRef.current()",
-      "strokeAdmissionCommitFlushRef.current = false",
+      "strokeAdmissionCommitFlushRef",
+      "flushSync(() => flushPendingStrokeCommitsRef.current())",
+    ]);
+    const admissionModule = source("../live/studio-live-ink-lane-admission.ts");
+    expectInOrder(admissionModule, [
+      "export function commitPendingStrokeBatchForAdmission",
+      "if (!pendingGpuAuthority) return;",
+      "admissionFlushRef.current = true;",
+      "flushPendingStrokeCommitsSync();",
+      "admissionFlushRef.current = false;",
     ]);
     // The flush keeps its own mid-stroke guard: only this admission path may bypass it, and the
     // exact terminal receipt gate inside the flush is untouched, so an unreceipted WebGPU stroke
@@ -262,7 +278,11 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("gpuLiveSourceJournalRef.current = advanced.state");
     expect(page).toContain('failSelectedGpuLiveInk("request-failed", el.id)');
     expect(page).not.toContain("relinquishGpuLiveInkToKonva");
-    expect(page).toContain("armGpuPinnedRequestWatchdog(outcome.requestId)");
+    // A finished stroke's terminal receipt gets its own budget: the live-latency deadline was
+    // deleting completed strokes whenever a commit render overran a frame.
+    expect(page).toContain(
+      "armGpuPinnedRequestWatchdog(outcome.requestId, STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS)",
+    );
     expect(page).toContain("STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS");
     expect(page).toContain("new StudioGpuPinReceiptWatchdog({");
     expect(page).toContain("gpuPinReceiptWatchdog().receipt(receipt.requestId)");

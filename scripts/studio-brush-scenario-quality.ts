@@ -39,6 +39,24 @@ export interface StudioBrushScenarioFlickerAnalysis {
   readonly verdict: "stable" | "flicker" | "vanish" | "empty";
 }
 
+/** One presented frame while the pointer is still down. */
+export interface StudioBrushScenarioInStrokeFrame {
+  readonly tMs: number;
+  /** Ink pixels inside the judged region, measured against the pre-gesture frame. */
+  readonly ink: number;
+}
+
+export interface StudioBrushScenarioInStrokeAnalysis {
+  readonly frameCount: number;
+  readonly peakInk: number;
+  /** Deepest fall below the running maximum, as a fraction of that maximum. */
+  readonly worstDropRatio: number;
+  readonly worstDropAtMs: number | null;
+  /** Frames that fell past the threshold and were painted again afterwards. */
+  readonly blinkCount: number;
+  readonly verdict: "stable" | "blink" | "too-few-frames";
+}
+
 export interface StudioBrushScenarioDiscrepancy {
   readonly liveInk: number;
   readonly releasedInk: number;
@@ -66,7 +84,9 @@ export interface StudioBrushScenarioFinding {
     | "long-task"
     | "frame-stall"
     | "stroke-refused"
-    | "undo-residue";
+    | "undo-residue"
+    | "buildup-lost"
+    | "in-stroke-flicker";
   readonly message: string;
 }
 
@@ -179,6 +199,68 @@ export function analyzeStudioBrushScenarioFlicker(
 }
 
 /** Live vs released silhouettes and tone inside one region. */
+/**
+ * Every frame the compositor presented while the pointer was still down.
+ *
+ * The post-release series above only watches the overlay -> document hand-off, which is one frame
+ * at the end of a gesture. It is structurally blind to the thing artists actually report: a line
+ * that blinks *while they are still drawing it*. This is the check for that, and its contract is
+ * the simplest one in the file — a gesture only ever adds ink, so the ink already on screen cannot
+ * go away before the pointer comes up. A frame that falls well under the running maximum and is
+ * repainted afterwards is a blink the artist saw.
+ *
+ * `dropRatio` is deliberately loose (a third of the stroke gone) because the series is measured
+ * from lossy screencast frames; a real blink drops most of the stroke, not a few edge pixels.
+ */
+export function analyzeStudioBrushScenarioInStroke(
+  frames: readonly StudioBrushScenarioInStrokeFrame[],
+  options: { readonly inkFloor?: number; readonly dropRatio?: number } = {},
+): StudioBrushScenarioInStrokeAnalysis {
+  const inkFloor = options.inkFloor ?? 200;
+  const dropRatio = options.dropRatio ?? 0.35;
+  const started = frames.findIndex((frame) => frame.ink >= inkFloor);
+  if (started < 0 || frames.length - started < 4) {
+    return {
+      frameCount: frames.length,
+      peakInk: frames.reduce((peak, frame) => Math.max(peak, frame.ink), 0),
+      worstDropRatio: 0,
+      worstDropAtMs: null,
+      blinkCount: 0,
+      verdict: "too-few-frames",
+    };
+  }
+  let runningMax = 0;
+  let worstDropRatio = 0;
+  let worstDropAtMs: number | null = null;
+  let blinkCount = 0;
+  const dipped: number[] = [];
+  for (let index = started; index < frames.length; index += 1) {
+    const { ink, tMs } = frames[index]!;
+    if (ink > runningMax) {
+      // Anything that dipped before this frame has now been painted over again: those were blinks.
+      blinkCount += dipped.length;
+      dipped.length = 0;
+      runningMax = ink;
+      continue;
+    }
+    const drop = (runningMax - ink) / runningMax;
+    if (drop <= dropRatio) continue;
+    dipped.push(index);
+    if (drop > worstDropRatio) {
+      worstDropRatio = drop;
+      worstDropAtMs = tMs;
+    }
+  }
+  return {
+    frameCount: frames.length,
+    peakInk: runningMax,
+    worstDropRatio,
+    worstDropAtMs,
+    blinkCount,
+    verdict: blinkCount > 0 ? "blink" : "stable",
+  };
+}
+
 export function analyzeStudioBrushScenarioDiscrepancy(
   baseline: StudioBrushMediaPixelImage,
   live: StudioBrushMediaPixelImage,
@@ -271,6 +353,21 @@ export function judgeStudioBrushScenarioFlicker(
   }
 }
 
+export function judgeStudioBrushScenarioInStroke(
+  analysis: StudioBrushScenarioInStrokeAnalysis,
+  input: StudioBrushScenarioJudgementInput,
+): StudioBrushScenarioFinding[] {
+  if (input.transparent) return [];
+  if (analysis.verdict !== "blink") return [];
+  return [finding(
+    "error",
+    "in-stroke-flicker",
+    `ink vanished and came back ${analysis.blinkCount}x while the pointer was down `
+      + `(worst ${Math.round(analysis.worstDropRatio * 100)}% of ${analysis.peakInk} px gone at `
+      + `${Math.round(analysis.worstDropAtMs ?? 0)} ms, ${analysis.frameCount} frames)`,
+  )];
+}
+
 /**
  * Crossing and cap regions compare live against released silhouettes. Soft/wet media settle their
  * edges for a moment after pointer-up, so their bound is looser; a transparent wash records only.
@@ -354,6 +451,52 @@ export function judgeStudioBrushScenarioPerf(
     ));
   }
   return findings;
+}
+
+/**
+ * How many stacked passes the build-up ladder must still be climbing, and by how much.
+ *
+ * Mirrors the planner-side contract pinned in
+ * `src/domains/creator/brush/studio-pencil-alias-passes.test.ts` ("stacking the same stroke gets
+ * monotonically darker for at least the first 5 passes"). One 8-bit code value is the smallest
+ * difference a pixel can carry, so a pass that adds less than that added nothing an artist can see.
+ */
+export const STUDIO_BRUSH_BUILDUP_LADDER_PASSES = 5;
+export const STUDIO_BRUSH_BUILDUP_MIN_PASS_GAIN = 1;
+
+/**
+ * The same-place-20-times ladder.
+ *
+ * The first cut of this judge only compared pass 1 against pass 20 at a 1.05 ratio, and that is
+ * blind to the failure it was written for: `pencil` at defaultOpacity 0.85 measured
+ * 82.9 → 91.1 → 95.0 → 97.0 → 97.9 → 98.4, a 1.19 overall ratio that sails past the ratio gate
+ * while pass 5 adds 0.9 of a code value — the ladder is over by the third stroke and an artist
+ * cannot build tone. So judge the ladder itself.
+ *
+ * A brush that gains nothing on pass 2 is opaque in one stroke (pen at opacity 1, a 6B laid flat)
+ * and has no build-up to lose; only a brush that demonstrably started climbing is held to keeping
+ * it up through pass `STUDIO_BRUSH_BUILDUP_LADDER_PASSES`.
+ */
+export function judgeStudioBrushScenarioBuildupLadder(
+  meanDarkness: readonly number[],
+  input: StudioBrushScenarioJudgementInput,
+): StudioBrushScenarioFinding[] {
+  if (input.transparent) return [];
+  if (meanDarkness.length < STUDIO_BRUSH_BUILDUP_LADDER_PASSES) return [];
+  const gain = (pass: number): number => meanDarkness[pass - 1]! - meanDarkness[pass - 2]!;
+  if (gain(2) < STUDIO_BRUSH_BUILDUP_MIN_PASS_GAIN) return [];
+  for (let pass = 3; pass <= STUDIO_BRUSH_BUILDUP_LADDER_PASSES; pass += 1) {
+    if (gain(pass) >= STUDIO_BRUSH_BUILDUP_MIN_PASS_GAIN) continue;
+    return [finding(
+      "error",
+      "buildup-lost",
+      `stacking stopped darkening at pass ${pass}: it added ${gain(pass).toFixed(2)} code values `
+        + `where pass 2 added ${gain(2).toFixed(2)} `
+        + `(${meanDarkness.slice(0, STUDIO_BRUSH_BUILDUP_LADDER_PASSES)
+          .map((value) => value.toFixed(1)).join(" → ")})`,
+    )];
+  }
+  return [];
 }
 
 /** Square region around a point, clamped to the frame. */
