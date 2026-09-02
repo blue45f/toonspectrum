@@ -331,7 +331,7 @@ def build_everyday_mug():
     shadow = material("MugV4_BaseShadow", (0.20, 0.16, 0.13), roughness=0.66)
 
     # Blender Z becomes runtime +Y. Keep the serialized X=.07 handle contact fixed while
-    # moving the vessel 18 mm away from the palm so Minseo's full hand volume cannot graze it.
+    # moving the vessel 18 mm away from the palm so the reference rig's full hand volume cannot graze it.
     vessel_x = -0.018
     cylinder("Mug_CeramicBody", 0.040, 0.082, (vessel_x, 0.0, 0.0), ceramic, 64, 0.004)
     torus("Mug_Rim", 0.0385, 0.0032, (vessel_x, 0.0, 0.041), rim, (0.0, 0.0, 0.0), 64, 14)
@@ -383,7 +383,7 @@ def build_everyday_cap():
     band = material("CapV4_Sweatband", (0.075, 0.065, 0.055), roughness=0.92)
 
     # The persisted cap socket is the head-bone forehead contact, not the crown base. A hidden
-    # liner post keeps [0,0,0] on real geometry while lifting the visible cap over Minseo's hair.
+    # liner post keeps [0,0,0] on real geometry while lifting the visible cap over the reference rig's hair.
     cap_lift = 0.065
     dome("Cap_Crown", 0.105, 0.097, 0.096, (0.0, 0.0, cap_lift), fabric, 64, 24)
     cylinder("Cap_HeadContact", 0.028, cap_lift + 0.003,
