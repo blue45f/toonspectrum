@@ -37,7 +37,6 @@ export type StudioBrushRuntimeEngine =
   | "oil-ribbon"
   | "dynamic-dabs"
   | "pencil-path"
-  | "pastel-dabs"
   | "screentone-dots";
 
 export type StudioBrushRuntimeTip =
@@ -401,9 +400,6 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   "pencil-path": {
     jitter: { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
     "side-shade": { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
-  },
-  "pastel-dabs": {
-    "soft-grain": { families: ["pastel"], previews: ["soft"], tip: "grain", texture: "procedural-grain", dynamics: "pastel-pressure" },
   },
   "screentone-dots": {
     "global-grid": { families: ["screentone"], previews: ["tone"], tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid" },
