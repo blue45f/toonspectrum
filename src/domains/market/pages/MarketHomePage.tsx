@@ -1,4 +1,4 @@
-import { Store, Upload } from "lucide-react";
+import { AlertTriangle, PackageSearch, RefreshCw, Store, Upload } from "lucide-react";
 
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
@@ -129,11 +129,28 @@ export function MarketHomePage() {
           </Link>
         </div>
         {hasFatalLatestError ? (
-          <StaleNoticeBar
-            message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
-            onRetry={latest.reload}
-            className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
-          />
+          <div
+            role="alert"
+            className="mt-6 rounded-2xl border border-warn/30 bg-warn/5 p-8 text-center sm:p-10"
+          >
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-warn/10 text-warn">
+              <AlertTriangle className="size-6" aria-hidden="true" />
+            </div>
+            <h3 className="mt-3 text-base font-bold text-fg">
+              최근 공유 리소스를 불러올 수 없어요
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">
+              일시적인 네트워크 문제이거나 서버 장애일 수 있어요.
+            </p>
+            <button
+              type="button"
+              onClick={latest.reload}
+              className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
+            >
+              <RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />
+              다시 시도
+            </button>
+          </div>
         ) : null}
         {latest.stale ? (
           <StaleNoticeBar
@@ -153,7 +170,7 @@ export function MarketHomePage() {
               aria-busy={latest.loading || undefined}
               className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
             >
-              {latest.loading
+              {latest.loading && latest.items.length === 0
                 ? Array.from({ length: 8 }, (_, index) => (
                     <li key={index} aria-hidden="true">
                       <div className="skeleton aspect-[16/9] w-full rounded-t-xl" />
@@ -170,15 +187,26 @@ export function MarketHomePage() {
                   ))}
             </ul>
             {!latest.loading && latest.items.length === 0 ? (
-              <p className="mt-6 rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-fg-2">
-                아직 공유된 리소스가 없어요.{" "}
-                <Link
-                  href="/studio?assetMarket=community&communityView=share"
-                  className="inline-flex min-h-6 items-center text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
-                >
-                  스튜디오에서 첫 리소스를 공유해 보세요.
-                </Link>
-              </p>
+              <div className="mt-6 rounded-2xl border border-dashed border-line bg-panel p-8 text-center sm:p-10">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
+                  <PackageSearch className="size-6" aria-hidden="true" />
+                </div>
+                <h3 className="mt-3 text-base font-bold text-fg">
+                  아직 공유된 리소스가 없어요
+                </h3>
+                <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">
+                  스튜디오에서 창작한 3D 에셋, 브러시, 팔레트를 마켓 커뮤니티에 가장 먼저 공유해 보세요!
+                </p>
+                <div className="mt-5 flex justify-center">
+                  <Link
+                    href="/studio?assetMarket=community&communityView=share"
+                    className={buttonClass({ variant: "solid", size: "sm" })}
+                  >
+                    <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
+                    스튜디오에서 첫 리소스 공유하기
+                  </Link>
+                </div>
+              </div>
             ) : null}
           </>
         )}

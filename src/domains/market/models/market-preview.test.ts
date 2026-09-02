@@ -386,4 +386,62 @@ describe("market-preview", () => {
       runtimeRef: "studio-asset:street-prop",
     });
   });
+
+  it("extracts recipe preview data for 3d-asset procedural recipe and builtin-ref", () => {
+    const proceduralRecord = makeBaseRecord({
+      kind: "3d-asset",
+      entries: [
+        {
+          id: "3d-asset-1",
+          name: "휴머노이드 캐릭터 3D",
+          kind: "3d-asset",
+          delivery: {
+            mode: "procedural-recipe",
+            mediaType: "application/vnd.toonspectrum.3d-asset+json",
+            payload: {
+              schemaVersion: 1,
+              resourceKind: "3d-asset",
+              runtime: "studio-3d-asset-v1",
+              definition: {
+                recipeId: "humanoid-base-male",
+                parameters: { height: 180, build: "athletic" },
+              },
+            },
+            byteSize: 190,
+            sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          },
+        },
+      ],
+    });
+
+    const proceduralData = recipePreviewData(proceduralRecord);
+    expect(proceduralData).toHaveLength(1);
+    expect(proceduralData?.[0].recipeId).toBe("humanoid-base-male");
+    expect(proceduralData?.[0].parameters).toEqual({ height: 180, build: "athletic" });
+
+    const builtinRecord = makeBaseRecord({
+      kind: "3d-asset",
+      entries: [
+        {
+          id: "3d-asset-builtin-1",
+          name: "교실 의자 소품",
+          kind: "3d-asset",
+          delivery: {
+            mode: "builtin-ref",
+            runtimeRef: "studio-3d-asset:classroom-chair",
+            byteSize: 0,
+            sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          },
+        },
+      ],
+    });
+
+    const builtinData = recipePreviewData(builtinRecord);
+    expect(builtinData).toHaveLength(1);
+    expect(builtinData?.[0]).toEqual({
+      name: "교실 의자 소품",
+      recipeId: "studio-3d-asset:classroom-chair",
+      runtimeRef: "studio-3d-asset:classroom-chair",
+    });
+  });
 });

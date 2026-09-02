@@ -24956,7 +24956,7 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      if (canvas2dSelected && !liveInkOverlayStarted) {
+      if (canvas2dSelected && overlayCandidate && !liveInkOverlayStarted) {
         return rejectSelectedSurface("Canvas2D 라이브 잉크", "명시적으로 선택한 2D 표면을 시작하지 못했습니다.");
       }
 

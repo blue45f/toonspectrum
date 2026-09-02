@@ -134,6 +134,6 @@ describe("MarketHomePage", () => {
     );
 
     expect(screen.queryByTestId("resource-cached-resource")).toBeNull();
-    expect(screen.getByRole("status").textContent).toContain("새 목록을 불러올 수 없어요");
+    expect(screen.getByRole("alert").textContent).toContain("최근 공유 리소스를 불러올 수 없어요");
   });
 });

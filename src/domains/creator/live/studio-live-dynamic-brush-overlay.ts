@@ -831,14 +831,18 @@ export function studioLiveDynamicBrushOverlaySupportsElement(
     && Number.isFinite(element.strokeWidth)
     && element.strokeWidth > 0
     && Number.isFinite(element.opacity ?? 1)
-    && (element.opacity ?? 1) > 0;
+    && (element.opacity ?? 1) > 0
+    && resolveStudioDynamicBrushMaterialIdentity(element.brush, element.brushCatalogId) !== null;
 }
 
 function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
   if (!studioLiveDynamicBrushOverlaySupportsElement(element)) return null;
+  // 시작 시점에 아직 점이 없어도(begin 이 첫 point 이전에 오는 경로) 획을 거절하지 않는다.
+  // 원점을 (0,0) 으로 고정하면 대칭 변환의 기준이 캔버스 좌상단으로 끌려가므로, 알 수 없을 때는
+  // 비워 두고 커버리지 렌더러가 첫 dab 을 원점으로 쓰게 한다. 실제 좌표는 소스가 채워지는 즉시
+  // dynamicStyleForSourceOrigin 이 다시 계산한다.
   const firstX = finiteCoordinate(element.points[0]);
   const firstY = finiteCoordinate(element.points[1]);
-  if (firstX === null || firstY === null) return null;
   const sourceDynamics = element.brushDynamics;
   const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
     element.brush,
@@ -856,10 +860,12 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
   const symmetry = detachedSymmetry(element.symmetry);
   const symmetrySignature = JSON.stringify(symmetry);
   const transforms = studioBrushSymmetryTransforms(symmetry);
-  const strokeOrigins = transforms.map((transform) => {
-    const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
-    return Object.freeze({ x, y });
-  });
+  const strokeOrigins = firstX === null || firstY === null
+    ? []
+    : transforms.map((transform) => {
+        const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
+        return Object.freeze({ x, y });
+      });
   const paperBrushId = typeof element.brush === "string" && element.brush
     ? element.brush
     : "dry-media";

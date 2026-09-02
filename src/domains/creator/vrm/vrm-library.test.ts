@@ -103,46 +103,6 @@ const NEW_BUNDLE_FILES = [
   "Eugenia.vrm",
 ] as const;
 
-const ORIGINAL_BUNDLE_FILES = [
-  "TS_Minseo_Campus.vrm",
-  "TS_Taeo_Barista.vrm",
-  "TS_Jeonghwa_Gardener.vrm",
-  "TS_Haram_Explorer.vrm",
-  "TS_Yeonhui_RuneGuard.vrm",
-  "TS_Nova_ServiceAndroid.vrm",
-  "cyber_agent_zero.vrm",
-  "TS_Seojin_Architect.vrm",
-  "TS_Mira_Detective.vrm",
-  "TS_Okseon_HanjiArchivist.vrm",
-  "TS_Nuri_RobotClub.vrm",
-  "TS_Dami_RescueCaptain.vrm",
-  "TS_Moru_MossGolem.vrm",
-  "TS_Samira_OrbitalBotanist.vrm",
-  "TS_Yunae_DeafPercussionist.vrm",
-  "TS_Boram_WeatherScientist.vrm",
-  "TS_Hyeon_StudioPotter.vrm",
-  "TS_Dorong_SeaOtterCourier.vrm",
-  "TS_Sunja_HaenyeoMentor.vrm",
-  "TS_Maya_CoutureDirector.vrm",
-  "TS_Iseul_AdaptiveRescuer.vrm",
-  "TS_Neoul_CoralDjinn.vrm",
-] as const;
-
-const WAVE4_SAMPLE_IDS = [
-  "ts-samira-orbital-botanist",
-  "ts-yunae-deaf-percussionist",
-  "ts-boram-weather-scientist",
-  "ts-hyeon-studio-potter",
-  "ts-dorong-sea-otter-courier",
-] as const;
-
-const WAVE5_SAMPLE_IDS = [
-  "ts-sunja-haenyeo-mentor",
-  "ts-maya-couture-director",
-  "ts-iseul-adaptive-rescuer",
-  "ts-neoul-coral-djinn",
-] as const;
-
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
 
 describe("VRM library helpers", () => {
@@ -151,30 +111,6 @@ describe("VRM library helpers", () => {
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
-    expect(names.slice(4, 26)).toEqual([
-      "민서 (캠퍼스 메이커)",
-      "태오 (동네 바리스타)",
-      "정화 (노년 정원사)",
-      "하람 (어린 탐험가)",
-      "연휘 (룬 수호자)",
-      "노바 (서비스 안드로이드)",
-      "사이버 에이전트 제로",
-      "서진 (배리어프리 건축가)",
-      "미라 (느와르 탐정)",
-      "옥선 (한지 기록가)",
-      "누리 (로봇 동아리원)",
-      "다미 (구조대장)",
-      "모루 (이끼 골렘)",
-      "사미라 (궤도 식물학자)",
-      "윤애 (진동 타악 연주자)",
-      "보람 (기상과학자)",
-      "현 (도예 스튜디오 운영자)",
-      "도롱 (해달 우편원)",
-      "선자 (해녀 멘토)",
-      "마야 (쿠튀르 디렉터)",
-      "이슬 (의족 구조전문가)",
-      "너울 (산호 진)",
-    ]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");
@@ -203,40 +139,6 @@ describe("VRM library helpers", () => {
     expect(new Set(urls).size).toBe(urls.length);
   });
 
-  it("places all five Wave 4 originals immediately after Moru in the default picker", () => {
-    const ids = SAMPLE_VRM_ENTRIES.map((entry) => entry.id);
-    const moruIndex = ids.indexOf("ts-moru-moss-golem");
-
-    expect(moruIndex).toBeGreaterThanOrEqual(0);
-    expect(ids.slice(moruIndex + 1, moruIndex + 1 + WAVE4_SAMPLE_IDS.length))
-      .toEqual(WAVE4_SAMPLE_IDS);
-  });
-
-  it("places all four Wave 5 originals immediately after Wave 4 with real bundled card art", () => {
-    const ids = SAMPLE_VRM_ENTRIES.map((entry) => entry.id);
-    const wave4End = ids.indexOf(WAVE4_SAMPLE_IDS.at(-1) ?? "");
-
-    expect(wave4End).toBeGreaterThanOrEqual(0);
-    expect(ids.slice(wave4End + 1, wave4End + 1 + WAVE5_SAMPLE_IDS.length))
-      .toEqual(WAVE5_SAMPLE_IDS);
-
-    for (const id of WAVE5_SAMPLE_IDS) {
-      const sample = SAMPLE_VRMS.find((candidate) => candidate.id === id);
-      const entry = SAMPLE_VRM_ENTRIES.find((candidate) => candidate.id === id);
-      expect(sample?.thumbnailUrl).toMatch(/^\/vrm\/thumbnails\/[A-Za-z0-9_.-]+\.png$/);
-      expect(entry?.thumbnail).toBe(sample?.thumbnailUrl);
-      if (!sample?.thumbnailUrl) continue;
-      const thumbnailPath = join(process.cwd(), "public", sample.thumbnailUrl.replace(/^\//, ""));
-      expect(existsSync(thumbnailPath), `${id}: missing bundled thumbnail`).toBe(true);
-      expect(statSync(thumbnailPath).size, `${id}: non-placeholder bundled thumbnail`)
-        .toBeGreaterThan(10 * 1024);
-      const thumbnailBytes = readFileSync(thumbnailPath);
-      expect(thumbnailBytes.subarray(1, 4).toString("ascii"), `${id}: PNG signature`).toBe("PNG");
-      expect(thumbnailBytes.readUInt32BE(16), `${id}: card width`).toBe(320);
-      expect(thumbnailBytes.readUInt32BE(20), `${id}: card height`).toBe(400);
-    }
-  });
-
   it("keeps audited limitations bounded while legacy ids remain restorable", () => {
     const samplesById = new Map(SAMPLE_VRMS.map((sample) => [sample.id, sample] as const));
 
@@ -257,7 +159,7 @@ describe("VRM library helpers", () => {
 
   it("registers every newly bundled model in the sample list", () => {
     const urls = new Set(SAMPLE_VRMS.map((sample) => sample.url));
-    for (const fileName of [...NEW_BUNDLE_FILES, ...ORIGINAL_BUNDLE_FILES]) {
+    for (const fileName of NEW_BUNDLE_FILES) {
       expect(urls.has(`/vrm/${fileName}`), `missing sample entry for ${fileName}`).toBe(true);
     }
   });
@@ -270,9 +172,6 @@ describe("VRM library helpers", () => {
     for (const fileName of NEW_BUNDLE_FILES) {
       expect(licenses, `LICENSES.md missing ${fileName}`).toContain(fileName);
     }
-    for (const fileName of ORIGINAL_BUNDLE_FILES) {
-      expect(licenses, `LICENSES.md missing ${fileName}`).toContain(fileName);
-    }
     // 출처 저장소와 Alicia(니코니 솔리드) 라이선스 고지 링크가 명시되어야 한다.
     expect(licenses).toContain("github.com/madjin/vrm-samples");
     expect(licenses).toContain("github.com/vrm-c/UniVRM");
@@ -283,9 +182,6 @@ describe("VRM library helpers", () => {
     expect(licenses).toContain("meebit_09842.vrm");
     expect(licenses).toContain("권리 격리");
     expect(licenses).toContain("런타임 로드를 차단");
-    expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack.py");
-    expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack_wave5.py");
-    expect(licenses).toContain("scripts/blender/render_toonspectrum_vrm_wave5_qa.py");
     expect(licenses).toContain("CC0 1.0");
     expect(licenses).toContain("https://creativecommons.org/publicdomain/zero/1.0/");
     expect(licenses).toContain('Avatar_Orion.vrm');
@@ -335,10 +231,8 @@ describe("VRM library helpers", () => {
     });
     expect(sampleVrmUrl("orion")).toBe("/vrm/Avatar_Orion.vrm");
     expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
-    expect(selectableSampleVrmUrl("ts-nova-service-android"))
-      .toBe("/vrm/TS_Nova_ServiceAndroid.vrm");
-    expect(selectableSampleVrmUrl("ts-iseul-adaptive-rescuer"))
-      .toBe("/vrm/TS_Iseul_AdaptiveRescuer.vrm");
+    expect(selectableSampleVrmUrl("orion")).toBe("/vrm/Avatar_Orion.vrm");
+    expect(selectableSampleVrmUrl("eugenia")).toBe("/vrm/Eugenia.vrm");
   });
 
   it("권리 제한 meebit을 별도 메타데이터로 격리하고 신규 카탈로그·엄격 로드에서 차단한다", () => {

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Market3dAssetPreview } from "./Market3dAssetPreview";
 import { MarketBrushPreview } from "./MarketBrushPreview";
 import { MarketFilterPreview } from "./MarketFilterPreview";
 import { MarketPalettePreview } from "./MarketPalettePreview";
@@ -131,5 +132,23 @@ describe("market interactive preview accessibility", () => {
     expect(recipeBadge.className).toContain("break-all");
     expect(document.body.textContent).not.toContain("실시간 렌더링 및 카메라 회전");
     expect(document.body.textContent).not.toContain("1클릭으로 해당 컷 가이드와 여백을 자동 설정");
+  });
+
+  it("renders Market3dAssetPreview with accessible region, parameters count, and disclaimer", () => {
+    render(
+      <Market3dAssetPreview
+        recipe={{
+          name: "휴머노이드 모델",
+          recipeId: "humanoid-base-v1",
+          parameters: { height: 175, pose: "standing", gender: "neutral" },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "3D 에셋 미리보기 (휴머노이드 모델)" })).toBeTruthy();
+    expect(screen.getByText("3개 파라미터")).toBeTruthy();
+    expect(screen.getByText("3D 에셋")).toBeTruthy();
+    expect(screen.getByText("회전 가능")).toBeTruthy();
+    expect(screen.getByText(/3D 에셋의 구조를 설명하기 위한 단순화된 일러스트이며/u)).toBeTruthy();
   });
 });

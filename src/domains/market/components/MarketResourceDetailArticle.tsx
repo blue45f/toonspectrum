@@ -17,6 +17,7 @@ import {
 
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
+import { Market3dAssetPreview } from "./Market3dAssetPreview";
 import { MarketAssetRecipePreview } from "./MarketAssetRecipePreview";
 import { MarketBrushPreview } from "./MarketBrushPreview";
 import { MarketFilterPreview } from "./MarketFilterPreview";
@@ -389,7 +390,7 @@ export function MarketResourceDetailArticle({
                 ) : null}
 
                 {record.kind === "3d-asset" && selectedRecipe ? (
-                  <MarketScene3dPreview key={`3d-asset-${safePreviewIndex}`} recipe={selectedRecipe} />
+                  <Market3dAssetPreview key={`3d-asset-${safePreviewIndex}`} recipe={selectedRecipe} />
                 ) : null}
               </div>
             </section>

@@ -8,6 +8,7 @@ import type {
 } from "@/lib/creator-marketplace-resource-contract";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { findStarterMarketplaceResourceById } from "@/lib/creator-marketplace-starter-catalog";
 import Link from "@/src/compat/router-link";
 import { getCreatorMarketplaceResourceHistory } from "@/src/infrastructure/creator-marketplace-client";
 
@@ -68,6 +69,38 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
       setState({ status: "ready", page, message: null });
     }).catch((error: unknown) => {
       if (controller.signal.aborted || requestGenerationRef.current !== generation) return;
+      const starter = findStarterMarketplaceResourceById(resourceId);
+      if (starter) {
+        setState({
+          status: "ready",
+          page: {
+            packageId: starter.packageId,
+            anchor: {
+              id: starter.id,
+              resourceVersion: starter.resourceVersion,
+              listed: true,
+            },
+            items: [
+              {
+                id: starter.id,
+                releaseOrdinal: 1,
+                name: starter.name,
+                resourceVersion: starter.resourceVersion,
+                minimumStudioVersion: starter.minimumStudioVersion,
+                manifestHash: starter.manifestHash,
+                createdAt: starter.createdAt,
+                selected: true,
+                releaseNotes: "초기 공식 릴리스",
+              },
+            ],
+            limit: HISTORY_PAGE_SIZE,
+            hasMore: false,
+            nextCursor: null,
+          },
+          message: null,
+        });
+        return;
+      }
       setState({ status: "error", page: null, message: historyErrorMessage(error) });
     });
 

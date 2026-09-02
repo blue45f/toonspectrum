@@ -32,6 +32,13 @@ export const STUDIO_INKWASH_PEN_FRESH_WETNESS = 0.16;
 /** InkWash §05: gaussian stamps spaced at 0.6 × radius. */
 export const STUDIO_INKWASH_STAMP_SPACING_RATIO = 0.6;
 
+/**
+ * 획 평균 간격에 해당하는 기준 속도. `speedShrink = 1/(1 + pace*0.85)` 에 들어가므로 이 값이
+ * 곧 "보통 속도로 그은 획"의 굵기·농도 배율을 정한다. 환경 변수로 흔들지 않는 고정 상수여야
+ * 라이브·커밋·내보내기가 같은 그림을 만든다.
+ */
+export const STUDIO_INKWASH_NOMINAL_PACE = 0.45;
+
 const PAPER = Object.freeze({ r: 0.965, g: 0.956, b: 0.932 });
 const FIELD_MAX = 2_048;
 const HASH_OFFSET = 0x811c9dc5;
@@ -245,7 +252,6 @@ export function depositStudioInkwashFluidStroke(
   let cursorY = samples[0]!.y;
   let previousX = cursorX;
   let previousY = cursorY;
-  let previousTime = samples[0]!.timeMs ?? 0;
 
   const stampAt = (
     x: number,
@@ -280,40 +286,80 @@ export function depositStudioInkwashFluidStroke(
     stamped += 1;
   };
 
-  for (let index = 0; index < samples.length; index += 1) {
+  /*
+   * 이 루프의 두 규칙은 모두 하나의 계약을 위한 것이다 — **같은 기하는 점 개수와 무관하게 같은
+   * 마크가 된다.** 문서는 점당 시간을 저장하지 않고, 직선 획은 커밋되며 2점으로 단순화된다.
+   *
+   * 1) 속도. 예전에는 합성 타임스탬프(`index * 고정간격`)에서 속도를 유도해, "speed" 가 손의
+   *    빠르기가 아니라 점이 얼마나 촘촘히 남았는지를 쟀다. 2점 직선에서는 한 구간의 거리가 획
+   *    전체가 되어 감쇠가 0.006 까지 떨어졌고 획이 시작점 한 방울로 붕괴했다(실측: 391px 수묵
+   *    세필 직선이 52px 얼룩 하나). 이제 속도는 이 획 자신의 평균 간격 대비 **상대값**으로만
+   *    쓰고 절대 크기는 STUDIO_INKWASH_NOMINAL_PACE 로 고정한다. 손이 실제로 빨라져 점 간격이
+   *    벌어진 구간은 그 비율만큼 여전히 얇고 옅어진다.
+   * 2) 위치. 예전에는 구간마다 `ceil(span/spacing)` 로 나눠 t=step/steps 에 찍어서, 스탬프 간격이
+   *    구간 길이에 따라 달라지고 샘플 점마다 뭉쳤다. 이제 획 시작점부터의 **호 길이**를 누적해
+   *    정확히 spacing 마다 찍는다 — 같은 경로를 지나는 폴리라인이면 스탬프가 같은 자리에 놓인다.
+   */
+  const segmentLengths: number[] = [];
+  for (let index = 1; index < samples.length; index += 1) {
+    segmentLengths.push(Math.hypot(
+      samples[index]!.x - samples[index - 1]!.x,
+      samples[index]!.y - samples[index - 1]!.y,
+    ));
+  }
+  const meanSegment = segmentLengths.length > 0
+    ? segmentLengths.reduce((total, value) => total + value, 0) / segmentLengths.length
+    : 0;
+
+  const first = samples[0]!;
+  stampAt(first.x, first.y, first.pressure, 0, 0, 0);
+  cursorX = first.x;
+  cursorY = first.y;
+  /** 다음 스탬프까지 남은 호 길이. 구간 경계에서 초기화하지 않아야 간격이 일정하다. */
+  let untilNextStamp = spacing;
+
+  for (let index = 1; index < samples.length; index += 1) {
     const sample = samples[index]!;
     const dx = sample.x - previousX;
     const dy = sample.y - previousY;
-    const distance = Math.hypot(dx, dy);
-    const dt = Math.max(1, (sample.timeMs ?? previousTime) - previousTime);
-    const speed = distance / dt;
-    const dirX = distance > 1e-6 ? dx / distance : 0;
-    const dirY = distance > 1e-6 ? dy / distance : 0;
+    const span = Math.hypot(dx, dy);
+    const relativePace = meanSegment > 1e-6 ? span / meanSegment : 1;
+    const speed = STUDIO_INKWASH_NOMINAL_PACE * Math.min(4, relativePace);
+    const dirX = span > 1e-6 ? dx / span : 0;
+    const dirY = span > 1e-6 ? dy / span : 0;
     const impulse = isWater ? 0.55 * Math.min(1.8, 0.35 + speed * 8) : 0;
-    if (index === 0) {
-      stampAt(sample.x, sample.y, sample.pressure, dirX * impulse, dirY * impulse, 0);
-      cursorX = sample.x;
-      cursorY = sample.y;
-    } else {
-      const span = Math.hypot(sample.x - cursorX, sample.y - cursorY);
-      const steps = Math.max(1, Math.ceil(span / spacing));
-      for (let step = 1; step <= steps; step += 1) {
-        const t = step / steps;
-        stampAt(
-          cursorX + (sample.x - cursorX) * t,
-          cursorY + (sample.y - cursorY) * t,
-          sample.pressure,
-          dirX * impulse,
-          dirY * impulse,
-          speed,
-        );
-      }
-      cursorX = sample.x;
-      cursorY = sample.y;
+    if (span <= 1e-9) {
+      previousX = sample.x;
+      previousY = sample.y;
+      continue;
     }
+    for (
+      let travelled = untilNextStamp;
+      travelled <= span + 1e-9;
+      travelled += spacing
+    ) {
+      const t = travelled / span;
+      stampAt(
+        cursorX + dx * t,
+        cursorY + dy * t,
+        sample.pressure,
+        dirX * impulse,
+        dirY * impulse,
+        speed,
+      );
+      untilNextStamp = travelled + spacing;
+    }
+    untilNextStamp -= span;
+    cursorX = sample.x;
+    cursorY = sample.y;
     previousX = sample.x;
     previousY = sample.y;
-    previousTime = sample.timeMs ?? previousTime;
+  }
+
+  // 마지막 점은 항상 찍는다 — 호 길이 격자에 걸리지 않아도 획의 끝은 존재해야 한다.
+  const last = samples[samples.length - 1]!;
+  if (samples.length > 1 && untilNextStamp < spacing - 1e-9) {
+    stampAt(last.x, last.y, last.pressure, 0, 0, STUDIO_INKWASH_NOMINAL_PACE);
   }
   return stamped;
 }
