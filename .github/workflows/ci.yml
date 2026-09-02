@@ -26,6 +26,32 @@ jobs:
       - name: Verify real p5.brush Worker WebGL2 runtime
         run: pnpm run verify:studio-p5-brush-real-runtime
 
+  studio-filter-dialog:
+    # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
+    # 실제로 몰아본다. 이 게이트가 없는 동안 페이지 합성·레이어 필터 전체가 브라우저에서
+    # 다이얼로그조차 못 여는 상태로 지나갔다 — createImageBitmap(svgBlob) 이 Chromium·WebKit
+    # 모두에서 InvalidStateError 라 선택된 offscreen 벡터 래스터가 항상 실패했는데, 유닛 테스트는
+    # 주입된 디코더를 쓰기 때문에 전부 초록이었다. 브라우저만이 그 사실을 말해준다.
+    #
+    # 잡 이름은 `core`/`verify` 와 겹치면 안 된다. 그 둘은 이미 각각 job id `verify:` 와
+    # `studio-3d-runtime:` 에 붙어 있고, main 브랜치 보호의 필수 체크가 `core` 하나다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build for vite preview
+        run: pnpm run build
+      - name: Verify the shipped filter dialog end to end
+        run: pnpm run verify:studio-filter-dialog
+
   studio-inapp-browser:
     # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
     # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
