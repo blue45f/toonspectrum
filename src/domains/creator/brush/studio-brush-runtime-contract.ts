@@ -337,8 +337,6 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "bristle-load-depletion": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     // 2026-08-13 wave 3: WetBrush-2D 강모 물리 시뮬(레인 궤적 스트림, bristlePhysics 캐리어 옵션).
     "bristle-physics-tuft": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
-    "fluid-paint-splat": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
-    "fluid-paint-rake": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
