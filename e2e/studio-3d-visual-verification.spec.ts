@@ -627,7 +627,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
    * `?room=work-instant-…` 잼을 발행하므로 `isRealtimeTeamSession`이 참이고, 그 분기가 실패로
    * 닫혀 있는 동안에는 3D 배경을 캔버스에 붙이는 경로가 어디에도 없었다.
    */
-  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }) => {
+  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }, testInfo) => {
     // This case walks the whole round trip — insert, update, reopen, update again — while every
     // frame is rendered by SwiftShader. On the CI runner the other 3D cases in this file each
     // take 1.5–2.5 minutes, and this one does several times their work, so the 300s it inherited
@@ -798,6 +798,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     );
     const updatedCanvas = await waitForStableDocumentFrame(page, "3D 배경 업데이트 캔버스 정착");
     expect(updatedCanvas.distinctColors).toBeGreaterThan(1);
+    await testInfo.attach("updated-document.png", {
+      body: await page.locator(STUDIO_DOCUMENT_SCOPE).first().screenshot(),
+      contentType: "image/png",
+    });
     // Same row, same `content-visibility:auto` caveat as the first selection above.
     await updatedLayer.scrollIntoViewIfNeeded();
     await updatedLayer.click({ position: { x: 12, y: 18 } });
@@ -824,8 +828,45 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await dismissStudioStatusNotices(page);
     await page.getByRole("button", { name: "해제", exact: true }).click();
     const reopenedCanvas = await waitForStableDocumentFrame(page, "재열기 뒤 캔버스 정착");
-    expect(peakColorTileDelta(reopenedCanvas, insertedCanvas)).toBeGreaterThan(3);
-    expect(peakColorTileDelta(reopenedCanvas, updatedCanvas)).toBeLessThan(3);
+    await testInfo.attach("reopened-document.png", {
+      body: await page.locator(STUDIO_DOCUMENT_SCOPE).first().screenshot(),
+      contentType: "image/png",
+    });
+
+    // "재열기가 문서 화면을 되돌리지 않았다"는 계약은 presenter 영수증으로 정확히 고정한다: 마지막으로
+    // 그린 raster 가 업데이트 PNG 그대로여야 하고, 기대와 영수증이 같은 src 를 가리켜야 한다.
+    const retained = await page.evaluate(() => {
+      const probe = window.__studioRasterImagePresentationProbe;
+      return {
+        expected: probe?.expected?.src ?? "",
+        receipt: probe?.receipt?.src ?? "",
+      };
+    });
+    expect(retained.expected).toBe(updatedCompositeSrc);
+    expect(retained.receipt).toBe(updatedCompositeSrc);
+
+    // 화면 비교는 방향으로 판정한다: 재열기 뒤 프레임은 삽입 raster 보다 업데이트 raster 에 가까워야
+    // 한다. 예전의 절대 임계(칸 RGB 차 < 3)는 러너별 글꼴·레이아웃 차이로 칸 경계가 한 픽셀 옮겨
+    // 가는 것(리눅스 러너에서 두 번 연속 정확히 3.55)까지 회귀로 읽었다 — 두 캡처가 모두 정착·알림
+    // 제거 뒤였고 값이 재현 가능해 시간 문제가 아니었다. 되돌림은 위 영수증 단언이 잡는다.
+    const reopenedToUpdated = peakColorTileDelta(reopenedCanvas, updatedCanvas);
+    const reopenedToInserted = peakColorTileDelta(reopenedCanvas, insertedCanvas);
+    const updatedToInserted = peakColorTileDelta(updatedCanvas, insertedCanvas);
+    await testInfo.attach("reopen-deltas.json", {
+      body: Buffer.from(JSON.stringify({
+        reopenedToUpdated,
+        reopenedToInserted,
+        updatedToInserted,
+        frames: {
+          inserted: [insertedCanvas.width, insertedCanvas.height],
+          updated: [updatedCanvas.width, updatedCanvas.height],
+          reopened: [reopenedCanvas.width, reopenedCanvas.height],
+        },
+      }, null, 2)),
+      contentType: "application/json",
+    });
+    expect(reopenedToInserted).toBeGreaterThan(3);
+    expect(reopenedToUpdated).toBeLessThan(reopenedToInserted);
 
     expect(fatal).toEqual([]);
   });
