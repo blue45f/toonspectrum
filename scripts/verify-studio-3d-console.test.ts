@@ -166,16 +166,16 @@ describe("3D character production-preview color boundary", () => {
       "async function closeCanvasDialog(",
     );
     const baseline = productionPreview.indexOf(
-      "const baselineChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+      "const baselineChroma = await measureSettledStudioVrmChroma(page, vrmCanvas,",
     );
     const toggleOn = productionPreview.indexOf("await mannequinSwitch.click();", baseline);
     const mannequin = productionPreview.indexOf(
-      "const mannequinChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+      "const mannequinChroma = await measureSettledStudioVrmChroma(page, vrmCanvas,",
       toggleOn,
     );
     const toggleOff = productionPreview.indexOf("await mannequinSwitch.click();", toggleOn + 1);
     const restored = productionPreview.indexOf(
-      "const restoredChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+      "const restoredChroma = await measureSettledStudioVrmChroma(page, vrmCanvas,",
       toggleOff,
     );
 
