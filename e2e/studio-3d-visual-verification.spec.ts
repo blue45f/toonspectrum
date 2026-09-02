@@ -414,6 +414,56 @@ async function waitForFrameChange(
   );
 }
 
+/**
+ * 상태 레일의 알림을 닫아 문서 캡처의 레이아웃을 고정한다.
+ *
+ * 실시간 룸의 병합 알림은 `[data-studio-global-status-rail]`(문서 흐름, `empty:hidden`)에 뜨므로
+ * 알림이 있고 없음에 따라 작업 영역 높이가 달라지고, 문서 스코프 스크린샷의 크기와 칸 배치가
+ * 함께 움직인다. 알림의 존재 자체는 호출 전에 단언하고, 캡처 전에는 항상 같은 레이아웃으로 되돌린다.
+ * 오류 배너는 닫지 않는다 — 그것은 실패 증거다.
+ */
+async function dismissStudioStatusNotices(page: Page): Promise<void> {
+  const dismiss = page.locator("[data-studio-status-notice-dismiss]");
+  for (let attempt = 0; attempt < 5 && (await dismiss.count()) > 0; attempt += 1) {
+    await dismiss.first().click();
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(300);
+}
+
+/**
+ * 문서 스코프 프레임이 안정될 때까지 폴링한 뒤 그 프레임을 돌려준다.
+ *
+ * `waitForFrameChange`는 기준과 달라진 첫 프레임을 돌려주므로, 러너가 느리면 Transformer 제거와
+ * raster 교체 사이의 과도기 프레임이 잡힌다. 그 프레임을 뒤의 "유지되어야 한다" 비교의 기준으로
+ * 쓰면 실제 회귀가 없어도 한 자리 칸 차이가 난다. 연속 두 구간이 같은 크기·1 미만 채널차이면 정착이다.
+ */
+async function waitForStableDocumentFrame(
+  page: Page,
+  label: string,
+  timeoutMs = 20_000,
+): Promise<FrameStats> {
+  const startedAt = Date.now();
+  let previous = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+  let latest = previous;
+  let stableIntervals = 0;
+  let delta = Number.POSITIVE_INFINITY;
+  while (Date.now() - startedAt < timeoutMs) {
+    await page.waitForTimeout(300);
+    latest = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+    delta = peakColorTileDelta(latest, previous);
+    const sameSurface = latest.width === previous.width && latest.height === previous.height;
+    stableIntervals = sameSurface && delta < 1 ? stableIntervals + 1 : 0;
+    if (stableIntervals >= 2) return latest;
+    previous = latest;
+  }
+  throw new Error(
+    `${label}: 문서 프레임이 ${timeoutMs}ms 안에 안정되지 않았습니다 `
+    + `(마지막 칸 최대 RGB 채널차 ${delta.toFixed(2)}, `
+    + `프레임 ${previous.width}×${previous.height} → ${latest.width}×${latest.height}).`,
+  );
+}
+
 /** 3D 표면은 치명적 런타임 오류 없이 렌더되어야 한다. */
 function collectFatalErrors(page: Page): string[] {
   const fatal: string[] = [];
@@ -619,18 +669,6 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await expect(page.getByText("3D LT 배경", { exact: false }).first()).toBeVisible({
       timeout: 30_000,
     });
-    // 삽입 직후 자동 선택된 Transformer/핸들을 제거하고 실제 문서 raster만 비교한다. 전체
-    // scroll viewport나 선택 테두리 변화는 빈/깨진 PNG도 성공으로 오판할 수 있다.
-    await page.getByRole("button", { name: "해제", exact: true }).click();
-    const insertedCanvas = await waitForFrameChange(
-      page,
-      STUDIO_DOCUMENT_SCOPE,
-      emptyCanvas,
-      "3D 배경 캔버스 합성",
-      30_000,
-    );
-    expect(insertedCanvas.distinctColors).toBeGreaterThan(1);
-
     // 실시간 룸에서는 병합 합성이 들어간다는 사실을 중립 알림으로 알려야 한다 — 오류가 아니다.
     const notice = page.locator("[data-studio-status-notice-dismiss]").first();
     if (await notice.count()) {
@@ -638,6 +676,21 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     }
     // 성공한 삽입이 빨간 오류 배너를 남겨서는 안 된다.
     await expect(page.locator("[data-studio-status-error-dismiss]")).toHaveCount(0);
+    // 알림은 상태 레일 높이를 바꾸므로, 빈 캔버스 기준과 같은 레이아웃으로 되돌린 뒤 캡처한다.
+    await dismissStudioStatusNotices(page);
+
+    // 삽입 직후 자동 선택된 Transformer/핸들을 제거하고 실제 문서 raster만 비교한다. 전체
+    // scroll viewport나 선택 테두리 변화는 빈/깨진 PNG도 성공으로 오판할 수 있다.
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    await waitForFrameChange(
+      page,
+      STUDIO_DOCUMENT_SCOPE,
+      emptyCanvas,
+      "3D 배경 캔버스 합성",
+      30_000,
+    );
+    const insertedCanvas = await waitForStableDocumentFrame(page, "3D 배경 캔버스 합성 정착");
+    expect(insertedCanvas.distinctColors).toBeGreaterThan(1);
 
     // 레이어 트리에서 방금 삽입한 원본을 다시 선택하고 ID를 기록한다. 업데이트가 delete +
     // reinsert로 바뀌어도 단순 count=1은 통과하므로 동일 identity를 직접 고정한다.
@@ -732,8 +785,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 먼저 재열기와 무관한 update 자체의 가시 결과를 고정한다. 이 지점에서 새 raster가 보이지
     // 않으면 캡처/patch/이미지 디코드 경로 결함이고, 여기서는 보이는데 아래 재열기 뒤 사라지면
     // route/modal 전환이 문서 화면을 되돌린 결함이다.
+    // 업데이트가 병합 알림을 다시 띄우므로 삽입 때와 같은 레이아웃으로 되돌린 뒤 캡처한다.
+    await dismissStudioStatusNotices(page);
     await page.getByRole("button", { name: "해제", exact: true }).click();
-    const updatedCanvas = await waitForFrameChange(
+    await waitForFrameChange(
       page,
       STUDIO_DOCUMENT_SCOPE,
       insertedCanvas,
@@ -741,6 +796,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
       30_000,
       "color",
     );
+    const updatedCanvas = await waitForStableDocumentFrame(page, "3D 배경 업데이트 캔버스 정착");
     expect(updatedCanvas.distinctColors).toBeGreaterThan(1);
     // Same row, same `content-visibility:auto` caveat as the first selection above.
     await updatedLayer.scrollIntoViewIfNeeded();
@@ -763,10 +819,11 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
     await expect(page.locator(BG3D_DIALOG)).toHaveCount(0);
 
-    // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다.
+    // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다. 고정 대기는
+    // 러너 속도에 판정을 거는 셈이므로 프레임이 정착할 때까지 폴링한다.
+    await dismissStudioStatusNotices(page);
     await page.getByRole("button", { name: "해제", exact: true }).click();
-    await page.waitForTimeout(2_000);
-    const reopenedCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+    const reopenedCanvas = await waitForStableDocumentFrame(page, "재열기 뒤 캔버스 정착");
     expect(peakColorTileDelta(reopenedCanvas, insertedCanvas)).toBeGreaterThan(3);
     expect(peakColorTileDelta(reopenedCanvas, updatedCanvas)).toBeLessThan(3);
 
