@@ -1,0 +1,46 @@
+name: Marketplace source snapshot
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-source-snapshot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Pack editable source
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=coverage \
+            --exclude=test-results \
+            --exclude=playwright-report \
+            --exclude=artifacts \
+            --exclude=qa-results \
+            --exclude=public/data \
+            -czf /tmp/toonspectrum-market-source.tgz \
+            .github apps packages src lib scripts e2e migrations public \
+            index.html package.json pnpm-lock.yaml pnpm-workspace.yaml \
+            tsconfig.json vite.config.ts playwright.config.ts turbo.json
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: toonspectrum-market-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/toonspectrum-market-source.tgz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
