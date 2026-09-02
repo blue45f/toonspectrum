@@ -9,6 +9,7 @@ import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
+import { findStarterMarketplaceResourceById } from "@/lib/creator-marketplace-starter-catalog";
 import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 
 export interface MarketResourceDetail {
@@ -62,6 +63,12 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
         if (cached) {
           setRecord(cached.record);
           setStaleSavedAt(cached.savedAt);
+          setLoading(false);
+          return;
+        }
+        const starter = findStarterMarketplaceResourceById(id);
+        if (starter) {
+          setRecord(starter);
           setLoading(false);
           return;
         }

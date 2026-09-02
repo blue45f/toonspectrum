@@ -31,6 +31,7 @@ import {
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
 } from "../../../../../lib/creator-marketplace-resource-contract";
+import { findStarterMarketplaceResourceById } from "../../../../../lib/creator-marketplace-starter-catalog";
 
 import {
   CREATOR_MARKETPLACE_PUBLISH_GATE,
@@ -565,18 +566,39 @@ export class CreatorMarketplaceService {
     id: string,
     options: { viewerId?: string } = {}
   ): Promise<CreatorMarketplaceResourceRecord> {
+    let row: CreatorMarketplaceResourceStoredRow | null = null;
+    let repoFailed = false;
     try {
-      const row = await this.repository.findById(id);
-      if (!row) throw new NotFoundException();
-      return projectRecord(row, options.viewerId);
+      row = await this.repository.findById(id);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logFailure("detail", error);
+      repoFailed = true;
+    }
+
+    if (row) {
+      try {
+        return projectRecord(row, options.viewerId);
+      } catch (error) {
+        if (error instanceof HttpException) throw error;
+        this.logFailure("detail", error);
+        throw new ServiceUnavailableException({
+          code: "creator_marketplace_unavailable",
+          message: "공유 리소스를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        });
+      }
+    }
+
+    const starter = findStarterMarketplaceResourceById(id);
+    if (starter) return starter;
+
+    if (repoFailed) {
       throw new ServiceUnavailableException({
         code: "creator_marketplace_unavailable",
         message: "공유 리소스를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.",
       });
     }
+    throw new NotFoundException();
   }
 
   async publish(
