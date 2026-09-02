@@ -1,9 +1,9 @@
 name: Studio parallel campaign coordinator
-run-name: Studio parallel coordinator · ${{ github.run_number }}
+run-name: Studio thirty-lane coordinator · ${{ github.run_number }}
 
 on:
   schedule:
-    # Event-driven continuation is primary. This twice-hourly coordinator is the recovery watchdog.
+    # Event-driven continuation is primary; this twice-hourly run is the recovery watchdog.
     - cron: "2,32 * * * *"
   workflow_dispatch:
 
@@ -20,11 +20,11 @@ concurrency:
 jobs:
   coordinate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
-      CAMPAIGN_WORKFLOW: studio-seven-day-campaign.yml
+      CAMPAIGN_WORKFLOW: studio-thirty-lane-worker.yml
       GATE_DISPATCHER_WORKFLOW: studio-campaign-gate-dispatcher.yml
       TRACKING_ISSUE: "555"
     steps:
@@ -33,7 +33,7 @@ jobs:
           ref: main
           persist-credentials: false
 
-      - name: Detect the optional authoring credential
+      - name: Detect optional Codex authoring credential
         id: authoring
         shell: bash
         env:
@@ -63,7 +63,7 @@ jobs:
           fi
           {
             echo "$marker"
-            echo "The six-lane parallel Studio coordinator is installed, but authoring dispatch is paused because OPENAI_API_KEY is not configured as a repository Actions secret."
+            echo "The up-to-thirty-lane Studio coordinator is installed, but authoring dispatch is paused because OPENAI_API_KEY is not configured as a repository Actions secret."
             echo "Benchmarking, existing PR gates, safe merge, deployment, and branch cleanup remain independent."
           } > "$RUNNER_TEMP/studio-parallel-key.md"
           gh issue comment "$TRACKING_ISSUE" \
@@ -87,22 +87,29 @@ jobs:
             exit 0
           fi
 
+          lane_count="$(jq '.lanes | length' "$config")"
           max_concurrent="$(jq -r '.maxConcurrentAuthoringRuns' "$config")"
-          if [[ ! "$max_concurrent" =~ ^[1-9][0-9]*$ ]]; then
-            echo "::error::maxConcurrentAuthoringRuns must be a positive integer."
+          max_research="$(jq -r '.maxParallelResearchRefreshes' "$config")"
+          if [[ "$lane_count" -ne 30 ]]; then
+            echo "::error::Expected exactly 30 configured lanes, found ${lane_count}."
+            exit 1
+          fi
+          if [[ ! "$max_concurrent" =~ ^[1-9][0-9]*$ ]] \
+            || [[ "$max_concurrent" -gt 30 ]] \
+            || [[ "$max_concurrent" -gt "$lane_count" ]]; then
+            echo "::error::maxConcurrentAuthoringRuns must be between 1 and 30 and no greater than lane count."
+            exit 1
+          fi
+          if [[ ! "$max_research" =~ ^[1-9][0-9]*$ ]] || [[ "$max_research" -gt 3 ]]; then
+            echo "::error::maxParallelResearchRefreshes must be between 1 and 3."
             exit 1
           fi
 
           pulls_json="$(
-            gh api \
-              -H 'Accept: application/vnd.github+json' \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "repos/${REPOSITORY}/pulls?state=open&per_page=100"
+            gh api "repos/${REPOSITORY}/pulls?state=open&per_page=100"
           )"
           runs_json="$(
             gh api \
-              -H 'Accept: application/vnd.github+json' \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
               "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=100"
           )"
 
@@ -140,16 +147,16 @@ jobs:
 
             if [[ "$open_count" -gt 0 || "$active_count" -gt 0 ]]; then
               busy_count=$((busy_count + 1))
-              echo "Lane ${lane_id} is busy: open_prs=${open_count}, active_runs=${active_count}."
+              echo "Lane ${lane_id} busy: open_prs=${open_count}, active_runs=${active_count}."
             else
               free_lanes+=("$lane_id")
-              echo "Lane ${lane_id} is free."
+              echo "Lane ${lane_id} free."
             fi
           done < <(jq -r '.lanes[].id' "$config")
 
           capacity=$((max_concurrent - busy_count))
           if [[ "$capacity" -le 0 ]]; then
-            echo "All configured parallel capacity is occupied."
+            echo "All configured authoring capacity is occupied."
             exit 0
           fi
 
@@ -161,9 +168,9 @@ jobs:
               ] | length
             " <<< "$runs_json"
           )"
-          research_assigned=false
-          if [[ "$research_active" -gt 0 ]]; then
-            research_assigned=true
+          research_remaining=$((max_research - research_active))
+          if [[ "$research_remaining" -lt 0 ]]; then
+            research_remaining=0
           fi
 
           dispatched=0
@@ -173,9 +180,9 @@ jobs:
             fi
 
             refresh_research=false
-            if [[ "$research_assigned" != "true" ]]; then
+            if [[ "$research_remaining" -gt 0 ]]; then
               refresh_research=true
-              research_assigned=true
+              research_remaining=$((research_remaining - 1))
             fi
 
             jq -n \
@@ -193,8 +200,6 @@ jobs:
               }' \
               | gh api \
                   --method POST \
-                  -H 'Accept: application/vnd.github+json' \
-                  -H 'X-GitHub-Api-Version: 2022-11-28' \
                   "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
                   --input -
 
@@ -203,13 +208,16 @@ jobs:
           done
 
           {
-            echo "## Parallel campaign coordination"
+            echo "## Thirty-lane campaign coordination"
             echo
+            echo "- Configured lanes: ${lane_count}"
             echo "- Busy lanes before dispatch: ${busy_count}"
             echo "- Free lanes before dispatch: ${#free_lanes[@]}"
-            echo "- Maximum concurrent lanes: ${max_concurrent}"
+            echo "- Requested authoring concurrency: ${max_concurrent}"
             echo "- Newly dispatched lanes: ${dispatched}"
-            echo "- Research refresh already active before dispatch: ${research_active}"
+            echo "- Research refreshes active before dispatch: ${research_active}"
+            echo
+            echo "GitHub may queue excess jobs when the account-level hosted-runner concurrency is lower than the requested 30 lanes."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Reconcile release gates for every open campaign PR
@@ -220,8 +228,6 @@ jobs:
           jq -n '{ref: "main"}' \
             | gh api \
                 --method POST \
-                -H 'Accept: application/vnd.github+json' \
-                -H 'X-GitHub-Api-Version: 2022-11-28' \
                 "repos/${REPOSITORY}/actions/workflows/${GATE_DISPATCHER_WORKFLOW}/dispatches" \
                 --input -
           echo "Dispatched campaign gate reconciliation."
