@@ -80,7 +80,18 @@ export class StudioGpuPinReceiptWatchdog {
     }
     // Before any visible receipt the immutable epoch timer is the stronger deadline. Crucially,
     // high-frequency appends do not clear or replace it.
-    if (!this.firstVisible || this.progressTimer) return;
+    if (!this.firstVisible) return;
+    if (this.progressTimer) {
+      // An explicit budget answers a different question than the outstanding one, so it replaces
+      // that deadline instead of inheriting it. The real order is always frame-then-terminal: a
+      // pointer frame arms the 300 ms live deadline and pointer-up's terminal request lands inside
+      // it, so without this the 2000 ms terminal budget never applied and the 300 ms deadline
+      // cancelled the finished stroke — the exact failure the override was added to prevent.
+      // Appends pass no budget, so they still cannot move the deadline that bounds them.
+      if (timeoutMs === undefined) return;
+      this.scheduler.clearTimeout(this.progressTimer);
+      this.progressTimer = null;
+    }
 
     const epoch = this.epoch;
     this.progressTimer = this.scheduler.setTimeout(() => {

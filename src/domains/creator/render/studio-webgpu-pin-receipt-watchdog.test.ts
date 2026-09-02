@@ -87,6 +87,27 @@ describe("StudioGpuPinReceiptWatchdog", () => {
     expect(onTimeout).toHaveBeenCalledWith("progress", "terminal:1");
   });
 
+  it("applies a terminal budget that arrives while a pointer-frame deadline is outstanding", () => {
+    // 실제 순서는 항상 이렇다: 포인터 프레임이 300 ms 시한을 걸어둔 채로 포인터업의 최종
+    // 요청이 도착한다. 그 시한을 그대로 물려받으면 2000 ms 예산은 한 번도 적용되지 않고
+    // 완성된 획이 취소된다.
+    vi.useFakeTimers();
+    const onTimeout = vi.fn();
+    const watchdog = new StudioGpuPinReceiptWatchdog({ timeoutMs: 300, onTimeout });
+
+    watchdog.begin("frame:1");
+    expect(watchdog.receipt("frame:1")).toBe(true);
+    watchdog.request("frame:2");
+    vi.advanceTimersByTime(120);
+    watchdog.request("terminal:1", 2_000);
+    vi.advanceTimersByTime(500);
+    expect(onTimeout).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1_600);
+    expect(onTimeout).toHaveBeenCalledOnce();
+    expect(onTimeout).toHaveBeenCalledWith("progress", "terminal:1");
+  });
+
   it("keeps the live budget for a pointer frame that passes no override", () => {
     vi.useFakeTimers();
     const onTimeout = vi.fn();
