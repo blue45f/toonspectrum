@@ -21,6 +21,7 @@ import {
   depositStudioInkwashFluidStroke,
   stepStudioInkwashFluid,
   studioInkwashFluidDigest,
+  studioInkwashActiveRegionSteps,
   studioInkwashFluidStepParams,
   type StudioInkwashFluidSession,
 } from "./studio-inkwash-fluid";
@@ -51,6 +52,7 @@ import {
 } from "./studio-wet-ink-field";
 
 import type { DrawEl } from "../studio-element-model";
+import type { StudioLivingInkFluidReferenceRegion } from "../studio-living-ink-fluid-reference";
 
 export const STUDIO_WET_INK_BRUSH_RUNTIME_VERSION =
   "wet-ink-brush-runtime-v1" as const;
@@ -643,10 +645,19 @@ export function resolveStudioWetInkBrushPhysicalRecipe(
 const INKWASH_CPU_STAM_CELL_CAP = 512 * 512;
 const INKWASH_CPU_STAM_STEPS = 4;
 
-function inkwashCpuStamSteps(session: { fluid: { width: number; height: number } }): number {
-  const cells = session.fluid.width * session.fluid.height;
-  if (cells > INKWASH_CPU_STAM_CELL_CAP) return 0;
-  return INKWASH_CPU_STAM_STEPS;
+/** 이 획의 파인 셀 bbox 를 공유 워시 좌표로 옮긴다(여백은 geometry 가 이미 반경+스텝만큼 넣었다). */
+function inkwashStrokeActiveRegion(
+  wash: NonNullable<ReturnType<typeof getStudioInkwashWash>>,
+  geometry: WetInkGeometry,
+): StudioLivingInkFluidReferenceRegion {
+  const origin = studioInkwashDocumentToField(
+    wash,
+    geometry.originCellX / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+    geometry.originCellY / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+  );
+  const x0 = Math.floor(origin.x);
+  const y0 = Math.floor(origin.y);
+  return { x0, y0, x1: x0 + geometry.width, y1: y0 + geometry.height };
 }
 
 function applyInkwashElementToWash(
@@ -686,10 +697,16 @@ function applyInkwashElementToWash(
     });
     markStudioInkwashWashDeposited(element);
     // Live Konva/DrawNode replays must not Stam. Overlay owns the pointer-frame field.
-    // Committed plans Stam once when this snapshot first lands, and only if the field is small
-    // enough for the main thread.
+    // Committed plans Stam once when this snapshot first lands, over the stroke's own active
+    // region — the shared wash may be page-sized, but this stroke only wets its own bbox.
     if (phase !== "live") {
-      const steps = inkwashCpuStamSteps(wash.session);
+      const region = inkwashStrokeActiveRegion(wash, geometry);
+      const steps = studioInkwashActiveRegionSteps(
+        INKWASH_CPU_STAM_STEPS,
+        region,
+        wash.session.fluid,
+        INKWASH_CPU_STAM_CELL_CAP,
+      );
       if (steps > 0) {
         stepStudioInkwashFluid(
           wash.session,
@@ -699,6 +716,7 @@ function applyInkwashElementToWash(
             dryRate: recipe.material.dryingRate,
             chromaticSeparation: recipe.material.chromatography ?? 0.5,
           }),
+          region,
         );
       }
     }

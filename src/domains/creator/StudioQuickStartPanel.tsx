@@ -16,17 +16,13 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
-import {
-  resolveStudioDialogOpener,
-  studioDialogFocusAnchor,
-} from "./studio-dialog-focus-return";
-import { holdsForeignModalFocus, useStudioModalSheet } from "./useStudioModalSheet";
+import { studioDialogFocusAnchor } from "./studio-dialog-focus-return";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { useI18n, useT } from "@/lib/i18n";
@@ -151,55 +147,68 @@ export function StudioQuickStartPanel({
   );
   const undoShortcut = displayQuickStartShortcut(shortcuts, "undo", "Mod+Z", copy.unassigned);
   const rootRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
 
-  // `aria-modal="true"`를 선언한 이상 포커스 루프도 계약이다. 이 훅이 Esc, Tab/⇧Tab 순환,
-  // 밖으로 새는 focusin 되돌리기, 트리거 포커스 복원을 한꺼번에 책임진다(WCAG 2.1 2.4.3).
-  // 배경 격리는 이 오버레이 안쪽으로만 제한해 캔버스를 inert로 만들지 않는다 — 첫 획까지의
-  // 경로를 막지 않으면서 키보드/스크린리더는 다이얼로그 안에 머문다.
+  // 이 코치는 **모달이 아니다.**
   //
-  // 이 코치는 사용자가 부른 게 아니라 스스로 뜬다. 그래서 닫을 때 돌려줄 "열어 준 컨트롤"이
-  // 없고, 실측에서 Esc 뒤 포커스가 `document.body` 로 떨어져 키보드 사용자가 문서 맨 앞부터
-  // 다시 Tab 해야 했다. 실제 트리거(우하단 빠른 실행 버튼)로 열렸으면 그쪽을, 자동으로 떴으면
-  // 메뉴바 첫 트리거를 착지점으로 준다 — Esc 한 번이면 메뉴바에 도달한다.
+  // 감사 근거(docs/rewrite/ux-audit-v5.md §2.1 · 2026-09-02 아키텍처 리뷰 P0): 손님은 첫 획을
+  // 긋기 전에 두 번 조작해야 했다 — 코치를 닫고, 도구를 바꾸고. `aria-modal="true"` + 전면
+  // 배경 + 포커스 루프는 그 첫 조작을 **강제**하는 장치였다. 이제 코치는 캔버스 위에 떠 있는
+  // 카드일 뿐이라: 마운트할 때 포커스를 가져가지 않고, Tab 을 가두지 않고, 자기 상자 밖의
+  // 포인터 이벤트를 먹지 않는다. 남의 모달 위로 뒤늦게 떠도 아무것도 빼앗지 않으므로
+  // 예전의 "양보하고 즉시 dismiss" 경로(`yieldToOpenModal`)도 필요 없어졌다.
   //
-  // 다만 사용자가 이미 열어 둔 다이얼로그 위로 뒤늦게 마운트되면 모달 계약이
-  // 그 다이얼로그에서 포커스를 빼앗으므로(실측 2026-08-21 verify-studio-launch), 계약을 아예
-  // 걸지 않고(`yieldToOpenModal`) 자리를 비운다. 화면도 가리지 않게 즉시 dismiss 한다.
-  const dismissForForeignModal = useEffectEvent(() => onDismiss());
-  useLayoutEffect(() => {
-    const dialog = dialogRef.current;
-    const ownerDocument = dialog?.ownerDocument ?? rootRef.current?.ownerDocument;
-    if (!ownerDocument) return;
-    if (!holdsForeignModalFocus(ownerDocument, dialog)) return;
-    dismissForForeignModal();
+  // 대신 두 가지는 남는다.
+  //   · Esc 는 **포커스가 카드 안에 있을 때만** 닫는다. 빈 캔버스에서 누른 Esc 가 코치를
+  //     지우면 "아무것도 안 했는데 뭔가 사라진" 상태가 되고, 그건 비모달의 계약이 아니다.
+  //   · 키보드로 카드 안에 들어와 있다가 닫으면 포커스가 `document.body` 로 떨어진다.
+  //     그때만 메뉴바 착지점으로 옮겨 준다 — 스스로 뜬 코치에는 돌려줄 트리거가 없다.
+  const releaseFocusFromCard = () => {
+    const card = cardRef.current;
+    const ownerDocument = card?.ownerDocument ?? null;
+    if (!card || !ownerDocument) return;
+    const active = ownerDocument.activeElement;
+    if (!active || !card.contains(active)) return;
+    // 스스로 뜬 코치에는 "열어 준 컨트롤"이 없다 — 메뉴바 첫 트리거가 유일한 착지점이다.
+    // (비모달이 된 뒤로는 `resolveStudioDialogOpener` 가 카드 안 버튼 자신을 후보로 돌려주어
+    //  아무 데도 못 옮긴다. 그 헬퍼는 모달 전용 계약이다.)
+    studioDialogFocusAnchor(ownerDocument)?.focus({ preventScroll: true });
+  };
+  const dismissFromCard = () => {
+    releaseFocusFromCard();
+    onDismiss();
+  };
+
+  const dismissFromEscape = useEffectEvent(() => dismissFromCard());
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const ownerDocument = card.ownerDocument;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const active = ownerDocument.activeElement;
+      const inside =
+        (event.target instanceof Node && card.contains(event.target))
+        || (active !== null && card.contains(active));
+      if (!inside) return;
+      // 캡처 단계에서 관찰하되, 카드 안에서 눌렸을 때만 소비한다 — 그래야 같은 Esc 가
+      // 스튜디오 전역 단축키(획 취소·선택 해제)로 두 번 해석되지 않는다.
+      event.preventDefault();
+      event.stopPropagation();
+      dismissFromEscape();
+    };
+    ownerDocument.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      ownerDocument.removeEventListener("keydown", onKeyDown, true);
+    };
   }, []);
-
-  useStudioModalSheet({
-    activeKey: "studio-quick-start",
-    dialogRef,
-    onDismiss,
-    resolveInitialFocus: (dialog) =>
-      dialog.querySelector<HTMLElement>("[data-studio-quickstart-dismiss='true']"),
-    resolveReturnFocus: () => {
-      const ownerDocument = rootRef.current?.ownerDocument ?? null;
-      if (!ownerDocument) return null;
-      return (
-        resolveStudioDialogOpener(ownerDocument, null) ??
-        studioDialogFocusAnchor(ownerDocument)
-      );
-    },
-    rootRef,
-    yieldToOpenModal: true,
-  });
 
   // 코치는 바깥에서 벌어지는 첫 실제 조작에 자리를 내준다.
   //
   // 실측(2026-08-08): 코치가 떠 있는 채로 메뉴바 `텍스트 ▸ 말풍선`을 열면 코치가 사라졌다가,
   // 그 패널을 Esc 로 닫는 순간 **다시 나타났다**. 표시 조건이 파생 상태(`!menu` 등)라 메뉴를
-  // 여는 경로는 코치를 *가리기*만 하고 dismiss 상태를 남기지 않기 때문이다. 배경 클릭이 이미
-  // dismiss 인데 배경 밖 클릭만 dismiss 가 아니었던 셈이라, 같은 규칙을 바깥 전체로 넓힌다.
-  // 이 한 줄이 dismiss 를 진짜 상태로 기록하게 만들어 재등장 경로를 닫는다.
+  // 여는 경로는 코치를 *가리기*만 하고 dismiss 상태를 남기지 않기 때문이다. 이 한 줄이
+  // dismiss 를 진짜 상태로 기록하게 만들어 재등장 경로를 닫는다.
   //
   // "언제" 닫느냐는 실측으로 두 번 고쳐서 얻었다. 코치가 사라지면 메뉴바가 다시 배치되고
   // React 가 트리거 DOM 노드를 재활용하기 때문에, 클릭이 처리되는 도중에 닫으면 사용자가
@@ -230,8 +239,8 @@ export function StudioQuickStartPanel({
   // 잃는다. 그래서 캔버스에 닿는 순간에는 예외적으로 pointerdown 에서 비킨다.
   //
   // 위 경로가 click 을 기다리는 이유(메뉴바 재배치가 사용자가 겨눈 트리거를 바꿔치기함)는 여기에
-  // 해당하지 않는다. 코치는 캔버스의 형제 오버레이라 사라져도 캔버스가 재배치되지 않고, 배경이
-  // 이제 `pointer-events-none` 이라 이 pointerdown 은 이미 캔버스가 받은 이벤트다. 우리는 그
+  // 해당하지 않는다. 코치는 캔버스의 형제 오버레이라 사라져도 캔버스가 재배치되지 않고, 카드
+  // 바깥에는 이제 아무 표면도 없어서 이 pointerdown 은 이미 캔버스가 받은 이벤트다. 우리는 그
   // 이벤트를 가로채지 않고(preventDefault·stopPropagation 없음) 코치만 치운다.
   const dismissFromCanvasPointerDown = useEffectEvent(() => onDismiss());
   useEffect(() => {
@@ -303,39 +312,19 @@ export function StudioQuickStartPanel({
   ];
 
   return (
+    // 배치: 작은 화면은 위(하단 모바일 독과 겹치지 않게), ≥sm 은 캔버스 우하단 카드.
+    // 그리기 옵션 바가 떠 있으면 그 높이만큼 밀어 올려 도구 옵션을 가리지 않는다 —
+    // 코치가 이제 그리기 도구와 공존하기 때문에(자동 표시 조건에서 `tool !== "draw"` 제거)
+    // 이 오프셋이 없으면 첫 획을 그으려는 손을 정확히 그 자리에서 막는다.
     <div
       ref={rootRef}
       data-studio-creative-starter="true"
-      className="pointer-events-none absolute inset-0 z-[58] text-fg"
+      className="pointer-events-none absolute inset-x-2 top-16 z-[58] mx-auto max-w-[34rem] p-2 text-fg sm:inset-x-auto sm:right-4 sm:top-auto sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem)] sm:mx-0 sm:w-[min(22rem,calc(100%-2rem))] sm:max-w-none sm:p-0"
     >
-      {/* Soft scrim: click outside the card dismisses without trapping the whole app.
-          `data-studio-modal-backdrop` keeps it out of the modal isolator so a tap outside
-          still dismisses while the keyboard loop stays inside the dialog. */}
-      <button
-        type="button"
-        aria-label={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
-        data-studio-quickstart-backdrop="true"
-        data-studio-modal-backdrop="true"
-        // `pointer-events-none` 이 이 결함의 수선이다.
-        //
-        // 이 배경은 캔버스 컬럼을 통째로 덮는 `inset-0` 이라, 붙잡고 있던 동안 **캔버스로 가야 할
-        // 첫 pointerdown 을 자기가 먹었다.** 코치가 뜬 직후 그리려고 획을 그으면 그 획은 시작조차
-        // 되지 않고, 코치는 뒤이은 click 에서야 닫혔다 — "그리려는 순간 가로막히는" 실체가 이것이다.
-        //
-        // 이제 배경은 **장식**이다(흐림·톤만 담당). 닫기는 세 갈래로 나뉘어 그대로 살아 있다:
-        //   · 캔버스 위 pointerdown → 아래 관찰자가 즉시 닫고, 그 이벤트는 캔버스가 그대로 받는다.
-        //   · 그 밖의 바깥 조작 → 기존 click 캡처 + 마이크로태스크 경로(메뉴 트리거 회귀 방지).
-        //   · 명시적 닫기 → 헤더의 X 버튼과 Esc.
-        // onClick 은 남겨 둔다 — 포인터를 안 쓰는 경로(키보드 활성화·합성 이벤트)에서 이 버튼이
-        // 여전히 "빠른 시작 닫기" 로 동작해야 한다.
-        className="pointer-events-none absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[1px]"
-        onClick={onDismiss}
-      />
-      <div className="pointer-events-none absolute inset-x-2 top-16 z-[1] mx-auto max-w-[34rem] p-2 sm:top-4 sm:p-3">
+      {/* 이름이 붙은 `<section>` 은 그 자체로 `region` 랜드마크다(명시 role 은 중복). 모달이
+          아니므로 스크린리더는 코치를 "지나갈 수 있는 한 구역"으로 읽고 캔버스에 그대로 닿는다. */}
       <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+        ref={cardRef}
         data-studio-shortcut-boundary="true"
         aria-labelledby="studio-quick-start-title"
         aria-describedby="studio-quick-start-description"
@@ -355,7 +344,7 @@ export function StudioQuickStartPanel({
             >
               {localizeText(
                 t,
-                "도구를 열면 바로 캔버스에서 작업해요. Esc 또는 바깥 클릭으로 닫을 수 있어요.",
+                "도구를 열면 바로 캔버스에서 작업해요. 캔버스를 누르거나 ✕로 닫을 수 있어요.",
                 "studio.quickStart.subtitle",
               )}
             </p>
@@ -363,7 +352,12 @@ export function StudioQuickStartPanel({
           <button
             type="button"
             data-studio-quickstart-dismiss="true"
-            onClick={onDismiss}
+            // 전면 스크림이 사라지면서 `data-studio-quickstart-backdrop` 의 소유자도 옮겼다.
+            // 그 선택자는 여러 Playwright 검증 스크립트가 "코치가 떠 있는가 · 눌러서 닫기"의
+            // 단일 신호로 쓰고 있어서(예: verify-studio-brushes · verify-studio-bg3d-physics),
+            // 이름은 유지하되 이제 진짜 닫기 버튼을 가리킨다 — 캔버스를 덮는 오버레이가 아니다.
+            data-studio-quickstart-backdrop="true"
+            onClick={dismissFromCard}
             className="grid size-11 shrink-0 touch-manipulation place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
             aria-label={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
             title={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
@@ -545,7 +539,6 @@ export function StudioQuickStartPanel({
           </details>
         </div>
       </section>
-      </div>
     </div>
   );
 }

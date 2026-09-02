@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Multi-domain Hybrid DCC browser E2E: industrial OCCT + mesh + CAD + export.
- * Runs against hybrid-dcc-e2e.html harness mounting the real StudioHybridDccPanel.
+ * Runs against the tools/browser-harnesses/hybrid-dcc-e2e.html harness mounting the real StudioHybridDccPanel.
  */
 test.describe("Hybrid DCC industrial multi-tool", () => {
   test("OCCT box → cube → dynatopo → retopo → CAD revolve → export mutates UI", async ({
@@ -10,7 +10,7 @@ test.describe("Hybrid DCC industrial multi-tool", () => {
   }) => {
     // OCCT WASM is ~63MB; allow long first load on cold cache.
     test.setTimeout(180_000);
-    await page.goto("/hybrid-dcc-e2e.html");
+    await page.goto("/tools/browser-harnesses/hybrid-dcc-e2e.html");
     await expect(page.locator("[data-studio-hybrid-dcc-panel]")).toBeVisible();
 
     // Industrial WASM OCCT on the real browser product surface (not pure-TS CAD-lite).

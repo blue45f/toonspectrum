@@ -1,5 +1,5 @@
 /**
- * Dev-only prop attachment comparison page. Open /props-compare.html via Vite.
+ * Dev-only prop attachment comparison page. Open /tools/browser-harnesses/props-compare.html via Vite.
  * Applies the same production path as StudioVrmPoser (pose → metrics → auto-grip →
  * follower math) and renders 4 views: full, right hand + mug(handle), left hand +
  * book(flat), and a grip contact closeup.
@@ -8,8 +8,8 @@ import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { pickNaturalIdlePose } from "./domains/creator/studio-pose-presets";
-import { resolveStudioVrmFingerAuthority } from "./domains/creator/vrm/studio-vrm-auto-grip-authority";
+import { pickNaturalIdlePose } from "@/src/domains/creator/studio-pose-presets";
+import { resolveStudioVrmFingerAuthority } from "@/src/domains/creator/vrm/studio-vrm-auto-grip-authority";
 import {
   applyFingerRotations,
   applyPoseToVrm,
@@ -18,21 +18,21 @@ import {
   stripFingerBones,
   type FingerRotationMap,
   type PoseBoneMap,
-} from "./domains/creator/vrm/studio-vrm-poser-utils";
-import { acquireStudioVrmPropAsset } from "./domains/creator/vrm/studio-vrm-prop-asset-runtime";
+} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
+import { acquireStudioVrmPropAsset } from "@/src/domains/creator/vrm/studio-vrm-prop-asset-runtime";
 import {
   createAutoGripFingerOverrides,
   measureVrmPropRigMetrics,
   resolvePropAttachment,
   resolveSecondaryPropTarget,
   type VrmPropRigMetrics,
-} from "./domains/creator/vrm/studio-vrm-prop-rig";
+} from "@/src/domains/creator/vrm/studio-vrm-prop-rig";
 import {
   buildPropObject,
   propDefById,
   type PropInstance,
   type PropRigV2,
-} from "./domains/creator/vrm/studio-vrm-props";
+} from "@/src/domains/creator/vrm/studio-vrm-props";
 
 const statusEl = document.getElementById("status")!;
 

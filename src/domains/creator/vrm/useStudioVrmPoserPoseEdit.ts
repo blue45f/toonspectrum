@@ -725,7 +725,23 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
       return next;
     });
   }
-  function applyHandPosePreset(side: 'left' | 'right', poseType: 'fist' | 'open' | 'point' | 'peace' | 'thumbsUp' | 'relaxed') {
+  function applyHandPosePreset(
+    side: 'left' | 'right',
+    poseType:
+      | 'fist'
+      | 'open'
+      | 'point'
+      | 'peace'
+      | 'thumbsUp'
+      | 'holding'
+      | 'phoneGrip'
+      | 'penGrip'
+      | 'fingerHeart'
+      | 'cupGrip'
+      | 'rockRoll'
+      | 'okSign'
+      | 'relaxed',
+  ) {
     const sign = side === 'left' ? -1 : 1;
     setFingerEdits((prev: FingerRotationMap) => {
       const next = { ...prev };
@@ -751,6 +767,98 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
         next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
         next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(40), sign * d(40)];
         next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(40)];
+      } else if (poseType === 'holding') {
+        // 무기/도구/손잡이 쥐기
+        const gripRad = d(75);
+        fingers.forEach((f) => {
+          next[`${side}${f}Proximal` as VRMHumanBoneName] = [0, 0, sign * d(68)];
+          next[`${side}${f}Intermediate` as VRMHumanBoneName] = [0, 0, sign * gripRad];
+          next[`${side}${f}Distal` as VRMHumanBoneName] = [0, 0, sign * d(55)];
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(35), sign * d(45)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(40)];
+      } else if (poseType === 'phoneGrip') {
+        // 스마트폰 쥐기
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, 0, sign * d(32)];
+        next[`${side}IndexIntermediate` as VRMHumanBoneName] = [0, 0, sign * d(28)];
+        next[`${side}IndexDistal` as VRMHumanBoneName] = [0, 0, sign * d(15)];
+        (['Middle', 'Ring', 'Little'] as const).forEach((f) => {
+          next[`${side}${f}Proximal` as VRMHumanBoneName] = [0, 0, sign * d(65)];
+          next[`${side}${f}Intermediate` as VRMHumanBoneName] = [0, 0, sign * d(60)];
+          next[`${side}${f}Distal` as VRMHumanBoneName] = [0, 0, sign * d(40)];
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(15), sign * d(22)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(10)];
+      } else if (poseType === 'penGrip') {
+        // 펜 쥐기
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, 0, sign * d(45)];
+        next[`${side}IndexIntermediate` as VRMHumanBoneName] = [0, 0, sign * d(52)];
+        next[`${side}IndexDistal` as VRMHumanBoneName] = [0, 0, sign * d(22)];
+        next[`${side}MiddleProximal` as VRMHumanBoneName] = [0, 0, sign * d(50)];
+        next[`${side}MiddleIntermediate` as VRMHumanBoneName] = [0, 0, sign * d(58)];
+        next[`${side}MiddleDistal` as VRMHumanBoneName] = [0, 0, sign * d(35)];
+        (['Ring', 'Little'] as const).forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * d(78)];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(32), sign * d(36)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(18)];
+      } else if (poseType === 'fingerHeart') {
+        // K-손가락 하트
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, sign * d(10), sign * d(38)];
+        next[`${side}IndexIntermediate` as VRMHumanBoneName] = [0, 0, sign * d(48)];
+        next[`${side}IndexDistal` as VRMHumanBoneName] = [0, 0, sign * d(15)];
+        (['Middle', 'Ring', 'Little'] as const).forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * d(82)];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(-18), sign * d(35)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(22)];
+      } else if (poseType === 'cupGrip') {
+        // 찻잔/머그잔 잡기
+        fingers.forEach((f) => {
+          next[`${side}${f}Proximal` as VRMHumanBoneName] = [0, 0, sign * d(52)];
+          next[`${side}${f}Intermediate` as VRMHumanBoneName] = [0, 0, sign * d(45)];
+          next[`${side}${f}Distal` as VRMHumanBoneName] = [0, 0, sign * d(25)];
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(20), sign * d(25)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(12)];
+      } else if (poseType === 'rockRoll') {
+        // 락/파이팅 제스처 (검지, 소지 펼침)
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}IndexIntermediate` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}IndexDistal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}LittleProximal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}LittleIntermediate` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}LittleDistal` as VRMHumanBoneName] = [0, 0, 0];
+        (['Middle', 'Ring'] as const).forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * d(85)];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(40), sign * d(45)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(40)];
+      } else if (poseType === 'okSign') {
+        // OK 수신호 (엄지+검지 원, 나머지 3개 펼침)
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, sign * d(15), sign * d(58)];
+        next[`${side}IndexIntermediate` as VRMHumanBoneName] = [0, 0, sign * d(55)];
+        next[`${side}IndexDistal` as VRMHumanBoneName] = [0, 0, sign * d(38)];
+        (['Middle', 'Ring', 'Little'] as const).forEach((f) => {
+          next[`${side}${f}Proximal` as VRMHumanBoneName] = [0, 0, sign * d(-8)];
+          next[`${side}${f}Intermediate` as VRMHumanBoneName] = [0, 0, 0];
+          next[`${side}${f}Distal` as VRMHumanBoneName] = [0, 0, 0];
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(-12), sign * d(42)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(30)];
       } else if (poseType === 'point') {
         const curlRad = d(85);
         segments.forEach((seg) => {

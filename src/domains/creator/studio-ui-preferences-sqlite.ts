@@ -28,6 +28,10 @@ import {
   normalizeStudioElementsRecentState,
   type StudioElementsRecentState,
 } from "./studio-elements-recent";
+import {
+  normalizeStudioRememberedPrimaryTool,
+  type StudioRememberedPrimaryTool,
+} from "./studio-initial-primary-tool";
 
 import type { StudioAsyncKeyValueStore } from "./studio-local-database";
 import type { StudioServerAiProviderPreference } from "./studio-server-ai-client";
@@ -53,6 +57,7 @@ const ADVANCED_FILL_SETTINGS_KEY = "advanced-fill-settings";
 const EFFECT_FAVORITES_KEY = "effect-favorites";
 const ELEMENTS_RECENT_KEY = "elements-recent";
 const PAGE_PREVIEW_SIZE_KEY = "page-preview-size";
+const PRIMARY_TOOL_KEY = "primary-tool";
 const RECENT_COLORS_KEY = "recent-colors";
 const SERVER_AI_PROVIDER_KEY = "server-ai-provider";
 
@@ -86,6 +91,12 @@ export interface StudioUiPreferencesRepository {
   saveElementsRecent(state: StudioElementsRecentState): Promise<void>;
   loadPagePreviewSize(): Promise<StudioPagePreviewSize>;
   savePagePreviewSize(value: StudioPagePreviewSize): Promise<void>;
+  /**
+   * 마지막으로 쓴 기본 캔버스 도구(선택/그리기). 없으면 `null` — 빈 문서를 그리기로 여는
+   * 기본값과 "기억된 선택"을 구분해야 하므로 불리언 환경설정과 달리 3상태다.
+   */
+  loadPrimaryTool(): Promise<StudioRememberedPrimaryTool | null>;
+  savePrimaryTool(tool: StudioRememberedPrimaryTool): Promise<void>;
   loadRecentColors(): Promise<string[]>;
   saveRecentColors(colors: readonly string[]): Promise<void>;
   loadServerAiProvider(): Promise<StudioServerAiProviderPreference>;
@@ -210,6 +221,14 @@ export function createStudioUiPreferencesRepository(
     },
     savePagePreviewSize(value: StudioPagePreviewSize) {
       return enqueue(PAGE_PREVIEW_SIZE_KEY, normalizeStudioPagePreviewSize(value));
+    },
+    async loadPrimaryTool() {
+      return normalizeStudioRememberedPrimaryTool(await store.get(PRIMARY_TOOL_KEY));
+    },
+    savePrimaryTool(tool: StudioRememberedPrimaryTool) {
+      const normalized = normalizeStudioRememberedPrimaryTool(tool);
+      // 정규화가 걸러 낸 값(예: `hand`)은 저장하지 않는다 — 기억이 없는 상태가 정답이다.
+      return normalized === null ? Promise.resolve() : enqueue(PRIMARY_TOOL_KEY, normalized);
     },
     async loadRecentColors() {
       return normalizeRecentColors(parseJson(await store.get(RECENT_COLORS_KEY)));

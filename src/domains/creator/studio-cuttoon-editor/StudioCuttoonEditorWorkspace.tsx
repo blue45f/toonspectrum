@@ -85,7 +85,6 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     setRailMoreOpen,
     setReferencePanelOpen,
     setStrokeWidth,
-    setTool,
     setViewTool,
     smudgeActive,
     studioLeftToolRailHandlers,
@@ -218,7 +217,6 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
           setPoserVrmOpen={setPoserVrmOpen}
           setHybridDccOpen={setHybridDccOpen}
           setStrokeWidth={setStrokeWidth}
-          setTool={setTool}
           setViewTool={setViewTool}
           dodgeBurnActive={dodgeBurnActive}
           wetMixActive={wetMixActive}

@@ -37,14 +37,31 @@ function oilDabs(seed: number) {
   return planOilBrushDabs({ points, pressures, baseWidth: 30, seed });
 }
 
-const OIL_BRUSH_IDS = [
+/**
+ * `studioOilRibbonProgramsForBrush` 의 id 매트릭스에 실제로 행이 있는 열한 id. 앞의 다섯은 각자
+ * 다른 조합을 켜고, 뒤의 여섯은 2026-08-20(517f96a1) 부터 한 case 로 묶여 세 프로그램을 전부 켠다.
+ * 여기 없는 매트릭스 행은 아래 바이트 동일성·왕복 계약 바깥에 있는 셈이므로, 매트릭스에 case 를
+ * 더하면 이 표와 캐리어 docstring 의 개수도 같이 늘려야 한다.
+ */
+const OIL_MATRIX_BRUSH_IDS = [
   "brush--bristle-physics",
   "brush--bristle-depletion",
   "brush--impasto-relief",
   "oil--filbert-ribbon",
   "oil--impasto-ribbon",
-  "brush--oil-lanes",
+  "oil",
+  "acrylic",
+  "fluid-paint",
+  "fluid-paint-fine",
+  "fluid-paint-load",
+  "fluid-paint-rake",
 ] as const;
+
+/** 매트릭스에 행이 없어 default 로 떨어지는 대표 id — 아무 프로그램도 켜지 않는다. */
+const OIL_DEFAULT_BRUSH_ID = "brush--oil-lanes" as const;
+
+/** 계약 테스트가 도는 전체 표: 매트릭스 열한 id + default. */
+const OIL_BRUSH_IDS = [...OIL_MATRIX_BRUSH_IDS, OIL_DEFAULT_BRUSH_ID] as const;
 
 describe("엔진 프로그램 세트", () => {
   it("오버라이드가 없으면 출하된 유화 브러시의 플랜이 그대로다", () => {
@@ -81,9 +98,25 @@ describe("엔진 프로그램 세트", () => {
     }
   });
 
+  it("표의 열한 id 는 전부 매트릭스 행이고 default 대표는 아무 프로그램도 켜지 않는다", () => {
+    // 위 두 계약은 표를 그대로 믿는다. 표에 적힌 id 가 실은 default 로 떨어지고 있으면 '검사했다'고
+    // 말하면서 빈 경로를 도는 셈이므로, 행이 있는 id 는 옵션 객체를 내고 세트도 빈 세트가 아니어야
+    // 하며, default 대표는 둘 다 비어 있어야 표가 정직하다.
+    const empty = studioOilProgramSetForBrush(OIL_DEFAULT_BRUSH_ID);
+    expect(studioOilRibbonProgramsForBrush(OIL_DEFAULT_BRUSH_ID, 5)).toBeUndefined();
+    expect(STUDIO_BRUSH_OIL_PROGRAM_KEYS.some((key) => empty[key])).toBe(false);
+    for (const brush of OIL_MATRIX_BRUSH_IDS) {
+      expect(studioOilRibbonProgramsForBrush(brush, 5), brush).toBeDefined();
+      expect(studioOilProgramSetForBrush(brush), brush).not.toEqual(empty);
+    }
+    // 캐리어 docstring 이 "eleven ids and the default" 라고 말한다 — 그 숫자를 여기 묶어 둔다.
+    expect(OIL_MATRIX_BRUSH_IDS).toHaveLength(11);
+    expect(new Set<string>(OIL_BRUSH_IDS).size).toBe(OIL_BRUSH_IDS.length);
+  });
+
   it("여덟 가지 조합이 모두 페인트 시점에 구분되는 플랜을 낸다", () => {
-    // id 스위치로는 다섯 가지 조합만 표현할 수 있었고, 그중 impasto+depletion 처럼 물리적으로
-    // 말이 되는 조합은 아예 존재하지 않았다. 여기서 여덟 가지가 전부 서로 다른 플랜을 낸다는 것이
+    // 세트를 도입할 당시 id 스위치로는 다섯 가지 조합만 표현할 수 있었고(지금은 전부 켬 행이
+    // 더해져 여섯), 그중 impasto+depletion 처럼 물리적으로 말이 되는 조합은 아예 존재하지 않았다. 여기서 여덟 가지가 전부 서로 다른 플랜을 낸다는 것이
     // "엔진을 조합해 커스텀 브러시를 만든다"가 선언이 아니라는 증거다.
     const dabs = oilDabs(41);
     const signatures = new Map<string, StudioBrushOilProgramSet>();

@@ -73,8 +73,7 @@
       "sha256": "839f1fe3143f0429e7720919d3efcfaa7c3948a14c3fa2c956cb151f7bf7d17f",
       "inkedPixels": 5828,
       "warnings": [
-        "parse[kpp] unmapped: chunk:tEXt(version)",
-        "parse[kpp] unmapped: mypaint:smudge"
+        "parse[kpp] unmapped: chunk:tEXt(version)"
       ]
     },
     {

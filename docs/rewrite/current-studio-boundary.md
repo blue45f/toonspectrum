@@ -1,5 +1,10 @@
 # 현재 Studio 경계 감사 (V12)
 
+> 2026-09-02 갱신: 엔진 역할(primary/provider/reference/lab)과 권위 소유자는 이제
+> [`docs/engines/renderer-roles.md`](../engines/renderer-roles.md)(원장 생성본)가 단일 진실이다. 이 문서의
+> §1·§3 중 "Vello는 selection-overlay island 한정" 서술은 stale이다 — `studio-vello-hub-document-hybrid-v13`이
+> 기본 활성이고 `documentAuthority=true`다. 그 밖의 경계 사실은 그대로 유효하다.
+
 - 감사 일자: 2026-08-11
 - 감사 대상: `/Users/hjunkim/WebstormProjects/toonspectrum` 현재 루트 트리
 - 감사 범위: 현재 소스, 설정, 테스트, 커밋된 benchmark JSON, retained Git metadata 유실 대조,

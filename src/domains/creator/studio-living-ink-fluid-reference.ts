@@ -85,6 +85,21 @@ export interface StudioLivingInkFluidReferenceField {
   readonly pigmentScratch: Float32Array;
 }
 
+/**
+ * 활성 영역(파인 셀, 반열림 `[x0,x1)×[y0,y1)`). 생략하면 격자 전체.
+ *
+ * 공유 워시는 페이지의 모든 수묵 획의 합집합 크기로 자라므로, 획 하나를 정착시킬 때 격자 전체를
+ * 쓸어내면 셀 수가 상한을 넘는 즉시 스텝이 0으로 꺼져 번짐·건조가 사라졌다(실측: 두 획이 몇 cm 만
+ * 떨어져도 128×128 문서 px 를 넘음). 물·안료 패스는 획 주변 영역만 갱신하고, 값싼 coarse 속도
+ * 패스는 그대로 전체를 돈다. 영역이 격자 전체면 결과는 예전과 바이트 단위로 같다.
+ */
+export interface StudioLivingInkFluidReferenceRegion {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
 export interface StudioLivingInkFluidReferenceOptions {
   readonly width: number;
   readonly height: number;
@@ -407,13 +422,55 @@ function confineVorticityReference(
   velocity.set(velocityScratch);
 }
 
+interface ResolvedFineBounds {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+  readonly full: boolean;
+}
+
+function resolveFineBounds(
+  width: number,
+  height: number,
+  region: StudioLivingInkFluidReferenceRegion | undefined,
+): ResolvedFineBounds {
+  if (!region) return { x0: 0, y0: 0, x1: width, y1: height, full: true };
+  const x0 = clampNumber(Math.floor(region.x0), 0, width);
+  const y0 = clampNumber(Math.floor(region.y0), 0, height);
+  const x1 = clampNumber(Math.ceil(region.x1), x0, width);
+  const y1 = clampNumber(Math.ceil(region.y1), y0, height);
+  return { x0, y0, x1, y1, full: x0 === 0 && y0 === 0 && x1 === width && y1 === height };
+}
+
+/** 스크래치 → 필드 복사. 영역 밖의 스크래치는 이전 스텝 값이라 절대 덮어쓰면 안 된다. */
+function commitScratchRows(
+  target: Float32Array,
+  scratch: Float32Array,
+  width: number,
+  bounds: ResolvedFineBounds,
+  channels: number,
+): void {
+  if (bounds.full) {
+    target.set(scratch);
+    return;
+  }
+  for (let y = bounds.y0; y < bounds.y1; y += 1) {
+    const start = (y * width + bounds.x0) * channels;
+    const end = (y * width + bounds.x1) * channels;
+    target.set(scratch.subarray(start, end), start);
+  }
+}
+
 function stepWetReference(
   field: StudioLivingInkFluidReferenceField,
   dt: number,
   creep: number,
   evaporation: number,
+  region?: StudioLivingInkFluidReferenceRegion,
 ): void {
   const { width, height, wet, wetScratch, velocity, coarseWidth, coarseHeight } = field;
+  const bounds = resolveFineBounds(width, height, region);
   const defaults = STUDIO_LIVING_INK_FLUID_DEFAULTS;
   const texelX = 1 / width;
   const texelY = 1 / height;
@@ -423,8 +480,8 @@ function stepWetReference(
   const farY = reachY * defaults.creepFarReach;
   const blend = clampNumber(creep * defaults.creepBlendGain, 0, defaults.creepBlendCeiling);
   const sampled: [number, number] = [0, 0];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
+  for (let y = bounds.y0; y < bounds.y1; y += 1) {
+    for (let x = bounds.x0; x < bounds.x1; x += 1) {
       const uvx = (x + 0.5) * texelX;
       const uvy = (y + 0.5) * texelY;
       sampleVec2Bilinear(velocity, coarseWidth, coarseHeight, uvx, uvy, sampled);
@@ -451,22 +508,24 @@ function stepWetReference(
       wetScratch[y * width + x] = clampNumber(capillary * evaporation, 0, defaults.wetCeiling);
     }
   }
-  wet.set(wetScratch);
+  commitScratchRows(wet, wetScratch, width, bounds, 1);
 }
 
 function advectPigmentReference(
   field: StudioLivingInkFluidReferenceField,
   params: StudioLivingInkFluidReferenceStepParams,
   chroma: readonly [number, number, number],
+  region?: StudioLivingInkFluidReferenceRegion,
 ): void {
   const { width, height, pigment, pigmentScratch, wet, velocity, coarseWidth, coarseHeight } = field;
+  const bounds = resolveFineBounds(width, height, region);
   const defaults = STUDIO_LIVING_INK_FLUID_DEFAULTS;
   const texelX = 1 / width;
   const texelY = 1 / height;
   const separation = clampNumber(params.chromaticSeparation, 0, 1);
   const sampled: [number, number] = [0, 0];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
+  for (let y = bounds.y0; y < bounds.y1; y += 1) {
+    for (let x = bounds.x0; x < bounds.x1; x += 1) {
       const cell = y * width + x;
       const base = cell * 4;
       const mobility = smoothstepNumber(
@@ -549,19 +608,21 @@ function advectPigmentReference(
       }
     }
   }
-  pigment.set(pigmentScratch);
+  commitScratchRows(pigment, pigmentScratch, width, bounds, 4);
 }
 
 function diffusePigmentReference(
   field: StudioLivingInkFluidReferenceField,
   params: StudioLivingInkFluidReferenceStepParams,
   chroma: readonly [number, number, number],
+  region?: StudioLivingInkFluidReferenceRegion,
 ): void {
   const { width, height, pigment, pigmentScratch, wet } = field;
+  const bounds = resolveFineBounds(width, height, region);
   const defaults = STUDIO_LIVING_INK_FLUID_DEFAULTS;
   const rates = [chroma[0], chroma[1], chroma[2], defaults.pigmentWhiteChannelGain];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
+  for (let y = bounds.y0; y < bounds.y1; y += 1) {
+    for (let x = bounds.x0; x < bounds.x1; x += 1) {
       const cell = y * width + x;
       const base = cell * 4;
       const mobility = smoothstepNumber(
@@ -590,7 +651,7 @@ function diffusePigmentReference(
       }
     }
   }
-  pigment.set(pigmentScratch);
+  commitScratchRows(pigment, pigmentScratch, width, bounds, 4);
 }
 
 /**
@@ -600,6 +661,7 @@ function diffusePigmentReference(
 export function stepStudioLivingInkFluidReference(
   field: StudioLivingInkFluidReferenceField,
   params: StudioLivingInkFluidReferenceStepParams,
+  region?: StudioLivingInkFluidReferenceRegion,
 ): Readonly<{ divergenceBefore: number; divergenceAfter: number }> {
   const fixing = params.fixing === true;
   const velocitySettling = params.velocitySettling === true;
@@ -627,9 +689,10 @@ export function stepStudioLivingInkFluidReference(
     params.dt,
     clampNumber(params.capillaryCreep, 0, 1),
     studioLivingInkEvaporationMultiplier(params.dryRate, params.dt, fixing),
+    region,
   );
-  if (params.transport !== false) advectPigmentReference(field, params, chroma);
-  diffusePigmentReference(field, params, chroma);
+  if (params.transport !== false) advectPigmentReference(field, params, chroma, region);
+  diffusePigmentReference(field, params, chroma, region);
   return Object.freeze({
     divergenceBefore: projection.before,
     divergenceAfter: projection.after,

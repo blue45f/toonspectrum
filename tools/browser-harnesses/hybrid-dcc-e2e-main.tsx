@@ -4,8 +4,8 @@
  */
 import { createRoot } from "react-dom/client";
 
-import { StudioHybridDccPanel } from "./domains/creator/hybrid-dcc/StudioHybridDccPanel";
-import "./styles/globals.css";
+import { StudioHybridDccPanel } from "@/src/domains/creator/hybrid-dcc/StudioHybridDccPanel";
+import "@/src/styles/globals.css";
 
 const root = document.getElementById("root");
 if (!root) {

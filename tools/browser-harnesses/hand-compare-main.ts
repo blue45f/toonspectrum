@@ -1,17 +1,17 @@
 /**
- * Dev-only hand comparison page. Open /hand-compare.html via Vite.
+ * Dev-only hand comparison page. Open /tools/browser-harnesses/hand-compare.html via Vite.
  * Applies the same natural-idle path as StudioVrmPoser and renders 4 views.
  */
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { pickNaturalIdlePose } from "./domains/creator/studio-pose-presets";
+import { pickNaturalIdlePose } from "@/src/domains/creator/studio-pose-presets";
 import {
   applyPoseToVrm,
   estimateVrmPalmNormal,
   type PoseBoneMap,
-} from "./domains/creator/vrm/studio-vrm-poser-utils";
+} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
 
 const statusEl = document.getElementById("status")!;
 

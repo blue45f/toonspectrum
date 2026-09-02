@@ -15,8 +15,14 @@ export interface StudioCanonicalDryMediaViewportAuthority {
 
 /**
  * A selected specialist keeps document pixel authority after failure only when it carries an exact
- * snapshot of the last receipted WebGPU frame for the same immutable DrawEl. An unavailable
- * preflight with no such frame is observable but never hides the ordinary document element.
+ * snapshot of the last receipted WebGPU frame for the same immutable DrawEl **in the same layout**.
+ * An unavailable preflight with no such frame is observable but never hides the ordinary document
+ * element.
+ *
+ * The envelope's `layoutKey` is stamped at publish time, so it always equals the current layout and
+ * cannot tell whether the retained bitmap is stale. The snapshot's own `lastPresented.layoutKey`
+ * can: a frame receipted at a previous surface size, scale, flip or device pixel ratio must not be
+ * stretched into the current bounds (the "old frame lingers after resize" symptom).
  */
 export function resolveStudioCanonicalDryMediaViewportAuthority(
   authority: StudioCanonicalVNextDryMediaCanvasAuthority | null,
@@ -32,7 +38,8 @@ export function resolveStudioCanonicalDryMediaViewportAuthority(
   const authorized = active?.status === "authorized" ? active : null;
   const unavailable = active?.status === "unavailable" ? active : null;
   const retainsExactLastGood = unavailable?.retainsLastGoodFrame === true
-    && unavailable.lastPresented?.element === candidate;
+    && unavailable.lastPresented?.element === candidate
+    && unavailable.lastPresented.layoutKey === layoutKey;
   const ownsDocumentPixels = authorized !== null || retainsExactLastGood;
   return Object.freeze({
     active,

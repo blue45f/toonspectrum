@@ -305,10 +305,12 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
         onAuthorityChange={onAuthorityChange}
       />,
     );
-    expect(authorities.at(-1)).toMatchObject({
-      status: "authorized",
-      layoutKey: baseProps.layoutKey,
-    });
+    // The layout change relinquishes the layout:1 authority synchronously; nothing for layout:2
+    // may be published until its own frame is receipted.
+    expect(authorities.at(-1)).toBeNull();
+    expect(
+      authorities.some((authority) => authority?.layoutKey === "page:layout:2"),
+    ).toBe(false);
     expect(canvas?.style.visibility).toBe("hidden");
 
     view.rerender(
@@ -389,7 +391,10 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     expect(harness.destroyedDevices).toBe(1);
   });
 
-  it("ends a failed presentation epoch as unavailable without revealing another renderer", async () => {
+  // Same-DrawEl/same-layout retention after a failure is exercised by the device-loss test above:
+  // in production every geometry input (bounds, scale, flip, DPR) is folded into `layoutKey`, so a
+  // re-run of the epoch with an unchanged key only happens through device loss.
+  it("ends a failed presentation epoch after a layout change as unavailable without revealing another renderer or a stale frame", async () => {
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const view = render(
       <StudioCanonicalVNextDryMediaCanvas
@@ -400,13 +405,22 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     );
     await waitFor(() => expect(authorities.at(-1)).toMatchObject({
       status: "authorized",
+      layoutKey: baseProps.layoutKey,
     }));
+    const snapshot = view.container.querySelector<HTMLCanvasElement>(
+      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
+    );
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.width).toBeGreaterThan(0);
     harness.failPresentations = 1;
 
+    // Resize: same DrawEl, new layout, and the fresh presentation fails. The old bitmap was
+    // receipted for 640px-wide bounds — it must not be shown at 520px.
     view.rerender(
       <StudioCanonicalVNextDryMediaCanvas
         {...baseProps}
         layoutKey="page:layout:2"
+        surfaceBounds={{ ...baseProps.surfaceBounds, width: 520 }}
         onAuthorityChange={(authority) => authorities.push(authority)}
         visible
       />,
@@ -415,15 +429,20 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     await waitFor(() => expect(authorities.at(-1)).toMatchObject({
       status: "unavailable",
       reason: "presentation:runtime-rejected",
-      retainsLastGoodFrame: true,
+      retainsLastGoodFrame: false,
+      lastPresented: null,
+      layoutKey: "page:layout:2",
     }));
+    // The layout change itself relinquished the stale authority before the new epoch ran.
+    expect(authorities).toContain(null);
+    expect(snapshot!.width).toBe(0);
+    expect(snapshot!.style.visibility).toBe("hidden");
     expect(view.container.querySelector<HTMLCanvasElement>(
       "canvas[data-studio-canonical-vnext-dry-media='true']",
     )?.style.visibility).toBe("hidden");
-    expect(view.container.querySelector<HTMLCanvasElement>(
-      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
-    )?.style.visibility).toBe("visible");
-    expect(harness.createSurfaceCalls).toBe(1);
+    expect(view.getByRole("alert").textContent).toContain(
+      "다른 렌더러로 자동 전환하지 않았습니다",
+    );
   });
 
   it("fails closed on initial create and retries only after an explicit reselection", async () => {

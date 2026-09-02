@@ -427,3 +427,10 @@ GPU-native workflows.
 This ordering separates provider experimentation from durable ownership while still developing
 quality, storage, and compatibility work in parallel. Every completed specialist remains
 replaceable because the canonical command, tile, color, path, and journal schemas are ours.
+
+## 개정 2026-09-02 (ADR-0021)
+
+"A missing Memory64 capability fails closed for the vNext writable profile" 조항은
+[ADR-0021](adr/0021-stroke-budget-myb-disposition-execution-profiles.md) §C로 개정됐다. 기본 프로필은
+wasm32 + OPFS windowing이며, Memory64는 capability가 있고 4 GiB 논리 오프셋이 실제로 필요한 대형 문서에서만
+켠다. 나머지 Memory64 정책(bigint 오프셋, bounded window, "huge document" 광고 금지)은 그대로다.

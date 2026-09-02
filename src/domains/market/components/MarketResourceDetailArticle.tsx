@@ -4,9 +4,11 @@ import {
   Download,
   FileJson,
   Layers,
+  Lightbulb,
   Link2,
   Shield,
   ShieldCheck,
+  Sliders,
   Sparkles,
   Star,
   ThumbsUp,
@@ -449,6 +451,122 @@ export function MarketResourceDetailArticle({
           </section>
 
           <MarketResourceReleaseHistory resourceId={record.id} />
+
+          {/* Pro Artist Usage Guide & Settings (Clip Studio Assets Benchmark) */}
+          <section aria-labelledby="market-usage-guide-heading" className="rounded-xl border border-line bg-card p-5">
+            <h2 id="market-usage-guide-heading" className="flex items-center gap-2 text-sm font-bold text-fg">
+              <Lightbulb className="h-4 w-4 text-accent" aria-hidden="true" />
+              프로 작가 소재 활용 팁 & 추천 설정
+            </h2>
+            <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
+              {record.kind === "3d-asset" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">3D 카메라 & 구도 잡기</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        Three.js 뷰포트에서 마우스 우클릭으로 회전하고 스크롤로 줌인/줌아웃하여 하이앵글·로우앵글 투시도를 쉽게 잡을 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">선화(Line) 추출 가이드</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        외곽선 잉크 두께를 1.5~2.0px로 설정하면 일반 G펜 브러시 펜선과 이질감 없이 자연스럽게 블렌딩됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "3d-preset" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">배경 조명 & 엠비언트 매칭</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        스토리 시간대에 맞춰 주간/노을/야간 조명을 선택한 후 Studio 컬러 필터와 결합해 통일된 무드를 연출하세요.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">소점 및 컷 스냅</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        3D 씬의 소점 가이드를 컷 박스에 맞추어 인물과 배경 사이의 투시 왜곡을 방지합니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "brush" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">추천 필압 및 손떨림 보정</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        선화 작업 시 추천 브러시 크기는 8~14px이며 손떨림 보정 15 내외에서 가장 깔끔한 펜선이 나옵니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">레이어 블렌딩 모드</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        음영 채색 시 [곱하기(Multiply)] 모드에 불투명도 70~80%를 적용하면 부드러운 입체감을 얻을 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "palette" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">배색 황금비율 적용</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        주조색(Base) 60%, 보조색(Sub) 30%, 포인트 강조색(Accent) 10% 비율로 채색하면 안정된 톤 밸런스가 완성됩니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">Studio 스와치 등록</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        설치 즉시 스튜디오 컬러 피커의 팔레트 목록에 자동 등록되어 스포이드 없이 1클릭으로 색상을 추출할 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">Studio 원터치 핸드오프</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        스튜디오 캔버스에서 해당 소재를 불러오면 즉시 해당 컷 레이어에 최적화되어 배치됩니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">모바일 스크롤 최적화</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        국내 주요 웹툰 플랫폼의 세로 스크롤 규격(720px~1080px 너비)에 완벽하게 호환됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
 
           {/* Trust & License Guarantee Banner (Acon3D & Clip Studio Benchmark) */}
           <section aria-labelledby="market-trust-guarantee-heading" className="rounded-xl border border-line bg-card p-5">

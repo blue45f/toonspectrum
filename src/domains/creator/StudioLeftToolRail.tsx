@@ -167,6 +167,18 @@ export interface StudioLeftToolRailHandlers {
    * 같은 명령이 진입점마다 다른 부수효과를 갖게 되므로 항상 이 핸들러를 거친다.
    */
   activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
+  /**
+   * 핸드(팬) 토글. 켜면 `hand`, 다시 누르면 `select` — 오늘과 같은 의미다. 레일이 `setTool`
+   * 업데이터를 직접 들고 있으면 "지금 도구가 무엇인지"에 대한 판단이 UI 로 새어 나오므로,
+   * 상태가 아니라 명령을 받는다.
+   */
+  toggleHandTool: () => void;
+  /**
+   * 픽셀 선택 도구 무장·"선택 후 변형" 복구처럼 **지금 도구를 내려놓고 선택으로 돌아가는**
+   * 경로. 기본 도구 전이(`activatePrimaryCanvasTool`)와는 다른 명령이다 — 획 취소·disarm 은
+   * 이 경로의 호출자들이 필요한 만큼 직접 부른다.
+   */
+  returnToSelectTool: () => void;
   fitCanvasToWidth: () => void;
   fitCanvasToWidthWithFocus?: () => void;
   openFrameAnimationForSelected: () => void;
@@ -250,7 +262,6 @@ interface StudioLeftToolRailProps {
   setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setHybridDccOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
   dodgeBurnActive: boolean;
   wetMixActive: boolean;
@@ -309,7 +320,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setPoserVrmOpen,
   setHybridDccOpen,
   setStrokeWidth: _setStrokeWidth,
-  setTool,
   setViewTool,
   dodgeBurnActive,
   wetMixActive,
@@ -416,6 +426,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     fitCanvasToWidthWithFocus,
     onRequestPixelSelection,
     onRequestSelectImage,
+    returnToSelectTool,
+    toggleHandTool,
     onPickImage,
     revealDrawToolProperties,
     toggleAdvancedFill,
@@ -649,7 +661,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "hand"}
               onClick={() => {
                 disarmAllPixelTools();
-                setTool((t) => (t === "hand" ? "select" : "hand"));
+                toggleHandTool();
                 setEyedropperActive(false);
                 setMenu(null);
               }}
@@ -874,7 +886,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }
               onClick={() => {
                 if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)) return;
-                setTool("select");
+                returnToSelectTool();
                 setMenu(null);
                 setPixelForceCircle(false);
                 if (pixelTool === "lasso") {
@@ -943,7 +955,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 }
                 if (objectTransformPickRecoveryAvailable) {
                   disarmAllPixelTools();
-                  setTool("select");
+                  returnToSelectTool();
                   setMenu(null);
                   announceDrawingShortcut(
                     "변형할 요소를 클릭해 선택하세요 · 모서리 핸들로 크기 조절",
