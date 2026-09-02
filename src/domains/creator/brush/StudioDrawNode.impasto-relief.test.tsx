@@ -110,12 +110,19 @@ afterEach(() => {
   cleanup();
 });
 
-describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이", () => {
+describe("StudioDrawNode — impastoRelief Canvas 릴리프 오버레이", () => {
   // oil--impasto-ribbon 은 2026-08-15 에 이 프로그램에 합류했다. 이름만 임파스토였던 레인으로,
   // 릴리프가 없으면 선언 필드가 oil--filbert-ribbon 과 완전히 동일했고 렌더 픽셀 거리도
   // oil--flat-ribbon 0.163 / acrylic--stiff-ribbon 0.168 로 코퍼스 중앙값(1.04)의 6분의 1이었다.
-  it.each(["brush--impasto-relief", "oil--impasto-ribbon"])(
-    "임파스토 릴리프 레인(%s)은 screen 글린트와 round-cap 코어 섀도우를 페인트한다",
+  it.each([
+    "brush--impasto-relief",
+    "oil--impasto-ribbon",
+    // 2026-08-20 에 세 프로그램을 모두 켜고 매트릭스에 들어온 기본 유화 — Canvas 가 매트릭스가
+    // 아니라 옛 두-레인 목록을 보면 여기서 글린트가 빠진다.
+    "oil",
+    "acrylic",
+  ])(
+    "임파스토 릴리프 프로그램이 켜진 id(%s)는 screen 글린트와 round-cap 코어 섀도우를 페인트한다",
     (brush) => {
     render(<StudioDrawNode el={oilEl(brush)} />);
     const context = paintOilShape();

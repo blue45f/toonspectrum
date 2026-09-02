@@ -72,6 +72,8 @@ export const STUDIO_BRUSH_FEEL_CULL_PRESET_IDS = [
   "leaf-fall-flurry",
   "sparkle-glint-cross",
   "brush-pen-ink",
+  // 2026-09-02 유사 브러시 정리: web-blend-softener 와 실행 서명이 같고 잔상이 실재하지 않음.
+  "web-smudge-trail",
 ] as const;
 
 function alphaDigest(alphaMapBase64: string | null | undefined): string {

@@ -37,7 +37,6 @@ export type StudioBrushRuntimeEngine =
   | "oil-ribbon"
   | "dynamic-dabs"
   | "pencil-path"
-  | "pastel-dabs"
   | "screentone-dots";
 
 export type StudioBrushRuntimeTip =
@@ -337,8 +336,6 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "bristle-load-depletion": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     // 2026-08-13 wave 3: WetBrush-2D 강모 물리 시뮬(레인 궤적 스트림, bristlePhysics 캐리어 옵션).
     "bristle-physics-tuft": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
-    "fluid-paint-splat": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
-    "fluid-paint-rake": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
@@ -403,9 +400,6 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   "pencil-path": {
     jitter: { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
     "side-shade": { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
-  },
-  "pastel-dabs": {
-    "soft-grain": { families: ["pastel"], previews: ["soft"], tip: "grain", texture: "procedural-grain", dynamics: "pastel-pressure" },
   },
   "screentone-dots": {
     "global-grid": { families: ["screentone"], previews: ["tone"], tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid" },

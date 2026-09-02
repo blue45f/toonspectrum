@@ -661,6 +661,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     redo: localizeStudioText(t, "다시", "studio.mobileDock.tool.redo"),
     redoAria: localizeStudioText(t, "다시실행", "studio.mainMenu.item.edit.command.redo"),
     brush: localizeStudioText(t, "브러시", "studio.quickStart.step.brush-kit.label"),
+    pages: localizeStudioText(t, "페이지", "studio.mobileDock.tool.pages"),
+    pagesOpenAria: localizeStudioText(t, "페이지 목록 열기", "studio.mobileDock.pagesOpen"),
+    pagesCloseAria: localizeStudioText(t, "페이지 목록 닫기", "studio.mobileDock.pagesClose"),
     brushSettings: localizeStudioText(
       t,
       "브러시 설정 (굵기·색·프리셋)",
@@ -1771,11 +1774,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 icon={Files}
-                label="페이지"
+                label={label.pages}
                 hintDescription="페이지 목록을 열어 추가·복제·순서를 바꿉니다."
                 data-studio-primary-action="pages"
                 active={mobileSheet === "pages"}
-                aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                aria-label={mobileSheet === "pages" ? label.pagesCloseAria : label.pagesOpenAria}
                 aria-pressed={mobileSheet === "pages"}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
@@ -1951,8 +1954,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 />
                 <StudioDockNavButton
                   icon={Files}
-                  label="페이지"
-                  aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                  label={label.pages}
+                  aria-label={mobileSheet === "pages" ? label.pagesCloseAria : label.pagesOpenAria}
                   aria-controls={STUDIO_MOBILE_PAGES_SHEET_ID}
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet === "pages"}

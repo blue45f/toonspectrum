@@ -50,7 +50,8 @@ describe("Studio stroke surface route wiring boundary", () => {
       "beginLiveStrokeBackendAudit(next.id, \"webgpu\")",
       "if (canvas2dSelected",
       "liveInkOverlayRendererRef.current.begin(",
-      "if (canvas2dSelected && !liveInkOverlayStarted)",
+      // 명시 선택된 2D 표면은 오버레이가 애초에 자격이 있었을 때만 "시작 실패"로 거절한다.
+      "if (canvas2dSelected && liveInkOverlayEligible && !liveInkOverlayStarted)",
       "const wetInkOverlayStarted = wetMediaSelected",
       "liveWetInkOverlayRendererRef.current.begin(next",
       "if (wetMediaSelected && !wetInkOverlayStarted)",

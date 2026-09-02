@@ -167,6 +167,8 @@ function createHandlers(): StudioLeftToolRailHandlers {
     disarmAllPixelTools: vi.fn(),
     onRequestPixelSelection: vi.fn(),
     onRequestSelectImage: vi.fn(),
+    returnToSelectTool: vi.fn(),
+    toggleHandTool: vi.fn(),
     onPickImage: vi.fn(async () => undefined),
     revealDrawToolProperties: vi.fn(),
     toggleAdvancedFill: vi.fn(),
@@ -220,7 +222,6 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     setRailMoreOpen: vi.fn(),
     setReferencePanelOpen: vi.fn(),
     setStrokeWidth: vi.fn(),
-    setTool: vi.fn(),
     setViewTool: vi.fn(),
     dodgeBurnActive: false,
     wetMixActive: false,
@@ -444,7 +445,7 @@ describe("StudioLeftToolRail", () => {
 
     fireEvent.click(transformPickRecovery);
     fireEvent.click(imageRecovery);
-    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.returnToSelectTool).toHaveBeenCalledOnce();
     expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
     expect(props.stableHandlers.onRequestSelectImage).toHaveBeenCalledOnce();
   });
@@ -464,7 +465,7 @@ describe("StudioLeftToolRail", () => {
     expect(selectionRecovery.disabled).toBe(false);
     fireEvent.click(selectionRecovery);
     expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
-    expect(props.setTool).not.toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.returnToSelectTool).not.toHaveBeenCalled();
   });
 
   it("disables only inactive raster-retouch tools when neither image nor page target is available", () => {
@@ -720,7 +721,7 @@ describe("StudioLeftToolRail", () => {
       "pen",
     );
     expect(props.stableHandlers.disarmAllPixelTools).not.toHaveBeenCalled();
-    expect(props.setTool).not.toHaveBeenCalled();
+    expect(props.stableHandlers.returnToSelectTool).not.toHaveBeenCalled();
     expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalledWith(
       "투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요",
     );
@@ -963,7 +964,7 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
     const transform = screen.getByRole("button", { name: "선택 후 변형" });
     fireEvent.click(transform);
-    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.returnToSelectTool).toHaveBeenCalledOnce();
     expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalled();
     expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
     expect(props.stableHandlers.openPixelSelectionTransform).not.toHaveBeenCalled();

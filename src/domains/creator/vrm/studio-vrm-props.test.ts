@@ -237,13 +237,14 @@ describe("VRM 소품 카탈로그", () => {
       const gltf = await loader.parseAsync(arrayBuffer, "");
       const size = new Vector3();
       new Box3().setFromObject(gltf.scene).getSize(size);
-      const minseoHeadMetric = 0.185916;
-      const minseoHeadBounds = new Vector3(0.232394, 0.278873, 0.199859);
-      const fittedScale = def.defaultScale * minseoHeadMetric / def.fit.designReference;
+      // Head metric and bounds calibrated on the retired procedural reference rig.
+      const referenceHeadMetric = 0.185916;
+      const referenceHeadBounds = new Vector3(0.232394, 0.278873, 0.199859);
+      const fittedScale = def.defaultScale * referenceHeadMetric / def.fit.designReference;
       const fitted = size.multiplyScalar(fittedScale);
-      expect(fitted.x / minseoHeadBounds.x, `${gate.id}: width`).toBeLessThanOrEqual(1.2);
-      expect(fitted.y / minseoHeadBounds.y, `${gate.id}: height`).toBeLessThanOrEqual(1.2);
-      expect(fitted.z / minseoHeadBounds.z, `${gate.id}: depth`).toBeLessThanOrEqual(1.35);
+      expect(fitted.x / referenceHeadBounds.x, `${gate.id}: width`).toBeLessThanOrEqual(1.2);
+      expect(fitted.y / referenceHeadBounds.y, `${gate.id}: height`).toBeLessThanOrEqual(1.2);
+      expect(fitted.z / referenceHeadBounds.z, `${gate.id}: depth`).toBeLessThanOrEqual(1.35);
     }
   });
 

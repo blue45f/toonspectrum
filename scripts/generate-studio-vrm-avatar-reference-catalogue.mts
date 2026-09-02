@@ -66,6 +66,8 @@ export const STUDIO_VRM_AVATAR_REFERENCE_RGBA_BYTE_LENGTH =
   * STUDIO_VRM_AVATAR_REFERENCE_BROWSER_HEIGHT
   * 4;
 
+// The pinned source was retired from public/vrm on 2026-09-02; the committed artifact stays the
+// authority. --write/--check need a new CC0 base that passes the gates below before they can run.
 const SOURCE_PATH = resolve(
   STUDIO_VRM_AVATAR_REFERENCE_ROOT,
   "public/vrm/TS_Minseo_Campus.vrm",

@@ -703,6 +703,13 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && canonicalDryMediaPanelClip === null
       ? canonicalDryMediaSelectedElement
       : null;
+  // The device pixel ratio is part of the layout identity: the specialist canvas allocates its
+  // backing store from it, so a monitor move or browser zoom that keeps the CSS bounds but changes
+  // DPR must invalidate any retained last-good frame exactly like a resize does.
+  const canonicalDryMediaDevicePixelRatio = Math.max(
+    1,
+    Math.min(4, Number(globalThis.devicePixelRatio) || 1),
+  );
   const canonicalDryMediaLayoutKey = webGpuViewportSurface
     ? [
         activePage.id,
@@ -714,6 +721,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
         webGpuViewportSurface.surface.height,
         effScale,
         canvasFlipH ? 1 : 0,
+        canonicalDryMediaDevicePixelRatio,
       ].join(":")
     : "unavailable";
   const canonicalDryMediaViewportAuthority =

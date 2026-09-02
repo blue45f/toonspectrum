@@ -1,7 +1,4 @@
 import {
-  STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
-} from "./bg3d/studio-bg3d-procedural-starter-pack";
-import {
   sanitizeBrushSnapshot,
   type StudioSavedBrush,
 } from "./brush/studio-brush-library";
@@ -271,14 +268,14 @@ function projectEntry(
     };
   }
   const definition = portableDefinition(entry);
-  return definition?.recipeId === STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID
+  return typeof definition?.recipeId === "string" && definition.recipeId.trim().length > 0
     ? {
         id: entry.id,
         name: entry.name,
         kind,
         delivery: {
           mode: "builtin-ref",
-          runtimeRef: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
+          runtimeRef: definition.recipeId,
         },
       }
     : null;

@@ -307,8 +307,8 @@ describe("studioGpuBristleOilRequest", () => {
       "oil--impasto-ribbon",
       "brush--bristle-physics",
       "brush--impasto-relief",
-      "fluid-paint",
-      "oil--fluid-paint-rake",
+      "acrylic",
+      "oil--filbert-ribbon",
     ]) {
       expect(studioGpuBristleOilRequest("el-1", brush, dabs, 1, "#332211")).toBeNull();
     }

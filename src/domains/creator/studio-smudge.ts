@@ -34,6 +34,12 @@ function lerpChannel(a: number, b: number, t: number): number {
 }
 
 /**
+ * 프리멀티플라이드 결과 알파가 이 값 이하이면 색을 되돌리지 않고 0으로 둔다.
+ * 8비트 알파 한 계단(1/255 ≈ 0.0039)보다 작아, 보이는 픽셀을 0으로 만들지 않는다.
+ */
+const SMUDGE_PREMULTIPLY_EPSILON = 1 / 1020;
+
+/**
  * 폴리라인을 일정 간격(step, 픽셀)으로 리샘플 — screentoneDotsForStroke(studio-brush.ts)와 동일 기법.
  * 0/1점 입력은 그대로 반환. 순수, 결정적. 길이 0인(정지된 두 점 사이) 구간은 건너뛰어 중복/NaN
  * 점을 만들지 않는다. 결과는 SMUDGE_MAX_RESAMPLED_POINTS 개로 상한(병적으로 길거나 루프도는 입력 방어).
@@ -179,9 +185,22 @@ export function smudgeStroke(
         if (amount <= 0) continue;
         const destIdx = (destY * w + destX) * 4;
         const srcIdx = (sy * boxW + sx) * 4;
-        data[destIdx] = lerpChannel(data[destIdx]!, snapshot[srcIdx]!, amount);
-        data[destIdx + 1] = lerpChannel(data[destIdx + 1]!, snapshot[srcIdx + 1]!, amount);
-        data[destIdx + 2] = lerpChannel(data[destIdx + 2]!, snapshot[srcIdx + 2]!, amount);
+        // getImageData 는 straight(비-프리멀티플라이드) RGBA 다. 투명 픽셀의 RGB 는 의미가 없는
+        // 0,0,0 이라 그대로 보간하면 "없는 검정"이 섞여, 빈 캔버스 쪽으로 문지른 꼬리가 옅어지는
+        // 대신 거뭇해진다. 안료를 알파로 가중해 섞고 나서 되돌린다. 양쪽이 불투명하면 이 식은
+        // 기존 straight 보간과 정확히 같은 값이므로 불투명 영역은 한 비트도 바뀌지 않는다.
+        const destAlpha = data[destIdx + 3]! / 255;
+        const srcAlpha = snapshot[srcIdx + 3]! / 255;
+        const outAlpha = destAlpha + (srcAlpha - destAlpha) * amount;
+        if (outAlpha > SMUDGE_PREMULTIPLY_EPSILON) {
+          const inverse = 1 / outAlpha;
+          for (let channel = 0; channel < 3; channel += 1) {
+            const destPremultiplied = data[destIdx + channel]! * destAlpha;
+            const srcPremultiplied = snapshot[srcIdx + channel]! * srcAlpha;
+            data[destIdx + channel] =
+              (destPremultiplied + (srcPremultiplied - destPremultiplied) * amount) * inverse;
+          }
+        }
         data[destIdx + 3] = lerpChannel(data[destIdx + 3]!, snapshot[srcIdx + 3]!, amount);
       }
     }

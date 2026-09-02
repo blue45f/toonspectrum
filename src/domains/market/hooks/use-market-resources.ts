@@ -10,6 +10,9 @@ import type {
   CreatorMarketplaceResourceSort,
 } from "@/lib/creator-marketplace-resource-contract";
 
+import { filterStarterMarketplaceResources } from "@/lib/creator-marketplace-starter-catalog";
+
+
 
 export interface MarketResourceQuery {
   readonly search?: string;
@@ -107,14 +110,33 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
     )
       .then((page) => {
         if (controller.signal.aborted || requestGenerationRef.current !== generation) return;
-        const nextCursor = page.hasMore ? page.nextCursor : null;
-        const pageHasMore = nextCursor !== null;
-        setItems(page.items);
+        let finalItems = page.items;
+        let finalHasMore = page.hasMore;
+        let nextCursor = page.hasMore ? page.nextCursor : null;
+
+        if (finalItems.length === 0 && !parsedQuery.search && !parsedQuery.publisher) {
+          const starter = filterStarterMarketplaceResources({
+            limit: parsedQuery.limit,
+            search: parsedQuery.search,
+            kind: parsedQuery.kind,
+            license: parsedQuery.license,
+            tag: parsedQuery.tag,
+            sort: parsedQuery.sort,
+          });
+          if (starter.items.length > 0) {
+            finalItems = starter.items;
+            finalHasMore = starter.hasMore;
+            nextCursor = null;
+          }
+        }
+
+        const pageHasMore = nextCursor !== null && finalHasMore;
+        setItems(finalItems);
         cursorRef.current = nextCursor;
         setHasMore(pageHasMore);
         setLoading(false);
         writeCachedMarketPage(queryKey, {
-          items: page.items,
+          items: finalItems,
           hasMore: pageHasMore,
           nextCursor,
         });
@@ -124,14 +146,27 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         const cached = readCachedMarketPage(queryKey);
         if (cached) {
           setItems(cached.items);
-          // A cached first page is an explicitly stale, offline-only snapshot. Its old cursor
-          // cannot be combined with a newly successful tail: doing so would carry a now-hidden
-          // head item forward and refresh its cache lifetime. Revalidate page one before any
-          // further pagination instead.
           setHasMore(false);
           cursorRef.current = null;
           setStale(true);
           setStaleSavedAt(cached.savedAt);
+          setLoading(false);
+          return;
+        }
+        const starter = filterStarterMarketplaceResources({
+          limit: parsedQuery.limit,
+          search: parsedQuery.search,
+          kind: parsedQuery.kind,
+          license: parsedQuery.license,
+          tag: parsedQuery.tag,
+          publisher: parsedQuery.publisher,
+          sort: parsedQuery.sort,
+        });
+        if (starter.items.length > 0) {
+          setItems(starter.items);
+          setHasMore(starter.hasMore);
+          cursorRef.current = null;
+          setError(null);
           setLoading(false);
           return;
         }

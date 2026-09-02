@@ -23,6 +23,7 @@ import type {
 
 interface RecordingCanvas extends HTMLCanvasElement {
   readonly clears: Array<readonly number[]>;
+  readonly paths: number[];
   readonly draws: Array<{
     readonly alpha: number;
     readonly arguments: readonly unknown[];
@@ -31,6 +32,8 @@ interface RecordingCanvas extends HTMLCanvasElement {
 
 function recordingCanvas(): RecordingCanvas {
   const clears: Array<readonly number[]> = [];
+  /** lineTo count of every stroked path, in order (one entry per moveTo). */
+  const paths: number[] = [];
   const draws: Array<{ alpha: number; arguments: readonly unknown[] }> = [];
   const stack: Array<{
     readonly alpha: number;
@@ -50,8 +53,12 @@ function recordingCanvas(): RecordingCanvas {
     },
     setTransform: () => undefined,
     beginPath: () => undefined,
-    moveTo: () => undefined,
-    lineTo: () => undefined,
+    moveTo: () => {
+      paths.push(0);
+    },
+    lineTo: () => {
+      paths[paths.length - 1] = (paths[paths.length - 1] ?? 0) + 1;
+    },
     stroke: () => undefined,
     imageSmoothingEnabled: true,
     lineCap: "butt" as CanvasLineCap,
@@ -83,6 +90,7 @@ function recordingCanvas(): RecordingCanvas {
     style: { opacity: "1" },
     clears,
     draws,
+    paths,
     getContext: () => context,
   } as unknown as RecordingCanvas;
 }
@@ -187,6 +195,45 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
       [10, 10],
       { brush: "inkwash-pen", watercolorPipeline: undefined },
     ))).toBe(false);
+  });
+
+  it("redraws the whole InkWash live polyline per frame instead of stacking round caps", () => {
+    const { activeCanvas, renderer } = attachedRenderer();
+    const start = wetStroke([20, 40], { brush: "inkwash-pen", id: "inkwash-pen-live-redraw" });
+    expect(renderer.begin(start, { pageEpoch: 5 }).status).toBe("started");
+    // pointer-down: one dot path (moveTo + the 0.01 px lineTo that gives a round cap its area).
+    expect(activeCanvas.paths).toEqual([1]);
+    const fullClears = () => activeCanvas.clears.filter(
+      (args) => args[0] === 0
+        && args[1] === 0
+        && args[2] === activeCanvas.width
+        && args[3] === activeCanvas.height,
+    ).length;
+    const clearsAfterBegin = fullClears();
+
+    const grown = wetStroke([20, 40, 60, 42, 100, 47], {
+      brush: "inkwash-pen",
+      id: "inkwash-pen-live-redraw",
+    });
+    expect(renderer.appendFrom(grown, { pageEpoch: 5 })).toMatchObject({
+      status: "appended",
+      consumedSourcePoints: 3,
+    });
+    // The frame cleared the previous polyline and stroked every point again as ONE path, so the
+    // start cap and the previous frame's end cap are never painted twice at partial alpha.
+    expect(fullClears()).toBe(clearsAfterBegin + 1);
+    expect(activeCanvas.paths).toEqual([1, 2]);
+
+    const longer = wetStroke([20, 40, 60, 42, 100, 47, 140, 50], {
+      brush: "inkwash-pen",
+      id: "inkwash-pen-live-redraw",
+    });
+    expect(renderer.appendFrom(longer, { pageEpoch: 5 })).toMatchObject({
+      status: "appended",
+      consumedSourcePoints: 4,
+    });
+    expect(fullClears()).toBe(clearsAfterBegin + 2);
+    expect(activeCanvas.paths).toEqual([1, 2, 3]);
   });
 
   it("keeps InkWash pen and water on one live wash field", () => {

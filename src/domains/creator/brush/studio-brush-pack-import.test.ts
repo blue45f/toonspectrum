@@ -147,9 +147,17 @@ describe("libmypaint .myb import draws", () => {
     // slow_tracking 1.8 → strength 0.18 → 2 on the 0..10 stabilizer slider.
     expect(snapshot.stabilizer).toBe(2);
 
-    // The honest ledger: libmypaint settings with no drawable counterpart.
-    expect(result.unmapped).toContain("myb:smudge");
-    expect(result.unmapped).toContain("myb:dabs_per_actual_radius");
+    // dabs_per_actual_radius 3.4 → 100 / (2 × 3.4) = 15% spacing, not the
+    // 10% default the old `dabs_per_radius` misspelling silently produced.
+    expect(snapshot.brushDynamics?.spacingRatio).toBeCloseTo(0.15);
+
+    // The honest ledger: libmypaint settings the common IR does NOT carry.
+    // smudge (→ mixing) and dabs_per_actual_radius (→ spacing) are applied,
+    // so naming them here would be a false loss report.
+    expect(result.unmapped).toContain("myb:smudge_length");
+    expect(result.unmapped).toContain("myb:color_h");
+    expect(result.unmapped).not.toContain("myb:smudge");
+    expect(result.unmapped).not.toContain("myb:dabs_per_actual_radius");
     expect(result.unmapped.every((entry) => entry.length > 0)).toBe(true);
 
     expect(drawCoverage(snapshot).coveredPixels).toBeGreaterThan(500);

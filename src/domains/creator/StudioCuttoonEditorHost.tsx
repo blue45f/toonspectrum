@@ -354,6 +354,10 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
+import {
+  commitPendingStrokeBatchForAdmission,
+  studioLiveInkLaneSelectsGpu,
+} from "./live/studio-live-ink-lane-admission";
 import { useStudioCollaborationWiring } from "./live/studio-collaboration-wiring";
 import { studioDrawElementToCrdtStroke } from "./live/studio-crdt-draw-bridge";
 import { StudioCrdtLiveStrokePublisher } from "./live/studio-crdt-live-stroke-publisher";
@@ -394,6 +398,8 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
+import { StudioAiSuperSuiteModal } from "./ai/StudioAiSuperSuiteModal";
+import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
 import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
@@ -557,6 +563,11 @@ import {
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
+  STUDIO_GPU_LIVE_INK_PROVIDER_LABEL,
+  studioRejectedLiveSurfaceMessage,
+  useStudioRejectedStrokeRecoveryHost,
+} from "./studio-rejected-stroke-recovery-host";
+import {
   cascadeCanvasPlacementAnchor,
   createCanvasImageElement,
   type CanvasImagePlacement,
@@ -572,6 +583,7 @@ import {
   STUDIO_ASSET_DRAG_MIME,
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
+import type { StudioRememberedPrimaryTool } from "./studio-initial-primary-tool";
 import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   navigateStudioInspector,
@@ -951,6 +963,7 @@ import {
   STUDIO_RAW_PEN_INK_PREVIEW_ENABLED,
   STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
   STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
+  STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS,
 } from "./studio-page-shell-runtime";
 import { useStudioAdvancedFill } from "./studio-page-advanced-fill";
 import { useStudioCompanionRuntime } from "./studio-page-companion-runtime";
@@ -958,6 +971,8 @@ import { useStudioMenuAssetLoader } from "./studio-page-menu-asset-loaders";
 import { buildStudioShortcutHandler } from "./studio-page-shortcut-dispatcher";
 import { createStudioPageVectorOps } from "./studio-page-vector-ops";
 import {
+  persistStudioPrimaryTool,
+  useStudioInitialPrimaryTool,
   useStudioPageWorkspacePersistence,
   useStudioUiBooleanPreferenceHydration,
   useStudioWorkspacePanelOpenOverrides,
@@ -1335,6 +1350,7 @@ import {
 } from "./render/studio-webgpu-live-source-journal";
 import {
   type StudioGpuPendingDrawAuthority,
+  pruneStudioGpuPendingAuthority,
 } from "./render/studio-webgpu-pending-authority";
 import { createStudioLiveStrokeGpuAudit } from "./render/studio-live-stroke-gpu-audit";
 import type {
@@ -5045,7 +5061,10 @@ export function StudioCuttoonEditor({
   const studioLifecycleDurablePendingFingerprintRef = useRef("");
   const studioLifecycleBaselineScopeRef = useRef<string | null>(null);
 
+  // hydration 전에는 기억된 도구도 문서 내용도 모른다 — 시작값은 `select`, 부팅 뒤
+  // `useStudioInitialPrimaryTool` 이 한 번만 갈아탄다(ref 는 사용자가 먼저 고른 경우의 방어).
   const [tool, setTool] = useState<Tool>("select");
+  const primaryToolActivatedRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [studioLayerLiftUi, setStudioLayerLiftUi] =
     useState<StudioLayerLiftUiState>(closedStudioLayerLiftUiState);
@@ -7614,6 +7633,8 @@ export function StudioCuttoonEditor({
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
+  const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
+  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(false);
   // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
@@ -7844,6 +7865,9 @@ export function StudioCuttoonEditor({
   const aiNoticeAcknowledgedRef = useRef(aiNoticeAcknowledged);
   aiNoticeAcknowledgedRef.current = aiNoticeAcknowledged;
   const [uiBooleanPreferencesReady, setUiBooleanPreferencesReady] = useState(false);
+  // 돌아온 사용자의 마지막 기본 도구. `null` 이면 "기억 없음" — 빈 문서는 그리기로 연다.
+  const [rememberedPrimaryTool, setRememberedPrimaryTool] =
+    useState<StudioRememberedPrimaryTool | null>(null);
   useStudioUiBooleanPreferenceHydration({
     aiNoticeAcknowledgedRef,
     mobileHintDismissedRef,
@@ -7852,6 +7876,7 @@ export function StudioCuttoonEditor({
     setAppSettingsPersistenceState,
     setMobileHintDismissed,
     setQuickStartDismissed,
+    setRememberedPrimaryTool,
     setStudioCommentPinsHiddenState,
     setUiBooleanPreferencesReady,
     studioCommentPinsHiddenRef,
@@ -10613,12 +10638,19 @@ export function StudioCuttoonEditor({
     }>>(null as never);
   liveStrokeBackendAuditEarlyGpuReceiptsRef.current ??= new Map();
 
+  const { salvageRejectedStroke } = useStudioRejectedStrokeRecoveryHost({
+    activePageId: activePage.id,
+    queueDeferredStrokeCommit,
+  });
   function rejectActiveSelectedLiveSurface(
     providerLabel: string,
     detail: string,
     strokeId: string | null = drawingRef.current?.id ?? null,
   ): void {
-    setError(`${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획을 취소했습니다. ${detail}`);
+    // Cancel the live operation (ADR 0018) but park its finished CPU geometry for an explicit restore.
+    const salvaged = strokeId !== null && drawingRef.current?.id === strokeId
+      && salvageRejectedStroke(drawingRef.current, providerLabel, detail).action === "salvage";
+    setError(studioRejectedLiveSurfaceMessage(providerLabel, detail, salvaged));
     if (!strokeId || drawingRef.current?.id !== strokeId) return;
     // Stop this provider before the next pointer sample. Cleanup runs after the current adapter
     // callback unwinds so it cannot re-enter a device-loss/frame-receipt transaction.
@@ -10640,7 +10672,7 @@ export function StudioCuttoonEditor({
     // Pointer-up releases drawingRef before an asynchronous final receipt or watchdog failure.
     // Remove that still-uncommitted operation explicitly instead of letting the deferred batch,
     // lifecycle autosave, or streamed CRDT draft outlive its failed selected provider.
-    cancelRejectedSelectedGpuPendingStroke(strokeId);
+    cancelRejectedSelectedGpuPendingStroke(strokeId, reason);
   }
   function failSelectedGpuLiveInk(
     reason: StudioLiveStrokeGpuFailureReason,
@@ -11142,6 +11174,13 @@ export function StudioCuttoonEditor({
   const flushPendingStrokeCommitsRef = useRef<() => boolean>(() => true);
   const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
   // GPU 파인 획의 지연 표면 유지: 커밋 동기화 전까지 엔진에 함께 공급되는 확정 획들.
+  /**
+   * Set only while a pointer-down is completing the PREVIOUS stroke's deferred commit. The flush
+   * normally refuses to run while a stroke is armed (a commit render must never interrupt a
+   * gesture); at admission time the new stroke has not painted anything yet, and the previous
+   * stroke's idle window is over by definition.
+   */
+  const strokeAdmissionCommitFlushRef = useRef(false);
   const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
   // Symmetry can fan one DrawEl out to several GPU operations. Retain that exact grouping so a
   // delayed/missing final receipt cancels the selected-provider group without partial mirrors or
@@ -11251,7 +11290,7 @@ export function StudioCuttoonEditor({
               ? `WebGPU 최종 획 동기화: ${cause.message}`
               : "WebGPU 최종 획을 협업 문서에 동기화하지 못했습니다.",
           );
-          cancelRejectedSelectedGpuPendingStroke(strokeId);
+          cancelRejectedSelectedGpuPendingStroke(strokeId, "crdt-sync-failed");
           return;
         }
       }
@@ -11273,9 +11312,12 @@ export function StudioCuttoonEditor({
    * The streamed CRDT draft and deferred vector are one transaction: retaining either would let a
    * later save resurrect geometry that never obtained its terminal WebGPU presentation receipt.
    */
-  function cancelRejectedSelectedGpuPendingStroke(strokeId: string): void {
+  function cancelRejectedSelectedGpuPendingStroke(strokeId: string, reason = "provider-unavailable"): void {
     const batch = pendingStrokeCommitsRef.current;
-    if (!batch?.strokes.some((stroke) => stroke.id === strokeId)) return;
+    const rejected = batch?.strokes.find((stroke) => stroke.id === strokeId);
+    if (!batch || !rejected) return;
+    // Removed from the batch and CRDT draft as before; the geometry survives as a recovery record.
+    salvageRejectedStroke(rejected, STUDIO_GPU_LIVE_INK_PROVIDER_LABEL, reason, batch.pageId);
 
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     abortDeferredStrokePostprocess([strokeId]);
@@ -11293,38 +11335,16 @@ export function StudioCuttoonEditor({
       };
     }
 
-    const authorities = pendingGpuDrawAuthoritiesRef.current;
-    const gpuStrokes = pendingGpuStrokesRef.current;
-    const nextAuthorities: StudioGpuPendingDrawAuthority[] = [];
-    const nextGpuStrokes: StudioGpuStroke[] = [];
-    let cursor = 0;
-    let authorityFound = false;
-    let authorityAccountingValid = true;
-    for (const authority of authorities) {
-      const nextCursor = cursor + authority.gpuStrokeCount;
-      if (
-        !Number.isSafeInteger(authority.gpuStrokeCount)
-        || authority.gpuStrokeCount <= 0
-        || nextCursor > gpuStrokes.length
-      ) {
-        authorityAccountingValid = false;
-        break;
-      }
-      if (authority.element.id === strokeId) {
-        authorityFound = true;
-      } else {
-        nextAuthorities.push(authority);
-        nextGpuStrokes.push(...gpuStrokes.slice(cursor, nextCursor));
-      }
-      cursor = nextCursor;
-    }
-    if (cursor !== gpuStrokes.length) authorityAccountingValid = false;
-    if (authorityFound && authorityAccountingValid) {
-      pendingGpuDrawAuthoritiesRef.current = nextAuthorities;
-      pendingGpuStrokesRef.current = nextGpuStrokes;
-    } else if (authorityFound || !authorityAccountingValid) {
-      // Corrupt grouping cannot authorize a partial survivor. Drop the hidden provider queue as one
-      // unit; retained DrawEls are never remeshed through Canvas2D/Konva as recovery.
+    const prune = pruneStudioGpuPendingAuthority(
+      pendingGpuDrawAuthoritiesRef.current,
+      pendingGpuStrokesRef.current,
+      strokeId,
+    );
+    if (prune.status === "pruned") {
+      pendingGpuDrawAuthoritiesRef.current = [...prune.authorities];
+      pendingGpuStrokesRef.current = [...prune.gpuStrokes];
+    } else if (prune.status === "dropped-all") {
+      // Corrupt grouping cannot authorize a partial survivor; the hidden queue goes as one unit.
       pendingGpuDrawAuthoritiesRef.current = [];
       pendingGpuStrokesRef.current = [];
     }
@@ -11938,7 +11958,7 @@ export function StudioCuttoonEditor({
       return "rejected";
     }
     gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
-    armGpuPinnedRequestWatchdog(outcome.requestId);
+    armGpuPinnedRequestWatchdog(outcome.requestId, STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS);
     applyLiveStrokeBackendPresentationEffects();
     return "advanced";
   }
@@ -11981,7 +12001,7 @@ export function StudioCuttoonEditor({
         return false;
       }
       gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
-      armGpuPinnedRequestWatchdog(outcome.requestId);
+      armGpuPinnedRequestWatchdog(outcome.requestId, STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS);
       applyLiveStrokeBackendPresentationEffects();
       finalRequestId = outcome.requestId;
     }
@@ -15807,10 +15827,12 @@ const puppetWarpArmed =
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
   // Auto-coach only while the page is still idle. Late work/autosave hydration must not
-  // cover the canvas after the artist already opened Draw, placed content, or operated any
-  // Studio control while the lazy coach/preferences were still loading. The eager interaction
-  // guard records that intent through the normal dismissal/revision fence before a late modal can
-  // steal focus; an explicit File > Quick start command still wins.
+  // cover the canvas after the artist already placed content or operated any Studio control
+  // while the lazy coach/preferences were still loading. The eager interaction guard records
+  // that intent through the normal dismissal/revision fence; an explicit File > Quick start
+  // command still wins.
+  // `tool !== "draw"` 는 빠졌다: 새 문서가 그리기로 열리는 이상 그 조건은 코치를 아예 못 보게
+  // 만들고, 비모달 카드는 그리기와 공존한다(첫 pointerdown 에 스스로 비킨다).
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
     (uiBooleanPreferencesReady
@@ -15819,8 +15841,7 @@ const puppetWarpArmed =
       && !hasAutosave
       && !quickStartDismissed
       && !menu
-      && elements.length === 0
-      && tool !== "draw")
+      && elements.length === 0)
   );
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
@@ -17324,6 +17345,13 @@ const puppetWarpArmed =
                     message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
                   };
                 }
+                if (resolution.target.kind === "3d-asset-catalog") {
+                  openBackground3dFromMenu();
+                  return {
+                    status: "opened" as const,
+                    message: "3D 에셋 카탈로그를 열었어요. 3D 모델·소품을 선택해 캔버스 장면에 배치하세요.",
+                  };
+                }
                 openBackground3dFromMenu();
                 return {
                   status: "opened" as const,
@@ -17382,6 +17410,20 @@ const puppetWarpArmed =
     assetMarketDeepLinkHandledRef.current = true;
     void openAssetMarketDeepLink();
   }, [uiBooleanPreferencesReady, workHydrated, autosaveChecked]);
+
+  // 빈 문서는 그리기로 열린다(감사 §2.1). 데스크톱만 펜 속성을 띄운다(모바일 시트 자동 열기 금지).
+  useStudioInitialPrimaryTool({
+    autosaveChecked,
+    hasExistingContent: hasAutosave || elements.length > 0,
+    primaryToolActivatedRef,
+    rememberedPrimaryTool,
+    startDrawing: () => {
+      activatePrimaryCanvasToolRef.current("draw");
+      if (!isMobile) openInspectorRoute({ primary: "properties" }, null);
+    },
+    uiBooleanPreferencesReady,
+    workHydrated,
+  });
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {
@@ -17623,7 +17665,7 @@ const puppetWarpArmed =
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
   useEffect(() => {
     flushPendingStrokeCommitsRef.current = () => {
-      if (drawingRef.current) {
+      if (drawingRef.current && !strokeAdmissionCommitFlushRef.current) {
         const current = pendingStrokeCommitsRef.current;
         if (current && !current.timer) {
           current.timer = globalThis.setTimeout(() => {
@@ -24186,6 +24228,9 @@ const puppetWarpArmed =
     nextDrawMode?: DrawMode,
     selectionWillReplaceToolSnapshot = false,
   ) {
+    // 기본 도구 전이의 단일 정본이므로, "무엇을 마지막으로 썼는가"의 기록도 여기 한 곳이다.
+    primaryToolActivatedRef.current = true;
+    persistStudioPrimaryTool(nextTool);
     const currentOperation = rememberedOperationForDrawMode(drawModeRef.current);
     const targetMode = nextTool === "draw"
       ? nextDrawMode ?? drawModeRef.current
@@ -24735,9 +24780,37 @@ const puppetWarpArmed =
       }
       pendingUndoneStrokeCommitsRef.current = null;
       setHasUndonePendingOverlay(false);
+      // 이전 획이 아직 대기 배치에 있고 WebGPU 권한을 들고 있으면 아래 진입 가드가 새 표면
+      // 작업을 통째로 거절한다 — 2초 유휴가 지나기 전에 두 번째 획을 그은 사람은 그 획을
+      // 통째로 잃었다(실측: 해칭 간격 0.6초에서 100% 거절, "획을 시작하지 않았습니다" 배너).
+      // 새 획이 시작된 이상 이전 획의 유휴 창은 끝났으므로 여기서 그 커밋을 끝낸다. 커밋과
+      // 레이아웃 이펙트(표면 반납)가 같은 태스크 안에서 끝나야 아래 가드가 비워진 큐를 보므로
+      // flushSync 다. 영수증을 아직 못 받은 획은 그대로 남고, 가드가 정직하게 거절한다.
+      if (
+        pendingStrokeCommitsRef.current
+        && (
+          pendingGpuStrokesRef.current.length > 0
+          || pendingGpuDrawAuthoritiesRef.current.length > 0
+        )
+      ) {
+        strokeAdmissionCommitFlushRef.current = true;
+        try {
+          flushSync(() => {
+            flushPendingStrokeCommitsRef.current();
+          });
+        } finally {
+          strokeAdmissionCommitFlushRef.current = false;
+        }
+      }
       // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
       // gated for future experiments, while production post-correction runs once on release.
       // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
+      commitPendingStrokeBatchForAdmission(
+        pendingStrokeCommitsRef.current !== null
+          && (pendingGpuStrokesRef.current.length > 0 || pendingGpuDrawAuthoritiesRef.current.length > 0),
+        strokeAdmissionCommitFlushRef,
+        () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+      );
       const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
       const causalPostCorrectionEligible = !pixelDirect
         && studioPostCorrectionRunsDuringPointerContact()
@@ -24806,21 +24879,14 @@ const puppetWarpArmed =
         && !dynamicSelected
         && !pixelDirect
         && isDirectLiveDraftEl(next);
-      const isExplicitWebGpu = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "webgpu";
-      const isExplicitCanvas2d = import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "canvas2d";
-      const isGpuHardwareReady =
-        webGpuBackendRef.current === "webgpu"
-        && webGpuCanvasHandleRef.current?.isBackendAvailable() === true;
-      const gpuSelected = genericDirectSelected
-        && !isExplicitCanvas2d
-        && (
-          isExplicitWebGpu
-          || (
-            STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
-            && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED
-            && isGpuHardwareReady
-          )
-        );
+      const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({
+        element: next,
+        explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND,
+        hardwareReady: webGpuBackendRef.current === "webgpu"
+          && webGpuCanvasHandleRef.current?.isBackendAvailable() === true,
+        rolloutPrefersGpu: STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+          && STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED,
+      });
       const canvas2dSelected = genericDirectSelected && !gpuSelected;
 
       if (pendingGpuAuthorityBlocksNewSurface) {
@@ -24907,13 +24973,18 @@ const puppetWarpArmed =
       // Canvas2D remains a manual compatibility engine. It is never reached from a WebGPU miss.
       liveInkOverlayClearGenRef.current += 1;
       let liveInkOverlayStarted = false;
+      // 오버레이가 애초에 맡지 않는 획(지우개·채우기·대칭)은 시작 실패가 아니라 Konva 직접
+      // 초안이 정상 경로다. 이 자격을 시작 조건과 거절 조건이 같이 써야, WebGPU 없는 기기에서
+      // 표준 지우개가 "2D 표면을 시작하지 못했다"며 통째로 거부되는 일이 없다(실측: 지우개 획이
+      // 화면에는 보이지만 문서·자동저장에 남지 않았다).
+      const liveInkOverlayEligible = overlayCandidate
+        && next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none";
       if (canvas2dSelected
         && liveInkBackendDecision.status === "ready"
         && liveInkBackendDecision.backend === "canvas2d"
-        && overlayCandidate
-        && next.mode !== "eraser"
-        && !next.fill
-        && (next.symmetry?.type ?? "none") === "none"
+        && liveInkOverlayEligible
       ) {
         const liveInkStyle = liveInkStyleFor(next);
         liveInkOverlayStarted = causalPostCorrectionEligible
@@ -24928,7 +24999,7 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      if (canvas2dSelected && !liveInkOverlayStarted) {
+      if (canvas2dSelected && liveInkOverlayEligible && !liveInkOverlayStarted) {
         return rejectSelectedSurface("Canvas2D 라이브 잉크", "명시적으로 선택한 2D 표면을 시작하지 못했습니다.");
       }
 
@@ -25530,6 +25601,7 @@ const puppetWarpArmed =
     schedulePanelSplitPreview,
     schedulePixelDragPreview,
     scheduleQuickMaskDragPreview,
+    salvageRejectedStroke,
     sealCausalPostCorrectionState,
     selected,
     settleGpuLiveStroke,
@@ -27149,6 +27221,8 @@ function clearSelectionForEdit() {
       openScrollPreview: () => setScrollPreviewOpen(true),
       openContinuityCheck: () => setContinuityOpen(true),
       openProductionBible: () => setProductionBibleOpen(true),
+      openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
+      openAiSuperSuite: () => setAiSuperSuiteOpen(true),
       openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
@@ -28707,6 +28781,15 @@ function clearSelectionForEdit() {
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
     activatePrimaryCanvasTool,
+    // "UI 는 명령을 받는다, setter 를 받지 않는다" 의 첫 걸음 — 의미는 오늘과 동일하다.
+    toggleHandTool: () => {
+      primaryToolActivatedRef.current = true;
+      setTool((current) => (current === "hand" ? "select" : "hand"));
+    },
+    // 픽셀 선택 무장·"선택 후 변형" 복구 — 기본 도구 전이가 아니라 오늘과 같은 raw 전이다.
+    returnToSelectTool: () => {
+      setTool("select");
+    },
     fitCanvasToWidthWithFocus: () => {
       fitCanvasToWidth();
       if (!presentationPanelsHidden) {
@@ -30956,6 +31039,21 @@ function clearSelectionForEdit() {
       onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
     >
       {editorSurface}
+      <StudioWebtoonAssistantModal
+        open={webtoonAssistantOpen}
+        onClose={() => setWebtoonAssistantOpen(false)}
+        canvasWidth={CANVAS_W}
+        canvasHeight={canvasH}
+      />
+      <StudioAiSuperSuiteModal
+        open={aiSuperSuiteOpen}
+        onClose={() => setAiSuperSuiteOpen(false)}
+        onApplyPrompt={(prompt) => {
+          setAiBgPrompt(prompt);
+          setAiAssistTool("background");
+          setAiSuperSuiteOpen(false);
+        }}
+      />
     </StudioDccWorkbenchRoute>
   );
 }

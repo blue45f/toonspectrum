@@ -1,4 +1,9 @@
-import { calculateStudioCrc32 } from "./studio-crc32";
+import {
+  STUDIO_CRC32_INITIAL_STATE,
+  calculateStudioCrc32,
+  finalizeStudioCrc32,
+  updateStudioCrc32,
+} from "./studio-crc32";
 import {
   STUDIO_CRC32_WORKER_MAX_BYTES,
   STUDIO_CRC32_WORKER_PROTOCOL_VERSION,
@@ -7,7 +12,15 @@ import {
   type StudioCrc32WorkerRunMessage,
 } from "./studio-crc32-worker-protocol";
 
-/** Direct reference CRC remains bounded to a short metadata-sized task. */
+/**
+ * Largest slice the bounded direct mode folds in one synchronous task.
+ *
+ * Inputs up to this size are hashed in a single call (a short metadata-sized task). Larger inputs
+ * — the bounded WILL v1 profile allows a 32 MiB strokes part — are folded slice by slice with an
+ * event-loop yield between slices, so the main thread is never blocked longer than one slice and
+ * a caller that legitimately reaches the profile limit no longer fails after the profile check
+ * already accepted its document.
+ */
 export const STUDIO_CRC32_DIRECT_MAX_BYTES = 1024 * 1024;
 
 const STUDIO_CRC32_WORKER_READY_TIMEOUT_MS = 3_000;
@@ -135,6 +148,38 @@ function runDirect(
   return { execution: "direct", crc32, data };
 }
 
+/**
+ * Hands control back to the event loop between CRC slices. Prefers the scheduler API (which lets
+ * pending input run first), then a macrotask so rendering and pointer handlers interleave.
+ */
+function yieldToEventLoop(): Promise<void> {
+  const scheduler = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (scheduler && typeof scheduler.yield === "function") {
+    return scheduler.yield().catch(() => undefined);
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Bounded-slice direct CRC for inputs larger than one synchronous task. The digest is identical
+ * to `calculateStudioCrc32(data)`; only the scheduling differs. Abort is honoured between slices.
+ */
+async function runDirectSliced(
+  data: Uint8Array,
+  signal: AbortSignal | undefined,
+  sliceBytes: number,
+): Promise<StudioCrc32WorkerResult> {
+  let state = STUDIO_CRC32_INITIAL_STATE;
+  for (let offset = 0; offset < data.byteLength; offset += sliceBytes) {
+    throwIfAborted(signal);
+    const end = Math.min(offset + sliceBytes, data.byteLength);
+    state = updateStudioCrc32(state, data, offset, end);
+    if (end < data.byteLength) await yieldToEventLoop();
+  }
+  throwIfAborted(signal);
+  return { execution: "direct", crc32: finalizeStudioCrc32(state), data };
+}
+
 function deserializeWorkerError(
   response: Extract<StudioCrc32WorkerResponseMessage, { type: "studio-crc32/failure" }>,
 ): Error {
@@ -189,6 +234,14 @@ export function createStudioCrc32WorkerSession(
             && typeof globalThis.document !== "undefined"
           ) {
             throw new Error("direct-headless CRC32는 DOM이 없는 실행 환경에서만 사용할 수 있습니다.");
+          }
+          if (
+            options.executionMode === "direct-bounded"
+            && data.byteLength > directMaxBytes
+          ) {
+            // Still "bounded": each synchronous slice stays within the metadata-sized budget;
+            // the whole-input ceiling remains the Worker maximum enforced by assertCrc32Input.
+            return runDirectSliced(data, runOptions.signal, directMaxBytes);
           }
           return Promise.resolve(runDirect(data, runOptions.signal, directMaxBytes));
         } catch (error) {

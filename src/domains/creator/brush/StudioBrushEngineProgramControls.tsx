@@ -17,12 +17,14 @@ import { resolveStudioBrushRenderFamily } from "../studio-brush";
 
 import {
   STUDIO_BRUSH_OIL_PROGRAM_KEYS,
+  STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
   studioBrushEngineProgramSetFromOil,
   studioOilProgramSetForBrush,
   type StudioBrushEngineProgramSet,
   type StudioBrushOilProgramKey,
   type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
+import { studioBrushPresetById } from "./studio-draw-ux";
 
 import { cn } from "@/lib/utils";
 
@@ -52,18 +54,42 @@ const OIL_PROGRAM_ROWS: readonly {
   },
 ];
 
-/** 편집 중인 조합이 어떤 출하 프리셋과 같은지 — 같은 게 없으면 null. */
-const OIL_PRESET_NAMES: Readonly<Record<string, string>> = {
-  "brush--bristle-physics": "강모 물리 데모",
+/**
+ * 물리 현상으로 부르는 이 편집기의 어조에 맞춘 손글 프리셋 이름. 여기 없는 매트릭스 id 는 카탈로그
+ * 이름으로 부른다(유화 붓, 아크릴 물감). 카탈로그에 없는 id 는 출하 프리셋이 아니므로 이름을 얻지
+ * 못하고 비교에서 빠진다.
+ */
+const OIL_PRESET_NAME_OVERRIDES: Readonly<Record<string, string>> = {
+  "brush--bristle-physics": "유화 · 물리 강모 갈필",
   "brush--bristle-depletion": "갈필",
   "brush--impasto-relief": "임파스토 릴리프",
   "oil--filbert-ribbon": "유화 · 필버트 리본",
-  "oil--impasto-ribbon": "유화 · 임파스토 리본",
+  "oil--impasto-ribbon": "유화 · 임파스토(소모 없음)",
   "brush--oil-lanes": "유화 · 기본 레인",
 };
 
-function matchingPresetName(programs: StudioBrushOilProgramSet): string | null {
-  for (const [id, name] of Object.entries(OIL_PRESET_NAMES)) {
+/**
+ * 비교 후보는 매트릭스가 데이터로 내보내는 id 전부와 매트릭스 밖의 기본 레인이다. 이 파일이 사설
+ * 사본을 들고 있던 동안 2026-08-20 에 세 프로그램을 모두 켜고 출하된 유화 붓·아크릴 물감이 빠져,
+ * 편집기가 출하된 조합을 "이 조합과 같은 프리셋은 없습니다"라고 말했다.
+ */
+const OIL_PRESET_CANDIDATE_IDS: readonly string[] = [
+  ...STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
+  "brush--oil-lanes",
+];
+
+function oilPresetName(id: string): string | null {
+  return OIL_PRESET_NAME_OVERRIDES[id] ?? studioBrushPresetById(id)?.name ?? null;
+}
+
+/**
+ * 편집 중인 조합이 어떤 출하 프리셋과 같은지 — 편집 중인 브러시 자신을 먼저 보고, 그다음 매트릭스
+ * 순서다(세 프로그램을 모두 켠 조합은 유화 붓으로 부른다). 같은 게 없으면 null.
+ */
+function matchingPresetName(programs: StudioBrushOilProgramSet, brushId: string): string | null {
+  for (const id of [brushId, ...OIL_PRESET_CANDIDATE_IDS]) {
+    const name = oilPresetName(id);
+    if (!name) continue;
     const baseline = studioOilProgramSetForBrush(id);
     if (STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => baseline[key] === programs[key])) {
       return name;
@@ -104,7 +130,7 @@ export function StudioBrushEngineProgramControls({
   const baseline = studioOilProgramSetForBrush(brushId);
   const current = programSet?.oil ?? baseline;
   const changed = STUDIO_BRUSH_OIL_PROGRAM_KEYS.some((key) => current[key] !== baseline[key]);
-  const presetName = matchingPresetName(current);
+  const presetName = matchingPresetName(current, brushId);
   const activeCount = STUDIO_BRUSH_OIL_PROGRAM_KEYS.filter((key) => current[key]).length;
 
   const toggle = (key: StudioBrushOilProgramKey) => {

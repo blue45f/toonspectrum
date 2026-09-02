@@ -29,11 +29,17 @@ function deepFreeze<T>(value: T): T {
 }
 
 /**
- * The ToonSpectrum-owned CC0 VRM used for the reproducible preset render catalogue.
+ * The ToonSpectrum-owned CC0 VRM the shipped preset render catalogue was built from.
  *
  * This is deliberately an exact content authority rather than a mutable URL. A catalogue build
  * must hash the source bytes before rendering and must use the fixed camera/lighting contract
  * below. `public/vrm/LICENSES.md` documents the original model and its CC0 1.0 grant.
+ *
+ * The model itself was retired from the bundle on 2026-09-02 together with the rest of the
+ * procedural character pack; the committed catalogue artifact remains the runtime authority and
+ * nothing at runtime fetches the source bytes. Rebuilding the catalogue needs a new CC0 base
+ * that passes the generator's uniqueness and calibration gates — every bundled 100Avatars
+ * candidate (CosmicBot, Eugenia, Devil, Bloody, LadyFawn, Robert) failed them.
  */
 export const STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY = deepFreeze({
   sourceAssetId: "toonspectrum-minseo-campus",

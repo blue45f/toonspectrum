@@ -45,4 +45,19 @@ describe("useMarketResourceDetail", () => {
     expect(result.current.record).toBeNull();
     expect(result.current.error).toBeNull();
   });
+
+  it("resolves official starter resource on network failure", async () => {
+    getResource.mockRejectedValueOnce(new Error("503 Service Unavailable"));
+    readCachedResource.mockReturnValueOnce(null);
+
+    const { result } = renderHook(() =>
+      useMarketResourceDetail("e0000001-0000-4000-8000-000000000001")
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.record).not.toBeNull();
+    expect(result.current.record?.kind).toBe("3d-asset");
+    expect(result.current.record?.name).toContain("애니메 표준 휴머노이드 소체");
+    expect(result.current.error).toBeNull();
+  });
 });

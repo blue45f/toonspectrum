@@ -68,4 +68,35 @@ describe("StudioGpuPinReceiptWatchdog", () => {
 
     expect(onTimeout).not.toHaveBeenCalled();
   });
+
+  it("lets one request carry its own budget without moving the live deadline", () => {
+    // 완성된 획의 최종 영수증은 라이브 지연 예산으로 재면 안 된다 — 지연 커밋 렌더가 한 프레임
+    // 예산을 넘기는 순간 제품이 그 획을 지웠다("현재 획을 취소했습니다").
+    vi.useFakeTimers();
+    const onTimeout = vi.fn();
+    const watchdog = new StudioGpuPinReceiptWatchdog({ timeoutMs: 300, onTimeout });
+
+    watchdog.begin("frame:1");
+    expect(watchdog.receipt("frame:1")).toBe(true);
+    watchdog.request("terminal:1", 2_000);
+    vi.advanceTimersByTime(1_500);
+    expect(onTimeout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(600);
+
+    expect(onTimeout).toHaveBeenCalledOnce();
+    expect(onTimeout).toHaveBeenCalledWith("progress", "terminal:1");
+  });
+
+  it("keeps the live budget for a pointer frame that passes no override", () => {
+    vi.useFakeTimers();
+    const onTimeout = vi.fn();
+    const watchdog = new StudioGpuPinReceiptWatchdog({ timeoutMs: 300, onTimeout });
+
+    watchdog.begin("frame:1");
+    expect(watchdog.receipt("frame:1")).toBe(true);
+    watchdog.request("frame:2");
+    vi.advanceTimersByTime(301);
+
+    expect(onTimeout).toHaveBeenCalledWith("progress", "frame:2");
+  });
 });

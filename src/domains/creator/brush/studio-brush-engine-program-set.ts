@@ -64,6 +64,30 @@ export const STUDIO_BRUSH_OIL_PROGRAM_KEYS = Object.freeze([
 
 export type StudioBrushOilProgramKey = (typeof STUDIO_BRUSH_OIL_PROGRAM_KEYS)[number];
 
+/**
+ * Every brush id the oil program matrix names — the case labels of `studioOilProgramSetForBrush`
+ * below and of `studioOilRibbonProgramsForBrush` in the carrier, restated as data. Consumers that
+ * walk the matrix (the byte-identity contract test, the engine editor's "same as preset" lookup)
+ * read this instead of keeping a private copy: the last private copies missed the rows added on
+ * 2026-08-20 for two weeks. The contract test proves every entry here is a real matrix row, so a
+ * typo fails a test instead of silently matching nothing.
+ *
+ * Only ids that ship are listed. The four `fluid-paint*` ids (registered in no catalog, so no
+ * picker could offer them) and the two `oil--fluid-paint-*` alias rows that nothing produced were
+ * dropped on 2026-09-02.
+ */
+export const STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS = Object.freeze([
+  // single- and two-mechanism showcase lanes
+  "brush--bristle-physics",
+  "brush--bristle-depletion",
+  "brush--impasto-relief",
+  "oil--filbert-ribbon",
+  "oil--impasto-ribbon",
+  // the general-purpose oils — all three programs (2026-08-20)
+  "oil",
+  "acrylic",
+] as const);
+
 const EMPTY_OIL_PROGRAMS: StudioBrushOilProgramSet = Object.freeze({
   bristlePhysics: false,
   bristleLoadDynamics: false,
@@ -112,12 +136,6 @@ export function studioOilProgramSetForBrush(brush: string): StudioBrushOilProgra
       });
     case "oil":
     case "acrylic":
-    case "fluid-paint":
-    case "fluid-paint-fine":
-    case "fluid-paint-load":
-    case "fluid-paint-rake":
-    case "oil--fluid-paint-splat":
-    case "oil--fluid-paint-rake":
       return Object.freeze({
         bristlePhysics: true,
         bristleLoadDynamics: true,

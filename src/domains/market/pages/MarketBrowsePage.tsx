@@ -1,4 +1,13 @@
-import { RotateCcw, Search, X } from "lucide-react";
+import {
+  AlertTriangle,
+  PackageSearch,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  SearchX,
+  Upload,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useSearchParams } from "react-router-dom";
 
@@ -86,6 +95,7 @@ export function MarketBrowsePage() {
     [setSearchParams]
   );
 
+  const activeSearch = query.search;
   const activeKind = query.kind;
   const activeLicense = query.license;
   const activePublisherLabel = query.publisher
@@ -289,6 +299,30 @@ export function MarketBrowsePage() {
           })}
         </div>
 
+        {/* Trending Genre / Thematic Tag Filters (Acon3D & Clip Studio Benchmark) */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5" role="group" aria-label="장르 및 테마 태그 필터">
+          <span className="text-[0.68rem] font-semibold text-fg-3 px-1">추천 태그:</span>
+          {["로판", "학교", "3D", "인체", "무기", "3D배경", "G펜", "레이스", "파티클", "소품"].map((tag) => {
+            const isSelected = query.tag === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => patchParams({ tag: isSelected ? null : tag })}
+                aria-pressed={isSelected}
+                className={cn(
+                  "inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-medium transition-colors duration-150 pointer-coarse:min-h-11",
+                  isSelected
+                    ? "border-accent bg-accent text-on-accent font-bold shadow-sm"
+                    : "border-line/70 bg-panel text-fg-2 hover:border-line-strong hover:text-fg"
+                )}
+              >
+                #{tag}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Status and Active Filter Chips */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
           {!hasInvalidQuery && !page.loading && !page.error ? (
@@ -423,15 +457,40 @@ export function MarketBrowsePage() {
           />
         ) : null}
 
-        {!hasInvalidQuery && page.error ? (
-          <StaleNoticeBar
-            message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
-            onRetry={page.reload}
-            className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
-          />
+        {!hasInvalidQuery && page.error && page.items.length === 0 ? (
+          <div
+            role="alert"
+            className="mt-8 rounded-2xl border border-warn/30 bg-warn/5 p-8 text-center sm:p-12"
+          >
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-warn/10 text-warn">
+              <AlertTriangle className="size-6" aria-hidden="true" />
+            </div>
+            <h2 className="mt-4 text-base font-bold text-fg">
+              리소스를 불러올 수 없어요
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
+              일시적인 네트워크 문제이거나 서버에 일시적 장애가 발생했을 수 있어요. 잠시 후 다시 시도해 주세요.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={page.reload}
+                className={buttonClass({ variant: "solid", size: "sm" })}
+              >
+                <RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />
+                다시 시도
+              </button>
+              <Link
+                href="/studio"
+                className={buttonClass({ variant: "outline", size: "sm" })}
+              >
+                스튜디오로 이동
+              </Link>
+            </div>
+          </div>
         ) : null}
 
-        {hasInvalidQuery || page.error ? null : (
+        {hasInvalidQuery || (page.error && page.items.length === 0) ? null : (
           <>
             <h2 className="sr-only">탐색 결과</h2>
             {page.loading ? (
@@ -443,7 +502,7 @@ export function MarketBrowsePage() {
               aria-busy={page.loading || undefined}
               className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
             >
-              {page.loading
+              {page.loading && page.items.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
                     <li key={index} aria-hidden="true">
                       <div className="skeleton aspect-[16/9] w-full rounded-t-xl" />
@@ -461,29 +520,114 @@ export function MarketBrowsePage() {
             </ul>
 
             {!page.loading && page.items.length === 0 ? (
-              <div className="mt-8 rounded-xl border border-dashed border-line bg-panel p-10 text-center">
-                <p className="text-sm font-medium text-fg">
-                  {activeKind
-                    ? `아직 등록된 ${marketKindMeta(activeKind).label} 리소스가 없어요.`
-                    : "조건에 맞는 공유 리소스가 없어요."}
-                </p>
-                <p className="mt-1 text-xs text-fg-3">
-                  스튜디오에서 제작한 브러시나 팔레트를 첫 번째로 공유해 보세요!
-                </p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <Link href="/studio" className={buttonClass({ variant: "solid", size: "sm" })}>
-                    스튜디오에서 첫 리소스 공유하기
-                  </Link>
-                  {hasActiveFilters ? (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className={buttonClass({ variant: "outline", size: "sm" })}
+              <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel p-8 text-center sm:p-12">
+                {activeSearch ? (
+                  <>
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
+                      <SearchX className="size-6" aria-hidden="true" />
+                    </div>
+                    <h2 className="mt-4 text-base font-bold text-fg">
+                      &lsquo;{activeSearch}&rsquo; 검색 결과가 없어요
+                    </h2>
+                    <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
+                      단어의 맞춤법을 확인하거나 더 일반적인 검색어로 찾아보세요.
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftSearch("");
+                          patchParams({ q: null });
+                        }}
+                        className={buttonClass({ variant: "solid", size: "sm" })}
+                      >
+                        검색어 초기화
+                      </button>
+                      {hasActiveFilters ? (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className={buttonClass({ variant: "outline", size: "sm" })}
+                        >
+                          <RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />
+                          모든 필터 초기화
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : activeKind ? (
+                  <>
+                    <div
+                      className="mx-auto flex size-12 items-center justify-center rounded-full"
+                      style={{
+                        backgroundColor: `oklch(0.92 0.04 ${marketKindMeta(activeKind).hue})`,
+                        color: `oklch(0.45 0.18 ${marketKindMeta(activeKind).hue})`,
+                      }}
                     >
-                      필터 조건 초기화
-                    </button>
-                  ) : null}
-                </div>
+                      {(() => {
+                        const Icon = marketKindMeta(activeKind).icon;
+                        return <Icon className="size-6" aria-hidden="true" />;
+                      })()}
+                    </div>
+                    <h2 className="mt-4 text-base font-bold text-fg">
+                      아직 등록된 {marketKindMeta(activeKind).label} 리소스가 없어요
+                    </h2>
+                    <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
+                      {activeKind === "3d-asset"
+                        ? "3D 캐릭터 소체, 학교·판타지 소품, 무기 파츠를 스튜디오에서 첫 번째로 공유해 보세요!"
+                        : activeKind === "3d-preset"
+                          ? "절차형 3D 공간과 조명 프리셋을 스튜디오에서 첫 번째로 공유해 보세요!"
+                          : "스튜디오에서 제작한 창작 도구를 마켓 커뮤니티에 가장 먼저 공유해 보세요!"}
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+                      <Link
+                        href="/studio?assetMarket=community&communityView=share"
+                        className={buttonClass({ variant: "solid", size: "sm" })}
+                      >
+                        <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
+                        스튜디오에서 {marketKindMeta(activeKind).label} 공유하기
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => patchParams({ kind: null })}
+                        className={buttonClass({ variant: "outline", size: "sm" })}
+                      >
+                        전체 리소스 둘러보기
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
+                      <PackageSearch className="size-6" aria-hidden="true" />
+                    </div>
+                    <h2 className="mt-4 text-base font-bold text-fg">
+                      조건에 맞는 공유 리소스가 없어요
+                    </h2>
+                    <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
+                      필터 조건을 변경하거나 스튜디오에서 창작한 도구를 첫 번째로 공유해 보세요.
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+                      <Link
+                        href="/studio?assetMarket=community&communityView=share"
+                        className={buttonClass({ variant: "solid", size: "sm" })}
+                      >
+                        <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
+                        스튜디오에서 첫 리소스 공유하기
+                      </Link>
+                      {hasActiveFilters ? (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className={buttonClass({ variant: "outline", size: "sm" })}
+                        >
+                          <RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />
+                          필터 조건 초기화
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                )}
               </div>
             ) : null}
 

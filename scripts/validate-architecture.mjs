@@ -48,6 +48,55 @@ for (const entry of requiredEntries) {
   if (!exists(entry)) issues.push(`missing app entry: ${entry}`);
 }
 
+// 앱 진입점은 정확히 하나(index.html -> src/app/main.tsx)여야 한다. 실험용 브라우저 하네스가
+// src 루트에 `*-main.ts(x)` 로, 그 페이지가 레포 루트에 `*.html` 로 눌러앉으면 "앱 소스"와
+// "일회성 실험"이 같은 트리에서 구분되지 않는다. 하네스의 집은 tools/browser-harnesses/ 다.
+const SRC_ROOT_ENTRY_PATTERN = /(?:^|-)main\.tsx?$/;
+if (exists("src")) {
+  for (const entry of fs.readdirSync(path.join(ROOT, "src"), { withFileTypes: true })) {
+    if (!entry.isFile() || !SRC_ROOT_ENTRY_PATTERN.test(entry.name)) continue;
+    issues.push(
+      `entry-shaped module at the src root: src/${entry.name}`
+      + ` (the app entry is src/app/main.tsx; browser harnesses belong in tools/browser-harnesses/)`,
+    );
+  }
+}
+for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
+  if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+  if (entry.name === "index.html") continue;
+  issues.push(
+    `stray HTML entry at the repo root: ${entry.name}`
+    + ` (only index.html may live here; harness pages belong in tools/browser-harnesses/)`,
+  );
+}
+if (!exists("tools/browser-harnesses")) {
+  issues.push("missing harness home: tools/browser-harnesses/");
+}
+
+// 린트 예외 원장 + 그 원장과 호스트 결합도를 지키는 두 래칫 테스트. 이 셋 중 하나라도
+// 사라지면 "기계적 추출" 상태가 다시 아무도 안 보는 곳으로 숨는다.
+const LEGACY_EXCEPTIONS_LEDGER = "eslint.legacy-exceptions.json";
+if (!exists(LEGACY_EXCEPTIONS_LEDGER)) {
+  issues.push(`missing lint exception ledger: ${LEGACY_EXCEPTIONS_LEDGER}`);
+} else {
+  try {
+    const ledger = JSON.parse(read(LEGACY_EXCEPTIONS_LEDGER));
+    for (const key of ["compilerOptOutFiles", "closureBagFiles"]) {
+      if (!Array.isArray(ledger[key])) {
+        issues.push(`${LEGACY_EXCEPTIONS_LEDGER}: "${key}" must be an array of globs`);
+      }
+    }
+  } catch (error) {
+    issues.push(`${LEGACY_EXCEPTIONS_LEDGER}: not parseable JSON (${error.message})`);
+  }
+}
+for (const guard of [
+  "src/domains/creator/studio-host-architecture-ratchet.test.ts",
+  "scripts/eslint-legacy-exceptions.test.mjs",
+]) {
+  if (!exists(guard)) issues.push(`missing architecture guard test: ${guard}`);
+}
+
 // Root scripts wired into the build/lint/test chain.
 // V11.1 §12.1/§Phase 8 — 인플레이스 교체 가드: 병렬 Studio 앱·버전 접미사 소스 경로 금지.
 const forbiddenParallelPaths = [

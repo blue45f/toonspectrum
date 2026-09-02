@@ -288,6 +288,12 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     "splatter--burst-cloud":
       "splatter 와 tip(flake)·texture(custom-alpha-capable)가 같은 산란 레인 — 굵기 48/45 차이뿐. "
       + "대안: splatter · spray · ink-particle--scatter-cloud(지침 6).",
+    // 2026-09-02 유사 브러시 정리(적대적 검증 통과): 잔상 트레일이 실재하지 않는 소프트 블렌드.
+    "web-smudge-trail":
+      "web-blend-softener 와 실행 서명이 동일(dynamic-dabs:soft-diffuse/soft-gradient/mapped-dabs) — "
+      + "lag ghost 4겹이 경로 위에 그대로 겹쳐 찍혀(실측 수직 편차 max 0.03px, 직각 코너에서도 0.93px) "
+      + "잔상이 실재하지 않고, 밀도 3.9배는 flow 슬라이더로 재현됩니다. "
+      + "대안: web-blend-softener · airbrush · soft-brush(지침 6).",
 
     // ── K. 서명이 완전히 동일한 레인 별칭 ─────────────────────────────────────────
     "pen--perfect-taper":

@@ -41,8 +41,9 @@ import {
 } from "./studio-brush-render-budget";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+import { planStudioInteractiveWetInkBrushReplay } from "./studio-wet-ink-backend-capability";
 import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT, planStudioWetRibbonCarrier  } from "./studio-wet-ribbon-carrier";
-import { StudioDrawNode } from "./StudioDrawNode";
+import { STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT, StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "../studio-element-model";
 import type { StudioPatternSpec } from "../studio-pattern-fill";
@@ -153,12 +154,22 @@ class AliasSceneContext {
   strokeStyle: string | CanvasGradient | CanvasPattern = "";
   private activePolygon: number[] = [];
   private activeCompoundPath: number[] = [];
+  /**
+   * 한 beginPath 안에서 moveTo 로 시작된 이전 서브패스들. 연필 리본은 알파 버킷별로 셀 수백 개를
+   * 한 번의 fill 로 채우므로(e90aadbe 배칭), 마지막 서브패스만 기억하면 셀이 전부 사라진 것처럼
+   * 읽힌다. `fillPolygons`/`fillCompoundPaths`/`fillAlphas` 는 예전처럼 fill 당 한 항목을 유지하고,
+   * 서브패스 단위 기하는 `fillSubpathPolygons`/`fillSubpathAlphas` 로 따로 노출한다.
+   */
+  private pendingPolygons: number[][] = [];
+  readonly fillSubpathPolygons: number[][] = [];
+  readonly fillSubpathAlphas: number[] = [];
 
   save(): void {}
   restore(): void {}
   beginPath(): void {
     this.activePolygon = [];
     this.activeCompoundPath = [];
+    this.pendingPolygons = [];
   }
   closePath(): void {}
   fill(): void {
@@ -167,8 +178,15 @@ class AliasSceneContext {
       this.fillCompoundPaths.push([...this.activeCompoundPath]);
       this.fillAlphas.push(this.globalAlpha);
     }
+    for (const polygon of [...this.pendingPolygons, this.activePolygon]) {
+      if (polygon.length < 6) continue;
+      this.fillSubpathPolygons.push([...polygon]);
+      this.fillSubpathAlphas.push(this.globalAlpha);
+    }
+    this.pendingPolygons = [];
   }
   moveTo(x: number, y: number): void {
+    if (this.activePolygon.length >= 6) this.pendingPolygons.push(this.activePolygon);
     this.activePolygon = [x, y];
     this.activeCompoundPath.push(x, y);
   }
@@ -382,6 +400,66 @@ function pattern(overrides: Partial<StudioPatternSpec> = {}): StudioPatternSpec 
 
 function captured(kind: string): CapturedKonvaNode[] {
   return konvaCapture.nodes.filter((node) => node.kind === kind);
+}
+
+interface PencilSvgPath {
+  readonly coords: readonly number[];
+  readonly opacity: number;
+}
+
+function pencilSvgPaths(
+  svg: string,
+  attribute: "data-pencil-ribbon-cell" | "data-pencil-endcap",
+): PencilSvgPath[] {
+  return Array.from(
+    svg.matchAll(
+      new RegExp(`<path d="([^"]+)"[^>]*${attribute}="[^"]+"[^>]*opacity="([^"]+)"[^>]*/>`, "gu"),
+    ),
+    (match) => ({
+      coords: Array.from(
+        match[1]!.matchAll(/-?\d+(?:\.\d+)?/gu),
+        (numberMatch) => Number(numberMatch[0]),
+      ),
+      opacity: Number(match[2]),
+    }),
+  );
+}
+
+function roundedPolygon(points: readonly number[]): number[] {
+  return points.map((coordinate) => Math.round(coordinate * 100) / 100 + 0);
+}
+
+function polygonKeys(polygons: readonly (readonly number[])[]): string[] {
+  return polygons.map((polygon) => polygon.join(",")).sort();
+}
+
+/**
+ * Canvas batches every pencil ribbon cell of a pass into one compound fill per alpha level
+ * (2026-09-02 long-stroke batching) while SVG writes the exact per-cell alpha. The ladder is the
+ * only permitted difference: at most STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT fills per pass, every
+ * fill alpha on a ladder step, and every exported cell present on Canvas within half a step —
+ * under one 8-bit alpha level, so no cell that can change a pixel is dropped or visibly shifted.
+ */
+function expectPencilAlphaLadder(
+  context: AliasSceneContext,
+  svgPaths: readonly PencilSvgPath[],
+  strokeOpacity: number,
+  passCount: number,
+): void {
+  const ladder = STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT;
+  expect(context.fillAlphas.length).toBeLessThanOrEqual(ladder * passCount);
+  const alphaByCell = new Map<string, number>();
+  context.fillSubpathPolygons.forEach((polygon, subpathIndex) => {
+    const alpha = context.fillSubpathAlphas[subpathIndex]!;
+    expect(alpha * ladder).toBeCloseTo(Math.round(alpha * ladder), 6);
+    alphaByCell.set(roundedPolygon(polygon).join(","), alpha);
+  });
+  for (const path of svgPaths) {
+    const canvasAlpha = alphaByCell.get(path.coords.join(","));
+    expect(canvasAlpha, `cell ${path.coords.join(",")} missing on Canvas`).toBeDefined();
+    expect(Math.abs(path.opacity / strokeOpacity - canvasAlpha!))
+      .toBeLessThanOrEqual(1 / (2 * ladder) + 1e-5);
+  }
 }
 
 async function flushStampRenderer(): Promise<void> {
@@ -977,7 +1055,46 @@ describe("StudioDrawNode orchestration", () => {
     },
   );
 
-  it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
+  it("hands committed ink-wash to the shared wet-ink replay instead of the retained ribbon", () => {
+    // 2026-09-02: ink-wash, inkwash-bleed-wash and sumi joined the InkWash fluid list so the live
+    // draft and the committed DrawNode share one Stam-wash renderer. The causal dab plan is still
+    // authored for the compatibility path, but once the wet-ink replay plan is ok the scene
+    // function never traces the retained ribbon or the legacy dab circles for this snapshot.
+    const authoredDabs = [
+      { x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" },
+      { x: 3, y: 4, radius: 12, opacity: 0.2, role: "diffuse" },
+    ] as const;
+    watercolorCapture.causalPlan.mockReturnValueOnce([...authoredDabs]);
+    const element = drawEl({
+      brush: "ink-wash",
+      mode: "pen",
+      points: [0, 0, 8, 0],
+      pressures: [0.5, 0.5],
+      strokeWidth: 20,
+      watercolorPipeline: "causal-walker-v2",
+    });
+    render(<StudioDrawNode el={element} />);
+
+    const replay = planStudioInteractiveWetInkBrushReplay(element, { phase: "committed" });
+    expect(
+      replay?.ok,
+      replay && !replay.ok ? `${replay.reason}: ${replay.detail}` : "wet-ink replay missing",
+    ).toBe(true);
+    // The authored dabs were consumed, so the compatibility renderers had pigment to draw and
+    // the empty context below is a renderer-selection fact, not an empty stroke.
+    expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
+    const context = new AliasSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+    expect(context.fillPolygons).toEqual([]);
+    expect(context.arcs).toEqual([]);
+  });
+
+  it("applies inkwash-white-ink spacing, pressure, and material scales to retained watercolor", () => {
+    // ink-wash 자체는 2026-09-02(b871ff48)부터 공유 Stam 유체 워시(studio-wet-ink-brush-runtime)로
+    // 그려져 dab 워시를 타지 않는다. 별칭 배율 계약은 아직 dab 워시에 남은 화이트 잉크로 고정한다.
     const authoredDabs = [
       { x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" },
       { x: 3, y: 4, radius: 12, opacity: 0.2, role: "diffuse" },
@@ -986,7 +1103,7 @@ describe("StudioDrawNode orchestration", () => {
     render(
       <StudioDrawNode
         el={drawEl({
-          brush: "ink-wash",
+          brush: "inkwash-white-ink",
           mode: "pen",
           points: [0, 0, 8, 0],
           pressures: [0.5, 0.5],
@@ -997,10 +1114,10 @@ describe("StudioDrawNode orchestration", () => {
     );
 
     const [planInput, finalize] = watercolorCapture.causalPlan.mock.calls[0]!;
-    // ink-wash diameterScale 0.92 × strokeWidth 20; spacingRatio 0.126 of scaled width
-    // (0.18 을 0.7배로 좁힘 — 젖은 dab 구슬 현상, 2026-08-16 시각 대조).
-    expect(planInput?.baseWidth).toBeCloseTo(18.4);
-    expect(planInput?.spacing).toBeCloseTo(2.3184);
+    // inkwash-white-ink diameterScale 0.85 × strokeWidth 20 = 17; spacing 2.618 of scaled width
+    // (resolveStudioBrushAliasWatercolorPlanSettings 실측, 2026-09-02).
+    expect(planInput?.baseWidth).toBeCloseTo(17);
+    expect(planInput?.spacing).toBeCloseTo(2.618);
     expect(planInput?.pressures).toEqual([
       expect.any(Number),
       expect.any(Number),
@@ -1014,7 +1131,7 @@ describe("StudioDrawNode orchestration", () => {
     sceneFunc(context as unknown as CanvasRenderingContext2D);
     expect(context.arcs).toHaveLength(0);
     const retainedPlan = planStudioWetRibbonCarrier(
-      applyStudioBrushAliasWatercolorMaterial("ink-wash", authoredDabs),
+      applyStudioBrushAliasWatercolorMaterial("inkwash-white-ink", authoredDabs),
     );
     expect(retainedPlan.batches.length).toBeGreaterThan(4);
     expect(retainedPlan.batches.length).toBeLessThanOrEqual(4 * STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT);
@@ -1040,8 +1157,9 @@ describe("StudioDrawNode orchestration", () => {
     );
     expect(diffuseOuterBatchIndex).toBeGreaterThanOrEqual(0);
     expect(coreBatchIndex).toBeGreaterThan(diffuseOuterBatchIndex);
+    // 화이트 잉크의 diffuse 스커트는 ink-wash(2배)보다 좁지만 코어보다 뚜렷이 넓어야 한다(실측 1.7배).
     expect(polygonSpan(context.fillPolygons[diffuseOuterBatchIndex]!))
-      .toBeGreaterThan(polygonSpan(context.fillPolygons[coreBatchIndex]!) * 2);
+      .toBeGreaterThan(polygonSpan(context.fillPolygons[coreBatchIndex]!) * 1.5);
   });
 
   it("renders soft pencil as a pale wide skirt plus a rough core", () => {
@@ -1114,12 +1232,13 @@ describe("StudioDrawNode orchestration", () => {
               context: CanvasRenderingContext2D
             ) => void;
             sceneFunc(context as unknown as CanvasRenderingContext2D);
-            const ribbonCells = context.fillPolygons.filter(
+            // 리본 셀은 알파 버킷별로 한 번의 fill 에 묶여 찍히므로 서브패스 단위로 읽는다.
+            const ribbonCells = context.fillSubpathPolygons.filter(
               (polygon) => polygon.length === 8,
             );
             return {
               arcs: context.arcs,
-              strokeAlphas: context.fillAlphas,
+              strokeAlphas: context.fillSubpathAlphas,
               strokeCaps: context.strokeCaps,
               strokeWidths: ribbonCells.map((polygon) => Math.max(
                 Math.hypot(
@@ -1131,7 +1250,7 @@ describe("StudioDrawNode orchestration", () => {
                   polygon[3]! - polygon[5]!,
                 ),
               )),
-              terminalCapCount: context.fillPolygons.filter(
+              terminalCapCount: context.fillSubpathPolygons.filter(
                 (polygon) => polygon.length > 8,
               ).length,
             };
@@ -1220,31 +1339,48 @@ describe("StudioDrawNode orchestration", () => {
     const roundCoordinates = (points: readonly number[]) => points.map(
       (coordinate) => Math.round(coordinate * 100) / 100 + 0,
     );
-    const canvasCells = context.fillPolygons
+    // Canvas 는 셀을 알파 버킷별로 묶어 채우고 SVG 는 경로 순서대로 쓴다 — 같은 메시라는
+    // 계약은 순서가 아니라 집합이 같다는 뜻이므로 양쪽을 같은 키로 정렬해 비교한다.
+    const sortMesh = (mesh: number[][]) => [...mesh].sort((a, b) =>
+      a.join(",").localeCompare(b.join(","), "en"));
+    const canvasCells = context.fillSubpathPolygons
       .filter((polygon) => polygon.length === 8)
       .map(roundCoordinates);
-    const canvasCaps = context.fillPolygons
+    const canvasCaps = context.fillSubpathPolygons
       .filter((polygon) => polygon.length > 8)
       .map(roundCoordinates);
+    // 연속성 검사는 경로 순서가 필요하므로 SVG 가 쓰는 순서(경로 진행순)를 기준으로 걷는다.
+    const svgCells = pathCoordinates("data-pencil-ribbon-cell");
 
     expect(exported).toContain('data-brush-engine="retained-pressure-ribbon-v1"');
-    expect(pathCoordinates("data-pencil-ribbon-cell")).toEqual(canvasCells);
-    expect(pathCoordinates("data-pencil-endcap")).toEqual(canvasCaps);
+    expect(sortMesh(svgCells)).toEqual(sortMesh(canvasCells));
+    expect(sortMesh(pathCoordinates("data-pencil-endcap"))).toEqual(sortMesh(canvasCaps));
     expect(canvasCaps).toHaveLength(2);
     expect(context.arcs).toEqual([]);
-    for (let cellIndex = 1; cellIndex < canvasCells.length; cellIndex += 1) {
+    for (let cellIndex = 1; cellIndex < svgCells.length; cellIndex += 1) {
       const previous = new Set(
         Array.from({ length: 4 }, (_, pointIndex) => (
-          `${canvasCells[cellIndex - 1]![pointIndex * 2]},${canvasCells[cellIndex - 1]![pointIndex * 2 + 1]}`
+          `${svgCells[cellIndex - 1]![pointIndex * 2]},${svgCells[cellIndex - 1]![pointIndex * 2 + 1]}`
         )),
       );
       const current = new Set(
         Array.from({ length: 4 }, (_, pointIndex) => (
-          `${canvasCells[cellIndex]![pointIndex * 2]},${canvasCells[cellIndex]![pointIndex * 2 + 1]}`
+          `${svgCells[cellIndex]![pointIndex * 2]},${svgCells[cellIndex]![pointIndex * 2 + 1]}`
         )),
       );
       expect([...previous].filter((point) => current.has(point))).toHaveLength(2);
     }
+    // The alpha ladder is the only place Canvas and SVG may differ: SVG writes the exact per-cell
+    // alpha, Canvas rounds it to the nearest ladder step.
+    expectPencilAlphaLadder(
+      context,
+      [
+        ...pencilSvgPaths(exported, "data-pencil-ribbon-cell"),
+        ...pencilSvgPaths(exported, "data-pencil-endcap"),
+      ],
+      element.opacity ?? 1,
+      1,
+    );
   });
 
   it.each(["neon", "glow"] as const)(
@@ -1755,8 +1891,8 @@ describe("StudioDrawNode orchestration", () => {
       }
       const result = {
         circles: captured("Circle").length,
-        polygons: context.fillPolygons.map((polygon) => [...polygon]),
-        alphas: [...context.fillAlphas],
+        polygons: context.fillSubpathPolygons.map((polygon) => [...polygon]),
+        alphas: [...context.fillSubpathAlphas],
       };
       view.unmount();
       konvaCapture.nodes.length = 0;
@@ -1769,6 +1905,85 @@ describe("StudioDrawNode orchestration", () => {
     expect(first.circles).toBe(0);
     expect(first.polygons.length).toBeGreaterThan(2);
     expect(replay).toEqual(first);
+  });
+
+  it("keeps every faint pencil cell on Canvas through the alpha ladder", () => {
+    // The 2026-09-02 long-stroke batching quantizes the pressure-driven cell alpha into fill
+    // buckets. At its original 16 levels every cell under 1/32 rounded into the empty bucket and
+    // was never drawn: soft-pencil's 0.18-scale skirt lost 40 of its 45 cells at light pressure
+    // while the SVG export kept them. The ladder now has STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT
+    // levels, so the Canvas cell multiset equals the SVG one and no visible cell is dropped.
+    const element = drawEl({
+      brush: "soft-pencil",
+      mode: "pen",
+      points: [0, 0, 12, 4, 24, 0],
+      pressures: [0, 0, 0],
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      strokeWidth: 6,
+      opacity: 1,
+    });
+    render(<StudioDrawNode el={element} />);
+    const context = new AliasSceneContext();
+    for (const shape of captured("Shape")) {
+      (shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void)(
+        context as unknown as CanvasRenderingContext2D,
+      );
+    }
+    const exported = exportPageToSvg({
+      width: 40,
+      height: 20,
+      bg: "#ffffff",
+      elements: [element],
+    }).svg;
+    const svgCells = pencilSvgPaths(exported, "data-pencil-ribbon-cell");
+    const svgCaps = pencilSvgPaths(exported, "data-pencil-endcap");
+    const canvasPolygons = context.fillSubpathPolygons.map(roundedPolygon);
+
+    expect(svgCells.length).toBeGreaterThan(20);
+    expect(polygonKeys(canvasPolygons.filter((polygon) => polygon.length === 8)))
+      .toEqual(polygonKeys(svgCells.map((path) => path.coords)));
+    expect(polygonKeys(canvasPolygons.filter((polygon) => polygon.length > 8)))
+      .toEqual(polygonKeys(svgCaps.map((path) => path.coords)));
+    // The skirt really is fainter than the 16-level ladder could represent.
+    expect(Math.min(...context.fillAlphas)).toBeLessThan(1 / 32);
+    expectPencilAlphaLadder(context, [...svgCells, ...svgCaps], 1, 2);
+  });
+
+  it("bounds a long two-pass pencil stroke to the alpha ladder's fill budget", () => {
+    // The batching exists so a long stroke never issues one fill per cell: the fill count is
+    // bounded by the ladder per pass, whatever the cell count.
+    const pointCount = 160;
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "pencil-6b",
+          mode: "pen",
+          points: Array.from({ length: pointCount }, (_, index) => [
+            index * 3,
+            index % 2 === 0 ? 0 : 9,
+          ]).flat(),
+          pressures: Array.from(
+            { length: pointCount },
+            (_, index) => 0.2 + 0.6 * ((index % 7) / 6),
+          ),
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          sampleSpacing: 1,
+          strokeWidth: 8,
+          opacity: 1,
+        })}
+      />,
+    );
+    const context = new AliasSceneContext();
+    for (const shape of captured("Shape")) {
+      (shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void)(
+        context as unknown as CanvasRenderingContext2D,
+      );
+    }
+
+    expect(context.fillSubpathPolygons.length)
+      .toBeGreaterThan(2 * STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT);
+    expect(context.fillAlphas.length)
+      .toBeLessThanOrEqual(2 * STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT);
   });
 
   it("keeps the soft-pencil two-pass material on a one-point tap", () => {

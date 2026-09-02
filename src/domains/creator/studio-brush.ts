@@ -119,10 +119,6 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   oil: "oil",
   acrylic: "oil",
   "paint-tube": "oil",
-  "fluid-paint": "oil",
-  "fluid-paint-fine": "oil",
-  "fluid-paint-load": "oil",
-  "fluid-paint-rake": "oil",
   pastel: "pastel",
   "oil-pastel": "pastel",
   "ink-particle": "ink-particle",
@@ -200,7 +196,7 @@ export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRen
     if (id.includes("pencil")) return "pencil";
     return "dry-media";
   }
-  if (/(?:oil|acrylic|paint-tube|fluid-paint)/u.test(id)) return "oil";
+  if (/(?:oil|acrylic|paint-tube)/u.test(id)) return "oil";
   if (/(?:marker|highlighter|felt-tip)/u.test(id)) {
     return id.includes("highlighter") ? "highlighter" : "marker";
   }
@@ -558,7 +554,7 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   },
   {
     id: "web-hatch-color",
-    name: "해치 채색 펜",
+    name: "해치 채색(평행)",
     defaultWidth: 4,
     defaultOpacity: 0.75,
     searchAliases: [
@@ -757,7 +753,7 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   },
   {
     id: "web-cross-hatch-pen",
-    name: "크로스 해치 펜",
+    name: "크로스 해치(교차)",
     defaultWidth: 3,
     defaultOpacity: 0.78,
     searchAliases: [

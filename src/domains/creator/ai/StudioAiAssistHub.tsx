@@ -15,6 +15,7 @@ import {
   Palette,
   ShieldCheck,
   Settings2,
+  Sparkles,
   TriangleAlert,
   UserRound,
   type LucideIcon,
@@ -59,6 +60,7 @@ export interface StudioAiAssistHubProps {
   providerSlot?: ReactNode;
   recentState: StudioAiRecentPromptsState;
   onApplyPresetPrompt: (tool: StudioAiAssistToolId, prompt: string) => void;
+  onOpenSuperSuite?: () => void;
   toolPanel: ReactNode;
   className?: string;
 }
@@ -75,6 +77,7 @@ export function StudioAiAssistHub({
   providerSlot,
   recentState,
   onApplyPresetPrompt,
+  onOpenSuperSuite,
   toolPanel,
   className,
 }: StudioAiAssistHubProps): ReactElement {
@@ -133,6 +136,26 @@ export function StudioAiAssistHub({
           <ChevronRight size={12} aria-hidden />
         </span>
       </button>
+
+      {onOpenSuperSuite ? (
+        <button
+          type="button"
+          onClick={onOpenSuperSuite}
+          className={cn(
+            "flex shrink-0 items-center justify-between gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-left transition-colors hover:bg-accent/15",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-accent">
+            <Sparkles size={14} className="shrink-0 text-accent animate-pulse" aria-hidden />
+            AI 웹툰 생성 슈퍼 스위트
+          </span>
+          <span className="text-[0.62rem] font-medium text-accent/80">
+            툰필터 · 음영 · 콘티 · 말풍선 →
+          </span>
+        </button>
+      ) : null}
 
       {providerSlot ? <div className="shrink-0">{providerSlot}</div> : null}
 

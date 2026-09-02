@@ -1068,6 +1068,16 @@ const FX_LUMINOUS_RIBBON_VERSION =
 const FX_LUMINOUS_MAX_FLATTENED_SEGMENTS = 262_144;
 const FX_LUMINOUS_MAX_SUBDIVISIONS = 16;
 const FX_LUMINOUS_ROUND_STEPS = 24;
+/**
+ * A round join is only needed where the two neighbouring bodies leave a wedge uncovered. Below
+ * this depth (document px) the wedge is invisible and the join is pure geometry.
+ *
+ * 실측 동기: 반지름 150px 원을 글로우로 그리면 360개 구간마다 24각형 조인이 붙어 패스가
+ * 1만 점을 넘고, 라이브 드래프트는 그 패스를 포인터 이동마다 통째로 다시 계획·추적한다
+ * (프로파일: closePath 1.4초, fxLuminousRunPolygons 0.9초). 원 한 획이 336초, 1.28초짜리
+ * 롱태스크 613개. 부드러운 구간에서 조인은 두 몸통이 이미 덮은 자리를 다시 덮을 뿐이다.
+ */
+const FX_LUMINOUS_JOIN_COVERAGE_TOLERANCE_PX = 0.05;
 const FX_LUMINOUS_QUANTIZE_SCALE = 10_000;
 
 function quantizeFxLuminous(value: number): number {
@@ -1380,6 +1390,41 @@ function splitFxLuminousRuns(
   return Object.freeze(runs.map((run) => Object.freeze(run)));
 }
 
+/**
+ * True when the round join between two sections would only re-cover what the bodies already fill.
+ *
+ * Both sides must carry a locally constant width (a width kink needs the disc to smooth it) and
+ * must share the joint radius exactly, so the two trapezoids meet along one shared edge. What is
+ * then left uncovered is the wedge on the outside of the turn, whose depth is
+ * `radius · (1 − cos(θ/2))`. A join is kept whenever that wedge could be seen.
+ */
+function fxLuminousJoinIsAlreadyCovered(
+  previous: FxLuminousSection,
+  current: FxLuminousSection,
+): boolean {
+  if (previous.toRadius !== current.fromRadius) return false;
+  const tolerance = FX_LUMINOUS_JOIN_COVERAGE_TOLERANCE_PX;
+  if (Math.abs(previous.toRadius - previous.fromRadius) > tolerance) return false;
+  if (Math.abs(current.toRadius - current.fromRadius) > tolerance) return false;
+  if (!fxLuminousSamePoint(previous.to, current.from)) return false;
+  const previousX = previous.to.x - previous.from.x;
+  const previousY = previous.to.y - previous.from.y;
+  const currentX = current.to.x - current.from.x;
+  const currentY = current.to.y - current.from.y;
+  const previousLength = Math.hypot(previousX, previousY);
+  const currentLength = Math.hypot(currentX, currentY);
+  if (previousLength <= POINT_EPS || currentLength <= POINT_EPS) return false;
+  const cosine = clamp(
+    (previousX * currentX + previousY * currentY) / (previousLength * currentLength),
+    -1,
+    1,
+  );
+  // 반각 코사인: cos(θ/2) = sqrt((1 + cos θ) / 2). θ 를 따로 구하지 않는다.
+  const halfAngleCosine = Math.sqrt(Math.max(0, (1 + cosine) / 2));
+  const radius = Math.max(previous.toRadius, current.fromRadius);
+  return radius * (1 - halfAngleCosine) <= tolerance;
+}
+
 function fxLuminousRunPolygons(
   sections: readonly FxLuminousSection[],
 ): readonly StudioFxLuminousRibbonPolygon[] {
@@ -1392,6 +1437,7 @@ function fxLuminousRunPolygons(
   for (let sectionIndex = 1; sectionIndex < sections.length; sectionIndex += 1) {
     const previous = sections[sectionIndex - 1]!;
     const current = sections[sectionIndex]!;
+    if (fxLuminousJoinIsAlreadyCovered(previous, current)) continue;
     polygons.push(Object.freeze({
       points: fxLuminousRoundPolygon(
         previous.to,

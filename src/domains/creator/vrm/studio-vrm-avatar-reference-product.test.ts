@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { ImageEmbedder } from "@mediapipe/tasks-vision";
 import { describe, expect, it } from "vitest";
@@ -98,14 +98,16 @@ function completeEnvelope() {
 }
 
 describe("Avatar reference recommendation product authority", () => {
-  it("pins the tracked canonical VRM to its real repository bytes", () => {
-    const bytes = readFileSync(new URL("../../../../public/vrm/TS_Minseo_Campus.vrm", import.meta.url));
-    expect(bytes.byteLength).toBe(
-      STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceByteLength,
+  it("pins the retired canonical VRM by exact bytes without shipping it", () => {
+    expect(STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceUrl)
+      .toBe("/vrm/TS_Minseo_Campus.vrm");
+    expect(STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceByteLength).toBe(1_325_288);
+    expect(STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceSha256).toBe(
+      "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
     );
-    expect(createHash("sha256").update(bytes).digest("hex")).toBe(
-      STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceSha256,
-    );
+    // Retired with the procedural pack; the committed artifact below is the runtime authority.
+    expect(existsSync(new URL("../../../../public/vrm/TS_Minseo_Campus.vrm", import.meta.url)))
+      .toBe(false);
     expect(Object.isFrozen(STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.camera))
       .toBe(true);
     expect(Object.isFrozen(

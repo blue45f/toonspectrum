@@ -61,7 +61,7 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
   [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md)와
   [`docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md`](docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md),
   [2026-07-27 코드 기반 997행 갭 재감사](docs/studio-feature-gap-audit-2026-07-27.md) 참고
-- **창작 마켓** `/market` — 스튜디오 커뮤니티 마켓플레이스의 공개 발견 표면. 브러시·필터·팔레트·템플릿·3D 프리셋·에셋 6종 카테고리, URL 파라미터 필터(검색·종류·라이선스·태그·배급자)와 커서 페이지네이션 탐색, 라이선스·출처·AI 사용 여부가 명시된 리소스 상세, `/studio?assetMarket=community` 딥링크로 스튜디오 자산 메뉴 커뮤니티 탭 즉시 진입. 전 리소스 무료 공유
+- **창작 마켓** `/market` — 스튜디오 커뮤니티 마켓플레이스의 공개 발견 표면. 브러시·필터·팔레트·템플릿·3D 프리셋·3D 에셋·에셋 7종 카테고리(클립스튜디오 ASSETS 스타일의 3D 에셋·소품·모델 거래 및 공유 지원), URL 파라미터 필터(검색·종류·라이선스·태그·배급자)와 커서 페이지네이션 탐색, 라이선스·출처·AI 사용 여부가 명시된 리소스 상세, `/studio?assetMarket=community` 딥링크로 스튜디오 자산 메뉴 커뮤니티 탭 즉시 진입. 전 리소스 무료 공유
 - **2D → 3D 변환** `/studio/lift3d` — 캐릭터·소품·배경 원화 한 장을 실루엣 거리장(캐릭터·소품)과 명암 부조(배경)로 읽어 3D 모델로 세우는 스튜디오 도구. 브라우저 안에서만 계산하고(업로드·외부 추론 호출 없음), 결과는 이 앱 자신의 모델 가져오기 게이트를 통과하는 텍스처 GLB 로 나가 배경 3D 씬에 그대로 들어간다. 설계는 [`docs/studio-2d-to-3d-lift.md`](docs/studio-2d-to-3d-lift.md) 참고
 - **⌘K 커맨드 팔레트** — 어디서든 통합 검색
 

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 EngineCapabilityRegistry, provider descriptors, hybrid execution planner and the E01-E28 candidate manifest.",
+  "description": "Engine capability registry, provider descriptors, hybrid execution planner and the renderer-candidate manifest that decide which engine runs each workload.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
@@ -13,6 +13,16 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./renderer-roles": {
+      "types": "./src/renderer-roles.ts",
+      "import": "./src/renderer-roles.ts",
+      "default": "./src/renderer-roles.ts"
+    },
+    "./wesl-compile": {
+      "types": "./src/wesl-compile.ts",
+      "import": "./src/wesl-compile.ts",
+      "default": "./src/wesl-compile.ts"
     }
   },
   "scripts": {

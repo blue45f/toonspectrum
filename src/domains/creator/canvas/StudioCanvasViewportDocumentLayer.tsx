@@ -1,4 +1,4 @@
-import { Fragment, Suspense, type ReactNode } from "react";
+import { Fragment, Suspense, useLayoutEffect, type ReactNode } from "react";
 import { Group, Shape } from "react-konva/lib/ReactKonvaCore";
 
 import { BlendIsolationGroup } from "../BlendIsolationGroup";
@@ -9,6 +9,7 @@ import {
 import { getSymmetricPoints } from "../brush/studio-draw-rendering";
 import { normalizeShapeParams } from "../brush/studio-stroke-shapes";
 import { StudioDrawNode } from "../brush/StudioDrawNode";
+import { reconcileStudioInkwashWashWithDocument } from "../brush/studio-wet-ink-brush-runtime";
 import { ClipMaskGroup } from "../ClipMaskGroup";
 import { shouldApplyLayerMask } from "../layer/studio-layer-mask";
 import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
@@ -197,6 +198,16 @@ export function StudioCanvasViewportDocumentLayer({
                     noClip: true,
                   });
                 }
+                // 공유 수묵 워시는 침착만 알고 삭제를 모른다. Konva 가 이 커밋을 그리기 전에
+                // (layout effect 는 react-konva 의 rAF batchDraw 보다 앞선다) 페이지의 수묵 획
+                // 집합과 대조해, Undo·삭제·이동·페이지 전환으로 사라진 획의 안료를 걷어낸다.
+                const inkwashDocumentElements: El[] =
+                  !masterEditMode && !activePage.hideMaster
+                    ? [...masterRenderEls, ...canvasRenderElements]
+                    : canvasRenderElements;
+                useLayoutEffect(() => {
+                  reconcileStudioInkwashWashWithDocument(inkwashDocumentElements);
+                }, [inkwashDocumentElements]);
                 const virtualFillPreviewTarget =
                   !timelapseCapturing &&
                   advancedFillPreview?.virtualTarget &&

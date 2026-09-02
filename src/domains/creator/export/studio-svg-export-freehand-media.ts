@@ -6,9 +6,7 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
-import { studioFluidPaintStationSpacingRatio,
-  studioOilFamilyPlanFields,
-} from "../brush/studio-fluid-paint-reference";
+import { studioOilFamilyPlanFields } from "../brush/studio-fluid-paint-reference";
 import {
   resolveStudioInkPressure,
   studioInkFallbackPressure,
@@ -628,18 +626,30 @@ export function serializeFreehandMedia(
       // no carrier pipeline to save, so it keeps the budget-filling refit.
       ...studioOilFamilyPlanFields(brush),
     });
-    // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
-    // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화
-    // 분기와 동일 입력(대브·시드)이라 두 렌더러의 플랜이 일치한다. 옵션이 없는 다른 모든 유화
-    // 브러시는 캐리어 계약상 바이트 동일 플랜을 유지한다.
+    // 유화 기계 프로그램의 정본은 studioOilRibbonProgramsForBrush 의 id 매트릭스다. Canvas 렌더러
+    // (StudioDrawNode)의 유화 분기에 같은 요약이 있고, 매트릭스를 고치면 둘 다 고친다 — "bristle-physics
+    // 레인만 시뮬" 이던 2026-08-13 wave 3 서술이 확장 뒤에도 남아 브러시 통합 검토를 오도한 전례가 있다.
+    // 2026-09-02 기준:
+    // - WetBrush-2D 강모 물리 시뮬(bristlePhysics): brush--bristle-physics · oil--filbert-ribbon ·
+    //   oil--impasto-ribbon · 기본 유화 2종(oil · acrylic). 2026-08-13 wave 3 에는 bristle-physics
+    //   전용이었고 2026-08-15 에 filbert·impasto-ribbon, 2026-08-20 에 기본 유화로 확장됐다(그때
+    //   함께 들어온 미출하 id — fluid-paint 4종·oil--fluid-paint-* 2행 — 은 2026-09-02 에 제거).
+    // - v1 강모 고갈 다이내믹(bristleLoadDynamics): brush--bristle-physics · brush--bristle-depletion ·
+    //   기본 유화 2종.
+    // - dli GGX 릴리프 오버레이(impastoRelief): brush--impasto-relief · oil--impasto-ribbon · 기본 유화 2종.
+    // 고유한 것은 조합이다: 고갈만 = bristle-depletion, 시뮬만 = filbert-ribbon, 릴리프만 = impasto-relief,
+    // 시뮬+고갈(릴리프 없음) = bristle-physics, 시뮬+릴리프(고갈 없음) = impasto-ribbon, 셋 다 = 기본 유화
+    // 2종. 매트릭스 밖의 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하고, 저장된 브러시의 프로그램
+    // 세트(brushEnginePrograms.oil)는 매트릭스를 병합이 아니라 대체한다. Canvas 렌더러와 동일 입력(대브·시드)
+    // 이라 두 렌더러의 플랜이 일치한다. 라이브 retained 오버레이(studio-live-retained-media-overlay)는 같은
+    // 매트릭스를 부르지만 대브 입력(원시 점·비alias 폭)이 달라 이 패리티 주장의 범위 밖이다.
     //
-    // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 **oil--impasto-ribbon** 두 레인이 켠다
-    // (2026-08-15). 임파스토 레인이 이름만 임파스토였던 것을 고친 것이다: 릴리프가 없으면
-    // oil--impasto-ribbon 은 선언 필드가 oil--filbert-ribbon 과 완전히 동일해서 defaultWidth/
-    // defaultOpacity 만 다른 같은 브러시였고, 렌더 픽셀 비교에서도 oil--flat-ribbon 과 0.163,
-    // acrylic--stiff-ribbon 과 0.168 로 코퍼스 중앙값(1.04)의 6분의 1 거리에 붙어 있었다.
-    // 저장된 oil--impasto-ribbon 획은 이제 릴리프와 함께 다시 그려진다 — 질감을 바이트 안정성보다
-    // 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
+    // oil--impasto-ribbon 이 릴리프를 켠 것은 2026-08-15 다(당시엔 brush--impasto-relief 와 둘뿐이었다).
+    // 임파스토 레인이 이름만 임파스토였던 것을 고친 것이다: 릴리프가 없으면 oil--impasto-ribbon 은 선언
+    // 필드가 oil--filbert-ribbon 과 완전히 동일해서 defaultWidth/defaultOpacity 만 다른 같은 브러시였고,
+    // 렌더 픽셀 비교에서도 oil--flat-ribbon 과 0.163, acrylic--stiff-ribbon 과 0.168 로 코퍼스 중앙값(1.04)의
+    // 6분의 1 거리에 붙어 있었다. 저장된 oil--impasto-ribbon 획은 이제 릴리프와 함께 다시 그려진다 — 질감을
+    // 바이트 안정성보다 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
     const carrier = planStudioOilRibbonCarrier(
       dabs,
       studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
@@ -651,9 +661,9 @@ export function serializeFreehandMedia(
     const bristles = carrier.bristleLanes.map((lane) => (
       `<path data-paint-bristle-lane="true" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
     )).join("");
-    // brush--impasto-relief 오버레이 — Canvas sceneFunc과 같은 페인트 계약(하이라이트=공유 화이트
-    // 상수 screen, 섀도우=스트로크 색 multiply, 레인당 한 번 페인트). 플랜에 키가 없으면 빈
-    // 문자열이라 기존 유화 lane 직렬화 바이트가 그대로 유지된다.
+    // impastoRelief 오버레이(위 매트릭스가 릴리프를 켜는 모든 id) — Canvas sceneFunc과 같은 페인트
+    // 계약(하이라이트=공유 화이트 상수 screen, 섀도우=스트로크 색 multiply, 레인당 한 번 페인트).
+    // 플랜에 키가 없으면 빈 문자열이라 기존 유화 lane 직렬화 바이트가 그대로 유지된다.
     const relief = (carrier.impastoReliefLanes ?? []).map((lane) => (
       `<path data-paint-impasto-relief="${lane.kind}" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${lane.kind === "highlight" ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR : escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}" style="mix-blend-mode:${lane.kind === "highlight" ? "screen" : "multiply"}"/>`
     )).join("");

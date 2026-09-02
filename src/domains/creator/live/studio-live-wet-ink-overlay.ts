@@ -11,6 +11,7 @@
 import { mapStudioBrushAliasPressure } from "../brush/studio-brush-alias-profile";
 import {
   depositStudioInkwashFluidStroke,
+  studioInkwashActiveRegionSteps,
   studioInkwashFluidStepParams,
 } from "../brush/studio-inkwash-fluid";
 import { isStudioInkwashFluidBrush } from "../brush/studio-inkwash-fluid-brushes";
@@ -1244,11 +1245,26 @@ export class StudioLiveWetInkOverlayRenderer {
     });
     upsertStudioInkwashWashStroke(element);
     markStudioInkwashWashDeposited(element);
-    const cells = wash.session.fluid.width * wash.session.fluid.height;
-    // Live frames never Stam. Pointer-up may, once, and only if the stroke-local field
-    // still fits the main-thread cap. Short washes need the full 16-step settle so water
-    // can carry unfixed pen ink; a 2048² field stays deposit-only.
-    const steps = cells <= 512 * 512 ? STUDIO_WET_INK_BRUSH_SIMULATION_STEPS : 0;
+    // Live frames never Stam. Pointer-up settles once over this stroke's own active region —
+    // the shared wash may be page-sized, but only the bbox this stroke wet needs the solver, so
+    // a second stroke a few centimetres away no longer switches the settle off for both.
+    const geometry = inkwashStrokeFieldGeometry(element, recipe);
+    const regionOrigin = geometry
+      ? studioInkwashDocumentToField(wash, geometry.originX, geometry.originY)
+      : null;
+    const region = geometry && regionOrigin
+      ? {
+          x0: Math.floor(regionOrigin.x),
+          y0: Math.floor(regionOrigin.y),
+          x1: Math.floor(regionOrigin.x) + geometry.width,
+          y1: Math.floor(regionOrigin.y) + geometry.height,
+        }
+      : { x0: 0, y0: 0, x1: wash.session.fluid.width, y1: wash.session.fluid.height };
+    const steps = studioInkwashActiveRegionSteps(
+      STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+      region,
+      wash.session.fluid,
+    );
     if (steps > 0) {
       stepStudioInkwashFluid(
         wash.session,
@@ -1258,6 +1274,7 @@ export class StudioLiveWetInkOverlayRenderer {
           dryRate: recipe.material.dryingRate,
           chromaticSeparation: recipe.material.chromatography ?? 0.5,
         }),
+        region,
       );
     }
     return true;
@@ -1305,7 +1322,12 @@ export class StudioLiveWetInkOverlayRenderer {
       active.previousSourceY = y;
     }
     active.consumedSourcePoints = total;
-    if (!this.paintInkwashLiveStroke(samples, active.recipe.baseWidth * 0.5, active.recipe)) {
+    // 접미사만 덧그리면 이전 점의 둥근 캡이 두 번 칠해져 시작점과 모든 포인터 프레임 경계에
+    // 알파가 두 배인 "구슬"이 남는다(실측: 물붓 라이브 프레임의 시작 원 2901px, 반투명 펜의
+    // 마디). 라이브 폴리라인은 매 프레임 지우고 전체를 한 번에 긋는다 — 한 path 의 stroke 는
+    // 자기 자신과 겹쳐도 알파를 더하지 않는다.
+    this.clearActiveRect();
+    if (!this.paintInkwashLivePolyline(active.livePoints, active.recipe)) {
       return this.failActive("surface-render");
     }
     return {

@@ -147,7 +147,6 @@ const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "web-spiro-orbit",
   "web-zigzag-edge",
   "web-neon-tube",
-  "web-smudge-trail",
   "web-cross-hatch-pen",
 ]);
 

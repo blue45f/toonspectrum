@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
+  STUDIO_CRC32_DIRECT_MAX_BYTES,
   createStudioCrc32WorkerSession,
   type StudioCrc32WorkerLike,
 } from "./studio-crc32-worker-client";
@@ -85,19 +86,75 @@ describe("createStudioCrc32WorkerSession", () => {
     session.dispose();
   });
 
-  it.each([16, 64])(
-    "fails closed for %d MiB in bounded direct mode",
-    async (megabytes) => {
-      const data = new Uint8Array(megabytes * 1024 * 1024);
+  // Large buffers are compared field by field: a deep-equal over a multi-MiB typed array makes
+  // the matcher walk (and on failure, print) tens of millions of elements.
+  it.each([
+    STUDIO_CRC32_DIRECT_MAX_BYTES - 1,
+    STUDIO_CRC32_DIRECT_MAX_BYTES,
+    STUDIO_CRC32_DIRECT_MAX_BYTES + 1,
+  ])(
+    "matches the reference digest across the %d-byte direct slice boundary",
+    async (byteLength) => {
+      const data = pattern(byteLength);
       const session = createStudioCrc32WorkerSession({ executionMode: "direct-bounded" });
 
-      await expect(session.run(data)).rejects.toThrow(
-        "메인 스레드 안전 상한을 초과했습니다",
-      );
-      expect(data.byteLength).toBe(megabytes * 1024 * 1024);
+      const result = await session.run(data);
+      expect(result.execution).toBe("direct");
+      expect(result.crc32).toBe(calculateStudioCrc32(data));
+      expect(result.data).toBe(data);
       session.dispose();
     },
   );
+
+  it.each([2, 16, 32])(
+    "folds %d MiB in bounded direct mode as yielding slices with the reference digest",
+    async (megabytes) => {
+      // The bounded WILL v1 profile admits a 32 MiB strokes part, so the bounded direct mode
+      // must accept the whole declared range — sliced, not refused after the profile check passed.
+      const data = pattern(megabytes * 1024 * 1024);
+      const session = createStudioCrc32WorkerSession({ executionMode: "direct-bounded" });
+      const yields: number[] = [];
+      const originalSetTimeout = globalThis.setTimeout;
+      // Force the macrotask yield path so the slice cadence is observable.
+      vi.stubGlobal("scheduler", undefined);
+      vi.stubGlobal("setTimeout", ((handler: () => void, delay?: number) => {
+        yields.push(delay ?? 0);
+        return originalSetTimeout(handler, delay);
+      }) as typeof setTimeout);
+      let result: Awaited<ReturnType<typeof session.run>>;
+      try {
+        result = await session.run(data);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(result.execution).toBe("direct");
+      expect(result.crc32).toBe(calculateStudioCrc32(data));
+      expect(result.data).toBe(data);
+      // One yield between every pair of 1 MiB slices, none after the last.
+      expect(yields).toHaveLength(megabytes - 1);
+      session.dispose();
+    },
+  );
+
+  it("honours abort between bounded direct slices", async () => {
+    const data = pattern(3 * 1024 * 1024);
+    const controller = new AbortController();
+    const session = createStudioCrc32WorkerSession({ executionMode: "direct-bounded" });
+    const originalSetTimeout = globalThis.setTimeout;
+    vi.stubGlobal("scheduler", undefined);
+    vi.stubGlobal("setTimeout", ((handler: () => void, delay?: number) => {
+      controller.abort();
+      return originalSetTimeout(handler, delay);
+    }) as typeof setTimeout);
+    try {
+      await expect(session.run(data, { signal: controller.signal })).rejects.toMatchObject({
+        name: "AbortError",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    session.dispose();
+  });
 
   it("allows an explicitly selected large direct mode only for a headless archive runtime", async () => {
     const data = pattern(2 * 1024 * 1024);

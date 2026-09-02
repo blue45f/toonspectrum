@@ -32,12 +32,17 @@ import {
   dismissStudioDestructiveActionRecord,
 } from "./studio-destructive-action-preview";
 import {
+  dismissStudioRejectedStroke,
+  restoreStudioRejectedStroke,
+} from "./studio-rejected-stroke-recovery";
+import {
   describeStudioSafeModeReason,
   exitStudioSafeModeManually,
 } from "./studio-reliability-status-store";
 import { ensureStudioSafeModeRuntime } from "./studio-safe-mode-runtime";
 import {
   useStudioDestructiveActionRecord,
+  useStudioRejectedStrokeRecords,
   useStudioReliabilityStatus,
 } from "./use-studio-reliability-status";
 
@@ -131,7 +136,9 @@ function SignalRow({ signal }: { signal: StudioReliabilitySignal }) {
 export function StudioReliabilityStatusRail() {
   const status = useStudioReliabilityStatus();
   const destructive = useStudioDestructiveActionRecord();
+  const rejectedStrokes = useStudioRejectedStrokeRecords();
   const [detailOpen, setDetailOpen] = useState(false);
+  const [rejectedStrokeNotice, setRejectedStrokeNotice] = useState<string | null>(null);
 
   useEffect(() => {
     // 고지 표면이 마운트되면 로스 관측을 세운다. GPU 디바이스를 미리 잡지는 않는다.
@@ -243,6 +250,60 @@ export function StudioReliabilityStatusRail() {
             </button>
           )}
         </div>
+      ) : null}
+
+      {rejectedStrokes.map((record) => (
+        <div
+          key={record.id}
+          data-studio-rejected-stroke-notice
+          data-studio-rejected-stroke-id={record.id}
+          role="status"
+          aria-live="polite"
+          className="pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning/40 bg-warning-soft/25 px-2.5 py-1.5 text-xs text-fg-2 shadow-sm backdrop-blur-md"
+        >
+          <span className="min-w-0 flex-1 font-medium leading-relaxed">
+            {record.provider} 엔진이 획을 확정하지 못해 미리보기를 중단했습니다. 그린 획은 보존돼 있습니다
+            ({record.reason}).
+          </span>
+          <button
+            type="button"
+            data-studio-rejected-stroke-restore
+            onClick={() => {
+              const outcome = restoreStudioRejectedStroke(record.id);
+              setRejectedStrokeNotice(
+                outcome.status === "restored"
+                  ? "획을 문서에 복구했습니다."
+                  : outcome.status === "refused"
+                    ? outcome.reason
+                    : "지금은 복구할 수 없습니다. 편집기가 준비된 뒤 다시 시도하세요.",
+              );
+            }}
+            className="ml-auto min-h-11 shrink-0 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            획 복구
+          </button>
+          <button
+            type="button"
+            data-studio-rejected-stroke-dismiss
+            onClick={() => {
+              dismissStudioRejectedStroke(record.id);
+              setRejectedStrokeNotice(null);
+            }}
+            className="min-h-11 shrink-0 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            버리기
+          </button>
+        </div>
+      ))}
+      {rejectedStrokeNotice ? (
+        <p
+          data-studio-rejected-stroke-outcome
+          role="status"
+          aria-live="polite"
+          className="pointer-events-auto w-full max-w-[min(30rem,100%)] rounded-lg border border-line bg-card/95 px-2.5 py-1.5 text-xs text-fg-2 shadow-sm backdrop-blur-md"
+        >
+          {rejectedStrokeNotice}
+        </p>
       ) : null}
 
       {/*

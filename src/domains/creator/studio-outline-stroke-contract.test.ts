@@ -196,6 +196,32 @@ describe("StudioOutlineStrokeContractV1 capture / normalization", () => {
     });
   });
 
+  it("perfect-freehand 프리셋의 모든 프로필을 캡처하고 재생 계약으로 받아들인다", async () => {
+    // maru-pen 은 프리셋·캡처에는 있었지만 계약의 허용 목록에 없어, 모든 마루펜 획이 캔버스에
+    // 자홍색 진단 상자로 그려졌다. 프리셋 표와 허용 목록은 같은 집합이어야 한다.
+    const stroker = await loadStudioPerfectFreehandStroker();
+    for (const profileId of Object.keys(STUDIO_PERFECT_FREEHAND_PROFILES)) {
+      const contract = captureStudioOutlineStrokeContractV1({
+        brushId: profileId,
+        pressureSource: "recorded",
+      });
+      expect(contract?.engine, profileId).toBe("perfect-freehand-outline");
+      expect(resolveStudioOutlineStrokeContract(contract).status, profileId).toBe("ready");
+      const plan = planStudioPerfectFreehandRender({
+        contract,
+        stroker,
+        points: Array.from({ length: 25 }, (_, index) => [
+          index * 6,
+          40 + Math.sin(index / 4) * 24,
+        ]).flat(),
+        pressures: Array.from({ length: 25 }, (_, index) => 0.2 + index * 0.025),
+        strokeWidth: 12,
+        sampleSpacing: 0.8,
+      });
+      expect(plan.kind, profileId).toBe("outline");
+    }
+  });
+
   it("normalize은 missing만 null로 두고 unsupported를 조용히 레거시 처리하지 않는다", () => {
     expect(normalizeStudioOutlineStrokeContract(null)).toBeNull();
     expect(() => normalizeStudioOutlineStrokeContract({

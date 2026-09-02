@@ -46,10 +46,13 @@ import type { BrushProgramIR } from "@toonspectrum/studio-project-model";
  * `inject[libmypaint]` for unknown settings/inputs during brush programming,
  * `render[abr-stamp]` for stamping-lane fallbacks. Deterministic order:
  * parse → compile/inject → render. The one deliberate exclusion is
- * `importMybBrush().unmappedSettings`: that list documents the VECTOR lane's
- * mapping table, while both raster preview engines re-derive authoritative
- * per-dimension reports from the full document — repeating it here would
- * misreport dimensions the preview engines do evaluate.
+ * `importMybBrush().settingReports` (and its derived `unmappedSettings`):
+ * those describe the COMMON-IR disposition of each setting — `mapped-*` vs
+ * `provider-native` / `parsed-inert` — whereas both raster preview engines
+ * re-read the full `.myb` document and re-derive authoritative per-dimension
+ * reports from it. Every `provider-native` entry is by definition a dimension
+ * these engines DO evaluate, so replaying that ledger here would warn about
+ * settings the preview renders correctly.
  *
  * Parsing stays gateway-owned. This module never re-implements a format: the
  * only local byte-walk is {@link extractKppPresetXml}, which relocates the
@@ -384,9 +387,9 @@ function renderMybPreview(
   mybEngine: "libmypaint" | "hokusai",
 ): BrushPreviewResult {
   const imported = importMybBrush(bytes, "brush-preview:myb", "brush-preview:myb");
-  // imported.unmappedSettings is skipped by design — see the module doc
-  // (vector-lane mapping table; both raster preview lanes re-derive their own
-  // authoritative per-dimension reports from the full document below).
+  // imported.settingReports / .unmappedSettings are skipped by design — see
+  // the module doc (common-IR disposition ledger; both raster preview lanes
+  // re-derive their own authoritative per-dimension reports below).
   if (mybEngine === "hokusai") {
     const lane = runHokusaiLane(imported.preset, context, "myb → hokusai");
     return finishStrokeLane(

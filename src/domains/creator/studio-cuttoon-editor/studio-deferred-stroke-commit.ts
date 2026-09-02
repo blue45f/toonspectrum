@@ -17,7 +17,10 @@ import {
 } from "../studio-linked-3d-render-document";
 import { withMasterElements, type DocumentMaster } from "../studio-master-page";
 import { findChangedLockedPageId } from "../studio-page-review";
-import { applyBubbleAnchors } from "../studio-page-shell-runtime";
+import {
+  STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS,
+  applyBubbleAnchors,
+} from "../studio-page-shell-runtime";
 import {
   appendStudioPagesHistorySnapshot,
   projectStudioPendingStrokes,
@@ -95,7 +98,7 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
   readonly activePage: PageState;
   readonly advancedFillApplyingRef: MutableRefObject<boolean>;
   readonly applyLiveStrokeBackendPresentationEffects: () => void;
-  readonly armGpuPinnedRequestWatchdog: (requestId: string) => void;
+  readonly armGpuPinnedRequestWatchdog: (requestId: string, timeoutMs?: number) => void;
   readonly bg3dDccSourceRef: MutableRefObject<StudioShared3dStageDccSource | null>;
   readonly buildGpuLiveStrokePlan: (
     el: DrawEl,
@@ -765,7 +768,10 @@ export function createStudioDeferredStrokeCommitEngine(
       }
       gpuLiveSourceJournalFirstStrokeIndexRef.current = nextPendingGpuStrokes.length;
       gpuLiveAcceptedRequestIdRef.current = acceptedRebaselineRequestId;
-      armGpuPinnedRequestWatchdog(acceptedRebaselineRequestId);
+      armGpuPinnedRequestWatchdog(
+        acceptedRebaselineRequestId,
+        STUDIO_GPU_TERMINAL_RECEIPT_TIMEOUT_MS,
+      );
       applyLiveStrokeBackendPresentationEffects();
     }
     const retainedOverlayBudget = Math.max(

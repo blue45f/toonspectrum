@@ -514,10 +514,6 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     oil: "paint-oil",
     acrylic: "paint-acrylic",
     "paint-tube": "paint-oil",
-    "fluid-paint": "paint-oil",
-    "fluid-paint-fine": "paint-oil",
-    "fluid-paint-load": "paint-oil",
-    "fluid-paint-rake": "paint-oil",
     airbrush: "spray-airbrush",
     "hard-airbrush": "spray-airbrush",
     "airbrush-fine": "spray-airbrush",
@@ -587,7 +583,8 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     "web-zigzag-edge": "line-ink",
     "web-neon-tube": "fx-particle",
     "web-pressure-flat": "marker",
-    "web-smudge-trail": "paint-bristle",
+    // 강모 경로가 없는 소프트 블렌드 — web-blend-softener 와 같은 핀.
+    "web-smudge-trail": "spray-airbrush",
     "web-cross-hatch-pen": "stamp-tone",
   });
 

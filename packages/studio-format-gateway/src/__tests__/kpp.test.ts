@@ -224,14 +224,49 @@ describe("kpp mypaintbrush delegation", () => {
     expect(result.program.name).toBe("ToonSpectrum MyPaint Wash");
   });
 
-  it("prefixes delegated unmapped settings and preserves the FULL kpp container", () => {
-    expect(result.unmapped).toContain("mypaint:smudge");
+  it("preserves the FULL kpp container and reports no loss for a fully mapped brush", () => {
+    // Every setting in the wash fixture (radius_logarithmic / opaque /
+    // slow_tracking / smudge) reaches the common IR, so the delegated ledger
+    // is empty. smudge in particular IS applied — to mixing.kind/strength —
+    // and must not be reported as an unmapped mypaint setting.
+    expect(result.program.mixing).toEqual({ kind: "smudge", strength: 0.3 });
+    expect(result.unmapped).not.toContain("mypaint:smudge");
+    expect(result.unmapped.filter((entry) => entry.startsWith("mypaint:"))).toEqual([]);
     expect(result.program.sourcePayload?.format).toBe("krita-kpp");
     expect(
       Buffer.from(result.program.sourcePayload?.base64 ?? "", "base64").equals(
         Buffer.from(bytes),
       ),
     ).toBe(true);
+  });
+
+  it("prefixes delegated settings the common IR does not carry", () => {
+    const withProviderNative = buildKppFile({
+      presetXml: serializeKppPresetXml({
+        name: "Provider Native",
+        paintopid: "mypaintbrush",
+        params: [
+          {
+            name: "mypaint_json",
+            type: "string",
+            value: JSON.stringify({
+              version: 3,
+              settings: {
+                radius_logarithmic: { base_value: 1.2, inputs: {} },
+                // Hokusai renders both from sourcePayload; the common IR has
+                // no slot for either, so both stay in the delegated ledger.
+                color_h: { base_value: 0.4, inputs: {} },
+                eraser: { base_value: 1, inputs: {} },
+              },
+            }),
+          },
+        ],
+      }),
+    });
+    const delegated = parseKppPreset(withProviderNative);
+    expect(delegated.unmapped).toContain("mypaint:color_h");
+    expect(delegated.unmapped).toContain("mypaint:eraser");
+    expect(delegated.unmapped).not.toContain("mypaint:radius_logarithmic");
   });
 
   it("refuses a mypaintbrush preset without mypaint_json instead of a lossy default", () => {
