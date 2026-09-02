@@ -20,7 +20,7 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 7. 프로덕션 오류가 확인되면 새 기능을 유지하기보다 마지막 검증 커밋으로 되돌릴 수 있어야 한다.
 8. API 키, 배포 토큰, OAuth 비밀값은 코드·문서·브라우저 번들에 저장하지 않는다.
 9. UI가 보이는 것만으로 완료로 판정하지 않는다. 실행, 저장/복원, 오류 경계, 접근성, 테스트 증거가 연결돼야 완료다.
-10. Clip Studio Paint의 상표, 독점 파일 포맷, 비공개 API, 유료 소재를 복제하지 않는다. 공개 기능 개념을 독자 구현한다.
+10. 외부 구현·소재·모델은 [외부 재사용 정책](./studio-third-party-reuse-policy-2026-09-02.md)을 따른다. 호환 라이선스나 권리자 허가가 승인 레지스트리에 기록되면 허용 범위 안에서 정확히 재사용하고, 증빙이 없거나 범위가 모호하면 공개 기능 개념·알고리즘 원리·작업 흐름을 분석해 독자 구현한다.
 
 ## 2. 자율 의사결정 범위
 
@@ -37,6 +37,7 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 - UI/UX 재배치, 인스펙터 및 도킹 시스템 변경
 - 테스트, CI, 프리뷰, 배포 자동화 변경
 - 성능이나 안정성을 위해 내부 API와 폴더 구조를 리팩터링
+- 승인 레지스트리에 증빙된 외부 코드·브러시·3D 소재·가중치·UI 자산을 라이선스 범위 안에서 통합
 
 다음 작업도 승인 대상은 아니지만 반드시 격리된 변경으로 수행한다.
 
@@ -46,6 +47,7 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 - GPU readback, texture pool, tile cache 수명주기 변경
 - collaboration mutation 또는 CRDT 모델 변경
 - 데이터베이스 destructive migration
+- 외부 코드나 자산을 새로 vendoring하는 변경
 
 ## 3. 브랜치와 병합 정책
 
@@ -59,6 +61,14 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 - `codex/studio-*`: 자율 고도화 오케스트레이션
 
 `main`에는 직접 쓰지 않는다. Pull Request가 기존 CI와 `studio-autonomous-risk-gate`를 통과하고, 충돌이나 unresolved review thread가 없을 때만 병합한다. 사용자의 수동 승인 여부는 병합 조건에 포함하지 않는다.
+
+병합이 성공하면 같은 저장소의 PR head 브랜치를 즉시 삭제한다. 즉시 삭제가 일시적으로 실패하면 일일 정리 작업이 다시 검사한다. 다음 브랜치는 삭제하지 않는다.
+
+- 기본 브랜치와 GitHub protected branch
+- `release/*`, `hotfix/*`, production/staging/develop 계열
+- 열린 Pull Request가 연결된 브랜치
+- 병합 뒤 새 커밋이 추가되어 PR의 마지막 head SHA와 달라진 브랜치
+- 외부 fork의 브랜치
 
 동시에 열린 PR과 겹치는 파일을 변경해야 하면 다음 순서를 따른다.
 
@@ -106,6 +116,15 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 - 인앱 브라우저와 GPU 미지원 장치에서 WebGL2/Canvas2D로 fail-safe
 - readback을 hot path에서 사용하지 않는지 검증
 
+### 4.5 외부 코드·소재·가중치
+
+- 원본 URL, 고정 버전, SHA-256, 라이선스 또는 허가 근거 기록
+- 상업 이용·수정·재배포·번들 권리를 종류별로 확인
+- attribution과 NOTICE 경로 보존
+- 가중치는 생성 결과물 이용권까지 별도 확인
+- 상표 자산은 brand-use 권한을 별도 확인
+- 권한 범위를 벗어난 소재는 번들하지 않고 로컬 import 또는 provider adapter로 격리
+
 ## 5. 자동 검증 등급
 
 변경 파일은 자동으로 위험 범주를 분류한다.
@@ -120,6 +139,14 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 
 고위험 범주가 감지되면 관련 targeted gate를 추가 실행한다. 기존 전체 CI는 최종 release oracle로 유지한다.
 
+외부 정확 재사용이 포함된 변경은 다음을 추가 검증한다.
+
+```text
+node --test scripts/validate-studio-third-party-reuse.test.mjs
+node scripts/validate-studio-third-party-reuse.mjs
+pnpm run audit:licenses
+```
+
 ## 6. 배포 정책
 
 프로덕션 기본 경로는 Vercel Git Integration이다. GitHub Actions의 Vercel CLI workflow는 수동 비상용 경로로 유지한다.
@@ -132,6 +159,7 @@ Studio 고도화 작업은 캔버스, 저장 포맷, Undo/Redo, WebGPU 렌더러
 - CSP 검증 성공
 - 핵심 `/studio` Playwright 시나리오 성공
 - 저장/복원 또는 GPU 변경 시 해당 전용 gate 성공
+- 외부 재사용 항목이 있으면 권한 레지스트리와 license audit 성공
 
 배포 후 smoke 검증에서 페이지 오류, 저장 손상, 빈 캔버스, GPU device-lost 반복, 핵심 도구 무응답이 확인되면 기능 유지보다 rollback을 우선한다.
 
@@ -148,7 +176,7 @@ Clip Studio Paint 기능은 이름만 같은 placeholder가 아니라 아래 증
 7. 자동 테스트 또는 재현 가능한 브라우저 증거 존재
 8. 내보내기 결과 또는 후속 작업에서 기능의 효과가 유지됨
 
-기능이 외부 모델, OAuth, 라이선스, 운영 비용을 요구하면 실행 가능한 adapter와 비활성 상태 안내까지 구현하되, 자격 증명이나 상업적 권리를 허위로 가정하지 않는다.
+기능이 외부 모델, OAuth, 라이선스, 운영 비용을 요구하면 실행 가능한 adapter와 비활성 상태 안내까지 구현하되, 자격 증명이나 상업적 권리를 허위로 가정하지 않는다. 정확 재사용 권리가 확인되면 승인 레지스트리에 증빙한 뒤 통합하고, 확인되지 않으면 독자 구현 또는 사용자가 직접 연결하는 adapter 경로를 사용한다.
 
 ## 8. 종료 조건
 
