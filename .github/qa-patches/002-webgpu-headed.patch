@@ -1,0 +1,122 @@
+# commit-message: fix(qa): run WebGPU brush gates in headed SwiftShader
+diff --git a/scripts/qa/studio-chromium-inapp-suite-runner.mjs b/scripts/qa/studio-chromium-inapp-suite-runner.mjs
+index b6235b5..4e54ee5 100755
+--- a/scripts/qa/studio-chromium-inapp-suite-runner.mjs
++++ b/scripts/qa/studio-chromium-inapp-suite-runner.mjs
+@@ -82,8 +82,18 @@ const SUITES = Object.freeze({
+     command("living-ink-integration", "pnpm run verify:studio-living-ink-integration", 22, "living-ink"),
+     command("native-raster-tools", "pnpm run verify:studio-native-raster-tools", 35, "raster-tools"),
+     command("filter-dialog", "pnpm run verify:studio-filter-dialog", 25, "filter-dialog"),
+-    command("webgpu-brush-parity", "pnpm run verify:studio-engine-webgpu-brush-parity", 20, "webgpu-brush"),
+-    command("professional-bristle", "pnpm run verify:studio-professional-bristle-webgpu", 20, "webgpu-bristle"),
++    command(
++      "webgpu-brush-parity",
++      'TOONSPECTRUM_WEBGPU_HEADED=1 xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-engine-webgpu-brush-parity',
++      20,
++      "webgpu-brush",
++    ),
++    command(
++      "professional-bristle",
++      'TOONSPECTRUM_WEBGPU_HEADED=1 xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-professional-bristle-webgpu',
++      20,
++      "webgpu-bristle",
++    ),
+   ],
+ });
+ 
+diff --git a/scripts/verify-studio-engine-webgpu-brush-parity.mjs b/scripts/verify-studio-engine-webgpu-brush-parity.mjs
+index 880fa7f..22862f0 100644
+--- a/scripts/verify-studio-engine-webgpu-brush-parity.mjs
++++ b/scripts/verify-studio-engine-webgpu-brush-parity.mjs
+@@ -338,14 +338,37 @@ async function main() {
+ 
+   let browser = null;
+   try {
++    const headedWebGpu = process.env.TOONSPECTRUM_WEBGPU_HEADED === "1";
++    const launchArgs = process.platform === "darwin"
++      ? [
++          "--no-sandbox",
++          "--enable-unsafe-webgpu",
++          "--use-gpu-in-tests",
++        ]
++      : [
++          "--no-sandbox",
++          "--enable-unsafe-webgpu",
++          "--enable-features=CDPScreenshotNewSurface,Vulkan",
++          "--use-vulkan=swiftshader",
++          "--use-webgpu-adapter=swiftshader",
++          "--use-gpu-in-tests",
++          "--use-gl=angle",
++          "--use-angle=swiftshader",
++          "--enable-unsafe-swiftshader",
++        ];
+     browser = await chromium.launch({
+-      headless: true,
+-      args: [
+-        "--no-sandbox",
+-        "--enable-unsafe-webgpu",
+-        "--use-angle=swiftshader",
+-      ],
++      channel: "chromium",
++      // Chromium 151 repeatedly loses Dawn's SwiftShader device on the first queue fence in
++      // new-headless Linux. The suite opts into the regular compositor under Xvfb; standalone
++      // callers retain headless mode unless they explicitly request the same proof boundary.
++      headless: !headedWebGpu,
++      args: launchArgs,
+     });
++    console.log(
++      `[webgpu-browser] mode=${headedWebGpu ? "headed" : "headless"} `
++        + `adapterPath=${process.platform === "darwin" ? "native" : "forced-swiftshader"} `
++        + `version=${browser.version()}`,
++    );
+     const context = await browser.newContext();
+     const page = await context.newPage();
+     const diagnostics = {
+diff --git a/scripts/verify-studio-professional-bristle-webgpu.mjs b/scripts/verify-studio-professional-bristle-webgpu.mjs
+index 5bc26f7..0b9156f 100644
+--- a/scripts/verify-studio-professional-bristle-webgpu.mjs
++++ b/scripts/verify-studio-professional-bristle-webgpu.mjs
+@@ -357,14 +357,37 @@ async function main() {
+ 
+   let browser = null;
+   try {
++    const headedWebGpu = process.env.TOONSPECTRUM_WEBGPU_HEADED === "1";
++    const launchArgs = process.platform === "darwin"
++      ? [
++          "--no-sandbox",
++          "--enable-unsafe-webgpu",
++          "--use-gpu-in-tests",
++        ]
++      : [
++          "--no-sandbox",
++          "--enable-unsafe-webgpu",
++          "--enable-features=CDPScreenshotNewSurface,Vulkan",
++          "--use-vulkan=swiftshader",
++          "--use-webgpu-adapter=swiftshader",
++          "--use-gpu-in-tests",
++          "--use-gl=angle",
++          "--use-angle=swiftshader",
++          "--enable-unsafe-swiftshader",
++        ];
+     browser = await chromium.launch({
+-      headless: true,
+-      args: [
+-        "--no-sandbox",
+-        "--enable-unsafe-webgpu",
+-        "--use-angle=swiftshader",
+-      ],
++      channel: "chromium",
++      // Chromium 151 repeatedly loses Dawn's SwiftShader device on the first queue fence in
++      // new-headless Linux. The suite opts into the regular compositor under Xvfb; standalone
++      // callers retain headless mode unless they explicitly request the same proof boundary.
++      headless: !headedWebGpu,
++      args: launchArgs,
+     });
++    console.log(
++      `[webgpu-browser] mode=${headedWebGpu ? "headed" : "headless"} `
++        + `adapterPath=${process.platform === "darwin" ? "native" : "forced-swiftshader"} `
++        + `version=${browser.version()}`,
++    );
+     const context = await browser.newContext();
+     const page = await context.newPage();
+     const diagnostics = {
