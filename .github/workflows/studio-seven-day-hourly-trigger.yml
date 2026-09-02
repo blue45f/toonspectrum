@@ -1,41 +1,83 @@
-name: Studio seven-day 30-minute trigger
+name: Studio parallel campaign coordinator
+run-name: Studio parallel coordinator · ${{ github.run_number }}
 
 on:
   schedule:
-    # GitHub-hosted jobs are restartable rather than permanent. Evaluate twice per hour and let
-    # the campaign workflow's active-run/PR serialization decide whether new work can start.
-    # The campaign's direct three-hour schedule remains a backup signal.
+    # Event-driven continuation is primary. This twice-hourly coordinator is the recovery watchdog.
     - cron: "2,32 * * * *"
   workflow_dispatch:
 
 permissions:
   actions: write
   contents: read
+  issues: write
+  pull-requests: read
 
 concurrency:
-  group: studio-seven-day-30-minute-trigger
+  group: studio-parallel-campaign-coordinator
   cancel-in-progress: true
 
 jobs:
-  trigger:
+  coordinate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
       CAMPAIGN_WORKFLOW: studio-seven-day-campaign.yml
+      GATE_DISPATCHER_WORKFLOW: studio-campaign-gate-dispatcher.yml
+      TRACKING_ISSUE: "555"
     steps:
       - uses: actions/checkout@v6
         with:
           ref: main
           persist-credentials: false
 
-      - name: Dispatch the next 30-minute cycle only inside the campaign window
+      - name: Detect the optional authoring credential
+        id: authoring
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report missing authoring configuration once
+        if: ${{ steps.authoring.outputs.present != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          start_at="$(jq -r '.startAt' docs/automation/studio-seven-day-campaign.json)"
-          end_at="$(jq -r '.endAt' docs/automation/studio-seven-day-campaign.json)"
+          marker='<!-- studio-parallel-campaign-key-missing -->'
+          existing="$(
+            gh api --paginate \
+              "repos/${REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
+              --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
+              | sed -n '1p'
+          )"
+          if [[ -n "$existing" ]]; then
+            echo "Missing-key notice already exists."
+            exit 0
+          fi
+          {
+            echo "$marker"
+            echo "The six-lane parallel Studio coordinator is installed, but authoring dispatch is paused because OPENAI_API_KEY is not configured as a repository Actions secret."
+            echo "Benchmarking, existing PR gates, safe merge, deployment, and branch cleanup remain independent."
+          } > "$RUNNER_TEMP/studio-parallel-key.md"
+          gh issue comment "$TRACKING_ISSUE" \
+            --repo "$REPOSITORY" \
+            --body-file "$RUNNER_TEMP/studio-parallel-key.md"
+
+      - name: Fill every free implementation lane
+        if: ${{ steps.authoring.outputs.present == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          config='docs/automation/studio-seven-day-campaign.json'
+          start_at="$(jq -r '.startAt' "$config")"
+          end_at="$(jq -r '.endAt' "$config")"
           now_epoch="$(date -u +%s)"
           start_epoch="$(date -u -d "$start_at" +%s)"
           end_epoch="$(date -u -d "$end_at" +%s)"
@@ -45,39 +87,141 @@ jobs:
             exit 0
           fi
 
+          max_concurrent="$(jq -r '.maxConcurrentAuthoringRuns' "$config")"
+          if [[ ! "$max_concurrent" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::maxConcurrentAuthoringRuns must be a positive integer."
+            exit 1
+          fi
+
+          pulls_json="$(
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${REPOSITORY}/pulls?state=open&per_page=100"
+          )"
           runs_json="$(
             gh api \
               -H 'Accept: application/vnd.github+json' \
               -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=30"
+              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=100"
           )"
 
-          active_count="$(
-            jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress" or .status == "requested" or .status == "waiting" or .status == "pending")] | length' \
-              <<< "$runs_json"
-          )"
-          if [[ "$active_count" -gt 0 ]]; then
-            echo "A campaign cycle is already active; it is the current continuous-work slot."
+          active_filter='
+            .status == "queued"
+            or .status == "in_progress"
+            or .status == "requested"
+            or .status == "waiting"
+            or .status == "pending"
+          '
+
+          busy_count=0
+          free_lanes=()
+          while IFS= read -r lane_id; do
+            branch_prefix="codex/campaign-${lane_id}-"
+            run_prefix="Studio campaign [${lane_id}]"
+
+            open_count="$(
+              jq -r --arg repo "$REPOSITORY" --arg prefix "$branch_prefix" '
+                [.[] |
+                  select(.base.ref == "main") |
+                  select(.head.repo.full_name == $repo) |
+                  select(.head.ref | startswith($prefix))
+                ] | length
+              ' <<< "$pulls_json"
+            )"
+            active_count="$(
+              jq -r --arg prefix "$run_prefix" "
+                [.workflow_runs[] |
+                  select(${active_filter}) |
+                  select((.display_title // \"\") | startswith(\$prefix))
+                ] | length
+              " <<< "$runs_json"
+            )"
+
+            if [[ "$open_count" -gt 0 || "$active_count" -gt 0 ]]; then
+              busy_count=$((busy_count + 1))
+              echo "Lane ${lane_id} is busy: open_prs=${open_count}, active_runs=${active_count}."
+            else
+              free_lanes+=("$lane_id")
+              echo "Lane ${lane_id} is free."
+            fi
+          done < <(jq -r '.lanes[].id' "$config")
+
+          capacity=$((max_concurrent - busy_count))
+          if [[ "$capacity" -le 0 ]]; then
+            echo "All configured parallel capacity is occupied."
             exit 0
           fi
 
-          latest_created="$(jq -r '[.workflow_runs[].created_at] | sort | last // ""' <<< "$runs_json")"
-          if [[ -n "$latest_created" ]]; then
-            latest_epoch="$(date -u -d "$latest_created" +%s)"
-            age_seconds="$((now_epoch - latest_epoch))"
-            # Avoid immediate duplicate dispatches caused by scheduler jitter or the direct
-            # three-hour backup run, while allowing the next half-hour slot to proceed.
-            if [[ "$age_seconds" -lt 900 ]]; then
-              echo "The latest campaign cycle began ${age_seconds}s ago; no duplicate dispatch."
-              exit 0
-            fi
+          research_active="$(
+            jq -r "
+              [.workflow_runs[] |
+                select(${active_filter}) |
+                select((.display_title // \"\") | contains(\"research=true\"))
+              ] | length
+            " <<< "$runs_json"
+          )"
+          research_assigned=false
+          if [[ "$research_active" -gt 0 ]]; then
+            research_assigned=true
           fi
 
-          jq -n '{ref: "main", inputs: {mode: "author", force_active: "false"}}' \
+          dispatched=0
+          for lane_id in "${free_lanes[@]}"; do
+            if [[ "$dispatched" -ge "$capacity" ]]; then
+              break
+            fi
+
+            refresh_research=false
+            if [[ "$research_assigned" != "true" ]]; then
+              refresh_research=true
+              research_assigned=true
+            fi
+
+            jq -n \
+              --arg ref "main" \
+              --arg lane_id "$lane_id" \
+              --arg refresh_research "$refresh_research" \
+              '{
+                ref: $ref,
+                inputs: {
+                  lane_id: $lane_id,
+                  mode: "author",
+                  refresh_research: $refresh_research,
+                  force_active: "false"
+                }
+              }' \
+              | gh api \
+                  --method POST \
+                  -H 'Accept: application/vnd.github+json' \
+                  -H 'X-GitHub-Api-Version: 2022-11-28' \
+                  "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
+                  --input -
+
+            echo "Dispatched lane ${lane_id}; refresh_research=${refresh_research}."
+            dispatched=$((dispatched + 1))
+          done
+
+          {
+            echo "## Parallel campaign coordination"
+            echo
+            echo "- Busy lanes before dispatch: ${busy_count}"
+            echo "- Free lanes before dispatch: ${#free_lanes[@]}"
+            echo "- Maximum concurrent lanes: ${max_concurrent}"
+            echo "- Newly dispatched lanes: ${dispatched}"
+            echo "- Research refresh already active before dispatch: ${research_active}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reconcile release gates for every open campaign PR
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n '{ref: "main"}' \
             | gh api \
                 --method POST \
                 -H 'Accept: application/vnd.github+json' \
                 -H 'X-GitHub-Api-Version: 2022-11-28' \
-                "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
+                "repos/${REPOSITORY}/actions/workflows/${GATE_DISPATCHER_WORKFLOW}/dispatches" \
                 --input -
-          echo "Dispatched one 30-minute Studio saturation cycle."
+          echo "Dispatched campaign gate reconciliation."
