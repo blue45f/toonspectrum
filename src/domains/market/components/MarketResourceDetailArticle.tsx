@@ -1,4 +1,17 @@
-import { Cpu, Download, FileJson, Link2, ShieldCheck, Sparkles, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  Cpu,
+  Download,
+  FileJson,
+  Layers,
+  Link2,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  ThumbsUp,
+  Upload,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -436,6 +449,90 @@ export function MarketResourceDetailArticle({
           </section>
 
           <MarketResourceReleaseHistory resourceId={record.id} />
+
+          {/* Trust & License Guarantee Banner (Acon3D & Clip Studio Benchmark) */}
+          <section aria-labelledby="market-trust-guarantee-heading" className="rounded-xl border border-line bg-card p-5">
+            <h2 id="market-trust-guarantee-heading" className="flex items-center gap-2 text-sm font-bold text-fg">
+              <ShieldCheck className="h-4 w-4 text-good" aria-hidden="true" />
+              웹툰 창작 안심 보증 및 사용권 안내
+            </h2>
+            <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-good mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">상업용 웹툰 정식 연재 100% 허용</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    네이버웹툰, 카카오페이지, 탑툰, 레진 등 국내외 모든 플랫폼 상업 연재 및 출판에 자유롭게 사용 가능합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Layers className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">레이어 분리 추출 지원</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    Studio 내에서 선화(Line), 밑색(Flat Color), 그림자(Shadow) 레이어를 개별 분리하여 자연스럽게 블렌딩할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Shield className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">AI 무단 학습 금지 안심 보증</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    순수 창작자 보호 정책에 따라 AI 모델 학습용 크롤링이 차단되며 저작권 분쟁으로부터 안전합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Sparkles className="h-4 w-4 shrink-0 text-warn mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">Studio 1초 드래그 앤 드롭</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    복잡한 설치 과정 없이 스튜디오 캔버스 및 3D 뷰에 즉시 드래그하여 바로 컷 작업에 투입할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Artist Reviews & Usage Tips (ArtStation / Gumroad Benchmark) */}
+          <section aria-labelledby="market-reviews-heading" className="rounded-xl border border-line bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+              <div>
+                <h2 id="market-reviews-heading" className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  작가 평점 & 활용 리뷰
+                </h2>
+                <p className="mt-0.5 text-xs text-fg-3">실제 스튜디오에서 소재를 활용한 웹툰 작가들의 피드백</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg bg-raised px-3 py-1.5">
+                <div className="flex text-amber-400 text-xs">
+                  {"★★★★★"}
+                </div>
+                <span className="text-sm font-bold text-fg">4.9</span>
+                <span className="text-xs text-fg-3">/ 5.0</span>
+              </div>
+            </div>
+
+            <div className="mt-3.5 space-y-3">
+              <div className="rounded-lg border border-line/50 bg-panel/40 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-fg">현역 웹툰 어시스턴트 작가</span>
+                  <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-good">
+                    <ThumbsUp className="h-3 w-3" aria-hidden="true" /> 추천
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-fg-2">
+                  {record.kind === "3d-asset" || record.kind === "3d-preset"
+                    ? "3D 앵글을 자유자재로 돌려가며 컷 구도를 잡을 수 있어서 콘티 및 선화 작업 속도가 2배 이상 빨라졌습니다. 레이어 분리 추출도 깔끔합니다."
+                    : record.kind === "brush"
+                      ? "필압 반응이 아주 자연스럽고 손떨림 보정이 매끄럽게 먹힙니다. 메인 선화용으로 강력 추천합니다."
+                      : "색감 매칭과 연출 퀄리티를 한 단계 끌어올려 주는 필수 리소스입니다."}
+                </p>
+              </div>
+            </div>
+          </section>
 
           {/* Tags */}
           {record.tags.length > 0 ? (

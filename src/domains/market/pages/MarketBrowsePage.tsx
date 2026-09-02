@@ -299,6 +299,30 @@ export function MarketBrowsePage() {
           })}
         </div>
 
+        {/* Trending Genre / Thematic Tag Filters (Acon3D & Clip Studio Benchmark) */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5" role="group" aria-label="장르 및 테마 태그 필터">
+          <span className="text-[0.68rem] font-semibold text-fg-3 px-1">추천 태그:</span>
+          {["로판", "학교", "3D", "인체", "무기", "3D배경", "G펜", "레이스", "파티클", "소품"].map((tag) => {
+            const isSelected = query.tag === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => patchParams({ tag: isSelected ? null : tag })}
+                aria-pressed={isSelected}
+                className={cn(
+                  "inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-medium transition-colors duration-150 pointer-coarse:min-h-11",
+                  isSelected
+                    ? "border-accent bg-accent text-on-accent font-bold shadow-sm"
+                    : "border-line/70 bg-panel text-fg-2 hover:border-line-strong hover:text-fg"
+                )}
+              >
+                #{tag}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Status and Active Filter Chips */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
           {!hasInvalidQuery && !page.loading && !page.error ? (
