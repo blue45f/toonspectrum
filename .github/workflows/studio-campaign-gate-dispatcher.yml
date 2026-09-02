@@ -4,6 +4,9 @@ on:
   workflow_run:
     workflows:
       - Studio seven-day saturation campaign
+      - Studio campaign release gate
+      - Studio autonomous risk gate
+      - SonarQube
     types: [completed]
   schedule:
     # Backup reconciliation when a workflow_run delivery or API dispatch is delayed.
@@ -13,6 +16,7 @@ on:
 permissions:
   actions: write
   contents: write
+  issues: write
   pull-requests: write
 
 concurrency:
@@ -22,10 +26,11 @@ concurrency:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
+      TRACKING_ISSUE: "555"
     steps:
       - name: Update and dispatch missing gates for eligible campaign pull requests
         shell: bash
@@ -38,7 +43,6 @@ jobs:
               -H 'X-GitHub-Api-Version: 2022-11-28' \
               "repos/${REPOSITORY}/pulls?state=open&per_page=100"
           )"
-          main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
 
           mapfile -t candidates < <(
             jq -r \
@@ -72,27 +76,68 @@ jobs:
                   end' <<< "$runs_json"
           }
 
-          needs_dispatch() {
+          terminal_failure_count() {
+            local runs_json="$1"
+            local workflow_name="$2"
+            jq -r \
+              --arg workflow_name "$workflow_name" \
+              '[.workflow_runs[]
+                | select(.name == $workflow_name)
+                | select(.status == "completed")
+                | select((.conclusion // "") != "success")]
+                | length' <<< "$runs_json"
+          }
+
+          latest_run_url() {
+            local runs_json="$1"
+            local workflow_name="$2"
+            jq -r \
+              --arg workflow_name "$workflow_name" \
+              '[.workflow_runs[] | select(.name == $workflow_name)]
+                | sort_by(.run_number)
+                | last
+                | .html_url // ""' <<< "$runs_json"
+          }
+
+          state_is_active_or_green() {
             local state="$1"
             case "$state" in
               completed/success|queued/*|in_progress/*|requested/*|waiting/*|pending/*)
-                return 1
+                return 0
                 ;;
               *)
-                return 0
+                return 1
                 ;;
             esac
           }
 
-          dispatch_simple() {
-            local workflow_file="$1"
-            local head_ref="$2"
+          dispatch_risk() {
+            local head_ref="$1"
+            local base_sha="$2"
+            local head_sha="$3"
+            local pull_number="$4"
+            jq -n \
+              --arg ref "$head_ref" \
+              --arg base_sha "$base_sha" \
+              --arg head_sha "$head_sha" \
+              --arg pr_number "$pull_number" \
+              '{ref: $ref, inputs: {base_sha: $base_sha, head_sha: $head_sha, pr_number: $pr_number}}' \
+              | gh api \
+                  --method POST \
+                  -H 'Accept: application/vnd.github+json' \
+                  -H 'X-GitHub-Api-Version: 2022-11-28' \
+                  "repos/${REPOSITORY}/actions/workflows/studio-autonomous-risk-gate.yml/dispatches" \
+                  --input -
+          }
+
+          dispatch_sonar() {
+            local head_ref="$1"
             jq -n --arg ref "$head_ref" '{ref: $ref}' \
               | gh api \
                   --method POST \
                   -H 'Accept: application/vnd.github+json' \
                   -H 'X-GitHub-Api-Version: 2022-11-28' \
-                  "repos/${REPOSITORY}/actions/workflows/${workflow_file}/dispatches" \
+                  "repos/${REPOSITORY}/actions/workflows/sonarqube.yml/dispatches" \
                   --input -
           }
 
@@ -113,6 +158,67 @@ jobs:
                   --input -
           }
 
+          recycle_failed_pull() {
+            local pull_number="$1"
+            local head_ref="$2"
+            local head_sha="$3"
+            local issue_number="$4"
+            local reason="$5"
+            local evidence="$6"
+
+            current_pull="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
+            if [[ "$(jq -r '.state' <<< "$current_pull")" != "open" ]] \
+              || [[ "$(jq -r '.head.sha' <<< "$current_pull")" != "$head_sha" ]]; then
+              echo "PR #${pull_number} changed before recycle; preserving it."
+              return
+            fi
+
+            report="$RUNNER_TEMP/studio-campaign-recycle-${pull_number}.md"
+            {
+              echo '<!-- studio-campaign-recycled -->'
+              echo '## Autonomous campaign retry budget exhausted'
+              echo
+              echo "This exact head (\`${head_sha}\`) failed the same required release path twice."
+              echo "Reason: ${reason}"
+              echo
+              echo 'The patch and workflow artifacts remain attached to the failed runs. The PR is closed and its branch is removed so the next hourly cycle can select a clean slice on current `main` instead of blocking the seven-day campaign.'
+              if [[ -n "$evidence" ]]; then
+                echo
+                echo "Latest evidence: ${evidence}"
+              fi
+            } > "$report"
+
+            gh pr comment "$pull_number" --repo "$REPOSITORY" --body-file "$report"
+            gh api \
+              --method PATCH \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${REPOSITORY}/pulls/${pull_number}" \
+              -f state=closed \
+              >/dev/null
+
+            if gh api --method DELETE "repos/${REPOSITORY}/git/refs/heads/${head_ref}" >/dev/null 2>&1; then
+              echo "Deleted recycled campaign branch ${head_ref}."
+            else
+              echo "::warning::Could not delete recycled branch ${head_ref}; it has no open PR and may be removed manually."
+            fi
+
+            tracker="$RUNNER_TEMP/studio-campaign-recycle-tracker-${pull_number}.md"
+            {
+              echo '<!-- studio-campaign-recycle-report -->'
+              echo "Campaign PR #${pull_number} (\`${head_ref}\`, \`${head_sha}\`) was recycled after two failed required-gate attempts."
+              echo "Reason: ${reason}"
+              if [[ -n "$issue_number" ]]; then
+                echo "Implementation issue: #${issue_number}"
+              fi
+              if [[ -n "$evidence" ]]; then
+                echo "Latest evidence: ${evidence}"
+              fi
+              echo 'The implementation issue remains open and a later cycle may attempt a smaller or different slice.'
+            } > "$tracker"
+            gh issue comment "$TRACKING_ISSUE" --repo "$REPOSITORY" --body-file "$tracker"
+          }
+
           for candidate in "${candidates[@]}"; do
             IFS=$'\t' read -r pull_number head_ref head_sha <<< "$candidate"
             echo "Reconciling PR #${pull_number} (${head_ref}@${head_sha})."
@@ -120,11 +226,14 @@ jobs:
             pull_json="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
             current_sha="$(jq -r '.head.sha' <<< "$pull_json")"
             current_state="$(jq -r '.state' <<< "$pull_json")"
+            body="$(jq -r '.body // ""' <<< "$pull_json")"
+            issue_number="$(grep -oE 'Progresses #[1-9][0-9]*' <<< "$body" | sed -n '1s/[^0-9]//gp')"
             if [[ "$current_state" != "open" || "$current_sha" != "$head_sha" ]]; then
               echo "PR #${pull_number} moved or closed during reconciliation; skipping."
               continue
             fi
 
+            main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
             comparison_json="$(
               gh api \
                 -H 'Accept: application/vnd.github+json' \
@@ -152,8 +261,36 @@ jobs:
                 echo "::warning::Could not update PR #${pull_number} onto current main: ${update_response}"
                 continue
               fi
-              pull_json="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
-              head_sha="$(jq -r '.head.sha' <<< "$pull_json")"
+
+              previous_sha="$head_sha"
+              updated=false
+              for attempt in {1..12}; do
+                sleep 5
+                pull_json="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
+                current_state="$(jq -r '.state' <<< "$pull_json")"
+                candidate_sha="$(jq -r '.head.sha' <<< "$pull_json")"
+                if [[ "$current_state" != "open" ]]; then
+                  break
+                fi
+                if [[ "$candidate_sha" != "$previous_sha" ]]; then
+                  head_sha="$candidate_sha"
+                  updated=true
+                  break
+                fi
+              done
+              if [[ "$updated" != "true" ]]; then
+                echo "::warning::PR #${pull_number} update did not publish a new head in the bounded poll window."
+                continue
+              fi
+
+              main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
+              post_status="$(
+                gh api "repos/${REPOSITORY}/compare/${main_sha}...${head_sha}" --jq '.status // "unknown"'
+              )"
+              if [[ "$post_status" != "ahead" && "$post_status" != "identical" ]]; then
+                echo "::warning::Updated PR #${pull_number} still does not contain current main (${post_status})."
+                continue
+              fi
               echo "PR #${pull_number} now points to ${head_sha}; dispatching gates for the new head."
             elif [[ "$comparison_status" != "ahead" && "$comparison_status" != "identical" ]]; then
               echo "::warning::Unexpected compare status ${comparison_status} for PR #${pull_number}; skipping."
@@ -170,19 +307,42 @@ jobs:
             release_state="$(latest_state "$runs_json" "Studio campaign release gate")"
             risk_state="$(latest_state "$runs_json" "Studio autonomous risk gate")"
             sonar_state="$(latest_state "$runs_json" "SonarQube")"
+            release_failures="$(terminal_failure_count "$runs_json" "Studio campaign release gate")"
+            risk_failures="$(terminal_failure_count "$runs_json" "Studio autonomous risk gate")"
+            sonar_failures="$(terminal_failure_count "$runs_json" "SonarQube")"
 
-            echo "PR #${pull_number}: release=${release_state}, risk=${risk_state}, sonar=${sonar_state}"
+            echo "PR #${pull_number}: release=${release_state} (${release_failures} failed), risk=${risk_state} (${risk_failures} failed), sonar=${sonar_state} (${sonar_failures} failed)"
 
-            if needs_dispatch "$release_state"; then
+            recycle_reason=""
+            recycle_evidence=""
+            if [[ "$release_state" == completed/* && "$release_state" != "completed/success" && "$release_failures" -ge 2 ]]; then
+              recycle_reason="Studio campaign release gate failed twice"
+              recycle_evidence="$(latest_run_url "$runs_json" "Studio campaign release gate")"
+            elif [[ "$risk_state" == completed/* && "$risk_state" != "completed/success" && "$risk_failures" -ge 2 ]]; then
+              recycle_reason="Studio autonomous risk gate failed twice"
+              recycle_evidence="$(latest_run_url "$runs_json" "Studio autonomous risk gate")"
+            elif [[ "$sonar_state" == completed/* && "$sonar_state" != "completed/success" && "$sonar_failures" -ge 2 ]]; then
+              recycle_reason="SonarQube failed twice"
+              recycle_evidence="$(latest_run_url "$runs_json" "SonarQube")"
+            fi
+
+            if [[ -n "$recycle_reason" ]]; then
+              recycle_failed_pull \
+                "$pull_number" "$head_ref" "$head_sha" "$issue_number" \
+                "$recycle_reason" "$recycle_evidence"
+              continue
+            fi
+
+            if ! state_is_active_or_green "$release_state"; then
               dispatch_release "$head_ref" "$head_sha" "$pull_number"
-              echo "Dispatched Studio campaign release gate for PR #${pull_number}."
+              echo "Dispatched or retried Studio campaign release gate for PR #${pull_number}."
             fi
-            if needs_dispatch "$risk_state"; then
-              dispatch_simple studio-autonomous-risk-gate.yml "$head_ref"
-              echo "Dispatched Studio autonomous risk gate for PR #${pull_number}."
+            if ! state_is_active_or_green "$risk_state"; then
+              dispatch_risk "$head_ref" "$main_sha" "$head_sha" "$pull_number"
+              echo "Dispatched or retried Studio autonomous risk gate for PR #${pull_number}."
             fi
-            if needs_dispatch "$sonar_state"; then
-              dispatch_simple sonarqube.yml "$head_ref"
-              echo "Dispatched SonarQube for PR #${pull_number}."
+            if ! state_is_active_or_green "$sonar_state"; then
+              dispatch_sonar "$head_ref"
+              echo "Dispatched or retried SonarQube for PR #${pull_number}."
             fi
           done
