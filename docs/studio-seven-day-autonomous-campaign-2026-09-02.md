@@ -1,11 +1,11 @@
 # ToonSpectrum Studio 7일 자율 포화 고도화 캠페인
 
-- 캠페인 ID: `studio-saturation-2026-09-02`
-- 시작: 2026-09-02 20:30 KST (`2026-09-02T11:30:00Z`)
-- 종료: 2026-09-09 20:30 KST (`2026-09-09T11:30:00Z`)
+- 캠페인 ID: `studio-saturation-2026-09-03`
+- 시작: 2026-09-03 09:00 KST (`2026-09-03T00:00:00Z`)
+- 종료: 2026-09-10 09:00 KST (`2026-09-10T00:00:00Z`)
 - 평가 간격: 최대 1시간
 - 추적 Epic: #555
-- 구현 큐: #557–#563
+- 구현 큐: #557–#563, #569–#571
 
 ## 1. 실제로 자동화되는 범위
 
@@ -47,7 +47,7 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 
 ## 3. 구현 우선순위
 
-회차마다 #557–#563의 시작 위치를 순환한다. 단, 실제 선택 시에는 해당 이슈가 열려 있고 동일 이슈를 진행 중인 열린 PR이 없어야 한다.
+회차마다 #557–#563, #569–#571의 시작 위치를 순환한다. 단, 실제 선택 시에는 해당 이슈가 열려 있고 동일 이슈를 진행 중인 열린 PR이 없어야 한다.
 
 - #557: operation replay·codec·crash recovery
 - #558: editable Smart Shape·recent-stroke correction
@@ -56,6 +56,9 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - #561: 3D surface painting·attachment·texture export
 - #562: cel animation·camera·audio·animatic timeline
 - #563: structured layered AI editing·provenance
+- #569: immutable asset family·variant·batch generation
+- #570: error-bounded GPU vector rasterizer candidate
+- #571: stroke-level co-creative proposal·provenance
 
 작업 큐가 막히거나 안전한 기능 slice가 없으면 제품·스타트업·논문 신호를 기반으로 작은 측정 가능한 실험을 선택한다. 연구 프로토타입도 제품 코드로 승격되려면 실제 실행 경로, 저장·복원, Undo/Redo, 오류 경계, 성능과 브라우저 증거가 필요하다.
 
@@ -95,6 +98,7 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - 운영 DB schema·migration·migration runner 수정
 - 파일 삭제
 - 바이너리 payload 추가
+- symlink와 git submodule 추가
 - 테스트 없는 제품 소스 변경
 - 출처 registry가 없는 외부 payload 경로
 
@@ -118,8 +122,10 @@ DB schema와 운영 migration은 별도 격리 PR에서 실제 migration ledger�
 - `Studio autonomous risk gate`
 - `SonarQube`
 
-캠페인 release gate는 다음을 포함한다.
+캠페인 release gate는 branch 단독이 아니라 현재 `main`과 PR head의 synthetic merge ref를 검사하며, admission policy는 campaign branch가 아니라 current-main 첫 번째 부모에서 꺼내 실행한다.
 
+- exact PR/head identity와 campaign marker
+- trusted current-main admission policy
 - 전체 root Vitest
 - PostgreSQL disposable schema
 - Redis 통합
@@ -131,7 +137,7 @@ DB schema와 운영 migration은 별도 격리 PR에서 실제 migration ledger�
 - 3D rendered-frame 검증
 - 실제 p5.brush Worker WebGL2 검증
 
-모든 gate가 성공하고 PR head SHA가 변하지 않았을 때만 squash merge한다.
+모든 gate가 성공하고 PR head SHA가 변하지 않았을 때만 squash merge한다. 캠페인 PR이 현재 `main`보다 뒤처지면 gate dispatcher가 GitHub update-branch를 실행하고 새 head에서 검증을 다시 시작한다.
 
 `main`이 패치 생성 중 바뀌면 오래된 패치를 억지로 재베이스하지 않는다. PR 생성 Job이 해당 회차를 버리고 다음 회차에서 최신 기준선으로 다시 생성한다.
 
@@ -152,7 +158,7 @@ Secret이 없는 경우에도 다음은 계속 작동한다.
 
 ## 8. 캠페인 종료
 
-종료 시각 이후 예약 실행은 새 코드를 작성하지 않는다. 완료 메시지를 Epic #555에 한 번 기록하고 audit-only 상태로 남는다. 기간을 연장하려면 설정 파일의 새 7일 window를 별도 PR로 검증하거나 유지관리자가 `force_active` 수동 회차를 실행한다.
+2026년 9월 10일 09:00 KST 이후 예약 실행은 새 코드를 작성하지 않는다. 완료 메시지를 Epic #555에 한 번 기록하고 audit-only 상태로 남는다. 기간을 연장하려면 설정 파일의 새 7일 window를 별도 PR로 검증하거나 유지관리자가 `force_active` 수동 회차를 실행한다.
 
 완료 평가는 커밋 수가 아니라 다음으로 판단한다.
 
