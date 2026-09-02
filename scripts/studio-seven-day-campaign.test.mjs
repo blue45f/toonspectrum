@@ -13,6 +13,14 @@ import {
 } from "./studio-seven-day-campaign.mjs";
 
 const config = JSON.parse(fs.readFileSync(STUDIO_SEVEN_DAY_CAMPAIGN_CONFIG_PATH, "utf8"));
+const thirtyMinuteTrigger = fs.readFileSync(
+  ".github/workflows/studio-seven-day-hourly-trigger.yml",
+  "utf8",
+);
+const immediateContinuation = fs.readFileSync(
+  ".github/workflows/studio-seven-day-immediate-continuation.yml",
+  "utf8",
+);
 
 test("committed campaign config is a bounded exact seven-day program", () => {
   assert.deepEqual(validateStudioSevenDayCampaignConfig(config), []);
@@ -23,6 +31,26 @@ test("committed campaign config is a bounded exact seven-day program", () => {
   assert.equal(config.maxOpenCampaignPullRequests, 1);
   assert.equal(config.agent.permissionProfile, ":workspace");
   assert.match(config.agent.actionCommit, /^[0-9a-f]{40}$/u);
+});
+
+test("the watchdog evaluates twice per hour without duplicating active work", () => {
+  assert.match(thirtyMinuteTrigger, /name: Studio seven-day 30-minute trigger/u);
+  assert.match(thirtyMinuteTrigger, /cron: "2,32 \* \* \* \*"/u);
+  assert.match(thirtyMinuteTrigger, /active_count/u);
+  assert.match(thirtyMinuteTrigger, /age_seconds" -lt 900/u);
+  assert.match(thirtyMinuteTrigger, /mode: "author"/u);
+  assert.match(thirtyMinuteTrigger, /force_active: "false"/u);
+});
+
+test("a released implementation lane dispatches the next cycle immediately", () => {
+  assert.match(immediateContinuation, /workflow_run:/u);
+  assert.match(immediateContinuation, /Studio safe automerge/u);
+  assert.match(immediateContinuation, /types: \[closed\]/u);
+  assert.match(immediateContinuation, /actions: write/u);
+  assert.match(immediateContinuation, /codex\/campaign-/u);
+  assert.match(immediateContinuation, /open_campaign_prs/u);
+  assert.match(immediateContinuation, /active_count/u);
+  assert.match(immediateContinuation, /Dispatched the next Studio saturation cycle immediately/u);
 });
 
 test("campaign window resolves before, active, and complete phases deterministically", () => {
