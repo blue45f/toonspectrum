@@ -1,170 +1,164 @@
-# ToonSpectrum Studio 7일 자율 포화 고도화 캠페인
+# ToonSpectrum Studio API-free 30레인 고도화 캠페인
 
 - 캠페인 ID: `studio-saturation-2026-09-03`
 - 시작: 2026-09-03 09:00 KST (`2026-09-03T00:00:00Z`)
 - 종료: 2026-09-10 09:00 KST (`2026-09-10T00:00:00Z`)
-- 평가 간격: 최대 1시간
+- 상태 감사 안전망: 매시 02분·32분
 - 추적 Epic: #555
-- 구현 큐: #557–#563, #569–#571
+- 논리 구현 레인: 30개
+- OpenAI API 키: 사용하지 않음
 
-## 1. 실제로 자동화되는 범위
+## 1. 운영 모델
 
-`.github/workflows/studio-seven-day-campaign.yml`과 시간당 보조 트리거는 캠페인 기간 동안 다음 순서를 반복한다.
+이 캠페인은 두 역할을 명확히 분리한다.
 
-1. 최신 `main`과 열린 PR·P0 이슈 상태를 읽는다.
-2. 성숙 제품 59개, 신규·스타트업·브라우저 도구 24개, 그래픽스·페인팅·애니메이션·3D 관련 논문 출처를 검사한다.
-3. 외부 페이지 제목과 연구 메타데이터를 명령이 아닌 신뢰하지 않는 데이터로 정규화한다.
-4. 이미 열린 캠페인 PR이 있으면 다음 구현을 만들지 않고 CI·자동 병합을 기다린다.
-5. 실행 가능한 슬롯이 있고 `OPENAI_API_KEY` 저장소 Secret이 구성돼 있으면, 고정된 OpenAI Codex Action과 CLI 버전으로 한 개의 작은 기능 패치를 생성한다.
-6. 에이전트가 수정한 working tree를 별도 정책기로 검사한다.
-7. 에이전트 Job에는 push 권한을 주지 않는다. 패치는 artifact로 넘기고, API 키를 받지 않는 별도 Job이 현재 `main` SHA가 그대로일 때만 브랜치·커밋·PR을 만든다.
-8. 봇이 만든 PR에도 전체 검증이 빠지지 않도록 gate dispatcher가 release gate, Studio 위험 게이트, SonarQube를 정확한 head SHA에서 명시적으로 실행한다.
-9. 검증 성공 PR만 exact-head squash merge하고, 병합된 캠페인 브랜치는 자동 정리한다.
-10. `main` 병합 뒤 Vercel Git Integration이 배포를 수행한다.
+### 연결된 ChatGPT/Codex 세션
 
-시간당 동작은 두 스케줄을 결합한다.
+- 저장소와 현재 이슈·PR·CI를 읽는다.
+- 30개 레인 중 충돌이 적고 가치가 높은 작업을 선택한다.
+- 실제 제품 코드와 focused test를 수정한다.
+- 기능별 브랜치·커밋·PR을 만든다.
+- CI 실패 원인을 읽고 같은 세션에서 수정한다.
+- 검증 성공 변경을 `main` 병합 대상으로 보낸다.
 
-- 주 캠페인: 매 3시간 17분
-- 시간당 보조 트리거: 매시 47분
-- 보조 트리거는 최근 55분 안의 실행 또는 queued/in-progress 실행을 발견하면 중복 dispatch하지 않는다.
+### GitHub Actions
 
-따라서 GitHub 스케줄 지연이 없을 때 최대 한 시간 간격으로 새 상태를 평가하면서, 같은 회차를 중복 실행하지 않는다.
+- 제품·스타트업·논문 변경 신호를 감사한다.
+- lint, typecheck, Vitest, Playwright, production build를 실행한다.
+- Canvas·저장·Undo/Redo·WebGPU 변경에 추가 위험 게이트를 적용한다.
+- 열린 캠페인 PR의 누락된 검증을 재조정한다.
+- 모든 필수 검증에 성공한 정확한 head만 순서대로 병합한다.
+- 병합된 작업 브랜치를 정리한다.
+- `main` 배포와 smoke 검증 경로를 유지한다.
 
-## 2. 연속 실행의 정확한 의미
+GitHub-hosted runner 안에서 OpenAI 모델을 호출하거나 코드를 자동 작성하지 않는다. 따라서 저장소 Secret `OPENAI_API_KEY`가 필요하지 않으며 별도 OpenAI API 사용료도 발생시키지 않는다.
 
-채팅 세션이나 단일 프로세스를 7일 동안 붙잡아 두는 방식이 아니다. GitHub Actions의 예약 실행과 독립 runner를 사용한다. 각 회차는 앞 회차가 종료되더라도 다음 스케줄에서 저장소 상태를 다시 읽고 재계획한다.
+## 2. 자동화되는 범위
 
-GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사용량 제한, 네트워크 장애 때문에 지연되거나 실행되지 않을 수 있다. 따라서 “한 순간도 중단되지 않는 프로세스”를 주장하지 않는다. 대신 이전 프로세스의 메모리에 의존하지 않고 다음 회차가 안전하게 이어받는 반복 가능한 캠페인으로 구성한다.
+`.github/workflows/studio-seven-day-hourly-trigger.yml`은 다음을 수행한다.
 
-동시에 열 수 있는 캠페인 PR은 기본 1개다. 이는 작업을 늦추기 위한 승인이 아니라 다음 문제를 막기 위한 직렬화 장치다.
+1. API-free runtime 계약과 30개 레인 registry를 검증한다.
+2. 제품·스타트업·연구 출처의 변경 신호를 수집한다.
+3. 결과와 레인 상태를 Actions artifact로 보관한다.
+4. 열린 기능 PR의 release gate, 위험 gate, SonarQube 상태를 재조정한다.
+5. 감사 결과를 GitHub Actions summary에 남긴다.
 
-- 같은 대형 Studio 파일에 대한 병렬 충돌
-- 실패한 기반 위에 후속 기능이 누적되는 현상
-- 저장 포맷·Undo/Redo·GPU authority 변경이 서로 다른 기준선을 사용하는 현상
-- CI runner와 Vercel 배포가 과도하게 밀리는 현상
+정상적인 코드 작성은 이 채팅이나 별도의 연결된 Codex 세션에서 수행한다. Actions 스케줄은 세션 밖에서 새로운 코드를 만들어내는 수단이 아니라, 연구 신호·검증·병합·배포 상태가 멈추지 않도록 확인하는 안전망이다.
 
-한 PR이 열려 있는 동안에도 제품·스타트업·논문 fingerprint와 CI 상태는 계속 확인한다. 병합 또는 종료 뒤 다음 회차가 새 구현을 선택한다.
+## 3. 30개 구현 레인
 
-## 3. 구현 우선순위
+1. `storage-recovery` — 저장·자동저장·codec·crash recovery
+2. `history-transactions` — Undo/Redo·command·transaction
+3. `import-export` — PSD·프로젝트·파일 형식
+4. `collaboration-crdt` — 협업·CRDT·오프라인 충돌
+5. `canvas-core` — 캔버스·포인터·좌표·합성
+6. `brush-engine` — 브러시 dynamics·stabilization
+7. `natural-media` — 수채·유화·안료·종이 시뮬레이션
+8. `smart-shape-vector` — Smart Shape·벡터 노드
+9. `gpu-vector-rasterizer` — GPU 벡터 래스터라이저
+10. `selection-transform` — 선택·변형·warp·liquify
+11. `color-management` — Lab·ICC·HDR·proofing
+12. `layers-masks` — 레이어·마스크·블렌딩
+13. `live-effects` — 조정 레이어·비파괴 효과
+14. `inspector-workspace` — 인스펙터·도킹·단축키
+15. `mobile-accessibility` — 모바일·태블릿·펜·접근성
+16. `text-lettering` — 폰트·말풍선·다국어 조판
+17. `comic-pages-panels` — 페이지·컷·여백·에피소드
+18. `materials-library` — 소재 검색·버전·마켓
+19. `three-d-import` — 3D 반입·GLB 검증·압축
+20. `three-d-surface` — UV·표면 페인팅·PBR
+21. `three-d-rig-pose` — 리깅·IK·포즈·모프
+22. `three-d-generation` — Hyper3D/Rodin 생성형 3D
+23. `three-d-render` — 툰 선화·톤·조명·일괄 렌더
+24. `animation-timeline` — 셀 애니메이션·키프레임
+25. `storyboard-camera-audio` — 콘티·카메라·오디오
+26. `structured-ai` — 레이어·마스크 기반 AI 편집
+27. `asset-variants` — 에셋 revision·variant·대량 생성
+28. `co-creative` — stroke 제안·대안·의도 보존
+29. `performance-webgpu-wasm` — WebGPU·WASM·Worker·메모리
+30. `quality-delivery` — 진단·오프라인·캐시·시작 성능
 
-회차마다 #557–#563, #569–#571의 시작 위치를 순환한다. 단, 실제 선택 시에는 해당 이슈가 열려 있고 동일 이슈를 진행 중인 열린 PR이 없어야 한다.
+레인은 동시에 개발 가능한 경계를 나타낸다. 한 연결 세션 안에서는 독립 작업을 병렬 조사할 수 있지만, 실제 GitHub 쓰기와 `main` 병합은 충돌을 막기 위해 순서대로 수행한다.
 
-- #557: operation replay·codec·crash recovery
-- #558: editable Smart Shape·recent-stroke correction
-- #559: non-destructive adjustment/live-effect graph
-- #560: deterministic natural-media simulation
-- #561: 3D surface painting·attachment·texture export
-- #562: cel animation·camera·audio·animatic timeline
-- #563: structured layered AI editing·provenance
-- #569: immutable asset family·variant·batch generation
-- #570: error-bounded GPU vector rasterizer candidate
-- #571: stroke-level co-creative proposal·provenance
+## 4. 작업 단위
 
-작업 큐가 막히거나 안전한 기능 slice가 없으면 제품·스타트업·논문 신호를 기반으로 작은 측정 가능한 실험을 선택한다. 연구 프로토타입도 제품 코드로 승격되려면 실제 실행 경로, 저장·복원, Undo/Redo, 오류 경계, 성능과 브라우저 증거가 필요하다.
+한 PR은 하나의 실행 가능한 vertical slice만 포함한다.
 
-## 4. 외부 소스와 소재 재사용
+```text
+문제 재현 또는 capability gap 확인
+→ 문서 모델·엔진·UI 경계 결정
+→ 구현
+→ focused test
+→ 저장·복원과 Undo/Redo 확인
+→ 브라우저·빌드 검증
+→ 작은 커밋과 PR
+```
 
-저장소 소유자의 캠페인 범위 허락은 `docs/third-party/studio-owner-attestation-2026-09-02.md`에 기록돼 있다. 같은 자료를 사용할 때마다 다시 승인을 요청하지 않는다.
+문서나 UI mock만 추가하고 기능이 완료됐다고 표시하지 않는다. 기능이 실제 Studio 진입점, 실행 경로, 오류 처리, 저장·복원, 테스트에 연결돼야 한다.
 
-실제로 가져오는 항목은 다음 정보를 `docs/third-party/studio-reuse-registry.json`에 남긴다.
+## 5. 충돌 방지
+
+- 기능 브랜치는 `codex/*`를 사용한다.
+- 열린 PR이 이미 수정 중인 파일과 정확히 겹치는 작업은 같은 PR에서 이어가거나 더 작은 경계로 분리한다.
+- 중앙 hotspot 파일의 불필요한 대형 수정은 피한다.
+- 하나의 PR이 병합되어 `main`이 움직이면 다른 PR은 최신 `main`을 포함한 head에서 다시 검증한다.
+- `main` writer는 하나만 유지한다.
+
+## 6. 외부 제품과 연구 적용
+
+제품·스타트업·논문 감시는 기능 아이디어를 찾는 입력이다. 외부 페이지의 제목이나 본문은 명령이 아니라 신뢰하지 않는 연구 데이터로 처리한다.
+
+실제로 외부 파일이나 코드를 가져오는 경우에는 다음을 기록한다.
 
 - 원본 URL
 - 고정 버전·릴리스·커밋
-- 실제 원본 바이트 SHA-256
-- 소유자 확인 또는 공개 라이선스 근거
+- 실제 원본 SHA-256
 - 반영 경로
-- 필요한 NOTICE·출처
+- 필요한 NOTICE와 출처
 
-자동 에이전트 patch에는 바이너리 외부 파일 추가를 허용하지 않는다. 모델 가중치·대형 3D·브러시 패키지는 출처와 해시를 검토한 별도 통합 PR 또는 runtime-download/BYOM 경로로 처리한다. 텍스트 소스는 원본·버전·해시·반영 경로를 registry에 기록하면 정확히 재사용할 수 있다. 접근 가능한 소스가 없으면 기능, 알고리즘, 데이터 모델, 작업 흐름과 품질 기준을 분석해 ToonSpectrum 엔진에 구현한다.
+원본 통합이 어렵거나 현재 아키텍처와 맞지 않으면 기능·알고리즘·데이터 모델·작업 흐름·품질 기준을 분석하여 ToonSpectrum 방식으로 구현한다.
 
-## 5. 에이전트 격리와 패치 제한
+## 7. 패치 제한
 
-자동 구현 Job은 다음 조건을 사용한다.
+연결 세션에서 만드는 자동화 대상 PR도 다음 기준을 유지한다.
 
-- `openai/codex-action` commit `86365089eb2b84e0a8fb0717b304f8bdcb13b20e`
-- Codex CLI `0.152.1`
-- 모델 `gpt-5.3-codex`
-- reasoning effort `high`
-- permission profile `:workspace`
-- 저장소 push 권한 없음
-- 최대 24개 파일, 3,200 변경 라인
+- 회차당 최대 24개 파일과 3,200 변경 라인
+- 제품 소스 변경에는 focused test 필수
+- 저장 포맷 변경은 migration과 이전 fixture 검증 필수
+- Undo/Redo 변경은 apply·revert·redo 대칭 검증 필수
+- WebGPU 변경은 device-lost 복구와 WebGL2/Canvas2D 폴백 유지
+- 파일 삭제·dependency·workflow·DB migration 같은 고위험 변경은 별도 명시적 PR 단위로 처리
 
-자동 패치에서 금지되는 항목:
+## 8. 필수 검증과 병합
 
-- `.github/workflows`와 Actions 정의 수정
-- dependency manifest와 lockfile 수정
-- 환경변수·배포 설정·비밀값 수정
-- 캠페인 자체 설정과 안전 정책 수정
-- 운영 DB schema·migration·migration runner 수정
-- 파일 삭제
-- 바이너리 payload 추가
-- symlink와 git submodule 추가
-- 테스트 없는 제품 소스 변경
-- 출처 registry가 없는 외부 payload 경로
+기능 PR은 변경 범위에 따라 다음 검증을 통과해야 한다.
 
-DB schema와 운영 migration은 별도 격리 PR에서 실제 migration ledger·권한·rollback까지 검증해야 하므로 시간당 에이전트 patch에서는 제외한다.
+- repository architecture
+- strict lint와 전체 TypeScript
+- focused test와 전체 Vitest
+- production build와 bundle budget
+- PostgreSQL·Redis·Cloudflare realtime 계약
+- Studio launch·artist journey·인앱 브라우저·모바일
+- 3D rendered-frame
+- 실제 p5.brush Worker WebGL2
+- Canvas·OPFS·Undo/Redo·WebGPU targeted verifier
 
-에이전트가 안전하고 의미 있는 변경을 만들지 못하면 working tree를 비워 둔다. 이 경우 PR을 만들지 않고 다음 회차에서 다시 연구·선택한다.
+모든 필수 gate가 성공하고 PR head가 변하지 않았을 때만 squash merge한다. 병합 뒤 브랜치는 자동 정리한다.
 
-## 6. 필수 검증과 병합
+## 9. 비밀값 정책
 
-패치 생성 Job의 최소 검증:
+- `OPENAI_API_KEY`를 저장소 Secret에 등록하지 않는다.
+- API 키를 채팅, 코드, 이슈, PR, 로그, artifact에 붙여 넣지 않는다.
+- 이미 노출된 키는 재사용하지 않고 OpenAI Platform에서 폐기한다.
+- 향후 로컬 모델이나 self-hosted runner를 도입할 경우에도 별도 PR에서 보안 경계를 검증한다.
 
-- 변경된 Node/Vitest 계약
-- `git diff --check`
-- `pnpm run lint:quick`
-- `pnpm run typecheck`
-- 패치 admission policy
+## 10. 완료 평가
 
-봇 PR은 `GITHUB_TOKEN` 재귀 실행 제한에 기대지 않고 `Studio campaign gate dispatcher`가 다음 워크플로를 명시적으로 dispatch한다.
-
-- `Studio campaign release gate`
-- `Studio autonomous risk gate`
-- `SonarQube`
-
-캠페인 release gate는 branch 단독이 아니라 현재 `main`과 PR head의 synthetic merge ref를 검사하며, admission policy는 campaign branch가 아니라 current-main 첫 번째 부모에서 꺼내 실행한다.
-
-- exact PR/head identity와 campaign marker
-- trusted current-main admission policy
-- 전체 root Vitest
-- PostgreSQL disposable schema
-- Redis 통합
-- Cloudflare realtime runtime·typecheck·dry-run
-- strict lint와 전체 workspace typecheck
-- production build, bundle ratchet, build:all
-- security·license audit
-- Studio launch·artist journey·인앱 브라우저·모바일·아이콘
-- 3D rendered-frame 검증
-- 실제 p5.brush Worker WebGL2 검증
-
-모든 gate가 성공하고 PR head SHA가 변하지 않았을 때만 squash merge한다. 캠페인 PR이 현재 `main`보다 뒤처지면 gate dispatcher가 GitHub update-branch를 실행하고 새 head에서 검증을 다시 시작한다.
-
-`main`이 패치 생성 중 바뀌면 오래된 패치를 억지로 재베이스하지 않는다. PR 생성 Job이 해당 회차를 버리고 다음 회차에서 최신 기준선으로 다시 생성한다.
-
-## 7. API 키가 없을 때
-
-GitHub Actions에서 코드를 작성하는 Codex Job은 저장소 Secret `OPENAI_API_KEY`가 필요하다. Secret은 고정된 OpenAI Action 단계에만 전달되며 push·PR Job에는 전달되지 않는다.
-
-Secret이 없는 경우에도 다음은 계속 작동한다.
-
-- 제품·스타트업 공식 출처 감시
-- 논문·연구 검색과 fingerprint
-- 기존 CI와 회귀 탐지
-- 열린 PR의 자동 병합
-- 병합 브랜치 정리
-- 배포와 smoke 검증
-
-코드 작성만 비활성화되고, Epic #555에 한 번만 상태가 기록된다.
-
-## 8. 캠페인 종료
-
-2026년 9월 10일 09:00 KST 이후 예약 실행은 새 코드를 작성하지 않는다. 완료 메시지를 Epic #555에 한 번 기록하고 audit-only 상태로 남는다. 기간을 연장하려면 설정 파일의 새 7일 window를 별도 PR로 검증하거나 유지관리자가 `force_active` 수동 회차를 실행한다.
-
-완료 평가는 커밋 수가 아니라 다음으로 판단한다.
+완료 여부는 커밋 수나 레인 수가 아니라 다음으로 판단한다.
 
 - 실제 병합·배포된 기능과 버그 수정
 - P0/P1 capability gap 감소
 - 캔버스·저장·Undo/Redo·GPU 안정성
 - 성능·메모리·bundle 비악화
-- 연구 프로토타입의 제품 승격 근거
-- 미완료 항목의 구체적인 blocker와 다음 실행 단위
+- 제품·논문 아이디어의 실행 가능한 제품화
+- 미완료 항목의 재현 가능한 blocker와 다음 작업 단위
