@@ -1322,7 +1322,12 @@ export class StudioLiveWetInkOverlayRenderer {
       active.previousSourceY = y;
     }
     active.consumedSourcePoints = total;
-    if (!this.paintInkwashLiveStroke(samples, active.recipe.baseWidth * 0.5, active.recipe)) {
+    // 접미사만 덧그리면 이전 점의 둥근 캡이 두 번 칠해져 시작점과 모든 포인터 프레임 경계에
+    // 알파가 두 배인 "구슬"이 남는다(실측: 물붓 라이브 프레임의 시작 원 2901px, 반투명 펜의
+    // 마디). 라이브 폴리라인은 매 프레임 지우고 전체를 한 번에 긋는다 — 한 path 의 stroke 는
+    // 자기 자신과 겹쳐도 알파를 더하지 않는다.
+    this.clearActiveRect();
+    if (!this.paintInkwashLivePolyline(active.livePoints, active.recipe)) {
       return this.failActive("surface-render");
     }
     return {

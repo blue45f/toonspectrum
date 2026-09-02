@@ -6,6 +6,7 @@ import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/brush/studio-brush-catalog";
 import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
 import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { studioWetInkBrushDepositsPigment } from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
 
 import {
   analyzeStudioLongBrushQuality,
@@ -122,6 +123,7 @@ describe("Studio exhaustive long-brush quality policy", () => {
             : descriptor
               ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
               : false,
+          depositsPigment: studioWetInkBrushDepositsPigment(descriptor?.runtimeBrushId ?? item.id),
         }).kind,
       };
     });
@@ -129,12 +131,15 @@ describe("Studio exhaustive long-brush quality policy", () => {
     const strict = policies.filter(({ kind }) => kind === "strict-continuous");
     const soft = policies.filter(({ kind }) => kind === "soft-wet-continuous");
     const discrete = policies.filter(({ kind }) => kind === "record-only-discrete");
+    const transparent = policies.filter(({ kind }) => kind === "record-only-transparent");
     // Catalogue growth (sketchpad + web competitive/coloring) lands mainly in
     // strict-continuous; soft/wet and discrete pro packs stay stable.
     expect(strict.length).toBeGreaterThanOrEqual(119);
     expect(soft.length).toBeGreaterThanOrEqual(36);
     expect(discrete.length).toBeGreaterThanOrEqual(76);
-    expect(strict.length + soft.length + discrete.length).toBe(policies.length);
+    // Only the water-only wash deposits no pigment.
+    expect(transparent).toHaveLength(1);
+    expect(strict.length + soft.length + discrete.length + transparent.length).toBe(policies.length);
     expect(policies.filter(({ source }) => source === "core")).toHaveLength(
       STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(({ source }) => source === "core").length,
     );
@@ -391,6 +396,46 @@ describe("Studio exhaustive long-brush quality policy", () => {
     expect(result.frames.settled.scallopResidualCoefficient).toBeLessThan(0.025);
     expect(result.findings.map((entry) => entry.code)).not.toContain("edge-periodicity");
     expect(result.ok).toBe(true);
+  });
+
+  it("records a transparent wash and fails only when ink survives pointer-up", () => {
+    const policy = classifyStudioLongBrushQualityPolicy({
+      id: "inkwash-water-brush",
+      source: "core",
+      runtimeBrushId: "inkwash-water-brush",
+      mediaGroup: "watercolor",
+      previewStyle: "soft",
+      intentionalDiscrete: false,
+      depositsPigment: false,
+    });
+    expect(policy.kind).toBe("record-only-transparent");
+
+    const blank = image();
+    const wetHint = image((x, y) => (Math.abs(y - HEIGHT / 2) <= 10 && x >= 20 && x <= 200 ? 230 : 255));
+    const clean = analyzeStudioLongBrushQuality({
+      policy,
+      baseline,
+      live: wetHint,
+      released: blank,
+      settled: blank,
+      route: ROUTE,
+    });
+    expect(clean.ok).toBe(true);
+    expect(clean.findings).toEqual([]);
+
+    const residue = analyzeStudioLongBrushQuality({
+      policy,
+      baseline,
+      live: wetHint,
+      released: wetHint,
+      settled: wetHint,
+      route: ROUTE,
+    });
+    expect(residue.ok).toBe(false);
+    expect(residue.findings.map((entry) => entry.code)).toEqual([
+      "transparent-wash-residue",
+      "transparent-wash-residue",
+    ]);
   });
 
   it("records intentional particles without turning continuous-carrier metrics into hard failures", () => {

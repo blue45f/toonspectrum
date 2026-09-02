@@ -16,7 +16,20 @@ const SOFT_WET_MATERIAL_GROUPS: ReadonlySet<StudioBrushMaterialGroup> = new Set(
 export type StudioLongBrushQualityPolicyKind =
   | "strict-continuous"
   | "soft-wet-continuous"
-  | "record-only-discrete";
+  | "record-only-discrete"
+  | "record-only-transparent";
+
+export type StudioLongBrushQualityContinuousPolicyKind = Exclude<
+  StudioLongBrushQualityPolicyKind,
+  "record-only-discrete" | "record-only-transparent"
+>;
+
+/** 연속 캐리어 판정을 받지 않는(기록만 남기는) 정책. */
+export function studioLongBrushQualityPolicyIsRecordOnly(
+  kind: StudioLongBrushQualityPolicyKind,
+): boolean {
+  return kind === "record-only-discrete" || kind === "record-only-transparent";
+}
 
 export const STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION = 3 as const;
 
@@ -27,6 +40,12 @@ export interface StudioLongBrushQualityPolicyInput {
   readonly mediaGroup: StudioBrushMaterialGroup;
   readonly previewStyle: string;
   readonly intentionalDiscrete: boolean;
+  /**
+   * 물붓처럼 안료를 얹지 않는 도구는 빈 종이에 아무것도 남기지 않는 것이 제품 계약이다. 라이브
+   * 프레임의 젖음 표시는 힌트일 뿐 잉크가 아니므로, 연속 캐리어 판정(라이브 전용 시작 원·에너지
+   * 붕괴·잉크 없음)을 그대로 적용하면 계약과 정반대를 요구하게 된다. 생략하면 안료를 얹는 도구.
+   */
+  readonly depositsPigment?: boolean;
 }
 
 export interface StudioLongBrushQualityPolicy {
@@ -112,6 +131,7 @@ export type StudioLongBrushQualityFindingCode =
   | "shape-drift"
   | "edge-density-churn"
   | "live-only-start-circle"
+  | "transparent-wash-residue"
   | "scallop-artifact"
   | "repeated-pattern"
   | "edge-periodicity";
@@ -782,6 +802,12 @@ function analyzeTransition(
 export function classifyStudioLongBrushQualityPolicy(
   input: StudioLongBrushQualityPolicyInput,
 ): StudioLongBrushQualityPolicy {
+  if (input.depositsPigment === false) {
+    return {
+      kind: "record-only-transparent",
+      reason: "water-only wash deposits no pigment; the live wet sheen is a hint, not ink",
+    };
+  }
   if (
     input.intentionalDiscrete
     || (input.source === "core" && CORE_DISCRETE_BRUSH_IDS.has(input.id))
@@ -833,7 +859,7 @@ function finding(
 }
 
 function evaluateContinuousQuality(
-  policy: Exclude<StudioLongBrushQualityPolicyKind, "record-only-discrete">,
+  policy: StudioLongBrushQualityContinuousPolicyKind,
   frames: StudioLongBrushQualityResult["frames"],
   transitions: StudioLongBrushQualityResult["transitions"],
 ): StudioLongBrushQualityFinding[] {
@@ -1068,6 +1094,37 @@ export function analyzeStudioLongBrushQuality(
       findings,
       // Intentional particle/stamp/tone geometry is diagnostic-only in the new carrier gate.
       ok: true,
+    };
+  }
+  if (input.policy.kind === "record-only-transparent") {
+    // 안료 없는 워시: 라이브 젖음 힌트는 있어야 하고, 손을 뗀 뒤에는 아무 잉크도 남으면 안 된다.
+    // 남는 잉크는 이 획의 것이 아니라 공유 워시가 되살린 남의 안료다(실측: Undo 한 수묵 펜 획을
+    // 같은 경로의 물붓이 다시 보이게 했다).
+    const findings = [
+      ...(frames.live.visiblePixels < 4
+        ? [finding("warning", "missing-live-ink", "transparent wash live frame shows no wet hint")]
+        : []),
+      ...(frames.released.visiblePixels >= 4
+        ? [finding(
+            "error",
+            "transparent-wash-residue",
+            `pointer-up frame keeps ${frames.released.visiblePixels} ink pixels from a brush that deposits none`,
+          )]
+        : []),
+      ...(frames.settled.visiblePixels >= 4
+        ? [finding(
+            "error",
+            "transparent-wash-residue",
+            `settled frame keeps ${frames.settled.visiblePixels} ink pixels from a brush that deposits none`,
+          )]
+        : []),
+    ];
+    return {
+      policy: input.policy,
+      frames,
+      transitions,
+      findings,
+      ok: findings.every((entry) => entry.level !== "error"),
     };
   }
   const findings = evaluateContinuousQuality(input.policy.kind, frames, transitions);
