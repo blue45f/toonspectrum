@@ -11,13 +11,13 @@
 
 | 원문 주장 | 판정 | 조치 |
 | --- | --- | --- |
-| P1-1 `.will` 32MiB 프로필 vs 1MiB 직접 CRC 상한 불일치 | **참** (단, 파일 메뉴 내보내기는 무영향) | 수정 `3474c06f` — 증분 CRC + 1MiB 슬라이스 yield |
-| P1-2 구형 `requiredEvidence: "fallback"` 마이그레이션 누락 | **참** | 수정 `26cd209f` — 토큰 재매핑 + 레거시 카탈로그 테스트 |
-| P1-3 Dry Media 캐시가 `elementSheet`만 비교, layoutKey 미검증 | **부분 참** (`elementSheet`는 존재하지 않는 식별자, 갭은 실재) | 수정 `dd49e597` — `lastPresented.layoutKey` 검증 + DPR 포함 |
+| P1-1 `.will` 32MiB 프로필 vs 1MiB 직접 CRC 상한 불일치 | **참** (단, 파일 메뉴 내보내기는 무영향) | 수정 `250fa4d9` — 증분 CRC + 1MiB 슬라이스 yield |
+| P1-2 구형 `requiredEvidence: "fallback"` 마이그레이션 누락 | **참** | 수정 `e28436ff` — 토큰 재매핑 + 레거시 카탈로그 테스트 |
+| P1-3 Dry Media 캐시가 `elementSheet`만 비교, layoutKey 미검증 | **부분 참** (`elementSheet`는 존재하지 않는 식별자, 갭은 실재) | 수정 `1a5983df` — `lastPresented.layoutKey` 검증 + DPR 포함 |
 | "Studio Perf Harness" CI 잡 실패 | **거짓** — 그런 잡은 없다 | 실제 실패 잡 3종 기록; core를 막던 lint(PR #485)·마이그레이션 매니페스트 누락·`.myb` 테스트 기대값 세 겹을 걷어냄(§3.1) |
 | 장거리 스트로크 하네스가 Stage 없으면 성공 종료, assertion 없음 | **참** (그 이상: 데드 코드, 홈 디렉터리 하드코딩) | `scripts/verify-studio-long-stroke.mts`로 교체 (§3.2) |
-| 슬라이스 출력 고정 250ms 대기 | **2026-08-08에 해소됨** (문서 표가 stale) | 표 갱신 `1fb142a0`, 잔여 1곳 기록 |
-| 필터 다이얼로그가 SQLite wasm 928KB를 끌어옴 | **2026-08-08에 해소됨**, 잔여 정적 의존 있음 | 표 갱신 `1fb142a0` |
+| 슬라이스 출력 고정 250ms 대기 | **2026-08-08에 해소됨** (문서 표가 stale) | 표 갱신 `9391d87e`, 잔여 1곳 기록 |
+| 필터 다이얼로그가 SQLite wasm 928KB를 끌어옴 | **2026-08-08에 해소됨**, 잔여 정적 의존 있음 | 표 갱신 `9391d87e` |
 | 중심 컴포넌트 42,149줄 | **stale 수치** — 현재 5줄 심 + 30,961줄 호스트 | §4 |
 | 적색 main에서도 배포되는 구조 | **참**, 단 2026-08-14 의도적 결정 | 재도입은 정책 판단으로 남김 (§3.3) |
 
@@ -58,7 +58,7 @@
   `encodeStudioWillV1DocumentTransport`와 인증 코덱 프로바이더(`studio-first-party-will-v1-document-codec-provider.ts`),
   그리고 코덱 컨포먼스(`studio-first-party-will-v1-document-codec-conformance.ts:150`)다.
 
-수정(`3474c06f`):
+수정(`250fa4d9`):
 
 - `studio-crc32.ts`에 증분 API 추가: `STUDIO_CRC32_INITIAL_STATE`, `updateStudioCrc32(state, bytes, start, end)`,
   `finalizeStudioCrc32(state)`. `calculateStudioCrc32`는 이 둘의 합성으로 재정의(핫 루프는 인덱스 기반 유지).
@@ -99,7 +99,7 @@
 - 원문보다 넓은 범위: `fallback: null`인 카드는 마이그레이션 본문에 들어가지도 않지만, evidence 토큰 때문에
   똑같이 실패한다. 즉 "마이그레이션이 남긴다"가 아니라 "재매핑 코드가 어디에도 없다"가 정확하다.
 
-수정(`26cd209f`):
+수정(`e28436ff`):
 
 - `migrateLegacyAssetReplacementEvidence`를 추가해 `fallback` → `explicit-provider-selection`으로 재매핑하고
   중복을 제거한다. 최상위 지시 유무와 **독립적으로** 먼저 적용된다. 정규값 선택 근거: enum diff의 1:1 치환,
@@ -141,7 +141,7 @@
   바꾼 뒤 `retainsLastGoodFrame: true`를 **정상으로** 단언하고 있었다(bounds를 안 바꿔서 오배치가 보이지
   않았을 뿐).
 
-수정(`dd49e597`):
+수정(`1a5983df`):
 
 - resolver: `retainsExactLastGood`에 `lastPresented.layoutKey === layoutKey` 추가.
 - 컴포넌트: `publishUnavailable`의 `lastPresented` 선택과 보존 참조 리셋 게이트 모두 `layoutKey` 일치를
@@ -206,7 +206,7 @@ Konva 원본 요소가 잠시 보이는 것은 전과 같다. 달라지는 것�
 약한 버전을 새로 썼다는 점과, `verify:studio-brush-latency`·`verify:studio-brush-planner-quality`가
 어떤 워크플로에서도 호출되지 않는다는 점이다.
 
-조치(`a0880c48`): 데드 스크립트를 삭제하고 `scripts/verify-studio-long-stroke.mts`(`verify:studio-long-stroke`)로
+조치(`f6bfa77e`): 데드 스크립트를 삭제하고 `scripts/verify-studio-long-stroke.mts`(`verify:studio-long-stroke`)로
 교체했다. 13개 하드 assertion을 두고 모든 실패를 모아 exit 1 한다.
 
 | 축 | 판정 방식 | 근거 훅 |
@@ -293,9 +293,9 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 
 | ID | 작업 | 현재 근거 | 이 PR | 남은 완료 기준 |
 | --- | --- | --- | --- | --- |
-| TS-REL-001 | `.will` 증분 CRC | — | **완료** `3474c06f` | 32MiB 케이던스 테스트 통과 ✓ |
-| TS-REL-002 | 구형 evidence 변환 | — | **완료** `26cd209f` | 레거시 catalog.v1 왕복 ✓ |
-| TS-REN-003 | Dry Media layoutKey 검증 | — | **완료** `dd49e597` | resize/DPR 단위 회귀 ✓, 실기기 E2E는 §7 |
+| TS-REL-001 | `.will` 증분 CRC | — | **완료** `250fa4d9` | 32MiB 케이던스 테스트 통과 ✓ |
+| TS-REL-002 | 구형 evidence 변환 | — | **완료** `e28436ff` | 레거시 catalog.v1 왕복 ✓ |
+| TS-REN-003 | Dry Media layoutKey 검증 | — | **완료** `1a5983df` | resize/DPR 단위 회귀 ✓, 실기기 E2E는 §7 |
 | TS-CI-004 | 적색 main 배포 차단 | 08-14 의도적 제거 | 정책 판단 (§3.3) | `workflow_run` 게이트 결정 |
 | TS-QA-005 | 성능 하네스 assertion | 정책 파일에 구현 있음, 미연결 | **교체** `verify:studio-long-stroke` | CI 잡 연결(`verify:studio-brush-latency`도 함께) |
 | TS-QA-006 | live/commit 픽셀 비교 | `probe-studio-brush-sweep.mjs`, `verify-inkwash-dippen-live-commit-fidelity.mts` | — | 브러시 전종 자동화를 CI 야간 잡으로 |
@@ -355,22 +355,22 @@ ADR 0007/0012의 단일 저널 원칙, "3D 실패 원인·GPU 상태 숨기기 �
 
 ## 10. 이 PR의 산출물과 남은 일
 
-커밋(PR #483, main 리베이스 후 해시):
+커밋(PR #483 → main rebase-merge 후 main 해시):
 
-1. `136eecaa` docs — 외부 리뷰 원문 보존
-2. `3474c06f` fix(creator) — WILL CRC 증분 슬라이스
-3. `26cd209f` fix(studio-project-model) — 구형 evidence 토큰 재매핑
-4. `dd49e597` fix(creator) — Dry Media 보존 프레임 레이아웃/DPR 무효화
-5. `1fb142a0` docs(perf) — heavy-feature findings 표 정정
-6. `16b11b71` test(creator) — WILL 대용량 fixture 타입 보정
-7. `a0880c48` test(creator) — `verify:studio-long-stroke` 게이트로 데드 벤치마크 교체
-8. `934ed6cd` docs(studio) — 반영·판정 기록(이 문서)
-9. `211b47d4` test(creator) — 리뷰 지적 반영(스냅숏 바이트 동일성, flip 케이스 정리, 성능 문서 시제)
-10. `25189c54` test(creator) — 장획 게이트 기대치를 디스패치 기하로 도출, 샘플러 재시도 수정
-11. `c4f387e2` test(creator) — `.myb` hardness 매핑 상태 단언(main의 core 단위 테스트 실패 해소)
-12. test(db) — 마이그레이션 핀 테스트 2건을 0035까지로 갱신(`run-production-database-migrations.test.mjs`
+1. `b2cd37bd` docs — 외부 리뷰 원문 보존
+2. `250fa4d9` fix(creator) — WILL CRC 증분 슬라이스
+3. `e28436ff` fix(studio-project-model) — 구형 evidence 토큰 재매핑
+4. `1a5983df` fix(creator) — Dry Media 보존 프레임 레이아웃/DPR 무효화
+5. `9391d87e` docs(perf) — heavy-feature findings 표 정정
+6. `5679c58c` test(creator) — WILL 대용량 fixture 타입 보정
+7. `f6bfa77e` test(creator) — `verify:studio-long-stroke` 게이트로 데드 벤치마크 교체
+8. `5305ce08` docs(studio) — 반영·판정 기록(이 문서)
+9. `fdbc9e7f` test(creator) — 리뷰 지적 반영(스냅숏 바이트 동일성, flip 케이스 정리, 성능 문서 시제)
+10. `a098fe1f` test(creator) — 장획 게이트 기대치를 디스패치 기하로 도출, 샘플러 재시도 수정
+11. `92ca76dc` test(creator) — `.myb` hardness 매핑 상태 단언(main의 core 단위 테스트 실패 해소)
+12. `7fa6a54d` test(db) — 마이그레이션 핀 테스트 2건을 0035까지로 갱신(`run-production-database-migrations.test.mjs`
     34→35, `bootstrap-empty-production-database.test.mjs` pending 목록)
-13. docs(studio) — 이 문서의 CI 절·커밋 목록 갱신
+13. `1adf0974` docs(studio) — 이 문서의 CI 절·커밋 목록 갱신
 
 두 커밋은 main이 먼저 같은 내용을 받아 리베이스에서 드롭됐다: soak runner의 `no-control-regex` 억제(PR #485)와
 프로덕션 마이그레이션 매니페스트의 0035 등재. 매니페스트 등재로 실패하기 시작한 핀 테스트 2건은 12번이 잡는다.
