@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "campaignId": "studio-saturation-2026-09-02",
-  "startAt": "2026-09-02T11:30:00Z",
-  "endAt": "2026-09-09T11:30:00Z",
+  "campaignId": "studio-saturation-2026-09-03",
+  "startAt": "2026-09-03T00:00:00Z",
+  "endAt": "2026-09-10T00:00:00Z",
   "cadenceMinutes": 60,
   "trackingIssue": 555,
   "maxOpenCampaignPullRequests": 1,
