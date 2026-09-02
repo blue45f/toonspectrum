@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
-import { validateStudioThirdPartyReuseRegistry } from "./validate-studio-third-party-reuse.mjs";
+import {
+  STUDIO_THIRD_PARTY_REUSE_REGISTRY_PATH,
+  validateStudioThirdPartyReuseRegistry,
+} from "./validate-studio-third-party-reuse.mjs";
 
 const baseRegistry = () => ({
   schemaVersion: 1,
@@ -33,6 +37,11 @@ const sourceCodeEntry = () => ({
     required: true,
     noticePath: "public/legal/THIRD_PARTY_NOTICES.generated.md",
   },
+});
+
+test("the committed third-party reuse registry satisfies the evidence contract", () => {
+  const registry = JSON.parse(fs.readFileSync(STUDIO_THIRD_PARTY_REUSE_REGISTRY_PATH, "utf8"));
+  assert.deepEqual(validateStudioThirdPartyReuseRegistry(registry), []);
 });
 
 test("accepts an empty registry and an evidence-complete permissive source entry", () => {
