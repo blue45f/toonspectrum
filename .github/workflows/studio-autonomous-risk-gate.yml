@@ -16,7 +16,7 @@ concurrency:
 jobs:
   classify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     outputs:
       changed_count: ${{ steps.classify.outputs.changed_count }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -37,6 +37,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
       - name: Resolve changed paths
         id: diff
@@ -75,8 +79,14 @@ jobs:
           echo "Changed paths:"
           cat "$RUNNER_TEMP/studio-changed-paths.txt"
 
-      - name: Verify change classifier contracts
+      - name: Verify autonomous change classifier contracts
         run: node --test scripts/studio-autonomous-change-plan.test.mjs
+
+      - name: Verify competitor registry and watcher contracts
+        run: |
+          node --test scripts/validate-studio-competitor-registry.test.mjs
+          node --test scripts/studio-competitor-watch.test.mjs
+          node scripts/validate-studio-competitor-registry.mjs
 
       - name: Classify Studio change risk
         id: classify
