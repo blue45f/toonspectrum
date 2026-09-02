@@ -1,0 +1,242 @@
+name: Studio autonomous risk gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed_count: ${{ steps.classify.outputs.changed_count }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      source_change: ${{ steps.classify.outputs.source_change }}
+      high_risk: ${{ steps.classify.outputs.high_risk }}
+      needs_browser: ${{ steps.classify.outputs.needs_browser }}
+      needs_build: ${{ steps.classify.outputs.needs_build }}
+      canvas: ${{ steps.classify.outputs.canvas }}
+      storage: ${{ steps.classify.outputs.storage }}
+      history: ${{ steps.classify.outputs.history }}
+      webgpu: ${{ steps.classify.outputs.webgpu }}
+      ui: ${{ steps.classify.outputs.ui }}
+      collaboration: ${{ steps.classify.outputs.collaboration }}
+      deployment: ${{ steps.classify.outputs.deployment }}
+      summary: ${{ steps.classify.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve changed paths
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+            head_sha="$PR_HEAD_SHA"
+          else
+            head_sha="$CURRENT_SHA"
+            if [[ -n "${EVENT_BEFORE_SHA:-}" ]] \
+              && [[ ! "$EVENT_BEFORE_SHA" =~ ^0+$ ]] \
+              && git cat-file -e "${EVENT_BEFORE_SHA}^{commit}" 2>/dev/null; then
+              base_sha="$EVENT_BEFORE_SHA"
+            elif git rev-parse "${head_sha}^" >/dev/null 2>&1; then
+              base_sha="$(git rev-parse "${head_sha}^")"
+            else
+              base_sha="$head_sha"
+            fi
+          fi
+
+          printf 'base=%s\nhead=%s\n' "$base_sha" "$head_sha"
+          git diff --name-only --diff-filter=ACDMRTUXB "$base_sha" "$head_sha" \
+            | sed '/^[[:space:]]*$/d' \
+            | sort -u \
+            > "$RUNNER_TEMP/studio-changed-paths.txt"
+
+          echo "Changed paths:"
+          cat "$RUNNER_TEMP/studio-changed-paths.txt"
+
+      - name: Verify change classifier contracts
+        run: node --test scripts/studio-autonomous-change-plan.test.mjs
+
+      - name: Classify Studio change risk
+        id: classify
+        run: |
+          node scripts/studio-autonomous-change-plan.mjs \
+            --paths-file "$RUNNER_TEMP/studio-changed-paths.txt" \
+            --github-output "$GITHUB_OUTPUT" \
+            --json
+
+      - name: Publish classification summary
+        env:
+          CLASSIFICATION: ${{ steps.classify.outputs.summary }}
+          CHANGED_COUNT: ${{ steps.classify.outputs.changed_count }}
+          HIGH_RISK: ${{ steps.classify.outputs.high_risk }}
+          NEEDS_BUILD: ${{ steps.classify.outputs.needs_build }}
+          NEEDS_BROWSER: ${{ steps.classify.outputs.needs_browser }}
+        run: |
+          {
+            echo "## Studio autonomous risk classification"
+            echo
+            echo "- Classification: \`$CLASSIFICATION\`"
+            echo "- Changed files: $CHANGED_COUNT"
+            echo "- High risk: $HIGH_RISK"
+            echo "- Production build required: $NEEDS_BUILD"
+            echo "- Browser evidence required: $NEEDS_BROWSER"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  targeted-gates:
+    needs: classify
+    if: ${{ needs.classify.outputs.source_change == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_CHANNEL: ""
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium for high-risk or UI changes
+        if: ${{ needs.classify.outputs.high_risk == 'true' || needs.classify.outputs.ui == 'true' }}
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Validate repository architecture
+        run: pnpm run validate:architecture
+
+      - name: Lint changed source
+        run: pnpm run lint:quick
+
+      - name: Typecheck all workspaces
+        run: pnpm run typecheck
+
+      - name: Build production Studio assets
+        if: ${{ needs.classify.outputs.needs_build == 'true' }}
+        run: pnpm run build
+
+      - name: Verify complete canvas surface inventory
+        if: ${{ needs.classify.outputs.canvas == 'true' }}
+        run: pnpm run verify:studio-canvas-surfaces
+
+      - name: Verify native raster tool execution
+        if: ${{ needs.classify.outputs.canvas == 'true' }}
+        run: pnpm run verify:studio-native-raster-tools
+
+      - name: Verify artist journey and history-visible canvas behavior
+        if: ${{ needs.classify.outputs.canvas == 'true' || needs.classify.outputs.history == 'true' }}
+        run: pnpm run verify:studio-artist-journey
+
+      - name: Verify Studio lifecycle and document recovery
+        if: ${{ needs.classify.outputs.storage == 'true' }}
+        run: pnpm run verify:studio-lifecycle
+
+      - name: Verify OPFS autosave session recovery
+        if: ${{ needs.classify.outputs.storage == 'true' }}
+        run: pnpm run verify:studio-autosave-opfs
+
+      - name: Verify two-tab autosave leadership
+        if: ${{ needs.classify.outputs.storage == 'true' }}
+        run: pnpm run verify:studio-autosave-two-tab
+
+      - name: Verify brush commit Undo/Redo round-trip
+        if: ${{ needs.classify.outputs.history == 'true' }}
+        run: pnpm run verify:studio-brush-media
+
+      - name: Verify committed GPU presentation parity
+        if: ${{ needs.classify.outputs.webgpu == 'true' }}
+        run: pnpm run verify:studio-gpu-committed-parity
+
+      - name: Verify WebGPU brush parity
+        if: ${{ needs.classify.outputs.webgpu == 'true' }}
+        run: pnpm run verify:studio-engine-webgpu-brush-parity
+
+      - name: Verify WebGPU filter parity
+        if: ${{ needs.classify.outputs.webgpu == 'true' }}
+        run: pnpm run verify:studio-engine-webgpu-filter-parity
+
+      - name: Verify WebGPU presentation lifecycle
+        if: ${{ needs.classify.outputs.webgpu == 'true' }}
+        run: pnpm run verify:studio-engine-webgpu-presentation
+
+      - name: Verify Studio menus
+        if: ${{ needs.classify.outputs.ui == 'true' }}
+        run: pnpm run verify:studio-menus
+
+      - name: Verify mobile top chrome
+        if: ${{ needs.classify.outputs.ui == 'true' }}
+        run: pnpm run verify:studio-mobile-top
+
+      - name: Verify Inspector walkthrough
+        if: ${{ needs.classify.outputs.ui == 'true' }}
+        run: pnpm run verify:studio-inspector-walkthrough
+
+      - name: Verify collaboration Worker runtime
+        if: ${{ needs.classify.outputs.collaboration == 'true' }}
+        run: pnpm run test:cloudflare-realtime
+
+      - name: Typecheck collaboration Worker
+        if: ${{ needs.classify.outputs.collaboration == 'true' }}
+        run: pnpm run typecheck:cloudflare-realtime
+
+      - name: Verify CSP source contract
+        if: ${{ needs.classify.outputs.deployment == 'true' }}
+        run: pnpm run verify:csp
+
+      - name: Verify Studio bundle budget
+        if: ${{ needs.classify.outputs.deployment == 'true' || needs.classify.outputs.high_risk == 'true' }}
+        run: pnpm run check:studio-bundle
+
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-autonomous-risk-gate-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/studio-*/
+            /tmp/toonspectrum-*/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  documentation-only:
+    needs: classify
+    if: ${{ needs.classify.outputs.docs_only == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Record documentation-only decision
+        env:
+          SUMMARY: ${{ needs.classify.outputs.summary }}
+        run: echo "No runtime gate required — $SUMMARY"
