@@ -132,7 +132,19 @@ async function dismissQuickStart(page: Page): Promise<void> {
     .then(() => true)
     .catch(() => false);
   if (!mounted) return;
-  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  // Since 4583af11 the coach is non-modal and no longer yields to a foreign modal. On the routed
+  // `/studio/bg3d` entry the editor dialog is already stacked above it, so a click on the card's
+  // close button only ever hits the dialog and times out. The card underneath changes nothing this
+  // verifier measures, so leave it and drive the dialog; on a plain `/studio` visit it still closes.
+  const editorOpen = await page
+    .locator('[data-testid="studio-bg3d-dialog"]')
+    .isVisible()
+    .catch(() => false);
+  if (editorOpen) return;
+  await quickStart
+    .locator('[data-studio-quickstart-dismiss="true"]')
+    .click({ timeout: 10_000 })
+    .catch(() => undefined);
   await quickStart.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
 }
 
