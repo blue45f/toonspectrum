@@ -11152,6 +11152,13 @@ export function StudioCuttoonEditor({
   const flushPendingStrokeCommitsRef = useRef<() => boolean>(() => true);
   const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
   // GPU 파인 획의 지연 표면 유지: 커밋 동기화 전까지 엔진에 함께 공급되는 확정 획들.
+  /**
+   * Set only while a pointer-down is completing the PREVIOUS stroke's deferred commit. The flush
+   * normally refuses to run while a stroke is armed (a commit render must never interrupt a
+   * gesture); at admission time the new stroke has not painted anything yet, and the previous
+   * stroke's idle window is over by definition.
+   */
+  const strokeAdmissionCommitFlushRef = useRef(false);
   const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
   // Symmetry can fan one DrawEl out to several GPU operations. Retain that exact grouping so a
   // delayed/missing final receipt cancels the selected-provider group without partial mirrors or
@@ -17655,7 +17662,7 @@ const puppetWarpArmed =
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
   useEffect(() => {
     flushPendingStrokeCommitsRef.current = () => {
-      if (drawingRef.current) {
+      if (drawingRef.current && !strokeAdmissionCommitFlushRef.current) {
         const current = pendingStrokeCommitsRef.current;
         if (current && !current.timer) {
           current.timer = globalThis.setTimeout(() => {
@@ -24770,6 +24777,28 @@ const puppetWarpArmed =
       }
       pendingUndoneStrokeCommitsRef.current = null;
       setHasUndonePendingOverlay(false);
+      // 이전 획이 아직 대기 배치에 있고 WebGPU 권한을 들고 있으면 아래 진입 가드가 새 표면
+      // 작업을 통째로 거절한다 — 2초 유휴가 지나기 전에 두 번째 획을 그은 사람은 그 획을
+      // 통째로 잃었다(실측: 해칭 간격 0.6초에서 100% 거절, "획을 시작하지 않았습니다" 배너).
+      // 새 획이 시작된 이상 이전 획의 유휴 창은 끝났으므로 여기서 그 커밋을 끝낸다. 커밋과
+      // 레이아웃 이펙트(표면 반납)가 같은 태스크 안에서 끝나야 아래 가드가 비워진 큐를 보므로
+      // flushSync 다. 영수증을 아직 못 받은 획은 그대로 남고, 가드가 정직하게 거절한다.
+      if (
+        pendingStrokeCommitsRef.current
+        && (
+          pendingGpuStrokesRef.current.length > 0
+          || pendingGpuDrawAuthoritiesRef.current.length > 0
+        )
+      ) {
+        strokeAdmissionCommitFlushRef.current = true;
+        try {
+          flushSync(() => {
+            flushPendingStrokeCommitsRef.current();
+          });
+        } finally {
+          strokeAdmissionCommitFlushRef.current = false;
+        }
+      }
       // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
       // gated for future experiments, while production post-correction runs once on release.
       // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
@@ -24846,8 +24875,17 @@ const puppetWarpArmed =
       const isGpuHardwareReady =
         webGpuBackendRef.current === "webgpu"
         && webGpuCanvasHandleRef.current?.isBackendAvailable() === true;
+      // 반투명 획은 WebGPU 레인이 준비 증명 없이는 그릴 수 없고(studio-live-ink-backend 의
+      // `opacity` 판정), 플래너도 그 증명을 만들지 않는다. 그런데도 GPU 를 선택해 두면 아래
+      // 결정이 not-ready 를 돌려주고 획이 통째로 거절됐다 — GPU 있는 브라우저에서 마커·볼펜
+      // 같은 반투명 직접잉크 브러시가 아무것도 그리지 않았다(실측 0px + "선택 거부 사유:
+      // opacity" 배너, 그 배너가 캔버스를 38px 밀어 그리는 중에 화면이 튀기까지 했다).
+      // 헤드리스 셸(SwiftShader)에서는 GPU 가 애초에 선택되지 않아 장획 게이트가 못 잡았다.
+      // 렌더할 수 없는 스타일은 처음부터 고르지 않는다 — 실패 뒤 넘기는 것이 아니라 선택 전에.
+      const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999;
       const gpuSelected = genericDirectSelected
         && !isExplicitCanvas2d
+        && gpuStyleRenderable
         && (
           isExplicitWebGpu
           || (

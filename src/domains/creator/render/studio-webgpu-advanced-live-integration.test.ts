@@ -97,6 +97,59 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(liveSurfaceStart).not.toContain("promotePendingGpuAuthoritiesToKonva");
   });
 
+  it("never selects the WebGPU lane for a translucent stroke it would then refuse", () => {
+    // 실측 회귀: GPU 가 있는 브라우저에서 마커(불투명도 0.6) 같은 반투명 직접잉크 브러시가
+    // 0px 를 그렸다 — GPU 를 선택해 놓고 "선택 거부 사유: opacity" 로 획 자체를 거절했다.
+    // 헤드리스 셸은 GPU 를 아예 못 골라서 장획 게이트가 이 경로를 밟지 못했다.
+    const page = source("../StudioCuttoonEditorHost.tsx");
+    const liveSurfaceStart = page.slice(
+      page.indexOf("function beginStudioDrawLiveSurfaces("),
+      page.indexOf("function onStageDown("),
+    );
+    expectInOrder(liveSurfaceStart, [
+      "const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999",
+      "const gpuSelected = genericDirectSelected",
+      "&& gpuStyleRenderable",
+      "const canvas2dSelected = genericDirectSelected && !gpuSelected",
+    ]);
+    // The style gate decides BEFORE the lane is entered, so this remains a selection rule rather
+    // than a hand-over after a GPU failure — the refusal below still owns real GPU failures.
+    expect(liveSurfaceStart.indexOf("const gpuStyleRenderable"))
+      .toBeLessThan(liveSurfaceStart.indexOf("const gpuStartEligible ="));
+    expect(liveSurfaceStart).toContain('rejectSelectedSurface(\n          "WebGPU 라이브 잉크"');
+  });
+
+  it("commits a pending WebGPU authority at admission instead of refusing the next stroke", () => {
+    // 실측 회귀: WebGPU 획 뒤 0.6초 만에 그은 두 번째 획이 100% 거절됐다("획을 시작하지
+    // 않았습니다"). 대기 배치의 2초 유휴 타이머가 큐를 붙들고 있었을 뿐인데, 진입 가드는 그
+    // 큐가 비지 않으면 새 표면 작업을 통째로 막는다. 새 획이 시작된 이상 이전 획의 유휴 창은
+    // 끝났으므로, 가드를 읽기 전에 그 커밋을 동기적으로 끝낸다.
+    const page = source("../StudioCuttoonEditorHost.tsx");
+    const liveSurfaceStart = page.slice(
+      page.indexOf("function beginStudioDrawLiveSurfaces("),
+      page.indexOf("function onStageDown("),
+    );
+    const flushIndex = liveSurfaceStart.indexOf("strokeAdmissionCommitFlushRef.current = true");
+    const guardIndex = liveSurfaceStart.indexOf("const pendingGpuAuthorityBlocksNewSurface =");
+    expect(flushIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeGreaterThan(flushIndex);
+    expectInOrder(liveSurfaceStart.slice(flushIndex - 400, guardIndex), [
+      "pendingGpuStrokesRef.current.length > 0",
+      "pendingGpuDrawAuthoritiesRef.current.length > 0",
+      "strokeAdmissionCommitFlushRef.current = true",
+      "flushSync(",
+      "flushPendingStrokeCommitsRef.current()",
+      "strokeAdmissionCommitFlushRef.current = false",
+    ]);
+    // The flush keeps its own mid-stroke guard: only this admission path may bypass it, and the
+    // exact terminal receipt gate inside the flush is untouched, so an unreceipted WebGPU stroke
+    // still refuses honestly rather than committing retained geometry.
+    expect(page).toContain(
+      "if (drawingRef.current && !strokeAdmissionCommitFlushRef.current) {",
+    );
+    expect(page).toContain("pendingBatchAwaitsSelectedGpuFinalReceipt(pendingBeforeReceiptGate)");
+  });
+
   it("keeps Canvas hidden for a WebGPU-selected operation until an exact GPU receipt", () => {
     const page = source("../StudioCuttoonEditorHost.tsx");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
