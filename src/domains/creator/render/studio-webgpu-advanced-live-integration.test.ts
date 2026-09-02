@@ -97,7 +97,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(liveSurfaceStart).not.toContain("promotePendingGpuAuthoritiesToKonva");
   });
 
-  it("never selects the WebGPU lane for a translucent stroke it would then refuse", () => {
+  it("never selects the WebGPU lane for a style it would then refuse", () => {
     // 실측 회귀: GPU 가 있는 브라우저에서 마커(불투명도 0.6) 같은 반투명 직접잉크 브러시가
     // 0px 를 그렸다 — GPU 를 선택해 놓고 "선택 거부 사유: opacity" 로 획 자체를 거절했다.
     // 헤드리스 셸은 GPU 를 아예 못 골라서 장획 게이트가 이 경로를 밟지 못했다.
@@ -108,6 +108,9 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     );
     expectInOrder(liveSurfaceStart, [
       "const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999",
+      'next.mode !== "eraser"',
+      "!next.fill",
+      '(next.symmetry?.type ?? "none") === "none"',
       "const gpuSelected = genericDirectSelected",
       "&& gpuStyleRenderable",
       "const canvas2dSelected = genericDirectSelected && !gpuSelected",

@@ -24876,7 +24876,15 @@ const puppetWarpArmed =
       // opacity" 배너, 그 배너가 캔버스를 38px 밀어 그리는 중에 화면이 튀기까지 했다).
       // 헤드리스 셸(SwiftShader)에서는 GPU 가 애초에 선택되지 않아 장획 게이트가 못 잡았다.
       // 렌더할 수 없는 스타일은 처음부터 고르지 않는다 — 실패 뒤 넘기는 것이 아니라 선택 전에.
-      const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999;
+      const gpuStyleRenderable = (next.opacity ?? 1) >= 0.999
+        // 지우개도 같은 함정이었다 — GPU 획 뒤 지우개를 대면 "선택 거부 사유: eraser" 로
+        // 거절됐다. 이 레인의 준비는 항상 transparent-overlay 라 destination-out 이 아래
+        // 커밋 캔버스를 지울 수 없고, 그래서 결정이 절대 ready 를 돌려주지 않는다.
+        && next.mode !== "eraser"
+        // 채우기는 준비 여부와 무관하게 이 레인이 받지 않는다(studio-live-ink-backend `fill`).
+        && !next.fill
+        // 대칭은 확장된 준비 증명이 있어야 하는데 플래너가 만들지 않는다.
+        && (next.symmetry?.type ?? "none") === "none";
       const gpuSelected = genericDirectSelected
         && !isExplicitCanvas2d
         && gpuStyleRenderable
