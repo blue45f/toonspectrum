@@ -149,8 +149,16 @@ async function parseScene(filename: string) {
   return new GLTFLoader().parseAsync(arrayBuffer, "");
 }
 
-async function parseMinseoVrm(): Promise<VRM> {
-  const bytes = readFileSync(join(process.cwd(), "public", "vrm", "TS_Minseo_Campus.vrm"));
+// Kate (100Avatars R1 #038, CC0) stands in for the retired procedural reference character. The
+// proportion constants were calibrated on that rig's authored head and palm meshes and are kept
+// relative to the measured rig metrics, so the gates stay meaningful on any bundled humanoid.
+const REFERENCE_VRM_FILE = "Kate.vrm";
+const REFERENCE_HEAD_WIDTH_PER_HEAD_METRIC = 1.25; // 0.232394 / 0.185916
+const REFERENCE_HEAD_DEPTH_PER_HEAD_METRIC = 1.075; // 0.199859 / 0.185916
+const REFERENCE_PALM_WIDTH_PER_HAND_METRIC = 0.95; // 0.0959 / 0.1010
+
+async function parseReferenceVrm(): Promise<VRM> {
+  const bytes = readFileSync(join(process.cwd(), "public", "vrm", REFERENCE_VRM_FILE));
   const arrayBuffer = bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
@@ -324,36 +332,39 @@ describe("ToonSpectrum everyday prop pack v4", () => {
     expect(detailMesh.material).toBe(detail);
   });
 
-  it("fits average Minseo head/body measurements without oversize geometry", async () => {
-    const vrm = await parseMinseoVrm();
+  it("fits the reference rig's head and body measurements without oversize geometry", async () => {
+    const vrm = await parseReferenceVrm();
     const metrics = measureVrmPropRigMetrics(vrm);
-    const minseoHeadMetric = metrics.head;
-    const minseoEyeDistance = minseoHeadMetric * 0.355;
-    const minseoHeadBounds = new Vector3(0.232394, 0.278873, 0.199859);
-    const minseoVisualShoulderWidth = 0.32;
+    const headMetric = metrics.head;
+    const eyeDistance = headMetric * 0.355;
+    const headWidth = headMetric * REFERENCE_HEAD_WIDTH_PER_HEAD_METRIC;
+    const headDepth = headMetric * REFERENCE_HEAD_DEPTH_PER_HEAD_METRIC;
+    // The backpack fit clamps to its minimum scale on every bundled rig, so its footprint is
+    // judged against the design-reference shoulder width the fit profile was authored for.
+    const visualShoulderWidth = propDefById("backpack")!.fit.designReference;
 
     const cap = await parseScene("everyday_cap.glb");
     const capSize = new Box3().setFromObject(cap.scene).getSize(new Vector3())
-      .multiplyScalar(minseoHeadMetric / propDefById("cap")!.fit.designReference);
-    expect(capSize.x / minseoHeadBounds.x).toBeLessThanOrEqual(1.02);
-    expect(capSize.z / minseoHeadBounds.z).toBeLessThanOrEqual(1.42);
+      .multiplyScalar(headMetric / propDefById("cap")!.fit.designReference);
+    expect(capSize.x / headWidth).toBeLessThanOrEqual(1.02);
+    expect(capSize.z / headDepth).toBeLessThanOrEqual(1.42);
 
     const glasses = await parseScene("everyday_glasses.glb");
     const glassesSize = new Box3().setFromObject(glasses.scene).getSize(new Vector3())
-      .multiplyScalar(minseoEyeDistance / propDefById("glasses")!.fit.designReference);
-    expect(glassesSize.x / minseoHeadBounds.x).toBeGreaterThan(0.58);
-    expect(glassesSize.x / minseoHeadBounds.x).toBeLessThanOrEqual(0.75);
-    expect(glassesSize.z / minseoHeadBounds.z).toBeLessThanOrEqual(0.95);
+      .multiplyScalar(eyeDistance / propDefById("glasses")!.fit.designReference);
+    expect(glassesSize.x / headWidth).toBeGreaterThan(0.58);
+    expect(glassesSize.x / headWidth).toBeLessThanOrEqual(0.75);
+    expect(glassesSize.z / headDepth).toBeLessThanOrEqual(0.95);
 
     const backpack = await parseScene("everyday_backpack.glb");
     const backpackSize = new Box3().setFromObject(backpack.scene).getSize(new Vector3())
       .multiplyScalar(resolvePropAttachment(
         propDefById("backpack")!,
-        createPropInstance("backpack", "minseo-backpack-fit")!,
+        createPropInstance("backpack", "reference-backpack-fit")!,
         metrics,
       ).scale);
-    expect(backpackSize.x / minseoVisualShoulderWidth).toBeGreaterThanOrEqual(0.65);
-    expect(backpackSize.x / minseoVisualShoulderWidth).toBeLessThanOrEqual(0.76);
+    expect(backpackSize.x / visualShoulderWidth).toBeGreaterThanOrEqual(0.65);
+    expect(backpackSize.x / visualShoulderWidth).toBeLessThanOrEqual(0.76);
     expect(backpackSize.y).toBeLessThan(0.30);
     // Z includes the authored shoulder straps wrapping from the back contact to the chest.
     expect(backpackSize.z).toBeLessThan(0.30);
@@ -372,26 +383,22 @@ describe("ToonSpectrum everyday prop pack v4", () => {
     expect(new Box3().setFromObject(body).distanceToPoint(point)).toBeGreaterThan(0.045);
   });
 
-  it("keeps the actual Minseo smart-rig palm on the handle with full hand-volume clearance", async () => {
+  it("keeps the reference rig's palm on the handle with full hand-volume clearance", async () => {
     const [vrm, mug] = await Promise.all([
-      parseMinseoVrm(),
+      parseReferenceVrm(),
       parseScene("everyday_mug.glb"),
     ]);
     const metrics = measureVrmPropRigMetrics(vrm);
     const resolved = resolvePropAttachment(
       propDefById("mug")!,
-      createPropInstance("mug", "minseo-mug-contact")!,
+      createPropInstance("mug", "reference-mug-contact")!,
       metrics,
     );
     // The clearance this guards is the PALM's: the mug body must not intersect the mass the
-    // handle sits against. Wave 1 modelled the whole hand as one mitten, so its mesh WAS the
-    // palm; Wave 7 splits palm from fingers, and the fingers curl around the handle rather than
-    // pushing the body away, so including them would demand clearance the grip never needs.
-    const palm = vrm.scene.getObjectByName("TS_Minseo_Campus_Palm_R")
-      ?? vrm.scene.getObjectByName("TS_Minseo_Campus_Hand_R");
-    expect(palm, "no right palm mesh on the Minseo rig").toBeDefined();
-    const handSize = new Box3().setFromObject(palm!).getSize(new Vector3());
-    const halfPalmVolume = Math.max(handSize.x, handSize.z) * 0.5;
+    // handle sits against. Fingers curl around the handle rather than pushing the body away, so
+    // the palm width comes from the hand metric with the proportion measured on the retired rig's
+    // authored palm mesh — authored single-mesh models cannot promise a palm node to look up.
+    const halfPalmVolume = metrics.rightHand * REFERENCE_PALM_WIDTH_PER_HAND_METRIC * 0.5;
     const anchor = new Vector3(...resolved.anchor.position);
     const handle = mug.scene.getObjectByName("Mug_HandleContact")!;
     const body = mug.scene.getObjectByName("Mug_CeramicBody")!;

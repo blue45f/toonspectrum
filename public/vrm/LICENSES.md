@@ -23,69 +23,6 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 
-## ToonSpectrum 오리지널 VRM 1.0 캐릭터 팩 (2026-08)
-
-아래 22종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender와 Blender MCP로 직접 제작한
-오리지널 캐릭터입니다. 기존 13종은
-`scripts/blender/generate_toonspectrum_vrm_pack.py`로 생성했고, Wave 4의 추가 5종과
-`scripts/blender/generate_toonspectrum_vrm_pack_wave5.py`의 추가 4종은 실제
-손가락·눈·발가락 변형까지 검증하는 강화된 Blender 생성 파이프라인을 적용합니다. 각 파일에는
-VRM 1.0 공개 라이선스 URL과 상업 이용·재배포·수정 허용 메타데이터가 포함됩니다.
-ToonSpectrum은 이 22개 원본 모델을 **CC0 1.0**으로 제공합니다.
-
-| 파일 | 스튜디오 이름 | 다양성/용도 | 저작자·라이선스 |
-| --- | --- | --- | --- |
-| `TS_Minseo_Campus.vrm` | 민서 (캠퍼스 메이커) | 현대·캠퍼스, 평균 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Taeo_Barista.vrm` | 태오 (동네 바리스타) | 현대·카페, 넓고 풍부한 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Jeonghwa_Gardener.vrm` | 정화 (노년 정원사) | 노년, 정원·일상 장면 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Haram_Explorer.vrm` | 하람 (어린 탐험가) | 아동, 중성적 탐험가 · 과도한 폭력/성적 이용 금지 | ToonSpectrum 오리지널 · CC0 1.0, VRM 이용 제한 적용 |
-| `TS_Yeonhui_RuneGuard.vrm` | 연휘 (룬 수호자) | 판타지, 어두운 피부톤, 중성적 수호자 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Nova_ServiceAndroid.vrm` | 노바 (서비스 안드로이드) | SF·로봇, 발광 얼굴 패널 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | SF·성인, 바이저·발광 코어·기계식 어깨 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Seojin_Architect.vrm` | 서진 (배리어프리 건축가) | 성인 휠체어 사용자, 강한 상체·작업 조끼·안경 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Mira_Detective.vrm` | 미라 (느와르 탐정) | 40대, 풍부한 체형·페도라·더블 코트 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Okseon_HanjiArchivist.vrm` | 옥선 (한지 기록가) | 노년, 현대 한복형 겹조끼·비녀·한지 기록 문화 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Nuri_RobotClub.vrm` | 누리 (로봇 동아리원) | 아동·어린 청소년, 성 중립적 동아리 작업복·안전한 일상 스타일 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Dami_RescueCaptain.vrm` | 다미 (구조대장) | 성인 액션 주역, 큰 체형·강한 팔다리·고가시성 구조 장비 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Moru_MossGolem.vrm` | 모루 (이끼 골렘) | 비인간 판타지, 돌·이끼·나뭇가지 실루엣·발광 심장 룬 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Samira_OrbitalBotanist.vrm` | 사미라 (궤도 식물학자) | 성인 과학자, 장신·마른 체형·히잡과 우주 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Yunae_DeafPercussionist.vrm` | 윤애 (진동 타악 연주자) | 농인 성인 예술가, 강한 팔·보이는 보청 및 진동 장치 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Boram_WeatherScientist.vrm` | 보람 (기상과학자) | 임신 중인 성인 전문직, 자연스러운 임신 체형·실용 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Hyeon_StudioPotter.vrm` | 현 (도예 스튜디오 운영자) | 저신장 성인, 넓은 몸통·짧은 사지·도예 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Dorong_SeaOtterCourier.vrm` | 도롱 (해달 우편원) | 유기적 비인간 캐릭터, 해달 실루엣·물갈퀴 손·꼬리 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Sunja_HaenyeoMentor.vrm` | 선자 (해녀 멘토) | 70대 제주 해녀 멘토, 작은 키·강한 체형·잠수 후드와 테왁 표식 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Maya_CoutureDirector.vrm` | 마야 (쿠튀르 디렉터) | 플러스사이즈 성인 디자이너, 짙은 피부톤·비대칭 쿠튀르 케이프 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Iseul_AdaptiveRescuer.vrm` | 이슬 (의족 구조전문가) | 성인 구조·스포츠 전문가, 보이는 오른쪽 종아리 의족·고가시성 구조복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| `TS_Neoul_CoralDjinn.vrm` | 너울 (산호 진) | 비인간 성인 판타지, 청록 피부·산호 왕관·관자 지느러미 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-
-- 공통 리그: VRM 휴머노이드 53개 매핑(손가락 포함), 실제 skin 및 `JOINTS_0`/`WEIGHTS_0`.
-- 관절 전환부는 인접 본 2개에 나뉜 실제 혼합 웨이트를 사용하며, `Blink`와 10종의 입모양·감정
-  셰이프 키(`AA`·`IH`·`OU`·`EE`·`OH`·`Happy`·`Sad`·`Angry`·`Relaxed`·`Surprised`)가
-  VRM 1.0 expression에 직접 바인딩됩니다.
-- 서진의 휠체어는 캐릭터의 일부로 고정하지 않았습니다. 스튜디오에서 별도 휠체어 프롭을 배치하면
-  교체·회전·포즈 조절이 가능하고, VRM 자체도 다른 좌석이나 장면에 재사용할 수 있습니다.
-- 누리는 어린 사용자를 성인화하지 않는 중립적인 동아리 작업복으로 디자인했습니다. 모루도 표준
-  휴머노이드 리그를 유지해 기존 포즈·표정 도구를 그대로 사용하면서 비인간 실루엣을 제공합니다.
-- Wave 4의 사미라·윤애·보람·현·도롱은 손가락 30본, 좌우 눈, 좌우 발가락 본이 실제 양의 스킨
-  웨이트를 가진 정점에 연결되고, 13개 이상의 비어 있지 않은 표정 바인딩을 갖도록 검증합니다.
-  악기·물레 같은 장면 프롭은 VRM 캐릭터에 고정하지 않습니다.
-- Wave 5의 선자·마야·이슬·너울도 같은 엄격 리그 계약과 MToon 1.0 재질, 13개 이상의 실제
-  morph expression 바인딩을 따릅니다. 선자의 잠수 장비와 이슬의 구조 장비는 고정 도구·탈것 없이
-  캐릭터 의상 실루엣만 표현하며, 이슬의 의족은 오른쪽 다리·발·발가락 본에 연결된 신체 일부입니다.
-- Wave 6에서는 위 4종의 ID·URL·이름·CC0 조건을 그대로 유지하면서
-  `scripts/blender/generate_toonspectrum_vrm_pack_wave6.py`로 시각 품질 v2를 재생성했습니다. 고밀도
-  얼굴과 귀·눈꺼풀·홍채·코·입술, 손톱·관절·신발 구조, 겹의상·헤어, 이슬의 의족 하드웨어,
-  너울의 분기 산호와 폴립을 실제 이름 있는 스킨 메시로 추가했습니다. 각 파일은 104~130개 메시,
-  37,068~42,264개 삼각형, 15~18개 MToon 재질과 동일 수의 내부 PNG 텍스처를 가지며
-  1.67~1.84MB 범위입니다. 외부 이미지·텍스처 URI는 없습니다.
-- Wave 6 카드 썸네일은 각 전달 VRM을 공식 Blender VRM importer로 다시 연 뒤 팔을 내린 정면
-  포즈에서 렌더한 320×400 PNG입니다. 정면·3/4·표정·팔·무릎·의족 변형 QA는
-  `scripts/blender/render_toonspectrum_vrm_wave6_qa.py`로 재현할 수 있습니다. 초기 Wave 5 렌더러는
-  `scripts/blender/render_toonspectrum_vrm_wave5_qa.py`에 v1 바이너리 비교·회귀 감사용으로 보존합니다.
-- 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
-- 하람 모델은 아동 캐릭터 안전정책에 따라 VRM 메타데이터에서도 과도한 폭력 및 과도한 성적 이용을 명시적으로 허용하지 않습니다.
-- CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
-
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
 - Alicia Solid 원 배포처: <https://3d.nicovideo.jp/works/td14712> — UniVRM 저장소의 VRM 0.51 변환본을 사용.
 
@@ -222,3 +159,8 @@ exporter로 만든 VRM 1.0 수리본입니다. 기존 `orion` ID와 `/vrm/Avatar
 가중치, 13개 이상의 바인딩된 표정을 추가했습니다. 원본에 외부 라이선스 URL이 없으므로 수리본의
 `otherLicenseUrl`도 비워 두며, exporter가 요구하는 표준 VRM 1.0 `licenseUrl`을 CC0 출처 URL로
 오해하지 않습니다.
+
+## 공개 도메인 원문
+
+- 100Avatars(Polygonal Mind) 모델은 CC0 1.0으로 배포됩니다. 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
+- 퇴역한 ToonSpectrum 오리지널 `TS_Minseo_Campus.vrm`(CC0 1.0, SHA-256 `903601a5…8ebea`)은 번들에서 제거됐지만, 그 모델로 렌더한 `public/catalog/studio-vrm-avatar-reference-catalogue-v1.json`은 그대로 유지되는 파생 산출물입니다.

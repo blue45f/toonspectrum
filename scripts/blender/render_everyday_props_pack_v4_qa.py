@@ -1,7 +1,7 @@
-"""Render fitted ToonSpectrum everyday props on the shipped Minseo VRM.
+"""Render fitted ToonSpectrum everyday props on the bundled reference VRM (Kate).
 
 Each invocation starts from the exported VRM and GLB binaries, applies the
-same Minseo smart-rig transform receipt as the Three runtime, attaches the
+same reference-rig transform receipt as the Three runtime, attaches the
 prop root to a real humanoid pose bone, and writes only the requested image.
 The two-hand book view additionally uses Blender IK so both wrists meet its
 authored cover-edge anchors.
@@ -26,7 +26,9 @@ from mathutils import Matrix, Quaternion, Vector
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
-MINSEO_VRM = REPOSITORY / "public/vrm/TS_Minseo_Campus.vrm"
+# Kate (100Avatars R1 #038, CC0) replaced the retired procedural reference character. HEAD/EYE fit
+# scales below were calibrated on that former rig and are approximate for this model.
+REFERENCE_VRM = REPOSITORY / "public/vrm/Kate.vrm"
 ASSET_DIRECTORY = REPOSITORY / "public/assets/3d"
 HEAD_FIT_SCALE = 0.185916 / 0.18
 EYE_FIT_SCALE = (0.185916 * 0.355) / 0.064
@@ -66,14 +68,14 @@ def point_at(obj, target):
     obj.rotation_euler = (Vector(target) - obj.location).to_track_quat("-Z", "Y").to_euler()
 
 
-def import_minseo():
-    if not MINSEO_VRM.is_file():
-        raise FileNotFoundError(MINSEO_VRM)
-    if bpy.ops.import_scene.vrm(filepath=str(MINSEO_VRM)) != {"FINISHED"}:
-        raise RuntimeError(f"VRM import failed: {MINSEO_VRM}")
+def import_reference_vrm():
+    if not REFERENCE_VRM.is_file():
+        raise FileNotFoundError(REFERENCE_VRM)
+    if bpy.ops.import_scene.vrm(filepath=str(REFERENCE_VRM)) != {"FINISHED"}:
+        raise RuntimeError(f"VRM import failed: {REFERENCE_VRM}")
     armatures = [obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"]
     if len(armatures) != 1:
-        raise RuntimeError(f"Expected one Minseo armature, found {len(armatures)}")
+        raise RuntimeError(f"Expected one reference armature, found {len(armatures)}")
     return armatures[0]
 
 
@@ -128,7 +130,7 @@ def place_runtime_transform(root, position, quaternion, scale):
 
 def attach_preserving_world(root, armature, bone_name):
     if bone_name not in armature.pose.bones:
-        raise RuntimeError(f"Minseo has no pose bone {bone_name!r}")
+        raise RuntimeError(f"Reference rig has no pose bone {bone_name!r}")
     world = root.matrix_world.copy()
     root.parent = armature
     root.parent_type = "BONE"
@@ -141,7 +143,7 @@ def add_arm_ik(armature, side, wrist_target):
     lower_name = f"lower_arm.{side}"
     lower = armature.pose.bones.get(lower_name)
     if lower is None:
-        raise RuntimeError(f"Minseo has no pose bone {lower_name!r}")
+        raise RuntimeError(f"Reference rig has no pose bone {lower_name!r}")
 
     target = bpy.data.objects.new(f"QA_WristTarget_{side}", None)
     target.location = wrist_target
@@ -265,7 +267,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
 
     clear_scene()
-    armature = import_minseo()
+    armature = import_reference_vrm()
     setup_view = {
         "head-three-quarter": "head",
         "backpack-front": "backpack",
@@ -303,7 +305,7 @@ def main():
     scene.view_settings.look = "Medium High Contrast"
     scene.view_settings.exposure = -0.45
     bpy.ops.render.render(write_still=True)
-    print("EVERYDAY_PROPS_V4_QA", args.view, "Minseo", str(output))
+    print("EVERYDAY_PROPS_V4_QA", args.view, "Kate", str(output))
 
 
 if __name__ == "__main__":
