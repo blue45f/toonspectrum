@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: studio-campaign-release-${{ inputs.head_sha }}
@@ -22,12 +23,16 @@ concurrency:
 jobs:
   validate-input:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     outputs:
       head_sha: ${{ steps.input.outputs.head_sha }}
       pr_number: ${{ steps.input.outputs.pr_number }}
+      merge_ref: ${{ steps.input.outputs.merge_ref }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
     steps:
-      - name: Validate immutable dispatch inputs
+      - name: Validate immutable dispatch inputs and pull-request identity
         id: input
         shell: bash
         env:
@@ -43,8 +48,38 @@ jobs:
             echo "::error::pr_number must be a positive integer."
             exit 1
           fi
+
+          pull_json="$(
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${REPOSITORY}/pulls/${PR_NUMBER}"
+          )"
+
+          state="$(jq -r '.state' <<< "$pull_json")"
+          draft="$(jq -r '.draft' <<< "$pull_json")"
+          base_ref="$(jq -r '.base.ref' <<< "$pull_json")"
+          head_ref="$(jq -r '.head.ref' <<< "$pull_json")"
+          actual_head_sha="$(jq -r '.head.sha' <<< "$pull_json")"
+          head_repo="$(jq -r '.head.repo.full_name' <<< "$pull_json")"
+          body="$(jq -r '.body // ""' <<< "$pull_json")"
+
+          if [[ "$state" != "open" ]] \
+            || [[ "$draft" != "false" ]] \
+            || [[ "$base_ref" != "main" ]] \
+            || [[ "$head_repo" != "$REPOSITORY" ]] \
+            || [[ "$head_ref" != codex/campaign-* ]] \
+            || [[ "$actual_head_sha" != "$HEAD_SHA" ]] \
+            || [[ "$body" != *'<!-- studio-automerge -->'* ]]; then
+            echo "::error::The dispatched pull request is not the exact eligible campaign head."
+            printf 'state=%s draft=%s base=%s head=%s repo=%s actual_sha=%s expected_sha=%s\n' \
+              "$state" "$draft" "$base_ref" "$head_ref" "$head_repo" "$actual_head_sha" "$HEAD_SHA"
+            exit 1
+          fi
+
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "merge_ref=refs/pull/${PR_NUMBER}/merge" >> "$GITHUB_OUTPUT"
 
   core:
     needs: validate-input
@@ -71,9 +106,37 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.validate-input.outputs.head_sha }}
+          ref: ${{ needs.validate-input.outputs.merge_ref }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify the synthetic merge and enforce the trusted base policy
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.validate-input.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          tested_head_sha="$(git rev-parse HEAD^2)"
+          tested_base_sha="$(git rev-parse HEAD^1)"
+          if [[ "$tested_head_sha" != "$EXPECTED_HEAD_SHA" ]]; then
+            echo "::error::The PR merge ref no longer represents the dispatched campaign head."
+            printf 'tested=%s expected=%s\n' "$tested_head_sha" "$EXPECTED_HEAD_SHA"
+            exit 1
+          fi
+
+          trusted_dir="$RUNNER_TEMP/studio-campaign-trusted-policy"
+          mkdir -p "$trusted_dir"
+          git show "${tested_base_sha}:scripts/studio-campaign-patch-policy.mjs" \
+            > "$trusted_dir/studio-campaign-patch-policy.mjs"
+          git show "${tested_base_sha}:scripts/studio-seven-day-campaign.mjs" \
+            > "$trusted_dir/studio-seven-day-campaign.mjs"
+          git show "${tested_base_sha}:docs/automation/studio-seven-day-campaign.json" \
+            > "$trusted_dir/studio-seven-day-campaign.json"
+
+          node "$trusted_dir/studio-campaign-patch-policy.mjs" \
+            --base "$tested_base_sha" \
+            --config "$trusted_dir/studio-seven-day-campaign.json"
+          git diff --check "$tested_base_sha" HEAD --
 
       - uses: pnpm/action-setup@v6
 
@@ -194,7 +257,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.validate-input.outputs.head_sha }}
+          ref: ${{ needs.validate-input.outputs.merge_ref }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@v6
@@ -226,7 +289,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.validate-input.outputs.head_sha }}
+          ref: ${{ needs.validate-input.outputs.merge_ref }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@v6
