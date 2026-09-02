@@ -1,0 +1,186 @@
+name: QA Studio Chromium and in-app only
+
+on:
+  push:
+    branches:
+      - qa/studio-chromium-inapp-20260902
+    paths:
+      - scripts/qa-live-chromium-inapp-audit.mjs
+      - scripts/qa/studio-chromium-inapp-suite-runner.mjs
+      - .github/workflows/qa-studio-chromium-inapp.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-studio-chromium-inapp-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  JIRA_BASE_URL: https://blue45f-1781926536822.atlassian.net
+  JIRA_PROJECT_KEY: KAN
+  JIRA_ASSIGNEE_ACCOUNT_ID: "712020:f4bf4bf1-f5f1-4ad3-a675-fe97d20f26df"
+
+jobs:
+  live-chromium-inapp:
+    name: Live Chrome and in-app route audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      STUDIO_BASE_URL: https://www.toonstudio.cloud
+      QA_OUTPUT_DIR: qa-results/studio-chromium-inapp/live
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium and Linux dependencies
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run live Chromium and in-app audit
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$QA_OUTPUT_DIR"
+          node scripts/qa-live-chromium-inapp-audit.mjs \
+            2>&1 | tee "$QA_OUTPUT_DIR/execution.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$QA_OUTPUT_DIR/exit-code.txt"
+          exit 0
+
+      - name: Add live report to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$QA_OUTPUT_DIR/report.md" ]]; then
+            cat "$QA_OUTPUT_DIR/report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Live Chromium report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload live Chrome and in-app evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-chromium-inapp-live-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: qa-results/studio-chromium-inapp/live
+
+      - name: Enforce live audit result
+        if: always()
+        shell: bash
+        run: |
+          code=999
+          if [[ -f "$QA_OUTPUT_DIR/exit-code.txt" ]]; then
+            code="$(cat "$QA_OUTPUT_DIR/exit-code.txt")"
+          fi
+          if [[ "$code" != "0" ]]; then
+            echo "Live Chromium/in-app audit reported product or compatibility failures."
+            exit 1
+          fi
+
+  local-chromium-suites:
+    name: Chromium suite · ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 220
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        suite:
+          - ui-inapp
+          - 3d-inapp
+          - brush-raster
+    env:
+      QA_SUITE: ${{ matrix.suite }}
+      QA_RESULTS_DIR: qa-results/studio-chromium-inapp/${{ matrix.suite }}
+      QA_EVIDENCE_DIR: artifacts/studio-chromium-inapp/${{ matrix.suite }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium and Linux dependencies
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build production Studio assets
+        run: pnpm run build
+
+      - name: Run Chromium suite and update Jira
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$QA_RESULTS_DIR" "$QA_EVIDENCE_DIR"
+          node scripts/qa/studio-chromium-inapp-suite-runner.mjs \
+            2>&1 | tee "$QA_RESULTS_DIR/execution.log"
+          code=${PIPESTATUS[0]}
+          printf '%s\n' "$code" > "$QA_RESULTS_DIR/exit-code.txt"
+          exit 0
+
+      - name: Add suite report to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$QA_RESULTS_DIR/summary.md" ]]; then
+            cat "$QA_RESULTS_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "${QA_SUITE} report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload suite logs, screenshots, and Jira update ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-chromium-inapp-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            qa-results/studio-chromium-inapp/${{ matrix.suite }}
+            artifacts/studio-chromium-inapp/${{ matrix.suite }}
+
+      - name: Enforce suite result after evidence upload
+        if: always()
+        shell: bash
+        run: |
+          code=999
+          if [[ -f "$QA_RESULTS_DIR/exit-code.txt" ]]; then
+            code="$(cat "$QA_RESULTS_DIR/exit-code.txt")"
+          fi
+          if [[ "$code" != "0" ]]; then
+            echo "${QA_SUITE} reported failures; evidence and Jira ledger were preserved."
+            exit 1
+          fi
