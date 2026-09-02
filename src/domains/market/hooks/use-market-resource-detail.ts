@@ -28,8 +28,11 @@ export interface MarketResourceDetail {
  * 보여주는 저하 모드로 전환한다(404는 저하 없이 notFound).
  */
 export function useMarketResourceDetail(id: string | undefined): MarketResourceDetail {
-  const [record, setRecord] = useState<CreatorMarketplaceResourceRecord | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialStarter = id ? findStarterMarketplaceResourceById(id) : null;
+  const [record, setRecord] = useState<CreatorMarketplaceResourceRecord | null>(
+    initialStarter
+  );
+  const [loading, setLoading] = useState(!initialStarter);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [staleSavedAt, setStaleSavedAt] = useState<string | null>(null);
@@ -38,29 +41,44 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
-    setRecord(null);
-    setLoading(true);
-    setNotFound(false);
-    setError(null);
-    setStaleSavedAt(null);
+    const starter = findStarterMarketplaceResourceById(id);
+
+    if (starter) {
+      setRecord(starter);
+      setLoading(false);
+      setNotFound(false);
+      setError(null);
+      setStaleSavedAt(null);
+    } else {
+      setRecord(null);
+      setLoading(true);
+      setNotFound(false);
+      setError(null);
+      setStaleSavedAt(null);
+    }
 
     getCreatorMarketplaceResource(id, controller.signal)
       .then((parsed) => {
         if (controller.signal.aborted) return;
         setRecord(parsed);
         setLoading(false);
+        setNotFound(false);
+        setError(null);
+        setStaleSavedAt(null);
         writeCachedMarketResource(parsed);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
-        const starter = findStarterMarketplaceResourceById(id);
         if (starter) {
           setRecord(starter);
           setLoading(false);
+          setNotFound(false);
+          setError(null);
           return;
         }
         if (cause instanceof NotFoundError) {
           removeCachedMarketResource(id);
+          setRecord(null);
           setNotFound(true);
           setLoading(false);
           return;
