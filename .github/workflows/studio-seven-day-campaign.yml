@@ -1,0 +1,624 @@
+name: Studio seven-day saturation campaign
+
+on:
+  schedule:
+    # Every three hours at a non-round minute. The campaign config owns the exact seven-day window.
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run research only or also author one bounded patch"
+        required: true
+        default: author
+        type: choice
+        options:
+          - author
+          - research-only
+      force_active:
+        description: "Run one deliberate cycle outside the configured seven-day window"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: studio-seven-day-saturation-campaign
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: read
+    outputs:
+      base_sha: ${{ steps.base.outputs.base_sha }}
+      window_active: ${{ steps.window.outputs.active }}
+      phase: ${{ steps.plan.outputs.phase }}
+      can_author: ${{ steps.plan.outputs.can_author }}
+      reason: ${{ steps.plan.outputs.reason }}
+      issue_number: ${{ steps.plan.outputs.issue_number }}
+      track: ${{ steps.plan.outputs.track }}
+      cycle_index: ${{ steps.plan.outputs.cycle_index }}
+      has_codex_key: ${{ steps.codex_key.outputs.present }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CAMPAIGN_DIR: ${{ runner.temp }}/studio-seven-day-campaign
+      TRACKING_ISSUE: "555"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Record exact main base
+        id: base
+        shell: bash
+        run: echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the configured campaign window
+        id: window
+        shell: bash
+        env:
+          FORCE_ACTIVE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_active }}
+        run: |
+          set -euo pipefail
+          start_at="$(jq -r '.startAt' docs/automation/studio-seven-day-campaign.json)"
+          end_at="$(jq -r '.endAt' docs/automation/studio-seven-day-campaign.json)"
+          now_epoch="$(date -u +%s)"
+          start_epoch="$(date -u -d "$start_at" +%s)"
+          end_epoch="$(date -u -d "$end_at" +%s)"
+          active=false
+          phase=after
+          if [[ "$FORCE_ACTIVE" == "true" ]]; then
+            active=true
+            phase=active
+          elif [[ "$now_epoch" -lt "$start_epoch" ]]; then
+            phase=before
+          elif [[ "$now_epoch" -lt "$end_epoch" ]]; then
+            active=true
+            phase=active
+          fi
+          echo "active=$active" >> "$GITHUB_OUTPUT"
+          echo "phase=$phase" >> "$GITHUB_OUTPUT"
+
+      - name: Detect optional Codex authoring credential
+        id: codex_key
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate campaign, reuse, benchmark, and research contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/studio-autonomous-change-plan.test.mjs
+          node --test scripts/studio-seven-day-campaign.test.mjs
+          node --test scripts/studio-campaign-patch-policy.test.mjs
+          node --test scripts/validate-studio-competitor-registry.test.mjs
+          node --test scripts/studio-competitor-watch.test.mjs
+          node --test scripts/studio-emerging-product-watch.test.mjs
+          node --test scripts/studio-research-watch.test.mjs
+          node --test scripts/validate-studio-third-party-reuse.test.mjs
+          node scripts/validate-studio-competitor-registry.mjs
+          node scripts/validate-studio-third-party-reuse.mjs
+
+      - name: Read the live issue and pull-request state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CAMPAIGN_DIR"
+          : > "$CAMPAIGN_DIR/issues.ndjson"
+          while IFS= read -r issue_number; do
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${GITHUB_REPOSITORY}/issues/${issue_number}" \
+              >> "$CAMPAIGN_DIR/issues.ndjson"
+            printf '\n' >> "$CAMPAIGN_DIR/issues.ndjson"
+          done < <(jq -r '.issueQueue[]' docs/automation/studio-seven-day-campaign.json)
+          jq -s '.' "$CAMPAIGN_DIR/issues.ndjson" > "$CAMPAIGN_DIR/issues.json"
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            > "$CAMPAIGN_DIR/pulls.json"
+
+      - name: Rotate the implementation queue across campaign cycles
+        shell: bash
+        run: |
+          set -euo pipefail
+          queue_count="$(jq '.issueQueue | length' docs/automation/studio-seven-day-campaign.json)"
+          shift_by="$((GITHUB_RUN_NUMBER % queue_count))"
+          jq --argjson shift "$shift_by" '
+            .issueQueue |= (
+              . as $queue
+              | [range(0; ($queue | length)) as $index
+                 | $queue[($index + $shift) % ($queue | length)]]
+            )
+          ' docs/automation/studio-seven-day-campaign.json \
+            > "$CAMPAIGN_DIR/campaign-config.json"
+
+      - name: Inspect mature products, emerging products, and primary research
+        if: ${{ steps.window.outputs.active == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/studio-competitor-watch.mjs \
+            --all \
+            --concurrency 4 \
+            --timeout-ms 15000 \
+            --output "$CAMPAIGN_DIR/mature-products.json" \
+            --markdown "$CAMPAIGN_DIR/mature-products.md"
+          node scripts/studio-emerging-product-watch.mjs \
+            --concurrency 4 \
+            --timeout-ms 15000 \
+            --output "$CAMPAIGN_DIR/emerging-products.json" \
+            --markdown "$CAMPAIGN_DIR/emerging-products.md"
+          node scripts/studio-research-watch.mjs \
+            --concurrency 4 \
+            --timeout-ms 20000 \
+            --output "$CAMPAIGN_DIR/research.json" \
+            --markdown "$CAMPAIGN_DIR/research.md"
+
+      - name: Materialize empty reports outside the campaign window
+        if: ${{ steps.window.outputs.active != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '{"results":[],"aggregateHash":"inactive"}' > "$CAMPAIGN_DIR/mature-products.json"
+          printf '%s\n' '{"results":[],"aggregateHash":"inactive"}' > "$CAMPAIGN_DIR/emerging-products.json"
+          printf '%s\n' '{"entries":[],"queryReports":[],"aggregateHash":"inactive"}' > "$CAMPAIGN_DIR/research.json"
+          : > "$CAMPAIGN_DIR/mature-products.md"
+          : > "$CAMPAIGN_DIR/emerging-products.md"
+          : > "$CAMPAIGN_DIR/research.md"
+
+      - name: Build the bounded implementation plan and agent prompt
+        id: plan
+        shell: bash
+        env:
+          FORCE_ACTIVE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_active }}
+        run: |
+          set -euo pipefail
+          force_args=()
+          if [[ "$FORCE_ACTIVE" == "true" ]]; then
+            force_args+=(--force-active)
+          fi
+          node scripts/studio-seven-day-campaign.mjs \
+            --config "$CAMPAIGN_DIR/campaign-config.json" \
+            --issues "$CAMPAIGN_DIR/issues.json" \
+            --pulls "$CAMPAIGN_DIR/pulls.json" \
+            --research "$CAMPAIGN_DIR/research.json" \
+            --mature-products "$CAMPAIGN_DIR/mature-products.json" \
+            --emerging-products "$CAMPAIGN_DIR/emerging-products.json" \
+            --output "$CAMPAIGN_DIR/plan.json" \
+            --prompt "$CAMPAIGN_DIR/prompt.md" \
+            --github-output "$GITHUB_OUTPUT" \
+            "${force_args[@]}"
+
+      - name: Publish only changed product or research fingerprints
+        if: ${{ steps.window.outputs.active == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          publish_if_changed() {
+            local marker="$1"
+            local report="$2"
+            local markdown="$3"
+            local current_hash previous_hash
+            current_hash="$(jq -r '.aggregateHash' "$report")"
+            set +e
+            previous_hash="$(
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
+                --jq ".[] | select(.user.login == \"github-actions[bot]\") | select((.body // \"\") | contains(\"<!-- ${marker} -->\")) | .body" \
+                | grep -oE 'Aggregate: `([0-9a-f]{64})`' \
+                | tail -n 1 \
+                | sed -E 's/.*`([0-9a-f]{64})`.*/\1/'
+            )"
+            set -e
+            if [[ "$current_hash" == "$previous_hash" ]]; then
+              echo "$marker fingerprint unchanged."
+              return
+            fi
+            gh issue comment "$TRACKING_ISSUE" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body-file "$markdown"
+          }
+
+          publish_if_changed \
+            studio-competitor-watch \
+            "$CAMPAIGN_DIR/mature-products.json" \
+            "$CAMPAIGN_DIR/mature-products.md"
+          publish_if_changed \
+            studio-emerging-product-watch \
+            "$CAMPAIGN_DIR/emerging-products.json" \
+            "$CAMPAIGN_DIR/emerging-products.md"
+          publish_if_changed \
+            studio-research-watch \
+            "$CAMPAIGN_DIR/research.json" \
+            "$CAMPAIGN_DIR/research.md"
+
+      - name: Publish campaign decision summary
+        shell: bash
+        env:
+          HAS_CODEX_KEY: ${{ steps.codex_key.outputs.present }}
+          PLAN_ACTIVE: ${{ steps.plan.outputs.active }}
+          PLAN_PHASE: ${{ steps.plan.outputs.phase }}
+          CAN_AUTHOR: ${{ steps.plan.outputs.can_author }}
+          PLAN_REASON: ${{ steps.plan.outputs.reason }}
+          ISSUE_NUMBER: ${{ steps.plan.outputs.issue_number }}
+          TRACK: ${{ steps.plan.outputs.track }}
+        run: |
+          {
+            echo "## Studio seven-day campaign cycle"
+            echo
+            echo "- Window: $PLAN_PHASE"
+            echo "- Active: $PLAN_ACTIVE"
+            echo "- Authoring credential configured: $HAS_CODEX_KEY"
+            echo "- Can author a patch: $CAN_AUTHOR"
+            echo "- Decision: $PLAN_REASON"
+            echo "- Queue issue: ${ISSUE_NUMBER:-none}"
+            echo "- Track: $TRACK"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the complete planning and research evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-seven-day-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-seven-day-campaign/
+          retention-days: 21
+          if-no-files-found: error
+
+  generate-patch:
+    needs: plan
+    if: >-
+      needs.plan.outputs.window_active == 'true' &&
+      needs.plan.outputs.can_author == 'true' &&
+      needs.plan.outputs.has_codex_key == 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.mode == 'author')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      has_patch: ${{ steps.inspect.outputs.has_patch }}
+      changed_files: ${{ steps.inspect.outputs.changed_files }}
+      changed_lines: ${{ steps.inspect.outputs.changed_lines }}
+    env:
+      CAMPAIGN_INPUT: ${{ runner.temp }}/studio-seven-day-campaign
+      CAMPAIGN_OUTPUT: ${{ runner.temp }}/studio-seven-day-patch
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.base_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install the locked workspace before sandboxed authoring
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-seven-day-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-seven-day-campaign
+
+      - name: Place the trusted prompt in the checkout temporarily
+        run: cp "$CAMPAIGN_INPUT/prompt.md" .studio-campaign-prompt.md
+
+      - name: Author one bounded Studio patch with Codex
+        id: codex
+        uses: openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          codex-version: "0.152.1"
+          model: "gpt-5.3-codex"
+          effort: "high"
+          prompt-file: ".studio-campaign-prompt.md"
+          output-file: ${{ runner.temp }}/studio-seven-day-patch/codex-final.md
+          allow-bots: "true"
+          allow-bot-users: "github-actions[bot]"
+
+      - name: Inspect and admit the generated patch
+        id: inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .studio-campaign-prompt.md
+          mkdir -p "$CAMPAIGN_OUTPUT"
+          git add -N -- .
+          if git diff --quiet HEAD --; then
+            echo "has_patch=false" >> "$GITHUB_OUTPUT"
+            echo "changed_files=0" >> "$GITHUB_OUTPUT"
+            echo "changed_lines=0" >> "$GITHUB_OUTPUT"
+            printf '%s\n' '{"ok":true,"empty":true,"reason":"agent-left-working-tree-clean"}' \
+              > "$CAMPAIGN_OUTPUT/policy.json"
+            exit 0
+          fi
+
+          node scripts/studio-campaign-patch-policy.mjs \
+            --base HEAD \
+            --output "$CAMPAIGN_OUTPUT/policy.json" \
+            --github-output "$GITHUB_OUTPUT"
+          git diff --check HEAD --
+          git diff --name-only HEAD -- > "$CAMPAIGN_OUTPUT/changed-files.txt"
+          git diff --stat HEAD -- > "$CAMPAIGN_OUTPUT/diff-stat.txt"
+          git diff --binary HEAD -- > "$CAMPAIGN_OUTPUT/studio-campaign.patch"
+          echo "has_patch=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run changed Node and Vitest contracts
+        if: ${{ steps.inspect.outputs.has_patch == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t node_tests < <(
+            git diff --name-only HEAD -- \
+              | grep -E '^scripts/.*\.test\.mjs$' \
+              || true
+          )
+          if (( ${#node_tests[@]} > 0 )); then
+            node --test "${node_tests[@]}"
+          fi
+
+          mapfile -t vitest_tests < <(
+            git diff --name-only HEAD -- \
+              | grep -E '\.(test|spec)\.[cm]?[jt]sx?$' \
+              | grep -vE '^e2e/' \
+              | grep -vE '^scripts/.*\.test\.mjs$' \
+              || true
+          )
+          if (( ${#vitest_tests[@]} > 0 )); then
+            pnpm exec vitest run "${vitest_tests[@]}"
+          fi
+
+      - name: Run repository-level pre-PR checks
+        if: ${{ steps.inspect.outputs.has_patch == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run lint:quick
+          pnpm run typecheck
+          git diff --check HEAD --
+
+      - name: Refresh the validated patch artifact
+        if: ${{ steps.inspect.outputs.has_patch == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --binary HEAD -- > "$CAMPAIGN_OUTPUT/studio-campaign.patch"
+          cp "$CAMPAIGN_INPUT/plan.json" "$CAMPAIGN_OUTPUT/plan.json"
+          cp "$CAMPAIGN_INPUT/research.json" "$CAMPAIGN_OUTPUT/research.json"
+          cp "$CAMPAIGN_INPUT/mature-products.json" "$CAMPAIGN_OUTPUT/mature-products.json"
+          cp "$CAMPAIGN_INPUT/emerging-products.json" "$CAMPAIGN_OUTPUT/emerging-products.json"
+
+      - name: Upload the isolated patch without repository credentials
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-seven-day-patch-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-seven-day-patch/
+          retention-days: 21
+          if-no-files-found: ignore
+
+  open-pull-request:
+    needs: [plan, generate-patch]
+    if: >-
+      needs.generate-patch.result == 'success' &&
+      needs.generate-patch.outputs.has_patch == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BASE_SHA: ${{ needs.plan.outputs.base_sha }}
+      ISSUE_NUMBER: ${{ needs.plan.outputs.issue_number }}
+      TRACK: ${{ needs.plan.outputs.track }}
+      PATCH_DIR: ${{ runner.temp }}/studio-seven-day-patch
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.base_sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-seven-day-patch-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-seven-day-patch
+
+      - name: Require the exact planned main revision
+        id: fresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$current_main" != "$BASE_SHA" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Main advanced from $BASE_SHA to $current_main; the next cycle will regenerate safely."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Apply and independently recheck the patch
+        if: ${{ steps.fresh.outputs.ready == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --index --whitespace=error-all "$PATCH_DIR/studio-campaign.patch"
+          node scripts/studio-campaign-patch-policy.mjs --base HEAD
+          git diff --cached --check
+
+      - name: Commit the isolated campaign slice
+        id: commit
+        if: ${{ steps.fresh.outputs.ready == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_slug="${ISSUE_NUMBER:-research}"
+          branch="codex/campaign-${issue_slug}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(studio): advance campaign ${issue_slug}"
+          git push --set-upstream origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Open an auto-merge eligible pull request
+        id: pull
+        if: ${{ steps.fresh.outputs.ready == 'true' }}
+        shell: bash
+        env:
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          COMMIT_SHA: ${{ steps.commit.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          issue_title="$(jq -r '.selectedIssue.title // .track' "$PATCH_DIR/plan.json")"
+          short_title="$(
+            printf '%s' "$issue_title" \
+              | sed -E 's/^(feat|fix|perf|refactor|test|chore)\(studio\):[[:space:]]*//' \
+              | cut -c1-90
+          )"
+          title="feat(studio): ${short_title}"
+          {
+            echo '<!-- studio-automerge -->'
+            echo
+            if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+              echo "Progresses #${ISSUE_NUMBER}"
+              echo
+            fi
+            echo "## Autonomous campaign slice"
+            echo
+            echo "- Campaign run: ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
+            echo "- Track: \`${TRACK}\`"
+            echo "- Exact base: \`${BASE_SHA}\`"
+            echo "- Commit: \`${COMMIT_SHA}\`"
+            echo "- Changed files: ${{ needs.generate-patch.outputs.changed_files }}"
+            echo "- Changed lines: ${{ needs.generate-patch.outputs.changed_lines }}"
+            echo
+            echo "## Codex implementation report"
+            echo
+            cat "$PATCH_DIR/codex-final.md"
+            echo
+            echo "## Admission evidence"
+            echo
+            echo '```json'
+            cat "$PATCH_DIR/policy.json"
+            echo '```'
+            echo
+            echo "This PR remains subject to the complete CI, Studio autonomous risk gate, SonarQube, exact-head safe automerge, deployment, and branch-cleanup contracts."
+          } > "$PATCH_DIR/pull-request.md"
+
+          pull_url="$(
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$BRANCH" \
+              --title "$title" \
+              --body-file "$PATCH_DIR/pull-request.md"
+          )"
+          echo "url=$pull_url" >> "$GITHUB_OUTPUT"
+          echo "Opened $pull_url"
+
+      - name: Record the campaign PR on its implementation issue
+        if: ${{ steps.fresh.outputs.ready == 'true' && needs.plan.outputs.issue_number != '' }}
+        shell: bash
+        env:
+          PULL_URL: ${{ steps.pull.outputs.url }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "<!-- studio-seven-day-campaign-pr -->\nCampaign cycle ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} opened ${PULL_URL}. It will merge only after the full release gates pass."
+
+  authoring-not-configured:
+    needs: plan
+    if: >-
+      needs.plan.outputs.window_active == 'true' &&
+      needs.plan.outputs.can_author == 'true' &&
+      needs.plan.outputs.has_codex_key != 'true' &&
+      (github.event_name != 'workflow_dispatch' || inputs.mode == 'author')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TRACKING_ISSUE: "555"
+    steps:
+      - name: Report the missing optional authoring credential once
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='<!-- studio-seven-day-campaign-key-missing -->'
+          existing="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
+              --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
+              | head -n 1
+          )"
+          if [[ -n "$existing" ]]; then
+            echo "Missing-key notice already exists."
+            exit 0
+          fi
+          gh issue comment "$TRACKING_ISSUE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "${marker}\nThe seven-day research, benchmarking, CI, merge, deployment, and cleanup automation is active. Code-authoring cycles are paused because this repository does not expose an OPENAI_API_KEY secret to GitHub Actions. Adding that repository secret enables the isolated Codex patch job; the secret is supplied only to the pinned OpenAI action and never to the push/PR job."
+
+  campaign-complete:
+    needs: plan
+    if: ${{ needs.plan.outputs.phase == 'after' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TRACKING_ISSUE: "555"
+    steps:
+      - name: Record campaign completion once
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='<!-- studio-seven-day-campaign-complete -->'
+          existing="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
+              --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
+              | head -n 1
+          )"
+          if [[ -n "$existing" ]]; then
+            echo "Campaign completion is already recorded."
+            exit 0
+          fi
+          gh issue comment "$TRACKING_ISSUE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "${marker}\nThe configured seven-day Studio saturation window has ended. Scheduled runs now remain audit-only and do not author new patches unless a maintainer manually dispatches a force-active cycle. Review merged campaign PRs, remaining P0/P1 gaps, production smoke evidence, and open blockers before extending the window."
