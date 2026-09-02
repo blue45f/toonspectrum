@@ -3,29 +3,38 @@
 - 캠페인 ID: `studio-saturation-2026-09-02`
 - 시작: 2026-09-02 20:30 KST (`2026-09-02T11:30:00Z`)
 - 종료: 2026-09-09 20:30 KST (`2026-09-09T11:30:00Z`)
-- 실행 간격: 3시간
+- 평가 간격: 최대 1시간
 - 추적 Epic: #555
 - 구현 큐: #557–#563
 
 ## 1. 실제로 자동화되는 범위
 
-`.github/workflows/studio-seven-day-campaign.yml`은 캠페인 기간 동안 다음 순서를 반복한다.
+`.github/workflows/studio-seven-day-campaign.yml`과 시간당 보조 트리거는 캠페인 기간 동안 다음 순서를 반복한다.
 
 1. 최신 `main`과 열린 PR·P0 이슈 상태를 읽는다.
-2. 성숙 제품 59개, 신규·스타트업·브라우저 도구 레지스트리, 그래픽스·페인팅·애니메이션·3D 관련 논문 출처를 검사한다.
+2. 성숙 제품 59개, 신규·스타트업·브라우저 도구 24개, 그래픽스·페인팅·애니메이션·3D 관련 논문 출처를 검사한다.
 3. 외부 페이지 제목과 연구 메타데이터를 명령이 아닌 신뢰하지 않는 데이터로 정규화한다.
 4. 이미 열린 캠페인 PR이 있으면 다음 구현을 만들지 않고 CI·자동 병합을 기다린다.
 5. 실행 가능한 슬롯이 있고 `OPENAI_API_KEY` 저장소 Secret이 구성돼 있으면, 고정된 OpenAI Codex Action과 CLI 버전으로 한 개의 작은 기능 패치를 생성한다.
 6. 에이전트가 수정한 working tree를 별도 정책기로 검사한다.
 7. 에이전트 Job에는 push 권한을 주지 않는다. 패치는 artifact로 넘기고, API 키를 받지 않는 별도 Job이 현재 `main` SHA가 그대로일 때만 브랜치·커밋·PR을 만든다.
-8. PR은 기존 전체 CI, Studio 위험 게이트, SonarQube, exact-head 자동 병합을 통과해야 `main`에 들어간다.
-9. 병합된 캠페인 브랜치는 자동 정리되고 Vercel Git Integration이 배포를 수행한다.
+8. 봇이 만든 PR에도 전체 검증이 빠지지 않도록 gate dispatcher가 release gate, Studio 위험 게이트, SonarQube를 정확한 head SHA에서 명시적으로 실행한다.
+9. 검증 성공 PR만 exact-head squash merge하고, 병합된 캠페인 브랜치는 자동 정리한다.
+10. `main` 병합 뒤 Vercel Git Integration이 배포를 수행한다.
+
+시간당 동작은 두 스케줄을 결합한다.
+
+- 주 캠페인: 매 3시간 17분
+- 시간당 보조 트리거: 매시 47분
+- 보조 트리거는 최근 55분 안의 실행 또는 queued/in-progress 실행을 발견하면 중복 dispatch하지 않는다.
+
+따라서 GitHub 스케줄 지연이 없을 때 최대 한 시간 간격으로 새 상태를 평가하면서, 같은 회차를 중복 실행하지 않는다.
 
 ## 2. 연속 실행의 정확한 의미
 
-채팅 세션이나 단일 프로세스를 7일 동안 붙잡아 두는 방식이 아니다. GitHub Actions의 예약 실행과 독립 runner를 사용한다. 각 회차는 앞 회차가 종료되더라도 다음 cron에서 다시 시작한다.
+채팅 세션이나 단일 프로세스를 7일 동안 붙잡아 두는 방식이 아니다. GitHub Actions의 예약 실행과 독립 runner를 사용한다. 각 회차는 앞 회차가 종료되더라도 다음 스케줄에서 저장소 상태를 다시 읽고 재계획한다.
 
-GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사용량 제한, 네트워크 장애 때문에 지연되거나 실행되지 않을 수 있다. 따라서 “한 순간도 중단되지 않는 프로세스”를 주장하지 않는다. 대신 다음 회차가 저장소 상태를 다시 읽고 중단 지점 없이 재계획할 수 있는 반복 가능한 캠페인으로 구성한다.
+GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사용량 제한, 네트워크 장애 때문에 지연되거나 실행되지 않을 수 있다. 따라서 “한 순간도 중단되지 않는 프로세스”를 주장하지 않는다. 대신 이전 프로세스의 메모리에 의존하지 않고 다음 회차가 안전하게 이어받는 반복 가능한 캠페인으로 구성한다.
 
 동시에 열 수 있는 캠페인 PR은 기본 1개다. 이는 작업을 늦추기 위한 승인이 아니라 다음 문제를 막기 위한 직렬화 장치다.
 
@@ -33,6 +42,8 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - 실패한 기반 위에 후속 기능이 누적되는 현상
 - 저장 포맷·Undo/Redo·GPU authority 변경이 서로 다른 기준선을 사용하는 현상
 - CI runner와 Vercel 배포가 과도하게 밀리는 현상
+
+한 PR이 열려 있는 동안에도 제품·스타트업·논문 fingerprint와 CI 상태는 계속 확인한다. 병합 또는 종료 뒤 다음 회차가 새 구현을 선택한다.
 
 ## 3. 구현 우선순위
 
@@ -61,7 +72,7 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - 반영 경로
 - 필요한 NOTICE·출처
 
-자동 에이전트 patch에는 바이너리 외부 파일 추가를 허용하지 않는다. 모델 가중치·대형 3D·브러시 패키지는 출처와 해시를 검토한 별도 통합 PR 또는 runtime-download/BYOM 경로로 처리한다. 접근 가능한 소스가 없으면 기능, 알고리즘, 데이터 모델, 작업 흐름과 품질 기준을 분석해 ToonSpectrum 엔진에 구현한다.
+자동 에이전트 patch에는 바이너리 외부 파일 추가를 허용하지 않는다. 모델 가중치·대형 3D·브러시 패키지는 출처와 해시를 검토한 별도 통합 PR 또는 runtime-download/BYOM 경로로 처리한다. 텍스트 소스는 원본·버전·해시·반영 경로를 registry에 기록하면 정확히 재사용할 수 있다. 접근 가능한 소스가 없으면 기능, 알고리즘, 데이터 모델, 작업 흐름과 품질 기준을 분석해 ToonSpectrum 엔진에 구현한다.
 
 ## 5. 에이전트 격리와 패치 제한
 
@@ -81,10 +92,13 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - dependency manifest와 lockfile 수정
 - 환경변수·배포 설정·비밀값 수정
 - 캠페인 자체 설정과 안전 정책 수정
+- 운영 DB schema·migration·migration runner 수정
 - 파일 삭제
 - 바이너리 payload 추가
 - 테스트 없는 제품 소스 변경
 - 출처 registry가 없는 외부 payload 경로
+
+DB schema와 운영 migration은 별도 격리 PR에서 실제 migration ledger·권한·rollback까지 검증해야 하므로 시간당 에이전트 patch에서는 제외한다.
 
 에이전트가 안전하고 의미 있는 변경을 만들지 못하면 working tree를 비워 둔다. 이 경우 PR을 만들지 않고 다음 회차에서 다시 연구·선택한다.
 
@@ -98,17 +112,26 @@ GitHub 예약 작업은 플랫폼 부하, 저장소 Actions 한도, 결제·사�
 - `pnpm run typecheck`
 - 패치 admission policy
 
-PR 생성 뒤에는 더 강한 저장소 기준을 적용한다.
+봇 PR은 `GITHUB_TOKEN` 재귀 실행 제한에 기대지 않고 `Studio campaign gate dispatcher`가 다음 워크플로를 명시적으로 dispatch한다.
 
-- 전체 CI
-- Studio 변경 위험 자동 분류
-- 캔버스·저장·history·WebGPU·UI 변경별 targeted verifier
-- 프로덕션 빌드와 bundle ratchet
-- SonarQube
-- 브라우저·OPFS·GPU 검증
-- exact-head squash merge
-- 병합 브랜치 삭제
-- Vercel 배포
+- `Studio campaign release gate`
+- `Studio autonomous risk gate`
+- `SonarQube`
+
+캠페인 release gate는 다음을 포함한다.
+
+- 전체 root Vitest
+- PostgreSQL disposable schema
+- Redis 통합
+- Cloudflare realtime runtime·typecheck·dry-run
+- strict lint와 전체 workspace typecheck
+- production build, bundle ratchet, build:all
+- security·license audit
+- Studio launch·artist journey·인앱 브라우저·모바일·아이콘
+- 3D rendered-frame 검증
+- 실제 p5.brush Worker WebGL2 검증
+
+모든 gate가 성공하고 PR head SHA가 변하지 않았을 때만 squash merge한다.
 
 `main`이 패치 생성 중 바뀌면 오래된 패치를 억지로 재베이스하지 않는다. PR 생성 Job이 해당 회차를 버리고 다음 회차에서 최신 기준선으로 다시 생성한다.
 
@@ -129,7 +152,7 @@ Secret이 없는 경우에도 다음은 계속 작동한다.
 
 ## 8. 캠페인 종료
 
-종료 시각 이후 예약 실행은 새 코드를 작성하지 않는다. 완료 메시지를 Epic #555에 한 번 기록하고 가벼운 audit-only 상태로 남는다. 기간을 연장하려면 설정 파일의 새 7일 window를 별도 PR로 검증하거나 유지관리자가 `force_active` 수동 회차를 실행한다.
+종료 시각 이후 예약 실행은 새 코드를 작성하지 않는다. 완료 메시지를 Epic #555에 한 번 기록하고 audit-only 상태로 남는다. 기간을 연장하려면 설정 파일의 새 7일 window를 별도 PR로 검증하거나 유지관리자가 `force_active` 수동 회차를 실행한다.
 
 완료 평가는 커밋 수가 아니라 다음으로 판단한다.
 
