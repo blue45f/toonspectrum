@@ -1,0 +1,56 @@
+name: QA source snapshot
+
+on:
+  push:
+    branches:
+      - qa/studio-chromium-inapp-20260902
+    paths:
+      - ".github/workflows/qa-source-snapshot.yml"
+      - "src/**"
+      - "scripts/**"
+      - "index.html"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig*.json"
+      - "vite.config.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-source-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    name: Export QA source snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Pack editable source
+        run: |
+          tar -czf /tmp/toonspectrum-qa-source.tgz \
+            .github/workflows/qa-studio-chromium-inapp.yml \
+            .github/workflows/qa-source-snapshot.yml \
+            index.html \
+            package.json \
+            pnpm-lock.yaml \
+            tsconfig.json \
+            vite.config.ts \
+            scripts \
+            src
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: toonspectrum-qa-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/toonspectrum-qa-source.tgz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
