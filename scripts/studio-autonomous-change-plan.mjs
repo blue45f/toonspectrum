@@ -55,7 +55,7 @@ const CATEGORY_RULES = Object.freeze({
   deployment: Object.freeze([
     /^\.github\/workflows\//,
     /^deploy\//,
-    /(?:^|\/)(?:vercel|netlify|service-worker|sw)(?:[-_.\/]|$)/i,
+    /(?:^|\/)(?:vercel|netlify|service-worker|sw)(?:[-_./]|$)/i,
     /(?:^|\/)(?:vite\.config|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/,
     /(?:csp|bundle-budget|deployment|production-build)/i,
   ]),
