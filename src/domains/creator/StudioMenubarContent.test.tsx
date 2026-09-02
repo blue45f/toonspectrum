@@ -509,19 +509,28 @@ describe("StudioMenubarContent", () => {
   });
 
   it("keeps every windowed action touchable while exposing the primary lane at 320px", () => {
-    render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
+    const stableHandlers = { ...createHandlers(), togglePageSequence: vi.fn() };
+    render(<StudioMenubarContent {...createProps({ isMobile: true, stableHandlers })} />);
 
+    // 모바일 폭(≤429px) 전체에서 아이콘 전용 44px 로 접힌다 — 359px 경계로는 360~430px 창모드에서
+    // 액션 클러스터가 레인을 넘쳐 게시 버튼이 잘렸다(`verify:studio-mobile-top`).
     for (const name of ["전체 화면 드로잉", "초안 저장", "게시하기"] as const) {
       const action = screen.getByRole("button", { name });
-      expect(action.className).toContain("max-[359px]:size-11");
+      expect(action.className).toContain("max-[429px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
         span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
       );
-      expect(label?.className).toContain("max-[359px]:sr-only");
+      expect(label?.className).toContain("max-[429px]:sr-only");
     }
 
     expect(screen.getByRole("button", { name: "프로젝트 작업" }).className)
       .toContain("min-w-11");
+    // 페이지·다운로드는 하단 도크의 드로잉 행이 소유한다 — 메뉴바 사본은 모바일에서 숨긴다.
+    for (const name of [/페이지 목록/u, /현재 페이지$/u]) {
+      const duplicate = screen.getByRole("button", { name, hidden: true });
+      expect(duplicate.className).toContain("hidden");
+    }
+    expect(screen.getByRole("button", { name: "내보내기 옵션" }).className).toContain("min-w-11");
   });
 
   it("switches the mobile immersive coach from entering to exiting", () => {

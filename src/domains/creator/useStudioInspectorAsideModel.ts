@@ -19,7 +19,7 @@ import {
   resolveStudioInspectorContentMode,
   resolveStudioInspectorInteractionPolicy,
 } from "./studio-inspector-interaction-policy";
-import { type StudioImageInspectorSection } from "./studio-inspector-layout";
+import type { StudioImageInspectorSection } from "./studio-inspector-layout";
 import { resolveStudioInspectorRasterToolPolicy } from "./studio-inspector-raster-tool-policy";
 import {
   studioInspectorTransientOwners,
@@ -31,13 +31,13 @@ import {
 } from "./studio-layers";
 import { isPuppetWarpNoop } from "./studio-puppet-warp";
 import { isSelectionUsable } from "./studio-selection-tools";
-import {
-  type StudioInspectorAsideHandlers,
-  type StudioInspectorAsideProps,
+import type {
+  StudioInspectorAsideHandlers,
+  StudioInspectorAsideProps,
 } from "./StudioInspectorAsideTypes";
-import {
-  type StudioInspectorPixelSelectionToolId,
-  type StudioRasterRecoveryRequest,
+import type {
+  StudioInspectorPixelSelectionToolId,
+  StudioRasterRecoveryRequest,
 } from "./StudioRasterToolRecoveryPanel";
 import { useStudioRasterSourcePresentation } from "./use-studio-raster-source-presentation";
 

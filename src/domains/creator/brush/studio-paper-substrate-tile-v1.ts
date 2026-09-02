@@ -41,10 +41,11 @@ import {
   type StudioPaperSubstrateRecipeOptionsV1,
 } from "./studio-paper-substrate-recipe-v1";
 import { STUDIO_PAPER_SUBSTRATE_TILE_SIZE_V1 as DEFAULT_TILE_SIZE } from "./studio-paper-substrate-tile-host-v1";
-import { type PaperGrainKind } from "./studio-paper-texture";
+
 
 import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
 import type { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
+import type { PaperGrainKind } from "./studio-paper-texture";
 
 export const STUDIO_PAPER_SUBSTRATE_TILE_VERSION_V1 = 1 as const;
 

@@ -92,8 +92,8 @@ import {
 import {
   propDefById,
 } from "./studio-vrm-props";
-import {
-  type StudioVrmIkConstraint,
+import type {
+  StudioVrmIkConstraint,
 } from "./studio-vrm-scene-document";
 import {
   commitStudioVrmFullStateHistoryTransaction,
@@ -104,8 +104,8 @@ import {
 import {
   mergeWardrobeCostumeVisibility,
 } from "./studio-vrm-wardrobe";
-import {
-  type StudioVrmPhotoPoseApplyPayload,
+import type {
+  StudioVrmPhotoPoseApplyPayload,
 } from "./StudioVrmPhotoPoseScanner";
 
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";

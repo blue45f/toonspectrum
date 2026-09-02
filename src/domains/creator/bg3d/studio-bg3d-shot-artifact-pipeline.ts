@@ -7,12 +7,6 @@
  */
 
 import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
-import {
-  type StudioBg3dLtRasterInput,
-  type StudioBg3dLtRasterLayer,
-  type StudioBg3dLtRenderResult,
-  type StudioBg3dLtRenderSettings,
-} from "./studio-bg3d-lt-render";
 import { renderStudioBg3dLtLayersInWorker } from "./studio-bg3d-lt-render-worker-client";
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
@@ -26,6 +20,12 @@ import {
 import { buildStudioBg3dShotLayeredPsdInWorker } from "./studio-bg3d-shot-psd-worker-client";
 
 import type { StudioBg3dCapturedRaster } from "./studio-bg3d-capture-adapter";
+import type {
+  StudioBg3dLtRasterInput,
+  StudioBg3dLtRasterLayer,
+  StudioBg3dLtRenderResult,
+  StudioBg3dLtRenderSettings,
+} from "./studio-bg3d-lt-render";
 import type {
   StudioBg3dShotBatchImage,
   StudioBg3dShotBatchLayeredPsd,

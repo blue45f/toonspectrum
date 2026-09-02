@@ -26,9 +26,9 @@ import { StudioPageSequenceStrip } from "../StudioPageSequenceStrip";
 
 import { localizeText } from "./studio-canvas-viewport-primitives";
 import { AiAssetNotice } from "./StudioCanvasAiAssetNotice";
-import {
-  type StudioCanvasViewportHandlers,
-  type StudioCanvasViewportProps,
+import type {
+  StudioCanvasViewportHandlers,
+  StudioCanvasViewportProps,
 } from "./StudioCanvasViewportTypes";
 
 import type { El, ImageEl } from "../studio-element-model";

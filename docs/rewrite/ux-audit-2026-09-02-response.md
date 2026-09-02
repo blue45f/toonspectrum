@@ -130,8 +130,10 @@ main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전
 | 검수 진입점 뷰포트 스냅샷 | 430px 몰입 모드에서 내보내기 옵션 셰브론이 44px 타깃으로 승격됐는데 스냅샷은 이전 값 | 스냅샷 갱신 |
 | `verify:studio-mobile-top`(inapp-browser CI) | 모바일 메뉴바 페이지 목록·다운로드 버튼이 42px 폭 | `min-w-11 justify-center` |
 | core CI `pnpm run lint` | `scripts/qa/studio-soak-runner.mjs`(56e7148a)의 ANSI 제거 정규식이 `no-control-regex` 에 걸림 | 해당 줄만 규칙 해제(사유 인라인) |
+| core CI `check:studio-bundle` | 페이지 분할 웨이브가 남긴 all-type 인라인 import(`import { type X }`) 64건이 `verbatimModuleSyntax` 아래서 런타임 edge 로 남아 comipo-assembly·scene-templates 를 Studio 정적 그래프에 되돌림(studio-gates §1 함정). vitest 가 붉어 main 에서는 이 단계까지 못 갔다 | 24파일 전부 `import type` 으로 재작성, 탐지기 0건, 로컬 재빌드 게이트 통과 |
+| `verify:studio-mobile-top` 레인 넘침(320~430px) | 모바일 액션 클러스터가 44px 버튼 7개(332px)라 레인(overflow-hidden)을 넘쳐 게시하기·전체화면 종료가 잘림 | 도크가 이미 가진 페이지·다운로드 사본을 모바일에서 숨기고, 전체화면·초안 저장·게시하기 라벨을 ≤429px 에서 아이콘 전용(44px)으로 접음 |
 
-남은 CI 붉은 항목: `studio-3d-visual`(peakColorTileDelta 타이밍 회귀, Playwright 3D)과 `oil-ribbon impasto` 스냅샷(부하 시 간헐) — 이번 회차 범위 밖으로 기록만 남긴다.
+남은 CI 붉은 항목: `studio-3d-visual`(peakColorTileDelta 타이밍 회귀, Playwright 3D), `oil-ribbon impasto` 스냅샷(부하 시 간헐), 그리고 in-app 스윕의 빠른 시작 패널 390px 넘침(instagram-ios-390/comic) — 이번 회차 범위 밖으로 기록만 남긴다.
 
 - 단위·계약: `pnpm vitest run` 전체(이 브랜치에서 실행).
 - 기존 결함 수정: `StudioMobileEditingDock.test.tsx › renders the drawing tool row in the active locale` 는 변경 이전

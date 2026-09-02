@@ -1520,8 +1520,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   }),
                   // Windowed: sticky exit keeps the control reachable while the long title lane
                   // scrolls. Immersive: no sticky/ring — the compact pill has no scroll sibling.
+                  // 모바일 폭(≤429px)에서는 아이콘만 남긴다. 예전 359px 경계로는 360~430px 창모드에서
+                  // 액션 클러스터가 레인을 넘쳐 게시 버튼이 잘렸다(`verify:studio-mobile-top`, CI 실패).
                   !mobileImmersive &&
-                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
+                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",
                   mobileImmersive &&
                     "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
                 )}
@@ -1531,7 +1533,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 ) : (
                   <Maximize2 size={15} aria-hidden />
                 )}
-                <span className={!mobileImmersive ? "max-[359px]:sr-only" : undefined}>
+                <span className={!mobileImmersive ? "max-[429px]:sr-only" : undefined}>
                   {mobileImmersive ? "종료" : "전체화면"}
                 </span>
               </button>
@@ -1561,9 +1563,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 gap-1.5" }),
-                  // 라벨이 `max-xl:sr-only` 로 접히면 아이콘+패딩만 남아 42px 였다 —
-                  // `verify:studio-mobile-top` 이 320~430px 전부에서 잡은 44px 미달(CI 실패).
-                  isMobile && "min-h-11 min-w-11 justify-center",
+                  // 모바일에서는 하단 도크의 드로잉 행이 같은 '페이지' 버튼을 이미 갖는다. 메뉴바 사본까지
+                  // 두면 320~430px 액션 클러스터가 44px 버튼 7개(332px)로 레인을 넘친다.
+                  isMobile && "hidden",
                 )}
               >
                 <Files size={14} aria-hidden />
@@ -1584,8 +1586,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                  // 같은 42px 미달 — 배율 텍스트가 `max-xl:hidden` 이라 아이콘만 남는다.
-                  isMobile && "min-h-11 min-w-11 justify-center"
+                  // 모바일 도크의 '내보내기' 가 같은 핸들러다. 메뉴바에는 배율·포맷을 고르는
+                  // 내보내기 옵션만 남겨 44px 클러스터가 320px 안에 들어오게 한다.
+                  isMobile && "hidden"
                 )}
               >
                 <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
@@ -2152,16 +2155,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                 }),
                 isMobile &&
-                  "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
-                mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
+                  "min-h-11 max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",
+                mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5 max-[429px]:px-0"
               )}
             >
               {saving ? (
                 <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
               ) : (
-                <Save size={14} className="hidden max-[359px]:block" aria-hidden />
+                <Save size={14} className="hidden max-[429px]:block" aria-hidden />
               )}
-              <span className="max-[359px]:sr-only">
+              <span className="max-[429px]:sr-only">
                 {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               </span>
             </button>
@@ -2194,16 +2197,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                   }),
                   isMobile &&
-                    "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
-                  mobileImmersive && "rounded-full px-3 shadow-none"
+                    "min-h-11 max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",
+                  mobileImmersive && "rounded-full px-3 shadow-none max-[429px]:px-0"
                 )}
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
                 ) : (
-                  <Send size={14} className="hidden max-[359px]:block" aria-hidden />
+                  <Send size={14} className="hidden max-[429px]:block" aria-hidden />
                 )}
-                <span className="max-[359px]:sr-only">
+                <span className="max-[429px]:sr-only">
                   {workId ? "수정 게시" : "게시하기"}
                 </span>
               </button>

@@ -186,8 +186,8 @@ import {
 import type {
   StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
-import {
-  type StudioAdvancedRuler,
+import type {
+  StudioAdvancedRuler,
 } from "./studio-advanced-ruler-document";
 import type {
   StudioAdvancedRulerSnapState,
@@ -986,9 +986,9 @@ import {
   createStudioLifecycleEmergencyAutosave,
   type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
-import {
-  type PerspectiveRay,
-  type VanishingPoint,
+import type {
+  PerspectiveRay,
+  VanishingPoint,
 } from "./studio-perspective-guide";
 import {
   admitStudioPixelArtStrokeColor,
@@ -1333,8 +1333,8 @@ import {
   type StudioGpuLiveSourceJournalIdentity,
   type StudioGpuLiveSourceJournalState,
 } from "./render/studio-webgpu-live-source-journal";
-import {
-  type StudioGpuPendingDrawAuthority,
+import type {
+  StudioGpuPendingDrawAuthority,
 } from "./render/studio-webgpu-pending-authority";
 import { createStudioLiveStrokeGpuAudit } from "./render/studio-live-stroke-gpu-audit";
 import type {

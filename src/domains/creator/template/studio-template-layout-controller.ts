@@ -1,4 +1,3 @@
-import { type BgPreset, type FrameSpec, type TemplateSpec } from "../studio-assets";
 import { svgToDataUrl } from "../studio-characters";
 import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
@@ -7,14 +6,17 @@ import {
   studioApplyTemplateRequest,
   settleStudioDestructiveCommit,
 } from "../studio-destructive-command-catalog";
-import { type StudioEditorMutationTicket } from "../studio-editor-scope";
-import { type StudioMenu } from "../studio-editor-tool-model";
-import { type El } from "../studio-element-model";
 import { comipoSeedsToEls } from "../studio-page-comipo-seeds";
 import { loadStudioComipoAssembly } from "../studio-page-lazy-ui";
-import { type PageState } from "../studio-page-state";
-import { type PanelLayoutPreset } from "../studio-panel-layouts";
 import { regenerateStudioTemplateFrames } from "../studio-template-gutter-layout";
+
+import type { BgPreset, FrameSpec, TemplateSpec } from "../studio-assets";
+import type { StudioEditorMutationTicket } from "../studio-editor-scope";
+import type { StudioMenu } from "../studio-editor-tool-model";
+import type { El } from "../studio-element-model";
+import type { PageState } from "../studio-page-state";
+import type { PanelLayoutPreset } from "../studio-panel-layouts";
+
 
 export interface StudioCollagePayload {
   canvasH: number;

@@ -30,11 +30,11 @@ import {
 import {
   propDefById,
 } from "./studio-vrm-props";
-import {
-  type ScenePropAttachmentConfig as PropAttachmentConfig,
+import type {
+  ScenePropAttachmentConfig as PropAttachmentConfig,
 } from "./studio-vrm-scene-props";
-import {
-  type TrackingOptions,
+import type {
+  TrackingOptions,
 } from "./studio-vrm-webcam-tracking";
 import {
   CONTROL_BUTTON,
