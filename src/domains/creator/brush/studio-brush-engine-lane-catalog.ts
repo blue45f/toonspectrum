@@ -133,7 +133,7 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
   Object.freeze([
     r("oil--filbert-ribbon", "유화 · 필버트 리본", "oil", "oil-ribbon", 26, 0.93, ["필버트 유화", "oil filbert"], "oil", "oil-ribbon", "filbert-lanes", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
     r("oil--flat-ribbon", "유화 · 플랫 리본", "oil", "oil-ribbon", 28, 0.94, ["플랫 유화", "oil flat"], "oil", "oil-ribbon", "flat-lanes", "oil", "oil", "hard", "procedural-bristle", "bristle-pressure", "engine-variant"),
-    r("oil--impasto-ribbon", "유화 · 임파스토 리본", "oil", "oil-ribbon", 30, 0.97, ["임파스토 유화"], "oil", "oil-ribbon", "impasto-lanes", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
+    r("oil--impasto-ribbon", "유화 · 임파스토(소모 없음)", "oil", "oil-ribbon", 30, 0.97, ["임파스토 유화", "임파스토 리본", "물감 소모 없는 임파스토"], "oil", "oil-ribbon", "impasto-lanes", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
     r("oil--tube-extrude", "유화 · 튜브 릴리프", "oil", "oil-extrude", 32, 0.96, ["튜브 유화"], "oil", "dynamic-dabs", "extruded-bead-ribbon", "paint-tube", "oil", "hard", "procedural-bristle", "mapped-dabs", "profile-variant"),
     r("oil--knife-edge", "유화 · 팔레트 나이프", "oil", "oil-extrude", 34, 0.98, ["팔레트 나이프"], "oil", "dynamic-dabs", "palette-knife-blade", "paint-tube", "oil", "hard", "none", "mapped-dabs", "engine-variant"),
     r("acrylic--stiff-ribbon", "아크릴 · 경질 리본", "acrylic", "oil-ribbon", 22, 0.96, ["경질 아크릴"], "oil", "oil-ribbon", "acrylic-stiff-lanes", "oil", "oil", "hard", "procedural-bristle", "bristle-pressure", "engine-variant"),
@@ -142,13 +142,13 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     r("watercolor--dense-core", "수채 · 농밀 코어", "watercolor", "wet-dabs", 26, 0.62, ["농밀 수채"], "watercolor", "watercolor-dabs", "dense-core", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
     r("watercolor--edge-stamp", "수채 · 웻엣지 스탬프", "watercolor", "wet-stamp", 28, 0.58, ["웻엣지 수채"], "stamp", "stamp-dabs", "watercolor", "wash-brush", "soft", "stamp-wet-edge", "wet-edge", "stamp-pressure-flow", "profile-variant"),
     r("ink-wash--sumi-core", "수묵 · 농묵 코어", "ink-wash", "wet-dabs", 28, 0.72, ["농묵"], "watercolor", "watercolor-dabs", "sumi-dense", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
-    r("ink-wash--bleed-halo", "수묵 · 번짐 후광", "ink-wash", "wet-dabs", 36, 0.48, ["수묵 번짐"], "watercolor", "watercolor-dabs", "bleed-halo", "watercolor", "soft", "soft-diffuse", "soft-gradient", "watercolor-pressure", "engine-variant"),
+    r("ink-wash--bleed-halo", "수묵 · 맑은 번짐", "ink-wash", "wet-dabs", 36, 0.48, ["수묵 번짐", "번짐 후광", "clear bleed"], "watercolor", "watercolor-dabs", "bleed-halo", "watercolor", "soft", "soft-diffuse", "soft-gradient", "watercolor-pressure", "engine-variant"),
     // Coffee-ring drying rim (inkwash edge 1.35): same wet-dabs engine, edge-response differentiated.
     r("watercolor--edge-bloom", "수채 · 엣지 블룸", "watercolor", "wet-dabs", 30, 0.55, ["엣지 블룸 수채", "coffee ring"], "watercolor", "watercolor-dabs", "edge-bloom", "watercolor", "soft", "sponge", "wet-edge", "watercolor-pressure", "engine-variant"),
     // Fibre-permeability pigment granulation (inkwash uGrain 0.55 + MoXi paper): texture differentiated.
     r("watercolor--granulating", "수채 · 입상 워시", "watercolor", "wet-dabs", 32, 0.5, ["입상 수채", "granulating wash"], "watercolor", "watercolor-dabs", "granulating-wash", "watercolor", "soft", "sponge", "procedural-grain", "watercolor-pressure", "engine-variant"),
     // Fresh-ink feathering steered by the fibre field (wetness 0.16 at 2.8x radius): sumi wet-line input response.
-    r("ink-wash--fiber-feather", "수묵 · 섬유 페더링", "ink-wash", "wet-dabs", 30, 0.6, ["섬유 페더링", "fiber feather"], "watercolor", "watercolor-dabs", "fiber-feather", "watercolor", "soft", "bristle", "procedural-grain", "watercolor-pressure", "engine-variant"),
+    r("ink-wash--fiber-feather", "수묵 · 생지 번짐(즉시)", "ink-wash", "wet-dabs", 30, 0.6, ["섬유 페더링", "fiber feather", "젖은 채 번짐"], "watercolor", "watercolor-dabs", "fiber-feather", "watercolor", "soft", "bristle", "procedural-grain", "watercolor-pressure", "engine-variant"),
     // Cheap-ink chromatography (R/G/B bleed vector): warm core, faint fast cool fringe.
     r("ink-wash--chroma-halo", "수묵 · 크로마 후광", "ink-wash", "wet-dabs", 34, 0.5, ["크로마 후광", "chroma halo"], "watercolor", "watercolor-dabs", "chroma-halo", "watercolor", "soft", "soft-diffuse", "soft-gradient", "watercolor-pressure", "engine-variant"),
     r("gouache--matte-body", "과슈 · 매트 바디", "gouache", "wet-dabs", 24, 0.92, ["매트 과슈"], "watercolor", "watercolor-dabs", "matte-body", "watercolor", "soft", "hard", "none", "watercolor-pressure", "engine-variant"),
@@ -236,9 +236,9 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     r("pen--croquis-stabilized", "펜 · 크로키 안정화", "pen", "capsule-outline", 8, 0.96, ["크로키 안정화 펜", "croquis stabilized pen", "풀드 스트링 펜"], "gpen", "capsule-outline", "croquis-capsule-pulled-string", "gpen--croquis-capsule", "calligraphy", "pressure-round", "none", "outline-pressure", "engine-variant"),
     // 물리 질감 레인: 리빙잉크 정착 베이크(수묵/수채, 프로그램 핀은 워터컬러 재질 행) +
     // WetBrush-2D 강모 물리(유화, 캐리어 옵션은 렌더러 양쪽에서 레인 id 리터럴로 게이트).
-    r("ink-wash--living-bake", "수묵 · 리빙잉크 베이크", "ink-wash", "wet-dabs", 30, 0.66, ["리빙잉크 수묵", "living ink bake"], "watercolor", "watercolor-dabs", "living-ink-settled-bake", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
+    r("ink-wash--living-bake", "수묵 · 정착 건조", "ink-wash", "wet-dabs", 30, 0.66, ["리빙잉크 수묵", "living ink bake", "리빙잉크 베이크", "들면 마르는 수묵"], "watercolor", "watercolor-dabs", "living-ink-settled-bake", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
     r("watercolor--fluid-feather", "수채 · 유체 페더", "watercolor", "wet-dabs", 28, 0.52, ["유체 페더", "fluid feather"], "watercolor", "watercolor-dabs", "fluid-feather-bake", "watercolor", "soft", "sponge", "wet-edge", "watercolor-pressure", "engine-variant"),
-    r("brush--bristle-physics", "붓 · 물리 강모", "brush", "oil-ribbon", 18, 0.92, ["물리 강모 붓", "physics bristle", "WetBrush"], "oil", "oil-ribbon", "bristle-physics-tuft", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
+    r("brush--bristle-physics", "유화 · 물리 강모 갈필", "brush", "oil-ribbon", 18, 0.92, ["물리 강모 붓", "physics bristle", "WetBrush", "붓 · 물리 강모"], "oil", "oil-ribbon", "bristle-physics-tuft", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
   ]);
 
 const LANE_ID_RE = /^([a-z0-9-]+)--([a-z0-9-]+)$/u;
