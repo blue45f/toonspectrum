@@ -161,6 +161,9 @@ export const TIMELAPSE_DURATION_PRESETS = [
   { id: "short", label: "짧게 — 약 15초", targetDurationSec: 15 },
   { id: "normal", label: "보통 — 약 30초", targetDurationSec: 30 },
   { id: "long", label: "길게 — 약 60초", targetDurationSec: 60 },
+  { id: "m2", label: "2분 — 약 120초", targetDurationSec: 120 },
+  { id: "m3", label: "3분 — 약 180초", targetDurationSec: 180 },
+  { id: "m5", label: "5분 — 약 300초", targetDurationSec: 300 },
 ] as const;
 
 // ── 순수 타임라인 플래너 ─────────────────────────────────────────────
