@@ -90,6 +90,22 @@ test("deployment configuration is classified independently", () => {
   assert.equal(classification.needsBuild, true);
 });
 
+test("control-plane workflow changes do not impersonate a runtime deployment", () => {
+  const classification = classifyStudioChanges([
+    ".github/workflows/studio-autonomous-risk-gate.yml",
+    ".github/workflows/studio-seven-day-hourly-trigger.yml",
+    "scripts/studio-competitor-watch.mjs",
+  ]);
+
+  assert.equal(classification.docsOnly, false);
+  assert.equal(classification.sourceChange, true);
+  assert.equal(classification.categories.deployment, false);
+  assert.equal(classification.highRisk, false);
+  assert.equal(classification.needsBrowser, false);
+  assert.equal(classification.needsBuild, false);
+  assert.match(summarizeStudioChangeClassification(classification), /general source change/);
+});
+
 test("paths are normalized, deduplicated, and sorted deterministically", () => {
   const classification = classifyStudioChanges([
     ".\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
