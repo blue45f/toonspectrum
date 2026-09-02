@@ -887,15 +887,72 @@ export class AssetMetadataMigrationError extends Error {
 }
 
 /**
+ * Retired `requiredEvidence` tokens and the canonical token each one became.
+ *
+ * `fallback` was renamed to `explicit-provider-selection` when automatic
+ * renderer substitution was retired (ADR 0018): the gate that used to mean
+ * "the fallback chain proved equivalent" now means "a person selected the
+ * provider". Cards persisted by the previous release still carry the old
+ * token side by side with the retired `fallback` instruction, so the
+ * migration must translate it before the strict enum rejects the card and
+ * poisons an otherwise valid catalog load.
+ */
+const LEGACY_ASSET_REPLACEMENT_EVIDENCE_ALIASES: Readonly<Record<string, z.infer<typeof assetReplacementEvidenceIRSchema>>> =
+  Object.freeze({
+    fallback: "explicit-provider-selection",
+  });
+
+function migrateLegacyAssetReplacementEvidence(
+  candidate: Record<string, unknown>,
+): Record<string, unknown> {
+  const condition = candidate.replacementCondition;
+  if (condition === null || typeof condition !== "object" || Array.isArray(condition)) {
+    return candidate;
+  }
+  const evidence = (condition as Record<string, unknown>).requiredEvidence;
+  if (!Array.isArray(evidence)) return candidate;
+  if (!evidence.some((token) => typeof token === "string" && Object.hasOwn(LEGACY_ASSET_REPLACEMENT_EVIDENCE_ALIASES, token))) {
+    return candidate;
+  }
+  // Remap in place-order, then dedupe: a card may already carry both the
+  // retired token and its canonical replacement. Non-string entries are left
+  // for the schema to reject with its own message.
+  const remapped: unknown[] = [];
+  const seen = new Set<string>();
+  for (const token of evidence) {
+    const canonical = typeof token === "string"
+      ? (Object.hasOwn(LEGACY_ASSET_REPLACEMENT_EVIDENCE_ALIASES, token)
+          ? LEGACY_ASSET_REPLACEMENT_EVIDENCE_ALIASES[token]
+          : token)
+      : token;
+    if (typeof canonical === "string") {
+      if (seen.has(canonical)) continue;
+      seen.add(canonical);
+    }
+    remapped.push(canonical);
+  }
+  return {
+    ...candidate,
+    replacementCondition: { ...(condition as Record<string, unknown>), requiredEvidence: remapped },
+  };
+}
+
+/**
  * Converts the retired V12 automatic-substitution record into the fail-closed
  * card shape. This is intentionally opt-in through parseAssetMetadata: direct
  * schema parsing rejects a retired `fallback` field, preventing new writers
  * from accidentally preserving auto-selection semantics.
+ *
+ * Two retired spellings are handled, independently of each other:
+ * - the top-level `fallback` routing instruction (→ `providerUnavailable`), and
+ * - the `replacementCondition.requiredEvidence` token `"fallback"`
+ *   (→ `"explicit-provider-selection"`), which the previous release emitted on
+ *   every card that also carried an instruction.
  */
 export function migrateLegacyAssetRendererSubstitution(value: unknown): unknown {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
-  const candidate = value as Record<string, unknown>;
-  if (!("fallback" in candidate)) return value;
+  const candidate = migrateLegacyAssetReplacementEvidence(value as Record<string, unknown>);
+  if (!("fallback" in candidate)) return candidate;
   const { fallback: retiredInstruction, ...withoutRetiredInstruction } = candidate;
   // Old cards emitted `fallback: null` by default. It carries no routing
   // instruction, so remove it without inventing an unavailable state.

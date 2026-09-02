@@ -17335,6 +17335,13 @@ const puppetWarpArmed =
                     message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
                   };
                 }
+                if (resolution.target.kind === "3d-asset-catalog") {
+                  openBackground3dFromMenu();
+                  return {
+                    status: "opened" as const,
+                    message: "3D 에셋 카탈로그를 열었어요. 3D 모델·소품을 선택해 캔버스 장면에 배치하세요.",
+                  };
+                }
                 openBackground3dFromMenu();
                 return {
                   status: "opened" as const,

@@ -376,6 +376,110 @@ describe("assetMetadataIRSchema", () => {
     ).toThrow(AssetMetadataMigrationError);
   });
 
+  it("translates the retired `fallback` evidence token on legacy cards instead of rejecting them", () => {
+    // The previous release emitted this exact pair on every myb/kpp/svg card: a retired
+    // `fallback` instruction next to `requiredEvidence` that still names the retired gate.
+    const normalizedIrRef = {
+      digest: computeAssetStructuredDigest({ kind: "brush", value: 2 }),
+      schema: "toonspectrum.brush-program-ir",
+      schemaVersion: 11,
+      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      locator: null,
+    };
+    const legacyEvidence = [
+      "visual-equivalence",
+      "real-device-stroke",
+      "pressure-fidelity",
+      "performance",
+      "memory",
+      "fallback",
+      "soak",
+    ];
+    const legacyCard = {
+      ...validMetadata(),
+      normalizedIrRef,
+      rendererVariants: [
+        {
+          id: "stable-hokusai",
+          tier: "stable",
+          providerId: "hokusai-natural-media",
+          providerVersion: null,
+          normalizedIrRef,
+          requiredCapabilities: [],
+          qualityStatus: "unmeasured",
+          determinism: "unmeasured",
+          limitations: [],
+        },
+      ],
+      replacementCondition: {
+        summary:
+          "Replace the stable brush lane only after exact real-device strokes meet or exceed visual, pressure and fallback gates for this material.",
+        requiredEvidence: legacyEvidence,
+      },
+      fallback: {
+        strategy: "renderer-variant",
+        rendererVariantId: "stable-hokusai",
+        providerId: "hokusai-natural-media",
+        preservesNormalizedIr: true,
+        reason: "Legacy instruction.",
+        limitations: [],
+      },
+    };
+
+    // Direct schema parsing still fails closed on the retired token…
+    expect(() => assetMetadataIRSchema.parse({ ...legacyCard, fallback: undefined }))
+      .toThrow(/fallback/);
+
+    // …but the migration entry point translates it to the canonical gate.
+    const migrated = parseAssetMetadata(legacyCard);
+    // normalizeAssetMetadata sorts evidence, so the canonical card is alphabetical.
+    expect(migrated.replacementCondition?.requiredEvidence).toEqual([
+      "explicit-provider-selection",
+      "memory",
+      "performance",
+      "pressure-fidelity",
+      "real-device-stroke",
+      "soak",
+      "visual-equivalence",
+    ]);
+    expect(migrated.providerUnavailable?.status).toBe("unavailable");
+
+    // Cards whose instruction was already null still need the evidence rename.
+    const nullInstruction = parseAssetMetadata({
+      ...legacyCard,
+      fallback: null,
+    });
+    expect(nullInstruction.replacementCondition?.requiredEvidence).toContain(
+      "explicit-provider-selection",
+    );
+    expect(nullInstruction.replacementCondition?.requiredEvidence).not.toContain("fallback");
+
+    // Both spellings on one card collapse to a single canonical token.
+    const duplicated = parseAssetMetadata({
+      ...legacyCard,
+      replacementCondition: {
+        summary: "dup",
+        requiredEvidence: ["fallback", "explicit-provider-selection", "soak"],
+      },
+    });
+    expect(duplicated.replacementCondition?.requiredEvidence).toEqual([
+      "explicit-provider-selection",
+      "soak",
+    ]);
+
+    // Round trip: migrate → canonical JSON → reparse is a fixed point.
+    const reparsed = parseAssetMetadata(JSON.parse(canonicalJson(migrated)));
+    expect(reparsed).toEqual(migrated);
+
+    // Unknown tokens are still the schema's job — the migration does not invent gates.
+    expect(() =>
+      parseAssetMetadata({
+        ...legacyCard,
+        replacementCondition: { summary: "bad", requiredEvidence: ["fallback", "telepathy"] },
+      }),
+    ).toThrow(/telepathy|invalid/i);
+  });
+
   it("rejects non-namespaced capability tokens at the schema layer", () => {
     for (const bad of ["RenderVectorFill", "render", "render.", ".vector"]) {
       expect(() =>

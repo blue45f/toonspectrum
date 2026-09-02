@@ -283,6 +283,13 @@ export const HAND_SHAPE_PRESETS = [
   { id: "point", label: "가리키기" },
   { id: "peace", label: "브이" },
   { id: "thumbsUp", label: "따봉" },
+  { id: "holding", label: "무기 쥐기" },
+  { id: "phoneGrip", label: "스마트폰" },
+  { id: "penGrip", label: "펜 쥐기" },
+  { id: "fingerHeart", label: "손가락 하트" },
+  { id: "cupGrip", label: "찻잔 잡기" },
+  { id: "rockRoll", label: "락/파이팅" },
+  { id: "okSign", label: "OK 수신호" },
   { id: "relaxed", label: "기본" },
 ] as const;
 
@@ -330,7 +337,9 @@ export const CAMERA_PRESETS: CameraPreset[] = [
   { id: "front", label: "정면", position: [0, 1.42, 3.15], target: [0, 1.22, 0], fov: 30 },
   { id: "threeQuarter", label: "사선", position: [1.55, 1.48, 2.75], target: [0, 1.2, 0], fov: 31 },
   { id: "low", label: "로우", position: [0.52, 0.92, 3.02], target: [0, 1.18, 0], fov: 32 },
+  { id: "wideAction", label: "광각 액션", position: [0.35, 0.65, 2.15], target: [0, 1.25, 0], fov: 52 },
   { id: "bust", label: "상반신", position: [0, 1.68, 2.1], target: [0, 1.45, 0], fov: 27 },
+  { id: "dramaticEye", label: "시선 집중", position: [0, 1.48, 1.65], target: [0, 1.42, 0], fov: 22 },
   { id: "high", label: "하이 앵글", position: [0, 2.2, 2.8], target: [0, 1.2, 0], fov: 28 },
   { id: "extremeLow", label: "웅장한 앵글", position: [0.1, 0.4, 2.5], target: [0, 1.3, 0], fov: 36 },
   { id: "closeup", label: "얼굴 줌", position: [0, 1.55, 1.25], target: [0, 1.5, 0], fov: 25 },
@@ -339,6 +348,7 @@ export const CAMERA_PRESETS: CameraPreset[] = [
   { id: "fullBody", label: "전신", position: [0, 1.05, 4.4], target: [0, 0.95, 0], fov: 34 },
   { id: "dutch", label: "더치 앵글", position: [1.2, 1.35, 2.6], target: [0, 1.25, 0], fov: 33 },
   { id: "topDown", label: "탑 다운", position: [0.2, 3.4, 1.2], target: [0, 1.1, 0], fov: 36 },
+  { id: "birdEyeIsometric", label: "조감도 쿼터뷰", position: [2.4, 3.1, 2.6], target: [0, 0.7, 0], fov: 24 },
 ];
 
 export const BONE_LABELS: Record<string, string> = {

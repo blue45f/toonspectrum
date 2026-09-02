@@ -261,7 +261,12 @@ CSS 자체를 첫 사용까지 미루는 쪽이 일관적이다. **품질(캔버
 
 ### 4-4. 필터 다이얼로그 오픈이 SQLite wasm 865 KB를 끌어온다 (P1)
 
-**증거.** ⌘⇧1로 필터 다이얼로그를 열면 오픈 자체는 **243 ms**로 빠른데 전송이 **1.03 MB**다.
+> **2026-09-02 갱신 — 아래는 2026-08-08 측정 시점의 기록이다.** 같은 날 `16f15f37`이 토너먼트 영속성을
+> 첫 plan 반환 뒤 idle 콜백으로 지연 로딩하도록 바꿔 클릭 경로에서 wasm이 빠졌다. 잔여: 다이얼로그 청크가
+> `studio-local-database.ts` SQL 계층을 정적으로 포함하고, 팩 종류 필터는 프리셋 라이브러리 때문에 열 때
+> SQLite 워커를 띄운다(§6 표 3번 참고).
+
+**증거(2026-08-08).** ⌘⇧1로 필터 다이얼로그를 열면 오픈 자체는 **243 ms**로 빠른데 전송이 **1.03 MB**다.
 내역은 `sqlite3-*.wasm` **865,028 B** + sqlite 글루 `dist-*.js` 63 KB = **928 KB (전체의 90 %)**.
 정작 `StudioFilterDialog` 청크는 10 KB, 필터 카탈로그 10 KB, konva 필터 10 KB에 불과하다.
 long task 110 ms도 이 구간에 있다.
@@ -280,7 +285,11 @@ long task 110 ms도 이 구간에 있다.
 
 ### 4-5. StudioPage 단일 청크 566 KB(원본 1.92 MB) + 소스 42,149줄 (P2)
 
-**증거.** `StudioPage-*.js`는 부팅에서 두 번째로 큰 요청(566,037 B gzip / 1,923,881 B raw)이고
+> **2026-09-02 갱신 — 아래는 2026-08-08 측정 시점의 기록이다.** 현재 `src/domains/creator/StudioPage.tsx`는
+> 5줄 라우트 심이고 편집기 본체는 `StudioCuttoonEditorHost.tsx` 30,961줄이다. 분할은 진행 중이며 여전히 가장
+> 큰 유지보수 리스크다(§6 표 6번).
+
+**증거(2026-08-08).** `StudioPage-*.js`는 부팅에서 두 번째로 큰 요청(566,037 B gzip / 1,923,881 B raw)이고
 부팅 JS 2.18 MB의 26 %다. 소스 `src/domains/creator/StudioPage.tsx`는 **42,149줄**이며 빌드 로그에
 `[BABEL] Note: The code generator has deoptimised the styling of …/StudioPage.tsx as it exceeds the max of 500KB`
 가 남는다. 빌드 전체가 `@rolldown/plugin-babel`에 **91 %** 를 쓴다(`[PLUGIN_TIMINGS]`).
@@ -318,10 +327,12 @@ long task 110 ms도 이 구간에 있다.
 | --- | --- | --- | --- |
 | ~~1~~ | ~~툴벨트 전용 7기능 진입점 복구 (§4-1)~~ — **완료 2026-08-09** | 기능 7종이 다시 사용 가능 | 낮음 |
 | ~~2~~ | ~~Pretendard dynamic-subset 전환 (§4-2)~~ — **완료 2026-08-08** | 콜드 부팅 −1.62 MB 실측 | 매우 낮음 |
-| 3 | 필터 오픈 경로에서 SQLite wasm 분리 (§4-4) | 필터 오픈 −928 KB (−90 %) | 낮음 |
+| ~~3~~ | ~~필터 오픈 경로에서 SQLite wasm 분리 (§4-4)~~ — **완료 2026-08-08 (`16f15f37`)**. 토너먼트 영속성은 첫 plan 반환 뒤 idle 콜백으로 지연 로딩(`studio-filter-island-plan.ts`). 잔여: 다이얼로그 청크가 `studio-local-database.ts` SQL 계층을 정적으로 포함하고, 팩 종류 필터는 프리셋 라이브러리 때문에 열 때 SQLite 워커를 띄운다(기능 의존, 텔레메트리 아님). | 필터 오픈 −928 KB (−90 %) | 낮음 |
 | 4 | VRM 기본 아바타 경량화 + 88모델 외부화 (§4-3) | 포저 첫 진입 −6 MB, 배포 −470 MB | 중간 |
-| 5 | 규격 슬라이스 250 ms 대기 재검토 (§2) | 다장 회차 내보내기 체감 단축 | 낮음 |
-| 6 | StudioPage 분할 계속 (§4-5) | 빌드·회귀 주기 개선, 저사양 부팅 여유 | 높음 |
+| ~~5~~ | ~~규격 슬라이스 250 ms 대기 재검토 (§2)~~ — **완료 2026-08-08 (`16f15f37`)**. 슬라이스당 고정 sleep을 "다음 다운로드 허용 시각" 마감 방식으로 바꿔 합성·인코딩 시간이 간격에서 차감된다(`export/studio-export-presets.ts`). 잔여: 스트립 "전체 다운로드" 청크 루프의 무조건 250 ms(`render/studio-raster-export-orchestration-runtime.ts`)는 그대로. 브라우저에 다운로드 완료 이벤트가 없어 0 으로는 못 내린다. | 다장 회차 내보내기 체감 단축 | 낮음 |
+| 6 | StudioPage 분할 계속 (§4-5) — 2026-09-02 기준 `StudioPage.tsx`는 5줄 라우트 심이고 본체는 `StudioCuttoonEditorHost.tsx` 30,961줄. 외부 리뷰가 인용한 42,149줄은 이 문서의 2026-08-08 측정치다. | 빌드·회귀 주기 개선, 저사양 부팅 여유 | 높음 |
+
+> 2026-09-02 추적 갱신: 외부 리뷰([`../studio-enhancement-analysis-external-2026-09-02.md`](../studio-enhancement-analysis-external-2026-09-02.md))가 이 표의 3·5번을 "현재 결함"으로 인용했다. 둘 다 표 작성 당일 같은 커밋에서 해소됐으나 표가 갱신되지 않아 생긴 오독이다. 측정 수치(§1~§5)는 2026-08-08 시점 기록으로 그대로 둔다.
 
 ---
 

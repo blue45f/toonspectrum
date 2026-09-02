@@ -13,7 +13,10 @@ export interface StudioBg3dLightingStudioPreset {
     | "portrait-soft"
     | "action-rim"
     | "lineart-flat"
-    | "cinematic-3point";
+    | "cinematic-3point"
+    | "sunset-golden"
+    | "cyberpunk-neon"
+    | "midnight-noir";
   readonly label: string;
   readonly description: string;
   readonly lighting: StudioBg3dLightingSettings;
@@ -164,6 +167,90 @@ readonly StudioBg3dLightingStudioPreset[] = deepFreeze([
           elevationDeg: 52,
         }),
         intensity: 0.46,
+        castsShadow: false,
+      },
+    },
+  },
+  {
+    id: "sunset-golden",
+    label: "황혼 노을",
+    description: "따뜻한 골든아워 주광과 짙은 보랏빛 역광으로 서정적인 석양 연출",
+    exposure: 1.15,
+    lighting: {
+      ambientColor: "#451a2d",
+      ambientIntensity: 0.45,
+      key: {
+        color: "#ff8c38",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: -70,
+          elevationDeg: 22,
+        }),
+        intensity: 1.95,
+        castsShadow: true,
+      },
+      fill: {
+        color: "#c084fc",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: 110,
+          elevationDeg: 35,
+        }),
+        intensity: 0.52,
+        castsShadow: false,
+      },
+    },
+  },
+  {
+    id: "cyberpunk-neon",
+    label: "사이버펑크 네온",
+    description: "시안 메인광과 마젠타 림라이트의 강렬한 네온 무드",
+    exposure: 1.2,
+    lighting: {
+      ambientColor: "#090d16",
+      ambientIntensity: 0.32,
+      key: {
+        color: "#06b6d4",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: 55,
+          elevationDeg: 38,
+        }),
+        intensity: 1.75,
+        castsShadow: true,
+      },
+      fill: {
+        color: "#f43f5e",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: -125,
+          elevationDeg: 42,
+        }),
+        intensity: 0.88,
+        castsShadow: true,
+      },
+    },
+  },
+  {
+    id: "midnight-noir",
+    label: "심야 느와르",
+    description: "차가운 달빛과 짙은 명암 대비로 긴장감 있는 밤 씬 연출",
+    exposure: 0.88,
+    lighting: {
+      ambientColor: "#0b1220",
+      ambientIntensity: 0.22,
+      key: {
+        color: "#bfdbfe",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: 135,
+          elevationDeg: 62,
+        }),
+        intensity: 1.45,
+        castsShadow: true,
+      },
+      fill: {
+        color: "#1e3a8a",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: -45,
+          elevationDeg: 20,
+        }),
+        intensity: 0.28,
         castsShadow: false,
       },
     },

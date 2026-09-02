@@ -253,8 +253,8 @@ describe("StudioBg3dLightingStudio", () => {
   });
 
   it("keeps all presets unique, frozen, and isolated from mood, sun, background, and fog state", () => {
-    expect(STUDIO_BG3D_LIGHTING_STUDIO_PRESETS).toHaveLength(5);
-    expect(new Set(STUDIO_BG3D_LIGHTING_STUDIO_PRESETS.map(({ id }) => id)).size).toBe(5);
+    expect(STUDIO_BG3D_LIGHTING_STUDIO_PRESETS).toHaveLength(8);
+    expect(new Set(STUDIO_BG3D_LIGHTING_STUDIO_PRESETS.map(({ id }) => id)).size).toBe(8);
     expect(Object.isFrozen(STUDIO_BG3D_LIGHTING_STUDIO_PRESETS)).toBe(true);
     for (const preset of STUDIO_BG3D_LIGHTING_STUDIO_PRESETS) {
       expect(Object.isFrozen(preset)).toBe(true);

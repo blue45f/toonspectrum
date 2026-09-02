@@ -1,4 +1,4 @@
-import { ArrowUpRight, Layers } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Layers } from "lucide-react";
 
 import { formatMarketDate, marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import {
@@ -22,6 +22,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const KindIcon = kind.icon;
   const paletteColors = palettePreviewColors(record);
   const brushPreviews = brushPreviewData(record);
+  const isOfficial = record.publisher.name.includes("공식") || record.publisher.id.startsWith("00000000");
 
   return (
     <Link
@@ -133,7 +134,12 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         <h3 className="line-clamp-2 text-pretty text-sm font-semibold leading-snug text-fg group-hover:text-accent transition-colors duration-150">
           {record.name}
         </h3>
-        <p className="truncate text-xs text-fg-2">{record.publisher.name}</p>
+        <div className="flex items-center gap-1.5 text-xs text-fg-2">
+          <span className="truncate">{record.publisher.name}</span>
+          {isOfficial ? (
+            <CheckCircle2 className="size-3 shrink-0 text-accent" aria-label="공식 인증 배급자" />
+          ) : null}
+        </div>
         <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-[0.68rem] text-fg-3">
           <span
             className="inline-flex min-h-6 items-center rounded bg-accent px-2 font-semibold text-on-accent"

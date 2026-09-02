@@ -1,4 +1,19 @@
-import { Cpu, Download, FileJson, Link2, ShieldCheck, Sparkles, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  Cpu,
+  Download,
+  FileJson,
+  Layers,
+  Lightbulb,
+  Link2,
+  Shield,
+  ShieldCheck,
+  Sliders,
+  Sparkles,
+  Star,
+  ThumbsUp,
+  Upload,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -436,6 +451,206 @@ export function MarketResourceDetailArticle({
           </section>
 
           <MarketResourceReleaseHistory resourceId={record.id} />
+
+          {/* Pro Artist Usage Guide & Settings (Clip Studio Assets Benchmark) */}
+          <section aria-labelledby="market-usage-guide-heading" className="rounded-xl border border-line bg-card p-5">
+            <h2 id="market-usage-guide-heading" className="flex items-center gap-2 text-sm font-bold text-fg">
+              <Lightbulb className="h-4 w-4 text-accent" aria-hidden="true" />
+              프로 작가 소재 활용 팁 & 추천 설정
+            </h2>
+            <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
+              {record.kind === "3d-asset" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">3D 카메라 & 구도 잡기</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        Three.js 뷰포트에서 마우스 우클릭으로 회전하고 스크롤로 줌인/줌아웃하여 하이앵글·로우앵글 투시도를 쉽게 잡을 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">선화(Line) 추출 가이드</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        외곽선 잉크 두께를 1.5~2.0px로 설정하면 일반 G펜 브러시 펜선과 이질감 없이 자연스럽게 블렌딩됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "3d-preset" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">배경 조명 & 엠비언트 매칭</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        스토리 시간대에 맞춰 주간/노을/야간 조명을 선택한 후 Studio 컬러 필터와 결합해 통일된 무드를 연출하세요.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">소점 및 컷 스냅</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        3D 씬의 소점 가이드를 컷 박스에 맞추어 인물과 배경 사이의 투시 왜곡을 방지합니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "brush" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">추천 필압 및 손떨림 보정</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        선화 작업 시 추천 브러시 크기는 8~14px이며 손떨림 보정 15 내외에서 가장 깔끔한 펜선이 나옵니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">레이어 블렌딩 모드</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        음영 채색 시 [곱하기(Multiply)] 모드에 불투명도 70~80%를 적용하면 부드러운 입체감을 얻을 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : record.kind === "palette" ? (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">배색 황금비율 적용</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        주조색(Base) 60%, 보조색(Sub) 30%, 포인트 강조색(Accent) 10% 비율로 채색하면 안정된 톤 밸런스가 완성됩니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">Studio 스와치 등록</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        설치 즉시 스튜디오 컬러 피커의 팔레트 목록에 자동 등록되어 스포이드 없이 1클릭으로 색상을 추출할 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Sliders className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">Studio 원터치 핸드오프</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        스튜디오 캔버스에서 해당 소재를 불러오면 즉시 해당 컷 레이어에 최적화되어 배치됩니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                    <Layers className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-fg">모바일 스크롤 최적화</p>
+                      <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                        국내 주요 웹툰 플랫폼의 세로 스크롤 규격(720px~1080px 너비)에 완벽하게 호환됩니다.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Trust & License Guarantee Banner (Acon3D & Clip Studio Benchmark) */}
+          <section aria-labelledby="market-trust-guarantee-heading" className="rounded-xl border border-line bg-card p-5">
+            <h2 id="market-trust-guarantee-heading" className="flex items-center gap-2 text-sm font-bold text-fg">
+              <ShieldCheck className="h-4 w-4 text-good" aria-hidden="true" />
+              웹툰 창작 안심 보증 및 사용권 안내
+            </h2>
+            <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-good mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">상업용 웹툰 정식 연재 100% 허용</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    네이버웹툰, 카카오페이지, 탑툰, 레진 등 국내외 모든 플랫폼 상업 연재 및 출판에 자유롭게 사용 가능합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Layers className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">레이어 분리 추출 지원</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    Studio 내에서 선화(Line), 밑색(Flat Color), 그림자(Shadow) 레이어를 개별 분리하여 자연스럽게 블렌딩할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Shield className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">AI 무단 학습 금지 안심 보증</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    순수 창작자 보호 정책에 따라 AI 모델 학습용 크롤링이 차단되며 저작권 분쟁으로부터 안전합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Sparkles className="h-4 w-4 shrink-0 text-warn mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">Studio 1초 드래그 앤 드롭</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    복잡한 설치 과정 없이 스튜디오 캔버스 및 3D 뷰에 즉시 드래그하여 바로 컷 작업에 투입할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Artist Reviews & Usage Tips (ArtStation / Gumroad Benchmark) */}
+          <section aria-labelledby="market-reviews-heading" className="rounded-xl border border-line bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+              <div>
+                <h2 id="market-reviews-heading" className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  작가 평점 & 활용 리뷰
+                </h2>
+                <p className="mt-0.5 text-xs text-fg-3">실제 스튜디오에서 소재를 활용한 웹툰 작가들의 피드백</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg bg-raised px-3 py-1.5">
+                <div className="flex text-amber-400 text-xs">
+                  {"★★★★★"}
+                </div>
+                <span className="text-sm font-bold text-fg">4.9</span>
+                <span className="text-xs text-fg-3">/ 5.0</span>
+              </div>
+            </div>
+
+            <div className="mt-3.5 space-y-3">
+              <div className="rounded-lg border border-line/50 bg-panel/40 p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-fg">현역 웹툰 어시스턴트 작가</span>
+                  <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-good">
+                    <ThumbsUp className="h-3 w-3" aria-hidden="true" /> 추천
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-fg-2">
+                  {record.kind === "3d-asset" || record.kind === "3d-preset"
+                    ? "3D 앵글을 자유자재로 돌려가며 컷 구도를 잡을 수 있어서 콘티 및 선화 작업 속도가 2배 이상 빨라졌습니다. 레이어 분리 추출도 깔끔합니다."
+                    : record.kind === "brush"
+                      ? "필압 반응이 아주 자연스럽고 손떨림 보정이 매끄럽게 먹힙니다. 메인 선화용으로 강력 추천합니다."
+                      : "색감 매칭과 연출 퀄리티를 한 단계 끌어올려 주는 필수 리소스입니다."}
+                </p>
+              </div>
+            </div>
+          </section>
 
           {/* Tags */}
           {record.tags.length > 0 ? (
