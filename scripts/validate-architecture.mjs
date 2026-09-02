@@ -48,6 +48,7 @@ const requiredPaths = [
   ".github/workflows/studio-merged-branch-cleanup.yml",
   ".github/workflows/studio-competitor-watch.yml",
   ".github/workflows/studio-seven-day-campaign.yml",
+  ".github/workflows/studio-seven-day-hourly-trigger.yml",
   ".github/workflows/studio-campaign-gate-dispatcher.yml",
   ".github/workflows/studio-campaign-release-gate.yml",
   "deploy/oci/.env.example",
