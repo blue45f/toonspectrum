@@ -443,8 +443,10 @@ async function waitForStableDocumentFrame(
   label: string,
   timeoutMs = 20_000,
 ): Promise<FrameStats> {
-  const startedAt = Date.now();
+  // 첫 표본 수집은 정착 대기가 아니므로 예산 밖이다. 이 호출이 예산 안에 들어가면 느린
+  // 러너에서 실제로 기다릴 수 있는 시간이 그만큼 줄어든다.
   let previous = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+  const startedAt = Date.now();
   let latest = previous;
   let stableIntervals = 0;
   let delta = Number.POSITIVE_INFINITY;

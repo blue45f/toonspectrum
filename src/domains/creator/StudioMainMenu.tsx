@@ -1,13 +1,23 @@
 /**
- * StudioMainMenu — familiar comic-production application menu with ToonStudio extensions.
- * The presentation host puts File · Edit · Comic · Animation · Layer · Select · View · Filter ·
- * Window · Help first, then marks the complete specialist catalogue with a compact tier boundary.
+ * StudioMainMenu — the desktop application menubar for ToonStudio.
+ * `createStudioMainMenuPresentation` hands it twelve titles in one row —
+ * 파일 · 편집 · 보기 · 삽입 · 레이어 · 선택 · 그리기 · 만화 · 필터 · 도구 · 창 · 도움말 —
+ * of which 삽입 (텍스트 · 벡터) and 도구 (캔버스 · 변형 · 애니메이션 · 3D · 협업 · AI) are
+ * composites: each concatenates several catalogue groups into a single dropdown.
+ * A composite dropdown renders every absorbed group as a `role="group"` section
+ * wrapper named by its own visible caption through `aria-labelledby`, so a screen
+ * reader hears 협업 before 팀 · 공유 권한 rather than ~15 undifferentiated rows. The
+ * rows stay flat `menuitem`s under one roving tabindex, so arrows walk straight
+ * across a section boundary; a non-composite title (파일 · 편집 …) carries no
+ * section caption and therefore emits no wrapper at all.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX), and
  * clicking a neighbouring title commits to that menu instead of toggling it back shut.
  * The bar is a WAI-ARIA `menubar` with a roving tab stop: one Tab press skips it, arrows
  * move between groups, and Tab from inside a panel dismisses it back to its own title.
+ * `specialistBoundaryGroupId` is the last remnant of the retired two-tier bar: the
+ * presentation hard-codes it to `null`, so the separator below never renders in the app.
  */
 import { Check, ChevronDown } from "lucide-react";
 import {
@@ -235,6 +245,34 @@ export function resolveStudioMainMenuItemIndex(
   return (currentPosition + offset + items.length) % items.length;
 }
 
+type MenuSectionRow = { readonly item: StudioMainMenuItem; readonly index: number };
+type MenuSection = { readonly label?: string; readonly rows: readonly MenuSectionRow[] };
+
+/**
+ * Splits a dropdown's rows into the captioned sections the presentation built.
+ * A composite title (삽입 · 도구) concatenates several catalogue groups and marks the
+ * first row of each with `sectionLabel`, so every row up to the next caption belongs
+ * to the section that caption names. Rows are carried with their panel-wide index so
+ * the roving-tabindex refs and `data-studio-main-menu-item-index` stay flat.
+ */
+function splitStudioMainMenuSections(
+  items: readonly StudioMainMenuItem[],
+): readonly MenuSection[] {
+  const sections: { label?: string; rows: MenuSectionRow[] }[] = [];
+  items.forEach((item, index) => {
+    const current = sections.at(-1);
+    if (!current || item.sectionLabel) {
+      sections.push({
+        ...(item.sectionLabel ? { label: item.sectionLabel } : {}),
+        rows: [{ item, index }],
+      });
+      return;
+    }
+    current.rows.push({ item, index });
+  });
+  return sections;
+}
+
 function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
   if (!btn) {
     return { top: 48, left: 8, minWidth: 248 };
@@ -431,6 +469,113 @@ function MenuDropdown({
     focusMenuItem(command, Number.isSafeInteger(itemIndex) ? itemIndex : activeItemIndex);
   };
 
+  const renderMenuItem = (item: StudioMainMenuItem, itemIndex: number): ReactElement => {
+    const Icon = item.icon;
+    const hint = item.hint
+      ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined)
+      ?? (item.unavailableReason
+            ? {
+              id: `main-menu-item-${group.id}-${item.id}`,
+              title: item.label,
+              description: localizeText(
+                t,
+                "Check why this item is unavailable in the current state.",
+                "studio.mainMenu.itemUnavailableHint",
+              ),
+            }
+        : undefined);
+    const unavailableReasonId = item.unavailableReason
+      ? `${panelId}-item-${itemIndex}-unavailable-reason`
+      : undefined;
+    return (
+      // Composite titles (삽입·도구) concatenate rows from several catalogue
+      // groups; ids are only unique per source group, so the key carries the index.
+      <div key={`${item.id}:${itemIndex}`}>
+        <StudioToolHintTarget
+          hint={hint}
+          unavailableReason={item.unavailableReason}
+          preferredSide="right"
+          className="flex w-full"
+        >
+          <button
+            ref={(node) => {
+              itemRefs.current[itemIndex] = node;
+            }}
+            type="button"
+            role={
+              item.checked === undefined
+                ? "menuitem"
+                : item.selectionRole === "radio"
+                  ? "menuitemradio"
+                  : "menuitemcheckbox"
+            }
+            aria-checked={item.checked === undefined ? undefined : item.checked}
+            aria-disabled={item.disabled || undefined}
+            aria-describedby={unavailableReasonId}
+            tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
+            data-studio-main-menu-item-index={itemIndex}
+            data-studio-menu-item-id={item.id}
+            onFocus={() => setActiveItemIndex(itemIndex)}
+            onClick={() => {
+              if (item.disabled) return;
+              try {
+                item.onSelect();
+              } finally {
+                closeMenu();
+              }
+            }}
+            className={cn(
+              "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING,
+              item.danger && "text-bad",
+              item.disabled
+                ? "cursor-not-allowed opacity-40"
+                : "text-fg-2 hover:bg-raised hover:text-fg"
+            )}
+          >
+            {Icon ? (
+              <Icon
+                size={STUDIO_ICON_SIZE.subtab}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({
+                  tone: item.disabled ? "muted" : item.checked ? "accent" : "default",
+                  active: item.checked,
+                  disabled: item.disabled,
+                })}
+              />
+            ) : (
+              <span aria-hidden className="size-[15px] shrink-0" />
+            )}
+            <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
+            {item.checked ? (
+              <Check
+                size={STUDIO_ICON_SIZE.subtab}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "accent", active: true })}
+              />
+            ) : null}
+            {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
+          </button>
+        </StudioToolHintTarget>
+        {item.unavailableReason ? (
+          <span
+            id={unavailableReasonId}
+            data-studio-main-menu-unavailable-reason="true"
+            className="sr-only"
+          >
+            {unavailableReasonLabel}: {item.unavailableReason}
+          </span>
+        ) : null}
+        {item.separatorAfter ? (
+          <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
+        ) : null}
+      </div>
+    );
+  };
+
   const menu =
     open && typeof document !== "undefined"
       ? createPortal(
@@ -455,121 +600,30 @@ function MenuDropdown({
               zIndex: STUDIO_Z.workspace,
             }}
           >
-            {group.items.map((item, itemIndex) => {
-              const Icon = item.icon;
-              const hint = item.hint
-                ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined)
-                ?? (item.unavailableReason
-                      ? {
-                        id: `main-menu-item-${group.id}-${item.id}`,
-                        title: item.label,
-                        description: localizeText(
-                          t,
-                        "Check why this item is unavailable in the current state.",
-                          "studio.mainMenu.itemUnavailableHint",
-                        ),
-                      }
-                  : undefined);
-              const unavailableReasonId = item.unavailableReason
-                ? `${panelId}-item-${itemIndex}-unavailable-reason`
-                : undefined;
+            {splitStudioMainMenuSections(group.items).map((section, sectionIndex) => {
+              const rows = section.rows.map(({ item, index }) => renderMenuItem(item, index));
+              if (!section.label) return <Fragment key={`section:${sectionIndex}`}>{rows}</Fragment>;
+              const captionId = `${panelId}-section-${sectionIndex}`;
+              // A composite dropdown is one flat list of ~15 rows unless the caption
+              // naming the source catalogue group reaches assistive tech too. `group`
+              // is the ARIA pattern for a labelled section inside a `menu`: the caption
+              // stays visible, labels the wrapper, and the rows keep their own
+              // `menuitem` roles, flat indices and roving tabindex.
               return (
-                // Composite titles (삽입·도구) concatenate rows from several catalogue
-                // groups; ids are only unique per source group, so the key carries the index.
-                <div key={`${item.id}:${itemIndex}`}>
-                  {item.sectionLabel ? (
-                    // Visual caption only. A `menu` may hold nothing but menu items, so the
-                    // caption stays out of the accessibility tree; the row label itself is
-                    // unchanged and the hint bubble still names the origin group.
-                    <div
-                      aria-hidden
-                      data-studio-main-menu-section={item.sectionLabel}
-                      className="mx-3 mb-0.5 mt-1.5 truncate text-[0.6875rem] font-bold uppercase tracking-wider text-fg-3 first:mt-0.5"
-                    >
-                      {item.sectionLabel}
-                    </div>
-                  ) : null}
-                  <StudioToolHintTarget
-                    hint={hint}
-                    unavailableReason={item.unavailableReason}
-                    preferredSide="right"
-                    className="flex w-full"
+                <div
+                  key={`section:${sectionIndex}`}
+                  role="group"
+                  aria-labelledby={captionId}
+                  data-studio-main-menu-section-group={section.label}
+                >
+                  <div
+                    id={captionId}
+                    data-studio-main-menu-section={section.label}
+                    className="mx-3 mb-0.5 mt-1.5 truncate text-[0.6875rem] font-bold uppercase tracking-wider text-fg-3 first:mt-0.5"
                   >
-                    <button
-                      ref={(node) => {
-                        itemRefs.current[itemIndex] = node;
-                      }}
-                      type="button"
-                      role={
-                        item.checked === undefined
-                          ? "menuitem"
-                          : item.selectionRole === "radio"
-                            ? "menuitemradio"
-                            : "menuitemcheckbox"
-                      }
-                      aria-checked={item.checked === undefined ? undefined : item.checked}
-                      aria-disabled={item.disabled || undefined}
-                      aria-describedby={unavailableReasonId}
-                      tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
-                      data-studio-main-menu-item-index={itemIndex}
-                      data-studio-menu-item-id={item.id}
-                      onFocus={() => setActiveItemIndex(itemIndex)}
-                      onClick={() => {
-                        if (item.disabled) return;
-                        try {
-                          item.onSelect();
-                        } finally {
-                          closeMenu();
-                        }
-                      }}
-                      className={cn(
-                        "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
-                        STUDIO_EASE,
-                        STUDIO_FOCUS_RING,
-                        item.danger && "text-bad",
-                        item.disabled
-                          ? "cursor-not-allowed opacity-40"
-                          : "text-fg-2 hover:bg-raised hover:text-fg"
-                      )}
-                    >
-                      {Icon ? (
-                        <Icon
-                          size={STUDIO_ICON_SIZE.subtab}
-                          strokeWidth={STUDIO_ICON_STROKE}
-                          aria-hidden
-                          className={studioChromeIconClass({
-                            tone: item.disabled ? "muted" : item.checked ? "accent" : "default",
-                            active: item.checked,
-                            disabled: item.disabled,
-                          })}
-                        />
-                      ) : (
-                        <span aria-hidden className="size-[15px] shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
-                      {item.checked ? (
-                        <Check
-                          size={STUDIO_ICON_SIZE.subtab}
-                          strokeWidth={STUDIO_ICON_STROKE}
-                          aria-hidden
-                          className={studioChromeIconClass({ tone: "accent", active: true })}
-                        />
-                      ) : null}
-                      {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
-                    </button>
-                  </StudioToolHintTarget>
-                  {item.unavailableReason ? (
-                    <span
-                      id={unavailableReasonId}
-                      data-studio-main-menu-unavailable-reason="true"
-                      className="sr-only"
-                    >
-                      {unavailableReasonLabel}: {item.unavailableReason}
-                    </span>
-                  ) : null}
-                  {item.separatorAfter ? (
-                    <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
-                  ) : null}
+                    {section.label}
+                  </div>
+                  {rows}
                 </div>
               );
             })}
