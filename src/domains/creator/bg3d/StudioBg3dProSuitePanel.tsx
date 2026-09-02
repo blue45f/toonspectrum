@@ -9,12 +9,26 @@ import {
   Wind,
   Type,
   Palette,
+  DoorOpen,
+  Clapperboard,
+  User,
+  Grid,
+  Move3d,
+  Aperture,
+  Download,
 } from "lucide-react";
 import { useState } from "react";
 
+import { StudioBg3dCharacterAnimatorPanel } from "./StudioBg3dCharacterAnimatorPanel";
+import { StudioBg3dCinematicDirectorPanel } from "./StudioBg3dCinematicDirectorPanel";
 import { StudioBg3dClonerPanel } from "./StudioBg3dClonerPanel";
+import { StudioBg3dDeformersPanel } from "./StudioBg3dDeformersPanel";
+import { StudioBg3dDynamicComponentsPanel } from "./StudioBg3dDynamicComponentsPanel";
+import { StudioBg3dHalftoneScreentonePanel } from "./StudioBg3dHalftoneScreentonePanel";
 import { StudioBg3dMatCapStudioPanel } from "./StudioBg3dMatCapStudioPanel";
+import { StudioBg3dMultiPassExporterPanel } from "./StudioBg3dMultiPassExporterPanel";
 import { StudioBg3dParticleVfxPanel } from "./StudioBg3dParticleVfxPanel";
+import { StudioBg3dPostProcessVfxPanel } from "./StudioBg3dPostProcessVfxPanel";
 import { StudioBg3dTextExtruderPanel } from "./StudioBg3dTextExtruderPanel";
 
 import type { CameraLensPreset, PerspectiveGuideMode } from "../scene-3d/studio-3d-camera-perspective-lens";
@@ -24,13 +38,20 @@ import type { TimeOfDayPreset } from "../scene-3d/studio-3d-scene-auto-culling";
 
 export type ProSuiteActiveTab =
   | "grip"
+  | "dynamic"
   | "lens"
-  | "culling"
-  | "hair"
+  | "director"
+  | "character"
   | "cloner"
   | "particle"
   | "text3d"
-  | "matcap";
+  | "matcap"
+  | "screentone"
+  | "deform"
+  | "postfx"
+  | "multipass"
+  | "culling"
+  | "hair";
 
 export interface StudioBg3dProSuitePanelProps {
   readonly disabled?: boolean;
@@ -39,39 +60,46 @@ export interface StudioBg3dProSuitePanelProps {
 export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuitePanelProps) {
   const [activeTab, setActiveTab] = useState<ProSuiteActiveTab>("grip");
 
-  // Tab 1: Prop Grip State
+  // Tab: Prop Grip State
   const [selectedGrip, setSelectedGrip] = useState<HandGripArchetype>("sword-power-grip");
   const [selectedSocket, setSelectedSocket] = useState<CharacterSocketSlot>("hand-right");
   const [tightness, setTightness] = useState(1.0);
 
-  // Tab 2: Lens & Foreshortening State
+  // Tab: Lens & Foreshortening State
   const [selectedLens, setSelectedLens] = useState<CameraLensPreset>("24mm-dramatic-low-angle");
   const [foreshortening, setForeshortening] = useState(1.8);
   const [guideMode, setGuideMode] = useState<PerspectiveGuideMode>("2-point");
 
-  // Tab 3: Culling & Atmosphere State
+  // Tab: Culling & Atmosphere State
   const [selectedTimeOfDay, setSelectedTimeOfDay] = useState<TimeOfDayPreset>("golden-hour-sunset");
   const [autoCullObstructions, setAutoCullObstructions] = useState(true);
 
-  // Tab 4: Hair Strand State
+  // Tab: Hair Strand State
   const [hairProfile, setHairProfile] = useState<HairCrossSectionProfile>("triangular-anime-spike");
   const [strandTaper, setStrandTaper] = useState(1.3);
 
   const navButtons: Array<{ id: ProSuiteActiveTab; label: string; icon: typeof Grab }> = [
     { id: "grip", label: "소품 그립", icon: Grab },
+    { id: "dynamic", label: "인터랙션", icon: DoorOpen },
     { id: "lens", label: "만화 렌즈", icon: Camera },
+    { id: "director", label: "컷 디렉터", icon: Clapperboard },
+    { id: "character", label: "캐릭터/표정", icon: User },
     { id: "cloner", label: "3D 클로너", icon: Layers },
     { id: "particle", label: "3D 파티클", icon: Wind },
     { id: "text3d", label: "3D 효과음", icon: Type },
     { id: "matcap", label: "맷캡 재질", icon: Palette },
+    { id: "screentone", label: "3D 망점/톤", icon: Grid },
+    { id: "deform", label: "디포머", icon: Move3d },
+    { id: "postfx", label: "렌즈 PostFX", icon: Aperture },
+    { id: "multipass", label: "멀티패스", icon: Download },
     { id: "culling", label: "배경 컬링", icon: Sun },
     { id: "hair", label: "헤어 가닥", icon: Scissors },
   ];
 
   return (
     <div className="flex flex-col gap-3 p-3 text-xs text-fg">
-      {/* 8 Navigation Tabs Grid */}
-      <div className="grid grid-cols-4 gap-1 rounded-lg border border-line bg-card p-1">
+      {/* Navigation Tabs Grid */}
+      <div className="grid grid-cols-5 gap-1 rounded-lg border border-line bg-card p-1">
         {navButtons.map((btn) => {
           const Icon = btn.icon;
           const isSelected = activeTab === btn.id;
@@ -81,20 +109,20 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
               type="button"
               disabled={disabled}
               onClick={() => setActiveTab(btn.id)}
-              className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.65rem] font-bold transition-all ${
+              className={`flex items-center justify-center gap-1 rounded-md py-1 text-[0.62rem] font-bold transition-all ${
                 isSelected
                   ? "border border-line bg-raised text-fg shadow-sm"
                   : "text-fg-3 hover:text-fg"
               }`}
             >
-              <Icon className="size-3.5 text-accent" />
-              <span>{btn.label}</span>
+              <Icon className="size-3 text-accent shrink-0" />
+              <span className="truncate">{btn.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Tab 1: Prop Snapping & Hand Grip */}
+      {/* Tab: Prop Snapping & Hand Grip */}
       {activeTab === "grip" && (
         <div className="flex flex-col gap-2.5">
           <div>
@@ -177,7 +205,10 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
         </div>
       )}
 
-      {/* Tab 2: Dynamic Lens & Foreshortening */}
+      {/* Tab: Dynamic Components */}
+      {activeTab === "dynamic" && <StudioBg3dDynamicComponentsPanel />}
+
+      {/* Tab: Dynamic Lens & Foreshortening */}
       {activeTab === "lens" && (
         <div className="flex flex-col gap-2.5">
           <div>
@@ -249,19 +280,37 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
         </div>
       )}
 
-      {/* Tab 3: Cloner Panel */}
+      {/* Tab: Cinematic Director */}
+      {activeTab === "director" && <StudioBg3dCinematicDirectorPanel />}
+
+      {/* Tab: Character Proportions & Expressions */}
+      {activeTab === "character" && <StudioBg3dCharacterAnimatorPanel />}
+
+      {/* Tab: Cloner Panel */}
       {activeTab === "cloner" && <StudioBg3dClonerPanel disabled={disabled} />}
 
-      {/* Tab 4: Particle VFX Panel */}
+      {/* Tab: Particle VFX Panel */}
       {activeTab === "particle" && <StudioBg3dParticleVfxPanel disabled={disabled} />}
 
-      {/* Tab 5: 3D Text Extruder Panel */}
+      {/* Tab: 3D Text Extruder Panel */}
       {activeTab === "text3d" && <StudioBg3dTextExtruderPanel disabled={disabled} />}
 
-      {/* Tab 6: MatCap Studio Panel */}
+      {/* Tab: MatCap Studio Panel */}
       {activeTab === "matcap" && <StudioBg3dMatCapStudioPanel disabled={disabled} />}
 
-      {/* Tab 7: Architecture Auto-Culling & Day/Night */}
+      {/* Tab: Screentone Panel */}
+      {activeTab === "screentone" && <StudioBg3dHalftoneScreentonePanel />}
+
+      {/* Tab: Deformers Panel */}
+      {activeTab === "deform" && <StudioBg3dDeformersPanel />}
+
+      {/* Tab: PostProcess VFX Panel */}
+      {activeTab === "postfx" && <StudioBg3dPostProcessVfxPanel />}
+
+      {/* Tab: MultiPass Exporter Panel */}
+      {activeTab === "multipass" && <StudioBg3dMultiPassExporterPanel />}
+
+      {/* Tab: Architecture Auto-Culling & Day/Night */}
       {activeTab === "culling" && (
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center justify-between rounded-xl border border-line bg-card/60 p-2.5 text-[0.68rem]">
@@ -317,7 +366,7 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
         </div>
       )}
 
-      {/* Tab 8: Hair Strand Maker */}
+      {/* Tab: Hair Strand Maker */}
       {activeTab === "hair" && (
         <div className="flex flex-col gap-2.5">
           <div>
