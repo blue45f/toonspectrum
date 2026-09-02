@@ -6,9 +6,23 @@
   "cadenceMinutes": 60,
   "trackingIssue": 555,
   "maxOpenCampaignPullRequests": 1,
+  "maxConcurrentAuthoringRuns": 6,
+  "maxParallelResearchRefreshes": 1,
   "branchPrefix": "codex/campaign-",
   "pullRequestMarker": "<!-- studio-automerge -->",
-  "issueQueue": [557, 558, 559, 560, 561, 562, 563, 569, 570, 571],
+  "issueQueue": [
+    557,
+    558,
+    559,
+    560,
+    561,
+    562,
+    563,
+    569,
+    570,
+    571,
+    573
+  ],
   "fallbackTracks": [
     "production-bug-and-ci-repair",
     "canvas-and-input-quality",
@@ -18,6 +32,7 @@
     "vector-and-smart-shape",
     "non-destructive-effects",
     "three-d-authoring",
+    "hyper3d-generation-and-texturing",
     "animation-and-storyboard",
     "structured-ai-assist",
     "asset-variants-and-batch-generation",
@@ -26,6 +41,167 @@
     "mobile-accessibility-and-workspace",
     "emerging-product-parity",
     "research-prototype"
+  ],
+  "lanes": [
+    {
+      "id": "reliability",
+      "title": "Document reliability and recovery",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        557
+      ],
+      "fallbackTracks": [
+        "production-bug-and-ci-repair",
+        "document-recovery-and-history",
+        "collaboration-consistency",
+        "import-export-integrity",
+        "recovery-soak"
+      ],
+      "focusTerms": [
+        "autosave",
+        "opfs",
+        "storage",
+        "history",
+        "undo",
+        "redo",
+        "recovery",
+        "codec",
+        "document"
+      ]
+    },
+    {
+      "id": "drawing",
+      "title": "Canvas, brush, vector, and natural media",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        558,
+        560,
+        570
+      ],
+      "fallbackTracks": [
+        "canvas-and-input-quality",
+        "brush-and-natural-media",
+        "vector-and-smart-shape",
+        "error-bounded-vector-rasterizer",
+        "input-latency-and-memory"
+      ],
+      "focusTerms": [
+        "canvas",
+        "brush",
+        "stroke",
+        "shape",
+        "vector",
+        "raster",
+        "paint",
+        "ink",
+        "pencil"
+      ]
+    },
+    {
+      "id": "effects-ui",
+      "title": "Non-destructive effects and production workspace",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        559
+      ],
+      "fallbackTracks": [
+        "non-destructive-effects",
+        "mobile-accessibility-and-workspace",
+        "layer-mask-quality",
+        "color-management-and-inspector",
+        "command-discoverability"
+      ],
+      "focusTerms": [
+        "effect",
+        "filter",
+        "adjustment",
+        "mask",
+        "layer",
+        "inspector",
+        "workspace",
+        "color"
+      ]
+    },
+    {
+      "id": "three-d",
+      "title": "3D authoring, surface painting, and generation",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        561,
+        573
+      ],
+      "fallbackTracks": [
+        "three-d-authoring",
+        "hyper3d-generation-and-texturing",
+        "surface-painting-and-materials",
+        "rigging-and-pose",
+        "toon-render-output"
+      ],
+      "focusTerms": [
+        "bg3d",
+        "3d",
+        "gltf",
+        "glb",
+        "vrm",
+        "texture",
+        "material",
+        "pose",
+        "model",
+        "rodin"
+      ]
+    },
+    {
+      "id": "animation",
+      "title": "Animation, storyboard, camera, and audio",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        562
+      ],
+      "fallbackTracks": [
+        "animation-and-storyboard",
+        "timeline-performance",
+        "camera-and-audio",
+        "frame-exposure-and-onion-skin",
+        "motion-export"
+      ],
+      "focusTerms": [
+        "animation",
+        "timeline",
+        "frame",
+        "onion",
+        "audio",
+        "camera",
+        "animatic",
+        "storyboard"
+      ]
+    },
+    {
+      "id": "ai-assets",
+      "title": "Structured AI, asset variants, and co-creation",
+      "maxOpenPullRequests": 1,
+      "issueQueue": [
+        563,
+        569,
+        571
+      ],
+      "fallbackTracks": [
+        "structured-ai-assist",
+        "asset-variants-and-batch-generation",
+        "stroke-level-co-creative-proposals",
+        "emerging-product-parity",
+        "research-prototype"
+      ],
+      "focusTerms": [
+        "ai",
+        "asset",
+        "variant",
+        "provenance",
+        "generation",
+        "proposal",
+        "marketplace",
+        "batch"
+      ]
+    }
   ],
   "agent": {
     "provider": "openai-codex-action",
@@ -45,6 +221,7 @@
     "requireLintQuick": true,
     "requireTypecheck": true,
     "requirePullRequestRiskGate": true,
-    "requireMainDeploymentSmoke": true
+    "requireMainDeploymentSmoke": true,
+    "rejectExactFileOverlapAcrossOpenCampaignPullRequests": true
   }
 }
