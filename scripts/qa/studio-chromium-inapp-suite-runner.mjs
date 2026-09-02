@@ -21,6 +21,7 @@ const JIRA_ASSIGNEE_ACCOUNT_ID = process.env.JIRA_ASSIGNEE_ACCOUNT_ID ?? "";
 const GITHUB_RUN_URL = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
   ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
   : "local";
+// eslint-disable-next-line no-control-regex -- strips ANSI CSI/OSC terminal escapes from QA output
 const ANSI = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/gu;
 
 const SUITES = Object.freeze({
