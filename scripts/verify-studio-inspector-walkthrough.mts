@@ -19,6 +19,13 @@
  * Findings that are real but out of scope for a hard gate are collected in
  * `notes` rather than failing the run, so the report stays honest about what it
  * could not exercise.
+ *
+ * `notes` never gate: only a `blocked` row reaches `report.failures` and sets a
+ * non-zero exit code. So a control the harness could not drive because the path
+ * into it is gone is a `blocked` row, never a note — a note there would let the
+ * row silently disappear and the run still print `RESULT: OK`. Notes are only
+ * for things outside the inspector's contract (e.g. this preview build cannot
+ * create a document element to select).
  */
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -150,8 +157,10 @@ async function dismissHydratedQuickStart(page: Page): Promise<void> {
     .then(() => true)
     .catch(() => false);
   if (!mounted) return;
-  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
-  await quickStart.waitFor({ state: "detached", timeout: 3_000 });
+  // 여기서 throw 하면 gotoStudio 가 끊겨 워크스루 전체가 리포트 없이 죽는다. 닫기에
+  // 실패하면 이후 행들이 각자 blocked 로 떨어지게 두고 계속 진행한다.
+  await clickControl(quickStart.locator('[data-studio-quickstart-dismiss="true"]'));
+  await quickStart.waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
 }
 
 /** 300ms 시트 트랜지션이 끝나기 전에 재는 것을 막는다. */
@@ -241,8 +250,11 @@ function primaryTab(page: Page, tab: string): Locator {
 async function selectPrimaryTab(page: Page, tab: string): Promise<boolean> {
   const button = primaryTab(page, tab);
   if ((await button.count()) === 0) return false;
-  if ((await button.getAttribute("aria-selected")) !== "true") await button.click();
-  return (await button.getAttribute("aria-selected")) === "true";
+  if ((await readAttribute(button, "aria-selected")) !== "true") {
+    // 클릭 실패는 false 로 떨어뜨린다 — throw 하면 이 탭 하나 때문에 워크 전체가 끊긴다.
+    if (!(await clickControl(button))) return false;
+  }
+  return (await readAttribute(button, "aria-selected")) === "true";
 }
 
 function documentTab(page: Page, label: string): Locator {
@@ -251,11 +263,393 @@ function documentTab(page: Page, label: string): Locator {
   }).first();
 }
 
+/**
+ * 문서 하위 탭 스트립은 `layout.primary === "document"` 일 때만 마운트된다. 새로고침
+ * 직후에는 워크스페이스 하이드레이션이 조금 늦게 primary 를 다시 잡으면서 스트립이 잠깐
+ * 사라지고, 그때 잡아 둔 탭 핸들로 클릭하면 "element was detached" 재시도가 기본 30초
+ * 타임아웃까지 이어져 **워크스루 전체가 중단**된다(관측 2회). 사용자가 할 법한 복구를
+ * 그대로 한다 — 문서 탭을 다시 고르고 짧은 타임아웃으로 재시도한다.
+ *
+ * 재시도가 소진되면 그건 하이드레이션 흔들림이 아니라 도달 불가다. **호출부는 false 를
+ * 반드시 blocked 행으로 기록해야 한다** — note 로 남기면 실패 목록(blocked 행에서만
+ * 만들어진다)에 들어가지 않아, 하위 탭이 죽어도 리포트가 RESULT: OK 로 끝난다.
+ */
 async function selectDocumentTab(page: Page, label: string): Promise<boolean> {
-  const tab = documentTab(page, label);
-  if ((await tab.count()) === 0) return false;
-  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-  return (await tab.getAttribute("aria-selected")) === "true";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tab = documentTab(page, label);
+    const attached = await tab
+      .waitFor({ state: "attached", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (attached) {
+      if ((await tab.getAttribute("aria-selected").catch(() => null)) === "true") return true;
+      const clicked = await tab
+        .click({ timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (
+        clicked
+        && (await tab.getAttribute("aria-selected").catch(() => null)) === "true"
+      ) {
+        return true;
+      }
+    }
+    await selectPrimaryTab(page, "document");
+  }
+  return false;
+}
+
+/** 게시 준비 모드의 표식 — 상시 탭이 아니라 내비게이터 위 배너로 나타난다. */
+function publishModeBanner(page: Page): Locator {
+  return page.locator(`${NAVIGATOR} [data-studio-inspector-publish-mode="true"]`).first();
+}
+
+/**
+ * 없는/이름이 바뀐 컨트롤을 맨 클릭하면 Playwright 가 기본 30초 동안 재시도하다 throw 해
+ * 워크스루 전체가 중단되고, 그 컨트롤을 위해 준비해 둔 defect 문자열은 영영 기록되지
+ * 않는다. 클릭은 전부 이 헬퍼를 지나 boolean 으로 떨어뜨려, 실패가 blocked 행이 되게 한다.
+ */
+async function clickControl(locator: Locator, timeout = 5_000): Promise<boolean> {
+  if ((await locator.count().catch(() => 0)) === 0) return false;
+  return locator
+    .click({ timeout })
+    .then(() => true)
+    .catch(() => false);
+}
+
+/**
+ * 통합 검색 다이얼로그.
+ *
+ * `[role="dialog"]` 를 first() 로 잡으면 안 된다 — 작업공간 다이얼로그처럼 `hidden` 으로
+ * 상시 마운트된 role=dialog 가 먼저 걸려, 정작 열려 있는 검색 팔레트를 "안 열렸다" 로
+ * 읽고 그 백드롭이 이후 클릭을 전부 가로챈다(게시 작업공간 경로를 밟은 뒤 실측).
+ */
+function commandSearchDialog(page: Page): Locator {
+  return page.getByRole("dialog", { name: "기능·설정 찾기" });
+}
+
+/**
+ * 열려 있는 모달을 Esc 로 걷어낸다.
+ *
+ * 삽입 시도가 엉뚱한 결과를 실행해 도움말 센터 같은 다른 모달이 열리면, 그 백드롭이
+ * 이후 클릭을 전부 가로채 워크스루가 30초 타임아웃으로 끊긴다(실측: F1 '말풍선 추가'
+ * 뒤 `z-[110]` 도움말 오버레이). 데스크톱 전용 — 모바일 작업 시트 자체가 모달이라
+ * 거기서 부르면 시트를 닫아 버린다.
+ */
+async function dismissOpenModals(page: Page): Promise<void> {
+  const modal = page.locator(
+    '[role="dialog"][aria-modal="true"]:visible, [role="alertdialog"][aria-modal="true"]:visible',
+  );
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if ((await modal.count().catch(() => 0)) === 0) return;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
+}
+
+/** getAttribute 도 같은 이유로 throw 한다 — 없으면 null 로 떨어뜨린다. */
+async function readAttribute(locator: Locator, name: string): Promise<string | null> {
+  if ((await locator.count().catch(() => 0)) === 0) return null;
+  return locator.getAttribute(name).catch(() => null);
+}
+
+/** 실제로 밟은 진입 경로. 검색 색인 하나에 게시 행 전체가 매달리지 않게 구분해 기록한다. */
+type PublishModeRoute = "workspace" | "search" | "none";
+
+/** 전환 직전의 활성 작업공간 — 되돌리기 위한 좌표. */
+interface WorkspaceIdentity {
+  id: string;
+  name: string;
+}
+
+interface PublishModeEntry {
+  /** 게시 준비 모드를 실제로 연 경로. 어느 쪽도 못 열면 "none". */
+  route: PublishModeRoute;
+  /** 검색 경로를 시도했다면 통합 검색 다이얼로그가 실제로 열렸는가. */
+  searchOpened: boolean;
+  /** 게시 준비 모드가 화면에 나타났는가. */
+  routed: boolean;
+  /** 실패 사유 — 행의 effect 가 실제로 일어난 일과 어긋나지 않게 한다. */
+  failure: string | null;
+  /**
+   * 전환은 커밋됐는데 되돌릴 좌표를 잡지 못한 경우의 사유. 복원을 시도할 수조차 없다는
+   * 뜻이므로 호출자는 이것을 blocked 행으로 남겨야 한다 — 그러지 않으면 이후 구획이
+   * 조용히 '게시' 배치를 재고 리포트는 OK 로 끝난다.
+   */
+  restoreUnavailable?: string | null;
+  /**
+   * 작업공간 프리셋 경로가 **실제로 전환을 커밋했다면** 그 직전의 활성 작업공간.
+   *
+   * `StudioWorkspaceMenu.completeWorkspaceSwitch` 는 `commitState` + `onApplyLayout` 으로
+   * 배치를 저장한다. 즉 이 전환은 되돌리지 않으면 이후 구획(E~I·모바일)이 전부 '게시'
+   * 배치를 측정하게 되어 기본 배치에 대한 측정이 아니게 된다. 호출부는 게시 행을 다
+   * 기록한 뒤 이 작업공간으로 반드시 복원하고, 복원 실패를 blocked 행으로 남겨야 한다.
+   */
+  restoreWorkspace: WorkspaceIdentity | null;
+}
+
+const WORKSPACE_TRIGGER = 'button[aria-label^="작업공간:"]';
+const WORKSPACE_DIALOG = '[data-testid="studio-workspace-dialog"]';
+const WORKSPACE_SWITCH_GUARD = '[data-testid="studio-workspace-switch-guard"]';
+
+/** 전환 목록에서 현재 활성으로 표시된 작업공간의 id/이름. 목록이 접혀 있어도 읽힌다. */
+async function readActiveWorkspace(dialog: Locator): Promise<WorkspaceIdentity | null> {
+  const active = dialog
+    .locator(
+      '[data-workspace-kind="builtin"][aria-current="true"],'
+        + ' [data-workspace-kind="custom-switch"][aria-current="true"]',
+    )
+    .first();
+  const id = await readAttribute(active, "data-workspace-id");
+  if (!id) return null;
+  // aria-label 은 `${이름}, 현재 작업공간` — 이름만 떼어 복원 시 검색어로 쓴다.
+  const name = ((await readAttribute(active, "aria-label")) ?? "").split(",")[0]?.trim() ?? "";
+  return name ? { id, name } : null;
+}
+
+/** 전환 목록에서 이 id 를 가진 버튼(관리 탭의 동명 항목이 아니라). */
+function workspaceSwitchOption(dialog: Locator, id: string): Locator {
+  const quoted = JSON.stringify(id);
+  return dialog
+    .locator(
+      `[data-workspace-kind="builtin"][data-workspace-id=${quoted}],`
+        + ` [data-workspace-kind="custom-switch"][data-workspace-id=${quoted}]`,
+    )
+    .first();
+}
+
+/** 배치 변경이 남아 있으면 뜨는 전환 가드 — 사용자가 하듯 저장 없이 넘어간다. */
+async function passWorkspaceSwitchGuard(page: Page): Promise<string | null> {
+  const guard = page.locator(WORKSPACE_SWITCH_GUARD);
+  const shown = await guard
+    .waitFor({ state: "visible", timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return null;
+  const discarded = await clickControl(guard.getByRole("button", { name: "저장하지 않고 전환" }));
+  return discarded ? null : "작업공간 전환 가드에서 '저장하지 않고 전환' 을 누르지 못했다";
+}
+
+/**
+ * 게시 구획이 커밋해 둔 작업공간 전환을 원래 작업공간으로 되돌린다.
+ *
+ * 성공하면 null, 실패하면 사유 문자열을 돌려준다 — 호출부가 blocked 행으로 남길 수 있게
+ * throw 하지 않는다. 복원 여부는 트리거의 `aria-label` 과 게시 배너 소멸로 확인한다.
+ */
+async function restoreWorkspace(page: Page, target: WorkspaceIdentity): Promise<string | null> {
+  const trigger = page.locator(WORKSPACE_TRIGGER).first();
+  if (!(await clickControl(trigger))) return "작업공간 버튼을 클릭하지 못했다";
+  const dialog = page.locator(WORKSPACE_DIALOG);
+  const opened = await dialog
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!opened) return "작업공간 다이얼로그가 열리지 않았다";
+
+  const search = dialog.getByLabel("작업공간 검색", { exact: true });
+  if ((await search.count()) === 0) return "작업공간 검색 입력이 없다";
+  const filtered = await search
+    .fill(target.name, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!filtered) return "작업공간 검색어를 입력하지 못했다";
+
+  if (!(await clickControl(workspaceSwitchOption(dialog, target.id)))) {
+    return `'${target.name}' 작업공간 항목을 클릭하지 못했다`;
+  }
+  const guardFailure = await passWorkspaceSwitchGuard(page);
+  if (guardFailure) return guardFailure;
+
+  const closed = await dialog
+    .waitFor({ state: "hidden", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!closed) return "전환 뒤에도 작업공간 다이얼로그가 닫히지 않았다";
+
+  const label = (await readAttribute(trigger, "aria-label")) ?? "";
+  if (!label.startsWith(`작업공간: ${target.name}`)) {
+    return `활성 작업공간이 '${target.name}' 로 돌아오지 않았다 (${label || "라벨 없음"})`;
+  }
+  if (await publishModeBanner(page).isVisible().catch(() => false)) {
+    return "작업공간은 되돌아왔으나 게시 준비 배너가 남아 있다";
+  }
+  return null;
+}
+
+/**
+ * 게시 작업공간 프리셋으로 게시 준비 모드를 연다.
+ *
+ * `src/domains/creator/studio-workspaces.ts` 의 `id: "publish"`(이름 '게시')는
+ * `createBuiltinLayout({ primary: "publish", ... })` 이고, 인스펙터는
+ * `publishMode = layout.primary === "publish"` 로 배너를 켠다. 즉 이 전환은 로그인도
+ * 검색 색인도 타지 않는 순수 배치 전환이며, 이 워크스루가 이미 읽고 있는
+ * `작업공간:` 버튼에서 바로 닿는다.
+ */
+async function openPublishPreparationModeViaWorkspace(page: Page): Promise<PublishModeEntry> {
+  const miss = (
+    failure: string,
+    restoreTarget: WorkspaceIdentity | null = null,
+  ): PublishModeEntry => ({
+    route: "none",
+    searchOpened: false,
+    routed: false,
+    failure,
+    restoreWorkspace: restoreTarget,
+  });
+  const trigger = page.locator(WORKSPACE_TRIGGER).first();
+  if (!(await clickControl(trigger))) return miss("작업공간 버튼을 클릭하지 못했다");
+
+  const dialog = page.locator(WORKSPACE_DIALOG);
+  const dialogOpen = await dialog
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!dialogOpen) return miss("작업공간 다이얼로그가 열리지 않았다");
+
+  // 전환은 배치를 커밋한다 — 되돌릴 좌표를 전환 **전에** 잡아 둔다.
+  const previous = await readActiveWorkspace(dialog);
+
+  // 기본 작업공간 목록은 접혀 있을 수 있다 — 검색어가 있으면 항상 펼쳐진다.
+  // exact — '작업공간 검색어 지우기' 버튼과의 부분 일치 충돌을 막는다.
+  const search = dialog.getByLabel("작업공간 검색", { exact: true });
+  if ((await search.count()) === 0) return miss("작업공간 검색 입력이 없다");
+  const filtered = await search
+    .fill("게시", { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!filtered) return miss("작업공간 검색어를 입력하지 못했다");
+
+  const preset = workspaceSwitchOption(dialog, "publish");
+  if (!(await clickControl(preset))) return miss("'게시' 작업공간 프리셋을 클릭하지 못했다");
+
+  // 배치가 변경된 상태면 저장 여부를 묻는 alertdialog 가 먼저 뜬다. 하네스는 배치를
+  // 저장할 게 없으므로 사용자가 하듯 '저장하지 않고 전환' 을 고른다.
+  const guardFailure = await passWorkspaceSwitchGuard(page);
+  if (guardFailure) return miss(guardFailure);
+
+  // 전환이 실제로 커밋됐을 때만 복원 대상을 실어 보낸다 — 커밋되지 않았는데 복원을
+  // 시도하면 '이미 활성' 인 항목(disabled)을 눌러 없는 결함을 만들어 낸다.
+  const switchedLabel = (await readAttribute(trigger, "aria-label")) ?? "";
+  const committed = switchedLabel.startsWith("작업공간: 게시");
+  const restoreTarget = committed && previous ? previous : null;
+  // 전환은 커밋됐는데 직전 작업공간을 읽지 못한 경우가 가장 위험하다: 되돌릴 좌표가 없으니
+  // 복원도 복원 행도 없이 E~I 구획이 '게시' 배치를 재고, 리포트는 OK 로 끝난다. 그 상태를
+  // 호출자가 blocked 행으로 남길 수 있도록 사유를 실어 보낸다.
+  const restoreUnavailable = committed && !previous
+    ? "'게시' 작업공간으로 전환했으나 전환 전 활성 작업공간을 읽지 못해 되돌릴 좌표가 없다"
+    : null;
+
+  const routed = await publishModeBanner(page)
+    .waitFor({ state: "visible", timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  return {
+    route: routed ? "workspace" : "none",
+    searchOpened: false,
+    routed,
+    failure: routed ? null : "'게시' 작업공간으로 전환했으나 게시 준비 배너가 나타나지 않았다",
+    restoreWorkspace: restoreTarget,
+    restoreUnavailable,
+  };
+}
+
+/**
+ * 통합 검색('현재 패널' 범위)으로 게시 준비 모드를 연다 — 데스크톱은 상단 검색 행,
+ * 모바일은 내비게이터의 '찾기' 버튼이며 둘 다 같은 다이얼로그를 연다.
+ *
+ * 게시 CTA·파일 ▸ 게시는 `studio-page-save-pipeline` 의 로그인 게이트("로그인 후 게시할
+ * 수 있어요.")에 먼저 막히고 이 하네스는 세션을 비로그인으로 고정하므로 밟을 수 없다.
+ * 하지만 이 검색이 '유일한' 비로그인 경로는 아니다 — 위의 게시 작업공간 프리셋이 세 번째
+ * 경로이고, 그쪽이 검색 색인과 독립이라 기본 경로다.
+ */
+async function openPublishPreparationModeViaSearch(page: Page): Promise<PublishModeEntry> {
+  const miss = (searchOpened: boolean, failure: string): PublishModeEntry => ({
+    route: "none",
+    searchOpened,
+    routed: false,
+    failure,
+    // 검색 경로는 작업공간을 전환하지 않는다 — 되돌릴 것이 없다.
+    restoreWorkspace: null,
+  });
+  const desktopTrigger = page.locator('[data-testid="studio-command-search-trigger"]');
+  // 모바일 시트에서는 상단 검색 행이 렌더되지 않는다(hideTrigger) — 같은 다이얼로그를
+  // 내비게이터의 '찾기' 버튼이 연다.
+  const trigger =
+    (await desktopTrigger.count()) > 0
+      ? desktopTrigger.first()
+      : page.locator(`${NAVIGATOR} [data-studio-inspector-search-trigger="true"]`).first();
+  if (!(await clickControl(trigger))) return miss(false, "통합 검색 트리거를 클릭하지 못했다");
+
+  const dialog = commandSearchDialog(page);
+  const searchOpened = await dialog
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!searchOpened) return miss(false, "통합 검색 다이얼로그가 열리지 않았다");
+
+  const inspectorScope = dialog.getByRole("radio", { name: "현재 패널" });
+  if ((await readAttribute(inspectorScope, "aria-checked")) !== "true") {
+    if (!(await clickControl(inspectorScope))) {
+      return miss(true, "'현재 패널' 범위 라디오를 고르지 못했다");
+    }
+  }
+  const combobox = dialog.getByRole("combobox");
+  if ((await combobox.count()) === 0) return miss(true, "검색 입력(combobox)이 없다");
+  const typed = await combobox
+    .fill("작품 정보", { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!typed) return miss(true, "검색어를 입력하지 못했다");
+  await page.keyboard.press("Enter");
+  const routed = await publishModeBanner(page)
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  // 라우팅에 실패하면 다이얼로그가 그대로 남아 이후 클릭을 전부 가로챈다 — 닫고 나간다.
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "hidden", timeout: 3_000 }).catch(() => undefined);
+  }
+  return {
+    route: routed ? "search" : "none",
+    searchOpened: true,
+    routed,
+    failure: routed ? null : "검색은 열렸으나 Enter 가 게시 준비 모드로 라우팅하지 않았다",
+    restoreWorkspace: null,
+  };
+}
+
+/**
+ * 게시 준비 모드 진입 — 작업공간 프리셋을 먼저 밟고, 그 경로가 막히면 통합 검색으로
+ * 물러선다. 두 경로 중 하나만 살아 있어도 게시 행들이 구동된다.
+ */
+async function openPublishPreparationMode(page: Page): Promise<PublishModeEntry> {
+  const viaWorkspace = await openPublishPreparationModeViaWorkspace(page);
+  if (viaWorkspace.routed) return viaWorkspace;
+  // 실패한 작업공간 다이얼로그가 열린 채 남으면 백드롭이 이후 클릭을 전부 가로챈다.
+  // (전환 가드가 떠 있으면 첫 Esc 는 가드만 닫는다 — 다이얼로그가 사라질 때까지 반복한다.)
+  const workspaceDialog = page.locator(WORKSPACE_DIALOG);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await workspaceDialog.isVisible().catch(() => false))) break;
+    await page.keyboard.press("Escape");
+    await workspaceDialog.waitFor({ state: "hidden", timeout: 2_000 }).catch(() => undefined);
+  }
+  const viaSearch = await openPublishPreparationModeViaSearch(page);
+  // 작업공간 경로가 배너까지 가지 못했더라도 전환 자체는 커밋됐을 수 있다 —
+  // 복원 대상은 어느 경로로 진입했든 그대로 들고 나간다.
+  if (viaSearch.routed) {
+    return {
+      ...viaSearch,
+      restoreWorkspace: viaWorkspace.restoreWorkspace,
+      restoreUnavailable: viaWorkspace.restoreUnavailable ?? null,
+    };
+  }
+  return {
+    ...viaSearch,
+    restoreWorkspace: viaWorkspace.restoreWorkspace,
+    restoreUnavailable: viaWorkspace.restoreUnavailable ?? null,
+    failure: `작업공간 경로: ${viaWorkspace.failure ?? "실패"}; 검색 경로: ${viaSearch.failure ?? "실패"}`,
+  };
 }
 
 /** 탭의 실제 소유 panel을 aria-controls로 찾고, 구버전 빌드에는 aria-label을 쓴다. */
@@ -352,9 +746,7 @@ async function walkDesktop(
 
     // F1 로 통합 검색이 열리고 Esc 로 닫힌다.
     await page.keyboard.press("F1");
-    const dialogOpen = await page
-      .locator('[role="dialog"]')
-      .first()
+    const dialogOpen = await commandSearchDialog(page)
       .waitFor({ state: "visible", timeout: 4_000 })
       .then(() => true)
       .catch(() => false);
@@ -422,24 +814,10 @@ async function walkDesktop(
     // 기능·설정 찾기(통합 검색, 범위 '현재 패널') — 입력 후 Enter 가 실제로 라우팅해야 한다.
     // 인스펙터 안의 로컬 검색은 통합 다이얼로그로 합쳐졌다(감사 §5.5: 화면당 검색 하나).
     await selectPrimaryTab(page, "properties");
-    const unifiedSearchTrigger = page.locator('[data-testid="studio-command-search-trigger"]');
-    await unifiedSearchTrigger.click();
-    const unifiedDialog = page.getByRole("dialog", { name: "기능·설정 찾기" });
-    const localSearchOpened = await unifiedDialog
-      .waitFor({ state: "visible", timeout: 3_000 })
-      .then(() => true)
-      .catch(() => false);
-    let routedByLocalSearch = false;
-    if (localSearchOpened) {
-      await unifiedDialog.getByRole("radio", { name: "현재 패널" }).click();
-      await unifiedDialog.getByRole("combobox").fill("작품 정보");
-      await page.keyboard.press("Enter");
-      routedByLocalSearch = await page
-        .locator(`${NAVIGATOR} [data-studio-inspector-publish-mode="true"]`)
-        .waitFor({ state: "visible", timeout: 3_000 })
-        .then(() => true)
-        .catch(() => false);
-    }
+    // 이 행은 검색 경로 자체가 대상이므로 작업공간 프리셋으로 물러서지 않는다.
+    const searchEntry = await openPublishPreparationModeViaSearch(page);
+    const localSearchOpened = searchEntry.searchOpened;
+    const routedByLocalSearch = searchEntry.routed;
     record(rows, {
       control: "기능·설정 찾기 (통합 검색 · 현재 패널 범위)",
       state: "항상",
@@ -447,8 +825,12 @@ async function walkDesktop(
       verdict: localSearchOpened && routedByLocalSearch ? "reachable" : "blocked",
       effect: routedByLocalSearch
         ? "'작품 정보' 입력 + Enter 가 게시 준비 모드로 실제 이동시켰다"
-        : "검색은 열렸으나 Enter 가 라우팅하지 않았다",
-      defect: localSearchOpened && !routedByLocalSearch ? "결과 Enter 가 no-op" : undefined,
+        : (searchEntry.failure ?? "검색이 게시 준비 모드로 라우팅하지 않았다"),
+      defect: routedByLocalSearch
+        ? undefined
+        : localSearchOpened
+          ? "결과 Enter 가 no-op"
+          : "인스펙터에서 통합 검색 다이얼로그를 열지 못한다",
     });
 
     /* ---- B. 페이지 ▸ 캔버스 (변경된 패널) -------------------------------- */
@@ -483,82 +865,180 @@ async function walkDesktop(
           : undefined,
     });
 
-    await selectDocumentTab(page, "캔버스");
+    const canvasTabSelected = await selectDocumentTab(page, "캔버스");
     const canvasPanel = await controlledPanel(page, documentTab(page, "캔버스"), ["캔버스 설정"]);
-    await canvasPanel.waitFor({ state: "visible", timeout: 8_000 });
+    const canvasPanelVisible =
+      canvasTabSelected
+      && (await canvasPanel
+        .waitFor({ state: "visible", timeout: 8_000 })
+        .then(() => true)
+        .catch(() => false));
+    if (!canvasPanelVisible) {
+      // 여기서 그냥 throw 하면 리포트가 통째로 사라져 무엇이 막혔는지 남지 않는다.
+      // blocked 행으로 남기고 데스크톱 워크를 끝낸다 — 실패 목록이 이 행을 집어 든다.
+      record(rows, {
+        control: "페이지 ▸ 캔버스 패널",
+        state: "페이지 탭",
+        path: "페이지 탭 → 캔버스 (2 스텝)",
+        verdict: "blocked",
+        effect: `'캔버스' 하위 탭 선택됨=${canvasTabSelected}, 캔버스 설정 패널 표시됨=false`,
+        defect: "문서 ▸ 캔버스 패널에 도달할 수 없어 캔버스 컨트롤 전체를 구동하지 못했다",
+      });
+      return;
+    }
     report.desktop.canvasPanelCollapsed = (await measure(canvasPanel)).height;
 
     // 기본 티어는 접기 없이 닿아야 한다 + 실제로 동작해야 한다.
-    const heightValueBefore = await page
-      .locator(`${PANEL} span[aria-label^="높이 "]`)
-      .first()
-      .textContent();
-    await canvasPanel.getByRole("button", { name: "높이 240px 늘리기" }).click();
-    const heightValueAfter = await page
-      .locator(`${PANEL} span[aria-label^="높이 "]`)
-      .first()
-      .textContent();
-    const heightChanged = heightValueBefore !== heightValueAfter;
-    // 되돌리기(역동작).
-    await canvasPanel.getByRole("button", { name: "높이 240px 줄이기" }).click();
-    const heightRestored =
-      (await page.locator(`${PANEL} span[aria-label^="높이 "]`).first().textContent())
-      === heightValueBefore;
+    const readHeightValue = async (): Promise<string | null> =>
+      page
+        .locator(`${PANEL} span[aria-label^="높이 "]`)
+        .first()
+        .textContent()
+        .catch(() => null);
+    const heightValueBefore = await readHeightValue();
+    const heightIncreased = await clickControl(
+      canvasPanel.getByRole("button", { name: "높이 240px 늘리기" }),
+    );
+    const heightValueAfter = heightIncreased ? await readHeightValue() : heightValueBefore;
+    const heightChanged = heightIncreased && heightValueBefore !== heightValueAfter;
+    // 되돌리기(역동작) — 값이 되돌아오지 않으면 왕복 계약이 깨진 것이므로 게이트한다.
+    const heightDecreased = heightChanged
+      ? await clickControl(canvasPanel.getByRole("button", { name: "높이 240px 줄이기" }))
+      : false;
+    const heightRestored = heightDecreased && (await readHeightValue()) === heightValueBefore;
     record(rows, {
       control: "캔버스 높이 ± (기본 티어)",
       state: "페이지 ▸ 캔버스",
       path: "페이지 탭 → 캔버스 → 높이 +/−  (2 스텝)",
-      verdict: heightChanged ? "reachable" : "blocked",
-      effect: `${heightValueBefore} → ${heightValueAfter}, 역동작 복원=${heightRestored}`,
-      defect: heightChanged ? undefined : "높이 버튼이 값을 바꾸지 않는다",
+      verdict: heightChanged && heightRestored ? "reachable" : "blocked",
+      effect: `${heightValueBefore} → ${heightValueAfter}, '줄이기' 클릭됨=${heightDecreased}, 역동작 복원=${heightRestored}`,
+      defect: !heightIncreased
+        ? "'높이 240px 늘리기' 버튼이 없거나 클릭되지 않는다"
+        : !heightChanged
+          ? "높이 버튼이 값을 바꾸지 않는다"
+          : !heightDecreased
+            ? "'높이 240px 줄이기' 버튼이 없거나 클릭되지 않아 되돌릴 수 없다"
+            : heightRestored
+              ? undefined
+              : "'줄이기' 가 원래 높이로 되돌리지 못한다 (왕복이 깨져 이후 행이 바뀐 캔버스를 측정한다)",
     });
 
+    /**
+     * 체크박스 왕복 — 켜고, 관측하고, 되돌린다.
+     *
+     * 맨 `click()` 은 컨트롤이 사라지거나 가려지면 30초 뒤 throw 해 워크스루 전체를
+     * 끊는다. 모든 클릭을 `clickControl` 로 흘려 boolean 으로 떨어뜨리고, 켠 상태에서
+     * 관측할 것이 있으면 `observe` 로 받는다.
+     */
+    const toggleRoundTrip = async (
+      toggle: Locator,
+      observe?: (checked: boolean | null) => Promise<boolean>,
+    ): Promise<{
+      exists: boolean;
+      before: boolean | null;
+      after: boolean | null;
+      clicked: boolean;
+      observed: boolean;
+      restoreClicked: boolean;
+      restored: boolean;
+    }> => {
+      const exists = (await toggle.count().catch(() => 0)) > 0;
+      const before = exists ? await toggle.isChecked().catch(() => null) : null;
+      const clicked = await clickControl(toggle);
+      const after = clicked ? await toggle.isChecked().catch(() => null) : null;
+      const observed = clicked && observe ? await observe(after) : false;
+      const restoreClicked = clicked ? await clickControl(toggle) : false;
+      const restored =
+        restoreClicked && (await toggle.isChecked().catch(() => null)) === before;
+      return { exists, before, after, clicked, observed, restoreClicked, restored };
+    };
+
+    /** 체크박스 행의 결함 문구 — 어느 단계에서 멈췄는지 한 줄로 말한다. */
+    const toggleDefect = (
+      label: string,
+      result: {
+        exists: boolean;
+        before: boolean | null;
+        after: boolean | null;
+        clicked: boolean;
+        restoreClicked: boolean;
+        restored: boolean;
+      },
+    ): string | undefined => {
+      if (!result.exists) return `'${label}' 체크박스가 렌더되지 않는다`;
+      if (!result.clicked) return `'${label}' 체크박스를 클릭할 수 없다 (가려졌거나 사라진다)`;
+      if (result.before === result.after) return `'${label}' 클릭이 체크 상태를 바꾸지 않는다`;
+      if (!result.restoreClicked) return `'${label}' 을 다시 눌러 되돌릴 수 없다`;
+      if (!result.restored) return `'${label}' 역동작이 원래 상태로 되돌리지 못한다`;
+      return undefined;
+    };
+
     const gridToggle = canvasPanel.getByLabel("그리드 격자 표시");
-    const gridBefore = await gridToggle.isChecked();
-    await gridToggle.click();
-    const gridAfter = await gridToggle.isChecked();
-    const gridSizeVisible = await canvasPanel
-      .getByRole("combobox", { name: "그리드 간격" })
-      .isVisible()
-      .catch(() => false);
-    await gridToggle.click();
+    const gridSizeSelect = canvasPanel.getByRole("combobox", { name: "그리드 간격" });
+    const grid = await toggleRoundTrip(gridToggle, async (checked) => {
+      // 기대 상태를 잠깐 기다린 뒤 **실제** 가시성을 읽는다 — 즉시 읽으면 React 커밋
+      // 한 프레임 차이로 정상 동작을 결함으로 오진한다.
+      await gridSizeSelect
+        .waitFor({ state: checked === true ? "visible" : "hidden", timeout: 4_000 })
+        .catch(() => undefined);
+      return gridSizeSelect.isVisible().catch(() => false);
+    });
+    // 간격 select 는 격자가 켜져 있을 때만 나와야 한다 — 노출 여부가 체크 상태와
+    // 일치하는지로 재면 '켜졌든 꺼졌든 통과' 인 자명한 판정이 되지 않는다.
+    const gridSizeMatchesState = grid.after !== null && grid.observed === grid.after;
+    const gridDefect = toggleDefect("그리드 격자 표시", grid);
     record(rows, {
       control: "그리드 격자 표시 + 간격 (기본 티어)",
       state: "페이지 ▸ 캔버스",
       path: "페이지 탭 → 캔버스 → 체크박스 (2 스텝)",
-      verdict: gridBefore !== gridAfter ? "reachable" : "blocked",
-      effect: `체크 상태 ${gridBefore}→${gridAfter}, 켰을 때 간격 select 노출=${gridSizeVisible}, 역동작 복원됨`,
+      verdict: !gridDefect && gridSizeMatchesState ? "reachable" : "blocked",
+      effect: `체크 상태 ${grid.before}→${grid.after}, 그 상태에서 간격 select 노출=${grid.observed}, 역동작 복원=${grid.restored}`,
+      defect:
+        gridDefect
+        ?? (gridSizeMatchesState
+          ? undefined
+          : `간격 select 노출(${grid.observed})이 격자 체크 상태(${grid.after})와 어긋난다`),
     });
 
     const snapToggle = canvasPanel.getByRole("checkbox", { name: /스냅/u }).first();
-    const snapBefore = await snapToggle.isChecked();
-    await snapToggle.click();
-    const snapAfter = await snapToggle.isChecked();
-    await snapToggle.click();
+    const snap = await toggleRoundTrip(snapToggle);
+    const snapDefect = toggleDefect("정렬 가이드(스냅)", snap);
     record(rows, {
       control: "정렬 가이드(스냅) (기본 티어)",
       state: "페이지 ▸ 캔버스",
       path: "페이지 탭 → 캔버스 → 체크박스 (2 스텝)",
-      verdict: snapBefore !== snapAfter ? "reachable" : "blocked",
-      effect: `${snapBefore}→${snapAfter}, 역동작 복원됨`,
+      verdict: snapDefect ? "blocked" : "reachable",
+      effect: `${snap.before}→${snap.after}, 역동작 복원=${snap.restored}`,
+      defect: snapDefect,
     });
 
     const webtoonToggle = canvasPanel.getByLabel("웹툰 규격 가이드");
-    const webtoonBefore = await webtoonToggle.isChecked();
-    await webtoonToggle.click();
-    const legendShown = await canvasPanel
-      .getByText(/플랫폼 표준폭|웹툰 규격 가이드를 여는 중/u)
-      .first()
-      .waitFor({ state: "visible", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-    await webtoonToggle.click();
+    const webtoon = await toggleRoundTrip(webtoonToggle, async (checked) => {
+      const legend = canvasPanel
+        .getByText(/플랫폼 표준폭|웹툰 규격 가이드를 여는 중/u)
+        .first();
+      await legend
+        .waitFor({ state: checked === true ? "visible" : "hidden", timeout: 8_000 })
+        .catch(() => undefined);
+      return legend.isVisible().catch(() => false);
+    });
+    // isChecked() 는 언제나 boolean 이므로 `!== undefined` 로는 아무것도 판정하지 못했다.
+    // 실제로 재는 것: 체크 상태가 바뀌고, 켠 동안 규격 범례가 나타나고, 되돌아온다.
+    const webtoonDefect = toggleDefect("웹툰 규격 가이드", webtoon);
+    // 범례도 체크 상태를 따라야 한다 — 켜면 나오고 꺼져 있으면 없다.
+    const webtoonLegendMatchesState =
+      webtoon.after !== null && webtoon.observed === webtoon.after;
     record(rows, {
       control: "웹툰 규격 가이드 (기본 티어)",
       state: "페이지 ▸ 캔버스",
       path: "페이지 탭 → 캔버스 → 체크박스 (2 스텝)",
-      verdict: webtoonBefore !== undefined ? "reachable" : "blocked",
-      effect: `켜면 규격 범례가 나타난다=${legendShown}, 역동작 복원됨`,
+      verdict: !webtoonDefect && webtoonLegendMatchesState ? "reachable" : "blocked",
+      effect: `체크 상태 ${webtoon.before}→${webtoon.after}, 그 상태에서 규격 범례 노출=${webtoon.observed}, 역동작 복원=${webtoon.restored}`,
+      defect:
+        webtoonDefect
+        ?? (webtoonLegendMatchesState
+          ? undefined
+          : `규격 범례 노출(${webtoon.observed})이 체크 상태(${webtoon.after})와 어긋난다`),
     });
 
     record(rows, {
@@ -641,27 +1121,44 @@ async function walkDesktop(
     // 가이드 추가는 실제로 문서를 바꿔야 한다 — 목록에 항목이 생기는지 확인한다.
     const addVertical = canvasPanel.getByRole("button", { name: "+ 세로 가이드" });
     if ((await addVertical.count()) > 0) {
-      await addVertical.click();
+      const addClicked = await clickControl(addVertical);
       const guideSlider = canvasPanel.getByRole("slider", { name: /가이드 #1 위치/u });
-      const created = await guideSlider
-        .waitFor({ state: "visible", timeout: 4_000 })
-        .then(() => true)
-        .catch(() => false);
+      const created =
+        addClicked
+        && (await guideSlider
+          .waitFor({ state: "visible", timeout: 4_000 })
+          .then(() => true)
+          .catch(() => false));
+      let deleteClicked = false;
       let removed = false;
       if (created) {
-        await canvasPanel.getByRole("button", { name: "모든 가이드 삭제" }).click();
-        removed = await guideSlider
-          .waitFor({ state: "detached", timeout: 4_000 })
-          .then(() => true)
-          .catch(() => false);
+        // 맨 click() 이면 버튼이 사라진/가려진 순간 30초 뒤 throw 해 워크스루가 통째로
+        // 끊긴다 — 실패를 boolean 으로 받아 이 행의 결함으로 남긴다.
+        deleteClicked = await clickControl(
+          canvasPanel.getByRole("button", { name: "모든 가이드 삭제" }),
+        );
+        removed =
+          deleteClicked
+          && (await guideSlider
+            .waitFor({ state: "detached", timeout: 4_000 })
+            .then(() => true)
+            .catch(() => false));
       }
       record(rows, {
         control: "가이드 추가 → 목록 → 전체 삭제 (왕복)",
         state: "페이지 ▸ 캔버스 ▸ 가이드선 펼침",
         path: "'+ 세로 가이드' → 목록 항목 확인 → '모든 가이드 삭제'",
-        verdict: created ? "reachable" : "blocked",
-        effect: `가이드 생성=${created}, 전체 삭제로 목록이 사라짐=${removed}`,
-        defect: created && !removed ? "삭제가 목록을 비우지 않는다" : undefined,
+        verdict: created && removed ? "reachable" : "blocked",
+        effect: `'+ 세로 가이드' 클릭됨=${addClicked}, 가이드 생성=${created}, '모든 가이드 삭제' 클릭됨=${deleteClicked}, 목록이 사라짐=${removed}`,
+        defect: !addClicked
+          ? "'+ 세로 가이드' 버튼을 클릭할 수 없다"
+          : !created
+            ? "'+ 세로 가이드' 가 가이드를 만들지 않는다"
+            : !deleteClicked
+              ? "'모든 가이드 삭제' 버튼이 없거나 클릭되지 않아 추가한 가이드를 되돌릴 수 없다"
+              : removed
+                ? undefined
+                : "삭제가 목록을 비우지 않는다",
       });
     }
 
@@ -671,18 +1168,25 @@ async function walkDesktop(
     await dismissHydratedQuickStart(page);
     await page.locator(PANEL).waitFor({ state: "visible", timeout: 20_000 });
     await selectPrimaryTab(page, "document");
-    await selectDocumentTab(page, "캔버스");
-    const persistedExpanded = await sectionHeader(page, persistedSection)
-      .getAttribute("aria-expanded")
-      .catch(() => null);
+    // 하위 탭을 못 고르면 접기 상태를 볼 수조차 없다. 반환값을 버리면 그 경우에도
+    // aria-expanded=null 이 나와 엉뚱하게 "접기 선택이 사라진다" 로 보고된다.
+    const reloadedCanvasTabSelected = await selectDocumentTab(page, "캔버스");
+    const persistedExpanded = reloadedCanvasTabSelected
+      ? await readAttribute(sectionHeader(page, persistedSection), "aria-expanded")
+      : null;
     record(rows, {
       control: "접기 상태 유지 (새로고침 왕복)",
       state: "페이지 ▸ 캔버스",
       path: "섹션 펼치기 → 새로고침 → 같은 섹션 확인",
-      verdict: persistedExpanded === "true" ? "reachable" : "blocked",
-      effect: `새로고침 뒤 ${persistedSection} 의 aria-expanded=${persistedExpanded}`,
-      defect:
-        persistedExpanded === "true"
+      verdict: reloadedCanvasTabSelected && persistedExpanded === "true"
+        ? "reachable"
+        : "blocked",
+      effect: reloadedCanvasTabSelected
+        ? `새로고침 뒤 ${persistedSection} 의 aria-expanded=${persistedExpanded}`
+        : "새로고침 뒤 재시도 3회 동안 '캔버스' 하위 탭이 선택되지 않아 접기 유지 여부를 볼 수 없었다",
+      defect: !reloadedCanvasTabSelected
+        ? "새로고침 뒤 문서 ▸ 캔버스 하위 탭을 고를 수 없다 — 접기 유지 여부를 판정할 수 없다"
+        : persistedExpanded === "true"
           ? undefined
           : "새로고침하면 접기 선택이 사라진다 (탭 왕복마다 다시 열어야 함)",
     });
@@ -693,7 +1197,10 @@ async function walkDesktop(
       const gradePanel = await controlledPanel(page, documentTab(page, "색보정"), ["페이지 색보정"]);
       const gradeToggle = gradePanel.locator('button[aria-expanded="false"]').first();
       const hadDisclosure = (await gradeToggle.count()) > 0;
-      if (hadDisclosure) await gradeToggle.click();
+      // 색보정 본체는 lazy 라 이 디스클로저 버튼이 not-stable → not-visible 로 바뀐다.
+      // 맨 click() 이면 그 순간 30초 타임아웃으로 throw 해 JSON 리포트와 모바일 워크까지
+      // 통째로 날아간다(실측) — 실패를 boolean 으로 받아 blocked 행으로 남긴다.
+      const gradeDisclosureOpened = hadDisclosure ? await clickControl(gradeToggle) : false;
       // 색보정 본체는 lazy 다 — 로딩 폴백이 걷힐 때까지 기다린 뒤에 센다.
       await gradePanel
         .locator('input[type="range"]')
@@ -707,8 +1214,28 @@ async function walkDesktop(
         control: "페이지 색보정",
         state: "페이지 ▸ 색보정",
         path: "페이지 탭 → 색보정 → (닫혀 있으면) 펼치기 (2~3 스텝)",
-        verdict: gradeControls > 1 ? "reachable" : "blocked",
-        effect: `펼친 뒤 컨트롤 ${gradeControls}개 노출 (디스클로저 존재=${hadDisclosure})`,
+        verdict:
+          gradeControls > 1 && (!hadDisclosure || gradeDisclosureOpened)
+            ? "reachable"
+            : "blocked",
+        effect: `펼친 뒤 컨트롤 ${gradeControls}개 노출 (디스클로저 존재=${hadDisclosure}, 클릭됨=${gradeDisclosureOpened})`,
+        defect:
+          hadDisclosure && !gradeDisclosureOpened
+            ? "색보정 디스클로저 버튼을 클릭할 수 없다 — lazy 본체가 붙는 사이 버튼이 사라진다"
+            : gradeControls > 1
+              ? undefined
+              : "펼쳐도 색보정 컨트롤이 나타나지 않는다",
+      });
+    } else {
+      // 하위 탭을 못 고르면 그 컨트롤은 도달 불가다. note 는 게이트를 통과시키므로
+      // (실패 목록은 blocked 행에서만 만들어진다) 반드시 blocked 행으로 남긴다.
+      record(rows, {
+        control: "페이지 색보정",
+        state: "페이지 ▸ 색보정",
+        path: "페이지 탭 → 색보정 (2 스텝)",
+        verdict: "blocked",
+        effect: "재시도 3회 뒤에도 '색보정' 하위 탭이 선택되지 않았다",
+        defect: "문서 ▸ 색보정 하위 탭을 고를 수 없어 색보정 컨트롤에 도달할 수 없다",
       });
     }
 
@@ -731,26 +1258,136 @@ async function walkDesktop(
             ? "미니맵이 키보드로 포커스되지 않는다"
             : undefined,
       });
+    } else {
+      record(rows, {
+        control: "미니맵 · 페이지 탐색",
+        state: "페이지 ▸ 미니맵",
+        path: "페이지 탭 → 미니맵 (2 스텝)",
+        verdict: "blocked",
+        effect: "재시도 3회 뒤에도 '미니맵' 하위 탭이 선택되지 않았다",
+        defect: "문서 ▸ 미니맵 하위 탭을 고를 수 없어 미니맵에 도달할 수 없다",
+      });
     }
 
-    /* ---- D. 게시 -------------------------------------------------------- */
+    /* ---- D. 게시 준비 (탭이 아니라 라우트) ------------------------------- */
 
-    await selectPrimaryTab(page, "publish");
+    // 예전에는 'publish' 기본 탭을 눌러 이 입력들을 쟀다. 그 탭은 §5.3 에서 사라졌고
+    // 작품 정보는 게시 CTA·파일 ▸ 게시·게시 작업공간·검색이 여는 '게시 준비' 모드가 됐다.
+    // 재는 대상(제목·설명·태그가 실제로 값을 받는가)은 그대로 두고, 진입만 제품 경로로
+    // 바꾼 뒤 이 모드에만 있는 '편집으로 돌아가기' 왕복을 새 행으로 더한다. 기본 진입은
+    // 검색 색인과 독립인 '게시' 작업공간 프리셋이고, 막히면 통합 검색으로 물러선다.
+    const publishEntry = await openPublishPreparationMode(page);
+    const publishRouteLabel =
+      publishEntry.route === "workspace"
+        ? "게시 작업공간 프리셋"
+        : publishEntry.route === "search"
+          ? "통합 검색"
+          : "진입 실패";
     const inspectorPanel = page.locator(PANEL);
-    const titleInput = inspectorPanel.getByRole("textbox", { name: "작품 제목 (필수)", exact: true });
-    await titleInput.fill("워크스루 제목");
-    const titleKept = (await titleInput.inputValue()) === "워크스루 제목";
-    const descriptionInput = inspectorPanel.getByRole("textbox", { name: "게시용 설명", exact: true });
-    await descriptionInput.fill("설명");
-    const tagsInput = inspectorPanel.getByRole("textbox", { name: "게시용 태그", exact: true });
-    await tagsInput.fill("태그1,태그2");
+    let titleKept = false;
+    let publishFieldsAccepted = false;
+    if (publishEntry.routed) {
+      // 입력이 없거나 접근명이 바뀌면 fill 이 30초 뒤 throw 하며 워크스루를 끊는다 —
+      // 아래 defect 문자열이 기록되도록 값 채우기도 boolean 으로 떨어뜨린다.
+      const fillField = async (name: string, value: string): Promise<boolean> => {
+        const field = inspectorPanel.getByRole("textbox", { name, exact: true });
+        if ((await field.count()) === 0) return false;
+        const filled = await field
+          .fill(value, { timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!filled) return false;
+        return (await field.inputValue().catch(() => null)) === value;
+      };
+      titleKept = await fillField("작품 제목 (필수)", "워크스루 제목");
+      const descriptionKept = await fillField("게시용 설명", "설명");
+      const tagsKept = await fillField("게시용 태그", "태그1,태그2");
+      publishFieldsAccepted = descriptionKept && tagsKept;
+    }
     record(rows, {
       control: "작품 정보 (제목·설명·태그)",
-      state: "작품 정보 탭",
-      path: "작품 정보 탭 → 입력 (2 스텝)",
-      verdict: titleKept ? "reachable" : "blocked",
-      effect: `제목이 문서 상태로 반영됨=${titleKept}, 설명/태그 입력 수용됨`,
+      state: "게시 준비 모드 (상시 탭 아님)",
+      path: "작업공간 ▸ '게시' 프리셋 (막히면 통합 검색 → '작품 정보' → Enter) → 입력",
+      verdict:
+        publishEntry.routed && titleKept && publishFieldsAccepted ? "reachable" : "blocked",
+      effect: publishEntry.routed
+        ? `${publishRouteLabel} 로 진입; 제목이 문서 상태로 반영됨=${titleKept}, 설명/태그 입력 수용됨=${publishFieldsAccepted}`
+        : `게시 준비 모드에 도달하지 못함 — ${publishEntry.failure ?? "사유 미상"}`,
+      defect: !publishEntry.routed
+        ? "게시 준비 모드에 도달할 수 없다 — 게시 CTA·파일 메뉴는 비로그인 세션에서 저장 게이트에 막히고, 게시 작업공간 프리셋과 통합 검색 두 경로도 모두 실패했다"
+        : titleKept
+          ? publishFieldsAccepted
+            ? undefined
+            : "설명·태그 입력이 값을 유지하지 못한다"
+          : "작품 정보 입력이 값을 유지하지 못한다",
     });
+
+    // 왕복 — 탭이 아니므로 '편집으로 돌아가기' 가 유일한 복귀 경로다.
+    let returnedToEditing = false;
+    let backClicked = false;
+    if (publishEntry.routed) {
+      backClicked = await clickControl(
+        publishModeBanner(page).getByRole("button", { name: "편집으로 돌아가기" }),
+      );
+      const bannerGone =
+        backClicked
+        && (await publishModeBanner(page)
+          .waitFor({ state: "hidden", timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false));
+      returnedToEditing =
+        bannerGone
+        && (await readAttribute(primaryTab(page, "properties"), "aria-selected")) === "true";
+    }
+    record(rows, {
+      control: "게시 준비 → 편집으로 돌아가기 (왕복)",
+      state: "게시 준비 모드",
+      path: "게시 준비 배너 → '편집으로 돌아가기' (1 스텝)",
+      verdict: returnedToEditing ? "reachable" : "blocked",
+      effect: publishEntry.routed
+        ? `'편집으로 돌아가기' 클릭됨=${backClicked}, 배너가 사라지고 대상 탭이 다시 선택됨=${returnedToEditing}`
+        : `게시 준비 모드에 도달하지 못해 복귀 버튼을 밟지 못했다 — ${publishEntry.failure ?? "사유 미상"}`,
+      defect: returnedToEditing
+        ? undefined
+        : !publishEntry.routed
+          ? "게시 준비 모드 진입이 막혀 복귀 경로를 구동하지 못했다"
+          : backClicked
+            ? "게시 준비 모드가 편집으로 돌아가지 못한다 — 탭이 아니므로 탭 스트립으로도 빠져나올 수 없다"
+            : "'편집으로 돌아가기' 버튼이 없거나 클릭되지 않는다 — 게시 준비 모드에서 빠져나올 어포던스가 없다",
+    });
+
+    // 작업공간 프리셋으로 진입했다면 배치가 커밋된 상태다 — 여기서 되돌리지 않으면
+    // 아래 E~I 구획과 모바일 워크가 기본 배치가 아니라 '게시' 배치를 측정한다.
+    // 복원 자체를 행으로 남겨, 조용히 실패해도 리포트가 RESULT: OK 로 끝나지 않게 한다.
+    if (publishEntry.restoreUnavailable) {
+      // 전환은 커밋됐는데 되돌릴 좌표가 없다. 복원을 시도할 수조차 없으므로 아래 구획들은
+      // '게시' 배치를 재게 된다 — 그 사실 자체가 실패다.
+      record(rows, {
+        control: "게시 작업공간 → 원래 작업공간 복원 (측정 전제)",
+        state: "게시 작업공간으로 전환된 뒤",
+        path: "작업공간 버튼 → 전환 전 활성 항목 (2 스텝)",
+        verdict: "blocked",
+        effect: `복원 불가 — ${publishEntry.restoreUnavailable}`,
+        defect: "게시 작업공간 전환이 커밋된 채로 남아 이후 행들이 기본 배치를 측정하지 못한다",
+      });
+    } else if (publishEntry.restoreWorkspace) {
+      const target = publishEntry.restoreWorkspace;
+      const restoreFailure = await restoreWorkspace(page, target);
+      record(rows, {
+        control: "게시 작업공간 → 원래 작업공간 복원 (측정 전제)",
+        state: "게시 작업공간으로 전환된 뒤",
+        path: `작업공간 버튼 → '${target.name}' 다시 선택 (2 스텝)`,
+        verdict: restoreFailure === null ? "reachable" : "blocked",
+        effect:
+          restoreFailure === null
+            ? `활성 작업공간이 '${target.name}'(${target.id}) 로 돌아왔고 게시 배너도 사라졌다`
+            : `복원 실패 — ${restoreFailure}`,
+        defect:
+          restoreFailure === null
+            ? undefined
+            : "게시 작업공간 전환이 커밋된 채로 남아 이후 행들이 기본 배치를 측정하지 못한다",
+      });
+    }
 
     /* ---- E. 레이어 ------------------------------------------------------ */
 
@@ -794,23 +1431,41 @@ async function walkDesktop(
         });
       }
       // 펜 버튼은 실제로 도구를 바꾸고 인스펙터를 그리기 패널로 넘겨야 한다.
-      await coach.getByRole("button", { name: /펜으로 그리기/u }).click();
-      const switchedToDrawing = await page
-        .locator('[data-testid="studio-inspector-context-drawing-panel"]')
-        .waitFor({ state: "visible", timeout: 8_000 })
-        .then(() => true)
-        .catch(() => false);
+      // 클릭 자체가 카드 리렌더와 겹치면 맨 click() 은 30초 뒤 throw 해 워크스루를
+      // 끊는다 — boolean 으로 받아 이 행의 결함으로 남긴다.
+      const penClicked = await clickControl(
+        coach.getByRole("button", { name: /펜으로 그리기/u }),
+      );
+      const switchedToDrawing =
+        penClicked
+        && (await page
+          .locator('[data-testid="studio-inspector-context-drawing-panel"]')
+          .waitFor({ state: "visible", timeout: 8_000 })
+          .then(() => true)
+          .catch(() => false));
       record(rows, {
         control: "시작 안내 → 그리기 전환 (실효)",
         state: "속성 탭 · 선택 없음",
         path: "'펜으로 그리기' 클릭",
         verdict: switchedToDrawing ? "reachable" : "blocked",
-        effect: `인스펙터가 그리기 도구 설정 패널로 실제 전환됨=${switchedToDrawing}`,
-        defect: switchedToDrawing ? undefined : "버튼이 도구를 바꾸지 못한다",
+        effect: `'펜으로 그리기' 클릭됨=${penClicked}, 인스펙터가 그리기 도구 설정 패널로 실제 전환됨=${switchedToDrawing}`,
+        defect: !penClicked
+          ? "'펜으로 그리기' 카드 버튼을 클릭할 수 없다"
+          : switchedToDrawing
+            ? undefined
+            : "버튼이 도구를 바꾸지 못한다",
       });
     } else {
+      // 게이트가 아니라 note 인 이유: 이 빌드는 제품 결정상 Studio 를 **그리기 모드**로
+      // 열고(스튜디오 기본 도구 = 펜), 그 상태에서 속성 탭은 시작 안내가 아니라 그리기
+      // 도구 설정 패널을 보여 준다. 즉 '선택 없음 · 그리기 아님' 이라는 빈 코치 상태는
+      // 이 진입 경로에서 실제로 발생하지 않는다 — 도달 불가가 아니라 존재하지 않는
+      // 상태이므로 blocked 행이 아니라 note 다.
       report.notes.push(
-        "속성 탭이 빈 문서에서 시작 안내 대신 다른 모드로 진입했다 — 시작 안내 경로를 구동하지 못함",
+        "시작 안내(빈 코치) 카드 행은 구동하지 않았다 — 이 빌드는 제품 결정상 Studio 를 "
+          + "그리기 모드(기본 도구 = 펜)로 열기 때문에, 속성 탭이 곧바로 그리기 도구 설정 "
+          + "패널로 진입해 '선택 없음 · 그리기 아님' 빈 코치 상태 자체가 발생하지 않는다. "
+          + "인스펙터가 막은 것이 아니라 그 상태가 없는 것이라 blocked 가 아니라 note 다.",
       );
     }
 
@@ -834,8 +1489,7 @@ async function walkDesktop(
           .waitFor({ state: "visible", timeout: 15_000 })
           .then(() => true)
           .catch(() => false);
-        if (triggerVisible) {
-          await trigger.click();
+        if (triggerVisible && (await clickControl(trigger))) {
           const popup = page.locator(
             '[data-studio-drawing-palette-overlay="palette"]'
               + '[data-studio-drawing-palette-overlay-id="tool-properties"]',
@@ -862,6 +1516,7 @@ async function walkDesktop(
         }
       }
       let sizeApplied = false;
+      let presetClicked = false;
       let presetDiagnostics = "preset group not visible";
       if (presetVisible) {
         const target = presetGroup.getByRole("button", { name: "브러시 크기 30px" });
@@ -873,16 +1528,16 @@ async function walkDesktop(
         });
         const before = await readPresetState();
         await target.scrollIntoViewIfNeeded().catch(() => undefined);
-        await target.click();
+        presetClicked = await clickControl(target);
         // React가 같은 클릭에서 도구 메모리와 최근 크기 목록을 함께 갱신한다. 프로덕션
         // 번들/느린 CI에서는 커밋이 Playwright click 반환보다 한 프레임 늦을 수 있으므로,
         // 즉시 읽기 한 번으로 정상 동작을 실패 처리하지 않고 짧고 제한된 시간만 관찰한다.
         const pressedDeadline = Date.now() + 2_000;
-        do {
-          sizeApplied = (await target.getAttribute("aria-pressed")) === "true";
-          if (sizeApplied) break;
+        while (presetClicked) {
+          sizeApplied = (await readAttribute(target, "aria-pressed")) === "true";
+          if (sizeApplied || Date.now() >= pressedDeadline) break;
           await page.waitForTimeout(50);
-        } while (Date.now() < pressedDeadline);
+        }
         const after = await readPresetState();
         presetDiagnostics = `before=${JSON.stringify(before)}; after=${JSON.stringify(after)}`;
       }
@@ -891,8 +1546,14 @@ async function walkDesktop(
         state: "속성 탭 · 그리기 도구",
         path: presetPath,
         verdict: presetVisible && sizeApplied ? "reachable" : "blocked",
-        effect: `30px 프리셋 클릭 후 aria-pressed=true 로 적용됨=${sizeApplied}; ${presetDiagnostics}`,
-        defect: presetVisible && !sizeApplied ? "프리셋 클릭이 활성 크기를 바꾸지 않는다" : undefined,
+        effect: `30px 프리셋 클릭됨=${presetClicked}, aria-pressed=true 로 적용됨=${sizeApplied}; ${presetDiagnostics}`,
+        defect: !presetVisible
+          ? undefined
+          : presetClicked
+            ? sizeApplied
+              ? undefined
+              : "프리셋 클릭이 활성 크기를 바꾸지 않는다"
+            : "30px 프리셋 버튼을 클릭할 수 없다",
       });
 
       for (const sectionId of [
@@ -951,7 +1612,7 @@ async function walkDesktop(
     if (!selectionPanelVisible) {
       // F1 통합 검색 → '말풍선 추가' — 빈 문서에서 선택 가능한 요소를 만드는 정식 경로.
       await page.keyboard.press("F1");
-      const dialog = page.locator('[role="dialog"]').first();
+      const dialog = commandSearchDialog(page);
       if (
         await dialog
           .waitFor({ state: "visible", timeout: 5_000 })
@@ -962,11 +1623,10 @@ async function walkDesktop(
         await page.waitForTimeout(500);
         await page.keyboard.press("Enter");
         await page.waitForTimeout(900);
-        // 검색이 아무것도 못 찾았으면 다이얼로그가 그대로 남아 백드롭이 이후
-        // 클릭을 전부 가로챈다 — 반드시 닫고 나간다.
-        if (await dialog.isVisible().catch(() => false)) {
-          await page.keyboard.press("Escape");
-        }
+        // 검색이 아무것도 못 찾으면 다이얼로그가 그대로 남고, 엉뚱한 결과가 실행되면
+        // 도움말 센터 같은 다른 모달이 열린다 — 어느 쪽이든 백드롭이 이후 클릭을 전부
+        // 가로채므로 열린 모달을 모두 닫고 나간다.
+        await dismissOpenModals(page);
         await dialog.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
         await selectPrimaryTab(page, "properties");
         selectionPanelVisible = await page
@@ -988,7 +1648,7 @@ async function walkDesktop(
           .then(() => true)
           .catch(() => false)
       ) {
-        await row.click();
+        await clickControl(row);
         await selectPrimaryTab(page, "properties");
         selectionPanelVisible = await page
           .locator('[data-testid="studio-inspector-context-selection"]')
@@ -1022,12 +1682,20 @@ async function walkDesktop(
         await opacity.fill("50");
         opacityChanged = (await opacity.inputValue()) !== before;
       }
+      // 존재만으로 통과시키면 슬라이더가 값을 먹지 않아도 reachable 이 된다 —
+      // 측정한 opacityChanged 가 판정을 쥐게 한다.
+      const opacityExists = (await opacity.count()) > 0;
       record(rows, {
         control: "선택 요소 · 불투명도 (기본 티어)",
         state: "속성 탭 · 요소 선택됨",
         path: "요소 선택 → 슬라이더 (0 추가 스텝)",
-        verdict: (await opacity.count()) > 0 ? "reachable" : "blocked",
-        effect: `값 변경 반영됨=${opacityChanged}`,
+        verdict: opacityExists && opacityChanged ? "reachable" : "blocked",
+        effect: `슬라이더 존재=${opacityExists}, 값 변경 반영됨=${opacityChanged}`,
+        defect: !opacityExists
+          ? "선택 요소 속성에 불투명도 슬라이더가 없다"
+          : opacityChanged
+            ? undefined
+            : "불투명도 슬라이더가 값을 받지 않는다",
       });
 
       for (const sectionId of [
@@ -1050,7 +1718,8 @@ async function walkDesktop(
       report.notes.push(
         "선택 기반 컨트롤(불투명도·혼합 모드·클리핑·그룹·배치·정렬·순서·타이포그래피·말풍선 등)은 "
           + "이 하니스에서 구동하지 못했다. 원인은 인스펙터가 아니라 문서다: "
-          + "펜 스트로크 드래그 · F1 통합 검색 '말풍선 추가' · 메뉴 텍스트▸말풍선 세 경로를 모두 밟았지만 "
+          + "펜 스트로크 드래그 · F1 통합 검색 '말풍선 추가' · 레이어 탭의 레이어 트리 행 클릭 "
+          + "세 경로를 모두 밟았지만 "
           + "vite preview(백엔드 API 없음)에서는 문서에 요소가 하나도 생기지 않았다(레이어 트리 0행, JS 오류 없음, "
           + "502 는 /api 프록시뿐). 즉 '선택이 필요한 컨트롤에 도달할 수 없다'가 아니라 "
           + "'이 하니스에서 선택 대상을 만들 수 없다'다. 해당 분기는 jsdom 단위 테스트가 덮는다.",
@@ -1061,16 +1730,17 @@ async function walkDesktop(
 
     await selectPrimaryTab(page, "properties");
     const collapseButton = panel.locator('button[title="작업 패널 접기"]');
-    await collapseButton.click();
-    const collapsedAway = await panel
-      .waitFor({ state: "hidden", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
+    const collapseClicked = await clickControl(collapseButton);
+    const collapsedAway =
+      collapseClicked
+      && (await panel
+        .waitFor({ state: "hidden", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false));
     const edgeRail = page.locator('button[title="속성 패널 펼치기"]');
     const railVisible = await edgeRail.isVisible().catch(() => false);
     let restored = false;
-    if (railVisible) {
-      await edgeRail.click();
+    if (railVisible && (await clickControl(edgeRail))) {
       restored = await panel
         .waitFor({ state: "visible", timeout: 5_000 })
         .then(() => true)
@@ -1081,8 +1751,12 @@ async function walkDesktop(
       state: "데스크톱",
       path: "인스펙터 상단 '접기' → 우측 엣지 레일 '속성' 클릭",
       verdict: collapsedAway && restored ? "reachable" : "blocked",
-      effect: `접힘=${collapsedAway}, 복구 레일 노출=${railVisible}, 복원=${restored} — 캔버스가 패널 폭 전체를 회수한다`,
-      defect: collapsedAway && !railVisible ? "접은 뒤 되돌릴 어포던스가 없다" : undefined,
+      effect: `'접기' 클릭됨=${collapseClicked}, 접힘=${collapsedAway}, 복구 레일 노출=${railVisible}, 복원=${restored} — 캔버스가 패널 폭 전체를 회수한다`,
+      defect: !collapseClicked
+        ? "'작업 패널 접기' 버튼을 클릭할 수 없다"
+        : collapsedAway && !railVisible
+          ? "접은 뒤 되돌릴 어포던스가 없다"
+          : undefined,
     });
 
     await page.screenshot({ path: join(SCRATCH, "inspector-desktop.png") }).catch(() => undefined);
@@ -1139,9 +1813,11 @@ async function walkMobile(
         && (hit === element || element.contains(hit))
       );
     });
-    const toggleExpandedBefore = await workspaceToggle.getAttribute("aria-expanded");
-    await workspaceToggle.click();
-    const toggleExpandedAfter = await workspaceToggle.getAttribute("aria-expanded");
+    const toggleExpandedBefore = await readAttribute(workspaceToggle, "aria-expanded");
+    const toggleClicked = await clickControl(workspaceToggle);
+    const toggleExpandedAfter = toggleClicked
+      ? await readAttribute(workspaceToggle, "aria-expanded")
+      : null;
     record(rows, {
       control: "모바일 작업공간 도구 펼치기 (인스펙터 진입 선행 단계)",
       state: "360px",
@@ -1157,9 +1833,11 @@ async function walkMobile(
       defect:
         !toggleInitiallyVisible
           ? "도구 토글이 첫 화면에 고정되지 않았거나 실제 히트테스트를 통과하지 못한다"
-          : toggleExpandedAfter !== "true"
-            ? "작업공간 토글이 2행을 펼치지 못한다"
-            : undefined,
+          : !toggleClicked
+            ? "'도구' 토글을 클릭할 수 없다"
+            : toggleExpandedAfter !== "true"
+              ? "작업공간 토글이 2행을 펼치지 못한다"
+              : undefined,
     });
 
     const launcher = page.locator(
@@ -1193,20 +1871,26 @@ async function walkMobile(
       });
       return;
     }
-    await launcher.click();
+    const launcherClicked = await clickControl(launcher);
 
     const sheet = page.locator(PANEL);
-    const opened = await sheet
-      .waitFor({ state: "visible", timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false);
+    const opened =
+      launcherClicked
+      && (await sheet
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false));
     record(rows, {
       control: "모바일 작업 패널 열기",
       state: "360px",
       path: "하단 도구막대 '도구' → '패널' (2 스텝)",
       verdict: opened ? "reachable" : "blocked",
-      effect: `런처 초기 가시·히트 가능=${launcherInitiallyVisible}; role=dialog 시트가 올라옴=${opened}`,
-      defect: opened ? undefined : "360px 에서 인스펙터에 도달할 수 없다",
+      effect: `런처 초기 가시·히트 가능=${launcherInitiallyVisible}, 클릭됨=${launcherClicked}; role=dialog 시트가 올라옴=${opened}`,
+      defect: opened
+        ? undefined
+        : launcherClicked
+          ? "360px 에서 인스펙터에 도달할 수 없다"
+          : "'작업 패널' 런처를 클릭할 수 없다",
     });
     if (!opened) return;
 
@@ -1216,10 +1900,15 @@ async function walkMobile(
       `mobile sheet ${report.mobile.panel.width}×${report.mobile.panel.height}, chrome ${report.mobile.chromeHeight}px`,
     );
 
-    // 탭 스트립이 360px 에서도 전부 닿는가.
-    for (const tab of ["properties", "layers", "document", "publish"]) {
+    // 탭 스트립이 360px 에서도 전부 닿는가. 스트립은 세 탭이다(대상·레이어·문서) —
+    // 작품 정보는 탭이 아니라 아래에서 따로 재는 '게시 준비' 모드다(§5.3).
+    for (const tab of ["properties", "layers", "document"]) {
       const button = page.locator(`${NAVIGATOR} [data-studio-inspector-primary-tab="${tab}"]`);
-      const box = await button.boundingBox();
+      // boundingBox() 는 요소를 기다렸다가 throw 한다 — 탭이 사라지면 그 사실을 보고할
+      // 행에 닿기도 전에 워크 전체가 끊긴다. 없으면 null 로 받아 blocked 행으로 남긴다.
+      const box = (await button.count()) > 0
+        ? await button.boundingBox().catch(() => null)
+        : null;
       const inViewport = box !== null && box.x >= 0 && box.x + box.width <= 360;
       record(rows, {
         control: `모바일 탭 · ${tab}`,
@@ -1227,14 +1916,76 @@ async function walkMobile(
         path: "'작업' 시트 → 탭 스트립 (2 스텝)",
         verdict: inViewport ? "reachable" : "blocked",
         effect: `가로 360px 안에 들어옴=${inViewport} (x=${Math.round(box?.x ?? -1)}, w=${Math.round(box?.width ?? 0)})`,
-        defect: inViewport ? undefined : "탭이 뷰포트 밖으로 잘린다",
+        defect: inViewport
+          ? undefined
+          : box === null
+            ? "탭이 렌더되지 않아 360px 안에 있는지 잴 수 없다"
+            : "탭이 뷰포트 밖으로 잘린다",
       });
     }
 
+    // 네 번째 탭이 사라진 자리 — 작품 정보는 시트 헤더의 '찾기'(같은 통합 다이얼로그)로
+    // 열리는 게시 준비 모드다. 예전 'publish 탭' 행이 재던 것(360px 안에 들어오는가)을
+    // 이 모드의 배너와 복귀 버튼에 대해 그대로 재고, 복귀까지 확인한다. 여기서 작업공간
+    // 프리셋으로 물러서지 않는 이유: 시트가 모달이라 뒤의 메뉴바 작업공간 버튼은 이
+    // 상태에서 사용자도 누를 수 없다 — 이 화면의 실제 경로는 시트의 '찾기' 하나다.
+    const mobilePublishEntry = await openPublishPreparationModeViaSearch(page);
+    let publishBannerBox: { x: number; width: number } | null = null;
+    let publishBackInViewport = false;
+    let mobileReturnedToEditing = false;
+    let mobileBackClicked = false;
+    if (mobilePublishEntry.routed) {
+      const banner = publishModeBanner(page);
+      const bannerBox = await banner.boundingBox().catch(() => null);
+      publishBannerBox = bannerBox ? { x: bannerBox.x, width: bannerBox.width } : null;
+      const back = banner.getByRole("button", { name: "편집으로 돌아가기" });
+      const backBox =
+        (await back.count().catch(() => 0)) > 0
+          ? await back.boundingBox().catch(() => null)
+          : null;
+      publishBackInViewport =
+        backBox !== null && backBox.x >= 0 && backBox.x + backBox.width <= 360;
+      mobileBackClicked = await clickControl(back);
+      const bannerGone =
+        mobileBackClicked
+        && (await banner
+          .waitFor({ state: "hidden", timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false));
+      mobileReturnedToEditing =
+        bannerGone
+        && (await readAttribute(primaryTab(page, "properties"), "aria-selected")) === "true";
+    }
+    record(rows, {
+      control: "모바일 게시 준비 모드 (작품 정보)",
+      state: "360px · 작업 시트 열림",
+      path: "'작업' 시트 → '찾기' → '작품 정보' → Enter (4 스텝)",
+      verdict:
+        mobilePublishEntry.routed && publishBackInViewport && mobileReturnedToEditing
+          ? "reachable"
+          : "blocked",
+      effect: mobilePublishEntry.routed
+        ? `배너 x=${Math.round(publishBannerBox?.x ?? -1)}, w=${Math.round(publishBannerBox?.width ?? 0)}; `
+          + `'편집으로 돌아가기' 가 360px 안=${publishBackInViewport}, 클릭됨=${mobileBackClicked}; `
+          + `편집 복귀=${mobileReturnedToEditing}`
+        : `게시 준비 모드에 도달하지 못함 — ${mobilePublishEntry.failure ?? "사유 미상"}`,
+      defect: !mobilePublishEntry.routed
+        ? "360px 에서 작품 정보(게시 준비)에 도달할 수 없다"
+        : !publishBackInViewport
+          ? "복귀 버튼이 뷰포트 밖으로 잘린다"
+          : !mobileBackClicked
+            ? "'편집으로 돌아가기' 버튼을 클릭할 수 없다"
+            : !mobileReturnedToEditing
+              ? "게시 준비 모드에서 편집으로 돌아오지 못한다"
+              : undefined,
+    });
+
     await selectPrimaryTab(page, "document");
-    await selectDocumentTab(page, "캔버스");
+    const mobileCanvasTabSelected = await selectDocumentTab(page, "캔버스");
     const canvasPanel = await controlledPanel(page, documentTab(page, "캔버스"), ["캔버스 설정"]);
-    if (await canvasPanel.isVisible().catch(() => false)) {
+    const mobileCanvasVisible =
+      mobileCanvasTabSelected && (await canvasPanel.isVisible().catch(() => false));
+    if (mobileCanvasVisible) {
       report.mobile.canvasPanelCollapsed = (await measure(canvasPanel)).height;
       const collapsedHeaders = await page
         .locator('[data-inspector-section-open="false"]')
@@ -1245,6 +1996,16 @@ async function walkMobile(
         path: "'작업' 시트 → 페이지 → 캔버스 (3 스텝)",
         verdict: collapsedHeaders >= CANVAS_SECTIONS.length ? "reachable" : "blocked",
         effect: `접힌 섹션 ${collapsedHeaders}개, 패널 높이 ${report.mobile.canvasPanelCollapsed}px`,
+      });
+    } else {
+      // 조용히 행을 빼면 360px 캔버스 패널이 사라져도 리포트는 OK 로 끝난다.
+      record(rows, {
+        control: "모바일 캔버스 패널 (접힌 기본 상태)",
+        state: "360px · 페이지 ▸ 캔버스",
+        path: "'작업' 시트 → 페이지 → 캔버스 (3 스텝)",
+        verdict: "blocked",
+        effect: `'캔버스' 하위 탭 선택됨=${mobileCanvasTabSelected}, 캔버스 설정 패널 표시됨=false`,
+        defect: "360px 에서 페이지 ▸ 캔버스 패널에 도달할 수 없다",
       });
     }
 
@@ -1285,26 +2046,33 @@ async function walkMobile(
     const handle = sheet
       .locator('[data-studio-sheet-drag-handle="true"][data-studio-sheet-kind="props"]')
       .first();
-    const snapBefore = await sheet.getAttribute("data-studio-sheet-snap");
+    const snapBefore = await readAttribute(sheet, "data-studio-sheet-snap");
     let snapChanged = false;
+    let handleClicked = false;
     if ((await handle.count()) > 0) {
-      await handle.click();
-      await awaitElementAnimations(sheet);
-      snapChanged = (await sheet.getAttribute("data-studio-sheet-snap")) !== snapBefore;
+      handleClicked = await clickControl(handle);
+      if (handleClicked) {
+        await awaitElementAnimations(sheet);
+        snapChanged = (await readAttribute(sheet, "data-studio-sheet-snap")) !== snapBefore;
+      }
     }
     record(rows, {
       control: "모바일 시트 스냅 (compact/medium/full)",
       state: "360px · 속성 시트 열림",
       path: "시트 상단 드래그 핸들 탭 (2 스텝)",
       verdict: snapChanged ? "reachable" : "blocked",
-      effect: `스냅 ${snapBefore} → ${await sheet.getAttribute("data-studio-sheet-snap")} — 시트를 줄여 캔버스를 되찾을 수 있다`,
-      defect: snapChanged ? undefined : "핸들 탭이 스냅을 바꾸지 않는다",
+      effect: `핸들 클릭됨=${handleClicked}; 스냅 ${snapBefore} → ${await readAttribute(sheet, "data-studio-sheet-snap")} — 시트를 줄여 캔버스를 되찾을 수 있다`,
+      defect: snapChanged
+        ? undefined
+        : handleClicked
+          ? "핸들 탭이 스냅을 바꾸지 않는다"
+          : "시트 드래그 핸들이 없거나 클릭되지 않는다",
     });
 
     const closeButton = page.getByRole("button", { name: "작업 패널 닫기", exact: true });
     let closed = false;
-    if ((await closeButton.count()) > 0) {
-      await closeButton.click();
+    const closeClicked = await clickControl(closeButton);
+    if (closeClicked) {
       closed = await sheet
         .waitFor({ state: "hidden", timeout: 5_000 })
         .then(() => true)
@@ -1315,7 +2083,12 @@ async function walkMobile(
       state: "360px · 속성 시트 열림",
       path: "시트 헤더 X (1 스텝)",
       verdict: closed ? "reachable" : "blocked",
-      effect: `시트가 닫혀 캔버스가 화면 전체를 회수함=${closed}`,
+      effect: `'작업 패널 닫기' 클릭됨=${closeClicked}, 시트가 닫혀 캔버스가 화면 전체를 회수함=${closed}`,
+      defect: closed
+        ? undefined
+        : closeClicked
+          ? "닫기 버튼을 눌러도 시트가 닫히지 않는다"
+          : "시트 헤더에 '작업 패널 닫기' 버튼이 없거나 클릭되지 않는다",
     });
 
     await page.screenshot({ path: join(SCRATCH, "inspector-mobile-360.png") }).catch(() => undefined);
@@ -1380,6 +2153,28 @@ async function main(): Promise<void> {
   if (report.desktop.canvasPanelCollapsed >= report.desktop.canvasPanelExpanded) {
     report.failures.push(
       "canvas panel is not actually shorter when collapsed — the disclosure buys nothing",
+    );
+  }
+  // 크롬 높이는 재기만 하고 게이트하지 않으면, -1(패널이나 첫 탭패널을 아예 못 찾음)이
+  // 리포트에 찍힌 채로 RESULT: OK 가 나온다. 측정 실패는 측정값이 아니라 결함이다.
+  for (const [surface, chromeHeight] of [
+    ["desktop", report.desktop.chromeHeight],
+    ["mobile", report.mobile.chromeHeight],
+  ] as const) {
+    if (chromeHeight < 0) {
+      report.failures.push(
+        `${surface} 인스펙터 크롬 높이를 측정하지 못했다 (${chromeHeight}) — `
+          + "속성 패널이나 보이는 첫 탭패널을 찾지 못했다",
+      );
+    }
+  }
+  // 360px 터치 대상도 같다 — 목록만 출력하고 게이트하지 않으면 44px 회귀가 통과한다.
+  if (report.mobile.smallTouchTargets.length > 0) {
+    report.failures.push(
+      `360px 시트 안 터치 대상 ${report.mobile.smallTouchTargets.length}건이 44px 미만: `
+        + report.mobile.smallTouchTargets
+          .map((target) => `${target.label}(${target.height}px)`)
+          .join(", "),
     );
   }
 
