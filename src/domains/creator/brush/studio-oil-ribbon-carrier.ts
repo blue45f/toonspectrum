@@ -103,8 +103,7 @@ const POINT_EPSILON = 1e-6;
  * - flat and acrylic-stiff declare a HARD tip: flat instruments whose mechanism is not tuft
  *   splay, so they stay off the sim (acrylic is already separated by its fast-setting body)
  * - brush--oil-lanes stays plain, which is what now distinguishes it from the filbert
- * - the product oil/acrylic beds and the Fluid Paint family (oil, acrylic, fluid-paint and its
- *   fine/load/rake variants) run all three: a loaded tuft that depletes as it travels and
+ * - the product oil/acrylic beds run all three: a loaded tuft that depletes as it travels and
  *   leaves ridges is what those tools sell
  */
 export function studioOilRibbonProgramsForBrush(
@@ -115,7 +114,7 @@ export function studioOilRibbonProgramsForBrush(
    * matrix below rather than merging with it, because a user brush's program set is a complete
    * statement of what that brush is - merging would make it impossible to turn a preset's own
    * program off. Absent, the matrix runs unchanged and every shipped preset keeps a byte-identical
-   * plan, which the program-set contract test pins for all eleven ids and the default.
+   * plan, which the program-set contract test pins for all seven ids and the default.
    */
   programs?: StudioBrushOilProgramSet | null,
 ): StudioOilRibbonCarrierOptions | undefined {
@@ -139,10 +138,6 @@ export function studioOilRibbonProgramsForBrush(
       return { bristlePhysics, impastoRelief: { enabled: true } };
     case "oil":
     case "acrylic":
-    case "fluid-paint":
-    case "fluid-paint-fine":
-    case "fluid-paint-load":
-    case "fluid-paint-rake":
       return { bristlePhysics, bristleLoadDynamics: { enabled: true, seed }, impastoRelief: { enabled: true } };
     default:
       return undefined;

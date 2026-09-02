@@ -475,6 +475,11 @@ describeWithDirectPostgres("Studio live lock repository PostgreSQL fencing", () 
       const pidB = await waitForValue(() => backendPidB, "second repository backend PID");
       expect(pidA).not.toBe(pidB);
 
+      // Poll for the whole shape the assertion below checks, `state` included. PostgreSQL does not
+      // publish the `pg_stat_activity` columns atomically: a backend that has just begun waiting on
+      // the advisory lock can be observed with a fresh `wait_event` while `state` still reads the
+      // previous "idle in transaction". Waiting only on the wait_event let the assertion sample
+      // that half-updated row and fail on `state` — observed once in CI, never reproducibly.
       const waiting = await waitForValue(async () => {
         const result = await observerPool.query<PgActivityRow>(
           `select pid, state, wait_event_type, wait_event
@@ -484,7 +489,8 @@ describeWithDirectPostgres("Studio live lock repository PostgreSQL fencing", () 
         );
         const activity = result.rows[0];
         return activity?.wait_event_type === "Lock" &&
-          activity.wait_event?.toLowerCase() === "advisory"
+          activity.wait_event?.toLowerCase() === "advisory" &&
+          activity.state === "active"
           ? activity
           : null;
       }, "second backend to wait for the advisory lock");

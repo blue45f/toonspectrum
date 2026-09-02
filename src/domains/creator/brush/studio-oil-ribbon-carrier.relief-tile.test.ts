@@ -27,7 +27,6 @@ import {
   type FxOilDab,
 } from "../studio-fx-brush";
 
-import { studioFluidPaintStationSpacingRatio } from "./studio-fluid-paint-reference";
 import {
   StudioOilRibbonCarrierPlanner,
   planStudioOilRibbonCarrier,
@@ -40,7 +39,6 @@ const BRUSH = "oil--impasto-ribbon";
 type Shape = (index: number) => readonly [number, number, number];
 
 function dabsAt(points: number[], pressures: number[], planner: FxOilDabPlanner): FxOilDab[] {
-  const spacing = studioFluidPaintStationSpacingRatio(BRUSH);
   return planner.plan({
     points,
     pressures,
@@ -50,7 +48,6 @@ function dabsAt(points: number[], pressures: number[], planner: FxOilDabPlanner)
     paintBody: studioOilPaintBodyForBrush(BRUSH),
     tipProfile: studioOilTipProfileForBrush(BRUSH),
     capMode: "prefix-stable-ladder-v2" as const,
-    ...(spacing === undefined ? {} : { stationSpacingRatio: spacing }),
   });
 }
 

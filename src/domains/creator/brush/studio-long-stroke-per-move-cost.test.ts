@@ -179,7 +179,6 @@ import {
 } from "./studio-brush-stamp-engine";
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
-import { studioFluidPaintStationSpacingRatio } from "./studio-fluid-paint-reference";
 import {
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
@@ -771,7 +770,6 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
       // One planner per stroke, held across moves — the live overlay creates it in `begin()`.
       const planner = new FxOilDabPlanner();
       const programs = studioOilRibbonProgramsForBrush(brushId, SEED);
-      const spacing = studioFluidPaintStationSpacingRatio(brushId);
       return wholePrefixStepper((stroke) => {
         const dabs = planner.plan({
           points: freehandPath(stroke),
@@ -781,7 +779,6 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
           maxDabs: FX_OIL_DAB_CAP,
           paintBody: studioOilPaintBodyForBrush(brushId),
           tipProfile: studioOilTipProfileForBrush(brushId),
-          ...(spacing === undefined ? {} : { stationSpacingRatio: spacing }),
         });
         return planStudioOilRibbonCarrier(dabs, programs).sourceStationCount;
       });

@@ -42,7 +42,6 @@ const TEST_ROSTER: BrushTestEntry[] = [
   // 4. Oil & Heavy Paint
   { category: "4_Oil_HeavyPaint", brushId: "oil", name: "유화 붓", color: "#b45309", width: 28 },
   { category: "4_Oil_HeavyPaint", brushId: "acrylic", name: "아크릴", color: "#dc2626", width: 26 },
-  { category: "4_Oil_HeavyPaint", brushId: "fluid-paint", name: "플루이드 페인트", color: "#0d9488", width: 24 },
 
   // 5. Airbrush & Particles
   { category: "5_Airbrush_Particles", brushId: "airbrush", name: "에어브러시", color: "#ec4899", width: 35 },
