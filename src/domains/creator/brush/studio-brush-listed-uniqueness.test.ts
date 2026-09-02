@@ -30,7 +30,7 @@ describe("listed paint uniqueness (2026-09-02 feel-cull)", () => {
   it("shrinks the picker-listed paint inventory below the pre-change count", () => {
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length)
       .toBeLessThan(STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT);
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(188);
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(185);
     expect(
       STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.every(
         (item) => !isStudioBrushQuarantinedPresetId(item.id),
