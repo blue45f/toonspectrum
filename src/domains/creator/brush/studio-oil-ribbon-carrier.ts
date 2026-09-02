@@ -1113,7 +1113,8 @@ function pressureProxyFromStationOpacity(opacity: number): number {
 }
 
 /**
- * v1 bristle-physics adapter (`brush--bristle-physics`). Feeds the carrier's
+ * v1 bristle-physics adapter (the `bristlePhysics` program; every matrix row
+ * that enables it runs this, not only brush--bristle-physics). Feeds the carrier's
  * own smoothed centreline and pressure proxy into the platform's WetBrush-2D
  * tuft; lane count and station count come from the exact same `stations` array
  * the band walker iterates, so the returned streams index it 1:1 by

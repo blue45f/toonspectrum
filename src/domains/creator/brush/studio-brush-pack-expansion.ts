@@ -121,9 +121,24 @@ export const STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS = [
 
 type StudioBrushPackVisibilityTuningId =
   (typeof STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS)[number];
+
+/**
+ * Original presets whose formula-built carrier cadence broke the mark they are named after.
+ * `dry-rake` carried a +0.15 authored spacing offset on top of the dry-media base, three times
+ * the cadence of the sibling rakes (0.11–0.12): each stamp of its bristle-row alpha map landed
+ * as an isolated bar, so a drag read as a picket fence instead of the parallel scratches a rake
+ * leaves (long gate: 1.8× the neighbouring spacing, bars visible in every frame).
+ */
+export const STUDIO_BRUSH_PACK_CARRIER_TUNING_IDS = [
+  "dry-rake",
+] as const satisfies readonly StudioBrushPackCatalogId[];
+
+type StudioBrushPackCarrierTuningId =
+  (typeof STUDIO_BRUSH_PACK_CARRIER_TUNING_IDS)[number];
 type StudioBrushPackTuningId =
   | StudioBrushPackExpansionWaveId
-  | StudioBrushPackVisibilityTuningId;
+  | StudioBrushPackVisibilityTuningId
+  | StudioBrushPackCarrierTuningId;
 
 /**
  * Additive override applied on top of the formula-built settings snapshot before normalization.
@@ -191,6 +206,15 @@ const EXPANSION_TUNING: Readonly<
     spacingRatio: 0.09,
     scatterRatio: 0.04,
     flow: { base: 0.28 },
+  },
+
+  // ── Carrier cadence corrections ─────────────────────────────────────────
+  "dry-rake": {
+    // Same cadence as the rakes that pass the continuity gate (hatching-contour-rake 0.11,
+    // wood-knot-rake 0.12), so consecutive bristle-row stamps overlap into continuous scratches.
+    // Less scatter keeps each bristle on its own line instead of smearing rows into each other.
+    spacingRatio: 0.11,
+    scatterRatio: 0.05,
   },
 
   // ── 연필/스케치 ─────────────────────────────────────────────────────────

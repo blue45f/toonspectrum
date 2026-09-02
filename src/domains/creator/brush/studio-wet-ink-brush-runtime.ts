@@ -34,10 +34,13 @@ import {
   ensureStudioInkwashWash,
   getStudioInkwashWash,
   markStudioInkwashWashDeposited,
+  resetStudioInkwashWash,
   studioInkwashDocumentToField,
   studioInkwashWashDigest,
   studioInkwashWashDisplay,
   studioInkwashWashNeedsDeposit,
+  studioInkwashStrokeSignature,
+  studioInkwashWashAppliedEntries,
   studioInkwashWashVisualOwnerId,
   upsertStudioInkwashWashStroke,
 } from "./studio-inkwash-wash";
@@ -51,7 +54,7 @@ import {
   type StudioWetInkTileUpload,
 } from "./studio-wet-ink-field";
 
-import type { DrawEl } from "../studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 import type { StudioLivingInkFluidReferenceRegion } from "../studio-living-ink-fluid-reference";
 
 export const STUDIO_WET_INK_BRUSH_RUNTIME_VERSION =
@@ -549,6 +552,65 @@ export function studioWetInkBrushDepositsPigment(brushId: unknown): boolean {
 export function isStudioInkwashFluidElement(element: DrawEl): boolean {
   return studioWetInkBrushRuntimeSupportsElement(element)
     && isStudioInkwashFluidBrush(element.brush);
+}
+
+/**
+ * 문서에 한 번이라도 존재했던 수묵 획 id. 오버레이가 pointer-up 에서 정착시킨 획은 지연 커밋이 끝날
+ * 때까지 문서에 없으므로, "본 적 없는 id" 는 아직 오지 않은 획이지 지워진 획이 아니다.
+ */
+let documentSeenInkwashIds: ReadonlySet<string> = new Set();
+
+function isDrawElement(element: El): element is DrawEl {
+  return element.type === "draw";
+}
+
+/**
+ * 공유 워시를 페이지의 수묵 획 집합과 대조한다.
+ *
+ * 워시는 침착만 알고 삭제를 모른다. Undo·삭제·이동·페이지 전환으로 문서에서 사라지거나 형태가
+ * 바뀐 획의 안료가 필드에 그대로 남고, 다음 수묵 획(특히 안료 없는 물붓)이 워시 전체를 표시하는
+ * 순간 그 유령이 되살아났다 — 실측: inkwash-pen 획 → Undo → 같은 경로에 물붓 = 지운 획이 다시
+ * 보임. 유체 상태는 경로 의존이라 한 획만 빼낼 수 없으므로, 문서에 남은 획을 문서 순서대로 다시
+ * 침착해 워시를 재구성한다. 성장(획 추가)만 있는 갱신은 재구성하지 않는다.
+ *
+ * @returns 워시를 재구성했으면 true.
+ */
+export function reconcileStudioInkwashWashWithDocument(
+  elements: readonly El[],
+): boolean {
+  const current: DrawEl[] = [];
+  for (const element of elements) {
+    if (isDrawElement(element) && isStudioInkwashFluidElement(element)) current.push(element);
+  }
+  const currentById = new Map(current.map((element) => [element.id, element] as const));
+  const applied = studioInkwashWashAppliedEntries();
+  let stale = false;
+  for (const [id, signature] of applied) {
+    const element = currentById.get(id);
+    if (element) {
+      if (studioInkwashStrokeSignature(element) !== signature) {
+        stale = true;
+        break;
+      }
+    } else if (documentSeenInkwashIds.has(id)) {
+      stale = true;
+      break;
+    }
+  }
+  if (!stale) {
+    const seen = new Set(currentById.keys());
+    for (const [id] of applied) {
+      if (documentSeenInkwashIds.has(id)) seen.add(id);
+    }
+    documentSeenInkwashIds = seen;
+    return false;
+  }
+  resetStudioInkwashWash();
+  documentSeenInkwashIds = new Set(currentById.keys());
+  for (const element of current) {
+    planStudioWetInkBrushReplay(element, { phase: "committed" });
+  }
+  return true;
 }
 
 export function depositStudioInkwashWashElement(

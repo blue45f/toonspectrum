@@ -232,6 +232,18 @@ export function markStudioInkwashWashDeposited(
   record.applied.set(element.id, studioInkwashStrokeSignature(element));
 }
 
+/**
+ * 워시가 지금까지 침착한 획의 (id, 서명) 목록. 문서 대조(reconcile)가 "문서에서 사라졌거나 형태가
+ * 바뀐 획이 아직 안료로 남아 있는가"를 판정하는 유일한 입력이다.
+ */
+export function studioInkwashWashAppliedEntries(
+  key: string = STUDIO_INKWASH_WASH_KEY,
+): ReadonlyArray<readonly [id: string, signature: string]> {
+  const record = washes.get(key);
+  if (!record) return [];
+  return Array.from(record.applied.entries(), ([id, signature]) => [id, signature] as const);
+}
+
 export function stepStudioInkwashWash(
   key: string = STUDIO_INKWASH_WASH_KEY,
   steps: number,

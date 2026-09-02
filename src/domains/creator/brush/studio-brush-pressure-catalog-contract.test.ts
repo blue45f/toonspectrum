@@ -16,7 +16,6 @@ import {
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planOilBrushDabs,
-  planPastelBrushDabs,
   planStudioFxBrushPressurePath,
 } from "../studio-fx-brush";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
@@ -329,20 +328,6 @@ function corePressureAxes(brushId: string, pressure: number): readonly number[] 
         sum(plan.segments.map(({ opacityScale, flowScale }) =>
           opacityScale * flowScale
         )),
-      ];
-    }
-    case "pastel-dabs": {
-      const dabs = planPastelBrushDabs({
-        points: PROBE_POINTS,
-        pressures,
-        baseWidth: diameter,
-        seed: 73,
-        maxDabs: 512,
-      });
-      return [
-        dabs.length,
-        sum(dabs.map(({ radiusX, radiusY }) => radiusX + radiusY)),
-        sum(dabs.map(({ opacity }) => opacity)),
       ];
     }
     case "highlighter-path":

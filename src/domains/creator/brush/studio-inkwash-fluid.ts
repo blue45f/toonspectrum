@@ -312,8 +312,10 @@ export function depositStudioInkwashFluidStroke(
     ? segmentLengths.reduce((total, value) => total + value, 0) / segmentLengths.length
     : 0;
 
+  // 첫 스탬프도 기준 속도로 찍는다. 속도 0 은 감쇠 없는 만재 침착이라, 균일한 간격으로 그은 획의
+  // 다른 스탬프(≈기준 속도)보다 시작점 한 곳만 무겁게 남는다.
   const first = samples[0]!;
-  stampAt(first.x, first.y, first.pressure, 0, 0, 0);
+  stampAt(first.x, first.y, first.pressure, 0, 0, STUDIO_INKWASH_NOMINAL_PACE);
   cursorX = first.x;
   cursorY = first.y;
   /** 다음 스탬프까지 남은 호 길이. 구간 경계에서 초기화하지 않아야 간격이 일정하다. */

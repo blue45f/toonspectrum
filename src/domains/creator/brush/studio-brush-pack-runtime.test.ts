@@ -6,6 +6,7 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
 import {
+  STUDIO_BRUSH_PACK_CARRIER_TUNING_IDS,
   STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
   STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS,
   STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS,
@@ -298,6 +299,7 @@ describe("procedural brush pack runtime", () => {
     const tunedIds = new Set<string>([
       ...STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
       ...STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS,
+      ...STUDIO_BRUSH_PACK_CARRIER_TUNING_IDS,
     ]);
     for (const id of STUDIO_BRUSH_PACK_CATALOG_IDS) {
       expect(
@@ -305,6 +307,12 @@ describe("procedural brush pack runtime", () => {
         `${id}: tuning table membership drift`
       ).toBe(tunedIds.has(id));
     }
+    // A rake reads as parallel scratches only when consecutive bristle-row stamps overlap; the
+    // formula gave dry-rake three times the cadence of its sibling rakes and drew a picket fence.
+    const rakeCadence = (id: "dry-rake" | "hatching-contour-rake" | "wood-knot-rake"): number =>
+      materializeStudioBrushPackDynamics(id)?.spacingRatio ?? Number.NaN;
+    expect(rakeCadence("dry-rake")).toBeLessThanOrEqual(rakeCadence("wood-knot-rake"));
+    expect(rakeCadence("dry-rake")).toBeCloseTo(rakeCadence("hatching-contour-rake"), 2);
 
     const dynamicsById = (id: (typeof STUDIO_BRUSH_PACK_CATALOG_IDS)[number]) =>
       materializeStudioBrushPackDynamics(id)!;
