@@ -221,7 +221,7 @@ export function studioOilFamilyPlanFields(brush: string): {
 }
 
 export function studioFluidPaintStationSpacingRatio(brush: string): number | undefined {
-  return isStudioFluidPaintBrushId(brush) || brush.startsWith("oil--fluid-paint")
+  return isStudioFluidPaintBrushId(brush)
     ? STUDIO_FLUID_PAINT_STATION_SPACING_RATIO
     : undefined;
 }

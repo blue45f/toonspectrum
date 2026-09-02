@@ -116,8 +116,6 @@ export function studioOilProgramSetForBrush(brush: string): StudioBrushOilProgra
     case "fluid-paint-fine":
     case "fluid-paint-load":
     case "fluid-paint-rake":
-    case "oil--fluid-paint-splat":
-    case "oil--fluid-paint-rake":
       return Object.freeze({
         bristlePhysics: true,
         bristleLoadDynamics: true,
