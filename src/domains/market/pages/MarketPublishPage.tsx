@@ -21,6 +21,7 @@ import {
   marketLicenseMeta,
 } from "../models/market-kind";
 
+
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceLicense,
@@ -29,6 +30,7 @@ import type {
 
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
+import { CREATOR_MARKETPLACE_RUNTIME_BY_KIND } from "@/lib/creator-marketplace-resource-contract";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
@@ -37,16 +39,6 @@ import {
   useMetaDescription,
 } from "@/src/hooks/use-document-title";
 import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
-
-const RUNTIME_BY_KIND = {
-  asset: "studio-procedural-asset-v1",
-  brush: "studio-brush-v1",
-  filter: "studio-filter-v1",
-  palette: "studio-palette-v1",
-  template: "studio-template-v1",
-  "3d-preset": "studio-bg3d-preset-v1",
-  "3d-asset": "studio-3d-asset-v1",
-} as const;
 
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 창작 마켓");
@@ -120,7 +112,7 @@ export function MarketPublishPage() {
           payload: {
             schemaVersion: 1,
             resourceKind: kind,
-            runtime: RUNTIME_BY_KIND[kind],
+            runtime: CREATOR_MARKETPLACE_RUNTIME_BY_KIND[kind],
             definition: {
               brushSize,
               brushOpacity,
