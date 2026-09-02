@@ -7,7 +7,10 @@
  *
  *   curve        an S-curve — the live overlay must match the committed stroke along a bend;
  *   cross        two strokes of the same brush crossing — the crossing must not blink, drift or
- *                change tone between the live composite and the committed one;
+ *                change tone between the live composite and the committed one. Crossing and corner
+ *                regions are judged against the LAST pointer-down frame: the mid-gesture frame is
+ *                taken at 60% of the path, and a region the pointer has not reached yet is empty
+ *                there for every brush (that read particle-scatter as a 72% renderer drift);
  *   mixed-over   a partner brush first, this brush across it (wet over dry, dry over wet);
  *   mixed-under  this brush first, the partner across it;
  *   endpoints    a tap, a short flick and a medium stroke — pointer-down and pointer-up caps
@@ -859,6 +862,7 @@ async function runScenario(
       strokes.push(analyzeStroke("corners", captured, corners.map((corner, index) => ({
         name: `corner-${index}`,
         code: "crossing-live-commit-drift" as const,
+        frame: "end" as const,
         region: studioBrushScenarioPointRegion(toClipSpace(corner, clip), crossRadius + 6, clip),
       })), profile, saveFrames(directory, prefix("corners"), captured)));
       break;
@@ -987,7 +991,7 @@ async function runScenario(
       const second = await drawAndCapture(page, clip, diagonalB);
       undoCount += 1;
       strokes.push(analyzeStroke("second", second, [
-        { name: "crossing", code: "crossing-live-commit-drift", region: crossingRegion(clip, center, crossRadius) },
+        { name: "crossing", code: "crossing-live-commit-drift", frame: "end", region: crossingRegion(clip, center, crossRadius) },
       ], profile, saveFrames(directory, prefix("second"), second)));
       break;
     }
@@ -1004,7 +1008,7 @@ async function runScenario(
       const over = await drawAndCapture(page, clip, diagonalB);
       undoCount += 1;
       strokes.push(analyzeStroke(`over:${overProfile.item.id}`, over, [
-        { name: "crossing", code: "crossing-live-commit-drift", region: crossingRegion(clip, center, Math.max(crossRadius, partner.defaultWidth * 1.6 + 8)) },
+        { name: "crossing", code: "crossing-live-commit-drift", frame: "end", region: crossingRegion(clip, center, Math.max(crossRadius, partner.defaultWidth * 1.6 + 8)) },
       ], overProfile, saveFrames(directory, prefix("over"), over)));
       await selectBrush(page, profile);
       break;
@@ -1042,7 +1046,7 @@ async function runScenario(
       undoCount += 1;
       const region = crossingRegion(clip, center, crossRadius);
       strokes.push(analyzeStroke("eraser", erase, [
-        { name: "crossing", code: "eraser-live-commit-drift", region },
+        { name: "crossing", code: "eraser-live-commit-drift", frame: "end", region },
       ], { ...profile, transparent: false, softWet: profile.softWet }, saveFrames(directory, prefix("eraser"), erase), {
         flicker: false,
         expectGap: region,
