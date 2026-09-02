@@ -22,6 +22,17 @@ jobs:
 
       - name: Pack editable source
         run: |
+          candidates=(
+            .github apps packages src lib scripts e2e public
+            index.html package.json pnpm-lock.yaml pnpm-workspace.yaml
+            tsconfig.json vite.config.ts playwright.config.ts turbo.json
+          )
+          paths=()
+          for path in "${candidates[@]}"; do
+            if [[ -e "$path" ]]; then
+              paths+=("$path")
+            fi
+          done
           tar \
             --exclude=.git \
             --exclude=node_modules \
@@ -33,9 +44,7 @@ jobs:
             --exclude=qa-results \
             --exclude=public/data \
             -czf /tmp/toonspectrum-market-source.tgz \
-            .github apps packages src lib scripts e2e migrations public \
-            index.html package.json pnpm-lock.yaml pnpm-workspace.yaml \
-            tsconfig.json vite.config.ts playwright.config.ts turbo.json
+            "${paths[@]}"
 
       - uses: actions/upload-artifact@v6
         with:
