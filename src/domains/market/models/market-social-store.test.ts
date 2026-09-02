@@ -78,12 +78,11 @@ describe("market-social-store", () => {
     const resourceId = "res-test-4";
     const review = addMarketReview(resourceId, {
       authorName: "프로작가K",
-      authorBadge: "verified_buyer",
+      roleTag: "verified_buyer",
       rating: 5,
       title: "최고의 퀄리티",
       content: "웹툰 콘티 짤 때 정말 큰 도움이 되었습니다.",
       tags: ["콘티속도UP", "자연스러운포즈"],
-      recommended: true,
     });
 
     expect(review.rating).toBe(5);

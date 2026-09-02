@@ -89,16 +89,16 @@ export function MarketLibraryPage() {
             전체 ({activeItems.length})
           </button>
           {MARKET_KINDS.map((k) => {
-            const count = activeItems.filter((i) => i.resource.kind === k.id).length;
+            const count = activeItems.filter((i) => i.resource.kind === k.kind).length;
             if (count === 0) return null;
             return (
               <button
-                key={k.id}
+                key={k.kind}
                 type="button"
-                onClick={() => setSelectedKind(k.id)}
+                onClick={() => setSelectedKind(k.kind)}
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                  selectedKind === k.id
+                  selectedKind === k.kind
                     ? "bg-accent text-on-accent"
                     : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg",
                 )}

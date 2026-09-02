@@ -145,7 +145,7 @@ export function MarketEditResourceModal({
               className="mt-1 h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg focus:border-accent focus:outline-none"
             >
               {MARKET_LICENSES.map((lic) => (
-                <option key={lic.id} value={lic.id}>
+                <option key={lic.license} value={lic.license}>
                   {lic.label} ({lic.summary})
                 </option>
               ))}

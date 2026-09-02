@@ -1212,6 +1212,15 @@ async function runScenario(
           dipFrame: null,
           verdict: "stable",
         },
+        inStroke: {
+          frameCount: cumulativeInk.length,
+          peakInk: finalInk,
+          worstDropRatio: worstShrink,
+          worstDropAtMs: null,
+          blinkCount: 0,
+          verdict: "stable",
+        },
+        layers: null,
         regions: {},
         perf: {
           longTasks: 0,
