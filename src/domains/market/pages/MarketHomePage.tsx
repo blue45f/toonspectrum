@@ -153,7 +153,7 @@ export function MarketHomePage() {
               aria-busy={latest.loading || undefined}
               className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
             >
-              {latest.loading
+              {latest.loading && latest.items.length === 0
                 ? Array.from({ length: 8 }, (_, index) => (
                     <li key={index} aria-hidden="true">
                       <div className="skeleton aspect-[16/9] w-full rounded-t-xl" />

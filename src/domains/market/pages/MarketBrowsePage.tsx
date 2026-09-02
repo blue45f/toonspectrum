@@ -443,7 +443,7 @@ export function MarketBrowsePage() {
               aria-busy={page.loading || undefined}
               className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
             >
-              {page.loading
+              {page.loading && page.items.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
                     <li key={index} aria-hidden="true">
                       <div className="skeleton aspect-[16/9] w-full rounded-t-xl" />
