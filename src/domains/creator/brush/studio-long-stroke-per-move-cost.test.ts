@@ -75,7 +75,9 @@
  * ## Scope and honesty
  *
  * `LANE_PROBES` covers all 15 `StudioBrushEngineLaneId` values plus the family-level retained
- * branches that have no lane id (highlighter, calligraphy, neon, glow, pastel). The first test
+ * branches that have no lane id (highlighter, calligraphy, neon, glow, pastel). A probe must run
+ * the whole per-move chain, not just the stage that was rewritten most recently — see the
+ * 2026-09-03 note below for the shape of that mistake. The first test
  * asserts the catalog side of that, so a newly added lane id fails here until it is either probed
  * or explicitly skipped with a reason. `SKIPPED_LANES` is part of the deliverable: an unmeasurable
  * lane is listed with why, never silently dropped.
@@ -109,6 +111,17 @@
  * growing are each caused by a deliberate global design, not replanning waste; they are pinned in
  * `DOCUMENTED_GLOBAL_REPLAN_LANES` with the reason and the redesign that re-arms the strict gate,
  * and assert regression ratchets so they cannot silently get worse in the meantime.
+ *
+ * ## 2026-09-03 — a lane is only as incremental as the stage the probe stops at
+ *
+ * `family:neon` and `family:glow` measured flat from 2026-08-28 while a single radius-150 glow
+ * circle still cost 34.8 s of planning, because the probe stopped at the pressure path. Glow
+ * expands its three declared halo rings into 48 composited shells, and every one of them rebuilt
+ * its whole ribbon plan and re-emitted every vertex per pointer move: the probe was timing 1/48 of
+ * the move, and the incremental stage was the only stage it timed. Both probes now run the shell
+ * loop the renderer runs — plan per shell, then trace the newly promoted prefix and the volatile
+ * tail — and read x1.2 (glow, 2.4 ms at n=3200) and x1.1 (neon, 0.14 ms). The lesson generalises:
+ * a probe that ends at a lane's first incremental stage certifies that stage, not the lane.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -137,12 +150,16 @@ import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-pla
 import {
   FX_OIL_DAB_CAP,
   FxOilDabPlanner,
+  createStudioIncrementalFxLuminousRibbonBuilder,
   createStudioIncrementalFxPressurePathBuilder,
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
-  planStudioFxBrushPressurePath,
+  planGlowBrushPasses,
+  planNeonBrushPasses,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
+  traceStudioFxLuminousRibbonPassRange,
+  type StudioFxLuminousBrushId,
 } from "../studio-fx-brush";
 import {
   createStudioIncrementalHighlighterWashRibbonBuilder,
@@ -622,30 +639,102 @@ function stampProbe(id: string, brushId: string): LaneProbe {
   };
 }
 
-function fxPressurePathProbe(id: string, brushId: string, fxBrushId: string): LaneProbe {
+/** The shells a luminous brush actually composites, in renderer order. */
+function luminousShells(
+  fxBrushId: StudioFxLuminousBrushId,
+  baseWidth: number,
+): { passWidthScale: number; passOpacity: number; luminousCore: boolean }[] {
+  const passes = fxBrushId === "neon"
+    ? planNeonBrushPasses(baseWidth)
+    : planGlowBrushPasses(baseWidth, fxBrushId === "soft-glow");
+  return passes.map((pass, index) => ({
+    passWidthScale: pass.widthScale,
+    passOpacity: pass.opacity,
+    luminousCore: index === passes.length - 1,
+  }));
+}
+
+/** The retained tracer only ever receives coordinates, so the gate can drop them on the floor. */
+const LUMINOUS_TRACE_SINK = {
+  moveTo(): void {},
+  lineTo(): void {},
+  closePath(): void {},
+};
+
+function fxPressurePathProbe(
+  id: string,
+  brushId: string,
+  fxBrushId: StudioFxLuminousBrushId,
+): LaneProbe {
   return {
     id,
     brushId,
     path: "live-incremental",
-    entry: "sceneFunc -> StudioIncrementalFxPressurePathBuilder.append",
+    entry: "sceneFunc -> StudioIncrementalFxPressurePathBuilder.append"
+      + " -> StudioIncrementalFxLuminousRibbonBuilder.append (per shell)"
+      + " -> traceStudioFxLuminousRibbonPassRange (retained prefix + volatile tail)",
     makeStroke: () => {
-      // `StudioDrawNode` holds one builder per (element, symmetry variation)
-      // (`fxPressurePathBuilderForVariation`) for ACTIVE DRAFTS and its pass sceneFuncs consume
-      // the growing snapshot with `append` — this is the exact per-move call shape, including
-      // the canonical pressure model and the accepted-input tension the render path reports for
-      // new-pipeline strokes. Committed elements replay the whole-prefix
-      // `planStudioFxBrushPressurePath` (also the SVG-export and legacy-document chain), a cost
-      // no pointer move pays.
-      const builder = createStudioIncrementalFxPressurePathBuilder();
-      return wholePrefixStepper((stroke) =>
-        builder.append({
-          brushId: fxBrushId as Parameters<typeof planStudioFxBrushPressurePath>[0]["brushId"],
+      // `StudioDrawNode` holds one pressure builder per (element, symmetry variation)
+      // (`fxPressurePathBuilderForVariation`) and one ribbon builder per (variation, pass) for
+      // ACTIVE DRAFTS; each pass sceneFunc consumes the growing snapshot with `append` and then
+      // traces only the polygons the ribbon builder newly promoted plus the volatile tail, which
+      // is the shape a retained `Path2D` frame does in the browser. Timing the pressure path
+      // ALONE — which this probe used to do — measured 1/48 of a glow move and read flat while a
+      // single radius-150 circle cost 34.8 s of planning: the pressure path was incremental and
+      // every one of its 48 downstream shells was not. Committed elements replay the whole-prefix
+      // `planStudioFxBrushPressurePath` + `planStudioFxLuminousRibbonPass` (also the SVG-export
+      // and legacy-document chain), a cost no pointer move pays.
+      const shells = luminousShells(fxBrushId, 24);
+      const producer = createStudioIncrementalFxPressurePathBuilder();
+      const ribbons = shells.map(
+        () => createStudioIncrementalFxLuminousRibbonBuilder(),
+      );
+      const tracedPolygons = shells.map(() => 0);
+      const paint = (stroke: StrokePrefix): number => {
+        const pressurePath = producer.append({
+          brushId: fxBrushId,
           points: freehandPath(stroke),
           pressures: stroke.pressures,
           pressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
           tension: 0.3,
-        }).segments.length,
-      );
+        });
+        let polygons = 0;
+        for (let shellIndex = 0; shellIndex < shells.length; shellIndex += 1) {
+          const plan = ribbons[shellIndex]!.append({
+            brushId: fxBrushId,
+            pressurePath,
+            producer,
+            baseWidth: 24,
+            ...shells[shellIndex]!,
+          });
+          const stable = ribbons[shellIndex]!.stablePolygonCount();
+          // Newly promoted polygons go into the kept path once; the tail is redrawn per frame.
+          traceStudioFxLuminousRibbonPassRange(
+            LUMINOUS_TRACE_SINK,
+            plan,
+            tracedPolygons[shellIndex]!,
+            stable,
+          );
+          tracedPolygons[shellIndex] = stable;
+          traceStudioFxLuminousRibbonPassRange(
+            LUMINOUS_TRACE_SINK,
+            plan,
+            stable,
+            plan.polygons.length,
+          );
+          polygons += plan.polygons.length;
+        }
+        return polygons;
+      };
+      // A seek that shortens the stroke resets both builders, so the retained trace watermark has
+      // to reset with them or the next move would skip polygons the kept path never received.
+      return {
+        seek(stroke) {
+          tracedPolygons.fill(0);
+          paint(stroke);
+        },
+        move: paint,
+      };
     },
   };
 }
