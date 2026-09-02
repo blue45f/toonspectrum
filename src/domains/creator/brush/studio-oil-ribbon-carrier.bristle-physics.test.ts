@@ -15,7 +15,7 @@ const HORIZONTAL_STROKE = {
   seed: 41,
 } as const;
 
-describe("studio oil ribbon carrier — bristle physics program (brush--bristle-physics)", () => {
+describe("studio oil ribbon carrier — bristle physics program (bristlePhysics)", () => {
   it("keeps every plan without the program byte-identical", () => {
     const dabs = planOilBrushDabs(HORIZONTAL_STROKE);
     const legacy = planStudioOilRibbonCarrier(dabs);

@@ -188,7 +188,7 @@ function scribbleDabs(): PlannedDabs {
   return planOilBrushDabs({ points, baseWidth: 26, seed: 3, maxDabs: 2048 });
 }
 
-describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-relief program)", () => {
+describe("studio oil ribbon carrier — impasto relief overlay (impastoRelief program)", () => {
   it("keeps every plan without the program structurally identical (no overlay key at all)", () => {
     const dabs = planOilBrushDabs(HORIZONTAL_STROKE);
     const legacy = planStudioOilRibbonCarrier(dabs);
