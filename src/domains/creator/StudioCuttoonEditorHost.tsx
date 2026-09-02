@@ -12802,8 +12802,9 @@ export function StudioCuttoonEditor({
     }
     // The rejected id was tombstoned in the CRDT draft and its GPU receipt bookkeeping was cleared;
     // restore under a fresh id through the ordinary deferred commit (Konva document layer). This is
-    // the user's explicit choice, not an automatic renderer substitution.
-    const restored: DrawEl = { ...record.stroke, id: uid() };
+    // the user's explicit choice, not an automatic renderer substitution. The record holds a frozen
+    // snapshot, so clone it before the document takes ownership of the arrays.
+    const restored: DrawEl = { ...structuredClone(record.stroke), id: uid() };
     queueDeferredStrokeCommit(restored);
     return { status: "restored", recordId: record.id, restoredStrokeId: restored.id };
   }
@@ -12811,10 +12812,15 @@ export function StudioCuttoonEditor({
   useEffect(() => {
     restoreRejectedStrokeRef.current = restoreRejectedStroke;
   });
-  useEffect(
-    () => setStudioRejectedStrokeRestorer((record) => restoreRejectedStrokeRef.current(record)),
-    [],
-  );
+  useEffect(() => {
+    // Registered per editor instance; the returned unregister runs on unmount (account/work key
+    // remounts) so a rail action can never call into refs of an instance that no longer exists.
+    const unregisterRestorer =
+      setStudioRejectedStrokeRestorer((record) => restoreRejectedStrokeRef.current(record));
+    return () => {
+      unregisterRestorer();
+    };
+  }, []);
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
     setMarqueeActive(next !== null); // 같은 값이면 React 가 렌더를 생략 — 시작/종료 2회만 렌더.
