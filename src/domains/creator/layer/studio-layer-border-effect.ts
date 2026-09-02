@@ -6,6 +6,8 @@ export interface StudioLayerBorderEffectSettings {
   color: string; // hex #RRGGBB or rgba
   type: StudioLayerBorderEffectType;
   antiAliased?: boolean;
+  /** CSP v5.1: Respect semi-transparent pixels on soft/watercolor brush edges */
+  respectTransparency?: boolean;
 }
 
 /** UI slider bounds — the render path clamps to the same range so 광고와 실제가 같다. */
@@ -22,6 +24,7 @@ export const DEFAULT_STUDIO_LAYER_BORDER_EFFECT: StudioLayerBorderEffectSettings
     color: "#000000",
     type: "outer" as StudioLayerBorderEffectType,
     antiAliased: true,
+    respectTransparency: true,
   });
 
 /**
@@ -72,6 +75,7 @@ export function normalizeStudioLayerBorderEffect(
     color,
     type,
     antiAliased: value?.antiAliased !== false,
+    respectTransparency: value?.respectTransparency !== false,
   };
 }
 
@@ -199,13 +203,14 @@ function renderStudioLayerBorderEffect(
   const parsedColor = parseColor(settings.color);
   const grid = new Float64Array(width * height);
 
-  const THRESHOLD = 127;
+  const respectTransparency = settings.respectTransparency !== false;
+  const THRESHOLD = respectTransparency ? 0 : 127;
   for (let i = 0; i < width * height; i++) {
     const alpha = data[i * 4 + 3];
     if (settings.type === "outer") {
       grid[i] = alpha > THRESHOLD ? 0 : 1e10;
     } else if (settings.type === "inner") {
-      grid[i] = alpha <= THRESHOLD ? 0 : 1e10;
+      grid[i] = alpha <= (respectTransparency ? 127 : THRESHOLD) ? 0 : 1e10;
     } else {
       const x = i % width;
       const y = Math.floor(i / width);
@@ -236,7 +241,7 @@ function renderStudioLayerBorderEffect(
     const dSq = grid[i];
     if (dSq <= tSq) {
       const origA = data[i * 4 + 3];
-      const isInside = origA > THRESHOLD;
+      const isInside = origA > (respectTransparency ? 127 : THRESHOLD);
 
       let strokeAlpha = 255;
       if (settings.antiAliased) {
@@ -262,15 +267,14 @@ function renderStudioLayerBorderEffect(
         if (drawStroke) {
           const idx = i * 4;
 
-          if (settings.type === "outer" || settings.type === "center" && !isInside) {
-            // Draw stroke ONLY on empty area
+          if (settings.type === "outer" && origA === 0) {
+            // Draw stroke on pure empty area
             outData[idx] = parsedColor.r;
             outData[idx + 1] = parsedColor.g;
             outData[idx + 2] = parsedColor.b;
             outData[idx + 3] = strokeAlpha;
           } else {
-            // Inner or Center(inside): Composite Stroke over Orig (or basically replace inside with stroke color near edge)
-            // Note: simple alpha compositing over original
+            // Semi-transparent pixel or Inner/Center: Composite Stroke and Original
             const origNormA = origA / 255;
             const strokeNormA = strokeAlpha / 255;
             const outNormA = strokeNormA + origNormA * (1 - strokeNormA);

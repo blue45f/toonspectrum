@@ -578,3 +578,94 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBe(before);
   });
 });
+
+describe("calligraphy suffix boundary", () => {
+  function recordingCanvas(width = 256, height = 128) {
+    let path: number[] = [];
+    const fills: { xs: number[]; ys: number[]; alpha: number }[] = [];
+    const context = {
+      canvas: { width, height },
+      globalAlpha: 1,
+      globalCompositeOperation: "source-over" as GlobalCompositeOperation,
+      fillStyle: "#000",
+      strokeStyle: "#000",
+      lineCap: "round" as CanvasLineCap,
+      lineJoin: "round" as CanvasLineJoin,
+      lineWidth: 1,
+      save() {},
+      restore() {},
+      beginPath() {
+        path = [];
+      },
+      closePath() {},
+      moveTo(x: number, y: number) {
+        path.push(x, y);
+      },
+      lineTo(x: number, y: number) {
+        path.push(x, y);
+      },
+      arc() {},
+      fill() {
+        if (path.length === 0) return;
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (let index = 0; index + 1 < path.length; index += 2) {
+          xs.push(path[index]!);
+          ys.push(path[index + 1]!);
+        }
+        fills.push({ xs, ys, alpha: context.globalAlpha });
+      },
+      drawImage() {},
+      setTransform() {},
+      getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+      clearRect() {},
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({
+        data: new Uint8ClampedArray(Math.max(0, w) * Math.max(0, h) * 4),
+        width: w,
+        height: h,
+      }),
+      putImageData() {},
+    };
+    const canvas = { width, height, getContext: () => context } as unknown as HTMLCanvasElement;
+    return { canvas, fills };
+  }
+
+  it("appends only the unpainted calligraphy segments", () => {
+    // 이미 칠한 마지막 구간을 suffix 계획에 다시 넣으면 그 구간이 프레임마다 한 번 더 칠해져
+    // 반투명 획의 알파가 1-(1-a)^2 로 쌓인다 — 같은 파일의 연필 경로가 실측으로 잡아 고친 것과
+    // 같은 결함이다. 리본 run 은 구간별 커버리지 폴리곤의 합집합이라 앞 구간을 다시 넣어도
+    // 조인이 더 덮이지 않는다: 각 구간이 자기 양 끝 nib 발자국을 이미 낸다.
+    const active = recordingCanvas();
+    const settled = recordingCanvas();
+    const renderer = new StudioLiveRetainedMediaOverlayRenderer();
+    renderer.attach({ activeCanvas: active.canvas, settledCanvas: settled.canvas });
+    renderer.setSurface({
+      left: 0,
+      top: 0,
+      width: 256,
+      height: 128,
+      documentScale: 1,
+      documentWidth: 256,
+      flipX: false,
+    });
+    const calligraphy = {
+      ...drawElement("cal-boundary", "pencil", [10, 40, 40, 40, 70, 40]),
+      brush: "calligraphy" as const,
+      opacity: 0.5,
+      strokeWidth: 6,
+    };
+    expect(renderer.begin(calligraphy)).toEqual({ status: "started", kind: "calligraphy" });
+    const beforeAppend = active.fills.length;
+    expect(renderer.appendFrom({
+      ...calligraphy,
+      points: [10, 40, 40, 40, 70, 40, 100, 40],
+      pressures: [0.6, 0.6, 0.6, 0.6],
+    }).status).toBe("appended");
+    const appended = active.fills.slice(beforeAppend);
+    expect(appended.length).toBeGreaterThan(0);
+    const appendedLeft = Math.min(...appended.flatMap((fill) => fill.xs));
+    // 새 구간은 70 → 100 하나뿐이다. 40 근처까지 왼쪽으로 뻗으면 이미 칠한 40 → 70 구간을
+    // 다시 칠하고 있다는 뜻이다(nib 반폭은 strokeWidth 를 넘지 않는다).
+    expect(appendedLeft).toBeGreaterThan(70 - calligraphy.strokeWidth);
+  });
+});

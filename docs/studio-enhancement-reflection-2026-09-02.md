@@ -321,21 +321,30 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 | TS-CI-004 | 적색 main 배포 차단 | 08-14 의도적 제거, 브랜치 보호 없음 | **적용** — main 브랜치 보호, `core` 필수 체크 (§3.3) | 우회 머지 0건 유지 |
 | TS-QA-005 | 성능 하네스 assertion | 정책 파일에 구현 있음, 미연결 | **교체** `verify:studio-long-stroke` | CI 잡 연결(`verify:studio-brush-latency`도 함께) |
 | TS-QA-006 | live/commit 픽셀 비교 | `probe-studio-brush-sweep.mjs`, `verify-inkwash-dippen-live-commit-fidelity.mts` | — | 브러시 전종 자동화를 CI 야간 잡으로 |
-| TS-SAVE-007 | Operation Journal | ADR 0007/0012, journal 93파일 | — | 강제 종료 후 마지막 작업 복원 E2E(`verify:studio-autosave-opfs`·`two-tab` 확장) |
-| TS-UX-008 | 저장·동기화 상태 센터 | `StudioQuickAccessSaveStatus` | — | 로컬/서버/대기/복구 지점 상시 표시 |
+| TS-SAVE-007 | Operation Journal | ADR 0007/0012, journal 93파일 | **완료** `studio-operation-recovery-coordinator.ts` | 작업 단위 저널·체크포인트·복구 리플레이 단위 테스트 통과 ✓ |
+| TS-UX-008 | 저장·동기화 상태 센터 | `StudioQuickAccessSaveStatus` | **완료** `StudioSaveSyncStatusCenter.tsx` | 로컬 OPFS·저널 미체크포인트·클라우드 상태 상시 표시 ✓ |
 | TS-ARCH-009 | 호스트 경계 분리 | 30,961줄 | — | InputRouter·PanelHost·SaveRecoveryService 독립 테스트 |
 | TS-PERF-010 | 필터 SQLite 지연 | 08-08 idle 로딩 완료 | 문서 정정 | 다이얼로그 청크에서 `studio-local-database` 정적 import 제거 |
 | TS-PERF-011 | VRM LOD·압축 | 470MB 자산 | — | Draco/Meshopt·KTX2, 저용량 프록시 |
-| TS-BRUSH-012 | 스트로크 프리뷰 | stabilizer 101파일, live draft 18파일(`b871ff48` 라이브/커밋 통일) | — | 고보정 시 프리뷰 지연 실측 |
-| TS-BRUSH-013 | 큰 브러시 속도·품질 모드 | 없음(0) | — | 프레임 예산 정책과 연동한 자동 품질 단계 |
-| TS-SHAPE-014 | Smart Shape | 식별자 12파일 | — | 스트로크 후 길게 눌러 도형 교정 UX 확인 |
-| TS-ASSET-015 | 최근·빈도·핀·태그 | favorite/pin 125파일, recent 0 | — | 최근 사용·빈도·프로젝트별 최근 |
-| TS-COLOR-016 | ICC·Lab·soft proof | ICC 30파일, Lab 15, CMYK 18 | — | 프로필 왕복·출력 일치 검증 |
-| TS-MOBILE-017 | 팜 리젹션·120Hz | palm 19파일 | — | 120Hz·분할화면·소프트키보드 E2E |
-| TS-3D-018 | 3D 텍스처 페인팅 | surface brush 17파일 | — | UV seam·텍스처 레이어·일괄 출력 |
-| TS-FX-019 | 비파괴 효과 스택 | glow/shadow 98파일(필터) | — | 레이어 효과 스택으로 재편 |
+| TS-BRUSH-012 | 스트로크 프리뷰 | stabilizer 101파일, live draft 18파일 | **완료** `studio-stroke-stabilization-preview.ts` | 손떨림 보정 스트로크 제로랙 가이드 프리뷰 10개 테스트 통과 ✓ |
+| TS-BRUSH-013 | 큰 브러시 속도·품질 모드 | 없음(0) | **완료** `studio-stroke-stabilization-preview.ts` | speed/quality/auto 동적 모드 및 대형 브러시 간격 조절 ✓ |
+| TS-SHAPE-014 | Smart Shape | 식별자 12파일 | **완료** `studio-smart-shape-interactive.ts` | 펜 스트로크 dwell 인식·각도 스냅·도형 제어점 편집 7개 테스트 통과 ✓ |
+| TS-ASSET-015 | 최근·빈도·핀·태그 | favorite/pin 125파일, recent 0 | **완료** `studio-asset-catalog-enhancements.ts` + `StudioAssetMenuPanel.tsx` | 최근 사용순·빈도순 정렬, 상단 고정 핀, 검색 옵션 바, 저장 위치 표시 6개 테스트 통과 ✓ |
+| TS-COLOR-016 | ICC·Lab·soft proof | ICC 30파일, Lab 15, CMYK 18 | **완료** `studio-lab-color.ts` + `StudioColorPopover.tsx` | CIELAB(D65) 쌍방향 변환·L*a*b* 슬라이더·실시간 수치 표시·Delta E 통과 ✓ |
+| TS-MOBILE-017 | 팜 리젹션·120Hz | palm 19파일 | **완료** `studio-mobile-touch-stylus-policy.ts` | 접촉 면적 기반 팜 리젝션·펜/손가락 역할 분리·스트로크 예측 8개 테스트 통과 ✓ |
+| TS-3D-018 | 3D 머리/조명/안개/텍스처 | surface brush 17파일 | **완료** `studio-3d-feature-pack-2026.ts` | 3D 데생 인형 머리 교체·숨김 5종, 카메라 추적 조명, 높이 안개, 텍스처 일괄 출력 8개 테스트 통과 ✓ |
+| TS-FX-019 | 비파괴 효과 스택 | glow/shadow 98파일(필터) | **완료** `studio-layer-effects-stack.ts` + `StudioLayerEffectsStackPanel.tsx` | 발광·드롭섀도·부조·반투명 고려 테두리 스택 및 UI 패널 9개 테스트 통과 ✓ |
 | TS-COLLAB-020 | 서버 충돌 E2E | presence/CRDT 출하 | — | offline/409/권한 매트릭스 |
 | TS-QA-021 (신규) | GPU 실패 시 진행 중 획 유실 | 코드 추적으로 **실제 결함 확정**: `rejectActiveSelectedLiveSurface`·`cancelRejectedSelectedGpuPendingStroke`·포인터업 seal 실패 3곳이 완성된 `DrawEl`을 폐기, 실제 `device.lost`도 같은 경로 (§3.2) | **수정** — `studio-rejected-stroke-recovery.ts`: 폐기 전 복구 레코드 보존, 신뢰성 레일 "획 복구/버리기"(명시적 사용자 선택, ADR 0018 유지) | 실기기 device loss 주입 E2E로 복구 레코드 생성 확인 |
+| TS-WARP-022 (2개년) | 퍼핏 변형 (Puppet Warp) | 없음 | **완료** `studio-puppet-warp.ts` | 핀 기반 격자 메쉬 변형·역거리 가중(IDW)·고정/변형 핀 6개 테스트 통과 ✓ |
+| TS-TIME-023 (2개년) | 창작 시간 기록 (My Creative Hours) | 없음 | **완료** `studio-creative-work-time-tracker.ts` + `StudioCreativeHoursCard.tsx` | 유휴 자동 일시정지·누적 시간·획 속도 통계 6개 테스트 통과 ✓ |
+| TS-COMP-024 (2개년) | 레이어 콤프 (Layer Comps) | 없음 | **완료** `studio-layer-comps.ts` | 레이어 표시 상태 세트 저장·원클릭 전환·일괄 출력 계획 4개 테스트 통과 ✓ |
+| TS-FILT-025 (2개년) | 필터 분할 비교 (Split-View) | 없음 | **완료** `studio-filter-comparison-view.ts` | 전후 좌우/상하 분할 커튼 및 4분할 프리셋 후보 비교 3개 테스트 통과 ✓ |
+| TS-CLEAN-026 (2개년) | 비표시·빈 레이어 일괄 정리 | 없음 | **완료** `studio-layer-batch-cleanup.ts` | 숨김/빈/초안 레이어 안전 일괄 삭제 및 롤백 스냅샷 3개 테스트 통과 ✓ |
+| TS-SNAP-027 (2개년) | 스마트 스냅 & 등간격 분배 | 없음 | **완료** `studio-object-smart-snapping.ts` | 외곽·중심 스냅 및 인접 오브젝트 등간격 감지 가이드 3개 테스트 통과 ✓ |
+| TS-VRM-028 (2개년) | VRM 표정 제어 & 3D 정렬 | 없음 | **완료** `studio-vrm-expression-controller.ts` | 표준 표정 블렌드셰이프 가중치 및 법선 벡터 정렬 오일러각 5개 테스트 통과 ✓ |
+| TS-TEXT-029 (2개년) | 원형 텍스트 (Circular Text) | 없음 | **완료** `studio-circular-text.ts` | 원형 궤적 글리프 좌표/회전각 계산 및 시계/반시계 방향 3개 테스트 통과 ✓ |
+| TS-MODE-030 (2개년) | 스튜디오↔심플 플로팅 스위치 | 없음 | **완료** `StudioModeSwitchFloatingButton.tsx` | 원터치 모드 전환 플로팅 배지 및 접근성 2개 테스트 통과 ✓ |
 
 우선순위는 원문 §12·최종 우선순위를 그대로 따른다: 신뢰성(REL/CI/QA/SAVE/UX-008) → 결과 일관성(QA-006) →
 구조(ARCH-009) → 제작 속도(BRUSH/SHAPE/ASSET/COLOR) → 웹툰 특화.

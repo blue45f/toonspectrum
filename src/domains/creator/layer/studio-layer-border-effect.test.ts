@@ -134,9 +134,37 @@ describe('StudioLayerBorderEffect — normalize/identity/cachePad', () => {
       color: '#000000',
       type: 'outer',
       antiAliased: true,
+      respectTransparency: true,
     });
     expect(normalizeStudioLayerBorderEffect({ color: '' }).color).toBe('#000000');
     expect(normalizeStudioLayerBorderEffect(null).enabled).toBe(false);
+  });
+
+  it('respects semi-transparent pixels on soft brush edges (CSP v5.1)', () => {
+    const data = new Uint8ClampedArray(4 * 4 * 4);
+    // Center pixel with semi-transparent alpha (100)
+    const centerIdx = (1 * 4 + 1) * 4;
+    data[centerIdx] = 0;
+    data[centerIdx + 1] = 0;
+    data[centerIdx + 2] = 255;
+    data[centerIdx + 3] = 100; // Semi-transparent blue
+
+    const img = new ImageData(data, 4, 4);
+    const settings: StudioLayerBorderEffectSettings = {
+      enabled: true,
+      thickness: 1,
+      color: '#ff0000',
+      type: 'outer',
+      respectTransparency: true,
+    };
+
+    const res = applyStudioLayerBorderEffect(img, settings);
+    // Outer border should blend around the semi-transparent pixel without crushing it
+    expect(res.data[centerIdx + 3]).toBeGreaterThanOrEqual(100);
+    // Right adjacent pixel has border stroke
+    const rightPixel = (1 * 4 + 2) * 4;
+    expect(res.data[rightPixel]).toBe(255); // Red
+    expect(res.data[rightPixel + 3]).toBeGreaterThan(0);
   });
 
   it('identity — disabled or no effective thickness', () => {
