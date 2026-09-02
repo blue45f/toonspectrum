@@ -19,7 +19,7 @@
 | 슬라이스 출력 고정 250ms 대기 | **2026-08-08에 해소됨** (문서 표가 stale) | 표 갱신 `9391d87e`, 잔여 1곳 기록 |
 | 필터 다이얼로그가 SQLite wasm 928KB를 끌어옴 | **2026-08-08에 해소됨**, 잔여 정적 의존 있음 | 표 갱신 `9391d87e` |
 | 중심 컴포넌트 42,149줄 | **stale 수치** — 현재 5줄 심 + 30,961줄 호스트 | §4 |
-| 적색 main에서도 배포되는 구조 | **참**, 단 2026-08-14 의도적 결정 | 재도입은 정책 판단으로 남김 (§3.3) |
+| 적색 main에서도 배포되는 구조 | **참**, 단 2026-08-14 의도적 결정 | 소유자 지시로 main 브랜치 보호(`core` 필수) 적용 (§3.3) |
 
 수정 커밋은 모두 회귀 테스트를 포함하며, 관련 6개 테스트 파일 70건이 통과한다. 하네스 교체는 §3.2에서
 별도로 결과를 적는다.
@@ -233,23 +233,43 @@ Konva 원본 요소가 잠시 보이는 것은 전과 같다. 달라지는 것�
 
 WebGPU 실측은 두 갈래로 읽어야 한다. (1) 헤드리스 SwiftShader의 WebGPU 텍스처 검증 실패는 알려진 측정
 함정이므로 게이트 기본값은 CPU 경로로 두었다 — CI 러너의 GPU 드라이버 상태를 재는 도구가 되면 안 된다.
-(2) 그러나 "GPU 복구 토스트 뒤 진행 중 획이 유실된다"는 앱 동작 자체는 실기기 GPU 컨텍스트 손실에서도
-같을 수 있으므로 별도 확인이 필요하다 — ADR 0018의 fail-closed는 "자동 대체 금지"이지 "입력 유실 허용"이
-아니다. §6에 TS-QA-021로 추가했다.
+(2) "GPU 복구 토스트 뒤 진행 중 획이 유실된다"는 앱 동작은 코드 추적으로 실제 결함으로 확정했다(TS-QA-021).
+폐기 지점은 세 곳 — 획 도중 300ms 영수증 워치독/장치 손실 → `rejectActiveSelectedLiveSurface` →
+`discardDrawingPointerSession`, 포인터업 seal 실패(`studio-cuttoon-stage-pointers-finish.ts`), 포인터업 이후
+영수증 실패 → `cancelRejectedSelectedGpuPendingStroke` — 이고 실제 `device.lost`도 `onWebGpuDeviceLost` →
+`reportAllLiveStrokeGpuAuditFailures("device-lost")`로 같은 경로에 들어온다. 세 곳 모두 그 순간 CPU 쪽 `DrawEl`
+(points·pressures)은 온전했다. 수정은 ADR 0018을 지키는 방식으로 했다: 라이브 작업 취소·프리젠테이션
+`unavailable`·다른 렌더러 승격 금지는 그대로 두고, 폐기 직전 기하를 `studio-rejected-stroke-recovery.ts` 복구
+레코드(스트로크 id 멱등, 최대 8개)에 보존한 뒤 신뢰성 레일에서 사용자가 **명시적으로** "획 복구"(새 id로 일반
+지연 커밋 → Konva 문서 레이어) 또는 "버리기"를 고른다. 사용자·도구 취소(`cancelled`·`pointercancel`)와 미완성
+마크는 여전히 폐기한다. 습식 매체·동적 브러시·리테인드 매체의 seal 실패도 같은 경로를 쓴다. 경계 테스트가
+"폐기 전 보존"과 "복원은 명시적 액션·새 id·일반 커밋"을 고정한다.
 
 하네스 작성 중 확인된 함정(다른 verifier에도 적용): Quick Start 다이얼로그가 hydration 뒤 마운트되어 `b`
 키·클릭을 삼킨다(설정은 SQLite UI prefs, localStorage 아님); tsx의 esbuild `__name` 헬퍼가 `page.evaluate`로
 새어 들어간다(`verify-studio-brush-latency.mts`처럼 shim); 종이 박스가 1000px 뷰포트 아래로 이어진다;
 상단 바의 실행취소 버튼 라벨은 `Undo`이고 툴벨트의 `실행취소`는 disabled로 렌더된다.
 
-### 3.3 배포 게이트 (TS-CI-004) — 정책 판단으로 남김
+### 3.3 배포 게이트 (TS-CI-004) — 브랜치 보호로 적용
 
-원문은 "적색 main 배포 차단"을 P0으로 둔다. 현재 `deploy-vercel.yml`은 main push마다 배포하며, 승인 SHA
-게이트는 **2026-08-14에 의도적으로 제거**됐다. 브랜치 보호도 없다(`gh api …/branches/main/protection` → 404).
-기술적으로는 (a) main 브랜치 보호에 `core`를 required check로 올리거나 (b) `deploy-vercel.yml`을
-`workflow_run: [ci]` + `conclusion == success`로 바꾸는 두 가지가 있고, 어느 쪽도 한 시간 안에 된다.
-그러나 이전 결정을 뒤집는 일이므로 이 PR에서는 하지 않았다. 권고는 (b): 브랜치 보호 없이도 "적색 main은
-배포 안 됨"만 정확히 표현하고, hotfix는 `workflow_dispatch`로 남긴다.
+원문은 "적색 main 배포 차단"을 P0으로 둔다. 실제 배포 경로는 Vercel Git Integration이 `origin/main` push마다
+production을 배포하는 것이고(`deploy-vercel.yml`은 수동 폴백일 뿐), 승인 SHA 게이트는 **2026-08-14에 의도적으로
+제거**됐으며 브랜치 보호도 없었다(`gh api …/branches/main/protection` → 404). 첫 PR(#483)에서는 이전 결정을 뒤집는
+일이라 정책 판단으로 남겼고, 이후 소유자가 "남은 사항까지 완료"를 지시해 적용했다.
+
+두 구현 후보 중 (b) `workflow_run: [ci]` + `core` 성공 시 CLI 배포는 **저장소에 Vercel 시크릿이 없어**(`gh secret list`
+빈 결과) 쓸 수 없었다 — 시크릿 없이 Git 자동 배포를 끄면 배포가 통째로 멈춘다. 따라서 (a) **main 브랜치 보호**를
+저장소 표준(2026-06-13 거버넌스: PR 필수, `enforce_admins=false`, `strict=false`, 승인 0)대로 적용했다.
+
+- 필수 상태 체크: `core`(lint·typecheck·마이그레이션 채택·전체 Vitest·빌드 게이트). CI의 `verify` 잡이 "Require successful
+  core CI"로 정의한 바로 그 게이트다.
+- `studio-3d-visual`·`studio-inapp-browser`는 러너 환경(SwiftShader·인앱 시뮬레이션)에 좌우돼 필수에 넣지 않았다.
+  넣으면 환경 실패가 배포를 막는 거짓 양성이 된다.
+- `enforce_admins=false`: 소유자 우회를 남겨 잠금 사고(게이트 자체가 깨진 경우)를 막는다. 우회 머지는 PR에 이유를 남긴다.
+- 적용 시점: PR #517(main core 잔여 실패 8건 수정)이 머지된 직후. 그 전에 걸면 바로 그 수정 PR이 막힌다.
+
+효과: 적색 커밋은 main에 들어갈 수 없으므로 "적색 main 배포"는 구조적으로 사라진다. 배포 경로(Vercel) 자체는 그대로다.
+`DEPLOY.md` §"Vercel 배포"에 같은 내용을 적었다.
 
 ## 4. 성능·아키텍처 주장 대조
 
@@ -296,7 +316,7 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 | TS-REL-001 | `.will` 증분 CRC | — | **완료** `250fa4d9` | 32MiB 케이던스 테스트 통과 ✓ |
 | TS-REL-002 | 구형 evidence 변환 | — | **완료** `e28436ff` | 레거시 catalog.v1 왕복 ✓ |
 | TS-REN-003 | Dry Media layoutKey 검증 | — | **완료** `1a5983df` | resize/DPR 단위 회귀 ✓, 실기기 E2E는 §7 |
-| TS-CI-004 | 적색 main 배포 차단 | 08-14 의도적 제거 | 정책 판단 (§3.3) | `workflow_run` 게이트 결정 |
+| TS-CI-004 | 적색 main 배포 차단 | 08-14 의도적 제거, 브랜치 보호 없음 | **적용** — main 브랜치 보호, `core` 필수 체크 (§3.3) | 우회 머지 0건 유지 |
 | TS-QA-005 | 성능 하네스 assertion | 정책 파일에 구현 있음, 미연결 | **교체** `verify:studio-long-stroke` | CI 잡 연결(`verify:studio-brush-latency`도 함께) |
 | TS-QA-006 | live/commit 픽셀 비교 | `probe-studio-brush-sweep.mjs`, `verify-inkwash-dippen-live-commit-fidelity.mts` | — | 브러시 전종 자동화를 CI 야간 잡으로 |
 | TS-SAVE-007 | Operation Journal | ADR 0007/0012, journal 93파일 | — | 강제 종료 후 마지막 작업 복원 E2E(`verify:studio-autosave-opfs`·`two-tab` 확장) |
@@ -313,7 +333,7 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 | TS-3D-018 | 3D 텍스처 페인팅 | surface brush 17파일 | — | UV seam·텍스처 레이어·일괄 출력 |
 | TS-FX-019 | 비파괴 효과 스택 | glow/shadow 98파일(필터) | — | 레이어 효과 스택으로 재편 |
 | TS-COLLAB-020 | 서버 충돌 E2E | presence/CRDT 출하 | — | offline/409/권한 매트릭스 |
-| TS-QA-021 (신규) | GPU 복구 시 진행 중 획 유실 확인 | 헤드리스 WebGPU 실측에서 복구 토스트 뒤 픽셀 0·자동저장 0 (§3.2) | 관찰 기록 | 실기기 `device.lost`/컨텍스트 손실 주입 시 진행 중 획이 커밋 또는 복구 저널에 남는지; 유실이면 P0 |
+| TS-QA-021 (신규) | GPU 실패 시 진행 중 획 유실 | 코드 추적으로 **실제 결함 확정**: `rejectActiveSelectedLiveSurface`·`cancelRejectedSelectedGpuPendingStroke`·포인터업 seal 실패 3곳이 완성된 `DrawEl`을 폐기, 실제 `device.lost`도 같은 경로 (§3.2) | **수정** — `studio-rejected-stroke-recovery.ts`: 폐기 전 복구 레코드 보존, 신뢰성 레일 "획 복구/버리기"(명시적 사용자 선택, ADR 0018 유지) | 실기기 device loss 주입 E2E로 복구 레코드 생성 확인 |
 
 우선순위는 원문 §12·최종 우선순위를 그대로 따른다: 신뢰성(REL/CI/QA/SAVE/UX-008) → 결과 일관성(QA-006) →
 구조(ARCH-009) → 제작 속도(BRUSH/SHAPE/ASSET/COLOR) → 웹툰 특화.
@@ -383,6 +403,9 @@ main의 core Vitest 실패(2026-09-02 18:50 기준 10파일 18건 — 히스토�
 검증: 변경 테스트 파일 6개 70건 + WILL 코덱·인터체인지·워커·CRC 커널 12파일 76건 통과, 변경 파일 eslint
 통과, 새 게이트 CPU 경로 13/13 통과(§3.2). 전체 typecheck는 pre-push 훅에서 실행.
 
-남은 일(이 PR 밖): §3.3 배포 게이트 결정, TS-QA-021 GPU 복구 시 획 유실 확인, §6의 미완료 티켓, §7의
+후속 PR(2026-09-02 저녁, 소유자 "남은 사항까지 완료" 지시)에서 §3.3 배포 게이트를 main 브랜치 보호로 적용하고 TS-QA-021을
+복구 레코드+명시적 복원으로 수정했다.
+
+남은 일: §6의 미완료 티켓, §7의
 미구현 축(문서 규모 매트릭스, 실기기 리사이즈/DPR E2E, 접근성 자동화), 그리고
 `verify:studio-brush-latency`·`verify:studio-long-stroke`를 CI 잡(야간 또는 PR 라벨 트리거)에 연결하는 일.

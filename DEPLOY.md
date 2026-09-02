@@ -212,7 +212,13 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
 `drizzle-kit push`를 실행하지 않습니다.
 
-Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). 이전에는
+Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). **2026-09-02부터
+`main`은 브랜치 보호로 PR 전용이며 CI의 `core` 체크(lint·typecheck·마이그레이션 채택·전체 Vitest·빌드 게이트)
+성공이 머지 조건**입니다. 적색 커밋은 main에 들어가지 못하므로 배포되지 않습니다 — "적색 main도 배포되는 구조"를
+배포 경로가 아니라 머지 경로에서 막은 것입니다(Vercel CLI 배포 시크릿이 저장소에 없어 `workflow_run` 게이트는
+쓸 수 없었습니다). 정책은 저장소 표준과 같습니다: 승인 0명, `strict=false`(base 최신화 강제 없음),
+`enforce_admins=false`(잠금 사고 방지용 소유자 탈출구 — 우회한 머지는 이유를 PR에 남길 것), 강제 push·삭제 금지.
+`studio-3d-visual`·`studio-inapp-browser`는 러너 환경 의존이 커서 필수 체크에 넣지 않았습니다. 이전에는
 `vercel.json`의 `ignoreCommand`가 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 커밋 SHA의 exact
 match를 요구해 릴리스마다 승인 SHA를 수동 회전해야 했습니다. 그 승인 단계는 제거했고, 대신
 **migration을 동반하는 release는 반드시 expand/contract 2회 merge로 나눠야 합니다.** 이유는 두 제약이
