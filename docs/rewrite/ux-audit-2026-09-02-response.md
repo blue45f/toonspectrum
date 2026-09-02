@@ -137,6 +137,7 @@ main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전
 | `studio-inapp-browser` CI "Open the 3D editor" 단계 | 같은 원인 — 인앱 WebView 는 WebGPU 가 차단(`inapp-browser-blocked`)되고 자동 폴백이 없어 `verify-studio-bg3d-inapp-editor.mts` 가 45초 동안 canvas 를 기다리다 실패. main 에선 앞 단계(라우트 스윕)가 먼저 깨져 이 단계가 skipped 였기 때문에 드러나지 않았다 | 검증기에 `selectWebGl2Engine`(보기 탭 → WebGL2 → `WebGL2 사용 중` 대기 → 원래 탭 복귀) 추가, 사라진 `auto` 옵션 제거, CI 주석 갱신 |
 | `studio-inapp-browser` CI "Open the 3D editor" 단계 (2차, main #484 병합 뒤) | 4583af11 이 빠른 시작 코치를 비모달로 바꾸며 다른 모달이 열릴 때 스스로 물러나던 경로(`yieldToOpenModal`)를 없앰 → 라우트 `/studio/bg3d` 로 진입하면 3D 편집기 다이얼로그가 코치 위에 겹치고, 검증기의 코치 닫기 클릭은 다이얼로그 뷰포트 컨테이너에 가로막혀 30초 타임아웃 | `dismissQuickStart` 가 편집기 다이얼로그가 이미 보이면 코치를 건너뛰고(측정 대상에 영향 없음), 아니면 10초 제한으로 닫기를 시도. main 은 앞 단계(라우트 스윕·모바일 상단)가 이 PR 의 수정 없이 실패해 이 단계가 skipped 라 드러나지 않음 |
 
+| CI `verify` 잡 (`verify:studio-3d-console`) | 메뉴바 프레젠테이션이 3D·협업을 도구 복합 타이틀로 접었는데 브라우저 검증기 3종이 최상위 `3D`·`협업` 트리거를 클릭 → 존재하지 않는 메뉴를 30초 기다리다 실패 | `verify-studio-3d-console`·`verify-studio-bg3d-physics`·`verify-studio-collab-ui` 가 도구 트리거·도구 드롭다운으로 진입(항목 id·라벨 무변경), 3D 콘솔 소스 계약 테스트도 같은 앵커로 갱신 |
 로컬 재검증(병합 트리 프로덕션 빌드): `verify:studio-mobile-top` 8/8 OK, `verify:studio-inapp-browser` 32/32 OK — 스윕이 잡던
 빠른 시작 패널 390px 넘침도 같은 레인 넘침의 파생이었다. 3D 는 CI 와 같은 조건(Playwright 번들 Chromium headless, ANGLE/SwiftShader,
 `navigator.gpu` 없음)에서 `verify:studio-3d-visual` 을 돌려 진입 경로 테스트 통과를 확인했다. 남은 기록 항목: `oil-ribbon impasto`
