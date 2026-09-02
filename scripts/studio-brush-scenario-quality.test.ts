@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeStudioBrushScenarioDiscrepancy,
   analyzeStudioBrushScenarioFlicker,
+  analyzeStudioBrushScenarioInStroke,
+  judgeStudioBrushScenarioInStroke,
+  judgeStudioBrushScenarioBuildupLadder,
   judgeStudioBrushScenarioDiscrepancy,
   judgeStudioBrushScenarioFlicker,
   judgeStudioBrushScenarioPerf,
@@ -100,5 +103,91 @@ describe("scenario perf", () => {
       expect.objectContaining({ level: "error", code: "long-task" }),
       expect.objectContaining({ level: "warning", code: "frame-stall" }),
     ]);
+  });
+});
+
+describe("scenario buildup ladder", () => {
+  const OPAQUE = { softWet: false, transparent: false };
+
+  it("flags the pencil ladder that the first/last ratio gate let through", () => {
+    // 실측(defaultOpacity 0.85, 같은 자리 20회): 전체로는 1.19배라 비율 게이트를 통과했지만
+    // 5회차가 더한 것은 0.9 코드값 — 3회차부터 같은 픽셀이다.
+    expect(judgeStudioBrushScenarioBuildupLadder(
+      [82.9, 91.1, 95.0, 97.0, 97.9, 98.4],
+      OPAQUE,
+    )).toEqual([
+      expect.objectContaining({ level: "error", code: "buildup-lost" }),
+    ]);
+  });
+
+  it("accepts a ladder still climbing by a code value at pass 5", () => {
+    expect(judgeStudioBrushScenarioBuildupLadder(
+      [60.0, 78.0, 88.0, 93.0, 95.5, 96.8],
+      OPAQUE,
+    )).toEqual([]);
+  });
+
+  it("leaves a one-stroke-opaque brush alone — it never started a ladder to lose", () => {
+    expect(judgeStudioBrushScenarioBuildupLadder(
+      [231.4, 231.6, 231.6, 231.7, 231.7],
+      OPAQUE,
+    )).toEqual([]);
+    expect(judgeStudioBrushScenarioBuildupLadder(
+      [82.9, 91.1, 95.0, 97.0, 97.9],
+      { softWet: false, transparent: true },
+    )).toEqual([]);
+  });
+});
+
+describe("analyzeStudioBrushScenarioInStroke", () => {
+  const frames = (inks: readonly number[]) => inks.map((ink, index) => ({ tMs: index * 16, ink }));
+
+  it("accepts a stroke that only ever grows", () => {
+    const analysis = analyzeStudioBrushScenarioInStroke(frames([0, 400, 900, 1400, 2000, 2600]));
+    expect(analysis.verdict).toBe("stable");
+    expect(analysis.blinkCount).toBe(0);
+    expect(analysis.peakInk).toBe(2600);
+  });
+
+  it("accepts the small dips lossy capture puts on a growing stroke", () => {
+    // A few per cent of the edge moving between frames is the codec, not the renderer.
+    expect(analyzeStudioBrushScenarioInStroke(
+      frames([0, 400, 980, 960, 1500, 1470, 2100]),
+    ).verdict).toBe("stable");
+  });
+
+  it("reports ink that vanished and was painted again", () => {
+    // The shape measured on the shipped build: the pen's overlay goes fully empty every other
+    // frame while the pointer is still down.
+    const analysis = analyzeStudioBrushScenarioInStroke(
+      frames([0, 500, 1200, 0, 1900, 0, 2400, 0, 3000]),
+    );
+    expect(analysis.verdict).toBe("blink");
+    expect(analysis.blinkCount).toBe(3);
+    expect(analysis.worstDropRatio).toBe(1);
+    expect(judgeStudioBrushScenarioInStroke(analysis, { softWet: false, transparent: false }))
+      .toHaveLength(1);
+  });
+
+  it("does not call the final fall a blink — nothing repainted it", () => {
+    // A stroke that drops at the very end and stays down is a vanish, which the post-release
+    // series owns; calling it a blink here would report the same defect twice under two names.
+    expect(analyzeStudioBrushScenarioInStroke(frames([0, 800, 1600, 2400, 0])).verdict)
+      .toBe("stable");
+  });
+
+  it("says so rather than guessing when the cast caught almost nothing", () => {
+    expect(analyzeStudioBrushScenarioInStroke(frames([0, 900])).verdict).toBe("too-few-frames");
+    expect(judgeStudioBrushScenarioInStroke(
+      analyzeStudioBrushScenarioInStroke(frames([0, 900])),
+      { softWet: false, transparent: false },
+    )).toEqual([]);
+  });
+
+  it("records a transparent wash instead of judging it", () => {
+    const analysis = analyzeStudioBrushScenarioInStroke(frames([0, 500, 1200, 0, 1900, 0, 2400]));
+    expect(analysis.verdict).toBe("blink");
+    expect(judgeStudioBrushScenarioInStroke(analysis, { softWet: false, transparent: true }))
+      .toEqual([]);
   });
 });
