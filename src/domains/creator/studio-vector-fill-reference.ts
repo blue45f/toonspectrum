@@ -142,10 +142,55 @@ export interface StudioVectorReferencePreparedExport {
 }
 
 export interface StudioVectorReferenceOffscreenOptions {
-  /** Test/platform seam. Production uses the browser's asynchronous SVG ImageBitmap decoder. */
+  /**
+   * Test/platform seam for the blob decoder. Production tries this first and, when the browser
+   * cannot decode an SVG blob, falls back to the `<img>` decoder — see
+   * {@link decodeStudioVectorReferenceSvgBitmap}.
+   */
   readonly createBitmap?: (source: Blob) => Promise<ImageBitmap>;
   /** Test/platform seam; injected sessions stay one-shot, while production uses a short shared lease. */
   readonly createSession?: () => StudioOffscreenRasterSession;
+}
+
+/**
+ * Which decoder actually reads an SVG in this realm. Cleared by
+ * {@link disposeStudioVectorReferenceRasterizer} so the verdict never outlives the rasterizer.
+ */
+type StudioVectorReferenceSvgBitmapDecoder = "blob" | "image-element";
+let studioVectorReferenceSvgBitmapDecoder: StudioVectorReferenceSvgBitmapDecoder | null = null;
+
+/**
+ * Decodes the serialized page SVG into a transferable bitmap.
+ *
+ * Chromium has never shipped SVG support for `createImageBitmap(Blob)` — the call rejects with
+ * `InvalidStateError: The source image could not be decoded` — and WebKit behaves the same way. A
+ * blob-only decoder therefore made this provider unusable in the browsers artists actually run,
+ * and because the filter menu selects this provider for every page-composite and layer-scoped
+ * filter, the whole filter path failed before its dialog could open. The `<img>` decoder does read
+ * SVG, and `createImageBitmap(HTMLImageElement)` still yields a transferable bitmap, so the page
+ * draw and PNG encode stay on the Worker exactly as the selected backend promises. The blob route
+ * is attempted first and its verdict memoized, so a realm that can decode blobs never pays for the
+ * element hop and a realm that cannot only pays once.
+ */
+async function decodeStudioVectorReferenceSvgBitmap(
+  blob: Blob,
+  createBitmap: (source: Blob) => Promise<ImageBitmap>,
+  signal: AbortSignal | undefined,
+): Promise<ImageBitmap> {
+  if (studioVectorReferenceSvgBitmapDecoder !== "image-element") {
+    try {
+      const bitmap = await createBitmap(blob);
+      studioVectorReferenceSvgBitmapDecoder = "blob";
+      return bitmap;
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+      if (typeof globalThis.createImageBitmap !== "function") throw error;
+      studioVectorReferenceSvgBitmapDecoder = "image-element";
+    }
+  }
+  const image = await loadSvgBlobImage(blob, signal);
+  throwIfAborted(signal);
+  return globalThis.createImageBitmap(image);
 }
 
 const STUDIO_VECTOR_REFERENCE_RASTER_IDLE_MS = 45_000;
@@ -181,6 +226,7 @@ export function disposeStudioVectorReferenceRasterizer(): void {
   const session = sharedStudioVectorReferenceRasterSession;
   sharedStudioVectorReferenceRasterSession = null;
   sharedStudioVectorReferenceRasterActiveRuns = 0;
+  studioVectorReferenceSvgBitmapDecoder = null;
   session?.dispose();
 }
 
@@ -660,10 +706,12 @@ export const rasterizeStudioVectorReferenceInBrowser: StudioVectorReferenceRaste
  *
  * Directly drawn Studio strokes reach smudge/mix/dodge/liquify through an editable raster copy.
  * SVG serialization was already Worker-backed, but the final full-page draw + PNG encode still
- * happened on the main thread and could look like a frozen canvas on long webtoon pages. Chrome's
- * ImageBitmap decoder is asynchronous; the decoded bitmap is then transferred once to the shared
- * OffscreenCanvas runtime for drawing and `convertToBlob()` encoding. Unsupported/startup/worker
- * failures are terminal for this selected provider and surface as `raster-unavailable`.
+ * happened on the main thread and could look like a frozen canvas on long webtoon pages. The SVG is
+ * decoded asynchronously (see {@link decodeStudioVectorReferenceSvgBitmap}) and the decoded bitmap
+ * is transferred once to the shared OffscreenCanvas runtime for drawing and `convertToBlob()`
+ * encoding. Startup and Worker failures are terminal for this selected provider and surface as
+ * `raster-unavailable`; the decoder picks whichever route this realm can actually read SVG with,
+ * which never moves the draw or the encode back onto the interaction thread.
  */
 export async function rasterizeStudioVectorReferenceOffscreen(
   request: StudioVectorReferenceRasterRequest,
@@ -691,7 +739,11 @@ export async function rasterizeStudioVectorReferenceOffscreen(
   let session: StudioOffscreenRasterSession | null = null;
   let leasedSession = false;
   try {
-    bitmap = await createBitmap(new Blob([request.svg], { type: SVG_EXPORT_MIME }));
+    bitmap = await decodeStudioVectorReferenceSvgBitmap(
+      new Blob([request.svg], { type: SVG_EXPORT_MIME }),
+      createBitmap,
+      request.signal,
+    );
     throwIfAborted(request.signal);
     if (bitmap.width <= 0 || bitmap.height <= 0) {
       throw new StudioVectorReferenceError(
