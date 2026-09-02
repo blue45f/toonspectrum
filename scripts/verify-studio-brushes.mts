@@ -76,6 +76,7 @@ import {
 } from "../src/domains/creator/brush/studio-brush-selection";
 import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/brush/studio-draw-pointer-pressure-contract";
 import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { studioWetInkBrushDepositsPigment } from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
 import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
 import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
@@ -2910,509 +2911,540 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     const evidence: LongBrushStrokeEvidence[] = [];
     const qualityEvidence: LongBrushQualityEvidence[] = [];
     for (const [index, preset] of LONG_BRUSH_CATALOG_ITEMS.entries()) {
-      const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
-      invariant(expectedSelection, `${preset.id}: long-route catalogue selection did not materialize`);
-      invariant(
-        preset.source === "core" || expectedSelection.brushDynamics,
-        `${preset.id}: long-route pro selection has no runtime dynamics`,
-      );
-      const operation = verifierBrushOperation(expectedSelection);
-      await selectDesktopBrush(page, preset, expectedSelection);
-      await page.mouse.move(4, 4);
-      // Every preset gets the same clean lane. Packing all brushes into the visible 300 px height
-      // made a broad preceding stroke cover a thin successor (notably pen → fineliner), so a
-      // screenshot diff falsely reported a truncated route even though autosave held both exact
-      // endpoints. The verified Undo below clears ink before the next preset.
-      const y = safeTop + (safeBottom - safeTop) / 2;
-      const startX = safeLeft;
-      const endX = safeRight;
-      const qualityMarginX = Math.max(
-        32,
-        Math.min(90, expectedSelection.defaultWidth * 1.25),
-      );
-      const qualityMarginY = Math.max(
-        48,
-        Math.min(104, expectedSelection.defaultWidth * 1.65),
-      );
-      const clip = sanitizeEvidenceClip({
-        x: Math.floor(startX - qualityMarginX),
-        y: Math.floor(y - qualityMarginY),
-        width: Math.ceil(endX - startX + qualityMarginX * 2),
-        height: Math.ceil(qualityMarginY * 2 + 4),
-      }, viewport);
-      const routeSegmentXRange = {
-        start: startX - clip.x,
-        end: endX - clip.x,
-      };
-      const eraseBaseline = operation === "erase"
-        ? await prepareVisibleEraserBaseline(page, {
-            start: { x: startX, y },
-            end: { x: endX, y: y + 4 },
-          }, clip)
-        : null;
-      if (eraseBaseline) {
-        await selectDesktopBrush(page, preset, expectedSelection);
-      }
-      const emptyBefore = eraseBaseline?.empty ?? null;
-      const before = eraseBaseline?.painted
-        ?? await captureStableEvidence(page, clip);
-      const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
-        document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
-      { x: startX, y: y });
-      const canvasReceivesEnd = await page.evaluate(({ x, y: pointY }) =>
-        document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
-      { x: endX, y: y + 4 });
-      invariant(canvasReceivesStart && canvasReceivesEnd, `${preset.id}: long-stroke route is covered by editor chrome`);
-
-      // One dispatched long move deliberately stresses sparse/fast pointer delivery. Every brush
-      // renderer must interpolate its own route instead of painting only the endpoints or dropping
-      // a capped prefix.
-      await page.mouse.move(startX, y);
-      await page.mouse.down();
-      await page.mouse.move(endX, y + 4);
-      // Capture the renderer's real pointer-down authority before pointerup can swap it for the
-      // retained/committed representation. brushCursorStyle='none' was installed before Studio
-      // initialized, so the complete live ROI is compared without an endpoint exclusion.
-      await page.waitForTimeout(50);
-      if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
-        const dump = await page.evaluate(() =>
-          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
-            index,
-            w: canvas.width,
-            h: canvas.height,
-            cls: (canvas.className ?? "").toString().slice(0, 48),
-            id: canvas.id,
-            parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
-            cssW: canvas.getBoundingClientRect().width,
-            cssH: canvas.getBoundingClientRect().height,
-            dpr: globalThis.devicePixelRatio ?? 1,
-            url: canvas.toDataURL("image/png"),
-          })),
-        );
-        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-live`);
-        mkdirSync(dumpDir, { recursive: true });
-        const ctxScales = await page.evaluate(
-          () => (globalThis as unknown as { __studioCtxScales?: Record<string, number[]> }).__studioCtxScales ?? {},
-        );
-        writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify({
-          canvases: dump.map(({ url: _url, ...rest }) => rest),
-          ctxScales,
-        }, null, 1));
-        for (const entry of dump) {
-          const base64 = entry.url.split(",")[1] ?? "";
-          if (!base64) continue;
-          writeFileSync(
-            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
-            Buffer.from(base64, "base64"),
-          );
-        }
-      }
-      const live = await page.screenshot({ animations: "disabled", clip });
-      if (operation === "erase") {
-        invariant(
-          await page.evaluate(() =>
-            document.querySelector('[data-studio-draw-options="true"]')
-              ?.getAttribute("data-studio-active-draw-mode") === "eraser"
-          ),
-          `${preset.id}: long pointer-down gesture lost eraser operation authority`,
-        );
-      }
-      await page.mouse.up();
-      const released = await page.screenshot({ animations: "disabled", clip });
-      if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
-        const dump = await page.evaluate(() =>
-          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
-            index,
-            w: canvas.width,
-            h: canvas.height,
-            cls: (canvas.className ?? "").toString().slice(0, 48),
-            id: canvas.id,
-            parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
-            cssW: canvas.getBoundingClientRect().width,
-            cssH: canvas.getBoundingClientRect().height,
-            dpr: globalThis.devicePixelRatio ?? 1,
-            url: canvas.toDataURL("image/png"),
-          })),
-        );
-        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-released`);
-        mkdirSync(dumpDir, { recursive: true });
-        for (const entry of dump) {
-          const base64 = entry.url.split(",")[1] ?? "";
-          if (!base64) continue;
-          writeFileSync(
-            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
-            Buffer.from(base64, "base64"),
-          );
-        }
-      }
-      await page.mouse.move(4, 4);
-      const immediateCoverage = await compareScreenshotCoverage(
-        page,
-        before,
-        released,
-        6,
-        3,
-        routeSegmentXRange,
-      );
-      invariant(
-        hasMeaningfulPixelChange(immediateCoverage),
-        `${preset.id}: fast long stroke produced no immediate visible pixels`,
-      );
-      if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
-        const perfectDebugState = await page.evaluate(() =>
-          (globalThis as {
-            __perfectInkDebugState?: {
-              brush: string;
-              pointCount: number;
-              strokeDistance: number;
-              isVeryShort: boolean;
-              isSparseLong: boolean;
-              profile: string;
-              outlineDistance: number;
-              outlinePointCount: number;
-              isDegeneratePath: boolean;
-            } | null;
-          }).__perfectInkDebugState ?? null,
-        );
-          log(`DEBUG ${preset.id} long:${JSON.stringify(perfectDebugState)}`);
-      }
-      await page.waitForTimeout(280);
-      if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
-        const settledPerfectDebugState = await page.evaluate(() =>
-          (globalThis as {
-            __perfectInkDebugState?: {
-              brush: string;
-              pointCount: number;
-              strokeDistance: number;
-              isVeryShort: boolean;
-              isSparseLong: boolean;
-              profile: string;
-              outlineDistance: number;
-              outlinePointCount: number;
-              isDegeneratePath: boolean;
-            } | null;
-          }).__perfectInkDebugState ?? null,
-        );
-        log(`DEBUG ${preset.id} long-settled:${JSON.stringify(settledPerfectDebugState)}`);
-      }
-      const persistedOperation = await waitForPersistedSelectedOperation(
-        page,
-        expectedSelection,
-        operation,
-        operation === "erase" ? 2 : 1,
-        preset.source === "pro" && operation === "paint",
-        // Living Ink completes a deterministic 120-tick release settle before its canonical PNG
-        // transaction becomes durable. Preserve the ordinary 5 s brush contract elsewhere, but
-        // give this quality matrix the same bounded 15 s handoff window as the product surface.
-        15_000,
-      );
-      const saved = persistedOperation.stroke;
-      const settled = await page.screenshot({ animations: "disabled", clip });
-      const descriptor = studioBrushPackDescriptorById(preset.id);
-      const dryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
-      const intentionalDiscrete = dryMediaClassification
-        ? dryMediaClassification.kind === "intentional-discrete"
-        : descriptor
-          ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
-          // Imported CC0 presets declare discreteness from their own upstream parameters, so a
-          // faithfully sparse splatter records density instead of failing a continuity gate.
-          : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
-      const classifiedQualityPolicy = classifyStudioLongBrushQualityPolicy({
-        id: preset.id,
-        source: preset.source,
-        runtimeBrushId: expectedSelection.runtimeBrushId,
-        mediaGroup: preset.mediaGroup,
-        previewStyle: preset.previewStyle,
-        intentionalDiscrete,
-      });
-      // Erasers replay their exact full compound path on the retained main layer, so the same
-      // continuous live/release/settled quality policy now applies to destination-out strokes.
-      const qualityPolicy = classifiedQualityPolicy;
-      const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
-      const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
-        const amount = sampleIndex / Math.max(1, sampleCount - 1);
-        return {
-          x: startX - clip.x + (endX - startX) * amount,
-          y: y - clip.y + 4 * amount,
-        };
-      });
-      const crossSectionRadius = Math.max(
-        10,
-        Math.min(46, expectedSelection.defaultWidth * 1.5),
-      );
-      const cursorIgnoreRadius = 0;
-      const quality = analyzeStudioLongBrushQuality({
-        policy: qualityPolicy,
-        baseline: decodeLongBrushQualityImage(before),
-        live: decodeLongBrushQualityImage(live),
-        released: decodeLongBrushQualityImage(released),
-        settled: decodeLongBrushQualityImage(settled),
-        route: {
-          points: localRoutePoints,
-          crossSectionRadius,
-          cursorIgnoreRadius,
-          nominalWidth: expectedSelection.defaultWidth,
-        },
-      });
-      const qualityArtifacts = saveLongBrushQualityArtifacts(
-        qualityRunDirectory,
-        index,
-        preset.id,
-        {
-          baseline: before,
-          live,
-          released,
-          settled,
-        },
-      );
-      qualityEvidence.push({
-        id: preset.id,
-        name: preset.name,
-        source: preset.source,
-        runtimeBrushId: expectedSelection.runtimeBrushId,
-        capture: {
-          clip,
-          localRouteStart: localRoutePoints[0]!,
-          localRouteEnd: localRoutePoints.at(-1)!,
-          brushCursorStyle: "none",
-          endpointExclusion: {
-            enabled: false,
-            center: localRoutePoints.at(-1)!,
-            radius: 0,
-          },
-        },
-        quality,
-        artifacts: qualityArtifacts,
-      });
-      writeLongBrushQualityReport({
-        reportPath: qualityReportPath,
-        runDirectory: qualityRunDirectory,
-        evidence: qualityEvidence,
-        completed: false,
-      });
-      for (const finding of quality.findings) {
-        log(
-          `${preset.id}: quality ${finding.level.toUpperCase()} `
-            + `${finding.code} — ${finding.message}`,
-        );
-      }
-      if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
-        // 집중 진단 모드에서는 성공/실패와 무관하게 지속 요소의 압력 채널을 읽는다 — 라이브
-        // 합성 압력(속도 모델)과 커밋 재생 압력의 괴리(erodible energy-collapse 0.35 실측)를
-        // 요소 데이터에서 직접 가른다.
-        try {
-          const persisted = await persistedDrawElements(page);
-          const lastDraw = persisted.at(-1) as
-            | { points?: readonly number[]; pressures?: readonly number[] }
-            | undefined;
-          const pressures = lastDraw?.pressures ?? [];
-          log(
-            `${preset.id}: long persisted pressures n=${pressures.length} `
-              + `head=${JSON.stringify(pressures.slice(0, 6).map((value) => Number(value.toFixed(3))))} `
-              + `tail=${JSON.stringify(pressures.slice(-4).map((value) => Number(value.toFixed(3))))}`,
-          );
-        } catch (cause) {
-          log(`${preset.id}: long persisted pressures read failed ${String(cause)}`);
-        }
-        const liveOverlayDebug = await page.evaluate(() => ({
-          seal: (globalThis as { __studioDynamicSealDebug?: unknown }).__studioDynamicSealDebug ?? null,
-          release: (globalThis as { __studioDynamicReleaseDebug?: unknown }).__studioDynamicReleaseDebug ?? null,
-        }));
-        log(`${preset.id}: long live-overlay breadcrumbs ${JSON.stringify(liveOverlayDebug).slice(0, 900)}`);
-      }
-      const coverage = await compareScreenshotCoverage(
-        page,
-        before,
-        settled,
-        6,
-        3,
-        routeSegmentXRange,
-      );
-      if (coverage.visibleSegments !== 6) {
-        // 장경로 실패에서도 커밋 분기/렌더 결과 브레드크럼을 읽는다 — "양끝 캡만 남는" 패턴이
-        // 커밋 타일 합성의 부분 실패인지 플랜 자체의 공백인지 가른다.
-        const longCommitDebug = await page.evaluate(() => ({
-          route: (globalThis as { __studioCommitRouteDebug?: unknown }).__studioCommitRouteDebug ?? null,
-          render: (globalThis as { __studioCommitRenderDebug?: unknown }).__studioCommitRenderDebug ?? null,
-        }));
-        log(`${preset.id}: long commit breadcrumbs ${JSON.stringify(longCommitDebug)}`);
-        try {
-          await page.waitForTimeout(2_500);
-          const persisted = await persistedDrawElements(page);
-          const lastDraw = persisted.at(-1) as
-            | { points?: readonly number[]; pressures?: readonly number[] }
-            | undefined;
-          log(
-            `${preset.id}: long persisted element points=${(lastDraw?.points?.length ?? 0) / 2} `
-              + `pressures=${lastDraw?.pressures?.length ?? 0} `
-              + `head=${JSON.stringify((lastDraw?.points ?? []).slice(0, 8))} `
-              + `tail=${JSON.stringify((lastDraw?.points ?? []).slice(-4))}`,
-          );
-        } catch (cause) {
-          log(`${preset.id}: long persisted element read failed ${String(cause)}`);
-        }
-        writeFileSync(join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-before.png`), before);
-        writeFileSync(
-          join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-immediate.png`),
-          released,
-        );
-        writeFileSync(
-          join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-settled.png`),
-          settled,
-        );
-        log(
-          `${preset.id}: long-stroke diagnostic coverage ${JSON.stringify(coverage)} `
-            + `clip ${JSON.stringify(clip)}`,
-        );
-        if (DEBUG_BRUSH_VERIFIER) {
-          await page.waitForTimeout(1_700);
-          const diagnosticPersisted = await persistedDrawElements(page);
-          log(
-            `${preset.id}: persisted long-stroke tails `
-              + JSON.stringify(diagnosticPersisted.slice(-2)),
-          );
-          await page.screenshot({
-            path: join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-page.png`),
-            animations: "disabled",
-          });
-        }
-      }
       /**
-       * 실패한 레인의 잔여 획이 다음 프리셋의 진단을 오염시키므로, 기록 후에는 반드시 페이지를
-       * 새로 세우고 넘어간다.
+       * 서베이 모드에서는 어떤 불변식이 깨져도 이 프리셋만 기록하고 다음으로 간다. 잔여 획이
+       * 다음 레인을 오염시키지 않도록 페이지는 반드시 새로 세운다. 서베이가 아니면 예전처럼
+       * 첫 실패에서 즉시 멈춘다 — 게이트의 엄격함은 그대로다.
        */
-      const surveySkip = async (message: string): Promise<boolean> => {
-        if (!LONG_MATRIX_SURVEY_MODE) return false;
-        surveyFailures.push(message);
+      const outcome = await (async (): Promise<"done" | "skipped"> => {
+        const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
+        invariant(expectedSelection, `${preset.id}: long-route catalogue selection did not materialize`);
+        invariant(
+          preset.source === "core" || expectedSelection.brushDynamics,
+          `${preset.id}: long-route pro selection has no runtime dynamics`,
+        );
+        const operation = verifierBrushOperation(expectedSelection);
+        await selectDesktopBrush(page, preset, expectedSelection);
+        await page.mouse.move(4, 4);
+        // Every preset gets the same clean lane. Packing all brushes into the visible 300 px height
+        // made a broad preceding stroke cover a thin successor (notably pen → fineliner), so a
+        // screenshot diff falsely reported a truncated route even though autosave held both exact
+        // endpoints. The verified Undo below clears ink before the next preset.
+        const y = safeTop + (safeBottom - safeTop) / 2;
+        const startX = safeLeft;
+        const endX = safeRight;
+        const qualityMarginX = Math.max(
+          32,
+          Math.min(90, expectedSelection.defaultWidth * 1.25),
+        );
+        const qualityMarginY = Math.max(
+          48,
+          Math.min(104, expectedSelection.defaultWidth * 1.65),
+        );
+        const clip = sanitizeEvidenceClip({
+          x: Math.floor(startX - qualityMarginX),
+          y: Math.floor(y - qualityMarginY),
+          width: Math.ceil(endX - startX + qualityMarginX * 2),
+          height: Math.ceil(qualityMarginY * 2 + 4),
+        }, viewport);
+        const routeSegmentXRange = {
+          start: startX - clip.x,
+          end: endX - clip.x,
+        };
+        const eraseBaseline = operation === "erase"
+          ? await prepareVisibleEraserBaseline(page, {
+              start: { x: startX, y },
+              end: { x: endX, y: y + 4 },
+            }, clip)
+          : null;
+        if (eraseBaseline) {
+          await selectDesktopBrush(page, preset, expectedSelection);
+        }
+        const emptyBefore = eraseBaseline?.empty ?? null;
+        const before = eraseBaseline?.painted
+          ?? await captureStableEvidence(page, clip);
+        const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
+          document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
+        { x: startX, y: y });
+        const canvasReceivesEnd = await page.evaluate(({ x, y: pointY }) =>
+          document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
+        { x: endX, y: y + 4 });
+        invariant(canvasReceivesStart && canvasReceivesEnd, `${preset.id}: long-stroke route is covered by editor chrome`);
+
+        // One dispatched long move deliberately stresses sparse/fast pointer delivery. Every brush
+        // renderer must interpolate its own route instead of painting only the endpoints or dropping
+        // a capped prefix.
+        await page.mouse.move(startX, y);
+        await page.mouse.down();
+        await page.mouse.move(endX, y + 4);
+        // Capture the renderer's real pointer-down authority before pointerup can swap it for the
+        // retained/committed representation. brushCursorStyle='none' was installed before Studio
+        // initialized, so the complete live ROI is compared without an endpoint exclusion.
+        await page.waitForTimeout(50);
+        if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+          const dump = await page.evaluate(() =>
+            Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+              index,
+              w: canvas.width,
+              h: canvas.height,
+              cls: (canvas.className ?? "").toString().slice(0, 48),
+              id: canvas.id,
+              parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+              cssW: canvas.getBoundingClientRect().width,
+              cssH: canvas.getBoundingClientRect().height,
+              dpr: globalThis.devicePixelRatio ?? 1,
+              url: canvas.toDataURL("image/png"),
+            })),
+          );
+          const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-live`);
+          mkdirSync(dumpDir, { recursive: true });
+          const ctxScales = await page.evaluate(
+            () => (globalThis as unknown as { __studioCtxScales?: Record<string, number[]> }).__studioCtxScales ?? {},
+          );
+          writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify({
+            canvases: dump.map(({ url: _url, ...rest }) => rest),
+            ctxScales,
+          }, null, 1));
+          for (const entry of dump) {
+            const base64 = entry.url.split(",")[1] ?? "";
+            if (!base64) continue;
+            writeFileSync(
+              join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+              Buffer.from(base64, "base64"),
+            );
+          }
+        }
+        const live = await page.screenshot({ animations: "disabled", clip });
+        if (operation === "erase") {
+          invariant(
+            await page.evaluate(() =>
+              document.querySelector('[data-studio-draw-options="true"]')
+                ?.getAttribute("data-studio-active-draw-mode") === "eraser"
+            ),
+            `${preset.id}: long pointer-down gesture lost eraser operation authority`,
+          );
+        }
+        await page.mouse.up();
+        const released = await page.screenshot({ animations: "disabled", clip });
+        if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+          const dump = await page.evaluate(() =>
+            Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+              index,
+              w: canvas.width,
+              h: canvas.height,
+              cls: (canvas.className ?? "").toString().slice(0, 48),
+              id: canvas.id,
+              parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+              cssW: canvas.getBoundingClientRect().width,
+              cssH: canvas.getBoundingClientRect().height,
+              dpr: globalThis.devicePixelRatio ?? 1,
+              url: canvas.toDataURL("image/png"),
+            })),
+          );
+          const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-released`);
+          mkdirSync(dumpDir, { recursive: true });
+          for (const entry of dump) {
+            const base64 = entry.url.split(",")[1] ?? "";
+            if (!base64) continue;
+            writeFileSync(
+              join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+              Buffer.from(base64, "base64"),
+            );
+          }
+        }
+        await page.mouse.move(4, 4);
+        const immediateCoverage = await compareScreenshotCoverage(
+          page,
+          before,
+          released,
+          6,
+          3,
+          routeSegmentXRange,
+        );
+        /**
+         * 물붓처럼 안료를 얹지 않는 도구는 빈 종이에서 아무것도 남기지 않는 것이 제품 계약이다.
+         * 여기서 픽셀을 요구하면 studio-ink-wash-feel 이 단언하는 것과 정반대를 요구하게 된다 —
+         * 그 도구가 "기존 잉크를 움직이는가"는 유닛 계약이 따로 검증한다.
+         */
+        const depositsPigment = studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);
+        if (depositsPigment) {
+          invariant(
+            hasMeaningfulPixelChange(immediateCoverage),
+            `${preset.id}: fast long stroke produced no immediate visible pixels`,
+          );
+        }
+        if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
+          const perfectDebugState = await page.evaluate(() =>
+            (globalThis as {
+              __perfectInkDebugState?: {
+                brush: string;
+                pointCount: number;
+                strokeDistance: number;
+                isVeryShort: boolean;
+                isSparseLong: boolean;
+                profile: string;
+                outlineDistance: number;
+                outlinePointCount: number;
+                isDegeneratePath: boolean;
+              } | null;
+            }).__perfectInkDebugState ?? null,
+          );
+            log(`DEBUG ${preset.id} long:${JSON.stringify(perfectDebugState)}`);
+        }
+        await page.waitForTimeout(280);
+        if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
+          const settledPerfectDebugState = await page.evaluate(() =>
+            (globalThis as {
+              __perfectInkDebugState?: {
+                brush: string;
+                pointCount: number;
+                strokeDistance: number;
+                isVeryShort: boolean;
+                isSparseLong: boolean;
+                profile: string;
+                outlineDistance: number;
+                outlinePointCount: number;
+                isDegeneratePath: boolean;
+              } | null;
+            }).__perfectInkDebugState ?? null,
+          );
+          log(`DEBUG ${preset.id} long-settled:${JSON.stringify(settledPerfectDebugState)}`);
+        }
+        const persistedOperation = await waitForPersistedSelectedOperation(
+          page,
+          expectedSelection,
+          operation,
+          operation === "erase" ? 2 : 1,
+          preset.source === "pro" && operation === "paint",
+          // Living Ink completes a deterministic 120-tick release settle before its canonical PNG
+          // transaction becomes durable. Preserve the ordinary 5 s brush contract elsewhere, but
+          // give this quality matrix the same bounded 15 s handoff window as the product surface.
+          15_000,
+        );
+        const saved = persistedOperation.stroke;
+        const settled = await page.screenshot({ animations: "disabled", clip });
+        const descriptor = studioBrushPackDescriptorById(preset.id);
+        const dryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
+        const intentionalDiscrete = dryMediaClassification
+          ? dryMediaClassification.kind === "intentional-discrete"
+          : descriptor
+            ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
+            // Imported CC0 presets declare discreteness from their own upstream parameters, so a
+            // faithfully sparse splatter records density instead of failing a continuity gate.
+            : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
+        const classifiedQualityPolicy = classifyStudioLongBrushQualityPolicy({
+          id: preset.id,
+          source: preset.source,
+          runtimeBrushId: expectedSelection.runtimeBrushId,
+          mediaGroup: preset.mediaGroup,
+          previewStyle: preset.previewStyle,
+          intentionalDiscrete,
+        });
+        // Erasers replay their exact full compound path on the retained main layer, so the same
+        // continuous live/release/settled quality policy now applies to destination-out strokes.
+        const qualityPolicy = classifiedQualityPolicy;
+        const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
+        const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
+          const amount = sampleIndex / Math.max(1, sampleCount - 1);
+          return {
+            x: startX - clip.x + (endX - startX) * amount,
+            y: y - clip.y + 4 * amount,
+          };
+        });
+        const crossSectionRadius = Math.max(
+          10,
+          Math.min(46, expectedSelection.defaultWidth * 1.5),
+        );
+        const cursorIgnoreRadius = 0;
+        const quality = analyzeStudioLongBrushQuality({
+          policy: qualityPolicy,
+          baseline: decodeLongBrushQualityImage(before),
+          live: decodeLongBrushQualityImage(live),
+          released: decodeLongBrushQualityImage(released),
+          settled: decodeLongBrushQualityImage(settled),
+          route: {
+            points: localRoutePoints,
+            crossSectionRadius,
+            cursorIgnoreRadius,
+            nominalWidth: expectedSelection.defaultWidth,
+          },
+        });
+        const qualityArtifacts = saveLongBrushQualityArtifacts(
+          qualityRunDirectory,
+          index,
+          preset.id,
+          {
+            baseline: before,
+            live,
+            released,
+            settled,
+          },
+        );
+        qualityEvidence.push({
+          id: preset.id,
+          name: preset.name,
+          source: preset.source,
+          runtimeBrushId: expectedSelection.runtimeBrushId,
+          capture: {
+            clip,
+            localRouteStart: localRoutePoints[0]!,
+            localRouteEnd: localRoutePoints.at(-1)!,
+            brushCursorStyle: "none",
+            endpointExclusion: {
+              enabled: false,
+              center: localRoutePoints.at(-1)!,
+              radius: 0,
+            },
+          },
+          quality,
+          artifacts: qualityArtifacts,
+        });
+        writeLongBrushQualityReport({
+          reportPath: qualityReportPath,
+          runDirectory: qualityRunDirectory,
+          evidence: qualityEvidence,
+          completed: false,
+        });
+        for (const finding of quality.findings) {
+          log(
+            `${preset.id}: quality ${finding.level.toUpperCase()} `
+              + `${finding.code} — ${finding.message}`,
+          );
+        }
+        if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+          // 집중 진단 모드에서는 성공/실패와 무관하게 지속 요소의 압력 채널을 읽는다 — 라이브
+          // 합성 압력(속도 모델)과 커밋 재생 압력의 괴리(erodible energy-collapse 0.35 실측)를
+          // 요소 데이터에서 직접 가른다.
+          try {
+            const persisted = await persistedDrawElements(page);
+            const lastDraw = persisted.at(-1) as
+              | { points?: readonly number[]; pressures?: readonly number[] }
+              | undefined;
+            const pressures = lastDraw?.pressures ?? [];
+            log(
+              `${preset.id}: long persisted pressures n=${pressures.length} `
+                + `head=${JSON.stringify(pressures.slice(0, 6).map((value) => Number(value.toFixed(3))))} `
+                + `tail=${JSON.stringify(pressures.slice(-4).map((value) => Number(value.toFixed(3))))}`,
+            );
+          } catch (cause) {
+            log(`${preset.id}: long persisted pressures read failed ${String(cause)}`);
+          }
+          const liveOverlayDebug = await page.evaluate(() => ({
+            seal: (globalThis as { __studioDynamicSealDebug?: unknown }).__studioDynamicSealDebug ?? null,
+            release: (globalThis as { __studioDynamicReleaseDebug?: unknown }).__studioDynamicReleaseDebug ?? null,
+          }));
+          log(`${preset.id}: long live-overlay breadcrumbs ${JSON.stringify(liveOverlayDebug).slice(0, 900)}`);
+        }
+        const coverage = await compareScreenshotCoverage(
+          page,
+          before,
+          settled,
+          6,
+          3,
+          routeSegmentXRange,
+        );
+        if (coverage.visibleSegments !== 6) {
+          // 장경로 실패에서도 커밋 분기/렌더 결과 브레드크럼을 읽는다 — "양끝 캡만 남는" 패턴이
+          // 커밋 타일 합성의 부분 실패인지 플랜 자체의 공백인지 가른다.
+          const longCommitDebug = await page.evaluate(() => ({
+            route: (globalThis as { __studioCommitRouteDebug?: unknown }).__studioCommitRouteDebug ?? null,
+            render: (globalThis as { __studioCommitRenderDebug?: unknown }).__studioCommitRenderDebug ?? null,
+          }));
+          log(`${preset.id}: long commit breadcrumbs ${JSON.stringify(longCommitDebug)}`);
+          try {
+            await page.waitForTimeout(2_500);
+            const persisted = await persistedDrawElements(page);
+            const lastDraw = persisted.at(-1) as
+              | { points?: readonly number[]; pressures?: readonly number[] }
+              | undefined;
+            log(
+              `${preset.id}: long persisted element points=${(lastDraw?.points?.length ?? 0) / 2} `
+                + `pressures=${lastDraw?.pressures?.length ?? 0} `
+                + `head=${JSON.stringify((lastDraw?.points ?? []).slice(0, 8))} `
+                + `tail=${JSON.stringify((lastDraw?.points ?? []).slice(-4))}`,
+            );
+          } catch (cause) {
+            log(`${preset.id}: long persisted element read failed ${String(cause)}`);
+          }
+          writeFileSync(join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-before.png`), before);
+          writeFileSync(
+            join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-immediate.png`),
+            released,
+          );
+          writeFileSync(
+            join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-settled.png`),
+            settled,
+          );
+          log(
+            `${preset.id}: long-stroke diagnostic coverage ${JSON.stringify(coverage)} `
+              + `clip ${JSON.stringify(clip)}`,
+          );
+          if (DEBUG_BRUSH_VERIFIER) {
+            await page.waitForTimeout(1_700);
+            const diagnosticPersisted = await persistedDrawElements(page);
+            log(
+              `${preset.id}: persisted long-stroke tails `
+                + JSON.stringify(diagnosticPersisted.slice(-2)),
+            );
+            await page.screenshot({
+              path: join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-page.png`),
+              animations: "disabled",
+            });
+          }
+        }
+        /**
+         * 실패한 레인의 잔여 획이 다음 프리셋의 진단을 오염시키므로, 기록 후에는 반드시 페이지를
+         * 새로 세우고 넘어간다.
+         */
+        const surveySkip = async (message: string): Promise<boolean> => {
+          if (!LONG_MATRIX_SURVEY_MODE) return false;
+          surveyFailures.push(message);
+          log(`long SURVEY -> ${message}`);
+          await prepareStudioPage(page, studioUrl);
+          await activateDesktopPen(page);
+          return true;
+        };
+        if (
+          depositsPigment
+          && !hasMeaningfulPixelChange(coverage)
+          && await surveySkip(`${preset.id}: long stroke disappeared before commit`)
+        ) return "skipped";
+        if (depositsPigment) {
+          invariant(
+            hasMeaningfulPixelChange(coverage),
+            `${preset.id}: long stroke disappeared before commit`,
+          );
+        }
+        /*
+         * A continuous carrier must cover every route segment. Intentionally discrete particle,
+         * motif and stamp brushes are different: a valid deterministic long stroke may leave one
+         * sampled sixth empty between authored marks (for example rain-mist-combo). Requiring 6/6
+         * there turns the verifier into a request to fill deliberate negative space. We still
+         * require meaningful output above, persist the full 300 px route below, capture all four
+         * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
+         */
+        if (depositsPigment && (operation === "erase" || qualityPolicy.kind !== "record-only-discrete")) {
+          const segmentFailure =
+            `${preset.id}: long stroke has missing visual segments `
+            + `(${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`;
+          if (coverage.visibleSegments !== 6 && await surveySkip(segmentFailure)) return "skipped";
+          invariant(coverage.visibleSegments === 6, segmentFailure);
+        }
+        // Visual-quality findings are aggregate failures, not loop breakers. The exhaustive run must
+        // still capture every remaining brush so one early scallop does not hide 213 later results.
+        // Functional absence, route coverage, persistence identity and Undo remain immediate failures.
+        const expectedPersistedDynamics = preset.source === "pro"
+          && operation === "paint"
+          ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
+          : null;
+        const persistedDynamicsMatched = preset.source === "pro"
+          && operation === "paint"
+          ? serializeStudioBrushDynamicsSettingsCanonical(saved.brushDynamics)
+            === serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)
+          : null;
+        const persistedPathDistance = persistedStrokePathDistance(saved.points);
+        invariant(
+          saved.kind === "freehand",
+          `${preset.id}: isolated long stroke persisted as ${saved.kind ?? "missing"}, not freehand`,
+        );
+        invariant(
+          operation === "erase"
+            ? saved.mode === "eraser" && saved.brush === expectedSelection.runtimeBrushId
+            : saved.mode === "pen" && saved.brush === expectedSelection.runtimeBrushId,
+          operation === "erase"
+            ? `${preset.id}: isolated long eraser did not persist as destination-out geometry`
+            : `${preset.id}: isolated long stroke persisted with runtime brush `
+              + `${saved.brush ?? "missing"}, expected ${expectedSelection.runtimeBrushId}`,
+        );
+        invariant(
+          operation === "erase"
+            ? saved.brushCatalogId === expectedSelection.catalogId
+            : preset.source === "core" || saved.brushCatalogId === preset.id,
+          `${preset.id}: isolated long stroke persisted with catalogue id `
+            + `${saved.brushCatalogId ?? "missing"}`,
+        );
+        invariant(
+          persistedDynamicsMatched !== false,
+          `${preset.id}: long-route persisted dynamics do not match the selected catalogue profile`,
+        );
+        invariant(
+          persistedPathDistance >= 300,
+          `${preset.id}: persisted long route stopped at ${persistedPathDistance.toFixed(1)} document px`,
+        );
+
+        const undo = await enabledHistoryButton(page, "실행취소");
+        invariant(await undo.isEnabled(), `${preset.id}: isolated long-stroke Undo is disabled`);
+        await page.keyboard.press("Meta+z");
+        await page.waitForTimeout(80);
+        const undone = await page.screenshot({ animations: "disabled", clip });
+        const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
+        const undoRestoredPixels = undoDiff.changedPixels <= 3;
+        invariant(
+          undoRestoredPixels,
+          `${preset.id}: isolated long-stroke Undo left ${undoDiff.changedPixels} visible pixels`,
+        );
+        invariant(
+          await enabledHistoryButton(page, "다시실행").then(() => true, () => false),
+          `${preset.id}: isolated long-stroke Undo did not create a redo entry`,
+        );
+        if (operation === "erase") {
+          invariant(emptyBefore, `${preset.id}: long eraser cleanup lost its empty baseline`);
+          await page.keyboard.press("Meta+z");
+          await page.waitForTimeout(80);
+          const fullyCleaned = await page.screenshot({ animations: "disabled", clip });
+          const fullCleanupDiff = await compareScreenshotPixels(
+            page,
+            emptyBefore,
+            fullyCleaned,
+            20,
+          );
+          invariant(
+            fullCleanupDiff.changedPixels <= 3,
+            `${preset.id}: long paint+erase cleanup left `
+              + `${fullCleanupDiff.changedPixels} visible pixels`,
+          );
+        }
+        evidence.push({
+          id: preset.id,
+          source: preset.source,
+          operation,
+          expectedRuntimeBrushId: expectedSelection.runtimeBrushId,
+          visualChanged: true,
+          visibleSegments: coverage.visibleSegments,
+          totalSegments: 6,
+          persistedBrushId: saved.brush,
+          persistedMode: saved.mode,
+          persistedCatalogId: saved.brushCatalogId,
+          persistedDynamicsMatched,
+          persistedPathDistance,
+          undoRestoredPixels,
+          qualityPolicy: quality.policy.kind,
+          qualityOk: quality.ok,
+        });
+        log(
+          `long ${index + 1}/${LONG_BRUSH_CATALOG_COUNT} `
+            + `${preset.id} → ${expectedSelection.runtimeBrushId}: `
+            + `${coverage.visibleSegments}/6 route segments visible`
+            + `${
+              operation === "erase"
+                ? " (live retained-layer eraser)"
+                : quality.policy.kind === "record-only-discrete"
+                  ? " (discrete)"
+                  : ""
+            } + `
+            + `${persistedPathDistance.toFixed(1)}px ${operation} persisted + Undo OK`,
+        );
+        return "done";
+      })().catch(async (error: unknown): Promise<"skipped"> => {
+        if (!LONG_MATRIX_SURVEY_MODE) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        surveyFailures.push(message.startsWith(`${preset.id}:`) ? message : `${preset.id}: ${message}`);
         log(`long SURVEY -> ${message}`);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
-        return true;
-      };
-      if (
-        !hasMeaningfulPixelChange(coverage)
-        && await surveySkip(`${preset.id}: long stroke disappeared before commit`)
-      ) continue;
-      invariant(hasMeaningfulPixelChange(coverage), `${preset.id}: long stroke disappeared before commit`);
-      /*
-       * A continuous carrier must cover every route segment. Intentionally discrete particle,
-       * motif and stamp brushes are different: a valid deterministic long stroke may leave one
-       * sampled sixth empty between authored marks (for example rain-mist-combo). Requiring 6/6
-       * there turns the verifier into a request to fill deliberate negative space. We still
-       * require meaningful output above, persist the full 300 px route below, capture all four
-       * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
-       */
-      if (operation === "erase" || qualityPolicy.kind !== "record-only-discrete") {
-        const segmentFailure =
-          `${preset.id}: long stroke has missing visual segments `
-          + `(${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`;
-        if (coverage.visibleSegments !== 6 && await surveySkip(segmentFailure)) continue;
-        invariant(coverage.visibleSegments === 6, segmentFailure);
-      }
-      // Visual-quality findings are aggregate failures, not loop breakers. The exhaustive run must
-      // still capture every remaining brush so one early scallop does not hide 213 later results.
-      // Functional absence, route coverage, persistence identity and Undo remain immediate failures.
-      const expectedPersistedDynamics = preset.source === "pro"
-        && operation === "paint"
-        ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
-        : null;
-      const persistedDynamicsMatched = preset.source === "pro"
-        && operation === "paint"
-        ? serializeStudioBrushDynamicsSettingsCanonical(saved.brushDynamics)
-          === serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)
-        : null;
-      const persistedPathDistance = persistedStrokePathDistance(saved.points);
-      invariant(
-        saved.kind === "freehand",
-        `${preset.id}: isolated long stroke persisted as ${saved.kind ?? "missing"}, not freehand`,
-      );
-      invariant(
-        operation === "erase"
-          ? saved.mode === "eraser" && saved.brush === expectedSelection.runtimeBrushId
-          : saved.mode === "pen" && saved.brush === expectedSelection.runtimeBrushId,
-        operation === "erase"
-          ? `${preset.id}: isolated long eraser did not persist as destination-out geometry`
-          : `${preset.id}: isolated long stroke persisted with runtime brush `
-            + `${saved.brush ?? "missing"}, expected ${expectedSelection.runtimeBrushId}`,
-      );
-      invariant(
-        operation === "erase"
-          ? saved.brushCatalogId === expectedSelection.catalogId
-          : preset.source === "core" || saved.brushCatalogId === preset.id,
-        `${preset.id}: isolated long stroke persisted with catalogue id `
-          + `${saved.brushCatalogId ?? "missing"}`,
-      );
-      invariant(
-        persistedDynamicsMatched !== false,
-        `${preset.id}: long-route persisted dynamics do not match the selected catalogue profile`,
-      );
-      invariant(
-        persistedPathDistance >= 300,
-        `${preset.id}: persisted long route stopped at ${persistedPathDistance.toFixed(1)} document px`,
-      );
-
-      const undo = await enabledHistoryButton(page, "실행취소");
-      invariant(await undo.isEnabled(), `${preset.id}: isolated long-stroke Undo is disabled`);
-      await page.keyboard.press("Meta+z");
-      await page.waitForTimeout(80);
-      const undone = await page.screenshot({ animations: "disabled", clip });
-      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
-      const undoRestoredPixels = undoDiff.changedPixels <= 3;
-      invariant(
-        undoRestoredPixels,
-        `${preset.id}: isolated long-stroke Undo left ${undoDiff.changedPixels} visible pixels`,
-      );
-      invariant(
-        await enabledHistoryButton(page, "다시실행").then(() => true, () => false),
-        `${preset.id}: isolated long-stroke Undo did not create a redo entry`,
-      );
-      if (operation === "erase") {
-        invariant(emptyBefore, `${preset.id}: long eraser cleanup lost its empty baseline`);
-        await page.keyboard.press("Meta+z");
-        await page.waitForTimeout(80);
-        const fullyCleaned = await page.screenshot({ animations: "disabled", clip });
-        const fullCleanupDiff = await compareScreenshotPixels(
-          page,
-          emptyBefore,
-          fullyCleaned,
-          20,
-        );
-        invariant(
-          fullCleanupDiff.changedPixels <= 3,
-          `${preset.id}: long paint+erase cleanup left `
-            + `${fullCleanupDiff.changedPixels} visible pixels`,
-        );
-      }
-      evidence.push({
-        id: preset.id,
-        source: preset.source,
-        operation,
-        expectedRuntimeBrushId: expectedSelection.runtimeBrushId,
-        visualChanged: true,
-        visibleSegments: coverage.visibleSegments,
-        totalSegments: 6,
-        persistedBrushId: saved.brush,
-        persistedMode: saved.mode,
-        persistedCatalogId: saved.brushCatalogId,
-        persistedDynamicsMatched,
-        persistedPathDistance,
-        undoRestoredPixels,
-        qualityPolicy: quality.policy.kind,
-        qualityOk: quality.ok,
+        return "skipped";
       });
-      log(
-        `long ${index + 1}/${LONG_BRUSH_CATALOG_COUNT} `
-          + `${preset.id} → ${expectedSelection.runtimeBrushId}: `
-          + `${coverage.visibleSegments}/6 route segments visible`
-          + `${
-            operation === "erase"
-              ? " (live retained-layer eraser)"
-              : quality.policy.kind === "record-only-discrete"
-                ? " (discrete)"
-                : ""
-          } + `
-          + `${persistedPathDistance.toFixed(1)}px ${operation} persisted + Undo OK`,
-      );
+      if (outcome === "skipped") continue;
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });

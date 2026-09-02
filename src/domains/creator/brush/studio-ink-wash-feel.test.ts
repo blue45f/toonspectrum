@@ -21,6 +21,7 @@ import {
   resetStudioInkwashWash,
   resolveStudioWetInkBrushPhysicalRecipe,
   stepStudioInkwashFluid,
+  studioWetInkBrushDepositsPigment,
   studioWetInkBrushRuntimeSupportsElement,
   type StudioWetInkBrushSurface,
   type StudioWetInkBrushSurfaceFactory,
@@ -270,6 +271,24 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     expect(penRecipe!.material.pigmentLoad).toBeGreaterThan(1);
     const replay = planStudioWetInkBrushReplay(pen, { phase: "committed" });
     expect(replay.ok).toBe(true);
+  });
+
+  it("names the water brush as the only tool that lays no pigment", () => {
+    // 브라우저 게이트가 "획을 그으면 픽셀이 생겨야 한다"를 이 술어로 예외 처리한다.
+    // 물붓이 목록에서 빠지면 게이트가 제품 계약과 정반대를 단언하게 되므로 여기서 고정한다.
+    expect(studioWetInkBrushDepositsPigment("inkwash-water-brush")).toBe(false);
+    for (const id of [
+      "inkwash-pen",
+      "ink-wash",
+      "watercolor",
+      "inkwash-bleed-wash",
+      "inkwash-white-ink",
+    ] as const) {
+      expect(studioWetInkBrushDepositsPigment(id)).toBe(true);
+    }
+    // 젖은 잉크 런타임이 모르는 id 는 일반 브러시로 취급한다 — 게이트가 느슨해지면 안 된다.
+    expect(studioWetInkBrushDepositsPigment("pen")).toBe(true);
+    expect(studioWetInkBrushDepositsPigment(undefined)).toBe(true);
   });
 
   it("shares one wash field so water moves unfixed pen ink and dry paper stays still", () => {

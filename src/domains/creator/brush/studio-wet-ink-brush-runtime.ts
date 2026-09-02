@@ -531,6 +531,19 @@ function fieldMaterial(
   };
 }
 
+/**
+ * 이 도구가 안료를 얹는가.
+ *
+ * 물붓은 색소를 올리지 않고 공유 워시의 **미정착 잉크를 움직이기만** 한다 — 제품 설명("먹선을
+ * 문지르면 번지고 소용돌이치며 마른 자국이 남음")과 유닛 계약(studio-ink-wash-feel: "keeps water
+ * from depositing ink")이 같은 말을 한다. 빈 종이에서 아무 픽셀도 남기지 않는 것이 정상이므로,
+ * "획을 그으면 픽셀이 생겨야 한다"는 게이트는 이 도구를 예외로 두어야 한다.
+ */
+export function studioWetInkBrushDepositsPigment(brushId: unknown): boolean {
+  const exact = exactWetInkBrushId(brushId);
+  return exact === null ? true : fieldMaterial(exact).pigmentLoad > 0;
+}
+
 export function isStudioInkwashFluidElement(element: DrawEl): boolean {
   return studioWetInkBrushRuntimeSupportsElement(element)
     && isStudioInkwashFluidBrush(element.brush);
