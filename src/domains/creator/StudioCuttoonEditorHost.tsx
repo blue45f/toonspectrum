@@ -398,6 +398,7 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
+import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
 import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
@@ -7631,6 +7632,7 @@ export function StudioCuttoonEditor({
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
+  const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
   // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
@@ -27217,6 +27219,7 @@ function clearSelectionForEdit() {
       openScrollPreview: () => setScrollPreviewOpen(true),
       openContinuityCheck: () => setContinuityOpen(true),
       openProductionBible: () => setProductionBibleOpen(true),
+      openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
       openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
@@ -31033,6 +31036,12 @@ function clearSelectionForEdit() {
       onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
     >
       {editorSurface}
+      <StudioWebtoonAssistantModal
+        open={webtoonAssistantOpen}
+        onClose={() => setWebtoonAssistantOpen(false)}
+        canvasWidth={CANVAS_W}
+        canvasHeight={canvasH}
+      />
     </StudioDccWorkbenchRoute>
   );
 }

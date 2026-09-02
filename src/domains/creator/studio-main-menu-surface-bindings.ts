@@ -63,6 +63,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly startEphemeralWhiteboard: () => unknown;
   readonly openVrmPoserFromMenu: () => unknown;
   readonly openBackground3dFromMenu: () => unknown;
+  readonly openWebtoonAssistant?: () => unknown;
 }
 
 /** Names on the left are the menu contract; names on the right are the host's. */
@@ -106,5 +107,6 @@ export function bindStudioMainMenuSurfaceActions(
     startEphemeralWhiteboard: actions.startEphemeralWhiteboard,
     openVrmPoser: actions.openVrmPoserFromMenu,
     openBackground3d: actions.openBackground3dFromMenu,
+    openWebtoonAssistant: actions.openWebtoonAssistant,
   };
 }

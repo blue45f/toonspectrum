@@ -21,6 +21,7 @@ import {
   PlaySquare,
   ScanEye,
   ScrollText,
+  Sparkles,
   Wallpaper,
 } from "lucide-react";
 
@@ -94,6 +95,15 @@ export function buildStudioProductionMenuItems({
       icon: PlaySquare,
       onSelect: () => {
         ui.openAnimaticTimeline();
+      },
+    },
+    {
+      id: "webtoon-assistant",
+      commandId: "comic.webtoon-assistant",
+      label: "웹툰 창작 보조 센터…",
+      icon: Sparkles,
+      onSelect: () => {
+        ui.openWebtoonAssistant?.();
       },
     },
   ];
