@@ -88,6 +88,8 @@ const SCENARIO_NAMES = [
   "curve",
   "circle",
   "corners",
+  "buildup",
+  "slow-fast",
   "cross",
   "mixed-over",
   "mixed-under",
@@ -539,7 +541,13 @@ async function drawAndCapture(
   page: Page,
   clip: Clip,
   points: readonly Point[],
-  options: { liveAt?: number; settleMs?: number; postFrames?: number } = {},
+  options: {
+    liveAt?: number;
+    settleMs?: number;
+    postFrames?: number;
+    /** Pause between pointer moves — a slow hand for the speed comparison. */
+    stepDelayMs?: number;
+  } = {},
 ): Promise<CapturedStroke> {
   invariant(points.length >= 1, "a gesture needs at least one point");
   const liveAt = Math.min(points.length - 1, Math.max(0, Math.floor((options.liveAt ?? 0.6) * (points.length - 1))));
@@ -557,6 +565,7 @@ async function drawAndCapture(
   for (let index = 1; index < points.length; index += 1) {
     const point = points[index]!;
     await page.mouse.move(point.x, point.y, { steps: 2 });
+    if (options.stepDelayMs) await page.waitForTimeout(options.stepDelayMs);
     if (index === liveAt) {
       await page.waitForTimeout(30);
       live = await shot(page, clip);
@@ -579,7 +588,7 @@ async function drawAndCapture(
   const { app: perf, captureInduced } = attributePerf(await readPerfProbe(page));
   const refusals = await page.evaluate(`Array.from(document.querySelectorAll('[role="alert"]'))
     .map((element) => (element.textContent || "").trim())
-    .filter((text) => text.includes("획을 시작하지 않았습니다"))`) as string[];
+    .filter((text) => text.includes("획을 시작하지 않았습니다") || text.includes("현재 획을 취소했습니다"))`) as string[];
   return {
     baseline,
     live,
@@ -854,6 +863,123 @@ async function runScenario(
       })), profile, saveFrames(directory, prefix("corners"), captured)));
       break;
     }
+    case "buildup": {
+      // 문서 표준 테스트: 같은 위치 20회 중첩. 판정은 각 패스의 델타가 아니라 최초 baseline
+      // 대비 누적으로 한다 — 불투명 브러시는 2회차부터 더할 것이 없고 그것은 결함이 아니다.
+      const path = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.5 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.5 },
+        30,
+      );
+      const passes = 20;
+      const base = decode(scenarioBaseline);
+      const cumulativeInk: number[] = [];
+      const meanDarkness: number[] = [];
+      for (let pass = 0; pass < passes; pass += 1) {
+        const captured = await drawAndCapture(page, clip, path, {
+          postFrames: 1,
+          settleMs: pass === passes - 1 ? 2_000 : STROKE_GAP_MS,
+        });
+        undoCount += 1;
+        const settled = decode(captured.settled);
+        const mask = studioBrushScenarioInkMask(base, settled);
+        cumulativeInk.push(studioBrushScenarioMaskStats(mask, base.width, base.height).count);
+        let darknessSum = 0;
+        let darknessCount = 0;
+        for (let index = 0; index < mask.length; index += 1) {
+          if (mask[index] === 0) continue;
+          const offset = index * settled.channels;
+          darknessSum += 255 - (
+            settled.data[offset]! + settled.data[offset + 1]! + settled.data[offset + 2]!
+          ) / 3;
+          darknessCount += 1;
+        }
+        meanDarkness.push(darknessCount === 0 ? 0 : darknessSum / darknessCount);
+        if (pass === 0 || pass === passes - 1) {
+          strokes.push(analyzeStroke(
+            `pass-${pass + 1}`,
+            captured,
+            [],
+            profile,
+            saveFrames(directory, prefix(`pass-${pass + 1}`), captured),
+            { flicker: pass === 0 },
+          ));
+        }
+      }
+      const buildupFindings: StudioBrushScenarioFinding[] = [];
+      const firstInk = cumulativeInk[0] ?? 0;
+      const finalInk = cumulativeInk.at(-1) ?? 0;
+      const firstDarkness = meanDarkness[0] ?? 0;
+      const finalDarkness = meanDarkness.at(-1) ?? 0;
+      const worstShrink = cumulativeInk.reduce(
+        (worst, value) => Math.max(worst, firstInk === 0 ? 0 : 1 - value / firstInk),
+        0,
+      );
+      if (!profile.transparent && finalInk < firstInk * 0.9) {
+        buildupFindings.push({
+          level: "error",
+          code: "buildup-lost",
+          message: `20 passes ended at ${finalInk} px against the first pass's ${firstInk} px`,
+        });
+      } else if (worstShrink > 0.25) {
+        buildupFindings.push({
+          level: "warning",
+          code: "buildup-lost",
+          message: `a pass dropped to ${(100 - worstShrink * 100).toFixed(0)}% of the first pass's `
+            + `coverage (${cumulativeInk.join(",")})`,
+        });
+      }
+      if (!profile.transparent && firstDarkness > 0 && finalDarkness < firstDarkness * 1.05) {
+        buildupFindings.push({
+          level: "warning",
+          code: "buildup-lost",
+          message: "mean darkness barely moved over 20 passes "
+            + `(${firstDarkness.toFixed(1)} → ${finalDarkness.toFixed(1)})`,
+        });
+      }
+      strokes.push({
+        label: "buildup-summary",
+        inkLive: firstInk,
+        inkReleased: finalInk,
+        inkSettled: finalInk,
+        flicker: {
+          counts: cumulativeInk,
+          maxDropRatio: worstShrink,
+          dipFrame: null,
+          verdict: "stable",
+        },
+        regions: {},
+        perf: {
+          longTasks: 0,
+          worstTaskMs: 0,
+          worstFrameGapMs: 0,
+          captureInducedLongTasks: 0,
+          gestureMs: 0,
+        },
+        findings: buildupFindings,
+        artifacts: { darkness: meanDarkness.map((value) => value.toFixed(1)).join(",") },
+      });
+      break;
+    }
+    case "slow-fast": {
+      const slowPath = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.34 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.34 },
+        90,
+      );
+      const fastPath = line(
+        { x: clip.x + clip.width * 0.18, y: clip.y + clip.height * 0.66 },
+        { x: clip.x + clip.width * 0.82, y: clip.y + clip.height * 0.66 },
+        6,
+      );
+      const slow = await drawAndCapture(page, clip, slowPath, { stepDelayMs: 12 });
+      undoCount += 1;
+      strokes.push(analyzeStroke("slow", slow, [], profile, saveFrames(directory, prefix("slow"), slow)));
+      const fast = await drawAndCapture(page, clip, fastPath);
+      undoCount += 1;
+      strokes.push(analyzeStroke("fast", fast, [], profile, saveFrames(directory, prefix("fast"), fast)));
+      break;
+    }
     case "cross": {
       const first = await drawAndCapture(page, clip, diagonalA, { postFrames: 2, settleMs: STROKE_GAP_MS });
       undoCount += 1;
@@ -971,6 +1097,8 @@ async function runBrush(
         && scenario !== "curve"
         && scenario !== "circle"
         && scenario !== "corners"
+        && scenario !== "buildup"
+        && scenario !== "slow-fast"
       ) {
         records.push({ scenario, partner: null, strokes: [], findings: [], skipped: "eraser presets only run curve, endpoints and eraser-cross" });
         continue;

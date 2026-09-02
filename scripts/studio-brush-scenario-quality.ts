@@ -66,7 +66,8 @@ export interface StudioBrushScenarioFinding {
     | "long-task"
     | "frame-stall"
     | "stroke-refused"
-    | "undo-residue";
+    | "undo-residue"
+    | "buildup-lost";
   readonly message: string;
 }
 
