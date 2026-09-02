@@ -1,0 +1,80 @@
+name: Studio seven-day hourly trigger
+
+on:
+  schedule:
+    # The main campaign also owns a three-hour direct schedule at :17. This trigger runs at :47,
+    # observes that run, and fills only the intervening hours.
+    - cron: "47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: studio-seven-day-hourly-trigger
+  cancel-in-progress: true
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      CAMPAIGN_WORKFLOW: studio-seven-day-campaign.yml
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Dispatch an hourly cycle only inside the campaign window
+        shell: bash
+        run: |
+          set -euo pipefail
+          start_at="$(jq -r '.startAt' docs/automation/studio-seven-day-campaign.json)"
+          end_at="$(jq -r '.endAt' docs/automation/studio-seven-day-campaign.json)"
+          now_epoch="$(date -u +%s)"
+          start_epoch="$(date -u -d "$start_at" +%s)"
+          end_epoch="$(date -u -d "$end_at" +%s)"
+
+          if [[ "$now_epoch" -lt "$start_epoch" || "$now_epoch" -ge "$end_epoch" ]]; then
+            echo "Outside campaign window: ${start_at} .. ${end_at}."
+            exit 0
+          fi
+
+          runs_json="$(
+            gh api \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=20"
+          )"
+
+          active_count="$(
+            jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress" or .status == "requested" or .status == "waiting" or .status == "pending")] | length' \
+              <<< "$runs_json"
+          )"
+          if [[ "$active_count" -gt 0 ]]; then
+            echo "A campaign cycle is already active; no duplicate dispatch."
+            exit 0
+          fi
+
+          latest_created="$(jq -r '[.workflow_runs[].created_at] | sort | last // ""' <<< "$runs_json")"
+          if [[ -n "$latest_created" ]]; then
+            latest_epoch="$(date -u -d "$latest_created" +%s)"
+            age_seconds="$((now_epoch - latest_epoch))"
+            if [[ "$age_seconds" -lt 3300 ]]; then
+              echo "The latest campaign cycle began ${age_seconds}s ago; no duplicate dispatch."
+              exit 0
+            fi
+          fi
+
+          jq -n '{ref: "main", inputs: {mode: "author", force_active: "false"}}' \
+            | gh api \
+                --method POST \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
+                --input -
+          echo "Dispatched one hourly Studio saturation cycle."
