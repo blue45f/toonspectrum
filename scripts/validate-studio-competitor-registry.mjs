@@ -28,6 +28,8 @@ const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const FOCUS_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const MINIMUM_PRODUCT_COUNT = 50;
 const TRUSTED_DOMAIN_BRIDGES = new Set([
+  "adobe.com|mixamo.com",
+  "mixamo.com|adobe.com",
   "corel.com|painterartist.com",
   "painterartist.com|corel.com",
 ]);
@@ -63,11 +65,19 @@ function uniqueStrings(values) {
 }
 
 function domainFamily(hostname) {
-  return hostname.toLocaleLowerCase("en").split(".").slice(-2).join(".");
+  return String(hostname)
+    .toLocaleLowerCase("en")
+    .split(".")
+    .filter(Boolean)
+    .slice(-2)
+    .join(".");
 }
 
-function sharesTrustedDomainBridge(leftHostname, rightHostname) {
-  return TRUSTED_DOMAIN_BRIDGES.has(`${domainFamily(leftHostname)}|${domainFamily(rightHostname)}`);
+export function shareStudioOfficialDomainFamily(leftHostname, rightHostname) {
+  const left = domainFamily(leftHostname);
+  const right = domainFamily(rightHostname);
+  if (!left || !right) return false;
+  return left === right || TRUSTED_DOMAIN_BRIDGES.has(`${left}|${right}`);
 }
 
 export function validateStudioCompetitorRegistry(registry, options = {}) {
@@ -78,12 +88,8 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
   const requireEveryCategory = options.requireEveryCategory !== false;
   const issues = [];
 
-  if (!isObject(registry)) {
-    return ["registry must be an object"];
-  }
-  if (registry.schemaVersion !== 1) {
-    issues.push("schemaVersion must be 1");
-  }
+  if (!isObject(registry)) return ["registry must be an object"];
+  if (registry.schemaVersion !== 1) issues.push("schemaVersion must be 1");
   if (typeof registry.updatedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(registry.updatedAt)) {
     issues.push("updatedAt must use YYYY-MM-DD");
   }
@@ -121,12 +127,14 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
       ids.add(product.id);
     }
 
+    const normalizedName =
+      typeof product.name === "string" ? product.name.toLocaleLowerCase("en") : "";
     if (typeof product.name !== "string" || product.name.trim() !== product.name || !product.name) {
       issues.push(`${prefix}.name must be a non-empty trimmed string`);
-    } else if (names.has(product.name.toLocaleLowerCase("en"))) {
+    } else if (names.has(normalizedName)) {
       issues.push(`${prefix}.name duplicates ${product.name}`);
     } else {
-      names.add(product.name.toLocaleLowerCase("en"));
+      names.add(normalizedName);
     }
 
     if (typeof product.category !== "string" || !CATEGORY_SET.has(product.category)) {
@@ -142,15 +150,11 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
     const officialUrl = parseHttpsUrl(product.officialUrl, `${prefix}.officialUrl`, issues);
     const watchUrl = parseHttpsUrl(product.watchUrl, `${prefix}.watchUrl`, issues);
     if (officialUrl && watchUrl) {
-      const sameHost = officialUrl.hostname === watchUrl.hostname;
-      const sourceRepository = watchUrl.hostname === "github.com";
-      const documentationSubdomain =
-        domainFamily(officialUrl.hostname) === domainFamily(watchUrl.hostname);
-      const trustedDomainBridge = sharesTrustedDomainBridge(
-        officialUrl.hostname,
-        watchUrl.hostname,
-      );
-      if (!sameHost && !sourceRepository && !documentationSubdomain && !trustedDomainBridge) {
+      const officialGitHubSource = watchUrl.hostname.toLocaleLowerCase("en") === "github.com";
+      if (
+        !officialGitHubSource &&
+        !shareStudioOfficialDomainFamily(officialUrl.hostname, watchUrl.hostname)
+      ) {
         issues.push(
           `${prefix}.watchUrl must stay on the official domain family or an official GitHub repository`,
         );
@@ -160,15 +164,15 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
     if (!Array.isArray(product.focus) || product.focus.length === 0) {
       issues.push(`${prefix}.focus must contain at least one capability tag`);
     } else {
-      const normalized = [];
+      const normalizedFocus = [];
       for (const [focusIndex, focus] of product.focus.entries()) {
         if (typeof focus !== "string" || !FOCUS_PATTERN.test(focus)) {
           issues.push(`${prefix}.focus[${focusIndex}] must be lowercase kebab-case`);
           continue;
         }
-        normalized.push(focus);
+        normalizedFocus.push(focus);
       }
-      if (uniqueStrings(normalized).length !== normalized.length) {
+      if (uniqueStrings(normalizedFocus).length !== normalizedFocus.length) {
         issues.push(`${prefix}.focus must not contain duplicate tags`);
       }
     }
@@ -179,7 +183,6 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
       if (count === 0) issues.push(`category ${category} has no products`);
     }
   }
-
   return issues;
 }
 
@@ -192,10 +195,10 @@ export function summarizeStudioCompetitorRegistry(registry) {
   const focusCounts = new Map();
 
   for (const product of products) {
-    if (product && typeof product.priority === "string" && Object.hasOwn(byPriority, product.priority)) {
+    if (typeof product?.priority === "string" && Object.hasOwn(byPriority, product.priority)) {
       byPriority[product.priority] += 1;
     }
-    if (product && typeof product.category === "string" && Object.hasOwn(byCategory, product.category)) {
+    if (typeof product?.category === "string" && Object.hasOwn(byCategory, product.category)) {
       byCategory[product.category] += 1;
     }
     if (Array.isArray(product?.focus)) {
@@ -219,13 +222,12 @@ export function summarizeStudioCompetitorRegistry(registry) {
   });
 }
 
-function readRegistry(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
-}
-
 function main() {
-  const filePath = path.resolve(process.cwd(), process.argv[2] ?? STUDIO_COMPETITOR_REGISTRY_PATH);
-  const registry = readRegistry(filePath);
+  const filePath = path.resolve(
+    process.cwd(),
+    process.argv[2] ?? STUDIO_COMPETITOR_REGISTRY_PATH,
+  );
+  const registry = JSON.parse(fs.readFileSync(filePath, "utf8"));
   const issues = validateStudioCompetitorRegistry(registry);
   if (issues.length > 0) {
     console.error(`Studio competitor registry validation failed: ${issues.length} issue(s)`);
