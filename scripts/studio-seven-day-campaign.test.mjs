@@ -113,9 +113,15 @@ test("coordinator audits and reconciles without API keys or model calls", () => 
 });
 
 test("compatibility and continuation entrypoints route only to the coordinator", () => {
-  assert.match(
-    compatibilityWorkflow,
-    /studio-seven-day-hourly-trigger\.yml\/dispatches/u,
+  assert.ok(
+    compatibilityWorkflow.includes(
+      "COORDINATOR_WORKFLOW: studio-seven-day-hourly-trigger.yml",
+    ),
+  );
+  assert.ok(
+    compatibilityWorkflow.includes(
+      "actions/workflows/${COORDINATOR_WORKFLOW}/dispatches",
+    ),
   );
   assert.doesNotMatch(compatibilityWorkflow, /secrets\.OPENAI_API_KEY/u);
   assert.doesNotMatch(compatibilityWorkflow, /openai\/codex-action/u);
