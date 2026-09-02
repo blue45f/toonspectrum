@@ -1,10 +1,11 @@
-name: Studio seven-day hourly trigger
+name: Studio seven-day 30-minute trigger
 
 on:
   schedule:
-    # The main campaign also owns a three-hour direct schedule at :17. This trigger runs at :47,
-    # observes that run, and fills only the intervening hours.
-    - cron: "47 * * * *"
+    # GitHub-hosted jobs are restartable rather than permanent. Evaluate twice per hour and let
+    # the campaign workflow's active-run/PR serialization decide whether new work can start.
+    # The campaign's direct three-hour schedule remains a backup signal.
+    - cron: "2,32 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-seven-day-hourly-trigger
+  group: studio-seven-day-30-minute-trigger
   cancel-in-progress: true
 
 jobs:
@@ -29,7 +30,7 @@ jobs:
           ref: main
           persist-credentials: false
 
-      - name: Dispatch an hourly cycle only inside the campaign window
+      - name: Dispatch the next 30-minute cycle only inside the campaign window
         shell: bash
         run: |
           set -euo pipefail
@@ -48,7 +49,7 @@ jobs:
             gh api \
               -H 'Accept: application/vnd.github+json' \
               -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=20"
+              "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/runs?per_page=30"
           )"
 
           active_count="$(
@@ -56,7 +57,7 @@ jobs:
               <<< "$runs_json"
           )"
           if [[ "$active_count" -gt 0 ]]; then
-            echo "A campaign cycle is already active; no duplicate dispatch."
+            echo "A campaign cycle is already active; it is the current continuous-work slot."
             exit 0
           fi
 
@@ -64,7 +65,9 @@ jobs:
           if [[ -n "$latest_created" ]]; then
             latest_epoch="$(date -u -d "$latest_created" +%s)"
             age_seconds="$((now_epoch - latest_epoch))"
-            if [[ "$age_seconds" -lt 3300 ]]; then
+            # Avoid immediate duplicate dispatches caused by scheduler jitter or the direct
+            # three-hour backup run, while allowing the next half-hour slot to proceed.
+            if [[ "$age_seconds" -lt 900 ]]; then
               echo "The latest campaign cycle began ${age_seconds}s ago; no duplicate dispatch."
               exit 0
             fi
@@ -77,4 +80,4 @@ jobs:
                 -H 'X-GitHub-Api-Version: 2022-11-28' \
                 "repos/${REPOSITORY}/actions/workflows/${CAMPAIGN_WORKFLOW}/dispatches" \
                 --input -
-          echo "Dispatched one hourly Studio saturation cycle."
+          echo "Dispatched one 30-minute Studio saturation cycle."
