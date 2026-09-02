@@ -48,14 +48,12 @@ const MARKET_LOAD_MORE_RETRY_HINT = "추가 리소스를 불러오지 못했어�
  * 네트워크 실패 시 localStorage의 마지막 성공 페이지를 보여주는 저하 모드로 전환한다.
  */
 export function useMarketResources(query: MarketResourceQuery | null): MarketResourcesPage {
-  const initialStarter = query ? filterStarterMarketplaceResources(query) : null;
-  const initialItems = initialStarter && initialStarter.items.length > 0 ? initialStarter.items : [];
-  const [items, setItems] = useState<readonly CreatorMarketplaceResourceRecord[]>(initialItems);
-  const [loading, setLoading] = useState(Boolean(query) && initialItems.length === 0);
+  const [items, setItems] = useState<readonly CreatorMarketplaceResourceRecord[]>([]);
+  const [loading, setLoading] = useState(Boolean(query));
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(initialStarter?.hasMore ?? false);
+  const [hasMore, setHasMore] = useState(false);
   const [stale, setStale] = useState(false);
   const [staleSavedAt, setStaleSavedAt] = useState<string | null>(null);
   const cursorRef = useRef<string | null>(null);
@@ -88,21 +86,13 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
     }
     const parsedQuery = JSON.parse(queryKey) as MarketResourceQuery;
     const controller = new AbortController();
-    const starter = filterStarterMarketplaceResources(parsedQuery);
-    if (starter.items.length > 0) {
-      setItems(starter.items);
-      setHasMore(starter.hasMore);
-      cursorRef.current = starter.nextCursor;
-      setLoading(false);
-    } else {
-      cursorRef.current = null;
-      setItems([]);
-      setLoading(true);
-      setHasMore(false);
-    }
+    cursorRef.current = null;
+    setItems([]);
+    setLoading(true);
     setLoadingMore(false);
     setError(null);
     setLoadMoreError(null);
+    setHasMore(false);
     setStale(false);
     setStaleSavedAt(null);
 
