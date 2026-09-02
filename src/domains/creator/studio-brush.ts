@@ -360,7 +360,16 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   { id: "spray", name: "스프레이", defaultWidth: 40, defaultOpacity: 0.55 },
   { id: "splatter", name: "스플래터(흩뿌리기)", defaultWidth: 45, defaultOpacity: 0.65 },
   // —— Texture / dry media ——
-  { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
+  // 흑연 점연필의 겹칠 사다리는 여기 defaultOpacity 가 전부다: 이 브러시들은 별칭 패스 하나를
+  // opacityScale 1.0 으로 칠하므로 리본 셀의 알파가 곧 요소 불투명도다. 0.85 에서는 같은 자리를
+  // 20번 덧칠해도 평균 농도 82.9 → 91.1 → 95.0 → 97.0 → 97.9 로 5회차부터 멈춘다 — 5회차가
+  // 더하는 양이 8비트 한 계단의 0.11 뿐이라 화면에서 같은 픽셀이다. 0.55 는 5회차에도 5.75계단을
+  // 더하고 6회차에 0.99 에 닿는 진짜 흑연 사다리를 만들며, 한 획은 여전히 연필선으로 읽힌다.
+  // 등급 순서(HB 0.55 < 2B 0.72×0.9=0.65 < 6B 0.85)는 재료 그대로 유지한다.
+  // 별칭 프로필의 opacityScale 이 아니라 이 값을 낮추는 이유: defaultOpacity 는 그릴 때
+  // DrawEl 에 박히므로 **새 획**만 달라지고 이미 저장된 문서의 획은 한 픽셀도 바뀌지 않는다.
+  // opacityScale 은 소급 적용이라 남이 이미 그려 둔 그림을 조용히 흐리게 만든다.
+  { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.55 },
   {
     id: "erodible-pencil",
     name: "마모 연필(닳는 심)",
@@ -368,7 +377,12 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
     defaultOpacity: 0.84,
     searchAliases: ["닳는 연필", "마모 촉", "erodible pencil", "erodible tip"],
   },
-  { id: "pencil-2b", name: "2B 드로잉 연필", defaultWidth: 3.5, defaultOpacity: 0.88 },
+  // 2B 도 같은 붕괴였다: 패스 0.9 × 0.88 = 획 알파 0.792, 5회차 증분 0.38계단. 0.72 는 획 알파를
+  // 0.65 로 놓아 5회차에 2.49계단을 더한다 — HB 보다 진하고 6B 보다 옅은 등급 순서 그대로다.
+  { id: "pencil-2b", name: "2B 드로잉 연필", defaultWidth: 3.5, defaultOpacity: 0.72 },
+  // 6B 는 의도적인 예외다. 껍질 8장 + 코어를 합성한 획 알파가 0.8514 라 3회차에 사실상 불투명해
+  // 지지만, 눕혀 그은 6B 한 획이 종이를 거의 덮는 것이 재료 그대로다 — 겹칠 사다리를 위해 옅게
+  // 만들면 6B 가 아니라 2B 가 된다. 겹칠 회귀 테스트는 이 브러시를 근불투명 행으로 못 박는다.
   { id: "pencil-6b", name: "6B 흑연 연필", defaultWidth: 6, defaultOpacity: 0.9 },
   { id: "soft-pencil", name: "소프트 연필", defaultWidth: 5, defaultOpacity: 0.7 },
   { id: "pencil-grain", name: "그레인 연필", defaultWidth: 4, defaultOpacity: 0.9 },
