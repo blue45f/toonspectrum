@@ -53,6 +53,12 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
+        const starter = findStarterMarketplaceResourceById(id);
+        if (starter) {
+          setRecord(starter);
+          setLoading(false);
+          return;
+        }
         if (cause instanceof NotFoundError) {
           removeCachedMarketResource(id);
           setNotFound(true);
@@ -63,12 +69,6 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
         if (cached) {
           setRecord(cached.record);
           setStaleSavedAt(cached.savedAt);
-          setLoading(false);
-          return;
-        }
-        const starter = findStarterMarketplaceResourceById(id);
-        if (starter) {
-          setRecord(starter);
           setLoading(false);
           return;
         }
