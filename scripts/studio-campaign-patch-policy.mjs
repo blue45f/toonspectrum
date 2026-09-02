@@ -10,28 +10,42 @@ import {
   validateStudioSevenDayCampaignConfig,
 } from "./studio-seven-day-campaign.mjs";
 
+const ALLOWED_PATH_RULES = Object.freeze([
+  /^(?:src|components|packages|crates|apps|lib|hooks|e2e|tests|docs|vendor|models)\//u,
+  /^public\/(?:assets|brushes|models|materials|textures|third-party)\//u,
+  /^(?:README|PRODUCT|DESIGN|DEPLOY|DIFFERENTIATION|MONETIZATION|STUDIO_MANUAL)\.md$/u,
+]);
+
 const FORBIDDEN_PATH_RULES = Object.freeze([
-  /^\.github\/(?:workflows|actions)\//u,
+  /^\.git/u,
+  /^\.github\//u,
   /(^|\/)package\.json$/u,
   /^pnpm-lock\.yaml$/u,
   /^pnpm-workspace\.yaml$/u,
   /(^|\/)package-lock\.json$/u,
   /(^|\/)yarn\.lock$/u,
   /(^|\/)bun\.lockb?$/u,
+  /(^|\/)(?:Cargo\.toml|Cargo\.lock|pyproject\.toml|poetry\.lock|uv\.lock|go\.mod|go\.sum)$/u,
+  /(^|\/)requirements[^/]*\.txt$/u,
   /(^|\/)\.env(?:\.|$)/u,
+  /(^|\/)\.npmrc$/u,
   /^deploy\//u,
+  /^scripts\//u,
+  /^tools\//u,
   /^vercel\.json$/u,
+  /^(?:vite|vitest|playwright|eslint|postcss|tailwind|commitlint|turbo|tsconfig)(?:\.|$)/u,
   /^apps\/api\/src\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
   /^lib\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
-  /^scripts\/(?:production-database-migrations|run-production-database-migrations|verify-production-database-capabilities)/u,
   /^drizzle(?:\.|\/|$)/u,
-  /^scripts\/studio-(?:seven-day-campaign|campaign-patch-policy|safe-automerge|merged-branch-cleanup)/u,
   /^docs\/automation\/studio-seven-day-campaign\.json$/u,
+  /^docs\/third-party\/studio-owner-attestation-2026-09-02\.md$/u,
+  /^docs\/studio-third-party-reuse-policy-2026-09-02\.md$/u,
 ]);
 
 const SOURCE_PATH_RULES = Object.freeze([
   /^(?:src|components|packages|crates|apps)\//u,
-  /^(?:lib|hooks)\//u,
+  /^(?:lib|hooks|vendor|models)\//u,
+  /^public\/(?:assets|brushes|models|materials|textures|third-party)\//u,
 ]);
 
 const TEST_PATH_RULES = Object.freeze([
@@ -39,7 +53,6 @@ const TEST_PATH_RULES = Object.freeze([
   /\.(?:test|spec)\.[cm]?[jt]sx?$/u,
   /^e2e\//u,
   /^tests\//u,
-  /^scripts\/verify-/u,
 ]);
 
 const EXTERNAL_PAYLOAD_RULES = Object.freeze([
@@ -65,6 +78,8 @@ export function evaluateStudioCampaignPatch(config, changes) {
     additions: Number.isFinite(Number(change.additions)) ? Number(change.additions) : 0,
     deletions: Number.isFinite(Number(change.deletions)) ? Number(change.deletions) : 0,
     binary: change.binary === true,
+    oldMode: String(change.oldMode ?? ""),
+    newMode: String(change.newMode ?? change.mode ?? ""),
   }));
 
   if (normalized.length === 0) issues.push("patch is empty");
@@ -77,18 +92,30 @@ export function evaluateStudioCampaignPatch(config, changes) {
   }
 
   for (const change of normalized) {
-    if (!change.path) issues.push("patch contains an empty path");
+    if (!change.path) {
+      issues.push("patch contains an empty path");
+      continue;
+    }
+    if (!matches(change.path, ALLOWED_PATH_RULES)) {
+      issues.push(`agent path is outside the campaign allowlist: ${change.path}`);
+    }
     if (matches(change.path, FORBIDDEN_PATH_RULES)) {
       issues.push(`agent may not modify protected path: ${change.path}`);
     }
     if (change.status === "D") issues.push(`agent may not delete files: ${change.path}`);
     if (change.binary) issues.push(`agent patch may not add or modify binary payloads: ${change.path}`);
+    if (change.newMode === "120000") {
+      issues.push(`agent patch may not create or modify symbolic links: ${change.path}`);
+    }
+    if (change.newMode === "160000") {
+      issues.push(`agent patch may not create or modify gitlinks or submodules: ${change.path}`);
+    }
   }
 
   const sourceChanges = normalized.filter((change) => matches(change.path, SOURCE_PATH_RULES));
   const testChanges = normalized.filter((change) => matches(change.path, TEST_PATH_RULES));
   if (config.quality.requireTestForSourceChange && sourceChanges.length > 0 && testChanges.length === 0) {
-    issues.push("source changes require at least one focused test or verifier change");
+    issues.push("source changes require at least one focused test change");
   }
 
   const externalPayload = normalized.some((change) => matches(change.path, EXTERNAL_PAYLOAD_RULES));
@@ -98,10 +125,16 @@ export function evaluateStudioCampaignPatch(config, changes) {
   if (externalPayload && !registryChanged) {
     issues.push("external payload changes require docs/third-party/studio-reuse-registry.json");
   }
+  if (externalPayload && testChanges.length === 0) {
+    issues.push("external payload changes require at least one focused test change");
+  }
 
-  const workflowChanged = normalized.some((change) => change.path.startsWith(".github/workflows/"));
+  const workflowChanged = normalized.some((change) => change.path.startsWith(".github/"));
   const dependencyChanged = normalized.some(
-    (change) => /(^|\/)package\.json$/u.test(change.path) || /(?:^|\/)pnpm-lock\.yaml$/u.test(change.path),
+    (change) => /(^|\/)(?:package\.json|pnpm-lock\.yaml|Cargo\.toml|Cargo\.lock)$/u.test(change.path),
+  );
+  const fileModeChanged = normalized.some(
+    (change) => change.oldMode !== change.newMode && (change.oldMode || change.newMode),
   );
 
   return Object.freeze({
@@ -115,6 +148,7 @@ export function evaluateStudioCampaignPatch(config, changes) {
     registryChanged,
     workflowChanged,
     dependencyChanged,
+    fileModeChanged,
     changes: Object.freeze(normalized),
   });
 }
@@ -143,6 +177,19 @@ function parseNumstat(text) {
   return rows;
 }
 
+function parseRawModes(text) {
+  const rows = new Map();
+  for (const line of String(text ?? "").split(/\r?\n/u).filter(Boolean)) {
+    const [metadata, ...parts] = line.split("\t");
+    if (!metadata.startsWith(":")) continue;
+    const [oldMode = "", newMode = ""] = metadata.slice(1).split(/\s+/u);
+    const pathname = normalizePath(parts.at(-1));
+    if (!pathname) continue;
+    rows.set(pathname, { oldMode, newMode });
+  }
+  return rows;
+}
+
 export function collectStudioCampaignGitChanges(base = "HEAD") {
   const nameStatus = execFileSync("git", ["diff", "--name-status", "--find-renames", base, "--"], {
     encoding: "utf8",
@@ -150,10 +197,17 @@ export function collectStudioCampaignGitChanges(base = "HEAD") {
   const numstat = execFileSync("git", ["diff", "--numstat", "--find-renames", base, "--"], {
     encoding: "utf8",
   });
+  const raw = execFileSync(
+    "git",
+    ["diff", "--raw", "--no-abbrev", "--find-renames", base, "--"],
+    { encoding: "utf8" },
+  );
   const stats = parseNumstat(numstat);
+  const modes = parseRawModes(raw);
   return parseNameStatus(nameStatus).map((change) => ({
     ...change,
     ...(stats.get(normalizePath(change.path)) ?? { additions: 0, deletions: 0, binary: false }),
+    ...(modes.get(normalizePath(change.path)) ?? { oldMode: "", newMode: "" }),
   }));
 }
 
