@@ -14,6 +14,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type RefObject,
 } from "react";
@@ -416,6 +418,44 @@ function studioFilterScrimBands(
   ].filter((band) => band.style.height !== 0 && band.style.width !== 0);
 }
 
+type StudioFilterDialogOffset = { x: number; y: number };
+
+/**
+ * Where the artist last parked the panel, remembered for the whole studio session.
+ *
+ * The dialog is centred, so it lands squarely on the part of the page it is previewing — exactly the
+ * pixels the artist opened it to judge. Desktop paint apps solve this by letting the panel be moved,
+ * and the position has to survive closing and reopening or it has to be re-dragged for every filter.
+ * It is deliberately not persisted to disk: a remembered offset from another window size would drop
+ * the panel somewhere unhelpful, and the clamp below only guards the current viewport.
+ */
+let studioFilterDialogOffset: StudioFilterDialogOffset = { x: 0, y: 0 };
+
+/**
+ * Keeps the whole panel on screen — 적용 and 취소 included. Letting only the header stay reachable
+ * would be enough to drag it back, but an artist who parks the panel low and then reaches for 적용
+ * should not have to first discover that the button fell off the bottom edge. When the panel is
+ * larger than the viewport it pins to the top-left margin instead, and its own scroll takes over.
+ */
+function clampStudioFilterDialogOffset(
+  offset: StudioFilterDialogOffset,
+  current: StudioFilterDialogOffset,
+  rect: { top: number; left: number; width: number; height: number },
+  viewport: { width: number; height: number },
+): StudioFilterDialogOffset {
+  const margin = 12;
+  const restingLeft = rect.left - current.x;
+  const restingTop = rect.top - current.y;
+  const minX = margin - restingLeft;
+  const maxX = viewport.width - margin - rect.width - restingLeft;
+  const minY = margin - restingTop;
+  const maxY = viewport.height - margin - rect.height - restingTop;
+  return {
+    x: Math.min(Math.max(offset.x, minX), Math.max(minX, maxX)),
+    y: Math.min(Math.max(offset.y, minY), Math.max(minY, maxY)),
+  };
+}
+
 export function StudioFilterDialog({
   activeKey,
   kind,
@@ -450,7 +490,13 @@ export function StudioFilterDialog({
     () => canUseSelectionScope ? "inside" : "whole",
   );
   const [previewEnabled, setPreviewEnabled] = useState(true);
-  const [isComparingOriginal, setIsComparingOriginal] = useState(false);
+  // Held down, the canvas drops back to the untouched page so the artist can see what the filter is
+  // actually costing. Separate from `previewEnabled` because it must never survive the pointer.
+  const [comparingOriginal, setComparingOriginal] = useState(false);
+  const [dialogOffset, setDialogOffset] = useState<StudioFilterDialogOffset>(
+    () => studioFilterDialogOffset,
+  );
+  const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryQuery, setGalleryQuery] = useState("");
   const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
@@ -672,12 +718,38 @@ export function StudioFilterDialog({
   useEffect(() => {
     let frameId: number | null = null;
     frameId = requestAnimationFrame(() => {
-      reportPreview(previewEnabled && !isComparingOriginal ? studioFilterDraftToPatch(draft) : null);
+      reportPreview(
+        previewEnabled && !comparingOriginal ? studioFilterDraftToPatch(draft) : null,
+      );
     });
     return () => {
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
-  }, [draft, previewEnabled, isComparingOriginal]);
+  }, [comparingOriginal, draft, previewEnabled]);
+
+  useEffect(() => {
+    if (!comparingOriginal) return;
+    const view = dialogRef.current?.ownerDocument.defaultView ?? null;
+    if (!view) return;
+    // The hold happens on a control inside a focus-trapped modal, where neither pointer capture nor
+    // the button's own blur survives the press — the modal takes focus back and the hold ended on
+    // the very next frame, so the canvas never actually reverted. Whatever ends the press instead
+    // reaches the window: the release, a cancelled pointer, or focus leaving the tab mid-hold.
+    const release = () => setComparingOriginal(false);
+    const releaseOnKey = (event: KeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter") release();
+    };
+    view.addEventListener("pointerup", release);
+    view.addEventListener("pointercancel", release);
+    view.addEventListener("keyup", releaseOnKey);
+    view.addEventListener("blur", release);
+    return () => {
+      view.removeEventListener("pointerup", release);
+      view.removeEventListener("pointercancel", release);
+      view.removeEventListener("keyup", releaseOnKey);
+      view.removeEventListener("blur", release);
+    };
+  }, [comparingOriginal]);
 
   useEffect(() => {
     if (!canUseSelectionScope && applicationScope !== "whole") {
@@ -710,6 +782,86 @@ export function StudioFilterDialog({
   };
 
   const title = STUDIO_FILTER_LABELS[activeKind];
+  const commitDialogOffset = (next: StudioFilterDialogOffset) => {
+    const node = dialogRef.current;
+    const view = node?.ownerDocument.defaultView ?? null;
+    const clamped = node && view
+      ? clampStudioFilterDialogOffset(next, studioFilterDialogOffset, node.getBoundingClientRect(), {
+        width: view.innerWidth,
+        height: view.innerHeight,
+      })
+      : next;
+    studioFilterDialogOffset = clamped;
+    setDialogOffset(clamped);
+  };
+  const startDialogDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX - dialogOffset.x,
+      y: event.clientY - dialogOffset.y,
+    };
+  };
+  const moveDialogDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    commitDialogOffset({ x: event.clientX - drag.x, y: event.clientY - drag.y });
+  };
+  const endDialogDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+  /** Arrow keys move the panel and Enter re-centres it, so the handle is not pointer-only. */
+  const nudgeDialogWithKey = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      commitDialogOffset({ x: 0, y: 0 });
+      return;
+    }
+    const step = event.shiftKey ? 48 : 12;
+    const delta =
+      event.key === "ArrowLeft"
+        ? { x: -step, y: 0 }
+        : event.key === "ArrowRight"
+          ? { x: step, y: 0 }
+          : event.key === "ArrowUp"
+            ? { x: 0, y: -step }
+            : event.key === "ArrowDown"
+              ? { x: 0, y: step }
+              : null;
+    if (!delta) return;
+    event.preventDefault();
+    event.stopPropagation();
+    commitDialogOffset({ x: dialogOffset.x + delta.x, y: dialogOffset.y + delta.y });
+  };
+  const reclampDialogOffset = useEffectEvent(() => {
+    commitDialogOffset(studioFilterDialogOffset);
+  });
+
+  useEffect(() => {
+    const node = dialogRef.current;
+    const view = node?.ownerDocument.defaultView ?? null;
+    if (!node || !view) return;
+    // Opening the gallery roughly doubles the panel's height, and the window can be resized under a
+    // parked panel. Either can push 적용 past an edge, so re-clamp rather than strand the button.
+    const observer =
+      typeof view.ResizeObserver === "function"
+        ? new view.ResizeObserver(() => reclampDialogOffset())
+        : null;
+    observer?.observe(node);
+    const onResize = () => reclampDialogOffset();
+    view.addEventListener("resize", onResize);
+    return () => {
+      observer?.disconnect();
+      view.removeEventListener("resize", onResize);
+    };
+  }, []);
+
   const resetDraft = () => {
     if (applying) return;
     setDraft(defaultDraft(activeKind));
@@ -787,9 +939,31 @@ export function StudioFilterDialog({
         data-studio-ui-preferences-authority={effectPreferenceAuthority}
         tabIndex={-1}
         className="relative flex max-h-[min(86dvh,42rem)] w-[min(34rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line-strong bg-panel text-fg shadow-2xl"
+        // `translate`, not `transform`: the shared modal entrance animation is `both`-filled, so it
+        // holds `transform: translate3d(0,0,0)` for the life of the dialog and would silently win.
+        style={
+          dialogOffset.x === 0 && dialogOffset.y === 0
+            ? undefined
+            : { translate: `${dialogOffset.x}px ${dialogOffset.y}px` }
+        }
       >
-        <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
+        <header
+          onPointerDown={startDialogDrag}
+          onPointerMove={moveDialogDrag}
+          onPointerUp={endDialogDrag}
+          onPointerCancel={endDialogDrag}
+          className="flex shrink-0 touch-none select-none items-center gap-3 border-b border-line px-4 py-3"
+        >
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label="필터 창 옮기기 — 끌어서 이동, 방향키로 미세 이동, Enter로 가운데 정렬"
+            onKeyDown={nudgeDialogWithKey}
+            className={cn(
+              "grid size-9 shrink-0 cursor-grab place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent active:cursor-grabbing",
+              STUDIO_FOCUS_RING,
+            )}
+          >
             <SlidersHorizontal size={17} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -1201,6 +1375,35 @@ export function StudioFilterDialog({
               <RotateCcw className="size-3.5" aria-hidden />
               기본값
             </button>
+            {/*
+              Judging a filter means seeing what it replaced. Toggling 캔버스 미리보기 off and on
+              costs two clicks and loses the moment of comparison, so this reverts the canvas only
+              for as long as the control is held — pointer or key — and never leaves it reverted.
+            */}
+            <button
+              type="button"
+              disabled={applying || !previewEnabled}
+              aria-pressed={comparingOriginal}
+              title="누르고 있는 동안 원본을 보여줍니다"
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                setComparingOriginal(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== " " && event.key !== "Enter") return;
+                event.preventDefault();
+                setComparingOriginal(true);
+              }}
+              className={buttonClass({
+                size: "sm",
+                variant: comparingOriginal ? "outline" : "quiet",
+                className: "min-h-11 select-none sm:min-h-8 pointer-coarse:min-h-11",
+              })}
+            >
+              <Eye className="size-3.5" aria-hidden />
+              원본 비교
+            </button>
             <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised">
               <input
                 type="checkbox"
@@ -1210,23 +1413,6 @@ export function StudioFilterDialog({
               />
               캔버스 미리보기
             </label>
-            {previewEnabled && (
-              <button
-                type="button"
-                onPointerDown={() => setIsComparingOriginal(true)}
-                onPointerUp={() => setIsComparingOriginal(false)}
-                onPointerLeave={() => setIsComparingOriginal(false)}
-                className={buttonClass({
-                  size: "sm",
-                  variant: isComparingOriginal ? "solid" : "outline",
-                  className: "min-h-11 sm:min-h-8 pointer-coarse:min-h-11 text-[11px] gap-1 px-2 border-dashed border-accent/60 text-accent hover:bg-accent-soft",
-                })}
-                title="누르고 있는 동안 원본과 실시간 비교합니다 (CSP 4.0)"
-              >
-                <Eye className="size-3.5" aria-hidden />
-                <span>{isComparingOriginal ? "원본 표시 중" : "원본 비교 (CSP 4.0)"}</span>
-              </button>
-            )}
           </div>
         </div>
 
