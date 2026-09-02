@@ -1,0 +1,48 @@
+name: Studio benchmark gap triage
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-benchmark-gap-triage
+  cancel-in-progress: true
+
+jobs:
+  map-benchmarks-to-lanes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Verify benchmark-to-lane planner
+        run: node --test scripts/studio-benchmark-gap-plan.test.mjs
+
+      - name: Build implementation-ready benchmark plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/studio-benchmark-gap"
+          unset SOURCE_DATE_EPOCH
+          node scripts/studio-benchmark-gap-plan.mjs \
+            --json-output "$RUNNER_TEMP/studio-benchmark-gap/plan.json" \
+            --markdown-output "$RUNNER_TEMP/studio-benchmark-gap/plan.md"
+          cat "$RUNNER_TEMP/studio-benchmark-gap/plan.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark implementation plan
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-benchmark-gap-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-benchmark-gap/
+          retention-days: 30
+          if-no-files-found: error
