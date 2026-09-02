@@ -130,6 +130,32 @@ describe("rejected stroke recovery store", () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
+  it("stores a frozen snapshot that later writes to the live stroke cannot change", () => {
+    const live = drawEl({ id: "live", points: [0, 0, 10, 10], pressures: [0.4, 0.4] });
+    recordStudioRejectedStroke({
+      stroke: live,
+      pageId: "p1",
+      provider: "WebGPU 라이브 잉크",
+      reason: "timeout",
+      at: 1,
+    });
+    // The discard runs in a later microtask; pointer samples and post-correction keep writing.
+    (live.points as number[]).push(99, 99);
+    (live.pressures as number[])[0] = 1;
+    live.stroke = "#ff0000";
+
+    const record = getStudioRejectedStrokeRecords()[0]!;
+    expect(record.stroke).not.toBe(live);
+    expect(record.stroke.points).toEqual([0, 0, 10, 10]);
+    expect(record.stroke.pressures).toEqual([0.4, 0.4]);
+    expect(record.stroke.stroke).toBe("#111827");
+    expect(Object.isFrozen(record.stroke)).toBe(true);
+    expect(Object.isFrozen(record.stroke.points)).toBe(true);
+    expect(() => {
+      (record.stroke.points as number[]).push(1);
+    }).toThrow();
+  });
+
   it("drops the oldest record beyond the limit", () => {
     for (let index = 0; index < STUDIO_REJECTED_STROKE_RECOVERY_LIMIT + 3; index += 1) {
       recordStudioRejectedStroke({

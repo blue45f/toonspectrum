@@ -100,6 +100,21 @@ let records: readonly StudioRejectedStrokeRecord[] = Object.freeze([]);
 let restorer: StudioRejectedStrokeRestorer | null = null;
 const listeners = new Set<() => void>();
 
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  return Object.freeze(value);
+}
+
+/**
+ * The live `DrawEl` keeps receiving pointer samples and post-correction writes after the rejection
+ * is announced (the discard runs in a later microtask), and a restorer must not be able to edit the
+ * parked geometry either. Snapshot the serialisable element and freeze every nested array.
+ */
+export function snapshotStudioRejectedStroke(stroke: DrawEl): DrawEl {
+  return deepFreeze(structuredClone(stroke));
+}
+
 function publish(): void {
   for (const listener of [...listeners]) {
     try {
@@ -147,7 +162,7 @@ export function recordStudioRejectedStroke(input: {
   const record: StudioRejectedStrokeRecord = Object.freeze({
     id: input.stroke.id,
     pageId: input.pageId,
-    stroke: input.stroke,
+    stroke: snapshotStudioRejectedStroke(input.stroke),
     provider: input.provider,
     reason: input.reason,
     at: input.at ?? Date.now(),
