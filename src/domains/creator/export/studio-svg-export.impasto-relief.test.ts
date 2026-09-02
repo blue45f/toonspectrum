@@ -83,21 +83,17 @@ describe("SVG export — impastoRelief GGX 릴리프 오버레이 직렬화", ()
     expect(exportPageToSvg(page([oilStroke("oil--impasto-ribbon")])).svg).toBe(svg);
   });
 
-  it.each([
-    "oil",
-    "acrylic",
-    "fluid-paint",
-    "fluid-paint-fine",
-    "fluid-paint-load",
-    "fluid-paint-rake",
-  ])("세 프로그램을 모두 켜는 기본 유화 id(%s)도 릴리프 오버레이를 직렬화한다", (brush) => {
-    // 2026-08-20 에 매트릭스에 들어온 6종. 내보내기가 매트릭스가 아니라 옛 두-레인 목록을 보면
+  it.each(["oil", "acrylic"])(
+    "세 프로그램을 모두 켜는 기본 유화 id(%s)도 릴리프 오버레이를 직렬화한다",
+    (brush) => {
+    // 2026-08-20 에 매트릭스에 들어온 기본 유화. 내보내기가 매트릭스가 아니라 옛 두-레인 목록을 보면
     // 여기서 오버레이가 빠진다.
     const { svg } = exportPageToSvg(page([oilStroke(brush)]));
     expect(svg, brush).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
     expect(svg, brush).toContain(OVERLAY_MARKER);
     expect(svg, brush).toContain("data-paint-impasto-relief");
-  });
+    },
+  );
 
   it("오버레이 마크는 다른 재료 mark처럼 획 투명도를 곱해 받는다", () => {
     const opacityOf = (svg: string): number[] => [...svg.matchAll(

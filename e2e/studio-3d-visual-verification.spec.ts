@@ -622,6 +622,41 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     expect(fatal).toEqual([]);
   });
 
+  test("3D 웹툰 프로 툴(20종)이 열리고 벤치마크 기능(필터·집중선·착지락·말풍선·셰이퍼)이 오류 없이 동작한다", async ({ page }) => {
+    test.setTimeout(300_000);
+    const fatal = collectFatalErrors(page);
+    await openStudio(page);
+    await openBg3d(page);
+
+    // 뷰포트 우측 상단의 빠른 열기 버튼(WandSparkles) 클릭
+    const proQuickBtn = page.locator('[data-testid="bg3d-prosuite-quick-open"]').first();
+    await proQuickBtn.click();
+
+    // 웹툰 프로 툴 탭 활성화 확인
+    const proTab = page.locator('#bg3d-view-tab-prosuite');
+    await expect(proTab).toHaveAttribute("aria-selected", "true");
+
+    // 20종 도구 및 카테고리 필터 표시 확인
+    await expect(page.locator('text=전체 (20)').first()).toBeVisible();
+    await expect(page.locator('text=웹툰 필터').first()).toBeVisible();
+    await expect(page.locator('text=2.5D 집중선').first()).toBeVisible();
+    await expect(page.locator('text=지면 착지락').first()).toBeVisible();
+    await expect(page.locator('text=셰이퍼 3D').first()).toBeVisible();
+    await expect(page.locator('text=투닝 연출').first()).toBeVisible();
+
+    // 웹툰 필터 탭 클릭 및 프리셋 선택
+    await page.locator('text=웹툰 필터').first().click();
+    await expect(page.locator('text=스냅툰·에이블러 스타일 7종 웹툰 렌더 필터').first()).toBeVisible();
+    await page.locator('text=로맨스 판타지 파스텔').first().click();
+
+    // 지면 착지락 탭 클릭 및 동작 확인
+    await page.locator('text=지면 착지락').first().click();
+    await expect(page.locator('text=플라스크 지면 착지 락').first()).toBeVisible();
+    await page.locator('text=양발 바닥 착지 락 & 골반 높이 적용').first().click();
+
+    expect(fatal).toEqual([]);
+  });
+
   /**
    * 이 회귀가 이 스위트를 만든 이유다. `/studio`는 저장된 작품 id가 없는 모든 세션에
    * `?room=work-instant-…` 잼을 발행하므로 `isRealtimeTeamSession`이 참이고, 그 분기가 실패로

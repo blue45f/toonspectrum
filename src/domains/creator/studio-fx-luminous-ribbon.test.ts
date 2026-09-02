@@ -188,6 +188,44 @@ describe("studio FX luminous pressure ribbon", () => {
     },
   );
 
+  it("drops the round join a smooth constant-width ribbon already covers, and keeps it at a corner", () => {
+    // 실측: 반지름 150px 원 한 획(360점)을 글로우로 그리면 구간마다 24각형 조인이 붙어
+    // 라이브 드래프트가 포인터 이동마다 1만 점 넘는 합성 패스를 다시 계획·추적했다 —
+    // 한 획 336초, 1.28초 롱태스크 613개. 부드러운 구간의 조인은 두 몸통이 이미 덮은 자리다.
+    const circlePoints: number[] = [];
+    const circlePressures: number[] = [];
+    for (let index = 0; index < 240; index += 1) {
+      const angle = (index / 239) * Math.PI * 2;
+      circlePoints.push(300 + Math.cos(angle) * 150, 300 + Math.sin(angle) * 150);
+      circlePressures.push(0.7);
+    }
+    const circle = planFor("glow", circlePoints, circlePressures);
+    const circleJoins = circle.polygons.filter(({ role }) => role === "join");
+    const circleBodies = circle.polygons.filter(({ role }) => role === "body");
+    expect(circleBodies.length).toBeGreaterThan(200);
+    // 1° 회전에 반지름 24px 면 쐐기 깊이가 0.001px — 남길 이유가 없다.
+    expect(circleJoins.length).toBeLessThan(circleBodies.length / 8);
+    // 덮임은 그대로다: 링 위의 표본은 여전히 합성 패스 안에 있고 원 바깥·안쪽은 비어 있다.
+    for (const sample of [0, 0.17, 0.41, 0.66, 0.89]) {
+      const angle = sample * Math.PI * 2;
+      expect(compoundCoverageAt(
+        circle.polygons,
+        300 + Math.cos(angle) * 150,
+        300 + Math.sin(angle) * 150,
+      )).toBe(true);
+    }
+    expect(compoundCoverageAt(circle.polygons, 300, 300)).toBe(false);
+
+    // 진짜 꺾임은 쐐기를 남기므로 조인이 그대로 있어야 한다(90° 지그재그).
+    const corner = planFor(
+      "glow",
+      [0, 0, 60, 0, 60, 60, 120, 60],
+      [0.7, 0.7, 0.7, 0.7],
+    );
+    expect(corner.polygons.filter(({ role }) => role === "join").length)
+      .toBeGreaterThan(0);
+  });
+
   it("interpolates pressure into a continuous ribbon without an internal width seam", () => {
     const plan = planFor(
       "neon",
