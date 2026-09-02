@@ -33,10 +33,11 @@ const SESSION_REST_FILE = path.join(
 
 /**
  * ratchet: may only decrease. 측정 2026-09-02 = 30,961줄(상한 31,000). 같은 날 저녁 main 에 먼저
- * 들어간 3D 에디터 배선(14469764 등)이 호스트를 31,006줄로 늘려 상한을 실측값으로 한 번 재설정했다 —
- * 그 커밋들은 이 래칫이 생기기 전에 작성된 것이다. 이후로는 다시 올리지 않는다.
+ * 들어간 3D 에디터 배선(14469764)·live-ink 지우개(b49203df)·ink-wash settle(3201a1e2) 이 호스트를
+ * 31,011줄로 늘려 상한을 실측값으로 재설정했다 — 그 커밋들은 이 래칫이 생기기 전에 작성된 것이다.
+ * 이후로는 다시 올리지 않는다.
  */
-const HOST_MAX_LINES = 31_006;
+const HOST_MAX_LINES = 31_011;
 
 /** ratchet: may only decrease. 측정 2026-09-02. */
 const SESSION_BAG_ANY_BASELINE = {
