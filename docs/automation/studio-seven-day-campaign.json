@@ -3,7 +3,7 @@
   "campaignId": "studio-saturation-2026-09-02",
   "startAt": "2026-09-02T11:30:00Z",
   "endAt": "2026-09-09T11:30:00Z",
-  "cadenceMinutes": 180,
+  "cadenceMinutes": 60,
   "trackingIssue": 555,
   "maxOpenCampaignPullRequests": 1,
   "branchPrefix": "codex/campaign-",
