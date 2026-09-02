@@ -1,0 +1,101 @@
+name: Marketplace authoring integration idempotency
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-idempotency.yml"
+      - "scripts/marketplace/harden-authoring-integration-idempotency.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-authoring-idempotency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 20
+      - name: Synchronize latest feature head
+        run: |
+          git fetch origin feat/marketplace-creator-pipeline-20260903
+          git reset --hard origin/feat/marketplace-creator-pipeline-20260903
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Harden and replay integrations twice
+        run: |
+          node scripts/marketplace/harden-authoring-integration-idempotency.mjs
+          node scripts/marketplace/integrate-creator-authoring.mjs
+          node scripts/marketplace/integrate-authoring-detail-action.mjs
+          node scripts/marketplace/integrate-brush-recipe-lab.mjs
+          sha256sum \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.tsx \
+            src/domains/creator/StudioBrushStudio.tsx > /tmp/first.sha
+          node scripts/marketplace/integrate-creator-authoring.mjs
+          node scripts/marketplace/integrate-authoring-detail-action.mjs
+          node scripts/marketplace/integrate-brush-recipe-lab.mjs
+          sha256sum \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.tsx \
+            src/domains/creator/StudioBrushStudio.tsx > /tmp/second.sha
+          diff -u /tmp/first.sha /tmp/second.sha
+      - run: pnpm install --frozen-lockfile
+      - name: Focused tests
+        run: >-
+          pnpm exec vitest run
+          lib/creator-marketplace-authoring-workshop.test.ts
+          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
+          src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
+          --reporter=verbose
+      - run: pnpm exec tsc -p tsconfig.json --noEmit
+      - run: pnpm run lint:quick
+      - run: pnpm run build
+      - name: Commit hardened integration
+        run: |
+          git config user.name "toonstudio-marketplace-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            scripts/marketplace/integrate-creator-authoring.mjs \
+            scripts/marketplace/integrate-authoring-detail-action.mjs \
+            scripts/marketplace/integrate-brush-recipe-lab.mjs \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.tsx \
+            src/domains/creator/StudioBrushStudio.tsx \
+            marketplace-authoring-idempotency-report.json \
+            marketplace-authoring-integration-report.json \
+            marketplace-authoring-detail-integration-report.json \
+            marketplace-brush-recipe-integration-report.json
+          if git diff --cached --quiet; then
+            echo "Integration was already idempotent."
+            exit 0
+          fi
+          git commit -m "fix(market): make creator authoring integration repeatable"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:feat/marketplace-creator-pipeline-20260903; then
+              exit 0
+            fi
+            git fetch origin feat/marketplace-creator-pipeline-20260903
+            git rebase origin/feat/marketplace-creator-pipeline-20260903
+            sleep 5
+          done
+          exit 1
