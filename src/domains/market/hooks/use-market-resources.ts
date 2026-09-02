@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getCustomPublishedResources } from "../models/market-custom-registry";
 import { readCachedMarketPage, writeCachedMarketPage } from "../models/market-resource-cache";
 import { listCreatorMarketplaceResources } from "../remotes/market-resource-remote";
 
@@ -41,6 +42,25 @@ export interface MarketResourcesPage {
 
 const MARKET_RETRY_HINT = "일시적인 장애일 수 있어요. 잠시 후 다시 시도해 주세요.";
 const MARKET_LOAD_MORE_RETRY_HINT = "추가 리소스를 불러오지 못했어요.";
+
+function matchesMarketQuery(
+  item: CreatorMarketplaceResourceRecord,
+  query: MarketResourceQuery,
+): boolean {
+  if (query.kind && item.kind !== query.kind) return false;
+  if (query.license && item.license !== query.license) return false;
+  if (query.publisher && item.publisher.id !== query.publisher) return false;
+  if (query.tag && !item.tags.some((t) => t.toLowerCase() === query.tag!.toLowerCase())) return false;
+  if (query.search) {
+    const q = query.search.toLowerCase().trim();
+    const match =
+      item.name.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.tags.some((t) => t.toLowerCase().includes(q));
+    if (!match) return false;
+  }
+  return true;
+}
 
 /**
  * creator-marketplace list API를 커서 페이지네이션과 함께 래핑한다.
@@ -130,6 +150,18 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
           }
         }
 
+        const matchingCustoms = getCustomPublishedResources().filter((r) =>
+          matchesMarketQuery(r, parsedQuery)
+        );
+        if (matchingCustoms.length > 0) {
+          const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
+          for (const item of matchingCustoms) itemMap.set(item.id, item);
+          for (const item of finalItems) {
+            if (!itemMap.has(item.id)) itemMap.set(item.id, item);
+          }
+          finalItems = [...itemMap.values()];
+        }
+
         const pageHasMore = nextCursor !== null && finalHasMore;
         setItems(finalItems);
         cursorRef.current = nextCursor;
@@ -143,9 +175,21 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       })
       .catch(() => {
         if (controller.signal.aborted || requestGenerationRef.current !== generation) return;
+        const matchingCustoms = getCustomPublishedResources().filter((r) =>
+          matchesMarketQuery(r, parsedQuery)
+        );
         const cached = readCachedMarketPage(queryKey);
         if (cached) {
-          setItems(cached.items);
+          let mergedCached = cached.items;
+          if (matchingCustoms.length > 0) {
+            const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
+            for (const item of matchingCustoms) itemMap.set(item.id, item);
+            for (const item of cached.items) {
+              if (!itemMap.has(item.id)) itemMap.set(item.id, item);
+            }
+            mergedCached = [...itemMap.values()];
+          }
+          setItems(mergedCached);
           setHasMore(false);
           cursorRef.current = null;
           setStale(true);
@@ -162,8 +206,14 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
           publisher: parsedQuery.publisher,
           sort: parsedQuery.sort,
         });
-        if (starter.items.length > 0) {
-          setItems(starter.items);
+        if (starter.items.length > 0 || matchingCustoms.length > 0) {
+          const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
+          for (const item of matchingCustoms) itemMap.set(item.id, item);
+          for (const item of starter.items) {
+            if (!itemMap.has(item.id)) itemMap.set(item.id, item);
+          }
+          const mergedStarter = [...itemMap.values()];
+          setItems(mergedStarter);
           setHasMore(starter.hasMore);
           cursorRef.current = null;
           setError(null);

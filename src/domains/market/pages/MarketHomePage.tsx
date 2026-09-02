@@ -7,8 +7,10 @@ import {
   Sparkles,
   Store,
   Upload,
+  Plus,
 } from "lucide-react";
 
+import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
@@ -61,18 +63,30 @@ export function MarketHomePage() {
   return (
     <div>
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-7 sm:py-12 lg:py-16">
-          <p className="eyebrow text-accent">Creator Market</p>
-          <h1 className="mt-2.5 text-pretty text-3xl font-bold leading-[1.1] sm:mt-3 sm:text-4xl lg:text-[2.9rem]">
+        <Container size="wide" className="py-7 sm:py-10">
+          <MarketNavHeader />
+          <p className="eyebrow text-accent mt-6">Creator Market</p>
+          <h1 className="mt-2 text-pretty text-3xl font-bold leading-[1.1] sm:mt-2.5 sm:text-4xl lg:text-[2.8rem]">
             창작 마켓
           </h1>
-          <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-4 sm:text-lg">
+          <p className="mt-2.5 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-3 sm:text-lg">
             스튜디오에서 태어난 창작 리소스가 다음 작가의 도구가 되는 곳.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-line pt-5 sm:mt-9 sm:pt-6">
+          <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
             <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
               <Store className="h-4 w-4" aria-hidden="true" />
               리소스 둘러보기
+            </Link>
+            <Link
+              href="/market/publish"
+              className={buttonClass({
+                variant: "outline",
+                size: "md",
+                className: "border-accent text-accent hover:bg-accent/10",
+              })}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              에셋 등록하기
             </Link>
             <Link
               href="/studio?assetMarket=community&communityView=share"

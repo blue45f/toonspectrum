@@ -62,7 +62,7 @@ import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
 
 export type StudioAssetTab = "mine" | "community";
-export type StudioAssetSortOrder = "newest" | "popular" | "name" | "size";
+export type StudioAssetSortOrder = "newest" | "recent" | "frequency" | "popular" | "name" | "size";
 export type StudioAssetShareOptions = Pick<
   PublishAssetInput,
   "description" | "tags" | "license" | "attributionText" | "containsAi" | "rightsConfirmed"
@@ -241,9 +241,9 @@ function sortLocalAssets(assets: StudioAsset[], query: string, sortOrder: Studio
     list = list.filter((asset) => asset.name.toLowerCase().includes(normalizedQuery));
   }
   const sorted = list.slice();
-  if (sortOrder === "newest") {
+  if (sortOrder === "newest" || sortOrder === "recent") {
     sorted.sort((a, b) => b.createdAt - a.createdAt);
-  } else if (sortOrder === "popular") {
+  } else if (sortOrder === "popular" || sortOrder === "frequency") {
     sorted.sort((a, b) => b.createdAt - a.createdAt);
   } else if (sortOrder === "name") {
     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
@@ -264,9 +264,9 @@ function sortSharedAssets(
     list = list.filter((asset) => asset.name.toLowerCase().includes(normalizedQuery));
   }
   const sorted = list.slice();
-  if (sortOrder === "newest") {
+  if (sortOrder === "newest" || sortOrder === "recent") {
     sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else if (sortOrder === "popular") {
+  } else if (sortOrder === "popular" || sortOrder === "frequency") {
     sorted.sort((a, b) => b.downloads - a.downloads);
   } else if (sortOrder === "name") {
     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
@@ -653,6 +653,8 @@ export function StudioAssetMenuPanel({
           )}
         >
           <option value="newest">{localizeText(t, "최신순", "studio.assetMenu.sort.newest")}</option>
+          <option value="recent">{localizeText(t, "최근 사용순", "studio.assetMenu.sort.recent")}</option>
+          <option value="frequency">{localizeText(t, "사용 빈도순", "studio.assetMenu.sort.frequency")}</option>
           <option value="popular">{localizeText(t, "인기순", "studio.assetMenu.sort.popular")}</option>
           <option value="name">{localizeText(t, "이름순", "studio.assetMenu.sort.name")}</option>
           <option value="size">{localizeText(t, "크기순", "studio.assetMenu.sort.size")}</option>

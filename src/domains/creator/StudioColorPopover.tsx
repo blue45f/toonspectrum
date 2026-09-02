@@ -19,6 +19,7 @@ import {
   type StudioColorPopoverPurpose,
 } from "./studio-color-popover-hints";
 import { isValidHexColor, normalizeHexColor } from "./studio-color-utils";
+import { formatLabString, hexToLab, labToHex } from "./studio-lab-color";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioPalette } from "./studio-color-palettes";
@@ -79,6 +80,7 @@ export function StudioColorPopover({
   const [paletteId, setPaletteId] = useState<string>("");
   // 헥스 텍스트 입력 로컬값 — 타이핑 중간 무효 상태를 허용하고 확정 시에만 반영.
   const [hexDraft, setHexDraft] = useState(value);
+  const [showLabSliders, setShowLabSliders] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -338,6 +340,70 @@ export function StudioColorPopover({
                 </button>
               </StudioToolHintTarget>
             ) : null}
+          </div>
+
+          {/* CIELAB 색 공간 토글 및 슬라이더 (CSP v5.1 parity) */}
+          <div className="mt-2 border-t border-line/40 pt-1.5">
+            {(() => {
+              const currentLab = hexToLab(value);
+              return (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLabSliders(!showLabSliders)}
+                    aria-expanded={showLabSliders}
+                    aria-label="CIELAB 색 공간 슬라이더 토글"
+                    className="flex w-full items-center justify-between rounded px-1 py-0.5 text-[0.62rem] font-medium text-fg-3 hover:bg-raised/60 hover:text-fg-2"
+                  >
+                    <span>CIELAB</span>
+                    <span className="font-mono text-[0.60rem] opacity-80">{formatLabString(currentLab)}</span>
+                  </button>
+                  {showLabSliders && (
+                    <div className="mt-1 space-y-1.5 rounded border border-line/60 bg-raised/30 p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">L*</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={Math.round(currentLab.l)}
+                          onChange={(e) => handleSelect(labToHex(Number(e.target.value), currentLab.a, currentLab.b))}
+                          aria-label="CIELAB 명도 L*"
+                          className="h-1.5 flex-1 cursor-pointer accent-accent"
+                        />
+                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.l)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">a*</span>
+                        <input
+                          type="range"
+                          min={-128}
+                          max={127}
+                          value={Math.round(currentLab.a)}
+                          onChange={(e) => handleSelect(labToHex(currentLab.l, Number(e.target.value), currentLab.b))}
+                          aria-label="CIELAB 적녹 a*"
+                          className="h-1.5 flex-1 cursor-pointer accent-accent"
+                        />
+                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.a)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">b*</span>
+                        <input
+                          type="range"
+                          min={-128}
+                          max={127}
+                          value={Math.round(currentLab.b)}
+                          onChange={(e) => handleSelect(labToHex(currentLab.l, currentLab.a, Number(e.target.value)))}
+                          aria-label="CIELAB 황청 b*"
+                          className="h-1.5 flex-1 cursor-pointer accent-accent"
+                        />
+                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.b)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 최근 사용 색 */}
