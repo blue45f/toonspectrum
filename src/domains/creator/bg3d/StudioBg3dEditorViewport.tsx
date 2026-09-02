@@ -6,6 +6,8 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
+import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
+import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
 
 export function StudioBg3dEditorViewport({ h }) {
@@ -321,8 +323,16 @@ export function StudioBg3dEditorViewport({ h }) {
     // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
     canPlaceSelectedModelRecipe, centerGroundSelectionDisabledReason, groundSelectionDisabledReason, measurementDraft, measurementStartWorld, placementPreviewAsset, setTransformSpaceOverride, setWebXrSupport, transformSpace,
   } = { ...R, ...h, CaptureBridge };
-  // 빈 장면에서는 "끌어서 회전 · 도형 클릭으로 선택" 이 가리킬 대상이 없다. 안내 두 개가 같은
-  // 아래쪽 슬롯을 다투는 것도 여기서 끊는다 — 좁은 화면의 뷰포트는 두 줄을 담을 높이가 없다.
+  const [compositionGuideMode, setCompositionGuideMode] = useState<StudioBg3dCompositionGuideMode>("none");
+  const cycleCompositionGuide = () => {
+    setCompositionGuideMode((current) => {
+      if (current === "none") return "ruleOfThirds";
+      if (current === "ruleOfThirds") return "verticalWebtoon";
+      if (current === "verticalWebtoon") return "goldenSpiral";
+      if (current === "goldenSpiral") return "crosshair";
+      return "none";
+    });
+  };
   const sceneIsEmpty =
     primitives.length === 0 && customModels.length === 0 && sharedCharacters.length === 0;
   return (
@@ -539,6 +549,11 @@ export function StudioBg3dEditorViewport({ h }) {
                       </span>
                     )}
                   </div>
+                ) : null}
+
+                {/* Webtoon composition and perspective guides overlay */}
+                {!immersiveSceneActive && !isCapturing ? (
+                  <StudioBg3dCompositionOverlay mode={compositionGuideMode} />
                 ) : null}
 
                 {placementSession.phase === "preview" && placementPreviewAsset ? (
@@ -953,6 +968,40 @@ export function StudioBg3dEditorViewport({ h }) {
                       onClick={() => setLineArtPreview((v) => !v)}
                     >
                       <Boxes size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={{
+                      id: "bg3d:viewport:composition-guide",
+                      title: `구도 가이드 (${
+                        compositionGuideMode === "none"
+                          ? "꺼짐"
+                          : compositionGuideMode === "ruleOfThirds"
+                            ? "3분할선"
+                            : compositionGuideMode === "verticalWebtoon"
+                              ? "웹툰 컷"
+                              : compositionGuideMode === "goldenSpiral"
+                                ? "황금나선"
+                                : "중심선"
+                      })`,
+                      description: "웹툰 컷 프레임, 3분할 황금비율 격자, 황금나선, 소점 중심선 가이드를 순환 전환합니다.",
+                      preview: "camera-orbit",
+                    }}
+                    preferredSide="left"
+                  >
+                    <button
+                      type="button"
+                      aria-label={`구도 가이드 전환 · 현재: ${compositionGuideMode}`}
+                      aria-pressed={compositionGuideMode !== "none"}
+                      data-testid="bg3d-composition-guide-toggle"
+                      className={cx(
+                        VIEWPORT_BTN,
+                        compositionGuideMode !== "none" &&
+                          "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                      )}
+                      onClick={cycleCompositionGuide}
+                    >
+                      <Aperture size={16} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
                 </div>
