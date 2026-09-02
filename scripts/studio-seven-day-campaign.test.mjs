@@ -26,6 +26,10 @@ const safeAutomergeWorkflow = fs.readFileSync(
   ".github/workflows/studio-safe-automerge.yml",
   "utf8",
 );
+const ciSupersessionWorkflow = fs.readFileSync(
+  ".github/workflows/studio-ci-supersession.yml",
+  "utf8",
+);
 
 function laneScopedConfig(laneId) {
   const lane = config.lanes.find((candidate) => candidate.id === laneId);
@@ -239,4 +243,14 @@ test("green parallel PRs converge through one ordered main writer and immediatel
   assert.match(safeAutomergeWorkflow, /fell behind current main/u);
   assert.match(safeAutomergeWorkflow, /studio-seven-day-hourly-trigger\.yml\/dispatches/u);
   assert.match(safeAutomergeWorkflow, /30-minute watchdog will recover the lane/u);
+});
+
+test("superseded PR heads cannot leave stale full CI runs occupying parallel capacity", () => {
+  assert.match(ciSupersessionWorkflow, /name: Studio CI supersession/u);
+  assert.match(ciSupersessionWorkflow, /actions: write/u);
+  assert.match(ciSupersessionWorkflow, /\.name == "CI"/u);
+  assert.match(ciSupersessionWorkflow, /\.head_sha != \$current/u);
+  assert.match(ciSupersessionWorkflow, /any\(\.pull_requests\[\]\?; \.number == \$pull\)/u);
+  assert.match(ciSupersessionWorkflow, /actions\/runs\/\$\{run_id\}\/cancel/u);
+  assert.doesNotMatch(ciSupersessionWorkflow, /select\(\.head_sha == \$current\)/u);
 });
