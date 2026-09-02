@@ -398,6 +398,7 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
+import { StudioAiSuperSuiteModal } from "./ai/StudioAiSuperSuiteModal";
 import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
 import {
   loadStudioPsdExportModule,
@@ -7633,6 +7634,7 @@ export function StudioCuttoonEditor({
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
+  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(false);
   // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
@@ -27220,6 +27222,7 @@ function clearSelectionForEdit() {
       openContinuityCheck: () => setContinuityOpen(true),
       openProductionBible: () => setProductionBibleOpen(true),
       openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
+      openAiSuperSuite: () => setAiSuperSuiteOpen(true),
       openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
@@ -31041,6 +31044,15 @@ function clearSelectionForEdit() {
         onClose={() => setWebtoonAssistantOpen(false)}
         canvasWidth={CANVAS_W}
         canvasHeight={canvasH}
+      />
+      <StudioAiSuperSuiteModal
+        open={aiSuperSuiteOpen}
+        onClose={() => setAiSuperSuiteOpen(false)}
+        onApplyPrompt={(prompt) => {
+          setAiBgPrompt(prompt);
+          setAiAssistTool("background");
+          setAiSuperSuiteOpen(false);
+        }}
       />
     </StudioDccWorkbenchRoute>
   );

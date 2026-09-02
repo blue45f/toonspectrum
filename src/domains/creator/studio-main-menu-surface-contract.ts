@@ -124,4 +124,6 @@ export interface StudioMainMenuSurfaceActions {
   openBackground3d: () => unknown;
   /** 웹툰 창작 보조 센터 — 규격 검사, 자동 슬라이서, 스크롤 페이싱, 효과음 사전, 컬러 조화, 포커스 타이머. */
   openWebtoonAssistant?: () => unknown;
+  /** AI 웹툰 생성 슈퍼 스위트 — 툰필터 화풍 변환, 음영 어시스트, 프롬프트 증강, 콘티 디렉터, 감정 말풍선. */
+  openAiSuperSuite?: () => unknown;
 }

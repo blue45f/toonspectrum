@@ -106,5 +106,14 @@ export function buildStudioProductionMenuItems({
         ui.openWebtoonAssistant?.();
       },
     },
+    {
+      id: "ai-super-suite",
+      commandId: "comic.ai-super-suite",
+      label: "AI 웹툰 생성 슈퍼 스위트…",
+      icon: Sparkles,
+      onSelect: () => {
+        ui.openAiSuperSuite?.();
+      },
+    },
   ];
 }
