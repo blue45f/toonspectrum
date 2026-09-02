@@ -1,0 +1,82 @@
+name: Studio merged branch cleanup
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
+  schedule:
+    # 03:17 KST every day. The odd minute avoids the top-of-hour Actions queue spike.
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List eligible merged branches without deleting them"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: studio-merged-branch-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      EVENT_NAME: ${{ github.event_name }}
+      MANUAL_DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Verify cleanup selection contracts
+        run: node --test scripts/studio-merged-branch-cleanup.test.mjs
+
+      - name: Delete only exact merged branch heads
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          apply=(--apply)
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "${MANUAL_DRY_RUN:-false}" == "true" ]]; then
+            apply=()
+          fi
+
+          report="$RUNNER_TEMP/studio-merged-branch-cleanup.json"
+          node scripts/studio-merged-branch-cleanup.mjs \
+            --repository "$REPOSITORY" \
+            --json \
+            "${apply[@]}" \
+            > "$report"
+
+          cat "$report"
+
+          {
+            echo "## Studio merged branch cleanup"
+            echo
+            echo "- Mode: \`$(jq -r '.mode' "$report")\`"
+            echo "- Repository branches inspected: $(jq -r '.branchCount' "$report")"
+            echo "- Eligible exact merged heads: $(jq -r '.candidateCount' "$report")"
+            echo "- Deleted: $(jq -r '.deletedCount' "$report")"
+            echo
+            jq -r '.results[]? | "- `\(.branch)`: \(.status) (`\(.sha)`)"' "$report"
+          } >> "$GITHUB_STEP_SUMMARY"
