@@ -164,8 +164,8 @@ export function validateStudioThirdPartyReuseRegistry(registry) {
     if (typeof entry.licenseId !== "string" || !entry.licenseId.trim()) {
       issues.push(`${prefix}.licenseId must identify the license or permission grant`);
     }
-    validateHttpsUrl(entry.licenseUrl, `${prefix}.licenseUrl`, issues);
 
+    const evidenceType = isObject(entry.evidence) ? entry.evidence.type : null;
     if (!isObject(entry.evidence)) {
       issues.push(`${prefix}.evidence must be an object`);
     } else {
@@ -176,6 +176,19 @@ export function validateStudioThirdPartyReuseRegistry(registry) {
       if (typeof entry.evidence.reviewedAt !== "string" || !DATE_PATTERN.test(entry.evidence.reviewedAt)) {
         issues.push(`${prefix}.evidence.reviewedAt must use YYYY-MM-DD`);
       }
+    }
+
+    if (evidenceType === "public-license") {
+      validateHttpsUrl(entry.licenseUrl, `${prefix}.licenseUrl`, issues);
+    } else if (entry.licenseUrl != null) {
+      validateHttpsUrl(entry.licenseUrl, `${prefix}.licenseUrl`, issues);
+    }
+    if (
+      (evidenceType === "rights-holder-permission" || evidenceType === "user-owned") &&
+      typeof entry.licenseId === "string" &&
+      !entry.licenseId.startsWith("LicenseRef-")
+    ) {
+      issues.push(`${prefix}.licenseId must use LicenseRef-* for private or user-owned grants`);
     }
 
     if (!Array.isArray(entry.allowedUses) || entry.allowedUses.length === 0) {
