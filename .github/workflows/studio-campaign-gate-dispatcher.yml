@@ -12,8 +12,8 @@ on:
 
 permissions:
   actions: write
-  contents: read
-  pull-requests: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: studio-campaign-gate-dispatcher
@@ -27,7 +27,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
     steps:
-      - name: Dispatch missing gates for eligible campaign pull requests
+      - name: Update and dispatch missing gates for eligible campaign pull requests
         shell: bash
         run: |
           set -euo pipefail
@@ -38,6 +38,7 @@ jobs:
               -H 'X-GitHub-Api-Version: 2022-11-28' \
               "repos/${REPOSITORY}/pulls?state=open&per_page=100"
           )"
+          main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
 
           mapfile -t candidates < <(
             jq -r \
@@ -121,6 +122,41 @@ jobs:
             current_state="$(jq -r '.state' <<< "$pull_json")"
             if [[ "$current_state" != "open" || "$current_sha" != "$head_sha" ]]; then
               echo "PR #${pull_number} moved or closed during reconciliation; skipping."
+              continue
+            fi
+
+            comparison_json="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "repos/${REPOSITORY}/compare/${main_sha}...${head_sha}"
+            )"
+            comparison_status="$(jq -r '.status // "unknown"' <<< "$comparison_json")"
+
+            if [[ "$comparison_status" == "behind" || "$comparison_status" == "diverged" ]]; then
+              echo "PR #${pull_number} is ${comparison_status} current main ${main_sha}; requesting an exact update."
+              update_payload="$(jq -n --arg expected_head_sha "$head_sha" '{expected_head_sha: $expected_head_sha}')"
+              set +e
+              update_response="$(
+                gh api \
+                  --method PUT \
+                  -H 'Accept: application/vnd.github+json' \
+                  -H 'X-GitHub-Api-Version: 2022-11-28' \
+                  "repos/${REPOSITORY}/pulls/${pull_number}/update-branch" \
+                  --input - <<< "$update_payload" \
+                  2>&1
+              )"
+              update_status=$?
+              set -e
+              if [[ "$update_status" -ne 0 ]]; then
+                echo "::warning::Could not update PR #${pull_number} onto current main: ${update_response}"
+                continue
+              fi
+              pull_json="$(gh api "repos/${REPOSITORY}/pulls/${pull_number}")"
+              head_sha="$(jq -r '.head.sha' <<< "$pull_json")"
+              echo "PR #${pull_number} now points to ${head_sha}; dispatching gates for the new head."
+            elif [[ "$comparison_status" != "ahead" && "$comparison_status" != "identical" ]]; then
+              echo "::warning::Unexpected compare status ${comparison_status} for PR #${pull_number}; skipping."
               continue
             fi
 
