@@ -2633,7 +2633,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       dabs.reduce((sum, dab) => sum + dab.radiusY, 0)
                       / Math.max(1, dabs.length),
                     ),
-                    mixModel: isStudioFluidPaintBrushId(brush) || brush.startsWith("oil--fluid-paint")
+                    mixModel: isStudioFluidPaintBrushId(brush)
                       ? ("ryb" as const)
                       : undefined,
                   };
