@@ -234,9 +234,12 @@ describe("deriveAssetMetadata", () => {
       commercialUseAllowed: null,
     });
     expect(card.provenance.importer).toBe("studio-format-gateway/importMybBrush");
-    // Every unmapped .myb setting survives into provenance — zero silent loss.
+    // Every unmapped .myb setting survives into provenance — zero silent loss. `hardness` is
+    // mapped to the tip since 66bc25b4, so it must no longer appear here; a setting the vector
+    // lane still ignores does.
     expect(card.provenance.unmapped).toEqual(result.unmappedSettings);
-    expect(card.provenance.unmapped).toContain("hardness");
+    expect(card.provenance.unmapped).not.toContain("hardness");
+    expect(card.provenance.unmapped).toContain("anti_aliasing");
     expect(card.createdAt).toBe(FIXED_NOW);
   });
 
