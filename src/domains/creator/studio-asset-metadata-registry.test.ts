@@ -738,10 +738,16 @@ describe("SQLite kv persistence", () => {
           });
         }
       }
-      // Saving the migrated catalog rewrites it in the current spelling, byte-identical on reload.
+      // Saving the migrated catalog rewrites it in the current spelling; reloading and saving
+      // again must reproduce the exact same bytes (canonical JSON, no retired spellings left).
       await loaded.saveTo(store);
+      const rewrittenPayload = await store.get(STUDIO_ASSET_METADATA_CATALOG_KEY);
+      expect(rewrittenPayload).not.toBeNull();
+      expect(rewrittenPayload).not.toContain('"fallback"');
       const reloaded = await StudioAssetMetadataRegistry.loadFrom(store);
       expect(reloaded.list()).toEqual(loaded.list());
+      await reloaded.saveTo(store);
+      expect(await store.get(STUDIO_ASSET_METADATA_CATALOG_KEY)).toBe(rewrittenPayload);
     } finally {
       await database.close();
     }

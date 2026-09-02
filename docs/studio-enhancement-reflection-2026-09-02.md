@@ -157,10 +157,11 @@ Konva 원본 요소가 잠시 보이는 것은 전과 같다. 달라지는 것�
 
 - `studio-canonical-dry-media-authority.test.ts`: 봉투는 현재 레이아웃, 스냅숏은 옛 레이아웃인 unavailable →
   `canvasVisible: false`; 스냅숏 레이아웃이 현재와 같으면 소유권 유지.
-- 컴포넌트 테스트: (a) 같은 레이아웃(flip만 변경)에서 프레젠테이션 실패 → 보존 유지, (b) 640→520 리사이즈 +
-  실패 → `retainsLastGoodFrame: false`, `lastPresented: null`, 스냅숏 캔버스 width 0·hidden, 경고 alert 표시,
-  (c) 기존 "stale in-flight frame" 테스트는 레이아웃 변경 직후 authority가 `null`로 반납되는 새 의미론으로
-  갱신.
+- 컴포넌트 테스트: (a) 640→520 리사이즈 + 프레젠테이션 실패 → `retainsLastGoodFrame: false`,
+  `lastPresented: null`, 스냅숏 캔버스 width 0·hidden, 경고 alert 표시, (b) 기존 "stale in-flight frame"
+  테스트는 레이아웃 변경 직후 authority가 `null`로 반납되는 새 의미론으로 갱신, (c) 같은 DrawEl·같은
+  레이아웃에서의 보존은 기존 device-lost 테스트가 담당 — 프로덕션에서는 bounds·scale·flip·DPR이 모두
+  `layoutKey`에 접히므로 키가 같은 채 epoch이 다시 도는 경로는 device loss뿐이다.
 
 원문의 회귀 매트릭스(창 크기, 브라우저 줌, DPR 1·2·3, 회전, 패널 토글, 모니터 이동, 방향 전환)는 모두
 "layoutKey가 달라지는 사건"으로 환원되며, 위 단위 테스트가 그 축을 덮는다. 실기기 E2E는 §7의 verify 스크립트

@@ -391,48 +391,10 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
     expect(harness.destroyedDevices).toBe(1);
   });
 
-  it("ends a failed presentation epoch as unavailable without revealing another renderer", async () => {
-    const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
-    const view = render(
-      <StudioCanonicalVNextDryMediaCanvas
-        {...baseProps}
-        visible
-        onAuthorityChange={(authority) => authorities.push(authority)}
-      />,
-    );
-    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
-      status: "authorized",
-    }));
-    harness.failPresentations = 1;
-
-    // Same DrawEl, same layout: re-running the epoch (a flip toggle changes only the render input
-    // here) and failing presentation keeps the exact last-good frame for this geometry.
-    view.rerender(
-      <StudioCanonicalVNextDryMediaCanvas
-        {...baseProps}
-        flipX
-        onAuthorityChange={(authority) => authorities.push(authority)}
-        visible
-      />,
-    );
-
-    await waitFor(() => expect(authorities.at(-1)).toMatchObject({
-      status: "unavailable",
-      reason: "presentation:runtime-rejected",
-      retainsLastGoodFrame: true,
-      layoutKey: baseProps.layoutKey,
-      lastPresented: { layoutKey: baseProps.layoutKey },
-    }));
-    expect(view.container.querySelector<HTMLCanvasElement>(
-      "canvas[data-studio-canonical-vnext-dry-media='true']",
-    )?.style.visibility).toBe("hidden");
-    expect(view.container.querySelector<HTMLCanvasElement>(
-      "canvas[data-studio-canonical-vnext-dry-media-last-good='true']",
-    )?.style.visibility).toBe("visible");
-    expect(harness.createSurfaceCalls).toBe(1);
-  });
-
-  it("drops a retained frame when the layout changes instead of stretching it into the new bounds", async () => {
+  // Same-DrawEl/same-layout retention after a failure is exercised by the device-loss test above:
+  // in production every geometry input (bounds, scale, flip, DPR) is folded into `layoutKey`, so a
+  // re-run of the epoch with an unchanged key only happens through device loss.
+  it("ends a failed presentation epoch after a layout change as unavailable without revealing another renderer or a stale frame", async () => {
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const view = render(
       <StudioCanonicalVNextDryMediaCanvas
