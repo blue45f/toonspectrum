@@ -40,7 +40,7 @@ type EyeDropperResult = { sRGBHex: string };
 type EyeDropperLike = { open: () => Promise<EyeDropperResult> };
 type EyeDropperCtor = new () => EyeDropperLike;
 
-const POPOVER_WIDTH_PX = 264;
+const POPOVER_WIDTH_PX = 268;
 const POPOVER_MAX_HEIGHT_PX = 460;
 const POPOVER_GAP_PX = 6;
 const VIEWPORT_PADDING_PX = 8;
@@ -288,7 +288,7 @@ export function StudioColorPopover({
           aria-haspopup="dialog"
           aria-controls={open ? popupId : undefined}
           onClick={() => setOpen((v) => !v)}
-          className="h-7 w-7 cursor-pointer rounded border border-line pointer-coarse:size-11"
+          className="h-7 w-7 cursor-pointer rounded-lg border border-white/20 shadow-sm pointer-coarse:size-11 transition-transform hover:scale-105 active:scale-95"
           style={{ background: value }}
         />
       </StudioToolHintTarget>
@@ -301,33 +301,37 @@ export function StudioColorPopover({
           aria-modal="false"
           aria-label={`${label} 선택`}
           data-studio-color-popover="true"
-          className="fixed z-[180] overflow-auto overscroll-contain rounded-xl border border-line/80 bg-panel/95 backdrop-blur-md p-3 shadow-[0_24px_64px_rgba(0,0,0,0.65)]"
+          className="fixed z-[180] overflow-auto overscroll-contain rounded-2xl border border-white/15 bg-panel/92 backdrop-blur-2xl p-3.5 shadow-[0_24px_64px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)_inset]"
           style={popupStyle}
         >
           {/* Header: Label, Color Name, Contrast badge & Close */}
-          <div className="mb-2 flex items-center justify-between border-b border-line/50 pb-2">
+          <div className="mb-2.5 flex items-center justify-between border-b border-line/50 pb-2.5">
             <div className="flex flex-col min-w-0 pr-2">
-              <span className="text-[0.62rem] font-bold text-fg-3 uppercase tracking-wider">{label}</span>
+              <span className="text-[0.60rem] font-bold text-fg-3 uppercase tracking-wider">{label}</span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="truncate text-xs font-semibold text-fg-1">{friendlyName.split(" (")[0]}</span>
-                <span className="shrink-0 rounded bg-raised px-1 text-[0.55rem] font-mono text-fg-3">
+                <span className="truncate text-xs font-semibold text-fg-1 tracking-tight">{friendlyName.split(" (")[0]}</span>
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-raised/80 px-2 py-0.5 text-[0.55rem] font-medium text-fg-2 border border-line/60">
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ backgroundColor: contrast.bestForeground }}
+                  />
                   {contrast.bestForeground === "#ffffff" ? "어두운 톤" : "밝은 톤"}
                 </span>
               </div>
             </div>
 
-            {/* Before vs After Color Comparison Chips */}
-            <div className="flex items-center gap-1 shrink-0">
-              <div className="flex items-center rounded-lg border border-line bg-card p-0.5 shadow-sm">
+            {/* Before vs After Color Comparison Chips & Close */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center rounded-xl border border-white/15 bg-card/80 p-0.5 shadow-sm backdrop-blur-sm">
                 <button
                   type="button"
                   aria-label={`이전 색상 ${initialColor}로 되돌리기`}
                   onClick={() => handleSelect(initialColor)}
-                  className="size-5 rounded-l border-r border-line/50 transition-transform active:scale-95"
+                  className="size-6 rounded-l-lg border-r border-line/40 transition-transform hover:scale-105 active:scale-95"
                   style={{ backgroundColor: initialColor }}
                 />
                 <div
-                  className="size-5 rounded-r"
+                  className="size-6 rounded-r-lg"
                   style={{ backgroundColor: value }}
                   aria-label={`현재 색상 ${value}`}
                 />
@@ -348,7 +352,7 @@ export function StudioColorPopover({
           <div
             role="tablist"
             aria-label="색상 도구 탭"
-            className="mb-2.5 grid grid-cols-5 gap-0.5 rounded-lg border border-line bg-raised/50 p-0.5 text-center"
+            className="mb-2.5 grid grid-cols-5 gap-1 rounded-xl border border-line/60 bg-raised/60 p-1 text-center backdrop-blur-sm"
           >
             {[
               { id: "palettes", label: "팔레트" },
@@ -367,10 +371,10 @@ export function StudioColorPopover({
                   aria-label={`${tab.label} 모드`}
                   onClick={() => setActiveTab(tab.id as StudioColorPopoverTab)}
                   className={cx(
-                    "rounded py-1 text-[0.62rem] font-semibold transition-all",
+                    "rounded-lg py-1 text-[0.62rem] font-medium transition-all",
                     isActive
-                      ? "bg-card text-accent shadow-sm border border-accent/40"
-                      : "text-fg-3 hover:text-fg-2"
+                      ? "bg-card text-accent font-semibold shadow-sm border border-accent/40 scale-[1.02]"
+                      : "text-fg-3 hover:text-fg-1 hover:bg-card/40"
                   )}
                 >
                   {tab.label}
@@ -396,10 +400,10 @@ export function StudioColorPopover({
                           onClick={() => setPaletteId(p.id)}
                           aria-pressed={p.id === activePalette.id}
                           className={cx(
-                            "rounded border px-1.5 py-0.5 text-[0.64rem] transition-colors",
+                            "rounded-lg border px-2 py-0.5 text-[0.64rem] font-medium transition-all",
                             p.id === activePalette.id
-                              ? "border-accent/60 bg-accent-soft text-accent"
-                              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg-2"
+                              ? "border-accent/60 bg-accent-soft text-accent shadow-sm"
+                              : "border-line bg-card/70 text-fg-3 hover:bg-raised hover:text-fg-1"
                           )}
                         >
                           {p.label}
@@ -408,7 +412,7 @@ export function StudioColorPopover({
                     ))}
                   </div>
                   <div
-                    className="flex flex-wrap gap-1"
+                    className="flex flex-wrap gap-1.5 pt-0.5"
                     role="radiogroup"
                     aria-label={`${activePalette.label} 팔레트`}
                   >
@@ -420,7 +424,7 @@ export function StudioColorPopover({
                         role="radio"
                         aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
                         onClick={() => handleSelect(c)}
-                        className="size-7 cursor-pointer rounded-lg border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform active:scale-95 shadow-sm"
+                        className="size-7 cursor-pointer rounded-lg border border-white/20 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-2 aria-checked:ring-offset-card transition-transform hover:scale-105 active:scale-95 shadow-sm"
                         style={{ background: c }}
                       />
                     ))}
@@ -429,7 +433,7 @@ export function StudioColorPopover({
               ) : (
                 <div className="flex flex-wrap gap-1" aria-label="팔레트 불러오는 중">
                   {Array.from({ length: 15 }).map((_, i) => (
-                    <span key={i} className="size-6 rounded border border-line bg-raised/70 animate-pulse" />
+                    <span key={i} className="size-7 rounded-lg border border-line bg-raised/70 animate-pulse" />
                   ))}
                 </div>
               )}
@@ -475,12 +479,12 @@ export function StudioColorPopover({
 
           {/* Bottom Common Area: Tints & Shades 9-step strip */}
           <div className="mt-2.5 border-t border-line/60 pt-2">
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex items-center justify-between px-0.5">
               <span className="text-[0.60rem] font-medium text-fg-3">명도·음영 단계 (Tints & Shades)</span>
-              <span className="font-mono text-[0.58rem] text-fg-3">하이라이트 → 딥음영</span>
+              <span className="font-mono text-[0.56rem] text-fg-3">하이라이트 → 딥음영</span>
             </div>
             <div
-              className="flex h-5 w-full overflow-hidden rounded-md border border-line shadow-inner"
+              className="flex h-5 w-full overflow-hidden rounded-lg border border-white/15 shadow-inner"
               role="radiogroup"
               aria-label="명도 및 음영 단계"
             >
@@ -494,7 +498,7 @@ export function StudioColorPopover({
                     aria-checked={isSelected}
                     aria-label={`명도 단계 ${stepHex} 선택`}
                     onClick={() => handleSelect(stepHex)}
-                    className="relative flex-1 cursor-pointer transition-opacity hover:opacity-80 active:scale-95"
+                    className="relative flex-1 cursor-pointer transition-opacity hover:opacity-85 active:scale-95"
                     style={{ backgroundColor: stepHex }}
                   >
                     {isSelected && (
@@ -509,13 +513,13 @@ export function StudioColorPopover({
           </div>
 
           {/* Native Color + Hex input + Eyedropper + Quick Copy */}
-          <div className="mt-2 flex items-center gap-1.5">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <input
               type="color"
               value={isValidHexColor(value) ? value : "#000000"}
               onChange={(e) => handleSelect(e.target.value)}
               aria-label="색상 휠"
-              className="size-7 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-0"
+              className="size-8 shrink-0 cursor-pointer rounded-lg border border-white/20 bg-transparent p-0 shadow-sm transition-transform hover:scale-105 active:scale-95"
             />
             <input
               ref={hexInputRef}
@@ -535,7 +539,7 @@ export function StudioColorPopover({
                 if (norm) handleSelect(norm);
                 else setHexDraft(value);
               }}
-              className="h-7 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 font-mono text-xs tabular-nums text-fg-2 focus:border-accent focus:outline-none"
+              className="h-8 min-w-0 flex-1 rounded-lg border border-line/80 bg-card/80 px-2.5 font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-inner"
             />
 
             {/* Copy button */}
@@ -543,7 +547,7 @@ export function StudioColorPopover({
               type="button"
               aria-label="색상 코드 복사"
               onClick={handleCopyHex}
-              className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised active:scale-95"
+              className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
             >
               {copied ? <Check className="size-3.5 text-good" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
             </button>
@@ -558,7 +562,7 @@ export function StudioColorPopover({
                     setOpen(false);
                     onRequestCanvasEyedropper();
                   }}
-                  className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent active:scale-95 shadow-sm transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
@@ -576,7 +580,7 @@ export function StudioColorPopover({
                       .then((r) => handleSelect(r.sRGBHex))
                       .catch(() => {});
                   }}
-                  className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised hover:text-fg"
+                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
@@ -587,18 +591,18 @@ export function StudioColorPopover({
           {/* Recent Colors Strip */}
           {recentColors.length > 0 && (
             <div className="mt-2.5">
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1 flex items-center justify-between px-0.5">
                 <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">최근</p>
                 <button
                   type="button"
                   aria-label="현재 색을 내 팔레트에 추가"
                   onClick={() => handleSavePaletteToLibrary("내 스와치", [value, ...recentColors.slice(0, 7)])}
-                  className="flex items-center gap-1 text-[0.58rem] text-accent hover:underline"
+                  className="flex items-center gap-1 text-[0.58rem] font-medium text-accent hover:underline"
                 >
                   <Plus className="size-2.5" aria-hidden /> 내 팔레트에 추가
                 </button>
               </div>
-              <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="최근 색상">
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="최근 색상">
                 {recentColors.map((c, i) => (
                   <button
                     key={`${c}-${i}`}
@@ -607,7 +611,7 @@ export function StudioColorPopover({
                     role="radio"
                     aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
                     onClick={() => handleSelect(c)}
-                    className="size-7 cursor-pointer rounded-lg border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform active:scale-95"
+                    className="size-7 cursor-pointer rounded-lg border border-white/20 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform hover:scale-105 active:scale-95 shadow-sm"
                     style={{ background: c }}
                   />
                 ))}
@@ -616,7 +620,7 @@ export function StudioColorPopover({
           )}
 
           {addedNotice && (
-            <div className="mt-1.5 flex items-center gap-1 rounded bg-good/15 px-2 py-1 text-[0.62rem] font-semibold text-good">
+            <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-good/15 border border-good/30 px-2.5 py-1 text-[0.62rem] font-semibold text-good">
               <Check className="size-3" aria-hidden /> {addedNotice}
             </div>
           )}
