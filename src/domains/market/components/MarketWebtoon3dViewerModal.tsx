@@ -9,13 +9,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { type WebtoonLicenseTier } from "../models/market-webtoon-licensing";
-import {
-  type AssetFormatId,
-  type PolycountGrade,
+import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
+
+import type { WebtoonLicenseTier } from "../models/market-webtoon-licensing";
+import type {
+  AssetFormatId,
+  PolycountGrade,
 } from "../models/market-webtoon-spec-inspector";
 
-import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
 
 import { cn } from "@/lib/utils";
 
