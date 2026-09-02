@@ -59,6 +59,7 @@ const ALIAS_IDS = [
   "pencil-2b",
   "pencil-6b",
   "soft-pencil",
+  "pencil--side-shade",
   "colored-pencil",
   "pastel",
   "oil-pastel",
@@ -175,6 +176,23 @@ describe("studio brush alias profiles", () => {
     const light = mapStudioBrushAliasPressure("ink-wash", 0.1);
     const heavy = mapStudioBrushAliasPressure("ink-wash", 0.95);
     expect(heavy).toBeGreaterThan(light * 1.5);
+  });
+
+  it("plans the side-shade pencil broader, paler and rougher than every point pencil", () => {
+    // 레인 카탈로그가 선언만 하고 렌더러가 분기하지 않던 변형 — 기본 연필과 바이트 동일한 평평한
+    // 띠였다. 측면 음영은 넓은 치마 + 옅고 거친 코어여야 종이 결이 비친다.
+    const side = resolveStudioBrushAliasPencilPasses("pencil--side-shade");
+    const sideCore = side.find(({ role }) => role === "core")!;
+    const sideSkirt = side.filter(({ role }) => role === "soft-edge");
+    expect(side).not.toEqual(resolveStudioBrushAliasPencilPasses("pencil"));
+    expect(sideSkirt.length).toBeGreaterThan(2);
+    expect(sideSkirt[0]!.widthScale).toBeCloseTo(2.2, 6);
+    for (const id of ["pencil", "pencil-2b", "pencil-6b", "soft-pencil"] as const) {
+      const core = resolveStudioBrushAliasPencilPasses(id).find(({ role }) => role === "core")!;
+      expect(sideCore.opacityScale, id).toBeLessThan(core.opacityScale);
+      expect(sideCore.jitterRadius, id).toBeGreaterThan(core.jitterRadius);
+      expect(sideCore.widthScale, id).toBeGreaterThan(core.widthScale);
+    }
   });
 
   it("keeps standard pencil one-pass while soft pencil plans a pale skirt and rough core", () => {
