@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { planOilBrushDabs } from "../studio-fx-brush";
 
 import { studioOilProgramSetForBrush } from "./studio-brush-engine-program-set";
-import {
-  STUDIO_FLUID_PAINT_STATION_SPACING_RATIO,
-  isStudioFluidPaintBrushId,
-} from "./studio-fluid-paint-reference";
+import { STUDIO_FLUID_PAINT_STATION_SPACING_RATIO } from "./studio-fluid-paint-reference";
 import {
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
@@ -24,28 +20,13 @@ function longStroke() {
   return { points, pressures };
 }
 
-describe("Fluid Paint product quality", () => {
-  it("routes the four Fluid Paint tools through the oil ribbon with every physical program", () => {
-    for (const brush of [
-      "fluid-paint",
-      "fluid-paint-fine",
-      "fluid-paint-load",
-      "fluid-paint-rake",
-    ] as const) {
-      expect(isStudioFluidPaintBrushId(brush)).toBe(true);
-      expect(resolveStudioBrushRenderFamily(brush)).toBe("oil");
-      const programs = studioOilProgramSetForBrush(brush);
-      expect(programs.bristlePhysics).toBe(true);
-      expect(programs.bristleLoadDynamics).toBe(true);
-      expect(programs.impastoRelief).toBe(true);
-      const options = studioOilRibbonProgramsForBrush(brush, 11);
-      expect(options?.bristlePhysics?.enabled).toBe(true);
-      expect(options?.bristleLoadDynamics?.enabled).toBe(true);
-      expect(options?.impastoRelief?.enabled).toBe(true);
-    }
-  });
-
-  it("walks Fluid Paint stations at 1/8 oil pitch so the film is a capsule splat, not beads", () => {
+/**
+ * david.li Fluid Paint 의 참조 수치가 유화 계열의 엔진 옵션으로 살아 있는지 — 옵션을 켠 플랜과
+ * 혼합이 실제로 다르게 나오는지 본다. 한때 이 수치를 id 로 골라 쓰던 fluid-paint* 브러시 4종은 어느
+ * 카탈로그에도 등록된 적이 없어 2026-09-02 에 제거됐다. 남는 것은 옵션과 참조 수치다.
+ */
+describe("Fluid Paint reference in the oil family", () => {
+  it("walks stations at the reference 1/8 oil pitch when a plan asks for it, so the film is a capsule splat, not beads", () => {
     const { points, pressures } = longStroke();
     const oil = planOilBrushDabs({
       points,
@@ -78,7 +59,7 @@ describe("Fluid Paint product quality", () => {
     expect(plan.bristleLanes.length).toBeGreaterThan(0);
   });
 
-  it("mixes Fluid Paint colors in RYB so red+yellow stays orange, not brown-mud", () => {
+  it("mixes in RYB when a paint input asks for it, so red+yellow stays orange, not brown-mud", () => {
     const canvas = new Uint8ClampedArray(32 * 16 * 4);
     for (let index = 0; index < 32 * 16; index += 1) {
       const offset = index * 4;

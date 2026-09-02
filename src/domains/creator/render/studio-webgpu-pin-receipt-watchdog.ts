@@ -61,7 +61,17 @@ export class StudioGpuPinReceiptWatchdog {
     }, this.timeoutMs);
   }
 
-  public request(requestId: string): void {
+  /**
+   * @param timeoutMs Overrides this watchdog's budget for THIS request only.
+   *
+   * The default budget is a live-latency budget: a pointer frame that cannot present within it is
+   * a broken live surface. A terminal request is a different question — the stroke is finished and
+   * nothing is animating, so the only thing the deadline can still catch is a lost receipt, and a
+   * commit render on the main thread routinely takes longer than a frame budget. Measured: with a
+   * 300 ms budget for both, drawing a handful of ordinary pen strokes raised "WebGPU 라이브 잉크
+   * 엔진을 더 이상 사용할 수 없어 현재 획을 취소했습니다" and the finished stroke was deleted.
+   */
+  public request(requestId: string, timeoutMs?: number): void {
     if (!this.active) return;
     this.expectedRequestId = requestId;
     if (this.lastReadyRequestId === requestId) {
@@ -81,7 +91,7 @@ export class StudioGpuPinReceiptWatchdog {
         || this.expectedRequestId === this.lastReadyRequestId
       ) return;
       this.fail("progress");
-    }, this.timeoutMs);
+    }, Math.max(1, Math.floor(timeoutMs ?? this.timeoutMs)));
   }
 
   /** Records all receipts, including a synchronous receipt that can arrive before begin/request. */

@@ -74,6 +74,7 @@ import {
   type StudioCompanionSurface,
   type StudioCompanionToolId,
 } from "./studio-tools-companion";
+import { StudioCompanionAssistantDisplay } from "./StudioCompanionAssistantDisplay";
 import { StudioCompanionNavigator } from "./StudioCompanionNavigator";
 import { StudioCompanionReviewConsole } from "./StudioCompanionReviewConsole";
 import {
@@ -100,7 +101,7 @@ const NAVIGATOR_CONTROL_COALESCE_MS = 32;
 const SCREEN_DETAILS_TIMEOUT_MS = 2_500;
 const REFERENCE_IMAGE_DECODE_TIMEOUT_MS = 5_000;
 
-type CompanionMode = "tools" | "navigator" | "review" | "reference";
+type CompanionMode = "tools" | "navigator" | "review" | "reference" | "assistant";
 type DedicatedCompanionSurface = Extract<
   StudioCompanionSurface,
   "navigator" | "review" | "reference"
@@ -1292,6 +1293,11 @@ export function StudioToolsCompanionPage() {
       label: localizeText(t, "레퍼런스", "studio.toolsCompanion.mode.reference"),
       icon: Images,
     },
+    {
+      id: "assistant",
+      label: "보조 툴킷",
+      icon: WandSparkles,
+    },
   ];
   const shellTitle = effectiveSurface === "workspace"
     ? visiblePrimaryTitle
@@ -1451,7 +1457,7 @@ export function StudioToolsCompanionPage() {
         {effectiveSurface === "workspace" ? (
           <div
             role="tablist"
-            className="mt-2 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card p-1"
+            className="mt-2 grid grid-cols-5 gap-1 rounded-xl border border-line bg-card p-1"
             aria-label={t("studio.toolsCompanion.modeTabAria")}
           >
             {tabs.map(({ id, label, icon: Icon }, index) => (
@@ -1766,6 +1772,19 @@ export function StudioToolsCompanionPage() {
                 />
               </Suspense>
             )}
+          </div>
+        ) : null}
+
+        {effectiveSurface === "workspace" && mode === "assistant" ? (
+          <div
+            role="tabpanel"
+            id="companion-mode-panel-assistant"
+            aria-labelledby="companion-mode-tab-assistant"
+            className={dedicatedLayout ? "flex min-h-[29rem] flex-1 flex-col" : "min-h-0"}
+          >
+            <StudioCompanionAssistantDisplay
+              layout={dedicatedLayout ? "dedicated" : "embedded"}
+            />
           </div>
         ) : null}
 

@@ -399,6 +399,7 @@ export type StudioCuttoonStagePointersHost = {
   schedulePanelSplitPreview: any;
   schedulePixelDragPreview: any;
   scheduleQuickMaskDragPreview: any;
+  salvageRejectedStroke: any;
   sealCausalPostCorrectionState: any;
   selected: any;
   settleGpuLiveStroke: any;

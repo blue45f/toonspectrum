@@ -64,7 +64,6 @@ const BRUSH_GROUPS: BrushGroup[] = [
     brushes: [
       { id: "oil", searchTerm: "유화 붓", displayName: "유화 붓 (Oil Bristle)", color: "#b45309", size: 28, description: "강모 결 레이크 텍스처" },
       { id: "acrylic", searchTerm: "아크릴", displayName: "아크릴 (Acrylic)", color: "#dc2626", size: 26, description: "선명한 피그먼트 필드" },
-      { id: "fluid-paint", searchTerm: "플루이드 페인트", displayName: "플루이드 페인트 (Fluid Paint)", color: "#0d9488", size: 24, description: "액상 블렌딩 레이어" },
     ],
   },
   {
