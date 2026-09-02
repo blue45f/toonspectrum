@@ -93,7 +93,11 @@ export type StudioCreatorBundledCatalogTarget =
     }>
   | Readonly<{
       kind: "bg3d-procedural-catalog";
-      runtimeRef: typeof STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID;
+      runtimeRef: string;
+    }>
+  | Readonly<{
+      kind: "3d-asset-catalog";
+      runtimeRef: string;
     }>;
 
 export type StudioCreatorBundledCatalogResolution =
@@ -440,15 +444,12 @@ export function resolveStudioCreatorBundledCatalogTarget(
     }
   }
 
-  if (
-    entry.kind === "3d-preset"
-    && entry.delivery.runtimeRef === STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID
-  ) {
+  if (entry.kind === "3d-preset" || entry.kind === "3d-asset") {
     return {
       status: "supported",
       target: {
-        kind: "bg3d-procedural-catalog",
-        runtimeRef: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
+        kind: entry.kind === "3d-asset" ? "3d-asset-catalog" : "bg3d-procedural-catalog",
+        runtimeRef: entry.delivery.runtimeRef,
       },
     };
   }
