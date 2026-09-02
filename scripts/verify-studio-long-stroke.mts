@@ -7,8 +7,11 @@
  * 2. 입력 점 수 vs 커밋 점 수 — SQLite 자동저장(verify-studio-brushes.mts persistedStudioDocument 와 같은
  *    훅)에서 커밋 획의 points 를 읽어 디스패치한 pointermove 수와 허용오차 안인지. 입력 단계 거리 필터
  *    (sampleSpacing, studio-brush.ts strokeSampleDistanceForBrushFamily)를 감안해 기대치 =
- *    min(디스패치 수, 경로길이/sampleSpacing). 훅을 못 읽는 환경(preview 빌드엔 /src 가 없다)에서는
- *    inputDeliveryRatio(관측/디스패치 pointermove) ≥ 0.95 로 대체하고 committedSource 에 그렇게 표기한다.
+ *    min(디스패치 수, *디스패치한 제스처* 경로길이(문서 단위)/sampleSpacing). 경로길이는 커밋 점이 아니라
+ *    제스처 기하에서 잰다(커밋 점으로 재면 꼬리가 잘려도 자기 자신을 통과시킨다). 같은 이유로 커밋 경로
+ *    길이 자체도 디스패치 길이의 ±15% 안이어야 한다(committed-path-length). 훅을 못 읽는 환경(preview
+ *    빌드엔 /src 가 없다)에서는 inputDeliveryRatio(관측/디스패치 pointermove) ≥ 0.95 로 대체하고
+ *    committedSource 에 그렇게 표기한다.
  * 3. pointerup 뒤 미완 획 0 — 커밋 300ms 후와 900ms 후 캡처가 같고(더 그려지는 것이 없다), 자동저장 문서의
  *    draw 요소가 정확히 1개다. 앱은 라이브/드래프트 획을 DOM 에 노출하지 않으므로 이 두 증거로 판정한다.
  * 4. 라이브 vs 커밋 픽셀 패리티 — 제스처 전반부(버튼 다운) 캡처와 커밋 캡처를 전반부 경로 경계상자 영역에서만
@@ -32,6 +35,7 @@
  *                                            SwiftShader WebGPU 는 텍스처 생성이 실패해 획이 통째로 사라진다(2026-09-02
  *                                            실측: ink-committed FAIL, 커밋 점 0, gpuValidationWarnings 15~33). 게이트가
  *                                            CI 러너에서 GPU 드라이버 상태를 재는 도구가 되지 않도록 기본은 끈다.
+ *   TOONSPECTRUM_LONG_STROKE_LONG_TASK_MAX   50ms 초과 longtask 허용 개수(기본 6 — 상수 주석 참고)
  *   TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW=1 vite preview 를 직접 띄운다(pnpm build 선행)
  *   TOONSPECTRUM_VERIFY_DIR                  산출물 루트(기본 os tmpdir) → <dir>/studio-long-stroke/report.json
  */
@@ -41,6 +45,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type CDPSession, type Page } from "playwright";
+
+import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
 
 import {
   findFreePort,
@@ -64,6 +70,7 @@ const COMMIT_SETTLE_MS = 300; // pointerup → 커밋 캡처 정착 대기
 const PENDING_RECHECK_MS = 900; // 미완 획 검사용 2차 캡처 시점(pointerup 기준)
 const POINT_COUNT_TOLERANCE = 0.15; // 커밋 점 수 하한: 기대치의 -15%
 const POINT_COUNT_EXTRA_MAX = 4; // 커밋 점 수 상한 여유: pointerdown·pointerup·endpoint seal 샘플
+const COMMITTED_PATH_TOLERANCE = 0.15; // 커밋 경로 길이 vs 디스패치 경로 길이(문서 단위) 허용 편차 ±15%
 const INPUT_DELIVERY_MIN = 0.95; // 관측 pointermove / 디스패치 pointermove 최소 비율(inputDeliveryRatio)
 const FIRST_HALF_CHANGED_RATIO_MAX = 0.01; // 전반부 영역에서 허용되는 라이브↔커밋 변경 픽셀 비율
 const INK_MIN_CHANGED_PIXELS = 200; // 잉크 존재 판정 최소 변경 픽셀(6px×640px 획 ≈ 4,000px; 링·토스트 오탐 배제)
@@ -71,7 +78,10 @@ const PAD_MIN_CSS = 48; // 경계상자 확장(CSS px) = max(48, 브러시 폭×
 const PIXEL_DELTA_THRESHOLD = 8; // 픽셀 변경 판정 채널差(probe-studio-brush-sweep diffShots 와 동일)
 const SETTLED_CHANGED_RATIO_MAX = 0.001; // 정착 판정: 300ms↔900ms 캡처 변경 픽셀 비율 상한
 const FRAME_P95_BUDGET_MS = 33.4; // 프레임시간 p95 — 헤드리스/SwiftShader 는 vsync 16.7ms 의 2배
-const LONG_TASK_MAX = 3; // 3,200 샘플 동안 허용 longtask(>50ms): 워밍업·GC 각 1회 여유 + 1
+// 3,200 샘플 동안 허용 longtask(>50ms). 첫 획 워밍업·GC·자동저장 flush 가 각 1회씩 나오고, 공유 러너나
+// 병행 부하(같은 머신의 vitest 등)에서는 그 수가 두 배로 잡힌다 — 2026-09-02 실측 2건(단독)·4건(병행).
+// 회귀 신호는 "수십 건" 단위이므로 6 이 노이즈와 회귀를 가르는 선이다. 환경변수로 조정 가능.
+const LONG_TASK_MAX = Number(process.env.TOONSPECTRUM_LONG_STROKE_LONG_TASK_MAX ?? "6") || 6;
 const HEAP_GROWTH_MAX_BYTES = 64 * 1024 * 1024; // 해제 후 힙 증가 상한
 const COMMIT_READ_TIMEOUT_MS = 8_000; // 커밋 획이 SQLite 자동저장에 나타날 때까지 폴링 상한
 /** 개발 서버에서 API(:4001)가 없을 때 나는 선택적 루프백 실패 — 게이트 결함이 아니다. */
@@ -267,6 +277,10 @@ async function installPerfSampler(page: Page): Promise<void> {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     await page.evaluate(() => {
       const scope = globalThis as GateGlobals;
+      // 재시도 시 이전 rAF 루프·관측기를 먼저 멈춘다 — 안 그러면 두 루프가 같은 배열에 밀어 넣어
+      // 프레임 간격이 반으로, longtask 수가 두 배로 잡힌다.
+      scope.__longStrokeStop?.();
+      scope.__longStrokeObserver?.disconnect();
       scope.__longStrokeFrames = [];
       scope.__longStrokeLongTasks = [];
       const observer = new PerformanceObserver((list) => {
@@ -322,6 +336,20 @@ function gesturePoint(box: Box, t: number): Point {
     x: box.x + box.width * (0.12 + 0.5 * t),
     y: box.y + box.height * (0.2 + 0.42 * t) - Math.sin(t * Math.PI) * box.height * 0.12,
   };
+}
+
+/**
+ * 실제로 디스패치되는 폴리라인의 CSS 길이 — drawGesture 는 20 배치 목표점 사이를 steps 로 선형 보간하므로
+ * 배치 목표점 20 구간의 합이 곧 입력 경로 길이다.
+ */
+function gesturePolylineLength(box: Box, batches = 20): number {
+  let total = 0;
+  for (let batch = 1; batch <= batches; batch += 1) {
+    const from = gesturePoint(box, (batch - 1) / batches);
+    const to = gesturePoint(box, batch / batches);
+    total += Math.hypot(to.x - from.x, to.y - from.y);
+  }
+  return total;
 }
 
 /** 경로 t∈[t0,t1] 의 경계상자를 pad 만큼 확장한 뷰포트 CSS 사각형. */
@@ -616,8 +644,15 @@ async function main(): Promise<void> {
     const settleDiff = await diffShots(page, committedShot, settledShot, {});
     const deliveryRatio = Math.min(1, Math.max(parityCounters.moves, parityCounters.coalesced) / dispatched);
     const committedPoints = committed ? committed.points.length / 2 : null;
+    // 기대 점 수는 *디스패치한* 제스처 기하에서 도출한다 — 커밋 점에서 도출하면 꼬리가 잘려도 경로가
+    // 같은 비율로 줄어 단언이 자기 자신을 통과시킨다. CSS px → 문서 단위 환산은 종이의 CSS 폭 대비 문서
+    // 폭(STUDIO_CANVAS_WIDTH)이다(sampleSpacing 은 문서 단위).
+    const gestureLengthCss = gesturePolylineLength(box);
+    const cssToDocument = STUDIO_CANVAS_WIDTH / full.width;
+    const gestureLengthDocument = gestureLengthCss * cssToDocument;
+    const committedPathLength = committed ? pathLength(committed.points) : null;
     const expectedPoints = committed && committed.sampleSpacing && committed.sampleSpacing > 0
-      ? Math.min(dispatched, Math.floor(pathLength(committed.points) / committed.sampleSpacing) + 1)
+      ? Math.min(dispatched, Math.floor(gestureLengthDocument / committed.sampleSpacing) + 1)
       : dispatched;
     report.parity = {
       dispatchedMoves: dispatched, observedPointerMoves: parityCounters.moves,
@@ -625,6 +660,7 @@ async function main(): Promise<void> {
       committedSource: committed
         ? "sqlite-autosave(/src import)"
         : "unavailable (preview build?) → inputDeliveryRatio fallback",
+      gestureLengthCss, cssToDocument, gestureLengthDocument, committedPathLength,
       committedPoints, expectedCommittedPoints: expectedPoints, sampleSpacing: committed?.sampleSpacing ?? null,
       drawCount: committed?.drawCount ?? null, pendingStrokeDurability: committed?.pendingStrokeDurability ?? null,
       diffs: { blankVsCommitted: inkDiff, liveVsCommitted: liveDiff, committed300VsSettled900: settleDiff },
@@ -632,12 +668,20 @@ async function main(): Promise<void> {
     const gpuNote = gpuValidationWarnings > 0 ? ` · ${gpuValidationWarnings} WebGPU validation warnings` : "";
     check("ink-committed", inkDiff.changedPixels >= INK_MIN_CHANGED_PIXELS,
       `blank→committed changedPixels=${inkDiff.changedPixels} (min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
-    if (committed && committedPoints !== null) {
+    if (committed && committedPoints !== null && committedPathLength !== null) {
       const lower = Math.ceil(expectedPoints * (1 - POINT_COUNT_TOLERANCE));
       const upper = dispatched + POINT_COUNT_EXTRA_MAX;
       check("input-vs-committed-points", committedPoints >= lower && committedPoints <= upper,
         `committed=${committedPoints} expected ${lower}..${upper} (dispatched=${dispatched}, `
-        + `sampleSpacing=${committed.sampleSpacing ?? "none"}, drawCount=${committed.drawCount})${gpuNote}`);
+        + `gesture ${gestureLengthDocument.toFixed(1)}doc-px / sampleSpacing=${committed.sampleSpacing ?? "none"}, `
+        + `drawCount=${committed.drawCount})${gpuNote}`);
+      // 점 수와 별개로 커밋 경로의 *길이* 가 입력 경로 길이와 맞아야 한다 — 꼬리가 잘리면 점 수가 맞아도
+      // 길이에서 드러난다.
+      const lengthLower = gestureLengthDocument * (1 - COMMITTED_PATH_TOLERANCE);
+      const lengthUpper = gestureLengthDocument * (1 + COMMITTED_PATH_TOLERANCE);
+      check("committed-path-length", committedPathLength >= lengthLower && committedPathLength <= lengthUpper,
+        `committed path ${committedPathLength.toFixed(1)}doc-px vs dispatched ${gestureLengthDocument.toFixed(1)}doc-px `
+        + `(±${Math.round(COMMITTED_PATH_TOLERANCE * 100)}%, css→doc ×${cssToDocument.toFixed(4)})${gpuNote}`);
     } else {
       check("input-vs-committed-points(inputDeliveryRatio fallback)", deliveryRatio >= INPUT_DELIVERY_MIN,
         `committed hook unavailable; inputDeliveryRatio=${deliveryRatio.toFixed(3)} (min ${INPUT_DELIVERY_MIN})`);
