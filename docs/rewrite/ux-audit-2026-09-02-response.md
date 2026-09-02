@@ -129,6 +129,7 @@ main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전
 | `StudioDrawNode` ink-wash 리테인드 워터컬러 | 유체 브러시는 커밋 렌더가 wet-ink 리플레이로 위임 | 유체 위임 단언 + 리테인드 캐리어는 비유체 `inkwash-white-ink` 로 검증 |
 | 검수 진입점 뷰포트 스냅샷 | 430px 몰입 모드에서 내보내기 옵션 셰브론이 44px 타깃으로 승격됐는데 스냅샷은 이전 값 | 스냅샷 갱신 |
 | `verify:studio-mobile-top`(inapp-browser CI) | 모바일 메뉴바 페이지 목록·다운로드 버튼이 42px 폭 | `min-w-11 justify-center` |
+| core CI `pnpm run lint` | `scripts/qa/studio-soak-runner.mjs`(56e7148a)의 ANSI 제거 정규식이 `no-control-regex` 에 걸림 | 해당 줄만 규칙 해제(사유 인라인) |
 
 남은 CI 붉은 항목: `studio-3d-visual`(peakColorTileDelta 타이밍 회귀, Playwright 3D)과 `oil-ribbon impasto` 스냅샷(부하 시 간헐) — 이번 회차 범위 밖으로 기록만 남긴다.
 
