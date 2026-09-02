@@ -463,9 +463,8 @@ export function bindStudioCuttoonStagePointersFinish(
           && !settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished)
         ) {
           // The selected provider did not seal its exact final operation. Remove the streamed CRDT
-          // draft in the same pointer-up task; no immediate/deferred canonical or Konva path may
-          // present this failed stroke. The finished CPU geometry is parked as a recovery record so
-          // the user can restore it explicitly — the operation is cancelled, the work is not lost.
+          // draft in the same pointer-up task; no canonical or Konva path may present this failed
+          // stroke. Its finished geometry is parked for an explicit user restore, not lost.
           salvageRejectedStroke(finished, "WebGPU 라이브 잉크", "final-seal-missing");
           completedLiveStrokeBackendAudit = false;
           discardDrawingPointerSession();
@@ -495,17 +494,11 @@ export function bindStudioCuttoonStagePointersFinish(
           // cancellation. It is never queued/committed through a different renderer by itself;
           // the geometry is parked for an explicit user restore instead of being deleted.
           completedLiveStrokeBackendAudit = false;
-          const salvage = salvageRejectedStroke(
-            finished,
-            selectedOverlaySeal.provider,
-            `${selectedOverlaySeal.result.status}/${selectedOverlaySeal.result.reason}`,
-          );
+          const outcome = `${selectedOverlaySeal.result.status}/${selectedOverlaySeal.result.reason}`;
+          const salvaged = salvageRejectedStroke(finished, selectedOverlaySeal.provider, outcome).action === "salvage";
           setError(
-            `${selectedOverlaySeal.provider} 엔진이 획을 확정하지 못했습니다: `
-              + `${selectedOverlaySeal.result.status}/${selectedOverlaySeal.result.reason}. `
-              + (salvage.action === "salvage"
-                ? "완성된 획은 상태 레일의 '획 복구'로 되살릴 수 있습니다. "
-                : "")
+            `${selectedOverlaySeal.provider} 엔진이 획을 확정하지 못했습니다: ${outcome}. `
+              + (salvaged ? "완성된 획은 상태 레일의 '획 복구'로 되살릴 수 있습니다. " : "")
               + "다른 렌더러를 선택한 뒤 새 획으로 다시 시도해 주세요.",
           );
           discardDrawingPointerSession();

@@ -97,3 +97,55 @@ export function releaseStudioGpuPendingAuthorityPrefix(
     normalizedToWholeGroup: consumed !== target,
   };
 }
+
+export type StudioGpuPendingAuthorityPrune<Stroke> =
+  | { readonly status: "untouched" }
+  | {
+      readonly status: "pruned";
+      readonly authorities: readonly StudioGpuPendingDrawAuthority[];
+      readonly gpuStrokes: readonly Stroke[];
+    }
+  | { readonly status: "dropped-all"; readonly reason: "invalid-accounting" };
+
+/**
+ * Removes one rejected DrawEl's operations from the hidden GPU authority queue. The queue is a flat
+ * list of GPU strokes grouped by each authority's `gpuStrokeCount`; a rejected stroke's group is cut
+ * out and every other group keeps its slice. Corrupt grouping (non-positive counts, counts that
+ * overrun or under-run the stroke list) cannot authorize a partial survivor, so the whole queue is
+ * dropped as one unit — retained DrawEls are never remeshed through Canvas2D/Konva as recovery.
+ */
+export function pruneStudioGpuPendingAuthority<Stroke>(
+  authorities: readonly StudioGpuPendingDrawAuthority[],
+  gpuStrokes: readonly Stroke[],
+  strokeId: string,
+): StudioGpuPendingAuthorityPrune<Stroke> {
+  const nextAuthorities: StudioGpuPendingDrawAuthority[] = [];
+  const nextGpuStrokes: Stroke[] = [];
+  let cursor = 0;
+  let found = false;
+  let valid = true;
+  for (const authority of authorities) {
+    const nextCursor = cursor + authority.gpuStrokeCount;
+    if (
+      !Number.isSafeInteger(authority.gpuStrokeCount)
+      || authority.gpuStrokeCount <= 0
+      || nextCursor > gpuStrokes.length
+    ) {
+      valid = false;
+      break;
+    }
+    if (authority.element.id === strokeId) {
+      found = true;
+    } else {
+      nextAuthorities.push(authority);
+      nextGpuStrokes.push(...gpuStrokes.slice(cursor, nextCursor));
+    }
+    cursor = nextCursor;
+  }
+  if (cursor !== gpuStrokes.length) valid = false;
+  if (found && valid) {
+    return { status: "pruned", authorities: nextAuthorities, gpuStrokes: nextGpuStrokes };
+  }
+  if (found || !valid) return { status: "dropped-all", reason: "invalid-accounting" };
+  return { status: "untouched" };
+}

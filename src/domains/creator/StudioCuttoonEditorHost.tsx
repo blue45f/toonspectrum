@@ -557,11 +557,10 @@ import {
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
-  recordStudioRejectedStroke,
-  setStudioRejectedStrokeRestorer,
-  type StudioRejectedStrokeRecord,
-  type StudioRejectedStrokeSalvagePlan,
-} from "./studio-rejected-stroke-recovery";
+  STUDIO_GPU_LIVE_INK_PROVIDER_LABEL,
+  studioRejectedLiveSurfaceMessage,
+  useStudioRejectedStrokeRecoveryHost,
+} from "./studio-rejected-stroke-recovery-host";
 import {
   cascadeCanvasPlacementAnchor,
   createCanvasImageElement,
@@ -1344,6 +1343,7 @@ import {
 } from "./render/studio-webgpu-live-source-journal";
 import {
   type StudioGpuPendingDrawAuthority,
+  pruneStudioGpuPendingAuthority,
 } from "./render/studio-webgpu-pending-authority";
 import { createStudioLiveStrokeGpuAudit } from "./render/studio-live-stroke-gpu-audit";
 import type {
@@ -10629,22 +10629,19 @@ export function StudioCuttoonEditor({
     }>>(null as never);
   liveStrokeBackendAuditEarlyGpuReceiptsRef.current ??= new Map();
 
+  const { salvageRejectedStroke } = useStudioRejectedStrokeRecoveryHost({
+    activePageId: activePage.id,
+    queueDeferredStrokeCommit,
+  });
   function rejectActiveSelectedLiveSurface(
     providerLabel: string,
     detail: string,
     strokeId: string | null = drawingRef.current?.id ?? null,
   ): void {
-    // The live operation is cancelled (ADR 0018: no other provider continues it), but the CPU-side
-    // geometry drawn so far is parked for an explicit user restore instead of being deleted.
-    const salvage = strokeId && drawingRef.current?.id === strokeId
-      ? salvageRejectedStroke(drawingRef.current, providerLabel, detail)
-      : null;
-    setError(
-      salvage?.action === "salvage"
-        ? `${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획의 미리보기를 중단했습니다. `
-          + `완성된 획은 상태 레일의 '획 복구'로 되살릴 수 있습니다. ${detail}`
-        : `${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획을 취소했습니다. ${detail}`,
-    );
+    // Cancel the live operation (ADR 0018) but park its finished CPU geometry for an explicit restore.
+    const salvaged = strokeId !== null && drawingRef.current?.id === strokeId
+      && salvageRejectedStroke(drawingRef.current, providerLabel, detail).action === "salvage";
+    setError(studioRejectedLiveSurfaceMessage(providerLabel, detail, salvaged));
     if (!strokeId || drawingRef.current?.id !== strokeId) return;
     // Stop this provider before the next pointer sample. Cleanup runs after the current adapter
     // callback unwinds so it cannot re-enter a device-loss/frame-receipt transaction.
@@ -11299,21 +11296,12 @@ export function StudioCuttoonEditor({
    * The streamed CRDT draft and deferred vector are one transaction: retaining either would let a
    * later save resurrect geometry that never obtained its terminal WebGPU presentation receipt.
    */
-  function cancelRejectedSelectedGpuPendingStroke(
-    strokeId: string,
-    reason: string = "provider-unavailable",
-  ): void {
+  function cancelRejectedSelectedGpuPendingStroke(strokeId: string, reason = "provider-unavailable"): void {
     const batch = pendingStrokeCommitsRef.current;
     const rejected = batch?.strokes.find((stroke) => stroke.id === strokeId);
     if (!batch || !rejected) return;
-    // Post-pointer-up rejection: the finished operation is removed from the deferred batch and the
-    // CRDT draft exactly as before, but its geometry survives as an explicit recovery record.
-    recordStudioRejectedStroke({
-      stroke: rejected,
-      pageId: batch.pageId,
-      provider: "WebGPU 라이브 잉크",
-      reason,
-    });
+    // Removed from the batch and CRDT draft as before; the geometry survives as a recovery record.
+    salvageRejectedStroke(rejected, STUDIO_GPU_LIVE_INK_PROVIDER_LABEL, reason, batch.pageId);
 
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     abortDeferredStrokePostprocess([strokeId]);
@@ -11331,38 +11319,16 @@ export function StudioCuttoonEditor({
       };
     }
 
-    const authorities = pendingGpuDrawAuthoritiesRef.current;
-    const gpuStrokes = pendingGpuStrokesRef.current;
-    const nextAuthorities: StudioGpuPendingDrawAuthority[] = [];
-    const nextGpuStrokes: StudioGpuStroke[] = [];
-    let cursor = 0;
-    let authorityFound = false;
-    let authorityAccountingValid = true;
-    for (const authority of authorities) {
-      const nextCursor = cursor + authority.gpuStrokeCount;
-      if (
-        !Number.isSafeInteger(authority.gpuStrokeCount)
-        || authority.gpuStrokeCount <= 0
-        || nextCursor > gpuStrokes.length
-      ) {
-        authorityAccountingValid = false;
-        break;
-      }
-      if (authority.element.id === strokeId) {
-        authorityFound = true;
-      } else {
-        nextAuthorities.push(authority);
-        nextGpuStrokes.push(...gpuStrokes.slice(cursor, nextCursor));
-      }
-      cursor = nextCursor;
-    }
-    if (cursor !== gpuStrokes.length) authorityAccountingValid = false;
-    if (authorityFound && authorityAccountingValid) {
-      pendingGpuDrawAuthoritiesRef.current = nextAuthorities;
-      pendingGpuStrokesRef.current = nextGpuStrokes;
-    } else if (authorityFound || !authorityAccountingValid) {
-      // Corrupt grouping cannot authorize a partial survivor. Drop the hidden provider queue as one
-      // unit; retained DrawEls are never remeshed through Canvas2D/Konva as recovery.
+    const prune = pruneStudioGpuPendingAuthority(
+      pendingGpuDrawAuthoritiesRef.current,
+      pendingGpuStrokesRef.current,
+      strokeId,
+    );
+    if (prune.status === "pruned") {
+      pendingGpuDrawAuthoritiesRef.current = [...prune.authorities];
+      pendingGpuStrokesRef.current = [...prune.gpuStrokes];
+    } else if (prune.status === "dropped-all") {
+      // Corrupt grouping cannot authorize a partial survivor; the hidden queue goes as one unit.
       pendingGpuDrawAuthoritiesRef.current = [];
       pendingGpuStrokesRef.current = [];
     }
@@ -12764,56 +12730,6 @@ export function StudioCuttoonEditor({
       persistPendingStrokeEmergencyAutosaveRef.current("pointerup");
     });
   }
-  /**
-   * Parks the geometry of a stroke whose selected live provider failed. The live operation itself
-   * is still cancelled by the caller (ADR 0018: no other provider continues it); this only keeps the
-   * finished CPU-side DrawEl reachable for an explicit user restore from the reliability rail.
-   */
-  function salvageRejectedStroke(
-    stroke: DrawEl | null | undefined,
-    providerLabel: string,
-    reason: string,
-  ): StudioRejectedStrokeSalvagePlan {
-    return recordStudioRejectedStroke({
-      stroke,
-      pageId: activePage.id,
-      provider: providerLabel,
-      reason,
-    });
-  }
-  function restoreRejectedStroke(
-    record: StudioRejectedStrokeRecord,
-  ):
-    | { status: "restored"; recordId: string; restoredStrokeId: string }
-    | { status: "refused"; recordId: string; reason: string } {
-    if (record.pageId !== activePage.id) {
-      return {
-        status: "refused",
-        recordId: record.id,
-        reason: "다른 페이지에서 그린 획입니다. 그 페이지로 이동한 뒤 복구하세요.",
-      };
-    }
-    // The rejected id was tombstoned in the CRDT draft and its GPU receipt bookkeeping was cleared;
-    // restore under a fresh id through the ordinary deferred commit (Konva document layer). This is
-    // the user's explicit choice, not an automatic renderer substitution. The record holds a frozen
-    // snapshot, so clone it before the document takes ownership of the arrays.
-    const restored: DrawEl = { ...structuredClone(record.stroke), id: uid() };
-    queueDeferredStrokeCommit(restored);
-    return { status: "restored", recordId: record.id, restoredStrokeId: restored.id };
-  }
-  const restoreRejectedStrokeRef = useRef(restoreRejectedStroke);
-  useEffect(() => {
-    restoreRejectedStrokeRef.current = restoreRejectedStroke;
-  });
-  useEffect(() => {
-    // Registered per editor instance; the returned unregister runs on unmount (account/work key
-    // remounts) so a rail action can never call into refs of an instance that no longer exists.
-    const unregisterRestorer =
-      setStudioRejectedStrokeRestorer((record) => restoreRejectedStrokeRef.current(record));
-    return () => {
-      unregisterRestorer();
-    };
-  }, []);
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
     setMarqueeActive(next !== null); // 같은 값이면 React 가 렌더를 생략 — 시작/종료 2회만 렌더.

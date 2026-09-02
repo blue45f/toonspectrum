@@ -9,6 +9,10 @@ const pointersFinish = readFileSync(
   new URL("./studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts", import.meta.url),
   "utf8",
 );
+const recoveryHost = readFileSync(
+  new URL("./studio-rejected-stroke-recovery-host.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(source: string, startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);
@@ -57,8 +61,9 @@ describe("rejected stroke recovery integration boundary", () => {
       "const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate]",
     );
     expectInOrder(cancel, [
-      "recordStudioRejectedStroke({",
+      "salvageRejectedStroke(rejected, STUDIO_GPU_LIVE_INK_PROVIDER_LABEL, reason, batch.pageId)",
       "pendingStrokeCommitsRef.current = null",
+      "pruneStudioGpuPendingAuthority(",
       "studioCrdtDocumentRef.current?.deleteStroke(strokeId)",
     ]);
     expect(host).toContain("cancelRejectedSelectedGpuPendingStroke(strokeId, reason)");
@@ -89,19 +94,28 @@ describe("rejected stroke recovery integration boundary", () => {
   });
 
   it("restores only through the explicit user action, under a fresh id, via the ordinary commit", () => {
-    const restore = sourceBetween(
+    // The host only wires the hook; the restore itself lives in the extracted module so the host
+    // ratchet keeps shrinking and the behaviour stays unit-testable.
+    expect(host).toContain("useStudioRejectedStrokeRecoveryHost({");
+    const wiring = sourceBetween(
       host,
-      "function restoreRejectedStroke(",
-      "const restoreRejectedStrokeRef = useRef(restoreRejectedStroke)",
+      "useStudioRejectedStrokeRecoveryHost({",
+      "function rejectActiveSelectedLiveSurface(",
     );
-    expect(restore).toContain("record.pageId !== activePage.id");
-    expect(restore).toContain("id: uid()");
+    expect(wiring).toContain("queueDeferredStrokeCommit,");
+    const restore = sourceBetween(
+      recoveryHost,
+      "export function restoreStudioRejectedStrokeIntoDocument(",
+      "export type StudioSalvageRejectedStroke",
+    );
+    expect(restore).toContain("record.pageId !== activePageId");
+    expect(restore).toContain("id: nextId()");
     expect(restore).toContain("queueDeferredStrokeCommit(restored)");
-    expect(host).toContain(
-      "setStudioRejectedStrokeRestorer((record) => restoreRejectedStrokeRef.current(record))",
-    );
+    expect(recoveryHost).toContain("setStudioRejectedStrokeRestorer((record) =>");
+    expect(recoveryHost).toContain("unregister();");
     // ADR 0018 invariants the recovery must never erode.
     expect(host).not.toContain("promotePendingGpuAuthoritiesToKonva");
     expect(host).not.toContain("relinquishGpuLiveInkToKonva");
+    expect(recoveryHost).not.toMatch(/from\s+["'](?:react-konva|konva)/u);
   });
 });
