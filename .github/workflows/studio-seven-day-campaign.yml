@@ -209,6 +209,15 @@ jobs:
             --github-output "$GITHUB_OUTPUT" \
             "${force_args[@]}"
 
+          if jq -e '
+            .window.active == true
+            and (.openCampaignPullRequests | length) == 0
+            and .selectedIssue == null
+          ' "$CAMPAIGN_DIR/plan.json" >/dev/null; then
+            echo "can_author=true" >> "$GITHUB_OUTPUT"
+            echo "reason=research-fallback" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish only changed product or research fingerprints
         if: ${{ steps.window.outputs.active == 'true' }}
         shell: bash
@@ -327,8 +336,10 @@ jobs:
           name: studio-seven-day-plan-${{ github.run_id }}
           path: ${{ runner.temp }}/studio-seven-day-campaign
 
-      - name: Place the trusted prompt in the checkout temporarily
-        run: cp "$CAMPAIGN_INPUT/prompt.md" .studio-campaign-prompt.md
+      - name: Place the trusted prompt and output directory
+        run: |
+          mkdir -p "$CAMPAIGN_OUTPUT"
+          cp "$CAMPAIGN_INPUT/prompt.md" .studio-campaign-prompt.md
 
       - name: Author one bounded Studio patch with Codex
         id: codex
@@ -555,9 +566,14 @@ jobs:
         env:
           PULL_URL: ${{ steps.pull.outputs.url }}
         run: |
+          {
+            echo '<!-- studio-seven-day-campaign-pr -->'
+            echo "Campaign cycle ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} opened ${PULL_URL}."
+            echo "It will merge only after the full release gates pass."
+          } > "$PATCH_DIR/issue-comment.md"
           gh issue comment "$ISSUE_NUMBER" \
             --repo "$GITHUB_REPOSITORY" \
-            --body "<!-- studio-seven-day-campaign-pr -->\nCampaign cycle ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} opened ${PULL_URL}. It will merge only after the full release gates pass."
+            --body-file "$PATCH_DIR/issue-comment.md"
 
   authoring-not-configured:
     needs: plan
@@ -583,15 +599,21 @@ jobs:
             gh api --paginate \
               "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
               --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
-              | head -n 1
+              | sed -n '1p'
           )"
           if [[ -n "$existing" ]]; then
             echo "Missing-key notice already exists."
             exit 0
           fi
+          {
+            echo "$marker"
+            echo "The seven-day research, benchmarking, CI, merge, deployment, and cleanup automation is active."
+            echo "Code-authoring cycles are paused because this repository does not expose an OPENAI_API_KEY secret to GitHub Actions."
+            echo "Adding that repository secret enables the isolated Codex patch job; the secret is supplied only to the pinned OpenAI action and never to the push/PR job."
+          } > "$RUNNER_TEMP/studio-campaign-key.md"
           gh issue comment "$TRACKING_ISSUE" \
             --repo "$GITHUB_REPOSITORY" \
-            --body "${marker}\nThe seven-day research, benchmarking, CI, merge, deployment, and cleanup automation is active. Code-authoring cycles are paused because this repository does not expose an OPENAI_API_KEY secret to GitHub Actions. Adding that repository secret enables the isolated Codex patch job; the secret is supplied only to the pinned OpenAI action and never to the push/PR job."
+            --body-file "$RUNNER_TEMP/studio-campaign-key.md"
 
   campaign-complete:
     needs: plan
@@ -613,12 +635,18 @@ jobs:
             gh api --paginate \
               "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
               --jq ".[] | select((.body // \"\") | contains(\"${marker}\")) | .id" \
-              | head -n 1
+              | sed -n '1p'
           )"
           if [[ -n "$existing" ]]; then
             echo "Campaign completion is already recorded."
             exit 0
           fi
+          {
+            echo "$marker"
+            echo "The configured seven-day Studio saturation window has ended."
+            echo "Scheduled runs now remain audit-only and do not author new patches unless a maintainer manually dispatches a force-active cycle."
+            echo "Review merged campaign PRs, remaining P0/P1 gaps, production smoke evidence, and open blockers before extending the window."
+          } > "$RUNNER_TEMP/studio-campaign-complete.md"
           gh issue comment "$TRACKING_ISSUE" \
             --repo "$GITHUB_REPOSITORY" \
-            --body "${marker}\nThe configured seven-day Studio saturation window has ended. Scheduled runs now remain audit-only and do not author new patches unless a maintainer manually dispatches a force-active cycle. Review merged campaign PRs, remaining P0/P1 gaps, production smoke evidence, and open blockers before extending the window."
+            --body-file "$RUNNER_TEMP/studio-campaign-complete.md"
