@@ -41,7 +41,7 @@ test("WebGPU renderer changes always inherit the canvas risk contract", () => {
   assert.equal(classification.needsBuild, true);
 });
 
-test("OPFS and recovery-journal changes trigger storage gates", () => {
+test("OPFS and recovery-journal changes trigger storage and browser gates", () => {
   const classification = classifyStudioChanges([
     "src/domains/creator/persistence/studio-recovery-journal.ts",
     "components/studio/runtime/studio-autosave-opfs-worker.ts",
@@ -49,17 +49,20 @@ test("OPFS and recovery-journal changes trigger storage gates", () => {
 
   assert.equal(classification.categories.storage, true);
   assert.equal(classification.highRisk, true);
+  assert.equal(classification.needsBrowser, true);
   assert.equal(classification.needsBuild, true);
   assert.ok(classification.matches.storage.length >= 1);
 });
 
-test("command registry and undo stack changes trigger history gates", () => {
+test("command registry and undo stack changes trigger history and browser gates", () => {
   const classification = classifyStudioChanges([
     "packages/studio-command-registry/src/undo-transaction.ts",
   ]);
 
   assert.equal(classification.categories.history, true);
   assert.equal(classification.highRisk, true);
+  assert.equal(classification.needsBrowser, true);
+  assert.equal(classification.needsBuild, true);
 });
 
 test("inspector-only UI changes request browser and build validation without inventing storage risk", () => {
@@ -81,6 +84,7 @@ test("deployment configuration is classified independently", () => {
 
   assert.equal(classification.categories.deployment, true);
   assert.equal(classification.highRisk, false);
+  assert.equal(classification.needsBrowser, false);
   assert.equal(classification.needsBuild, true);
 });
 
@@ -98,6 +102,7 @@ test("paths are normalized, deduplicated, and sorted deterministically", () => {
   ]);
   assert.equal(classification.changedCount, 2);
   assert.equal(classification.categories.canvas, true);
+  assert.equal(classification.needsBrowser, true);
 });
 
 test("an empty diff remains explicit and does not run source gates", () => {
@@ -106,5 +111,6 @@ test("an empty diff remains explicit and does not run source gates", () => {
   assert.equal(classification.changedCount, 0);
   assert.equal(classification.sourceChange, false);
   assert.equal(classification.highRisk, false);
+  assert.equal(classification.needsBrowser, false);
   assert.equal(summarizeStudioChangeClassification(classification), "no changed files");
 });
