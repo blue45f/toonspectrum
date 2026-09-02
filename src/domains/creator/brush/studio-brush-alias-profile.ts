@@ -76,6 +76,7 @@ export type StudioBrushAliasId =
   | "pencil-2b"
   | "pencil-6b"
   | "soft-pencil"
+  | "pencil--side-shade"
   | "colored-pencil"
   | "pastel"
   | "oil-pastel"
@@ -540,6 +541,22 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     pencilPasses: [
       { role: "soft-edge", widthScale: 1.9, opacityScale: 0.18, jitterRadius: 0.3 },
       { role: "core", widthScale: 1, opacityScale: 0.72, jitterRadius: 1.2 },
+    ],
+  },
+  "pencil--side-shade": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "pencil--side-shade",
+    family: "pencil",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+    // The lane catalogue declared a "side-shade" variant, but no renderer ever branched on it, so
+    // the brush painted the base pencil's single hard pass at ten pixels: a flat, toothless band
+    // (long gate: distinctTones 1). Shading with the side of the lead is broad, pale and rough —
+    // a wide skirt folded from thin shells, and a core that is paler and jitters harder than any
+    // point pencil so the paper tooth shows through instead of a solid ribbon.
+    pencilPasses: [
+      { role: "soft-edge", widthScale: 2.2, opacityScale: 0.12, jitterRadius: 0.5 },
+      { role: "core", widthScale: 1.3, opacityScale: 0.4, jitterRadius: 2.4 },
     ],
   },
   "colored-pencil": {
