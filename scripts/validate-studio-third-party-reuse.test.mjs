@@ -99,7 +99,7 @@ test("rejects unsafe destinations, mutable hashes, and unsupported evidence", ()
   assert.ok(issues.some((issue) => issue.includes("private-record")));
 });
 
-test("accepts a confidential written authorization by immutable private evidence digest", () => {
+test("accepts confidential written authorization by immutable digest without a public license URL", () => {
   const registry = baseRegistry();
   const entry = sourceCodeEntry();
   entry.evidence = {
@@ -108,7 +108,22 @@ test("accepts a confidential written authorization by immutable private evidence
     reviewedAt: "2026-09-02",
   };
   entry.licenseId = "LicenseRef-RightsHolderPermission-2026-09-02";
-  entry.licenseUrl = "https://example.com/legal/contact";
+  entry.licenseUrl = null;
   registry.entries.push(entry);
   assert.deepEqual(validateStudioThirdPartyReuseRegistry(registry), []);
+});
+
+test("private grants use an explicit LicenseRef identifier", () => {
+  const registry = baseRegistry();
+  const entry = sourceCodeEntry();
+  entry.evidence = {
+    type: "user-owned",
+    reference: `private-record:sha256:${"c".repeat(64)}`,
+    reviewedAt: "2026-09-02",
+  };
+  entry.licenseId = "proprietary";
+  entry.licenseUrl = null;
+  registry.entries.push(entry);
+  const issues = validateStudioThirdPartyReuseRegistry(registry);
+  assert.ok(issues.some((issue) => issue.includes("LicenseRef-*")));
 });
