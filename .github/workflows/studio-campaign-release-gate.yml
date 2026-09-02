@@ -1,0 +1,271 @@
+name: Studio campaign release gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Campaign pull request number"
+        required: true
+        type: string
+      head_sha:
+        description: "Exact 40-character campaign head SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-campaign-release-${{ inputs.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate-input:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      head_sha: ${{ steps.input.outputs.head_sha }}
+      pr_number: ${{ steps.input.outputs.pr_number }}
+    steps:
+      - name: Validate immutable dispatch inputs
+        id: input
+        shell: bash
+        env:
+          HEAD_SHA: ${{ inputs.head_sha }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::head_sha must be exactly 40 lowercase hex characters."
+            exit 1
+          fi
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::pr_number must be a positive integer."
+            exit 1
+          fi
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+  core:
+    needs: validate-input
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: webdex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webdex -d webdex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_CHANNEL: ""
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-input.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Validate architecture and toolchain coverage
+        run: |
+          pnpm run validate:architecture
+          pnpm run verify:toolchain-coverage
+
+      - name: Run strict lint and workspace typecheck
+        run: |
+          pnpm run lint:ci
+          pnpm run typecheck
+
+      - name: Provision and verify the disposable PostgreSQL schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+          set +e
+          push_output="$(pnpm exec drizzle-kit push --force 2>&1)"
+          push_status=$?
+          set -e
+          printf '%s\n' "$push_output"
+          if [[ "$push_status" -ne 0 ]] \
+            || grep -Eiq '(^|[[:space:]])error:|severity:.*(ERROR|FATAL|PANIC)' <<< "$push_output"; then
+            echo "::error::drizzle-kit campaign schema provision failed."
+            exit 1
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'user'
+                AND column_name = 'status'
+            ) THEN
+              RAISE EXCEPTION 'Campaign schema provision failed: public.user.status is missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'creator_work_crdt_snapshot'
+                AND column_name = 'compactedSequence'
+            ) THEN
+              RAISE EXCEPTION 'Campaign schema provision failed: CRDT sequence contract is missing';
+            END IF;
+          END;
+          $$;
+          SQL
+
+      - name: Run the complete root Vitest suite
+        timeout-minutes: 45
+        run: pnpm run test
+
+      - name: Verify distributed Redis coordination
+        run: pnpm run test:redis:integration
+
+      - name: Verify Cloudflare realtime runtime and packaging
+        run: |
+          pnpm run test:cloudflare-realtime
+          pnpm run typecheck:cloudflare-realtime
+          pnpm exec wrangler deploy \
+            --dry-run \
+            --config deploy/cloudflare-realtime/wrangler.jsonc \
+            --outdir /tmp/toonspectrum-campaign-cloudflare-realtime
+
+      - name: Build all production workspaces and enforce bundle ratchets
+        run: |
+          pnpm run build
+          pnpm run check:studio-bundle
+          pnpm run build:all
+
+      - name: Verify security and license policy
+        run: |
+          pnpm run audit:security
+          pnpm run audit:licenses
+
+      - name: Verify the principal Studio browser journeys
+        run: |
+          pnpm run verify:studio-launch
+          pnpm run verify:studio-artist-journey
+          pnpm run verify:studio-inapp-browser
+          pnpm run verify:studio-mobile-top
+          pnpm run verify:studio-icons
+
+      - name: Upload core failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-campaign-core-${{ inputs.head_sha }}
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/studio-*/
+            /tmp/toonspectrum-*/
+          retention-days: 21
+          if-no-files-found: ignore
+
+  studio-3d-visual:
+    needs: validate-input
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_CHANNEL: ""
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-input.outputs.head_sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify rendered Studio 3D surfaces
+        run: pnpm run verify:studio-3d-visual
+
+      - name: Upload 3D visual failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-campaign-3d-${{ inputs.head_sha }}
+          path: test-results/
+          retention-days: 21
+          if-no-files-found: ignore
+
+  studio-p5-brush-runtime:
+    needs: validate-input
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-input.outputs.head_sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify real p5.brush Worker WebGL2 runtime
+        run: pnpm run verify:studio-p5-brush-real-runtime
+
+  release-oracle:
+    needs:
+      - validate-input
+      - core
+      - studio-3d-visual
+      - studio-p5-brush-runtime
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require every dispatched campaign gate
+        shell: bash
+        env:
+          INPUT_RESULT: ${{ needs.validate-input.result }}
+          CORE_RESULT: ${{ needs.core.result }}
+          VISUAL_RESULT: ${{ needs.studio-3d-visual.result }}
+          P5_RESULT: ${{ needs.studio-p5-brush-runtime.result }}
+        run: |
+          set -euo pipefail
+          printf 'validate-input=%s\ncore=%s\nstudio-3d-visual=%s\nstudio-p5-brush-runtime=%s\n' \
+            "$INPUT_RESULT" "$CORE_RESULT" "$VISUAL_RESULT" "$P5_RESULT"
+          for result in "$INPUT_RESULT" "$CORE_RESULT" "$VISUAL_RESULT" "$P5_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "::error::At least one campaign release gate did not succeed."
+              exit 1
+            fi
+          done
