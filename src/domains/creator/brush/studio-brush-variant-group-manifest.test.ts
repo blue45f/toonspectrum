@@ -293,6 +293,7 @@ describe("studio brush variant group manifest", () => {
         "airbrush--klecks-grit",
         "spray--equal-area",
         "splatter--burst-cloud",
+        "web-smudge-trail",
         "pen--perfect-taper",
         "calligraphy--perfect-chisel",
         "pencil--erodible-wear",

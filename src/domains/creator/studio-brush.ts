@@ -558,7 +558,7 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   },
   {
     id: "web-hatch-color",
-    name: "해치 채색 펜",
+    name: "해치 채색(평행)",
     defaultWidth: 4,
     defaultOpacity: 0.75,
     searchAliases: [
@@ -757,7 +757,7 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   },
   {
     id: "web-cross-hatch-pen",
-    name: "크로스 해치 펜",
+    name: "크로스 해치(교차)",
     defaultWidth: 3,
     defaultOpacity: 0.78,
     searchAliases: [
