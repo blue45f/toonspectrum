@@ -188,10 +188,11 @@ describe("studio FX luminous pressure ribbon", () => {
     },
   );
 
-  it("drops the round join a smooth constant-width ribbon already covers, and keeps it at a corner", () => {
-    // 실측: 반지름 150px 원 한 획(360점)을 글로우로 그리면 구간마다 24각형 조인이 붙어
-    // 라이브 드래프트가 포인터 이동마다 1만 점 넘는 합성 패스를 다시 계획·추적했다 —
-    // 한 획 336초, 1.28초 롱태스크 613개. 부드러운 구간의 조인은 두 몸통이 이미 덮은 자리다.
+  it("keeps every interior round join, because the halo shells are what make a glow smooth", () => {
+    // 한 번 시도했다가 되돌린 최적화: 쐐기 깊이가 서브픽셀인 조인을 생략하면 6~7배 빨라지지만
+    // 넓고 옅은 외곽 글로우 헤일로가 방사형으로 너덜해진다(정착 프레임 육안 대조). 쐐기 깊이
+    // 근사는 큰 반지름·저알파 패스에 쌓이는 스캘럽을 대표하지 못한다. 속도는 픽셀을 바꾸지 않는
+    // 증분화로 얻어야 하고, 이 테스트는 그 최적화가 다시 슬며시 들어오는 것을 막는다.
     const circlePoints: number[] = [];
     const circlePressures: number[] = [];
     for (let index = 0; index < 240; index += 1) {
@@ -200,12 +201,11 @@ describe("studio FX luminous pressure ribbon", () => {
       circlePressures.push(0.7);
     }
     const circle = planFor("glow", circlePoints, circlePressures);
-    const circleJoins = circle.polygons.filter(({ role }) => role === "join");
-    const circleBodies = circle.polygons.filter(({ role }) => role === "body");
-    expect(circleBodies.length).toBeGreaterThan(200);
-    // 1° 회전에 반지름 24px 면 쐐기 깊이가 0.001px — 남길 이유가 없다.
-    expect(circleJoins.length).toBeLessThan(circleBodies.length / 8);
-    // 덮임은 그대로다: 링 위의 표본은 여전히 합성 패스 안에 있고 원 바깥·안쪽은 비어 있다.
+    const bodies = circle.polygons.filter(({ role }) => role === "body");
+    const joins = circle.polygons.filter(({ role }) => role === "join");
+    expect(bodies.length).toBeGreaterThan(200);
+    // 내부 경계마다 조인이 하나씩. 런이 하나면 joins === bodies - 1.
+    expect(joins.length).toBe(bodies.length - 1);
     for (const sample of [0, 0.17, 0.41, 0.66, 0.89]) {
       const angle = sample * Math.PI * 2;
       expect(compoundCoverageAt(
@@ -215,15 +215,6 @@ describe("studio FX luminous pressure ribbon", () => {
       )).toBe(true);
     }
     expect(compoundCoverageAt(circle.polygons, 300, 300)).toBe(false);
-
-    // 진짜 꺾임은 쐐기를 남기므로 조인이 그대로 있어야 한다(90° 지그재그).
-    const corner = planFor(
-      "glow",
-      [0, 0, 60, 0, 60, 60, 120, 60],
-      [0.7, 0.7, 0.7, 0.7],
-    );
-    expect(corner.polygons.filter(({ role }) => role === "join").length)
-      .toBeGreaterThan(0);
   });
 
   it("interpolates pressure into a continuous ribbon without an internal width seam", () => {
