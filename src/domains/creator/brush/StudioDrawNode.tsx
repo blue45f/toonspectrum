@@ -235,6 +235,28 @@ function processStudioPencilAliasPassPoints(
   });
 }
 
+/**
+ * Pencil ribbon cells are batched into one compound fill per quantized alpha level (2026-09-02
+ * long-stroke batching): a stroke costs at most this many `fill()` calls per pass instead of one
+ * per cell. The ladder resolution is a fidelity contract, not a tuning knob — cell alpha is
+ * pressure-driven and continuous, and at 16 levels every cell under 1/32 rounded into the empty
+ * bucket and was never drawn: soft-pencil's 0.18-scale skirt lost 40 of its 45 cells at light
+ * pressure while the SVG export kept them. 128 levels (the wet-ribbon carrier precedent) keep the
+ * quantization error under one 8-bit alpha step (1/256), so Canvas and SVG agree on every cell
+ * that can change a pixel, while the fill count stays bounded by the ladder.
+ */
+export const STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT = 128;
+
+function pencilRibbonAlphaBucket(alpha: number): number {
+  return Math.max(
+    0,
+    Math.min(
+      STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT,
+      Math.round(alpha * STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
+    ),
+  );
+}
+
 // 손그림(스케치) 도형용 rough.js generator 훅 — 스케치가 켜진 도형이 처음 보일 때만
 // 동적 import로 로드한다(Studio eager 청크에 rough.js 미포함). 로드 전에는 null을 반환해
 // 깨끗한 Konva 프리미티브 폴백으로 그리고, 로드가 끝나면 상태 변경으로 다시 그린다.
@@ -2131,7 +2153,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   // butt strokes, the pressure mesh has neither an outer hole nor a darker inner
                   // overlap; each source segment still owns its canonical pigment response.
                   for (const { pass, ribbon } of passPlans) {
-                    const buckets: number[][] = Array.from({ length: 17 }, () => []);
+                    const buckets: number[][] = Array.from(
+                      { length: STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT + 1 },
+                      () => [],
+                    );
                     for (const run of ribbon.runs) {
                       for (const cell of run.cells) {
                         if (cell.points.length < 6) continue;
@@ -2140,7 +2165,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           pass.opacityScale
                           * Math.sqrt(cell.opacityScale * cell.flowScale),
                         );
-                        const bIndex = Math.max(0, Math.min(16, Math.round(alpha * 16)));
+                        const bIndex = pencilRibbonAlphaBucket(alpha);
                         if (bIndex > 0) {
                           const bucket = buckets[bIndex]!;
                           for (let ci = 0; ci < cell.points.length; ci += 1) {
@@ -2156,7 +2181,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           pass.opacityScale
                           * Math.sqrt(cap.opacityScale * cap.flowScale),
                         );
-                        const bIndex = Math.max(0, Math.min(16, Math.round(alpha * 16)));
+                        const bIndex = pencilRibbonAlphaBucket(alpha);
                         if (bIndex > 0) {
                           const bucket = buckets[bIndex]!;
                           for (let ci = 0; ci < cap.points.length; ci += 1) {
@@ -2167,10 +2192,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       }
                     }
 
-                    for (let b = 1; b <= 16; b += 1) {
+                    for (let b = 1; b <= STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT; b += 1) {
                       const coords = buckets[b]!;
                       if (coords.length === 0) continue;
-                      context.globalAlpha = inheritedAlpha * (b / 16);
+                      context.globalAlpha =
+                        inheritedAlpha * (b / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT);
                       context.beginPath();
                       let startIdx = 0;
                       for (let i = 0; i <= coords.length; i += 1) {
