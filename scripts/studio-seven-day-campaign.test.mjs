@@ -13,44 +13,54 @@ import {
 } from "./studio-seven-day-campaign.mjs";
 
 const config = JSON.parse(fs.readFileSync(STUDIO_SEVEN_DAY_CAMPAIGN_CONFIG_PATH, "utf8"));
-const thirtyMinuteTrigger = fs.readFileSync(
+const workerWorkflow = fs.readFileSync(".github/workflows/studio-seven-day-campaign.yml", "utf8");
+const coordinatorWorkflow = fs.readFileSync(
   ".github/workflows/studio-seven-day-hourly-trigger.yml",
   "utf8",
 );
-const immediateContinuation = fs.readFileSync(
+const continuationWorkflow = fs.readFileSync(
   ".github/workflows/studio-seven-day-immediate-continuation.yml",
   "utf8",
 );
 
-test("committed campaign config is a bounded exact seven-day program", () => {
+function laneScopedConfig(laneId) {
+  const lane = config.lanes.find((candidate) => candidate.id === laneId);
+  assert.ok(lane, `missing lane ${laneId}`);
+  return {
+    ...config,
+    issueQueue: [...lane.issueQueue],
+    fallbackTracks: [...lane.fallbackTracks],
+    maxOpenCampaignPullRequests: lane.maxOpenPullRequests,
+    branchPrefix: `${config.branchPrefix}${lane.id}-`,
+    activeLane: lane,
+  };
+}
+
+test("committed campaign config is an exact seven-day six-lane program", () => {
   assert.deepEqual(validateStudioSevenDayCampaignConfig(config), []);
   assert.equal(Date.parse(config.endAt) - Date.parse(config.startAt), 7 * 24 * 60 * 60 * 1_000);
   assert.equal(config.startAt, "2026-09-03T00:00:00Z");
   assert.equal(config.endAt, "2026-09-10T00:00:00Z");
-  assert.equal(config.cadenceMinutes, 60);
-  assert.equal(config.maxOpenCampaignPullRequests, 1);
-  assert.equal(config.agent.permissionProfile, ":workspace");
-  assert.match(config.agent.actionCommit, /^[0-9a-f]{40}$/u);
-});
+  assert.equal(config.maxConcurrentAuthoringRuns, 6);
+  assert.equal(config.maxParallelResearchRefreshes, 1);
+  assert.equal(config.lanes.length, 6);
 
-test("the watchdog evaluates twice per hour without duplicating active work", () => {
-  assert.match(thirtyMinuteTrigger, /name: Studio seven-day 30-minute trigger/u);
-  assert.match(thirtyMinuteTrigger, /cron: "2,32 \* \* \* \*"/u);
-  assert.match(thirtyMinuteTrigger, /active_count/u);
-  assert.match(thirtyMinuteTrigger, /age_seconds" -lt 900/u);
-  assert.match(thirtyMinuteTrigger, /mode: "author"/u);
-  assert.match(thirtyMinuteTrigger, /force_active: "false"/u);
-});
+  const laneIds = config.lanes.map((lane) => lane.id);
+  assert.equal(new Set(laneIds).size, laneIds.length);
 
-test("a released implementation lane dispatches the next cycle immediately", () => {
-  assert.match(immediateContinuation, /workflow_run:/u);
-  assert.match(immediateContinuation, /Studio safe automerge/u);
-  assert.match(immediateContinuation, /types: \[closed\]/u);
-  assert.match(immediateContinuation, /actions: write/u);
-  assert.match(immediateContinuation, /codex\/campaign-/u);
-  assert.match(immediateContinuation, /open_campaign_prs/u);
-  assert.match(immediateContinuation, /active_count/u);
-  assert.match(immediateContinuation, /Dispatched the next Studio saturation cycle immediately/u);
+  const laneIssues = config.lanes.flatMap((lane) => {
+    assert.equal(lane.maxOpenPullRequests, 1);
+    assert.ok(lane.fallbackTracks.length >= 5);
+    assert.ok(lane.focusTerms.length >= 5);
+    assert.deepEqual(validateStudioSevenDayCampaignConfig(laneScopedConfig(lane.id)), []);
+    return lane.issueQueue;
+  });
+
+  assert.equal(new Set(laneIssues).size, laneIssues.length);
+  assert.deepEqual([...laneIssues].sort((left, right) => left - right), [
+    ...config.issueQueue,
+  ].sort((left, right) => left - right));
+  assert.ok(config.lanes.find((lane) => lane.id === "three-d").issueQueue.includes(573));
 });
 
 test("campaign window resolves before, active, and complete phases deterministically", () => {
@@ -63,41 +73,84 @@ test("campaign window resolves before, active, and complete phases deterministic
 });
 
 test("selects the first open queue issue not already claimed by an open pull request", () => {
+  const reliability = laneScopedConfig("reliability");
   const issues = [
     { number: 557, state: "open", title: "Recovery", body: "First" },
-    { number: 558, state: "open", title: "Shape", body: "Second" },
   ];
-  const pulls = [
-    { state: "open", body: "Implements #557", head: { ref: "feature/recovery" } },
+  const unrelatedPulls = [
+    {
+      number: 700,
+      state: "open",
+      title: "Drawing work",
+      body: "Progresses #558",
+      head: { ref: "codex/campaign-drawing-558-123" },
+    },
   ];
-  assert.equal(selectStudioCampaignIssue(config, issues, pulls)?.number, 558);
+
+  assert.equal(selectStudioCampaignIssue(reliability, issues, unrelatedPulls)?.number, 557);
+
+  const claimedPulls = [
+    {
+      number: 701,
+      state: "open",
+      title: "Recovery work",
+      body: "Progresses #557",
+      head: { ref: "codex/campaign-reliability-557-456" },
+    },
+  ];
+  assert.equal(selectStudioCampaignIssue(reliability, issues, claimedPulls), null);
 });
 
-test("an existing campaign pull request blocks another authoring cycle", () => {
-  const plan = buildStudioSevenDayCampaignPlan({
-    config,
+test("parallel lanes block only their own active campaign pull request", () => {
+  const reliability = laneScopedConfig("reliability");
+  const issues = [{ number: 557, state: "open", title: "Recovery", body: "Work" }];
+
+  const otherLanePlan = buildStudioSevenDayCampaignPlan({
+    config: reliability,
     now: "2026-09-03T11:30:00Z",
-    issues: [{ number: 557, state: "open", title: "Recovery", body: "Work" }],
+    issues,
     pulls: [
       {
         number: 700,
         state: "open",
-        title: "Existing campaign patch",
-        body: "Implements #558",
-        head: { ref: "codex/campaign-558-123" },
+        title: "Drawing lane",
+        body: "Progresses #558",
+        head: { ref: "codex/campaign-drawing-558-123" },
       },
     ],
     researchReport: {},
     matureProductReport: {},
     emergingProductReport: {},
   });
-  assert.equal(plan.canAuthor, false);
-  assert.equal(plan.reason, "campaign-pr-already-open");
+  assert.equal(otherLanePlan.canAuthor, true);
+  assert.equal(otherLanePlan.openCampaignPullRequests.length, 0);
+
+  const ownLanePlan = buildStudioSevenDayCampaignPlan({
+    config: reliability,
+    now: "2026-09-03T11:30:00Z",
+    issues,
+    pulls: [
+      {
+        number: 701,
+        state: "open",
+        title: "Reliability lane",
+        body: "Progresses #557",
+        head: { ref: "codex/campaign-reliability-557-456" },
+      },
+    ],
+    researchReport: {},
+    matureProductReport: {},
+    emergingProductReport: {},
+  });
+  assert.equal(ownLanePlan.canAuthor, false);
+  assert.equal(ownLanePlan.reason, "campaign-pr-already-open");
+  assert.equal(ownLanePlan.openCampaignPullRequests.length, 1);
 });
 
 test("active empty lane produces a bounded issue plan and trusted-owner instructions", () => {
+  const reliability = laneScopedConfig("reliability");
   const plan = buildStudioSevenDayCampaignPlan({
-    config,
+    config: reliability,
     now: "2026-09-03T11:30:00Z",
     issues: [
       {
@@ -125,7 +178,7 @@ test("active empty lane produces a bounded issue plan and trusted-owner instruct
   });
   assert.equal(plan.canAuthor, true);
   assert.equal(plan.selectedIssue.number, 557);
-  const prompt = renderStudioCampaignPrompt(config, plan);
+  const prompt = renderStudioCampaignPrompt(reliability, plan);
   assert.match(prompt, /one bounded ToonSpectrum Studio saturation-campaign cycle/u);
   assert.match(prompt, /studio-owner-attestation-2026-09-02\.md/u);
   assert.match(prompt, /UNTRUSTED RESEARCH DATA/u);
@@ -141,4 +194,35 @@ test("force-active supports a deliberate manual audit after the time window", ()
   const forced = resolveStudioCampaignWindow(config, "2026-09-10T00:00:00Z", true);
   assert.equal(forced.active, true);
   assert.equal(forced.phase, "active");
+});
+
+test("worker workflow runs lanes concurrently while serializing only PR admission", () => {
+  assert.match(
+    workerWorkflow,
+    /run-name: Studio campaign \[\$\{\{ inputs\.lane_id \}\}\].*research=\$\{\{ inputs\.refresh_research \}\}/u,
+  );
+  assert.doesNotMatch(workerWorkflow, /^\s{2}schedule:/mu);
+  assert.match(workerWorkflow, /group: studio-seven-day-saturation-campaign-\$\{\{ inputs\.lane_id \}\}/u);
+  assert.match(workerWorkflow, /group: studio-campaign-pr-admission/u);
+  assert.match(workerWorkflow, /codex\/campaign-\$\{LANE_ID\}-\$\{issue_slug\}/u);
+  assert.match(workerWorkflow, /Reject exact file overlap with another open campaign PR/u);
+  assert.match(workerWorkflow, /studio-campaign-lane:\$\{LANE_ID\}/u);
+});
+
+test("coordinator fills all free lanes and limits research refresh to one active run", () => {
+  assert.match(coordinatorWorkflow, /cron: "2,32 \* \* \* \*"/u);
+  assert.match(coordinatorWorkflow, /\.maxConcurrentAuthoringRuns/u);
+  assert.match(coordinatorWorkflow, /\.lanes\[\]\.id/u);
+  assert.match(coordinatorWorkflow, /Studio campaign \[\$\{lane_id\}\]/u);
+  assert.match(coordinatorWorkflow, /refresh_research/u);
+  assert.match(coordinatorWorkflow, /research=true/u);
+  assert.match(coordinatorWorkflow, /studio-campaign-gate-dispatcher\.yml/u);
+});
+
+test("manual campaign closure refills lanes while the watchdog covers token-created merges", () => {
+  assert.match(continuationWorkflow, /pull_request:/u);
+  assert.match(continuationWorkflow, /codex\/campaign-\*/u);
+  assert.match(continuationWorkflow, /studio-seven-day-hourly-trigger\.yml/u);
+  assert.match(continuationWorkflow, /Dispatched the parallel coordinator immediately/u);
+  assert.match(coordinatorWorkflow, /cron: "2,32 \* \* \* \*"/u);
 });
