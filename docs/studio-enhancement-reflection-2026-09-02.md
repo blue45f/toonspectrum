@@ -11,13 +11,13 @@
 
 | 원문 주장 | 판정 | 조치 |
 | --- | --- | --- |
-| P1-1 `.will` 32MiB 프로필 vs 1MiB 직접 CRC 상한 불일치 | **참** (단, 파일 메뉴 내보내기는 무영향) | 수정 `0cc1486d` — 증분 CRC + 1MiB 슬라이스 yield |
-| P1-2 구형 `requiredEvidence: "fallback"` 마이그레이션 누락 | **참** | 수정 `92adb6d7` — 토큰 재매핑 + 레거시 카탈로그 테스트 |
-| P1-3 Dry Media 캐시가 `elementSheet`만 비교, layoutKey 미검증 | **부분 참** (`elementSheet`는 존재하지 않는 식별자, 갭은 실재) | 수정 `dc684fc3` — `lastPresented.layoutKey` 검증 + DPR 포함 |
-| "Studio Perf Harness" CI 잡 실패 | **거짓** — 그런 잡은 없다 | 실제 실패 잡 3종 기록, core lint 차단 해제 `ddc368ba` |
+| P1-1 `.will` 32MiB 프로필 vs 1MiB 직접 CRC 상한 불일치 | **참** (단, 파일 메뉴 내보내기는 무영향) | 수정 `99193ae2` — 증분 CRC + 1MiB 슬라이스 yield |
+| P1-2 구형 `requiredEvidence: "fallback"` 마이그레이션 누락 | **참** | 수정 `b17fd880` — 토큰 재매핑 + 레거시 카탈로그 테스트 |
+| P1-3 Dry Media 캐시가 `elementSheet`만 비교, layoutKey 미검증 | **부분 참** (`elementSheet`는 존재하지 않는 식별자, 갭은 실재) | 수정 `4eb6948c` — `lastPresented.layoutKey` 검증 + DPR 포함 |
+| "Studio Perf Harness" CI 잡 실패 | **거짓** — 그런 잡은 없다 | 실제 실패 잡 3종 기록; core를 막던 lint(PR #485)·마이그레이션 매니페스트 누락·`.myb` 테스트 기대값 세 겹을 걷어냄(§3.1) |
 | 장거리 스트로크 하네스가 Stage 없으면 성공 종료, assertion 없음 | **참** (그 이상: 데드 코드, 홈 디렉터리 하드코딩) | `scripts/verify-studio-long-stroke.mts`로 교체 (§3.2) |
-| 슬라이스 출력 고정 250ms 대기 | **2026-08-08에 해소됨** (문서 표가 stale) | 표 갱신 `f314ca1b`, 잔여 1곳 기록 |
-| 필터 다이얼로그가 SQLite wasm 928KB를 끌어옴 | **2026-08-08에 해소됨**, 잔여 정적 의존 있음 | 표 갱신 `f314ca1b` |
+| 슬라이스 출력 고정 250ms 대기 | **2026-08-08에 해소됨** (문서 표가 stale) | 표 갱신 `b9901327`, 잔여 1곳 기록 |
+| 필터 다이얼로그가 SQLite wasm 928KB를 끌어옴 | **2026-08-08에 해소됨**, 잔여 정적 의존 있음 | 표 갱신 `b9901327` |
 | 중심 컴포넌트 42,149줄 | **stale 수치** — 현재 5줄 심 + 30,961줄 호스트 | §4 |
 | 적색 main에서도 배포되는 구조 | **참**, 단 2026-08-14 의도적 결정 | 재도입은 정책 판단으로 남김 (§3.3) |
 
@@ -58,7 +58,7 @@
   `encodeStudioWillV1DocumentTransport`와 인증 코덱 프로바이더(`studio-first-party-will-v1-document-codec-provider.ts`),
   그리고 코덱 컨포먼스(`studio-first-party-will-v1-document-codec-conformance.ts:150`)다.
 
-수정(`0cc1486d`):
+수정(`99193ae2`):
 
 - `studio-crc32.ts`에 증분 API 추가: `STUDIO_CRC32_INITIAL_STATE`, `updateStudioCrc32(state, bytes, start, end)`,
   `finalizeStudioCrc32(state)`. `calculateStudioCrc32`는 이 둘의 합성으로 재정의(핫 루프는 인덱스 기반 유지).
@@ -99,7 +99,7 @@
 - 원문보다 넓은 범위: `fallback: null`인 카드는 마이그레이션 본문에 들어가지도 않지만, evidence 토큰 때문에
   똑같이 실패한다. 즉 "마이그레이션이 남긴다"가 아니라 "재매핑 코드가 어디에도 없다"가 정확하다.
 
-수정(`92adb6d7`):
+수정(`b17fd880`):
 
 - `migrateLegacyAssetReplacementEvidence`를 추가해 `fallback` → `explicit-provider-selection`으로 재매핑하고
   중복을 제거한다. 최상위 지시 유무와 **독립적으로** 먼저 적용된다. 정규값 선택 근거: enum diff의 1:1 치환,
@@ -114,8 +114,8 @@
   `fallback` 지시 복원, 토큰 개명)로 되돌린 `catalog.v1` 스냅숏을 실제 sqlite-wasm 메모리 DB에 넣고 로드 →
   카드 전부 복원, `providerUnavailable` 라우팅 사실 일치, 재저장 후 바이트 동일 재로드.
 
-같은 파일에서 `.myb` "hardness" 테스트 1건이 실패하는데, 이는 `66bc25b4`(2026-09-02)의 브러시 엔진 변경에서
-온 기존 실패로 이 작업과 무관하다(§3.1).
+같은 파일의 `.myb` "hardness" 테스트는 `66bc25b4`(2026-09-02)가 hardness를 매핑 대상으로 옮긴 뒤 기대값이
+갱신되지 않아 main에서 실패하고 있었다. 이 PR에서 매핑된 상태를 단언하도록 고쳤다(§3.1).
 
 ### 2.3 P1-3 — Dry Media 캐시 레이아웃 검증 (부분 참)
 
@@ -141,7 +141,7 @@
   바꾼 뒤 `retainsLastGoodFrame: true`를 **정상으로** 단언하고 있었다(bounds를 안 바꿔서 오배치가 보이지
   않았을 뿐).
 
-수정(`dc684fc3`):
+수정(`4eb6948c`):
 
 - resolver: `retainsExactLastGood`에 `lastPresented.layoutKey === layoutKey` 추가.
 - 컴포넌트: `publishUnavailable`의 `lastPresented` 선택과 보존 참조 리셋 게이트 모두 `layoutKey` 일치를
@@ -176,8 +176,13 @@ Konva 원본 요소가 잠시 보이는 것은 전과 같다. 달라지는 것�
 - `56e7148a` 기준 main CI 실패 잡은 `core`, `studio-inapp-browser`, `studio-3d-visual`, 그리고 `core`에
   종속된 `verify`다.
   - `core`: `pnpm run lint`가 `scripts/qa/studio-soak-runner.mjs:26`의 ANSI 제거 정규식에서
-    `no-control-regex`로 멈춘다(`56e7148a`가 추가). 제어 문자가 그 정규식의 본질이므로 사유를 적고 해당
-    줄만 억제했다(`ddc368ba`). 이 한 줄이 main의 core를 적색으로 만들고 있었다.
+    `no-control-regex`로 멈춘다(`56e7148a`가 추가). 이 PR과 PR #485가 같은 억제를 넣었고 main 쪽이 먼저
+    머지되어 이 브랜치의 커밋은 리베이스에서 드롭됐다. lint를 통과하자 그 뒤에 가려져 있던 두 실패가
+    드러났고 둘 다 이 PR에서 고쳤다: (1) `e90aadbe`가 `0035_creator_marketplace_3d_asset_kind.sql`을
+    추가하며 `scripts/production-database-migrations.manifest`를 갱신하지 않아 "manifest must list every
+    numbered SQL migration exactly once"로 마이그레이션 채택 단계가 실패 → 항목 추가; (2) `66bc25b4`가
+    `.myb` `hardness`를 매핑 대상으로 옮겼는데 `studio-asset-metadata-registry.test.ts`는 여전히
+    unmapped 목록에 있기를 요구 → 매핑된 상태를 단언하도록 갱신.
   - `studio-3d-visual`: "Verify Studio 3D surfaces against rendered frames" 실패 — 2026-09-01 진단된
     `peakColorTileDelta` 타이밍 회귀 계열. 이 작업 범위 밖.
   - `studio-inapp-browser`: 라우트 스윕·상단 크롬 프로브 실패. 이 작업 범위 밖.
@@ -201,7 +206,7 @@ Konva 원본 요소가 잠시 보이는 것은 전과 같다. 달라지는 것�
 약한 버전을 새로 썼다는 점과, `verify:studio-brush-latency`·`verify:studio-brush-planner-quality`가
 어떤 워크플로에서도 호출되지 않는다는 점이다.
 
-조치(`58643693`): 데드 스크립트를 삭제하고 `scripts/verify-studio-long-stroke.mts`(`verify:studio-long-stroke`)로
+조치(`d8e4eab4`): 데드 스크립트를 삭제하고 `scripts/verify-studio-long-stroke.mts`(`verify:studio-long-stroke`)로
 교체했다. 13개 하드 assertion을 두고 모든 실패를 모아 exit 1 한다.
 
 | 축 | 판정 방식 | 근거 훅 |
@@ -288,9 +293,9 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 
 | ID | 작업 | 현재 근거 | 이 PR | 남은 완료 기준 |
 | --- | --- | --- | --- | --- |
-| TS-REL-001 | `.will` 증분 CRC | — | **완료** `0cc1486d` | 32MiB 케이던스 테스트 통과 ✓ |
-| TS-REL-002 | 구형 evidence 변환 | — | **완료** `92adb6d7` | 레거시 catalog.v1 왕복 ✓ |
-| TS-REN-003 | Dry Media layoutKey 검증 | — | **완료** `dc684fc3` | resize/DPR 단위 회귀 ✓, 실기기 E2E는 §7 |
+| TS-REL-001 | `.will` 증분 CRC | — | **완료** `99193ae2` | 32MiB 케이던스 테스트 통과 ✓ |
+| TS-REL-002 | 구형 evidence 변환 | — | **완료** `b17fd880` | 레거시 catalog.v1 왕복 ✓ |
+| TS-REN-003 | Dry Media layoutKey 검증 | — | **완료** `4eb6948c` | resize/DPR 단위 회귀 ✓, 실기기 E2E는 §7 |
 | TS-CI-004 | 적색 main 배포 차단 | 08-14 의도적 제거 | 정책 판단 (§3.3) | `workflow_run` 게이트 결정 |
 | TS-QA-005 | 성능 하네스 assertion | 정책 파일에 구현 있음, 미연결 | **교체** `verify:studio-long-stroke` | CI 잡 연결(`verify:studio-brush-latency`도 함께) |
 | TS-QA-006 | live/commit 픽셀 비교 | `probe-studio-brush-sweep.mjs`, `verify-inkwash-dippen-live-commit-fidelity.mts` | — | 브러시 전종 자동화를 CI 야간 잡으로 |
@@ -350,16 +355,23 @@ ADR 0007/0012의 단일 저널 원칙, "3D 실패 원인·GPU 상태 숨기기 �
 
 ## 10. 이 PR의 산출물과 남은 일
 
-커밋:
+커밋(PR #483, main 리베이스 후 해시):
 
-1. `bc20c1fc` docs — 외부 리뷰 원문 보존
-2. `0cc1486d` fix(creator) — WILL CRC 증분 슬라이스
-3. `92adb6d7` fix(studio-project-model) — 구형 evidence 토큰 재매핑
-4. `dc684fc3` fix(creator) — Dry Media 보존 프레임 레이아웃/DPR 무효화
-5. `ddc368ba` chore(qa) — soak runner `no-control-regex` 억제(core lint 차단 해제)
-6. `f314ca1b` docs(perf) — heavy-feature findings 표 정정
-7. `58643693` test(creator) — `verify:studio-long-stroke` 게이트로 데드 벤치마크 교체
-8. (이 문서) docs(studio) — 반영·판정 기록
+1. `35e2c1c7` docs — 외부 리뷰 원문 보존
+2. `99193ae2` fix(creator) — WILL CRC 증분 슬라이스
+3. `b17fd880` fix(studio-project-model) — 구형 evidence 토큰 재매핑
+4. `4eb6948c` fix(creator) — Dry Media 보존 프레임 레이아웃/DPR 무효화
+5. `b9901327` docs(perf) — heavy-feature findings 표 정정
+6. `e1f1d2ee` test(creator) — WILL 대용량 fixture 타입 보정
+7. `d8e4eab4` test(creator) — `verify:studio-long-stroke` 게이트로 데드 벤치마크 교체
+8. `00cfcad8` docs(studio) — 반영·판정 기록(이 문서)
+9. `90684cfc` fix(db) — 프로덕션 마이그레이션 매니페스트에 0035 등재
+10. `29a99851` test(creator) — 리뷰 지적 반영(스냅숏 바이트 동일성, flip 케이스 정리, 성능 문서 시제)
+11. `5507b2ac` test(creator) — 장획 게이트 기대치를 디스패치 기하로 도출, 샘플러 재시도 수정
+12. test(creator) — `.myb` hardness 매핑 상태 단언(main의 core 단위 테스트 실패 해소)
+13. docs(studio) — 이 문서의 CI 절·커밋 목록 갱신
+
+soak runner의 `no-control-regex` 억제는 PR #485가 먼저 머지해 이 브랜치의 동일 커밋은 리베이스에서 드롭됐다.
 
 검증: 변경 테스트 파일 6개 70건 + WILL 코덱·인터체인지·워커·CRC 커널 12파일 76건 통과, 변경 파일 eslint
 통과, 새 게이트 CPU 경로 13/13 통과(§3.2). 전체 typecheck는 pre-push 훅에서 실행.
