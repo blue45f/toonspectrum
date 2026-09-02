@@ -114,7 +114,7 @@ export function classifyStudioChanges(inputPaths) {
 
   const highRisk = categories.canvas || categories.storage || categories.history || categories.webgpu;
   const sourceChange = paths.length > 0 && !docsOnly;
-  const needsBrowser = sourceChange && (categories.canvas || categories.webgpu || categories.ui);
+  const needsBrowser = sourceChange && (highRisk || categories.ui);
   const needsBuild = sourceChange && (highRisk || categories.ui || categories.deployment);
 
   return Object.freeze({
