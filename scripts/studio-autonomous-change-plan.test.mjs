@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import "./studio-merged-branch-cleanup.test.mjs";
+import "./validate-studio-third-party-reuse.test.mjs";
 import {
   classifyStudioChanges,
   summarizeStudioChangeClassification,
