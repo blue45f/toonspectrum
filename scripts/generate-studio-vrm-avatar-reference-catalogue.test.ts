@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -60,15 +61,7 @@ describe("Avatar Forge reference catalogue generator", () => {
       .toThrow(/--write\|--check/u);
   });
 
-  it("pins only the owned CC0 Minseo source bytes", async () => {
-    const source = new Uint8Array(await readFile(resolve(
-      STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-      "public/vrm/TS_Minseo_Campus.vrm",
-    )));
-    expect(source.byteLength).toBe(1_325_288);
-    expect(sha256(source)).toBe(
-      "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
-    );
+  it("keeps the retired CC0 source pinned by exact bytes and never by a mutable sample", async () => {
     const generator = await readFile(
       resolve(
         STUDIO_VRM_AVATAR_REFERENCE_ROOT,
@@ -76,7 +69,15 @@ describe("Avatar Forge reference catalogue generator", () => {
       ),
       "utf8",
     );
+    expect(generator).toContain('const SOURCE_URL = "/vrm/TS_Minseo_Campus.vrm";');
+    expect(generator).toContain("const SOURCE_BYTE_LENGTH = 1_325_288;");
+    expect(generator).toContain(
+      '"903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea"',
+    );
     expect(generator).not.toContain("AvatarSample_A");
+    // The procedural source pack was retired; the committed artifact is the runtime authority.
+    expect(existsSync(resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "public/vrm/TS_Minseo_Campus.vrm")))
+      .toBe(false);
   });
 
   it("hashes the exact serialized MediaPipe embedding object", () => {
