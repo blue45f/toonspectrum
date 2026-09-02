@@ -116,6 +116,22 @@ const MarketResourceDetailPage = lazyRetry(
   })),
   "MarketResourceDetailPage"
 );
+const MarketPublishPage = lazyRetry(
+  () => import("@/src/domains/market/pages/MarketPublishPage").then((m) => ({ default: m.MarketPublishPage })),
+  "MarketPublishPage"
+);
+const MarketManagePage = lazyRetry(
+  () => import("@/src/domains/market/pages/MarketManagePage").then((m) => ({ default: m.MarketManagePage })),
+  "MarketManagePage"
+);
+const MarketLibraryPage = lazyRetry(
+  () => import("@/src/domains/market/pages/MarketLibraryPage").then((m) => ({ default: m.MarketLibraryPage })),
+  "MarketLibraryPage"
+);
+const MarketWishlistPage = lazyRetry(
+  () => import("@/src/domains/market/pages/MarketWishlistPage").then((m) => ({ default: m.MarketWishlistPage })),
+  "MarketWishlistPage"
+);
 
 /* -------------------------------------------------------------------------- */
 /* Account & Admin Domain Routes                                              */
@@ -237,6 +253,10 @@ export function AppRouter() {
             {/* Market Routes */}
             <Route path="/market" element={<MarketHomePage />} />
             <Route path="/market/browse" element={<MarketBrowsePage />} />
+            <Route path="/market/publish" element={<MarketPublishPage />} />
+            <Route path="/market/manage" element={<MarketManagePage />} />
+            <Route path="/market/library" element={<MarketLibraryPage />} />
+            <Route path="/market/wishlist" element={<MarketWishlistPage />} />
             <Route path="/market/resource/:id" element={<MarketResourceDetailPage />} />
 
             {/* Account & Admin Routes */}

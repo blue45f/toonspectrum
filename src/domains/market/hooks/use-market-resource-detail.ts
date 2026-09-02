@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { findMergedMarketResourceById } from "../models/market-custom-registry";
 import {
   readCachedMarketResource,
   removeCachedMarketResource,
@@ -28,7 +29,9 @@ export interface MarketResourceDetail {
  * 보여주는 저하 모드로 전환한다(404는 저하 없이 notFound).
  */
 export function useMarketResourceDetail(id: string | undefined): MarketResourceDetail {
-  const initialStarter = id ? findStarterMarketplaceResourceById(id) : null;
+  const initialStarter = id
+    ? (findMergedMarketResourceById(id) ?? findStarterMarketplaceResourceById(id))
+    : null;
   const [record, setRecord] = useState<CreatorMarketplaceResourceRecord | null>(
     initialStarter
   );
@@ -41,7 +44,7 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
-    const starter = findStarterMarketplaceResourceById(id);
+    const starter = findMergedMarketResourceById(id) ?? findStarterMarketplaceResourceById(id);
 
     if (starter) {
       setRecord(starter);

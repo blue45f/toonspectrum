@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useSearchParams } from "react-router-dom";
 
+import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
@@ -169,7 +170,8 @@ export function MarketBrowsePage() {
     <div>
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
-          <p className="eyebrow text-accent">Browse</p>
+          <MarketNavHeader />
+          <p className="eyebrow text-accent mt-6">Browse</p>
           <h1 className="mt-2 text-pretty text-2xl font-bold leading-tight sm:text-3xl">
             마켓 탐색
           </h1>
