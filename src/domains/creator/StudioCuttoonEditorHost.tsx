@@ -24914,13 +24914,18 @@ const puppetWarpArmed =
       // Canvas2D remains a manual compatibility engine. It is never reached from a WebGPU miss.
       liveInkOverlayClearGenRef.current += 1;
       let liveInkOverlayStarted = false;
+      // 오버레이가 애초에 맡지 않는 획(지우개·채우기·대칭)은 시작 실패가 아니라 Konva 직접
+      // 초안이 정상 경로다. 이 자격을 시작 조건과 거절 조건이 같이 써야, WebGPU 없는 기기에서
+      // 표준 지우개가 "2D 표면을 시작하지 못했다"며 통째로 거부되는 일이 없다(실측: 지우개 획이
+      // 화면에는 보이지만 문서·자동저장에 남지 않았다).
+      const liveInkOverlayEligible = overlayCandidate
+        && next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none";
       if (canvas2dSelected
         && liveInkBackendDecision.status === "ready"
         && liveInkBackendDecision.backend === "canvas2d"
-        && overlayCandidate
-        && next.mode !== "eraser"
-        && !next.fill
-        && (next.symmetry?.type ?? "none") === "none"
+        && liveInkOverlayEligible
       ) {
         const liveInkStyle = liveInkStyleFor(next);
         liveInkOverlayStarted = causalPostCorrectionEligible
@@ -24935,7 +24940,7 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      if (canvas2dSelected && overlayCandidate && !liveInkOverlayStarted) {
+      if (canvas2dSelected && liveInkOverlayEligible && !liveInkOverlayStarted) {
         return rejectSelectedSurface("Canvas2D 라이브 잉크", "명시적으로 선택한 2D 표면을 시작하지 못했습니다.");
       }
 
