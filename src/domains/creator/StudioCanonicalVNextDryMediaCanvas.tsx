@@ -353,7 +353,11 @@ export function StudioCanonicalVNextDryMediaCanvas({
       if (!element) return;
       blockedElementIdRef.current = element.id;
       unavailableReasonRef.current = reason;
+      // Only a frame receipted for this exact DrawEl in this exact layout may stand in for the
+      // document pixels. A snapshot from a previous surface size/scale/DPR would be stretched into
+      // the current bounds, so it is not "last good" here — the ordinary element paints instead.
       const lastPresented = lastAuthorizedRef.current?.element === element
+        && lastAuthorizedRef.current.layoutKey === layoutKey
         ? lastAuthorizedRef.current
         : null;
       const retainsLastGoodFrame = lastPresented !== null;
@@ -421,7 +425,13 @@ export function StudioCanonicalVNextDryMediaCanvas({
     setDisplay((current) => current.state === "authorized"
       ? current
       : { state: "awaiting-receipt", reason: null });
-    if (lastAuthorizedRef.current?.element !== element) {
+    if (
+      lastAuthorizedRef.current?.element !== element
+      || lastAuthorizedRef.current.layoutKey !== layoutKey
+    ) {
+      // A layout change (resize, zoom, flip, DPR) invalidates the retained bitmap even for the
+      // same DrawEl: the viewport resolver already refuses a stale-layout authority, so drop the
+      // snapshot here too instead of letting a later failure resurrect it at the wrong geometry.
       lastAuthorizedRef.current = null;
       callbackRef.current(null);
       clearPresentedSnapshot(snapshotCanvas);
