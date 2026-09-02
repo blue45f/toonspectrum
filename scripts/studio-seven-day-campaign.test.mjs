@@ -22,6 +22,10 @@ const continuationWorkflow = fs.readFileSync(
   ".github/workflows/studio-seven-day-immediate-continuation.yml",
   "utf8",
 );
+const safeAutomergeWorkflow = fs.readFileSync(
+  ".github/workflows/studio-safe-automerge.yml",
+  "utf8",
+);
 
 function laneScopedConfig(laneId) {
   const lane = config.lanes.find((candidate) => candidate.id === laneId);
@@ -219,10 +223,20 @@ test("coordinator fills all free lanes and limits research refresh to one active
   assert.match(coordinatorWorkflow, /studio-campaign-gate-dispatcher\.yml/u);
 });
 
-test("manual campaign closure refills lanes while the watchdog covers token-created merges", () => {
+test("manual campaign closure refills lanes while the watchdog covers event loss", () => {
   assert.match(continuationWorkflow, /pull_request:/u);
   assert.match(continuationWorkflow, /codex\/campaign-\*/u);
   assert.match(continuationWorkflow, /studio-seven-day-hourly-trigger\.yml/u);
   assert.match(continuationWorkflow, /Dispatched the parallel coordinator immediately/u);
   assert.match(coordinatorWorkflow, /cron: "2,32 \* \* \* \*"/u);
+});
+
+test("green parallel PRs converge through one ordered main writer and immediately refill capacity", () => {
+  assert.match(safeAutomergeWorkflow, /actions: write/u);
+  assert.match(safeAutomergeWorkflow, /group: studio-safe-automerge-main/u);
+  assert.match(safeAutomergeWorkflow, /cancel-in-progress: false/u);
+  assert.match(safeAutomergeWorkflow, /does not contain current main/u);
+  assert.match(safeAutomergeWorkflow, /fell behind current main/u);
+  assert.match(safeAutomergeWorkflow, /studio-seven-day-hourly-trigger\.yml\/dispatches/u);
+  assert.match(safeAutomergeWorkflow, /30-minute watchdog will recover the lane/u);
 });
