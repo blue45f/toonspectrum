@@ -586,8 +586,8 @@ async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<Scree
     metadata: { timestamp?: number };
   }) => {
     const stamp = (event.metadata.timestamp ?? 0) * 1_000;
-    origin ??= stamp;
-    if (frames.length < maxFrames) frames.push({ tMs: stamp - origin, data: Buffer.from(event.data, "base64") });
+    origin = origin === null ? stamp : Math.min(origin, stamp);
+    if (frames.length < maxFrames) frames.push({ tMs: stamp, data: Buffer.from(event.data, "base64") });
     // Chromium presents the next frame only once the previous one is acknowledged.
     void session.send("Page.screencastFrameAck", { sessionId: event.sessionId }).catch(() => {});
   });
@@ -605,7 +605,13 @@ async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<Scree
       } finally {
         await session.detach().catch(() => {});
       }
-      return frames;
+      // Frame metadata timestamps do not arrive in order — an out-of-order frame put the deepest
+      // dip at -103 ms, i.e. before the cast opened. Order by presentation time before anything
+      // reads the series as a timeline.
+      const first = origin ?? 0;
+      return frames
+        .map((frame) => ({ tMs: frame.tMs - first, data: frame.data }))
+        .sort((left, right) => left.tMs - right.tMs);
     },
   };
 }
@@ -943,6 +949,10 @@ function analyzeStroke(
   const released = decode(captured.released);
   const settled = decode(captured.settled);
   const judgement = { softWet: profile.softWet, transparent: profile.transparent };
+  // An eraser stroke on paper that carries no base removes nothing, so "there is no ink" is a
+  // statement about the scenario, not about the renderer. It used to be reported as
+  // post-release-empty on every eraser preset the curve scenario ran.
+  const judgesInk = options.flicker !== false && !(profile.eraser && options.expectGap == null);
   const findings: StudioBrushScenarioFinding[] = [];
   const stats = (frame: StudioBrushMediaPixelImage) =>
     studioBrushScenarioMaskStats(studioBrushScenarioInkMask(baseline, frame), baseline.width, baseline.height).count;
@@ -950,9 +960,9 @@ function analyzeStroke(
     baseline,
     [released, ...captured.postRelease.map(decode), settled],
   );
-  if (options.flicker !== false) findings.push(...judgeStudioBrushScenarioFlicker(flicker, judgement));
+  if (judgesInk) findings.push(...judgeStudioBrushScenarioFlicker(flicker, judgement));
   const inStroke = analyzeStudioBrushScenarioInStroke(captured.inStroke);
-  if (options.flicker !== false) findings.push(...judgeStudioBrushScenarioInStroke(inStroke, judgement));
+  if (judgesInk) findings.push(...judgeStudioBrushScenarioInStroke(inStroke, judgement));
   const regionResults: Record<string, StudioBrushScenarioDiscrepancy> = {};
   for (const spec of regions) {
     const discrepancy = analyzeStudioBrushScenarioDiscrepancy(
