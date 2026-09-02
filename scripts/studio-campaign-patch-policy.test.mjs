@@ -15,6 +15,8 @@ const change = (path, additions = 10, deletions = 0, extra = {}) => ({
   additions,
   deletions,
   binary: false,
+  oldMode: "100644",
+  newMode: "100644",
   ...extra,
 });
 
@@ -29,9 +31,10 @@ test("accepts a bounded source change accompanied by a focused test", () => {
   assert.equal(result.testChanged, true);
   assert.equal(result.changedFiles, 2);
   assert.equal(result.changedLines, 153);
+  assert.equal(result.fileModeChanged, false);
 });
 
-test("rejects source changes without a focused test or verifier", () => {
+test("rejects source changes without a focused test", () => {
   const result = evaluateStudioCampaignPatch(config, [
     change("src/domains/creator/studio-new-engine.ts", 120, 0, { status: "A" }),
   ]);
@@ -69,6 +72,25 @@ test("rejects workflow, dependency, lockfile, environment, deployment, and datab
   assert.equal(result.dependencyChanged, true);
 });
 
+test("rejects build configuration, verification scripts, tools, and arbitrary root files", () => {
+  const result = evaluateStudioCampaignPatch(config, [
+    change("vite.config.ts"),
+    change("scripts/check-studio-bundle.mjs"),
+    change("tools/generated-runner.mjs"),
+    change("unexpected-root.json"),
+  ]);
+
+  assert.equal(result.ok, false);
+  for (const pathname of [
+    "vite.config.ts",
+    "scripts/check-studio-bundle.mjs",
+    "tools/generated-runner.mjs",
+    "unexpected-root.json",
+  ]) {
+    assert.ok(result.issues.some((issue) => issue.includes(pathname)));
+  }
+});
+
 test("rejects patches that exceed changed-file or changed-line budgets", () => {
   const tooManyFiles = Array.from(
     { length: config.agent.maxChangedFiles + 1 },
@@ -87,7 +109,7 @@ test("rejects patches that exceed changed-file or changed-line budgets", () => {
 
 test("rejects file deletion and binary payload mutations", () => {
   const result = evaluateStudioCampaignPatch(config, [
-    change("src/domains/creator/legacy.ts", 0, 40, { status: "D" }),
+    change("src/domains/creator/legacy.ts", 0, 40, { status: "D", newMode: "000000" }),
     change("public/assets/external-model.glb", 0, 0, { status: "A", binary: true }),
   ]);
 
@@ -96,7 +118,29 @@ test("rejects file deletion and binary payload mutations", () => {
   assert.ok(result.issues.some((issue) => issue.includes("binary payloads")));
 });
 
-test("external payload paths require an exact reuse-registry update", () => {
+test("rejects symbolic links and submodules even inside allowed source paths", () => {
+  const result = evaluateStudioCampaignPatch(config, [
+    change("src/domains/creator/external-link.ts", 1, 0, {
+      status: "A",
+      oldMode: "000000",
+      newMode: "120000",
+    }),
+    change("vendor/external-engine", 1, 0, {
+      status: "A",
+      oldMode: "000000",
+      newMode: "160000",
+    }),
+    change("src/domains/creator/external-link.test.ts", 20, 0, { status: "A" }),
+    change("docs/third-party/studio-reuse-registry.json", 20, 1),
+  ]);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.fileModeChanged, true);
+  assert.ok(result.issues.some((issue) => issue.includes("symbolic links")));
+  assert.ok(result.issues.some((issue) => issue.includes("submodules")));
+});
+
+test("external payload paths require an exact reuse-registry update and focused test", () => {
   const withoutRegistry = evaluateStudioCampaignPatch(config, [
     change("vendor/paint-engine/index.ts", 50, 0, { status: "A" }),
     change("tests/vendor/paint-engine.test.ts", 30, 0, { status: "A" }),
@@ -105,13 +149,20 @@ test("external payload paths require an exact reuse-registry update", () => {
   assert.equal(withoutRegistry.externalPayload, true);
   assert.ok(withoutRegistry.issues.some((issue) => issue.includes("reuse-registry.json")));
 
-  const withRegistry = evaluateStudioCampaignPatch(config, [
+  const withoutTest = evaluateStudioCampaignPatch(config, [
+    change("vendor/paint-engine/index.ts", 50, 0, { status: "A" }),
+    change("docs/third-party/studio-reuse-registry.json", 20, 1),
+  ]);
+  assert.equal(withoutTest.ok, false);
+  assert.ok(withoutTest.issues.some((issue) => issue.includes("focused test")));
+
+  const withRegistryAndTest = evaluateStudioCampaignPatch(config, [
     change("vendor/paint-engine/index.ts", 50, 0, { status: "A" }),
     change("tests/vendor/paint-engine.test.ts", 30, 0, { status: "A" }),
     change("docs/third-party/studio-reuse-registry.json", 20, 1),
   ]);
-  assert.equal(withRegistry.ok, true);
-  assert.equal(withRegistry.registryChanged, true);
+  assert.equal(withRegistryAndTest.ok, true);
+  assert.equal(withRegistryAndTest.registryChanged, true);
 });
 
 test("an empty agent diff is explicitly rejected", () => {
