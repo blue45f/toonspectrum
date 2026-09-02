@@ -482,7 +482,16 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ),
       has("Animatic", "comic/animatic"),
     ],
-    extras: [],
+    extras: [
+      ours(
+        "comic/webtoon-assistant",
+        "웹툰 창작 보조 센터 — §15.3 에 대응 행이 없다. 플랫폼 규격 검사·자동 슬라이서·스크롤 페이싱·효과음 사전·컬러 조화·포커스 타이머·크로키 가이드를 한 창에 모은 제작 보조 도구다(2026-09-03).",
+      ),
+      ours(
+        "comic/ai-super-suite",
+        "AI 웹툰 생성 슈퍼 스위트 — §15.3 은 만화 그룹에 AI 행을 두지 않는다(AI 는 제품 고유 그룹). 화풍 변환·음영 어시스트·프롬프트 증강·콘티 디렉터·감정 말풍선을 연다(2026-09-03).",
+      ),
+    ],
   },
   {
     id: "animation",

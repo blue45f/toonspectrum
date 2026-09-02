@@ -187,7 +187,10 @@ describe("§15.3 menu group spec", () => {
       // 2026-08-27: View 중복이던 검수·미리보기 3종과 창 그룹의 앱 설정 두 번째
       // 진입점 extras 를 제거했다(40 → 36) — 단일 행은 Animation/Comic 그룹과
       // 편집 메뉴가 소유한다.
-      extras: 36,
+      // 2026-09-03: 만화 그룹에 합류한 웹툰 창작 보조 센터와 AI 웹툰 생성 슈퍼
+      // 스위트는 §15.3 Comic & Story 8행 어디에도 대응하지 않아 extras(36 → 38).
+      // 어느 행도 옮기지 않았으므로 present/partial/absent 수치는 그대로다.
+      extras: 38,
     });
   });
 
