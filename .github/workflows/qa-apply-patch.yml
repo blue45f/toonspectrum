@@ -49,11 +49,33 @@ jobs:
             exit 1
           fi
           commit_message="${first_line#\# commit-message: }"
-          tail -n +2 "$patch_file" > /tmp/pending.patch
+
+          second_line="$(sed -n '2p' "$patch_file")"
+          parts=()
+          if [[ "$second_line" == '# patch-parts: '* ]]; then
+            part_prefix="${second_line#\# patch-parts: }"
+            if [[ ! "$part_prefix" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "Patch part prefix contains unsupported characters: $part_prefix" >&2
+              exit 1
+            fi
+            mapfile -t parts < <(
+              find .github/qa-patches -maxdepth 1 -type f -name "${part_prefix}*" -print | sort
+            )
+            if (( ${#parts[@]} == 0 )); then
+              echo "No patch parts found for prefix: $part_prefix" >&2
+              exit 1
+            fi
+            cat "${parts[@]}" > /tmp/pending.patch
+          else
+            tail -n +2 "$patch_file" > /tmp/pending.patch
+          fi
 
           git apply --check --whitespace=error-all /tmp/pending.patch
           git apply --whitespace=fix /tmp/pending.patch
           git rm "$patch_file"
+          if (( ${#parts[@]} > 0 )); then
+            git rm "${parts[@]}"
+          fi
           git add -A
           git diff --cached --check
 
