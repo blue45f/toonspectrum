@@ -979,8 +979,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         context.beginPath();
         context.arc(firstX, firstY, radius, 0, Math.PI * 2);
         context.fill();
+        // 탭은 아직 어떤 **구간도** 칠하지 않았다. 여기서 1을 세워 두면 아래 suffix 가
+        // 첫 구간을 이미 칠한 것으로 오해하고 건너뛴다. 탭 재진입은 paintedPencilMarks 가
+        // 막으므로 이 값은 0으로 남겨야 정확하다.
         active.paintedPencilMarks = 1;
-        active.paintedSourceSegments = 1;
         return true;
       }
       // 증분 빌더: 이동마다 전체 스트로크의 선분을 다시 세우던 O(n)/이동을 새 점 수에만
@@ -1003,9 +1005,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           twist: twists?.[index],
         }),
       );
-      const start = active.paintedSourceSegments === 0
-        ? 0
-        : Math.max(0, active.paintedSourceSegments - 1);
+      // 아직 칠하지 않은 구간만 계획한다. 경계 구간을 다시 넣으면 그 구간이 프레임마다 한 번
+      // 더 칠해져 반투명 획의 알파가 1-(1-a)^2 로 쌓였다 — 같은 파일의 연필 경로가 실측으로
+      // 잡아낸 것과 같은 결함이다(라이브 86.3 vs 커밋 70.0). 다시 넣어도 조인이 더 덮이지도
+      // 않는다: run 의 outline 은 구간별 커버리지 폴리곤의 합집합이고 각 구간이 자기 양 끝
+      // nib 발자국을 이미 내므로, 경계의 앞 구간 몫은 직전 프레임이 이미 칠했다.
+      const start = active.paintedSourceSegments;
       const ribbon = planStudioCalligraphyRibbon(segments.slice(start));
       context.fillStyle = element.stroke;
       context.globalAlpha = Math.min(1, element.opacity ?? 1);
