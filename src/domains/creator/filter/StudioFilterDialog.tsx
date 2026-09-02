@@ -497,6 +497,11 @@ export function StudioFilterDialog({
     () => studioFilterDialogOffset,
   );
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const galleryToggleRef = useRef<HTMLButtonElement>(null);
+  const galleryPickPendingFocusRef = useRef(false);
+  // Announced only after a gallery pick. The dialog's own title changes too, but a title is not a
+  // live region, so nothing told a screen reader that the filter under the sliders is now different.
+  const [galleryPickAnnouncement, setGalleryPickAnnouncement] = useState("");
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryQuery, setGalleryQuery] = useState("");
   const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
@@ -728,6 +733,16 @@ export function StudioFilterDialog({
   }, [comparingOriginal, draft, previewEnabled]);
 
   useEffect(() => {
+    if (!galleryPickPendingFocusRef.current) return;
+    galleryPickPendingFocusRef.current = false;
+    // Choosing a filter collapses the gallery, which unmounts the card that had focus. The browser
+    // then drops focus to <body>: the next Tab restarts from the top of the page, and a screen
+    // reader is left outside the dialog with no word that the filter changed. Hand focus to the
+    // browse toggle, which sits right where the gallery was and is what the artist would reopen.
+    galleryToggleRef.current?.focus({ preventScroll: true });
+  }, [activeKind]);
+
+  useEffect(() => {
     if (!comparingOriginal) return;
     const view = dialogRef.current?.ownerDocument.defaultView ?? null;
     if (!view) return;
@@ -874,6 +889,8 @@ export function StudioFilterDialog({
       rememberStudioEffectRecent(current, studioFilterEffectId(nextKind)),
     );
     setGalleryOpen(false);
+    galleryPickPendingFocusRef.current = true;
+    setGalleryPickAnnouncement(`${STUDIO_FILTER_LABELS[nextKind]} 필터로 바꿨습니다`);
   };
   const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
     updateEffectFavoriteState((current) =>
@@ -997,11 +1014,21 @@ export function StudioFilterDialog({
                 즐겨찾기와 최근 필터는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
               </p>
             ) : null}
+            {/*
+              A live region by attribute rather than role="status": the memory-only preferences
+              warning below already owns that role, and a second one made "the dialog's status"
+              ambiguous to anything querying by role. aria-live + aria-atomic is what role="status"
+              resolves to anyway, so screen-reader behaviour is unchanged.
+            */}
+            <p aria-live="polite" aria-atomic="true" className="sr-only">
+              {galleryPickAnnouncement}
+            </p>
             <section
               aria-label="필터 갤러리"
               className="min-w-0 overflow-hidden rounded-xl border border-line bg-card/45"
             >
               <button
+                ref={galleryToggleRef}
                 type="button"
                 aria-expanded={galleryOpen}
                 aria-controls="studio-filter-gallery-content"
