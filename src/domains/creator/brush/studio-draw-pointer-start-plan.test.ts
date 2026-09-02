@@ -663,10 +663,10 @@ describe("planStudioDrawPointerStart", () => {
   });
 
   it("authors remaining core wet presets as bounded dynamic strokes while preserving legacy walkers", () => {
+    // ink-wash · inkwash-bleed-wash 는 2026-09-02(b871ff48)부터 STUDIO_INKWASH_FLUID_BRUSH_IDS 에
+    // 속해 dab dynamics 대신 공유 Stam 유체 워시를 탄다 — 아래 fluid 블록이 그 계약을 고정한다.
     const wetBrushIds = [
       "watercolor",
-      "ink-wash",
-      "inkwash-bleed-wash",
       "inkwash-white-ink",
     ] as const;
 
@@ -702,6 +702,27 @@ describe("planStudioDrawPointerStart", () => {
     expect(legacy.element.brushDynamics).toBeUndefined();
     expect(legacy.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(legacy.capturePointerDynamics).toBe(false);
+
+    // 유체 수묵은 선택에 dynamics 스냅샷이 실려 있어도 dab 동역학으로 빠지지 않는다 — 포인터
+    // 시작이 그 스냅샷을 버리고 공유 워시 경로(causal-walker-v2)를 고정해야 라이브·커밋이 같다.
+    for (const brushId of ["ink-wash", "inkwash-bleed-wash"] as const) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+      const fluid = planStudioDrawPointerStart(input({
+        brush: brushId,
+        brushCatalogId: selection.catalogId,
+        brushCatalogName: selection.catalogName,
+        brushDynamics: selection.brushDynamics,
+        brushOpacity: selection.defaultOpacity,
+        strokeWidth: selection.defaultWidth,
+      }));
+      expect(fluid.element.paintModel, `${brushId}: fluid wash has no bounded paint model`)
+        .toBeUndefined();
+      expect(fluid.element.watercolorPipeline, `${brushId}: shared Stam wash route`)
+        .toBe("causal-walker-v2");
+    }
   });
 
   it("starts InkWash pen and water on the wet/fluid runtime instead of dab engines", () => {
