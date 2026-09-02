@@ -508,7 +508,7 @@ interface CapturedStroke {
   /** Presented frames while the pointer was down, in presentation order. */
   readonly inStroke: readonly StudioBrushScenarioInStrokeFrame[];
   /** Per-canvas ink over the gesture, when TOONSPECTRUM_SCENARIO_LAYER_PROBE=1. */
-  readonly layers: { labels: string[]; samples: Array<[number, number[]]> } | null;
+  readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
   /** The presented frames themselves, so a detected blink can be written out to look at. */
   readonly presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>;
 }
@@ -627,9 +627,11 @@ async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<Scree
  */
 async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
   await page.evaluate(`((clip) => {
-    // The live overlays are siblings of the Konva stage, not children of it — an earlier probe
-    // rooted at .konvajs-content saw four unchanging document layers and missed the stroke entirely.
-    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active]"));
+    // The live overlays are siblings of the Konva stage, not children of it, and a GPU-lane brush
+    // draws on neither — its pixels are on the WebGPU compositor child. A probe rooted only at
+    // .konvajs-content reported "no layer changed" for a whole pen gesture whose every pixel was on
+    // that compositor, which is what sent one investigation in circles. Watch all three families.
+    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-gpu-compositor]"));
     if (roots.length === 0) return;
     const collect = () => roots.flatMap((root) =>
       root instanceof HTMLCanvasElement ? [root] : Array.from(root.querySelectorAll("canvas")));
@@ -679,11 +681,20 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
         const role = canvas.dataset.studioLiveInkOverlay ? "live-ink"
           : canvas.dataset.studioLiveRetainedActive ? "retained-active"
           : canvas.dataset.studioLiveRetainedSettled ? "retained-settled"
+          : canvas.dataset.studioGpuSurface ? "gpu-" + canvas.dataset.studioGpuSurface
           : "konva";
         return index + ":" + role + ":store" + canvas.width + "x" + canvas.height
           + ":css" + Math.round(rect.width) + "x" + Math.round(rect.height);
       });
-      state.samples.push([Math.round(now), canvases.map(sampleOf)]);
+      // A hidden surface still reads back its pixels, so ink alone cannot explain a blank frame.
+      // The compositor root is CSS-hidden between a GPU submission and its receipt; record that.
+      const compositor = document.querySelector("[data-studio-gpu-compositor]");
+      const shown = compositor ? getComputedStyle(compositor) : null;
+      state.samples.push([
+        Math.round(now),
+        canvases.map(sampleOf),
+        shown ? (shown.visibility === "hidden" || shown.opacity === "0" ? 0 : 1) : -1,
+      ]);
       state.raf = requestAnimationFrame(tick);
     };
     state.raf = requestAnimationFrame(tick);
@@ -693,7 +704,7 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
 
 async function readLayerProbe(page: Page): Promise<{
   labels: string[];
-  samples: Array<[number, number[]]>;
+  samples: Array<[number, number[], number]>;
 }> {
   return await page.evaluate(`(() => {
     const state = window.__scenarioLayers;
@@ -701,7 +712,7 @@ async function readLayerProbe(page: Page): Promise<{
     cancelAnimationFrame(state.raf);
     delete window.__scenarioLayers;
     return { labels: state.labels, samples: state.samples };
-  })()`) as { labels: string[]; samples: Array<[number, number[]]> };
+  })()`) as { labels: string[]; samples: Array<[number, number[], number]> };
 }
 
 async function shot(page: Page, clip: Clip): Promise<Buffer> {
@@ -866,7 +877,7 @@ interface StrokeRecord {
   readonly inkSettled: number;
   readonly flicker: StudioBrushScenarioFlickerAnalysis;
   readonly inStroke: StudioBrushScenarioInStrokeAnalysis;
-  readonly layers: { labels: string[]; samples: Array<[number, number[]]> } | null;
+  readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
   readonly regions: Readonly<Record<string, StudioBrushScenarioDiscrepancy>>;
   readonly perf: {
     longTasks: number;
