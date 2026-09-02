@@ -21,10 +21,12 @@ permissions:
   pull-requests: write
 
 # Feature authoring and validation are parallel. Updating main remains a single ordered stream so
-# two green heads cannot race past one another on a stale base.
+# two green heads cannot race past one another on a stale base. Preserve every pending head when
+# many lane gates complete together instead of replacing earlier pending merge evaluations.
 concurrency:
   group: studio-safe-automerge-main
   cancel-in-progress: false
+  queue: max
 
 jobs:
   merge:
