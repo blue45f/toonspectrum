@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - qa/studio-chromium-inapp-20260902
-    paths:
-      - scripts/qa-live-chromium-inapp-audit.mjs
-      - scripts/qa/studio-chromium-inapp-suite-runner.mjs
-      - .github/workflows/qa-studio-chromium-inapp.yml
   workflow_dispatch:
 
 permissions:
