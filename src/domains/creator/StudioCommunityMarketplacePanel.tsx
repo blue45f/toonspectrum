@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Cloud,
   CloudOff,
+  Cuboid,
   Filter,
   LayoutTemplate,
   LoaderCircle,
@@ -107,6 +108,7 @@ import {
   isCreatorMarketplaceSemver,
   suggestNextCreatorMarketplaceSemver,
 } from "@/lib/creator-marketplace-semver";
+import { filterStarterMarketplaceResources } from "@/lib/creator-marketplace-starter-catalog";
 import { cx } from "@/lib/cx";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/src/compat/auth-session-store";
@@ -250,8 +252,14 @@ const KIND_OPTIONS: readonly {
   {
     id: "3d-preset",
     labelKey: "studio.community.kind.threeDPreset",
-    labelFallback: "3D",
+    labelFallback: "3D 프리셋",
     Icon: Box,
+  },
+  {
+    id: "3d-asset",
+    labelKey: "studio.community.kind.threeDAsset",
+    labelFallback: "3D 에셋",
+    Icon: Cuboid,
   },
 ];
 
@@ -1868,14 +1876,50 @@ export function StudioCommunityMarketplacePanel({
           hasMore: page.hasMore,
         };
       }
-      const page = await listCreatorMarketplaceResources(params, controller.signal);
-      return {
-        items: page.items,
-        libraryEntries: [] as StudioCloudLibraryEntry[],
-        ownedReleases: [] as CreatorMarketplaceOwnedRelease[],
-        nextCursor: page.nextCursor,
-        hasMore: page.hasMore,
-      };
+      try {
+        const page = await listCreatorMarketplaceResources(params, controller.signal);
+        let items = page.items;
+        let hasMore = page.hasMore;
+        let nextCursor = page.nextCursor;
+        if (items.length === 0 && !params.search) {
+          const starter = filterStarterMarketplaceResources({
+            limit: params.limit,
+            search: params.search,
+            kind: params.kind,
+            sort: "newest",
+          });
+          if (starter.items.length > 0) {
+            items = starter.items;
+            hasMore = starter.hasMore;
+            nextCursor = null;
+          }
+        }
+        return {
+          items,
+          libraryEntries: [] as StudioCloudLibraryEntry[],
+          ownedReleases: [] as CreatorMarketplaceOwnedRelease[],
+          nextCursor,
+          hasMore,
+        };
+      } catch (caught: unknown) {
+        if (controller.signal.aborted) throw caught;
+        const starter = filterStarterMarketplaceResources({
+          limit: params.limit,
+          search: params.search,
+          kind: params.kind,
+          sort: "newest",
+        });
+        if (starter.items.length > 0) {
+          return {
+            items: starter.items,
+            libraryEntries: [] as StudioCloudLibraryEntry[],
+            ownedReleases: [] as CreatorMarketplaceOwnedRelease[],
+            nextCursor: null,
+            hasMore: starter.hasMore,
+          };
+        }
+        throw caught;
+      }
     })()
       .then((page) => {
         if (!isCurrentRequest()) return;

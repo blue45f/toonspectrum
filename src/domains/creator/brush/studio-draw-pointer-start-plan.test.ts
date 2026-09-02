@@ -663,9 +663,8 @@ describe("planStudioDrawPointerStart", () => {
   });
 
   it("authors remaining core wet presets as bounded dynamic strokes while preserving legacy walkers", () => {
-    // ink-wash and inkwash-bleed-wash joined the fluid wet-ink brushes (b871ff48): pointer-start
-    // opts them out of dab dynamics so the shared wet/fluid runtime owns live and committed
-    // rendering. Only the non-fluid wet presets are bounded dynamic strokes now.
+    // ink-wash · inkwash-bleed-wash 는 2026-09-02(b871ff48)부터 STUDIO_INKWASH_FLUID_BRUSH_IDS 에
+    // 속해 dab dynamics 대신 공유 Stam 유체 워시를 탄다 — 아래 fluid 블록이 그 계약을 고정한다.
     const wetBrushIds = [
       "watercolor",
       "inkwash-white-ink",
@@ -704,8 +703,8 @@ describe("planStudioDrawPointerStart", () => {
     expect(legacy.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(legacy.capturePointerDynamics).toBe(false);
 
-    // Fluid wet-ink brushes plan like the legacy walker even when the catalogue carries
-    // dynamics: the dab dynamics stay off so the fluid runtime is the single renderer.
+    // 유체 수묵은 선택에 dynamics 스냅샷이 실려 있어도 dab 동역학으로 빠지지 않는다 — 포인터
+    // 시작이 그 스냅샷을 버리고 공유 워시 경로(causal-walker-v2)를 고정해야 라이브·커밋이 같다.
     for (const brushId of ["ink-wash", "inkwash-bleed-wash"] as const) {
       const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
       expect(preset, `${brushId}: missing core preset`).toBeDefined();
@@ -719,13 +718,10 @@ describe("planStudioDrawPointerStart", () => {
         brushOpacity: selection.defaultOpacity,
         strokeWidth: selection.defaultWidth,
       }));
-      expect(fluid.element.paintModel, `${brushId}: fluid strokes carry no dab paint model`)
+      expect(fluid.element.paintModel, `${brushId}: fluid wash has no bounded paint model`)
         .toBeUndefined();
-      expect(fluid.element.brushDynamics, `${brushId}: fluid strokes carry no dab dynamics`)
-        .toBeUndefined();
-      expect(fluid.element.watercolorPipeline, `${brushId}: compatibility walker`)
+      expect(fluid.element.watercolorPipeline, `${brushId}: shared Stam wash route`)
         .toBe("causal-walker-v2");
-      expect(fluid.capturePointerDynamics, `${brushId}: sensor channels`).toBe(false);
     }
   });
 

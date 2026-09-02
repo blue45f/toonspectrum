@@ -214,7 +214,44 @@ describe("smudgeStroke", () => {
     expect(a).toBeGreaterThan(0);
     expect(a).toBeLessThan(255);
 
+    /*
+     * 번져 나간 자락은 옅어질 뿐 어두워지지 않는다.
+     *
+     * getImageData 의 straight RGBA 를 그대로 보간하면 투명 픽셀의 의미 없는 (0,0,0) 이 섞여
+     * 색이 알파와 같은 비율로 끌려 내려간다 — 합성에서 알파가 이미 한 번 옅게 만드는데 색까지
+     * 어두워지므로 자락이 탁한 회갈색이 된다. 실측(원본 200,50,50): 알파 55 인 픽셀이
+     * (43,12,12) 로 읽혔다. 프리멀티플라이드로 섞으면 같은 픽셀이 (200,50,50) 을 유지한다.
+     */
+    for (let x = 0; x < W; x += 1) {
+      const [r, g, b, alpha] = pixelAt(data, W, x, 5);
+      if (alpha <= 0) continue;
+      expect(r).toBeGreaterThan(190);
+      expect(g).toBeGreaterThan(40);
+      expect(g).toBeLessThan(60);
+      expect(b).toBeLessThan(60);
+    }
+
     // 반경 밖(수직으로 멀리 떨어진 지점)은 알파가 그대로 0.
     expect(pixelAt(data, W, 11, 9)[3]).toBe(0);
+  });
+
+  it("an opaque-on-opaque smudge is unchanged by premultiplication", () => {
+    const LEFT: [number, number, number, number] = [200, 50, 50, 255];
+    const RIGHT: [number, number, number, number] = [20, 180, 90, 255];
+    const data = makeImageData(W, H, (x) => (x < 10 ? LEFT : RIGHT));
+    smudgeStroke(data, W, H, [{ x: 4, y: 5 }, { x: 16, y: 5 }], 4, 0.9);
+
+    // 양쪽이 불투명하면 프리멀티플라이드 식은 straight 보간과 같은 값이라, 기존 결과가
+    // 한 비트도 움직이지 않아야 한다 — 알파는 255 로 남고 색은 두 색 사이에 머문다.
+    for (let x = 0; x < W; x += 1) {
+      const [r, g, b, alpha] = pixelAt(data, W, x, 5);
+      expect(alpha).toBe(255);
+      expect(r).toBeGreaterThanOrEqual(Math.min(LEFT[0], RIGHT[0]) - 1);
+      expect(r).toBeLessThanOrEqual(Math.max(LEFT[0], RIGHT[0]) + 1);
+      expect(g).toBeGreaterThanOrEqual(Math.min(LEFT[1], RIGHT[1]) - 1);
+      expect(g).toBeLessThanOrEqual(Math.max(LEFT[1], RIGHT[1]) + 1);
+      expect(b).toBeGreaterThanOrEqual(Math.min(LEFT[2], RIGHT[2]) - 1);
+      expect(b).toBeLessThanOrEqual(Math.max(LEFT[2], RIGHT[2]) + 1);
+    }
   });
 });

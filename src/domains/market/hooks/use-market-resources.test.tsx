@@ -304,4 +304,14 @@ describe("useMarketResources", () => {
       nextCursor: "stale-cursor",
     });
   });
+
+  it("falls back to starter catalog when network fails and no localStorage cache exists", async () => {
+    listResources.mockRejectedValueOnce(new Error("503 Service Unavailable"));
+    const { result } = renderHook(() => useMarketResources({ limit: 12, sort: "newest" }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items.length).toBeGreaterThanOrEqual(1);
+    expect(result.current.items.some((r) => r.kind === "3d-asset")).toBe(true);
+  });
 });

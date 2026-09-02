@@ -54,11 +54,11 @@ const OIL_PROGRAM_ROWS: readonly {
 
 /** 편집 중인 조합이 어떤 출하 프리셋과 같은지 — 같은 게 없으면 null. */
 const OIL_PRESET_NAMES: Readonly<Record<string, string>> = {
-  "brush--bristle-physics": "강모 물리 데모",
+  "brush--bristle-physics": "유화 · 물리 강모 갈필",
   "brush--bristle-depletion": "갈필",
   "brush--impasto-relief": "임파스토 릴리프",
   "oil--filbert-ribbon": "유화 · 필버트 리본",
-  "oil--impasto-ribbon": "유화 · 임파스토 리본",
+  "oil--impasto-ribbon": "유화 · 임파스토(소모 없음)",
   "brush--oil-lanes": "유화 · 기본 레인",
 };
 

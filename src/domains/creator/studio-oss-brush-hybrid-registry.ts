@@ -587,7 +587,8 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     "web-zigzag-edge": "line-ink",
     "web-neon-tube": "fx-particle",
     "web-pressure-flat": "marker",
-    "web-smudge-trail": "paint-bristle",
+    // 강모 경로가 없는 소프트 블렌드 — web-blend-softener 와 같은 핀.
+    "web-smudge-trail": "spray-airbrush",
     "web-cross-hatch-pen": "stamp-tone",
   });
 

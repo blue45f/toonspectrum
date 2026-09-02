@@ -31,7 +31,7 @@ describe("StudioBrushEngineProgramControls", () => {
       />,
     );
     // oil--impasto-ribbon 은 붓털 물리 + 임파스토를 켠다.
-    expect(screen.getByText("유화 · 임파스토 리본와 같은 조합")).toBeTruthy();
+    expect(screen.getByText("유화 · 임파스토(소모 없음)와 같은 조합")).toBeTruthy();
     expect(screen.getByRole("button", { name: /붓털 물리/ }).getAttribute("aria-pressed"))
       .toBe("true");
     expect(screen.getByRole("button", { name: /임파스토 릴리프/ }).getAttribute("aria-pressed"))
