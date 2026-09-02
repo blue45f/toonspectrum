@@ -9,7 +9,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { studioBrushEngineProgramSetFromOil } from "./studio-brush-engine-program-set";
+import {
+  STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
+  studioBrushEngineProgramSetFromOil,
+} from "./studio-brush-engine-program-set";
+import { studioBrushPresetById } from "./studio-draw-ux";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 
 describe("StudioBrushEngineProgramControls", () => {
@@ -40,7 +44,7 @@ describe("StudioBrushEngineProgramControls", () => {
       .toBe("false");
   });
 
-  it("패스를 켜면 세트를 실어 보내고, 프리셋에 없는 조합이면 커스텀이라고 표시한다", () => {
+  it("패스를 켜면 세트를 실어 보내고, 다른 출하 프리셋과 같아지면 그 이름으로 부른다", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -65,9 +69,66 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    // 세 프로그램을 전부 켠 조합에 대응하는 출하 프리셋은 없다.
-    expect(screen.getByText("커스텀 조합")).toBeTruthy();
+    // 세 프로그램을 전부 켠 조합은 2026-08-20 부터 유화 붓·아크릴 물감이 출하하는 조합이다 —
+    // 커스텀이 아니라 그 프리셋 이름으로 불러야 한다(매트릭스 순서상 유화 붓).
+    expect(screen.getByText("유화 붓와 같은 조합")).toBeTruthy();
+    expect(screen.queryByText(/이 조합과 같은 프리셋은 없습니다/)).toBeNull();
     expect(screen.getAllByText("변경됨").length).toBe(1);
+  });
+
+  it("출하 프리셋 어느 것과도 같지 않은 조합만 커스텀이라고 부른다", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <StudioBrushEngineProgramControls
+        brushId="brush--impasto-relief"
+        programSet={null}
+        onChange={onChange}
+      />,
+    );
+    // 릴리프 + 물감 소모(붓털 물리 없음)는 여덟 조합 중 유일하게 출하 프리셋이 없는 조합이다.
+    fireEvent.click(screen.getByRole("button", { name: /물감 소모/ }));
+    const next = onChange.mock.calls[0]![0];
+    expect(next?.oil).toEqual({
+      bristlePhysics: false,
+      bristleLoadDynamics: true,
+      impastoRelief: true,
+    });
+
+    rerender(
+      <StudioBrushEngineProgramControls
+        brushId="brush--impasto-relief"
+        programSet={next}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByText("커스텀 조합")).toBeTruthy();
+    expect(screen.getByText(/이 조합과 같은 프리셋은 없습니다/)).toBeTruthy();
+  });
+
+  it("세 프로그램을 모두 켜고 출하된 유화 붓·아크릴 물감은 자기 이름으로 불린다", () => {
+    for (const [brushId, name] of [["oil", "유화 붓"], ["acrylic", "아크릴 물감"]] as const) {
+      render(
+        <StudioBrushEngineProgramControls brushId={brushId} programSet={null} onChange={vi.fn()} />,
+      );
+      expect(screen.getByText(`${name}와 같은 조합`), brushId).toBeTruthy();
+      expect(screen.queryByText("커스텀 조합"), brushId).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("카탈로그에 실린 매트릭스 id 는 기본 조합에서 결코 커스텀으로 표시되지 않는다", () => {
+    // 매트릭스에 행이 늘어도 편집기가 따라오도록 — 이름을 못 얻는 id(카탈로그에 없는 행)만 예외다.
+    let checked = 0;
+    for (const brushId of STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS) {
+      if (!studioBrushPresetById(brushId)) continue;
+      checked += 1;
+      render(
+        <StudioBrushEngineProgramControls brushId={brushId} programSet={null} onChange={vi.fn()} />,
+      );
+      expect(screen.queryByText("커스텀 조합"), brushId).toBeNull();
+      cleanup();
+    }
+    expect(checked).toBeGreaterThanOrEqual(7);
   });
 
   it("기본값으로 되돌아오면 세트가 아니라 null 을 내보낸다", () => {

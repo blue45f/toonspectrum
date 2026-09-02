@@ -14,6 +14,7 @@ import {
   normalizeStudioBrushEngineProgramSet,
   STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
   STUDIO_BRUSH_OIL_PROGRAM_KEYS,
+  STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
   studioBrushEngineProgramSetFromOil,
   studioBrushEngineProgramSetMatchesBrush,
   studioBrushWatercolorProgramSetFrom,
@@ -40,22 +41,11 @@ function oilDabs(seed: number) {
 /**
  * `studioOilRibbonProgramsForBrush` 의 id 매트릭스에 실제로 행이 있는 열한 id. 앞의 다섯은 각자
  * 다른 조합을 켜고, 뒤의 여섯은 2026-08-20(517f96a1) 부터 한 case 로 묶여 세 프로그램을 전부 켠다.
- * 여기 없는 매트릭스 행은 아래 바이트 동일성·왕복 계약 바깥에 있는 셈이므로, 매트릭스에 case 를
- * 더하면 이 표와 캐리어 docstring 의 개수도 같이 늘려야 한다.
+ * 표는 모듈이 데이터로 내보내는 목록을 그대로 쓴다 — 이 파일의 사설 사본은 2026-08-20 확장을 두 주
+ * 동안 놓쳤고, 엔진 편집기의 사본도 같은 식으로 뒤처졌다. 매트릭스에 case 를 더하면 그 목록과
+ * 캐리어 docstring 의 개수를 같이 늘리고, 아래 정직성 테스트가 목록의 항목 하나하나를 행과 대조한다.
  */
-const OIL_MATRIX_BRUSH_IDS = [
-  "brush--bristle-physics",
-  "brush--bristle-depletion",
-  "brush--impasto-relief",
-  "oil--filbert-ribbon",
-  "oil--impasto-ribbon",
-  "oil",
-  "acrylic",
-  "fluid-paint",
-  "fluid-paint-fine",
-  "fluid-paint-load",
-  "fluid-paint-rake",
-] as const;
+const OIL_MATRIX_BRUSH_IDS = STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS;
 
 /** 매트릭스에 행이 없어 default 로 떨어지는 대표 id — 아무 프로그램도 켜지 않는다. */
 const OIL_DEFAULT_BRUSH_ID = "brush--oil-lanes" as const;
@@ -82,6 +72,7 @@ describe("엔진 프로그램 세트", () => {
       }
     }
   });
+
 
   it("id 매트릭스를 세트로 다시 쓴 표가 원본과 같은 프로그램을 켠다", () => {
     for (const brush of OIL_BRUSH_IDS) {
