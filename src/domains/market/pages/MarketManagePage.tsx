@@ -66,7 +66,7 @@ export function MarketManagePage() {
         if (remoteHeads.items.length > 0) {
           const map = new Map<string, CreatorMarketplaceResourceRecord>();
           for (const item of local) map.set(item.id, item);
-          for (const item of remoteHeads.items) map.set(item.id, item);
+          for (const head of remoteHeads.items) map.set(head.resource.id, head.resource);
           setItems([...map.values()]);
         }
       } catch {

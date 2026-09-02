@@ -38,6 +38,16 @@ import {
 } from "@/src/hooks/use-document-title";
 import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
 
+const RUNTIME_BY_KIND = {
+  asset: "studio-procedural-asset-v1",
+  brush: "studio-brush-v1",
+  filter: "studio-filter-v1",
+  palette: "studio-palette-v1",
+  template: "studio-template-v1",
+  "3d-preset": "studio-bg3d-preset-v1",
+  "3d-asset": "studio-3d-asset-v1",
+} as const;
+
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 창작 마켓");
   useMetaDescription(
@@ -110,7 +120,7 @@ export function MarketPublishPage() {
           payload: {
             schemaVersion: 1,
             resourceKind: kind,
-            runtime: `studio-${kind}:v1`,
+            runtime: RUNTIME_BY_KIND[kind],
             definition: {
               brushSize,
               brushOpacity,
@@ -300,12 +310,12 @@ export function MarketPublishPage() {
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {MARKET_KINDS.map((k) => {
                       const Icon = k.icon;
-                      const selected = kind === k.id;
+                      const selected = kind === k.kind;
                       return (
                         <button
-                          key={k.id}
+                          key={k.kind}
                           type="button"
-                          onClick={() => setKind(k.id)}
+                          onClick={() => setKind(k.kind)}
                           className={cn(
                             "flex flex-col items-start rounded-xl border p-4 text-left transition-all duration-150",
                             selected
@@ -521,7 +531,7 @@ export function MarketPublishPage() {
                       className="mt-1 h-9 w-full rounded-lg border border-line bg-panel px-2.5 text-xs text-fg"
                     >
                       {MARKET_LICENSES.map((lic) => (
-                        <option key={lic.id} value={lic.id}>
+                        <option key={lic.license} value={lic.license}>
                           {lic.label} — {lic.summary}
                         </option>
                       ))}
