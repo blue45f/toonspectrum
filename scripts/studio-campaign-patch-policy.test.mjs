@@ -40,13 +40,16 @@ test("rejects source changes without a focused test or verifier", () => {
   assert.ok(result.issues.some((issue) => issue.includes("require at least one focused test")));
 });
 
-test("rejects workflow, dependency, lockfile, environment, and deployment mutations", () => {
+test("rejects workflow, dependency, lockfile, environment, deployment, and database migration mutations", () => {
   const result = evaluateStudioCampaignPatch(config, [
     change(".github/workflows/agent.yml"),
     change("package.json"),
     change("pnpm-lock.yaml"),
     change(".env.production"),
     change("deploy/oci/service.sh"),
+    change("apps/api/src/db/migrations/9999_campaign.sql"),
+    change("apps/api/src/db/schema.ts"),
+    change("scripts/run-production-database-migrations.mjs"),
   ]);
 
   assert.equal(result.ok, false);
@@ -56,6 +59,9 @@ test("rejects workflow, dependency, lockfile, environment, and deployment mutati
     "pnpm-lock.yaml",
     ".env.production",
     "deploy/oci/service.sh",
+    "apps/api/src/db/migrations/9999_campaign.sql",
+    "apps/api/src/db/schema.ts",
+    "scripts/run-production-database-migrations.mjs",
   ]) {
     assert.ok(result.issues.some((issue) => issue.includes(pathname)));
   }
