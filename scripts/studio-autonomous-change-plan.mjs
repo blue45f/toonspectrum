@@ -53,7 +53,11 @@ const CATEGORY_RULES = Object.freeze({
     /^deploy\/cloudflare-realtime\//,
   ]),
   deployment: Object.freeze([
-    /^\.github\/workflows\//,
+    // Repository automation is not automatically a runtime deployment change. Only workflows
+    // whose filename declares an actual deploy/release target request production build and bundle
+    // validation; coordination, CI, benchmark-watch and branch-cleanup workflows stay API-free
+    // control-plane changes and are covered by the contract tests above the targeted gates.
+    /^\.github\/workflows\/(?:deploy|release|production|vercel|netlify|cloudflare|service-worker)(?:[-_.]|$)/i,
     /^deploy\//,
     /(?:^|\/)(?:vercel|netlify|service-worker|sw)(?:[-_./]|$)/i,
     /(?:^|\/)(?:vite\.config|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/,
@@ -158,7 +162,7 @@ function parseArguments(argv) {
       continue;
     }
     if (argument === "--github-output") {
-      options.githubOutput = argv[index + 1] ?? null;
+      options.githubOutput = argv[index +1] ?? null;
       index += 1;
       continue;
     }
