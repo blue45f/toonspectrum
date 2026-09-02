@@ -16,7 +16,7 @@ concurrency:
 jobs:
   classify:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 10
     outputs:
       changed_count: ${{ steps.classify.outputs.changed_count }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -79,14 +79,28 @@ jobs:
           echo "Changed paths:"
           cat "$RUNNER_TEMP/studio-changed-paths.txt"
 
-      - name: Verify autonomous change classifier contracts
-        run: node --test scripts/studio-autonomous-change-plan.test.mjs
+      - name: Verify autonomous change and branch-cleanup contracts
+        run: |
+          node --test scripts/studio-autonomous-change-plan.test.mjs
+          node --test scripts/studio-merged-branch-cleanup.test.mjs
 
-      - name: Verify competitor registry and watcher contracts
+      - name: Verify product, startup, and research watch contracts
         run: |
           node --test scripts/validate-studio-competitor-registry.test.mjs
           node --test scripts/studio-competitor-watch.test.mjs
+          node --test scripts/studio-emerging-product-watch.test.mjs
+          node --test scripts/studio-research-watch.test.mjs
           node scripts/validate-studio-competitor-registry.mjs
+
+      - name: Verify seven-day campaign and patch-admission contracts
+        run: |
+          node --test scripts/studio-seven-day-campaign.test.mjs
+          node --test scripts/studio-campaign-patch-policy.test.mjs
+
+      - name: Verify exact external-reuse provenance contracts
+        run: |
+          node --test scripts/validate-studio-third-party-reuse.test.mjs
+          node scripts/validate-studio-third-party-reuse.mjs
 
       - name: Classify Studio change risk
         id: classify
