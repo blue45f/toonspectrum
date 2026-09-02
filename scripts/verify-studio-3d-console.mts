@@ -812,11 +812,22 @@ async function dismissHydratedQuickStart(page: Page): Promise<void> {
   await quickStart.waitFor({ state: "detached", timeout: 3_000 });
 }
 
+/** Composite menubar title that absorbed the 3D group (studio-main-menu-presentation.ts). */
+const STUDIO_TOOLS_MENU_TITLE = "도구";
+
+/**
+ * Opens the dropdown that now carries the 3D rows.
+ *
+ * The §15.3 catalogue still owns a `3d` group, but the menubar presentation
+ * (UX 감사 2026-09-02) folds the six thin groups — 캔버스·변형·애니메이션·3D·협업·AI —
+ * into one 도구 title, so there is no top-level "3D" trigger any more. The rows
+ * themselves keep their ids and labels, so everything below this helper is unchanged.
+ */
 async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="3D"]');
+  await mainMenu.getByRole("menuitem", { name: STUDIO_TOOLS_MENU_TITLE, exact: true }).click();
+  const menu = page.locator(`[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]`);
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }
