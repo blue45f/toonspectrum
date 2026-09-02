@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-02",
+  "purpose": "Evidence-gated registry for exact third-party reuse in ToonSpectrum Studio. Compatible public licenses, rights-holder permission, public-domain status, or user-owned rights must be recorded before integration; otherwise only independently implemented capabilities and workflows are allowed.",
+  "entries": []
+}
