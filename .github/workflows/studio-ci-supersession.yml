@@ -1,0 +1,100 @@
+name: Studio CI supersession
+run-name: Supersede stale CI for PR #${{ github.event.pull_request.number }}
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: studio-ci-supersession-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  cancel-stale-ci:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      PULL_NUMBER: ${{ github.event.pull_request.number }}
+      CURRENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Cancel superseded CI runs for this pull request only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          runs_json="$(
+            gh api \
+              --method GET \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              -f event='pull_request' \
+              -f branch="$HEAD_REF" \
+              -f per_page='100' \
+              "repos/${REPOSITORY}/actions/runs"
+          )"
+
+          mapfile -t stale_run_ids < <(
+            jq -r \
+              --arg current "$CURRENT_HEAD_SHA" \
+              --argjson pull "$PULL_NUMBER" '
+                .workflow_runs[]
+                | select(.name == "CI")
+                | select(.head_sha != $current)
+                | select(
+                    .status == "queued"
+                    or .status == "in_progress"
+                    or .status == "requested"
+                    or .status == "waiting"
+                    or .status == "pending"
+                  )
+                | select(any(.pull_requests[]?; .number == $pull))
+                | .id
+              ' <<< "$runs_json"
+          )
+
+          if (( ${#stale_run_ids[@]} == 0 )); then
+            echo "No stale CI run exists for PR #${PULL_NUMBER}."
+            exit 0
+          fi
+
+          cancelled=0
+          for run_id in "${stale_run_ids[@]}"; do
+            set +e
+            response="$(
+              gh api \
+                --method POST \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "repos/${REPOSITORY}/actions/runs/${run_id}/cancel" \
+                2>&1
+            )"
+            status=$?
+            set -e
+            if [[ "$status" -eq 0 ]]; then
+              echo "Cancelled stale CI run ${run_id}."
+              cancelled=$((cancelled + 1))
+            else
+              echo "::notice::CI run ${run_id} completed or moved before cancellation: ${response}"
+            fi
+          done
+
+          {
+            echo "## Stale CI supersession"
+            echo
+            echo "- Pull request: #${PULL_NUMBER}"
+            echo "- Current head: \`${CURRENT_HEAD_SHA}\`"
+            echo "- Stale CI runs found: ${#stale_run_ids[@]}"
+            echo "- Cancellation requests accepted: ${cancelled}"
+          } >> "$GITHUB_STEP_SUMMARY"
