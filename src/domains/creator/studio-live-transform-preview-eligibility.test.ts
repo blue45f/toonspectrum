@@ -155,8 +155,49 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
   it("allows only the audited exact-draft-safe engines", () => {
     // pen/g-pen are causal-ink and calligraphy is calligraphy-segments -- each checked against its
     // planner for world constants, index-derived noise and document-grid snapping.
-    for (const brush of ["pen", "calligraphy"]) {
+    // `brush`/`flat-brush` are angled-ribbon: one quadrilateral per segment about a world-fixed
+    // -30deg nib, planned by a pure function with no seed, clock or coordinate hash, and painted
+    // source-over through a scratch surface that is cleared per mark rather than cached per element.
+    for (const brush of ["pen", "calligraphy", "brush", "flat-brush"]) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(false);
+    }
+  });
+
+  it("refuses subtractive strokes, which an isolated draft Layer cannot show at all", () => {
+    // `destination-out` on the lifted, initially empty draft Layer removes nothing, while hiding
+    // the authoritative source restores the erased region: the hole fills in for the whole drag
+    // and snaps back open at release. Both the explicit eraser mode and an erase-operation brush
+    // reach that composite, and both take `causal-ink` -- an audited engine -- so the check has to
+    // precede the allowlist rather than live inside it.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(draw({ mode: "eraser" }), false),
+    ).toBe(true);
+    for (const brush of ["standard-eraser", "kneaded-eraser"]) {
+      expect(
+        studioLiveTransformPreviewBlockedForElement(draw({ brush }), false),
+        brush,
+      ).toBe(true);
+    }
+    // A paint-operation brush on the same engine is untouched.
+    expect(studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen" }), false)).toBe(false);
+  });
+
+  it("refuses blended strokes, which composite against the document rather than themselves", () => {
+    // Most blended strokes are already caught by the cached-ancestor check, because the document
+    // layer flattens them through a self-caching BlendIsolationGroup. `destination-out` is the
+    // exception that wrapper deliberately leaves uncached, and it is the one that subtracts.
+    for (const blendMode of ["destination-out", "multiply", "screen", "overlay"]) {
+      expect(
+        studioLiveTransformPreviewBlockedForElement(draw({ blendMode }), false),
+        blendMode,
+      ).toBe(true);
+    }
+    // Both spellings of "no blend" keep their preview.
+    for (const blendMode of ["source-over", "normal", undefined]) {
+      expect(
+        studioLiveTransformPreviewBlockedForElement(draw({ blendMode }), false),
+        String(blendMode),
+      ).toBe(false);
     }
   });
 

@@ -240,13 +240,27 @@ export function renderStudioCanvasSelectionDecorations({
           livePreview={
             singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
               ? {
+                  mode: "single" as const,
                   scope: liveTransformDraftScope,
                   element: canvasSelectionEls[0],
                   elements,
                   draftStore: liveTransformDraftStore,
                   transformLiftLayerRef: singleObjectDragLayerRef,
                 }
-              : undefined
+              : marqueeIds.length > 1 && canvasSelectionEls.length === marqueeIds.length
+                ? {
+                    // The group lane admits itself: it stands down to today's commit-at-release
+                    // whenever a member is not a drafted-safe stroke, so the caller does not
+                    // pre-filter and the two cannot disagree about what "eligible" means.
+                    mode: "group" as const,
+                    scope: liveTransformDraftScope,
+                    selection: canvasSelectionEls,
+                    elements,
+                    draftStore: liveTransformDraftStore,
+                    transformLiftLayerRef: singleObjectDragLayerRef,
+                    isLocked: (element: El) => isEffectivelyLocked(element, groups),
+                  }
+                : undefined
           }
           gestureBinding={{
             externalCancelSignal: canvasSelectionResizeCancelSignal,

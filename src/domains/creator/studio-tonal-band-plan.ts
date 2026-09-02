@@ -51,7 +51,7 @@ const MIN_VISIBLE_DEPOSIT = 1 / 255;
  */
 const MAX_TONE_STEP = 1 / 128;
 /** Ceiling on shells per mark. Shell k repaints everything above it, so this bounds the fan-out. */
-const MAX_DENSITY_BANDS = 32;
+export const MAX_DENSITY_BANDS = 32;
 /**
  * Curvature of the density ladder; below 1 the rungs bunch toward the peak. See the ladder comment
  * in the shell planner for why the dark end is both where the steps show and where they are cheap.

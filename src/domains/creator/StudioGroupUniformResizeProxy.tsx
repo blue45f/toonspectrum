@@ -8,6 +8,7 @@ import {
   beginStudioKonvaDrawTransformGesture,
   studioKonvaDrawTransformIsBusy,
 } from "./studio-live-transform-gesture-konva";
+import { beginStudioKonvaGroupDrawTransformGesture } from "./studio-live-transform-group-gesture-konva";
 import {
   mirrorStudioDrawElementTranslation,
 } from "./studio-selection-chrome-mirror";
@@ -73,17 +74,28 @@ export interface StudioGroupUniformResizeProxyProps {
    */
   readonly freeTransform?: boolean;
   /**
-   * Optional single-stroke renderer claim. Route thresholds, arrow semantics, clip ownership,
-   * Layer lift and chrome parking are compiled behind the Konva adapter at gesture begin.
+   * Optional renderer claim for live ink. Route thresholds, arrow semantics, clip ownership,
+   * Layer lift and chrome parking are compiled behind the Konva adapters at gesture begin.
+   *
+   * `mode` is explicit rather than inferred from the payload, because the two lanes commit
+   * differently: a single stroke absorbs a full affine and SCALES its width, while a
+   * multi-selection takes the uniform group planner and PRESERVES it. Picking the wrong adapter
+   * would show ink the release does not produce, so the caller has to name the lane it means.
    */
   readonly livePreview?: {
     readonly scope: string;
-    readonly element: DrawEl;
     readonly elements: readonly El[];
     readonly draftStore?: StudioLiveTransformDraftStore;
     readonly transformLiftLayerRef?: RefObject<Konva.Layer | null>;
     readonly scheduler?: StudioLiveTransformPreviewScheduler;
-  };
+  } & (
+    | { readonly mode: "single"; readonly element: DrawEl }
+    | {
+        readonly mode: "group";
+        readonly selection: readonly El[];
+        readonly isLocked: (element: El) => boolean;
+      }
+  );
   /**
    * Sole document boundary for this gesture. `commit` is the only callback allowed to publish
    * scene/history/CRDT state; `acquire`, `release` and `cancel` own the existing page lease.
@@ -159,7 +171,9 @@ export function StudioGroupUniformResizeProxy({
    * and the user gets the gesture back by lifting that finger.
    */
   function livePreviewStrokeIsAlreadyDragging(): boolean {
-    if (!livePreview) return false;
+    // Only the single-stroke lane writes the wrapper transform, so only it can collide with a
+    // body drag. The group lane leaves every source node untouched and merely hides it.
+    if (livePreview?.mode !== "single") return false;
     const stage = proxyRef.current?.getStage();
     if (!stage) return false;
     return studioKonvaDrawTransformIsBusy(stage, livePreview.element.id);
@@ -256,11 +270,17 @@ export function StudioGroupUniformResizeProxy({
       },
       createTransient: () => {
         const stage = proxy.getStage();
-        const renderer = livePreview && stage
-          ? beginStudioKonvaDrawTransformGesture({
-              preview: {
+        const shared = livePreview && stage
+          ? {
+              sourceBounds,
+              stage,
+              proxy,
+              transformer,
+              onFatalError: () => {
+                cancelActiveTransform("preview-error");
+              },
+              common: {
                 scope: livePreview.scope,
-                element: livePreview.element,
                 elements: livePreview.elements,
                 dragLayer: livePreview.transformLiftLayerRef?.current ?? null,
                 ...(livePreview.draftStore !== undefined
@@ -270,15 +290,31 @@ export function StudioGroupUniformResizeProxy({
                   ? { scheduler: livePreview.scheduler }
                   : {}),
               },
-              sourceBounds,
-              stage,
-              proxy,
-              transformer,
-              onFatalError: () => {
-                cancelActiveTransform("preview-error");
-              },
-            })
+            }
           : null;
+        const renderer = !shared || !livePreview
+          ? null
+          : livePreview.mode === "single"
+            ? beginStudioKonvaDrawTransformGesture({
+                preview: { ...shared.common, element: livePreview.element },
+                sourceBounds: shared.sourceBounds,
+                stage: shared.stage,
+                proxy: shared.proxy,
+                transformer: shared.transformer,
+                onFatalError: shared.onFatalError,
+              })
+            : beginStudioKonvaGroupDrawTransformGesture({
+                preview: {
+                  ...shared.common,
+                  selection: livePreview.selection,
+                  isLocked: livePreview.isLocked,
+                },
+                sourceBounds: shared.sourceBounds,
+                stage: shared.stage,
+                proxy: shared.proxy,
+                transformer: shared.transformer,
+                onFatalError: shared.onFatalError,
+              });
         return {
           offer: (frame) => renderer?.offer(frame),
           close: (outcome) => {
@@ -404,11 +440,17 @@ export function StudioGroupUniformResizeProxy({
     [cancelActiveTransform]
   );
 
+  // The drag mirror exists for a single stroke whose body can be dragged while the handles are
+  // up. A multi-selection has no such single body, so the group lane opts out entirely.
+  const mirroredDragElementId = livePreview?.mode === "single"
+    ? livePreview.element.id
+    : undefined;
+
   // Follow the stroke's imperative drag translation so the handle frame is rasterized in the same
   // frame as the ink. Skipped during an active resize, where the proxy is the thing being moved.
   useLayoutEffect(() => {
     const proxy = proxyRef.current;
-    const mirrorDragElementId = livePreview?.element.id;
+    const mirrorDragElementId = mirroredDragElementId;
     if (!proxy || !mirrorDragElementId || !validBounds) return;
     const stage = proxy.getStage();
     if (!stage) return;
@@ -454,7 +496,7 @@ export function StudioGroupUniformResizeProxy({
         parkedTransformer.getLayer()?.batchDraw();
       }
     };
-  }, [livePreview?.element.id, bounds.x, bounds.y, validBounds]);
+  }, [mirroredDragElementId, bounds.x, bounds.y, validBounds]);
 
   const minimumSize = MINIMUM_VISUAL_SIZE_PX / scale;
 

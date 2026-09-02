@@ -32,37 +32,40 @@ export function StudioLiveTransformDraftNode({
     store.getSnapshot,
   );
   const scopedSnapshot = snapshot?.scope === scope ? snapshot : null;
-  const clip = scopedSnapshot?.clip ?? null;
+  const entries = scopedSnapshot?.entries ?? null;
 
   // Active frames are synchronously painted by the gesture adapter after it switches authority.
   // This receipt handles the other direction: ack/scope-change removes the React child first,
   // then clears the retained pixels before the browser can paint the new document surface.
   useLayoutEffect(() => {
-    if (scopedSnapshot === null) rootRef.current?.getLayer?.()?.drawScene();
-  }, [scope, scopedSnapshot]);
+    if (entries === null) rootRef.current?.getLayer?.()?.drawScene();
+  }, [entries, scope]);
 
   return (
-    <Group
-      ref={rootRef}
-      name="studio-live-transform-draft-root"
-      listening={false}
-      {...(clip
-        ? {
-            clipX: clip.x,
-            clipY: clip.y,
-            clipWidth: clip.width,
-            clipHeight: clip.height,
-          }
-        : {})}
-    >
-      {scopedSnapshot ? (
-        <StudioDrawNode
-          el={scopedSnapshot.element}
-          exposeSceneIdentity={false}
-          paperSurface={paperSurface}
-          renderPurpose="transform-draft"
-        />
-      ) : null}
+    <Group ref={rootRef} name="studio-live-transform-draft-root" listening={false}>
+      {/* One clipping Group per entry: a multi-selection can straddle panels, so the panel that
+          owns each stroke has to clip that stroke and no other. */}
+      {entries?.map(({ element, clip }) => (
+        <Group
+          key={element.id}
+          listening={false}
+          {...(clip
+            ? {
+                clipX: clip.x,
+                clipY: clip.y,
+                clipWidth: clip.width,
+                clipHeight: clip.height,
+              }
+            : {})}
+        >
+          <StudioDrawNode
+            el={element}
+            exposeSceneIdentity={false}
+            paperSurface={paperSurface}
+            renderPurpose="transform-draft"
+          />
+        </Group>
+      )) ?? null}
     </Group>
   );
 }

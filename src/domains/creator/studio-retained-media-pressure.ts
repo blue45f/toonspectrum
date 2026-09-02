@@ -177,6 +177,24 @@ function centeredAxisResponse(
   return 1 + (axis.heavy - 1) * Math.pow(distance, axis.curve);
 }
 
+/**
+ * Largest diameter multiplier a profile can ever return, for O(1) paint-footprint budgeting.
+ *
+ * `centeredAxisResponse` is monotonic in pressure above the neutral plateau and reaches its
+ * maximum, `axis.heavy`, exactly at pressure 1; below the plateau it only descends toward
+ * `axis.light`. `applyStudioMaterialMinimumDiameterRatio` then raises small values toward a ratio
+ * the type constrains to [0, 1], and every profile's `heavy` is above 1, so the floor can never
+ * lift the result past it. The maximum is therefore `heavy` for every input.
+ *
+ * Callers that need a paint radius before touching the samples -- live transform work admission --
+ * multiply this by the nib half-width rather than scanning the pressure array per frame.
+ */
+export function studioRetainedMediaMaximumSizeScale(
+  profileId: StudioRetainedMediaPressureProfileId,
+): number {
+  return PROFILE[profileId].size.heavy;
+}
+
 export function resolveStudioRetainedMediaPressureProfileId(
   brushId: unknown,
 ): StudioRetainedMediaPressureProfileId | null {
