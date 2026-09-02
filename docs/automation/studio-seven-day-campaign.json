@@ -8,7 +8,7 @@
   "maxOpenCampaignPullRequests": 1,
   "branchPrefix": "codex/campaign-",
   "pullRequestMarker": "<!-- studio-automerge -->",
-  "issueQueue": [557, 558, 559, 560, 561, 562, 563],
+  "issueQueue": [557, 558, 559, 560, 561, 562, 563, 569, 570, 571],
   "fallbackTracks": [
     "production-bug-and-ci-repair",
     "canvas-and-input-quality",
@@ -20,6 +20,9 @@
     "three-d-authoring",
     "animation-and-storyboard",
     "structured-ai-assist",
+    "asset-variants-and-batch-generation",
+    "error-bounded-vector-rasterizer",
+    "stroke-level-co-creative-proposals",
     "mobile-accessibility-and-workspace",
     "emerging-product-parity",
     "research-prototype"
