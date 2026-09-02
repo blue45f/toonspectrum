@@ -1,0 +1,105 @@
+name: Studio competitor watch
+
+on:
+  schedule:
+    # Monday 10:23 KST. A non-round minute reduces shared-runner congestion.
+    - cron: "23 1 * * 1"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Sources to inspect"
+        required: true
+        default: p0
+        type: choice
+        options:
+          - p0
+          - all
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: studio-competitor-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TRACKING_ISSUE: "555"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Validate registry and watcher contracts
+        run: |
+          node --test scripts/validate-studio-competitor-registry.test.mjs
+          node --test scripts/studio-competitor-watch.test.mjs
+          node scripts/validate-studio-competitor-registry.mjs
+
+      - name: Inspect official competitor sources
+        env:
+          REQUESTED_SCOPE: ${{ inputs.scope || 'p0' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/studio-competitor-watch"
+          args=(--priority P0)
+          if [[ "$REQUESTED_SCOPE" == "all" ]]; then
+            args=(--all)
+          fi
+          node scripts/studio-competitor-watch.mjs \
+            "${args[@]}" \
+            --concurrency 4 \
+            --timeout-ms 15000 \
+            --output "$RUNNER_TEMP/studio-competitor-watch/report.json" \
+            --markdown "$RUNNER_TEMP/studio-competitor-watch/report.md"
+
+      - name: Publish only a new or degraded fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/studio-competitor-watch/report.json"
+          markdown="$RUNNER_TEMP/studio-competitor-watch/report.md"
+          current_hash="$(jq -r '.aggregateHash' "$report")"
+          failed_count="$(jq -r '.failedCount' "$report")"
+
+          set +e
+          previous_hash="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/issues/${TRACKING_ISSUE}/comments?per_page=100" \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select((.body // "") | contains("<!-- studio-competitor-watch -->")) | .body' \
+              | grep -oE 'Aggregate: `([0-9a-f]{64})`' \
+              | tail -n 1 \
+              | sed -E 's/.*`([0-9a-f]{64})`.*/\1/'
+          )"
+          lookup_status=$?
+          set -e
+          if [[ "$lookup_status" -ne 0 ]]; then
+            previous_hash=""
+          fi
+
+          if [[ "$current_hash" == "$previous_hash" && "$failed_count" == "0" ]]; then
+            echo "Official-source fingerprint is unchanged; no issue comment needed."
+            exit 0
+          fi
+
+          gh issue comment "$TRACKING_ISSUE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body-file "$markdown"
+
+      - name: Upload complete watch evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-competitor-watch-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-competitor-watch/
+          retention-days: 30
+          if-no-files-found: error
