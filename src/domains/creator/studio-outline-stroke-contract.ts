@@ -190,10 +190,16 @@ const CAPSULE_PROFILE_KEYS = [
   "arcTolerancePx",
   "pulledStringLengthPx",
 ] as const;
+/**
+ * 계약이 재생할 수 있는 프로필. `studio-perfect-freehand` 가 프리셋을 추가하면 여기도 같이 커져야
+ * 한다 — maru-pen 은 프리셋과 캡처에는 있었지만 이 목록에 빠져, 모든 마루펜 획이 캔버스에
+ * 자홍색 진단 상자로 그려졌다(장획 게이트 실측: 선이 아니라 점선 상자의 주기가 잡혔다).
+ */
 const PROFILE_IDS = new Set<StudioPerfectFreehandProfileId>([
   "perfect-ink",
   "perfect-marker",
   "gpen",
+  "maru-pen",
 ]);
 
 function issue(

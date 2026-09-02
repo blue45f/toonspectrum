@@ -43,8 +43,9 @@ export interface StudioOilRibbonCarrierPlan {
   /** The body is a single connected outline; it never emits a repeated round/ellipse stamp. */
   readonly repeatedBodyStampCount: 0;
   /**
-   * dli/paint GGX relief overlay lanes (`brush--impasto-relief` program). The key is present iff
-   * the `impastoRelief` option is enabled.
+   * dli/paint GGX relief overlay lanes (the `impastoRelief` program — enabled by the id matrix in
+   * studioOilRibbonProgramsForBrush or a saved program set, not by brush--impasto-relief alone).
+   * The key is present iff the `impastoRelief` option is enabled.
    */
   readonly impastoReliefLanes?: readonly StudioOilRibbonImpastoReliefLane[];
 }

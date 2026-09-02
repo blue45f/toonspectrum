@@ -98,6 +98,7 @@ import {
 } from "./lib/studio-verify-preview-harness.mjs";
 import {
   analyzeStudioLongBrushQuality,
+  studioLongBrushQualityPolicyIsRecordOnly,
   classifyStudioLongBrushQualityPolicy,
   STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION,
   type StudioLongBrushQualityResult,
@@ -2810,6 +2811,7 @@ function writeLongBrushQualityReport(input: Readonly<{
     "strict-continuous": 0,
     "soft-wet-continuous": 0,
     "record-only-discrete": 0,
+    "record-only-transparent": 0,
   };
   for (const entry of input.evidence) {
     policyCounts[entry.quality.policy.kind] += 1;
@@ -2843,6 +2845,11 @@ function writeLongBrushQualityReport(input: Readonly<{
       startCirclePolicy:
         "No route pixels are masked; a live-only circular start deposit is a hard "
         + "continuous-carrier failure.",
+      transparentWashPolicy:
+        "A brush that deposits no pigment (studioWetInkBrushDepositsPigment=false) is "
+        + "record-only-transparent: its live wet hint is recorded, and any ink left in the "
+        + "released or settled frame is a transparent-wash-residue error because it can only be "
+        + "another stroke's pigment resurrected by the shared wash.",
       exactTransitionPolicy:
         "Every transition reports rawChangedPixels/maxChannelDelta at zero RGB tolerance as well "
         + "as perceptible changedPixels. released-to-settled exact parity therefore cannot be "
@@ -3191,6 +3198,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           mediaGroup: preset.mediaGroup,
           previewStyle: preset.previewStyle,
           intentionalDiscrete,
+          depositsPigment,
         });
         // Erasers replay their exact full compound path on the retained main layer, so the same
         // continuous live/release/settled quality policy now applies to destination-out strokes.
@@ -3376,7 +3384,10 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
          * require meaningful output above, persist the full 300 px route below, capture all four
          * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
          */
-        if (depositsPigment && (operation === "erase" || qualityPolicy.kind !== "record-only-discrete")) {
+        if (
+          depositsPigment
+          && (operation === "erase" || !studioLongBrushQualityPolicyIsRecordOnly(qualityPolicy.kind))
+        ) {
           const segmentFailure =
             `${preset.id}: long stroke has missing visual segments `
             + `(${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`;
@@ -3483,7 +3494,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
                 ? " (live retained-layer eraser)"
                 : quality.policy.kind === "record-only-discrete"
                   ? " (discrete)"
-                  : ""
+                  : quality.policy.kind === "record-only-transparent"
+                    ? " (transparent wash)"
+                    : ""
             } + `
             + `${persistedPathDistance.toFixed(1)}px ${operation} persisted + Undo OK`,
         );
@@ -3525,7 +3538,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       `long survey recorded ${surveyFailures.length} failing preset(s)`,
     );
     const continuousSegmentCounts = evidence
-      .filter((entry) => entry.qualityPolicy !== "record-only-discrete")
+      .filter((entry) => !studioLongBrushQualityPolicyIsRecordOnly(entry.qualityPolicy))
       .map((entry) => entry.visibleSegments);
     const discreteSegmentCounts = evidence
       .filter((entry) => entry.qualityPolicy === "record-only-discrete")
@@ -3535,7 +3548,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         entry.visualChanged
         && (
           entry.visibleSegments === entry.totalSegments
-          || entry.qualityPolicy === "record-only-discrete"
+          || studioLongBrushQualityPolicyIsRecordOnly(entry.qualityPolicy)
         )
         && (
           entry.operation === "erase"
@@ -3571,6 +3584,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         ).length,
         "record-only-discrete": qualityEvidence.filter((entry) =>
           entry.quality.policy.kind === "record-only-discrete"
+        ).length,
+        "record-only-transparent": qualityEvidence.filter((entry) =>
+          entry.quality.policy.kind === "record-only-transparent"
         ).length,
       },
       totalSegmentsPerTool: 6,

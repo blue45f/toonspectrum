@@ -32,8 +32,8 @@ function oilStroke(
 
 const OVERLAY_MARKER = `data-brush-engine-overlay="${STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION}"`;
 
-describe("SVG export — brush--impasto-relief GGX 릴리프 오버레이 직렬화", () => {
-  it("임파스토 릴리프 레인만 오버레이 그룹을 직렬화하고 두 톤 계약을 지킨다", () => {
+describe("SVG export — impastoRelief GGX 릴리프 오버레이 직렬화", () => {
+  it("임파스토 릴리프 프로그램이 켜진 획은 오버레이 그룹을 직렬화하고 두 톤 계약을 지킨다", () => {
     const { svg } = exportPageToSvg(page([oilStroke("brush--impasto-relief")]));
 
     expect(svg).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
@@ -79,8 +79,24 @@ describe("SVG export — brush--impasto-relief GGX 릴리프 오버레이 직렬
     expect(svg).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
     expect(svg).toContain("data-paint-impasto-relief");
     expect(svg).toContain(OVERLAY_MARKER);
-    // 결정성은 전용 레인과 동일하게 유지된다.
+    // 결정성은 brush--impasto-relief 와 동일하게 유지된다.
     expect(exportPageToSvg(page([oilStroke("oil--impasto-ribbon")])).svg).toBe(svg);
+  });
+
+  it.each([
+    "oil",
+    "acrylic",
+    "fluid-paint",
+    "fluid-paint-fine",
+    "fluid-paint-load",
+    "fluid-paint-rake",
+  ])("세 프로그램을 모두 켜는 기본 유화 id(%s)도 릴리프 오버레이를 직렬화한다", (brush) => {
+    // 2026-08-20 에 매트릭스에 들어온 6종. 내보내기가 매트릭스가 아니라 옛 두-레인 목록을 보면
+    // 여기서 오버레이가 빠진다.
+    const { svg } = exportPageToSvg(page([oilStroke(brush)]));
+    expect(svg, brush).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
+    expect(svg, brush).toContain(OVERLAY_MARKER);
+    expect(svg, brush).toContain("data-paint-impasto-relief");
   });
 
   it("오버레이 마크는 다른 재료 mark처럼 획 투명도를 곱해 받는다", () => {
