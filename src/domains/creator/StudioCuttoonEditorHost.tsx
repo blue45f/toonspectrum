@@ -557,6 +557,12 @@ import {
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
+  recordStudioRejectedStroke,
+  setStudioRejectedStrokeRestorer,
+  type StudioRejectedStrokeRecord,
+  type StudioRejectedStrokeSalvagePlan,
+} from "./studio-rejected-stroke-recovery";
+import {
   cascadeCanvasPlacementAnchor,
   createCanvasImageElement,
   type CanvasImagePlacement,
@@ -10628,7 +10634,17 @@ export function StudioCuttoonEditor({
     detail: string,
     strokeId: string | null = drawingRef.current?.id ?? null,
   ): void {
-    setError(`${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획을 취소했습니다. ${detail}`);
+    // The live operation is cancelled (ADR 0018: no other provider continues it), but the CPU-side
+    // geometry drawn so far is parked for an explicit user restore instead of being deleted.
+    const salvage = strokeId && drawingRef.current?.id === strokeId
+      ? salvageRejectedStroke(drawingRef.current, providerLabel, detail)
+      : null;
+    setError(
+      salvage?.action === "salvage"
+        ? `${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획의 미리보기를 중단했습니다. `
+          + `완성된 획은 상태 레일의 '획 복구'로 되살릴 수 있습니다. ${detail}`
+        : `${providerLabel} 엔진을 더 이상 사용할 수 없어 현재 획을 취소했습니다. ${detail}`,
+    );
     if (!strokeId || drawingRef.current?.id !== strokeId) return;
     // Stop this provider before the next pointer sample. Cleanup runs after the current adapter
     // callback unwinds so it cannot re-enter a device-loss/frame-receipt transaction.
@@ -10650,7 +10666,7 @@ export function StudioCuttoonEditor({
     // Pointer-up releases drawingRef before an asynchronous final receipt or watchdog failure.
     // Remove that still-uncommitted operation explicitly instead of letting the deferred batch,
     // lifecycle autosave, or streamed CRDT draft outlive its failed selected provider.
-    cancelRejectedSelectedGpuPendingStroke(strokeId);
+    cancelRejectedSelectedGpuPendingStroke(strokeId, reason);
   }
   function failSelectedGpuLiveInk(
     reason: StudioLiveStrokeGpuFailureReason,
@@ -11261,7 +11277,7 @@ export function StudioCuttoonEditor({
               ? `WebGPU 최종 획 동기화: ${cause.message}`
               : "WebGPU 최종 획을 협업 문서에 동기화하지 못했습니다.",
           );
-          cancelRejectedSelectedGpuPendingStroke(strokeId);
+          cancelRejectedSelectedGpuPendingStroke(strokeId, "crdt-sync-failed");
           return;
         }
       }
@@ -11283,9 +11299,21 @@ export function StudioCuttoonEditor({
    * The streamed CRDT draft and deferred vector are one transaction: retaining either would let a
    * later save resurrect geometry that never obtained its terminal WebGPU presentation receipt.
    */
-  function cancelRejectedSelectedGpuPendingStroke(strokeId: string): void {
+  function cancelRejectedSelectedGpuPendingStroke(
+    strokeId: string,
+    reason: string = "provider-unavailable",
+  ): void {
     const batch = pendingStrokeCommitsRef.current;
-    if (!batch?.strokes.some((stroke) => stroke.id === strokeId)) return;
+    const rejected = batch?.strokes.find((stroke) => stroke.id === strokeId);
+    if (!batch || !rejected) return;
+    // Post-pointer-up rejection: the finished operation is removed from the deferred batch and the
+    // CRDT draft exactly as before, but its geometry survives as an explicit recovery record.
+    recordStudioRejectedStroke({
+      stroke: rejected,
+      pageId: batch.pageId,
+      provider: "WebGPU 라이브 잉크",
+      reason,
+    });
 
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     abortDeferredStrokePostprocess([strokeId]);
@@ -12736,6 +12764,50 @@ export function StudioCuttoonEditor({
       persistPendingStrokeEmergencyAutosaveRef.current("pointerup");
     });
   }
+  /**
+   * Parks the geometry of a stroke whose selected live provider failed. The live operation itself
+   * is still cancelled by the caller (ADR 0018: no other provider continues it); this only keeps the
+   * finished CPU-side DrawEl reachable for an explicit user restore from the reliability rail.
+   */
+  function salvageRejectedStroke(
+    stroke: DrawEl | null | undefined,
+    providerLabel: string,
+    reason: string,
+  ): StudioRejectedStrokeSalvagePlan {
+    return recordStudioRejectedStroke({
+      stroke,
+      pageId: activePage.id,
+      provider: providerLabel,
+      reason,
+    });
+  }
+  function restoreRejectedStroke(
+    record: StudioRejectedStrokeRecord,
+  ):
+    | { status: "restored"; recordId: string; restoredStrokeId: string }
+    | { status: "refused"; recordId: string; reason: string } {
+    if (record.pageId !== activePage.id) {
+      return {
+        status: "refused",
+        recordId: record.id,
+        reason: "다른 페이지에서 그린 획입니다. 그 페이지로 이동한 뒤 복구하세요.",
+      };
+    }
+    // The rejected id was tombstoned in the CRDT draft and its GPU receipt bookkeeping was cleared;
+    // restore under a fresh id through the ordinary deferred commit (Konva document layer). This is
+    // the user's explicit choice, not an automatic renderer substitution.
+    const restored: DrawEl = { ...record.stroke, id: uid() };
+    queueDeferredStrokeCommit(restored);
+    return { status: "restored", recordId: record.id, restoredStrokeId: restored.id };
+  }
+  const restoreRejectedStrokeRef = useRef(restoreRejectedStroke);
+  useEffect(() => {
+    restoreRejectedStrokeRef.current = restoreRejectedStroke;
+  });
+  useEffect(
+    () => setStudioRejectedStrokeRestorer((record) => restoreRejectedStrokeRef.current(record)),
+    [],
+  );
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
     setMarqueeActive(next !== null); // 같은 값이면 React 가 렌더를 생략 — 시작/종료 2회만 렌더.
@@ -25570,6 +25642,7 @@ const puppetWarpArmed =
     schedulePanelSplitPreview,
     schedulePixelDragPreview,
     scheduleQuickMaskDragPreview,
+    salvageRejectedStroke,
     sealCausalPostCorrectionState,
     selected,
     settleGpuLiveStroke,

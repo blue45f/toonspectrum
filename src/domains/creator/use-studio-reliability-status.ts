@@ -12,12 +12,25 @@ import {
   subscribeStudioDestructiveActionLedger,
 } from "./studio-destructive-action-preview";
 import {
+  getStudioRejectedStrokeRecords,
+  subscribeStudioRejectedStrokeRecovery,
+} from "./studio-rejected-stroke-recovery";
+import {
   getStudioReliabilityStatusSnapshot,
   subscribeStudioReliabilityStatus,
 } from "./studio-reliability-status-store";
 
 import type { StudioDestructiveActionRecord } from "./studio-destructive-action-preview";
+import type { StudioRejectedStrokeRecord } from "./studio-rejected-stroke-recovery";
 import type { StudioReliabilityStatusSnapshot } from "./studio-reliability-status-store";
+
+export function useStudioRejectedStrokeRecords(): readonly StudioRejectedStrokeRecord[] {
+  return useSyncExternalStore(
+    subscribeStudioRejectedStrokeRecovery,
+    getStudioRejectedStrokeRecords,
+    getStudioRejectedStrokeRecords,
+  );
+}
 
 export function useStudioReliabilityStatus(): StudioReliabilityStatusSnapshot {
   return useSyncExternalStore(
