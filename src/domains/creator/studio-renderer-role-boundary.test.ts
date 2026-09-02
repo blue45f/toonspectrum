@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   STUDIO_RENDERER_ROLE_LEDGER,
   findLabEngineProductImports,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonspectrum/studio-engine-registry/renderer-roles";
 import { describe, expect, it } from "vitest";
 
 // src/domains/creator -> repo root

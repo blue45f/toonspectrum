@@ -26,7 +26,9 @@ E01–E28 후보 조사(`manifest/providers.json`)에 기록돼 있지만, **어
 
 1. `packages/studio-engine-registry/src/renderer-roles.ts`의 `STUDIO_RENDERER_ROLE_LEDGER`가 렌더러 역할의
    단일 진실이다. 항목마다 `role`(현재), `targetRole`(목표), `authorities`, `evidence`(존재해야 하는 경로),
-   `moduleSpecifiers`, `productSymbols`, `candidateId`, `adr`, `note`를 갖는다.
+   `moduleSpecifiers`, `productSymbols`, `candidateId`, `adr`, `note`를 갖는다. 원장은 문서·테스트 증거이지
+   런타임 코드가 아니므로 패키지 배럴에 넣지 않고 `@toonspectrum/studio-engine-registry/renderer-roles`
+   서브패스로만 노출한다(Studio 라우트 번들 ratchet이 이를 잡았다).
 2. 역할은 넷뿐이다.
    - **primary**: 해당 권위의 유일한 소유자. 권위당 정확히 하나.
    - **provider**: 게이트·island·명시 선택으로만 실행되는 전문 엔진. 문서 의미와 undo 히스토리를 소유하지 않는다.

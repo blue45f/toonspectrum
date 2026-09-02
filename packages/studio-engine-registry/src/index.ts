@@ -16,4 +16,6 @@ export * from "./wgsl-sandbox";
 export * from "./wgsl-pipeline-cache";
 export * from "./wesl-compile";
 export * from "./external-filter-bridge";
-export * from "./renderer-roles";
+// The renderer role ledger is documentation and test evidence, not runtime code. It stays out of
+// this barrel so the Studio route bundle does not carry ~35 KiB of ledger notes; import it from
+// "@toonspectrum/studio-engine-registry/renderer-roles" (tests, the doc generator, CI gates).

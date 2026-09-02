@@ -13,6 +13,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./renderer-roles": {
+      "types": "./src/renderer-roles.ts",
+      "import": "./src/renderer-roles.ts",
+      "default": "./src/renderer-roles.ts"
     }
   },
   "scripts": {
