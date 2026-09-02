@@ -1,0 +1,62 @@
+name: Marketplace authoring browser verification
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-browser.yml"
+      - "e2e/marketplace-authoring-workshop.spec.ts"
+      - "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx"
+      - "src/domains/market/pages/MarketPublishPage.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-authoring-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run existing and new marketplace Chromium flows
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/market.spec.ts
+          --project=chromium
+          --reporter=line,html
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-authoring-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 21
