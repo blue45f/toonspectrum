@@ -10,14 +10,12 @@ import {
   STUDIO_FLUID_PAINT_DISPLAY,
   STUDIO_FLUID_PAINT_SPLAT,
   STUDIO_FLUID_PAINT_STATION_SPACING_RATIO,
-  isStudioFluidPaintBrushId,
   studioFluidPaintClampVelocity,
   studioFluidPaintDistanceToSegment,
   studioFluidPaintFilteredSpeed,
   studioFluidPaintRgbToRyb,
   studioFluidPaintRybToRgb,
   studioFluidPaintSplatWeight,
-  studioFluidPaintStationSpacingRatio,
   studioOilFamilyPlanFields,
 } from "./studio-fluid-paint-reference";
 
@@ -69,20 +67,16 @@ describe("Fluid Paint (david.li/paint) reference", () => {
     expect(studioFluidPaintFilteredSpeed([0.1, 0.4, 0.2])).toBe(0.4);
   });
 
-  it("recognizes the Fluid Paint brush family", () => {
-    expect(isStudioFluidPaintBrushId("fluid-paint")).toBe(true);
-    expect(isStudioFluidPaintBrushId("fluid-paint-rake")).toBe(true);
-    expect(isStudioFluidPaintBrushId("oil")).toBe(false);
-    expect(studioFluidPaintStationSpacingRatio("fluid-paint")).toBe(
-      STUDIO_FLUID_PAINT_STATION_SPACING_RATIO,
-    );
-    expect(studioFluidPaintStationSpacingRatio("oil")).toBeUndefined();
+  it("keeps the reference station pitch at one eighth of the oil default", () => {
+    // 8 capsule splats per bristle segment (brush.js) against the 0.068 oil ribbon pitch. No
+    // shipped brush selects this by id any more; a plan opts in through `stationSpacingRatio`.
+    expect(STUDIO_FLUID_PAINT_STATION_SPACING_RATIO).toBeCloseTo(0.068 / 8, 12);
   });
 });
 
 describe("studioOilFamilyPlanFields", () => {
   it("carries the prefix-stable ladder with the rest of the oil plan fields", () => {
-    // The four travel together so a call site cannot take the paint body and forget the cap mode.
+    // The fields travel together so a call site cannot take the paint body and forget the cap mode.
     // It was forgotten exactly once, at the committed Canvas renderer, which would have let a
     // capped stroke be previewed on the ladder and then redrawn on the legacy refit the moment the
     // live overlay handed off — the stroke visibly changing with nothing having been edited.
@@ -91,7 +85,6 @@ describe("studioOilFamilyPlanFields", () => {
       expect(fields.capMode).toBe("prefix-stable-ladder-v2");
       expect(fields.paintBody).toBe(studioOilPaintBodyForBrush(brush));
       expect(fields.tipProfile).toBe(studioOilTipProfileForBrush(brush));
-      expect(fields.stationSpacingRatio).toBe(studioFluidPaintStationSpacingRatio(brush));
     }
   });
 });

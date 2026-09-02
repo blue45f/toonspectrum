@@ -32,7 +32,6 @@ import {
 } from "../studio-fx-brush";
 
 import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
-import { studioFluidPaintStationSpacingRatio } from "./studio-fluid-paint-reference";
 import {
   StudioOilRibbonCarrierPlanner,
   planStudioOilRibbonCarrier,
@@ -66,7 +65,6 @@ function strokePressures(count: number): number[] {
 }
 
 function dabsAt(brushId: string, sampleCount: number, planner?: FxOilDabPlanner): FxOilDab[] {
-  const spacing = studioFluidPaintStationSpacingRatio(brushId);
   const input = {
     points: strokePoints(sampleCount),
     pressures: strokePressures(sampleCount),
@@ -77,7 +75,6 @@ function dabsAt(brushId: string, sampleCount: number, planner?: FxOilDabPlanner)
     tipProfile: studioOilTipProfileForBrush(brushId),
     // Matches the live overlay, which is the caller this planner exists for.
     capMode: "prefix-stable-ladder-v2" as const,
-    ...(spacing === undefined ? {} : { stationSpacingRatio: spacing }),
   };
   return planner ? planner.plan(input) : planOilBrushDabs(input);
 }

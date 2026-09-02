@@ -117,14 +117,10 @@ describe("StudioDrawNode — impastoRelief Canvas 릴리프 오버레이", () =>
   it.each([
     "brush--impasto-relief",
     "oil--impasto-ribbon",
-    // 2026-08-20 에 세 프로그램을 모두 켜고 매트릭스에 들어온 기본 유화 6종 — Canvas 가 매트릭스가
+    // 2026-08-20 에 세 프로그램을 모두 켜고 매트릭스에 들어온 기본 유화 — Canvas 가 매트릭스가
     // 아니라 옛 두-레인 목록을 보면 여기서 글린트가 빠진다.
     "oil",
     "acrylic",
-    "fluid-paint",
-    "fluid-paint-fine",
-    "fluid-paint-load",
-    "fluid-paint-rake",
   ])(
     "임파스토 릴리프 프로그램이 켜진 id(%s)는 screen 글린트와 round-cap 코어 섀도우를 페인트한다",
     (brush) => {

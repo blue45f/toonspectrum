@@ -57,7 +57,7 @@ const OIL_PROGRAM_ROWS: readonly {
 /**
  * 물리 현상으로 부르는 이 편집기의 어조에 맞춘 손글 프리셋 이름. 여기 없는 매트릭스 id 는 카탈로그
  * 이름으로 부른다(유화 붓, 아크릴 물감). 카탈로그에 없는 id 는 출하 프리셋이 아니므로 이름을 얻지
- * 못하고 비교에서 빠진다 — 어느 카탈로그에도 등록되지 않은 fluid-paint 4종이 그렇다.
+ * 못하고 비교에서 빠진다.
  */
 const OIL_PRESET_NAME_OVERRIDES: Readonly<Record<string, string>> = {
   "brush--bristle-physics": "유화 · 물리 강모 갈필",
