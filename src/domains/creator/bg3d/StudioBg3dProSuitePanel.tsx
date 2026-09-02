@@ -1,17 +1,43 @@
-import { Grab, Camera, EyeOff, Sun, Scissors, Sparkles } from "lucide-react";
+import {
+  Grab,
+  Camera,
+  EyeOff,
+  Sun,
+  Scissors,
+  Sparkles,
+  Layers,
+  Wind,
+  Type,
+  Palette,
+} from "lucide-react";
 import { useState } from "react";
+
+import { StudioBg3dClonerPanel } from "./StudioBg3dClonerPanel";
+import { StudioBg3dMatCapStudioPanel } from "./StudioBg3dMatCapStudioPanel";
+import { StudioBg3dParticleVfxPanel } from "./StudioBg3dParticleVfxPanel";
+import { StudioBg3dTextExtruderPanel } from "./StudioBg3dTextExtruderPanel";
 
 import type { CameraLensPreset, PerspectiveGuideMode } from "../scene-3d/studio-3d-camera-perspective-lens";
 import type { HairCrossSectionProfile } from "../scene-3d/studio-3d-procedural-hair-strand";
 import type { HandGripArchetype, CharacterSocketSlot } from "../scene-3d/studio-3d-prop-hand-grip-solver";
 import type { TimeOfDayPreset } from "../scene-3d/studio-3d-scene-auto-culling";
 
+export type ProSuiteActiveTab =
+  | "grip"
+  | "lens"
+  | "culling"
+  | "hair"
+  | "cloner"
+  | "particle"
+  | "text3d"
+  | "matcap";
+
 export interface StudioBg3dProSuitePanelProps {
   readonly disabled?: boolean;
 }
 
 export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuitePanelProps) {
-  const [activeTab, setActiveTab] = useState<"grip" | "lens" | "culling" | "hair">("grip");
+  const [activeTab, setActiveTab] = useState<ProSuiteActiveTab>("grip");
 
   // Tab 1: Prop Grip State
   const [selectedGrip, setSelectedGrip] = useState<HandGripArchetype>("sword-power-grip");
@@ -31,65 +57,41 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
   const [hairProfile, setHairProfile] = useState<HairCrossSectionProfile>("triangular-anime-spike");
   const [strandTaper, setStrandTaper] = useState(1.3);
 
+  const navButtons: Array<{ id: ProSuiteActiveTab; label: string; icon: typeof Grab }> = [
+    { id: "grip", label: "소품 그립", icon: Grab },
+    { id: "lens", label: "만화 렌즈", icon: Camera },
+    { id: "cloner", label: "3D 클로너", icon: Layers },
+    { id: "particle", label: "3D 파티클", icon: Wind },
+    { id: "text3d", label: "3D 효과음", icon: Type },
+    { id: "matcap", label: "맷캡 재질", icon: Palette },
+    { id: "culling", label: "배경 컬링", icon: Sun },
+    { id: "hair", label: "헤어 가닥", icon: Scissors },
+  ];
+
   return (
     <div className="flex flex-col gap-3 p-3 text-xs text-fg">
-      {/* 4 Navigation Tabs */}
+      {/* 8 Navigation Tabs Grid */}
       <div className="grid grid-cols-4 gap-1 rounded-lg border border-line bg-card p-1">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setActiveTab("grip")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.68rem] font-bold transition-all ${
-            activeTab === "grip"
-              ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg"
-          }`}
-        >
-          <Grab className="h-3.5 w-3.5 text-accent" />
-          <span>소품 그립</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setActiveTab("lens")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.68rem] font-bold transition-all ${
-            activeTab === "lens"
-              ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg"
-          }`}
-        >
-          <Camera className="h-3.5 w-3.5 text-accent" />
-          <span>만화 렌즈</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setActiveTab("culling")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.68rem] font-bold transition-all ${
-            activeTab === "culling"
-              ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg"
-          }`}
-        >
-          <Sun className="h-3.5 w-3.5 text-accent" />
-          <span>배경 컬링</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setActiveTab("hair")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.68rem] font-bold transition-all ${
-            activeTab === "hair"
-              ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg"
-          }`}
-        >
-          <Scissors className="h-3.5 w-3.5 text-accent" />
-          <span>헤어 가닥</span>
-        </button>
+        {navButtons.map((btn) => {
+          const Icon = btn.icon;
+          const isSelected = activeTab === btn.id;
+          return (
+            <button
+              key={btn.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => setActiveTab(btn.id)}
+              className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.65rem] font-bold transition-all ${
+                isSelected
+                  ? "border border-line bg-raised text-fg shadow-sm"
+                  : "text-fg-3 hover:text-fg"
+              }`}
+            >
+              <Icon className="size-3.5 text-accent" />
+              <span>{btn.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab 1: Prop Snapping & Hand Grip */}
@@ -247,7 +249,19 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
         </div>
       )}
 
-      {/* Tab 3: Architecture Auto-Culling & Day/Night */}
+      {/* Tab 3: Cloner Panel */}
+      {activeTab === "cloner" && <StudioBg3dClonerPanel disabled={disabled} />}
+
+      {/* Tab 4: Particle VFX Panel */}
+      {activeTab === "particle" && <StudioBg3dParticleVfxPanel disabled={disabled} />}
+
+      {/* Tab 5: 3D Text Extruder Panel */}
+      {activeTab === "text3d" && <StudioBg3dTextExtruderPanel disabled={disabled} />}
+
+      {/* Tab 6: MatCap Studio Panel */}
+      {activeTab === "matcap" && <StudioBg3dMatCapStudioPanel disabled={disabled} />}
+
+      {/* Tab 7: Architecture Auto-Culling & Day/Night */}
       {activeTab === "culling" && (
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center justify-between rounded-xl border border-line bg-card/60 p-2.5 text-[0.68rem]">
@@ -303,7 +317,7 @@ export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuite
         </div>
       )}
 
-      {/* Tab 4: Hair Strand Maker */}
+      {/* Tab 8: Hair Strand Maker */}
       {activeTab === "hair" && (
         <div className="flex flex-col gap-2.5">
           <div>

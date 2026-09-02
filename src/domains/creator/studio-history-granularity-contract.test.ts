@@ -29,14 +29,6 @@ const autosaveRuntimeSource = readFileSync(
   new URL("./studio-page-autosave-runtime.ts", import.meta.url),
   "utf8",
 );
-// Intentional change (1ebbc478): the sidecar history controller (recordStudioSidecarHistoryEntry,
-// setCharacterBible/setWriterRoom, restore/hydrate) moved to history/studio-page-sidecars-controller.ts.
-// The host injects the pending-stroke flush through `onBeforeRecordSidecar`, so the ordering
-// contract is now split across the two files and checked in both below.
-const sidecarsControllerSource = readFileSync(
-  new URL("./history/studio-page-sidecars-controller.ts", import.meta.url),
-  "utf8",
-);
 const catalogSource = readFileSync(
   new URL("./studio-destructive-command-catalog.ts", import.meta.url),
   "utf8",
@@ -62,8 +54,15 @@ function autosaveRuntimeBetween(start: string, end: string): string {
   return sliceBetween(autosaveRuntimeSource, start, end);
 }
 
-function sidecarsBetween(start: string, end: string): string {
-  return sliceBetween(sidecarsControllerSource, start, end);
+// 사이드카 setter·기록·수화는 1ebbc478 에서 history/studio-page-sidecars-controller.ts 로 추출됐다.
+// 계약(플러시 → 기록 순서, before/after 스냅샷)은 그대로이므로 그 파일에서 확인한다.
+const sidecarControllerSource = readFileSync(
+  new URL("./history/studio-page-sidecars-controller.ts", import.meta.url),
+  "utf8",
+);
+
+function sidecarBetween(start: string, end: string): string {
+  return sliceBetween(sidecarControllerSource, start, end);
 }
 
 function editorSourceBetween(start: string, end: string): string {
@@ -178,11 +177,11 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
 
     for (const target of ["characterBible", "writerRoom"]) {
       const setter = target === "characterBible"
-        ? sidecarsBetween(
+        ? sidecarBetween(
             "const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {",
             "const setWriterRoom = (next:",
           )
-        : sidecarsBetween(
+        : sidecarBetween(
             "const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {",
             "function restoreStudioSidecarDocument(",
           );
@@ -197,20 +196,18 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
   });
 
   it("사이드카 기록은 대기 획 배치를 먼저 안착시켜 시간 순서를 지킨다", () => {
-    const record = sidecarsBetween(
+    const record = sidecarBetween(
       "function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {",
       "const setCharacterBible =",
     );
 
     // 배치는 나중에 flush 된다 — 먼저 안착시키지 않으면 "획 → 사이드카" 가 저널에서 뒤집힌다.
-    // 컨트롤러는 flush 를 직접 알지 못하고 `onBeforeRecordSidecar` 훅을 저널 기록보다 먼저 부른다.
-    expect(record).toContain("onBeforeRecordSidecar?.();");
-    expect(record.indexOf("onBeforeRecordSidecar")).toBeLessThan(
+    // 컨트롤러는 훅(onBeforeRecordSidecar)을 먼저 부르고, 호스트가 그 훅에 대기 배치 flush 를 건다.
+    expect(record.indexOf("onBeforeRecordSidecar?.()")).toBeLessThan(
       record.indexOf("recordStudioHistoryJournalSidecarEdit"),
     );
-    // 호스트가 그 훅에 대기 획 배치 flush 를 넣는다 — 이 배선이 빠지면 계약은 소리 없이 깨진다.
-    const wiring = sourceBetween("useStudioSidecarDocuments({", "historyJournalRef,");
-    expect(wiring).toContain("onBeforeRecordSidecar: () => {");
+    expect(record.indexOf("onBeforeRecordSidecar?.()")).toBeGreaterThanOrEqual(0);
+    const wiring = sourceBetween("onBeforeRecordSidecar: () => {", "historyJournalRef,");
     expect(wiring).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
   });
 
@@ -273,9 +270,9 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
     expect(restore).toContain("resetStudioHistoryJournal();");
     expect(restore).toContain("hydrateStudioSidecarDocuments({");
 
-    const hydrate = sidecarsBetween(
+    const hydrate = sidecarBetween(
       "function hydrateStudioSidecarDocuments(input: {",
-      "  return {",
+      "  return {\n    characterBible,",
     );
     // 수화는 사용자의 편집이 아니다 — raw setter 로 가고 저널 항목을 만들지 않는다.
     expect(hydrate).toContain("setCharacterBibleState(input.characterBible);");

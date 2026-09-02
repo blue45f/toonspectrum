@@ -4,11 +4,15 @@ import { describe, it, expect } from "vitest";
 import { StudioBg3dProSuitePanel } from "./StudioBg3dProSuitePanel";
 
 describe("StudioBg3dProSuitePanel", () => {
-  it("renders all 4 pro suite tabs: Prop Grip, Manga Lens, Scene Culling, Hair Strands", () => {
+  it("renders all 8 pro suite tabs: Prop Grip, Manga Lens, Cloner, Particle VFX, Text SFX, MatCap, Culling, Hair", () => {
     const markup = renderToStaticMarkup(<StudioBg3dProSuitePanel />);
 
     expect(markup).toContain("소품 그립");
     expect(markup).toContain("만화 렌즈");
+    expect(markup).toContain("3D 클로너");
+    expect(markup).toContain("3D 파티클");
+    expect(markup).toContain("3D 효과음");
+    expect(markup).toContain("맷캡 재질");
     expect(markup).toContain("배경 컬링");
     expect(markup).toContain("헤어 가닥");
 

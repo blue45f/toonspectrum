@@ -69,12 +69,13 @@ export interface StudioBackground3DProps {
 export type TransformModeId = "translate" | "rotate" | "scale";
 export type TransformSpace = "local" | "world";
 export type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
-export type ViewEditorSection = "camera" | "physics";
+export type ViewEditorSection = "camera" | "physics" | "prosuite";
 export type LtEditorSection = "line" | "tone";
 
 export const VIEW_EDITOR_SECTIONS = [
   { id: "camera", label: "카메라 · 환경" },
   { id: "physics", label: "물리 배치" },
+  { id: "prosuite", label: "웹툰 프로 툴" },
 ] as const satisfies readonly { id: ViewEditorSection; label: string }[];
 
 export type LtUserPresetLibraryStatus =
