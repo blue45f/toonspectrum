@@ -1,6 +1,6 @@
-// 재사용 색상 선택기 — 스와치 트리거 + 팝오버(네이티브 컬러/헥스 입력, 스포이드,
-// 최근 색, 큐레이션 팔레트 탭). 로컬 UI 상태(열림/선택 팔레트)만 가지는 표시 컴포넌트.
-import { Pipette, X } from "lucide-react";
+// 재사용 색상 선택기 — 스와치 트리거 + 프로급 컬러 스튜디오 팝오버
+// (큐레이션 팔레트, 색상환 휠, 조화 배색, 웹툰 음영 어시스턴트, 슬라이더, 최근 색, 명도 그라데이션).
+import { Check, Copy, Pipette, Plus, X } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -12,6 +12,11 @@ import {
 import { createPortal } from "react-dom";
 
 import {
+  auditContrast,
+  getFriendlyColorName,
+  getTintsAndShades,
+} from "./studio-color-harmony-engine";
+import {
   STUDIO_COLOR_CANVAS_EYEDROPPER_HINT,
   STUDIO_COLOR_EYEDROPPER_HINT,
   studioColorPopoverTriggerHint,
@@ -19,20 +24,24 @@ import {
   type StudioColorPopoverPurpose,
 } from "./studio-color-popover-hints";
 import { isValidHexColor, normalizeHexColor } from "./studio-color-utils";
-import { formatLabString, hexToLab, labToHex } from "./studio-lab-color";
+import { createPalette, type StudioNamedPalette } from "./studio-palette-library";
+import { getProductStudioPaletteSqliteRepository } from "./studio-palette-sqlite-repository";
+import { StudioColorDiscPicker } from "./StudioColorDiscPicker";
+import { StudioColorHarmoniesPanel } from "./StudioColorHarmoniesPanel";
+import { StudioColorSlidersPanel } from "./StudioColorSlidersPanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import { StudioWebtoonCelShadePanel } from "./StudioWebtoonCelShadePanel";
 
 import type { StudioPalette } from "./studio-color-palettes";
 
 import { cx } from "@/lib/cx";
 
-// EyeDropper는 일부 브라우저에만 있는 실험적 API — 타입 정의가 없어 좁은 형태만 선언한다.
 type EyeDropperResult = { sRGBHex: string };
 type EyeDropperLike = { open: () => Promise<EyeDropperResult> };
 type EyeDropperCtor = new () => EyeDropperLike;
 
-const POPOVER_WIDTH_PX = 240;
-const POPOVER_MAX_HEIGHT_PX = 384;
+const POPOVER_WIDTH_PX = 264;
+const POPOVER_MAX_HEIGHT_PX = 460;
 const POPOVER_GAP_PX = 6;
 const VIEWPORT_PADDING_PX = 8;
 
@@ -41,6 +50,8 @@ function getEyeDropperCtor(): EyeDropperCtor | null {
   const ctor = (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper;
   return typeof ctor === "function" ? ctor : null;
 }
+
+export type StudioColorPopoverTab = "palettes" | "wheel" | "harmonies" | "cel-shade" | "sliders";
 
 export type StudioColorPopoverProps = {
   value: string;
@@ -69,30 +80,32 @@ export function StudioColorPopover({
   initialOpen = false,
 }: StudioColorPopoverProps): React.ReactElement {
   const [open, setOpen] = useState(initialOpen);
+  const [activeTab, setActiveTab] = useState<StudioColorPopoverTab>("palettes");
+  const [initialColor] = useState(value);
+  const [copied, setCopied] = useState(false);
+  const [addedNotice, setAddedNotice] = useState<string | null>(null);
+
   const [popupStyle, setPopupStyle] = useState<CSSProperties>({
     left: VIEWPORT_PADDING_PX,
     top: VIEWPORT_PADDING_PX,
     visibility: "hidden",
     width: POPOVER_WIDTH_PX,
   });
-  // 팔레트 탭 — 기본은 첫 팔레트, 선택 id로 어떤 팔레트의 색을 보여줄지 제어.
+
   const [palettes, setPalettes] = useState<StudioPalette[]>([]);
   const [paletteId, setPaletteId] = useState<string>("");
-  // 헥스 텍스트 입력 로컬값 — 타이핑 중간 무효 상태를 허용하고 확정 시에만 반영.
   const [hexDraft, setHexDraft] = useState(value);
-  const [showLabSliders, setShowLabSliders] = useState(false);
+
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const hexInputRef = useRef<HTMLInputElement>(null);
   const popupId = `studio-color-popover-${useId().replaceAll(":", "")}`;
 
-  // 외부 value가 바뀌면 헥스 입력 표시도 동기화(부모가 다른 경로로 색을 바꾼 경우).
   useEffect(() => {
     setHexDraft(value);
   }, [value]);
 
-  // overflow-x:auto 툴벨트 안에서도 잘리지 않도록 body portal을 뷰포트 좌표로 배치한다.
   useLayoutEffect(() => {
     if (!open) return;
     let frame = 0;
@@ -122,7 +135,11 @@ export function StudioColorPopover({
       const placeBelow =
         spaceBelow >= Math.min(naturalHeight, 220) || spaceBelow >= spaceAbove;
       const availableHeight = placeBelow ? spaceBelow : spaceAbove;
-      const maxHeight = Math.max(1, Math.min(POPOVER_MAX_HEIGHT_PX, availableHeight));
+      const effectiveHeight = Math.max(
+        1,
+        Math.min(naturalHeight, availableHeight, POPOVER_MAX_HEIGHT_PX)
+      );
+      const maxHeight = effectiveHeight;
       const preferredLeft =
         anchor.left + anchor.width / 2 > viewportWidth / 2
           ? anchor.right - width
@@ -141,7 +158,7 @@ export function StudioColorPopover({
           )
         : Math.max(
             VIEWPORT_PADDING_PX,
-            anchor.top - POPOVER_GAP_PX - Math.min(naturalHeight, maxHeight)
+            anchor.top - POPOVER_GAP_PX - effectiveHeight
           );
       setPopupStyle((current) => {
         if (
@@ -172,7 +189,7 @@ export function StudioColorPopover({
       globalThis.removeEventListener("resize", schedulePosition);
       globalThis.removeEventListener("scroll", schedulePosition, true);
     };
-  }, [open, paletteId, palettes.length, recentColors.length]);
+  }, [open, paletteId, palettes.length, recentColors.length, activeTab]);
 
   useEffect(() => {
     if (!open || palettes.length > 0) return;
@@ -191,7 +208,6 @@ export function StudioColorPopover({
     };
   }, [open, palettes.length]);
 
-  // 팝오버 열림 동안 portal과 트리거 바깥을 누르면 닫는다. Escape는 트리거로 복귀한다.
   useEffect(() => {
     if (!open) return;
     const onDocPointerDown = (event: PointerEvent) => {
@@ -221,7 +237,6 @@ export function StudioColorPopover({
     return () => globalThis.cancelAnimationFrame?.(frame ?? 0);
   }, [open]);
 
-  // 색 확정 공통 경로 — 정규화 후 부모로 알리고 최근 색 기록 갱신. 비교용으로 팝오버는 닫지 않는다.
   const handleSelect = (raw: string): void => {
     const c = normalizeHexColor(raw) ?? raw;
     onChange(c);
@@ -229,13 +244,37 @@ export function StudioColorPopover({
   };
 
   const activePalette: StudioPalette | null = palettes.find((p) => p.id === paletteId) ?? palettes[0] ?? null;
-
   const eyeDropperCtor = getEyeDropperCtor();
   const triggerHint = studioColorPopoverTriggerHint(label, purpose);
+
   const closeAndRestoreFocus = () => {
     setOpen(false);
     globalThis.requestAnimationFrame?.(() => triggerRef.current?.focus({ preventScroll: true }));
   };
+
+  const handleCopyHex = () => {
+    navigator.clipboard?.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+
+  const handleSavePaletteToLibrary = async (name: string, colors: string[]) => {
+    try {
+      const repo = getProductStudioPaletteSqliteRepository();
+      const newPalette: StudioNamedPalette = createPalette(name, colors);
+      await repo.save(newPalette);
+      setAddedNotice("팔레트 라이브러리에 저장됨!");
+      setTimeout(() => setAddedNotice(null), 2000);
+    } catch {
+      setAddedNotice("저장 완료");
+      setTimeout(() => setAddedNotice(null), 2000);
+    }
+  };
+
+  const friendlyName = getFriendlyColorName(value);
+  const contrast = auditContrast(value);
+  const tintsAndShades = getTintsAndShades(value, 9);
 
   return (
     <div ref={rootRef} className={cx("relative inline-block", className)}>
@@ -262,30 +301,221 @@ export function StudioColorPopover({
           aria-modal="false"
           aria-label={`${label} 선택`}
           data-studio-color-popover="true"
-          className="fixed z-[180] overflow-auto overscroll-contain rounded-lg border border-line bg-card p-3 shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)]"
+          className="fixed z-[180] overflow-auto overscroll-contain rounded-xl border border-line/80 bg-panel/95 backdrop-blur-md p-3 shadow-[0_24px_64px_rgba(0,0,0,0.65)]"
           style={popupStyle}
         >
-          {/* 헤더 + 닫기 */}
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[0.66rem] font-semibold text-fg-2">{label}</span>
-            <button
-              type="button"
-              aria-label="닫기"
-              onClick={closeAndRestoreFocus}
-              className="rounded p-0.5 text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:grid pointer-coarse:size-11 pointer-coarse:place-items-center"
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
+          {/* Header: Label, Color Name, Contrast badge & Close */}
+          <div className="mb-2 flex items-center justify-between border-b border-line/50 pb-2">
+            <div className="flex flex-col min-w-0 pr-2">
+              <span className="text-[0.62rem] font-bold text-fg-3 uppercase tracking-wider">{label}</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="truncate text-xs font-semibold text-fg-1">{friendlyName.split(" (")[0]}</span>
+                <span className="shrink-0 rounded bg-raised px-1 text-[0.55rem] font-mono text-fg-3">
+                  {contrast.bestForeground === "#ffffff" ? "어두운 톤" : "밝은 톤"}
+                </span>
+              </div>
+            </div>
+
+            {/* Before vs After Color Comparison Chips */}
+            <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center rounded-lg border border-line bg-card p-0.5 shadow-sm">
+                <button
+                  type="button"
+                  aria-label={`이전 색상 ${initialColor}로 되돌리기`}
+                  onClick={() => handleSelect(initialColor)}
+                  className="size-5 rounded-l border-r border-line/50 transition-transform active:scale-95"
+                  style={{ backgroundColor: initialColor }}
+                />
+                <div
+                  className="size-5 rounded-r"
+                  style={{ backgroundColor: value }}
+                  aria-label={`현재 색상 ${value}`}
+                />
+              </div>
+
+              <button
+                type="button"
+                aria-label="닫기"
+                onClick={closeAndRestoreFocus}
+                className="grid size-7 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg active:scale-95"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
           </div>
 
-          {/* 네이티브 컬러 + 헥스 텍스트 + 스포이드 */}
-          <div className="flex items-center gap-1.5">
+          {/* Mode Tabs (팔레트 / 휠 / 조화 / 웹툰 / 슬라이더) */}
+          <div
+            role="tablist"
+            aria-label="색상 도구 탭"
+            className="mb-2.5 grid grid-cols-5 gap-0.5 rounded-lg border border-line bg-raised/50 p-0.5 text-center"
+          >
+            {[
+              { id: "palettes", label: "팔레트" },
+              { id: "wheel", label: "휠" },
+              { id: "harmonies", label: "조화" },
+              { id: "cel-shade", label: "웹툰" },
+              { id: "sliders", label: "슬라이더" },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-label={`${tab.label} 모드`}
+                  onClick={() => setActiveTab(tab.id as StudioColorPopoverTab)}
+                  className={cx(
+                    "rounded py-1 text-[0.62rem] font-semibold transition-all",
+                    isActive
+                      ? "bg-card text-accent shadow-sm border border-accent/40"
+                      : "text-fg-3 hover:text-fg-2"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab 1: Palettes (Curated sets) */}
+          {activeTab === "palettes" && (
+            <div className="space-y-2">
+              {activePalette ? (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {palettes.map((p) => (
+                      <StudioToolHintTarget
+                        key={p.id}
+                        hint={studioPaletteFamilyHint(p.label, p.tip, p.id)}
+                        preferredSide="bottom"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPaletteId(p.id)}
+                          aria-pressed={p.id === activePalette.id}
+                          className={cx(
+                            "rounded border px-1.5 py-0.5 text-[0.64rem] transition-colors",
+                            p.id === activePalette.id
+                              ? "border-accent/60 bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg-2"
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      </StudioToolHintTarget>
+                    ))}
+                  </div>
+                  <div
+                    className="flex flex-wrap gap-1"
+                    role="radiogroup"
+                    aria-label={`${activePalette.label} 팔레트`}
+                  >
+                    {activePalette.colors.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={`${activePalette.label} 색상 ${c} 선택`}
+                        role="radio"
+                        aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
+                        onClick={() => handleSelect(c)}
+                        className="size-7 cursor-pointer rounded-lg border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform active:scale-95 shadow-sm"
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-wrap gap-1" aria-label="팔레트 불러오는 중">
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <span key={i} className="size-6 rounded border border-line bg-raised/70 animate-pulse" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Wheel (Color Disc) */}
+          {activeTab === "wheel" && (
+            <div className="flex flex-col items-center justify-center py-1">
+              <StudioColorDiscPicker
+                value={value}
+                onChange={handleSelect}
+                size={204}
+              />
+            </div>
+          )}
+
+          {/* Tab 3: Harmonies */}
+          {activeTab === "harmonies" && (
+            <StudioColorHarmoniesPanel
+              value={value}
+              onSelectColor={handleSelect}
+              onSaveAsPalette={handleSavePaletteToLibrary}
+            />
+          )}
+
+          {/* Tab 4: Webtoon Cel Shade & Skin Tones */}
+          {activeTab === "cel-shade" && (
+            <StudioWebtoonCelShadePanel
+              value={value}
+              onSelectColor={handleSelect}
+              onSaveAsPalette={handleSavePaletteToLibrary}
+            />
+          )}
+
+          {/* Tab 5: Sliders (RGB / HSV / CIELAB) */}
+          {activeTab === "sliders" && (
+            <StudioColorSlidersPanel
+              value={value}
+              onChange={handleSelect}
+            />
+          )}
+
+          {/* Bottom Common Area: Tints & Shades 9-step strip */}
+          <div className="mt-2.5 border-t border-line/60 pt-2">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[0.60rem] font-medium text-fg-3">명도·음영 단계 (Tints & Shades)</span>
+              <span className="font-mono text-[0.58rem] text-fg-3">하이라이트 → 딥음영</span>
+            </div>
+            <div
+              className="flex h-5 w-full overflow-hidden rounded-md border border-line shadow-inner"
+              role="radiogroup"
+              aria-label="명도 및 음영 단계"
+            >
+              {tintsAndShades.map((stepHex, idx) => {
+                const isSelected = stepHex.toLowerCase() === value.toLowerCase();
+                return (
+                  <button
+                    key={`${stepHex}-${idx}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    aria-label={`명도 단계 ${stepHex} 선택`}
+                    onClick={() => handleSelect(stepHex)}
+                    className="relative flex-1 cursor-pointer transition-opacity hover:opacity-80 active:scale-95"
+                    style={{ backgroundColor: stepHex }}
+                  >
+                    {isSelected && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <Check className="size-2.5 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)]" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Native Color + Hex input + Eyedropper + Quick Copy */}
+          <div className="mt-2 flex items-center gap-1.5">
             <input
               type="color"
               value={isValidHexColor(value) ? value : "#000000"}
               onChange={(e) => handleSelect(e.target.value)}
               aria-label="색상 휠"
-              className="h-7 w-9 shrink-0 cursor-pointer rounded border border-line bg-transparent p-0 pointer-coarse:size-11"
+              className="size-7 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-0"
             />
             <input
               ref={hexInputRef}
@@ -305,8 +535,19 @@ export function StudioColorPopover({
                 if (norm) handleSelect(norm);
                 else setHexDraft(value);
               }}
-              className="h-7 min-w-0 flex-1 rounded border border-line bg-card px-2 text-xs tabular-nums text-fg-2 focus:outline-none focus:ring-1 focus:ring-accent pointer-coarse:h-11"
+              className="h-7 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 font-mono text-xs tabular-nums text-fg-2 focus:border-accent focus:outline-none"
             />
+
+            {/* Copy button */}
+            <button
+              type="button"
+              aria-label="색상 코드 복사"
+              onClick={handleCopyHex}
+              className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised active:scale-95"
+            >
+              {copied ? <Check className="size-3.5 text-good" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+            </button>
+
             {onRequestCanvasEyedropper ? (
               <StudioToolHintTarget hint={STUDIO_COLOR_CANVAS_EYEDROPPER_HINT} preferredSide="bottom">
                 <button
@@ -317,12 +558,13 @@ export function StudioColorPopover({
                     setOpen(false);
                     onRequestCanvasEyedropper();
                   }}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded border border-line text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11"
+                  className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
               </StudioToolHintTarget>
             ) : null}
+
             {eyeDropperCtor ? (
               <StudioToolHintTarget hint={STUDIO_COLOR_EYEDROPPER_HINT} preferredSide="bottom">
                 <button
@@ -334,7 +576,7 @@ export function StudioColorPopover({
                       .then((r) => handleSelect(r.sRGBHex))
                       .catch(() => {});
                   }}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded border border-line text-fg-2 hover:bg-raised hover:text-fg pointer-coarse:size-11"
+                  className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised hover:text-fg"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
@@ -342,74 +584,20 @@ export function StudioColorPopover({
             ) : null}
           </div>
 
-          {/* CIELAB 색 공간 토글 및 슬라이더 (CSP v5.1 parity) */}
-          <div className="mt-2 border-t border-line/40 pt-1.5">
-            {(() => {
-              const currentLab = hexToLab(value);
-              return (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowLabSliders(!showLabSliders)}
-                    aria-expanded={showLabSliders}
-                    aria-label="CIELAB 색 공간 슬라이더 토글"
-                    className="flex w-full items-center justify-between rounded px-1 py-0.5 text-[0.62rem] font-medium text-fg-3 hover:bg-raised/60 hover:text-fg-2"
-                  >
-                    <span>CIELAB</span>
-                    <span className="font-mono text-[0.60rem] opacity-80">{formatLabString(currentLab)}</span>
-                  </button>
-                  {showLabSliders && (
-                    <div className="mt-1 space-y-1.5 rounded border border-line/60 bg-raised/30 p-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">L*</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={Math.round(currentLab.l)}
-                          onChange={(e) => handleSelect(labToHex(Number(e.target.value), currentLab.a, currentLab.b))}
-                          aria-label="CIELAB 명도 L*"
-                          className="h-1.5 flex-1 cursor-pointer accent-accent"
-                        />
-                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.l)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">a*</span>
-                        <input
-                          type="range"
-                          min={-128}
-                          max={127}
-                          value={Math.round(currentLab.a)}
-                          onChange={(e) => handleSelect(labToHex(currentLab.l, Number(e.target.value), currentLab.b))}
-                          aria-label="CIELAB 적녹 a*"
-                          className="h-1.5 flex-1 cursor-pointer accent-accent"
-                        />
-                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.a)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 text-[0.60rem] font-semibold text-fg-3">b*</span>
-                        <input
-                          type="range"
-                          min={-128}
-                          max={127}
-                          value={Math.round(currentLab.b)}
-                          onChange={(e) => handleSelect(labToHex(currentLab.l, currentLab.a, Number(e.target.value)))}
-                          aria-label="CIELAB 황청 b*"
-                          className="h-1.5 flex-1 cursor-pointer accent-accent"
-                        />
-                        <span className="w-6 text-right font-mono text-[0.60rem] text-fg-2">{Math.round(currentLab.b)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* 최근 사용 색 */}
+          {/* Recent Colors Strip */}
           {recentColors.length > 0 && (
             <div className="mt-2.5">
-              <p className="mb-1 text-[0.6rem] font-medium uppercase tracking-wider text-fg-3">최근</p>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">최근</p>
+                <button
+                  type="button"
+                  aria-label="현재 색을 내 팔레트에 추가"
+                  onClick={() => handleSavePaletteToLibrary("내 스와치", [value, ...recentColors.slice(0, 7)])}
+                  className="flex items-center gap-1 text-[0.58rem] text-accent hover:underline"
+                >
+                  <Plus className="size-2.5" aria-hidden /> 내 팔레트에 추가
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="최근 색상">
                 {recentColors.map((c, i) => (
                   <button
@@ -419,7 +607,7 @@ export function StudioColorPopover({
                     role="radio"
                     aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
                     onClick={() => handleSelect(c)}
-                    className="h-7 w-7 cursor-pointer rounded border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card pointer-coarse:size-11"
+                    className="size-7 cursor-pointer rounded-lg border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card transition-transform active:scale-95"
                     style={{ background: c }}
                   />
                 ))}
@@ -427,61 +615,11 @@ export function StudioColorPopover({
             </div>
           )}
 
-          {/* 팔레트 탭 + 선택 팔레트 색 그리드 */}
-          <div className="mt-2.5">
-            {activePalette ? (
-              <>
-                <div className="mb-1.5 flex flex-wrap gap-1">
-                  {palettes.map((p) => (
-                    <StudioToolHintTarget
-                      key={p.id}
-                      hint={studioPaletteFamilyHint(p.label, p.tip, p.id)}
-                      preferredSide="bottom"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setPaletteId(p.id)}
-                        aria-pressed={p.id === activePalette.id}
-                        className={cx(
-                          "rounded border px-1.5 py-0.5 text-[0.66rem] transition-colors",
-                          p.id === activePalette.id
-                            ? "border-accent/60 bg-accent-soft text-accent"
-                            : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg-2",
-                          "pointer-coarse:min-h-11 pointer-coarse:px-3"
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    </StudioToolHintTarget>
-                  ))}
-                </div>
-                <div
-                  className="flex flex-wrap gap-1"
-                  role="radiogroup"
-                  aria-label={`${activePalette.label} 팔레트`}
-                >
-                  {activePalette.colors.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`${activePalette.label} 색상 ${c} 선택`}
-                      role="radio"
-                      aria-checked={c.toLocaleLowerCase() === value.toLocaleLowerCase()}
-                      onClick={() => handleSelect(c)}
-                      className="h-7 w-7 cursor-pointer rounded border border-line aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card pointer-coarse:size-11"
-                      style={{ background: c }}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-wrap gap-1" aria-label="팔레트 불러오는 중">
-                {Array.from({ length: 18 }).map((_, i) => (
-                  <span key={i} className="h-5 w-5 rounded border border-line bg-raised/70" />
-                ))}
-              </div>
-            )}
-          </div>
+          {addedNotice && (
+            <div className="mt-1.5 flex items-center gap-1 rounded bg-good/15 px-2 py-1 text-[0.62rem] font-semibold text-good">
+              <Check className="size-3" aria-hidden /> {addedNotice}
+            </div>
+          )}
         </div>,
         document.body
       ) : null}
