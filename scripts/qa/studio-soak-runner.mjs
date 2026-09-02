@@ -23,6 +23,7 @@ const jiraBase = (process.env.JIRA_BASE_URL ?? "").replace(/\/$/, "");
 const jiraEmail = process.env.JIRA_EMAIL ?? "";
 const jiraToken = process.env.JIRA_API_TOKEN ?? "";
 const jiraProject = process.env.JIRA_PROJECT_KEY ?? "KAN";
+// eslint-disable-next-line no-control-regex -- ANSI/OSC 이스케이프를 지우는 정규식은 제어 문자를 그대로 적어야 한다.
 const ansi = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/g;
 
 const variants = [
