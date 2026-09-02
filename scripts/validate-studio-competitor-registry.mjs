@@ -27,6 +27,10 @@ const CATEGORY_SET = new Set(STUDIO_COMPETITOR_CATEGORIES);
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const FOCUS_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const MINIMUM_PRODUCT_COUNT = 50;
+const TRUSTED_DOMAIN_BRIDGES = new Set([
+  "corel.com|painterartist.com",
+  "painterartist.com|corel.com",
+]);
 
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -56,6 +60,14 @@ function parseHttpsUrl(value, label, issues) {
 
 function uniqueStrings(values) {
   return [...new Set(values)];
+}
+
+function domainFamily(hostname) {
+  return hostname.toLocaleLowerCase("en").split(".").slice(-2).join(".");
+}
+
+function sharesTrustedDomainBridge(leftHostname, rightHostname) {
+  return TRUSTED_DOMAIN_BRIDGES.has(`${domainFamily(leftHostname)}|${domainFamily(rightHostname)}`);
 }
 
 export function validateStudioCompetitorRegistry(registry, options = {}) {
@@ -133,9 +145,12 @@ export function validateStudioCompetitorRegistry(registry, options = {}) {
       const sameHost = officialUrl.hostname === watchUrl.hostname;
       const sourceRepository = watchUrl.hostname === "github.com";
       const documentationSubdomain =
-        officialUrl.hostname.split(".").slice(-2).join(".") ===
-        watchUrl.hostname.split(".").slice(-2).join(".");
-      if (!sameHost && !sourceRepository && !documentationSubdomain) {
+        domainFamily(officialUrl.hostname) === domainFamily(watchUrl.hostname);
+      const trustedDomainBridge = sharesTrustedDomainBridge(
+        officialUrl.hostname,
+        watchUrl.hostname,
+      );
+      if (!sameHost && !sourceRepository && !documentationSubdomain && !trustedDomainBridge) {
         issues.push(
           `${prefix}.watchUrl must stay on the official domain family or an official GitHub repository`,
         );
@@ -177,10 +192,10 @@ export function summarizeStudioCompetitorRegistry(registry) {
   const focusCounts = new Map();
 
   for (const product of products) {
-    if (product && typeof product.priority === "string" && product.priority in byPriority) {
+    if (product && typeof product.priority === "string" && Object.hasOwn(byPriority, product.priority)) {
       byPriority[product.priority] += 1;
     }
-    if (product && typeof product.category === "string" && product.category in byCategory) {
+    if (product && typeof product.category === "string" && Object.hasOwn(byCategory, product.category)) {
       byCategory[product.category] += 1;
     }
     if (Array.isArray(product?.focus)) {
