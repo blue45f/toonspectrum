@@ -173,6 +173,26 @@ describe("Studio SQLite UI preferences", () => {
     await expect(repository.loadPagePreviewSize()).resolves.toBe(value);
   });
 
+  it("round-trips the remembered primary tool and reports no memory before a first pick", async () => {
+    const fixture = memoryStore();
+    const repository = createStudioUiPreferencesRepository(fixture.store);
+
+    await expect(repository.loadPrimaryTool()).resolves.toBeNull();
+    await repository.savePrimaryTool("draw");
+    await expect(repository.loadPrimaryTool()).resolves.toBe("draw");
+    expect(fixture.values.get("primary-tool")).toBe("draw");
+    await repository.savePrimaryTool("select");
+    await expect(repository.loadPrimaryTool()).resolves.toBe("select");
+  });
+
+  it("treats an unknown persisted primary tool as no memory at all", async () => {
+    const fixture = memoryStore({ "primary-tool": "hand" });
+    const repository = createStudioUiPreferencesRepository(fixture.store);
+
+    // `hand` 는 잠깐 쓰는 보조 동작이라 다음 세션의 시작 도구가 되면 안 된다.
+    await expect(repository.loadPrimaryTool()).resolves.toBeNull();
+  });
+
   it("fails closed to defaults for malformed persisted values", async () => {
     const fixture = memoryStore({
       "background-recent": "{bad",

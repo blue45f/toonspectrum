@@ -234,14 +234,15 @@ describe("deriveAssetMetadata", () => {
       commercialUseAllowed: null,
     });
     expect(card.provenance.importer).toBe("studio-format-gateway/importMybBrush");
-    // Every unmapped .myb setting survives into provenance — zero silent loss. `hardness` is
-    // mapped to the tip since 66bc25b4, so it must no longer appear here; a setting the vector
-    // lane still ignores does.
+    // Every setting the common IR does NOT carry survives into provenance — zero silent loss.
+    // Settings the IR does carry (hardness → tip.hardness since 66bc25b4, dabs_per_actual_radius →
+    // tip.spacingPct) must stay out of the ledger; provider-native settings the vector lane
+    // still ignores (anti_aliasing, pressure_gain_log) stay in it.
     expect(card.provenance.unmapped).toEqual(result.unmappedSettings);
-    // `hardness` maps to the tip since the kernel wave (66bc25b4); it must no longer be reported
-    // as lost, while a setting the vector lane still ignores stays on the ledger.
-    expect(card.provenance.unmapped).not.toContain("hardness");
+    expect(card.provenance.unmapped).toContain("pressure_gain_log");
     expect(card.provenance.unmapped).toContain("anti_aliasing");
+    expect(card.provenance.unmapped).not.toContain("hardness");
+    expect(card.provenance.unmapped).not.toContain("dabs_per_actual_radius");
     expect(card.createdAt).toBe(FIXED_NOW);
   });
 

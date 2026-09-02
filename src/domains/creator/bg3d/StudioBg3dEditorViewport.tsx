@@ -8,6 +8,7 @@ import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
+import { StudioBg3dTurntableController } from "./StudioBg3dTurntableController";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
 
 export function StudioBg3dEditorViewport({ h }) {
@@ -1065,7 +1066,10 @@ export function StudioBg3dEditorViewport({ h }) {
 
                 {!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted
                 && !sceneIsEmpty ? (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex flex-col items-center gap-1.5 sm:flex-row sm:justify-between sm:px-3">
+                    <div className="pointer-events-auto">
+                      <StudioBg3dTurntableController />
+                    </div>
                     <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
                       끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
                     </span>

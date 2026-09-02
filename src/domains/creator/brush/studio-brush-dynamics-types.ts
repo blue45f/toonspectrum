@@ -1,4 +1,10 @@
 import {
+  DEFAULT_STUDIO_STROKE_BUDGET,
+  resolveStrokeDabCapacity,
+  STUDIO_DYNAMIC_BRUSH_DAB_RESIDENT_BYTES,
+} from "@toonspectrum/studio-brush-platform";
+
+import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   isStudioDynamicBrushCausalDepositPipeline,
   STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
@@ -42,7 +48,20 @@ export const STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS = {
   roundness: { min: 0.08, max: 1 },
 } as const;
 
-export const STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE = { min: 1, max: 32_768 } as const;
+/**
+ * dab 상한은 이제 고정 상수가 아니라 StrokeBudget 에서 파생된다(2026-09-02 아키텍처 리뷰).
+ *
+ * 기본 예산 4 MiB / dab 당 128 B = 32,768 — 지금 출하 중인 값과 정확히 같다. 즉 이 파생은
+ * 동작 중립이고, 예산을 올리면(예: pro 프로파일) 상한이 따라 올라간다. 진짜 무제한 획은
+ * 후속 레인의 "수락된 접두 청크 플러시" 배선이 담당한다.
+ */
+export const STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE = {
+  min: 1,
+  max: resolveStrokeDabCapacity({
+    budget: DEFAULT_STUDIO_STROKE_BUDGET,
+    bytesPerDab: STUDIO_DYNAMIC_BRUSH_DAB_RESIDENT_BYTES,
+  }),
+} as const;
 export const DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS = 8_192;
 export const STUDIO_BRUSH_DYNAMICS_RATIO_LIMITS = {
   spacing: { min: 0.01, max: 16 },

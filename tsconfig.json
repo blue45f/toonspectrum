@@ -28,6 +28,8 @@
     "components/**/*.tsx",
     "lib/**/*.ts",
     "lib/**/*.tsx",
+    "tools/**/*.ts",
+    "tools/**/*.tsx",
     "vite.config.ts",
     "drizzle.config.ts",
     "eslint.config.mjs",

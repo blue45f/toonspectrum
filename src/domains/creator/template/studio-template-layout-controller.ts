@@ -17,7 +17,6 @@ import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type { PanelLayoutPreset } from "../studio-panel-layouts";
 
-
 export interface StudioCollagePayload {
   canvasH: number;
   canvasBg: string;

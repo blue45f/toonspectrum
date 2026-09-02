@@ -17,6 +17,7 @@ import {
   stepStudioLivingInkFluidReference,
   studioLivingInkReferenceDivergenceL2,
   type StudioLivingInkFluidReferenceField,
+  type StudioLivingInkFluidReferenceRegion,
   type StudioLivingInkFluidReferenceStepParams,
 } from "../studio-living-ink-fluid-reference";
 
@@ -374,16 +375,44 @@ export function studioInkwashFluidStepParams(
 }
 
 /** One Stam tick: the shipped Living Ink CPU reference (advection + pressure + vorticity). */
+/**
+ * 주 스레드에서 한 번에 쓸어도 되는 활성 영역 셀 수. 영역이 이 안이면 정착 스텝을 전부 돌고,
+ * 넘으면 비례해 줄이되 **0이 되지는 않는다** — 획이 길다고 번짐 자체가 사라지면 안 된다.
+ */
+export const STUDIO_INKWASH_ACTIVE_REGION_CELL_BUDGET = 512 * 512;
+
+/**
+ * 획이 실제로 건드린 영역(파인 셀)만큼만 정착 예산을 잰다. 예전에는 공유 워시 전체 셀 수를 재서
+ * 페이지에 수묵 획이 둘만 있어도 상한을 넘어 스텝 0 — 번짐·건조·색분리가 통째로 꺼졌다.
+ */
+export function studioInkwashActiveRegionSteps(
+  fullSteps: number,
+  region: StudioLivingInkFluidReferenceRegion,
+  field: Readonly<{ width: number; height: number }>,
+  budget = STUDIO_INKWASH_ACTIVE_REGION_CELL_BUDGET,
+): number {
+  const x0 = Math.max(0, Math.floor(region.x0));
+  const y0 = Math.max(0, Math.floor(region.y0));
+  const x1 = Math.min(field.width, Math.ceil(region.x1));
+  const y1 = Math.min(field.height, Math.ceil(region.y1));
+  const cells = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+  const steps = Math.max(0, Math.floor(fullSteps));
+  if (steps === 0 || cells === 0) return 0;
+  if (cells <= budget) return steps;
+  return Math.max(1, Math.floor((steps * budget) / cells));
+}
+
 export function stepStudioInkwashFluid(
   session: StudioInkwashFluidSession,
   steps = 1,
   params: StudioLivingInkFluidReferenceStepParams = STUDIO_INKWASH_FLUID_STEP_PARAMS,
+  region?: StudioLivingInkFluidReferenceRegion,
 ): Readonly<{ divergenceBefore: number; divergenceAfter: number }> {
   const count = Math.max(0, Math.floor(steps));
   let before = studioLivingInkReferenceDivergenceL2(session.fluid);
   let after = before;
   for (let step = 0; step < count; step += 1) {
-    const result = stepStudioLivingInkFluidReference(session.fluid, params);
+    const result = stepStudioLivingInkFluidReference(session.fluid, params, region);
     if (step === 0) before = result.divergenceBefore;
     after = result.divergenceAfter;
     session.simulationStep += 1;

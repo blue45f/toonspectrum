@@ -8,4 +8,5 @@ export * from "./ink-mesh-path";
 export * from "./compile";
 export * from "./raster-compile";
 export * from "./providers";
+export * from "./stroke-budget";
 export * from "./natural-media-fullsize-benchmark";

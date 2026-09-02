@@ -24,6 +24,7 @@ import {
 } from "./studio-bg3d-editor-ui";
 import { StudioBg3dEnginePanel } from "./StudioBg3dEnginePanel";
 import { StudioBg3dLightingStudio } from "./StudioBg3dLightingStudio";
+import { StudioBg3dProSuitePanel } from "./StudioBg3dProSuitePanel";
 
 import type {
   StudioBg3dEnginePreference,
@@ -43,8 +44,7 @@ import type {
 import type { StudioBg3dSectionPlaneState } from "./studio-bg3d-section-plane";
 import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
 import type { StudioBg3dSunRigConfig } from "./studio-bg3d-sun-rig";
-
-type ViewEditorSection = "camera" | "physics";
+import type { ViewEditorSection } from "./StudioBackground3DTypes";
 
 export type StudioBg3dBabylonDiagnosticBackend = "webgl2" | "webgpu";
 
@@ -557,7 +557,7 @@ export function StudioBg3dViewPanel({
                 <div
                   role="tablist"
                   aria-label="보기 도구"
-                  className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-line bg-card/70 p-1"
+                  className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/70 p-1"
                 >
                   {VIEW_EDITOR_SECTIONS.map((section, sectionIndex) => {
                     const active = viewEditorSection === section.id;
@@ -602,6 +602,15 @@ export function StudioBg3dViewPanel({
                       </button>
                     );
                   })}
+                </div>
+
+                <div
+                  id="bg3d-view-section-prosuite"
+                  role="tabpanel"
+                  aria-labelledby="bg3d-view-tab-prosuite"
+                  hidden={viewEditorSection !== "prosuite"}
+                >
+                  <StudioBg3dProSuitePanel disabled={isCapturing || isRestoringScene} />
                 </div>
 
                 <div

@@ -12,6 +12,7 @@ import {
   type StudioBg3dPushPullFace,
 } from "./studio-bg3d-push-pull";
 import { StudioBg3dProceduralStarterPanel } from "./StudioBg3dProceduralStarterPanel";
+import { StudioBg3dTextExtruderPanel } from "./StudioBg3dTextExtruderPanel";
 
 import type { BgCompositeCategory } from "../studio-background-3d-composites";
 import type {
@@ -322,6 +323,17 @@ export function StudioBg3dShapesPanel({
                   <StudioBg3dProceduralStarterPanel
                     disabledReason={proceduralStarterDisabledReason}
                     onInsert={addProceduralStarterAsset}
+                  />
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <h3 className="mb-2 text-sm font-bold text-fg">3D 텍스트 & 효과음 (SFX)</h3>
+                  <StudioBg3dTextExtruderPanel
+                    onApplyText={(spec) => {
+                      if (spec.characterTransforms.length > 0) {
+                        addPrimitive("box");
+                      }
+                    }}
                   />
                 </div>
 

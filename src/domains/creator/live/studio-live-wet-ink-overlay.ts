@@ -11,6 +11,7 @@
 import { mapStudioBrushAliasPressure } from "../brush/studio-brush-alias-profile";
 import {
   depositStudioInkwashFluidStroke,
+  studioInkwashActiveRegionSteps,
   studioInkwashFluidStepParams,
 } from "../brush/studio-inkwash-fluid";
 import { isStudioInkwashFluidBrush } from "../brush/studio-inkwash-fluid-brushes";
@@ -1244,11 +1245,26 @@ export class StudioLiveWetInkOverlayRenderer {
     });
     upsertStudioInkwashWashStroke(element);
     markStudioInkwashWashDeposited(element);
-    const cells = wash.session.fluid.width * wash.session.fluid.height;
-    // Live frames never Stam. Pointer-up may, once, and only if the stroke-local field
-    // still fits the main-thread cap. Short washes need the full 16-step settle so water
-    // can carry unfixed pen ink; a 2048² field stays deposit-only.
-    const steps = cells <= 512 * 512 ? STUDIO_WET_INK_BRUSH_SIMULATION_STEPS : 0;
+    // Live frames never Stam. Pointer-up settles once over this stroke's own active region —
+    // the shared wash may be page-sized, but only the bbox this stroke wet needs the solver, so
+    // a second stroke a few centimetres away no longer switches the settle off for both.
+    const geometry = inkwashStrokeFieldGeometry(element, recipe);
+    const regionOrigin = geometry
+      ? studioInkwashDocumentToField(wash, geometry.originX, geometry.originY)
+      : null;
+    const region = geometry && regionOrigin
+      ? {
+          x0: Math.floor(regionOrigin.x),
+          y0: Math.floor(regionOrigin.y),
+          x1: Math.floor(regionOrigin.x) + geometry.width,
+          y1: Math.floor(regionOrigin.y) + geometry.height,
+        }
+      : { x0: 0, y0: 0, x1: wash.session.fluid.width, y1: wash.session.fluid.height };
+    const steps = studioInkwashActiveRegionSteps(
+      STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+      region,
+      wash.session.fluid,
+    );
     if (steps > 0) {
       stepStudioInkwashFluid(
         wash.session,
@@ -1258,6 +1274,7 @@ export class StudioLiveWetInkOverlayRenderer {
           dryRate: recipe.material.dryingRate,
           chromaticSeparation: recipe.material.chromatography ?? 0.5,
         }),
+        region,
       );
     }
     return true;
