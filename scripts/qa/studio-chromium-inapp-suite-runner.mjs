@@ -82,8 +82,18 @@ const SUITES = Object.freeze({
     command("living-ink-integration", "pnpm run verify:studio-living-ink-integration", 22, "living-ink"),
     command("native-raster-tools", "pnpm run verify:studio-native-raster-tools", 35, "raster-tools"),
     command("filter-dialog", "pnpm run verify:studio-filter-dialog", 25, "filter-dialog"),
-    command("webgpu-brush-parity", "pnpm run verify:studio-engine-webgpu-brush-parity", 20, "webgpu-brush"),
-    command("professional-bristle", "pnpm run verify:studio-professional-bristle-webgpu", 20, "webgpu-bristle"),
+    command(
+      "webgpu-brush-parity",
+      'TOONSPECTRUM_WEBGPU_HEADED=1 xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-engine-webgpu-brush-parity',
+      20,
+      "webgpu-brush",
+    ),
+    command(
+      "professional-bristle",
+      'TOONSPECTRUM_WEBGPU_HEADED=1 xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-professional-bristle-webgpu',
+      20,
+      "webgpu-bristle",
+    ),
   ],
 });
 
