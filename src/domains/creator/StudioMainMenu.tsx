@@ -61,7 +61,7 @@ function localizeText(
   return translated === key ? fallback : translated;
 }
 
-type MenuCoords = { top: number; left: number; minWidth: number };
+type MenuCoords = { top: number; left: number; minWidth: number; maxHeight: number };
 type MenuOpenFocusIntent = "first" | "preserve";
 type MenuGroupNavigationDirection = "next" | "previous";
 export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
@@ -235,9 +235,20 @@ export function resolveStudioMainMenuItemIndex(
   return (currentPosition + offset + items.length) % items.length;
 }
 
+/**
+ * A menu is only as tall as the room under its title. The old flat 28rem ceiling was fine for the
+ * short groups but left the long ones — 필터 ships 49 kinds — scrolling four screens inside a panel
+ * that was using under half the viewport. Measuring the gap keeps every group as tall as it can be
+ * without ever running off the bottom edge, and the floor keeps a menu opened from a title near the
+ * bottom of a short window from collapsing to a sliver.
+ */
+const STUDIO_MAIN_MENU_VIEWPORT_MARGIN = 12;
+const STUDIO_MAIN_MENU_MIN_HEIGHT = 240;
+const STUDIO_MAIN_MENU_FALLBACK_HEIGHT = 448;
+
 function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
   if (!btn) {
-    return { top: 48, left: 8, minWidth: 248 };
+    return { top: 48, left: 8, minWidth: 248, maxHeight: STUDIO_MAIN_MENU_FALLBACK_HEIGHT };
   }
   const rect = btn.getBoundingClientRect();
   const minWidth = Math.max(248, rect.width + 48);
@@ -246,10 +257,19 @@ function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
     left = Math.min(left, window.innerWidth - minWidth - 8);
     left = Math.max(8, left);
   }
+  const top = rect.bottom + 6;
+  const viewportHeight = typeof window === "undefined" ? 0 : window.innerHeight;
+  const maxHeight = viewportHeight > 0
+    ? Math.max(
+      STUDIO_MAIN_MENU_MIN_HEIGHT,
+      viewportHeight - top - STUDIO_MAIN_MENU_VIEWPORT_MARGIN,
+    )
+    : STUDIO_MAIN_MENU_FALLBACK_HEIGHT;
   return {
-    top: rect.bottom + 6,
+    top,
     left,
     minWidth,
+    maxHeight,
   };
 }
 
@@ -444,13 +464,14 @@ function MenuDropdown({
             data-studio-shortcut-boundary="true"
             onKeyDown={handleMenuKeyDown}
             className={cn(
-              "fixed max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
+              "fixed overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
               "[scrollbar-width:thin]"
             )}
             style={{
               top: coords.top,
               left: coords.left,
               minWidth: coords.minWidth,
+              maxHeight: coords.maxHeight,
               // Body-level: beat studio shell / overflow chrome (options strip, absolute leftovers).
               zIndex: STUDIO_Z.workspace,
             }}
