@@ -48,6 +48,7 @@ import {
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  createStudioIncrementalFxLuminousRibbonBuilder,
   createStudioIncrementalFxPressurePathBuilder,
   planNeonBrushPasses,
   planOilBrushDabs,
@@ -58,7 +59,6 @@ import {
   planStudioFxLuminousRibbonPass,
   resolveStudioFxBrushTapPressureResponse,
   resolveStudioFxPressurePassResponse,
-  traceStudioFxLuminousRibbonPass,
   studioLuminousCoreColor,
 } from "../studio-fx-brush";
 import { konvaGradientProps } from "../studio-gradient-engine";
@@ -143,6 +143,12 @@ import {
   resolveStudioCausalInkDrawContract,
 } from "./studio-draw-rendering";
 import { studioOilFamilyPlanFields } from "./studio-fluid-paint-reference";
+import {
+  createStudioFxLuminousRetainedPass,
+  fillStudioFxLuminousRibbonPass,
+  studioFxLuminousDraftRetentionFits,
+  type StudioFxLuminousRetainedPass,
+} from "./studio-fx-luminous-retained-path";
 import { resolveStudioDrawTapRadius } from "./studio-live-visible-tap";
 import {
   paintStudioOilRibbonCarrier,
@@ -269,6 +275,7 @@ function useStudioPerfectFreehandStroker(wanted: boolean): StudioPerfectFreehand
   }, [wanted, stroker]);
   return wanted ? stroker : null;
 }
+
 
 const STUDIO_DRAW_PATTERN_IMAGE_CACHE_LIMIT = 128;
 const resolvedPatternTileImages = new Map<string, HTMLImageElement>();
@@ -436,6 +443,37 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     }
     return builder;
   };
+  /**
+   * 발광 리본 패스별 유지 상태 — (대칭 변형, 패스) 키 하나당 증분 플래너와 안정 prefix Path2D.
+   *
+   * 압력 경로만 증분이던 시절 glow 는 셸 48개를 매 이동 통째로 다시 계획하고 다시 그렸다(실측
+   * r150 원 한 획 34.8초, 최악 이동 716 ms). 패스마다 플래너를 들고 있으면 이동당 비용이 새로
+   * 들어온 섹션에만 비례한다(같은 획 0.91초, 최악 이동 25.2 ms).
+   */
+  const fxLuminousRetainedPassesRef =
+    useRef<Map<string, StudioFxLuminousRetainedPass> | null>(null);
+  const fxLuminousRetainedPass = (
+    variationIndex: number,
+    passIndex: number,
+    retain: boolean,
+  ): StudioFxLuminousRetainedPass | null => {
+    // 예산을 넘긴 순간 이미 들고 있던 패스까지 놓는다 — 유지하지 않을 획의 폴리곤을 계속 붙들고
+    // 있으면 예산이 상한이 아니라 그냥 미뤄진 지출이 된다.
+    if (!retain) {
+      fxLuminousRetainedPassesRef.current = null;
+      return null;
+    }
+    const passes = fxLuminousRetainedPassesRef.current ??= new Map();
+    const key = `${variationIndex}:${passIndex}`;
+    let retained = passes.get(key);
+    if (!retained) {
+      retained = createStudioFxLuminousRetainedPass(
+        createStudioIncrementalFxLuminousRibbonBuilder(),
+      );
+      passes.set(key, retained);
+    }
+    return retained;
+  };
   const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
   const stroke = isEraserOperation ? "#16100c" : el.stroke;
@@ -492,9 +530,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   }
   useEffect(() => {
     if (!activeDraft) return undefined;
+    // 발광 유지 패스는 이 인스턴스의 ref 라 오일 베드처럼 전역에서 회수할 필요가 없다. 초안이
+    // 끝나는 모든 경로(커밋 리렌더·제스처 취소·언마운트)가 이 정리를 지나므로 여기 한 곳이면
+    // 충분하고, 렌더 본문에서 ref 를 쓰지 않아 react-compiler 순수성 규약도 건드리지 않는다.
+    const luminousPasses = fxLuminousRetainedPassesRef;
     return () => {
       releaseStudioOilRibbonDraftPlanners(el.id);
       releaseOilBrushDabDraftPlanners(el.id);
+      luminousPasses.current = null;
     };
   }, [activeDraft, el.id]);
   const dynamicBrushPlanResult = dynamicBrushId
@@ -2244,6 +2287,12 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyTension: 0.35,
             });
             const passes = planNeonBrushPasses(strokeWidth);
+            const retainLuminousPasses = studioFxLuminousDraftRetentionFits(
+              activeDraft,
+              renderPath.points.length,
+              passes.length,
+              symmetricVariations.length,
+            );
             if (
               el.materialPressureModel
               !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
@@ -2325,10 +2374,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     <Shape
                       key={passIndex}
                       sceneFunc={(context) => {
-                        // 압력 경로는 라이브 드래프트에서만 증분 빌더로 소비한다 — 같은 스냅샷의
-                        // 두 번째 이후 패스는 휘발 꼬리만 다시 방출하므로 그리기당 추가 비용이
-                        // 상수다. 커밋 요소는 배치 플래너로 매번 값 동일 재계산(P2: O(1) 앵커가
-                        // 같은 길이·꼬리의 내부 재작성을 놓친다).
+                        // 압력 경로도 리본도 라이브 드래프트에서만 증분 빌더로 소비한다 — 같은
+                        // 스냅샷의 두 번째 이후 패스는 휘발 꼬리만 다시 방출하므로 그리기당 추가
+                        // 비용이 상수다. 커밋 요소는 배치 플래너로 매번 값 동일 재계산(P2: O(1)
+                        // 앵커가 같은 길이·꼬리의 내부 재작성을 놓친다).
                         const fxInput = {
                           brushId: "neon",
                           points: renderPath.points,
@@ -2337,23 +2386,30 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           minimumDiameterRatio: el.materialMinimumDiameterRatio,
                           tension: renderPath.tension,
                         } as const;
-                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                        const producer = activeDraft
+                          ? fxPressurePathBuilderForVariation(index)
+                          : null;
+                        const retained = producer
+                          ? fxLuminousRetainedPass(index, passIndex, retainLuminousPasses)
+                          : null;
+                        const passPlanInput = {
                           brushId: "neon",
-                          pressurePath: activeDraft
-                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                          pressurePath: producer
+                            ? producer.append(fxInput)
                             : planStudioFxBrushPressurePath(fxInput),
                           baseWidth: strokeWidth,
                           passWidthScale: pass.widthScale,
                           passOpacity: pass.opacity,
                           luminousCore,
-                        });
+                        } as const;
+                        const ribbonPlan = producer && retained
+                          ? retained.builder.append({ ...passPlanInput, producer })
+                          : planStudioFxLuminousRibbonPass(passPlanInput);
                         if (ribbonPlan.polygons.length === 0) return;
                         context.save();
                         context.globalAlpha *= ribbonPlan.opacity;
                         context.fillStyle = passColor;
-                        context.beginPath();
-                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                        context.fill();
+                        fillStudioFxLuminousRibbonPass(context, ribbonPlan, retained);
                         context.restore();
                       }}
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
@@ -2375,6 +2431,12 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             });
             const soft = (el.brush ?? "glow") === "soft-glow";
             const passes = planGlowBrushPasses(strokeWidth, soft);
+            const retainLuminousPasses = studioFxLuminousDraftRetentionFits(
+              activeDraft,
+              renderPath.points.length,
+              passes.length,
+              symmetricVariations.length,
+            );
             if (
               el.materialPressureModel
               !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
@@ -2458,7 +2520,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       key={passIndex}
                       sceneFunc={(context) => {
                         // neon 분기와 같은 소비 규율 — 라이브 드래프트만 증분(이동당 상수),
-                        // 커밋 요소는 배치 플래너로 값 동일 재계산.
+                        // 커밋 요소는 배치 플래너로 값 동일 재계산. 셸이 48개인 이 분기가 유지
+                        // 리본이 갚는 비용의 전부다(실측 r150 원 34.8초 → 0.91초).
                         const fxInput = {
                           brushId: pressureBrush,
                           points: renderPath.points,
@@ -2467,23 +2530,30 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           minimumDiameterRatio: el.materialMinimumDiameterRatio,
                           tension: renderPath.tension,
                         } as const;
-                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                        const producer = activeDraft
+                          ? fxPressurePathBuilderForVariation(index)
+                          : null;
+                        const retained = producer
+                          ? fxLuminousRetainedPass(index, passIndex, retainLuminousPasses)
+                          : null;
+                        const passPlanInput = {
                           brushId: pressureBrush,
-                          pressurePath: activeDraft
-                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                          pressurePath: producer
+                            ? producer.append(fxInput)
                             : planStudioFxBrushPressurePath(fxInput),
                           baseWidth: strokeWidth,
                           passWidthScale: pass.widthScale,
                           passOpacity: pass.opacity,
                           luminousCore,
-                        });
+                        } as const;
+                        const ribbonPlan = producer && retained
+                          ? retained.builder.append({ ...passPlanInput, producer })
+                          : planStudioFxLuminousRibbonPass(passPlanInput);
                         if (ribbonPlan.polygons.length === 0) return;
                         context.save();
                         context.globalAlpha *= ribbonPlan.opacity;
                         context.fillStyle = stroke;
-                        context.beginPath();
-                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                        context.fill();
+                        fillStudioFxLuminousRibbonPass(context, ribbonPlan, retained);
                         context.restore();
                       }}
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
