@@ -72,6 +72,30 @@ describe("MarketplaceBrushPublishShortcut", () => {
     expect(findStoredBrushSnapshotForMarketplace(blockedStorage)).toBeNull();
   });
 
+  it("skips one inaccessible cache entry and keeps scanning", () => {
+    const entries = createStorage({
+      "studio-brush-blocked": JSON.stringify({ enginePrograms: [{ id: "blocked" }] }),
+      "studio-brush-safe": JSON.stringify({
+        enginePrograms: [{ id: "safe" }],
+        dualBrush: { enabled: true },
+      }),
+    });
+    const storage = {
+      ...entries,
+      getItem(key: string) {
+        if (key === "studio-brush-blocked") {
+          throw new DOMException("Blocked", "SecurityError");
+        }
+        return entries.getItem(key);
+      },
+    } as Storage;
+
+    expect(findStoredBrushSnapshotForMarketplace(storage)).toEqual({
+      enginePrograms: [{ id: "safe" }],
+      dualBrush: { enabled: true },
+    });
+  });
+
   it("exposes a stable accessible publishing action and recovers after a provider error", async () => {
     render(
       <MarketplaceBrushPublishShortcut
