@@ -14,7 +14,7 @@ import type { El } from "./studio-element-model";
 const SOURCE = { x: 10, y: 20, width: 100, height: 50 };
 const DOUBLE = { x: 30, y: 40, width: 200, height: 100 };
 
-function draw(id = "draw", overrides: Partial<Extract<El, { type: "draw" }>> = {}): El {
+function draw(id = "draw", overrides: Partial<Extract<El, { type: "draw" }>> = {}): Extract<El, { type: "draw" }> {
   return {
     id,
     type: "draw",
