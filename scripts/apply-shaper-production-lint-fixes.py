@@ -163,4 +163,23 @@ replace_once(
     expect(plan.pose.pelvisOffset).toEqual(normalizedRun.pelvisOffset);''',
 )
 
-print("Applied generated accessibility, precision, and regression corrections.")
+host = "src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx"
+replace_once(
+    host,
+    '''    sceneRef.current?.setShaperAppearance(
+      resolveStudioMannequinShaperAppearance(shaperSelection),
+    );''',
+    '''    sceneRef.current?.setShaperAppearance?.(
+      resolveStudioMannequinShaperAppearance(shaperSelection),
+    );''',
+)
+replace_once(
+    host,
+    "    sceneRef.current?.setShaperAppearance(plan.appearance);",
+    "    sceneRef.current?.setShaperAppearance?.(plan.appearance);",
+)
+
+print(
+    "Applied generated accessibility, precision, legacy-handle, "
+    "and regression corrections."
+)
