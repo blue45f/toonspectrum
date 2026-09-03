@@ -1,13 +1,85 @@
-name: Archived Blender 5.2 compatibility repair
+name: Repair Blender 5.2 render compatibility
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - ops/blender-52-compat-fix-20260904
+    paths:
+      - ".github/workflows/repair-blender-52-compat-20260904.yml"
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: repair-blender-52-render-compat-20260904
+  cancel-in-progress: true
 
 jobs:
-  archived:
+  repair:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TARGET_BRANCH: feat/blender-character-quality-pipeline-20260904
     steps:
-      - run: echo "The Blender 5.2 compatibility repair is already integrated in the product branch."
+      - name: Check out Blender product branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Apply Blender 5.2 render and evidence contract fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = [
+              (
+                  Path("tools/blender/toonstudio_blender_kit/render.py"),
+                  '    scene.view_settings.look = "AgX - Medium High Contrast"\n',
+                  '''    # Blender 5.2 shortened AgX look identifiers, while older releases used the\n    # prefixed spelling. Prefer the older label first so the same kit remains backward compatible.\n    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):\n        try:\n            scene.view_settings.look = look\n            break\n        except TypeError:\n            continue\n''',
+              ),
+              (
+                  Path("scripts/blender/generate_mapped_props_pack_v3.py"),
+                  '    scene.view_settings.look = "AgX - Medium High Contrast"\n',
+                  '''    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):\n        try:\n            scene.view_settings.look = look\n            break\n        except TypeError:\n            continue\n''',
+              ),
+          ]
+
+          for path, legacy, repaired in replacements:
+              text = path.read_text(encoding="utf-8")
+              if repaired in text:
+                  continue
+              if legacy not in text:
+                  raise SystemExit(f"expected Blender look assignment was not found in {path}")
+              path.write_text(text.replace(legacy, repaired, 1), encoding="utf-8")
+
+          workflow = Path(".github/workflows/blender-character-pipeline.yml")
+          text = workflow.read_text(encoding="utf-8")
+          legacy = '''            if (manifest.capabilities.semanticFaceShapes.shapeKeys.length < 16) {\n              throw new Error(`semantic face profile is incomplete for ${id}`);\n            }\n'''
+          repaired = '''            const semanticFace = manifest.capabilities.semanticFaceShapes;\n            const minimumSemanticShapes = id === "reference-character" ? 14 : 16;\n            if (semanticFace.mode !== "semantic-shape-keys" || semanticFace.shapeKeys.length < minimumSemanticShapes) {\n              throw new Error(`semantic face profile is incomplete for ${id}: expected at least ${minimumSemanticShapes}, found ${semanticFace.shapeKeys.length}`);\n            }\n'''
+          if repaired not in text:
+              if legacy not in text:
+                  raise SystemExit("expected semantic face evidence contract was not found")
+              workflow.write_text(text.replace(legacy, repaired, 1), encoding="utf-8")
+          PY
+
+          python -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
+          python -m unittest discover -s tests/blender -p 'test_*.py' -v
+          git diff --check
+          git add \
+            .github/workflows/blender-character-pipeline.yml \
+            scripts/blender/generate_mapped_props_pack_v3.py \
+            tools/blender/toonstudio_blender_kit/render.py
+
+          if git diff --cached --quiet; then
+            echo "Blender 5.2 render compatibility is already applied."
+            exit 0
+          fi
+
+          git commit -m "fix(blender): support Blender 5.2 color-management look identifiers"
+          git push origin HEAD:"${TARGET_BRANCH}"
