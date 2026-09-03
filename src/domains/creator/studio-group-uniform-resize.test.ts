@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import {
   planStudioGroupUniformResize,
+  studioGroupUniformResizeMemberCanRotate,
   type StudioGroupUniformResizeBounds,
   type StudioGroupUniformResizeInput,
 } from "./studio-group-uniform-resize";
+
 
 import type { El } from "./studio-element-model";
 
@@ -72,6 +75,187 @@ function plan(
     ...overrides,
   });
 }
+
+describe("planStudioGroupUniformResize · rotation", () => {
+  // The frame is `translate(target) . rotate(theta) . scale . translate(-source)`, so the source
+  // box ORIGIN lands on the target origin for every theta. Everything below is checked against
+  // that one decomposition rather than against a re-derivation.
+  const mapOrigin = (x: number, y: number, deg: number) => {
+    const radians = (deg * Math.PI) / 180;
+    const scale = DOUBLE.width / SOURCE.width;
+    const u = (x - SOURCE.x) * scale;
+    const v = (y - SOURCE.y) * scale;
+    return {
+      x: DOUBLE.x + u * Math.cos(radians) - v * Math.sin(radians),
+      y: DOUBLE.y + u * Math.sin(radians) + v * Math.cos(radians),
+    };
+  };
+
+  it("turns a box element by composing the gesture angle onto its own", () => {
+    // Each box is drawn at its (x, y) and rotated about that point with no Konva offset, so the
+    // whole affine reduces to "move the origin, add theta". Uniform scale is what makes that
+    // exact: it commutes with rotation, so the order the two are applied in cannot matter.
+    const [next] = plan([image()], { rotationDeg: 40 }) as [Extract<El, { type: "image" }>];
+    const expected = mapOrigin(20, 25, 40);
+    expect(next.x).toBeCloseTo(expected.x, 9);
+    expect(next.y).toBeCloseTo(expected.y, 9);
+    expect(next.rotation).toBeCloseTo(17 + 40, 9);
+    // Scale still applies, and skew rides along untouched -- uniform scale commutes with it too.
+    expect(next.width).toBe(60);
+    expect(next.skewX).toBe(8);
+  });
+
+  it("wraps the stored angle so repeated gestures cannot drift it", () => {
+    // 17 + 350 = 367, which Konva would happily keep and a long session would grow without bound.
+    const [next] = plan([image()], { rotationDeg: 350 }) as [Extract<El, { type: "image" }>];
+    expect(next.rotation).toBeCloseTo(7, 9);
+  });
+
+  it("bakes the angle into a stroke's points, matching the single-stroke planner exactly", () => {
+    // The draw branch delegates, so a group rotation and a single-stroke rotation of the same
+    // stroke cannot disagree -- which is the bug a user would notice first.
+    const stroke = draw();
+    const [next] = plan([stroke], { rotationDeg: 30 }) as [Extract<El, { type: "draw" }>];
+    const solo = planStudioDrawObjectTransform({
+      el: stroke,
+      sourceBounds: SOURCE,
+      targetBounds: DOUBLE,
+      rotationDeg: 30,
+      strokeWidthPolicy: "preserve",
+    });
+    expect(next).toEqual(solo);
+    // And the geometry really is the shared affine, not merely self-consistent.
+    const head = mapOrigin(10, 20, 30);
+    expect(next.points[0]).toBeCloseTo(head.x, 9);
+    expect(next.points[1]).toBeCloseTo(head.y, 9);
+  });
+
+  it("refuses the whole plan when one member cannot carry an angle", () => {
+    // Tearing a selection is the one outcome a group planner must never produce, so a member that
+    // has nowhere to put theta stands the plan down rather than staying upright beside its
+    // turning neighbours. A frame is axis-aligned panel geometry with no stored angle at all.
+    const panel: El = {
+      id: "frame",
+      type: "frame",
+      x: 15,
+      y: 25,
+      width: 40,
+      height: 30,
+    } as unknown as El;
+    const items: El[] = [image(), panel];
+    expect(plan(items, { rotationDeg: 30 })).toEqual(items);
+    // The same selection resizes fine; only the angle is refused.
+    const resized = plan(items);
+    expect(resized[0]).not.toBe(items[0]);
+  });
+
+  it("refuses a bounds-derived shape's angle instead of dropping it", () => {
+    // The renderer rebuilds rect/ellipse/star/triangle/polygon from `drawBounds(points)` as
+    // axis-aligned primitives. The single-stroke planner may drop the rotation there because
+    // nothing is left behind to disagree; inside a selection that would tear it.
+    const shape = { ...draw("rect"), kind: "rect" } as El;
+    const items: El[] = [draw(), shape];
+    expect(plan(items, { rotationDeg: 30 })).toEqual(items);
+    expect(plan(items)[0]).not.toBe(items[0]);
+  });
+
+  it("refuses a mirrored-symmetry stroke's angle so its copies cannot turn the other way", () => {
+    // The renderer re-reflects the committed base about world axes, so a turned base would put
+    // every mirrored copy at -theta (the single-stroke planner drops the angle for exactly that
+    // reason). Dropped inside a selection, the member would stay upright beside turning
+    // neighbours, so the plan stands down as a whole. Radial copies are rotations about the same
+    // centre and commute with the frame, so they turn with everyone else.
+    const mirrored: El = {
+      ...draw("mirrored"),
+      symmetry: { type: "vertical", centerX: 15, centerY: 25 },
+    };
+    const items: El[] = [image(), mirrored];
+    expect(plan(items, { rotationDeg: 30 })).toEqual(items);
+    expect(plan(items)[1]).not.toBe(items[1]);
+
+    const radial: El = {
+      ...draw("radial"),
+      symmetry: { type: "radial", centerX: 15, centerY: 25, radialCount: 6 },
+    };
+    const turned = plan([image(), radial], { rotationDeg: 30 });
+    expect(turned[1]).not.toBe(radial);
+    expect(turned[1]).toEqual(
+      planStudioDrawObjectTransform({
+        el: radial,
+        sourceBounds: SOURCE,
+        targetBounds: DOUBLE,
+        rotationDeg: 30,
+        strokeWidthPolicy: "preserve",
+      }),
+    );
+  });
+
+  it("refuses a stroke whose stylus orientation the single planner would leave world-fixed", () => {
+    // The single-stroke planner turns the points of a tilted calligraphy stroke but deliberately
+    // leaves tilt/twist alone, so its nib no longer follows the turned stroke. A mouse-drawn
+    // neighbour composes the angle onto its nib and keeps its look -- the two would disagree, so
+    // the plan stands down as a whole.
+    const tilted: El = { ...draw("tilted"), brush: "calligraphy", tiltXs: [0.5, 0.5, 0.5] };
+    const mouse: El = { ...draw("mouse"), brush: "calligraphy" };
+    const items: El[] = [mouse, tilted];
+    expect(plan(items, { rotationDeg: 90 })).toEqual(items);
+    expect(plan(items)[1]).not.toBe(items[1]);
+  });
+
+  it("leaves the pure-resize contract untouched at zero degrees", () => {
+    const items: El[] = [draw(), text(), image()];
+    expect(plan(items, { rotationDeg: 0 })).toEqual(plan(items));
+    // A rotate-only gesture is still a change even when the box does not move.
+    const rotateOnly = plan([image()], { targetBounds: SOURCE, rotationDeg: 15 });
+    expect(rotateOnly[0]).not.toBe(items[2]);
+    expect((rotateOnly[0] as Extract<El, { type: "image" }>).rotation).toBeCloseTo(32, 9);
+  });
+
+  it("refuses a non-finite angle rather than writing one into the document", () => {
+    const items: El[] = [image()];
+    expect(plan(items, { rotationDeg: Number.NaN })).toEqual(items);
+    expect(plan(items, { rotationDeg: Number.POSITIVE_INFINITY })).toEqual(items);
+  });
+
+  it("exposes the one rule the rotation handle is offered from", () => {
+    // The editor withholds the handle from exactly the members the commit refuses, so the two
+    // can never disagree about who may turn.
+    expect(studioGroupUniformResizeMemberCanRotate(image())).toBe(true);
+    expect(studioGroupUniformResizeMemberCanRotate(text())).toBe(true);
+    expect(studioGroupUniformResizeMemberCanRotate(draw())).toBe(true);
+    expect(
+      studioGroupUniformResizeMemberCanRotate({
+        ...draw(),
+        symmetry: { type: "radial", centerX: 0, centerY: 0, radialCount: 4 },
+      }),
+    ).toBe(true);
+    expect(studioGroupUniformResizeMemberCanRotate({ ...draw(), brush: "calligraphy" })).toBe(true);
+    expect(studioGroupUniformResizeMemberCanRotate({ ...draw(), kind: "ellipse" } as El)).toBe(false);
+    expect(
+      studioGroupUniformResizeMemberCanRotate({
+        ...draw(),
+        brush: "calligraphy",
+        tiltXs: [0.5, 0.5, 0.5],
+      }),
+    ).toBe(false);
+    expect(
+      studioGroupUniformResizeMemberCanRotate({
+        ...draw(),
+        symmetry: { type: "kaleidoscope", centerX: 0, centerY: 0, radialCount: 6 },
+      }),
+    ).toBe(false);
+    expect(
+      studioGroupUniformResizeMemberCanRotate({
+        id: "frame",
+        type: "frame",
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      } as unknown as El),
+    ).toBe(false);
+  });
+});
 
 describe("planStudioGroupUniformResize", () => {
   it("draw + text + image 혼합 선택을 같은 양수 균일 배율로 원자 변환한다", () => {
@@ -151,6 +335,32 @@ describe("planStudioGroupUniformResize", () => {
       centerY: 50,
       radialCount: 9,
     });
+  });
+
+  it("clamps a scaled cornerRadius to the renderer's range, as the single-stroke planner does", () => {
+    // An unclamped 200 on a radius-100 rectangle draws as 120 and shows 120 in the inspector,
+    // and the next resize then compounds from the hidden 200. The single-selection lane already
+    // refuses to store it, so a multi-selection must not disagree with it at theta = 0.
+    const rounded = {
+      ...draw(),
+      kind: "rect",
+      shapeParams: { starPoints: 5, starInnerRatio: 0.5, polygonSides: 6, cornerRadius: 100 },
+    } as El;
+    const [scaled] = plan([rounded]) as [Extract<El, { type: "draw" }>];
+    expect(scaled.shapeParams).toEqual({
+      starPoints: 5,
+      starInnerRatio: 0.5,
+      polygonSides: 6,
+      cornerRadius: 120,
+    });
+    // Nothing moved -> the original reference survives, so a no-op cannot publish a mutation.
+    const square = {
+      ...draw(),
+      kind: "rect",
+      shapeParams: { starPoints: 5, starInnerRatio: 0.5, polygonSides: 6, cornerRadius: 0 },
+    } as Extract<El, { type: "draw" }>;
+    const [kept] = plan([square]) as [Extract<El, { type: "draw" }>];
+    expect(kept.shapeParams).toBe(square.shapeParams);
   });
 
   it("sticker의 위치와 fontSize를 바꾸되 rotation/skew는 유지한다", () => {

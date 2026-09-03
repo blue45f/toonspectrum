@@ -130,7 +130,6 @@ import {
   resolveStudioStampBrushStyle,
 } from "./brush/studio-brush-stamp-engine";
 import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
-import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
@@ -523,10 +522,8 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
-import {
-  planStudioGroupUniformResize,
-  type StudioGroupUniformResizeBounds,
-} from "./studio-group-uniform-resize";
+import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
+import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import {
   planHealCloneDabs,
 } from "./studio-heal-clone";
@@ -5392,70 +5389,24 @@ export function StudioCuttoonEditor({
       return false;
     }
 
-    // A single stroke is one point array, so it can absorb rotation and independent width/height
-    // exactly; the group planner stays authoritative for every mixed/multi selection, where a
-    // general affine is not a safe default. Both bake into `points` and hand the result to the
-    // one document commit below, so undo/redo and CRDT publication are identical either way.
-    const soleSelection =
-      session.selectedIds.length === 1
-        ? currentById.get(session.selectedIds[0]!)
-        : undefined;
-    const soleSelectedDraw =
-      soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
-        ? soleSelection
-        : undefined;
-    const next =
-      soleSelectedDraw?.type === "draw"
-        ? (() => {
-            const transformed = planStudioDrawObjectTransform({
-              el: soleSelectedDraw,
-              sourceBounds: session.sourceBounds,
-              targetBounds,
-              rotationDeg,
-            });
-            return transformed
-              ? currentElements.map((element) =>
-                  element.id === transformed.id ? transformed : element
-                )
-              : [...currentElements];
-          })()
-        : planStudioGroupUniformResize({
-            items: currentElements,
-            selectedIds: session.selectedIds,
-            sourceBounds: session.sourceBounds,
-            targetBounds,
-            isLocked: (element) =>
-              isEffectivelyLocked(element, activeGroupsRef.current),
-          });
-    const nextById = new Map(next.map((element) => [element.id, element]));
-    const changed = session.selectedIds.some(
-      (id) => nextById.get(id) !== currentById.get(id)
-    );
-    if (!changed) {
-      const boundsChanged =
-        Math.abs(targetBounds.x - session.sourceBounds.x) > 1e-7 ||
-        Math.abs(targetBounds.y - session.sourceBounds.y) > 1e-7 ||
-        Math.abs(targetBounds.width - session.sourceBounds.width) > 1e-7 ||
-        Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
-      if (boundsChanged) {
-        setError(
-          "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
-        );
-      }
+    // Which planner runs, whether anything changed and what to say about it are pure facts;
+    // `planStudioSelectionTransformCommit` owns them so this host keeps only its refs.
+    const plan = planStudioSelectionTransformCommit({
+      elements: currentElements,
+      selectedIds: session.selectedIds,
+      sourceBounds: session.sourceBounds,
+      targetBounds,
+      rotationDeg,
+      isLocked: (element) => isEffectivelyLocked(element, activeGroupsRef.current),
+    });
+    if (plan.kind === "unchanged") {
+      if (plan.refusal) setError(plan.refusal);
       return false;
     }
-    const committed = commit(next);
+    const committed = commit(plan.next);
     if (committed) {
-      const percent = Math.max(
-        1,
-        Math.round((targetBounds.width / session.sourceBounds.width) * 100)
-      );
       setError(null);
-      announceDrawingShortcut(
-        session.selectedIds.length === 1
-          ? `레이어 크기 조절 · ${percent}%`
-          : `그룹 크기 조절 · ${percent}%`,
-      );
+      announceDrawingShortcut(plan.announcement);
     }
     return committed;
   }

@@ -66,13 +66,24 @@ export interface StudioGroupUniformResizeProxyProps {
   readonly coarse?: boolean;
   readonly enabled: boolean;
   /**
-   * Opt in to a free transform: rotation handle plus independent width/height.
+   * Opt in to independent width/height (the mid-side anchors and no aspect lock).
    *
-   * Off by default because a mixed multi-selection is only safe under the uniform, axis-aligned
-   * planner. A single draw(선화) element turns it on — one point array can absorb a full affine
-   * exactly, so the extra degrees of freedom cost it nothing.
+   * Off by default because a mixed multi-selection is only safe under the UNIFORM planner: a
+   * non-uniform scale would have to re-weight every stroke by direction, and rotation would stop
+   * commuting with it. A single draw(선화) element turns it on — one point array can absorb a full
+   * affine exactly, so the extra degrees of freedom cost it nothing.
    */
   readonly freeTransform?: boolean;
+  /**
+   * Opt in to the rotation handle.
+   *
+   * Separate from `freeTransform` because the two are independently safe. A multi-selection can
+   * turn as a rigid body — uniform scale commutes with rotation, so each member's own angle is
+   * just its stored one plus the gesture's — while still being unable to take a non-uniform
+   * scale. The planner refuses the angle anyway when a member cannot represent one, so this is
+   * the affordance, not the authority.
+   */
+  readonly rotatable?: boolean;
   /**
    * Optional renderer claim for live ink. Route thresholds, arrow semantics, clip ownership,
    * Layer lift and chrome parking are compiled behind the Konva adapters at gesture begin.
@@ -129,6 +140,7 @@ export function StudioGroupUniformResizeProxy({
   coarse = false,
   enabled,
   freeTransform = false,
+  rotatable = false,
   livePreview,
   gestureBinding,
 }: StudioGroupUniformResizeProxyProps) {
@@ -370,7 +382,7 @@ export function StudioGroupUniformResizeProxy({
         width: proxy.width() * proxy.scaleX(),
         height: proxy.height() * proxy.scaleY(),
       },
-      rotationDeg: freeTransform ? proxy.rotation() : 0,
+      rotationDeg: rotatable ? proxy.rotation() : 0,
     });
   }
 
@@ -391,7 +403,7 @@ export function StudioGroupUniformResizeProxy({
     };
     // Konva reports the box unrotated and carries the angle separately, which is exactly the
     // scale-then-rotate decomposition the draw planner consumes.
-    const rotationDeg = freeTransform ? proxy.rotation() : 0;
+    const rotationDeg = rotatable ? proxy.rotation() : 0;
     if (!finitePositiveBounds(targetBounds) || !Number.isFinite(rotationDeg)) {
       active.gesture.cancel("invalid-terminal-frame");
       return;
@@ -523,8 +535,8 @@ export function StudioGroupUniformResizeProxy({
         name="studio-group-uniform-resize-transformer"
         visible={enabled && validBounds}
         resizeEnabled={enabled && validBounds}
-        rotateEnabled={freeTransform && enabled && validBounds}
-        rotationSnaps={freeTransform ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
+        rotateEnabled={rotatable && enabled && validBounds}
+        rotationSnaps={rotatable ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
         rotationSnapTolerance={6}
         flipEnabled={false}
         keepRatio={!freeTransform}

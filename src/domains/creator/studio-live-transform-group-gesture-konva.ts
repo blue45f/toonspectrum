@@ -21,9 +21,12 @@
  *    a selection with anything painting above it would jump to the front for the drag and drop
  *    back at release; `studioLiveTransformGroupStackingIsolatable` refuses that outright.
  *
- * Rotation is not offered for a multi-selection anywhere in the editor -- the group planner rejects
- * anything but a positive, axis-aligned, uniform resize -- so a non-zero angle here is a caller
- * error and stands the frame down rather than being drawn.
+ * The frame's angle is forwarded to the group planner untouched. That planner is the authority on
+ * whether the selection can carry it -- it turns the set as a rigid body and refuses the WHOLE
+ * plan when any member cannot (`studioGroupUniformResizeMemberCanRotate`: a panel frame, a
+ * bounds-derived shape, a mirrored-symmetry stroke) -- and a refused plan falls back to
+ * commit-at-release here exactly like any other refusal. Admission stays angle-agnostic: its
+ * footprint bound is the box diagonal, which no rotation can exceed.
  */
 import { flushSync } from "react-dom";
 
@@ -142,7 +145,13 @@ function drawPointBounds(points: readonly number[]): {
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
-/** One member's box carried through the selection's own uniform frame. */
+/**
+ * One member's box carried through the selection's own uniform frame.
+ *
+ * Deliberately ignores the gesture angle: work admission reads only `width`/`height` from this
+ * box (the footprint bound is `hypot(w, h)`, which a rotation leaves alone), so turning the box
+ * would move numbers nothing downstream consults.
+ */
 function mapBoundsThroughFrame(
   bounds: StudioGroupUniformResizeBounds,
   sourceBounds: StudioGroupUniformResizeBounds,
@@ -381,16 +390,19 @@ export function beginStudioKonvaGroupDrawTransformGesture(
     frame: StudioLiveSelectionTransformFrame,
   ): readonly DrawEl[] | null => {
     if (!draftClaim) return null;
-    // The group planner has no rotation; a non-zero angle would preview a turn release throws away.
-    if (frame.rotationDeg !== 0 || !frameAdmitted(frame)) {
+    if (!Number.isFinite(frame.rotationDeg) || !frameAdmitted(frame)) {
       restoreSources();
       return null;
     }
+    // The planner is asked for the angle too, and it is the authority on whether the selection can
+    // take one: a member that cannot carry an angle makes it return null, and this frame then
+    // falls back to commit-at-release like any other refusal.
     const planned = planStudioGroupUniformResizeSelection({
       items: elements,
       selectedIds,
       sourceBounds: options.sourceBounds,
       targetBounds: frame.targetBounds,
+      rotationDeg: frame.rotationDeg,
       isLocked: options.preview.isLocked,
     });
     if (!planned || planned.length !== members.length) {
@@ -413,7 +425,7 @@ export function beginStudioKonvaGroupDrawTransformGesture(
         element,
         clip: studioLiveTransformCommittedClip({
           targetBounds: frame.targetBounds,
-          rotationDeg: 0,
+          rotationDeg: frame.rotationDeg,
           elements,
           ...(transformedBounds ? { transformedBounds } : {}),
           ...(member.snapshot.noClip !== undefined ? { noClip: member.snapshot.noClip } : {}),
