@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+
 
 import {
   STUDIO_EASE,
@@ -8,6 +8,7 @@ import {
 import { StudioQuickAccessPalette } from "./StudioQuickAccessPalette";
 
 import type { StudioQuickAccessSurfaceLeafProps } from "./studio-quick-access-surface-types";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { cn } from "@/lib/utils";
 

@@ -1,9 +1,9 @@
-import type { RefObject } from "react";
-
 import type {
   StudioQuickAccessCommandMeta,
   StudioQuickAccessState,
 } from "./studio-quick-access";
+import type { RefObject } from "react";
+
 
 export interface StudioQuickAccessSurfaceProps {
   readonly state: StudioQuickAccessState;

@@ -10,13 +10,14 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetStudioFloatingSurfaceStackForTest } from "../studio-floating-surface-stack";
+
+import {
+  studioDrawingPaletteFloatingLayoutKey,
+} from "./studio-drawing-palette-floating-layout";
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
   type StudioDrawingPaletteLayout,
 } from "./studio-drawing-palettes";
-import {
-  studioDrawingPaletteFloatingLayoutKey,
-} from "./studio-drawing-palette-floating-layout";
 import { StudioDrawingPaletteStack } from "./StudioDrawingPaletteStack";
 
 function Harness() {
