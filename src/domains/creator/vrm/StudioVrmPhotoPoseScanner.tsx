@@ -125,6 +125,31 @@ const PHOTO_POSE_QUALITY_RANK: Readonly<
   Record<StudioVrmPhotoPoseConfidenceSummary["quality"], number>
 > = Object.freeze({ low: 0, medium: 1, high: 2 });
 
+type StudioVrmPhotoPoseApplyScope = "full" | "upper" | "arms";
+
+const PHOTO_POSE_APPLY_SCOPES: ReadonlyArray<{
+  readonly id: StudioVrmPhotoPoseApplyScope;
+  readonly label: string;
+  readonly hint: string;
+}> = [
+  { id: "full", label: "전신", hint: "몸통·팔·다리·손을 모두 적용" },
+  { id: "upper", label: "상체", hint: "몸통·머리·팔·손만 적용" },
+  { id: "arms", label: "팔·손", hint: "현재 하체를 유지하고 팔과 손만 적용" },
+] as const;
+
+function filterPhotoPoseBones(
+  bones: BoneEulerMap,
+  scope: StudioVrmPhotoPoseApplyScope,
+): BoneEulerMap {
+  if (scope === "full") return bones;
+  const upperPattern = /head|neck|spine|chest|shoulder|arm|hand/i;
+  const armPattern = /shoulder|arm|hand/i;
+  const pattern = scope === "upper" ? upperPattern : armPattern;
+  return Object.fromEntries(
+    Object.entries(bones).filter(([bone]) => pattern.test(bone)),
+  ) as BoneEulerMap;
+}
+
 function doesStudioVrmPhotoPoseConfidenceMeetMinimum(
   confidence: StudioVrmPhotoPoseConfidenceSummary,
   minimumQuality: StudioVrmPhotoPoseConfidenceSummary["quality"],
@@ -206,9 +231,11 @@ function HandSkeleton({ detection }: { readonly detection: StudioVrmPhotoHandDet
 function SkeletonPreview({
   landmarks,
   hands,
+  imageUrl,
 }: {
   readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly hands: StudioVrmPhotoHandInferenceResult;
+  readonly imageUrl: string;
 }) {
   return (
     <svg
@@ -217,6 +244,12 @@ function SkeletonPreview({
       role="img"
       viewBox="0 0 100 100"
     >
+      {imageUrl ? (
+        <>
+          <image href={imageUrl} width="100" height="100" preserveAspectRatio="xMidYMid slice" />
+          <rect width="100" height="100" fill="oklch(0.08 0.01 250 / 0.28)" />
+        </>
+      ) : null}
       {SKELETON_CONNECTIONS.map(([fromIndex, toIndex]) => {
         const from = landmarks[fromIndex];
         const to = landmarks[toIndex];
@@ -263,6 +296,7 @@ export function StudioVrmPhotoPoseScanner({
   onApply,
 }: StudioVrmPhotoPoseScannerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const preprocessorRef = useRef<StudioVrmPhotoPosePreprocessor | null>(null);
   const jobRef = useRef<StudioVrmPhotoPosePreprocessJob | null>(null);
   const scanAbortRef = useRef<AbortController | null>(null);
@@ -274,7 +308,20 @@ export function StudioVrmPhotoPoseScanner({
   const [progressStage, setProgressStage] = useState<StudioVrmPhotoPoseProgressStage | "inference">("admission");
   const [error, setError] = useState("");
   const [candidate, setCandidate] = useState<PhotoPoseCandidate | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [applyScope, setApplyScope] = useState<StudioVrmPhotoPoseApplyScope>("full");
   const [includeFingerEdits, setIncludeFingerEdits] = useState(true);
+
+  const replacePreviewUrl = (file: File | null) => {
+    if (previewUrlRef.current && typeof URL.revokeObjectURL === "function") {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    const next = file && typeof URL.createObjectURL === "function"
+      ? URL.createObjectURL(file)
+      : "";
+    previewUrlRef.current = next || null;
+    setPreviewUrl(next);
+  };
 
   useEffect(() => {
     aliveRef.current = true;
@@ -286,6 +333,10 @@ export function StudioVrmPhotoPoseScanner({
       jobRef.current = null;
       preprocessorRef.current?.dispose();
       preprocessorRef.current = null;
+      if (previewUrlRef.current && typeof URL.revokeObjectURL === "function") {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      previewUrlRef.current = null;
       disposePhotoHandLandmarker();
       disposePhotoPoseLandmarker();
     };
@@ -296,6 +347,7 @@ export function StudioVrmPhotoPoseScanner({
     event.target.value = "";
     if (!file || disabled) return;
 
+    replacePreviewUrl(file);
     setBusy(true);
     setCandidate(null);
     setIncludeFingerEdits(true);
@@ -517,7 +569,7 @@ export function StudioVrmPhotoPoseScanner({
 
       {candidate ? (
         <div className="mt-3 grid gap-2">
-          <SkeletonPreview landmarks={candidate.landmarks} hands={candidate.hands} />
+          <SkeletonPreview landmarks={candidate.landmarks} hands={candidate.hands} imageUrl={previewUrl} />
           <div className="flex items-center justify-between gap-2 text-[0.66rem] text-fg-2">
             <span className="min-w-0 truncate" title={candidate.sourceName}>{candidate.sourceName}</span>
             <span className="shrink-0 font-bold">
@@ -555,11 +607,36 @@ export function StudioVrmPhotoPoseScanner({
               인식한 손가락도 함께 적용
             </label>
           ) : null}
+          <fieldset className="rounded-lg border border-line bg-panel/60 p-2">
+            <legend className="px-1 text-[0.62rem] font-bold text-fg-2">적용 범위</legend>
+            <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="사진 포즈 적용 범위">
+              {PHOTO_POSE_APPLY_SCOPES.map((scope) => (
+                <button
+                  key={scope.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={applyScope === scope.id}
+                  title={scope.hint}
+                  className={`min-h-10 rounded-lg border px-1 text-[0.6rem] font-bold transition-colors ${
+                    applyScope === scope.id
+                      ? "border-accent/60 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                  }`}
+                  onClick={() => setApplyScope(scope.id)}
+                >
+                  {scope.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               className="min-h-11 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised"
-              onClick={() => setCandidate(null)}
+              onClick={() => {
+                setCandidate(null);
+                replacePreviewUrl(null);
+              }}
             >
               다시 선택
             </button>
@@ -571,7 +648,7 @@ export function StudioVrmPhotoPoseScanner({
                 if (disabled || !candidateMeetsMinimum) return;
                 const applied = onApply({
                   sourceName: candidate.sourceName,
-                  bones: candidate.bones,
+                  bones: filterPhotoPoseBones(candidate.bones, applyScope),
                   landmarks: candidate.landmarks,
                   worldLandmarks: candidate.worldLandmarks,
                   confidence: candidate.confidence,
@@ -583,6 +660,7 @@ export function StudioVrmPhotoPoseScanner({
                     : [],
                 });
                 if (applied) setCandidate(null);
+                if (applied) replacePreviewUrl(null);
               }}
             >
               <Check size={11} aria-hidden /> 포즈 적용

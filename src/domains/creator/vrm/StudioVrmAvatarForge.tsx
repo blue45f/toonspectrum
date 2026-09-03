@@ -276,12 +276,26 @@ export function createAvatarForgeHairGeometry(part: AvatarForgeHairPart) {
 }
 
 function createHairMaterial(part: AvatarForgeHairPart) {
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshToonMaterial({
     color: 0xffffff,
     vertexColors: true,
-    roughness: clamp(0.82 - part.shine * 0.54, 0.22, 0.84),
-    metalness: clamp(0.015 + part.shine * 0.11, 0, 0.14),
     side: THREE.DoubleSide,
+  });
+  material.emissive.set(part.baseColor);
+  material.emissiveIntensity = clamp(0.015 + part.shine * 0.055, 0.015, 0.07);
+  return material;
+}
+
+function createHairOutlineMaterial(part: AvatarForgeHairPart) {
+  const outline = new THREE.Color(part.baseColor)
+    .lerp(new THREE.Color("#151112"), 0.72);
+  return new THREE.MeshBasicMaterial({
+    color: outline,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 0.82,
+    depthWrite: false,
+    toneMapped: false,
   });
 }
 
@@ -313,6 +327,7 @@ function addHairParts(group: THREE.Group, state: AvatarForgeState, fit: HeadFit)
     const geometry = createHairGeometry(part);
     const material = createHairMaterial(part);
     const mesh = new THREE.Mesh(geometry, material);
+    const outline = new THREE.Mesh(geometry, createHairOutlineMaterial(part));
     const transform = transformHairPart(part, fit);
     mesh.name = `ToonSpectrumAvatarForgeHair_${part.id}`;
     mesh.position.copy(transform.position);
@@ -321,6 +336,13 @@ function addHairParts(group: THREE.Group, state: AvatarForgeState, fit: HeadFit)
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.renderOrder = 6;
+
+    outline.name = `ToonSpectrumAvatarForgeHairOutline_${part.id}`;
+    outline.position.copy(transform.position);
+    outline.rotation.copy(transform.rotation);
+    outline.scale.copy(transform.scale).multiplyScalar(1.026);
+    outline.renderOrder = 5;
+    group.add(outline);
     group.add(mesh);
   }
 }
