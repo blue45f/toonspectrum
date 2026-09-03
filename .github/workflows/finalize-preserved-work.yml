@@ -1,0 +1,106 @@
+name: Finalize preserved outstanding work
+
+on:
+  push:
+    branches:
+      - automation/finalize-preserved-work-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-preserved-open-work-20260903
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: integration/preserved-open-work-20260903
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Wait for the preservation pull request
+        id: pr
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          number=""
+          for attempt in $(seq 1 90); do
+            number="$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --head "$TARGET_BRANCH" \
+              --json number \
+              --jq '.[0].number // empty')"
+            if [[ -n "$number" ]]; then
+              break
+            fi
+            echo "Preservation PR is not available yet ($attempt/90)."
+            sleep 20
+          done
+          if [[ -z "$number" ]]; then
+            echo "Preservation PR was not created within 30 minutes." >&2
+            exit 1
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          gh pr view "$number" --repo "$GITHUB_REPOSITORY" \
+            --json number,title,url,headRefName,headRefOid,baseRefName,state,isDraft,mergeStateStatus
+
+      - name: Wait until real checks are registered
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          count=0
+          for attempt in $(seq 1 60); do
+            checks="$(gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+            count="$(jq 'length' <<<"$checks")"
+            core_count="$(jq '[.[] | select((.name | ascii_downcase) == "core" or (.name | ascii_downcase | contains("core")))] | length' <<<"$checks")"
+            if (( count > 0 && core_count > 0 )); then
+              printf '%s\n' "$checks" | jq .
+              break
+            fi
+            echo "Waiting for at least one core check ($attempt/60, current checks: $count)."
+            sleep 20
+          done
+          if (( count == 0 || core_count == 0 )); then
+            echo "No core check was registered; refusing an unchecked merge." >&2
+            exit 1
+          fi
+
+      - name: Require all pull-request checks to pass
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          gh pr checks "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --watch \
+            --fail-fast \
+            --interval 20
+
+      - name: Merge the exact validated head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          draft="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          if [[ "$draft" == "true" ]]; then
+            gh pr ready "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
+          head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --match-head-commit "$head_sha" \
+            --subject "chore(integration): preserve outstanding work without loss" \
+            --body "Validated by all registered pull-request checks. Conflicting PR-head variants remain recorded in the preservation ledger instead of being discarded."
