@@ -247,6 +247,12 @@ describe("studio brush variant group manifest", () => {
     // uniqueness is execution signature unless a real renderer branch distinguishes the pair,
     // plus pack tip footprint (runtime + motif/alpha + layers + 45° angle). 236 listed all
     // (234 paint) -> 191 listed all (189 paint).
+    //
+    // 2026-09-03 mark-distance cull: fresh-leaf · long-leaf · fur-soft-clumps. Ranked by the
+    // channels that make the mark — tip alpha map, spacing/scatter/flow/softness/grain, stamp
+    // angle — over every exposed pro preset. The single-leaf trio sat inside 0.064 of each other
+    // (fresh<->long 0.0355 is the closest pair in the whole pack) and fur-soft-clumps was the
+    // nearest rake pair at 0.0494. 191 listed all (189 paint) -> 188 listed all (185 paint).
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -389,6 +395,9 @@ describe("studio brush variant group manifest", () => {
         "leaf-fall-flurry",
         "sparkle-glint-cross",
         "brush-pen-ink",
+        "fresh-leaf",
+        "long-leaf",
+        "fur-soft-clumps",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

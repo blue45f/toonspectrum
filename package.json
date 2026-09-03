@@ -59,6 +59,7 @@
     "lint:strict": "NODE_OPTIONS='--max-old-space-size=8192' eslint --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:ci": "pnpm run lint:strict",
     "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --prod --audit-level high",
+    "audit:studio-brush-mark-distance": "tsx scripts/audit-studio-brush-mark-distance.mts",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
     "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",

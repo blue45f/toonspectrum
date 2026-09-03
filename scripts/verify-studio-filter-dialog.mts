@@ -131,11 +131,20 @@ function invariant(condition: unknown, message: string): asserts condition {
 }
 
 /** Static-preview noise that is not a product failure (copied idiom from verify-studio-menus). */
+/**
+ * `vite preview` serves the static bundle and nothing else — the NestJS API is a separate service
+ * this gate deliberately does not start, so its dev proxy answers /api/* with 502. The studio's
+ * filter path does not touch the API, and treating those as defects would leave the gate permanently
+ * red for a reason that has nothing to do with filters. Only /api/* is forgiven: a 5xx from any
+ * other origin still fails, so a broken asset or worker chunk is still caught.
+ */
 function isExpectedPreviewNoise(message: string): boolean {
   return (
     message.includes("ECONNREFUSED")
     || message.includes("proxy error")
     || message.includes("Unexpected response code: 400")
+    || /\s\S*\/api\//.test(message)
+    || message.includes("Failed to load resource: the server responded with a status of 502")
   );
 }
 
@@ -563,6 +572,124 @@ async function main(): Promise<void> {
     }
 
     // --- Direct-image target scenario ---
+    // ── 미리보기 판단 어포던스 ───────────────────────────────────────────────────
+    // The dialog opens centred, directly over the pixels it is previewing, and the only way to
+    // judge a filter is to see them. Two affordances answer that — dragging the panel aside and
+    // holding 원본 비교 to drop back to the untouched page — and both are only worth anything if
+    // they move real pixels, so they are driven here rather than asserted in a jsdom render.
+    {
+      const result: FilterCaseResult = {
+        label: "미리보기 판단 어포던스",
+        group: "affordance",
+        ok: false,
+        openMs: null,
+        applyMs: null,
+        target: null,
+        diff: null,
+        undoDiff: null,
+      };
+      results.push(result);
+      try {
+        // The band of canvas this case judges by: fixed up front so its baseline is captured before
+        // the dialog exists, and asserted dialog-free after the drag.
+        const compareClip = { x: clip.x, y: clip.y, width: clip.width, height: 180 };
+        const beforeOpenBand = await screenshotClipped(page, compareClip);
+        await openMainMenuGroup(page, "필터");
+        await clickEnabledMenuItem(page, "가우시안 블러");
+        const dialog = filterDialog(page);
+        await dialog.waitFor({ state: "visible", timeout: 45_000 });
+        await nudgeFirstParameterSlider(dialog);
+        await page.waitForTimeout(600);
+
+        // 1) Dragging the header moves the panel and never parks any edge off screen — losing 적용
+        //    behind a viewport edge would be worse than the occlusion this affordance fixes.
+        const before = await dialog.boundingBox();
+        invariant(before, "다이얼로그 위치를 측정하지 못했습니다");
+        // Dragged hard into the bottom-right corner on purpose: it parks the panel clear of the
+        // comparison band below, and it is the clamp's own test — a panel thrown well past the edge
+        // has to come to rest fully on screen, 적용 included.
+        await page.mouse.move(before.x + before.width / 2, before.y + 24);
+        await page.mouse.down();
+        await page.mouse.move(before.x + before.width / 2 + 900, before.y + 24 + 900, { steps: 16 });
+        await page.mouse.up();
+        await page.waitForTimeout(200);
+        const after = await dialog.boundingBox();
+        invariant(after, "이동 후 다이얼로그 위치를 측정하지 못했습니다");
+        const moved = Math.hypot(after.x - before.x, after.y - before.y);
+        invariant(moved > 80, `헤더를 끌었는데 다이얼로그가 움직이지 않았습니다 (${moved.toFixed(1)}px)`);
+        const viewport = page.viewportSize();
+        invariant(viewport, "뷰포트 크기를 확인하지 못했습니다");
+        invariant(
+          after.x >= 0 && after.y >= 0
+            && after.x + after.width <= viewport.width
+            && after.y + after.height <= viewport.height,
+          `이동한 다이얼로그가 화면 밖으로 나갔습니다 `
+            + `(${after.x},${after.y},${after.width}x${after.height} in ${viewport.width}x${viewport.height})`,
+        );
+
+        // 2) Holding 원본 비교 returns the canvas to the untouched page, and releasing brings the
+        //    filtered preview back. A toggle that stuck would silently apply the wrong pixels.
+        //
+        // Judged on a band the dialog does NOT cover. Diffing the whole evidence clip counted the
+        // scrim and the panel just dragged into it, which is how an earlier version of this check
+        // reported "필터가 남아 있습니다" on a run where the canvas had fully reverted — the residual
+        // was the dialog, not filter pixels.
+        invariant(
+          after.y >= compareClip.y + compareClip.height,
+          `이동한 다이얼로그가 비교 띠를 덮고 있어 캔버스만 측정할 수 없습니다 `
+            + `(다이얼로그 top ${after.y}, 띠 ${compareClip.y}~${compareClip.y + compareClip.height})`,
+        );
+        const previewing = await screenshotClipped(page, compareClip);
+        const previewDiff = await compareScreenshotPixels(page, beforeOpenBand, previewing);
+        invariant(
+          previewDiff.changedPixels > previewDiff.totalPixels * 0.001,
+          `미리보기가 캔버스를 바꾸지 않아 비교 대상이 없습니다 `
+            + `(${previewDiff.changedPixels}/${previewDiff.totalPixels})`,
+        );
+        const compare = dialog.getByRole("button", { name: "원본 비교" });
+        const compareBox = await compare.boundingBox();
+        invariant(compareBox, "원본 비교 버튼을 찾지 못했습니다");
+        await page.mouse.move(
+          compareBox.x + compareBox.width / 2,
+          compareBox.y + compareBox.height / 2,
+        );
+        await page.mouse.down();
+        await page.waitForTimeout(700);
+        const held = await screenshotClipped(page, compareClip);
+        const heldDiff = await compareScreenshotPixels(page, beforeOpenBand, held);
+        await page.mouse.up();
+        await page.waitForTimeout(700);
+        const released = await screenshotClipped(page, compareClip);
+        const releasedDiff = await compareScreenshotPixels(page, beforeOpenBand, released);
+        invariant(
+          heldDiff.changedPixels < previewDiff.changedPixels * 0.2,
+          `원본 비교를 누르고 있는 동안에도 필터가 남아 있습니다 `
+            + `(${heldDiff.changedPixels} vs 미리보기 ${previewDiff.changedPixels})`,
+        );
+        invariant(
+          releasedDiff.changedPixels > releasedDiff.totalPixels * 0.001,
+          `원본 비교에서 손을 뗀 뒤 미리보기가 돌아오지 않았습니다 `
+            + `(${releasedDiff.changedPixels}/${releasedDiff.totalPixels})`,
+        );
+        result.diff = previewDiff;
+
+        await dialog.getByRole("button", { name: "취소", exact: true }).click({ timeout: 5_000 });
+        await dialog.waitFor({ state: "hidden", timeout: 30_000 });
+        await page.waitForTimeout(400);
+        result.ok = true;
+        log(
+          `미리보기 판단 어포던스: OK — 이동 ${moved.toFixed(0)}px, `
+            + `미리보기 ${previewDiff.changedPixels}px → 원본 비교 ${heldDiff.changedPixels}px `
+            + `→ 해제 ${releasedDiff.changedPixels}px`,
+        );
+      } catch (error) {
+        result.failure = String(error instanceof Error ? error.message : error);
+        log(`미리보기 판단 어포던스: FAILED — ${result.failure}`);
+        await page.keyboard.press("Escape").catch(() => undefined);
+        await page.waitForTimeout(300);
+      }
+    }
+
     // Every loop case runs against the page-composite lane (no image element exists while the
     // pen strokes are the only content). The most common artist flow — a SELECTED image layer
     // receiving a non-destructive patch — is a different branch in openStudioFilter, so place
