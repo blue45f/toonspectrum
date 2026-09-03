@@ -9,13 +9,13 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: webgpu-v2-bootstrap-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   restore-source:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-slim, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -74,4 +74,12 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           HUSKY=0 git commit -m "feat(brush): materialize WebGPU v2 benchmark candidate"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+            exit 0
+          fi
+          git fetch origin "${GITHUB_REF_NAME}"
+          if git cat-file -e "FETCH_HEAD:src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts"; then
+            echo "candidate source was materialized by the parallel runner"
+            exit 0
+          fi
+          exit 1
