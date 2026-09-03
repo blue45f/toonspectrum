@@ -1,0 +1,75 @@
+name: Finalize Blender source-aware model quality
+
+on:
+  push:
+    branches:
+      - feat/blender-character-quality-pipeline-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blender-source-aware-finalizer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[source-aware-quality-applied]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/blender-character-quality-pipeline-20260904
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply source-aware quality closure
+        run: python3 scripts/apply-blender-source-aware-quality.py
+
+      - name: Inspect generated diff
+        run: git diff --check && git status --short
+
+      - name: Run Blender Python source contracts
+        run: python3 -m unittest discover -s tests/blender -p 'test_*.py' -v
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify static Blender pipeline safety
+        run: pnpm exec tsx scripts/verify-blender-character-pipeline.mjs
+
+      - name: Run package admission tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+          src/domains/creator/vrm/studio-vrm-blender-character-loader.test.ts
+
+      - name: Type-check web workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Commit verified implementation
+        run: |
+          rm -f scripts/apply-blender-source-aware-quality.py
+          rm -f .github/workflows/finalize-blender-source-aware-quality.yml
+          find tools tests scripts -type d -name __pycache__ -prune -exec rm -rf {} +
+          find tools tests scripts -type f -name '*.py[co]' -delete
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "fix(blender): use source-aware quality and component morphs [source-aware-quality-applied]"
+          git push --no-verify origin HEAD:feat/blender-character-quality-pipeline-20260904
