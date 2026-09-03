@@ -29,6 +29,27 @@ jobs:
       - name: Apply deterministic pipeline payload
         run: python3 scripts/bootstrap-blender-character-pipeline.py
 
+      - name: Harden generated package CLI typing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/import-blender-character-package.mts")
+          source = path.read_text(encoding="utf-8")
+          old = '''  const prefer = option(args, "--prefer");
+          if (prefer && prefer !== "vrm" && prefer !== "glb") throw new Error("--prefer must be vrm or glb");
+          const selected = selectStudioVrmBlenderRuntimeAsset(parsed, { prefer });'''
+          new = '''  const preferValue = option(args, "--prefer");
+          if (preferValue && preferValue !== "vrm" && preferValue !== "glb") {
+            throw new Error("--prefer must be vrm or glb");
+          }
+          const prefer = preferValue as "vrm" | "glb" | undefined;
+          const selected = selectStudioVrmBlenderRuntimeAsset(parsed, { prefer });'''
+          if source.count(old) != 1:
+              raise SystemExit("expected package CLI preference block exactly once")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - name: Inspect payload diff
         run: git diff --check && git status --short
 
