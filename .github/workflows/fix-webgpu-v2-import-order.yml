@@ -34,11 +34,60 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Repair the fail-closed fixture after creating a valid fingerprint
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts")
+          source = path.read_text(encoding="utf-8")
+          old = '''  it("fails closed outside the measured product lane", () => {
+            const valid = texturedPlan();
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(valid)).toBe(true);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              mode: "append",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              durableR8GrainSource: {} as never,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
+            }))).toBe(false);
+          });'''
+          new = '''  it("fails closed outside the measured product lane", () => {
+            const valid = texturedPlan();
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(valid)).toBe(true);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              mode: "append" as const,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              durableR8GrainSource: {} as never,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              grainSamplingSemantics: "durable-r8-cpu-parity-v1" as const,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              batches: [{ ...valid.batches[0]!, porterDuff: "destination-out" as const }],
+            }))).toBe(false);
+          });'''
+          if source.count(old) != 1:
+              raise SystemExit(f"expected one V2 fail-closed test block, found {source.count(old)}")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - name: Normalize and verify V2 source
         run: |
           pnpm exec eslint --fix \
             scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
           pnpm exec eslint --max-warnings=0 \
             scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
             scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
@@ -58,5 +107,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add -A
           git diff --cached --check
-          git commit --no-verify -m "fix(webgpu): normalize V2 source imports [webgpu-v2-imports-fixed]"
+          git commit --no-verify -m "fix(webgpu): normalize V2 source and fail-closed fixtures [webgpu-v2-imports-fixed]"
           git push --no-verify origin HEAD:feat/webgpu-brush-v2-final-20260904
