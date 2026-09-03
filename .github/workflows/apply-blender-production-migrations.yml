@@ -39,7 +39,10 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
 
-      - name: Apply capability-aware Orion migration
+      - name: Apply source-aware quality migration
+        run: python3 scripts/apply-blender-source-aware-quality.py
+
+      - name: Apply capability-aware Orion normalization
         run: |
           python3 scripts/fix-blender-orion-capability-audit.py
           python3 - <<'PY'
@@ -52,9 +55,6 @@ jobs:
           if broken in source:
               path.write_text(source.replace(broken, fixed, 1), encoding="utf-8")
           PY
-
-      - name: Apply source-aware quality migration
-        run: python3 scripts/apply-blender-source-aware-quality.py
 
       - name: Stage generated workflow contract outside workflows directory
         run: |
