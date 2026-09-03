@@ -48,10 +48,16 @@ replace_once(
 
 preview = Path("src/domains/creator/scene-3d/StudioShaperPresetPreview.tsx")
 preview_source = preview.read_text(encoding="utf-8")
-marker = "  const legBottom = tall ? 96 : 91;\n"
-if preview_source.count(marker) != 1:
-    raise RuntimeError("StudioShaperPresetPreview: unused legBottom marker changed")
-preview.write_text(preview_source.replace(marker, "", 1), encoding="utf-8")
+for marker in (
+    '  const tall = category === "body" && presetId === "body-tall";\n',
+    "  const legBottom = tall ? 96 : 91;\n",
+):
+    if preview_source.count(marker) != 1:
+        raise RuntimeError(
+            f"StudioShaperPresetPreview: generated marker changed: {marker!r}"
+        )
+    preview_source = preview_source.replace(marker, "", 1)
+preview.write_text(preview_source, encoding="utf-8")
 
 panel_test = Path("src/domains/creator/scene-3d/StudioShaperPanel.test.tsx")
 panel_test_source = panel_test.read_text(encoding="utf-8")
