@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      EVIDENCE_DIR: ${{ runner.temp }}/webgpu-v2-evidence
+      EVIDENCE_DIR: /tmp/webgpu-v2-evidence
+      PAYLOAD_ARCHIVE: /tmp/webgpu-v2-payload.tar.xz
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,9 +30,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(find .bootstrap/webgpu-v2 -type f -name 'part-*' | wc -l)" -eq 7
-          cat .bootstrap/webgpu-v2/part-* | base64 --decode > "${{ runner.temp }}/webgpu-v2-payload.tar.xz"
-          echo "fa8c10d2deceec63fd691e7d56ad1623ff7f0422cadbe488ca42b1d4b3626dfd  ${{ runner.temp }}/webgpu-v2-payload.tar.xz" | sha256sum --check --strict
-          tar -xJf "${{ runner.temp }}/webgpu-v2-payload.tar.xz"
+          cat .bootstrap/webgpu-v2/part-* | base64 --decode > "$PAYLOAD_ARCHIVE"
+          echo "fa8c10d2deceec63fd691e7d56ad1623ff7f0422cadbe488ca42b1d4b3626dfd  $PAYLOAD_ARCHIVE" | sha256sum --check --strict
+          tar -xJf "$PAYLOAD_ARCHIVE"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -87,7 +88,7 @@ jobs:
           rm -rf .bootstrap/webgpu-v2
           rm -f .github/workflows/webgpu-v2-working-snapshot.yml
           mkdir -p docs/reports
-          cp "${{ env.EVIDENCE_DIR }}/summary.json" docs/reports/studio-webgpu-brush-v2-benchmark-2026-09-04.json
+          cp "$EVIDENCE_DIR/summary.json" docs/reports/studio-webgpu-brush-v2-benchmark-2026-09-04.json
           git add -A
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
