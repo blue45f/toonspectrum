@@ -625,7 +625,11 @@ describe("StudioFilterDialog", () => {
     fireEvent.click(
       within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
     );
-    fireEvent.click(within(gallery).getByRole("button", { name: "변형" }));
+    // The category strip is a radiogroup: exactly one category is active, and nine independent
+    // aria-pressed toggles said otherwise.
+    fireEvent.click(within(gallery).getByRole("radio", { name: "변형" }));
+    expect(within(gallery).getByRole("radio", { name: "변형" }).getAttribute("aria-checked"))
+      .toBe("true");
 
     expect(within(gallery).getByText(`${transformFilterCount}개 필터`)).toBeTruthy();
     expect(within(gallery).getAllByRole("button", { name: /필터 선택$/ }))
@@ -642,12 +646,15 @@ describe("StudioFilterDialog", () => {
     fireEvent.click(
       within(firstGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
     );
-    fireEvent.click(
-      within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기 추가" }),
-    );
+    // The name stays put and aria-pressed carries the state; swapping the name too announced the
+    // undo action as already done.
+    const favorite = within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기" });
+    expect(favorite.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(favorite);
     expect(
-      within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기 해제" }),
-    ).toBeTruthy();
+      within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
     expect(first.onApply).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(preferences.values.get("effect-favorites")).toContain("filter:glitch");
@@ -664,7 +671,7 @@ describe("StudioFilterDialog", () => {
     fireEvent.click(
       within(secondGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
     );
-    fireEvent.click(within(secondGallery).getByRole("button", { name: "즐겨찾기" }));
+    fireEvent.click(within(secondGallery).getByRole("radio", { name: "즐겨찾기" }));
     expect(
       within(secondGallery).getByRole("button", { name: "글리치 필터 선택" }),
     ).toBeTruthy();
