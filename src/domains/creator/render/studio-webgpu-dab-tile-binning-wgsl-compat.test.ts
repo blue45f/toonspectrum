@@ -18,7 +18,13 @@ describe("WebGPU dab tile-binning WGSL compatibility", () => {
       expect(shader).toContain("var<uniform> config: Meta;");
     }
     expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scan).toContain(
-      "let level_count = min(",
+      "var level_count = 2048u;",
+    );
+    expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scan).toContain(
+      "level_count >>= 1u;",
+    );
+    expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scan).toContain(
+      "level_count *= 2u;",
     );
   });
 });
