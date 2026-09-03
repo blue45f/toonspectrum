@@ -1,0 +1,223 @@
+name: Build fixed preserved all-branch integration
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/merge-all-branches-fixed-integration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: fixed-all-branch-integration-20260903
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out latest main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge all unmerged remote branch heads with preservation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          integration="integration/all-unmerged-preserved-20260903"
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          report_dir="docs/merge-preservation/fixed-20260903"
+          mkdir -p "$report_dir/conflicts"
+          rm -f "$report_dir"/conflicts/*.txt "$report_dir"/branches.tsv
+          : > "$report_dir/branches.tsv"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git switch -C "$integration" origin/main
+
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | .head.ref' \
+            | sort -u > /tmp/merged-pr-heads.txt
+
+          mapfile -t branches < <(
+            git for-each-ref refs/remotes/origin --format='%(refname:strip=3)' | sort -u
+          )
+          for branch in "${branches[@]}"; do
+            case "$branch" in
+              ''|HEAD|main|gh-pages|production|archive/*|integration/*|ops/merge-all-preserve-*|deploy/*|release/*)
+                printf '%s\t%s\t%s\t%s\t%s\n' "$branch" skipped protected-or-generated "" 0 >> "$report_dir/branches.tsv"
+                continue
+                ;;
+            esac
+
+            remote_ref="refs/remotes/origin/${branch}"
+            sha="$(git rev-parse "$remote_ref")"
+            if grep -Fxq "$branch" /tmp/merged-pr-heads.txt; then
+              printf '%s\t%s\t%s\t%s\t%s\n' "$branch" skipped already-merged-pr-source "$sha" 0 >> "$report_dir/branches.tsv"
+              continue
+            fi
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              printf '%s\t%s\t%s\t%s\t%s\n' "$branch" skipped already-ancestor "$sha" 0 >> "$report_dir/branches.tsv"
+              continue
+            fi
+
+            safe="$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#__#g')"
+            tag="archive/pre-fixed-merge-${stamp}/${safe}"
+            git tag -f "$tag" "$sha"
+            git push origin "refs/tags/${tag}:refs/tags/${tag}"
+
+            conflict_file="$report_dir/conflicts/${safe}.txt"
+            : > "$conflict_file"
+            status=merged
+            reason=clean-or-ort-resolved
+            if ! GIT_MERGE_AUTOEDIT=no git merge \
+              --no-ff \
+              --no-edit \
+              --allow-unrelated-histories \
+              -X ours \
+              "$remote_ref"; then
+              status=merged-with-conflict-ledger
+              reason=current-main-derived-side-retained
+              git diff --name-only --diff-filter=U | sort -u > "$conflict_file"
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                if git checkout --ours -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                elif git checkout --theirs -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                else
+                  rm -rf -- "$path"
+                  git add -A -- "$path"
+                fi
+              done < "$conflict_file"
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "Unresolved conflicts after deterministic preservation policy" >&2
+                git diff --name-only --diff-filter=U >&2
+                exit 1
+              fi
+              git commit --no-edit || git commit -m "merge-preserve: integrate ${branch}"
+            fi
+            count="$(grep -c . "$conflict_file" || true)"
+            printf '%s\t%s\t%s\t%s\t%s\n' "$branch" "$status" "$reason" "$sha" "$count" >> "$report_dir/branches.tsv"
+          done
+
+          find "$report_dir/conflicts" -type f -empty -delete
+          python3 - "$report_dir" "$integration" <<'PY'
+          import csv
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          integration = sys.argv[2]
+          rows = []
+          with (root / "branches.tsv").open(encoding="utf-8", newline="") as stream:
+              for fields in csv.reader(stream, delimiter="\t"):
+                  fields += [""] * (5 - len(fields))
+                  rows.append({
+                      "branch": fields[0],
+                      "status": fields[1],
+                      "reason": fields[2],
+                      "headSha": fields[3] or None,
+                      "conflictCount": int(fields[4] or 0),
+                  })
+          payload = {
+              "schemaVersion": 3,
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "integrationBranch": integration,
+              "sourceBranchesDeleted": False,
+              "branches": rows,
+          }
+          (root / "report.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          lines = [
+              "# Fixed all-branch integration ledger",
+              "",
+              f"- Generated: `{payload['generatedAt']}`",
+              f"- Integration branch: `{integration}`",
+              "- Source branches were not deleted.",
+              "- Conflicting active code keeps the current-main-derived side; the complete source branch and immutable archive tag remain recoverable.",
+              "",
+              "| Branch | Status | Head | Conflicts |",
+              "|---|---|---|---:|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| `{row['branch']}` | {row['status']}: {row['reason']} | "
+                  f"`{(row['headSha'] or '')[:12]}` | {row['conflictCount']} |"
+              )
+          (root / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          git add "$report_dir"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(merge): record fixed all-branch preservation ledger"
+          fi
+          git push --force-with-lease origin "HEAD:refs/heads/${integration}"
+
+      - name: Verify integrated source without suppressing preservation push
+        shell: bash
+        run: |
+          set +e
+          mkdir -p merge-verification
+          pnpm install --frozen-lockfile > merge-verification/install.log 2>&1
+          install_code=$?
+          if [ "$install_code" -eq 0 ]; then
+            pnpm run typecheck > merge-verification/typecheck.log 2>&1
+            typecheck_code=$?
+            pnpm run lint:quick > merge-verification/lint.log 2>&1
+            lint_code=$?
+            pnpm exec vitest run \
+              src/domains/market \
+              src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+              src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+              --reporter=verbose > merge-verification/marketplace-tests.log 2>&1
+            test_code=$?
+            pnpm run build > merge-verification/build.log 2>&1
+            build_code=$?
+          else
+            typecheck_code=125
+            lint_code=125
+            test_code=125
+            build_code=125
+          fi
+          cat > merge-verification/results.json <<JSON
+          {
+            "install": ${install_code},
+            "typecheck": ${typecheck_code},
+            "lint": ${lint_code},
+            "marketplaceTests": ${test_code},
+            "build": ${build_code}
+          }
+          JSON
+          cat merge-verification/results.json >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Upload full integration verification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fixed-all-branch-integration-${{ github.run_id }}
+          path: |
+            docs/merge-preservation/fixed-20260903
+            merge-verification
+          if-no-files-found: warn
+          retention-days: 30

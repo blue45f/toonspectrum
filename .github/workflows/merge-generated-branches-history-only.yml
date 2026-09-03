@@ -1,0 +1,129 @@
+name: Merge generated and archive branches as history only
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/merge-generated-branches-history-only.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: generated-branches-history-only-20260903
+  cancel-in-progress: false
+
+jobs:
+  merge-history:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: integration/generated-history-only-20260903
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge deployment, release, archive, and integration refs without changing source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="docs/merge-preservation/generated-history-only-20260903"
+          mkdir -p "$report_dir"
+          : > "$report_dir/branches.tsv"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git switch -C "$TARGET_BRANCH" origin/main
+
+          mapfile -t branches < <(
+            git for-each-ref refs/remotes/origin --format='%(refname:strip=3)' | sort -u
+          )
+          for branch in "${branches[@]}"; do
+            case "$branch" in
+              gh-pages|production|deploy/*|release/*|archive/*|integration/*)
+                ;;
+              *)
+                continue
+                ;;
+            esac
+            case "$branch" in
+              "$TARGET_BRANCH") continue ;;
+            esac
+            ref="refs/remotes/origin/${branch}"
+            sha="$(git rev-parse "$ref")"
+            if git merge-base --is-ancestor "$ref" HEAD; then
+              printf '%s\t%s\t%s\n' "$branch" already-ancestor "$sha" >> "$report_dir/branches.tsv"
+              continue
+            fi
+            safe="$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#__#g')"
+            tag="archive/pre-history-only-20260903/${safe}"
+            git tag -f "$tag" "$sha"
+            git push origin "refs/tags/${tag}:refs/tags/${tag}"
+            GIT_MERGE_AUTOEDIT=no git merge \
+              -s ours \
+              --no-ff \
+              --no-edit \
+              --allow-unrelated-histories \
+              "$ref"
+            printf '%s\t%s\t%s\n' "$branch" history-only "$sha" >> "$report_dir/branches.tsv"
+          done
+
+          python3 - "$report_dir" <<'PY'
+          import csv
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          root = Path(sys.argv[1])
+          rows = []
+          with (root / "branches.tsv").open(encoding="utf-8", newline="") as stream:
+              for fields in csv.reader(stream, delimiter="\t"):
+                  fields += [""] * (3 - len(fields))
+                  rows.append({"branch": fields[0], "mode": fields[1], "headSha": fields[2]})
+          payload = {
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "policy": "history-only merge; main source tree retained",
+              "branches": rows,
+          }
+          (root / "report.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          lines = [
+              "# Generated and archive branch history integration",
+              "",
+              "These branches are merged with Git's `ours` strategy so their commit history is preserved without replacing the source tree with deployment artifacts.",
+              "",
+              "| Branch | Mode | Head |",
+              "|---|---|---|",
+          ]
+          for row in rows:
+              lines.append(f"| `{row['branch']}` | {row['mode']} | `{row['headSha'][:12]}` |")
+          (root / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          git add "$report_dir"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(merge): record generated branch history integration"
+          fi
+          git push --force-with-lease origin "HEAD:refs/heads/${TARGET_BRANCH}"
+
+      - name: Create protected PR and request merge commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "merge: preserve generated and archive branch histories" \
+              --body-file docs/merge-preservation/generated-history-only-20260903/README.md)"
+            number="${url##*/}"
+          fi
+          gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+          echo "PR: https://github.com/${GITHUB_REPOSITORY}/pull/${number}" >> "$GITHUB_STEP_SUMMARY"
