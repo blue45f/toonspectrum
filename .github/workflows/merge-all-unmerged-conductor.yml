@@ -1,0 +1,142 @@
+name: Preserve and queue every unmerged branch
+
+on:
+  push:
+    branches:
+      - automation/merge-all-unmerged-20260903-driver-v10
+    paths:
+      - ".github/workflows/merge-all-unmerged-conductor.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-all-unmerged-conductor
+  cancel-in-progress: false
+
+jobs:
+  preserve-and-queue:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      DRIVER_BRANCH: automation/merge-all-unmerged-20260903-driver-v10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.DRIVER_BRANCH }}
+
+      - name: Fetch every remote branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+
+      - name: Preserve exact branch heads and queue integrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p merge-all-report
+          report="merge-all-report/report.tsv"
+          printf 'branch\tsha\tbackup_ref\tpr\taction\tdetail\n' > "$report"
+
+          mapfile -t branches < <(
+            git for-each-ref --format='%(refname:strip=3)\t%(objectname)' refs/remotes/origin \
+              | grep -v $'^HEAD\t' \
+              | sort
+          )
+
+          for row in "${branches[@]}"; do
+            branch="${row%%$'\t'*}"
+            sha="${row#*$'\t'}"
+            [[ "$branch" == "main" ]] && continue
+            [[ "$branch" == "$DRIVER_BRANCH" ]] && continue
+            [[ "$branch" == automation/merge-all-unmerged-20260903-* ]] && continue
+            [[ "$branch" == archive/* || "$branch" == backup/* ]] && continue
+
+            safe="$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-//;s/-$//')"
+            backup="refs/tags/pre-merge-all/${GITHUB_RUN_ID}/${safe}"
+            if gh api -X POST "repos/${REPOSITORY}/git/refs" \
+              -f ref="$backup" -f sha="$sha" >/dev/null 2>&1; then
+              backup_action="created"
+            else
+              backup_action="exists-or-protected"
+            fi
+
+            if git merge-base --is-ancestor "$sha" origin/main; then
+              printf '%s\t%s\t%s\t\tcontained\t%s\n' "$branch" "$sha" "$backup" "$backup_action" >> "$report"
+              continue
+            fi
+
+            pr_number="$(gh pr list --repo "$REPOSITORY" --state open --head "$branch" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+            if [[ -z "$pr_number" ]]; then
+              title="chore(integration): merge preserved branch ${branch}"
+              body=$(cat <<EOF
+This PR was created by the lossless branch integration conductor.
+
+- Original branch: \`${branch}\`
+- Preserved head: \`${sha}\`
+- Backup ref: \`${backup}\`
+
+The original branch is not deleted until GitHub confirms a successful merge.
+EOF
+)
+              pr_url="$(gh pr create --repo "$REPOSITORY" --base main --head "$branch" --title "$title" --body "$body" 2>/dev/null || true)"
+              pr_number="$(printf '%s' "$pr_url" | sed -n 's#.*/pull/##p')"
+              if [[ -z "$pr_number" ]]; then
+                printf '%s\t%s\t%s\t\tpr-create-failed\t%s\n' "$branch" "$sha" "$backup" "$backup_action" >> "$report"
+                continue
+              fi
+            fi
+
+            draft="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null || echo false)"
+            if [[ "$draft" == "true" ]]; then
+              gh pr ready "$pr_number" --repo "$REPOSITORY" >/dev/null 2>&1 || true
+            fi
+
+            merge_state="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo UNKNOWN)"
+            checks_json="$(gh pr checks "$pr_number" --repo "$REPOSITORY" --json state 2>/dev/null || echo '[]')"
+            failed="$(jq '[.[] | select(.state == "FAILURE" or .state == "ERROR" or .state == "CANCELLED" or .state == "TIMED_OUT" or .state == "ACTION_REQUIRED")] | length' <<<"$checks_json")"
+            pending="$(jq '[.[] | select(.state == "PENDING" or .state == "QUEUED" or .state == "IN_PROGRESS" or .state == "WAITING")] | length' <<<"$checks_json")"
+
+            if [[ "$merge_state" == "BEHIND" ]]; then
+              gh pr update-branch "$pr_number" --repo "$REPOSITORY" >/dev/null 2>&1 || true
+              merge_state="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo UNKNOWN)"
+            fi
+
+            if [[ "$failed" == "0" && "$pending" == "0" && "$merge_state" != "DIRTY" && "$merge_state" != "BLOCKED" ]]; then
+              if gh pr merge "$pr_number" --repo "$REPOSITORY" --squash --delete-branch >/dev/null 2>&1; then
+                printf '%s\t%s\t%s\t%s\tmerged\t%s\n' "$branch" "$sha" "$backup" "$pr_number" "$merge_state" >> "$report"
+                git fetch origin main --quiet || true
+                continue
+              fi
+            fi
+
+            if [[ "$failed" == "0" && "$merge_state" != "DIRTY" ]]; then
+              if gh pr merge "$pr_number" --repo "$REPOSITORY" --squash --delete-branch --auto >/dev/null 2>&1; then
+                printf '%s\t%s\t%s\t%s\tauto-merge-enabled\tstate=%s,pending=%s\n' "$branch" "$sha" "$backup" "$pr_number" "$merge_state" "$pending" >> "$report"
+              else
+                printf '%s\t%s\t%s\t%s\tqueue-blocked\tstate=%s,pending=%s\n' "$branch" "$sha" "$backup" "$pr_number" "$merge_state" "$pending" >> "$report"
+              fi
+            else
+              printf '%s\t%s\t%s\t%s\tneeds-repair\tstate=%s,failed=%s,pending=%s\n' "$branch" "$sha" "$backup" "$pr_number" "$merge_state" "$failed" "$pending" >> "$report"
+            fi
+          done
+
+          column -t -s $'\t' "$report" | tee merge-all-report/report.txt
+
+      - name: Upload lossless integration inventory
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: merge-all-unmerged-${{ github.run_id }}
+          path: merge-all-report
+          if-no-files-found: error
+          retention-days: 30
