@@ -1190,7 +1190,12 @@ def render_preview(filename, output_path, view_direction=(1.6, -2.2, 1.4)):
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = False
     scene.render.filepath = output_path
-    scene.view_settings.look = "AgX - Medium High Contrast"
+    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):
+        try:
+            scene.view_settings.look = look
+            break
+        except TypeError:
+            continue
     bpy.ops.render.render(write_still=True)
     print(f"Rendered {filename}: {output_path}")
 

@@ -112,7 +112,14 @@ def _configure_render(scene: bpy.types.Scene, options: RenderOptions) -> None:
     scene.render.use_overwrite = True
     scene.render.use_placeholder = False
     scene.render.engine = scene.render.engine
-    scene.view_settings.look = "AgX - Medium High Contrast"
+    # Blender 5.2 shortened AgX look identifiers, while older releases used the
+    # prefixed spelling. Prefer the older label first so the same kit remains backward compatible.
+    for look in ("AgX - Medium High Contrast", "Medium High Contrast"):
+        try:
+            scene.view_settings.look = look
+            break
+        except TypeError:
+            continue
     if hasattr(scene, "eevee"):
         scene.eevee.taa_render_samples = options.samples
     world = scene.world or bpy.data.worlds.new("TS_QualityWorld")
