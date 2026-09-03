@@ -707,6 +707,41 @@ export function VrmActor({
       return;
     }
     if (isStudioVrmTexturePaintBrushProductBlocked(settings.tool)) return;
+    if (settings.tool !== "surface-brush") return;
+
+    runtime.clearError();
+    const begin = texturePaintSurfaceTool.begin({
+      runtime,
+      settings: {
+        color: settings.color,
+        sizeCssPixels: settings.sizeTexels,
+        opacity: settings.opacity,
+        flow: settings.tuning.flow,
+        hardness: settings.tuning.hardness,
+        minSize: settings.tuning.minSize,
+      },
+      sample: studioVrmSurfacePaintPointerSample(
+        event,
+        "down",
+        hit,
+        camera,
+        gl.domElement.getBoundingClientRect().height,
+        texturePaintSurfaceCameraPointRef.current,
+      ),
+    });
+    if (!begin.ok) return;
+
+    texturePaintSurfacePointerIdRef.current = event.pointerId;
+    const captureTarget =
+      event.currentTarget as unknown as StudioVrmTexturePaintPointerCaptureTarget;
+    texturePaintSurfaceCaptureTargetRef.current = captureTarget;
+    try {
+      captureTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Window lifecycle listeners still finish or cancel an admitted stroke without capture.
+      texturePaintSurfaceCaptureTargetRef.current = null;
+    }
+    invalidate();
   };
 
   const moveTexturePaint = (event: ThreeEvent<PointerEvent>) => {

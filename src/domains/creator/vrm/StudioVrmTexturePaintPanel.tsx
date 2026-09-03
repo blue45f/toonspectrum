@@ -22,7 +22,7 @@ export interface StudioVrmTexturePaintPanelSettings {
   readonly tool: "surface-brush" | "brush" | "fill";
   readonly brushKind: StudioStampBrushKind;
   readonly color: string;
-  /** Texture-space diameter in texels. */
+  /** Surface-brush diameter in CSS pixels (legacy key kept for scene compatibility). */
   readonly sizeTexels: number;
   readonly opacity: number;
   readonly blend: StudioVrmTexturePaintBlendMode;
@@ -153,8 +153,8 @@ export function StudioVrmTexturePaintPanel({
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-fg">3D 표면 페인트</h3>
             <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-              ColorDrop으로 연결 영역을 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 현재
-              baseColor 색을 가져옵니다. 결과는 삽입 이미지와 캡처에 바로 반영됩니다.
+              모델 표면을 따라 직접 그리거나 ColorDrop으로 연결 영역을 채웁니다. 스포이드 버튼
+              또는 Alt+클릭으로 baseColor 색을 가져오며, 결과는 삽입 이미지와 캡처에 바로 반영됩니다.
             </p>
           </div>
         </div>
@@ -209,12 +209,15 @@ export function StudioVrmTexturePaintPanel({
         <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="표면 페인트 도구">
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            aria-describedby="vrm-surface-brush-unavailable-reason"
-            aria-pressed="false"
-            title={surfaceBrushUnavailableReason}
-            className="inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-bold text-fg-3 opacity-55"
+            aria-pressed={settings.tool === "surface-brush"}
+            title="3D 모델 표면을 따라 직접 그립니다. 필압과 기울기는 로컬 UV 브러시에 반영됩니다."
+            className={cn(
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              settings.tool === "surface-brush"
+                ? "border-accent/60 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+            onClick={() => onSettingsChange({ tool: "surface-brush" })}
           >
             <Paintbrush size={14} aria-hidden />
             표면 브러시
@@ -236,19 +239,22 @@ export function StudioVrmTexturePaintPanel({
           </button>
         </div>
         <p className="text-[0.64rem] leading-relaxed text-fg-3">
-          표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다.
+          {settings.tool === "surface-brush"
+            ? "모델 위를 드래그해 직접 그립니다. 필압은 굵기에 반영되고 한 번의 제스처가 하나의 실행 취소 단계가 됩니다."
+            : "표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다."}
         </p>
       </fieldset>
 
       <div
-        id="vrm-surface-brush-unavailable-reason"
-        className="flex items-start gap-2 rounded-lg border border-warn/35 bg-warn/10 px-3 py-2.5 text-[0.64rem] leading-relaxed text-warn"
+        id="vrm-surface-brush-capability-note"
+        hidden={settings.tool !== "surface-brush"}
+        className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft/35 px-3 py-2.5 text-[0.64rem] leading-relaxed text-fg-2"
         role="note"
         data-testid="vrm-surface-brush-capability"
       >
-        <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
+        <Paintbrush size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <span className="min-w-0">
-          <span className="block font-bold text-fg-2">표면 브러시 준비 중</span>
+          <span className="block font-bold text-fg">직접 그리기 지원 범위</span>
           {surfaceBrushUnavailableReason}
         </span>
       </div>
@@ -319,6 +325,150 @@ export function StudioVrmTexturePaintPanel({
           </div>
         </div>
 
+        <div
+          hidden={settings.tool !== "surface-brush"}
+          className="space-y-3"
+          data-testid="vrm-surface-brush-controls"
+        >
+          <label
+            htmlFor="vrm-surface-brush-size"
+            className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs"
+          >
+            <span className="font-semibold text-fg-2">크기</span>
+            <input
+              id="vrm-surface-brush-size"
+              type="range"
+              min="2"
+              max="192"
+              step="1"
+              value={settings.sizeTexels}
+              disabled={editingDisabled}
+              aria-label="표면 브러시 크기"
+              aria-valuetext={`${Math.round(settings.sizeTexels)} px`}
+              className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) => onSettingsChange({ sizeTexels: Number(event.target.value) })}
+            />
+            <output
+              htmlFor="vrm-surface-brush-size"
+              className="text-right text-[0.68rem] tabular-nums text-fg-3"
+            >
+              {Math.round(settings.sizeTexels)} px
+            </output>
+          </label>
+
+          <label
+            htmlFor="vrm-surface-brush-opacity"
+            className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs"
+          >
+            <span className="font-semibold text-fg-2">불투명도</span>
+            <input
+              id="vrm-surface-brush-opacity"
+              type="range"
+              min="0.01"
+              max="1"
+              step="0.01"
+              value={settings.opacity}
+              disabled={editingDisabled}
+              aria-label="표면 브러시 불투명도"
+              aria-valuetext={`${Math.round(settings.opacity * 100)}%`}
+              className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) => onSettingsChange({ opacity: Number(event.target.value) })}
+            />
+            <output
+              htmlFor="vrm-surface-brush-opacity"
+              className="text-right text-[0.68rem] tabular-nums text-fg-3"
+            >
+              {Math.round(settings.opacity * 100)}%
+            </output>
+          </label>
+
+          <label
+            htmlFor="vrm-surface-brush-flow"
+            className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs"
+          >
+            <span className="font-semibold text-fg-2">도포량</span>
+            <input
+              id="vrm-surface-brush-flow"
+              type="range"
+              min="0.01"
+              max="1"
+              step="0.01"
+              value={settings.tuning.flow}
+              disabled={editingDisabled}
+              aria-label="표면 브러시 도포량"
+              aria-valuetext={`${Math.round(settings.tuning.flow * 100)}%`}
+              className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) =>
+                onSettingsChange({ tuning: { flow: Number(event.target.value) } })}
+            />
+            <output
+              htmlFor="vrm-surface-brush-flow"
+              className="text-right text-[0.68rem] tabular-nums text-fg-3"
+            >
+              {Math.round(settings.tuning.flow * 100)}%
+            </output>
+          </label>
+
+          <label
+            htmlFor="vrm-surface-brush-hardness"
+            className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs"
+          >
+            <span className="font-semibold text-fg-2">경도</span>
+            <input
+              id="vrm-surface-brush-hardness"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={settings.tuning.hardness}
+              disabled={editingDisabled}
+              aria-label="표면 브러시 경도"
+              aria-valuetext={`${Math.round(settings.tuning.hardness * 100)}%`}
+              className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) =>
+                onSettingsChange({ tuning: { hardness: Number(event.target.value) } })}
+            />
+            <output
+              htmlFor="vrm-surface-brush-hardness"
+              className="text-right text-[0.68rem] tabular-nums text-fg-3"
+            >
+              {Math.round(settings.tuning.hardness * 100)}%
+            </output>
+          </label>
+
+          <label
+            htmlFor="vrm-surface-brush-min-size"
+            className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs"
+          >
+            <span className="font-semibold text-fg-2">최소 굵기</span>
+            <input
+              id="vrm-surface-brush-min-size"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={settings.tuning.minSize}
+              disabled={editingDisabled}
+              aria-label="표면 브러시 최소 굵기"
+              aria-valuetext={`${Math.round(settings.tuning.minSize * 100)}%`}
+              className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) =>
+                onSettingsChange({ tuning: { minSize: Number(event.target.value) } })}
+            />
+            <output
+              htmlFor="vrm-surface-brush-min-size"
+              className="text-right text-[0.68rem] tabular-nums text-fg-3"
+            >
+              {Math.round(settings.tuning.minSize * 100)}%
+            </output>
+          </label>
+
+          <p className="text-[0.62rem] leading-relaxed text-fg-3">
+            현재 제품 경로는 round 촉과 혼색 없음만 지원합니다. 미지원 촉·혼색은 자동 대체하지 않습니다.
+          </p>
+        </div>
+
+        <div hidden={settings.tool !== "fill"} className="space-y-3">
         <label htmlFor="vrm-surface-fill-tolerance" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
           <span className="font-semibold text-fg-2">허용치</span>
           <input
@@ -367,6 +517,7 @@ export function StudioVrmTexturePaintPanel({
               : "현재 텍스처 전체에서 비슷한 색을 찾습니다. 떨어진 UV 조각도 함께 바뀔 수 있습니다."}
           </p>
         </fieldset>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 border-t border-line pt-3">
