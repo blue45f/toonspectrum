@@ -1,0 +1,71 @@
+name: Finalize clean persistent Studio workspace surfaces
+
+on:
+  push:
+    branches:
+      - feat/studio-persistent-workspace-surfaces-clean-20260904
+    paths:
+      - ".github/workflows/finalize-persistent-workspace-surfaces-clean.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-persistent-workspace-surfaces-clean-20260904
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-persistent-workspace-surfaces-clean-20260904
+          fetch-depth: 0
+      - name: Apply current floating-surface contract adaptation
+        run: |
+          python3 scripts/adapt-persistent-workspace-surfaces.py
+          git diff --check
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate architecture and focused source quality
+        run: |
+          pnpm run validate:architecture
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/StudioAnimaticTimelineDialog.tsx \
+            src/domains/creator/StudioAnimaticTimelineDialog.test.tsx \
+            src/domains/creator/StudioPageReviewPanel.tsx \
+            src/domains/creator/StudioPageReviewPanel.test.tsx \
+            src/domains/creator/studio-floating-surface-preferences-sqlite.ts \
+            src/domains/creator/studio-floating-surface-preferences-sqlite.test.ts \
+            src/domains/creator/use-studio-floating-surface-layout.ts
+      - name: Run focused workspace-surface tests
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/StudioAnimaticTimelineDialog.test.tsx \
+            src/domains/creator/StudioPageReviewPanel.test.tsx \
+            src/domains/creator/studio-floating-surface-preferences-sqlite.test.ts \
+            src/domains/creator/StudioFloatingSurface.test.tsx \
+            src/domains/creator/studio-floating-surface.test.ts
+      - name: Type-check, build, and enforce production bundle budgets
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm run build
+          pnpm run check:studio-bundle
+      - name: Commit validated implementation and remove staging artifacts
+        run: |
+          rm -f scripts/adapt-persistent-workspace-surfaces.py
+          rm -f .github/workflows/finalize-persistent-workspace-surfaces-clean.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): persist movable review and animatic workspaces"
+          git push origin HEAD:feat/studio-persistent-workspace-surfaces-clean-20260904
