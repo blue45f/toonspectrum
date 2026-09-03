@@ -143,12 +143,13 @@ export const VRM_VIEWPORT_HINTS = {
 export const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 export const STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON =
-  "검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아 브러시 그리기를 사용할 수 없습니다. 자체 라운드 촉으로 대체하지 않으며, 현재는 ColorDrop과 스포이드를 사용할 수 있습니다.";
+  "검증된 round 촉 기반 3D 표면 브러시입니다. 필압·크기·불투명도·경도는 로컬 UV atlas에 반영되며, stamp/image 촉과 wet/smudge 혼색은 아직 지원하지 않습니다.";
 
 export function isStudioVrmTexturePaintBrushProductBlocked(
   tool: StudioVrmTexturePaintPanelSettings["tool"],
 ): boolean {
-  return tool === "surface-brush" || tool === "brush";
+  // The measured round surface provider is admitted; only the legacy stamp-brush state remains.
+  return tool === "brush";
 }
 
 export const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS: StudioVrmTexturePaintPanelSettings = {

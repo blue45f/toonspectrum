@@ -100,7 +100,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
           "relative mx-auto flex h-full min-h-0 max-h-full flex-col overflow-hidden bg-panel",
           broadcastPreviewActive
             ? "max-w-none rounded-none border-0 shadow-none"
-            : "max-w-[1280px] rounded-2xl border border-line shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]",
+            : "max-w-[1480px] rounded-2xl border border-line shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]",
         )}
       >
         <header
@@ -171,8 +171,8 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
             broadcastPreviewActive
               ? "grid-rows-1 lg:grid-cols-1"
               : texturePaintModeSelected
-                ? "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px]"
-                : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px]",
+                ? "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]"
+                : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]",
           )}
         >
           <StudioVrmPoserViewport h={h} />
