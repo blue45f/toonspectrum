@@ -1,0 +1,51 @@
+name: Apply Studio floating surface payload
+
+on:
+  push:
+    branches:
+      - feat/studio-window-manager-20260904
+    paths:
+      - .github/workflows/apply-studio-floating-component.yml
+      - tools/studio-floating-component.gz.b64
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-floating-component
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Restore verified component source
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode tools/studio-floating-component.gz.b64 \
+            | gzip --decompress \
+            > src/domains/creator/StudioFloatingSurface.tsx
+          actual="$(git hash-object src/domains/creator/StudioFloatingSurface.tsx)"
+          expected="832cddc919a61f7c99f3fd8cba4ba27bdfbcd244"
+          test "$actual" = "$expected"
+
+      - name: Commit verified all-edge resize source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/domains/creator/StudioFloatingSurface.tsx; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/domains/creator/StudioFloatingSurface.tsx
+          git commit -m "feat(studio): support all-edge floating panel resize"
+          git push origin "HEAD:${{ github.ref_name }}"
