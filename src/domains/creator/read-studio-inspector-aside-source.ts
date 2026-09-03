@@ -7,6 +7,8 @@ export const STUDIO_INSPECTOR_ASIDE_SURFACE_FILES = [
   "StudioInspectorAsideTypes.ts",
   "StudioInspectorAsideBody.tsx",
   "StudioInspectorAsideShell.tsx",
+  "StudioInspectorContextRouteSync.tsx",
+  "studio-inspector-context-route.ts",
   "StudioInspectorSelectionSection.tsx",
   "StudioInspectorImageToolsSection.tsx",
   "StudioInspectorEmptyCoachSection.tsx",
