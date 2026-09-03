@@ -1,0 +1,103 @@
+name: Bootstrap Shaper-inspired character workshop
+
+on:
+  push:
+    branches:
+      - feat/shaper-character-workshop-20260903
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shaper-character-workshop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[shaper-character-workshop-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Check out stacked feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/shaper-character-workshop-20260903
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply visual-first workshop migration
+        run: |
+          python3 scripts/apply-shaper-character-workshop.py
+          python3 scripts/finalize-shaper-character-workshop.py
+
+      - name: Inspect generated implementation
+        run: |
+          git diff --check
+          git status --short
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint changed character-workshop files
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx
+          src/domains/creator/vrm/StudioVrmAvatarForgePreview.tsx
+          src/domains/creator/vrm/StudioVrmForgeRangeControl.tsx
+          src/domains/creator/vrm/StudioVrmAvatarReferenceRecommendationsPanel.tsx
+          src/domains/creator/vrm/StudioVrmPhotoPoseScanner.tsx
+          src/domains/creator/vrm/StudioVrmAvatarForge.tsx
+          src/domains/creator/vrm/StudioVrmPoserDialog.tsx
+          src/domains/creator/vrm/StudioVrmAvatarForgePreview.test.tsx
+          src/domains/creator/vrm/StudioVrmForgeRangeControl.test.tsx
+          src/domains/creator/vrm/studio-vrm-character-workshop-boundary.test.ts
+
+      - name: Run focused creator and rendering tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/vrm/StudioVrmAvatarForgePanel.test.tsx
+          src/domains/creator/vrm/StudioVrmAvatarForgePreview.test.tsx
+          src/domains/creator/vrm/StudioVrmForgeRangeControl.test.tsx
+          src/domains/creator/vrm/StudioVrmAvatarReferenceRecommendationsPanel.test.tsx
+          src/domains/creator/vrm/StudioVrmPhotoPoseScanner.test.tsx
+          src/domains/creator/vrm/StudioVrmAvatarForge.test.ts
+          src/domains/creator/vrm/studio-vrm-avatar-forge.test.ts
+          src/domains/creator/vrm/studio-vrm-character-workshop-boundary.test.ts
+
+      - name: Type-check web workspace
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio assets
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm run build
+
+      - name: Commit verified implementation
+        env:
+          HUSKY: "0"
+        run: |
+          rm scripts/apply-shaper-character-workshop.py
+          rm scripts/finalize-shaper-character-workshop.py
+          rm .github/workflows/bootstrap-shaper-character-workshop.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(vrm): deliver visual-first character workshop [shaper-character-workshop-applied]"
+          git push --no-verify origin HEAD:feat/shaper-character-workshop-20260903
