@@ -462,6 +462,7 @@ import {
 } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
+import { planStudioEmeresUnderlayElement } from "./studio-emeres-underlay-placement";
 import type {
   ExportFormat,
 } from "./export/studio-export";
@@ -816,6 +817,7 @@ import {
   type StudioWorkspaceLayoutSource,
 } from "./studio-menu-session-model";
 import { STUDIO_MOBILE_EDITING_DOCK_UI } from "./studio-mobile-dock-presets-config";
+import { useStudioMobileHistoryTouchGestures } from "./studio-mobile-history-touch-gesture-host";
 import {
   saveStudioMobileImmersivePreference,
   shouldStartStudioMobileImmersive,
@@ -19871,95 +19873,15 @@ const puppetWarpArmed =
       else enterCanvasOnlyMode();
     },
   };
-  useEffect(() => {
-    const node = wrapRef.current;
-    if (!isMobile || !node) return;
-    let candidate: {
-      count: 2 | 3;
-      startedAt: number;
-      points: Map<number, { x: number; y: number }>;
-      moved: boolean;
-    } | null = null;
-    const onTouchStart = (event: TouchEvent) => {
-      if (isStudioViewToolsHudEventTarget(event.target)) {
-        candidate = null;
-        return;
-      }
-      if (canvasPointerGestureIsOwned()) {
-        candidate = null;
-        return;
-      }
-      if (event.touches.length !== 2 && event.touches.length !== 3) {
-        candidate = null;
-        return;
-      }
-      const touchPrefs = appSettingsRef.current.touch;
-      if (
-        (event.touches.length === 2 && touchPrefs.twoFinger !== "undo-redo")
-        || (event.touches.length === 3 && touchPrefs.threeFinger === "none")
-      ) {
-        candidate = null;
-        return;
-      }
-      candidate = {
-        count: event.touches.length,
-        startedAt: performance.now(),
-        points: new Map(
-          Array.from(event.touches).map((touch) => [
-            touch.identifier,
-            { x: touch.clientX, y: touch.clientY },
-          ])
-        ),
-        moved: false,
-      };
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      if (!candidate || event.touches.length !== candidate.count) {
-        candidate = null;
-        return;
-      }
-      for (const touch of Array.from(event.touches)) {
-        const start = candidate.points.get(touch.identifier);
-        if (!start || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 12) {
-          candidate.moved = true;
-          break;
-        }
-      }
-    };
-    const onTouchEnd = (event: TouchEvent) => {
-      if (!candidate) return;
-      if (event.touches.length > 0) return;
-      const completed = !candidate.moved && performance.now() - candidate.startedAt <= 320;
-      const count = candidate.count;
-      candidate = null;
-      if (!completed) return;
-      event.preventDefault();
-      const touchPrefs = appSettingsRef.current.touch;
-      if (count === 2 && touchPrefs.twoFinger === "undo-redo") {
-        mobileHistoryGestureRef.current.undo();
-      } else if (count === 3 && touchPrefs.threeFinger === "undo") {
-        mobileHistoryGestureRef.current.undo();
-      } else if (count === 3 && touchPrefs.threeFinger === "toggle-ui") {
-        mobileHistoryGestureRef.current.toggleUi();
-      } else {
-        return;
-      }
-      if (typeof globalThis.navigator?.vibrate === "function") globalThis.navigator.vibrate(8);
-    };
-    const onTouchCancel = () => {
-      candidate = null;
-    };
-    node.addEventListener("touchstart", onTouchStart, { passive: true });
-    node.addEventListener("touchmove", onTouchMove, { passive: true });
-    node.addEventListener("touchend", onTouchEnd, { passive: false });
-    node.addEventListener("touchcancel", onTouchCancel, { passive: true });
-    return () => {
-      node.removeEventListener("touchstart", onTouchStart);
-      node.removeEventListener("touchmove", onTouchMove);
-      node.removeEventListener("touchend", onTouchEnd);
-      node.removeEventListener("touchcancel", onTouchCancel);
-    };
-  }, [isMobile, canvasPointerGestureIsOwned]);
+  // 두/세 손가락 탭 제스처는 studio-mobile-history-touch-gesture-host.ts 로 추출됐다.
+  // 호스트는 래퍼 노드와 위 동작 ref 만 넘긴다.
+  useStudioMobileHistoryTouchGestures({
+    surfaceRef: wrapRef,
+    isMobile,
+    canvasPointerGestureIsOwned,
+    appSettingsRef,
+    gestureRef: mobileHistoryGestureRef,
+  });
   // 히스토리 목록 점프 — undo/redo 와 동일하게 pagesHi 인덱스만 이동(스냅샷 배열은 그대로 유지).
   const jumpToHistoryIndex = (index: number) => {
     if (masterEditMode || collaborationDocumentLocked) return;
@@ -21233,95 +21155,38 @@ const puppetWarpArmed =
       });
     }
   }
-  // 이메레스(툰스푼 스타일) — 스케치 밑그림을 반투명+잠금 레이어로 깔고 바로 펜 모드로 전환.
-  // 패널이 선택돼 있으면 그 칸 안에 맞춰 넣고, 아니면 캔버스 중앙에 배치한다.
-  function addEmeresTemplate(t: StudioEmeresTemplate) {
+  // 이메레스 밑그림 삽입의 공통 경로 — 배치는 planStudioEmeresUnderlayElement(순수 모듈)가 계산하고,
+  // 호스트는 문서 커밋·선택 해제·펜 모드 전환이라는 부수효과만 맡는다.
+  function insertEmeresUnderlay(src: string, sourceWidth: number, sourceHeight: number, emeresSourceId: string) {
     setMenu(null);
-    const src = svgToDataUrl(t.svg);
-    const opacity = studioOptionalAssets.emeresUnderlayOpacity;
-    let el: El;
-    if (selected?.type === "frame") {
-      const fit = Math.min(selected.width / t.width, selected.height / t.height) * 0.94;
-      const w = Math.round(t.width * fit);
-      const h = Math.round(t.height * fit);
-      el = {
-        id: uid(),
-        type: "image",
-        src,
-        x: Math.round(selected.x + (selected.width - w) / 2),
-        y: Math.round(selected.y + (selected.height - h) / 2),
-        width: w,
-        height: h,
-        rotation: 0,
-        opacity,
-        locked: true,
-        emeresSourceId: t.id,
-      };
-    } else {
-      el = {
-        ...createCanvasImageElement({
-          id: uid(),
-          src,
-          canvasWidth: CANVAS_W,
-          canvasHeight: canvasH,
-          sourceWidth: t.width,
-          sourceHeight: t.height,
-          horizontalInset: 80,
-          placement: nextAssetInsertionPlacement(),
-        }),
-        opacity,
-        locked: true,
-        emeresSourceId: t.id,
-      };
-    }
+    const frame = selected?.type === "frame" ? selected : null;
+    const el = planStudioEmeresUnderlayElement({
+      id: uid(),
+      src,
+      sourceWidth,
+      sourceHeight,
+      opacity: studioOptionalAssets.emeresUnderlayOpacity,
+      emeresSourceId,
+      frame,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      // 칸 안 배치는 placement를 쓰지 않는다 — 미리 부르면 삽입 캐스케이드 순번만 헛돈다.
+      placement: frame ? undefined : nextAssetInsertionPlacement(),
+    });
     commit([...elements, el]);
     setSelectedId(null);
     activatePrimaryCanvasTool("draw", "pen");
   }
-  // 개인 보관함(studio-emeres-library) 항목을 캔버스에 삽입 — addEmeresTemplate과 배치 로직은
-  // 동일하되, svgToDataUrl 변환이 없고(item.src가 이미 dataURL) emeresSourceId에 custom: 접두사를 붙인다.
+  // 이메레스(툰스푼 스타일) — 스케치 밑그림을 반투명+잠금 레이어로 깔고 바로 펜 모드로 전환.
+  // 패널이 선택돼 있으면 그 칸 안에 맞춰 넣고, 아니면 캔버스 중앙에 배치한다.
+  function addEmeresTemplate(t: StudioEmeresTemplate) {
+    insertEmeresUnderlay(svgToDataUrl(t.svg), t.width, t.height, t.id);
+  }
+  // 개인 보관함(studio-emeres-library) 항목을 캔버스에 삽입 — addEmeresTemplate과 배치 로직을
+  // planStudioEmeresUnderlayElement로 공유한다. item.src는 이미 dataURL이라 svgToDataUrl 변환이
+  // 없고, emeresSourceId에만 custom: 접두사가 붙는다.
   function addEmeresLibraryItem(item: StudioEmeresLibraryItem) {
-    setMenu(null);
-    const src = item.src;
-    const opacity = studioOptionalAssets.emeresUnderlayOpacity;
-    let el: El;
-    if (selected?.type === "frame") {
-      const fit = Math.min(selected.width / item.width, selected.height / item.height) * 0.94;
-      const w = Math.round(item.width * fit);
-      const h = Math.round(item.height * fit);
-      el = {
-        id: uid(),
-        type: "image",
-        src,
-        x: Math.round(selected.x + (selected.width - w) / 2),
-        y: Math.round(selected.y + (selected.height - h) / 2),
-        width: w,
-        height: h,
-        rotation: 0,
-        opacity,
-        locked: true,
-        emeresSourceId: `custom:${item.id}`,
-      };
-    } else {
-      el = {
-        ...createCanvasImageElement({
-          id: uid(),
-          src,
-          canvasWidth: CANVAS_W,
-          canvasHeight: canvasH,
-          sourceWidth: item.width,
-          sourceHeight: item.height,
-          horizontalInset: 80,
-          placement: nextAssetInsertionPlacement(),
-        }),
-        opacity,
-        locked: true,
-        emeresSourceId: `custom:${item.id}`,
-      };
-    }
-    commit([...elements, el]);
-    setSelectedId(null);
-    activatePrimaryCanvasTool("draw", "pen");
+    insertEmeresUnderlay(item.src, item.width, item.height, `custom:${item.id}`);
   }
   // 우클릭한 요소를 이메레스 개인 보관함에 저장 — captureAnimFrame의 stage.toDataURL + 회전 가드
   // 패턴을 재사용하되, 프레임에 합성하지 않고 독립 StudioEmeresLibraryItem으로 저장한다.
