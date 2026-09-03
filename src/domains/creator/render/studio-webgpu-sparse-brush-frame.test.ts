@@ -82,7 +82,6 @@ describe("Studio WebGPU sparse brush frame planner", () => {
     })).toEqual({
       status: "rejected",
       reason: "atlas-capacity",
-      detail: undefined,
     });
     expect(planner.stats()).toMatchObject({
       residentTiles: 0,
