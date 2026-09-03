@@ -21,6 +21,8 @@ on:
       - "lib/creator-marketplace-*"
       - "e2e/market*.spec.ts"
       - ".github/workflows/marketplace-postmerge-browser-audit.yml"
+  schedule:
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
