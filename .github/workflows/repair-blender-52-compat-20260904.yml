@@ -1,85 +1,13 @@
-name: Repair Blender 5.2 compatibility
+name: Archived Blender 5.2 compatibility repair
 
 on:
-  push:
-    branches:
-      - ops/blender-52-compat-fix-20260904
+  workflow_dispatch:
 
 permissions:
-  contents: write
-
-concurrency:
-  group: repair-blender-52-compat-20260904
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  repair:
+  archived:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
     steps:
-      - name: Check out the Blender product branch
-        uses: actions/checkout@v6
-        with:
-          ref: feat/blender-character-quality-pipeline-20260904
-          fetch-depth: 0
-
-      - name: Apply Blender 5.2 data API compatibility fixes
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path("tools/blender/toonstudio_blender_kit/face.py")
-          text = path.read_text(encoding="utf-8")
-
-          text, vertex_count = re.subn(
-              r'(?m)^(?P<indent>\s*)for vertex in obj\.data\.vertices\[::step\]:$',
-              lambda match: (
-                  f'{match.group("indent")}vertices = obj.data.vertices\n'
-                  f'{match.group("indent")}for vertex_index in range(0, len(vertices), step):\n'
-                  f'{match.group("indent")}    vertex = vertices[vertex_index]'
-              ),
-              text,
-          )
-          if vertex_count != 1:
-              raise SystemExit(f"expected one bpy_prop_collection stepped slice, found {vertex_count}")
-
-          text, label_count = re.subn(
-              r'(?m)^(?P<indent>\s*)key\["toonstudio_label"\] = label$',
-              lambda match: (
-                  f'{match.group("indent")}shape_keys = obj.data.shape_keys\n'
-                  f'{match.group("indent")}if shape_keys is not None:\n'
-                  f'{match.group("indent")}    shape_keys[f"toonstudio_label:{key.name}"] = label'
-              ),
-              text,
-          )
-          if label_count != 1:
-              raise SystemExit(f"expected one unsupported ShapeKey ID-property write, found {label_count}")
-
-          path.write_text(text, encoding="utf-8")
-          PY
-
-      - name: Verify Python source and Blender contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
-          python -m unittest discover -s tests/blender -p 'test_*.py' -v
-          grep -F 'for vertex_index in range(0, len(vertices), step):' tools/blender/toonstudio_blender_kit/face.py
-          grep -F 'shape_keys[f"toonstudio_label:{key.name}"] = label' tools/blender/toonstudio_blender_kit/face.py
-
-      - name: Commit the repair to the Blender branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/blender/toonstudio_blender_kit/face.py
-          if git diff --cached --quiet; then
-            echo "No repair commit was needed."
-            exit 0
-          fi
-          git commit -m "fix(blender): support Blender 5.2 shape key and vertex APIs"
-          git push origin HEAD:feat/blender-character-quality-pipeline-20260904
+      - run: echo "The Blender 5.2 compatibility repair is already integrated in the product branch."
