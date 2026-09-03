@@ -1,3 +1,4 @@
+# Retriggered after moving SQLite/OPFS acquisition behind the lazy surface boundary.
 name: Finalize clean persistent Studio workspace surfaces
 
 on:

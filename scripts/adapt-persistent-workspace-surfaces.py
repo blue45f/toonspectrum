@@ -63,6 +63,70 @@ function encodeStudioFloatingSurfaceLayout(
 ''',
 )
 
+hook = "src/domains/creator/use-studio-floating-surface-layout.ts"
+replace_once(
+    hook,
+    '''import {
+  acquireProductStudioFloatingSurfacePreferencesRepository,
+  type StudioFloatingSurfacePersistenceFailure,
+  type StudioFloatingSurfacePreferencesRepository,
+} from "./studio-floating-surface-preferences-sqlite";''',
+    '''import type {
+  StudioFloatingSurfacePersistenceFailure,
+  StudioFloatingSurfacePreferencesRepository,
+} from "./studio-floating-surface-preferences-sqlite";''',
+)
+replace_once(
+    hook,
+    '''function productRepositoryAvailable(): boolean {
+  try {
+    return typeof navigator !== "undefined"
+      && typeof navigator.storage?.getDirectory === "function";
+  } catch {
+    return false;
+  }
+}
+
+/**''',
+    '''function productRepositoryAvailable(): boolean {
+  try {
+    return typeof navigator !== "undefined"
+      && typeof navigator.storage?.getDirectory === "function";
+  } catch {
+    return false;
+  }
+}
+
+async function acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred(): Promise<
+  StudioFloatingSurfacePreferencesRepository
+> {
+  const { acquireProductStudioFloatingSurfacePreferencesRepository } = await import(
+    "./studio-floating-surface-preferences-sqlite"
+  );
+  return acquireProductStudioFloatingSurfacePreferencesRepository();
+}
+
+/**''',
+)
+replace_once(
+    hook,
+    '''  repositoryFactory =
+    acquireProductStudioFloatingSurfacePreferencesRepository,
+}: UseStudioFloatingSurfaceLayoutOptions): UseStudioFloatingSurfaceLayoutResult {''',
+    '''  repositoryFactory =
+    acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred,
+}: UseStudioFloatingSurfaceLayoutOptions): UseStudioFloatingSurfaceLayoutResult {''',
+)
+replace_once(
+    hook,
+    '''  const sqliteAvailable = repositoryFactory
+    !== acquireProductStudioFloatingSurfacePreferencesRepository
+    || productRepositoryAvailable();''',
+    '''  const sqliteAvailable = repositoryFactory
+    !== acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred
+    || productRepositoryAvailable();''',
+)
+
 page = "src/domains/creator/StudioPageReviewPanel.tsx"
 replace_once(
     page,
@@ -161,7 +225,7 @@ for relative in (
     page,
     animatic,
     repo_test,
-    "src/domains/creator/use-studio-floating-surface-layout.ts",
+    hook,
     "src/domains/creator/StudioPageReviewPanel.test.tsx",
     "src/domains/creator/StudioAnimaticTimelineDialog.test.tsx",
 ):
