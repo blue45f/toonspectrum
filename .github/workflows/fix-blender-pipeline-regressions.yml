@@ -1,0 +1,74 @@
+name: Finalize Blender pipeline regressions
+
+on:
+  push:
+    branches:
+      - feat/blender-character-quality-pipeline-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-blender-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair-and-commit:
+    if: ${{ !contains(github.event.head_commit.message, '[blender-regressions-fixed]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Check out pipeline branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/blender-character-quality-pipeline-20260904
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply targeted Blender regression fixes
+        run: python3 scripts/fix-blender-pipeline-regressions.py
+
+      - name: Validate generated Python and diff
+        run: |
+          python3 -m py_compile \
+            tools/blender/toonstudio_blender_kit/render.py \
+            tools/blender/toonstudio_blender_kit/pipeline.py \
+            tests/blender/test_pipeline_regressions.py
+          git diff --check
+          git status --short
+
+      - name: Run pure Python pipeline contracts
+        run: python3 -m unittest discover -s tests/blender -p 'test_*.py'
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify repository and package contracts
+        run: |
+          pnpm run validate:architecture
+          node scripts/verify-blender-character-pipeline.mjs
+          pnpm exec vitest run src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Commit verified fixes
+        run: |
+          rm -f scripts/fix-blender-pipeline-regressions.py
+          rm -f .github/workflows/fix-blender-pipeline-regressions.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "fix(blender): stabilize Blender 5.2 QA and package receipts [blender-regressions-fixed]"
+          git push --no-verify origin HEAD:feat/blender-character-quality-pipeline-20260904
