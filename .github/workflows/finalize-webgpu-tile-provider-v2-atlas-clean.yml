@@ -31,7 +31,7 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Normalize workflow, imports, and strict TypeScript boundaries
+      - name: Repair strict TypeScript boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -43,13 +43,6 @@ jobs:
               if count != 1:
                   raise SystemExit(f'{path}: expected one match, found {count}')
               target.write_text(source.replace(old, new, 1), encoding='utf-8')
-
-          workflow = '.github/workflows/webgpu-tile-provider-v2-atlas.yml'
-          replace_once(
-              workflow,
-              'feat/webgpu-tile-provider-v2-atlas-20260904',
-              'feat/webgpu-tile-provider-v2-atlas-clean-20260904',
-          )
 
           source_file = 'src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.ts'
           replace_once(
@@ -101,12 +94,13 @@ jobs:
             src/domains/creator/render/studio-engine-webgpu-tile-provider-v1.test.ts \
             src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.test.ts
           pnpm exec tsc -p tsconfig.json --noEmit --incremental false
-      - name: Commit validated clean candidate
+      - name: Commit validated product files
         run: |
-          rm -f .github/workflows/finalize-webgpu-tile-provider-v2-atlas-clean.yml
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A
+          git add \
+            src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.ts \
+            src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.test.ts
           git diff --cached --check
           git commit -m "feat(webgpu): finalize clean single-atlas tile provider candidate"
           git push origin HEAD:feat/webgpu-tile-provider-v2-atlas-clean-20260904
