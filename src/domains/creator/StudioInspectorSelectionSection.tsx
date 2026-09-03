@@ -170,6 +170,25 @@ export function StudioInspectorSelectionSection({
                 <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
 
+              {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
+                <button
+                  type="button"
+                  onClick={() => startEditText(selected.id)}
+                  title={inspectorInteractionPolicy.selection.reason ?? undefined}
+                  aria-label={selected.type === "bubble" ? "대사 편집" : "글자 편집"}
+                  data-studio-inspector-primary-action="edit-text"
+                  data-inspector-priority="essential"
+                  data-inspector-control-id="element.edit-text"
+                  className={buttonClass({
+                    size: "sm",
+                    variant: "solid",
+                    className: "mb-3 min-h-11 w-full justify-center text-sm pointer-coarse:min-h-11",
+                  })}
+                >
+                  {selected.type === "bubble" ? "대사 편집" : "글자 편집"}
+                </button>
+              )}
+
               {selected.type === "draw" && (
                 <StudioInspectorShapeSection
                   selected={selected}
@@ -557,13 +576,6 @@ export function StudioInspectorSelectionSection({
 
               <StudioInspectorSelectedImageTools model={model} tabA11y={tabA11y} />
 
-              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
-                {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
-                  <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
-                    글자 편집
-                  </button>
-                )}
-              </div>
               <StudioInspectorOrderAlignSection
                 selected={selected}
                 selectedBg3dEditSource={selectedBg3dEditSource}
