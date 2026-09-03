@@ -356,6 +356,7 @@ def _write_shape(
     obj[f"toonstudio_shape_{_normalize(key.name)}_direction"] = (
         "positive" if direction > 0 else "negative"
     )
+    obj["toonstudio_generated"] = True
     obj[f"toonstudio_shape_{_normalize(key.name)}_generated"] = True
     return changed
 
