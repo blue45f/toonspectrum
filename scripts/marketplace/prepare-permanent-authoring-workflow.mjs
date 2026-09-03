@@ -7,7 +7,8 @@ let source = readFileSync(target, "utf8");
 
 function replaceOnce(before, after, label) {
   if (source.includes(after)) return;
-  if (!source.includes(before)) throw new Error(`Missing ${label} anchor.`);
+  const count = source.split(before).length - 1;
+  if (count !== 1) throw new Error(`${label}: expected one anchor, found ${count}`);
   source = source.replace(before, after);
 }
 
@@ -18,7 +19,7 @@ source = source.replaceAll(
 
 replaceOnce(
   `          lib/creator-marketplace-authoring-workshop.test.ts\n          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx\n          src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx`,
-  `          lib/creator-marketplace-authoring-safety.test.ts\n          lib/creator-marketplace-authoring-workshop.test.ts\n          lib/creator-marketplace-package-builder.test.ts\n          lib/creator-marketplace-quality-validation.test.ts\n          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx\n          src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx\n          src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx`,
+  `          lib/creator-marketplace-authoring-safety.test.ts\n          lib/creator-marketplace-authoring-workshop.test.ts\n          lib/creator-marketplace-package-builder.test.ts\n          lib/creator-marketplace-quality-validation.test.ts\n          src/domains/creator/MarketplaceBrushStudioBridge.test.tsx\n          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx\n          src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx\n          src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx`,
   "permanent focused tests",
 );
 
