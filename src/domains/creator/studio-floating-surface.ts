@@ -563,6 +563,31 @@ export function loadStudioFloatingSurfaceLayout(
   }
 }
 
+/**
+ * Serializes the normalized **exact allowlist**, never the caller's object, so a stray field can
+ * never reach a store.
+ *
+ * Exported because there are two stores. This module's synchronous storage and the SQLite/OPFS
+ * repository each wrote this list out by hand; the copies happened to agree, but nothing held them
+ * in step, and the next field added to the layout would have reached one and not the other. That
+ * is the shape of the bug that already lost `dock` once.
+ */
+export function encodeStudioFloatingSurfaceLayout(
+  layout: StudioFloatingSurfaceLayout,
+): string {
+  const normalized = normalizeStudioFloatingSurfaceLayout(layout);
+  return JSON.stringify({
+    version: normalized.version,
+    xRatio: normalized.xRatio,
+    yRatio: normalized.yRatio,
+    width: normalized.width,
+    height: normalized.height,
+    dock: normalized.dock,
+    positionLocked: normalized.positionLocked,
+    sizeLocked: normalized.sizeLocked,
+  });
+}
+
 /** Writes the normalized exact allowlist; storage failures remain non-fatal UI preference loss. */
 export function saveStudioFloatingSurfaceLayout(
   storage: StudioFloatingSurfaceStorage | null | undefined,
@@ -571,17 +596,7 @@ export function saveStudioFloatingSurfaceLayout(
 ): boolean {
   if (!storage || !key || key.length > 256) return false;
   try {
-    const normalized = normalizeStudioFloatingSurfaceLayout(layout);
-    storage.setItem(key, JSON.stringify({
-      version: normalized.version,
-      xRatio: normalized.xRatio,
-      yRatio: normalized.yRatio,
-      width: normalized.width,
-      height: normalized.height,
-      dock: normalized.dock,
-      positionLocked: normalized.positionLocked,
-      sizeLocked: normalized.sizeLocked,
-    }));
+    storage.setItem(key, encodeStudioFloatingSurfaceLayout(layout));
     return true;
   } catch {
     return false;

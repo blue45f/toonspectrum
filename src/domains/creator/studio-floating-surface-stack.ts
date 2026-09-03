@@ -89,9 +89,32 @@ export function studioFloatingSurfaceStackSnapshot(): number {
   return revision;
 }
 
+const resetListeners = new Set<() => void>();
+
+/**
+ * Asks every mounted floating surface to return to its default layout.
+ *
+ * This is the recovery path for a window dragged past the viewport or shrunk to a sliver: its own
+ * header — and therefore its own reset — is no longer reachable, so the action cannot live on the
+ * surface alone. The request only carries the ask; each surface still performs its own reset, so a
+ * surface keeps ownership of what "default" means for it.
+ */
+export function requestStudioFloatingSurfaceLayoutReset(): void {
+  // Copy first: a listener that unmounts its surface would otherwise mutate the set mid-iteration.
+  for (const listener of [...resetListeners]) listener();
+}
+
+export function subscribeStudioFloatingSurfaceLayoutReset(
+  listener: () => void,
+): () => void {
+  resetListeners.add(listener);
+  return () => resetListeners.delete(listener);
+}
+
 /** Test-only reset; product code never needs to globally erase the visible window stack. */
 export function resetStudioFloatingSurfaceStackForTest(): void {
   order.length = 0;
   registrations.clear();
+  resetListeners.clear();
   publish();
 }
