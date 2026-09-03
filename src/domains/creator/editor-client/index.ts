@@ -20,6 +20,7 @@ export { useEditorSelector } from "./useEditorSelector";
 export {
   STUDIO_LEFT_TOOL_RAIL_COMMANDS,
   createStudioLeftToolRailClient,
+  createStudioLeftToolRailRuntime,
 } from "./studio-left-tool-rail-client";
 export type {
   StudioLeftToolRailActionArguments,
@@ -28,5 +29,6 @@ export type {
   StudioLeftToolRailClient,
   StudioLeftToolRailClientInput,
   StudioLeftToolRailHandlersContract,
+  StudioLeftToolRailRuntime,
   StudioLeftToolRailSnapshot,
 } from "./studio-left-tool-rail-client";
