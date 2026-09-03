@@ -1,0 +1,64 @@
+name: Blender contract repair 20260904
+
+on:
+  push:
+    branches:
+      - automation/source-snapshot-20260904
+    paths:
+      - .github/workflows/blender-contract-repair-20260904.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blender-contract-repair-20260904
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out current Blender integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/blender-character-quality-pipeline-20260904
+          fetch-depth: 1
+
+      - name: Restore generated-object contract and remove temporary runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/blender/toonstudio_blender_kit/face.py")
+          source = path.read_text(encoding="utf-8")
+          anchor = '    obj[f"toonstudio_shape_{_normalize(key.name)}_generated"] = True\n'
+          marker = '    obj["toonstudio_generated"] = True\n'
+          if marker not in source:
+              if source.count(anchor) != 1:
+                  raise SystemExit("generated metadata anchor changed")
+              source = source.replace(anchor, marker + anchor, 1)
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          rm -f .github/workflows/blender-compat-repair-manual.yml
+          python3 -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
+          python3 -m unittest discover -s tests/blender -p 'test_*.py' -v
+          git diff --check
+          grep -F 'obj["toonstudio_generated"] = True' tools/blender/toonstudio_blender_kit/face.py
+
+      - name: Commit and push contract repair
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Contract repair is already present."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/blender/toonstudio_blender_kit/face.py
+          git add -A .github/workflows/blender-compat-repair-manual.yml
+          git commit -m "fix(blender): retain generated metadata contract on Blender 5.2"
+          git push origin HEAD:feat/blender-character-quality-pipeline-20260904
