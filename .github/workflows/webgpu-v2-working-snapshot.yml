@@ -33,12 +33,29 @@ jobs:
           import io
           import tarfile
 
+          CORRUPT_SHA = 'db7b874c051f82c9c26f931b4dd975764d196de3dbb749454f49a453059b801b'
+          EXPECTED_SHA = 'fa8c10d2deceec63fd691e7d56ad1623ff7f0422cadbe488ca42b1d4b3626dfd'
+          REPAIR_OFFSET = 8532
+          REPAIR_FROM = 0xE0
+          REPAIR_TO = 0xE2
+
           parts = sorted(Path('.bootstrap/webgpu-v2').glob('part-*'))
           if len(parts) != 7:
               raise SystemExit(f'expected 7 payload parts, got {len(parts)}')
           encoded = ''.join(part.read_text(encoding='utf-8').split())
           payload = base64.b64decode(encoded, validate=True)
-          print(f'candidate archive sha256={hashlib.sha256(payload).hexdigest()}')
+          observed_sha = hashlib.sha256(payload).hexdigest()
+          if observed_sha == CORRUPT_SHA:
+              repaired = bytearray(payload)
+              if len(repaired) <= REPAIR_OFFSET or repaired[REPAIR_OFFSET] != REPAIR_FROM:
+                  raise SystemExit('candidate repair precondition drifted')
+              repaired[REPAIR_OFFSET] = REPAIR_TO
+              payload = bytes(repaired)
+              observed_sha = hashlib.sha256(payload).hexdigest()
+              print('repaired the recorded one-byte transport corruption')
+          if observed_sha != EXPECTED_SHA:
+              raise SystemExit(f'candidate archive sha256 mismatch: {observed_sha}')
+          print(f'candidate archive sha256={observed_sha}')
           with tarfile.open(fileobj=io.BytesIO(payload), mode='r:xz') as archive:
               members = archive.getmembers()
               if not members:
