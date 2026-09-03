@@ -333,9 +333,12 @@ export function StudioCommandSearchDialog({
       switch (action.kind) {
         case "inspector": {
           if (target.type !== "inspector") return;
+          // 행이 광고한 목적지를 통째로 넘긴다. 서브탭(`image`/`document`)을
+          // 빼면 탭만 맞고 화면은 직전 서브탭에 남는다.
           const route: StudioInspectorRoute = {
             primary: target.primary,
             ...(target.image ? { image: target.image } : {}),
+            ...(target.document ? { document: target.document } : {}),
           };
           if (target.focusTarget) onNavigateInspector?.(route, target.focusTarget);
           else onNavigateInspector?.(route);

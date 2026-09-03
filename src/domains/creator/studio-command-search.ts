@@ -34,7 +34,10 @@ import {
   tokenizeStudioSearchQuery,
 } from "./studio-search-text";
 
-import type { StudioInspectorActionContext } from "./studio-inspector-layout";
+import type {
+  StudioInspectorAction,
+  StudioInspectorActionContext,
+} from "./studio-inspector-layout";
 import type {
   StudioSearchKind,
   StudioSearchTarget,
@@ -146,6 +149,21 @@ export const STUDIO_SEARCH_DEFAULT_MIN_SCORE = 15;
 
 /* ------------------------------------------------------------ index build */
 
+/**
+ * The navigator's vocabulary (`panel` | `property` | `tool`) mapped onto the
+ * index's four sections. A `tool` action reveals a concrete control group just
+ * like a `property` one — `STUDIO_SEARCH_CORPUS` already files the rows it
+ * absorbs from tool actions (e.g. `image-mask`) under `property` — so both land
+ * in "속성·보정"; only true navigation targets stay panels.
+ */
+const INSPECTOR_ACTION_KIND: Readonly<
+  Record<NonNullable<StudioInspectorAction["kind"]>, StudioSearchKind>
+> = Object.freeze({
+  panel: "panel",
+  property: "property",
+  tool: "property",
+});
+
 const ALL_INSPECTOR_ROUTES: StudioInspectorActionContext = {
   hasSelection: true,
   selectedType: "image",
@@ -248,18 +266,26 @@ export function buildStudioSearchIndex(
     if (superseded.has(action.id)) continue;
     entries.push({
       id: `inspector.${action.id}`,
-      kind: "panel",
+      kind: INSPECTOR_ACTION_KIND[action.kind ?? "panel"],
       label: action.label,
       description: action.description,
-      location: "인스펙터",
       aliases: [],
       keywords: action.keywords,
       helpNodeId: `help/inspector/${action.id}`,
       requiresSelection: false,
+      // `location` 은 다이얼로그가 라벨 밑에 실제로 그리는 문자열이다. 액션은
+      // 이미 정확한 breadcrumb 을 `path` 로 들고 있으므로("문서 › 캔버스 ›
+      // 가이드") 통짜 "인스펙터" 로 뭉개지 않는다 — 코퍼스 행이 "인스펙터 ›
+      // 대상 › 마스크" 라고 적는 옆줄에서 혼자만 어디로 가는지 못 알려준다.
+      location: action.path ? `인스펙터 › ${action.path}` : "인스펙터",
+      // 목적지는 통째로 옮긴다. `primary` 만 실으면 탭은 맞고 서브탭은 직전
+      // 상태로 남으며, `focusTarget` 을 빠뜨리면 컨트롤 그룹이 열리지 않는다.
       target: {
         type: "inspector",
         primary: action.route.primary,
         ...(action.route.image ? { image: action.route.image } : {}),
+        ...(action.route.document ? { document: action.route.document } : {}),
+        ...(action.focusTarget ? { focusTarget: action.focusTarget } : {}),
       },
     });
   }

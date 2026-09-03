@@ -27,8 +27,14 @@ import {
   studioSearchTextMatches,
   tokenizeStudioSearchQuery,
 } from "./studio-command-search";
+import { studioInspectorActions } from "./studio-inspector-layout";
+import { STUDIO_SEARCH_CORPUS } from "./studio-search-corpus";
 
-import type { StudioSearchOutcome } from "./studio-command-search";
+import type {
+  StudioSearchKind,
+  StudioSearchOutcome,
+} from "./studio-command-search";
+import type { StudioInspectorActionContext } from "./studio-inspector-layout";
 
 const index = studioSearchIndex();
 
@@ -161,6 +167,38 @@ describe("통합 Command Search — 타사 용어 사전", () => {
   });
 });
 
+/**
+ * 회귀 방지(2026-09-04). PR #517 이 오른쪽 패널의 헤더·aria 라벨만 "작업 패널"로
+ * 바꾸고 명령 카탈로그는 "속성 패널 표시 전환"에 남겨 둔 탓에, 화면에 보이는 이름으로
+ * 이 토글을 검색하면 0건이 나왔다. 검색 색인의 명령 라벨은 메뉴 행이 아니라
+ * `STUDIO_COMMAND_CATALOG` 의 `labels` 에서 온다(`buildStudioSearchIndex` 의
+ * `label: koLabel(command.labels)`). 그래서 메뉴 행 라벨에 pin 을 박아도 이 결함은
+ * 다시 들어올 수 있고, 여기서 실제 색인을 질의해 양쪽 이름을 모두 묶어 둔다.
+ */
+describe("통합 Command Search — 작업 패널 토글은 화면 이름과 옛 이름 둘 다로 찾힌다", () => {
+  const TOGGLE = "window.right-panel";
+
+  it("화면에 보이는 canonical 이름 '작업 패널'로 토글이 나온다", () => {
+    expect(ids(searchStudio("작업 패널"))).toContain(TOGGLE);
+  });
+
+  it("색인이 들고 있는 명령 라벨 자체가 화면 이름이다", () => {
+    const entry = index.entries.find((row) => row.id === TOGGLE);
+    expect(entry?.label).toContain("작업 패널");
+    expect(entry?.label).not.toContain("속성 패널");
+  });
+
+  it("옛 이름 '속성 패널'도 별칭으로 계속 같은 토글에 닿는다", () => {
+    const outcome = searchStudio("속성 패널");
+    expect(ids(outcome)).toContain(TOGGLE);
+    const match = outcome.sections
+      .flatMap((section) => section.results)
+      .find((result) => result.entry.id === TOGGLE);
+    expect(match?.matchedOn).toBe("alias");
+    expect(match?.matchedAlias?.vendor).toBe("toonstudio");
+  });
+});
+
 describe("통합 Command Search — 네 표면의 코퍼스를 모두 덮는다", () => {
   it("명령·속성·패널·튜토리얼 네 구획이 모두 색인돼 있다", () => {
     const kinds = new Set(index.entries.map((entry) => entry.kind));
@@ -181,6 +219,22 @@ describe("통합 Command Search — 네 표면의 코퍼스를 모두 덮는다"
     expect(ids(searchStudio("튜토리얼", { kind: "tutorial" })).length + 1)
       .toBeGreaterThan(0);
     expect(ids(searchStudio("게시"))).toContain("inspector.publish");
+  });
+
+  /**
+   * "브러시 스튜디오" 는 빌더가 액션의 `focusTarget` 을 싣기 시작한 뒤에야
+   * 완전한 쌍둥이가 됐다 — 그 전에는 코퍼스 행만 `tool.brush-studio` 를
+   * 들고 있어서 목적지가 달랐다. 라벨이 같고 목적지가 같은 행이 두 구획에
+   * 나뉘어 뜨는 걸 여기서 막는다.
+   */
+  it("같은 이름 + 같은 목적지인 행이 색인에 둘 이상 있지 않다", () => {
+    const seen = new Map<string, string[]>();
+    for (const entry of index.entries) {
+      const key = `${entry.label} ${JSON.stringify(entry.target)}`;
+      seen.set(key, [...(seen.get(key) ?? []), entry.id]);
+    }
+    const twins = [...seen.values()].filter((group) => group.length > 1);
+    expect(twins).toEqual([]);
   });
 
   it("중복 목적지는 한 번만 나온다 (인스펙터 라우트 흡수)", () => {
@@ -348,5 +402,212 @@ describe("통합 Command Search — 공유 매처", () => {
   it("색인은 한 번만 만들고 재사용한다", () => {
     expect(studioSearchIndex()).toBe(studioSearchIndex());
     expect(buildStudioSearchIndex()).not.toBe(studioSearchIndex());
+  });
+});
+
+describe("통합 Command Search — 인스펙터 행은 목적지를 통째로 나른다", () => {
+  /**
+   * PR #517 이 인스펙터 자체 검색창을 지우고 통합 검색으로 합칠 때, 코퍼스
+   * 빌더가 `route.primary` 만 복사하고 `route.document` 와 `focusTarget` 을
+   * 흘렸다. 사라진 검색창은 둘 다 지켰다(`navigateStudioInspector(layout, route)`
+   * + `requestStudioInspectorFocus(focusTarget)`), 그래서 결과를 활성화하면 탭은
+   * 맞지만 서브탭은 직전 상태로 남고 컨트롤 그룹은 끝내 열리지 않았다.
+   *
+   * 기대값은 손으로 적지 않는다 — `studioInspectorActions()` 가 선언한 것을
+   * 그대로 비교한다. 액션이 늘거나 라우트가 바뀌어도 이 테스트는 따라온다.
+   */
+  const CONTEXTS: readonly [string, StudioInspectorActionContext][] = [
+    [
+      "이미지 선택 + 그리기",
+      {
+        hasSelection: true,
+        selectedType: "image",
+        drawing: true,
+        imageToolsAvailable: true,
+      },
+    ],
+    [
+      "텍스트 선택",
+      {
+        hasSelection: true,
+        selectedType: "text",
+        drawing: false,
+        imageToolsAvailable: true,
+      },
+    ],
+    [
+      "말풍선 선택",
+      {
+        hasSelection: true,
+        selectedType: "bubble",
+        drawing: false,
+        imageToolsAvailable: true,
+      },
+    ],
+    [
+      "선택 없음 · 그리기",
+      {
+        hasSelection: false,
+        selectedType: null,
+        drawing: true,
+        imageToolsAvailable: true,
+      },
+    ],
+  ];
+
+  /** 코퍼스가 흡수한 액션은 자기 행이 없다 — 대신 코퍼스 행이 목적지를 든다. */
+  const superseded = new Set(
+    STUDIO_SEARCH_CORPUS.flatMap((entry) => entry.supersedes ?? []),
+  );
+
+  /** 액션 어휘(panel/property/tool) → 색인 구획. `tool` 도 컨트롤 그룹이다. */
+  const EXPECTED_KIND: Readonly<Record<string, StudioSearchKind>> = {
+    panel: "panel",
+    property: "property",
+    tool: "property",
+  };
+
+  it.each(CONTEXTS)(
+    "%s — 모든 인스펙터 행이 액션이 선언한 라우트·포커스를 그대로 싣는다",
+    (_label, context) => {
+      const built = buildStudioSearchIndex(context);
+      const actions = studioInspectorActions(context).filter(
+        (action) => !superseded.has(action.id),
+      );
+      expect(actions.length).toBeGreaterThan(0);
+
+      for (const action of actions) {
+        const entry = built.entries.find(
+          (candidate) => candidate.id === `inspector.${action.id}`,
+        );
+        expect(entry, `inspector.${action.id} 행이 색인에 없다`).toBeDefined();
+        expect(entry?.target.type).toBe("inspector");
+        if (entry?.target.type !== "inspector") continue;
+
+        // 필드를 손으로 나열하지 않는다 — 액션이 선언한 `route` 를 통째로
+        // 펼쳐서 비교한다. `StudioInspectorRoute` 에 새 필드가 생기고 빌더가
+        // 그걸 옮기지 않으면, 이 테스트를 건드리지 않아도 여기서 깨진다.
+        expect(entry.target).toEqual({
+          type: "inspector",
+          ...action.route,
+          ...(action.focusTarget ? { focusTarget: action.focusTarget } : {}),
+        });
+
+        expect(entry.kind).toBe(EXPECTED_KIND[action.kind ?? "panel"]);
+
+        // 다이얼로그가 라벨 밑에 그리는 건 `location` 이다. 액션이 이미 정확한
+        // breadcrumb 을 들고 있으므로 통짜 "인스펙터" 로 뭉개면 안 된다.
+        expect(entry.location).toBe(
+          action.path ? `인스펙터 › ${action.path}` : "인스펙터",
+        );
+        expect(action.path, `${action.id} 가 path 를 선언하지 않았다`).toBeDefined();
+      }
+    },
+  );
+
+  it("서브탭·포커스를 실제로 선언하는 행이 존재한다 — 빈 계약이 아니다", () => {
+    const rows = CONTEXTS.flatMap(([, context]) =>
+      buildStudioSearchIndex(context).entries.filter((entry) =>
+        entry.id.startsWith("inspector."),
+      ),
+    ).map((entry) => entry.target);
+
+    const inspectorTargets = rows.filter(
+      (target) => target.type === "inspector",
+    );
+    expect(
+      inspectorTargets.filter(
+        (target) => target.type === "inspector" && target.document !== undefined,
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      inspectorTargets.filter(
+        (target) =>
+          target.type === "inspector" && target.focusTarget !== undefined,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  /**
+   * 구획(`kind`)과 breadcrumb(`location`) 은 랭킹과 화면에 그대로 나가는 값이다.
+   * `KIND_BONUS` 는 property 4 · panel 3 이고 구획마다 5행 / 전체 12행 상한이
+   * 걸려 있어서, 액션의 `kind` 하나가 바뀌면 다른 행이 조용히 잘려 나간다.
+   * 그래서 행별 결과를 원장으로 박아 둔다 — 매핑을 바꾸면 코드가 아니라 이
+   * 표가 먼저 빨개지고, 무엇이 어느 구획으로 옮겨 가는지 diff 에 남는다.
+   *
+   * `tool` → `property` 판정 근거: 같은 목적지를 코퍼스가 이미 property 로
+   * 적고 있다(`property.layer-mask` 가 `image-mask` 를, `property.levels` ·
+   * `property.tone-curve-panel` 이 `image-quick` 과 같은 `image:"quick"` 을).
+   * 흡수된 세 행(`layers` · `image-mask` · `brush-studio`)은 코퍼스 행이
+   * 대신 서므로 이 표에 없다 — supersedes 가 늘거나 줄어도 여기서 걸린다.
+   */
+  const INSPECTOR_ROW_LEDGER: Readonly<Record<string, string>> = {
+    "brush-engines": "property · 인스펙터 › 대상 › 그리기 › 브러시 엔진",
+    canvas: "panel · 인스펙터 › 문서 › 캔버스",
+    "canvas-guides": "property · 인스펙터 › 문서 › 캔버스 › 가이드",
+    "canvas-resize": "property · 인스펙터 › 문서 › 캔버스 › 크기",
+    "canvas-style": "property · 인스펙터 › 문서 › 캔버스 › 스타일",
+    "drawing-properties": "property · 인스펙터 › 대상 › 그리기 도구",
+    grade: "panel · 인스펙터 › 문서 › 색보정",
+    "image-fill": "property · 인스펙터 › 대상 › 이미지 › 채우기·선화",
+    "image-quick": "property · 인스펙터 › 대상 › 이미지 › 빠른 수정",
+    "image-retouch": "property · 인스펙터 › 대상 › 이미지 › 선택·리터치",
+    "image-transform": "property · 인스펙터 › 대상 › 이미지 › 변형",
+    navigator: "panel · 인스펙터 › 문서 › 미니맵",
+    publish: "panel · 인스펙터 › 게시 준비 › 작품 정보",
+    "selection-layout": "property · 인스펙터 › 대상 › 선택 요소 › 배치",
+    "selection-order-align": "property · 인스펙터 › 대상 › 선택 요소 › 정렬·순서",
+    "selection-properties": "property · 인스펙터 › 대상 › 선택 요소",
+    "text-align": "property · 인스펙터 › 대상 › 글자 › 문단",
+    "text-fill": "property · 인스펙터 › 대상 › 글자 › 채우기",
+    typography: "property · 인스펙터 › 대상 › 글자 › 글꼴",
+  };
+
+  it("인스펙터 행별 구획·breadcrumb 이 원장과 정확히 일치한다", () => {
+    const observed = new Map<string, string>();
+    for (const [, context] of CONTEXTS) {
+      for (const entry of buildStudioSearchIndex(context).entries) {
+        if (!entry.id.startsWith("inspector.")) continue;
+        const actionId = entry.id.slice("inspector.".length);
+        const row = `${entry.kind} · ${entry.location}`;
+        const previous = observed.get(actionId);
+        // 같은 액션이 컨텍스트에 따라 다른 구획으로 가면 그 자체가 결함이다.
+        if (previous !== undefined) expect(row).toBe(previous);
+        observed.set(actionId, row);
+      }
+    }
+
+    expect(Object.fromEntries([...observed].sort())).toEqual(
+      Object.fromEntries(Object.entries(INSPECTOR_ROW_LEDGER).sort()),
+    );
+  });
+
+  /**
+   * 흡수(`supersedes`)가 빠지면 여기서 걸린다. 공유 색인은 `hasSelection: true`
+   * 로 지어져 그리기 전용 액션(`brush-studio`)을 아예 담지 않으므로, 쌍둥이
+   * 검사는 컨텍스트를 돌면서 해야 한다.
+   */
+  it.each(CONTEXTS)(
+    "%s — 이름과 목적지가 모두 같은 행이 둘 이상 생기지 않는다",
+    (_label, context) => {
+      const seen = new Map<string, string[]>();
+      for (const entry of buildStudioSearchIndex(context).entries) {
+        const key = `${entry.label} ${JSON.stringify(entry.target)}`;
+        seen.set(key, [...(seen.get(key) ?? []), entry.id]);
+      }
+      expect([...seen.values()].filter((group) => group.length > 1)).toEqual([]);
+    },
+  );
+
+  it("인스펙터 행이 전부 패널로 뭉개지지 않는다", () => {
+    const kinds = new Set(
+      CONTEXTS.flatMap(([, context]) =>
+        buildStudioSearchIndex(context)
+          .entries.filter((entry) => entry.id.startsWith("inspector."))
+          .map((entry) => entry.kind),
+      ),
+    );
+    expect(kinds.has("property")).toBe(true);
+    expect(kinds.has("panel")).toBe(true);
   });
 });

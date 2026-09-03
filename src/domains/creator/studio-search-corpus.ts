@@ -19,6 +19,7 @@
 
 import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type {
+  StudioDocumentInspectorSection,
   StudioImageInspectorSection,
   StudioInspectorPrimarySection,
 } from "./studio-inspector-layout";
@@ -33,11 +34,20 @@ import type { TerminologyAlias } from "@toonspectrum/studio-command-registry";
 export type StudioSearchKind = "command" | "property" | "panel" | "tutorial";
 
 export type StudioSearchTarget =
-  /** Move the right inspector to a route (see `navigateStudioInspector`). */
+  /**
+   * Move the right inspector to a route (see `navigateStudioInspector`).
+   *
+   * The shape mirrors `StudioInspectorRoute` field for field — `primary` alone
+   * lands on the right tab but the *previous* subtab, so `image`/`document`
+   * must ride along or "캔버스 설정" opens the document tab on whatever the
+   * user last looked at. `focusTarget` is the deep link the inspector honours
+   * after the route mounts (`requestStudioInspectorFocus`).
+   */
   | {
       type: "inspector";
       primary: StudioInspectorPrimarySection;
       image?: StudioImageInspectorSection;
+      document?: StudioDocumentInspectorSection;
       focusTarget?: StudioInspectorFocusTarget;
     }
   /** Expand one of the two drawing palettes. */
@@ -326,10 +336,14 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
     },
     {
       id: "panel.brush-studio",
-      kind: "panel",
+      // 목적지가 인스펙터 컨트롤 그룹(`tool.brush-studio`)이라 "속성"이다.
+      // `studio-inspector-density.ts` 의 같은 그룹이 `searchEntryId` 로 이
+      // 행을 가리키고, 형제인 `tool.brush-engines` 도 property 로 들어온다.
+      // (id 는 다른 파일이 참조하므로 legacy `panel.` 접두사를 유지한다.)
+      kind: "property",
       label: "브러시 스튜디오",
       labelEn: "Brush studio",
-      location: "그리기 독 › 도구 속성 › 브러시 스튜디오",
+      location: "인스펙터 › 대상 › 그리기 › 브러시 스튜디오",
       description: "브러시 끝·산포·필압 곡선까지 전부 편집합니다.",
       aliases: [
         csp("보조 도구 상세"),
@@ -346,6 +360,10 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
         primary: "properties",
         focusTarget: "tool.brush-studio",
       },
+      // 빌더가 액션의 `focusTarget` 을 싣기 시작하면서 인스펙터 액션
+      // `brush-studio` 와 목적지·라벨이 완전히 같아졌다 — 흡수하지 않으면
+      // "브러시" 한 번에 같은 이름 두 줄이 두 구획에 나뉘어 뜬다.
+      supersedes: ["brush-studio"],
     },
     {
       id: "panel.layer-list",

@@ -180,6 +180,24 @@ describe("StudioCommandSearchDialog", () => {
     );
   });
 
+  it("문서 서브탭을 가진 결과는 탭만이 아니라 서브탭·포커스까지 전달한다", () => {
+    // PR #517 회귀: 인스펙터 행이 `primary` 만 실어서 문서 탭은 열리지만
+    // 서브탭은 직전 상태에 남고 컨트롤 그룹은 열리지 않았다.
+    const onNavigateInspector = vi.fn();
+    openDialog({ onNavigateInspector });
+    type("가이드와 스냅");
+    const inspectorResult = screen.getAllByRole("option").find(
+      (option) => option.getAttribute("data-action") === "inspector"
+        && within(option).queryByText("가이드와 스냅"),
+    );
+    expect(inspectorResult).toBeTruthy();
+    fireEvent.click(inspectorResult as HTMLElement);
+    expect(onNavigateInspector).toHaveBeenCalledWith(
+      { primary: "document", document: "canvas" },
+      "canvas.guide-lines",
+    );
+  });
+
   it("빈 질의는 목록 대신 안내만 보여준다", () => {
     openDialog();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
