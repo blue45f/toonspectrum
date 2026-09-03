@@ -93,8 +93,8 @@ replaceOnce(
 );
 if (!source.includes("setSourceFiles([file]);\n    if (/json|brush|toonmarket/iu")) {
   replaceOnce(
-    `      return;\n    }\n    if (/json|brush|toonmarket/iu.test(\`${file.type} ${file.name}\`)) {`,
-    `      return;\n    }\n    setSourceFiles([file]);\n    if (/json|brush|toonmarket/iu.test(\`${file.type} ${file.name}\`)) {`,
+    `      return;\n    }\n    if (/json|brush|toonmarket/iu.test(\`\${file.type} \${file.name}\`)) {`,
+    `      return;\n    }\n    setSourceFiles([file]);\n    if (/json|brush|toonmarket/iu.test(\`\${file.type} \${file.name}\`)) {`,
     "retain selected source file",
   );
 }
@@ -110,7 +110,7 @@ source = source.replace(
 
 if (!source.includes("data-testid=\"market-authoring-source-files\"")) {
   const anchor = `            <div className="grid gap-4 lg:grid-cols-2">`;
-  const insert = `            <div\n              data-testid="market-authoring-source-files"\n              className="rounded-xl border border-line bg-raised/30 p-3 text-xs text-fg-2"\n            >\n              {sourceFiles.length > 0\n                ? \`원본 연결: \${sourceFiles.map((file) => \`${file.name} (\${(file.size / 1024 / 1024).toFixed(1)}MB)\`).join(", ")}\`\n                : normalized.source.mode === "file"\n                  ? "새로고침 후 원본 바이트가 복원되지 않았습니다. 같은 원본 파일을 다시 선택하세요."\n                  : "Brush Studio 원본은 제작 manifest 안에 보존됩니다."}\n            </div>\n`;
+  const insert = `            <div\n              data-testid="market-authoring-source-files"\n              className="rounded-xl border border-line bg-raised/30 p-3 text-xs text-fg-2"\n            >\n              {sourceFiles.length > 0\n                ? \`원본 연결: \${sourceFiles.map((file) => \`\${file.name} (\${(file.size / 1024 / 1024).toFixed(1)}MB)\`).join(", ")}\`\n                : normalized.source.mode === "file"\n                  ? "새로고침 후 원본 바이트가 복원되지 않았습니다. 같은 원본 파일을 다시 선택하세요."\n                  : "Brush Studio 원본은 제작 manifest 안에 보존됩니다."}\n            </div>\n`;
   const index = source.indexOf(anchor, source.indexOf('data-testid="market-authoring-source-file"'));
   if (index < 0) throw new Error("Source file summary anchor changed.");
   source = `${source.slice(0, index)}${insert}${source.slice(index)}`;
@@ -123,7 +123,7 @@ if (!source.includes("원본 파일 바이트가 현재 세션에 없습니다."
   source = source.replace(anchor, `${insert}${anchor}`);
 }
 
-const oldPackageButton = `          <button\n            type="button"\n            onClick={() => downloadJson(\n              \`${normalized.title || "marketplace-asset"}.toonmarket.json\`,\n              buildCreatorMarketplaceAuthoringManifest(normalized),\n            )}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >패키지 내려받기</button>`;
+const oldPackageButton = `          <button\n            type="button"\n            onClick={() => downloadJson(\n              \`\${normalized.title || \"marketplace-asset\"}.toonmarket.json\`,\n              buildCreatorMarketplaceAuthoringManifest(normalized),\n            )}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >패키지 내려받기</button>`;
 const newPackageButton = `          <button\n            type="button"\n            onClick={() => void downloadPackage()}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >원본 포함 패키지 내려받기</button>`;
 replaceOnce(oldPackageButton, newPackageButton, "package download button");
 
