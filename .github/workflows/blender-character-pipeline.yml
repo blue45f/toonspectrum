@@ -98,6 +98,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install headless EGL and Mesa runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libegl1 \
+            libgl1 \
+            libgl1-mesa-dri \
+            libglx-mesa0
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11.4.0
@@ -144,6 +153,7 @@ jobs:
           echo "HOME=$HOME" >> "$GITHUB_ENV"
           echo "BLENDER_USER_RESOURCES=$BLENDER_USER_RESOURCES" >> "$GITHUB_ENV"
           echo "BLENDER_PATH=$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
           mkdir -p "$HOME" "$BLENDER_USER_RESOURCES"
           "$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" --version
 
