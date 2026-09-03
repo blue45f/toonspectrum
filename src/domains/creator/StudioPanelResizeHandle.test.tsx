@@ -66,7 +66,7 @@ describe("StudioPanelResizeHandle", () => {
     render(
       <StudioPanelResizeHandle
         dragging={false}
-        label="속성 패널 너비 조절"
+        label="작업 패널 너비 조절"
         handleProps={{
           role: "separator",
           "aria-orientation": "vertical",
@@ -82,7 +82,7 @@ describe("StudioPanelResizeHandle", () => {
       />,
     );
 
-    const handle = screen.getByRole("separator", { name: "속성 패널 너비 조절" });
+    const handle = screen.getByRole("separator", { name: "작업 패널 너비 조절" });
     const grip = handle.querySelector("[aria-hidden]");
     expect(handle.getAttribute("data-dragging")).toBe("false");
     expect(handle.classList.contains("w-3")).toBe(true);

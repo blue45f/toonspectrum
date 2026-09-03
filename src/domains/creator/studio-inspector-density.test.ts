@@ -257,3 +257,52 @@ describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다
     ]);
   });
 });
+
+/**
+ * 행 하나짜리 게이트 — `element.typography-advanced`.
+ *
+ * 이 행의 `leaves` 는 잎이 아니라 자식 패널 수를 센다(밀도 표 주석). 그래서 위의 계약들이
+ * 전부 초록이어도 이 수가 틀릴 수 있다: element-properties 총합은 감사 실측치(33)보다 한참
+ * 크고, tier 가 advanced 라 5~9 예산에 닿지 않으며, `inDefault + inAdvanced === total` 은
+ * 어떤 값에도 성립한다. 실제로 원형 텍스트가 편입된 뒤에도 2 로 남아 있었고 아무 테스트도
+ * 울지 않았다. 그래서 이 행만은 선언을 컴포넌트가 실제로 마운트하는 패널 수에 묶는다.
+ */
+describe("inspector density — 고급 조판은 마운트한 패널 수와 일치한다", () => {
+  const TYPOGRAPHY_SOURCE = readFileSync(
+    path.join(__dirname, "StudioInspectorTypographySection.tsx"),
+    "utf-8",
+  );
+
+  /** `<StudioInspectorSection sectionId="…">` 본문만 잘라낸다(중첩 섹션 없음). */
+  function sectionBody(source: string, sectionId: string): string {
+    const anchor = source.indexOf(`sectionId="${sectionId}"`);
+    expect(anchor, `${sectionId} 섹션을 소스에서 찾지 못했다`).toBeGreaterThanOrEqual(0);
+    const end = source.indexOf("</StudioInspectorSection>", anchor);
+    expect(end, `${sectionId} 섹션이 닫히지 않았다`).toBeGreaterThan(anchor);
+    return source.slice(anchor, end);
+  }
+
+  /** 본문이 마운트하는 패널 컴포넌트 이름들. `StudioPanelLoading`(대기 표시)은 제외된다. */
+  function mountedPanels(body: string): string[] {
+    return [...body.matchAll(/<(Studio\w*Panel)[\s/>]/gu)].map((match) => match[1]);
+  }
+
+  it("선언한 leaves 가 섹션이 실제로 마운트하는 패널 수와 같다", () => {
+    const group = inspectorGroups("element-properties").find(
+      (candidate) => candidate.id === "element.typography-advanced",
+    );
+    expect(group).toBeDefined();
+
+    const panels = mountedPanels(sectionBody(TYPOGRAPHY_SOURCE, "element.typography-advanced"));
+    expect(new Set(panels).size, panels.join(", ")).toBe(panels.length);
+    expect(panels.length, `마운트된 패널: ${panels.join(", ")}`).toBe(group!.leaves);
+  });
+
+  it("패널 수 규약을 쓰는 행은 rationale 에 그 사실을 적는다", () => {
+    // 규약이 행마다 다르면(잎 vs 패널) 다음 독자가 오해한다. 예외인 행은 스스로 밝힌다.
+    const group = inspectorGroups("element-properties").find(
+      (candidate) => candidate.id === "element.typography-advanced",
+    );
+    expect(group?.rationale).toMatch(/패널 개수/u);
+  });
+});

@@ -17,6 +17,8 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { StudioTextEffectPanel } from "./lettering/StudioTextEffectPanel";
+import { StudioTextPathPanel } from "./lettering/StudioTextPathPanel";
 import { resolveStudioFigmaSelectionLayoutMetrics } from "./studio-figma-selection-ux";
 import { STUDIO_INSPECTOR_DEFAULT_BUDGET } from "./studio-inspector-density";
 import {
@@ -27,7 +29,10 @@ import { resetStudioInspectorSectionStateCache } from "./studio-inspector-sectio
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
+import { StudioInspectorSection } from "./StudioInspectorSection";
+import { StudioCircularTextPanel } from "./text/StudioCircularTextPanel";
 
+import type { TextPathConfig } from "./lettering/studio-text-path";
 import type { El, ImageEl } from "./studio-element-model";
 import type { StudioInspectorLayout } from "./studio-inspector-layout";
 
@@ -170,5 +175,100 @@ describe("navigator chrome — measured on the DOM", () => {
     expect(root.querySelectorAll('[role="tablist"]')).toHaveLength(2);
     // 감사 §5.5: 전역 검색과 별개의 인스펙터 내부 검색창은 더 이상 없다.
     expect(root.querySelector('input[type="search"]')).toBeNull();
+  });
+});
+
+/**
+ * 고급 조판(`element.typography-advanced`) — 감사가 존재하는 이유인 사각지대.
+ *
+ * 이 섹션의 세 자식은 각자 독립 패널이라 밀도 표는 잎이 아니라 패널 수(3)를 센다. 그
+ * 규약 때문에 표만 보면 안에 몇 개가 실제로 뜨는지 알 수 없고, 실제로 세 패널은 한동안
+ * `data-inspector-priority` 를 하나도 달지 않은 채 열세 개를 그리고 있었다. 모듈 머리말이
+ * 못 박은 대로 "선언하지 않는 것"은 예산을 피해 가는 탈출구가 되어서는 안 되므로, 여기서
+ * 실제 DOM 을 세어 unclassified 가 0 인지 확인한다.
+ */
+describe("advanced typography section — measured on the DOM", () => {
+  const flatPath: TextPathConfig = { shape: "none", curve: 50 };
+  const arcPath: TextPathConfig = { shape: "arcUp", curve: 40 };
+
+  function mountAdvancedTypography(
+    { path, circularEnabled }: { path: TextPathConfig; circularEnabled: boolean },
+  ) {
+    const view = render(
+      <StudioInspectorSection sectionId="element.typography-advanced" forceOpen>
+        <StudioTextEffectPanel onApply={() => undefined} />
+        <StudioTextPathPanel
+          value={path}
+          onPatch={() => undefined}
+          onApplyPreset={() => undefined}
+          onReset={() => undefined}
+        />
+        <StudioCircularTextPanel
+          text="원형"
+          enabled={circularEnabled}
+          options={{ centerX: 0, centerY: 0, radius: 80 }}
+          onToggleEnabled={() => undefined}
+          onOptionsChange={() => undefined}
+        />
+      </StudioInspectorSection>,
+    );
+    return view.container;
+  }
+
+  it("declares every control it renders — no unclassified escape hatch", () => {
+    const root = mountAdvancedTypography({ path: arcPath, circularEnabled: true });
+    const audit = auditStudioInspectorDensity(root);
+
+    expect(
+      audit.violations.filter((violation) => violation.kind === "unclassified-control"),
+    ).toEqual([]);
+    expect(audit.count.unclassified).toBe(0);
+    // 헤더 하나만 chrome, 나머지는 전부 디스클로저 안의 advanced 속성이다.
+    expect(audit.count.chrome).toBe(1);
+    expect(audit.count.essential).toBe(0);
+    expect(audit.violations).toEqual([]);
+  });
+
+  it("names every control the three panels own", () => {
+    const root = mountAdvancedTypography({ path: arcPath, circularEnabled: true });
+    const ids = [...root.querySelectorAll("[data-inspector-control-id]")].map((element) =>
+      element.getAttribute("data-inspector-control-id"),
+    );
+
+    // 프리셋 칩 수는 목록 길이를 따라가므로 총합을 박지 않고, 세 패널이 각각 자기 이름을
+    // 붙였는지만 고정한다. 하나라도 선언을 지우면 위 unclassified 계약이 먼저 깨진다.
+    expect(ids).toContain("typography.fx.reset");
+    expect(ids).toContain("typography.path.reset");
+    expect(ids).toContain("typography.path.curve");
+    expect(ids).toContain("typography.circular.enabled");
+    expect(ids).toContain("typography.circular.radius");
+    expect(ids).toContain("typography.circular.start-angle");
+    expect(ids.filter((id) => id?.startsWith("typography.fx.preset.")).length).toBeGreaterThan(0);
+    expect(ids.filter((id) => id?.startsWith("typography.path.shape.")).length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("says why the curve slider is locked on a straight path", () => {
+    const root = mountAdvancedTypography({ path: flatPath, circularEnabled: true });
+    const audit = auditStudioInspectorDensity(root);
+
+    const curve = root.querySelector<HTMLInputElement>(
+      '[data-inspector-control-id="typography.path.curve"]',
+    );
+    expect(curve?.disabled).toBe(true);
+    expect(
+      audit.violations.filter((violation) => violation.kind === "disabled-without-reason"),
+    ).toEqual([]);
+  });
+
+  it("stays clean while the circular panel is collapsed to its toggle", () => {
+    const root = mountAdvancedTypography({ path: arcPath, circularEnabled: false });
+    const audit = auditStudioInspectorDensity(root);
+
+    expect(audit.count.unclassified).toBe(0);
+    expect(
+      root.querySelector('[data-inspector-control-id="typography.circular.radius"]'),
+    ).toBeNull();
+    expect(audit.violations).toEqual([]);
   });
 });

@@ -7,18 +7,29 @@
  * it while an artist scrubbing the drawer cannot tell them apart. This audit measures the gap
  * instead of asserting it away, over the channels that decide what a mark looks like:
  *
- *   - the tip's alpha silhouette, compared pixel-wise (weight 0.45) — the dominant term,
- *   - tip roundness (0.15) — the dab's aspect; a round billow and a flattened streak read as
+ *   - the tip's alpha silhouette, resampled to a common grid and compared pixel-wise (0.38),
+ *   - tip roundness (0.12) — the dab's aspect; a round billow and a flattened streak read as
  *     different brushes even when every other channel agrees,
- *   - the stamp angle, folded to 180° (0.15) — a chisel's whole identity,
- *   - spacing, scatter, flow, softness and grain (0.20) — how the dab repeats and deposits,
+ *   - the stamp angle, folded to 180° (0.12) — a chisel's whole identity,
+ *   - spacing, scatter, flow, softness and grain (0.18) — how the dab repeats and deposits,
+ *   - nib width as a log ratio (0.15) — the same shape at twice the width is a different brush,
  *   - whether taper is on (0.05) — a stroke that thins into its ends versus one that does not.
+ *
+ * Above all of that sits a floor: two brushes that disagree on dual-brush, tip-layer count or grain
+ * space are never near-duplicates however closely their tips match, because each of those changes
+ * the mark outright. oil-impasto-heavy and oil-linen-filbert stamp near-identical silhouettes
+ * (tip 0.033) and the floor is the only thing that keeps them from being nominated.
  *
  * Roundness and taper were added after a first sweep flagged pairs an artist reads as clearly
  * distinct: cloud-cirrus-stream vs smoke-wisp-layered agree on tip and scalars but sit at roundness
  * 0.42 vs 0.84, and horizontal-blade vs directional-flat share a byte-identical chisel alpha map
  * while differing in roundness, taper and scatter. A metric blind to those channels nominates cuts
  * that would flatten real expressive axes.
+ *
+ * The tip is built with the renderer's own `buildStudioBrushTipAlphaMap`, so primitive-tip brushes
+ * count too. Reading the raw `alphaMapBase64` only ever saw the custom maps, which silently hid 20
+ * of the 87 listed presets — whole categories could never be nominated, and the audit reported a
+ * clean sweep over a population it had quietly cut by a quarter.
  *
  * The per-index noise seed is excluded on purpose: it moves grain placement without changing the
  * character an artist is choosing between. Only same-category pairs are reported, because the
@@ -30,6 +41,7 @@
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../src/domains/creator/brush/studio-brush-pack-index";
 import { materializeStudioBrushPackDynamics } from "../src/domains/creator/brush/studio-brush-pack-runtime";
 import { isStudioBrushQuarantinedPresetId } from "../src/domains/creator/brush/studio-brush-quarantine";
+import { buildStudioBrushTipAlphaMap } from "../src/domains/creator/brush/studio-brush-tip-stamp";
 
 const SCALAR_CHANNELS = [
   "spacingRatio",
@@ -43,6 +55,26 @@ const SCALAR_CHANNELS = [
 
 type ScalarChannel = (typeof SCALAR_CHANNELS)[number];
 
+/**
+ * Every tip is compared on this grid. Primitive tips come back at 128 and custom ones at 64, so a
+ * raw difference would be measuring the resolution rather than the silhouette.
+ */
+const TIP_GRID = 64;
+
+/** Nearest-neighbour resample of a square 0..1 alpha map onto TIP_GRID. */
+function resampleTip(alphas: Float32Array, size: number): Float32Array {
+  if (size === TIP_GRID) return alphas;
+  const out = new Float32Array(TIP_GRID * TIP_GRID);
+  for (let y = 0; y < TIP_GRID; y += 1) {
+    const sourceY = Math.min(size - 1, Math.floor((y * size) / TIP_GRID));
+    for (let x = 0; x < TIP_GRID; x += 1) {
+      const sourceX = Math.min(size - 1, Math.floor((x * size) / TIP_GRID));
+      out[y * TIP_GRID + x] = alphas[sourceY * size + sourceX] ?? 0;
+    }
+  }
+  return out;
+}
+
 interface BrushMark {
   readonly id: string;
   readonly name: string;
@@ -51,8 +83,12 @@ interface BrushMark {
   readonly angle: number;
   readonly roundness: number;
   readonly tapered: boolean;
-  readonly alpha: Uint8Array;
-  readonly alphaSize: number;
+  readonly alpha: Float32Array;
+  readonly defaultWidth: number;
+  /** Channels that change the mark outright; a mismatch floors the distance rather than nudging it. */
+  readonly dualBrush: boolean;
+  readonly tipLayers: number;
+  readonly grainSpace: string;
   readonly scalars: Readonly<Record<ScalarChannel, number>>;
 }
 
@@ -69,8 +105,10 @@ function collectMarks(): BrushMark[] {
     if (isStudioBrushQuarantinedPresetId(descriptor.catalogId)) continue;
     const dynamics = materializeStudioBrushPackDynamics(descriptor.catalogId);
     if (!dynamics) continue;
-    const alphaMapBase64 = dynamics.tip.alphaMapBase64;
-    if (typeof alphaMapBase64 !== "string" || alphaMapBase64.length === 0) continue;
+    // Build the tip the renderer would stamp. Reading `alphaMapBase64` directly only ever saw the
+    // custom maps and silently skipped every primitive-tip brush — 20 of the 87 listed presets,
+    // including whole categories, were invisible to this audit and could never be nominated.
+    const tip = buildStudioBrushTipAlphaMap(dynamics.tip);
     marks.push({
       id: descriptor.catalogId,
       name: descriptor.catalogName,
@@ -79,8 +117,11 @@ function collectMarks(): BrushMark[] {
       angle: Number(dynamics.angle.base ?? 0),
       roundness: Number(dynamics.roundness.base ?? 1),
       tapered: dynamics.taper.enabled === true,
-      alpha: new Uint8Array(Buffer.from(alphaMapBase64, "base64")),
-      alphaSize: Number(dynamics.tip.alphaMapSize ?? 0),
+      alpha: resampleTip(tip.alphas, tip.size),
+      defaultWidth: Number(descriptor.defaultWidth ?? 0),
+      dualBrush: (dynamics as { dualBrush?: { enabled?: boolean } }).dualBrush?.enabled === true,
+      tipLayers: dynamics.tipLayers?.length ?? 0,
+      grainSpace: String(dynamics.grain.space ?? ""),
       scalars: {
         spacingRatio: Number(dynamics.spacingRatio ?? 0),
         scatterRatio: Number(dynamics.scatterRatio ?? 0),
@@ -95,14 +136,42 @@ function collectMarks(): BrushMark[] {
   return marks;
 }
 
-/** Mean absolute alpha difference; 0 means the two tips stamp the same silhouette. */
+/** Mean absolute alpha difference on the common grid; 0 means the two tips stamp the same shape. */
 function tipDistance(left: BrushMark, right: BrushMark): number {
-  if (left.alphaSize !== right.alphaSize || left.alpha.length !== right.alpha.length) return 1;
+  if (left.alpha.length !== right.alpha.length) return 1;
   let total = 0;
   for (let index = 0; index < left.alpha.length; index += 1) {
     total += Math.abs(left.alpha[index]! - right.alpha[index]!);
   }
-  return total / (left.alpha.length * 255);
+  // Samples are already 0..1, so the mean is the distance.
+  return total / left.alpha.length;
+}
+
+/**
+ * A floor for differences the silhouette cannot show. A second tip stamped alongside the first, an
+ * extra tip layer, or grain pinned to the canvas instead of the stroke each change the mark
+ * outright, so two brushes that disagree on any of them are never near-duplicates however closely
+ * their tips match. Without this the widened population nominates oil-impasto-heavy against
+ * oil-linen-filbert — same silhouette, but one lays a dual-brush stamp the other does not.
+ */
+const STRUCTURAL_FLOOR = 0.18;
+
+function structuralFloor(left: BrushMark, right: BrushMark): number {
+  const differs =
+    left.dualBrush !== right.dualBrush
+    || left.tipLayers !== right.tipLayers
+    || left.grainSpace !== right.grainSpace;
+  return differs ? STRUCTURAL_FLOOR : 0;
+}
+
+/**
+ * Nib size as a log ratio, so a 3px liner is never scored against a 7px shader on silhouette alone —
+ * the same shape at twice the width is a different brush to draw with.
+ */
+function widthDistance(left: BrushMark, right: BrushMark): number {
+  const a = Math.max(1, left.defaultWidth);
+  const b = Math.max(1, right.defaultWidth);
+  return Math.min(1, Math.abs(Math.log2(a / b)) / 2);
 }
 
 function main(): void {
@@ -110,7 +179,7 @@ function main(): void {
   const threshold = numberArg("--threshold", 0.12);
   const marks = collectMarks();
   if (marks.length === 0) {
-    console.error("no listed procedural brush exposed a tip alpha map");
+    console.error("no listed procedural brush produced a tip alpha map");
     process.exitCode = 1;
     return;
   }
@@ -140,8 +209,11 @@ function main(): void {
     const angle = Math.min(wrapped, 180 - wrapped) / 90;
     const roundness = Math.min(1, Math.abs(left.roundness - right.roundness));
     const taper = left.tapered === right.tapered ? 0 : 1;
+    const width = widthDistance(left, right);
+    const weighted =
+      tip * 0.38 + roundness * 0.12 + angle * 0.12 + scalar * 0.18 + taper * 0.05 + width * 0.15;
     return {
-      total: tip * 0.45 + roundness * 0.15 + angle * 0.15 + scalar * 0.2 + taper * 0.05,
+      total: Math.max(weighted, structuralFloor(left, right)),
       tip,
       scalar,
       angle,
