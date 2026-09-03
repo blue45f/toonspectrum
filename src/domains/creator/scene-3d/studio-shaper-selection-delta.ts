@@ -21,17 +21,16 @@ const FACE_KEYS: readonly StudioMannequinHeadParamKey[] = Object.freeze([
   "chinLength",
 ]);
 
-function assignKeys(
-  target: StudioMannequinBodyParams,
+function selectKeys(
   source: StudioMannequinBodyParams,
   keys: readonly (keyof StudioMannequinBodyParams)[],
-): StudioMannequinBodyParams {
-  const next = { ...target };
+): Partial<StudioMannequinBodyParams> {
+  const selected: Record<string, number> = {};
   for (const key of keys) {
     const value = source[key];
-    if (typeof value === "number") next[key] = value;
+    if (typeof value === "number") selected[key] = value;
   }
-  return next;
+  return selected;
 }
 
 /**
@@ -49,10 +48,10 @@ export function applyShaperSelectionDeltaToBodyParams(
   let next = { ...current };
 
   if (previousSelection.body !== nextSelection.body) {
-    next = assignKeys(next, planned, BODY_KEYS);
+    next = { ...next, ...selectKeys(planned, BODY_KEYS) };
   }
   if (previousSelection.face !== nextSelection.face) {
-    next = assignKeys(next, planned, FACE_KEYS);
+    next = { ...next, ...selectKeys(planned, FACE_KEYS) };
   }
   if (previousSelection.eye !== nextSelection.eye && typeof planned.eyeScale === "number") {
     next = { ...next, eyeScale: planned.eyeScale };
