@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   restore-source:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -71,8 +71,7 @@ jobs:
                       raise SystemExit(f'unsupported archive member: {member.name}')
               archive.extractall('.', members=members)
           PY
-          # The App token may write source but may not create a permanent workflow. That workflow
-          # is added later through the repository connector after the implementation is validated.
+          # The job token can write source but cannot create a permanent Actions workflow.
           rm -f .github/workflows/studio-webgpu-brush-v2.yml
           git add -A
           if git diff --cached --quiet; then
