@@ -1,0 +1,100 @@
+name: Finalize all preserved merge candidates v2
+
+on:
+  push:
+    branches:
+      - automation/finalize-all-preserved-merges-v2-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-all-preserved-merges-v2-20260903
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  finalize:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: integration/preserved-open-work-20260903
+            subject: "chore(integration): preserve outstanding work without loss"
+          - target: fix/marketplace-wiring-preserved-20260903
+            subject: "fix(marketplace): restore authoring surface wiring without work loss"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Wait for pull request
+        id: pr
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ matrix.target }}
+        run: |
+          set -Eeuo pipefail
+          number=""
+          for attempt in $(seq 1 180); do
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+            [[ -n "$number" ]] && break
+            echo "Waiting for $TARGET_BRANCH PR ($attempt/180)."
+            sleep 20
+          done
+          [[ -n "$number" ]] || { echo "PR was not created for $TARGET_BRANCH." >&2; exit 1; }
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Update candidate from latest main
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          merge_state="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus')"
+          if [[ "$merge_state" == "BEHIND" ]]; then
+            gh pr update-branch "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Wait for core check registration on current head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          core_count=0
+          for attempt in $(seq 1 90); do
+            checks="$(gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+            core_count="$(jq '[.[] | select(.name | ascii_downcase | contains("core"))] | length' <<<"$checks")"
+            (( core_count > 0 )) && break
+            echo "Waiting for core check ($attempt/90)."
+            sleep 20
+          done
+          (( core_count > 0 )) || { echo "No core check registered; refusing unchecked merge." >&2; exit 1; }
+
+      - name: Require all checks
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 20
+
+      - name: Merge exact passing head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          SUBJECT: ${{ matrix.subject }}
+        run: |
+          set -Eeuo pipefail
+          head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --match-head-commit "$head_sha" \
+            --subject "$SUBJECT" \
+            --body "Merged only after synchronization with current main and success of every registered pull-request check on this exact head."
