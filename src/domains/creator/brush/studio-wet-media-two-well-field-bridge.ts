@@ -9,18 +9,6 @@
  */
 
 import {
-  advanceStudioWetMediaTwoWellContact,
-  parseStudioWetMediaTwoWellSettings,
-  parseStudioWetMediaTwoWellState,
-  STUDIO_WET_MEDIA_TWO_WELL_VERSION,
-  type StudioWetMediaCanvasSample,
-  type StudioWetMediaContactResult,
-  type StudioWetMediaLinearRgba as StudioWetMediaTwoWellLinearRgba,
-  type StudioWetMediaTwoWellFailureReason,
-  type StudioWetMediaTwoWellSettings,
-  type StudioWetMediaTwoWellState,
-} from "./studio-wet-media-two-well-model";
-import {
   applyStudioWetMediaTileFieldDepositions,
   parseStudioWetMediaTileFieldSettings,
   parseStudioWetMediaTileFieldState,
@@ -32,6 +20,18 @@ import {
   type StudioWetMediaTileFieldSettings,
   type StudioWetMediaTileFieldState,
 } from "./studio-wet-media-tile-field";
+import {
+  advanceStudioWetMediaTwoWellContact,
+  parseStudioWetMediaTwoWellSettings,
+  parseStudioWetMediaTwoWellState,
+  STUDIO_WET_MEDIA_TWO_WELL_VERSION,
+  type StudioWetMediaCanvasSample,
+  type StudioWetMediaContactResult,
+  type StudioWetMediaLinearRgba as StudioWetMediaTwoWellLinearRgba,
+  type StudioWetMediaTwoWellFailureReason,
+  type StudioWetMediaTwoWellSettings,
+  type StudioWetMediaTwoWellState,
+} from "./studio-wet-media-two-well-model";
 
 export const STUDIO_WET_MEDIA_TWO_WELL_FIELD_BRIDGE_VERSION = 1 as const;
 
