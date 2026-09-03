@@ -12,6 +12,7 @@ import {
 import { useState, type FormEvent } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { MarketplaceAuthoringWorkshop } from "../components/MarketplaceAuthoringWorkshop";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { saveCustomPublishedResource } from "../models/market-custom-registry";
 import {
@@ -82,7 +83,7 @@ export function MarketPublishPage() {
     .filter((t) => t.length > 0)
     .slice(0, 8);
 
-  const [fallbackUserId] = useState(() => "user-guest");
+  const fallbackUserId = "user-guest";
   const publisherId = (user as { id?: string })?.id || fallbackUserId;
   const publisherName =
     (user as { name?: string; nickname?: string })?.nickname ||
@@ -192,6 +193,8 @@ export function MarketPublishPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10">
       <MarketNavHeader />
+      {/* marketplace-authoring-workshop */}
+      <MarketplaceAuthoringWorkshop />
 
       {/* Breadcrumb */}
       <Link
