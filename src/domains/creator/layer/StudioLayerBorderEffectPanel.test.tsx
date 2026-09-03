@@ -14,6 +14,9 @@ const ACTIVE: StudioLayerBorderEffectSettings = {
   color: "#ff0000",
   type: "outer",
   antiAliased: true,
+  // The normalizer materializes this field on every commit (`respectTransparency !== false`), so
+  // a fixture without it compares a recipe the panel can never emit.
+  respectTransparency: true,
 };
 
 describe("StudioLayerBorderEffectPanel", () => {

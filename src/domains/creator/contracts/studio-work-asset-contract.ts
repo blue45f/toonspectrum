@@ -343,6 +343,9 @@ export const StudioWorkAssetBorderEffectSchema = z
     color: z.string().min(1).max(48),
     type: z.enum(STUDIO_WORK_ASSET_BORDER_EFFECT_TYPES),
     antiAliased: z.boolean().optional(),
+    // The recipe normalizer materializes this on every commit, so a strict schema without it
+    // rejected every borderEffect a client actually publishes -- remote border sync was dead.
+    respectTransparency: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, context) => {
