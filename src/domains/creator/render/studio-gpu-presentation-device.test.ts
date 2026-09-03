@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { acquireStudioGpuPresentationDevice } from "./studio-gpu-presentation-device";
+
 const fabricHarness = vi.hoisted(() => ({
   acquireStudioGpuDevice: vi.fn(),
 }));
@@ -7,8 +9,6 @@ const fabricHarness = vi.hoisted(() => ({
 vi.mock("./studio-gpu-fabric", () => ({
   acquireStudioGpuDevice: fabricHarness.acquireStudioGpuDevice,
 }));
-
-import { acquireStudioGpuPresentationDevice } from "./studio-gpu-presentation-device";
 
 function fakeGpu(input?: {
   readonly format?: GPUTextureFormat;
