@@ -1,0 +1,24 @@
+name: Kick Creator Marketplace finalizer
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-finalizer-kick.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the latest finalizer definition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh workflow run marketplace-authoring-finalizer.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref feat/marketplace-creator-pipeline-20260903
