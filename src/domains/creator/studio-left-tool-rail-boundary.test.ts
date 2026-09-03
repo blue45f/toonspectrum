@@ -107,6 +107,22 @@ describe("Studio left tool rail module boundary", () => {
     expect(page.topLevelDeclarations.has("StudioLeftToolRailHandlers")).toBe(false);
   });
 
+  it("mounts the rail through one EditorClient prop", () => {
+    const rail = moduleShape("./StudioLeftToolRail.tsx");
+    const workspace = moduleShape(
+      "./studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx",
+    );
+
+    expect(rail.source).toContain("readonly client: StudioLeftToolRailClient;");
+    expect(rail.source).not.toContain('import("react").Dispatch<');
+    expect(workspace.source).toContain(
+      "<LazyStudioLeftToolRail client={studioLeftToolRailClient} />",
+    );
+    expect(workspace.source).not.toContain(
+      "stableHandlers={studioLeftToolRailHandlers}",
+    );
+  });
+
   it("keeps the rail independent from canvas render runtimes", () => {
     const rail = moduleShape("./StudioLeftToolRail.tsx");
 

@@ -18,13 +18,20 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  installStudioCommandExecutionBindings,
+  resetStudioCommandExecutionBindingsForTests,
+} from "./studio-command-execution-registry";
+import {
   STUDIO_SEARCH_DEFAULT_SECTION_LIMIT,
   STUDIO_SEARCH_DEFAULT_TOTAL_LIMIT,
 } from "./studio-command-search";
 import { StudioCommandSearchDialog } from "./StudioCommandSearchDialog";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetStudioCommandExecutionBindingsForTests();
+});
 
 function openDialog(
   overrides: Partial<
@@ -230,6 +237,55 @@ describe("StudioCommandSearchDialog — 범위(scope)", () => {
 });
 
 describe("StudioCommandSearchDialog — 결과 활성화", () => {
+  it("검토된 메뉴 명령은 검색에서 같은 실행 함수를 직접 호출한다", () => {
+    const execute = vi.fn();
+    installStudioCommandExecutionBindings([
+      {
+        commandId: "filter.gaussian-blur",
+        label: "가우시안 블러",
+        execute,
+        disabled: false,
+      },
+    ]);
+    const onOpenHelp = vi.fn();
+    const { onClose } = openDialog({ onOpenHelp });
+    type("가우시안 블러");
+    const option = screen.getAllByRole("option").find(
+      (candidate) => within(candidate).queryByText("가우시안 블러", { exact: true }),
+    );
+    if (!option) throw new Error("missing exact 가우시안 블러 option");
+    expect(option.getAttribute("data-action")).toBe("execute");
+    expect(within(option).getByText("실행")).toBeTruthy();
+    fireEvent.click(option);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(onOpenHelp).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledWith("action");
+  });
+
+  it("현재 비활성인 직접 명령은 실행하지 않고 이유를 푸터에 표시한다", () => {
+    const execute = vi.fn();
+    installStudioCommandExecutionBindings([
+      {
+        commandId: "filter.gaussian-blur",
+        label: "가우시안 블러",
+        execute,
+        disabled: true,
+        unavailableReason: "이미지 레이어를 먼저 선택하세요.",
+      },
+    ]);
+    openDialog({ onOpenHelp: vi.fn() });
+    type("가우시안 블러");
+    const option = screen.getAllByRole("option").find(
+      (candidate) => within(candidate).queryByText("가우시안 블러", { exact: true }),
+    );
+    if (!option) throw new Error("missing exact 가우시안 블러 option");
+    expect(option.getAttribute("aria-disabled")).toBe("true");
+    expect(within(option).getByText("사용 불가")).toBeTruthy();
+    expect(footerText()).toContain("이미지 레이어를 먼저 선택하세요");
+    fireEvent.click(option);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("명령 행을 클릭하면 도움말 소비자가 helpNodeId 와 commandId 를 함께 받는다", () => {
     const onOpenHelp = vi.fn();
     const { onClose } = openDialog({ onOpenHelp });
@@ -279,6 +335,7 @@ describe("StudioCommandSearchDialog — 결과 활성화", () => {
 
   it("행마다 보이는 배지가 그 행의 실제 능력과 일치한다", () => {
     const BADGE: Record<string, string> = {
+      execute: "실행",
       inspector: "이동",
       palette: "펼치기",
       tutorial: "튜토리얼",

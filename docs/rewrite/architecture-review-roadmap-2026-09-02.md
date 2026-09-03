@@ -19,7 +19,7 @@
 | P0 | 실험 진입점 `tools/browser-harnesses/` 이동, 패키지 설명 책임 기반 문구 | **완료** | `validate:architecture` |
 | P0 | Hokusai route 수 문서 불일치 정리 | 미확인 | 검토가 지목한 문서 위치를 찾지 못함 — 발견 시 `renderer-roles.md`에 흡수 |
 | P1 | `EditorClient` 계약 + `useEditorSelector`/`useEditorCommand` | **완료(계약)** | `editor-client.test.ts`, `src/domains/creator/editor-client/*.test.tsx` |
-| P1 | 호스트에 `EditorClient` 배선, 툴 레일 → selector+command 전환 | 진행 | 레일 setter 17 → 16(`setTool` 제거). 목표: 레일이 `EditorClient`만 받음 |
+| P1 | 호스트에 `EditorClient` 배선, 툴 레일 → selector+command 전환 | **완료(툴 레일)** | 레일 raw React setter 16 → 0. `StudioLeftToolRail`은 `EditorClient` 하나만 받고 모든 클릭을 CommandRegistry 리시트 경로로 전달 |
 | P1 | 런타임 소유자 분해(`StudioDocumentRuntime`, `ToolRuntime`, `ViewportRuntime`, `DurabilityRuntime`, `CollaborationRuntime`) | 미착수 | 호스트 500–1,000행, feature 공개 타입 `any` 0, `ViewSessionCore/Rest` 삭제 |
 | P1 | `studio-project-model` 분리(`studio-document`/`studio-command`/`studio-history`/`studio-runtime`/`studio-storage`) | 미착수 | `studio-document`가 React/DOM/Worker/OPFS를 import하지 않음(경계 테스트 먼저) |
 | P1 | 웹 앱을 `apps/studio-web`·`apps/discovery-web`로 분리 | 미착수 | 번들·배포 분리. `validate:architecture`의 병렬 앱 금지 조항과 충돌하지 않도록 in-place 이동으로 설계 |

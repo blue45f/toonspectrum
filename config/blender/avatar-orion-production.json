@@ -1,0 +1,83 @@
+{
+  "$schema": "./toonstudio-character-pipeline.schema.json",
+  "version": 1,
+  "characterId": "avatar-orion-authored",
+  "displayName": "Avatar Orion · Authored Toon",
+  "mode": "upgrade",
+  "inputPath": "public/vrm/Avatar_Orion.vrm",
+  "outputDir": "batch_generated/blender-character",
+  "strict": true,
+  "hair": {
+    "enabled": true,
+    "style": "short-layered",
+    "replaceDetectedHair": false,
+    "volume": 0.94,
+    "length": 0.78,
+    "fringe": 0.36,
+    "wave": 0.08,
+    "clumpDensity": 0.86,
+    "generateLods": true,
+    "palette": {
+      "base": "#18253a",
+      "shadow": "#070b14",
+      "highlight": "#3a99c7",
+      "outline": "#03050a"
+    }
+  },
+  "face": {
+    "createSemanticShapeKeys": true,
+    "preserveExpressionShapeKeys": true,
+    "requireExplicitFaceMesh": false,
+    "maximumDisplacementRatio": 0.022,
+    "minimumDetectionConfidence": 0.58
+  },
+  "render": {
+    "enabled": true,
+    "resolution": 768,
+    "transparent": true,
+    "samples": 48,
+    "views": [
+      "front",
+      "three-quarter",
+      "side",
+      "back"
+    ],
+    "expressions": [
+      "neutral",
+      "happy",
+      "angry",
+      "surprised",
+      "blink"
+    ]
+  },
+  "export": {
+    "glb": true,
+    "vrm": true,
+    "blend": true,
+    "embedTextures": true,
+    "applyModifiers": false,
+    "exportAnimations": true,
+    "exportMorphNormals": true
+  },
+  "quality": {
+    "maxTrianglesLod0": 180000,
+    "maxTrianglesLod1": 95000,
+    "maxTrianglesLod2": 48000,
+    "maxHairTrianglesLod0": 30000,
+    "maxHairMaterials": 3,
+    "maxVertexInfluences": 4,
+    "maxTextureSize": 4096,
+    "maxUnappliedScaleDelta": 0.001,
+    "maxDegenerateFaces": 0,
+    "maxNonManifoldEdges": 64,
+    "minimumScore": 86
+  },
+  "provenance": {
+    "source": "public/vrm/Avatar_Orion.vrm",
+    "sourceGitBlob": "b244cf74aa845e75b33a4e48a962ebd880ec2210",
+    "sourceAuthor": "Polygonal Mind",
+    "sourceLicense": "CC0",
+    "sourceRepair": "scripts/blender/repair_avatar_orion_vrm1.py",
+    "pipeline": "ToonStudio authored character pipeline v1"
+  }
+}

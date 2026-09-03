@@ -3,6 +3,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  createStudioLeftToolRailClient,
+  type StudioLeftToolRailClient,
+  type StudioLeftToolRailClientInput,
+} from "./editor-client/studio-left-tool-rail-client";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import {
   StudioLeftToolRail,
@@ -11,7 +16,7 @@ import {
 
 import type { El } from "./studio-element-model";
 import type { LucideIcon } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { useI18n } from "@/lib/i18n";
 
@@ -125,7 +130,11 @@ vi.mock("./StudioToolHint", () => ({
   StudioToolHintTarget: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-type RailProps = ComponentProps<typeof StudioLeftToolRail>;
+type RailProps = StudioLeftToolRailClientInput & {
+  readonly client: StudioLeftToolRailClient;
+  readonly stableHandlers: StudioLeftToolRailHandlers;
+  readonly setStrokeWidth: ReturnType<typeof vi.fn>;
+};
 
 const IMAGE: El = {
   id: "image-1",
@@ -182,7 +191,8 @@ function createHandlers(): StudioLeftToolRailHandlers {
 }
 
 function createProps(overrides: Partial<RailProps> = {}): RailProps {
-  return {
+  const stableHandlers = overrides.stableHandlers ?? createHandlers();
+  const defaults = {
     activeSurfaceReviewLocked: false,
     pixelToolTargetAvailable: true,
     rasterRetouchTargetAvailable: true,
@@ -193,8 +203,8 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     canvasOnlyMode: false,
     commentPinArmed: false,
     cropActive: false,
-    drawMode: "pen",
-    drawShape: "rect",
+    drawMode: "pen" as const,
+    drawShape: "rect" as const,
     eyedropperActive: false,
     frameAnimOpen: false,
     frameAnimTargetId: null,
@@ -208,6 +218,10 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     quickShapeActive: false,
     railMoreOpen: false,
     referencePanelOpen: false,
+    mannequinPoserOpen: false,
+    poserVrmOpen: false,
+    bg3dOpen: false,
+    hybridDccOpen: false,
     selected: null,
     selectedImageMutationLocked: false,
     setAppSettingsInitialTab: vi.fn(),
@@ -221,18 +235,31 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     setQuickShapeActive: vi.fn(),
     setRailMoreOpen: vi.fn(),
     setReferencePanelOpen: vi.fn(),
+    setMannequinPoserOpen: vi.fn(),
+    setPoserVrmOpen: vi.fn(),
+    setHybridDccOpen: vi.fn(),
     setStrokeWidth: vi.fn(),
     setViewTool: vi.fn(),
     dodgeBurnActive: false,
     wetMixActive: false,
     smudgeActive: false,
-    stableHandlers: createHandlers(),
-    tool: "select",
-    uiDensityMode: "full",
+    tool: "select" as const,
+    uiDensityMode: "full" as const,
     viewTool: null,
     viewTransformSuppressed: false,
-    ...overrides,
+    stableHandlers,
   };
+  const merged = { ...defaults, ...overrides, stableHandlers };
+  const input = {
+    ...merged,
+    ...stableHandlers,
+  } as StudioLeftToolRailClientInput;
+
+  return {
+    ...merged,
+    ...stableHandlers,
+    client: createStudioLeftToolRailClient(input),
+  } as RailProps;
 }
 
 afterEach(() => {
@@ -370,15 +397,14 @@ describe("StudioLeftToolRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "너비에 맞춤 (Home)" }));
     expect(props.stableHandlers.fitCanvasToWidth).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "보기 확대·축소 (Z)" }));
-    expect(props.setViewTool).toHaveBeenCalledOnce();
-    const zoomAction = vi.mocked(props.setViewTool).mock.calls.at(-1)?.[0];
-    expect(typeof zoomAction).toBe("function");
-    expect(typeof zoomAction === "function" ? zoomAction(null) : null).toBe("zoom");
+    expect(props.setViewTool).toHaveBeenCalledExactlyOnceWith("zoom");
   });
 
   it("prefers workspace-aware fit-width handler when it is provided", () => {
-    const stableHandlers = createHandlers();
-    stableHandlers.fitCanvasToWidthWithFocus = vi.fn();
+    const stableHandlers: StudioLeftToolRailHandlers = {
+    ...createHandlers(),
+    fitCanvasToWidthWithFocus: vi.fn(),
+  };
     const props = createProps({
       stableHandlers,
       selected: IMAGE,

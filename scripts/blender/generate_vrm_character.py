@@ -1,33 +1,49 @@
-"""Regenerate only Cyber Agent Zero through the official VRM exporter.
+"""Compatibility entry point for the authoritative ToonStudio Blender pipeline.
 
-Kept as a compatibility entry point for earlier development commands.  The
-authoritative implementation lives in ``generate_toonspectrum_vrm_pack.py``;
-there is deliberately no glTF JSON injection or fake humanoid metadata here.
-
-Run from the repository root:
-  blender --background --python scripts/blender/generate_vrm_character.py
+Earlier revisions depended on a removed generator module. The supported path
+is now the versioned character-pipeline config.
+Override the default with ``scene['toonstudio_pipeline_config']`` when called
+from Blender MCP.
 """
+from __future__ import annotations
 
-import sys
+import json
 from pathlib import Path
+import sys
+
+import bpy
 
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+ROOT = Path(__file__).resolve().parents[2]
+KIT_ROOT = ROOT / "tools" / "blender"
+if str(KIT_ROOT) not in sys.path:
+    sys.path.insert(0, str(KIT_ROOT))
 
-from generate_toonspectrum_vrm_pack import (  # noqa: E402
-    CHARACTERS,
-    generate_character,
-)
+from toonstudio_blender_kit.contracts import load_config  # noqa: E402
+from toonstudio_blender_kit.pipeline import run_pipeline  # noqa: E402
 
 
-def main():
-    spec = next(
-        character
-        for character in CHARACTERS
-        if character["file"] == "cyber_agent_zero.vrm"
+def main() -> None:
+    raw = bpy.context.scene.get(
+        "toonstudio_pipeline_config",
+        str(ROOT / "config/blender/avatar-orion-production.json"),
     )
-    generate_character(spec)
-    print("VRM_CHARACTER_COMPLETE " + spec["file"])
+    path = Path(str(raw)).expanduser()
+    if not path.is_absolute():
+        path = ROOT / path
+    execution = run_pipeline(load_config(path.resolve()), project_root=ROOT)
+    print(
+        "VRM_CHARACTER_COMPLETE "
+        + json.dumps(
+            {
+                "characterId": execution.report.character_id,
+                "score": execution.report.score,
+                "outputDir": str(execution.output_dir),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":
