@@ -1,0 +1,57 @@
+name: Codex EditorClient rail migration
+
+on:
+  push:
+    branches:
+      - codex/editor-client-rail-boundary-20260904
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-verify:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: codex/editor-client-rail-boundary-20260904
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply the one-shot migration
+        run: node .github/codex/apply-editor-client-rail.mjs
+      - name: Check the changed Studio boundary
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/StudioLeftToolRail.tsx \
+            src/domains/creator/StudioLeftToolRail.test.tsx \
+            src/domains/creator/editor-client/studio-left-tool-rail-client.ts \
+            src/domains/creator/editor-client/studio-left-tool-rail-client.test.ts \
+            src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx \
+            src/domains/creator/studio-left-tool-rail-boundary.test.ts \
+            src/domains/creator/studio-host-architecture-ratchet.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/editor-client/studio-left-tool-rail-client.test.ts \
+            src/domains/creator/StudioLeftToolRail.test.tsx \
+            src/domains/creator/studio-left-tool-rail-boundary.test.ts \
+            src/domains/creator/studio-host-architecture-ratchet.test.ts
+          pnpm run validate:architecture
+          pnpm run typecheck
+      - name: Commit the verified migration
+        run: |
+          rm -f .github/codex/apply-editor-client-rail.mjs
+          rm -f .github/workflows/codex-editor-client-rail.yml
+          rmdir .github/codex 2>/dev/null || true
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "refactor(studio): route left tool rail through EditorClient"
+          git push origin HEAD:codex/editor-client-rail-boundary-20260904
