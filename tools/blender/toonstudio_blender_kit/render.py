@@ -131,6 +131,17 @@ def _configure_render(scene: bpy.types.Scene, options: RenderOptions) -> None:
         background.inputs["Strength"].default_value = 0.34
 
 
+def _is_generated_shape_key(obj: bpy.types.Object, key_name: str) -> bool:
+    """Read generator metadata from the owning object, not ShapeKey ID properties.
+
+    Blender 5.2's ShapeKey RNA type does not guarantee ``IDProperty`` access, while
+    ``face.py`` deliberately stores the provenance marker on the mesh object.
+    """
+
+    marker = f"toonstudio_shape_{_normalize(key_name)}_generated"
+    return bool(obj.get(marker, False))
+
+
 def _set_expression(objects: Sequence[bpy.types.Object], expression: str) -> dict[tuple[str, str], float]:
     snapshot: dict[tuple[str, str], float] = {}
     aliases = _EXPRESSION_ALIASES.get(expression, ())
@@ -149,7 +160,7 @@ def _set_expression(objects: Sequence[bpy.types.Object], expression: str) -> dic
             key
             for key in shape_keys.key_blocks
             if key.name != "Basis"
-            and not key.get("toonstudio_generated", False)
+            and not _is_generated_shape_key(obj, key.name)
             and any(alias in _normalize(key.name) for alias in aliases)
         ]
         # Prefer the most specific/shortest target to avoid stacking aliases from unrelated meshes.

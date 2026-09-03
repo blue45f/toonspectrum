@@ -6,7 +6,7 @@ commands, or evaluates arbitrary code.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -606,6 +606,12 @@ def run_pipeline(
     if neutral_front:
         outputs["thumbnail"] = neutral_front
 
+    # Declare stable sibling paths before serialising the report.  The report can
+    # reference its manifest without hashing itself; the manifest is written only
+    # after the final report bytes exist, so its qualityReport receipt is immutable.
+    outputs["qualityReport"] = "quality-report.json"
+    outputs["manifest"] = "character-package.json"
+
     score = calculate_score(issues)
     passed = score >= config.quality.minimum_score and not any(issue.severity == "error" for issue in issues)
     report = PipelineReport(
@@ -630,11 +636,9 @@ def run_pipeline(
             ),
         },
         issues=tuple(issues),
-        outputs=outputs,
+        outputs=dict(outputs),
     )
     write_json(output_dir / "quality-report.json", report.to_mapping())
-    outputs["qualityReport"] = "quality-report.json"
-    report = replace(report, outputs=dict(outputs))
     manifest = _build_manifest(
         config,
         report,
@@ -647,9 +651,6 @@ def run_pipeline(
         source_sha256,
     )
     write_json(output_dir / "character-package.json", manifest)
-    outputs["manifest"] = "character-package.json"
-    report = replace(report, outputs=dict(outputs))
-    write_json(output_dir / "quality-report.json", report.to_mapping())
 
     if config.strict and not report.passed:
         errors = [issue.message for issue in report.issues if issue.severity == "error"]
