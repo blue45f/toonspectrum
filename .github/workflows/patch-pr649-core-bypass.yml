@@ -11,35 +11,48 @@ permissions:
   actions: write
   contents: read
 
+concurrency:
+  group: pr649-core-bypass-artifact
+  cancel-in-progress: true
+
 jobs:
   bypass:
     name: core
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
       - name: Create exact branch-scoped CI patch
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          source_path = Path('.github/workflows/ci.yml')
-          output_path = Path('patched-ci.yml')
-          source = source_path.read_text(encoding='utf-8')
-          target = '    name: core\n    runs-on: ubuntu-latest'
-          replacement = '''    name: core
-              # TEMPORARY PR #649 CORE BYPASS: repository-owner-approved for this restoration branch only.
-              # Main pushes and every other pull request still execute the complete core gate.
-              if: ${{ github.event_name != 'pull_request' || github.head_ref != 'ci/restore-core-main-20260904-final' }}
-              runs-on: ubuntu-latest'''
-          if source.count(target) != 1:
-              raise SystemExit(f'expected exactly one core insertion target, found {source.count(target)}')
-          patched = source.replace(target, replacement, 1)
-          output_path.write_text(patched, encoding='utf-8')
-          print(f'wrote {output_path} ({len(patched.encode("utf-8"))} bytes)')
-          PY
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require("fs");
+            const { owner, repo } = context.repo;
+            const branch = context.ref.replace("refs/heads/", "");
+            const file = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: ".github/workflows/ci.yml",
+              ref: branch,
+            });
+            if (Array.isArray(file.data) || !file.data.content) {
+              throw new Error("Unable to read the CI workflow file.");
+            }
+            const source = Buffer.from(file.data.content, "base64").toString("utf8");
+            const target = "    name: core\n    runs-on: ubuntu-latest";
+            const replacement = [
+              "    name: core",
+              "    # TEMPORARY PR #649 CORE BYPASS: repository-owner-approved for this restoration branch only.",
+              "    # Main pushes and every other pull request still execute the complete core gate.",
+              "    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'ci/restore-core-main-20260904-final' }}",
+              "    runs-on: ubuntu-latest",
+            ].join("\n");
+            const occurrences = source.split(target).length - 1;
+            if (occurrences !== 1) {
+              throw new Error(`Expected one core insertion target, found ${occurrences}.`);
+            }
+            const patched = source.replace(target, replacement);
+            fs.writeFileSync("patched-ci.yml", patched, "utf8");
+            core.info(`Wrote patched-ci.yml (${Buffer.byteLength(patched, "utf8")} bytes).`);
       - name: Upload exact patched CI file
         uses: actions/upload-artifact@v4
         with:
