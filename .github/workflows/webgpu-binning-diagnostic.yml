@@ -1,0 +1,93 @@
+name: WebGPU binning diagnostic
+
+on:
+  push:
+    branches:
+      - fix/webgpu-dab-binning-real-gpu-20260904
+    paths:
+      - ".github/workflows/webgpu-binning-diagnostic.yml"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-binning-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Instrument scoped errors in the runner checkout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts")
+          source = path.read_text()
+          old = '''      if (errors.some((error) => error !== null)) {
+                this.#failed = true;
+                return Object.freeze({ status: "failed", reason: "gpu-error" });
+              }'''
+          new = '''      const scopedMessages = errors
+                .filter((error): error is GPUError => error !== null)
+                .map((error) => error.message);
+              if (scopedMessages.length > 0) {
+                console.error("[binning-compute-scoped]", JSON.stringify(scopedMessages));
+                this.#failed = true;
+                return Object.freeze({ status: "failed", reason: "gpu-error" });
+              }'''
+          if old not in source:
+              raise SystemExit("scoped-error block not found")
+          source = source.replace(old, new, 1)
+          old = '''    } catch {
+                while (errorScopeDepth > 0) {
+                  try {
+                    await this.#device.popErrorScope();
+                  } catch {
+                    // The runtime fails closed below.
+                  }
+                  errorScopeDepth -= 1;
+                }'''
+          new = '''    } catch (error) {
+                console.error(
+                  "[binning-compute-exception]",
+                  error instanceof Error ? error.stack ?? error.message : String(error),
+                );
+                while (errorScopeDepth > 0) {
+                  try {
+                    const scoped = await this.#device.popErrorScope();
+                    if (scoped) {
+                      console.error("[binning-compute-catch-scope]", scoped.message);
+                    }
+                  } catch (scopeError) {
+                    console.error(
+                      "[binning-compute-pop-error]",
+                      scopeError instanceof Error ? scopeError.message : String(scopeError),
+                    );
+                  }
+                  errorScopeDepth -= 1;
+                }'''
+          if old not in source:
+              raise SystemExit("catch block not found")
+          path.write_text(source.replace(old, new, 1))
+          PY
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run exact compute verifier with diagnostics
+        env:
+          TOONSPECTRUM_WEBGPU_HEADED: "1"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec node scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs
