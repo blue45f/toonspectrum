@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createStudioGpuSparseBrushAtlasRuntime,
   STUDIO_GPU_SPARSE_BRUSH_ATLAS_USAGE,
+  type StudioGpuSparseBrushAtlasRuntimeOptions,
 } from "./studio-webgpu-sparse-brush-atlas-runtime";
 
 interface Deferred<Value> {
@@ -47,7 +48,7 @@ function fakeDevice() {
 
 function runtime(
   gpu: ReturnType<typeof fakeDevice>,
-  overrides: Record<string, unknown> = {},
+  overrides: Partial<Omit<StudioGpuSparseBrushAtlasRuntimeOptions, "device">> = {},
 ) {
   const created = createStudioGpuSparseBrushAtlasRuntime({
     device: gpu.device,
@@ -135,10 +136,11 @@ describe("Studio WebGPU sparse brush atlas runtime", () => {
     });
     expect(prepared.status).toBe("prepared");
     if (prepared.status !== "prepared") return;
+    // Logical tile 1:0 is the only resident tile, so sparse allocation places it in physical slot 0.
     expect(prepared.frame.tiles[0]).toMatchObject({
       logicalTileId: "1:0",
       contentRect: {
-        x: 134,
+        x: 2,
         y: 2,
         width: 52,
         height: 80,
