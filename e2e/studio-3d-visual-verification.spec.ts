@@ -284,7 +284,28 @@ async function forceBg3dWebGpu(page: Page): Promise<void> {
     await webgpuPreference.click();
   }
   await expect(webgpuPreference).toHaveAttribute("aria-pressed", "true");
-  await expect(backend).toContainText("WebGPU", { timeout: 120_000 });
+
+  // The badge reads `${activeLabel} ${status}` (StudioBg3dEnginePanel), so "WebGPU 사용 불가" and
+  // "WebGPU 실행 실패" both *contain* "WebGPU". Asserting containment let an unmounted viewport
+  // through: whenever plan.status !== "available" the viewport renders the
+  // studio-bg3d-engine-unavailable alert INSTEAD of <Canvas>, so there is no renderer, no
+  // TransformControls and no rotation ring — and every drag then reads 0,0,0, which this suite
+  // reported as "회전 링이 pointer hit를 받지 못했습니다". That message named the symptom of a
+  // precondition that had already failed. Wait for the probe to settle, then split the two
+  // outcomes apart so each one says what actually happened.
+  await expect(page.locator('[data-testid="studio-bg3d-engine-probing"]'))
+    .toHaveCount(0, { timeout: 120_000 });
+
+  // Deliberately NOT a skip. Which branch CI actually lands in is still unproven — the runner does
+  // expose an adapter (the preceding console step logs a SwiftShader fallback one), so "the engine
+  // refused to mount" and "the engine mounted and the ring was missed" are both live explanations.
+  // Skipping on the first would turn the gate green without anyone having established which is true.
+  // Fail here instead, naming the engine's own words, and let the uploaded artifacts settle it.
+  await expect(page.locator('[data-testid="studio-bg3d-engine-unavailable"]'))
+    .toHaveCount(0, { timeout: 120_000 });
+  await expect(backend).toHaveText(/WebGPU 사용 중/, { timeout: 120_000 });
+  // A mounted canvas is what the rotation drag needs; the badge alone has been proven to lie.
+  await expect(page.locator(`${BG3D_VIEWPORT} canvas`).first()).toBeVisible({ timeout: 120_000 });
   await page.getByRole("tab", { name: "도형", exact: true }).click();
   await page.waitForTimeout(1_000);
 }

@@ -399,7 +399,23 @@ jobs:
       - name: Verify BG3D WebGPU TransformControls rotation frames do not accumulate
         # The defect exists only while the WebGPU compositor is live and the pointer is still down;
         # the ordinary headless WebGL2 visual suite cannot reproduce this interaction path.
+        #
+        # This gate has never once passed on a runner. The spec now asserts its own precondition —
+        # that WebGPU really mounted — so a failure names the engine's state instead of reporting it
+        # as a missed pointer hit, and the step below publishes the page state that produced it.
         run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-bg3d-webgpu-rotation
+      # Same reason the visual job publishes it: a CI-only e2e failure is undiagnosable without the
+      # page state that produced it. The rotation gate has failed on every runner it has ever run on
+      # and nobody could see why, because this job — unlike studio-3d-visual — kept no evidence.
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-3d-runtime-failure
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Verify BG3D next-generation engine capture parity and in-app browser policy
         # Renders one scene through both the WebGL2 and WebGPU capture adapters and fails if the
         # composited raster or the depth samples diverge, then replays the page under KakaoTalk,
