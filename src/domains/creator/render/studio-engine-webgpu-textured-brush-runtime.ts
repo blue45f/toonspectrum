@@ -311,6 +311,11 @@ interface AssetTexture {
   readonly height: number;
 }
 
+interface CachedBindGroup {
+  readonly bindGroup: GPUBindGroup;
+  readonly assetKeys: readonly string[];
+}
+
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -847,9 +852,10 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   readonly #pipelines: Readonly<Record<"source-over" | "destination-out", GPURenderPipeline>>;
   readonly #bindGroupLayout: GPUBindGroupLayout;
   readonly #assetTextures = new Map<string, AssetTexture>();
-  readonly #bindGroups = new Map<string, GPUBindGroup>();
+  readonly #bindGroups = new Map<string, CachedBindGroup>();
   #instanceBuffer: GPUBuffer | null = null;
   #instanceCapacity = 0;
+  #instanceScratch: Float32Array | null = null;
   #residentAssetBytes = 0;
   #inFlight = 0;
   #lastRequestSequence = 0;
@@ -1028,13 +1034,78 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     return this.#instanceBuffer;
   }
 
+  #ensureInstanceScratch(dabCount: number): Float32Array {
+    const requiredFloats =
+      dabCount * STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS;
+    if (
+      this.#instanceScratch
+      && this.#instanceScratch.length >= requiredFloats
+    ) return this.#instanceScratch;
+    let capacity = Math.min(256, this.#maximumDabs);
+    while (capacity < dabCount) capacity = Math.min(this.#maximumDabs, capacity * 2);
+    this.#instanceScratch = new Float32Array(
+      capacity * STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS,
+    );
+    return this.#instanceScratch;
+  }
+
+  #touchAssetTexture(key: string, resource: AssetTexture): AssetTexture {
+    this.#assetTextures.delete(key);
+    this.#assetTextures.set(key, resource);
+    return resource;
+  }
+
+  #dropBindGroupsReferencingAsset(assetKey: string): void {
+    for (const [key, cached] of this.#bindGroups) {
+      if (cached.assetKeys.includes(assetKey)) this.#bindGroups.delete(key);
+    }
+  }
+
+  #reserveGenericAssetResidency(
+    requiredAdditionalBytes: number,
+    protectedKeys: ReadonlySet<string>,
+  ): boolean {
+    if (
+      !Number.isSafeInteger(requiredAdditionalBytes)
+      || requiredAdditionalBytes < 0
+      || requiredAdditionalBytes > this.#maximumResidentAssetBytes
+    ) return false;
+    const fits = () => (
+      this.#residentAssetBytes + requiredAdditionalBytes
+      <= this.#maximumResidentAssetBytes
+    );
+    if (fits()) return true;
+    /*
+     * Bind groups capture texture views. Reclaim generic textures only while no execution can
+     * still reference them; sequential long-session brush switches can then make progress without
+     * invalidating submitted or queued GPU work.
+     */
+    if (this.#inFlight !== 0) return false;
+    for (const [key, resource] of this.#assetTextures) {
+      if (resource.role === "dummy-grain" || protectedKeys.has(key)) continue;
+      this.#assetTextures.delete(key);
+      this.#dropBindGroupsReferencingAsset(key);
+      try {
+        resource.texture.destroy();
+      } catch {
+        // Device loss may retire a resource concurrently; logical residency is still released.
+      }
+      this.#residentAssetBytes = Math.max(
+        0,
+        this.#residentAssetBytes - resource.byteLength,
+      );
+      if (fits()) return true;
+    }
+    return fits();
+  }
+
   #uploadAsset(
     asset: StudioEngineWebGpuTexturedBrushResolvedAsset,
     role: "tip" | "grain",
   ): AssetTexture {
     const key = assetTextureIdentity(asset, role);
     const cached = this.#assetTextures.get(key);
-    if (cached) return cached;
+    if (cached) return this.#touchAssetTexture(key, cached);
     if (this.#residentAssetBytes + asset.byteLength > this.#maximumResidentAssetBytes) {
       throw new RangeError("resident-asset-budget");
     }
@@ -1113,13 +1184,15 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     const grainKey = nativeR8Grain
       ? `durable-r8:${nativeR8Grain.sourceKey}`
       : grain!.key;
-    const key = `${batch.key}|${tip.key}|${grainKey}`;
+    // Bind groups depend only on captured GPU resources. A plan-local diagnostic batch key or
+    // Porter-Duff pipeline change must not duplicate an otherwise identical texture binding.
+    const key = `${tip.key}|${grainKey}`;
     // A durable lease can be released and its LRU texture evicted immediately after the queue
     // fence. Never retain a bind group that could outlive that texture. Generic runtime-owned
     // textures share this runtime's lifetime and remain safe to cache.
     if (!nativeR8Grain) {
       const cached = this.#bindGroups.get(key);
-      if (cached) return cached;
+      if (cached) return cached.bindGroup;
     }
     const bindGroup = this.#device.createBindGroup({
       label: `Studio textured brush batch ${batch.key}`,
@@ -1132,7 +1205,12 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
         { binding: 4, resource: { buffer: this.#uniformBuffer } },
       ],
     });
-    if (!nativeR8Grain) this.#bindGroups.set(key, bindGroup);
+    if (!nativeR8Grain) {
+      this.#bindGroups.set(key, {
+        bindGroup,
+        assetKeys: [tip.key, grain!.key],
+      });
+    }
     return bindGroup;
   }
 
@@ -1198,20 +1276,26 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       && frame.plan.grain?.kind === "asset-r8-repeat"
       ? frame.plan.grain.assetIndex
       : null;
-    const uncachedBytes = frame.plan.assets.reduce((total, asset) => {
+    const protectedGenericAssetKeys = new Set<string>();
+    const uncachedGenericAssets = new Map<string, number>();
+    for (const asset of frame.plan.assets) {
       // A durable R8 asset is resident in the strict native cache, never duplicated in the
       // generic textured-asset cache.
-      if (asset.assetIndex === nativeR8AssetIndex) return total;
-      const role = asset.role;
-      return total + (
-        this.#assetTextures.has(assetTextureIdentity(asset, role))
-          ? 0
-          : asset.byteLength
-      );
-    }, 0);
-    if (
-      this.#residentAssetBytes + uncachedBytes > this.#maximumResidentAssetBytes
-    ) {
+      if (asset.assetIndex === nativeR8AssetIndex) continue;
+      const key = assetTextureIdentity(asset, asset.role);
+      protectedGenericAssetKeys.add(key);
+      if (!this.#assetTextures.has(key) && !uncachedGenericAssets.has(key)) {
+        uncachedGenericAssets.set(key, asset.byteLength);
+      }
+    }
+    const uncachedBytes = Array.from(uncachedGenericAssets.values()).reduce(
+      (total, byteLength) => total + byteLength,
+      0,
+    );
+    if (!this.#reserveGenericAssetResidency(
+      uncachedBytes,
+      protectedGenericAssetKeys,
+    )) {
       return Object.freeze({ status: "rejected", reason: "resident-asset-budget" });
     }
     const nativeResidentBudget = Math.max(
@@ -1365,7 +1449,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       const instanceBuffer = this.#ensureInstanceBuffer(frame.plan.dabs.length);
       const packed = packStudioEngineWebGpuTexturedBrushDabs(
         frame.plan,
-        undefined,
+        this.#ensureInstanceScratch(frame.plan.dabs.length),
         nativeR8GrainLease ?? undefined,
       );
       this.#device.queue.writeBuffer(instanceBuffer, 0, packed);
@@ -1511,6 +1595,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     this.#privateContentInitialized = false;
     this.#privateContentFingerprint = null;
     this.#instanceBuffer?.destroy();
+    this.#instanceScratch = null;
     this.#uniformBuffer.destroy();
     this.#surfaceTexture?.destroy();
     for (const resource of this.#assetTextures.values()) resource.texture.destroy();
