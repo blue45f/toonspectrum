@@ -1,7 +1,8 @@
 import type { StudioFloatingSurfaceRect } from "./studio-floating-surface";
 
-export const STUDIO_FLOATING_SURFACE_Z_INDEX_BASE = 72;
-export const STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT = 980;
+export const STUDIO_FLOATING_SURFACE_Z_INDEX_BASE = 70;
+/** Persistent panels must remain below the Studio modal tier (z=80). */
+export const STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT = 79;
 
 export interface StudioFloatingSurfaceRegistryEntry {
   readonly id: string;
@@ -50,12 +51,37 @@ export function createStudioFloatingSurfaceRegistry(): StudioFloatingSurfaceRegi
     const ordered = [...entries.values()].sort((left, right) => (
       left.zIndex - right.zIndex || left.id.localeCompare(right.id)
     ));
-    sequence = STUDIO_FLOATING_SURFACE_Z_INDEX_BASE;
-    for (const entry of ordered) {
-      sequence += 1;
-      entry.zIndex = sequence;
-      entry.onZIndexChange(sequence);
+    // Reserve the highest slot for the interaction that triggered compaction. When more panels
+    // are mounted than the numeric band can represent, only the oldest panels share the bottom
+    // slot; the newest/active ordering remains distinct and no persistent panel crosses z=79.
+    const distinctSlots = Math.max(
+      1,
+      STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT
+        - STUDIO_FLOATING_SURFACE_Z_INDEX_BASE
+        - 1,
+    );
+    const duplicateBottomCount = Math.max(
+      0,
+      ordered.length - distinctSlots,
+    );
+    for (let index = 0; index < ordered.length; index += 1) {
+      const entry = ordered[index]!;
+      const zIndex = STUDIO_FLOATING_SURFACE_Z_INDEX_BASE
+        + 1
+        + Math.max(0, index - duplicateBottomCount);
+      entry.zIndex = Math.min(
+        STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT - 1,
+        zIndex,
+      );
+      entry.onZIndexChange(entry.zIndex);
     }
+    sequence = ordered.length === 0
+      ? STUDIO_FLOATING_SURFACE_Z_INDEX_BASE
+      : Math.min(
+          STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT - 1,
+          STUDIO_FLOATING_SURFACE_Z_INDEX_BASE
+            + Math.min(distinctSlots, ordered.length),
+        );
   };
 
   const nextZIndex = (): number => {

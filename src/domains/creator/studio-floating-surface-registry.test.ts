@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createStudioFloatingSurfaceRegistry,
   STUDIO_FLOATING_SURFACE_Z_INDEX_BASE,
+  STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT,
 } from "./studio-floating-surface-registry";
 
 afterEach(() => {
@@ -65,6 +66,32 @@ describe("studio floating surface registry", () => {
 
     unregisterFirst();
     expect(registry.size()).toBe(1);
+  });
+
+  it("compacts repeated focus changes below the modal z-index tier", () => {
+    const registry = createStudioFloatingSurfaceRegistry();
+    const observed: number[] = [];
+    registry.register({
+      id: "first",
+      node: surface(10, 10),
+      onZIndexChange: (value) => observed.push(value),
+    });
+    registry.register({
+      id: "second",
+      node: surface(320, 10),
+      onZIndexChange: (value) => observed.push(value),
+    });
+
+    for (let index = 0; index < 64; index += 1) {
+      registry.activate(index % 2 === 0 ? "first" : "second");
+    }
+
+    expect(Math.max(...observed)).toBeLessThanOrEqual(
+      STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT,
+    );
+    expect(registry.activate("first")).toBeLessThanOrEqual(
+      STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT,
+    );
   });
 
   it("returns only mounted visible peer rectangles", () => {
