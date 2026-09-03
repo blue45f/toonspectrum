@@ -1,0 +1,82 @@
+name: Bootstrap Blender character quality pipeline
+
+on:
+  push:
+    branches:
+      - feat/blender-character-quality-pipeline-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-blender-character-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[blender-character-pipeline-applied]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/blender-character-quality-pipeline-20260904
+          fetch-depth: 0
+
+      - name: Apply deterministic pipeline payload
+        run: python3 scripts/bootstrap-blender-character-pipeline.py
+
+      - name: Inspect payload diff
+        run: git diff --check && git status --short
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate repository architecture
+        run: pnpm run validate:architecture
+
+      - name: Run pure pipeline contracts
+        run: |
+          python3 -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
+          python3 -m unittest discover -s tests/blender -p 'test_*.py' -v
+          node scripts/verify-blender-character-pipeline.mjs
+
+      - name: Lint package integration
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/import-blender-character-package.mts
+          scripts/setup-toonstudio-blender-pipeline.mts
+          scripts/verify-blender-character-pipeline.mjs
+          src/domains/creator/vrm/studio-vrm-blender-character-package.ts
+          src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+
+      - name: Test package admission and type-check
+        run: |
+          pnpm exec vitest run src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Commit verified implementation
+        run: |
+          rm -f scripts/bootstrap-blender-character-pipeline.py
+          rm -f scripts/.blender-character-pipeline.part*
+          rm -f .github/workflows/bootstrap-blender-character-pipeline.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(studio): add Blender character quality pipeline [blender-character-pipeline-applied]"
+          git push --no-verify origin HEAD:feat/blender-character-quality-pipeline-20260904
