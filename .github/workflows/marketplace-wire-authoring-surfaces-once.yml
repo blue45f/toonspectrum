@@ -1,0 +1,87 @@
+name: Wire marketplace authoring surfaces once
+
+on:
+  push:
+    branches:
+      - fix/marketplace-wire-authoring-surfaces-20260903
+    paths:
+      - ".github/workflows/marketplace-wire-authoring-surfaces-once.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-wire-authoring-surfaces-once
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  patch-verify-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/marketplace-wire-authoring-surfaces-20260903
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Materialize the two missing product connections
+        run: node scripts/marketplace/integrate-creator-authoring.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize and verify the product patch
+        run: |
+          pnpm exec eslint --fix \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx
+          pnpm exec vitest run \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run build
+          git diff --check
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify desktop, mobile and in-app authoring paths
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line
+          --trace=retain-on-failure
+
+      - name: Commit only the verified product wiring
+        run: |
+          set -euo pipefail
+          rm -f marketplace-authoring-integration-report.json
+          rm -f .github/workflows/marketplace-wire-authoring-surfaces-once.yml
+          git add \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx \
+            .github/workflows/marketplace-wire-authoring-surfaces-once.yml
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(marketplace): wire authoring workshop and Brush Studio bridge"
+          git push origin HEAD:fix/marketplace-wire-authoring-surfaces-20260903
