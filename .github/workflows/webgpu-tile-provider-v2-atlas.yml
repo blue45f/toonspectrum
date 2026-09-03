@@ -3,7 +3,7 @@ name: WebGPU tile provider V2 atlas
 on:
   push:
     branches:
-      - feat/webgpu-tile-provider-v2-atlas-20260904
+      - feat/webgpu-tile-provider-v2-atlas-clean-20260904
     paths:
       - "src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.ts"
       - "src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.test.ts"
