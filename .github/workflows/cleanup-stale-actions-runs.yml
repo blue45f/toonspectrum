@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
+    # Queue repair does not depend on Linux, containers, or repository checkout. Use the separate
+    # macOS runner pool so a saturated Ubuntu CI backlog cannot prevent stale-run cancellation.
+    runs-on: macos-latest
     timeout-minutes: 10
     steps:
       - name: Cancel runs whose commit is no longer a live branch or PR head
