@@ -222,19 +222,19 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                       ? "crosshair"
                       : texturePaintSettings.tool === "fill"
                         ? "cell"
-                        : undefined
+                        : "crosshair"
                     : undefined,
                 }}
               >
                 <p id={viewportInstructionsId} className="sr-only">
                   {texturePaintModeSelected
-                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. ColorDrop으로 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 baseColor 색상을 가져오며, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요. 검증된 3D 표면 브러시 엔진이 연결될 때까지 브러시 그리기는 사용할 수 없습니다."
+                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. B로 직접 그리기, F로 ColorDrop, I로 스포이드를 선택합니다. 직접 그리기는 검증된 round 촉으로 UV 경계를 안전하게 나누고, 한 번의 제스처를 하나의 실행 취소 단계로 저장합니다."
                     : "3D 캐릭터 편집 뷰포트입니다. 포인터로 끌어 캐릭터를 회전하고, 휠·핀치 또는 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."}
                 </p>
                 <Canvas
                   role="group"
                   tabIndex={0}
-                  aria-keyshortcuts="F I"
+                  aria-keyshortcuts="B F I"
                   aria-label={
                     texturePaintModeSelected
                       ? "3D 캐릭터 표면 페인트 뷰포트"
@@ -255,6 +255,13 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                     if (key === "i") {
                       event.preventDefault();
                       setTexturePaintEyedropperActive((active: boolean) => !active);
+                    } else if (key === "b") {
+                      event.preventDefault();
+                      setTexturePaintEyedropperActive(false);
+                      setTexturePaintSettings((current: StudioVrmTexturePaintPanelSettings) => ({
+                        ...current,
+                        tool: "surface-brush",
+                      }));
                     } else if (key === "f") {
                       event.preventDefault();
                       setTexturePaintEyedropperActive(false);

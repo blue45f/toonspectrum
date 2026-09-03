@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-
 import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 
 const poserSource = readStudioVrmPoserImplementationSource();
@@ -22,23 +21,37 @@ const panelSource = readFileSync(
   "utf8",
 );
 
+function between(source: string, startToken: string, endToken: string): string {
+  const start = source.indexOf(startToken);
+  const end = source.indexOf(endToken, start + startToken.length);
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
 describe("VRM V12 surface-paint product boundary", () => {
-  it("keeps the internal surface tool quarantined from the strict product pointer path", () => {
-    const begin = poserSource.slice(
-      poserSource.indexOf("const beginTexturePaint ="),
-      poserSource.indexOf("const moveTexturePaint ="),
+  it("wires the admitted round surface tool into the strict product pointer path", () => {
+    const begin = between(
+      poserSource,
+      "const beginTexturePaint =",
+      "const moveTexturePaint =",
     );
 
     expect(poserSource).toContain('from "./studio-vrm-surface-paint-tool"');
     expect(poserSource).toContain("createStudioVrmSurfacePaintTool({");
     expect(begin).toContain("isStudioVrmTexturePaintBrushProductBlocked(settings.tool)");
-    expect(begin).not.toContain("texturePaintSurfaceTool.begin({");
+    expect(begin).toContain('settings.tool !== "surface-brush"');
+    expect(begin).toContain("texturePaintSurfaceTool.begin({");
     expect(begin).not.toContain("runtime.beginStroke({");
-    expect(poserSource).toContain('tool: "fill"');
+    expect(begin).toContain("sizeCssPixels: settings.sizeTexels");
+    expect(begin).toContain("flow: settings.tuning.flow");
+    expect(begin).toContain('studioVrmSurfacePaintPointerSample(');
+    expect(begin).toContain("texturePaintSurfacePointerIdRef.current = event.pointerId");
+    expect(begin).toContain("captureTarget.setPointerCapture(event.pointerId)");
     expect(poserSource).toContain("onPointerDown={beginTexturePaint}");
     expect(poserSource).toContain("onPointerMove={moveTexturePaint}");
     expect(poserSource).toContain("onPointerUp={finishTexturePaint}");
-    expect(panelSource).not.toContain('onSettingsChange({ tool: "surface-brush" })');
+    expect(panelSource).toContain('onSettingsChange({ tool: "surface-brush" })');
     expect(panelSource).not.toContain('onSettingsChange({ tool: "brush" })');
     expect(pageSource).not.toContain("studio-vrm-surface-paint-tool");
   });
@@ -63,7 +76,7 @@ describe("VRM V12 surface-paint product boundary", () => {
     expect(adapterSource).toContain("commitSurfaceBrushSession(this.session");
   });
 
-  it("fails closed without selecting a round-tip or alternate brush for the same operation", () => {
+  it("fails closed without selecting an alternate brush for the same operation", () => {
     expect(toolSource).not.toContain('fallback: "round-tip"');
     expect(toolSource).not.toContain('route: "round-tip-fallback"');
     expect(toolSource).not.toContain("호환 라운드 브러시로 처리합니다");
@@ -88,18 +101,20 @@ describe("VRM V12 surface-paint product boundary", () => {
     expect(poserSource).toContain("studioVrmSurfacePaintWorldUnitsPerCssPixel(");
   });
 
-  it("shows one honest Korean unavailable state without adding an interactive readback", () => {
-    expect(panelSource).toContain("표면 브러시 준비 중");
+  it("publishes an honest capability note without interactive readback", () => {
+    expect(panelSource).toContain("직접 그리기 지원 범위");
     expect(panelSource).toContain("surfaceBrushUnavailableReason");
-    expect(poserSource).toContain("검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아");
-    expect(poserSource).toContain("자체 라운드 촉으로 대체하지 않으며");
-    expect(poserSource).toContain("ColorDrop과 스포이드를 사용할 수 있습니다");
-    expect(panelSource).toContain("disabled\n            aria-disabled=\"true\"");
-    expect(panelSource).not.toContain("호환 폴백");
+    expect(panelSource).toContain('data-testid="vrm-surface-brush-controls"');
+    expect(poserSource).toContain("검증된 round 촉 기반 3D 표면 브러시입니다");
+    expect(poserSource).toContain("stamp/image 촉과 wet/smudge 혼색은 아직 지원하지 않습니다");
+    expect(poserSource).toContain('return tool === "brush"');
+    expect(panelSource).not.toContain('onSettingsChange({ tool: "brush" })');
     expect(toolSource).toContain('code: "memory"');
     expect(toolSource).toContain('code: "upload"');
     expect(toolSource).toContain('deviceFailure ? "device-failure" : null');
-    expect(`${poserSource}\n${toolSource}\n${adapterSource}`).not.toMatch(
+    expect(`${poserSource}
+${toolSource}
+${adapterSource}`).not.toMatch(
       /\breadPixels\s*\(|\bgetImageData\s*\(/u,
     );
   });
