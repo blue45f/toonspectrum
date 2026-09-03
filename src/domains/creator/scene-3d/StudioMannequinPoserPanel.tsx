@@ -101,6 +101,10 @@ import {
   type StudioMannequinPoseLandmarker,
   type StudioMannequinWebcamErrorStage,
 } from "./studio-mannequin-webcam-tracking";
+import {
+  buildShaperLayeredPsd,
+  type ShaperPresetSelection,
+} from "./studio-shaper-model";
 import { StudioShaperPanel } from "./StudioShaperPanel";
 
 import type { ReactElement } from "react";
@@ -1302,6 +1306,105 @@ export function StudioMannequinPoserPanel({
     setError(null);
   }, [commitPose, photoPoseUndoEntry]);
 
+  const handleShaperSelectionChange = useCallback((sel: ShaperPresetSelection) => {
+    let nextParams = { ...params };
+    if (sel.body === "body-chibi") {
+      nextParams = { ...nextParams, headCount: 3.5, heightCm: 120, shoulderWidth: 0.8, pelvisWidth: 0.8 };
+    } else if (sel.body === "body-tall") {
+      nextParams = { ...nextParams, headCount: 8.5, heightCm: 188, shoulderWidth: 1.15, legLength: 1.15 };
+    } else if (sel.body === "body-muscular") {
+      nextParams = { ...nextParams, headCount: 7.8, heightCm: 184, shoulderWidth: 1.25, build: 2.5 };
+    } else if (sel.body === "body-slim-female") {
+      nextParams = { ...nextParams, headCount: 7.2, heightCm: 162, shoulderWidth: 0.92, pelvisWidth: 1.05, build: 0.8 };
+    } else if (sel.body === "body-slim-male") {
+      nextParams = { ...nextParams, headCount: 7.6, heightCm: 176, shoulderWidth: 1.08, pelvisWidth: 0.95, build: 0.9 };
+    }
+
+    if (sel.face === "face-sharp") {
+      nextParams = { ...nextParams, headMorphJawWidth: -0.6, headMorphChinLength: 0.5 };
+    } else if (sel.face === "face-round") {
+      nextParams = { ...nextParams, headMorphCheekVolume: 0.6, headMorphJawWidth: 0.4, headMorphChinLength: -0.4 };
+    } else if (sel.face === "face-square") {
+      nextParams = { ...nextParams, headMorphJawWidth: 0.7, headMorphChinLength: 0.2 };
+    } else if (sel.face === "face-chibi") {
+      nextParams = { ...nextParams, headMorphCheekVolume: 0.8, headMorphChinLength: -0.6 };
+    }
+    commitParams(nextParams);
+
+    if (sel.bodypose === "pose-run") {
+      applyPosePreset("dash");
+    } else if (sel.bodypose === "pose-sit") {
+      applyPosePreset("sit-chair");
+    } else if (sel.bodypose === "pose-hip") {
+      applyPosePreset("cross-arms");
+    }
+
+    if (sel.handpose) {
+      applyPosePreset(sel.handpose);
+    }
+  }, [applyPosePreset, commitParams, params]);
+
+  const handleExportPsdFromScene = useCallback(async () => {
+    const handle = sceneRef.current;
+    if (!handle) return;
+    try {
+      setCapturing(true);
+      const result = await handle.captureDataUrl(2);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = result.pngDataUrl;
+      });
+
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = result.width;
+      offCanvas.height = result.height;
+      const ctx = offCanvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, result.width, result.height);
+      const flat = new Uint8ClampedArray(imgData.data);
+
+      const lineArt = new Uint8ClampedArray(flat.length);
+      const w = result.width;
+      const h = result.height;
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = (y * w + x) * 4;
+          const a = flat[idx + 3];
+          const aRight = flat[(y * w + (x + 1)) * 4 + 3];
+          const aDown = flat[((y + 1) * w + x) * 4 + 3];
+          if (a > 30 && (aRight < 30 || aDown < 30)) {
+            lineArt[idx] = 20;
+            lineArt[idx + 1] = 20;
+            lineArt[idx + 2] = 20;
+            lineArt[idx + 3] = 255;
+          }
+        }
+      }
+
+      const psdBlob = buildShaperLayeredPsd({
+        width: result.width,
+        height: result.height,
+        flatColor: flat,
+        lineArt,
+      });
+
+      const url = URL.createObjectURL(psdBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `shaper-webtoon-${Date.now()}.psd`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(getErrorText(cause, "PSD 내보내기를 실패했습니다."));
+    } finally {
+      setCapturing(false);
+    }
+  }, []);
+
   const handleCapture = useCallback(() => {
     const handle = sceneRef.current;
     if (!handle || capturing) return;
@@ -1483,6 +1586,8 @@ export function StudioMannequinPoserPanel({
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {tab === "shaper" ? (
                 <StudioShaperPanel
+                  onSelectionChange={handleShaperSelectionChange}
+                  onExportPsd={handleExportPsdFromScene}
                   onTriggerPoseScanner={() => setTab("pose")}
                   onInsertCanvas={handleCapture}
                 />
