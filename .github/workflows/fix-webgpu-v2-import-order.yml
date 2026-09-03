@@ -37,13 +37,6 @@ jobs:
 
       - name: Normalize and verify V2 source
         run: |
-          pnpm exec prettier --write \
-            scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
-            scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
           pnpm exec eslint --fix \
             scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
             scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
