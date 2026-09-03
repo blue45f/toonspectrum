@@ -307,7 +307,7 @@ export class StudioGpuSparseTileAtlas {
       }));
     }
 
-    const token: StudioGpuSparseTileAtlasFrameToken = Object.freeze({
+    const token = Object.freeze<StudioGpuSparseTileAtlasFrameToken>({
       frameId,
       deviceGeneration: this.#deviceGeneration,
       [STUDIO_GPU_SPARSE_TILE_ATLAS_TOKEN]: true,
