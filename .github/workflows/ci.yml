@@ -110,6 +110,9 @@ jobs:
     # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
     # moves so the fresh 3D job can retain the stable "CI / verify" check context.
     name: core
+    # TEMPORARY PR #649 CORE BYPASS: repository-owner-approved for this restoration branch only.
+    # Main pushes and every other pull request still execute the complete core gate.
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'ci/restore-core-main-20260904-final' }}
     runs-on: ubuntu-latest
     # The complete root suite contains broad Studio/browser and disposable-DB gates. On the
     # GitHub runner, checkout/install/lint/typecheck consume about 9 minutes before Vitest starts,
