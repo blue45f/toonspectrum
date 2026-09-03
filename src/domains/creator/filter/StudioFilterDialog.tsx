@@ -94,6 +94,12 @@ type StudioFilterGalleryView =
   | "recent"
   | StudioFilterCatalogGroup;
 
+/**
+ * Must track the gallery grid's `grid-cols-2`: ArrowUp/ArrowDown move by exactly one visual row, so
+ * a column count that disagrees with the class silently makes vertical arrows jump the wrong rows.
+ */
+const STUDIO_FILTER_GALLERY_COLUMNS = 2;
+
 const STUDIO_FILTER_GALLERY_VIEWS: readonly {
   id: StudioFilterGalleryView;
   label: string;
@@ -508,6 +514,7 @@ export function StudioFilterDialog({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryQuery, setGalleryQuery] = useState("");
   const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
+  const [galleryFocusKind, setGalleryFocusKind] = useState<StudioFilterKind | null>(null);
   const [effectFavoriteState, setEffectFavoriteState] = useState(() =>
     rememberStudioEffectRecent(
       normalizeStudioEffectFavoriteState(),
@@ -543,6 +550,17 @@ export function StudioFilterDialog({
     galleryView,
     effectFavoriteState,
   );
+  /**
+   * The one card that carries the grid's tab stop. Search re-filters on every keystroke, so the
+   * remembered card disappears constantly — falling back to the active filter and then to the first
+   * result keeps the grid tabbable instead of stranding it with no reachable entry at all.
+   */
+  const rovingGalleryKind =
+    visibleGalleryItems.some((entry) => entry.kind === galleryFocusKind)
+      ? galleryFocusKind
+      : visibleGalleryItems.some((entry) => entry.kind === activeKind)
+        ? activeKind
+        : visibleGalleryItems[0]?.kind ?? null;
   const reportPreview = useEffectEvent(onPreview);
   // 미리보기가 켜져 있을 때 스크림에서 제외할 캔버스 영역(뷰포트 좌표). 측정 불가면 null → 통짜 스크림.
   const [previewCutout, setPreviewCutout] = useState<StudioFilterPreviewCutout | null>(null);
@@ -892,6 +910,7 @@ export function StudioFilterDialog({
       rememberStudioEffectRecent(current, studioFilterEffectId(nextKind)),
     );
     setGalleryOpen(false);
+    setGalleryFocusKind(nextKind);
     galleryPickPendingFocusRef.current = true;
     setGalleryPickAnnouncement(`${STUDIO_FILTER_LABELS[nextKind]} 필터로 바꿨습니다`);
   };
@@ -920,6 +939,39 @@ export function StudioFilterDialog({
       ?.querySelector<HTMLElement>(`[data-studio-filter-gallery-view="${next.id}"]`)
       ?.focus({ preventScroll: false });
   };
+  /**
+   * Arrow movement inside the card grid, so the gallery costs one tab stop instead of one per card.
+   * Left/Right wrap along reading order, matching the category radiogroup the artist just came from.
+   * Up/Down clamp instead: the grid scrolls, and wrapping ArrowDown off the bottom row would
+   * teleport the focus two dozen rows up rather than doing the harmless nothing a clamp does.
+   */
+  const moveGalleryCardWithKey = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    const lastIndex = visibleGalleryItems.length - 1;
+    if (lastIndex < 0) return;
+    const columns = STUDIO_FILTER_GALLERY_COLUMNS;
+    let nextIndex: number;
+    if (event.key === "ArrowRight") nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    else if (event.key === "ArrowLeft") nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    else if (event.key === "ArrowDown") nextIndex = Math.min(currentIndex + columns, lastIndex);
+    else if (event.key === "ArrowUp") nextIndex = Math.max(currentIndex - columns, 0);
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = lastIndex;
+    else return;
+    const next = visibleGalleryItems[nextIndex];
+    if (!next) return;
+    event.preventDefault();
+    setGalleryFocusKind(next.kind);
+    const nextCard = event.currentTarget
+      .closest("[data-studio-filter-gallery-grid]")
+      ?.querySelector<HTMLButtonElement>(`[data-studio-filter-gallery-card="${next.kind}"]`);
+    nextCard?.focus({ preventScroll: true });
+    // jsdom has no scrollIntoView; the optional call keeps the unit tests on the real handler.
+    nextCard?.scrollIntoView?.({ block: "nearest" });
+  };
+
   const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
     updateEffectFavoriteState((current) =>
       toggleStudioEffectFavorite(current, studioFilterEffectId(nextKind)),
@@ -1154,8 +1206,23 @@ export function StudioFilterDialog({
                   </p>
 
                   {visibleGalleryItems.length > 0 ? (
-                    <div className="grid max-h-[min(44dvh,24rem)] min-w-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
-                      {visibleGalleryItems.map((entry) => {
+                    <>
+                    {/*
+                      A group, not a listbox: an option may not own focusable descendants and every
+                      card owns its 즐겨찾기 toggle, so listbox semantics would either strand the star
+                      or produce an invalid tree. Roving tabindex gives the same one-stop behaviour.
+                    */}
+                    <p id="studio-filter-gallery-keys" className="sr-only">
+                      방향키로 필터 카드를 옮기고, Tab으로 즐겨찾기 버튼에 갑니다.
+                    </p>
+                    <div
+                      data-studio-filter-gallery-grid="true"
+                      role="group"
+                      aria-label="필터 카드"
+                      aria-describedby="studio-filter-gallery-keys"
+                      className="grid max-h-[min(44dvh,24rem)] min-w-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]"
+                    >
+                      {visibleGalleryItems.map((entry, entryIndex) => {
                         const selected = entry.kind === activeKind;
                         const favorite = isStudioEffectFavorite(
                           effectFavoriteState,
@@ -1177,6 +1244,10 @@ export function StudioFilterDialog({
                               type="button"
                               aria-pressed={selected}
                               aria-label={`${entryTitle} 필터 선택`}
+                              data-studio-filter-gallery-card={entry.kind}
+                              tabIndex={entry.kind === rovingGalleryKind ? 0 : -1}
+                              onFocus={() => setGalleryFocusKind(entry.kind)}
+                              onKeyDown={(event) => moveGalleryCardWithKey(event, entryIndex)}
                               onClick={() => selectGalleryFilter(entry.kind)}
                               className={cn(
                                 "block min-h-24 w-full min-w-0 p-1.5 text-left",
@@ -1206,6 +1277,11 @@ export function StudioFilterDialog({
                               // name too announced "즐겨찾기 해제, pressed" — the undo action
                               // described as already done.
                               aria-label={`${entryTitle} 즐겨찾기`}
+                              // One Tab from the card you are on; every other star is reached by
+                              // arrowing to its card first. No arrow handler here on purpose —
+                              // arrowing off a star would have to guess between the next card's star
+                              // and its select button, and buys nothing over that single Tab.
+                              tabIndex={entry.kind === rovingGalleryKind ? 0 : -1}
                               onClick={() => toggleGalleryFavorite(entry.kind)}
                               className={cn(
                                 "absolute right-1 top-1 grid size-11 place-items-center rounded-lg border border-white/20 bg-black/55 text-white shadow-sm hover:bg-black/75",
@@ -1220,6 +1296,7 @@ export function StudioFilterDialog({
                         );
                       })}
                     </div>
+                    </>
                   ) : (
                     <div
                       role="status"
