@@ -22,11 +22,13 @@ export interface EditorClientRuntimeUpdate<S> {
   readonly context: () => CommandContext;
 }
 
-export interface EditorClientRuntimeOptions<S>
-  extends Omit<EditorClientOptions<S>, "store" | "context"> {
+export type EditorClientRuntimeOptions<S> = Omit<
+  EditorClientOptions<S>,
+  "store" | "context"
+> & {
   readonly initialSnapshot: S;
   readonly initialContext: () => CommandContext;
-}
+};
 
 export interface EditorClientRuntime<S> {
   readonly client: EditorClient<S>;
