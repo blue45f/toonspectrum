@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+id = "toonstudio_character_pipeline"
+version = "1.0.0"
+name = "ToonStudio Character Pipeline"
+tagline = "Build validated toon characters for ToonStudio"
+maintainer = "ToonSpectrum"
+type = "add-on"
+website = "https://github.com/blue45f/toonspectrum"
+tags = ["3D View", "Import-Export", "Modeling"]
+blender_version_min = "5.2.0"
+license = ["SPDX:MIT"]
+
+[permissions]
+files = "Read sources and write local character packages and previews"
