@@ -37,11 +37,14 @@ describe("Shaper-inspired character workshop product boundary", () => {
     expect(pose).toContain("replacePreviewUrl(null)");
   });
 
-  it("adds a toon silhouette without mutating source hair geometry", () => {
+  it("adds a merged authored toon silhouette without mutating source hair geometry", () => {
     expect(renderer).toContain("new THREE.MeshToonMaterial");
     expect(renderer).toContain("new THREE.MeshBasicMaterial");
     expect(renderer).toContain("THREE.BackSide");
-    expect(renderer).toContain("multiplyScalar(1.026)");
+    expect(renderer).toContain("createExpandedOutlineGeometry");
+    expect(renderer).toContain("normal.getX(index) * thickness");
+    expect(renderer).toContain("ToonSpectrumAvatarForgeHair_AuthoredMerged");
+    expect(renderer).toContain("mergeStudioVrmAuthoredHairGeometry(");
     expect(dialog).toContain("max-w-[1480px]");
     expect(dialog).toContain("_460px");
   });
