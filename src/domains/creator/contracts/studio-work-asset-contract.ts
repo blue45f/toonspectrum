@@ -343,6 +343,7 @@ export const StudioWorkAssetBorderEffectSchema = z
     color: z.string().min(1).max(48),
     type: z.enum(STUDIO_WORK_ASSET_BORDER_EFFECT_TYPES),
     antiAliased: z.boolean().optional(),
+    respectTransparency: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, context) => {
