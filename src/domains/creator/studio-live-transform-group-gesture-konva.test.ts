@@ -229,12 +229,21 @@ describe("beginStudioKonvaGroupDrawTransformGesture", () => {
     expect(begin().gesture).not.toBeNull();
   });
 
-  it("refuses a rotated frame, which the group commit cannot express", () => {
+  it("previews a rotated frame with what the rotating commit will produce", () => {
     const { gesture, store, clock } = begin();
     gesture!.offer({ targetBounds: frame.targetBounds, rotationDeg: 30 });
     clock.flush();
-    expect(store.getSnapshot()).toBeNull();
-    expect(scene.wrappers.get(first.id)!.visible()).toBe(true);
+    const expected = planStudioGroupUniformResizeSelection({
+      items: [first, second],
+      selectedIds: [first.id, second.id],
+      sourceBounds,
+      targetBounds: frame.targetBounds,
+      rotationDeg: 30,
+      isLocked: () => false,
+    });
+    expect(expected).not.toBeNull();
+    expect((store.getSnapshot()?.entries ?? []).map((entry) => entry.element)).toEqual(expected);
+    expect(scene.wrappers.get(first.id)!.visible()).toBe(false);
     gesture!.close({ kind: "cancel", reason: "escape" });
   });
 

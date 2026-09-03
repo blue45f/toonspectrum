@@ -113,8 +113,12 @@ async function installCollectors(page: Page, sink: Event[], state: { cycle: numb
         if (adapter && adapter.requestDevice) {
           const requestDevice = adapter.requestDevice.bind(adapter);
           adapter.requestDevice = async (...deviceArgs) => {
+            // Tag every device with the app frame that asked for it: a runtime that destroys its
+            // own short-lived device also reports "lost: destroyed", so the creator is the only
+            // way to tell a benign teardown from a long-lived engine losing its device mid-stroke.
+            const creator = String(new Error().stack || "").split("\n").slice(2, 5).map((line) => line.trim().replace(/^at /, "")).join(" < ");
             const device = await requestDevice(...deviceArgs);
-            if (device && device.lost) device.lost.then((info) => push("gpu", "device lost: " + info.reason + " — " + info.message));
+            if (device && device.lost) device.lost.then((info) => push("gpu", "device lost: " + info.reason + " — " + info.message + " [created by " + creator + "]"));
             if (device && device.addEventListener) device.addEventListener("uncapturederror", (event) => push("gpu", "uncaptured: " + ((event.error && event.error.message) || "?")));
             return device;
           };

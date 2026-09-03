@@ -1,15 +1,36 @@
 /**
- * Atomic, model-aware uniform resize for a Studio group/multi-selection.
+ * Atomic, model-aware uniform resize and rotation for a Studio group/multi-selection.
  *
  * This is deliberately narrower than a general affine transform:
- * - positive, axis-aligned, uniform corner resize only;
- * - no reflection, rotation, or non-uniform scale;
+ * - positive, uniform scale only -- no reflection, no non-uniform scale;
+ * - rotation about the target box origin, admitted ONLY when every member can absorb it;
  * - every selected member is validated and transformed before any result is exposed.
+ *
+ * The frame is the same decomposition the single-stroke planner uses,
+ * `translate(target) . rotate(theta) . scale . translate(-source)`, under which the source box's
+ * ORIGIN maps to the target origin for every theta. That matters for the box elements: each is
+ * drawn at its own `(x, y)` and rotated about that point with no Konva offset, so composing the
+ * gesture angle is exactly "move the origin through the affine, add theta to the stored rotation".
+ * Uniform scale commutes with rotation, which is what makes that composition exact rather than
+ * approximate -- and is the reason non-uniform scale stays refused.
+ *
+ * Rotation is all-or-nothing across the selection. A member that cannot represent an angle -- a
+ * `frame`, whose panel geometry is axis-aligned, or a bounds-derived draw shape, which the
+ * renderer rebuilds from its point bounding box -- makes the WHOLE plan refuse rather than
+ * silently leaving that member upright while its neighbours turn. Tearing a selection is the one
+ * outcome a group planner must never produce; the single-stroke planner can afford to drop a
+ * rotation because there is nothing left behind to disagree with.
  *
  * A failure returns a fresh outer array containing the original element references. Callers can
  * therefore detect an applied resize with the same reference comparison used by the group
  * translation planner, while unsupported/invalid input can never tear a mixed group.
  */
+import {
+  planStudioDrawObjectTransformWithBounds,
+  studioDrawHasEffectivePerSampleOrientation,
+  studioDrawObjectRotationIsDropped,
+} from "./brush/studio-draw-object-transform";
+import { SHAPE_PARAM_RANGES } from "./brush/studio-stroke-shapes";
 import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./lettering/studio-bubble-text-fit";
 
 import type { BubbleTailSpec } from "./lettering/studio-bubble-path";
@@ -38,6 +59,11 @@ export interface StudioGroupUniformResizeInput {
    * policies until the editor exposes a separate "scale effects" contract.
    */
   readonly strokeWidthPolicy?: StudioGroupUniformResizeStrokeWidthPolicy;
+  /**
+   * Clockwise degrees about the TARGET box origin, the same convention the single-stroke planner
+   * and Konva's `rotation` both use. Omitted or zero keeps the pure resize contract unchanged.
+   */
+  readonly rotationDeg?: number;
 }
 
 const UNIFORM_SCALE_RELATIVE_EPSILON = 1e-6;
@@ -184,16 +210,40 @@ function scaleOptionalFiniteForStrokePolicy(
   return scaleFiniteForStrokePolicy(value, scale, policy);
 }
 
+/**
+ * `translate(target) . rotate(theta) . scale . translate(-source)` applied to one document point.
+ *
+ * At theta = 0 this reduces to the original scale-and-translate exactly (cos 1, sin 0), so the
+ * pure-resize path is unchanged rather than merely equivalent.
+ */
 function transformPosition(
   x: number,
   y: number,
   source: StudioGroupUniformResizeBounds,
   target: StudioGroupUniformResizeBounds,
-  scale: number
+  scale: number,
+  cos = 1,
+  sin = 0
 ): { x: number; y: number } | null {
-  const nextX = target.x + (x - source.x) * scale;
-  const nextY = target.y + (y - source.y) * scale;
+  const u = (x - source.x) * scale;
+  const v = (y - source.y) * scale;
+  const nextX = target.x + u * cos - v * sin;
+  const nextY = target.y + u * sin + v * cos;
   return finite(nextX) && finite(nextY) ? { x: nextX, y: nextY } : null;
+}
+
+/**
+ * The stored angle a rotated member should carry, wrapped so repeated gestures cannot drift it.
+ *
+ * Konva reads this straight into `rotation`, and the payload validator has a finite range, so an
+ * unwrapped sum would accumulate without bound across a long editing session.
+ */
+function composeRotation(rotation: number, rotationDeg: number): number | null {
+  if (rotationDeg === 0) return rotation;
+  const sum = rotation + rotationDeg;
+  if (!finite(sum)) return null;
+  const wrapped = ((((sum + 180) % 360) + 360) % 360) - 180;
+  return wrapped === -180 ? 180 : wrapped;
 }
 
 function scalePointArray(points: readonly number[], scale: number): number[] | null {
@@ -243,13 +293,41 @@ function scaleDrawShapeParams(
   scale: number
 ): Extract<El, { type: "draw" }>["shapeParams"] | null {
   if (shapeParams === undefined) return undefined;
-  const cornerRadius = scaleFinite(shapeParams.cornerRadius, scale);
-  return cornerRadius === null
-    ? null
-    : {
-        ...shapeParams,
-        cornerRadius,
-      };
+  const scaled = scaleFinite(shapeParams.cornerRadius, scale);
+  if (scaled === null) return null;
+  // Clamp to what the renderer and the payload validator accept, exactly as the single-stroke
+  // planner does: an unclamped 200 on a radius-100 rectangle draws as 120, shows 120 in the
+  // inspector, and the next resize then compounds from the hidden 200. Keep the original
+  // reference when nothing moved so a no-op gesture cannot publish a mutation.
+  const cornerRadius = Math.min(
+    SHAPE_PARAM_RANGES.cornerRadius.max,
+    Math.max(SHAPE_PARAM_RANGES.cornerRadius.min, scaled)
+  );
+  return cornerRadius === shapeParams.cornerRadius
+    ? shapeParams
+    : { ...shapeParams, cornerRadius };
+}
+
+/**
+ * Whether a member can carry a gesture angle at all. This is the ONE rule a non-zero
+ * `rotationDeg` is refused from, exported so the editor offers the rotation handle only where the
+ * commit could honour it:
+ *
+ *  - a panel frame stores no angle;
+ *  - a stroke the single-stroke planner would DROP the angle for -- a bounds-derived shape that
+ *    is rebuilt axis-aligned from its point bounds, or a mirrored-symmetry stroke whose copies
+ *    would turn by -theta (`studioDrawObjectRotationIsDropped`);
+ *  - a calligraphy stroke with effective per-sample stylus orientation. The single planner turns
+ *    its points but deliberately leaves the stored tilt/twist world-fixed, so alone that is a
+ *    documented limitation; beside a mouse-drawn neighbour whose nib angle composed the turn it
+ *    is a tear, and the live lane already refuses such strokes for the same reason.
+ *
+ * Every other member either stores an angle of its own or bakes the turn into `points`.
+ */
+export function studioGroupUniformResizeMemberCanRotate(item: El): boolean {
+  if (item.type === "frame") return false;
+  if (item.type !== "draw") return true;
+  return !studioDrawObjectRotationIsDropped(item) && !studioDrawHasEffectivePerSampleOrientation(item);
 }
 
 function transformElement(
@@ -257,9 +335,42 @@ function transformElement(
   source: StudioGroupUniformResizeBounds,
   target: StudioGroupUniformResizeBounds,
   scale: number,
-  strokeWidthPolicy: StudioGroupUniformResizeStrokeWidthPolicy
+  strokeWidthPolicy: StudioGroupUniformResizeStrokeWidthPolicy,
+  rotationDeg: number,
+  cos: number,
+  sin: number
 ): El | null {
+  // A member that cannot carry the angle stands the WHOLE plan down: leaving it upright beside
+  // turning neighbours is the tear this planner exists to prevent. The editor withholds the
+  // handle from the same verdict, so this is the commit's guard rather than its common path.
+  if (rotationDeg !== 0 && !studioGroupUniformResizeMemberCanRotate(item)) return null;
   if (item.type === "draw") {
+    // A turning stroke is handed to the single-stroke planner rather than re-derived here.
+    //
+    // That planner already owns every rotation rule a DrawEl needs, and each of them was learned
+    // the hard way: the calligraphy nib angle composes with the gesture only when the stroke has
+    // no per-sample tilt (otherwise half the ribbon turns and half does not), a legacy tap
+    // materializes the fallback tip it actually rendered rather than the catalogue one, and the
+    // stored angle is wrapped so repeated gestures cannot drift it. Re-deriving that here would
+    // be two copies of renderer-coupled reasoning that must never disagree -- and a group
+    // rotation disagreeing with a single-stroke rotation of the same stroke is precisely the bug
+    // a user would report. The bounds it works from are the SELECTION box, which is the same
+    // affine this planner applies to every other member.
+    if (rotationDeg !== 0) {
+      const turned = planStudioDrawObjectTransformWithBounds({
+        el: item,
+        sourceBounds: source,
+        targetBounds: target,
+        rotationDeg,
+        strokeWidthPolicy,
+      });
+      // The single-stroke planner DROPS an angle it cannot bake in (bounds-derived kinds,
+      // mirrored symmetry) and reports what it applied. The guard above already refused those
+      // members; this catches any drop rule that planner grows later, because a member that did
+      // not turn beside neighbours that did is a tear whatever produced it.
+      if (!turned || turned.rotationDeg !== rotationDeg) return null;
+      return turned.element;
+    }
     if (
       !finiteEvenPoints(item.points, 2) ||
       !finiteNonNegative(item.strokeWidth) ||
@@ -316,7 +427,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const height = scaleFinite(item.height, scale);
     const cornerRadius = scaleOptionalFinite(item.cornerRadius, scale);
@@ -328,11 +439,14 @@ function transformElement(
     ) {
       return null;
     }
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (rotation === null) return null;
     return {
       ...item,
       ...position,
       width,
       height,
+      rotation,
       ...(cornerRadius !== undefined ? { cornerRadius } : {}),
     };
   }
@@ -352,7 +466,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const fontSize = scaleFinite(item.fontSize, scale);
     const letterSpacing = scaleOptionalFinite(item.letterSpacing, scale);
@@ -371,11 +485,14 @@ function transformElement(
     ) {
       return null;
     }
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (rotation === null) return null;
     return {
       ...item,
       ...position,
       width,
       fontSize,
+      rotation,
       ...(letterSpacing !== undefined ? { letterSpacing } : {}),
       ...(strokeWidth !== undefined ? { strokeWidth } : {}),
     };
@@ -392,10 +509,11 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const fontSize = scaleFinite(item.fontSize, scale);
-    if (!position || fontSize === null || fontSize <= 0) return null;
-    return { ...item, ...position, fontSize };
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (!position || fontSize === null || fontSize <= 0 || rotation === null) return null;
+    return { ...item, ...position, fontSize, rotation };
   }
 
   if (item.type === "bubble") {
@@ -414,7 +532,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const height = scaleFinite(item.height, scale);
     const customShapePoints = item.customShapePoints
@@ -472,11 +590,14 @@ function transformElement(
     ) {
       return null;
     }
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (rotation === null) return null;
     return {
       ...item,
       ...position,
       width,
       height,
+      rotation,
       ...(customShapePoints ? { customShapePoints } : {}),
       ...(fontSize !== undefined ? { fontSize } : {}),
       ...(autoShrinkMinFontSize !== undefined
@@ -490,6 +611,9 @@ function transformElement(
   }
 
   if (item.type === "frame") {
+    // A frame is the panel itself: axis-aligned box geometry plus an optional axis-aligned
+    // `points` polygon, and no stored angle anywhere to put theta into. Turning one is not
+    // representable, which is why `studioGroupUniformResizeMemberCanRotate` refuses it above.
     if (
       !validBoxGeometry(item) ||
       !validOptionalPoints(item.points, 6) ||
@@ -497,7 +621,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const height = scaleFinite(item.height, scale);
     const points = item.points ? scalePointArray(item.points, scale) : undefined;
@@ -536,7 +660,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const height = scaleFinite(item.height, scale);
     const innerRadius = scaleFinite(item.innerRadius, scale);
@@ -558,11 +682,14 @@ function transformElement(
     ) {
       return null;
     }
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (rotation === null) return null;
     return {
       ...item,
       ...position,
       width,
       height,
+      rotation,
       innerRadius,
       outerRadius,
       strokeWidth,
@@ -579,7 +706,7 @@ function transformElement(
     ) {
       return null;
     }
-    const position = transformPosition(item.x, item.y, source, target, scale);
+    const position = transformPosition(item.x, item.y, source, target, scale, cos, sin);
     const width = scaleFinite(item.width, scale);
     const height = scaleFinite(item.height, scale);
     const strokeWidth = scaleFiniteForStrokePolicy(
@@ -597,11 +724,14 @@ function transformElement(
     ) {
       return null;
     }
+    const rotation = composeRotation(item.rotation, rotationDeg);
+    if (rotation === null) return null;
     return {
       ...item,
       ...position,
       width,
       height,
+      rotation,
       strokeWidth,
       ...(noise !== undefined ? { noise } : {}),
     };
@@ -656,13 +786,22 @@ export function planStudioGroupUniformResizeSelection(
   if (!finitePositive(scaleX) || !finitePositive(scaleY)) return null;
   if (!nearlyEqual(scaleX, scaleY, UNIFORM_SCALE_RELATIVE_EPSILON)) return null;
   const scale = (scaleX + scaleY) / 2;
+  const rotationDeg = input.rotationDeg ?? 0;
+  if (!finite(rotationDeg)) return null;
   if (
+    rotationDeg === 0 &&
     nearlyEqual(scale, 1, IDENTITY_RELATIVE_EPSILON) &&
     nearlyEqual(input.sourceBounds.x, input.targetBounds.x, IDENTITY_RELATIVE_EPSILON) &&
     nearlyEqual(input.sourceBounds.y, input.targetBounds.y, IDENTITY_RELATIVE_EPSILON)
   ) {
     return null;
   }
+
+  const radians = (rotationDeg * Math.PI) / 180;
+  // Exact at theta = 0 rather than merely close, so the pure-resize path keeps producing the
+  // numbers it always did instead of ones a cosine happened to round back.
+  const cos = rotationDeg === 0 ? 1 : Math.cos(radians);
+  const sin = rotationDeg === 0 ? 0 : Math.sin(radians);
 
   const transformed: El[] = [];
   for (const item of selectedItems) {
@@ -671,7 +810,10 @@ export function planStudioGroupUniformResizeSelection(
       input.sourceBounds,
       input.targetBounds,
       scale,
-      strokeWidthPolicy
+      strokeWidthPolicy,
+      rotationDeg,
+      cos,
+      sin
     );
     if (!next) return null;
     transformed.push(next);

@@ -331,7 +331,10 @@ export function StudioInspectorTypographySection({
               />
             </Suspense>
           </div>
-          <div className="border-t border-line/40 pt-2.5">
+          {/* CSP 패리티(main 6ddf0406): 원형 텍스트. 외곽선·그림자는 외형 섹션이, 자간·행간은 문단
+              섹션이 이미 소유하므로 main 의 중복 블록은 들이지 않는다 — 밀도 감사의
+              duplicate-control-id 계약이 그 이유다. */}
+          <div className="mt-2.5 border-t border-line/40 pt-2.5">
             <StudioCircularTextPanel
               text={text.text}
               enabled={
