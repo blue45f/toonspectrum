@@ -855,6 +855,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   readonly #bindGroups = new Map<string, CachedBindGroup>();
   #instanceBuffer: GPUBuffer | null = null;
   #instanceCapacity = 0;
+  #instanceScratch: Float32Array | null = null;
   #residentAssetBytes = 0;
   #inFlight = 0;
   #lastRequestSequence = 0;
@@ -1033,6 +1034,21 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     return this.#instanceBuffer;
   }
 
+  #ensureInstanceScratch(dabCount: number): Float32Array {
+    const requiredFloats =
+      dabCount * STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS;
+    if (
+      this.#instanceScratch
+      && this.#instanceScratch.length >= requiredFloats
+    ) return this.#instanceScratch;
+    let capacity = Math.min(256, this.#maximumDabs);
+    while (capacity < dabCount) capacity = Math.min(this.#maximumDabs, capacity * 2);
+    this.#instanceScratch = new Float32Array(
+      capacity * STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS,
+    );
+    return this.#instanceScratch;
+  }
+
   #touchAssetTexture(key: string, resource: AssetTexture): AssetTexture {
     this.#assetTextures.delete(key);
     this.#assetTextures.set(key, resource);
@@ -1168,7 +1184,9 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     const grainKey = nativeR8Grain
       ? `durable-r8:${nativeR8Grain.sourceKey}`
       : grain!.key;
-    const key = `${batch.key}|${tip.key}|${grainKey}`;
+    // Bind groups depend only on captured GPU resources. A plan-local diagnostic batch key or
+    // Porter-Duff pipeline change must not duplicate an otherwise identical texture binding.
+    const key = `${tip.key}|${grainKey}`;
     // A durable lease can be released and its LRU texture evicted immediately after the queue
     // fence. Never retain a bind group that could outlive that texture. Generic runtime-owned
     // textures share this runtime's lifetime and remain safe to cache.
@@ -1431,7 +1449,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       const instanceBuffer = this.#ensureInstanceBuffer(frame.plan.dabs.length);
       const packed = packStudioEngineWebGpuTexturedBrushDabs(
         frame.plan,
-        undefined,
+        this.#ensureInstanceScratch(frame.plan.dabs.length),
         nativeR8GrainLease ?? undefined,
       );
       this.#device.queue.writeBuffer(instanceBuffer, 0, packed);
@@ -1577,6 +1595,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     this.#privateContentInitialized = false;
     this.#privateContentFingerprint = null;
     this.#instanceBuffer?.destroy();
+    this.#instanceScratch = null;
     this.#uniformBuffer.destroy();
     this.#surfaceTexture?.destroy();
     for (const resource of this.#assetTextures.values()) resource.texture.destroy();

@@ -1419,6 +1419,57 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(harness.bindGroupDescriptors).toHaveLength(4);
   });
 
+  it("reuses content-addressed textures and bind groups across plan-local aliases", async () => {
+    const harness = fakeGpuHarness();
+    const target = runtime(harness);
+    const values = [0, 32, 128, 255] as const;
+    const planA = texturedPlanWithTip("alias-a", values);
+    const planB = texturedPlanWithTip("alias-b", values);
+
+    expect((await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: planA,
+    })).status).toBe("completed");
+    expect((await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: planB,
+    })).status).toBe("completed");
+
+    expect(harness.textures.filter((texture) => (
+      String(texture.descriptor.label).startsWith("Studio textured brush tip ")
+    ))).toHaveLength(1);
+    expect(harness.bindGroupDescriptors).toHaveLength(1);
+  });
+
+  it("reuses the CPU dab staging allocation across sequential GPU submissions", async () => {
+    const harness = fakeGpuHarness();
+    const target = runtime(harness);
+
+    expect((await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: texturedPlan(),
+    })).status).toBe("completed");
+    expect((await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: texturedPlan(),
+    })).status).toBe("completed");
+
+    const backingBuffers = harness.writeBuffer.mock.calls
+      .filter((call) => (
+        (call[0] as unknown as { descriptor?: GPUBufferDescriptor })
+          .descriptor?.label === "Studio textured brush instance buffer"
+      ))
+      .map((call) => (
+        (call[2] as unknown as Float32Array).buffer
+      ));
+    expect(backingBuffers).toHaveLength(2);
+    expect(backingBuffers[0]).toBe(backingBuffers[1]);
+  });
+
   it("does not evict a texture while submitted GPU work can still reference it", async () => {
     const gate = deferred<void>();
     const harness = fakeGpuHarness(() => gate.promise);
