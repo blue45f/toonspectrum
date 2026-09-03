@@ -300,7 +300,20 @@ export const PALETTE_STUDIO_TOOLS: PaletteStudioTool[] = [
     icon: SlidersHorizontal,
     tip: "선택한 대상의 속성과 그리기 도구 설정을 한곳에서 조절합니다.",
     // "속성 패널"은 이 패널의 옛 이름이다 — 손버릇이 끊기지 않게 검색어로 남긴다.
-    keywords: ["작업", "속성", "패널", "대상", "인스펙터", "properties", "inspector", "panel"],
+    // 구(句) 전체를 한 항목으로 넣는다: matchesCommandSearch 는 키워드 **하나가** 질의 전체를
+    // 포함하는지 보므로, "속성"·"패널"로 쪼개 두면 "속성 패널"이라고 친 사람은 0건을 본다.
+    keywords: [
+      "속성 패널",
+      "properties panel",
+      "작업",
+      "속성",
+      "패널",
+      "대상",
+      "인스펙터",
+      "properties",
+      "inspector",
+      "panel",
+    ],
   },
   {
     id: "tool-layers",
