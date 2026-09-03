@@ -72,9 +72,6 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
 
-      - name: Build production assets
-        run: pnpm run build
-
       - name: Browser · existing marketplace regression
         id: existing
         continue-on-error: true
