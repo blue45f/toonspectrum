@@ -1,0 +1,66 @@
+name: Marketplace authoring contract fixer
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-contract-fixer.yml"
+      - "scripts/marketplace/fix-authoring-contracts.mjs"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-authoring-contract-fixer
+  cancel-in-progress: true
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Apply deterministic contract repairs
+        run: node scripts/marketplace/fix-authoring-contracts.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify authoring contracts
+        run: |
+          pnpm exec vitest run \
+            lib/creator-marketplace-authoring-workshop.test.ts \
+            lib/creator-marketplace-package-builder.test.ts \
+            lib/creator-marketplace-quality-validation.test.ts \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx \
+            src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx \
+            src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Commit verified repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            lib/creator-marketplace-authoring-workshop.ts \
+            lib/creator-marketplace-package-builder.ts \
+            lib/creator-marketplace-quality-validation.test.ts
+          if git diff --cached --quiet; then
+            echo "No contract repair was required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(market): enforce authoring quality and owned package buffers"
+          git push origin HEAD:feat/marketplace-creator-pipeline-20260903
