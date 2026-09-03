@@ -44,7 +44,11 @@ class SourceContractTests(unittest.TestCase):
         for token in ("blink", "phoneme", "viseme", "happy", "angry", "surprised"):
             self.assertIn(token, face.casefold())
         self.assertIn("preserve_expression_shape_keys", face)
-        self.assertIn('"toonstudio_generated"', face)
+        self.assertIn(
+            'obj[f"toonstudio_shape_{_normalize(key.name)}_generated"] = True',
+            face,
+        )
+        self.assertNotRegex(face, re.compile(r'\bkey\["toonstudio_'))
 
     def test_compatibility_entry_point_no_longer_imports_missing_generator(self) -> None:
         source = (ROOT / "scripts/blender/generate_vrm_character.py").read_text()
