@@ -18,14 +18,20 @@
  *   ① 넘침 게이트를 먼저 돌린다 → 권고 조판 줄(`verdict.lines`)을 얻는다.
  *   ② 그 줄을 문체 린터에 `lines`로 넘긴다 → 레이아웃 3규칙(관사 뒤 줄바꿈·하이픈 앞 줄바꿈·
  *      실루엣)이 비로소 실행된다. 이 줄이 없으면 그 셋은 "미실행"으로 집계된다.
- *   ③ 두 결과를 MQM 오류 입력으로 바꿔 한 번에 채점한다 → 점수가 하나만 존재한다.
+ *   ②' 용어집 규칙이 주어졌으면 큐마다 원문·번역문을 대고 충돌을 모은다(§2.5).
+ *   ②'' 말풍선 글자·바탕 명도 대비를 큐마다 재다 — MQM 점수에는 넣지 않고 큐에만 싣는다.
+ *   ③ 세 갈래를 MQM 오류 입력으로 바꿔 한 번에 채점한다 → 점수가 하나만 존재한다.
  *
  * §1. 입력 모델
  * §2. 타이포그래피 해석 — 전부 위임
+ * §2.5 용어집 충돌 → MQM 오류
  * §3. 회차 실행
  * §4. 차원별 묶음(패널이 그대로 그린다)
  */
 
+import { findStudioTranslationMemoryGlossaryConflicts } from "../studio-translation-glossary";
+
+import { auditBubbleTextLegibility } from "./studio-bubble-legibility-contrast";
 import {
   bubbleLetterSpacing,
   resolveBubbleFontFamily,
@@ -46,6 +52,7 @@ import {
   type StudioMqmErrorInput,
   type StudioMqmDimensionRollup,
   type StudioMqmScoreResult,
+  type StudioMqmSeverity,
   type StudioMqmTruncationObservation,
 } from "./studio-localization-mqm";
 import {
@@ -64,7 +71,16 @@ import {
   type StudioLocalizationStyleUnit,
 } from "./studio-localization-style-lint";
 
+
+import type {
+  BubbleLegibilityLevel,
+  BubbleLegibilityReport,
+} from "./studio-bubble-legibility-contrast";
 import type { DialogueElementLike, DialoguePageLike } from "./studio-dialogue-batch";
+import type {
+  StudioTranslationMemoryGlossaryConflict,
+  StudioTranslationMemoryGlossaryRule,
+} from "../studio-translation-glossary";
 
 // ── §1. 입력 모델 ─────────────────────────────────────────────────────────────
 
@@ -79,9 +95,26 @@ export interface StudioLocalizationQaElementTypography {
   readonly fontStyle?: string;
   readonly lineHeight?: number;
   readonly vertical?: boolean;
+  /** 대사 글자색 — `BubbleEl.textFill`. 없으면 명도 대비를 판정하지 않는다. */
+  readonly textFill?: string;
+  /** 말풍선 바탕색 — `BubbleEl.fill`. */
+  readonly fill?: string;
+  /**
+   * 말풍선 그라데이션 채우기 — `BubbleEl.gradient`. 설정돼 있으면 `fill`(단색)보다 **우선**해
+   * 렌더되므로, 있으면 대비 판정을 거부해야 한다(화면에 없는 색으로 재게 된다).
+   */
+  readonly gradient?: unknown;
 }
 
 type QaElement = DialogueElementLike & StudioLocalizationQaElementTypography;
+
+/** 용어집 충돌 두 종류의 MQM 심각도. 둘 다 정책값이다 — §2.5. */
+export interface StudioLocalizationQaGlossarySeverity {
+  /** 같은 원문 용어에 서로 다른 대역어가 지정된 경우. */
+  readonly ambiguousRule?: StudioMqmSeverity;
+  /** 규칙이 지정한 대역어가 번역문에 없는 경우. */
+  readonly missingTarget?: StudioMqmSeverity;
+}
 
 /** 큐 하나 — 발견을 되짚을 때 패널이 필요한 최소 정보. */
 export interface StudioLocalizationQaCue {
@@ -93,6 +126,12 @@ export interface StudioLocalizationQaCue {
   readonly text: string;
   /** 넘침 판정 — 상자 치수를 못 읽은 큐는 null. */
   readonly overflow: LocalizationOverflowVerdict | null;
+  /**
+   * 대사 글자 대 말풍선 바탕의 WCAG 명도 대비 판정. 요소를 못 찾은 큐만 null 이고, 색을 못 읽은
+   * 큐는 null 이 아니라 `verdict: "indeterminate"` 다 — "안 쟀다"와 "재려 했지만 판정 불가"는
+   * 다른 사실이고, 뒤엣것은 이유(`reason`)를 들고 온다.
+   */
+  readonly legibility: BubbleLegibilityReport | null;
 }
 
 export interface StudioLocalizationQaOptions {
@@ -114,6 +153,19 @@ export interface StudioLocalizationQaOptions {
   readonly styleOptions?: StudioLocalizationStyleLintOptions;
   readonly overflowPolicy?: LocalizationOverflowPolicy;
   /**
+   * 용어집 규칙. 주면 큐마다 원문·번역문을 대고 충돌을 찾아 MQM Terminology 오류로 싣는다.
+   *
+   * **원문을 모르면 한 건도 돌지 않는다** — 이 판정은 "원문에 이 용어가 있는데 번역문에 규칙이
+   * 지정한 대역어가 없다"는 형태라, `sourceTextFor`가 그 큐의 원문을 주지 않으면 전제가 없다.
+   * 조용히 통과시키는 대신 `glossaryCheckedCueCount`로 몇 큐를 실제로 봤는지 보고한다.
+   */
+  readonly glossaryRules?: readonly StudioTranslationMemoryGlossaryRule[];
+  /**
+   * 용어집 충돌의 MQM 심각도 재정의. **MQM 은 이 값을 정해 주지 않는다**(§2.5 참조) —
+   * 기본값은 이 저장소의 정책이고, 회차·벤더마다 다르게 잡고 싶으면 여기서 갈아 끼운다.
+   */
+  readonly glossarySeverity?: StudioLocalizationQaGlossarySeverity;
+  /**
    * 채점 분모 단위. 기본 `"characters"` — 웹툰 대사는 문단이 아니고 한국어·일본어·중국어의
    * 공백 분절이 단어 수를 크게 왜곡한다. 임계값 99가 단어 분모로만 교정돼 있다는 사실은
    * 결과의 `score.denominator.thresholdCalibrated`가 그대로 들고 다닌다.
@@ -121,6 +173,8 @@ export interface StudioLocalizationQaOptions {
   readonly denominatorUnit?: StudioMqmDenominatorUnit;
   /** 숨김·잠금 큐도 검사할지. 기본 false — 캔버스 편집과 같은 규약. */
   readonly includeHidden?: boolean;
+  /** 명도 대비 준수 수준. 기본 "AA"(WCAG 1.4.3). */
+  readonly legibilityLevel?: BubbleLegibilityLevel;
 }
 
 export interface StudioLocalizationQaReport {
@@ -132,6 +186,18 @@ export interface StudioLocalizationQaReport {
   readonly overflowCheckedCount: number;
   /** 숨김·잠금이라 건너뛴 큐 수. */
   readonly skippedCueCount: number;
+  /**
+   * 그중 **원문까지 알아서** 용어집을 실제로 대 본 큐 수. 규칙이 없거나 원문을 모르면 0이다 —
+   * 0인데 Terminology 오류가 없다는 것을 "용어집 통과"로 읽으면 안 되기 때문에 따로 센다.
+   */
+  readonly glossaryCheckedCueCount: number;
+  /**
+   * 그중 명도 대비를 **실제로 판정한**(pass/fail 이 난) 큐 수. 반투명·그라데이션·색 누락으로
+   * `indeterminate` 가 난 큐는 세지 않는다 — 0 인데 실패가 없다는 것을 "대비 통과"로 읽으면 안 된다.
+   */
+  readonly legibilityCheckedCueCount: number;
+  /** 그중 임계값을 밑돈 큐 수. */
+  readonly legibilityFailCueCount: number;
   readonly cues: readonly StudioLocalizationQaCue[];
   readonly style: StudioLocalizationStyleLintResult;
   readonly overflow: LocalizationOverflowSummary;
@@ -202,6 +268,51 @@ function truncationObservation(
   };
 }
 
+// ── §2.5 용어집 충돌 → MQM 오류 ─────────────────────────────────────────────
+
+/**
+ * 용어집 충돌의 기본 심각도. **MQM 명세는 이 값을 정해 주지 않는다** — 심각도는 회차·벤더가
+ * 정하는 정책이라, 아래 둘은 이 저장소의 기본값일 뿐이고 `glossarySeverity` 로 갈아 끼운다.
+ *
+ * 규칙이 지정한 대역어가 번역문에 없는 것(`missing-target`)은 독자가 읽을 문장이 이미 규칙을
+ * 어겼다는 뜻이라 `major`. 같은 원문 용어에 규칙이 서로 다른 대역어를 지정한 것
+ * (`ambiguous-rule`)은 번역문이 아니라 **용어집 자체의 모순**이므로, 이 큐를 틀렸다고 단정할
+ * 근거가 없어 `minor` 로 둔다.
+ */
+const DEFAULT_GLOSSARY_SEVERITY: Required<StudioLocalizationQaGlossarySeverity> = Object.freeze({
+  ambiguousRule: "minor",
+  missingTarget: "major",
+});
+
+/**
+ * 충돌 하나를 MQM 오류 입력으로 옮긴다.
+ *
+ * 차원은 `terminology` 로 두되 **서브타입은 주지 않는다**. MQM 의 Terminology 는 서브타입 3개를
+ * 선언하지만 이 저장소의 카탈로그는 그 이름을 아직 확인하지 못했다(`declaredSubtypeCount: 3`,
+ * `subtypeCatalogComplete: false`). 확인되지 않은 이름을 지어내면 채점기가 그것을 사실로 싣는다.
+ *
+ * `expectedTargets` 는 문자열로 합쳐 넣는다 — `StudioMqmEvidence` 는 원시값만 담는다.
+ */
+function glossaryConflictToMqmError(
+  conflict: StudioTranslationMemoryGlossaryConflict,
+  cue: { readonly id: string; readonly pageIndex: number },
+  severity: Required<StudioLocalizationQaGlossarySeverity>,
+): StudioMqmErrorInput {
+  return {
+    id: `${cue.id}:glossary:${conflict.kind}:${conflict.sourceTerm}`,
+    dimension: "terminology",
+    severity: conflict.kind === "ambiguous-rule" ? severity.ambiguousRule : severity.missingTarget,
+    cueId: cue.id,
+    page: cue.pageIndex + 1,
+    note: conflict.message,
+    evidence: Object.freeze({
+      ruleId: `glossary/${conflict.kind}`,
+      sourceTerm: conflict.sourceTerm,
+      expectedTargets: conflict.expectedTargets.join(" | "),
+    }),
+  };
+}
+
 // ── §3. 회차 실행 ─────────────────────────────────────────────────────────────
 
 /**
@@ -226,8 +337,17 @@ export function runStudioLocalizationQa(
   const observations: StudioMqmTruncationObservation[] = [];
   const verdicts: LocalizationOverflowVerdict[] = [];
   const scoredTexts: string[] = [];
+  const glossaryErrors: StudioMqmErrorInput[] = [];
+  const glossarySeverity: Required<StudioLocalizationQaGlossarySeverity> = {
+    ...DEFAULT_GLOSSARY_SEVERITY,
+    ...options.glossarySeverity,
+  };
+  const glossaryRules = options.glossaryRules ?? [];
   let skippedCueCount = 0;
   let overflowCheckedCount = 0;
+  let glossaryCheckedCueCount = 0;
+  let legibilityCheckedCueCount = 0;
+  let legibilityFailCueCount = 0;
 
   for (const item of items) {
     if (!options.includeHidden && (item.hidden || item.locked)) {
@@ -261,6 +381,44 @@ export function runStudioLocalizationQa(
       page: item.pageIndex + 1,
     });
 
+    // ②' 용어집 — 원문을 모르면 한 건도 돌지 않는다. 전제(원문)가 없는 판정을 "통과"로
+    //     보이지 않으려고, 실제로 대 본 큐 수를 따로 센다.
+    const sourceText = options.sourceTextFor?.(item.id);
+    if (glossaryRules.length > 0 && sourceText !== undefined && sourceText !== "") {
+      glossaryCheckedCueCount += 1;
+      for (const conflict of findStudioTranslationMemoryGlossaryConflicts({
+        sourceText,
+        translation: text,
+        sourceLocale: options.sourceLocale ?? "",
+        targetLocale: options.targetLocale,
+        rules: glossaryRules,
+      })) {
+        glossaryErrors.push(
+          glossaryConflictToMqmError(conflict, { id: item.id, pageIndex: item.pageIndex }, glossarySeverity),
+        );
+      }
+    }
+
+    // ②'' 명도 대비 — 조판이 아니라 **읽힘**의 문제라 MQM 점수에는 넣지 않는다. MQM 은 번역
+    //      품질 척도이고, 흰 말풍선의 연회색 대사는 번역이 틀린 것이 아니다. 큐에 판정만 싣는다.
+    //
+    //      말풍선의 `stroke` 는 **말풍선 테두리**이지 글자 외곽선이 아니므로 엔진에 넘기지
+    //      않는다. 넘기면 테두리 있는 말풍선이 전부 "외곽선 있는 글자"로 오인돼 indeterminate
+    //      가 되고, 검사기가 조용히 꺼진 것과 같아진다.
+    let legibility: BubbleLegibilityReport | null = null;
+    if (el) {
+      legibility = auditBubbleTextLegibility({
+        textColor: el.textFill,
+        backdropColor: el.fill,
+        backdropIsGradient: el.gradient !== undefined && el.gradient !== null,
+        fontSizePx: resolveBubbleFontSize(el.fontSize),
+        fontStyle: el.fontStyle,
+        ...(options.legibilityLevel === undefined ? {} : { level: options.legibilityLevel }),
+      });
+      if (legibility.verdict !== "indeterminate") legibilityCheckedCueCount += 1;
+      if (legibility.verdict === "fail") legibilityFailCueCount += 1;
+    }
+
     scoredTexts.push(text);
     cues.push({
       id: item.id,
@@ -268,6 +426,7 @@ export function runStudioLocalizationQa(
       pageIndex: item.pageIndex,
       text,
       overflow: verdict,
+      legibility,
     });
   }
 
@@ -277,6 +436,7 @@ export function runStudioLocalizationQa(
   const errorInputs: StudioMqmErrorInput[] = [
     ...style.findings.map(studioLocalizationStyleFindingToMqmError),
     ...detectStudioMqmTruncationErrors(observations),
+    ...glossaryErrors,
   ];
   const score = scoreStudioMqmErrors(
     errorInputs,
@@ -289,6 +449,9 @@ export function runStudioLocalizationQa(
     checkedCueCount: cues.length,
     overflowCheckedCount,
     skippedCueCount,
+    glossaryCheckedCueCount,
+    legibilityCheckedCueCount,
+    legibilityFailCueCount,
     cues: Object.freeze(cues),
     style,
     overflow: summarizeLocalizationOverflow(verdicts),

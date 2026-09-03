@@ -133,7 +133,31 @@ export function StudioLocalizationQaReport({
             <dt>실행한 문체 규칙</dt>
             <dd className="tabular-nums text-fg-2">{report.style.checkedRuleCount}개</dd>
           </div>
+          <div className="flex justify-between gap-1">
+            <dt>대비 판정</dt>
+            <dd className="tabular-nums text-fg-2">{report.legibilityCheckedCueCount}개</dd>
+          </div>
+          <div className="flex justify-between gap-1">
+            <dt>대비 미달</dt>
+            <dd className="tabular-nums text-fg-2">{report.legibilityFailCueCount}개</dd>
+          </div>
         </dl>
+        {/*
+          대비는 번역 품질이 아니라 읽힘의 문제라 위 점수에 들어가지 않는다. 그래서 미달이 있으면
+          점수와 별개로 여기서 말해 준다 — 점수만 보고 "통과"로 읽지 않도록.
+        */}
+        {report.legibilityFailCueCount > 0 && (
+          <p className="mt-1.5 rounded-lg border border-warn/35 bg-warn/10 px-1.5 py-1 text-[0.58rem] leading-relaxed text-warn">
+            대사 {report.legibilityFailCueCount}개가 말풍선 바탕과의 명도 대비(WCAG)를 밑돕니다.
+            글자색이나 말풍선 색을 조정하세요. 이 항목은 위 번역 품질 점수에는 포함되지 않습니다.
+          </p>
+        )}
+        {report.legibilityCheckedCueCount === 0 && report.checkedCueCount > 0 && (
+          <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-4">
+            명도 대비를 판정한 대사가 없습니다(반투명·그라데이션 채우기이거나 색을 읽지
+            못했습니다). 대비 미달 0개를 "통과"로 읽지 마세요.
+          </p>
+        )}
         {/* 점수의 한계를 화면이 직접 말한다 — 임계값 99는 단어 분모로만 교정돼 있다. */}
         {!score.denominator.thresholdCalibrated && (
           <p className="mt-1.5 rounded-lg border border-line bg-panel px-1.5 py-1 text-[0.58rem] leading-relaxed text-fg-4">
