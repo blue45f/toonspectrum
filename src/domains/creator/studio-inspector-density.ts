@@ -111,7 +111,14 @@ export interface StudioInspectorControlGroup {
   /** Header text. Must equal `STUDIO_INSPECTOR_CANONICAL_LABELS[canonical]`. */
   label: string;
   tier: StudioInspectorTier;
-  /** Individual controls this group renders — the audit counts leaves. */
+  /**
+   * Individual controls this group renders — the audit counts leaves.
+   *
+   * One documented exception: a group whose children are self-contained panels counts
+   * panels, not the controls inside them (their chip counts follow a preset list and
+   * cannot be hand-kept). Such a row says so in its own `rationale`; the real
+   * interactive count for those is measured on the DOM by `studio-inspector-dom-density`.
+   */
   leaves: number;
   /** Source-of-truth line span in `StudioInspectorAside.tsx`, measured. */
   source: string;
@@ -315,8 +322,13 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     rationale: "말풍선 외형·모양·앵커·꼬리.",
   },
   /**
-   * 2026-09-02 감사 §5.8: 타이포그래피 한 섹션이 15개를 접고 있어 열면 다시 과밀했다.
+   * 2026-09-02 감사 §5.8: 타이포그래피 한 섹션이 실측 15개를 접고 있어 열면 다시 과밀했다.
    * 글꼴 / 외형 / 고급 조판 세 섹션으로 나누고, 정렬·자간·행간은 아래 문단 섹션 한 곳에만 둔다.
+   *
+   * 아래 세 행의 합은 15 가 아니다 — 산술이 아니라 재분할이기 때문이다. 같은 커밋(446d86fe)이
+   * 자간·행간을 문단으로 옮기며 `element.text-align` 을 3 → 5 로 올렸고, `element.typography-advanced`
+   * 는 그 뒤 원형 텍스트가 편입되며 2 → 3 이 됐다. 15 는 분할 이전에 실측한 역사적 수치라
+   * 사후에 맞춰 고치지 않는다. 재분할 설명은 여기 한 곳에만 둔다.
    */
   {
     id: "element.typography",
@@ -336,14 +348,23 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     source: "StudioInspectorTypographySection.tsx:1",
     rationale: "외곽선(사용·색·두께) + 그림자(사용·색·흐림·X·Y·불투명도). 텍스트 요소에서만 렌더된다.",
   },
+  /**
+   * `leaves` 규약: 이 행은 잎이 아니라 **자식 패널 개수**를 센다. 세 자식은 각자 헤더와
+   * 초기화를 가진 독립 패널이고, 그 안의 칩 수는 프리셋 목록 길이를 따라가서 손으로 유지할
+   * 수 없다. 분할 이전 행도 두 패널을 2 로 셌으므로 규약을 바꾸지 않는다. 세 패널이 그리는
+   * 상호작용 요소는 소스 기준 13곳(2 + 4 + 7)이고 프리셋 칩은 목록 길이만큼 더 늘어나므로,
+   * 화면에 실제로 뜨는 수는 `studio-inspector-dom-density.test.tsx` 가 DOM 에서 센다.
+   */
   {
     id: "element.typography-advanced",
     canonical: "typography-advanced",
     label: label("typography-advanced"),
     tier: "advanced",
-    leaves: 2,
+    leaves: 3,
     source: "StudioInspectorTypographySection.tsx:1",
-    rationale: "글자 효과 프리셋 패널 + 곡선 텍스트. 둘 다 자체 패널을 가진 특수 조판이다.",
+    rationale:
+      "글자 효과 프리셋 + 곡선 텍스트 + 원형 텍스트(main 6ddf0406 CSP 패리티에서 편입) 세 패널. "
+      + "셋 다 자체 패널을 가진 특수 조판이라 이 행의 수는 잎이 아니라 패널 개수다(위 주석).",
   },
   {
     id: "element.constraints",
