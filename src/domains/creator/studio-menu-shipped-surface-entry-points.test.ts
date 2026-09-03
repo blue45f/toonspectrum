@@ -129,6 +129,7 @@ const SURFACE_ROWS: readonly (readonly [string, string, string])[] = [
   ["vector", "erase-to-intersection", "toggleVectorEraseToIntersection"],
   ["text", "dialogue-batch", "openDialogueBatch"],
   ["text", "dialogue-translate", "openDialogueTranslate"],
+  ["text", "localization-qa", "openLocalizationQa"],
   ["comic", "writer-room", "openWriterRoom"],
   ["comic", "storyboard", "openStoryboardGrid"],
   ["comic", "story-bible", "openProductionBible"],

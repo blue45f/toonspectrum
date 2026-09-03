@@ -143,7 +143,7 @@ export function StudioBubbleToolPopoverBody({
             onClick={() => {
               setMenu(null);
               setDialogueBatchOpen(false);
-              setDialogueTranslateOpen(true);
+              setDialogueTranslateOpen("translate");
             }}
             className="min-h-11 rounded-xl border border-line/60 bg-card/70 px-2 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
           >

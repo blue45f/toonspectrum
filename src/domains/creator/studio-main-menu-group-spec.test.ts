@@ -187,6 +187,9 @@ describe("§15.3 menu group spec", () => {
       // 2026-08-27: View 중복이던 검수·미리보기 3종과 창 그룹의 앱 설정 두 번째
       // 진입점 extras 를 제거했다(40 → 36) — 단일 행은 Animation/Comic 그룹과
       // 편집 메뉴가 소유한다.
+      // 2026-09-03: 현지화 QA(text/localization-qa)는 Localization Layout 행의 두 번째
+      // 항목이라 extras 가 아니라 partial 행에 머문다(rowsPartial 36 그대로) — 로케일별
+      // 폰트/박스 오버라이드가 남아 present 로 올리지 않는다.
       extras: 38,
     });
   });
