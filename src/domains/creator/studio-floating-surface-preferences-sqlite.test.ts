@@ -6,11 +6,14 @@ import {
 } from "./studio-floating-surface-preferences-sqlite";
 
 const FALLBACK = Object.freeze({
-  version: 1 as const,
+  version: 2 as const,
   xRatio: 1,
   yRatio: 0,
   width: 336,
   height: 720,
+  dock: "free" as const,
+  positionLocked: false,
+  sizeLocked: false,
 });
 
 function memoryStore(initial: Record<string, string> = {}) {
@@ -66,6 +69,8 @@ describe("studio floating surface SQLite preferences", () => {
       "width",
       "height",
       "dock",
+      "positionLocked",
+      "sizeLocked",
     ]);
   });
 

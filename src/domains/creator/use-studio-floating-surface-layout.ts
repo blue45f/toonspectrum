@@ -14,10 +14,10 @@ import {
   type StudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceStorage,
 } from "./studio-floating-surface";
-import {
-  acquireProductStudioFloatingSurfacePreferencesRepository,
-  type StudioFloatingSurfacePersistenceFailure,
-  type StudioFloatingSurfacePreferencesRepository,
+
+import type {
+  StudioFloatingSurfacePersistenceFailure,
+  StudioFloatingSurfacePreferencesRepository,
 } from "./studio-floating-surface-preferences-sqlite";
 
 export type StudioFloatingSurfaceLayoutAuthority =
@@ -63,6 +63,15 @@ function productRepositoryAvailable(): boolean {
   }
 }
 
+async function acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred(): Promise<
+  StudioFloatingSurfacePreferencesRepository
+> {
+  const { acquireProductStudioFloatingSurfacePreferencesRepository } = await import(
+    "./studio-floating-surface-preferences-sqlite"
+  );
+  return acquireProductStudioFloatingSurfacePreferencesRepository();
+}
+
 /**
  * Synchronous UI continuity plus verified SQLite/OPFS durability for one persistent Studio panel.
  *
@@ -75,7 +84,7 @@ export function useStudioFloatingSurfaceLayout({
   sessionKey = studioFloatingSurfaceSessionKey(surfaceId),
   enabled = true,
   repositoryFactory =
-    acquireProductStudioFloatingSurfacePreferencesRepository,
+    acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred,
 }: UseStudioFloatingSurfaceLayoutOptions): UseStudioFloatingSurfaceLayoutResult {
   const normalizedDefault = useMemo(
     () => normalizeStudioFloatingSurfaceLayout(defaultLayout, defaultLayout),
@@ -99,7 +108,7 @@ export function useStudioFloatingSurfaceLayout({
   liveLayoutRef.current = layout;
 
   const sqliteAvailable = repositoryFactory
-    !== acquireProductStudioFloatingSurfacePreferencesRepository
+    !== acquireProductStudioFloatingSurfacePreferencesRepositoryDeferred
     || productRepositoryAvailable();
 
   const repository = useCallback(() => {

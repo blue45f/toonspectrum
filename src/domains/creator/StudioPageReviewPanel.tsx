@@ -8,7 +8,6 @@ import {
 import { useEffect, type ChangeEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import {
   normalizePageReviewState,
   PAGE_REVIEW_STATUS_LABELS,
@@ -16,6 +15,7 @@ import {
   type PageReviewState,
   type PageReviewStatus,
 } from "./studio-page-review";
+import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
 
 import { useIsMobile } from "@/src/hooks/use-media-query";
@@ -38,12 +38,15 @@ export interface StudioPageReviewPanelProps {
   ) => void;
 }
 
-export const DEFAULT_STUDIO_PAGE_REVIEW_FLOATING_LAYOUT = Object.freeze({
-  version: 1 as const,
+const DEFAULT_STUDIO_PAGE_REVIEW_FLOATING_LAYOUT = Object.freeze({
+  version: 2 as const,
   xRatio: 0.86,
   yRatio: 0.08,
   width: 760,
   height: 720,
+  dock: "right" as const,
+  positionLocked: false,
+  sizeLocked: false,
 });
 
 export function StudioPageReviewPanel({
@@ -63,7 +66,7 @@ export function StudioPageReviewPanel({
   } = useStudioFloatingSurfaceLayout({
     surfaceId: "page-review",
     defaultLayout: DEFAULT_STUDIO_PAGE_REVIEW_FLOATING_LAYOUT,
-    enabled: open,
+    enabled: open && !isMobile,
   });
 
   useEffect(() => {

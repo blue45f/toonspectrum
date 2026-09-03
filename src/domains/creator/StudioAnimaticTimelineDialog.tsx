@@ -19,13 +19,15 @@ export interface StudioAnimaticTimelineDialogProps {
   readonly onClose: () => void;
 }
 
-export const DEFAULT_STUDIO_ANIMATIC_FLOATING_LAYOUT = Object.freeze({
-  version: 1 as const,
+const DEFAULT_STUDIO_ANIMATIC_FLOATING_LAYOUT = Object.freeze({
+  version: 2 as const,
   xRatio: 0.5,
   yRatio: 1,
   width: 1_100,
   height: 480,
   dock: "bottom" as const,
+  positionLocked: false,
+  sizeLocked: false,
 });
 
 function scopeHash(value: string): string {
@@ -37,7 +39,7 @@ function scopeHash(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
-export function studioAnimaticFloatingSurfaceId(workScope: string): string {
+function studioAnimaticFloatingSurfaceId(workScope: string): string {
   const readable = workScope
     .normalize("NFKC")
     .replace(/[^A-Za-z0-9._~-]+/gu, "-")
@@ -101,12 +103,12 @@ export function StudioAnimaticTimelineDialog({
         insetRight={12}
         insetBottom={12}
         insetLeft={12}
-        allowedDockEdges={["left", "right", "bottom"]}
         onLayoutChange={setLayout}
         onClose={onClose}
         rootDataAttributes={{
           "data-studio-animatic-dialog": "true",
           "data-studio-animatic-presentation": "desktop",
+          "data-dock-edge": layout.dock,
           "data-studio-shortcut-boundary": "true",
           "data-layout-authority": authority,
           "data-layout-failure": failure ?? undefined,

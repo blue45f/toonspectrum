@@ -1,5 +1,4 @@
 import {
-  encodeStudioFloatingSurfaceLayout,
   normalizeStudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceLayout,
 } from "./studio-floating-surface";
@@ -52,6 +51,22 @@ export function isValidStudioFloatingSurfaceId(surfaceId: string): boolean {
 
 function storageKey(surfaceId: string): string {
   return `surface:${surfaceId}`;
+}
+
+function encodeStudioFloatingSurfaceLayout(
+  layout: StudioFloatingSurfaceLayout,
+): string {
+  const normalized = normalizeStudioFloatingSurfaceLayout(layout);
+  return JSON.stringify({
+    version: normalized.version,
+    xRatio: normalized.xRatio,
+    yRatio: normalized.yRatio,
+    width: normalized.width,
+    height: normalized.height,
+    dock: normalized.dock,
+    positionLocked: normalized.positionLocked,
+    sizeLocked: normalized.sizeLocked,
+  });
 }
 
 /**
