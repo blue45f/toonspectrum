@@ -59,6 +59,7 @@ import type {
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
+import type { StudioDialogueTranslateSurface } from "./StudioDialogueTranslatePanel";
 import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
@@ -591,7 +592,7 @@ export interface StudioToolBeltContentProps {
   setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueScript: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<StudioDialogueTranslateSurface>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setEmeresCategoryFilter: import("react").Dispatch<import("react").SetStateAction<string>>;
   setEmeresSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;

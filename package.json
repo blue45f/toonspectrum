@@ -8,7 +8,7 @@
     "pnpm": ">=11"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky && git config core.hooksPath .husky",
     "dev": "vite --host 0.0.0.0",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
     "postbuild": "node scripts/generate-third-party-notices.mjs --output dist/legal/THIRD_PARTY_NOTICES.generated.md && node scripts/verify-vercel-csp.mjs dist/index.html",
@@ -39,7 +39,8 @@
     "typecheck:trace": "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json --incremental false --generateTrace .tstrace",
     "typecheck:analyze-trace": "analyze-trace .tstrace",
     "typecheck:trace:report": "pnpm run typecheck:trace && pnpm run typecheck:analyze-trace",
-    "test": "vitest run",
+    "test": "vitest run && pnpm run test:perf",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:postgres:integration": "node scripts/run-postgres-integration-tests.mjs",
     "verify:creator-marketplace-db": "tsx scripts/verify-creator-marketplace-db.mts",
     "test:market:e2e": "playwright test --config playwright.market.config.ts",
@@ -58,6 +59,7 @@
     "lint:strict": "NODE_OPTIONS='--max-old-space-size=8192' eslint --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:ci": "pnpm run lint:strict",
     "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --prod --audit-level high",
+    "audit:studio-brush-mark-distance": "tsx scripts/audit-studio-brush-mark-distance.mts",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
     "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",

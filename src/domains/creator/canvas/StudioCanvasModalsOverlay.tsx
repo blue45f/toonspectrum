@@ -131,8 +131,10 @@ export interface StudioCanvasModalsOverlayProps {
     end: number
   ) => void;
   importDialogueInterchange: StudioCanvasViewportHandlers["importDialogueInterchange"];
-  dialogueTranslateOpen: boolean;
-  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  dialogueTranslateOpen: StudioCanvasViewportProps["dialogueTranslateOpen"];
+  setDialogueTranslateOpen: StudioCanvasViewportProps["setDialogueTranslateOpen"];
+  /** 말풍선 테마 — 현지화 QA 의 넘침 판정이 렌더와 같은 행간·자간 기본값을 쓰게 한다. */
+  webtoonTheme: StudioCanvasViewportProps["webtoonTheme"];
   textAiConfigured: boolean;
   activeServerAiProviderLabel: string;
   activeDialogueLocale: string;
@@ -250,6 +252,7 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
   importDialogueInterchange,
   dialogueTranslateOpen,
   setDialogueTranslateOpen,
+  webtoonTheme,
   textAiConfigured,
   activeServerAiProviderLabel,
   activeDialogueLocale,
@@ -528,6 +531,10 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
             onSwitchLocale={switchToDialogueLocale}
             onClose={() => setDialogueTranslateOpen(false)}
             workScope={workId ?? authorizedWorkAssetScopeId ?? undefined}
+            qaOpen={dialogueTranslateOpen === "qa"}
+            onQaOpenChange={(open) => setDialogueTranslateOpen(open ? "qa" : "translate")}
+            webtoonTheme={webtoonTheme}
+            onRevealCue={selectDialogueElement}
           />
         </Suspense>
       )}

@@ -108,6 +108,11 @@ export interface StudioMainMenuSurfaceActions {
   openDialogueBatch: () => unknown;
   /** §15.3 Text ▸ Localization Layout — dialogue locales + translation memory. */
   openDialogueTranslate: () => unknown;
+  /**
+   * §15.3 Text ▸ Localization Layout, 현지화 QA — the same translate panel opened
+   * straight onto its overflow/style/MQM report screen.
+   */
+  openLocalizationQa: () => unknown;
   /** 그리기 ▸ 픽셀 아트 — 제한 팔레트 스냅. */
   togglePixelArtMode: () => unknown;
   /** 캔버스 ▸ 스티키 노트 — 기본 레몬 프리셋. */
