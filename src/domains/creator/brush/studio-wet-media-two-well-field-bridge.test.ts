@@ -199,13 +199,22 @@ describe("two-well wet-media tile-field bridge", () => {
 
   it("fails without advancing either immutable state when the field cannot accept the deposit", () => {
     const model = fieldSettings({ maxCellPigment: 1, maxCellWater: 1 });
-    const field = emptyField(model);
+    const empty = emptyField(model);
+    const seeded = applyStudioWetMediaTileFieldDepositions(model, empty, [{
+      cellIndex: 0,
+      waterMassDelta: 0,
+      pigmentMassDelta: 0.8,
+      color: [0.2, 0.4, 0.8, 1],
+    }]);
+    expect(seeded.ok).toBe(true);
+    if (!seeded.ok) return;
+    const field = seeded.value.state;
     const mixer = twoWellSettings({
-      wetness: 1,
-      load: 1,
+      wetness: 0,
+      load: 0.1,
       mix: 0,
       pickupRate: 0,
-      depositionRate: 256,
+      depositionRate: 0.1,
       reservoirPigmentCapacity: 10,
       reservoirWaterCapacity: 8,
     });
@@ -232,10 +241,10 @@ describe("two-well wet-media tile-field bridge", () => {
       stage: "tile-field",
       reason: "mass-budget-exceeded",
     });
-    expect(field.mobilePigmentMass[0]).toBe(0);
+    expect(field.mobilePigmentMass[0]).toBeCloseTo(0.8, 12);
     expect(field.surfaceWater[0]).toBe(0);
     expect(brush.lastContactSequence).toBeNull();
-    expect(brush.reservoir.pigmentMass).toBe(10);
+    expect(brush.reservoir.pigmentMass).toBe(1);
   });
 
   it("rejects inactive cells before changing brush contact sequence", () => {
