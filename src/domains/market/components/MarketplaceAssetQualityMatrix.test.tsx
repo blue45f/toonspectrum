@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   createCreatorMarketplaceAuthoringDraft,
@@ -22,6 +22,10 @@ function Harness({ initial }: { initial: CreatorMarketplaceAuthoringDraft }): Re
     </>
   );
 }
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("MarketplaceAssetQualityMatrix", () => {
   it("stores required brush scenarios in the shared authoring draft", () => {
