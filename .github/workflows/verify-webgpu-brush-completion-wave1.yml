@@ -52,8 +52,7 @@ jobs:
           {
             "extends": "./tsconfig.json",
             "compilerOptions": {
-              "incremental": false,
-              "tsBuildInfoFile": null
+              "incremental": false
             },
             "files": [
               "src/domains/creator/render/studio-engine-webgpu-tile-provider-production.ts",
