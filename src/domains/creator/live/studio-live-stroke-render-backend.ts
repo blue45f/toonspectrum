@@ -176,9 +176,23 @@ export interface StudioLiveStrokeEpochIdentity {
   readonly strokeId: string;
 }
 
+/**
+ * What a submission does to the pixels already presented on the shared GPU surface.
+ *
+ * - `rewrite` reassigns the backing store or replaces the journal baseline. The presented pixels
+ *   are gone or no longer describe this stroke, so presentation must close until the new exact
+ *   receipt lands.
+ * - `append` extends the retained journal in place. Retained tiles are appended (`loadOp: "load"`)
+ *   and the presentation pass redraws the whole composite, so the surface keeps showing either the
+ *   last presented frame or a superset of it — in both cases a valid prefix of this same stroke.
+ */
+export type StudioLiveStrokeGpuSurfaceContinuity = "append" | "rewrite";
+
 export interface StudioLiveStrokeGpuFrameRequestInput
   extends StudioLiveStrokeEpochIdentity {
   readonly requestId: string;
+  /** Defaults to `rewrite`: a caller that does not state continuity is assumed to destroy pixels. */
+  readonly surfaceContinuity?: StudioLiveStrokeGpuSurfaceContinuity;
 }
 
 export interface StudioLiveStrokeGpuFrameReceiptInput {
@@ -425,14 +439,20 @@ export class StudioLiveStrokeRenderBackendCoordinator {
       requestId: input.requestId,
     });
     this.gpuSequence = token.sequence;
+    // A rewrite mutates the shared surface: its last receipt cannot authorize pixels from a newer
+    // submission, so presentation closes until the new exact token completes. An append only grows
+    // the retained journal, so a session that is already presenting keeps presenting its own
+    // prefix. Because `gpuOverlayVisible` is still false before the first receipt, the opening
+    // frame of a stroke is never exposed unreceipted. The receipt remains the sole authority for
+    // readback capture and canonical handoff either way, and the retained Canvas geometry stays
+    // document-commit evidence rather than an alternate live renderer.
+    const retainsPresentation = input.surfaceContinuity === "append"
+      && previous.gpuOverlayVisible;
     const next = sessionSnapshot({
       ...previous,
-      // The shared GPU surface is mutated in place. Its last receipt cannot authorize pixels from
-      // a newer submission, so presentation is unavailable until the new exact token completes.
-      // The retained Canvas geometry is document-commit evidence, not an alternate live renderer.
-      presentationBackend: null,
+      presentationBackend: retainsPresentation ? previous.presentationBackend : null,
       canvasShadowVisible: false,
-      gpuOverlayVisible: false,
+      gpuOverlayVisible: retainsPresentation,
       expectedGpuRequest: token,
     });
     return this.accept(
@@ -441,7 +461,9 @@ export class StudioLiveStrokeRenderBackendCoordinator {
       next,
       [
         { type: "canvas-shadow.retain-hidden" },
-        { type: "gpu-overlay.hide" },
+        retainsPresentation
+          ? { type: "gpu-overlay.linger" }
+          : { type: "gpu-overlay.hide" },
         { type: "gpu-frame.await", token },
       ],
       token,
