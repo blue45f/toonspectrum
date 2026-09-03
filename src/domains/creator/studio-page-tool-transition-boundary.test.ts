@@ -15,6 +15,13 @@ const leftToolRailSource = readFileSync(
   new URL("./StudioLeftToolRail.tsx", import.meta.url),
   "utf8",
 );
+// The rail no longer declares the transition's signature inline: it binds every host action
+// generically through `bindVoidAction("activatePrimaryCanvasTool")`, and the typed signature moved
+// to the EditorClient handler contract. That is where the rail's half of this invariant now lives.
+const leftToolRailClientSource = readFileSync(
+  new URL("./editor-client/studio-left-tool-rail-client.ts", import.meta.url),
+  "utf8",
+);
 const toolBeltSource = readFileSync(
   new URL("./StudioToolBeltContent.tsx", import.meta.url),
   "utf8",
@@ -474,13 +481,24 @@ describe("StudioPage tool transition boundary", () => {
   it("gives every pen/eraser/select entry point the same side effects", () => {
     // 감사 근거: 펜/지우개가 8곳에 복제되어 부수효과가 4갈래로 갈렸다(획 취소·disarm 유무).
     // 완전한 CommandRegistry 통합은 다음 웨이브 몫이고, 여기서는 "부수효과 집합이 하나"만 고정한다.
+    // 부수효과 집합이 하나라는 것을 두 갈래로 고정한다: 전이의 서명이 한 곳에만 선언되고,
+    // 두 진입점 중 누구도 setTool/setDrawMode 를 직접 부르지 않는다.
+    expect(toolBeltSource, "tool belt").toContain(
+      'activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
+    );
+    expect(leftToolRailClientSource, "rail client contract").toContain(
+      "readonly activatePrimaryCanvasTool: (",
+    );
+    expect(leftToolRailClientSource, "rail client contract").toContain(
+      'tool: "select" | "draw",',
+    );
+    expect(leftToolRailClientSource, "rail client contract").toContain(
+      "drawMode?: DrawMode,",
+    );
     for (const [label, source] of [
       ["rail", leftToolRailSource],
       ["tool belt", toolBeltSource],
     ] as const) {
-      expect(source, label).toContain(
-        'activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
-      );
       expect(source, label).not.toContain('setTool("draw");');
       expect(source, label).not.toContain('setDrawMode("pen");');
       expect(source, label).not.toContain('setDrawMode("eraser");');

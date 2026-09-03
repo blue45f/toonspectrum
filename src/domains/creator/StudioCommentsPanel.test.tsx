@@ -194,7 +194,13 @@ describe("StudioCommentsPanel review rail contract", () => {
 
     expect(studioPageSource).toContain("commentPlacementPhaseRef");
     expect(studioPageSource).toContain('const commentPlacementActive = commentPlacementPhase !== "idle"');
-    expect(studioShellSource.match(/commentPinArmed=\{commentPlacementActive\}/gu)).toHaveLength(2);
+    // Two surfaces show the comment tool as still armed while the composer is open — that is the
+    // Magma-style behaviour this test guards. They no longer take the flag the same way: the mobile
+    // dock still receives a JSX prop, while the left tool rail moved onto the EditorClient factory
+    // during the rail/client split. Assert both wirings so narrowing either one back to the
+    // placing-only `commentPinArmed` (which would hide the 해제 affordance mid-compose) fails here.
+    expect(studioShellSource.match(/commentPinArmed=\{commentPlacementActive\}/gu)).toHaveLength(1);
+    expect(studioShellSource.match(/commentPinArmed: commentPlacementActive,/gu)).toHaveLength(1);
     expect(studioPageSource).toContain('setStudioCommentPlacementPhase("placing")');
     expect(studioPageSource).toContain('setStudioCommentPlacementPhase("composing")');
     expect(studioPageSource).toContain("stopStudioCommentPlacementSession");
