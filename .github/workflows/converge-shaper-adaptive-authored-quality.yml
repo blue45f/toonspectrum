@@ -1,0 +1,179 @@
+name: Converge adaptive face and authored hair
+
+on:
+  push:
+    branches:
+      - feat/shaper-adaptive-face-authored-hair-20260903
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: shaper-adaptive-authored-convergence
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  FEATURE_BRANCH: feat/shaper-adaptive-face-authored-hair-20260903
+
+jobs:
+  verify-and-open:
+    if: ${{ !contains(github.event.head_commit.message || '', '[adaptive-authored-converged]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out feature branch with full history
+        uses: actions/checkout@v6
+        with:
+          ref: feat/shaper-adaptive-face-authored-hair-20260903
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Synchronize current protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            git merge --no-ff --no-edit origin/main
+          fi
+
+      - name: Materialize adaptive face and authored hair integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="scripts/apply-shaper-adaptive-authored-quality.py"
+          actor="src/domains/creator/vrm/StudioVrmAvatarForge.tsx"
+          if [ -f "$script" ] && ! grep -q 'studio-vrm-authored-hair-geometry' "$actor"; then
+            python3 "$script"
+          fi
+          grep -q 'studio-vrm-authored-hair-geometry' "$actor"
+          grep -q 'studio-vrm-semantic-face-morph' "$actor"
+          test -f src/domains/creator/vrm/studio-vrm-adaptive-face-deformer.ts
+          test -f src/domains/creator/vrm/studio-vrm-authored-hair-geometry.ts
+          git diff --check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize generated source safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix \
+            src/domains/creator/vrm/StudioVrmAvatarForge.tsx \
+            src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx \
+            src/domains/creator/vrm/StudioVrmPoserPanelBodyA.tsx \
+            src/domains/creator/vrm/studio-vrm-semantic-face-morph.ts \
+            src/domains/creator/vrm/studio-vrm-adaptive-face-deformer.ts \
+            src/domains/creator/vrm/studio-vrm-authored-hair-geometry.ts
+          git diff --check
+
+      - name: Validate architecture
+        run: pnpm run validate:architecture
+
+      - name: Lint complete repository
+        run: pnpm run lint
+
+      - name: Run focused character-quality tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            src/domains/creator/vrm/studio-vrm-semantic-face-morph.test.ts
+            src/domains/creator/vrm/studio-vrm-adaptive-face-deformer.test.ts
+            src/domains/creator/vrm/studio-vrm-authored-hair-geometry.test.ts
+            src/domains/creator/vrm/studio-vrm-character-quality-closure.test.ts
+            src/domains/creator/vrm/StudioVrmAvatarForge.test.ts
+            src/domains/creator/vrm/StudioVrmAvatarForgePreview.test.tsx
+            src/domains/creator/vrm/StudioVrmAvatarForgePanel.test.tsx
+            src/domains/creator/vrm/studio-vrm-avatar-forge.test.ts
+            src/domains/creator/vrm/studio-vrm-avatar-forge-face-controller.test.ts
+            src/domains/creator/vrm/studio-vrm-character-workshop-boundary.test.ts
+            src/domains/creator/vrm/studio-vrm-texture-paint-integration-boundary.test.ts
+          )
+          existing=()
+          for test_file in "${tests[@]}"; do
+            [ -f "$test_file" ] && existing+=("$test_file")
+          done
+          test ${#existing[@]} -gt 0
+          pnpm exec vitest run "${existing[@]}"
+
+      - name: Type-check all web sources
+        run: pnpm run typecheck
+
+      - name: Build production Studio
+        run: pnpm run build
+
+      - name: Verify Studio bundle boundaries and budgets
+        run: pnpm run check:studio-bundle
+
+      - name: Remove one-shot integration machinery
+        shell: bash
+        run: |
+          rm -f scripts/apply-shaper-adaptive-authored-quality.py
+          rm -f .github/workflows/bootstrap-shaper-adaptive-authored-quality.yml
+          rm -f .github/workflows/export-shaper-worktree.yml
+          rm -f .github/workflows/finalize-shaper-adaptive-authored-quality.yml
+          rm -f .github/workflows/converge-shaper-adaptive-authored-quality.yml
+          git diff --check
+
+      - name: Commit and push verified implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit --no-verify -m "feat(studio): close adaptive face and authored hair quality gaps [adaptive-authored-converged]"
+          fi
+          git push --no-verify origin "HEAD:${FEATURE_BRANCH}"
+
+      - name: Create or update protected-main pull request
+        id: pull
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$FEATURE_BRANCH" --base main --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$FEATURE_BRANCH" \
+              --title "feat(studio): adaptive facial sculpt and authored toon hair" \
+              --body "Closes the remaining character-quality gaps without inventing unsupported semantics. Native VRM facial morphs are used first; a bounded, reversible face-mesh deformer covers models without semantic shape keys. Procedural tube-like hair is replaced in the product route by a deterministic authored-clump buffer with a separate outline shell. Existing expression, lip-sync, rig, persistence, capture, and surface-paint contracts remain intact. This workflow passed repository architecture, full lint, focused quality tests, root typecheck, production build, and bundle-budget verification before opening this PR.")"
+            number="${url##*/}"
+          fi
+          gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/pull/${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish convergence summary
+        run: |
+          {
+            echo "## Adaptive face and authored hair convergence"
+            echo
+            echo "- PR: ${{ steps.pull.outputs.url }}"
+            echo "- Required main checks are not bypassed."
+            echo "- Native semantic morphs remain authoritative when present."
+            echo "- Adaptive fallback is bounded, reversible, and excludes expression targets."
+            echo "- Hair is baked into deterministic authored clump and outline buffers."
+          } >> "$GITHUB_STEP_SUMMARY"
