@@ -242,8 +242,10 @@ export function renderStudioCanvasSelectionDecorations({
           // Rotation is safe for both. Uniform scale commutes with it, so a selection turns as a
           // rigid body and each member's committed angle is simply its own plus the gesture's.
           // The handle is offered from the planners' own verdicts (`selectionRotatable`, derived
-          // in the interaction hook): a member that cannot carry an angle makes the commit refuse
-          // or drop it, so offering the handle there could only end in a toast or a silent no-op.
+          // in the interaction hook from the same predicates the commit runs): a member that
+          // cannot carry an angle makes the commit stand the whole gesture down -- the group plan
+          // refuses, and a sole dropped-rotation stroke is refused up front rather than committed
+          // as a silent resize -- so offering the handle there could only end in a refusal toast.
           rotatable={selectionRotatable}
           // The caller supplies document facts only. Route thresholds, arrow semantics, clip
           // ownership, drag-Layer lift and wrapper lookup are private to the Konva adapter.

@@ -449,8 +449,11 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     && !isEffectivelyLocked(canvasSelectionEls[0]!, groups);
   // The proxy's rotation handle is offered only where the commit could honour it: a sole stroke
   // follows the single-stroke planner's drop rule, a selection the group planner's all-or-nothing
-  // verdict. That verdict scans calligraphy strokes for effective stylus orientation, so it is
-  // derived here with the other per-selection facts rather than in the per-render decoration pass.
+  // verdict, which scans calligraphy strokes for effective stylus orientation. It is derived here
+  // beside the other facts that gate the same proxy -- singleDrawFreeScale, multiSelectionBounds,
+  // groupResizeEnabled -- so one selection cannot produce a handle and a commit that disagree.
+  // Placement is not a cost argument: the decoration pass is a plain factory whose caller owns
+  // every piece of state it reads, and it imports no planner to ask.
   const soleSelectionEl = canvasSelectionEls[0];
   const selectionRotatable = singleDrawFreeScale
     ? soleSelectionEl?.type === "draw" && !studioDrawObjectRotationIsDropped(soleSelectionEl)

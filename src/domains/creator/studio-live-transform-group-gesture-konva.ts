@@ -24,9 +24,13 @@
  * The frame's angle is forwarded to the group planner untouched. That planner is the authority on
  * whether the selection can carry it -- it turns the set as a rigid body and refuses the WHOLE
  * plan when any member cannot (`studioGroupUniformResizeMemberCanRotate`: a panel frame, a
- * bounds-derived shape, a mirrored-symmetry stroke) -- and a refused plan falls back to
- * commit-at-release here exactly like any other refusal. Admission stays angle-agnostic: its
- * footprint bound is the box diagonal, which no rotation can exceed.
+ * bounds-derived shape, a mirrored-symmetry stroke, or a calligraphy stroke with effective
+ * per-sample orientation -- the one this adapter has already refused for itself below, for the
+ * same tearing reason) -- and a refused plan falls back to commit-at-release here exactly like
+ * any other refusal. Admission stays angle-agnostic in every lane, though not for one reason: the
+ * ribbon and generic lanes bound the fill by the target box diagonal, which no rotation can
+ * exceed, while the causal-ink lane charges dab count times dab area and reads the box only
+ * through its scale factor.
  */
 import { flushSync } from "react-dom";
 
@@ -149,8 +153,9 @@ function drawPointBounds(points: readonly number[]): {
  * One member's box carried through the selection's own uniform frame.
  *
  * Deliberately ignores the gesture angle: work admission reads only `width`/`height` from this
- * box (the footprint bound is `hypot(w, h)`, which a rotation leaves alone), so turning the box
- * would move numbers nothing downstream consults.
+ * box -- the ribbon and generic lanes turn them into `hypot(w, h)`, the causal-ink lane into a
+ * scale factor -- and a rotation leaves both alone, so turning the box would move numbers nothing
+ * downstream consults.
  */
 function mapBoundsThroughFrame(
   bounds: StudioGroupUniformResizeBounds,
