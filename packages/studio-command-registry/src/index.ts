@@ -70,3 +70,10 @@ export type {
   EditorSnapshotStore,
   TileRegion,
 } from "./editor-client";
+
+export { createEditorClientRuntime } from "./editor-client-runtime";
+export type {
+  EditorClientRuntime,
+  EditorClientRuntimeOptions,
+  EditorClientRuntimeUpdate,
+} from "./editor-client-runtime";
