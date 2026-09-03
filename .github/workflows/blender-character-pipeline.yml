@@ -1,0 +1,242 @@
+name: Blender character pipeline
+
+on:
+  push:
+    branches:
+      - feat/blender-character-quality-pipeline-20260904
+    paths:
+      - ".github/workflows/blender-character-pipeline.yml"
+      - "config/blender/**"
+      - "docs/studio/blender-character-pipeline.md"
+      - "scripts/blender/**"
+      - "scripts/import-blender-character-package.mts"
+      - "scripts/setup-toonstudio-blender-pipeline.mts"
+      - "scripts/verify-blender-character-pipeline.mjs"
+      - "src/domains/creator/vrm/studio-vrm-blender-character-package*"
+      - "tests/blender/**"
+      - "tools/blender/toonstudio_blender_kit/**"
+  pull_request:
+    paths:
+      - ".github/workflows/blender-character-pipeline.yml"
+      - "config/blender/**"
+      - "docs/studio/blender-character-pipeline.md"
+      - "scripts/blender/**"
+      - "scripts/import-blender-character-package.mts"
+      - "scripts/setup-toonstudio-blender-pipeline.mts"
+      - "scripts/verify-blender-character-pipeline.mjs"
+      - "src/domains/creator/vrm/studio-vrm-blender-character-package*"
+      - "tests/blender/**"
+      - "tools/blender/toonstudio_blender_kit/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blender-character-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BLENDER_VERSION: 5.2.1
+  VRM_ADDON_VERSION: 4.5.0
+  VRM_ADDON_SHA256: e5e0f923a0bb11eb1320870b2db8091948dd5b63014510d839016a112e40a35a
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  contracts:
+    name: contracts-and-runtime-boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate repository architecture
+        run: pnpm run validate:architecture
+
+      - name: Run pure Python pipeline contracts
+        run: |
+          python3 -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
+          python3 -m unittest discover -s tests/blender -p 'test_*.py' -v
+
+      - name: Verify static integration and safety boundary
+        run: node scripts/verify-blender-character-pipeline.mjs
+
+      - name: Lint TypeScript package tooling
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/import-blender-character-package.mts
+          scripts/setup-toonstudio-blender-pipeline.mts
+          scripts/verify-blender-character-pipeline.mjs
+          src/domains/creator/vrm/studio-vrm-blender-character-package.ts
+          src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+
+      - name: Test ToonStudio package admission boundary
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+
+      - name: Type-check the web workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+  real-blender:
+    name: real-blender-5.2-authoring-and-roundtrip
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      HOME: ${{ runner.temp }}/toonstudio-blender-home
+      BLENDER_USER_RESOURCES: ${{ runner.temp }}/toonstudio-blender-user
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore Blender binary cache
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/blender-${{ env.BLENDER_VERSION }}-linux-x64
+          key: blender-${{ runner.os }}-x64-${{ env.BLENDER_VERSION }}
+
+      - name: Download and verify official Blender LTS
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p .cache
+          cd .cache
+          archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          checksum="blender-${BLENDER_VERSION}.sha256"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output "$archive" \
+            "https://download.blender.org/release/Blender5.2/$archive"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output "$checksum" \
+            "https://download.blender.org/release/Blender5.2/$checksum"
+          grep " $archive$" "$checksum" | sha256sum --check -
+          tar -xf "$archive"
+          mv "blender-${BLENDER_VERSION}-linux-x64" "blender-${BLENDER_VERSION}-linux-x64.ready"
+          rm -f "$archive" "$checksum"
+          mv "blender-${BLENDER_VERSION}-linux-x64.ready" "blender-${BLENDER_VERSION}-linux-x64"
+
+      - name: Export Blender path
+        run: |
+          echo "BLENDER_PATH=$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" >> "$GITHUB_ENV"
+          mkdir -p "$HOME" "$BLENDER_USER_RESOURCES"
+          "$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" --version
+
+      - name: Build, install and probe pinned extensions
+        run: >-
+          pnpm exec tsx scripts/setup-toonstudio-blender-pipeline.mts --
+          --blender "$BLENDER_PATH"
+          --cache-dir "$RUNNER_TEMP/toonstudio-blender-cache"
+          --install-addons
+
+      - name: Generate the strict reference character package
+        run: >-
+          "$BLENDER_PATH" --background
+          --python scripts/blender/toonstudio_character_pipeline.py --
+          --config config/blender/reference-character.json
+          --project-root "$GITHUB_WORKSPACE"
+
+      - name: Record the exact Orion source digest
+        run: sha256sum public/vrm/Avatar_Orion.vrm
+
+      - name: Upgrade the audited Orion source to authored hair and semantic face controls
+        run: >-
+          "$BLENDER_PATH" --background
+          --python scripts/blender/toonstudio_character_pipeline.py --
+          --config config/blender/avatar-orion-production.json
+          --project-root "$GITHUB_WORKSPACE"
+
+      - name: Verify package quality, provenance, paths and SHA-256
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile, stat } from "node:fs/promises";
+          import path from "node:path";
+
+          const roots = ["reference-character", "avatar-orion-authored"];
+          for (const id of roots) {
+            const dir = path.resolve("batch_generated/blender-character", id);
+            const manifest = JSON.parse(await readFile(path.join(dir, "character-package.json"), "utf8"));
+            if (manifest.kind !== "toonstudio.character-package" || manifest.characterId !== id) {
+              throw new Error(`invalid package identity for ${id}`);
+            }
+            if (!manifest.quality.passed || manifest.quality.score < manifest.quality.minimumScore) {
+              throw new Error(`quality gate failed for ${id}: ${JSON.stringify(manifest.quality)}`);
+            }
+            if (!manifest.capabilities.authoredHair.enabled || manifest.capabilities.authoredHair.lodTriangles.length !== 3) {
+              throw new Error(`authored hair/LOD receipt missing for ${id}`);
+            }
+            if (manifest.capabilities.semanticFaceShapes.shapeKeys.length < 16) {
+              throw new Error(`semantic face profile is incomplete for ${id}`);
+            }
+            if (id === "avatar-orion-authored") {
+              const custom = manifest.capabilities.vrmCustomExpressions;
+              if (custom.status !== "ready" || custom.names.length < 16) {
+                throw new Error(`VRM custom semantic expressions are incomplete: ${JSON.stringify(custom)}`);
+              }
+            }
+            for (const [role, receipt] of Object.entries(manifest.files)) {
+              const relative = String(receipt.path).replaceAll("\\", "/");
+              if (relative.startsWith("/") || relative.split("/").some((part) => part === ".." || part === "")) {
+                throw new Error(`unsafe package path ${id}:${role}:${relative}`);
+              }
+              const file = path.resolve(dir, relative);
+              const bytes = await readFile(file);
+              const actual = createHash("sha256").update(bytes).digest("hex");
+              if (actual !== receipt.sha256 || (await stat(file)).size !== receipt.bytes) {
+                throw new Error(`package receipt mismatch ${id}:${role}`);
+              }
+            }
+            console.log(`${id}: score=${manifest.quality.score}, hair=${manifest.capabilities.authoredHair.lodTriangles.join("/")}, shapes=${manifest.capabilities.semanticFaceShapes.shapeKeys.length}, custom=${manifest.capabilities.vrmCustomExpressions.names.length}`);
+          }
+          NODE
+
+      - name: Re-import exported GLB and VRM in a fresh Blender process
+        run: |
+          "$BLENDER_PATH" --background --factory-startup --python-expr "import bpy; r=bpy.ops.import_scene.gltf(filepath='${GITHUB_WORKSPACE}/batch_generated/blender-character/reference-character/reference-character.glb'); assert 'FINISHED' in r; assert any(o.type == 'MESH' for o in bpy.context.scene.objects); print('TOONSTUDIO_GLB_ROUNDTRIP_OK')"
+          "$BLENDER_PATH" --background --python-expr "import bpy; r=bpy.ops.import_scene.vrm(filepath='${GITHUB_WORKSPACE}/batch_generated/blender-character/avatar-orion-authored/avatar-orion-authored.vrm'); assert 'FINISHED' in r; assert any(o.type == 'ARMATURE' for o in bpy.context.scene.objects); print('TOONSTUDIO_VRM_ROUNDTRIP_OK')"
+
+      - name: Dry-run ToonStudio package import
+        run: >-
+          pnpm exec tsx scripts/import-blender-character-package.mts --
+          --package batch_generated/blender-character/avatar-orion-authored/character-package.json
+          --destination "$RUNNER_TEMP/toonstudio-batch-source"
+          --dry-run
+
+      - name: Upload generated Blender packages and visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonstudio-blender-character-evidence-${{ github.sha }}
+          path: |
+            batch_generated/blender-character/**/character-package.json
+            batch_generated/blender-character/**/quality-report.json
+            batch_generated/blender-character/**/previews/**
+            batch_generated/blender-character/**/*.glb
+            batch_generated/blender-character/**/*.vrm
+          if-no-files-found: warn
+          retention-days: 14
