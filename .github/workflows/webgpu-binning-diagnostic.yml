@@ -70,6 +70,26 @@ jobs:
                   raise SystemExit("source header not found")
               patched = patched.replace(header, header + marker, 1)
           path.write_text(patched)
+
+          test_path = Path("src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts")
+          test = test_path.read_text()
+          old_expectation = '      "tile_offsets[meta.tile_count] = meta.reference_count",'
+          new_expectation = '      "tile_offsets[config.tile_count] = config.reference_count",'
+          if test.count(old_expectation) != 1:
+              raise SystemExit("legacy scan expectation not found exactly once")
+          test = test.replace(old_expectation, new_expectation, 1)
+          assertion_anchor = '''    expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scatter).not.toContain(
+              "atomicAdd",
+            );'''
+          assertion = '''    expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scatter).not.toContain(
+              "atomicAdd",
+            );
+            for (const shader of Object.values(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL)) {
+              expect(shader).not.toMatch(/\\b(meta|active)\\b/u);
+            }'''
+          if test.count(assertion_anchor) != 1:
+              raise SystemExit("shader assertion anchor not found exactly once")
+          test_path.write_text(test.replace(assertion_anchor, assertion, 1))
           PY
 
       - name: Focused unit tests
@@ -114,6 +134,9 @@ jobs:
           rm .github/workflows/webgpu-binning-diagnostic.yml
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts .github/workflows/webgpu-binning-diagnostic.yml
+          git add \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts \
+            .github/workflows/webgpu-binning-diagnostic.yml
           git commit -m "fix(webgpu): avoid reserved WGSL identifiers in tile binning"
           git push origin HEAD:fix/webgpu-dab-binning-real-gpu-20260904
