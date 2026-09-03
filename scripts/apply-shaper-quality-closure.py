@@ -67,10 +67,10 @@ new_mannequin_test = '''  it("셰이퍼 탭은 독립 ToonStudio 레시피를 �
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /^셰이퍼/ }));
 
-    expect(screen.getByRole("button", { name: /캐릭터 레시피/u })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "캐릭터 레시피" })).toBeTruthy();
     expect(screen.queryByText("SHAPER")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "얼굴형" }));
+    fireEvent.click(screen.getByRole("tab", { name: "얼굴형" }));
     fireEvent.click(screen.getByRole("button", { name: /둥근 동안형/u }));
     await waitFor(() => {
       expect(sceneHandle.setBodySpec).toHaveBeenCalled();
