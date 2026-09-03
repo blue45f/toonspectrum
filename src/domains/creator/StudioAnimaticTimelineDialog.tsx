@@ -103,6 +103,7 @@ export function StudioAnimaticTimelineDialog({
         insetRight={12}
         insetBottom={12}
         insetLeft={12}
+        allowedDockEdges={["left", "right", "bottom"]}
         onLayoutChange={setLayout}
         onClose={onClose}
         rootDataAttributes={{
