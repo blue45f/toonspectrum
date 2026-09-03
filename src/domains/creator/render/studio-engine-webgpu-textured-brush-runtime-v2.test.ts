@@ -200,17 +200,20 @@ describe("compact textured WebGPU brush v2", () => {
   it("fails closed outside the measured product lane", () => {
     const valid = texturedPlan();
     expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(valid)).toBe(true);
-    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+      ...valid,
       mode: "append",
     }))).toBe(false);
     expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
       ...valid,
       durableR8GrainSource: {} as never,
     }))).toBe(false);
-    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+      ...valid,
       grainSamplingSemantics: "durable-r8-cpu-parity-v1",
     }))).toBe(false);
-    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+      ...valid,
       batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
     }))).toBe(false);
   });
