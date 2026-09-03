@@ -11904,7 +11904,8 @@ export function StudioCuttoonEditor({
     }
 
     const firstStrokeIndex = gpuLiveSourceJournalFirstStrokeIndexRef.current;
-    if (!prepareLiveStrokeGpuSubmission(el.id)) {
+    // Grows the retained journal in place, so the presented prefix survives this submission.
+    if (!prepareLiveStrokeGpuSubmission(el.id, "append")) {
       failSelectedGpuLiveInk("request-failed", el.id);
       return "rejected";
     }
@@ -11921,7 +11922,7 @@ export function StudioCuttoonEditor({
       return "rejected";
     }
     gpuLiveSourceJournalRef.current = advanced.state;
-    if (!registerLiveStrokeGpuRequest(el.id, outcome.requestId)) {
+    if (!registerLiveStrokeGpuRequest(el.id, outcome.requestId, "append")) {
       failSelectedGpuLiveInk("surface-lost", el.id);
       return "rejected";
     }

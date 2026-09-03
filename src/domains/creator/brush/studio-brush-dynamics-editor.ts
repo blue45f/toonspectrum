@@ -11,7 +11,9 @@ import {
   type StudioBrushTaperSettings,
 } from "./studio-brush-dynamics";
 import {
+  normalizeStudioBrushColorDynamicsSettings,
   normalizeStudioBrushGrainSettings,
+  type StudioBrushColorDynamicsSettings,
   type StudioBrushGrainSettings,
 } from "./studio-brush-material-dynamics";
 import {
@@ -177,5 +179,19 @@ export function updateStudioBrushDynamicsTip(
   return normalizeStudioBrushDynamicsSettings({
     ...normalized,
     tip: normalizeStudioBrushTipSettings({ ...normalized.tip, ...patch }),
+  });
+}
+
+export function updateStudioBrushDynamicsColorDynamics(
+  settings: unknown,
+  patch: Partial<StudioBrushColorDynamicsSettings>
+): NormalizedStudioBrushDynamicsSettings {
+  const normalized = normalizeStudioBrushDynamicsSettings(settings);
+  return normalizeStudioBrushDynamicsSettings({
+    ...normalized,
+    colorDynamics: normalizeStudioBrushColorDynamicsSettings({
+      ...normalized.colorDynamics,
+      ...patch,
+    }),
   });
 }

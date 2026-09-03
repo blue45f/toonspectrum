@@ -1,8 +1,9 @@
-import { Activity, ChevronDown, Shuffle, Waves } from "lucide-react";
+import { Activity, ChevronDown, Shuffle, Sparkles, Waves } from "lucide-react";
 
 import {
   findStudioBrushDynamicsMapping,
   removeStudioBrushDynamicsMapping,
+  updateStudioBrushDynamicsColorDynamics,
   updateStudioBrushDynamicsGrain,
   updateStudioBrushDynamicsJitter,
   updateStudioBrushDynamicsMapping,
@@ -577,3 +578,101 @@ export function StudioBrushGrainControls({
     </details>
   );
 }
+
+export function StudioBrushColorDynamicsControls({
+  settings,
+  onSettingsChange,
+}: StudioBrushDynamicsControlsProps) {
+  const colorDynamics = settings.colorDynamics;
+  const isJitterActive =
+    colorDynamics.hueJitter > 0 ||
+    colorDynamics.saturationJitter > 0 ||
+    colorDynamics.valueJitter > 0 ||
+    colorDynamics.foregroundBackgroundJitter > 0;
+
+  return (
+    <details
+      className="group rounded-xl border border-line bg-card/45"
+      data-testid="studio-brush-color-dynamics-controls"
+    >
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+        <Sparkles size={15} className="shrink-0 text-accent" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.72rem] font-bold text-fg-2">
+            색상 변화 및 지터 (Color Jitter)
+          </span>
+          <span className="block text-[0.61rem] text-fg-3">
+            CSP 1.10.5 펜촉/획 단위 색조·채도·명도 무작위 변화
+          </span>
+        </span>
+        <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[0.6rem] tabular-nums text-fg-3">
+          {isJitterActive ? "활성" : "꺼짐"}
+        </span>
+        <ChevronDown
+          size={14}
+          className="shrink-0 text-fg-3 transition-transform group-open:rotate-180"
+          aria-hidden
+        />
+      </summary>
+      <div className="grid gap-1.5 border-t border-line p-2 sm:grid-cols-2">
+        <CompactRange
+          label="색조 지터 (Hue Jitter)"
+          value={colorDynamics.hueJitter}
+          min={0}
+          max={180}
+          step={1}
+          display={`${Math.round(colorDynamics.hueJitter)}°`}
+          onChange={(hueJitter) =>
+            onSettingsChange(
+              updateStudioBrushDynamicsColorDynamics(settings, { hueJitter }),
+            )
+          }
+        />
+        <CompactRange
+          label="채도 지터 (Saturation Jitter)"
+          value={colorDynamics.saturationJitter}
+          min={0}
+          max={1}
+          step={0.01}
+          display={`${Math.round(colorDynamics.saturationJitter * 100)}%`}
+          onChange={(saturationJitter) =>
+            onSettingsChange(
+              updateStudioBrushDynamicsColorDynamics(settings, {
+                saturationJitter,
+              }),
+            )
+          }
+        />
+        <CompactRange
+          label="명도 지터 (Value Jitter)"
+          value={colorDynamics.valueJitter}
+          min={0}
+          max={1}
+          step={0.01}
+          display={`${Math.round(colorDynamics.valueJitter * 100)}%`}
+          onChange={(valueJitter) =>
+            onSettingsChange(
+              updateStudioBrushDynamicsColorDynamics(settings, { valueJitter }),
+            )
+          }
+        />
+        <CompactRange
+          label="전경/배경색 혼합 지터"
+          value={colorDynamics.foregroundBackgroundJitter}
+          min={0}
+          max={1}
+          step={0.01}
+          display={`${Math.round(colorDynamics.foregroundBackgroundJitter * 100)}%`}
+          onChange={(foregroundBackgroundJitter) =>
+            onSettingsChange(
+              updateStudioBrushDynamicsColorDynamics(settings, {
+                foregroundBackgroundJitter,
+              }),
+            )
+          }
+        />
+      </div>
+    </details>
+  );
+}
+

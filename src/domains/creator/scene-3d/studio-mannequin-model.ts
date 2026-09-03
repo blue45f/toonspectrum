@@ -82,7 +82,30 @@ export interface StudioMannequinBodyParams {
   readonly legLength: number;
   /** 체형 블렌드. 0=마른, 1=표준, 2=근육, 3=통통 (연속값). */
   readonly build: number;
+  /** 턱/얼굴 너비 배율 (CSP 1.11.6/2.0 3D 헤드 모델). 0.7–1.3. 기본 1. */
+  readonly faceWidth?: number;
+  /** 턱 길이 배율. 0.7–1.3. 기본 1. */
+  readonly chinLength?: number;
+  /** 눈 크기 배율. 0.8–1.3. 기본 1. */
+  readonly eyeScale?: number;
+  /** 코 높이 배율. 0.8–1.3. 기본 1. */
+  readonly noseHeight?: number;
 }
+
+export type StudioMannequinCoreParamKey =
+  | "heightCm"
+  | "headCount"
+  | "shoulderWidth"
+  | "pelvisWidth"
+  | "armLength"
+  | "legLength"
+  | "build";
+
+export type StudioMannequinHeadParamKey =
+  | "faceWidth"
+  | "chinLength"
+  | "eyeScale"
+  | "noseHeight";
 
 export const STUDIO_MANNEQUIN_PARAM_RANGES = Object.freeze({
   heightCm: [120, 200],
@@ -92,7 +115,14 @@ export const STUDIO_MANNEQUIN_PARAM_RANGES = Object.freeze({
   armLength: [0.8, 1.2],
   legLength: [0.8, 1.2],
   build: [0, 3],
-} as const satisfies Record<keyof StudioMannequinBodyParams, readonly [number, number]>);
+} as const satisfies Record<StudioMannequinCoreParamKey, readonly [number, number]>);
+
+export const STUDIO_MANNEQUIN_HEAD_PARAM_RANGES = Object.freeze({
+  faceWidth: [0.7, 1.3],
+  chinLength: [0.7, 1.3],
+  eyeScale: [0.8, 1.3],
+  noseHeight: [0.8, 1.3],
+} as const satisfies Record<StudioMannequinHeadParamKey, readonly [number, number]>);
 
 export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = Object.freeze({
   heightCm: 170,
@@ -102,6 +132,45 @@ export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = O
   armLength: 1,
   legLength: 1,
   build: 1,
+});
+
+export const STUDIO_MANNEQUIN_DEFAULT_HEAD_PARAMS = Object.freeze({
+  faceWidth: 1,
+  chinLength: 1,
+  eyeScale: 1,
+  noseHeight: 1,
+});
+
+export type StudioMannequinHeadPresetId =
+  | "anime"
+  | "realistic"
+  | "chibi"
+  | "sharp"
+  | "round";
+
+export const STUDIO_MANNEQUIN_HEAD_PRESETS: Readonly<
+  Record<StudioMannequinHeadPresetId, { label: string; params: Partial<StudioMannequinBodyParams> }>
+> = Object.freeze({
+  anime: {
+    label: "웹툰/애니형",
+    params: Object.freeze({ faceWidth: 0.95, chinLength: 0.92, eyeScale: 1.15, noseHeight: 0.9 }),
+  },
+  realistic: {
+    label: "실사/표준형",
+    params: Object.freeze({ faceWidth: 1.0, chinLength: 1.0, eyeScale: 1.0, noseHeight: 1.0 }),
+  },
+  chibi: {
+    label: "SD/치비형",
+    params: Object.freeze({ faceWidth: 1.25, chinLength: 0.75, eyeScale: 1.25, noseHeight: 0.8 }),
+  },
+  sharp: {
+    label: "날카로운 턱",
+    params: Object.freeze({ faceWidth: 0.82, chinLength: 1.15, eyeScale: 1.05, noseHeight: 1.1 }),
+  },
+  round: {
+    label: "둥근 얼굴",
+    params: Object.freeze({ faceWidth: 1.15, chinLength: 0.85, eyeScale: 1.1, noseHeight: 0.95 }),
+  },
 });
 
 export type StudioMannequinBodyPresetId =
@@ -386,10 +455,15 @@ export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinB
     ? input
     : {}) as Partial<Record<keyof StudioMannequinBodyParams, unknown>>;
   const result = {} as Record<keyof StudioMannequinBodyParams, number>;
-  for (const key of Object.keys(STUDIO_MANNEQUIN_PARAM_RANGES) as
-    (keyof StudioMannequinBodyParams)[]) {
+  for (const key of Object.keys(STUDIO_MANNEQUIN_PARAM_RANGES) as StudioMannequinCoreParamKey[]) {
     const [min, max] = STUDIO_MANNEQUIN_PARAM_RANGES[key];
     result[key] = clampNumber(source[key], min, max, STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key]);
+  }
+  for (const key of Object.keys(STUDIO_MANNEQUIN_HEAD_PARAM_RANGES) as StudioMannequinHeadParamKey[]) {
+    if (source[key] !== undefined) {
+      const [min, max] = STUDIO_MANNEQUIN_HEAD_PARAM_RANGES[key];
+      result[key] = clampNumber(source[key], min, max, STUDIO_MANNEQUIN_DEFAULT_HEAD_PARAMS[key]);
+    }
   }
   return result as StudioMannequinBodyParams;
 }

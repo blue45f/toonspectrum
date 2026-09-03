@@ -29,7 +29,8 @@ export type StudioMannequinPoseCategory =
   | "action"
   | "daily"
   | "sports"
-  | "webtoon";
+  | "webtoon"
+  | "hand";
 
 export const STUDIO_MANNEQUIN_POSE_CATEGORIES: readonly {
   id: StudioMannequinPoseCategory;
@@ -40,6 +41,7 @@ export const STUDIO_MANNEQUIN_POSE_CATEGORIES: readonly {
   { id: "daily", label: "일상·휴식" },
   { id: "sports", label: "스포츠·동작" },
   { id: "webtoon", label: "웹툰 연출" },
+  { id: "hand", label: "손 포즈 (CSP 2.0)" },
 ]);
 
 export interface StudioMannequinPosePreset {
@@ -393,6 +395,85 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
       rightLowerArm: deg3(-10, 0, 0),
       leftLowerLeg: deg3(4, 0, 0),
       rightLowerLeg: deg3(4, 0, 0),
+    }),
+  },
+  {
+    id: "hand-fist",
+    label: "주먹 (Fist)",
+    category: "hand",
+    pose: pose({
+      leftUpperArm: deg3(10, 0, 15),
+      rightUpperArm: deg3(10, 0, -15),
+      leftLowerArm: deg3(-60, 0, 0),
+      rightLowerArm: deg3(-60, 0, 0),
+      leftHand: deg3(-30, 0, 45),
+      rightHand: deg3(-30, 0, -45),
+    }),
+  },
+  {
+    id: "hand-open",
+    label: "펼친 손 (Open Palm)",
+    category: "hand",
+    pose: pose({
+      leftUpperArm: deg3(15, 0, 20),
+      rightUpperArm: deg3(15, 0, -20),
+      leftLowerArm: deg3(-30, 0, 0),
+      rightLowerArm: deg3(-30, 0, 0),
+      leftHand: deg3(0, 0, 0),
+      rightHand: deg3(0, 0, 0),
+    }),
+  },
+  {
+    id: "hand-peace",
+    label: "V 사인 (Peace)",
+    category: "hand",
+    pose: pose({
+      leftUpperArm: deg3(15, 0, 10),
+      rightUpperArm: deg3(45, 0, -10),
+      leftLowerArm: deg3(-20, 0, 0),
+      rightLowerArm: deg3(-80, 0, 0),
+      leftHand: deg3(0, 0, 10),
+      rightHand: deg3(10, 0, -20),
+    }),
+  },
+  {
+    id: "hand-point",
+    label: "가리키기 (Pointing)",
+    category: "hand",
+    pose: pose({
+      leftUpperArm: deg3(15, 0, 15),
+      rightUpperArm: deg3(70, 0, 0),
+      leftLowerArm: deg3(-20, 0, 0),
+      rightLowerArm: deg3(-10, 0, 0),
+      leftHand: deg3(0, 0, 10),
+      rightHand: deg3(0, 0, -10),
+    }),
+  },
+  {
+    id: "hand-salute",
+    label: "경례 (Salute)",
+    category: "hand",
+    pose: pose({
+      leftUpperArm: deg3(10, 0, 10),
+      rightUpperArm: deg3(50, 0, -30),
+      leftLowerArm: deg3(-20, 0, 0),
+      rightLowerArm: deg3(-110, 0, 0),
+      leftHand: deg3(0, 0, 0),
+      rightHand: deg3(15, 0, -10),
+    }),
+  },
+  {
+    id: "hand-prayer",
+    label: "두 손 모으기 (Clasp)",
+    category: "hand",
+    pose: pose({
+      chest: deg3(8, 0, 0),
+      leftUpperArm: deg3(30, 0, 20),
+      rightUpperArm: deg3(30, 0, -20),
+      leftLowerArm: deg3(-90, 0, 0),
+      rightLowerArm: deg3(-90, 0, 0),
+      leftHand: deg3(-10, 0, 30),
+      rightHand: deg3(-10, 0, -30),
     }),
   },
 ]);

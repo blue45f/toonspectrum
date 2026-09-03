@@ -258,10 +258,25 @@ describe("StudioMannequinPoserPanel", () => {
     renderPanel();
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByText("3D 데생 인형")).toBeTruthy();
-    for (const label of ["체형", "포즈", "관절", "카메라"]) {
+    for (const label of ["셰이퍼", "체형", "포즈", "관절", "카메라"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeTruthy();
     }
     expect(createScene).toHaveBeenCalledTimes(1);
+  });
+
+  it("셰이퍼 탭을 클릭하면 Shaper 패널이 렌더링되고 프리셋 선택이 씬에 반영된다", async () => {
+    renderPanel();
+    const shaperTab = screen.getByRole("button", { name: /^셰이퍼/ });
+    fireEvent.click(shaperTab);
+
+    expect(screen.getByText("3D 셰이퍼 (Webtoon Shaper)")).toBeTruthy();
+    expect(screen.getByText("SHAPER")).toBeTruthy();
+
+    // Select hair preset
+    const hairChip = screen.getByRole("button", { name: "헤어" });
+    fireEvent.click(hairChip);
+    const bobPreset = screen.getByRole("button", { name: /시스루 뱅 단발/i });
+    fireEvent.click(bobPreset);
   });
 
   it("포즈 탭에 모든 프리셋 칩이 있고 클릭하면 씬에 포즈가 반영된다", async () => {
@@ -726,5 +741,23 @@ describe("StudioMannequinPoserPanel", () => {
       pose: { joints: {}, pelvisOffset: [0, 0, 0] },
     });
     await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
+  });
+
+  it("exposes 3D Head Model (Face Proportions) presets and morphing sliders (CSP 2.0)", async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
+
+    expect(screen.getByText("3D 헤드 모델 (Face Proportions)")).toBeDefined();
+    expect(screen.getByRole("button", { name: /웹툰\/애니형/ })).toBeDefined();
+    expect(screen.getByRole("button", { name: /날카로운 턱/ })).toBeDefined();
+
+    // Click '날카로운 턱' preset
+    fireEvent.click(screen.getByRole("button", { name: /날카로운 턱/ }));
+
+    // Verify chin/face sliders exist
+    const faceWidthSlider = screen.getByLabelText(/턱\/얼굴 너비/);
+    expect(faceWidthSlider).toBeDefined();
+    fireEvent.change(faceWidthSlider, { target: { value: "0.85" } });
+    await waitFor(() => expect((faceWidthSlider as HTMLInputElement).value).toBe("0.85"));
   });
 });

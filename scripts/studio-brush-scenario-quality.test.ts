@@ -127,6 +127,14 @@ describe("scenario buildup ladder", () => {
     )).toEqual([]);
   });
 
+  it("stands down for a brush that is opaque by material, whatever its edge does", () => {
+    // The pen, measured: its second pass adds anti-aliased edge coverage (89.8 -> 92.1 over 20
+    // passes), which the gain rule reads as a ladder that then died. Opaque means no headroom.
+    const penLike = [89.8, 91.2, 91.8, 92.0, 92.1, 92.1];
+    expect(judgeStudioBrushScenarioBuildupLadder(penLike, { ...OPAQUE, opaque: true })).toEqual([]);
+    expect(judgeStudioBrushScenarioBuildupLadder(penLike, OPAQUE)).toHaveLength(1);
+  });
+
   it("leaves a one-stroke-opaque brush alone — it never started a ladder to lose", () => {
     expect(judgeStudioBrushScenarioBuildupLadder(
       [231.4, 231.6, 231.6, 231.7, 231.7],

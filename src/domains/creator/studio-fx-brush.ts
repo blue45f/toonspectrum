@@ -1209,63 +1209,100 @@ function fxLuminousInterpolatedScale(
   return continuous ? (current + adjacent[key]) / 2 : current;
 }
 
-function flattenFxLuminousRibbon(
+/**
+ * The growing state one luminous pass is planned into.
+ *
+ * Sections, runs, polygons and the length-weighted opacity all advance left to right, so a pass
+ * that already consumed a prefix can extend it instead of re-deriving it. The batch planner runs
+ * the very same appends once from index 0, which is what keeps the two from drifting.
+ */
+interface FxLuminousPlanState {
+  readonly sections: FxLuminousSection[];
+  readonly polygons: StudioFxLuminousRibbonPolygon[];
+  /**
+   * First section of the run still being extended. A run breaks where a section's `from` leaves
+   * the previous section's `to`, and that predicate reads only the adjacent pair, so an append can
+   * extend this run or open the next one but can never re-cut an earlier boundary.
+   */
+  openRunStart: number;
+  /**
+   * `polygons.length` without the open run's two trailing caps. Everything below it is final;
+   * only those two caps move as the run grows, which is what makes the flat array append-only.
+   */
+  bodyJoinCount: number;
+  capped: boolean;
+  weightedOpacity: number;
+  totalLength: number;
+}
+
+function createFxLuminousPlanState(): FxLuminousPlanState {
+  return {
+    sections: [],
+    polygons: [],
+    openRunStart: 0,
+    bodyJoinCount: 0,
+    capped: false,
+    weightedOpacity: 0,
+    totalLength: 0,
+  };
+}
+
+/**
+ * Flattens pressure segments `[fromSegmentIndex, toSegmentIndex)` onto `state`.
+ *
+ * Section i reads only segments i-1..i+1 — `fxLuminousInterpolatedScale` averages a response
+ * across a continuous joint — so a caller that stops one segment short of its producer's stable
+ * watermark gets sections it will never have to recompute.
+ */
+function appendFxLuminousSections(
+  state: FxLuminousPlanState,
   pressurePath: StudioFxPressurePathPlan,
-  baseWidth: number,
-  passWidthScale: number,
-  luminousCore: boolean,
-): {
-  readonly sections: readonly FxLuminousSection[];
-  readonly capped: boolean;
-} {
-  const sections: FxLuminousSection[] = [];
-  const responses = fxLuminousSegmentResponses(
-    pressurePath,
-    passWidthScale,
-    luminousCore,
-  );
-  const passWidth = clamp(baseWidth * passWidthScale, 0.5, 4096);
+  passWidth: number,
+  responses: readonly FxLuminousSegmentResponse[],
+  fromSegmentIndex: number,
+  toSegmentIndex: number,
+): void {
+  const sections = state.sections;
+  const segments = pressurePath.segments;
   for (
-    let segmentIndex = 0;
-    segmentIndex < pressurePath.segments.length;
+    let segmentIndex = fromSegmentIndex;
+    segmentIndex < toSegmentIndex;
     segmentIndex += 1
   ) {
-    const segment = pressurePath.segments[segmentIndex]!;
+    const segment = segments[segmentIndex]!;
     const subdivisions = fxLuminousSubdivisionCount(segment, passWidth);
     const fromWidthScale = fxLuminousInterpolatedScale(
       responses,
-      pressurePath.segments,
+      segments,
       segmentIndex,
       "from ",
       "widthScale",
     );
     const toWidthScale = fxLuminousInterpolatedScale(
       responses,
-      pressurePath.segments,
+      segments,
       segmentIndex,
       "to",
       "widthScale",
     );
     const fromOpacityScale = fxLuminousInterpolatedScale(
       responses,
-      pressurePath.segments,
+      segments,
       segmentIndex,
       "from ",
       "opacityScale",
     );
     const toOpacityScale = fxLuminousInterpolatedScale(
       responses,
-      pressurePath.segments,
+      segments,
       segmentIndex,
       "to",
       "opacityScale",
     );
     for (let subdivision = 0; subdivision < subdivisions; subdivision += 1) {
       if (sections.length >= FX_LUMINOUS_MAX_FLATTENED_SEGMENTS) {
-        return {
-          sections: Object.freeze(sections),
-          capped: true,
-        };
+        state.capped = true;
+        return;
       }
       const fromProgress = subdivision / subdivisions;
       const toProgress = (subdivision + 1) / subdivisions;
@@ -1277,6 +1314,12 @@ function flattenFxLuminousRibbon(
       const toResponseWidth = fromWidthScale
         + (toWidthScale - fromWidthScale) * toProgress;
       const midpointProgress = (fromProgress + toProgress) / 2;
+      const opacityScale = clamp(
+        fromOpacityScale
+        + (toOpacityScale - fromOpacityScale) * midpointProgress,
+        0,
+        4,
+      );
       sections.push(Object.freeze({
         from,
         to,
@@ -1290,19 +1333,16 @@ function flattenFxLuminousRibbon(
           0.25,
           2048,
         ),
-        opacityScale: clamp(
-          fromOpacityScale
-          + (toOpacityScale - fromOpacityScale) * midpointProgress,
-          0,
-          4,
-        ),
+        opacityScale,
       }));
+      // Running accumulators for the length-weighted pass alpha. Terms are added in section order
+      // here exactly as one batch loop over the finished array would add them, so a sum resumed
+      // from a snapshot is the same float rather than a close one.
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      state.weightedOpacity += opacityScale * length;
+      state.totalLength += length;
     }
   }
-  return {
-    sections: Object.freeze(sections),
-    capped: false,
-  };
 }
 
 function fxLuminousPolygonSignedArea(points: readonly number[]): number {
@@ -1363,74 +1403,119 @@ function fxLuminousRoundPolygon(
   return sameWindingFxLuminousPolygon(points);
 }
 
-function splitFxLuminousRuns(
-  sections: readonly FxLuminousSection[],
-): readonly (readonly FxLuminousSection[])[] {
-  const runs: FxLuminousSection[][] = [];
-  let active: FxLuminousSection[] = [];
-  for (const section of sections) {
-    const previous = active.at(-1);
-    if (previous && !fxLuminousSamePoint(previous.to, section.from)) {
-      runs.push(active);
-      active = [];
-    }
-    active.push(section);
-  }
-  if (active.length > 0) runs.push(active);
-  return Object.freeze(runs.map((run) => Object.freeze(run)));
+function pushFxLuminousRunCaps(
+  polygons: StudioFxLuminousRibbonPolygon[],
+  first: FxLuminousSection,
+  last: FxLuminousSection,
+): void {
+  polygons.push(
+    Object.freeze({
+      points: fxLuminousRoundPolygon(first.from, first.fromRadius),
+      role: "start-cap" as const,
+    }),
+    Object.freeze({
+      points: fxLuminousRoundPolygon(last.to, last.toRadius),
+      role: "end-cap" as const,
+    }),
+  );
 }
 
-function fxLuminousRunPolygons(
-  sections: readonly FxLuminousSection[],
-): readonly StudioFxLuminousRibbonPolygon[] {
-  const polygons: StudioFxLuminousRibbonPolygon[] = sections.map((section) => (
-    Object.freeze({
+/**
+ * Emits polygons for sections `[fromSectionIndex, …)` in section-local groups —
+ * `body_0, body_1, join_1, body_2, join_2, …` and then the run's two caps.
+ *
+ * Grouping per section rather than per role (every body, then every join, then the caps) is what
+ * makes the flat array append-only: only the open run's trailing caps ever move, so a frame
+ * rewinds two polygons instead of re-emitting the whole stroke. Pixels do not shift — every
+ * polygon is forced to one winding by `sameWindingFxLuminousPolygon` and the pass is filled once
+ * with non-zero, so the winding sum at any point does not depend on the emission order.
+ */
+function appendFxLuminousRunPolygons(
+  state: FxLuminousPlanState,
+  fromSectionIndex: number,
+): void {
+  const { polygons, sections } = state;
+  polygons.length = state.bodyJoinCount;
+  for (let index = fromSectionIndex; index < sections.length; index += 1) {
+    const section = sections[index]!;
+    const previous = index > 0 ? sections[index - 1]! : null;
+    if (previous && !fxLuminousSamePoint(previous.to, section.from)) {
+      pushFxLuminousRunCaps(polygons, sections[state.openRunStart]!, previous);
+      state.openRunStart = index;
+    }
+    polygons.push(Object.freeze({
       points: fxLuminousBodyPolygon(section),
       role: "body" as const,
-    })
-  ));
-  for (let sectionIndex = 1; sectionIndex < sections.length; sectionIndex += 1) {
-    const previous = sections[sectionIndex - 1]!;
-    const current = sections[sectionIndex]!;
-    polygons.push(Object.freeze({
-      points: fxLuminousRoundPolygon(
-        previous.to,
-        Math.max(previous.toRadius, current.fromRadius),
-      ),
-      role: "join",
     }));
+    if (previous && index > state.openRunStart) {
+      polygons.push(Object.freeze({
+        points: fxLuminousRoundPolygon(
+          previous.to,
+          Math.max(previous.toRadius, section.fromRadius),
+        ),
+        role: "join" as const,
+      }));
+    }
+    state.bodyJoinCount = polygons.length;
   }
-  const first = sections[0];
   const last = sections.at(-1);
-  if (first && last) {
-    polygons.push(
-      Object.freeze({
-        points: fxLuminousRoundPolygon(first.from, first.fromRadius),
-        role: "start-cap",
-      }),
-      Object.freeze({
-        points: fxLuminousRoundPolygon(last.to, last.toRadius),
-        role: "end-cap",
-      }),
-    );
-  }
-  return Object.freeze(polygons);
+  if (last) pushFxLuminousRunCaps(polygons, sections[state.openRunStart]!, last);
 }
 
-function fxLuminousWeightedOpacity(
-  sections: readonly FxLuminousSection[],
-): number {
-  let weightedOpacity = 0;
-  let totalLength = 0;
-  for (const section of sections) {
-    const length = Math.hypot(
-      section.to.x - section.from.x,
-      section.to.y - section.from.y,
-    );
-    weightedOpacity += section.opacityScale * length;
-    totalLength += length;
-  }
-  return totalLength <= POINT_EPS ? 1 : weightedOpacity / totalLength;
+function fxLuminousPlanWeightedOpacity(state: FxLuminousPlanState): number {
+  return state.totalLength <= POINT_EPS
+    ? 1
+    : state.weightedOpacity / state.totalLength;
+}
+
+interface FxLuminousPassConfig {
+  readonly baseWidth: number;
+  readonly passWidthScale: number;
+  readonly passOpacity: number;
+  readonly luminousCore: boolean;
+}
+
+function resolveFxLuminousPassConfig(input: {
+  readonly baseWidth: unknown;
+  readonly passWidthScale: unknown;
+  readonly passOpacity: unknown;
+  readonly luminousCore?: boolean;
+}): FxLuminousPassConfig {
+  return {
+    baseWidth: clamp(finiteNumber(input.baseWidth, 0), 0, 4096),
+    passWidthScale: clamp(finiteNumber(input.passWidthScale, 1), 0.025, 16),
+    passOpacity: clamp(finiteNumber(input.passOpacity, 0), 0, 1),
+    luminousCore: input.luminousCore === true,
+  };
+}
+
+function sealFxLuminousRibbonPassPlan(
+  brushId: StudioFxLuminousBrushId,
+  pressurePath: StudioFxPressurePathPlan,
+  config: FxLuminousPassConfig,
+  state: FxLuminousPlanState,
+  polygons: readonly StudioFxLuminousRibbonPolygon[],
+): StudioFxLuminousRibbonPassPlan {
+  return {
+    kind: "studio-fx-luminous-ribbon-pass",
+    version: FX_LUMINOUS_RIBBON_VERSION,
+    brushId,
+    coverageOperation: "stroke-local-single-fill",
+    compositeOperation: STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
+    fillRule: "nonzero",
+    cap: "round",
+    sourceSegmentCount: pressurePath.segments.length,
+    flattenedSegmentCount: state.sections.length,
+    capped: state.capped,
+    passWidthScale: config.passWidthScale,
+    luminousCore: config.luminousCore,
+    opacity: clamp(
+      config.passOpacity * fxLuminousPlanWeightedOpacity(state),
+      0,
+      1,
+    ),
+    polygons,
+  };
 }
 
 /**
@@ -1440,6 +1525,9 @@ function fxLuminousWeightedOpacity(
  * round caps deliberately overlap inside that one fill; non-zero winding turns those overlaps,
  * exact retraces and figure-eight crossings into a union. The advertised premultiplied
  * source-over composite then builds coverage across separate DrawEls without additive whitening.
+ *
+ * This is the whole-stroke wrapper over the same two appends the incremental builder drives, run
+ * once from index 0 — one code path, so the two cannot report different geometry.
  */
 export function planStudioFxLuminousRibbonPass(input: {
   readonly brushId: StudioFxLuminousBrushId;
@@ -1449,44 +1537,227 @@ export function planStudioFxLuminousRibbonPass(input: {
   readonly passOpacity: unknown;
   readonly luminousCore?: boolean;
 }): StudioFxLuminousRibbonPassPlan {
-  const baseWidth = clamp(finiteNumber(input.baseWidth, 0), 0, 4096);
-  const passWidthScale = clamp(
-    finiteNumber(input.passWidthScale, 1),
-    0.025,
-    16,
-  );
-  const passOpacity = clamp(finiteNumber(input.passOpacity, 0), 0, 1);
-  const luminousCore = input.luminousCore === true;
-  const flattened = baseWidth > 0
-    ? flattenFxLuminousRibbon(
+  const config = resolveFxLuminousPassConfig(input);
+  const state = createFxLuminousPlanState();
+  if (config.baseWidth > 0) {
+    appendFxLuminousSections(
+      state,
+      input.pressurePath,
+      clamp(config.baseWidth * config.passWidthScale, 0.5, 4096),
+      fxLuminousSegmentResponses(
         input.pressurePath,
-        baseWidth,
-        passWidthScale,
-        luminousCore,
-      )
-    : { sections: Object.freeze([]), capped: false };
-  const polygons = splitFxLuminousRuns(flattened.sections)
-    .flatMap((run) => fxLuminousRunPolygons(run));
-  return Object.freeze({
-    kind: "studio-fx-luminous-ribbon-pass",
-    version: FX_LUMINOUS_RIBBON_VERSION,
-    brushId: input.brushId,
-    coverageOperation: "stroke-local-single-fill",
-    compositeOperation: STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
-    fillRule: "nonzero",
-    cap: "round",
-    sourceSegmentCount: input.pressurePath.segments.length,
-    flattenedSegmentCount: flattened.sections.length,
-    capped: flattened.capped,
-    passWidthScale,
-    luminousCore,
-    opacity: clamp(
-      passOpacity * fxLuminousWeightedOpacity(flattened.sections),
+        config.passWidthScale,
+        config.luminousCore,
+      ),
       0,
-      1,
-    ),
-    polygons: Object.freeze(polygons),
-  });
+      input.pressurePath.segments.length,
+    );
+    appendFxLuminousRunPolygons(state, 0);
+  }
+  return Object.freeze(sealFxLuminousRibbonPassPlan(
+    input.brushId,
+    input.pressurePath,
+    config,
+    state,
+    Object.freeze(state.polygons),
+  ));
+}
+
+export interface StudioIncrementalFxLuminousRibbonBuilder {
+  /**
+   * 자라나는 획의 현재 압력 경로를 소비하고 이 패스의 전체 리본 플랜을 돌려준다. 플랜 모양은
+   * 배치 플래너와 완전히 같으며(`polygons`는 빌더 내부 배열이므로 수정하면 안 된다), 재사용
+   * 검증에 실패하면 전체를 다시 만든다. `producer`는 `pressurePath`를 만든 그 빌더여야 한다 —
+   * 소비 워터마크와 세대가 전부 거기서 나온다.
+   */
+  append(input: {
+    readonly brushId: StudioFxLuminousBrushId;
+    readonly pressurePath: StudioFxPressurePathPlan;
+    readonly producer: StudioIncrementalFxPressurePathBuilder;
+    readonly baseWidth: unknown;
+    readonly passWidthScale: unknown;
+    readonly passOpacity: unknown;
+    readonly luminousCore?: boolean;
+  }): StudioFxLuminousRibbonPassPlan;
+  /**
+   * 마지막 `append()`가 돌려준 `polygons` 앞쪽에서 앞으로 어떤 append도 다시 쓰지 않는 prefix
+   * 길이. 유지 경로(Path2D)는 이 길이까지만 재사용하고 나머지는 매 프레임 다시 그린다.
+   */
+  stablePolygonCount(): number;
+  /** 전체 재구축(리셋)마다 증가한다 — 유지된 Path2D의 prefix 신뢰를 무효화하는 신호. */
+  generation(): number;
+}
+
+/**
+ * 라이브 드래프트용 증분 발광 리본 빌더.
+ *
+ * `planStudioFxLuminousRibbonPass`는 매 이동 전체 압력 경로를 다시 평탄화하고 폴리곤을 전부 다시
+ * 만든다. 압력 경로 자체는 이미 증분이지만(`createStudioIncrementalFxPressurePathBuilder`) 그
+ * 하류가 전부 전체 재구축이라, glow처럼 셸이 48개인 브러시는 이동당 48 x O(n) — 실측 n=3200에서
+ * 이동당 1394 ms — 를 문다. 섹션 i는 세그먼트 i-1..i+1 만 읽고, 런 분할은 이웃 한 쌍만 비교하며,
+ * 길이 가중 알파는 좌→우 누적이므로 세 단계 모두 append 전용으로 만들 수 있다.
+ *
+ * 재사용은 전부 O(1) 검증을 통과한 뒤에만 한다: 설정 동일성, 생산자 세대, 그리고 소비한 마지막
+ * 세그먼트의 **객체 동일성**(`emitFxPressurePathSegment`는 호출마다 새 frozen 객체를 만들고
+ * 생산자는 `segments.length = rebuildFrom; push(...)`로 꼬리를 다시 만들므로, 다시 방출된
+ * 인덱스는 참조가 반드시 바뀐다 — 좌표 비교보다 정확하고 싸다). 소비 워터마크는 생산자의 안정
+ * prefix보다 하나 앞에서 멈춘다(`fxLuminousInterpolatedScale`가 i+1을 읽는다).
+ */
+export function createStudioIncrementalFxLuminousRibbonBuilder(): StudioIncrementalFxLuminousRibbonBuilder {
+  const state = createFxLuminousPlanState();
+  const responses: FxLuminousSegmentResponse[] = [];
+  let configBrushId: StudioFxLuminousBrushId | null = null;
+  let configBaseWidth = Number.NaN;
+  let configPassWidthScale = Number.NaN;
+  let configPassOpacity = Number.NaN;
+  let configLuminousCore = false;
+  let producerGeneration = -1;
+  let consumedSegmentCount = 0;
+  let lastConsumedSegment: StudioFxPressurePathSegment | null = null;
+  /** 세그먼트 i에서만 나오므로 생산자 워터마크가 그대로 상한이다. */
+  let stableResponseCount = 0;
+  let stableSections = 0;
+  let stableOpenRunStart = 0;
+  let stableBodyJoinCount = 0;
+  let stableWeightedOpacity = 0;
+  let stableTotalLength = 0;
+  let poisoned = false;
+  let rebuildGeneration = 0;
+
+  const reset = (): void => {
+    state.sections.length = 0;
+    state.polygons.length = 0;
+    state.openRunStart = 0;
+    state.bodyJoinCount = 0;
+    state.capped = false;
+    state.weightedOpacity = 0;
+    state.totalLength = 0;
+    responses.length = 0;
+    consumedSegmentCount = 0;
+    lastConsumedSegment = null;
+    stableResponseCount = 0;
+    stableSections = 0;
+    stableOpenRunStart = 0;
+    stableBodyJoinCount = 0;
+    stableWeightedOpacity = 0;
+    stableTotalLength = 0;
+    poisoned = false;
+    rebuildGeneration += 1;
+  };
+
+  /** 지난 프레임의 휘발 꼬리를 걷어내고 워터마크 상태로 되돌린다. */
+  const rewindToWatermark = (): void => {
+    state.sections.length = stableSections;
+    state.openRunStart = stableOpenRunStart;
+    state.bodyJoinCount = stableBodyJoinCount;
+    state.weightedOpacity = stableWeightedOpacity;
+    state.totalLength = stableTotalLength;
+  };
+
+  return {
+    append(input) {
+      const config = resolveFxLuminousPassConfig(input);
+      const segments = input.pressurePath.segments;
+      const producerGenerationNow = input.producer.generation();
+      const reusable = configBrushId === input.brushId
+        && Object.is(configBaseWidth, config.baseWidth)
+        && Object.is(configPassWidthScale, config.passWidthScale)
+        && Object.is(configPassOpacity, config.passOpacity)
+        && configLuminousCore === config.luminousCore
+        && producerGeneration === producerGenerationNow
+        && segments.length >= consumedSegmentCount
+        && (consumedSegmentCount === 0
+          || segments[consumedSegmentCount - 1] === lastConsumedSegment);
+      if (!reusable) reset();
+      configBrushId = input.brushId;
+      configBaseWidth = config.baseWidth;
+      configPassWidthScale = config.passWidthScale;
+      configPassOpacity = config.passOpacity;
+      configLuminousCore = config.luminousCore;
+      producerGeneration = producerGenerationNow;
+      // 폭 0 패스는 배치와 같은 빈 플랜이고, 캡 포화 획은 `appendFxLuminousSections`의 조기
+      // 반환(`capped: true`) 의미를 한 글자도 바꾸지 않으려고 이 획 동안 빌더를 봉인한 뒤 배치
+      // 플래너에 위임한다.
+      if (poisoned || config.baseWidth <= 0) {
+        return planStudioFxLuminousRibbonPass(input);
+      }
+
+      const passWidth = clamp(
+        config.baseWidth * config.passWidthScale,
+        0.5,
+        4096,
+      );
+      const stableSegmentCount = Math.min(
+        input.producer.stableSegmentCount(),
+        segments.length,
+      );
+      const flattenLimit = Math.max(0, stableSegmentCount - 1);
+
+      responses.length = Math.min(responses.length, stableResponseCount);
+      for (let index = responses.length; index < segments.length; index += 1) {
+        responses.push(resolveStudioFxPressurePassResponse(
+          segments[index]!,
+          config.passWidthScale,
+          config.luminousCore,
+        ));
+      }
+      stableResponseCount = stableSegmentCount;
+
+      rewindToWatermark();
+      if (flattenLimit > consumedSegmentCount) {
+        appendFxLuminousSections(
+          state,
+          input.pressurePath,
+          passWidth,
+          responses,
+          consumedSegmentCount,
+          flattenLimit,
+        );
+        if (state.capped) {
+          reset();
+          poisoned = true;
+          return planStudioFxLuminousRibbonPass(input);
+        }
+        appendFxLuminousRunPolygons(state, stableSections);
+        stableSections = state.sections.length;
+        stableOpenRunStart = state.openRunStart;
+        stableBodyJoinCount = state.bodyJoinCount;
+        stableWeightedOpacity = state.weightedOpacity;
+        stableTotalLength = state.totalLength;
+        consumedSegmentCount = flattenLimit;
+        lastConsumedSegment = segments[flattenLimit - 1]!;
+      }
+      // 꼬리는 항상 소비 워터마크에서 시작한다. 생산자의 안정 prefix 가 (같은 세대 안에서)
+      // 뒤로 물러나더라도 이미 stable 로 넘어간 섹션을 두 번 만들지 않는다.
+      appendFxLuminousSections(
+        state,
+        input.pressurePath,
+        passWidth,
+        responses,
+        consumedSegmentCount,
+        segments.length,
+      );
+      if (state.capped) {
+        reset();
+        poisoned = true;
+        return planStudioFxLuminousRibbonPass(input);
+      }
+      appendFxLuminousRunPolygons(state, stableSections);
+      return sealFxLuminousRibbonPassPlan(
+        input.brushId,
+        input.pressurePath,
+        config,
+        state,
+        state.polygons,
+      );
+    },
+    stablePolygonCount() {
+      return stableBodyJoinCount;
+    },
+    generation() {
+      return rebuildGeneration;
+    },
+  };
 }
 
 /**
@@ -1497,11 +1768,32 @@ export function traceStudioFxLuminousRibbonPass(
   sink: StudioFxLuminousRibbonPathSink,
   plan: StudioFxLuminousRibbonPassPlan,
 ): void {
-  for (const polygon of plan.polygons) {
-    if (polygon.points.length < 6) continue;
-    sink.moveTo(polygon.points[0]!, polygon.points[1]!);
-    for (let index = 2; index + 1 < polygon.points.length; index += 2) {
-      sink.lineTo(polygon.points[index]!, polygon.points[index + 1]!);
+  traceStudioFxLuminousRibbonPassRange(sink, plan, 0, plan.polygons.length);
+}
+
+/**
+ * Appends polygons `[fromPolygonIndex, toPolygonIndex)` of a luminous pass.
+ *
+ * The retained renderer keeps one `Path2D` for the plan's append-only prefix and traces only the
+ * volatile tail each frame; it must still copy that prefix and issue ONE fill, because filling the
+ * prefix and the tail separately composites their overlap twice (`a + a(1-a)` instead of `a`) —
+ * exactly the seam the single-fill contract exists to prevent.
+ */
+export function traceStudioFxLuminousRibbonPassRange(
+  sink: StudioFxLuminousRibbonPathSink,
+  plan: StudioFxLuminousRibbonPassPlan,
+  fromPolygonIndex: number,
+  toPolygonIndex: number,
+): void {
+  const polygons = plan.polygons;
+  const from = Math.max(0, Math.min(fromPolygonIndex, polygons.length));
+  const to = Math.max(from, Math.min(toPolygonIndex, polygons.length));
+  for (let index = from; index < to; index += 1) {
+    const points = polygons[index]!.points;
+    if (points.length < 6) continue;
+    sink.moveTo(points[0]!, points[1]!);
+    for (let offset = 2; offset + 1 < points.length; offset += 2) {
+      sink.lineTo(points[offset]!, points[offset + 1]!);
     }
     sink.closePath();
   }

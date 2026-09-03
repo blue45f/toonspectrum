@@ -1,0 +1,142 @@
+name: Diagnose Creator Marketplace browser flows
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-browser-diagnosis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-authoring-browser-diagnosis
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: feat/marketplace-creator-pipeline-20260903
+
+      - name: Merge the current main baseline
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Materialize the product integrations
+        run: |
+          set -euo pipefail
+          for script in \
+            normalize-authoring-safety-source.mjs \
+            normalize-package-builder.mjs \
+            harden-authoring-payload.mjs \
+            integrate-quality-validation.mjs \
+            integrate-creator-authoring.mjs \
+            integrate-authoring-detail-action.mjs \
+            integrate-brush-recipe-lab.mjs \
+            integrate-asset-quality-matrix.mjs \
+            integrate-source-package-builder.mjs \
+            integrate-package-recovery.mjs \
+            prepare-permanent-authoring-workflow.mjs \
+            harden-authoring-integration-idempotency.mjs
+          do
+            node "scripts/marketplace/$script"
+          done
+          grep -Fq '<MarketplaceAuthoringWorkshop />' src/domains/market/pages/MarketPublishPage.tsx
+          grep -Fq '<MarketplaceBrushStudioBridge snapshot={currentSnapshot} visible={open} />' src/domains/creator/brush/StudioBrushStudio.tsx
+          grep -Fq '<MarketplaceAuthoringInstallAction record={record} />' src/domains/market/components/MarketResourceDetailArticle.tsx
+
+      - name: Install dependencies and Chromium
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Browser · existing marketplace regression
+        id: existing
+        continue-on-error: true
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/market.spec.ts
+          --project=chromium
+          --reporter=line
+          --trace=retain-on-failure
+          --output=test-results/existing
+
+      - name: Browser · creator authoring workshop
+        id: workshop
+        continue-on-error: true
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          --project=chromium
+          --reporter=line
+          --trace=retain-on-failure
+          --output=test-results/workshop
+
+      - name: Browser · mobile and in-app profiles
+        id: inapp
+        continue-on-error: true
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line
+          --trace=retain-on-failure
+          --output=test-results/inapp
+
+      - name: Write browser diagnosis summary
+        if: always()
+        run: |
+          mkdir -p browser-diagnosis
+          cat > browser-diagnosis/outcomes.json <<JSON
+          {
+            "existingMarketplace": "${{ steps.existing.outcome }}",
+            "authoringWorkshop": "${{ steps.workshop.outcome }}",
+            "mobileAndInApp": "${{ steps.inapp.outcome }}",
+            "head": "${GITHUB_SHA}",
+            "runId": "${GITHUB_RUN_ID}"
+          }
+          JSON
+          cat browser-diagnosis/outcomes.json
+
+      - name: Upload browser screenshots, traces, and outcomes
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-browser-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results
+            browser-diagnosis
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Enforce browser diagnosis
+        if: always()
+        run: |
+          test "${{ steps.existing.outcome }}" = success
+          test "${{ steps.workshop.outcome }}" = success
+          test "${{ steps.inapp.outcome }}" = success

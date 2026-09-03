@@ -122,7 +122,13 @@ function isCanonicalMannequinInput(
   }
   for (const key of canonicalParamKeys) {
     const param = key as keyof StudioMannequinPersistentState["params"];
-    if (!sameNumber(input.params[param], canonical.params[param])) return false;
+    const left = input.params[param];
+    const right = canonical.params[param];
+    if (left === undefined || right === undefined) {
+      if (left !== right) return false;
+    } else if (!sameNumber(left, right)) {
+      return false;
+    }
   }
   if (Object.keys(input.pose).sort().join("|") !== "joints|pelvisOffset") {
     return false;

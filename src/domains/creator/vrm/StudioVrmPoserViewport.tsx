@@ -292,7 +292,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                   <StudioVrmTexturePaintInvalidateBridge
                     onReady={handleTexturePaintInvalidateReady}
                   />
-                  <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} />
+                  <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} vrm={vrm} />
                   <ViewportController onReady={handleViewportReady} />
                   <VrmLighting
                     tone={lightingTone}
