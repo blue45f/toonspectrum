@@ -237,6 +237,7 @@ export function StudioPageReviewPanel({
         onClose={onClose}
         rootDataAttributes={{
           "data-studio-page-review-surface": "desktop",
+          "data-studio-shortcut-boundary": "true",
           "data-layout-authority": authority,
           "data-layout-failure": failure ?? undefined,
         }}

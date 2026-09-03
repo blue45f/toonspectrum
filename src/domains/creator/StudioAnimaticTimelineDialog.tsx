@@ -107,6 +107,7 @@ export function StudioAnimaticTimelineDialog({
         rootDataAttributes={{
           "data-studio-animatic-dialog": "true",
           "data-studio-animatic-presentation": "desktop",
+          "data-studio-shortcut-boundary": "true",
           "data-layout-authority": authority,
           "data-layout-failure": failure ?? undefined,
         }}
