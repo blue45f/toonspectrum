@@ -40,6 +40,20 @@ jobs:
       - name: Apply capability-aware audit fixes
         run: python3 scripts/fix-blender-orion-capability-audit.py
 
+      - name: Preserve migrated Python indentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/blender/toonstudio_blender_kit/quality.py")
+          source = path.read_text(encoding="utf-8")
+          broken = "\n   if degenerate_total > budget.max_degenerate_faces:"
+          fixed = "\n    if degenerate_total > budget.max_degenerate_faces:"
+          if broken not in source:
+              raise SystemExit("expected migration indentation boundary was not found")
+          path.write_text(source.replace(broken, fixed, 1), encoding="utf-8")
+          PY
+
       - name: Validate Python, JSON and diff
         run: |
           python3 -m py_compile \
