@@ -51,7 +51,7 @@ jobs:
           uniform_count = shaders.count("var<uniform> meta: Meta;")
           member_count = shaders.count("meta.")
           active_count = len(re.findall(r"\bactive\b", shaders))
-          if uniform_count != 3 or member_count < 8 or active_count != 7:
+          if uniform_count != 3 or member_count < 8 or active_count != 8:
               raise SystemExit(
                   f"unexpected shader shape: uniforms={uniform_count}, members={member_count}, active={active_count}"
               )
