@@ -191,4 +191,15 @@ replace_once(
     '''    expect(range).toContain("정확한 값");''',
 )
 
+POSE = "src/domains/creator/vrm/StudioVrmPhotoPoseScanner.tsx"
+replace_once(
+    POSE,
+    '''                if (applied) {
+                  setCandidate(null);
+                  replacePreviewUrl(null);
+                }''',
+    '''                if (applied) setCandidate(null);
+                if (applied) replacePreviewUrl(null);''',
+)
+
 print("Finalized visual workshop source transforms.")
