@@ -14,11 +14,13 @@ back on that stale specialist surface.
 The new policy treats the image subtab as contextual navigation:
 
 - entering an image-capable selection starts on **Quick**;
-- returning from text, drawing-tool, empty-canvas, document, or other non-image work starts on
+- returning from text, drawing-tool, empty-canvas or another non-image selection starts on
   **Quick**;
 - switching between `image` and `draw` selection kinds starts on **Quick**;
 - moving between image layers of the same kind preserves the active specialist tab so repetitive
   retouch work stays efficient;
+- merely visiting another inspector primary tab preserves the specialist subtab while the same
+  image selection remains active;
 - hidden image state is not rewritten while the current context cannot display image tabs.
 
 `StudioInspectorContextRouteSync` runs the pure resolver in a layout effect, avoiding one painted
