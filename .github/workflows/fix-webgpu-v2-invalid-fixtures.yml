@@ -30,38 +30,43 @@ jobs:
 
           path = Path('src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts')
           source = path.read_text(encoding='utf-8')
-          old = '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
-              mode: "append",
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
-              ...valid,
-              durableR8GrainSource: {} as never,
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
-              grainSamplingSemantics: "durable-r8-cpu-parity-v1",
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
-              batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
-            }))).toBe(false);'''.replace('            ', '')
-          new = '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
-              ...valid,
-              mode: "append",
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
-              ...valid,
-              durableR8GrainSource: {} as never,
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
-              ...valid,
-              grainSamplingSemantics: "durable-r8-cpu-parity-v1",
-            }))).toBe(false);
-            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
-              ...valid,
-              batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
-            }))).toBe(false);'''.replace('            ', '')
-          if source.count(old) != 1:
-              raise SystemExit(f'expected one invalid fixture block, found {source.count(old)}')
-          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          def replace_once(old: str, new: str) -> None:
+              global source
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one fixture snippet, found {count}: {old[:80]!r}')
+              source = source.replace(old, new, 1)
+
+          replace_once(
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+                mode: "append",
+              }))).toBe(false);'''.replace('              ', ''),
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+                ...valid,
+                mode: "append",
+              }))).toBe(false);'''.replace('              ', ''),
+          )
+          replace_once(
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+                grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+              }))).toBe(false);'''.replace('              ', ''),
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+                ...valid,
+                grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+              }))).toBe(false);'''.replace('              ', ''),
+          )
+          replace_once(
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+                batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
+              }))).toBe(false);'''.replace('              ', ''),
+              '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+                ...valid,
+                batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
+              }))).toBe(false);'''.replace('              ', ''),
+          )
+
+          path.write_text(source, encoding='utf-8')
           PY
           rm -f .github/workflows/fix-webgpu-v2-invalid-fixtures.yml
           git diff --check
