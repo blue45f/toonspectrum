@@ -29,9 +29,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(find .bootstrap/webgpu-v2 -type f -name 'part-*' | wc -l)" -eq 7
-          cat .bootstrap/webgpu-v2/part-* | base64 --decode > "$PAYLOAD_ARCHIVE"
-          echo "fa8c10d2deceec63fd691e7d56ad1623ff7f0422cadbe488ca42b1d4b3626dfd  $PAYLOAD_ARCHIVE" | sha256sum --check --strict
+          mapfile -t parts < <(find .bootstrap/webgpu-v2 -maxdepth 1 -type f -name 'part-*' | sort)
+          test "${#parts[@]}" -eq 7
+          cat "${parts[@]}" | base64 --decode > "$PAYLOAD_ARCHIVE"
+          xz --test "$PAYLOAD_ARCHIVE"
+          archive_sha="$(sha256sum "$PAYLOAD_ARCHIVE" | cut -d' ' -f1)"
+          echo "candidate archive sha256=$archive_sha"
+          if tar -tJf "$PAYLOAD_ARCHIVE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo "unsafe path in candidate archive" >&2
+            exit 1
+          fi
           tar -xJf "$PAYLOAD_ARCHIVE"
 
       - uses: pnpm/action-setup@v4
