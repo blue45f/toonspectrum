@@ -42,8 +42,10 @@ import {
   type StudioFloatingSurfaceViewport,
 } from "./studio-floating-surface";
 import {
+  resetAllStudioFloatingSurfaces,
   studioFloatingSurfaceRegistry,
   STUDIO_FLOATING_SURFACE_Z_INDEX_BASE,
+  STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT,
 } from "./studio-floating-surface-registry";
 import {
   startStudioFloatingSurfacePointerSession,
@@ -723,6 +725,17 @@ export const StudioFloatingSurface = forwardRef<
               >
                 위치와 크기 초기화
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex min-h-10 w-full items-center rounded-lg px-2.5 text-left text-fg-2 hover:bg-raised hover:text-fg"
+                onClick={() => {
+                  resetAllStudioFloatingSurfaces();
+                  setPlacementMenuOpen(false);
+                }}
+              >
+                열린 패널 모두 초기화
+              </button>
             </div>
           ) : null}
         </div>
@@ -793,7 +806,7 @@ export const StudioFloatingSurface = forwardRef<
                 top: dockPreviewRect.y,
                 width: dockPreviewRect.width,
                 height: dockPreviewRect.height,
-                zIndex: zIndex + 1,
+                zIndex: Math.min(STUDIO_FLOATING_SURFACE_Z_INDEX_LIMIT, zIndex + 1),
               }}
             />,
             document.body,
