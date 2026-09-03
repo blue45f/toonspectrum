@@ -16,6 +16,13 @@ export const MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT =
 export const MARKETPLACE_BRUSH_STUDIO_IMPORT_STORAGE_KEY =
   "toonspectrum:brush-studio-market-import:v2";
 
+export interface MarketplaceBrushStudioBridgeProps {
+  /** Exact normalized snapshot rendered by the open Brush Studio. */
+  snapshot?: unknown;
+  /** Keep the event bridge mounted, but only show the publish action inside Brush Studio. */
+  visible?: boolean;
+}
+
 function snapshotFromDraft(draft: CreatorMarketplaceAuthoringDraft | null): unknown {
   if (!draft || draft.kind !== "brush") return null;
   return draft.brush.originalSnapshot
@@ -31,25 +38,41 @@ function snapshotFromDraft(draft: CreatorMarketplaceAuthoringDraft | null): unkn
     };
 }
 
-export function MarketplaceBrushStudioBridge(): ReactElement {
-  const latestSnapshotRef = useRef<unknown>(null);
+function shouldLoadMarketplaceDraft(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("marketAuthoring")
+    || params.has("marketResource")
+    || params.get("assetKind") === "brush";
+}
+
+export function MarketplaceBrushStudioBridge({
+  snapshot = null,
+  visible = false,
+}: MarketplaceBrushStudioBridgeProps): ReactElement | null {
+  const latestSnapshotRef = useRef<unknown>(snapshot);
 
   useEffect(() => {
-    const draft = loadCreatorMarketplaceAuthoringDraft();
-    const snapshot = snapshotFromDraft(draft);
-    if (snapshot !== null) {
-      latestSnapshotRef.current = snapshot;
-      try {
-        window.sessionStorage.setItem(
-          MARKETPLACE_BRUSH_STUDIO_IMPORT_STORAGE_KEY,
-          JSON.stringify(snapshot),
-        );
-      } catch {
-        // Event delivery remains available when session storage is blocked.
+    latestSnapshotRef.current = snapshot;
+  }, [snapshot]);
+
+  useEffect(() => {
+    if (shouldLoadMarketplaceDraft()) {
+      const draft = loadCreatorMarketplaceAuthoringDraft();
+      const importedSnapshot = snapshotFromDraft(draft);
+      if (importedSnapshot !== null) {
+        latestSnapshotRef.current = importedSnapshot;
+        try {
+          window.sessionStorage.setItem(
+            MARKETPLACE_BRUSH_STUDIO_IMPORT_STORAGE_KEY,
+            JSON.stringify(importedSnapshot),
+          );
+        } catch {
+          // Event delivery remains available when session storage is blocked.
+        }
+        window.dispatchEvent(new CustomEvent(MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT, {
+          detail: { snapshot: importedSnapshot, resumeToken: draft?.resumeToken ?? null },
+        }));
       }
-      window.dispatchEvent(new CustomEvent(MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT, {
-        detail: { snapshot, resumeToken: draft?.resumeToken ?? null },
-      }));
     }
 
     const respond = (event: Event): void => {
@@ -66,32 +89,22 @@ export function MarketplaceBrushStudioBridge(): ReactElement {
     const capture = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return;
       const detail = event.detail as { snapshot?: unknown } | null;
-      if (detail && detail.snapshot !== undefined) latestSnapshotRef.current = detail.snapshot;
+      if (detail?.snapshot !== undefined) latestSnapshotRef.current = detail.snapshot;
     };
 
-    window.addEventListener(
-      MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT,
-      respond as EventListener,
-    );
-    window.addEventListener(
-      MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT,
-      capture as EventListener,
-    );
+    window.addEventListener(MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT, respond as EventListener);
+    window.addEventListener(MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT, capture as EventListener);
     return () => {
-      window.removeEventListener(
-        MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT,
-        respond as EventListener,
-      );
-      window.removeEventListener(
-        MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT,
-        capture as EventListener,
-      );
+      window.removeEventListener(MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT, respond as EventListener);
+      window.removeEventListener(MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT, capture as EventListener);
     };
   }, []);
 
+  if (!visible) return null;
   return (
     <MarketplaceBrushPublishShortcut
       snapshotProvider={() => latestSnapshotRef.current}
+      data-testid="brush-studio-marketplace-publish"
     />
   );
 }
