@@ -86,18 +86,17 @@ function positionsOf(part: AvatarForgeHairPart) {
 }
 
 describe("createAvatarForgeHairGeometry", () => {
-  it("가닥(tapered-capsule)은 링 15개 × 10정점 + 양 끝 중심 2개 = 152 정점", () => {
+  it("가닥은 19×7 front/back 그리드의 닫힌 authored clump로 구워진다", () => {
     const strand = planFor("long").find((part) => part.primitive === "tapered-capsule");
     expect(strand).toBeDefined();
-    // (lengthSegments 14 + 1) * radialSegments 10 + top/bottom 캡 중심 2
-    expect(positionsOf(strand!).count).toBe(152);
+    expect(positionsOf(strand!).count).toBe((18 + 1) * (6 + 1) * 2);
   });
 
-  it("캡은 반구(32×18), 그 외 구체 파츠는 완전구(24×16)로 구워진다", () => {
+  it("캡은 고밀도 authored shell, 번 파츠는 완전구로 구워진다", () => {
     const parts = planFor("bun");
     const cap = parts.find((part) => part.role === "cap");
     const bun = parts.find((part) => part.id === "bun");
-    expect(positionsOf(cap!).count).toBe(33 * 19);
+    expect(positionsOf(cap!).count).toBe(29 * 19);
     expect(positionsOf(bun!).count).toBe(25 * 17);
   });
 
@@ -142,16 +141,10 @@ describe("createAvatarForgeHairGeometry", () => {
     const after = positionsOf(waved);
     expect(after.count).toBe(before.count);
 
-    const ringCenterXs = (values: Float32Array) =>
-      Array.from({ length: 15 }, (_, row) => {
-        let total = 0;
-        for (let column = 0; column < 10; column += 1) {
-          total += values[(row * 10 + column) * 3] ?? 0;
-        }
-        return total / 10;
-      });
-    const beforeCenters = ringCenterXs(before.array);
-    const afterCenters = ringCenterXs(after.array);
+    const centrelineXs = (values: Float32Array) =>
+      Array.from({ length: 19 }, (_, row) => values[(row * 7 + 3) * 3] ?? 0);
+    const beforeCenters = centrelineXs(before.array);
+    const afterCenters = centrelineXs(after.array);
     const maximumCenterlineShift = Math.max(
       ...afterCenters.map((value, index) => Math.abs(value - (beforeCenters[index] ?? 0))),
     );
@@ -164,13 +157,13 @@ describe("Avatar Forge toon-clump geometry quality", () => {
   it("produces pointed, flattened toon clumps instead of constant-radius tubes", () => {
     const strand = planFor("long").find((part) => part.primitive === "tapered-capsule")!;
     const { array } = positionsOf(strand);
-    const radialSegments = 10;
+    const columns = 7;
 
     const spread = (row: number, axis: 0 | 2) => {
       let minimum = Number.POSITIVE_INFINITY;
       let maximum = Number.NEGATIVE_INFINITY;
-      for (let column = 0; column < radialSegments; column += 1) {
-        const value = array[(row * radialSegments + column) * 3 + axis]!;
+      for (let column = 0; column < columns; column += 1) {
+        const value = array[(row * columns + column) * 3 + axis]!;
         minimum = Math.min(minimum, value);
         maximum = Math.max(maximum, value);
       }
@@ -179,7 +172,7 @@ describe("Avatar Forge toon-clump geometry quality", () => {
 
     const rootWidth = spread(1, 0);
     const rootDepth = spread(1, 2);
-    const tipWidth = spread(14, 0);
+    const tipWidth = spread(18, 0);
     expect(rootDepth).toBeLessThan(rootWidth * 0.5);
     expect(tipWidth).toBeLessThan(rootWidth * 0.08);
   });

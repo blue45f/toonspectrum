@@ -128,15 +128,25 @@ const FACE_SHAPE_PRESETS: ReadonlyArray<{
 ] as const;
 
 const HAIR_COLOR_PRESETS = [
-  { id: "ink", label: "잉크 블랙", baseColor: "#171515", tipColor: "#46403d" },
-  { id: "espresso", label: "에스프레소", baseColor: "#2b1d18", tipColor: "#775344" },
-  { id: "honey", label: "허니 블론드", baseColor: "#91611f", tipColor: "#f1ca6d" },
-  { id: "silver", label: "실버", baseColor: "#777b86", tipColor: "#e8e9ee" },
-  { id: "rose", label: "로즈", baseColor: "#713344", tipColor: "#e995ad" },
-  { id: "violet", label: "바이올렛", baseColor: "#33254f", tipColor: "#9a7bd1" },
-  { id: "ocean", label: "오션", baseColor: "#173a58", tipColor: "#5aa7cf" },
-  { id: "mint", label: "민트", baseColor: "#174b48", tipColor: "#73d2c6" },
+  { id: "ink", label: "잉크 블랙", baseColor: "#171515", shadowColor: "#070606", tipColor: "#5d5551" },
+  { id: "espresso", label: "에스프레소", baseColor: "#2b1d18", shadowColor: "#110b09", tipColor: "#8d6756" },
+  { id: "honey", label: "허니 블론드", baseColor: "#91611f", shadowColor: "#3c260b", tipColor: "#f4d67f" },
+  { id: "silver", label: "실버", baseColor: "#777b86", shadowColor: "#30333a", tipColor: "#f0f1f5" },
+  { id: "rose", label: "로즈", baseColor: "#713344", shadowColor: "#2b1119", tipColor: "#efa8bb" },
+  { id: "violet", label: "바이올렛", baseColor: "#33254f", shadowColor: "#130d20", tipColor: "#aa91dc" },
+  { id: "ocean", label: "오션", baseColor: "#173a58", shadowColor: "#071724", tipColor: "#70b9dc" },
+  { id: "mint", label: "민트", baseColor: "#174b48", shadowColor: "#071e1d", tipColor: "#8be0d5" },
 ] as const;
+
+function deriveHairShadowColor(hex: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "#111111";
+  const value = Number.parseInt(match[1], 16);
+  const channel = (shift: number) => Math.round(((value >> shift) & 0xff) * 0.38)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
 
 function presetMatchesFilter(
   preset: (typeof AVATAR_FORGE_PRESETS)[number],
@@ -760,12 +770,13 @@ export function StudioVrmAvatarForgePanel({
                   })}
                 >
                   <ArrowRightLeft size={11} aria-hidden />
-                  뿌리·끝 교체
+                  기본·하이라이트 교체
                 </button>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {HAIR_COLOR_PRESETS.map((palette) => {
                   const selected = state.hair.baseColor === palette.baseColor
+                    && (state.hair.shadowColor ?? deriveHairShadowColor(state.hair.baseColor)) === palette.shadowColor
                     && state.hair.tipColor === palette.tipColor;
                   return (
                     <button
@@ -784,6 +795,7 @@ export function StudioVrmAvatarForgePanel({
                         hair: {
                           ...state.hair,
                           baseColor: palette.baseColor,
+                          shadowColor: palette.shadowColor,
                           tipColor: palette.tipColor,
                         },
                       })}
@@ -800,21 +812,32 @@ export function StudioVrmAvatarForgePanel({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {(["baseColor", "tipColor"] as const).map((key) => (
-                <label key={key} className="flex min-h-12 items-center gap-2 rounded-xl border border-line bg-card px-2.5 text-[0.66rem] font-bold text-fg-2">
-                  <Palette size={13} className="text-fg-3" aria-hidden />
-                  <span className="flex-1">{key === "baseColor" ? "뿌리색" : "끝색"}</span>
-                  <input
-                    type="color"
-                    value={state.hair[key]}
-                    disabled={disabled}
-                    onChange={(event) => updateHair(key, event.target.value)}
-                    className="size-8 cursor-pointer rounded-lg border border-line bg-transparent p-0 pointer-coarse:size-11"
-                    aria-label={key === "baseColor" ? "헤어 뿌리 색상" : "헤어 끝 색상"}
-                  />
-                </label>
-              ))}
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ["baseColor", "기본색"],
+                ["shadowColor", "그림자색"],
+                ["tipColor", "하이라이트"],
+              ] as const).map(([key, label]) => {
+                const value = key === "shadowColor"
+                  ? state.hair.shadowColor ?? deriveHairShadowColor(state.hair.baseColor)
+                  : state.hair[key];
+                return (
+                  <label key={key} className="flex min-h-12 min-w-0 flex-col justify-center gap-1 rounded-xl border border-line bg-card px-2 text-[0.58rem] font-bold text-fg-2">
+                    <span className="flex items-center gap-1 truncate">
+                      <Palette size={11} className="shrink-0 text-fg-3" aria-hidden />
+                      {label}
+                    </span>
+                    <input
+                      type="color"
+                      value={value}
+                      disabled={disabled || state.hair.style === "none"}
+                      onChange={(event) => updateHair(key, event.target.value)}
+                      className="h-8 w-full cursor-pointer rounded-lg border border-line bg-transparent p-0 disabled:opacity-35 pointer-coarse:h-11"
+                      aria-label={`헤어 ${label}`}
+                    />
+                  </label>
+                );
+              })}
             </div>
 
             <div className="space-y-3 rounded-xl border border-line bg-card/70 p-3">
@@ -978,9 +1001,9 @@ export function StudioVrmAvatarForgePanel({
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-[0.68rem] font-bold text-fg-2">모델 고유 얼굴 모프</p>
+                  <p className="text-[0.68rem] font-bold text-fg-2">적응형 얼굴 디테일</p>
                   <p className="mt-0.5 text-[0.58rem] leading-relaxed text-fg-3">
-                    눈·코·입·귀 이름이 명확한 shape key만 탐지합니다. 표정·립싱크 채널은 제외합니다.
+                    모델 고유 shape key를 먼저 사용하고, 없는 항목은 머리·눈 랜드마크와 얼굴 메시를 기반으로 부드럽게 조형합니다. 표정·립싱크 채널은 제외합니다.
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.57rem] font-bold text-accent">
@@ -993,7 +1016,7 @@ export function StudioVrmAvatarForgePanel({
                     <StudioVrmForgeRangeControl
                       key={control.id}
                       label={control.label}
-                      hint={control.hint}
+                      hint={`${control.provider === "native-morph" ? "모델 morph" : `적응형 mesh ${control.adaptiveMeshCount}개`} · ${control.hint}`}
                       value={state.semanticFaceMorphs?.[control.id] ?? 0}
                       minimum={control.minimum}
                       maximum={control.maximum}
@@ -1006,12 +1029,14 @@ export function StudioVrmAvatarForgePanel({
                   ))}
                   <details className="rounded-lg border border-line/70 bg-card/60 p-2.5">
                     <summary className="min-h-8 cursor-pointer text-[0.59rem] font-bold text-fg-2">
-                      연결된 shape key 확인
+                      조형 공급자 확인
                     </summary>
                     <div className="mt-2 space-y-1 border-t border-line/60 pt-2">
                       {semanticFaceMorphProfile.controls.map((control) => (
                         <p key={control.id} className="break-all text-[0.55rem] leading-relaxed text-fg-3">
-                          <b className="text-fg-2">{control.label}</b> · {control.targetNames.join(" · ")}
+                          <b className="text-fg-2">{control.label}</b> · {control.provider === "native-morph"
+                            ? `모델 morph · ${control.targetNames.join(" · ")}`
+                            : `적응형 mesh · 얼굴 메시 ${control.adaptiveMeshCount}개`}
                         </p>
                       ))}
                     </div>
@@ -1020,7 +1045,7 @@ export function StudioVrmAvatarForgePanel({
               ) : (
                 <p className="mt-3 rounded-lg border border-line bg-card/60 px-3 py-2 text-[0.6rem] leading-relaxed text-fg-3">
                   {semanticFaceMorphProfile?.message
-                    ?? "모델을 불러오면 호환되는 상세 얼굴 morph를 검사합니다."}
+                    ?? "모델을 불러오면 native morph와 적응형 얼굴 메시를 함께 검사합니다."}
                 </p>
               )}
             </div>

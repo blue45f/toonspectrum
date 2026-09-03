@@ -1,12 +1,12 @@
 import {
+  applyStudioVrmAdaptiveFaceMorphs,
+  inspectStudioVrmAdaptiveFaceProfile,
+} from "./studio-vrm-adaptive-face-deformer";
+import {
   sanitizeAvatarForgeSemanticFaceMorphs,
   type AvatarForgeSemanticFaceMorphId,
   type AvatarForgeSemanticFaceMorphState,
 } from "./studio-vrm-avatar-forge";
-import {
-  applyStudioVrmAdaptiveFaceMorphs,
-  inspectStudioVrmAdaptiveFaceProfile,
-} from "./studio-vrm-adaptive-face-deformer";
 
 import type { VRM } from "@pixiv/three-vrm";
 import type * as THREE from "three";
@@ -253,39 +253,41 @@ export function inspectStudioVrmSemanticFaceMorphProfile(
 ): StudioVrmSemanticFaceMorphProfile {
   const bindings = discoverBindings(vrm);
   const adaptive = inspectStudioVrmAdaptiveFaceProfile(vrm);
-  const controls = SEMANTIC_SPECS.flatMap((spec) => {
+  const controls: StudioVrmSemanticFaceMorphControl[] = [];
+  for (const spec of SEMANTIC_SPECS) {
     const matching = bindings.filter((binding) => binding.semanticId === spec.id);
     const positiveTargetCount = matching.filter((binding) => binding.direction === 1).length;
     const negativeTargetCount = matching.length - positiveTargetCount;
     if (matching.length > 0) {
-      return [Object.freeze({
+      controls.push(Object.freeze({
         id: spec.id,
         label: spec.label,
         hint: spec.hint,
-        minimum: negativeTargetCount > 0 ? -1 as const : 0 as const,
-        maximum: positiveTargetCount > 0 ? 1 as const : 0 as const,
+        minimum: negativeTargetCount > 0 ? -1 : 0,
+        maximum: positiveTargetCount > 0 ? 1 : 0,
         positiveTargetCount,
         negativeTargetCount,
         targetNames: Object.freeze([...new Set(matching.map((binding) => binding.targetName))].sort()),
-        provider: "native-morph" as const,
+        provider: "native-morph",
         adaptiveMeshCount: 0,
-      })];
+      }));
+      continue;
     }
     const adaptiveCapability = adaptive.capabilities.find((capability) => capability.id === spec.id);
-    if (!adaptiveCapability) return [];
-    return [Object.freeze({
+    if (!adaptiveCapability) continue;
+    controls.push(Object.freeze({
       id: spec.id,
       label: spec.label,
       hint: spec.hint,
-      minimum: -1 as const,
-      maximum: 1 as const,
+      minimum: -1,
+      maximum: 1,
       positiveTargetCount: 0,
       negativeTargetCount: 0,
       targetNames: Object.freeze([]),
-      provider: "adaptive-mesh" as const,
+      provider: "adaptive-mesh",
       adaptiveMeshCount: adaptiveCapability.meshCount,
-    })];
-  });
+    }));
+  }
   const nativeTargetCount = bindings.length;
   const adaptiveMeshCount = adaptive.meshCount;
   const nativeControlCount = controls.filter((control) => control.provider === "native-morph").length;

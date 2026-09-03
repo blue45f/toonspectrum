@@ -322,8 +322,9 @@ export function StudioVrmAvatarForgePreview({
           <stop offset="1" stopColor="#dca98f" />
         </linearGradient>
         <linearGradient id={hairGradientId} x1="0" x2="0.9" y1="0" y2="1">
-          <stop offset="0" stopColor={safe.hair.baseColor} />
-          <stop offset="0.58" stopColor={safe.hair.baseColor} />
+          <stop offset="0" stopColor={safe.hair.shadowColor ?? safe.hair.baseColor} />
+          <stop offset="0.34" stopColor={safe.hair.baseColor} />
+          <stop offset="0.72" stopColor={safe.hair.baseColor} />
           <stop offset="1" stopColor={safe.hair.tipColor} />
         </linearGradient>
       </defs>
@@ -343,7 +344,7 @@ export function StudioVrmAvatarForgePreview({
         </g>
       ) : null}
 
-      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.4">
+      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.4">
         <HairBack style={safe.hair.style} />
       </g>
       <ellipse
@@ -384,7 +385,7 @@ export function StudioVrmAvatarForgePreview({
       <path d={`M${headCx - 2} ${headCy + 5}q2 3 4 0`} fill="none" stroke="#b77f6b" strokeLinecap="round" strokeWidth="1.4" />
       <path d={`M${headCx - 8} ${headCy + 18}q8 ${4 + safe.face.cheekVolume * 2} 16 0`} fill="none" stroke="#9f4f55" strokeLinecap="round" strokeWidth="1.8" />
       <FaceAccents state={safe} cx={headCx} cy={headCy} width={headWidth} height={headHeight} />
-      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.2">
+      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.2">
         <Bangs style={safe.hair.bangStyle} />
       </g>
       <path

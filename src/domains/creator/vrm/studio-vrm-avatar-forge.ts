@@ -113,6 +113,8 @@ export type AvatarForgeHairParams = {
   curl: number;
   shine: number;
   baseColor: string;
+  /** Optional authored cel-shadow colour. Omitted legacy states derive it from baseColor. */
+  shadowColor?: string;
   tipColor: string;
   /** v2: 앞머리 형태. "full"이 v1과 동일한 3가닥 뱅. */
   bangStyle: AvatarForgeBangStyle;
@@ -174,6 +176,8 @@ export type AvatarForgeHairPart = {
   rotation: readonly [number, number, number];
   scale: readonly [number, number, number];
   baseColor: string;
+  /** Optional authored cel-shadow colour. Omitted legacy states derive it from baseColor. */
+  shadowColor?: string;
   tipColor: string;
   taper: number;
   curl: number;
@@ -618,6 +622,9 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
       curl: clampNumber(hair.curl, AVATAR_FORGE_HAIR_LIMITS.curl, DEFAULT_HAIR.curl),
       shine: clampNumber(hair.shine, AVATAR_FORGE_HAIR_LIMITS.shine, DEFAULT_HAIR.shine),
       baseColor: color(hair.baseColor, DEFAULT_HAIR.baseColor),
+      ...(typeof hair.shadowColor === "string" && HEX_COLOR.test(hair.shadowColor)
+        ? { shadowColor: hair.shadowColor.toLowerCase() }
+        : {}),
       tipColor: color(hair.tipColor, DEFAULT_HAIR.tipColor),
       bangStyle,
       wave: legacy
@@ -791,6 +798,7 @@ function hairPart(
     rotation,
     scale,
     baseColor: hair.baseColor,
+    ...(hair.shadowColor ? { shadowColor: hair.shadowColor } : {}),
     tipColor: hair.tipColor,
     taper,
     curl: hair.curl,
