@@ -39,6 +39,18 @@ jobs:
         run: |
           python3 scripts/apply-shaper-character-workshop.py
           python3 scripts/finalize-shaper-character-workshop.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/vrm/StudioVrmAvatarForgePreview.tsx")
+          source = path.read_text(encoding="utf-8")
+          directive = (
+              "/* eslint-disable react-refresh/only-export-components -- "
+              "Pure visual-summary helpers are the preview renderer's canonical contract. */\n"
+          )
+          if not source.startswith(directive):
+              path.write_text(directive + source, encoding="utf-8")
+          PY
 
       - name: Inspect generated implementation
         run: |
@@ -47,6 +59,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Normalize relative import order
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: >-
+          pnpm exec eslint --fix
+          src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx
+          src/domains/creator/vrm/StudioVrmAvatarReferenceRecommendationsPanel.tsx
 
       - name: Lint changed character-workshop files
         env:
