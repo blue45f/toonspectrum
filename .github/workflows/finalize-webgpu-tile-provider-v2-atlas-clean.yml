@@ -31,17 +31,62 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Normalize clean branch workflow and imports
+      - name: Normalize workflow, imports, and strict TypeScript boundaries
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          workflow = Path('.github/workflows/webgpu-tile-provider-v2-atlas.yml')
-          source = workflow.read_text(encoding='utf-8')
-          old = 'feat/webgpu-tile-provider-v2-atlas-20260904'
-          new = 'feat/webgpu-tile-provider-v2-atlas-clean-20260904'
-          if source.count(old) != 1:
-              raise SystemExit(f'expected one workflow branch reference, found {source.count(old)}')
-          workflow.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              source = target.read_text(encoding='utf-8')
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              target.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          workflow = '.github/workflows/webgpu-tile-provider-v2-atlas.yml'
+          replace_once(
+              workflow,
+              'feat/webgpu-tile-provider-v2-atlas-20260904',
+              'feat/webgpu-tile-provider-v2-atlas-clean-20260904',
+          )
+
+          source_file = 'src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.ts'
+          replace_once(
+              source_file,
+              '''  #createVirtualDevice(): GPUDevice {
+              const queue = this.#createVirtualQueue();
+              return {
+                get label() {
+                  return this.#device?.label ?? "Studio virtual atlas device";
+                },'''.replace('              ', ''),
+              '''  #createVirtualDevice(): GPUDevice {
+              const queue = this.#createVirtualQueue();
+              const deviceLabel = this.#device.label;
+              return {
+                get label() {
+                  return deviceLabel || "Studio virtual atlas device";
+                },'''.replace('              ', ''),
+          )
+
+          test_file = 'src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.test.ts'
+          replace_once(
+              test_file,
+              '''    expect(result.batch.deltas).toHaveLength(2);
+              expect(new Uint8Array(result.batch.deltas[0]!.encoded.buffer)[0]).toBe(1);
+              expect(new Uint8Array(result.batch.deltas[1]!.encoded.buffer)[0]).toBe(2);'''.replace('              ', ''),
+              '''    expect(result.batch.deltas).toHaveLength(2);
+              const firstEncoded = result.batch.deltas[0]!.encoded;
+              const secondEncoded = result.batch.deltas[1]!.encoded;
+              const firstBytes = firstEncoded instanceof Uint16Array
+                ? new Uint8Array(firstEncoded.buffer, firstEncoded.byteOffset, firstEncoded.byteLength)
+                : new Uint8Array(firstEncoded);
+              const secondBytes = secondEncoded instanceof Uint16Array
+                ? new Uint8Array(secondEncoded.buffer, secondEncoded.byteOffset, secondEncoded.byteLength)
+                : new Uint8Array(secondEncoded);
+              expect(firstBytes[0]).toBe(1);
+              expect(secondBytes[0]).toBe(2);'''.replace('              ', ''),
+          )
           PY
           pnpm exec eslint --fix \
             src/domains/creator/render/studio-engine-webgpu-tile-provider-v2-atlas.ts \
