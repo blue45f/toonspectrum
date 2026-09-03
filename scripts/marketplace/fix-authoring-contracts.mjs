@@ -27,21 +27,21 @@ function patchWorkshop() {
   let source = fs.readFileSync(WORKSHOP_PATH, "utf8");
   source = insertOnce(
     source,
-    "export const CREATOR_MARKETPLACE_BRUSH_ENGINE_LABELS",
+    "function nowIso(): string {",
     `export const CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS: Readonly<\n  Record<CreatorMarketplaceAuthoringKind, readonly string[]>\n> = Object.freeze({\n  brush: Object.freeze([\"brush-fast-slow\", \"brush-pressure\", \"brush-crossing\"]),\n  tone: Object.freeze([\"tone-seam\", \"tone-dpi\"]),\n  palette: Object.freeze([\"palette-space\", \"palette-contrast\"]),\n  pose: Object.freeze([\"pose-rig\", \"pose-mirror\"]),\n  \"3d\": Object.freeze([\"3d-scale\", \"3d-material\", \"3d-lod\"]),\n  background: Object.freeze([\"background-scroll\", \"background-perspective\"]),\n  bubble: Object.freeze([\"bubble-fit\", \"bubble-vertical\"]),\n  template: Object.freeze([\"template-pages\", \"template-fonts\"]),\n  material: Object.freeze([\"material-install\", \"material-dependencies\"]),\n});\n\n`,
     "quality scenario contract",
   );
   source = replaceOnce(
     source,
-    `  const diagnostics: CreatorMarketplaceAuthoringDiagnostic[] = [];\n  const add = (id: string, severity: CreatorMarketplaceAuthoringDiagnostic[\"severity\"], stage: CreatorMarketplaceAuthoringStageId, message: string): void => diagnostics.push({ id, severity, stage, message });`,
-    `  const diagnostics: CreatorMarketplaceAuthoringDiagnostic[] = [];\n  const add = (\n    id: string,\n    severity: CreatorMarketplaceAuthoringDiagnostic[\"severity\"],\n    stage: CreatorMarketplaceAuthoringStageId,\n    message: string,\n  ): void => {\n    diagnostics.push({ id, severity, stage, message });\n  };`,
+    `  const diagnostics: CreatorMarketplaceAuthoringDiagnostic[] = [];\n  const add = (\n    id: string,\n    severity: CreatorMarketplaceAuthoringDiagnostic[\"severity\"],\n    step: CreatorMarketplaceAuthoringDiagnostic[\"step\"],\n    message: string,\n    action: string,\n  ): void => diagnostics.push({ id, severity, step, message, action });`,
+    `  const diagnostics: CreatorMarketplaceAuthoringDiagnostic[] = [];\n  const add = (\n    id: string,\n    severity: CreatorMarketplaceAuthoringDiagnostic[\"severity\"],\n    step: CreatorMarketplaceAuthoringDiagnostic[\"step\"],\n    message: string,\n    action: string,\n  ): void => {\n    diagnostics.push({ id, severity, step, message, action });\n  };`,
     "diagnostic callback",
   );
 
   const returnMarker = "  return diagnostics;\n}";
   const returnIndex = source.lastIndexOf(returnMarker);
   if (returnIndex < 0) throw new Error("authoring diagnostics return marker was not found");
-  const qualityValidation = `  const selectedQualityScenarios = Array.isArray(draft.technical.qualityScenarios)\n    ? draft.technical.qualityScenarios.filter(\n      (scenario): scenario is string => typeof scenario === \"string\",\n    )\n    : [];\n  const missingQualityScenarios = CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS[draft.kind]\n    .filter((scenario) => !selectedQualityScenarios.includes(scenario));\n  if (missingQualityScenarios.length > 0) {\n    add(\n      \"quality-plan\",\n      \"error\",\n      \"preview\",\n      \`필수 품질 시나리오 \\${missingQualityScenarios.length}개를 미리보기·검수 계획에 포함해야 합니다.\`,\n    );\n  }\n  if (draft.media.some((media) => !media.alt.trim())) {\n    add(\n      \"preview-alt\",\n      \"error\",\n      \"preview\",\n      \"모든 미리보기에는 결과와 사용 목적을 설명하는 대체 텍스트가 필요합니다.\",\n    );\n  }\n  if (draft.bundle.some((item) => !item.name.trim() || !item.role.trim())) {\n    add(\n      \"bundle-metadata\",\n      \"error\",\n      \"bundle\",\n      \"번들 구성요소마다 이름과 설치 역할을 입력해야 합니다.\",\n    );\n  }\n\n`;
+  const qualityValidation = `  const rawQualityScenarios = draft.technical.qualityScenarios;\n  const selectedQualityScenarios = Array.isArray(rawQualityScenarios)\n    ? rawQualityScenarios.filter(\n      (scenario): scenario is string => typeof scenario === \"string\",\n    )\n    : [];\n  const missingQualityScenarios = CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS[draft.kind]\n    .filter((scenario) => !selectedQualityScenarios.includes(scenario));\n  if (missingQualityScenarios.length > 0) {\n    add(\n      \"quality-plan\",\n      \"error\",\n      \"preview\",\n      \`필수 품질 시나리오 \${missingQualityScenarios.length}개가 검수 계획에서 누락됐습니다.\`,\n      \"품질 시나리오 화면에서 모든 필수 항목을 선택하고 실제 미리보기 결과를 연결하세요.\",\n    );\n  }\n  if (draft.media.some((media) => !media.alt.trim())) {\n    add(\n      \"preview-alt\",\n      \"error\",\n      \"preview\",\n      \"설명이 없는 미리보기 미디어가 있습니다.\",\n      \"모든 미리보기에 결과와 사용 목적을 설명하는 대체 텍스트를 입력하세요.\",\n    );\n  }\n  if (draft.bundle.some((item) => !item.name.trim() || !item.role.trim())) {\n    add(\n      \"bundle-metadata\",\n      \"error\",\n      \"bundle\",\n      \"이름 또는 설치 역할이 비어 있는 번들 구성요소가 있습니다.\",\n      \"각 구성요소의 이름과 설치 후 역할을 입력하세요.\",\n    );\n  }\n\n`;
   if (!source.includes("missingQualityScenarios")) {
     source = `${source.slice(0, returnIndex)}${qualityValidation}${source.slice(returnIndex)}`;
   }
@@ -58,8 +58,8 @@ function patchPackageBuilder() {
   );
   source = replaceOnce(
     source,
-    `  const fileName = \`${"${safePackageBaseName(draft.title)}-${safePackageBaseName(draft.release.version)}.toonmarket.zip"}\`;\n  return {\n    file: new File([archive], fileName, { type: \"application/vnd.toonspectrum.marketplace+zip\" }),`,
-    `  const fileName = \`${"${safePackageBaseName(draft.title)}-${safePackageBaseName(draft.release.version)}.toonmarket.zip"}\`;\n  const ownedArchive = new Uint8Array(archive.byteLength);\n  ownedArchive.set(archive);\n  return {\n    file: new File([ownedArchive.buffer], fileName, {\n      type: \"application/vnd.toonspectrum.marketplace+zip\",\n    }),`,
+    `  const fileName = \`\${safePackageBaseName(draft.title)}-\${safePackageBaseName(draft.release.version)}.toonmarket.zip\`;\n  return {\n    file: new File([archive], fileName, { type: \"application/vnd.toonspectrum.marketplace+zip\" }),`,
+    `  const fileName = \`\${safePackageBaseName(draft.title)}-\${safePackageBaseName(draft.release.version)}.toonmarket.zip\`;\n  const ownedArchive = new Uint8Array(archive.byteLength);\n  ownedArchive.set(archive);\n  return {\n    file: new File([ownedArchive.buffer], fileName, {\n      type: \"application/vnd.toonspectrum.marketplace+zip\",\n    }),`,
     "owned archive BlobPart",
   );
   fs.writeFileSync(PACKAGE_PATH, source, "utf8");
