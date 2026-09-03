@@ -99,6 +99,31 @@ describe("studio floating surface SQLite preferences", () => {
     });
   });
 
+  it("waits for an accepted write before a remount-style load", async () => {
+    const store = memoryStore();
+    const repository = createStudioFloatingSurfacePreferencesRepository({
+      ...store,
+      async set(key, value) {
+        await Promise.resolve();
+        store.values.set(key, value);
+      },
+    });
+    const layout = { ...FALLBACK, xRatio: 0.63, dock: "right" as const };
+
+    const pendingSave = repository.save("quick-access", layout);
+    const pendingLoad = repository.load("quick-access", FALLBACK);
+
+    await expect(pendingLoad).resolves.toMatchObject({
+      layout,
+      persisted: true,
+      failure: null,
+    });
+    await expect(pendingSave).resolves.toMatchObject({
+      status: "persisted",
+      failure: null,
+    });
+  });
+
   it("fails closed for invalid IDs, malformed reads, and ignored writes", async () => {
     const malformed = memoryStore({
       "surface:quick-access": "{bad-json",

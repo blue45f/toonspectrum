@@ -89,6 +89,7 @@ export function createStudioFloatingSurfacePreferencesRepository(
         });
       }
       try {
+        await writeTail.catch(() => undefined);
         const raw = await store.get(storageKey(surfaceId));
         if (raw === null) {
           return Object.freeze({
