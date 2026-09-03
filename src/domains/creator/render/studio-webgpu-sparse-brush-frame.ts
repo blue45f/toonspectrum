@@ -20,8 +20,8 @@ const STUDIO_GPU_SPARSE_BRUSH_FRAME_TOKEN: unique symbol = Symbol(
   "StudioGpuSparseBrushFrameToken",
 );
 
-export interface StudioGpuSparseBrushFramePlannerOptions
-  extends StudioGpuSparseTileAtlasOptions {}
+export type StudioGpuSparseBrushFramePlannerOptions =
+  StudioGpuSparseTileAtlasOptions;
 
 export interface StudioGpuSparseBrushFrameInput {
   readonly frameId: string;
@@ -91,7 +91,6 @@ export type StudioGpuSparseBrushFrameSettlementResult =
 
 interface ActiveSparseBrushFrame {
   readonly token: StudioGpuSparseBrushFrameToken;
-  readonly frame: Readonly<StudioGpuSparseBrushPreparedFrame>;
 }
 
 function parseVisibleTileId(
@@ -132,14 +131,17 @@ export class StudioGpuSparseBrushFramePlanner {
     if (this.#active) {
       return Object.freeze({ status: "rejected", reason: "busy" });
     }
+    if (!input || typeof input !== "object" || typeof input.frameId !== "string") {
+      return Object.freeze({ status: "rejected", reason: "invalid-input" });
+    }
     const stats = this.#atlas.stats();
     const binned = planStudioGpuDabTileBinning({
-      documentWidth: input?.documentWidth,
-      documentHeight: input?.documentHeight,
+      documentWidth: input.documentWidth,
+      documentHeight: input.documentHeight,
       tileSize: stats.tileSize,
-      dabs: input?.dabs,
-      maximumTileReferences: input?.maximumTileReferences,
-      maximumTiles: input?.maximumTiles,
+      dabs: input.dabs,
+      maximumTileReferences: input.maximumTileReferences,
+      maximumTiles: input.maximumTiles,
     });
     if (binned.status !== "ready") return binned;
 
@@ -156,7 +158,7 @@ export class StudioGpuSparseBrushFramePlanner {
           binned.plan.columns,
           binned.plan.rows,
         );
-        if (tileIndex === null) {
+        if (tileIndex === null || visible.has(tileIndex)) {
           return Object.freeze({ status: "rejected", reason: "invalid-visible-tiles" });
         }
         visible.add(tileIndex);
@@ -193,7 +195,9 @@ export class StudioGpuSparseBrushFramePlanner {
       return Object.freeze({
         status: "rejected",
         reason: atlasFrame.reason === "capacity" ? "atlas-capacity" : atlasFrame.reason,
-        detail: atlasFrame.activeFrameId,
+        ...(atlasFrame.activeFrameId
+          ? { detail: atlasFrame.activeFrameId }
+          : {}),
       });
     }
     if (atlasFrame.frame.assignments.length !== selected.length) {
@@ -220,7 +224,7 @@ export class StudioGpuSparseBrushFramePlanner {
       binning: binned.plan,
       tiles: Object.freeze(tiles),
     });
-    this.#active = { token, frame };
+    this.#active = { token };
     return Object.freeze({ status: "prepared", frame });
   }
 
