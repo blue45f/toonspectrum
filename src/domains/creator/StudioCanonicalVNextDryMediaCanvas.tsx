@@ -5,6 +5,7 @@ import {
   type StudioEngineWebGpuPresentationLayout,
   type StudioEngineWebGpuPresentationSurface,
 } from "./render/studio-engine-webgpu-presentation-surface";
+import { acquireStudioGpuPresentationDevice } from "./render/studio-gpu-presentation-device";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime,
   type StudioEngineWebGpuTexturedBrushRuntime,
@@ -96,11 +97,6 @@ type DryMediaCanvasDisplayState =
   | "last-good-unavailable"
   | "unavailable";
 
-function preferredCanvasFormat(gpu: GPU): "bgra8unorm" | "rgba8unorm" | null {
-  const format = gpu.getPreferredCanvasFormat();
-  return format === "bgra8unorm" || format === "rgba8unorm" ? format : null;
-}
-
 function surfaceDevicePixelRatio(width: number, height: number): number {
   const native = Number(globalThis.devicePixelRatio);
   return resolveStudioLiveSurfaceDevicePixelRatio({
@@ -114,58 +110,69 @@ async function createResources(
   canvas: HTMLCanvasElement,
   onDeviceLost: (info: GPUDeviceLostInfo) => void,
 ): Promise<DryMediaGpuResources | null> {
-  const gpu = navigator.gpu;
-  if (!gpu) return null;
-  const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
-  const canvasFormat = preferredCanvasFormat(gpu);
-  if (!context || !canvasFormat) return null;
-  const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
-  if (!adapter) return null;
-  const device = await adapter.requestDevice();
-  const surfaceResult = createStudioEngineWebGpuPresentationSurface({
-    device,
-    context,
-    canvas,
-    canvasFormat,
-    initialDeviceEpoch: 1,
-    ownsDevice: false,
-    onDeviceLost,
-  });
-  if (surfaceResult.status !== "ready") {
+  const acquired = await acquireStudioGpuPresentationDevice();
+  if (!acquired) return null;
+  const { device, deviceEpoch, canvasFormat } = acquired;
+  let surface: StudioEngineWebGpuPresentationSurface | null = null;
+  let runtime: StudioEngineWebGpuTexturedBrushRuntime | null = null;
+  try {
+    const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
+    if (!context) {
+      device.destroy();
+      return null;
+    }
+    const surfaceResult = createStudioEngineWebGpuPresentationSurface({
+      device,
+      context,
+      canvas,
+      canvasFormat,
+      initialDeviceEpoch: deviceEpoch,
+      ownsDevice: false,
+      onDeviceLost,
+    });
+    if (surfaceResult.status !== "ready") {
+      device.destroy();
+      return null;
+    }
+    surface = surfaceResult.surface;
+    const runtimeResult = createStudioEngineWebGpuTexturedBrushRuntime({
+      device,
+      initialDeviceEpoch: deviceEpoch,
+      presentationOnly: true,
+      ownsDevice: false,
+      onDeviceLost,
+    });
+    if (runtimeResult.status !== "ready") {
+      surface.dispose();
+      device.destroy();
+      return null;
+    }
+    runtime = runtimeResult.runtime;
+    return {
+      device,
+      surface,
+      runtime,
+      controller: new StudioCanonicalVNextDryMediaPresentationController({
+        surface,
+        runtime,
+      }),
+      epochs: {
+        presentation: 0,
+        resize: 0,
+        viewport: 0,
+        flip: 0,
+        resizeSignature: null,
+        viewportSignature: null,
+        flipSignature: null,
+      },
+      tail: Promise.resolve(),
+    };
+  } catch {
+    runtime?.dispose();
+    surface?.dispose();
     device.destroy();
     return null;
   }
-  const runtimeResult = createStudioEngineWebGpuTexturedBrushRuntime({
-    device,
-    initialDeviceEpoch: 1,
-    presentationOnly: true,
-    ownsDevice: false,
-    onDeviceLost,
-  });
-  if (runtimeResult.status !== "ready") {
-    surfaceResult.surface.dispose();
-    device.destroy();
-    return null;
-  }
-  return {
-    device,
-    surface: surfaceResult.surface,
-    runtime: runtimeResult.runtime,
-    controller: new StudioCanonicalVNextDryMediaPresentationController({
-      surface: surfaceResult.surface,
-      runtime: runtimeResult.runtime,
-    }),
-    epochs: {
-      presentation: 0,
-      resize: 0,
-      viewport: 0,
-      flip: 0,
-      resizeSignature: null,
-      viewportSignature: null,
-      flipSignature: null,
-    },
-    tail: Promise.resolve(),
-  };
 }
 
 function configureSurface(
