@@ -153,6 +153,88 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("decodes SVG through the image element when the blob decoder cannot read it", async () => {
+    // Chromium and WebKit reject createImageBitmap(svgBlob) with InvalidStateError, which used to
+    // make this provider — the only one the filter menu selects — fail on every real browser.
+    vi.stubGlobal("Worker", class Worker {});
+    vi.stubGlobal("FileReader", FakeFileReader);
+    vi.stubGlobal("URL", {
+      createObjectURL: () => "blob:studio-vector-reference",
+      revokeObjectURL: () => {},
+    });
+    const loaded: string[] = [];
+    vi.stubGlobal("Image", class FakeImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) {
+        loaded.push(value);
+        queueMicrotask(() => this.onload?.());
+      }
+    });
+    const close = vi.fn();
+    const elementSources: unknown[] = [];
+    vi.stubGlobal("createImageBitmap", async (source: unknown) => {
+      elementSources.push(source);
+      return { width: 320, height: 240, close } as unknown as ImageBitmap;
+    });
+    const session: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
+      run: vi.fn(async () => ({
+        ok: true as const,
+        runId: 1,
+        width: 320,
+        height: 240,
+        payload: {
+          kind: "encoded" as const,
+          mime: "image/png" as const,
+          blob: pngBlob(24),
+        },
+      })),
+      dispose: vi.fn(),
+    };
+    const createBitmap = vi.fn(async () => {
+      throw new DOMException("The source image could not be decoded.", "InvalidStateError");
+    });
+
+    const result = await rasterizeStudioVectorReferenceOffscreen(request(), {
+      createBitmap,
+      createSession: () => session,
+    });
+
+    expect(result).toEqual({ dataUrl: PNG_DATA_URL, width: 320, height: 240 });
+    expect(createBitmap).toHaveBeenCalledOnce();
+    expect(loaded).toEqual(["blob:studio-vector-reference"]);
+    // The draw and PNG encode still happen on the Worker, so the selected backend stays honest.
+    expect(session.run).toHaveBeenCalledOnce();
+    expect(elementSources).toHaveLength(1);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("still fails closed when neither SVG decoder can read the page", async () => {
+    vi.stubGlobal("Worker", class Worker {});
+    vi.stubGlobal("URL", {
+      createObjectURL: () => "blob:studio-vector-reference",
+      revokeObjectURL: () => {},
+    });
+    vi.stubGlobal("Image", class FakeImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        queueMicrotask(() => this.onerror?.());
+      }
+    });
+    vi.stubGlobal("createImageBitmap", async () => {
+      throw new Error("unreachable");
+    });
+
+    await expect(rasterizeStudioVectorReferenceOffscreen(request(), {
+      createBitmap: async () => {
+        throw new DOMException("The source image could not be decoded.", "InvalidStateError");
+      },
+      createSession: () => { throw new Error("session must not be leased"); },
+    })).rejects.toMatchObject({ code: "raster-unavailable" });
+  });
+
   it("keeps the PNG output budget authoritative on the accelerated path", async () => {
     vi.stubGlobal("Worker", class Worker {});
     const close = vi.fn();

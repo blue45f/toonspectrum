@@ -17,6 +17,11 @@ import {
   recordStudioFilterExecutionShadow,
 } from "./render/studio-filter-plan-shadow";
 import {
+  ensureStudioGpuFilterLaneAdmission,
+  readStudioGpuFilterLaneAdmission,
+  type StudioGpuFilterLaneAdmission,
+} from "./render/studio-gpu-filter-lane-admission";
+import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
@@ -467,6 +472,9 @@ export function StudioKonvaImageNode({
   }>({ module: null, settled: false });
   const gpuFilterModule = gpuFilterLoad.module;
   const gpuFilterModuleSettled = gpuFilterLoad.settled;
+  const [gpuLaneAdmission, setGpuLaneAdmission] = useState<StudioGpuFilterLaneAdmission>(
+    readStudioGpuFilterLaneAdmission,
+  );
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [proxyFilteredCanvas, setProxyFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [gpuFilteredCanvas, setGpuFilteredCanvas] = useState<GpuFilteredCanvasState>();
@@ -760,8 +768,24 @@ export function StudioKonvaImageNode({
     };
   }, [filterModule, hasFilters]);
 
+  // Program-expressible AND actually runnable here. Splitting these two questions is the whole point
+  // of the admission gate: the first is about the filter, the second about the machine.
   const gpuFilterProgramEligible =
-    gpuFilterModule?.isStudioGpuFilterChainEligible(el) === true;
+    gpuLaneAdmission === "admitted"
+    && gpuFilterModule?.isStudioGpuFilterChainEligible(el) === true;
+
+  // Probed once per session, alongside the GPU chunk import so the two settle together rather than
+  // in series. Until it settles the filter effect waits, exactly as it already waits for the chunk.
+  useEffect(() => {
+    if (!hasFilters || gpuLaneAdmission !== "unknown") return;
+    let active = true;
+    void ensureStudioGpuFilterLaneAdmission().then((next) => {
+      if (active) setGpuLaneAdmission(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [gpuLaneAdmission, hasFilters]);
   // Worker 코드는 GPU 모듈이 정상 로드된 뒤 현재 프로그램을 지원하지 않는다고 판정했을 때만
   // 가져온다. GPU provider가 선택된 요청은 Worker 청크의 준비 여부와 완전히 독립적이다.
   useEffect(() => {
@@ -962,8 +986,12 @@ export function StudioKonvaImageNode({
     && cachePad === 0
     && !el.isAnimatedGif
     && !filterMaskActivationBlocked;
+  // Planning needs both the GPU chunk AND the verdict on whether this machine can run it. Choosing
+  // a lane while admission is still "unknown" would be a guess, and a wrong guess dead-ends: the
+  // GPU branch returns instead of continuing to the Worker dispatch below it.
   const filterPipelinePlanningReady = workerPipelineRequested
-    && gpuFilterModuleSettled;
+    && gpuFilterModuleSettled
+    && gpuLaneAdmission !== "unknown";
   const workerRequestKey = JSON.stringify([
     el.src,
     filterCacheKey,
@@ -1199,7 +1227,8 @@ export function StudioKonvaImageNode({
 
     const filterProgram = elRef.current;
     const gpuChainEligible =
-      gpuFilterModule?.isStudioGpuFilterChainEligible(filterProgram) === true;
+      gpuLaneAdmission === "admitted"
+      && gpuFilterModule?.isStudioGpuFilterChainEligible(filterProgram) === true;
     const filterIslandInput = {
       gpuChainEligible,
       workload: { width, height, chainSteps: filterChainSteps },
@@ -1638,6 +1667,7 @@ export function StudioKonvaImageNode({
     filterWorkerClient,
     filterWorkerClientSettled,
     gpuFilterModule,
+    gpuLaneAdmission,
     el.src,
     workerWidth,
     workerHeight,

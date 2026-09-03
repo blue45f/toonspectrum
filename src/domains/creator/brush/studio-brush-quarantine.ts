@@ -466,7 +466,7 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       + "수채 워시가 실재하지 않습니다. 대안: transparent-flat · 코어 watercolor(지침 6).",
     "foliage-broad-canopy":
       "잎송이 알파맵과 팁 레이어를 leaf-cluster 와 공유하고 scatter 0.62/0.39 차이만 남습니다. "
-      + "대안: leaf-cluster · long-leaf · leaf-fall-flurry(지침 6).",
+      + "대안: leaf-cluster · round-leaf(지침 6).",
 
     // ── 2026-08-27 영수증 재생성 감사: 우산 id 의 커널 미주행 ─────────────────────
     // T1 de-polygon 웨이브가 crayon·chalk·charcoal·pastel·oil-pastel 을 커널 dab 경로로 옮길 때
@@ -644,12 +644,35 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     "snow-flurry-flake":
       "ink-particle/flake 발자국을 free-stamp 와 공유합니다. 대안: free-stamp(지침 6).",
     "leaf-fall-flurry":
-      "잎 레이어 발자국을 long-leaf 와 공유합니다. 대안: long-leaf · leaf-cluster(지침 6).",
+      "잎 레이어 발자국을 long-leaf 와 공유합니다. 대안: round-leaf · leaf-cluster(지침 6).",
     "sparkle-glint-cross":
       "ink-particle/star 발자국을 stardust-star-scatter 와 공유합니다. 대안: "
       + "stardust-star-scatter · glitter(지침 6).",
     "brush-pen-ink":
       "ink-particle/sumi 발자국을 flex-ink 와 공유합니다. 대안: flex-ink · brush-pen(지침 6).",
+
+    // ── 2026-09-03 유사 브러시 축소 웨이브: 마크 거리 계측 ────────────────────────────
+    // 노출 중인 절차 브러시 90종의 실제 materialize 결과에서 마크를 만드는 채널만 뽑아
+    // 거리를 쟀습니다 — 팁 알파맵 픽셀 평균절대차(0.55) · 간격/산포/플로/부드러움/그레인
+    // 스칼라(0.25) · 스탬프 각도(0.20). 시드는 그레인 위치만 옮기고 성격을 바꾸지 않아
+    // 제외했습니다. 카테고리 내부 쌍만 후보로 봤습니다(지침: 그룹 내 대안이 있을 것).
+    // foliage 는 전체 카탈로그에서 가장 조밀한 군집이었습니다: 0.12 미만 쌍 8개 중 6개가
+    // 홑잎 4종(fresh-leaf · long-leaf · round-leaf · leaf-cluster) 사이에서 나왔고,
+    // fresh↔long 0.0355 는 90종 전체에서 가장 가까운 쌍입니다. 홑잎 3종은 서로 0.064
+    // 안에 들어오는 반면 잎송이는 어느 홑잎과도 0.08 이상 떨어져 있어, 홑잎 대표 하나와
+    // 잎뭉치 하나를 남기는 편이 아티스트가 실제로 구분하는 축과 맞습니다.
+    "fresh-leaf":
+      "홑잎 마크 거리가 long-leaf 와 0.0355(90종 중 최근접) · round-leaf 와 0.0635 로 "
+      + "같은 홑잎 도장이 셋 겹칩니다. 대안: round-leaf · leaf-cluster(지침 6).",
+    "long-leaf":
+      "홑잎 마크 거리가 fresh-leaf 와 0.0355 · round-leaf 와 0.0442 로 round-leaf 가 "
+      + "그대로 대신합니다. 대안: round-leaf · leaf-cluster(지침 6).",
+    // rake 는 hair/fur 촉이 다섯이고, fur-soft-clumps 가 그 사이에 끼어 양쪽 모두와
+    // 가장 가깝습니다(hair-fiber 0.0494 · fine-hair-strands 0.1110). 털 표현은 같은
+    // 카테고리의 airbrush 런타임 fur-undercoat-soft 가 다른 발자국으로 남습니다.
+    "fur-soft-clumps":
+      "머리카락 결과 마크 거리 0.0494 로 rake 카테고리에서 가장 가까운 쌍입니다. "
+      + "대안: hair-fiber · fur-undercoat-soft(지침 6).",
 
     // ── 2026-08-27 web-soft-cloud: 같은 날 격리 후 같은 날 복귀(DELISTED) ────────────────
     // 격리 사유였던 "장경로 520px 획이 화면에 총 8px@delta6"는 web-drawing 키트 브리지의

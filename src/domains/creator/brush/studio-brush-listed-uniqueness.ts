@@ -74,6 +74,12 @@ export const STUDIO_BRUSH_FEEL_CULL_PRESET_IDS = [
   "brush-pen-ink",
   // 2026-09-02 유사 브러시 정리: web-blend-softener 와 실행 서명이 같고 잔상이 실재하지 않음.
   "web-smudge-trail",
+  // 2026-09-03 마크 거리 축소 웨이브. 팁 알파맵·간격/산포/플로/그레인·스탬프 각도로 잰 거리에서
+  // 홑잎 3종이 서로 0.064 안에 들어오고(fresh<->long 0.0355 가 팩 전체 최근접), fur-soft-clumps
+  // 는 rake 최근접 쌍(hair-fiber 0.0494)이었습니다. 사유는 격리 원장에 있습니다.
+  "fresh-leaf",
+  "long-leaf",
+  "fur-soft-clumps",
 ] as const;
 
 function alphaDigest(alphaMapBase64: string | null | undefined): string {

@@ -1220,14 +1220,10 @@ async function runScenario(
           dipFrame: null,
           verdict: "stable",
         },
-        inStroke: {
-          frameCount: cumulativeInk.length,
-          peakInk: finalInk,
-          worstDropRatio: worstShrink,
-          worstDropAtMs: null,
-          blinkCount: 0,
-          verdict: "stable",
-        },
+        // This row summarises a ladder of separate passes rather than one gesture, so it captured
+        // no in-stroke frames. Let the analyzer say that itself: a hand-written "stable" with
+        // blinkCount 0 reads as a blink check that passed, when none ever ran.
+        inStroke: analyzeStudioBrushScenarioInStroke([]),
         layers: null,
         regions: {},
         perf: {
