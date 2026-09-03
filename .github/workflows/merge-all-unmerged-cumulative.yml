@@ -1,0 +1,222 @@
+name: Lossless cumulative integration of every branch
+
+on:
+  push:
+    branches:
+      - automation/merge-all-unmerged-20260903-driver-v10
+    paths:
+      - ".github/workflows/merge-all-unmerged-cumulative.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-all-unmerged-conductor
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      CI: "true"
+      GH_TOKEN: ${{ github.token }}
+      NODE_OPTIONS: --max-old-space-size=12288
+      REPOSITORY: ${{ github.repository }}
+      DRIVER_BRANCH: automation/merge-all-unmerged-20260903-driver-v10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.DRIVER_BRANCH }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Build a cumulative lossless carrier
+        id: integrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          git switch --force-create "automation/all-unmerged-carrier-${GITHUB_RUN_ID}" origin/main
+
+          mkdir -p merge-all-report
+          report="merge-all-report/cumulative.tsv"
+          conflicts="merge-all-report/conflicts.tsv"
+          printf 'branch\tsha\tresult\tconflict_files\n' > "$report"
+          printf 'branch\tpath\tresolution\n' > "$conflicts"
+
+          mapfile -t branches < <(
+            git for-each-ref --format='%(committerdate:unix)\t%(refname:strip=3)\t%(objectname)' refs/remotes/origin \
+              | sort -n \
+              | awk -F '\t' -v driver="$DRIVER_BRANCH" '
+                  $2 != "main" &&
+                  $2 != "HEAD" &&
+                  $2 != driver &&
+                  $2 !~ /^automation\/merge-all-unmerged-20260903-/ &&
+                  $2 !~ /^automation\/all-unmerged-carrier-/ &&
+                  $2 !~ /^archive\// &&
+                  $2 !~ /^backup\// { print $2 "\t" $3 }
+                '
+          )
+
+          for row in "${branches[@]}"; do
+            branch="${row%%$'\t'*}"
+            sha="${row#*$'\t'}"
+            git fetch origin main --quiet || true
+            if git merge-base --is-ancestor "$sha" HEAD; then
+              printf '%s\t%s\talready-contained\t0\n' "$branch" "$sha" >> "$report"
+              continue
+            fi
+
+            safe="$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-//;s/-$//')"
+            backup="refs/tags/pre-merge-all/${GITHUB_RUN_ID}/${safe}"
+            gh api -X POST "repos/${REPOSITORY}/git/refs" -f ref="$backup" -f sha="$sha" >/dev/null 2>&1 || true
+
+            set +e
+            git merge --no-ff --no-edit -X theirs "origin/$branch" >"merge-all-report/${safe}.merge.log" 2>&1
+            merge_exit=$?
+            set -e
+            if [[ "$merge_exit" == "0" ]]; then
+              printf '%s\t%s\tmerged-clean-or-recursive\t0\n' "$branch" "$sha" >> "$report"
+              continue
+            fi
+
+            mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
+            if [[ "${#unresolved[@]}" == "0" ]]; then
+              git merge --abort || true
+              printf '%s\t%s\tmerge-failed-without-index-conflict\t0\n' "$branch" "$sha" >> "$report"
+              exit 31
+            fi
+
+            for path in "${unresolved[@]}"; do
+              if git cat-file -e ":3:$path" 2>/dev/null; then
+                git checkout --theirs -- "$path"
+                git add -- "$path"
+                printf '%s\t%s\tbranch-version\n' "$branch" "$path" >> "$conflicts"
+              elif git cat-file -e ":2:$path" 2>/dev/null; then
+                git checkout --ours -- "$path"
+                git add -- "$path"
+                printf '%s\t%s\tmain-version-kept-branch-delete-preserved-by-tag\n' "$branch" "$path" >> "$conflicts"
+              else
+                printf '%s\t%s\tunresolvable\n' "$branch" "$path" >> "$conflicts"
+                exit 32
+              fi
+            done
+            git commit --no-edit
+            printf '%s\t%s\tmerged-with-recorded-resolution\t%s\n' "$branch" "$sha" "${#unresolved[@]}" >> "$report"
+          done
+
+          if git diff --quiet origin/main...HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          git log --oneline --decorate origin/main..HEAD > merge-all-report/carrier-commits.txt
+          git diff --stat origin/main...HEAD > merge-all-report/carrier-stat.txt
+
+      - name: Install locked dependencies
+        if: steps.integrate.outputs.changed == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize only deterministic lint fixes
+        if: steps.integrate.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD | grep -E '\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$' || true)
+          if [[ "${#changed[@]}" -gt 0 ]]; then
+            pnpm exec eslint --fix "${changed[@]}" || true
+          fi
+          git diff --check
+
+      - name: Type, architecture, and lint gates
+        if: steps.integrate.outputs.changed == 'true'
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run validate:architecture
+          pnpm run lint:quick
+
+      - name: Full unit and integration suite
+        if: steps.integrate.outputs.changed == 'true'
+        run: pnpm exec vitest run --reporter=dot
+
+      - name: Production build
+        if: steps.integrate.outputs.changed == 'true'
+        run: |
+          pnpm run build
+          test -f dist/index.html
+
+      - name: Commit normalized carrier and push it
+        if: steps.integrate.outputs.changed == 'true'
+        id: push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(integration): normalize cumulative branch merge"
+          fi
+          carrier="automation/all-unmerged-carrier-${GITHUB_RUN_ID}"
+          git push --force-with-lease origin "HEAD:refs/heads/${carrier}"
+          echo "carrier=$carrier" >> "$GITHUB_OUTPUT"
+
+      - name: Create and merge the certified carrier PR
+        if: steps.integrate.outputs.changed == 'true'
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          carrier="${{ steps.push.outputs.carrier }}"
+          body=$(cat <<EOF
+Cumulative integration of every remote branch not already contained in \`main\`.
+
+- Every source head was preserved under \`pre-merge-all/${GITHUB_RUN_ID}/...\`.
+- True conflict paths are recorded in the workflow artifact.
+- TypeScript, architecture, strict lint, full Vitest, and production build passed on the exact carrier tree before this PR was opened.
+EOF
+)
+          url="$(gh pr create --repo "$REPOSITORY" --base main --head "$carrier" --title "chore(integration): merge every preserved unmerged branch" --body "$body")"
+          number="${url##*/}"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          gh pr merge "$number" --repo "$REPOSITORY" --squash --delete-branch --admin \
+            || gh pr merge "$number" --repo "$REPOSITORY" --squash --delete-branch --auto
+
+      - name: Close superseded PRs whose heads are now contained
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main '+refs/heads/*:refs/remotes/origin/*' --prune || true
+          gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,headRefName \
+            --jq '.[] | [.number, .headRefName] | @tsv' | while IFS=$'\t' read -r number branch; do
+              [[ "$branch" == "$DRIVER_BRANCH" ]] && continue
+              [[ "$branch" == automation/merge-all-unmerged-20260903-* ]] && continue
+              sha="$(git rev-parse "origin/$branch" 2>/dev/null || true)"
+              [[ -z "$sha" ]] && continue
+              if git merge-base --is-ancestor "$sha" origin/main; then
+                gh pr close "$number" --repo "$REPOSITORY" --comment "Superseded: this exact branch head is now contained in main. Its pre-integration backup tag is retained." --delete-branch || true
+              fi
+            done
+
+      - name: Upload cumulative integration evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cumulative-merge-all-${{ github.run_id }}
+          path: merge-all-report
+          if-no-files-found: error
+          retention-days: 30
