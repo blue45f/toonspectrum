@@ -1,0 +1,51 @@
+name: WebGPU sparse tile scheduling
+
+on:
+  push:
+    branches:
+      - feat/webgpu-sparse-tiles-final-20260904
+  pull_request:
+    paths:
+      - ".github/workflows/studio-webgpu-sparse-tiles.yml"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning*"
+      - "src/domains/creator/render/studio-webgpu-sparse-tile-atlas*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-sparse-tiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-sparse-tiles:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate source and contracts
+        run: |
+          pnpm run validate:architecture
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.ts \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
