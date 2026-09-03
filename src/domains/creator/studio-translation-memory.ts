@@ -5,7 +5,44 @@
  * by work + speaker + source/target locale + NFKC/whitespace-normalized source. Fuzzy matches are
  * suggestions only: the `autoApply` field is a literal false and callers must require an explicit
  * author action before reuse.
+ *
+ * 용어집(파싱·충돌 판정)과 문자열/로케일 정규화는 `studio-translation-glossary.ts`에 있다. 이
+ * 모듈은 `Storage`(브라우저 타입)를 들고 있어 순수 엔진에서 import 할 수 없기 때문이다. 여기서는
+ * 옮겨 간 이름을 **전부 같은 이름으로 다시 내보내므로**, 이 모듈의 공개 API 는 그대로다.
  */
+
+import {
+  compareCodeUnits,
+  findStudioTranslationMemoryGlossaryConflicts,
+  normalizeCaseInsensitive,
+  normalizeLocaleKey,
+  normalizeStoredText,
+  normalizeStudioTranslationMemoryText,
+  STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_RULES,
+  STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_TERM_CHARS,
+  STUDIO_TRANSLATION_MEMORY_MAX_LOCALE_CHARS,
+} from "./studio-translation-glossary";
+
+import type {
+  StudioTranslationMemoryGlossaryConflict,
+  StudioTranslationMemoryGlossaryRule,
+} from "./studio-translation-glossary";
+
+/** 옮겨 간 이름을 같은 이름으로 다시 내보낸다 — 기존 호출부·테스트는 그대로 컴파일된다. */
+export {
+  findStudioTranslationMemoryGlossaryConflicts,
+  normalizeStudioTranslationMemoryText,
+  parseStudioTranslationMemoryGlossaryText,
+  STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_RULES,
+  STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_TERM_CHARS,
+  STUDIO_TRANSLATION_MEMORY_MAX_LOCALE_CHARS,
+} from "./studio-translation-glossary";
+
+export type {
+  StudioTranslationMemoryConflictKind,
+  StudioTranslationMemoryGlossaryConflict,
+  StudioTranslationMemoryGlossaryRule,
+} from "./studio-translation-glossary";
 
 export const STUDIO_TRANSLATION_MEMORY_VERSION = 1;
 export const STUDIO_TRANSLATION_MEMORY_KIND =
@@ -19,10 +56,7 @@ export const STUDIO_TRANSLATION_MEMORY_MAX_SOURCE_CHARS = 4_000;
 export const STUDIO_TRANSLATION_MEMORY_MAX_TRANSLATION_CHARS = 8_000;
 export const STUDIO_TRANSLATION_MEMORY_MAX_SPEAKER_CHARS = 160;
 export const STUDIO_TRANSLATION_MEMORY_MAX_SCOPE_CHARS = 200;
-export const STUDIO_TRANSLATION_MEMORY_MAX_LOCALE_CHARS = 48;
 export const STUDIO_TRANSLATION_MEMORY_MAX_REVISION_CHARS = 160;
-export const STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_RULES = 160;
-export const STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_TERM_CHARS = 240;
 export const STUDIO_TRANSLATION_MEMORY_MAX_IMPORT_BYTES = 2_000_000;
 export const STUDIO_TRANSLATION_MEMORY_MAX_EXPORT_BYTES = 1_500_000;
 export const STUDIO_TRANSLATION_MEMORY_MAX_IMPORT_CANDIDATES =
@@ -34,25 +68,6 @@ export type StudioTranslationMemoryStatus =
   | "draft"
   | "reviewed"
   | "approved";
-
-export type StudioTranslationMemoryConflictKind =
-  | "ambiguous-rule"
-  | "missing-target";
-
-export interface StudioTranslationMemoryGlossaryRule {
-  readonly sourceTerm: string;
-  readonly targetTerm: string;
-  readonly sourceLocale?: string;
-  readonly targetLocale?: string;
-  readonly caseSensitive?: boolean;
-}
-
-export interface StudioTranslationMemoryGlossaryConflict {
-  readonly kind: StudioTranslationMemoryConflictKind;
-  readonly sourceTerm: string;
-  readonly expectedTargets: readonly string[];
-  readonly message: string;
-}
 
 export interface StudioTranslationMemoryEntry {
   readonly version: typeof STUDIO_TRANSLATION_MEMORY_VERSION;
@@ -171,39 +186,6 @@ const STATUS_PRIORITY: Record<StudioTranslationMemoryStatus, number> = {
   approved: 2,
 };
 
-function normalizeNfkc(value: string): string {
-  try {
-    return value.normalize("NFKC");
-  } catch {
-    return value;
-  }
-}
-
-/** Compatibility-normalizes and collapses every whitespace run to one ASCII space. */
-export function normalizeStudioTranslationMemoryText(value: string): string {
-  return normalizeNfkc(value).replace(/\s+/gu, " ").trim();
-}
-
-function normalizeCaseInsensitive(value: string): string {
-  return normalizeStudioTranslationMemoryText(value).toLowerCase();
-}
-
-function compareCodeUnits(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function normalizeStoredText(value: string): string {
-  return normalizeNfkc(value).trim();
-}
-
-function normalizeLocale(value: string): string {
-  return normalizeStudioTranslationMemoryText(value);
-}
-
-function normalizeLocaleKey(value: string): string {
-  return normalizeLocale(value).toLowerCase();
-}
-
 function normalizeRevision(value: string | number): string {
   return normalizeStudioTranslationMemoryText(String(value));
 }
@@ -288,155 +270,6 @@ function validateInputField(
     };
   }
   return { ok: true, value: normalized };
-}
-
-function localeMatches(ruleLocale: string | undefined, actualLocale: string): boolean {
-  return (
-    !ruleLocale
-    || normalizeLocaleKey(ruleLocale) === normalizeLocaleKey(actualLocale)
-  );
-}
-
-function normalizeGlossaryRule(
-  rule: StudioTranslationMemoryGlossaryRule
-): StudioTranslationMemoryGlossaryRule | null {
-  const sourceTerm = normalizeStoredText(rule.sourceTerm);
-  const targetTerm = normalizeStoredText(rule.targetTerm);
-  if (
-    sourceTerm.length === 0
-    || targetTerm.length === 0
-    || sourceTerm.length > STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_TERM_CHARS
-    || targetTerm.length > STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_TERM_CHARS
-  ) {
-    return null;
-  }
-  const sourceLocale = rule.sourceLocale
-    ? normalizeLocale(rule.sourceLocale).slice(
-        0,
-        STUDIO_TRANSLATION_MEMORY_MAX_LOCALE_CHARS
-      )
-    : undefined;
-  const targetLocale = rule.targetLocale
-    ? normalizeLocale(rule.targetLocale).slice(
-        0,
-        STUDIO_TRANSLATION_MEMORY_MAX_LOCALE_CHARS
-      )
-    : undefined;
-  return {
-    sourceTerm,
-    targetTerm,
-    sourceLocale: sourceLocale || undefined,
-    targetLocale: targetLocale || undefined,
-    caseSensitive: rule.caseSensitive === true,
-  };
-}
-
-/** Parses bounded `source: target`, `source = target` or `source => target` glossary lines. */
-export function parseStudioTranslationMemoryGlossaryText(
-  glossary: string
-): StudioTranslationMemoryGlossaryRule[] {
-  const rules: StudioTranslationMemoryGlossaryRule[] = [];
-  const seen = new Set<string>();
-  for (const line of normalizeNfkc(glossary).split(/\r?\n/u)) {
-    if (rules.length >= STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_RULES) break;
-    const match = line.match(/^\s*(.+?)\s*(?:=>|:|=)\s*(.+?)\s*$/u);
-    if (!match) continue;
-    const rule = normalizeGlossaryRule({
-      sourceTerm: match[1],
-      targetTerm: match[2],
-    });
-    if (!rule) continue;
-    const key = JSON.stringify([
-      normalizeCaseInsensitive(rule.sourceTerm),
-      normalizeCaseInsensitive(rule.targetTerm),
-    ]);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rules.push(rule);
-  }
-  return rules;
-}
-
-export function findStudioTranslationMemoryGlossaryConflicts(input: {
-  readonly sourceText: string;
-  readonly translation: string;
-  readonly sourceLocale: string;
-  readonly targetLocale: string;
-  readonly rules: readonly StudioTranslationMemoryGlossaryRule[];
-}): StudioTranslationMemoryGlossaryConflict[] {
-  const applicable = input.rules
-    .slice(0, STUDIO_TRANSLATION_MEMORY_MAX_GLOSSARY_RULES)
-    .map(normalizeGlossaryRule)
-    .filter((rule): rule is StudioTranslationMemoryGlossaryRule => rule !== null)
-    .filter(
-      (rule) =>
-        localeMatches(rule.sourceLocale, input.sourceLocale)
-        && localeMatches(rule.targetLocale, input.targetLocale)
-    )
-    .filter((rule) => {
-      const source = rule.caseSensitive
-        ? normalizeStudioTranslationMemoryText(input.sourceText)
-        : normalizeCaseInsensitive(input.sourceText);
-      const term = rule.caseSensitive
-        ? normalizeStudioTranslationMemoryText(rule.sourceTerm)
-        : normalizeCaseInsensitive(rule.sourceTerm);
-      return source.includes(term);
-    });
-
-  const bySource = new Map<
-    string,
-    {
-      readonly displaySource: string;
-      readonly rules: StudioTranslationMemoryGlossaryRule[];
-    }
-  >();
-  for (const rule of applicable) {
-    const key = rule.caseSensitive
-      ? normalizeStudioTranslationMemoryText(rule.sourceTerm)
-      : normalizeCaseInsensitive(rule.sourceTerm);
-    const existing = bySource.get(key);
-    if (existing) existing.rules.push(rule);
-    else bySource.set(key, { displaySource: rule.sourceTerm, rules: [rule] });
-  }
-
-  const conflicts: StudioTranslationMemoryGlossaryConflict[] = [];
-  for (const [, group] of [...bySource].sort(([left], [right]) =>
-    compareCodeUnits(left, right)
-  )) {
-    const expectedTargets = [
-      ...new Map(
-        group.rules.map((rule) => [
-          normalizeCaseInsensitive(rule.targetTerm),
-          rule.targetTerm,
-        ])
-      ).values(),
-    ].sort(compareCodeUnits);
-    if (expectedTargets.length > 1) {
-      conflicts.push({
-        kind: "ambiguous-rule",
-        sourceTerm: group.displaySource,
-        expectedTargets,
-        message: `“${group.displaySource}”에 서로 다른 용어집 번역이 지정되어 있습니다.`,
-      });
-      continue;
-    }
-    const firstRule = group.rules[0];
-    const translation = firstRule.caseSensitive
-      ? normalizeStudioTranslationMemoryText(input.translation)
-      : normalizeCaseInsensitive(input.translation);
-    const expected = firstRule.caseSensitive
-      ? normalizeStudioTranslationMemoryText(expectedTargets[0])
-      : normalizeCaseInsensitive(expectedTargets[0]);
-    if (!translation.includes(expected)) {
-      conflicts.push({
-        kind: "missing-target",
-        sourceTerm: group.displaySource,
-        expectedTargets,
-        message: `“${group.displaySource}”은(는) “${expectedTargets[0]}” 규칙과 일치하지 않습니다.`,
-      });
-    }
-  }
-  return conflicts;
 }
 
 function validNow(value: number | undefined): number {
