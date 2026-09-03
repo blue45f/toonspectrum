@@ -27,6 +27,20 @@ export const CREATOR_MARKETPLACE_AUTHORING_KINDS = [
 export type CreatorMarketplaceAuthoringKind =
   (typeof CREATOR_MARKETPLACE_AUTHORING_KINDS)[number];
 
+export const CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS: Readonly<
+  Record<CreatorMarketplaceAuthoringKind, readonly string[]>
+> = {
+  brush: ["brush-fast-slow", "brush-pressure", "brush-crossing"],
+  tone: ["tone-seam", "tone-dpi"],
+  palette: ["palette-space", "palette-contrast"],
+  pose: ["pose-rig", "pose-mirror"],
+  "3d": ["3d-scale", "3d-material", "3d-lod"],
+  background: ["background-scroll", "background-perspective"],
+  bubble: ["bubble-fit", "bubble-vertical"],
+  template: ["template-pages", "template-fonts"],
+  material: ["material-install", "material-dependencies"],
+};
+
 export const CREATOR_MARKETPLACE_BRUSH_ENGINES = [
   "solid-path",
   "vector-outline",
@@ -650,7 +664,9 @@ export function validateCreatorMarketplaceAuthoringDraft(
     step: CreatorMarketplaceAuthoringDiagnostic["step"],
     message: string,
     action: string,
-  ): void => diagnostics.push({ id, severity, step, message, action });
+  ): void => {
+    diagnostics.push({ id, severity, step, message, action });
+  };
 
   if (draft.title.trim().length < 2) add("title", "error", "source", "에셋 이름이 너무 짧습니다.", "이름을 2자 이상 입력하세요.");
   if (draft.summary.trim().length < 12) add("summary", "warning", "source", "검색 카드 요약이 짧습니다.", "용도와 결과를 한 문장으로 설명하세요.");
@@ -667,7 +683,27 @@ export function validateCreatorMarketplaceAuthoringDraft(
     if (draft.brush.originalEnginePrograms.length > 0 && enabled.every((node) => node.sourceProgram === undefined)) add("engine-program-loss", "error", "recipe", "Brush Studio enginePrograms가 게시 레시피에서 분리됐습니다.", "Studio 원본 엔진 프로그램을 다시 가져오세요.");
   }
 
+  const qualityScenarios = Array.isArray(draft.technical.qualityScenarios)
+    ? draft.technical.qualityScenarios.filter((value): value is string => typeof value === "string")
+    : [];
+  const missingQualityScenarios = CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS[draft.kind]
+    .filter((scenario) => !qualityScenarios.includes(scenario));
+  if (missingQualityScenarios.length > 0) {
+    add(
+      "quality-plan",
+      "error",
+      "preview",
+      `필수 품질 시나리오 ${missingQualityScenarios.length}개가 계획되지 않았습니다.`,
+      "미리보기 단계에서 필수 시나리오를 선택하고 실제 결과를 첨부하세요.",
+    );
+  }
   if (draft.media.length === 0) add("preview", "warning", "preview", "실사용 미리보기가 없습니다.", "커버 또는 스트로크 테스트 시트를 추가하세요.");
+  if (draft.media.some((media) => media.alt.trim().length < 3)) {
+    add("preview-alt", "error", "preview", "대체 텍스트가 없는 미리보기가 있습니다.", "각 미디어가 무엇을 검증하는지 설명하세요.");
+  }
+  if (draft.bundle.some((item) => !item.name.trim() || !item.role.trim())) {
+    add("bundle-metadata", "error", "bundle", "이름 또는 역할이 비어 있는 번들 항목이 있습니다.", "설치 항목의 이름과 역할을 입력하세요.");
+  }
   if (draft.release.mode === "update" && !draft.release.previousResourceId) add("update-parent", "error", "release", "업데이트 대상 리소스가 없습니다.", "기존 마켓 리소스를 선택하세요.");
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(draft.release.version)) add("semver", "error", "release", "버전이 SemVer 형식이 아닙니다.", "예: 1.2.0 또는 2.0.0-beta.1");
   if (!draft.rights.originalWorkAttested) add("rights-original", "error", "rights", "원본 제작 권리 확인이 필요합니다.", "권리 확인 항목에 동의하세요.");

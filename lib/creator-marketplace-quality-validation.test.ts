@@ -4,10 +4,11 @@ import {
   CREATOR_MARKETPLACE_REQUIRED_QUALITY_SCENARIOS,
   createCreatorMarketplaceAuthoringDraft,
   validateCreatorMarketplaceAuthoringDraft,
+  type CreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringKind,
 } from "./creator-marketplace-authoring-workshop";
 
-function validDraft(kind: CreatorMarketplaceAuthoringKind) {
+function validDraft(kind: CreatorMarketplaceAuthoringKind): CreatorMarketplaceAuthoringDraft {
   const draft = createCreatorMarketplaceAuthoringDraft(kind);
   return {
     ...draft,

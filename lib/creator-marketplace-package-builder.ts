@@ -113,10 +113,18 @@ function dateToDos(value: Date): { date: number; time: number } {
   };
 }
 
+function replaceUnsafeNameCharacters(value: string, forbidden: string): string {
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 32 || forbidden.includes(character) ? "-" : character;
+  }).join("");
+}
+
 function safePackageBaseName(value: string): string {
-  const normalized = value
-    .normalize("NFKC")
-    .replace(/[\\/:*?"<>|\u0000-\u001f]+/gu, "-")
+  const normalized = replaceUnsafeNameCharacters(
+    value.normalize("NFKC"),
+    "\\/:*?\"<>|",
+  )
     .replace(/\s+/gu, "-")
     .replace(/^-+|-+$/gu, "")
     .slice(0, 96);
@@ -128,7 +136,7 @@ export function sanitizeCreatorMarketplaceArchivePath(value: string): string {
   const parts = normalized
     .split("/")
     .filter((part) => part.length > 0 && part !== ".")
-    .map((part) => part.replace(/[\u0000-\u001f:*?"<>|]+/gu, "-").slice(0, 120));
+    .map((part) => replaceUnsafeNameCharacters(part, ":*?\"<>|").slice(0, 120));
   if (parts.some((part) => part === "..") || parts.length === 0) {
     throw new CreatorMarketplacePackageError("unsafe-name", "안전하지 않은 패키지 파일 이름입니다.");
   }
@@ -136,10 +144,8 @@ export function sanitizeCreatorMarketplaceArchivePath(value: string): string {
 }
 
 async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  );
+  const digestInput = Uint8Array.from(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", digestInput);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -320,8 +326,11 @@ export async function buildCreatorMarketplaceSourcePackage({
     );
   }
   const fileName = `${safePackageBaseName(draft.title)}-${safePackageBaseName(draft.release.version)}.toonmarket.zip`;
+  const ownedArchive = Uint8Array.from(archive);
   return {
-    file: new File([archive], fileName, { type: "application/vnd.toonspectrum.marketplace+zip" }),
+    file: new File([ownedArchive.buffer], fileName, {
+      type: "application/vnd.toonspectrum.marketplace+zip",
+    }),
     inventory,
     manifest: manifestWithInventory,
   };
