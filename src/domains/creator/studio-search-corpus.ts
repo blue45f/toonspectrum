@@ -366,6 +366,31 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       supersedes: ["brush-studio"],
     },
     {
+      // 이 패널을 이름으로 찾을 수 있게 하는 행. 명령 카탈로그에는 여닫는 명령이 있지만 그쪽은
+      // `>` 명령 모드(원격 색인)에서만 답하고, 기본 '전체' 탭이 오프라인으로 뒤지는 것은 이
+      // 코퍼스다. 형제인 `panel.layer-list` 만 여기 있고 정작 그 옆 패널이 빠져 있어서
+      // "작업 패널"·"속성 패널" 둘 다 0건이었다.
+      id: "panel.work",
+      kind: "panel",
+      label: "작업 패널",
+      labelEn: "Work Panel",
+      location: "인스펙터 › 대상",
+      description: "선택한 대상의 속성과 그리기 도구 설정을 조절합니다.",
+      aliases: [
+        // 이 저장소가 쓰던 옛 이름. 손버릇이 끊기지 않게 별칭으로 남긴다.
+        ours("속성 패널"),
+        csp("도구 속성"),
+        cspEn("Tool Property"),
+        ps("Properties Panel"),
+        psKo("속성 패널"),
+        krita("Tool Options Docker"),
+        procreate("Adjustments"),
+      ],
+      keywords: ["작업", "속성", "패널", "대상", "properties", "inspector", "panel"],
+      helpNodeId: "help/panel/work",
+      target: { type: "inspector", primary: "properties" },
+    },
+    {
       id: "panel.layer-list",
       kind: "panel",
       label: "레이어 목록",

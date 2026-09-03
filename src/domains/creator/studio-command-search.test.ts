@@ -611,3 +611,30 @@ describe("통합 Command Search — 인스펙터 행은 목적지를 통째로 �
     expect(kinds.has("panel")).toBe(true);
   });
 });
+
+/**
+ * The right panel renamed itself to "작업 패널", but a production-build probe found the offline
+ * "전체" tab returning **zero** rows for both "작업 패널" and the legacy "속성 패널", while the
+ * neighbouring "레이어 패널" answered fine. The command catalog did carry a toggle row, but that
+ * one only answers in `>` command mode, which needs the remote index; the default tab searches
+ * this corpus offline, and the panel itself simply had no entry in it.
+ */
+describe("작업 패널 is findable by the name on screen", () => {
+  const idsFor = (query: string): string[] =>
+    searchStudio(query).sections.flatMap((section) =>
+      section.results.map((result) => result.entry.id));
+
+  for (const query of ["작업 패널", "속성 패널"]) {
+    it(`"${query}" reaches the work panel row`, () => {
+      expect(idsFor(query)).toContain("panel.work");
+    });
+  }
+
+  it("lands on the inspector's 대상 tab", () => {
+    const hit = searchStudio("작업 패널").sections
+      .flatMap((section) => section.results)
+      .find((result) => result.entry.id === "panel.work");
+    expect(hit?.entry.label).toBe("작업 패널");
+    expect(hit?.entry.target).toMatchObject({ type: "inspector", primary: "properties" });
+  });
+});
