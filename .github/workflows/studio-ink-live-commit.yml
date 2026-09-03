@@ -1,6 +1,14 @@
 name: Studio ink live-commit fidelity
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-ink-live-commit.yml"
+      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - "scripts/verify-studio-long-stroke.mts"
+      - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "src/domains/creator/**"
   pull_request:
     branches: [main]
     paths:
