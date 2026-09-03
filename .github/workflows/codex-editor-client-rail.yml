@@ -25,6 +25,17 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Repair the one-shot range helper
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/codex/apply-editor-client-rail.mjs')
+          source = path.read_text()
+          old = 'return `${source.slice(0, start)}${replacement}${source.slice(end)}`;'
+          new = 'return `${source.slice(0, start)}${replacement}${source.slice(end + endMarker.length)}`;'
+          assert source.count(old) == 1
+          path.write_text(source.replace(old, new))
+          PY
       - name: Apply the one-shot migration
         run: node .github/codex/apply-editor-client-rail.mjs
       - name: Check the changed Studio boundary
