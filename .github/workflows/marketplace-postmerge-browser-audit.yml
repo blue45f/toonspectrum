@@ -1,0 +1,152 @@
+name: Marketplace continuous browser audit
+
+on:
+  pull_request:
+    paths:
+      - "src/domains/market/**"
+      - "src/domains/creator/MarketplaceBrush*"
+      - "src/domains/creator/brush/StudioBrushStudio.tsx"
+      - "lib/creator-marketplace-*"
+      - "e2e/market*.spec.ts"
+      - ".github/workflows/marketplace-postmerge-browser-audit.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/domains/market/**"
+      - "src/domains/creator/MarketplaceBrush*"
+      - "src/domains/creator/brush/StudioBrushStudio.tsx"
+      - "lib/creator-marketplace-*"
+      - "e2e/market*.spec.ts"
+      - ".github/workflows/marketplace-postmerge-browser-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-continuous-browser-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Marketplace and Brush Studio contracts
+        run: |
+          pnpm exec vitest run \
+            lib/creator-marketplace-authoring-safety.test.ts \
+            lib/creator-marketplace-authoring-workshop.test.ts \
+            lib/creator-marketplace-package-builder.test.ts \
+            lib/creator-marketplace-quality-validation.test.ts \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/market \
+            --reporter=verbose
+      - name: Type and lint gates
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run lint:quick
+
+  browser-desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Desktop authoring, install, update, and round trip
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/market.spec.ts
+          e2e/marketplace-authoring-workshop.spec.ts
+          --project=chromium
+          --reporter=line,html
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: marketplace-desktop-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  browser-inapp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Mobile and Chromium in-app authoring flows
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line,html
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: marketplace-inapp-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  production-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Production build and marketplace route smoke
+        run: |
+          pnpm run build
+          test -f dist/index.html
