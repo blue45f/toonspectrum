@@ -310,7 +310,7 @@ export class StudioGpuSparseTileAtlas {
     const token: StudioGpuSparseTileAtlasFrameToken = Object.freeze({
       frameId,
       deviceGeneration: this.#deviceGeneration,
-      [STUDIO_GPU_SPARSE_TILE_ATLAS_TOKEN]: true,
+      [STUDIO_GPU_SPARSE_TILE_ATLAS_TOKEN]: true as const,
     });
     const prepared: StudioGpuSparseTileAtlasPreparedFrame = Object.freeze({
       kind: "studio-gpu-sparse-tile-atlas-frame",
