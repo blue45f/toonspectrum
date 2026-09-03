@@ -1,0 +1,136 @@
+name: Delete retired remote branches v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/delete-retired-remote-branches-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: delete-retired-remote-branches-v2-20260904
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Delete only exact retired refs
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const repository = `${owner}/${repo}`;
+            const expected = new Map([
+              ["ci/restore-core-gate-final-20260904", "b400d79c1963c9b72139192a574e6fd8d547835c"],
+              ["ci/temporary-core-bypass-cleanup-20260904", "b3409ddacb398d3f496d19ddbe3947199e33a2c9"],
+              ["feat/webgpu-sparse-tiles-final-20260904", "600a2abbcd14696daac22ca4a1081bf070611b53"],
+              ["test/bg3d-webgpu-gate-final-20260904", "8009face8d33979f3e15a36059b37506888b0559"],
+            ]);
+
+            const replacementState = new Map([
+              ["ci/restore-core-gate-final-20260904", { pr: 640, replacement: 649 }],
+              ["feat/webgpu-sparse-tiles-final-20260904", { pr: 646, replacement: 652 }],
+              ["test/bg3d-webgpu-gate-final-20260904", { pr: 642, replacement: 656 }],
+            ]);
+
+            const openPulls = await github.paginate(
+              "GET /repos/{owner}/{repo}/pulls",
+              { owner, repo, state: "open", per_page: 100 },
+            );
+            const liveRefs = new Set();
+            for (const pull of openPulls) {
+              if (pull.head.repo?.full_name === repository) liveRefs.add(pull.head.ref);
+              if (pull.base.repo?.full_name === repository) liveRefs.add(pull.base.ref);
+            }
+
+            const deleted = [];
+            const absent = [];
+            const preserved = [];
+            const failed = [];
+
+            for (const [branch, expectedSha] of expected) {
+              if (liveRefs.has(branch)) {
+                preserved.push(`${branch} — still used by an open PR`);
+                continue;
+              }
+
+              const state = replacementState.get(branch);
+              if (state) {
+                const original = await github.request(
+                  "GET /repos/{owner}/{repo}/pulls/{pull_number}",
+                  { owner, repo, pull_number: state.pr },
+                );
+                const replacement = await github.request(
+                  "GET /repos/{owner}/{repo}/pulls/{pull_number}",
+                  { owner, repo, pull_number: state.replacement },
+                );
+                if (original.data.state !== "closed" || original.data.merged_at !== null) {
+                  preserved.push(`${branch} — original PR #${state.pr} is not closed/unmerged`);
+                  continue;
+                }
+                if (replacement.data.merged_at === null) {
+                  preserved.push(`${branch} — replacement PR #${state.replacement} is not merged`);
+                  continue;
+                }
+              }
+
+              let tip;
+              try {
+                const ref = await github.request(
+                  "GET /repos/{owner}/{repo}/git/ref/{ref}",
+                  { owner, repo, ref: `heads/${branch}` },
+                );
+                tip = ref.data.object.sha;
+              } catch (error) {
+                if (error.status === 404) {
+                  absent.push(`${branch} — already absent`);
+                  continue;
+                }
+                failed.push(`${branch} — ref read failed: ${error.message}`);
+                continue;
+              }
+
+              if (tip !== expectedSha) {
+                preserved.push(`${branch} — moved from ${expectedSha} to ${tip}`);
+                continue;
+              }
+
+              try {
+                await github.request(
+                  "DELETE /repos/{owner}/{repo}/git/refs/{ref}",
+                  { owner, repo, ref: `heads/${branch}` },
+                );
+                deleted.push(`${branch} — ${tip}`);
+              } catch (error) {
+                failed.push(`${branch} — delete failed: ${error.message}`);
+              }
+            }
+
+            const section = (title, values) => [
+              `## ${title}`,
+              ...(values.length ? values.map((value) => `- ${value}`) : ["- none"]),
+              "",
+            ].join("\n");
+            const report = [
+              "# Retired remote branch cleanup v2",
+              "",
+              `- Deleted: ${deleted.length}`,
+              `- Already absent: ${absent.length}`,
+              `- Preserved: ${preserved.length}`,
+              `- Failed: ${failed.length}`,
+              "",
+              section("Deleted", deleted),
+              section("Already absent", absent),
+              section("Preserved", preserved),
+              section("Failed", failed),
+            ].join("\n");
+
+            core.info(report);
+            await core.summary.addRaw(report).write();
+            if (failed.length) core.setFailed(`${failed.length} deletion(s) failed`);
