@@ -920,34 +920,6 @@ export function StudioFilterDialog({
       ?.querySelector<HTMLElement>(`[data-studio-filter-gallery-view="${next.id}"]`)
       ?.focus({ preventScroll: false });
   };
-  /** Roving focus inside the category radiogroup — one tab stop, arrows to move between chips. */
-  const moveGalleryViewWithKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    const step =
-      event.key === "ArrowRight" || event.key === "ArrowDown"
-        ? 1
-        : event.key === "ArrowLeft" || event.key === "ArrowUp"
-          ? -1
-          : 0;
-    const jump = event.key === "Home" ? 0 : event.key === "End" ? -1 : null;
-    if (step === 0 && jump === null) return;
-    event.preventDefault();
-    const views = STUDIO_FILTER_GALLERY_VIEWS;
-    const current = views.findIndex((view) => view.id === galleryView);
-    const nextIndex =
-      jump === null
-        ? (current + step + views.length) % views.length
-        : jump === 0
-          ? 0
-          : views.length - 1;
-    const next = views[nextIndex];
-    if (!next) return;
-    setGalleryView(next.id);
-    // The handler sits on each radio rather than the group, because a keydown on a container that
-    // is not itself focusable is a listener nothing can ever reach by keyboard.
-    event.currentTarget.parentElement
-      ?.querySelector<HTMLElement>(`[data-studio-filter-gallery-view="${next.id}"]`)
-      ?.focus({ preventScroll: false });
-  };
   const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
     updateEffectFavoriteState((current) =>
       toggleStudioEffectFavorite(current, studioFilterEffectId(nextKind)),
