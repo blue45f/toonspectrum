@@ -64,7 +64,7 @@ jobs:
 
           patched = source[:start] + shaders + source[end:]
           marker = " * WGSL identifiers deliberately avoid evolving reserved words (`meta`, `active`).\n"
-          header = "/**\n * Exact WebGPU count / prefix-scan / stable-scatter candidate for sparse dab tile binning.\n"
+          header = "/**\n * Bounded exact WebGPU count / scan / stable-scatter candidate.\n"
           if marker not in patched:
               if header not in patched:
                   raise SystemExit("source header not found")
