@@ -38,7 +38,7 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
-      TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification
+      TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.artifacts/toonspectrum-verification
     steps:
       - uses: actions/checkout@v6
         with:
