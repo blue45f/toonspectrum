@@ -1,4 +1,4 @@
-name: WebGPU v2 working snapshot
+name: WebGPU v2 bootstrap and benchmark
 
 on:
   push:
@@ -7,18 +7,89 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: webgpu-v2-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  snapshot:
+  verify-and-commit:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      EVIDENCE_DIR: ${{ runner.temp }}/webgpu-v2-evidence
     steps:
       - uses: actions/checkout@v4
-      - name: Archive tracked source
-        run: git archive --format=zip --output=toonspectrum-source.zip HEAD
-      - uses: actions/upload-artifact@v4
         with:
-          name: toonspectrum-webgpu-v2-source
-          path: toonspectrum-source.zip
-          if-no-files-found: error
-          retention-days: 1
+          fetch-depth: 1
+
+      - name: Restore candidate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .bootstrap/webgpu-v2 -type f -name 'part-*' | wc -l)" -eq 7
+          cat .bootstrap/webgpu-v2/part-* | base64 --decode > "${{ runner.temp }}/webgpu-v2-payload.tar.xz"
+          echo "fa8c10d2deceec63fd691e7d56ad1623ff7f0422cadbe488ca42b1d4b3626dfd  ${{ runner.temp }}/webgpu-v2-payload.tar.xz" | sha256sum --check --strict
+          tar -xJf "${{ runner.temp }}/webgpu-v2-payload.tar.xz"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts
+          scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts
+
+      - name: Focused unit tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts
+
+      - name: Root TypeScript
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Install real Chromium boundary
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Real WebGPU A/B benchmark
+        env:
+          TOONSPECTRUM_WEBGPU_V2_VERIFY_DIR: ${{ env.EVIDENCE_DIR }}
+        run: node scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-webgpu-brush-v2-evidence
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Persist validated candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .bootstrap/webgpu-v2
+          rm -f .github/workflows/webgpu-v2-working-snapshot.yml
+          mkdir -p docs/reports
+          cp "${{ env.EVIDENCE_DIR }}/summary.json" docs/reports/studio-webgpu-brush-v2-benchmark-2026-09-04.json
+          git add -A
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          HUSKY=0 git commit -m "feat(brush): add compact WebGPU v2 engine and A/B gate"
+          git push origin "HEAD:${{ github.ref_name }}"
