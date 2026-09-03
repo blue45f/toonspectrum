@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createStudioWetMediaTwoWellState,
-  type StudioWetMediaTwoWellSettings,
-} from "./studio-wet-media-two-well-model";
-import {
   applyStudioWetMediaTileFieldDepositions,
   createStudioWetMediaTileField,
   type StudioWetMediaTileFieldPaper,
@@ -15,6 +11,10 @@ import {
   advanceStudioWetMediaTwoWellFieldContact,
   sampleStudioWetMediaTileFieldCell,
 } from "./studio-wet-media-two-well-field-bridge";
+import {
+  createStudioWetMediaTwoWellState,
+  type StudioWetMediaTwoWellSettings,
+} from "./studio-wet-media-two-well-model";
 
 function fieldSettings(
   overrides: Partial<StudioWetMediaTileFieldSettings> = {},
