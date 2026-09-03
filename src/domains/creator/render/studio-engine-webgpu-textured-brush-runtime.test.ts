@@ -281,6 +281,28 @@ function texturedPlan(
   };
 }
 
+function texturedPlanWithTip(
+  assetId: string,
+  values: readonly number[],
+): StudioEngineWebGpuTexturedBrushPlan {
+  if (values.length !== 4) throw new RangeError("test tip must remain 2x2");
+  const base = texturedPlan();
+  const bytes = new Uint8Array(values);
+  return texturedPlan({
+    assets: [{
+      ...base.assets[0]!,
+      assetId,
+      contentHash: `sha256:${sha256HexPortable(bytes)}`,
+      byteLength: bytes.byteLength,
+      bytes,
+    }],
+    batches: [{
+      ...base.batches[0]!,
+      key: assetId + "|none|source-over",
+    }],
+  });
+}
+
 function runtime(harness: FakeGpuHarness, overrides = {}) {
   const result = createStudioEngineWebGpuTexturedBrushRuntime({
     device: harness.device,
@@ -1334,6 +1356,103 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(harness.pushErrorScope).toHaveBeenCalledTimes(6);
     expect(harness.popErrorScope).toHaveBeenCalledTimes(6);
     expect(harness.submitted).toHaveBeenCalledTimes(2);
+  });
+
+  it("reclaims least-recently-used idle textures during long brush-switch sessions", async () => {
+    const harness = fakeGpuHarness();
+    const target = runtime(harness, { maximumResidentAssetBytes: 8 });
+    const planA = texturedPlanWithTip("tip-a", [0, 32, 128, 255]);
+    const planB = texturedPlanWithTip("tip-b", [255, 128, 32, 0]);
+    const planC = texturedPlanWithTip("tip-c", [0, 255, 64, 192]);
+    const tipTextures = () => harness.textures.filter((texture) => (
+      String(texture.descriptor.label).startsWith("Studio textured brush tip ")
+    ));
+    const textureFor = (plan: StudioEngineWebGpuTexturedBrushPlan) => (
+      tipTextures().find((texture) => (
+        String(texture.descriptor.label).includes(plan.assets[0]!.contentHash)
+      ))
+    );
+
+    expect((await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: planA,
+    })).status).toBe("completed");
+    expect((await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: planB,
+    })).status).toBe("completed");
+    const textureA = textureFor(planA)!;
+    const textureB = textureFor(planB)!;
+    expect(tipTextures()).toHaveLength(2);
+
+    expect((await target.execute({
+      requestSequence: 3,
+      deviceEpoch: 1,
+      plan: planC,
+    })).status).toBe("completed");
+    const textureC = textureFor(planC)!;
+    expect(textureA.destroy).toHaveBeenCalledTimes(1);
+    expect(textureB.destroy).not.toHaveBeenCalled();
+    expect(textureC.destroy).not.toHaveBeenCalled();
+    expect(tipTextures()).toHaveLength(3);
+    expect(harness.bindGroupDescriptors).toHaveLength(3);
+
+    const texturesBeforeBReplay = tipTextures().length;
+    expect((await target.execute({
+      requestSequence: 4,
+      deviceEpoch: 1,
+      plan: planB,
+    })).status).toBe("completed");
+    expect(tipTextures()).toHaveLength(texturesBeforeBReplay);
+    expect(harness.bindGroupDescriptors).toHaveLength(3);
+
+    expect((await target.execute({
+      requestSequence: 5,
+      deviceEpoch: 1,
+      plan: planA,
+    })).status).toBe("completed");
+    expect(textureC.destroy).toHaveBeenCalledTimes(1);
+    expect(textureB.destroy).not.toHaveBeenCalled();
+    expect(tipTextures()).toHaveLength(texturesBeforeBReplay + 1);
+    expect(harness.bindGroupDescriptors).toHaveLength(4);
+  });
+
+  it("does not evict a texture while submitted GPU work can still reference it", async () => {
+    const gate = deferred<void>();
+    const harness = fakeGpuHarness(() => gate.promise);
+    const target = runtime(harness, {
+      maximumInFlightSubmissions: 2,
+      maximumResidentAssetBytes: 4,
+    });
+    const planA = texturedPlanWithTip("in-flight-a", [0, 64, 128, 255]);
+    const planB = texturedPlanWithTip("in-flight-b", [255, 128, 64, 0]);
+    const first = target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: planA,
+    });
+    await vi.waitFor(() => expect(harness.submitted).toHaveBeenCalledTimes(1));
+    const textureA = harness.textures.find((texture) => (
+      String(texture.descriptor.label).includes(planA.assets[0]!.contentHash)
+    ))!;
+
+    expect(await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: planB,
+    })).toEqual({ status: "rejected", reason: "resident-asset-budget" });
+    expect(textureA.destroy).not.toHaveBeenCalled();
+
+    gate.resolve();
+    expect((await first).status).toBe("completed");
+    expect((await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: planB,
+    })).status).toBe("completed");
+    expect(textureA.destroy).toHaveBeenCalledTimes(1);
   });
 
   it("rejects cancellation, stale request/device epochs and resident asset overflow", async () => {
