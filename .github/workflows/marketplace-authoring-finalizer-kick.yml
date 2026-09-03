@@ -15,6 +15,7 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      # recertification trigger: publish-page-hook-order-v1
       - name: Dispatch the latest finalizer definition
         env:
           GH_TOKEN: ${{ github.token }}
