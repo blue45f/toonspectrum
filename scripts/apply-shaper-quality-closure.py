@@ -13,4 +13,7 @@ encoded = "".join(
     for index in range(6)
 )
 source = zlib.decompress(base64.b64decode(encoded, validate=True)).decode("utf-8")
+# Some transport layers rewrite comment openers inside compressed generator literals.
+# Restore the four audited JSDoc markers before compiling the migration itself.
+source = source.replace("**()", "/**")
 exec(compile(source, str(Path(__file__).with_name("shaper-quality-closure.payload.py")), "exec"))
