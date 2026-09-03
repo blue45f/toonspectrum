@@ -6,6 +6,7 @@ import {
   resolveStudioFloatingSurfaceDockCandidate,
   resolveStudioFloatingSurfaceDockRect,
   resolveStudioFloatingSurfaceRect,
+  resizeStudioFloatingSurfaceRectFromEdge,
   snapStudioFloatingSurfaceRectToPeers,
   undockStudioFloatingSurfaceRect,
   type StudioFloatingSurfaceConstraints,
@@ -185,4 +186,47 @@ describe("studio floating surface docking", () => {
     expect(floating.x).toBeGreaterThanOrEqual(VIEWPORT.insetLeft);
     expect(floating.y).toBe(VIEWPORT.insetTop);
   });
+  it("resizes from every edge while anchoring the opposite edges", () => {
+    const start = { x: 400, y: 240, width: 360, height: 420 };
+    expect(resizeStudioFloatingSurfaceRectFromEdge(
+      start,
+      -40,
+      -30,
+      "nw",
+      VIEWPORT,
+      CONSTRAINTS,
+    )).toEqual({
+      x: 360,
+      y: 210,
+      width: 400,
+      height: 450,
+    });
+    expect(resizeStudioFloatingSurfaceRectFromEdge(
+      start,
+      50,
+      60,
+      "se",
+      VIEWPORT,
+      CONSTRAINTS,
+    )).toEqual({
+      x: 400,
+      y: 240,
+      width: 410,
+      height: 480,
+    });
+    expect(resizeStudioFloatingSurfaceRectFromEdge(
+      start,
+      1_000,
+      0,
+      "w",
+      VIEWPORT,
+      CONSTRAINTS,
+    )).toEqual({
+      x: 480,
+      y: 240,
+      width: 280,
+      height: 420,
+    });
+  });
+
 });

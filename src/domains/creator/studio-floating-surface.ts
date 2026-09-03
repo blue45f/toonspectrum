@@ -14,9 +14,21 @@ export const STUDIO_FLOATING_SURFACE_DOCK_EDGES = [
   "right",
   "bottom",
 ] as const;
+export const STUDIO_FLOATING_SURFACE_RESIZE_EDGES = [
+  "n",
+  "ne",
+  "e",
+  "se",
+  "s",
+  "sw",
+  "w",
+  "nw",
+] as const;
 
 export type StudioFloatingSurfaceDockEdge =
   (typeof STUDIO_FLOATING_SURFACE_DOCK_EDGES)[number];
+export type StudioFloatingSurfaceResizeEdge =
+  (typeof STUDIO_FLOATING_SURFACE_RESIZE_EDGES)[number];
 
 export interface StudioFloatingSurfaceLayout {
   readonly version: typeof STUDIO_FLOATING_SURFACE_LAYOUT_VERSION;
@@ -372,7 +384,75 @@ export function moveStudioFloatingSurfaceRect(
     : moved;
 }
 
-/** Resizes from the bottom-right corner without moving the anchored top-left corner. */
+/**
+ * Resizes from any edge or corner while keeping the opposite edges anchored and respecting both
+ * surface and viewport constraints. The rendered pointer preview can therefore update x/y as well
+ * as width/height without changing the durable layout until pointer-up.
+ */
+export function resizeStudioFloatingSurfaceRectFromEdge(
+  start: StudioFloatingSurfaceRect,
+  deltaX: number,
+  deltaY: number,
+  edge: StudioFloatingSurfaceResizeEdge,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+): StudioFloatingSurfaceRect {
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
+  const [minWidth, maxWidth] = resolveDimensionRange(
+    bounds.width,
+    constraints.minWidth,
+    constraints.maxWidth,
+  );
+  const [minHeight, maxHeight] = resolveDimensionRange(
+    bounds.height,
+    constraints.minHeight,
+    constraints.maxHeight,
+  );
+  const west = edge.includes("w");
+  const east = edge.includes("e");
+  const north = edge.includes("n");
+  const south = edge.includes("s");
+  let x = start.x;
+  let y = start.y;
+  let width = start.width;
+  let height = start.height;
+
+  if (west) {
+    const right = start.x + start.width;
+    width = clamp(
+      start.width - finite(deltaX, 0),
+      minWidth,
+      Math.min(maxWidth, right - bounds.left),
+    );
+    x = right - width;
+  } else if (east) {
+    width = clamp(
+      start.width + finite(deltaX, 0),
+      minWidth,
+      Math.min(maxWidth, bounds.right - start.x),
+    );
+  }
+
+  if (north) {
+    const bottom = start.y + start.height;
+    height = clamp(
+      start.height - finite(deltaY, 0),
+      minHeight,
+      Math.min(maxHeight, bottom - bounds.top),
+    );
+    y = bottom - height;
+  } else if (south) {
+    height = clamp(
+      start.height + finite(deltaY, 0),
+      minHeight,
+      Math.min(maxHeight, bounds.bottom - start.y),
+    );
+  }
+
+  return constrainRect({ x, y, width, height }, viewport, constraints);
+}
+
+/** Compatibility helper for the original bottom-right resize contract. */
 export function resizeStudioFloatingSurfaceRect(
   start: StudioFloatingSurfaceRect,
   deltaWidth: number,
@@ -380,18 +460,14 @@ export function resizeStudioFloatingSurfaceRect(
   viewport: StudioFloatingSurfaceViewport,
   constraints: StudioFloatingSurfaceConstraints,
 ): StudioFloatingSurfaceRect {
-  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
-  return constrainRect({
-    ...start,
-    width: Math.min(
-      start.width + finite(deltaWidth, 0),
-      Math.max(1, bounds.right - start.x),
-    ),
-    height: Math.min(
-      start.height + finite(deltaHeight, 0),
-      Math.max(1, bounds.bottom - start.y),
-    ),
-  }, viewport, constraints);
+  return resizeStudioFloatingSurfaceRectFromEdge(
+    start,
+    deltaWidth,
+    deltaHeight,
+    "se",
+    viewport,
+    constraints,
+  );
 }
 
 /** Resizes the exposed edge of a dock while keeping the dock attached to its safe viewport edge. */
