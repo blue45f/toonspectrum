@@ -113,6 +113,7 @@ export function StudioCanvasViewportHudOverlays({
     tutorialHubOpen,
     tutorialInitialId,
     viewTransformSuppressed,
+    webtoonTheme,
     workId,
     zoomLocked,
     stableHandlers,
@@ -341,6 +342,7 @@ export function StudioCanvasViewportHudOverlays({
             switchToDialogueLocale={switchToDialogueLocale}
             workId={workId}
             authorizedWorkAssetScopeId={authorizedWorkAssetScopeId}
+            webtoonTheme={webtoonTheme}
             masterPanelOpen={masterPanelOpen}
             setMasterPanelOpen={setMasterPanelOpen}
             master={master}

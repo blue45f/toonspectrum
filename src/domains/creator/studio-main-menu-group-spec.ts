@@ -438,8 +438,9 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       has("Dialogue Link", "text/dialogue-batch"),
       part(
         "Localization Layout",
-        "언어 전환·번역 메모리·말풍선 자동 맞춤까지. 로케일별 폰트/박스 오버라이드와 넘침 보고서는 없다.",
+        "언어 전환·번역 메모리·말풍선 자동 맞춤에 현지화 QA(넘침 예측·영문 문체 린트·MQM 점수)까지. 로케일별 폰트/박스 오버라이드는 없다.",
         "text/dialogue-translate",
+        "text/localization-qa",
       ),
       gap("Font Report", "폰트 사용·라이선스 보고서가 없다(사용자 폰트 관리 패널도 아직 미배선)."),
     ],
