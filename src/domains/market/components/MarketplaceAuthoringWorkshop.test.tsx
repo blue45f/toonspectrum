@@ -3,13 +3,14 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MarketplaceAuthoringWorkshop } from "./MarketplaceAuthoringWorkshop";
+
 import {
   CREATOR_MARKETPLACE_AUTHORING_HANDOFF_KEY,
   createCreatorMarketplaceDraftFromBrushStudio,
   serializeCreatorMarketplaceAuthoringDraft,
 } from "@/lib/creator-marketplace-authoring-workshop";
 
-import { MarketplaceAuthoringWorkshop } from "./MarketplaceAuthoringWorkshop";
 
 describe("MarketplaceAuthoringWorkshop", () => {
   beforeEach(() => {

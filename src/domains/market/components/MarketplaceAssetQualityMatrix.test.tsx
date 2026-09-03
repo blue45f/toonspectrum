@@ -4,12 +4,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { MarketplaceAssetQualityMatrix } from "./MarketplaceAssetQualityMatrix";
+
 import {
   createCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
 } from "@/lib/creator-marketplace-authoring-workshop";
 
-import { MarketplaceAssetQualityMatrix } from "./MarketplaceAssetQualityMatrix";
 
 function Harness({ initial }: { initial: CreatorMarketplaceAuthoringDraft }): ReactElement {
   const [draft, setDraft] = useState(initial);
