@@ -3,6 +3,10 @@ import {
   type AvatarForgeSemanticFaceMorphId,
   type AvatarForgeSemanticFaceMorphState,
 } from "./studio-vrm-avatar-forge";
+import {
+  applyStudioVrmAdaptiveFaceMorphs,
+  inspectStudioVrmAdaptiveFaceProfile,
+} from "./studio-vrm-adaptive-face-deformer";
 
 import type { VRM } from "@pixiv/three-vrm";
 import type * as THREE from "three";
@@ -22,6 +26,8 @@ type InternalBinding = Readonly<{
   targetName: string;
 }>;
 
+export type StudioVrmSemanticFaceMorphProvider = "native-morph" | "adaptive-mesh";
+
 export type StudioVrmSemanticFaceMorphControl = Readonly<{
   id: AvatarForgeSemanticFaceMorphId;
   label: string;
@@ -31,12 +37,17 @@ export type StudioVrmSemanticFaceMorphControl = Readonly<{
   positiveTargetCount: number;
   negativeTargetCount: number;
   targetNames: readonly string[];
+  provider: StudioVrmSemanticFaceMorphProvider;
+  adaptiveMeshCount: number;
 }>;
 
 export type StudioVrmSemanticFaceMorphProfile = Readonly<{
   status: "ready" | "unavailable";
   controls: readonly StudioVrmSemanticFaceMorphControl[];
+  /** Backwards-compatible native shape-key target count. */
   targetCount: number;
+  nativeTargetCount: number;
+  adaptiveMeshCount: number;
   message: string;
 }>;
 
@@ -52,7 +63,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "eyeSize",
     label: "눈 크기",
-    hint: "모델이 제공하는 눈 크기 전용 morph만 사용합니다.",
+    hint: "모델 고유 shape key를 우선 사용하고, 없으면 눈 랜드마크 주변 메시를 부드럽게 조형합니다.",
     positiveAliases: [
       "eyeSizeBig", "eyesBig", "eyeBig", "eyeLarge", "eyesLarge",
       "eyeScaleUp", "eyesScaleUp", "eyeEnlarge",
@@ -64,7 +75,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "eyeSpacing",
     label: "눈 간격",
-    hint: "양 눈 간격을 위해 명명된 morph가 있을 때만 활성화됩니다.",
+    hint: "전용 morph가 없으면 양 눈 랜드마크를 기준으로 좌우 영역을 대칭 이동합니다.",
     positiveAliases: [
       "eyeSpacingWide", "eyesWide", "eyeDistanceWide", "eyesApart",
     ],
@@ -75,7 +86,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "eyeTilt",
     label: "눈꼬리",
-    hint: "표정 morph가 아닌 고정 눈매 morph만 사용합니다.",
+    hint: "표정 morph는 제외하고 고정 눈매 morph 또는 적응형 외안각 조형만 사용합니다.",
     positiveAliases: [
       "eyeTiltUp", "eyesTiltUp", "eyeUpturned", "eyesUpturned", "catEye",
     ],
@@ -86,7 +97,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "irisSize",
     label: "홍채 크기",
-    hint: "홍채 또는 동공 크기 전용 morph가 확인된 모델에서만 사용합니다.",
+    hint: "홍채 전용 morph 또는 분리된 iris/pupil 메시가 확인된 모델에서 조절합니다.",
     positiveAliases: [
       "irisSizeBig", "irisBig", "irisLarge", "pupilSizeBig", "pupilBig",
     ],
@@ -97,7 +108,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "noseHeight",
     label: "코 높이",
-    hint: "코 위치·높이 전용 morph를 사용하며 표정 채널은 건드리지 않습니다.",
+    hint: "코 위치 전용 morph를 우선하고, 없으면 얼굴 기준점 주변을 제한 범위에서 이동합니다.",
     positiveAliases: [
       "noseHeightHigh", "noseHigh", "noseUp", "nosePositionUp",
     ],
@@ -108,7 +119,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "noseWidth",
     label: "코 너비",
-    hint: "코 폭 전용 morph가 존재할 때만 활성화됩니다.",
+    hint: "코 폭 shape key 또는 대칭 공간 마스크를 사용합니다.",
     positiveAliases: [
       "noseWidthWide", "noseWide", "noseBig",
     ],
@@ -119,7 +130,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "mouthWidth",
     label: "입 너비",
-    hint: "미소·발음 expression이 아닌 입 폭 전용 morph만 사용합니다.",
+    hint: "미소·발음 expression을 건드리지 않고 입 폭 전용 morph 또는 입 주변 메시만 조형합니다.",
     positiveAliases: [
       "mouthWidthWide", "mouthWide", "lipWidthWide", "lipsWide",
     ],
@@ -130,7 +141,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "lipFullness",
     label: "입술 볼륨",
-    hint: "입술 두께 전용 morph가 확인된 경우에만 활성화됩니다.",
+    hint: "입술 두께 shape key 또는 입 주변의 깊이·높이 마스크를 사용합니다.",
     positiveAliases: [
       "lipFullnessHigh", "lipFull", "lipsFull", "lipThick", "lipsThick",
     ],
@@ -141,7 +152,7 @@ const SEMANTIC_SPECS: readonly SemanticSpec[] = Object.freeze([
   {
     id: "earSize",
     label: "귀 크기",
-    hint: "귀 크기 전용 morph만 사용하며 귀 모양을 임의로 추측하지 않습니다.",
+    hint: "귀 전용 morph가 없으면 머리 기준 양측 귀 영역만 제한적으로 조형합니다.",
     positiveAliases: [
       "earSizeBig", "earsBig", "earBig", "earLarge", "earsLarge",
     ],
@@ -241,30 +252,53 @@ export function inspectStudioVrmSemanticFaceMorphProfile(
   vrm: VRM | null | undefined,
 ): StudioVrmSemanticFaceMorphProfile {
   const bindings = discoverBindings(vrm);
+  const adaptive = inspectStudioVrmAdaptiveFaceProfile(vrm);
   const controls = SEMANTIC_SPECS.flatMap((spec) => {
     const matching = bindings.filter((binding) => binding.semanticId === spec.id);
     const positiveTargetCount = matching.filter((binding) => binding.direction === 1).length;
     const negativeTargetCount = matching.length - positiveTargetCount;
-    if (matching.length === 0) return [];
+    if (matching.length > 0) {
+      return [Object.freeze({
+        id: spec.id,
+        label: spec.label,
+        hint: spec.hint,
+        minimum: negativeTargetCount > 0 ? -1 as const : 0 as const,
+        maximum: positiveTargetCount > 0 ? 1 as const : 0 as const,
+        positiveTargetCount,
+        negativeTargetCount,
+        targetNames: Object.freeze([...new Set(matching.map((binding) => binding.targetName))].sort()),
+        provider: "native-morph" as const,
+        adaptiveMeshCount: 0,
+      })];
+    }
+    const adaptiveCapability = adaptive.capabilities.find((capability) => capability.id === spec.id);
+    if (!adaptiveCapability) return [];
     return [Object.freeze({
       id: spec.id,
       label: spec.label,
       hint: spec.hint,
-      minimum: negativeTargetCount > 0 ? -1 as const : 0 as const,
-      maximum: positiveTargetCount > 0 ? 1 as const : 0 as const,
-      positiveTargetCount,
-      negativeTargetCount,
-      targetNames: Object.freeze([...new Set(matching.map((binding) => binding.targetName))].sort()),
+      minimum: -1 as const,
+      maximum: 1 as const,
+      positiveTargetCount: 0,
+      negativeTargetCount: 0,
+      targetNames: Object.freeze([]),
+      provider: "adaptive-mesh" as const,
+      adaptiveMeshCount: adaptiveCapability.meshCount,
     })];
   });
-  const targetCount = bindings.length;
+  const nativeTargetCount = bindings.length;
+  const adaptiveMeshCount = adaptive.meshCount;
+  const nativeControlCount = controls.filter((control) => control.provider === "native-morph").length;
+  const adaptiveControlCount = controls.length - nativeControlCount;
   return Object.freeze({
     status: controls.length > 0 ? "ready" as const : "unavailable" as const,
     controls: Object.freeze(controls),
-    targetCount,
+    targetCount: nativeTargetCount,
+    nativeTargetCount,
+    adaptiveMeshCount,
     message: controls.length > 0
-      ? `의미가 명확한 얼굴 morph ${controls.length}종 · 대상 ${targetCount}개를 확인했습니다.`
-      : "이 VRM에는 안전하게 식별할 수 있는 눈·코·입·귀 조형 morph가 없습니다. 두상·턱 비율 편집은 계속 사용할 수 있습니다.",
+      ? `모델 morph ${nativeControlCount}종 · 적응형 메시 ${adaptiveControlCount}종을 준비했습니다.`
+      : "얼굴 조형에 사용할 shape key, 얼굴 메시, 머리 랜드마크를 찾지 못했습니다. 두상·턱 비율 편집은 계속 사용할 수 있습니다.",
   });
 }
 
@@ -273,18 +307,19 @@ function clamp01(value: number): number {
 }
 
 /**
- * Applies only exact semantic shape-key bindings and returns a restoration lease.
- *
- * Expression channels (blink, phoneme, joy, etc.) are deliberately absent from the alias table,
- * so active facial animation remains under the VRM expression manager's authority.
+ * Applies exact native shape keys first and fills only missing semantics with reversible adaptive
+ * mesh deformation. Expression channels (blink, phoneme, joy, etc.) are absent from the alias
+ * table, and adaptive deformation restores the original geometry object byte-for-byte on release.
  */
 export function applyStudioVrmSemanticFaceMorphs(
   vrm: VRM | null | undefined,
   rawState: AvatarForgeSemanticFaceMorphState | null | undefined,
 ): () => void {
+  if (!vrm) return () => undefined;
   const bindings = discoverBindings(vrm);
-  if (bindings.length === 0) return () => undefined;
   const state = sanitizeAvatarForgeSemanticFaceMorphs(rawState) ?? {};
+  const nativeSemanticIds = new Set(bindings.map((binding) => binding.semanticId));
+  const adaptiveRelease = applyStudioVrmAdaptiveFaceMorphs(vrm, state, nativeSemanticIds);
   const baselines = bindings.map((binding) => ({
     binding,
     value: binding.mesh.morphTargetInfluences?.[binding.targetIndex] ?? 0,
@@ -303,6 +338,7 @@ export function applyStudioVrmSemanticFaceMorphs(
   }
 
   return () => {
+    adaptiveRelease();
     for (const { binding, value } of baselines) {
       const influences = binding.mesh.morphTargetInfluences;
       if (!influences || binding.targetIndex >= influences.length) continue;
