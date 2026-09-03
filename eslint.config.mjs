@@ -183,6 +183,16 @@ export default defineConfig(
     },
   },
 
+  // 마켓 이행 스크립트는 정확한 TS/TSX 소스 조각을 template literal 안에 보존한다.
+  // 이스케이프를 제거하면 생성되는 소스 계약이 바뀌므로 두 파일에만 규칙을 제한적으로 끈다.
+  {
+    files: [
+      'scripts/marketplace/fix-authoring-contracts.mjs',
+      'scripts/marketplace/integrate-source-package-builder.mjs',
+    ],
+    rules: { 'no-useless-escape': 'off' },
+  },
+
   // 테스트 — Vitest globals; fast-refresh 제약 완화 + any 허용.
   {
     files: ['**/*.{test,spec}.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

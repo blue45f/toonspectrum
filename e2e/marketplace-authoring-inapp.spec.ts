@@ -53,7 +53,11 @@ test("marketplace authoring remains operable in Chromium in-app profiles", async
     await expect(workshop.getByTestId("market-authoring-add-engine"), profile.id).toBeVisible();
     await workshop.getByLabel("추가할 엔진").selectOption("particle-scatter");
     await workshop.getByTestId("market-authoring-add-engine").click();
-    await expect(workshop.getByText("파티클·산포"), profile.id).toBeVisible();
+    const engineList = workshop.getByTestId("market-authoring-engine-list");
+    await expect(
+      engineList.getByText("파티클·산포", { exact: true }),
+      profile.id,
+    ).toBeVisible();
 
     const geometry = await workshop.evaluate((root) => {
       const documentOverflow = Math.max(
