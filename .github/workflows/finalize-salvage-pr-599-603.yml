@@ -1,0 +1,83 @@
+name: Finalize safe salvage PR 599 603
+
+on:
+  push:
+    branches:
+      - automation/finalize-salvage-pr-599-603-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-salvage-pr-599-603-20260903
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: integration/salvage-pr-599-603-safe-files-20260903
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Wait for safe salvage PR
+        id: pr
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          number=""
+          for attempt in $(seq 1 180); do
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+            [[ -n "$number" ]] && break
+            echo "Waiting for safe salvage PR ($attempt/180)."
+            sleep 20
+          done
+          [[ -n "$number" ]] || { echo "Safe salvage PR was not created." >&2; exit 1; }
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Synchronize from current main
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          merge_state="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq '.mergeStateStatus')"
+          if [[ "$merge_state" == "BEHIND" ]]; then
+            gh pr update-branch "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Wait for core and all checks
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          core_count=0
+          for attempt in $(seq 1 90); do
+            checks="$(gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+            core_count="$(jq '[.[] | select(.name | ascii_downcase | contains("core"))] | length' <<<"$checks")"
+            (( core_count > 0 )) && break
+            echo "Waiting for core check ($attempt/90)."
+            sleep 20
+          done
+          (( core_count > 0 )) || { echo "No core check; merge refused." >&2; exit 1; }
+          gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 20
+
+      - name: Merge exact passing head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --match-head-commit "$head_sha" \
+            --subject "chore(integration): salvage conflict-free work from PRs 599 and 603" \
+            --body "Merged after current-main synchronization and success of every registered check on the exact safe-slice head."
