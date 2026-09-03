@@ -43,13 +43,42 @@ function scoreBrushSnapshot(value: unknown, depth = 0): number {
   return score;
 }
 
-function findStoredBrushSnapshot(): unknown {
+function browserLocalStorage(): Storage | null {
   if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Finds the richest portable brush snapshot without assuming storage is available.
+ * Some in-app WebViews expose `localStorage` but throw on length, key, or item access.
+ */
+export function findStoredBrushSnapshotForMarketplace(
+  storage: Storage | null = browserLocalStorage(),
+): unknown {
+  if (!storage) return null;
+
+  let length = 0;
+  try {
+    length = storage.length;
+  } catch {
+    return null;
+  }
+
   let best: { score: number; value: unknown } | null = null;
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (!key || !/(brush|preset|studio|ink|pencil)/iu.test(key)) continue;
-    const raw = window.localStorage.getItem(key);
+  for (let index = 0; index < length; index += 1) {
+    let key: string | null;
+    let raw: string | null;
+    try {
+      key = storage.key(index);
+      if (!key || !/(brush|preset|studio|ink|pencil)/iu.test(key)) continue;
+      raw = storage.getItem(key);
+    } catch {
+      continue;
+    }
     if (!raw || raw.length > 8_000_000) continue;
     try {
       const value: unknown = JSON.parse(raw);
@@ -108,7 +137,7 @@ export function MarketplaceBrushPublishShortcut({
     setBusy(true);
     try {
       const live = snapshotProvider ? await snapshotProvider() : await requestLiveSnapshot();
-      const source = live ?? snapshot ?? findStoredBrushSnapshot() ?? {
+      const source = live ?? snapshot ?? findStoredBrushSnapshotForMarketplace() ?? {
         name: "Brush Studio brush",
         enginePrograms: [],
       };
@@ -135,12 +164,20 @@ export function MarketplaceBrushPublishShortcut({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <strong className="block truncate text-sm text-fg">마켓에 브러시 등록</strong>
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-fg-2">{message}</p>
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-fg-2"
+          >
+            {message}
+          </p>
         </div>
         <button
           type="button"
+          data-testid="brush-studio-marketplace-publish"
           onClick={() => void publish()}
           disabled={busy}
+          aria-busy={busy}
           className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? "준비 중" : "등록 준비"}
