@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   normalize:
-    if: ${{ !contains(github.event.head_commit.message, '[webgpu-v2-imports-fixed]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[webgpu-v2-normalized]') }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -35,43 +35,109 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Normalize and verify V2 source
+      - name: Normalize, verify, and record evidence
+        id: verify
+        shell: bash
         run: |
-          pnpm exec eslint --fix \
-            scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
-            scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
+          set +e
+          FILES=(
+            scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts
+            scripts/studio-engine-webgpu-textured-brush-v2-quality-browser.ts
+            scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs
+            scripts/verify-studio-engine-webgpu-textured-brush-v2-quality.mjs
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts
             src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
-          pnpm exec eslint --max-warnings=0 \
-            scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
-            scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
+            src/domains/creator/render/studio-webgpu-brush-visual-metrics.ts
+            src/domains/creator/render/studio-webgpu-brush-visual-metrics.test.ts
+          )
+          pnpm exec eslint --fix "${FILES[@]}" > /tmp/webgpu-eslint-fix.log 2>&1
+          fix_status=$?
+          pnpm exec eslint --max-warnings=0 "${FILES[@]}" > /tmp/webgpu-eslint.log 2>&1
+          lint_status=$?
           pnpm exec vitest run \
             src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
-          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts \
+            src/domains/creator/render/studio-webgpu-brush-visual-metrics.test.ts \
+            > /tmp/webgpu-vitest.log 2>&1
+          test_status=$?
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false \
+            > /tmp/webgpu-tsc.log 2>&1
+          type_status=$?
+          mkdir -p docs/reports
+          FIX_STATUS="$fix_status" LINT_STATUS="$lint_status" \
+          TEST_STATUS="$test_status" TYPE_STATUS="$type_status" \
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const tail = (path, lines = 120) => {
+            try {
+              return readFileSync(path, 'utf8').split('\n').slice(-lines).join('\n');
+            } catch {
+              return '';
+            }
+          };
+          const status = {
+            kind: 'studio-webgpu-brush-v2-static-verification',
+            revision: 1,
+            commit: process.env.GITHUB_SHA,
+            runner: process.env.RUNNER_ARCH,
+            node: process.version,
+            results: {
+              eslintFix: Number(process.env.FIX_STATUS),
+              eslint: Number(process.env.LINT_STATUS),
+              vitest: Number(process.env.TEST_STATUS),
+              typecheck: Number(process.env.TYPE_STATUS),
+            },
+            logs: {
+              eslintFix: tail('/tmp/webgpu-eslint-fix.log'),
+              eslint: tail('/tmp/webgpu-eslint.log'),
+              vitest: tail('/tmp/webgpu-vitest.log'),
+              typecheck: tail('/tmp/webgpu-tsc.log'),
+            },
+          };
+          status.ok = Object.values(status.results).every((value) => value === 0);
+          writeFileSync(
+            'docs/reports/studio-webgpu-brush-v2-static-status.json',
+            `${JSON.stringify(status, null, 2)}\n`,
+          );
+          NODE
+          echo "fix_status=$fix_status" >> "$GITHUB_OUTPUT"
+          echo "lint_status=$lint_status" >> "$GITHUB_OUTPUT"
+          echo "test_status=$test_status" >> "$GITHUB_OUTPUT"
+          echo "type_status=$type_status" >> "$GITHUB_OUTPUT"
+          exit 0
 
-      - name: Commit normalized implementation
+      - name: Commit normalized source and verification receipt
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
           git add \
             scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
+            scripts/studio-engine-webgpu-textured-brush-v2-quality-browser.ts \
             scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
+            scripts/verify-studio-engine-webgpu-textured-brush-v2-quality.mjs \
             src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts \
             src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
             src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
-            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
-          if git diff --cached --quiet; then
-            echo "source already normalized"
-            exit 0
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts \
+            src/domains/creator/render/studio-webgpu-brush-visual-metrics.ts \
+            src/domains/creator/render/studio-webgpu-brush-visual-metrics.test.ts \
+            docs/reports/studio-webgpu-brush-v2-static-status.json
+          if ! git diff --cached --quiet; then
+            git diff --cached --check
+            git commit --no-verify -m "test(webgpu): normalize V2 and record static evidence [webgpu-v2-normalized]"
+            git pull --rebase origin feat/webgpu-brush-v2-final-20260904
+            git push --no-verify origin HEAD:feat/webgpu-brush-v2-final-20260904
           fi
-          git diff --cached --check
-          git commit --no-verify -m "fix(webgpu): normalize V2 source [webgpu-v2-imports-fixed]"
-          git pull --rebase origin feat/webgpu-brush-v2-final-20260904
-          git push --no-verify origin HEAD:feat/webgpu-brush-v2-final-20260904
+
+      - name: Enforce static verification result
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.verify.outputs.fix_status }}" = "0"
+          test "${{ steps.verify.outputs.lint_status }}" = "0"
+          test "${{ steps.verify.outputs.test_status }}" = "0"
+          test "${{ steps.verify.outputs.type_status }}" = "0"
