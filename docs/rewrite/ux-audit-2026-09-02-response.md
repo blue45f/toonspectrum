@@ -140,6 +140,7 @@ main 의 core CI 는 2026-09-01 이후 붉은 상태였다. 이 브랜치의 전
 | CI `verify` 잡 (`verify:studio-3d-console`) | 메뉴바 프레젠테이션이 3D·협업을 도구 복합 타이틀로 접었는데 브라우저 검증기 3종이 최상위 `3D`·`협업` 트리거를 클릭 → 존재하지 않는 메뉴를 30초 기다리다 실패 | `verify-studio-3d-console`·`verify-studio-bg3d-physics`·`verify-studio-collab-ui` 가 도구 트리거·도구 드롭다운으로 진입(항목 id·라벨 무변경), 3D 콘솔 소스 계약 테스트도 같은 앵커로 갱신 |
 | CI `verify` 잡 VRM 색 복원 (기준선 결함) | `measureStudioVrmChroma` 가 rAF 2회만 기다려 소프트웨어 래스터라이저에서 정착 전 프레임을 기준선으로 잡음(러너 0.0058 vs 복원 0.0027, 복원값은 조용한 머신의 정상값과 일치) | 세 캡처 모두 연속 두 샘플이 일치할 때까지 표본화(`measureSettledStudioVrmChroma`), 임계값은 유지 |
 | CI `verify` 잡 BG3D 캔버스 (main 도 동일 실패) | ADR-0018 로 자동 mount 가 없어 캔버스가 영원히 안 보임 | 보기 탭에서 WebGL2 를 직접 선택하고 `WebGL2 사용 중` 배지를 대기 |
+| main 6ddf0406(CSP 패리티) 원형 텍스트 패널 병합 | main 은 단일 타이포그래피 섹션 끝에 원형 텍스트·외곽선·자간/행간·그림자 블록을 나란히 추가 | 3분할 구조에 맞춰 원형 텍스트만 고급 조판 섹션에 편입(외곽선·그림자는 외형, 자간·행간은 문단 섹션이 이미 소유 → 중복 컨트롤 id 금지 계약). main 의 테스트는 "타이포그래피" 대신 "고급 조판" 섹션을 열도록 갱신 |
 로컬 재검증(병합 트리 프로덕션 빌드): `verify:studio-mobile-top` 8/8 OK, `verify:studio-inapp-browser` 32/32 OK — 스윕이 잡던
 빠른 시작 패널 390px 넘침도 같은 레인 넘침의 파생이었다. 3D 는 CI 와 같은 조건(Playwright 번들 Chromium headless, ANGLE/SwiftShader,
 `navigator.gpu` 없음)에서 `verify:studio-3d-visual` 을 돌려 진입 경로 테스트 통과를 확인했다. 남은 기록 항목: `oil-ribbon impasto`
