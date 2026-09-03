@@ -103,14 +103,16 @@ jobs:
           pnpm exec vitest run src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
           pnpm exec tsc -p tsconfig.json --noEmit --incremental false
 
-      - name: Commit verified implementation
+      - name: Commit verified implementation without workflow files
         run: |
+          rm -f .github/workflows/blender-character-pipeline.yml
           rm -f scripts/bootstrap-blender-character-pipeline.py
           rm -f scripts/.blender-character-pipeline.part*
-          rm -f .github/workflows/bootstrap-blender-character-pipeline.yml
+          find scripts/blender tests/blender tools/blender -type d -name __pycache__ -prune -exec rm -rf {} +
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
+          git reset -- .github/workflows/bootstrap-blender-character-pipeline.yml
           git diff --cached --check
           git commit --no-verify -m "feat(studio): add Blender character quality pipeline [blender-character-pipeline-applied]"
           git push --no-verify origin HEAD:feat/blender-character-quality-pipeline-20260904
