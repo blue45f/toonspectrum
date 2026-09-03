@@ -494,7 +494,12 @@ describe("buildStudioMainMenuGroups", () => {
       disabled: true,
     });
     expect(menuItem(groups, "window", "left-panel").label).toBe("왼쪽 패널 보이기");
-    expect(menuItem(groups, "window", "right-panel").label).toBe("속성 패널 보이기");
+    // 계약 변경(2026-09-04). PR #517 이 패널 헤더·aria 라벨만 "작업 패널"로 바꾸고
+    // 이 행과 명령 카탈로그는 "속성 패널"에 남겨 두는 바람에, 통합 검색이 화면에 보이는
+    // 이름으로는 이 패널을 찾지 못했다("작업 패널" 0건 / "속성 패널" 2건). 이름이 갈라진
+    // 쪽은 메뉴·명령이므로 여기 pin 을 화면 이름으로 옮긴다. 예전 이름은
+    // `studio-command-catalog.ts` 의 `window.right-panel` 검색 별칭으로 계속 잡힌다.
+    expect(menuItem(groups, "window", "right-panel").label).toBe("작업 패널 보이기");
     expect(menuItem(groups, "filter", "last-filter")).toMatchObject({
       label: "마지막 필터 다시 열기",
       disabled: true,
