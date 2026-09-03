@@ -207,7 +207,8 @@ def _head_group_weight_ratio(obj: bpy.types.Object) -> float:
     step = max(1, len(obj.data.vertices) // 1200)
     sampled = 0
     weighted = 0
-    for vertex in obj.data.vertices[::step]:
+    for index in range(0, len(obj.data.vertices), step):
+        vertex = obj.data.vertices[index]
         sampled += 1
         if any(group.group in head_groups and group.weight > 0.04 for group in vertex.groups):
             weighted += 1
@@ -220,7 +221,8 @@ def _head_region_ratio(obj: bpy.types.Object, frame: HeadFrame) -> float:
     step = max(1, len(obj.data.vertices) // 1200)
     sampled = 0
     inside = 0
-    for vertex in obj.data.vertices[::step]:
+    for index in range(0, len(obj.data.vertices), step):
+        vertex = obj.data.vertices[index]
         world = obj.matrix_world @ vertex.co
         delta = world - frame.center
         x = delta.dot(frame.right) / max(1e-6, frame.radius_x)
@@ -350,9 +352,11 @@ def _write_shape(
         displacement = spec.displacement(x, depth, z)
         key.data[index].co = point.co + _local_delta(obj, frame, displacement) * (weight * direction)
         changed += 1
-    key["toonstudio_semantic_id"] = spec.semantic_id
-    key["toonstudio_direction"] = "positive" if direction > 0 else "negative"
-    key["toonstudio_generated"] = True
+    obj[f"toonstudio_shape_{_normalize(key.name)}_semantic_id"] = spec.semantic_id
+    obj[f"toonstudio_shape_{_normalize(key.name)}_direction"] = (
+        "positive" if direction > 0 else "negative"
+    )
+    obj[f"toonstudio_shape_{_normalize(key.name)}_generated"] = True
     return changed
 
 
@@ -381,7 +385,7 @@ def create_semantic_face_shape_keys(
                     continue
                 key = _shape_key(obj, name)
                 key.name = name
-                key["toonstudio_label"] = label
+                obj[f"toonstudio_shape_{_normalize(name)}_label"] = label
                 changed = _write_shape(obj, key, frame, spec, direction)
                 if changed >= 8:
                     created.append(f"{obj.name}:{name}")
