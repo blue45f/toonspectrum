@@ -74,16 +74,27 @@ panel_test_source = panel_test_source.replace(
     '/풍성한 웨이브/u',
 )
 panel_test_source = panel_test_source.replace(
+    '/둥근형/u',
+    '/^둥근 동안형마네킹 실시간$/u',
+)
+panel_test_source = panel_test_source.replace(
     '/기본 계란형/u',
-    '/갸름한 달걀형/u',
+    '/^갸름한 달걀형마네킹 실시간$/u',
 )
 if (
     'getByRole("listitem",' in panel_test_source
     or 'queryByRole("listitem",' in panel_test_source
 ):
     raise RuntimeError("StudioShaperPanel tests still query interactive list items")
-if '/내추럴 웨이브/u' in panel_test_source or '/기본 계란형/u' in panel_test_source:
-    raise RuntimeError("StudioShaperPanel tests still use stale catalogue labels")
+for stale in (
+    '/내추럴 웨이브/u',
+    '/둥근형/u',
+    '/기본 계란형/u',
+):
+    if stale in panel_test_source:
+        raise RuntimeError(
+            f"StudioShaperPanel tests still use a stale or ambiguous label: {stale}"
+        )
 panel_test.write_text(panel_test_source, encoding="utf-8")
 
 appearance_test = (
