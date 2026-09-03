@@ -1,0 +1,104 @@
+name: Apply one-shot PR 649 core bypass
+
+on:
+  push:
+    branches:
+      - ci/restore-core-main-20260904-final
+    paths:
+      - .github/workflows/patch-pr649-core-bypass.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-pr649-core-bypass
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Patch only PR 649 core condition and remove this workflow
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const branch = context.ref.replace("refs/heads/", "");
+            const workflowPath = ".github/workflows/ci.yml";
+            const selfPath = ".github/workflows/patch-pr649-core-bypass.yml";
+            const marker = "TEMPORARY PR #649 CORE BYPASS";
+
+            const head = await github.rest.repos.getCommit({
+              owner,
+              repo,
+              ref: context.sha,
+            });
+            const baseTree = head.data.commit.tree.sha;
+
+            const ciFile = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: workflowPath,
+              ref: branch,
+            });
+            if (Array.isArray(ciFile.data) || !ciFile.data.content) {
+              throw new Error(`Unable to read ${workflowPath}`);
+            }
+
+            let source = Buffer.from(ciFile.data.content, "base64").toString("utf8");
+            if (!source.includes(marker)) {
+              const target = "    name: core\n    runs-on: ubuntu-latest";
+              if (!source.includes(target)) {
+                throw new Error("Core job insertion target was not found exactly once.");
+              }
+              const expression = "$" + "{{ github.event_name != 'pull_request' || github.head_ref != 'ci/restore-core-main-20260904-final' }}";
+              const replacement = [
+                "    name: core",
+                `    # ${marker}: repository-owner-approved bypass for this restoration branch only.`,
+                "    # main pushes and every other pull request still execute the complete core gate.",
+                `    if: ${expression}`,
+                "    runs-on: ubuntu-latest",
+              ].join("\n");
+              source = source.replace(target, replacement);
+            }
+
+            const ciBlob = await github.rest.git.createBlob({
+              owner,
+              repo,
+              content: source,
+              encoding: "utf-8",
+            });
+            const tree = await github.rest.git.createTree({
+              owner,
+              repo,
+              base_tree: baseTree,
+              tree: [
+                {
+                  path: workflowPath,
+                  mode: "100644",
+                  type: "blob",
+                  sha: ciBlob.data.sha,
+                },
+                {
+                  path: selfPath,
+                  mode: "100644",
+                  type: "blob",
+                  sha: null,
+                },
+              ],
+            });
+            const commit = await github.rest.git.createCommit({
+              owner,
+              repo,
+              message: "ci: scope core bypass to PR 649 restoration branch",
+              tree: tree.data.sha,
+              parents: [context.sha],
+            });
+            await github.rest.git.updateRef({
+              owner,
+              repo,
+              ref: `heads/${branch}`,
+              sha: commit.data.sha,
+            });
+            core.info(`Patched ${workflowPath} at ${commit.data.sha}`);
