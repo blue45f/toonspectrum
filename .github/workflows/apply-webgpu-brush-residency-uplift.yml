@@ -1,0 +1,85 @@
+name: Apply WebGPU brush residency uplift
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-residency-lru-20260904
+    paths:
+      - scripts/apply-webgpu-brush-residency-uplift.mjs
+      - .github/workflows/apply-webgpu-brush-residency-uplift.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-webgpu-brush-residency-uplift
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply verified WebGPU brush uplift
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Apply verified transformation
+        run: |
+          node scripts/apply-webgpu-brush-residency-uplift.mjs
+          rm scripts/apply-webgpu-brush-residency-uplift.mjs
+          rm .github/workflows/apply-webgpu-brush-residency-uplift.yml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format changed sources
+        run: |
+          pnpm exec prettier --write \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime.test.ts \
+            src/domains/creator/render/studio-webgpu-resident-asset-budget.ts \
+            src/domains/creator/render/studio-webgpu-resident-asset-budget.test.ts
+
+      - name: Run focused brush tests
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime.test.ts \
+            src/domains/creator/render/studio-webgpu-resident-asset-budget.test.ts
+
+      - name: Lint changed sources
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime.test.ts \
+            src/domains/creator/render/studio-webgpu-resident-asset-budget.ts \
+            src/domains/creator/render/studio-webgpu-resident-asset-budget.test.ts
+
+      - name: Typecheck repository
+        run: pnpm run typecheck
+
+      - name: Commit verified implementation
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::error::The uplift produced no commit-worthy changes."
+            exit 1
+          fi
+          git commit -m "feat(brush): improve WebGPU asset residency and staging"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
