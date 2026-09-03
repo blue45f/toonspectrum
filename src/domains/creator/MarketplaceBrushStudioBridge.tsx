@@ -101,10 +101,5 @@ export function MarketplaceBrushStudioBridge({
   }, []);
 
   if (!visible) return null;
-  return (
-    <MarketplaceBrushPublishShortcut
-      snapshotProvider={() => latestSnapshotRef.current}
-      data-testid="brush-studio-marketplace-publish"
-    />
-  );
+  return <MarketplaceBrushPublishShortcut snapshotProvider={() => latestSnapshotRef.current} />;
 }
