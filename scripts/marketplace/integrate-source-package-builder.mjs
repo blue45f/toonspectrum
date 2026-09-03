@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape -- These migration utilities intentionally store escaped source-code templates. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
