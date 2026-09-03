@@ -8,7 +8,14 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import {
   DEFAULT_STUDIO_QUICK_ACCESS_STATE,
@@ -17,6 +24,9 @@ import {
 import {
   buildStudioQuickAccessCommandCatalog,
 } from "./studio-quick-access-integration";
+import {
+  STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
+} from "./studio-quick-access-surface-layout";
 import { StudioQuickAccessSurface } from "./StudioQuickAccessSurface";
 
 const CATALOG = buildStudioQuickAccessCommandCatalog({
@@ -38,6 +48,18 @@ const CATALOG = buildStudioQuickAccessCommandCatalog({
   "quick-mask": false,
   "wet-mix": false,
   "dodge-burn": false,
+});
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+  Object.defineProperty(globalThis, "innerWidth", {
+    configurable: true,
+    value: 1_024,
+  });
+  Object.defineProperty(globalThis, "innerHeight", {
+    configurable: true,
+    value: 768,
+  });
 });
 
 afterEach(cleanup);
@@ -73,7 +95,7 @@ function SurfaceHarness({
 }
 
 describe("StudioQuickAccessSurface", () => {
-  it("keeps desktop non-modal and restores launcher focus after close", async () => {
+  it("keeps desktop non-modal, movable, resizable, and restores launcher focus", async () => {
     render(<SurfaceHarness isMobile={false} />);
     const launcher = screen.getByRole("button", {
       name: "빠른 액세스 열기",
@@ -86,7 +108,15 @@ describe("StudioQuickAccessSurface", () => {
     });
     expect(surface.getAttribute("aria-modal")).toBeNull();
     expect(surface.getAttribute("data-mobile")).toBe("false");
-    expect(surface.className).toContain("top-[4.75rem]");
+    expect(surface.getAttribute("data-studio-floating-surface")).toBe("true");
+    expect(surface.style.left).not.toBe("");
+    expect(surface.style.top).not.toBe("");
+    expect(screen.getByRole("button", {
+      name: "빠른 액세스 팔레트 이동",
+    })).toBeTruthy();
+    expect(screen.getByRole("button", {
+      name: "빠른 액세스 팔레트 크기 조절",
+    })).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "빠른 액세스 닫기" }),
     ).toBeNull();
@@ -103,6 +133,41 @@ describe("StudioQuickAccessSurface", () => {
     expect(document.activeElement).toBe(launcher);
   });
 
+  it("restores the desktop floating position after close and reopen in the same tab", () => {
+    render(<SurfaceHarness isMobile={false} />);
+    const launcher = screen.getByRole("button", {
+      name: "빠른 액세스 열기",
+    });
+    fireEvent.click(launcher);
+
+    const moveHandle = screen.getByRole("button", {
+      name: "빠른 액세스 팔레트 이동",
+    });
+    fireEvent.keyDown(moveHandle, {
+      key: "ArrowLeft",
+      altKey: true,
+    });
+
+    const encoded = window.sessionStorage.getItem(
+      STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
+    );
+    expect(encoded).not.toBeNull();
+    const parsed = JSON.parse(encoded!) as { readonly xRatio: number };
+    expect(parsed.xRatio).toBeLessThan(1);
+    const movedLeft = screen.getByRole("dialog", {
+      name: "빠른 액세스 팔레트",
+    }).style.left;
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "빠른 액세스 팔레트 닫기",
+    }));
+    fireEvent.click(launcher);
+
+    expect(screen.getByRole("dialog", {
+      name: "빠른 액세스 팔레트",
+    }).style.left).toBe(movedLeft);
+  });
+
   it("uses a bounded mobile sheet, backdrop dismissal, and one trusted executor", () => {
     const onExecute = vi.fn();
     render(<SurfaceHarness isMobile onExecute={onExecute} />);
@@ -115,6 +180,7 @@ describe("StudioQuickAccessSurface", () => {
     });
     expect(surface.getAttribute("aria-modal")).toBe("true");
     expect(surface.getAttribute("data-mobile")).toBe("true");
+    expect(surface.getAttribute("data-studio-floating-surface")).toBeNull();
     expect(surface.className).toContain("h-[min(78dvh,44rem)]");
     expect(surface.className).toContain("max-h-[calc(100dvh-4rem)]");
 
@@ -152,6 +218,39 @@ describe("StudioQuickAccessSurface", () => {
       name: "빠른 액세스 팔레트",
     }), { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("cancels a floating drag with Escape without closing the palette", () => {
+    render(<SurfaceHarness isMobile={false} />);
+    fireEvent.click(screen.getByRole("button", {
+      name: "빠른 액세스 열기",
+    }));
+    const handle = screen.getByRole("button", {
+      name: "빠른 액세스 팔레트 이동",
+    });
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 51,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 900,
+      clientY: 90,
+    });
+    fireEvent.pointerMove(window, {
+      pointerId: 51,
+      pointerType: "mouse",
+      buttons: 1,
+      clientX: 860,
+      clientY: 120,
+    });
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.getByRole("dialog", {
+      name: "빠른 액세스 팔레트",
+    })).toBeTruthy();
+    expect(window.sessionStorage.getItem(
+      STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
+    )).toBeNull();
   });
 
   it("closes with the same Shift+Q chord inside its shortcut boundary", () => {

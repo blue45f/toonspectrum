@@ -1,12 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- This statically imported Studio leaf intentionally co-locates its typed overlay controller with the portal that exclusively consumes it. */
 import {
   LockKeyhole,
-  MoreHorizontal,
   PanelRightOpen,
   Pin,
   SlidersHorizontal,
   SwatchBook,
-  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -20,6 +18,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { StudioDrawingPaletteFloatingSurface } from "./StudioDrawingPaletteFloatingSurface";
 
 import type {
   StudioCanonicalDrawingPaletteLayout,
@@ -281,7 +280,16 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
       dismiss();
     };
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (
+        openOverlay.kind === "palette"
+        && (
+          overlayRef.current?.dataset.dragging === "true"
+          || overlayRef.current?.dataset.resizing === "true"
+        )
+      ) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       dismiss();
@@ -370,103 +378,54 @@ export function StudioDrawingPaletteOverlayPortal({
     toggleInlineOptions,
     close,
   } = controller;
-  if (!openOverlay || !overlayStyle || typeof document === "undefined") {
-    return null;
-  }
+  if (!openOverlay || typeof document === "undefined") return null;
 
   const definition = STUDIO_DRAWING_PALETTES[openOverlay.id];
+  const options = (
+    <PaletteOptions
+      id={openOverlay.id}
+      label={definition.label}
+      layout={layout}
+      presentation={presentation}
+      onLockToggle={(kind) => onLockToggle(openOverlay.id, kind)}
+      onPresentationChange={onPresentationChange}
+    />
+  );
+
+  if (openOverlay.kind === "palette") {
+    const popupId = studioDrawingPaletteOverlayId(stackId, openOverlay);
+    return createPortal(
+      <StudioDrawingPaletteFloatingSurface
+        key={openOverlay.id}
+        id={openOverlay.id}
+        popupId={popupId}
+        label={definition.label}
+        surfaceRef={overlayRef}
+        optionsOpen={inlineOptionsOpen}
+        optionsId={`${stackId}-${openOverlay.id}-popup-options`}
+        options={options}
+        onToggleOptions={toggleInlineOptions}
+        onClose={() => close(true)}
+      >
+        {paletteBody(openOverlay.id, subTools, toolProperties)}
+      </StudioDrawingPaletteFloatingSurface>,
+      document.body,
+    );
+  }
+
+  if (!overlayStyle) return null;
   return createPortal(
     <div
       ref={overlayRef}
       id={studioDrawingPaletteOverlayId(stackId, openOverlay)}
-      role={openOverlay.kind === "options" ? "menu" : "dialog"}
-      aria-label={`${definition.label} ${
-        openOverlay.kind === "options" ? "팔레트 옵션" : "팝업"
-      }`}
-      data-studio-drawing-palette-overlay={openOverlay.kind}
+      role="menu"
+      aria-label={`${definition.label} 팔레트 옵션`}
+      data-studio-drawing-palette-overlay="options"
       data-studio-drawing-palette-overlay-id={openOverlay.id}
       style={overlayStyle}
-      className={cn(
-        "fixed z-[70] min-w-0 overflow-hidden rounded-xl border border-line-strong bg-panel text-fg shadow-2xl",
-        openOverlay.kind === "palette" &&
-          "flex max-h-[min(70dvh,34rem)] flex-col",
-      )}
+      className="fixed z-[70] min-w-0 overflow-hidden rounded-xl border border-line-strong bg-panel text-fg shadow-2xl"
     >
-      {openOverlay.kind === "options" ? (
-        <PaletteOptions
-          id={openOverlay.id}
-          label={definition.label}
-          layout={layout}
-          presentation={presentation}
-          onLockToggle={(kind) => onLockToggle(openOverlay.id, kind)}
-          onPresentationChange={onPresentationChange}
-        />
-      ) : (
-        <>
-          <header className="flex min-h-11 shrink-0 items-center gap-1 border-b border-line px-1.5">
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-accent"
-            >
-              <definition.Icon size={16} strokeWidth={1.8} />
-            </span>
-            <strong className="min-w-0 flex-1 truncate text-xs">
-              {definition.label}
-            </strong>
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={inlineOptionsOpen}
-              aria-controls={`${stackId}-${openOverlay.id}-popup-options`}
-              onClick={toggleInlineOptions}
-              aria-label={`${definition.label} 팔레트 옵션`}
-              className={cn(
-                "grid size-11 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg",
-                inlineOptionsOpen && "bg-accent-soft text-accent",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-              )}
-            >
-              <MoreHorizontal size={17} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => close(true)}
-              aria-label={`${definition.label} 팝업 닫기`}
-              className={cn(
-                "grid size-11 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-              )}
-            >
-              <X size={16} aria-hidden />
-            </button>
-          </header>
-          {inlineOptionsOpen ? (
-            <div
-              id={`${stackId}-${openOverlay.id}-popup-options`}
-              role="menu"
-              aria-label={`${definition.label} 팔레트 옵션`}
-              className="shrink-0 border-b border-line bg-card/55"
-            >
-              <PaletteOptions
-                id={openOverlay.id}
-                label={definition.label}
-                layout={layout}
-                presentation={presentation}
-                onLockToggle={(kind) => onLockToggle(openOverlay.id, kind)}
-                onPresentationChange={onPresentationChange}
-              />
-            </div>
-          ) : null}
-          <div
-            data-studio-drawing-palette-popup-content="true"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [scrollbar-gutter:stable]"
-          >
-            {paletteBody(openOverlay.id, subTools, toolProperties)}
-          </div>
-        </>
-      )}
+      {options}
     </div>,
     document.body,
   );
