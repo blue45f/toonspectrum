@@ -73,20 +73,50 @@ jobs:
           src/domains/creator/scene-3d/StudioShaperPanel.test.tsx
           src/domains/creator/scene-3d/studio-shaper-production-boundary.test.ts
 
-      - name: Run focused production workspace tests
+      - name: Test production selection and application model
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-        run: >-
-          pnpm exec vitest run
-          src/domains/creator/scene-3d/studio-shaper-production-model.test.ts
-          src/domains/creator/scene-3d/studio-shaper-render-separation.test.ts
-          src/domains/creator/scene-3d/studio-shaper-mannequin-appearance-three.test.ts
-          src/domains/creator/scene-3d/StudioShaperPanel.test.tsx
-          src/domains/creator/scene-3d/studio-shaper-production-boundary.test.ts
-          src/domains/creator/scene-3d/StudioMannequinPoserPanel.test.tsx
-          src/domains/creator/scene-3d/studio-shaper-model.test.ts
-          src/domains/creator/scene-3d/studio-mannequin-model.test.ts
-          src/domains/creator/scene-3d/studio-mannequin-poses.test.ts
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-shaper-production-model.test.ts
+
+      - name: Test layered render separation
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-shaper-render-separation.test.ts
+
+      - name: Test mannequin appearance geometry
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-shaper-mannequin-appearance-three.test.ts
+
+      - name: Test production Shaper panel interactions
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/StudioShaperPanel.test.tsx
+
+      - name: Test production integration boundaries
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-shaper-production-boundary.test.ts
+
+      - name: Test existing mannequin poser regressions
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/StudioMannequinPoserPanel.test.tsx
+
+      - name: Test existing Shaper catalogue regressions
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-shaper-model.test.ts
+
+      - name: Test existing mannequin model regressions
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+
+      - name: Test existing mannequin pose regressions
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec vitest run src/domains/creator/scene-3d/studio-mannequin-poses.test.ts
 
       - name: Type-check the web workspace
         env:
