@@ -26,10 +26,11 @@ export function studioInspectorContextUsesImageTabs(
  * Image-tool navigation is contextual, not a global workspace preference.
  *
  * Keeping `retouch` or `mask` in the persisted layout is useful while an artist moves between
- * image layers of the same kind. It becomes misleading after text, drawing-tool, document or
- * empty-canvas work: the next image selection would reopen on an old specialist tab with no
- * explanation. Entering a new image-capable context therefore starts at Quick, while same-type
- * image-to-image selection preserves the artist's local workflow.
+ * image layers of the same kind. It becomes misleading after text, drawing-tool or empty-canvas
+ * work: the next image selection would reopen on an old specialist tab with no explanation.
+ * Entering a new image-capable context therefore starts at Quick, while same-type image-to-image
+ * selection preserves the artist's local workflow. Merely visiting another inspector primary tab
+ * does not reset the subtab while the same image selection remains active.
  */
 export function resolveStudioInspectorContextRoute(
   layout: StudioInspectorLayout,
