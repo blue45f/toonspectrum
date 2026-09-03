@@ -1,0 +1,79 @@
+name: Merge validated marketplace wiring
+
+on:
+  push:
+    branches:
+      - automation/finalize-marketplace-pr-merge-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-marketplace-pr-merge-20260903
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: fix/marketplace-wiring-preserved-20260903
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Wait for validated wiring PR
+        id: pr
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          number=""
+          for attempt in $(seq 1 180); do
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+            [[ -n "$number" ]] && break
+            echo "Waiting for wiring PR ($attempt/180)."
+            sleep 20
+          done
+          [[ -n "$number" ]] || { echo "Wiring PR was not created." >&2; exit 1; }
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for core check registration
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          core_count=0
+          for attempt in $(seq 1 90); do
+            checks="$(gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+            core_count="$(jq '[.[] | select(.name | ascii_downcase | contains("core"))] | length' <<<"$checks")"
+            (( core_count > 0 )) && break
+            echo "Waiting for core check registration ($attempt/90)."
+            sleep 20
+          done
+          (( core_count > 0 )) || { echo "No core check; refusing merge." >&2; exit 1; }
+
+      - name: Require every registered PR check
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 20
+
+      - name: Squash merge exact validated head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -Eeuo pipefail
+          head_sha="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --match-head-commit "$head_sha" \
+            --subject "fix(marketplace): restore authoring surface wiring without work loss" \
+            --body "Focused unit/type/lint/build/browser gates and every registered repository check passed on this exact head."
