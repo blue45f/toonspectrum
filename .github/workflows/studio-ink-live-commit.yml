@@ -1,0 +1,58 @@
+name: Studio ink live-commit fidelity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-ink-live-commit.yml"
+      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - "scripts/verify-studio-long-stroke.mts"
+      - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "src/domains/creator/**"
+  schedule:
+    # 03:23 KST. The scheduled run catches renderer drift even when a dependency or generated
+    # artifact changes outside the obvious brush paths.
+    - cron: "23 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-ink-live-commit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fidelity:
+    name: ink-live-commit-fidelity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
+      TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Browser code comes from the pull request and never needs a repository write token.
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production Studio assets
+        run: pnpm run build
+      - name: Verify ink-wash and dip-pen live/commit fidelity
+        run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+      - name: Upload fidelity evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-ink-live-commit-${{ github.run_id }}
+          path: ${{ env.TOONSPECTRUM_VERIFY_DIR }}/studio-ink-live-commit
+          if-no-files-found: warn
+          retention-days: 14
