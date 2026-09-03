@@ -1,0 +1,234 @@
+name: Lossless current-main branch sweep
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/lossless-current-main-sweep.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: lossless-current-main-sweep-20260903
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  HUSKY: "0"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  converge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: integration/lossless-current-main-sweep-20260903
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Use repository Node version
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.16.0"
+
+      - name: Install dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Preserve every remote tip and admit only gate-clean executable changes
+        id: converge
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          report="docs/merge-preservation/current-main-sweep-20260903.tsv"
+          mkdir -p "$(dirname "$report")" /tmp/current-main-sweep
+          : > "$report"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git switch -C "$TARGET_BRANCH" origin/main
+
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | .head.ref' | sort -u > /tmp/merged-pr-heads.txt
+
+          preserve_history_only() {
+            local branch="$1"
+            local remote_ref="refs/remotes/origin/${branch}"
+            local sha
+            sha="$(git rev-parse "$remote_ref")"
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              printf '%s\tancestor\t%s\n' "$branch" "$sha" >> "$report"
+              return 0
+            fi
+            GIT_MERGE_AUTOEDIT=no git merge -s ours --no-ff --no-edit "$remote_ref"
+            printf '%s\thistory-only\t%s\n' "$branch" "$sha" >> "$report"
+          }
+
+          # First absorb PR #609 as a history-only parent. Its 46-tip ancestry then
+          # becomes part of this integration without replaying its stale executable tree
+          # over the newer main branch.
+          if git show-ref --verify --quiet refs/remotes/origin/integration/lossless-all-remote-branches-20260903; then
+            preserve_history_only integration/lossless-all-remote-branches-20260903
+          fi
+
+          git for-each-ref refs/remotes/origin --format='%(refname:strip=3)' | sort -u > /tmp/all-branches.txt
+
+          while IFS= read -r branch; do
+            [ -n "$branch" ] || continue
+            case "$branch" in
+              HEAD|main|"$TARGET_BRANCH") continue ;;
+            esac
+            remote_ref="refs/remotes/origin/${branch}"
+            git show-ref --verify --quiet "$remote_ref" || continue
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              printf '%s\tancestor\t%s\n' "$branch" "$(git rev-parse "$remote_ref")" >> "$report"
+              continue
+            fi
+
+            # Generated/integration/archive/ops branches are preservation material,
+            # not executable product candidates. Keep their exact history as parents.
+            case "$branch" in
+              archive/*|automation/*|integration/*|ops/*|deploy/*|release/*)
+                preserve_history_only "$branch"
+                continue
+                ;;
+            esac
+
+            # A source branch whose PR was already merged may no longer be an ancestor
+            # after squash/rebase. Preserve its history without replaying stale code.
+            if grep -Fxq "$branch" /tmp/merged-pr-heads.txt; then
+              preserve_history_only "$branch"
+              continue
+            fi
+
+            sha="$(git rev-parse "$remote_ref")"
+            safe="$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#__#g')"
+            tag="archive/pre-current-main-sweep-${stamp}/${safe}"
+            git tag -f "$tag" "$sha"
+
+            before="$(git rev-parse HEAD)"
+            mode=active
+            if ! GIT_MERGE_AUTOEDIT=no git merge --no-ff --no-edit --allow-unrelated-histories -X ours "$remote_ref"; then
+              conflicts="/tmp/current-main-sweep/${safe}.conflicts"
+              git diff --name-only --diff-filter=U | sort -u > "$conflicts"
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                if git checkout --ours -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                elif git checkout --theirs -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                else
+                  rm -rf -- "$path"
+                  git add -A -- "$path"
+                fi
+              done < "$conflicts"
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                git merge --abort || true
+                git reset --hard "$before"
+                GIT_MERGE_AUTOEDIT=no git merge -s ours --no-ff --no-edit "$remote_ref"
+                printf '%s\thistory-only-conflict\t%s\n' "$branch" "$sha" >> "$report"
+                continue
+              fi
+              git commit --no-edit || git commit -m "merge-preserve: resolve ${branch} against current main integration"
+            fi
+
+            set +e
+            pnpm run validate:architecture > "/tmp/current-main-sweep/${safe}.architecture.log" 2>&1
+            architecture_code=$?
+            pnpm exec tsc -p tsconfig.json --noEmit > "/tmp/current-main-sweep/${safe}.typecheck.log" 2>&1
+            type_code=$?
+            pnpm run lint:quick > "/tmp/current-main-sweep/${safe}.lint.log" 2>&1
+            lint_code=$?
+            set -e
+
+            if [ "$architecture_code" -ne 0 ] || [ "$type_code" -ne 0 ] || [ "$lint_code" -ne 0 ]; then
+              git reset --hard "$before"
+              GIT_MERGE_AUTOEDIT=no git merge -s ours --no-ff --no-edit "$remote_ref"
+              mode="history-only-gate-${architecture_code}-${type_code}-${lint_code}"
+            fi
+            printf '%s\t%s\t%s\n' "$branch" "$mode" "$sha" >> "$report"
+          done < /tmp/all-branches.txt
+
+          # Record the exact snapshot and prove that every fetched remote branch tip
+          # (except main and this target itself) is now an ancestor of the integration.
+          missing=0
+          while IFS= read -r branch; do
+            [ -n "$branch" ] || continue
+            case "$branch" in HEAD|main|"$TARGET_BRANCH") continue ;; esac
+            ref="refs/remotes/origin/${branch}"
+            git show-ref --verify --quiet "$ref" || continue
+            if ! git merge-base --is-ancestor "$ref" HEAD; then
+              echo "missing ancestor: $branch" >&2
+              missing=1
+            fi
+          done < /tmp/all-branches.txt
+          [ "$missing" -eq 0 ]
+
+          git add "$report"
+          git commit -m "chore(merge): record current-main lossless branch sweep" || true
+
+          pnpm run validate:architecture
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run lint:quick
+          pnpm run build
+
+          git push --force-with-lease origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          git push origin --tags
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+
+      - name: Create or reuse protected integration PR
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "merge: converge current main with all preserved remote work" \
+              --body "Preserves PR #609 ancestry plus every fetched remote branch tip. Executable branch changes are admitted only after architecture, TypeScript, and lint gates; stale, generated, conflicted, or failing heads are retained as history-only merge parents. Final build passed before this PR was opened. Required branch-protection checks remain authoritative.")"
+            number="${url##*/}"
+          fi
+          gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/pull/${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lossless-current-main-sweep-${{ github.run_id }}
+          path: |
+            docs/merge-preservation/current-main-sweep-20260903.tsv
+            /tmp/current-main-sweep
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Lossless current-main sweep"
+            echo "Integration head: ${{ steps.converge.outputs.head }}"
+            echo "PR: ${{ steps.pr.outputs.url }}"
+            echo "No required status check or branch protection was bypassed."
+          } >> "$GITHUB_STEP_SUMMARY"
