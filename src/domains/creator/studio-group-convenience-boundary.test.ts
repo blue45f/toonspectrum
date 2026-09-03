@@ -64,8 +64,12 @@ describe("Studio PPT-style group convenience boundary", () => {
     const selectAllSource = functionBody("selectAllElements", "selectAllForEdit");
 
     expect(selectAllSource).toContain("applyGroupSelectionState({");
-    expect(selectAllSource).toContain("selectedId: null");
-    expect(selectAllSource).toContain("marqueeIds: ids");
+    // The shape comes from the canonical helper rather than a hand-written pair: a one-element
+    // page must collapse to `selectedId`, or the selection satisfies neither the multi-selection
+    // proxy (`marqueeIds.length > 1`) nor single-stroke free transform (`length === 0`) and
+    // loses its resize/rotate handles entirely.
+    expect(selectAllSource).toContain("...selectionShapeForIds(ids)");
+    expect(selectAllSource).not.toContain("marqueeIds: ids");
     expect(selectAllSource).toContain("activeGroupId: null");
     expect(selectAllSource).not.toContain("setMarqueeIds(");
   });

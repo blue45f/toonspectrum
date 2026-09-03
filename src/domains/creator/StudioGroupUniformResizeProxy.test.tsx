@@ -760,6 +760,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         ...commonProps(),
         freeTransform: true,
         livePreview: {
+          mode: "single" as const,
           scope: "page:page-1",
           element: LIVE_DRAW,
           elements: [LIVE_DRAW],

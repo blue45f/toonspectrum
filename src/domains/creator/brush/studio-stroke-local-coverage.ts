@@ -16,6 +16,7 @@ import {
   type StudioRetainedMediaPressureProfileId,
 } from "../studio-retained-media-pressure";
 import {
+  MAX_DENSITY_BANDS,
   planStudioTonalBands,
   planStudioTonalBandsFromExtremes,
 } from "../studio-tonal-band-plan";
@@ -187,6 +188,38 @@ export function normalizeStudioStrokeLocalCoveragePolygon(
     return Object.freeze({ points: Object.freeze(reversed) });
   }
   return Object.freeze({ points: Object.freeze(detached) });
+}
+
+export interface StudioAngledNibCoverageWorkUpperBound {
+  /** Numeric coordinate fields the Canvas path emits across every band. */
+  readonly canvasCoordinateScalars: number;
+  /** `moveTo`/`lineTo`/`closePath` plus one `beginPath`+`fill` per band. */
+  readonly canvasPathCommands: number;
+}
+
+/**
+ * O(1) ceiling on the Canvas work one angled-nib mark can produce, from its sample count alone.
+ *
+ * The planner emits AT MOST one quadrilateral per source segment -- `sourcePointCount - 1` of them,
+ * fewer when a malformed sample drops its segment -- and `planStudioTonalBands` partitions those
+ * same polygons into DISJOINT bands, so the total painted polygon count never exceeds the segment
+ * count however the tone splits. Each quadrilateral is four vertices: one `moveTo`, three `lineTo`
+ * and a `closePath`, for eight coordinate scalars. Each band adds a `beginPath` and a `fill`.
+ *
+ * Used by live-transform work admission, which must decide before it plans; anything that raises
+ * the planner's per-segment emission has to raise this with it.
+ */
+export function studioAngledNibCoverageWorkUpperBound(
+  pointCount: number,
+): StudioAngledNibCoverageWorkUpperBound {
+  if (!Number.isSafeInteger(pointCount) || pointCount <= 1) {
+    return { canvasCoordinateScalars: 0, canvasPathCommands: 0 };
+  }
+  const segments = pointCount - 1;
+  return {
+    canvasCoordinateScalars: segments * 8,
+    canvasPathCommands: segments * 5 + MAX_DENSITY_BANDS * 2,
+  };
 }
 
 /**

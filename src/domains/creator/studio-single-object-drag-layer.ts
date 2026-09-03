@@ -457,6 +457,46 @@ function laterVisiblePaintingSibling(
 }
 
 /**
+ * Can this whole set of wrappers be drafted together on the isolated Layer without lying about
+ * stacking?
+ *
+ * A multi-selection draft hides every selected wrapper at once and repaints the transformed copies
+ * in the draft root, which the isolated Layer draws AFTER the entire document Layer. So the
+ * selection as a whole moves to the top for the duration of the gesture. That is invisible only
+ * when nothing else was painting above it -- otherwise a stroke that sits under an image would
+ * jump in front of it while the handles move and drop back behind at release, and a later
+ * `destination-out` eraser would stop erasing the selection entirely.
+ *
+ * Checking the LOWEST member is sufficient and necessary: every later painting sibling is above the
+ * lowest, and members of the selection are exempt because they are all lifted together and keep
+ * their relative order inside the draft root. Split parents mean the members interleave with
+ * content this check cannot see, so that fails closed too.
+ *
+ * Same evidence standard as the single-object lift, one level up; the single lift's own
+ * `laterVisiblePaintingSibling` is what this delegates to.
+ */
+export function studioLiveTransformGroupStackingIsolatable(
+  wrappers: readonly Konva.Node[],
+): boolean {
+  if (wrappers.length === 0) return false;
+  const selection = new Set(wrappers);
+  if (selection.size !== wrappers.length) return false;
+  try {
+    const parent = wrappers[0]!.getParent();
+    if (!parent) return false;
+    let lowest = wrappers[0]!;
+    for (const wrapper of wrappers) {
+      if (wrapper.getParent() !== parent) return false;
+      if (wrapper.zIndex() < lowest.zIndex()) lowest = wrapper;
+    }
+    return !laterVisiblePaintingSibling(lowest, selection);
+  } catch {
+    // Unreadable scene state is not positive evidence that the reorder preserves composition.
+    return false;
+  }
+}
+
+/**
  * Lift one already-selected draggable object into a small, otherwise-empty Layer.
  *
  * Konva redraws the whole owning Layer whenever a draggable node changes position. The Studio

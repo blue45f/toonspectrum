@@ -35,12 +35,13 @@ import type { DrawEl, El } from "./studio-element-model";
  * An engine earns a place here only when model replanning is deterministic, transform-purpose
  * rendering starts no document-owned async/cache/diagnostic work, and the commit planner carries
  * every renderer-significant input. That does NOT certify affine equivalence: causal dab spacing,
- * calligraphy quantization and perfect-outline topology all contain absolute-pixel rules, so the
- * draw compiler currently marks all three admitted engines `model-draft-only`.
+ * calligraphy quantization, perfect-outline topology and the angled nib's winding normalization
+ * and tonal banding all contain absolute-pixel rules, so the draw compiler marks every admitted
+ * engine `model-draft-only`.
  *
  * Everything else stands down until someone audits its planner and adds it here with the same
- * evidence -- including engines that may well be safe (`neon-halo`, `glow-halo`, `angled-ribbon`),
- * which are omitted because they have not been checked, not because they are known bad. Some are
+ * evidence -- including engines that may well be safe (`neon-halo`, `glow-halo`), which are
+ * omitted because they have not been checked, not because they are known bad. Some are
  * known bad: `stamp-dabs` drains charge by `stampIndex` and offers a world-`fixed` tip rotation
  * plus a `random-jitter` one; `oil-ribbon`, `pencil-path`, `watercolor-dabs`, `particle-scatter`
  * and `screentone-dots` were each confirmed in review.
@@ -59,7 +60,69 @@ const STUDIO_EXACT_DRAFT_SAFE_ENGINES: ReadonlySet<string> = new Set([
   "causal-ink",
   "calligraphy-segments",
   "perfect-outline",
+  // `angled-ribbon` (the plain 브러시/flat-brush nib) earns its place on the same evidence the
+  // three above carry, checked against `StudioDrawNode`'s `brushFamily === "brush"` branch:
+  //
+  //  - Deterministic model replan. `planStudioAngledNibStrokeLocalCoverage` reads only points,
+  //    width, the fixed -30deg nib angle and the retained-media pressure series. No seed, no
+  //    clock, no `Math.random`, no coordinate hash. The INCREMENTAL builder that does hold
+  //    per-element state is reached only when `activeDraft` is true, and a transform draft renders
+  //    with `renderPurpose="transform-draft"`, so it takes the batch replan the commit takes.
+  //  - No document-owned side effects. The tonal blit borrows a module-scoped, grow-only scratch
+  //    canvas that is cleared per mark and never keyed by element, so a draft frame cannot
+  //    populate or stale a committed cache; there is no worker, bake or diagnostic on this branch.
+  //  - No backdrop dependence. The branch is gated on `el.mode !== "eraser"` and paints
+  //    `source-over` into a compound non-zero fill, so an isolated Layer shows the same pixels the
+  //    document Layer would. (Eraser-mode strokes stand down below, before the engine is read.)
+  //  - Commit-planner parity. Everything the branch consumes is either transformed by
+  //    `planStudioDrawObjectTransform` (points, `strokeWidth`, `sampleSpacing`) or copied verbatim
+  //    (`pressures`, `materialPressureModel`, `materialMinimumDiameterRatio`, `opacity`, `stroke`).
+  //    The nib angle is world-fixed at -30deg in BOTH the draft and the commit, so a rotation
+  //    re-lays the ribbon rather than turning it — visibly true, and exactly what release produces.
+  "angled-ribbon",
 ]);
+
+/**
+ * Whether the stroke paints with `destination-out` rather than into its own pixels.
+ *
+ * `StudioDrawNode` renders every erase-operation element with `globalCompositeOperation:
+ * "destination-out"`, which subtracts from whatever the DESTINATION canvas already holds. The
+ * exact draft is deliberately the opposite of that: an isolated, initially empty Layer lifted
+ * above the document, with the authoritative source hidden underneath. Subtracting from an empty
+ * surface removes nothing, so the draft paints zero pixels while un-hiding the erased region --
+ * the hole visibly fills in for the whole drag and snaps back open at release.
+ *
+ * There is no isolated presentation of a subtractive mark, so this is not an audit gap that a
+ * later engine review can close; it is a property of the lane. Erase strokes therefore keep
+ * commit-at-release, which for them is the honest outcome. Checked BEFORE the engine allowlist
+ * because `causal-ink` covers the standard and kneaded erasers as well as the pens.
+ */
+function studioDrawElementErases(element: DrawEl): boolean {
+  if (element.mode === "eraser") return true;
+  return element.brush !== undefined
+    && resolveStudioBrushRuntimeContract(element.brush)?.operation === "erase";
+}
+
+/**
+ * Whether the element carries a layer blend mode, which composites it against the DOCUMENT.
+ *
+ * Most blended strokes are already unreachable: `StudioCanvasViewportDocumentLayer` wraps them in a
+ * self-caching `BlendIsolationGroup`, and the node-level check refuses anything under a cached
+ * ancestor. But that wrapper deliberately excludes `destination-out` -- a subtractive mark must not
+ * be flattened to a bitmap first -- so an element blended that way reaches the exact draft with no
+ * cache above it and paints its subtraction into an empty Layer, exactly like the eraser above.
+ *
+ * Stated here as its own positive rule rather than left to the wrapper's caching, because "the
+ * other module happens to cache this case" is not a property this file can rely on staying true.
+ * Anything but the unblended default stands down; `normal` and `source-over` are the two spellings
+ * of that default the document model uses interchangeably.
+ */
+function studioDrawElementIsBlended(element: DrawEl): boolean {
+  const blendMode = element.blendMode;
+  return blendMode !== undefined
+    && blendMode !== "source-over"
+    && blendMode !== "normal";
+}
 
 /**
  * True only when the renderer is known safe from EVERY id the element carries.
@@ -98,6 +161,9 @@ export function studioLiveTransformPreviewBlockedForElement(
   // Symmetry generates copies about WORLD axes and the model stores no axis angle, so the
   // preview's `A ∘ S` and the commit's `S ∘ A` diverge whenever the two do not commute.
   if (draw.symmetry !== undefined && draw.symmetry.type !== "none") return true;
+  // Marks that composite against the document cannot be shown on an isolated Layer at all --
+  // see `studioDrawElementErases` and `studioDrawElementIsBlended`.
+  if (studioDrawElementErases(draw) || studioDrawElementIsBlended(draw)) return true;
   // Per-sample calligraphy orientation is checked by the gesture adapter only AFTER its O(1)
   // compiler budget admits at most 256 samples. Scanning tilt/twist here would make every ordinary
   // Stage React render O(total calligraphy samples), even when nothing is selected or transforming.
