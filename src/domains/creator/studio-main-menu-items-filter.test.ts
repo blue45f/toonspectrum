@@ -193,6 +193,31 @@ describe("filter menu ↔ filter gallery parity", () => {
     }
   });
 
+  it("groups the long menu into stable, named filter families", () => {
+    const { items } = filterRows();
+    expect(
+      items.flatMap((item) =>
+        item.sectionLabel ? [[item.id, item.sectionLabel] as const] : [],
+      ),
+    ).toEqual([
+      ["gaussian-blur", "기본 필터"],
+      ["levels", "레이어 보정"],
+      ["mosaic", "픽셀화"],
+      ["radial-blur", "블러"],
+      ["chromatic-aberration", "렌즈·화면 효과"],
+      ["emboss", "스타일화"],
+      ["line-cleanup", "선화·복원"],
+      ["noise-add", "노이즈"],
+      ["wave-warp", "왜곡"],
+      ["film-grain-pro", "질감·변환"],
+    ]);
+  });
+
+  it("opts every filter row into the reviewed direct-search execution path", () => {
+    const { items } = filterRows();
+    expect(items.every((item) => item.searchActivation === "execute")).toBe(true);
+  });
+
   it("carries the host's unavailable reason onto every destructive row", () => {
     const { items } = filterRows({
       filterDisabled: true,

@@ -1,0 +1,68 @@
+{
+  "$schema": "./toonstudio-character-pipeline.schema.json",
+  "version": 1,
+  "characterId": "reference-character",
+  "displayName": "ToonStudio Reference Character",
+  "mode": "reference",
+  "outputDir": "batch_generated/blender-character",
+  "strict": true,
+  "hair": {
+    "enabled": true,
+    "style": "soft-bob",
+    "replaceDetectedHair": false,
+    "volume": 1.04,
+    "length": 1.0,
+    "fringe": 0.72,
+    "wave": 0.12,
+    "clumpDensity": 1.0,
+    "generateLods": true,
+    "palette": {
+      "base": "#272132",
+      "shadow": "#0e0b14",
+      "highlight": "#846f9f",
+      "outline": "#08070b"
+    }
+  },
+  "face": {
+    "createSemanticShapeKeys": true,
+    "preserveExpressionShapeKeys": true,
+    "requireExplicitFaceMesh": true,
+    "maximumDisplacementRatio": 0.032,
+    "minimumDetectionConfidence": 0.72
+  },
+  "render": {
+    "enabled": true,
+    "resolution": 640,
+    "transparent": true,
+    "samples": 32,
+    "views": ["front", "three-quarter", "side", "back"],
+    "expressions": ["neutral"]
+  },
+  "export": {
+    "glb": true,
+    "vrm": false,
+    "blend": true,
+    "embedTextures": true,
+    "applyModifiers": false,
+    "exportAnimations": false,
+    "exportMorphNormals": true
+  },
+  "quality": {
+    "maxTrianglesLod0": 120000,
+    "maxTrianglesLod1": 65000,
+    "maxTrianglesLod2": 30000,
+    "maxHairTrianglesLod0": 36000,
+    "maxHairMaterials": 3,
+    "maxVertexInfluences": 4,
+    "maxTextureSize": 4096,
+    "maxUnappliedScaleDelta": 0.001,
+    "maxDegenerateFaces": 0,
+    "maxNonManifoldEdges": 0,
+    "minimumScore": 90
+  },
+  "provenance": {
+    "generator": "tools/blender/toonstudio_blender_kit",
+    "license": "CC0-1.0",
+    "purpose": "real-Blender CI and visual quality baseline"
+  }
+}

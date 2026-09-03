@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toonstudio.cloud/schemas/blender-character-pipeline-v1.json",
+  "title": "ToonStudio Blender Character Pipeline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "characterId",
+    "displayName",
+    "mode"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "characterId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,62}$"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "mode": {
+      "enum": [
+        "audit",
+        "upgrade",
+        "reference"
+      ]
+    },
+    "inputPath": {
+      "type": "string"
+    },
+    "outputDir": {
+      "type": "string"
+    },
+    "strict": {
+      "type": "boolean"
+    },
+    "hair": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "style": {
+          "enum": [
+            "short-layered",
+            "soft-bob",
+            "romance-long",
+            "action-pony",
+            "hime-cut",
+            "wolf-layered"
+          ]
+        },
+        "replaceDetectedHair": {
+          "type": "boolean"
+        },
+        "volume": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.8
+        },
+        "length": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.8
+        },
+        "fringe": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wave": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "clumpDensity": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.8
+        },
+        "generateLods": {
+          "type": "boolean"
+        },
+        "palette": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/hexColor"
+            },
+            "shadow": {
+              "$ref": "#/$defs/hexColor"
+            },
+            "highlight": {
+              "$ref": "#/$defs/hexColor"
+            },
+            "outline": {
+              "$ref": "#/$defs/hexColor"
+            }
+          }
+        }
+      }
+    },
+    "face": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createSemanticShapeKeys": {
+          "type": "boolean"
+        },
+        "preserveExpressionShapeKeys": {
+          "type": "boolean"
+        },
+        "requireExplicitFaceMesh": {
+          "type": "boolean"
+        },
+        "maximumDisplacementRatio": {
+          "type": "number",
+          "minimum": 0.005,
+          "maximum": 0.08
+        },
+        "minimumDetectionConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "resolution": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 2048
+        },
+        "transparent": {
+          "type": "boolean"
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "views": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "front",
+              "three-quarter",
+              "side",
+              "back"
+            ]
+          }
+        },
+        "expressions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "glb": {
+          "type": "boolean"
+        },
+        "vrm": {
+          "type": "boolean"
+        },
+        "blend": {
+          "type": "boolean"
+        },
+        "embedTextures": {
+          "type": "boolean"
+        },
+        "applyModifiers": {
+          "type": "boolean"
+        },
+        "exportAnimations": {
+          "type": "boolean"
+        },
+        "exportMorphNormals": {
+          "type": "boolean"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxTrianglesLod0": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTrianglesLod1": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTrianglesLod2": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxHairTrianglesLod0": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxHairMaterials": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxVertexInfluences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTextureSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxUnappliedScaleDelta": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxDegenerateFaces": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxNonManifoldEdges": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimumScore": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 80
+      },
+      "properties": {
+        "sourceSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sourceGitBlob": {
+          "$ref": "#/$defs/gitObject"
+        }
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 500
+      }
+    }
+  },
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "gitObject": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    }
+  }
+}

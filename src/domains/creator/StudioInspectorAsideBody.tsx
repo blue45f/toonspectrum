@@ -8,6 +8,7 @@ import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
+import { StudioInspectorContextRouteSync } from "./StudioInspectorContextRouteSync";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
 import { StudioInspectorSelectionSection } from "./StudioInspectorSelectionSection";
@@ -15,6 +16,8 @@ import { StudioInspectorUnselectedImageTools } from "./StudioInspectorUnselected
 import { useStudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 import type { StudioInspectorAsideProps } from "./StudioInspectorAsideTypes";
+
+import { buttonClass } from "@/components/ui/button-utils";
 
 export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const model = useStudioInspectorAsideModel(props);
@@ -26,6 +29,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
     elements,
     marqueeIds,
     inspectorInteractionPolicy,
+    changeInspectorLayout,
+    startEditText,
     applyFigmaSelectionLayoutPatch,
     zoomToSelection,
     flipSelected,
@@ -38,6 +43,12 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
 
   return (
     <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
+      <StudioInspectorContextRouteSync
+        contentMode={inspectorContentMode}
+        layout={inspectorLayout}
+        selectedType={selected?.type ?? null}
+        onChange={changeInspectorLayout}
+      />
       <div
         id={tabA11y.primary.properties.panelId}
         role="tabpanel"
@@ -49,6 +60,31 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
             : "space-y-2"
         }
       >
+          {inspectorContentMode === "selection"
+            && !hasMultiSelection
+            && selected
+            && (selected.type === "text"
+              || selected.type === "bubble"
+              || selected.type === "sticker") ? (
+            <button
+              type="button"
+              disabled={inspectorInteractionPolicy.selection.disabled}
+              title={inspectorInteractionPolicy.selection.reason}
+              aria-label={selected.type === "bubble" ? "대사 편집" : "글자 편집"}
+              data-studio-inspector-primary-text-edit="true"
+              data-inspector-priority="essential"
+              data-inspector-control-id="element.edit-text"
+              onClick={() => startEditText(selected.id)}
+              className={buttonClass({
+                size: "md",
+                variant: "solid",
+                className: "min-h-11 w-full justify-between px-3 text-left",
+              })}
+            >
+              <span>{selected.type === "bubble" ? "대사 편집" : "글자 편집"}</span>
+              <span className="text-[0.6875rem] font-semibold opacity-80">내용 수정</span>
+            </button>
+          ) : null}
           {inspectorContentMode === "selection" && (
             <div>
               <StudioFigmaDesignPanel
