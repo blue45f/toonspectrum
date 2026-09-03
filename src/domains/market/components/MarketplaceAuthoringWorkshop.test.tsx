@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   CREATOR_MARKETPLACE_AUTHORING_HANDOFF_KEY,
@@ -13,6 +13,12 @@ import { MarketplaceAuthoringWorkshop } from "./MarketplaceAuthoringWorkshop";
 
 describe("MarketplaceAuthoringWorkshop", () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -32,7 +38,9 @@ describe("MarketplaceAuthoringWorkshop", () => {
 
     render(<MarketplaceAuthoringWorkshop />);
 
-    expect(screen.getByTestId("market-authoring-title")).toHaveValue("Pencil and glow");
+    const title = screen.getByTestId("market-authoring-title");
+    expect(title).toBeInstanceOf(HTMLInputElement);
+    expect((title as HTMLInputElement).value).toBe("Pencil and glow");
     fireEvent.click(screen.getByRole("tab", { name: /엔진·구성/u }));
     const list = screen.getByTestId("market-authoring-engine-list");
     expect(within(list).getAllByText("Studio 원본 보존")).toHaveLength(2);
@@ -68,7 +76,8 @@ describe("MarketplaceAuthoringWorkshop", () => {
   it("keeps publish handoff disabled until blocking rights errors are resolved", () => {
     render(<MarketplaceAuthoringWorkshop />);
     const apply = screen.getByTestId("market-authoring-apply");
-    expect(apply).toBeDisabled();
+    expect(apply).toBeInstanceOf(HTMLButtonElement);
+    expect((apply as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.change(screen.getByTestId("market-authoring-title"), {
       target: { value: "Production ink" },
