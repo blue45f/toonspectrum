@@ -41,6 +41,25 @@ describe("planStudioEmeresUnderlayElement — 칸이 선택된 경로", () => {
     expect(el.rotation).toBe(0);
   });
 
+  it("가로가 넘치는 밑그림은 넓은 쪽이 아니라 가로가 배율을 정한다", () => {
+    // 위 케이스는 둘 다 세로가 좁은 칸이라, 배율이 min()이 아니라 그냥 height 비율이어도
+    // 통과해 버린다. 가로로 긴 밑그림(1000x100)을 좁은 칸(110)에 넣어 반대 축이 배율을
+    // 잡는 경우를 따로 못박는다 — height 비율만 봤다면 3.76배로 부풀어 칸 밖으로 튄다.
+    const el = planStudioEmeresUnderlayElement(
+      input({
+        sourceWidth: 1000,
+        sourceHeight: 100,
+        frame: { x: 0, y: 0, width: 110, height: 400 },
+      }),
+    );
+    // fit = min(110/1000, 400/100) * 0.94 = 0.1034 → 1000 * 0.1034 = 103.4
+    expect(el.width).toBe(103);
+    expect(el.height).toBe(10);
+    // 가로 중앙 정렬이 반픽셀(3.5)로 떨어지는 배치라, x 쪽 반올림도 여기서 함께 잡힌다.
+    expect(el.x).toBe(4);
+    expect(el.y).toBe(195);
+  });
+
   it("칸이 있으면 캔버스 크기와 placement를 쳐다보지 않는다", () => {
     // 호스트는 칸이 선택되면 placement를 아예 만들지 않고(삽입 캐스케이드 순번을 아끼려고)
     // undefined를 넘긴다. 그 호출이 캔버스 배치로 새지 않는다는 보장이 필요하다.
