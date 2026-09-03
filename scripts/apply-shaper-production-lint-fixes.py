@@ -92,4 +92,54 @@ import {
 } from "./studio-shaper-production-model";''',
 )
 
-print("Applied generated accessibility and lint corrections.")
+production_model = "src/domains/creator/scene-3d/studio-shaper-production-model.ts"
+replace_once(
+    production_model,
+    "  let pose = normalizeStudioMannequinPose(input.currentPose);",
+    "  // Appearance-only edits must not quantize or otherwise rewrite hand-authored pose values.\n  let pose = input.currentPose;",
+)
+
+production_model_test = (
+    "src/domains/creator/scene-3d/studio-shaper-production-model.test.ts"
+)
+replace_once(
+    production_model_test,
+    '''import {
+  createStudioMannequinRestPose,
+  findStudioMannequinPosePreset,
+} from "./studio-mannequin-poses";''',
+    '''import {
+  createStudioMannequinRestPose,
+  findStudioMannequinPosePreset,
+  normalizeStudioMannequinPose,
+} from "./studio-mannequin-poses";''',
+)
+replace_once(
+    production_model_test,
+    '        eye: "eye-romance",',
+    '        eye: "eye-gentle",',
+)
+replace_once(
+    production_model_test,
+    "    expect(plan.params.eyeScale).toBe(1.22);",
+    "    expect(plan.params.eyeScale).toBe(1.12);",
+)
+replace_once(
+    production_model_test,
+    '''    expect(plan.pose.joints.leftUpperLeg).toEqual(run?.pose.joints.leftUpperLeg);
+    expect(plan.pose.joints.rightLowerLeg).toEqual(run?.pose.joints.rightLowerLeg);
+    expect(plan.pose.joints.rightUpperArm).toEqual(peace?.pose.joints.rightUpperArm);
+    expect(plan.pose.pelvisOffset).toEqual(run?.pose.pelvisOffset);''',
+    '''    const normalizedRun = normalizeStudioMannequinPose(
+      run?.pose ?? createStudioMannequinRestPose(),
+    );
+    const normalizedPeace = normalizeStudioMannequinPose(
+      peace?.pose ?? createStudioMannequinRestPose(),
+    );
+    expect(plan.pose.joints.leftUpperLeg).toEqual(normalizedRun.joints.leftUpperLeg);
+    expect(plan.pose.joints.rightLowerLeg).toEqual(normalizedRun.joints.rightLowerLeg);
+    expect(plan.pose.joints.rightUpperArm).toEqual(normalizedPeace.joints.rightUpperArm);
+    expect(plan.pose.pelvisOffset).toEqual(normalizedRun.pelvisOffset);''',
+)
+
+print("Applied generated accessibility, precision, and regression corrections.")
