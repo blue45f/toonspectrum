@@ -143,7 +143,13 @@ jobs:
                   source,
                   r"readonly presentedMeta: typeof lastPresentedMeta;",
                   "readonly presentedMeta: PresentedFrameMeta | null;",
-                  "stroke record metadata contract",
+                  "captured stroke metadata contract",
+              )
+              source = regex_once(
+                  source,
+                  r"readonly presentedMeta: typeof lastPresentedMeta;",
+                  "readonly presentedMeta: PresentedFrameMeta | null;",
+                  "analyzed stroke metadata contract",
               )
               source = regex_once(
                   source,
