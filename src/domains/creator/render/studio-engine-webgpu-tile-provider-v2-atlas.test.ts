@@ -350,8 +350,16 @@ describe("StudioEngineWebGpuTileProviderV2 atlas boundary", () => {
       complete: true,
     });
     expect(result.batch.deltas).toHaveLength(2);
-    expect(new Uint8Array(result.batch.deltas[0]!.encoded.buffer)[0]).toBe(1);
-    expect(new Uint8Array(result.batch.deltas[1]!.encoded.buffer)[0]).toBe(2);
+    const firstEncoded = result.batch.deltas[0]!.encoded;
+    const secondEncoded = result.batch.deltas[1]!.encoded;
+    const firstBytes = firstEncoded instanceof Uint16Array
+      ? new Uint8Array(firstEncoded.buffer, firstEncoded.byteOffset, firstEncoded.byteLength)
+      : new Uint8Array(firstEncoded);
+    const secondBytes = secondEncoded instanceof Uint16Array
+      ? new Uint8Array(secondEncoded.buffer, secondEncoded.byteOffset, secondEncoded.byteLength)
+      : new Uint8Array(secondEncoded);
+    expect(firstBytes[0]).toBe(1);
+    expect(secondBytes[0]).toBe(2);
 
     expect(gpu.passes).toHaveLength(2);
     expect(gpu.passes.every((pass) => (

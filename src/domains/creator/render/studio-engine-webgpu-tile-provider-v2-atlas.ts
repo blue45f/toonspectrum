@@ -16,6 +16,9 @@
  */
 
 import {
+  STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
+} from "./studio-engine-webgpu-brush-runtime";
+import {
   createStudioEngineWebGpuTileProviderV1,
   DEFAULT_STUDIO_ENGINE_WEBGPU_TILE_PROVIDER_LIMITS,
   STUDIO_ENGINE_WEBGPU_TILE_PROVIDER_VERSION,
@@ -28,9 +31,6 @@ import {
   type StudioEngineWebGpuTileProviderStats,
   type StudioEngineWebGpuTileProviderV1,
 } from "./studio-engine-webgpu-tile-provider-v1";
-import {
-  STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
-} from "./studio-engine-webgpu-brush-runtime";
 
 import type {
   StudioEngineTileProviderDeltaBatch,
@@ -617,9 +617,10 @@ class StudioEngineWebGpuAtlasVirtualBoundary {
 
   #createVirtualDevice(): GPUDevice {
     const queue = this.#createVirtualQueue();
+    const deviceLabel = this.#device.label;
     return {
       get label() {
-        return this.#device?.label ?? "Studio virtual atlas device";
+        return deviceLabel || "Studio virtual atlas device";
       },
       limits: this.#device.limits,
       features: this.#device.features,
