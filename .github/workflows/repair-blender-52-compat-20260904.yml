@@ -25,9 +25,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ env.TARGET_BRANCH }}
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Apply Blender 5.2 render and evidence contract fixes
+      - name: Apply Blender 5.2 render compatibility fixes
         shell: bash
         run: |
           set -euo pipefail
@@ -57,22 +57,12 @@ jobs:
               if legacy not in text:
                   raise SystemExit(f"expected Blender look assignment was not found in {path}")
               path.write_text(text.replace(legacy, repaired, 1), encoding="utf-8")
-
-          workflow = Path(".github/workflows/blender-character-pipeline.yml")
-          text = workflow.read_text(encoding="utf-8")
-          legacy = '''            if (manifest.capabilities.semanticFaceShapes.shapeKeys.length < 16) {\n              throw new Error(`semantic face profile is incomplete for ${id}`);\n            }\n'''
-          repaired = '''            const semanticFace = manifest.capabilities.semanticFaceShapes;\n            const minimumSemanticShapes = id === "reference-character" ? 14 : 16;\n            if (semanticFace.mode !== "semantic-shape-keys" || semanticFace.shapeKeys.length < minimumSemanticShapes) {\n              throw new Error(`semantic face profile is incomplete for ${id}: expected at least ${minimumSemanticShapes}, found ${semanticFace.shapeKeys.length}`);\n            }\n'''
-          if repaired not in text:
-              if legacy not in text:
-                  raise SystemExit("expected semantic face evidence contract was not found")
-              workflow.write_text(text.replace(legacy, repaired, 1), encoding="utf-8")
           PY
 
           python -m compileall -q tools/blender/toonstudio_blender_kit scripts/blender
           python -m unittest discover -s tests/blender -p 'test_*.py' -v
           git diff --check
           git add \
-            .github/workflows/blender-character-pipeline.yml \
             scripts/blender/generate_mapped_props_pack_v3.py \
             tools/blender/toonstudio_blender_kit/render.py
 
