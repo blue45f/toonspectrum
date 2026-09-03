@@ -1,0 +1,117 @@
+name: Clean merged branches after lossless integration
+
+on:
+  push:
+    branches:
+      - automation/merge-all-unmerged-20260903-driver-v10
+    paths:
+      - ".github/workflows/merge-all-unmerged-cleanup.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-all-unmerged-conductor
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      DRIVER_BRANCH: automation/merge-all-unmerged-20260903-driver-v10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Delete only branch heads already contained in main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          mkdir -p cleanup-report
+          printf 'branch\tsha\taction\n' > cleanup-report/branches.tsv
+
+          git for-each-ref --format='%(refname:strip=3)\t%(objectname)' refs/remotes/origin \
+            | sort | while IFS=$'\t' read -r branch sha; do
+                [[ "$branch" == "main" || "$branch" == "HEAD" ]] && continue
+                [[ "$branch" == "$DRIVER_BRANCH" ]] && continue
+                [[ "$branch" == archive/* || "$branch" == backup/* ]] && continue
+
+                if git merge-base --is-ancestor "$sha" origin/main; then
+                  gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${branch}" >/dev/null 2>&1 \
+                    && action="deleted-contained" \
+                    || action="kept-protected-or-already-deleted"
+                else
+                  action="kept-unmerged"
+                fi
+                printf '%s\t%s\t%s\n' "$branch" "$sha" "$action" >> cleanup-report/branches.tsv
+              done
+
+      - name: Close superseded open PRs already contained in main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main '+refs/heads/*:refs/remotes/origin/*' --prune || true
+          printf 'pr\tbranch\taction\n' > cleanup-report/pulls.tsv
+          gh pr list --repo "$REPOSITORY" --state open --limit 500 --json number,headRefName \
+            --jq '.[] | [.number, .headRefName] | @tsv' | while IFS=$'\t' read -r number branch; do
+              [[ "$branch" == "$DRIVER_BRANCH" ]] && continue
+              sha="$(git rev-parse "origin/$branch" 2>/dev/null || true)"
+              if [[ -n "$sha" ]] && git merge-base --is-ancestor "$sha" origin/main; then
+                gh pr close "$number" --repo "$REPOSITORY" \
+                  --comment "Closed after lossless integration: this exact head is contained in main and its pre-merge backup tag is retained." \
+                  --delete-branch >/dev/null 2>&1 || true
+                printf '%s\t%s\tclosed-contained\n' "$number" "$branch" >> cleanup-report/pulls.tsv
+              else
+                printf '%s\t%s\tkept-unmerged\n' "$number" "$branch" >> cleanup-report/pulls.tsv
+              fi
+            done
+
+      - name: Count remaining unmerged remote heads
+        id: remaining
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          count=0
+          : > cleanup-report/remaining.txt
+          git for-each-ref --format='%(refname:strip=3)\t%(objectname)' refs/remotes/origin \
+            | sort | while IFS=$'\t' read -r branch sha; do
+                [[ "$branch" == "main" || "$branch" == "HEAD" || "$branch" == "$DRIVER_BRANCH" ]] && continue
+                [[ "$branch" == automation/merge-all-unmerged-20260903-* ]] && continue
+                [[ "$branch" == automation/all-unmerged-* ]] && continue
+                [[ "$branch" == archive/* || "$branch" == backup/* ]] && continue
+                if ! git merge-base --is-ancestor "$sha" origin/main; then
+                  printf '%s\t%s\n' "$branch" "$sha" >> cleanup-report/remaining.txt
+                fi
+              done
+          count="$(wc -l < cleanup-report/remaining.txt | tr -d ' ')"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$count" > cleanup-report/remaining-count.txt
+
+      - name: Remove empty merge-driver branches when all work is contained
+        if: steps.remaining.outputs.count == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${REPOSITORY}/branches?per_page=100" --jq '.[].name' \
+            | grep '^automation/merge-all-unmerged-20260903-' \
+            | while read -r branch; do
+                gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${branch}" >/dev/null 2>&1 || true
+              done
+
+      - name: Upload cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: merge-all-cleanup-${{ github.run_id }}
+          path: cleanup-report
+          if-no-files-found: error
+          retention-days: 30
