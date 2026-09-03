@@ -142,6 +142,8 @@ const OUTPUT_DIR = process.env.TOONSPECTRUM_SCENARIO_DIR?.trim()
   || join(tmpdir(), `toonspectrum-brush-scenarios-${Date.now()}`);
 const STRICT = process.env.TOONSPECTRUM_SCENARIO_STRICT === "1";
 const LAYER_PROBE = process.env.TOONSPECTRUM_SCENARIO_LAYER_PROBE === "1";
+/** Diagnostic: trace full-canvas clears, backing-store resizes and the first draw after each clear. */
+const CLEAR_TRACE = process.env.TOONSPECTRUM_SCENARIO_CLEAR_TRACE === "1";
 const CHANNEL = process.env.TOONSPECTRUM_SCENARIO_CHANNEL?.trim() || "chromium";
 /**
  * Pause between consecutive strokes of one scenario. Artists hatch at well under a second, so the
@@ -505,10 +507,21 @@ interface CapturedStroke {
   readonly gestureMs: number;
   /** Product alerts that say a stroke was refused, read right after this gesture. */
   readonly refusals: readonly string[];
+  /**
+   * The refused-stroke recovery rail's own DOM hook, counted right after pointer-up and again
+   * after settle. Read beside the presented-frame series it separates two blinks that look the
+   * same on screen: a rail parking a refused stroke and repainting it on the CPU (notice present)
+   * from a compositor hidden between a submit and its receipt (no notice).
+   */
+  readonly rejectedNotices: { readonly released: number; readonly settled: number };
   /** Presented frames while the pointer was down, in presentation order. */
   readonly inStroke: readonly StudioBrushScenarioInStrokeFrame[];
   /** Per-canvas ink over the gesture, when TOONSPECTRUM_SCENARIO_LAYER_PROBE=1. */
   readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
+  /** Canvas clear/resize/draw events over the gesture, when TOONSPECTRUM_SCENARIO_CLEAR_TRACE=1. */
+  readonly clearTrace: Array<Record<string, unknown>> | null;
+  /** Sizes of the presented frames (diagnostic — off-size frames are skipped by the ink series). */
+  readonly presentedMeta: typeof lastPresentedMeta;
   /** The presented frames themselves, so a detected blink can be written out to look at. */
   readonly presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>;
 }
@@ -617,6 +630,100 @@ async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<Scree
 }
 
 /**
+ * Canvas mutation tracer (diagnostic). Wraps clearRect / width / height / first draw so a blank
+ * presented frame can be attributed: a full clear followed by no draw before the next frame is
+ * "cleared and not repainted"; a frame with no clear at all means nothing was ever painted.
+ */
+async function installClearTrace(page: Page): Promise<void> {
+  await page.evaluate(`(() => {
+    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-live-dynamic-settled], [data-studio-live-dynamic-active], [data-studio-live-wet-ink-settled], [data-studio-live-wet-ink-active], [data-studio-live-stamp-overlay], [data-studio-live-ink-prediction], [data-studio-gpu-compositor]"));
+    const labelOf = (canvas) => {
+      const ds = canvas.dataset || {};
+      const role = ds.studioLiveInkOverlay ? "live-ink"
+        : ds.studioLiveRetainedActive ? "retained-active"
+        : ds.studioLiveRetainedSettled ? "retained-settled"
+        : ds.studioLiveDynamicActive ? "dynamic-active"
+        : ds.studioLiveDynamicSettled ? "dynamic-settled"
+        : ds.studioLiveWetInkActive ? "wet-ink-active"
+        : ds.studioLiveWetInkSettled ? "wet-ink-settled"
+        : ds.studioLiveStampOverlay ? "stamp"
+        : ds.studioLiveInkPrediction ? "ink-prediction"
+        : ds.studioGpuSurface ? "gpu-" + ds.studioGpuSurface
+        : ds.studioDraftPreviewBlend ? "konva-draft-" + ds.studioDraftPreviewBlend
+        : "konva";
+      const all = roots.flatMap((root) => root instanceof HTMLCanvasElement ? [root] : Array.from(root.querySelectorAll("canvas")));
+      const index = all.indexOf(canvas);
+      return (index < 0 ? "?" : index) + ":" + role;
+    };
+    const tracked = (canvas) => canvas instanceof HTMLCanvasElement && roots.some((root) => root === canvas || root.contains(canvas));
+    const state = { events: [], drawsSinceClear: new WeakMap(), installed: performance.now() };
+    const stackTop = () => {
+      try { return String(new Error().stack || "").split("\n").slice(2, 6).map((l) => l.trim()).join(" < "); } catch { return ""; }
+    };
+    const proto = CanvasRenderingContext2D.prototype;
+    const originalClear = proto.clearRect;
+    proto.clearRect = function (x, y, w, h) {
+      const canvas = this.canvas;
+      if (tracked(canvas)) {
+        const m = this.getTransform ? this.getTransform() : null;
+        const sw = m ? Math.abs(w * m.a) : w;
+        const sh = m ? Math.abs(h * m.d) : h;
+        const full = sw >= canvas.width * 0.9 && sh >= canvas.height * 0.9;
+        if (full) {
+          state.events.push({ t: performance.now(), kind: "clear", label: labelOf(canvas), w: canvas.width, h: canvas.height, stack: stackTop() });
+          state.drawsSinceClear.set(canvas, 0);
+        }
+      }
+      return originalClear.apply(this, arguments);
+    };
+    for (const name of ["fill", "stroke", "drawImage", "putImageData", "fillRect", "fillText"]) {
+      const original = proto[name];
+      if (typeof original !== "function") continue;
+      proto[name] = function () {
+        const canvas = this.canvas;
+        if (tracked(canvas)) {
+          const count = state.drawsSinceClear.get(canvas) ?? 0;
+          if (count === 0) state.events.push({ t: performance.now(), kind: "first-draw", op: name, label: labelOf(canvas) });
+          state.drawsSinceClear.set(canvas, count + 1);
+        }
+        return original.apply(this, arguments);
+      };
+    }
+    for (const prop of ["width", "height"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, prop);
+      if (!descriptor || !descriptor.set) continue;
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, {
+        configurable: true,
+        enumerable: descriptor.enumerable,
+        get: descriptor.get,
+        set(value) {
+          if (tracked(this)) {
+            state.events.push({ t: performance.now(), kind: "resize-" + prop, label: labelOf(this), from: descriptor.get.call(this), to: value, stack: stackTop() });
+            state.drawsSinceClear.set(this, 0);
+          }
+          return descriptor.set.call(this, value);
+        },
+      });
+    }
+    const originalRaf = window.requestAnimationFrame;
+    window.__scenarioClearTrace = state;
+    // Frame markers: one per animation frame so events can be bucketed into frames.
+    const tick = (now) => { state.events.push({ t: now, kind: "raf" }); state.raf = originalRaf.call(window, tick); };
+    state.raf = originalRaf.call(window, tick);
+  })()`);
+}
+
+async function readClearTrace(page: Page): Promise<Array<Record<string, unknown>>> {
+  return await page.evaluate(`(() => {
+    const state = window.__scenarioClearTrace;
+    if (!state) return [];
+    cancelAnimationFrame(state.raf);
+    delete window.__scenarioClearTrace;
+    return state.events;
+  })()`) as Array<Record<string, unknown>>;
+}
+
+/**
  * Per-canvas ink, sampled once per animation frame.
  *
  * The presented-frame series says a stroke blinked; it cannot say which layer went blank. This
@@ -631,7 +738,7 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
     // draws on neither — its pixels are on the WebGPU compositor child. A probe rooted only at
     // .konvajs-content reported "no layer changed" for a whole pen gesture whose every pixel was on
     // that compositor, which is what sent one investigation in circles. Watch all three families.
-    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-gpu-compositor]"));
+    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-live-dynamic-settled], [data-studio-live-dynamic-active], [data-studio-live-wet-ink-settled], [data-studio-live-wet-ink-active], [data-studio-live-stamp-overlay], [data-studio-live-ink-prediction], [data-studio-gpu-compositor]"));
     if (roots.length === 0) return;
     const collect = () => roots.flatMap((root) =>
       root instanceof HTMLCanvasElement ? [root] : Array.from(root.querySelectorAll("canvas")));
@@ -681,7 +788,14 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
         const role = canvas.dataset.studioLiveInkOverlay ? "live-ink"
           : canvas.dataset.studioLiveRetainedActive ? "retained-active"
           : canvas.dataset.studioLiveRetainedSettled ? "retained-settled"
+          : canvas.dataset.studioLiveDynamicActive ? "dynamic-active"
+          : canvas.dataset.studioLiveDynamicSettled ? "dynamic-settled"
+          : canvas.dataset.studioLiveWetInkActive ? "wet-ink-active"
+          : canvas.dataset.studioLiveWetInkSettled ? "wet-ink-settled"
+          : canvas.dataset.studioLiveStampOverlay ? "stamp"
+          : canvas.dataset.studioLiveInkPrediction ? "ink-prediction"
           : canvas.dataset.studioGpuSurface ? "gpu-" + canvas.dataset.studioGpuSurface
+          : canvas.dataset.studioDraftPreviewBlend ? "konva-draft-" + canvas.dataset.studioDraftPreviewBlend
           : "konva";
         return index + ":" + role + ":store" + canvas.width + "x" + canvas.height
           + ":css" + Math.round(rect.width) + "x" + Math.round(rect.height);
@@ -747,6 +861,7 @@ async function drawAndCapture(
   await installPerfProbe(page);
   const cast = await recordPresentedFrames(page);
   if (LAYER_PROBE) await installLayerProbe(page, clip);
+  if (CLEAR_TRACE) await installClearTrace(page);
   const started = Date.now();
   const first = points[0]!;
   await page.mouse.move(first.x, first.y);
@@ -770,9 +885,11 @@ async function drawAndCapture(
   if (!live) live = liveEnd;
   const presented = await cast.stop();
   const layers = LAYER_PROBE ? await readLayerProbe(page) : null;
+  const clearTrace = CLEAR_TRACE ? await readClearTrace(page) : null;
   await page.mouse.up();
   const gestureMs = Date.now() - started;
   const released = await shot(page, clip);
+  const noticesAtRelease = await page.locator("[data-studio-rejected-stroke-notice]").count();
   const postRelease: Buffer[] = [];
   for (let index = 0; index < (options.postFrames ?? 8); index += 1) {
     await page.waitForTimeout(40);
@@ -781,6 +898,7 @@ async function drawAndCapture(
   await page.mouse.move(4, 4);
   await page.waitForTimeout(options.settleMs ?? 2_000);
   const settled = await shot(page, clip);
+  const noticesAtSettle = await page.locator("[data-studio-rejected-stroke-notice]").count();
   const { app: perf, captureInduced } = attributePerf(await readPerfProbe(page));
   const refusals = await page.evaluate(`Array.from(document.querySelectorAll('[role="alert"]'))
     .map((element) => (element.textContent || "").trim())
@@ -796,8 +914,11 @@ async function drawAndCapture(
     captureInducedLongTasks: captureInduced,
     gestureMs,
     refusals,
+    rejectedNotices: { released: noticesAtRelease, settled: noticesAtSettle },
     inStroke: measurePresentedInk(presented, clip),
+    presentedMeta: lastPresentedMeta,
     layers,
+    clearTrace,
     presented,
   };
 }
@@ -807,6 +928,13 @@ async function drawAndCapture(
  * opened with. Screencast frames cover the whole viewport, so the clip is applied as a region
  * rather than by cropping; the first frame is the pre-gesture reference by construction.
  */
+/** Diagnostic: sizes of every presented frame of the last measured gesture (clip screenshots resize the cast). */
+let lastPresentedMeta: {
+  referenceWidth: number;
+  referenceHeight: number;
+  frames: Array<{ tMs: number; width: number; height: number }>;
+} | null = null;
+
 function measurePresentedInk(
   presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>,
   clip: Clip,
@@ -820,6 +948,11 @@ function measurePresentedInk(
   const reference = toImage(presented[0]!.data);
   const region = { x: clip.x, y: clip.y, width: clip.width, height: clip.height };
   const measured: StudioBrushScenarioInStrokeFrame[] = [];
+  lastPresentedMeta = {
+    referenceWidth: reference.width,
+    referenceHeight: reference.height,
+    frames: [{ tMs: presented[0]!.tMs, width: reference.width, height: reference.height }],
+  };
   for (let index = 1; index < presented.length; index += 1) {
     const frame = presented[index]!;
     let image: StudioBrushMediaPixelImage;
@@ -828,6 +961,7 @@ function measurePresentedInk(
     } catch {
       continue; // a truncated frame is the cast's problem, not the renderer's
     }
+    lastPresentedMeta.frames.push({ tMs: frame.tMs, width: image.width, height: image.height });
     if (image.width !== reference.width || image.height !== reference.height) continue;
     const mask = studioBrushScenarioInkMask(reference, image);
     measured.push({
@@ -877,7 +1011,12 @@ interface StrokeRecord {
   readonly inkSettled: number;
   readonly flicker: StudioBrushScenarioFlickerAnalysis;
   readonly inStroke: StudioBrushScenarioInStrokeAnalysis;
+  /** The presented-frame ink series the in-stroke verdict was read from (diagnostic). */
+  readonly inStrokeFrames: readonly StudioBrushScenarioInStrokeFrame[];
+  readonly rejectedNotices: { readonly released: number; readonly settled: number };
   readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
+  readonly clearTrace: Array<Record<string, unknown>> | null;
+  readonly presentedMeta: typeof lastPresentedMeta;
   readonly regions: Readonly<Record<string, StudioBrushScenarioDiscrepancy>>;
   readonly perf: {
     longTasks: number;
@@ -1025,6 +1164,10 @@ function analyzeStroke(
     inkSettled: stats(settled),
     flicker,
     inStroke,
+    inStrokeFrames: captured.inStroke,
+    clearTrace: captured.clearTrace,
+    presentedMeta: captured.presentedMeta,
+    rejectedNotices: captured.rejectedNotices,
     layers: captured.layers,
     regions: regionResults,
     perf: {
@@ -1339,6 +1482,9 @@ async function runScenario(
   const undoResidue = await undoTimes(page, clip, scenarioBaseline, undoCount);
   const findings = strokes.flatMap((stroke) => stroke.findings);
   if (undoResidue >= 24) {
+    // A residue count cannot say whether it is leftover ink or a layout shift from a banner;
+    // the frame can. Write it next to the stroke artifacts whenever residue is reported.
+    writeFileSync(join(directory, `${scenario}-06-after-undo.png`), await shot(page, clip));
     findings.push({
       level: findings.some((entry) => entry.code === "stroke-refused") ? "warning" : "error",
       code: "undo-residue",
