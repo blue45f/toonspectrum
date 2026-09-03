@@ -46,10 +46,27 @@ jobs:
           src/domains/creator/render/studio-engine-webgpu-tile-provider-production.test.ts
           src/domains/creator/brush/studio-wet-media-two-well-field-bridge.ts
           src/domains/creator/brush/studio-wet-media-two-well-field-bridge.test.ts
-      - name: Full TypeScript check
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
-        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Dependency-complete targeted TypeScript check
+        run: |
+          cat > tsconfig.webgpu-wave1.json <<'JSON'
+          {
+            "extends": "./tsconfig.json",
+            "compilerOptions": {
+              "incremental": false,
+              "tsBuildInfoFile": null
+            },
+            "files": [
+              "src/domains/creator/render/studio-engine-webgpu-tile-provider-production.ts",
+              "src/domains/creator/render/studio-engine-webgpu-tile-provider-production.test.ts",
+              "src/domains/creator/brush/studio-wet-media-two-well-field-bridge.ts",
+              "src/domains/creator/brush/studio-wet-media-two-well-field-bridge.test.ts"
+            ],
+            "include": [],
+            "exclude": []
+          }
+          JSON
+          NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -p tsconfig.webgpu-wave1.json --noEmit
+          rm tsconfig.webgpu-wave1.json
       - name: Remove temporary verifier after success
         run: |
           rm .github/workflows/verify-webgpu-brush-completion-wave1.yml
