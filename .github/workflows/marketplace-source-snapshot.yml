@@ -22,6 +22,8 @@ jobs:
 
       - name: Pack editable source
         run: |
+          # Keep this list broad enough that an external hardening pass can reproduce the exact
+          # authoring branch without generated catalog data or build products.
           candidates=(
             .github apps packages src lib scripts e2e public
             index.html package.json pnpm-lock.yaml pnpm-workspace.yaml
