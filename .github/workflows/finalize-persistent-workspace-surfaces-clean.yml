@@ -35,13 +35,45 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Normalize imports, validate architecture, and lint focused sources
+      - name: Normalize jsdom pointer input and focused source quality
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/domains/creator/StudioFloatingSurface.test.tsx')
+          source = path.read_text(encoding='utf-8')
+          marker = 'import { StudioFloatingSurface } from "./StudioFloatingSurface";\n\n'
+          addition = '''class StudioFloatingSurfaceTestPointerEvent extends MouseEvent {
+            readonly pointerId: number;
+            readonly pointerType: string;
+            readonly isPrimary: boolean;
+
+            constructor(type: string, init: PointerEventInit = {}) {
+              super(type, init);
+              this.pointerId = init.pointerId ?? 0;
+              this.pointerType = init.pointerType ?? "mouse";
+              this.isPrimary = init.isPrimary ?? true;
+            }
+          }
+
+          Object.defineProperty(globalThis, "PointerEvent", {
+            configurable: true,
+            value: StudioFloatingSurfaceTestPointerEvent,
+          });
+
+          '''.replace('          ', '')
+          if 'class StudioFloatingSurfaceTestPointerEvent' not in source:
+              if source.count(marker) != 1:
+                  raise SystemExit(f'expected one PointerEvent insertion marker, found {source.count(marker)}')
+              source = source.replace(marker, marker + addition, 1)
+              path.write_text(source, encoding='utf-8')
+          PY
           pnpm exec eslint --fix \
             src/domains/creator/StudioAnimaticTimelineDialog.tsx \
             src/domains/creator/StudioAnimaticTimelineDialog.test.tsx \
             src/domains/creator/StudioPageReviewPanel.tsx \
             src/domains/creator/StudioPageReviewPanel.test.tsx \
+            src/domains/creator/StudioFloatingSurface.test.tsx \
             src/domains/creator/studio-floating-surface-preferences-sqlite.ts \
             src/domains/creator/studio-floating-surface-preferences-sqlite.test.ts \
             src/domains/creator/use-studio-floating-surface-layout.ts
@@ -52,6 +84,7 @@ jobs:
             src/domains/creator/StudioAnimaticTimelineDialog.test.tsx \
             src/domains/creator/StudioPageReviewPanel.tsx \
             src/domains/creator/StudioPageReviewPanel.test.tsx \
+            src/domains/creator/StudioFloatingSurface.test.tsx \
             src/domains/creator/studio-floating-surface-preferences-sqlite.ts \
             src/domains/creator/studio-floating-surface-preferences-sqlite.test.ts \
             src/domains/creator/use-studio-floating-surface-layout.ts
