@@ -8,7 +8,7 @@
     "pnpm": ">=11"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky && git config core.hooksPath .husky",
     "dev": "vite --host 0.0.0.0",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
     "postbuild": "node scripts/generate-third-party-notices.mjs --output dist/legal/THIRD_PARTY_NOTICES.generated.md && node scripts/verify-vercel-csp.mjs dist/index.html",
