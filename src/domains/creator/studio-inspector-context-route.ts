@@ -1,7 +1,7 @@
+import type { StudioInspectorContentMode } from "./studio-inspector-interaction-policy";
 import type { StudioInspectorLayout } from "./studio-inspector-layout";
 
-/** Contexts the right inspector renders independently of its persisted tab route. */
-export type StudioInspectorContentMode = "empty" | "drawing" | "selection";
+export type { StudioInspectorContentMode } from "./studio-inspector-interaction-policy";
 
 export interface StudioInspectorContextSnapshot {
   readonly contentMode: StudioInspectorContentMode;
