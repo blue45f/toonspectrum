@@ -1,4 +1,4 @@
-name: Repair and kick Creator Marketplace finalizer
+name: Kick Creator Marketplace finalizer
 
 on:
   push:
@@ -9,58 +9,12 @@ on:
 
 permissions:
   actions: write
-  contents: write
+  contents: read
 
 jobs:
-  repair-and-dispatch:
+  dispatch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: feat/marketplace-creator-pipeline-20260903
-
-      - name: Repair generated expressions and finalizer assertions
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          package_path = Path("scripts/marketplace/integrate-source-package-builder.mjs")
-          package_source = package_path.read_text(encoding="utf-8")
-          replacements = {
-              "${file.type}": r"\${file.type}",
-              "${file.name}": r"\${file.name}",
-              "${normalized.title || \"marketplace-asset\"}": r"\${normalized.title || \"marketplace-asset\"}",
-          }
-          for before, after in replacements.items():
-              package_source = package_source.replace(before, after)
-          package_path.write_text(package_source, encoding="utf-8")
-
-          finalizer_path = Path(".github/workflows/marketplace-authoring-finalizer.yml")
-          finalizer = finalizer_path.read_text(encoding="utf-8")
-          old = '''            ["src/domains/market/components/MarketplaceAuthoringInstallAction.tsx", "extractCreatorMarketplaceManifestFromZip"],'''
-          new = '''            ["src/domains/market/components/MarketplaceAuthoringInstallAction.tsx", "import { extractCreatorMarketplaceManifestFromZip } from \\\"@/lib/creator-marketplace-package-builder\\\";"],
-            ["src/domains/market/components/MarketplaceAuthoringInstallAction.tsx", "extractCreatorMarketplaceManifestFromZip(bytes)"],'''
-          if old in finalizer:
-              finalizer = finalizer.replace(old, new)
-          elif new not in finalizer:
-              raise SystemExit("Finalizer package-recovery assertion anchor changed")
-          finalizer_path.write_text(finalizer, encoding="utf-8")
-          PY
-          node --check scripts/marketplace/integrate-source-package-builder.mjs
-
-      - name: Commit the verified gate repair
-        run: |
-          set -euo pipefail
-          git add \
-            scripts/marketplace/integrate-source-package-builder.mjs \
-            .github/workflows/marketplace-authoring-finalizer.yml
-          if ! git diff --cached --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "fix(market): distinguish package recovery import and call"
-            git push origin HEAD:feat/marketplace-creator-pipeline-20260903
-          fi
-
       - name: Dispatch the latest finalizer definition
         env:
           GH_TOKEN: ${{ github.token }}
