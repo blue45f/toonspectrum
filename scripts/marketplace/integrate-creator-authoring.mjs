@@ -26,6 +26,13 @@ function insertAfterUnique(source, anchor, insertion, presentNeedle, label) {
   return source.replace(anchor, `${anchor}\n${insertion}`);
 }
 
+function replaceUnique(source, anchor, replacement, label) {
+  if (source.includes(replacement)) return source;
+  const count = source.split(anchor).length - 1;
+  if (count !== 1) throw new Error(`${label}: expected one anchor, found ${count}`);
+  return source.replace(anchor, replacement);
+}
+
 function integratePublishPage() {
   const page = resolve(root, "src/domains/market/pages/MarketPublishPage.tsx");
   const workshop = resolve(root, "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx");
@@ -36,6 +43,12 @@ function integratePublishPage() {
   let after = addImport(
     before,
     `import { MarketplaceAuthoringWorkshop } from "${relativeImport(page, workshop)}";`,
+  );
+  after = replaceUnique(
+    after,
+    '  const [fallbackUserId] = useState(() => "user-guest");',
+    '  const fallbackUserId = "user-guest";',
+    "stable guest publisher id",
   );
   after = insertAfterUnique(
     after,
