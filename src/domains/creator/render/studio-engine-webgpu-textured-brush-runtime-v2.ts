@@ -34,6 +34,7 @@ import {
   type StudioEngineWebGpuTexturedBrushPlan,
   type StudioEngineWebGpuTexturedBrushResolvedAsset,
 } from "./studio-engine-webgpu-textured-brush-plan";
+
 import type {
   StudioEngineWebGpuTexturedBrushExecutionResult,
   StudioEngineWebGpuTexturedBrushFrame,

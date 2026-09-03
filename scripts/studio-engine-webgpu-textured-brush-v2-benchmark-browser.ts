@@ -6,14 +6,14 @@ import {
   type StudioEngineWebGpuPresentationSurface,
 } from "../src/domains/creator/render/studio-engine-webgpu-presentation-surface";
 import {
-  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
-  type StudioEngineWebGpuTexturedBrushPlan,
-} from "../src/domains/creator/render/studio-engine-webgpu-textured-brush-plan";
-import {
   electStudioEngineWebGpuTexturedBrushRuntime,
   type StudioEngineWebGpuBrushBenchmarkDistribution,
   type StudioEngineWebGpuBrushBenchmarkReport,
 } from "../src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract";
+import {
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
+  type StudioEngineWebGpuTexturedBrushPlan,
+} from "../src/domains/creator/render/studio-engine-webgpu-textured-brush-plan";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime as createV1Runtime,
   packStudioEngineWebGpuTexturedBrushDabs as packV1Dabs,
