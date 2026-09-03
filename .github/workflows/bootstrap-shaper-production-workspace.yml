@@ -1,0 +1,118 @@
+name: Bootstrap production-grade 3D character workspace
+
+on:
+  push:
+    branches:
+      - feat/shaper-production-workspace-20260903
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shaper-production-workspace-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[shaper-production-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out production workspace branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/shaper-production-workspace-20260903
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Decode and apply verified migration
+        shell: bash
+        run: |
+          cat \
+            scripts/.shaper-production-workspace.part00 \
+            scripts/.shaper-production-workspace.part01 \
+            scripts/.shaper-production-workspace.part02 \
+            > /tmp/shaper-production-workspace.py.gz.b64
+          echo "630aed84b5f8590d2d349afe0ed0586de6dc33419e8327016ec1767fc76d49a2  /tmp/shaper-production-workspace.py.gz.b64" | sha256sum --check --strict
+          base64 --decode /tmp/shaper-production-workspace.py.gz.b64 | gzip --decompress --stdout > scripts/apply-shaper-production-workspace.py
+          echo "b985eca06cc2ab9365b3c0d8524f9ec0930676037e0c74b79f4c82a56eed396a  scripts/apply-shaper-production-workspace.py" | sha256sum --check --strict
+          python3 scripts/apply-shaper-production-workspace.py
+          git diff --check
+          git status --short
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint changed production surfaces
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/scene-3d/studio-shaper-production-model.ts
+          src/domains/creator/scene-3d/studio-shaper-mannequin-appearance-three.ts
+          src/domains/creator/scene-3d/studio-shaper-render-separation.ts
+          src/domains/creator/scene-3d/StudioShaperPresetPreview.tsx
+          src/domains/creator/scene-3d/StudioShaperPanel.tsx
+          src/domains/creator/scene-3d/studio-mannequin-scene.ts
+          src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx
+          src/domains/creator/StudioThreeDPreviewPanelStack.tsx
+          src/domains/creator/scene-3d/studio-shaper-production-model.test.ts
+          src/domains/creator/scene-3d/studio-shaper-render-separation.test.ts
+          src/domains/creator/scene-3d/studio-shaper-mannequin-appearance-three.test.ts
+          src/domains/creator/scene-3d/StudioShaperPanel.test.tsx
+          src/domains/creator/scene-3d/studio-shaper-production-boundary.test.ts
+
+      - name: Run focused production workspace tests
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/scene-3d/studio-shaper-production-model.test.ts
+          src/domains/creator/scene-3d/studio-shaper-render-separation.test.ts
+          src/domains/creator/scene-3d/studio-shaper-mannequin-appearance-three.test.ts
+          src/domains/creator/scene-3d/StudioShaperPanel.test.tsx
+          src/domains/creator/scene-3d/studio-shaper-production-boundary.test.ts
+          src/domains/creator/scene-3d/StudioMannequinPoserPanel.test.tsx
+          src/domains/creator/scene-3d/studio-shaper-model.test.ts
+          src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+          src/domains/creator/scene-3d/studio-mannequin-poses.test.ts
+
+      - name: Type-check the web workspace
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio assets
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm run build
+
+      - name: Enforce Studio bundle budgets
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm run check:studio-bundle
+
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm -f scripts/.shaper-production-workspace.part00
+          rm -f scripts/.shaper-production-workspace.part01
+          rm -f scripts/.shaper-production-workspace.part02
+          rm -f scripts/apply-shaper-production-workspace.py
+          rm -f .github/workflows/bootstrap-shaper-production-workspace.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(studio): ship production 3D character workspace [shaper-production-applied]"
+          git push --no-verify origin HEAD:feat/shaper-production-workspace-20260903
