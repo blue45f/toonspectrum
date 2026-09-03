@@ -1,0 +1,93 @@
+name: Marketplace post-merge mechanical autofix
+
+on:
+  push:
+    branches:
+      - fix/marketplace-postmerge-browser-regressions-20260903
+    paths:
+      - ".github/workflows/marketplace-postmerge-autofix.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-postmerge-mechanical-autofix
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/marketplace-postmerge-browser-regressions-20260903
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Fix only deterministic lint and import ordering issues
+        run: |
+          pnpm exec eslint --fix \
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/market/components/MarketplaceAuthoringInstallAction.tsx \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.tsx \
+            src/domains/market/components/MarketplaceAssetQualityMatrix.tsx \
+            src/domains/market/components/MarketplaceBrushRecipeAccelerator.tsx \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            lib/creator-marketplace-authoring-safety.ts \
+            lib/creator-marketplace-authoring-workshop.ts \
+            lib/creator-marketplace-package-builder.ts
+          git diff --check
+
+      - name: Verify mechanical changes before committing
+        run: |
+          pnpm run lint:quick
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm exec vitest run \
+            lib/creator-marketplace-authoring-safety.test.ts \
+            lib/creator-marketplace-authoring-workshop.test.ts \
+            lib/creator-marketplace-package-builder.test.ts \
+            lib/creator-marketplace-quality-validation.test.ts \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/market --reporter=verbose
+
+      - name: Commit verified mechanical fixes
+        run: |
+          set -euo pipefail
+          git add \
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/market/components/MarketplaceAuthoringInstallAction.tsx \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.tsx \
+            src/domains/market/components/MarketplaceAssetQualityMatrix.tsx \
+            src/domains/market/components/MarketplaceBrushRecipeAccelerator.tsx \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            lib/creator-marketplace-authoring-safety.ts \
+            lib/creator-marketplace-authoring-workshop.ts \
+            lib/creator-marketplace-package-builder.ts
+          if git diff --cached --quiet; then
+            echo "No deterministic fix was needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(marketplace): normalize post-merge authoring contracts"
+          git push origin HEAD:fix/marketplace-postmerge-browser-regressions-20260903
