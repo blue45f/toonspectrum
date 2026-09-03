@@ -55,6 +55,7 @@ jobs:
               "incremental": false
             },
             "files": [
+              "src/vite-env.d.ts",
               "src/domains/creator/render/studio-engine-webgpu-tile-provider-production.ts",
               "src/domains/creator/render/studio-engine-webgpu-tile-provider-production.test.ts",
               "src/domains/creator/brush/studio-wet-media-two-well-field-bridge.ts",
