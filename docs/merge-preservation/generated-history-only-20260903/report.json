@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-09-03T09:28:36.445082+00:00",
+  "policy": "history-only merge; main source tree retained",
+  "branches": [
+    {
+      "branch": "archive/main-after-preservation-merges-20260903",
+      "mode": "already-ancestor",
+      "headSha": "f8e54c42afc3e4e595c1864444dfa2e48848cf42"
+    },
+    {
+      "branch": "archive/pr-595-emotion-bubbles-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "7b018b1cf04dfc43368b754fb49c4b4873206ead"
+    },
+    {
+      "branch": "archive/pr-596-platform-preflight-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "df17f4e4b97044116511e9db2711850882a80b6f"
+    },
+    {
+      "branch": "archive/pr-598-service-worker-check-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "cdc83a6e6ea7f27c86c8dab79b72271d43d0fe04"
+    },
+    {
+      "branch": "archive/pr-599-full-head-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "cd2e9cf3933ee2b0d3945360e768240537c20539"
+    },
+    {
+      "branch": "archive/pr-599-main-core-repair-premerge-20260903",
+      "mode": "already-ancestor",
+      "headSha": "cd2e9cf3933ee2b0d3945360e768240537c20539"
+    },
+    {
+      "branch": "archive/pr-603-full-head-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "8d17da8aa8506584452721598603008ff6689c30"
+    },
+    {
+      "branch": "archive/pr-604-soak-harness-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "ee866cfd144ca112f6f1b5270af273602d868015"
+    },
+    {
+      "branch": "archive/pr-605-marketplace-wiring-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "ae8919d9632c66731f66e7b6dba327986c0fcc2e"
+    },
+    {
+      "branch": "archive/pr-606-marketplace-hardening-premerge-20260903",
+      "mode": "history-only",
+      "headSha": "7ad88ff0e628972b6945a098c925d2b5b867e283"
+    },
+    {
+      "branch": "archive/pr-607-marketplace-regressions-premerge-20260903",
+      "mode": "already-ancestor",
+      "headSha": "8d17da8aa8506584452721598603008ff6689c30"
+    },
+    {
+      "branch": "integration/lossless-all-remote-branches-20260903",
+      "mode": "history-only",
+      "headSha": "b6caf62cd072c2ba21e5726281f73177e9e92829"
+    },
+    {
+      "branch": "integration/preserve-open-work-20260903",
+      "mode": "already-ancestor",
+      "headSha": "521ba72f89f9a5b08bcad65d4518efce9d1536d4"
+    },
+    {
+      "branch": "integration/preserve-pr603-unique-20260903",
+      "mode": "already-ancestor",
+      "headSha": "f8e54c42afc3e4e595c1864444dfa2e48848cf42"
+    }
+  ]
+}
