@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   restore-source:
-    runs-on: macos-15
+    runs-on: windows-2025
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -23,10 +23,10 @@ jobs:
           fetch-depth: 1
 
       - name: Restore and persist candidate source
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
+          $ErrorActionPreference = "Stop"
+          @'
           from pathlib import Path, PurePosixPath
           import base64
           import hashlib
@@ -50,11 +50,12 @@ jobs:
                   if member.issym() or member.islnk() or member.isdev():
                       raise SystemExit(f'unsupported archive member: {member.name}')
               archive.extractall('.', members=members)
-          PY
-          rm -rf .bootstrap/webgpu-v2
-          rm -f .github/workflows/webgpu-v2-working-snapshot.yml
+          '@ | python -
+          Remove-Item -Recurse -Force .bootstrap/webgpu-v2
+          Remove-Item -Force .github/workflows/webgpu-v2-working-snapshot.yml
           git add -A
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          HUSKY=0 git commit -m "feat(brush): materialize WebGPU v2 benchmark candidate"
-          git push origin "HEAD:${{ github.ref_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          $env:HUSKY = "0"
+          git commit -m "feat(brush): materialize WebGPU v2 benchmark candidate"
+          git push origin "HEAD:$env:GITHUB_REF_NAME"
