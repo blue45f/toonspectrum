@@ -61,7 +61,7 @@ export function createStudioFloatingPointerSessionState(
 function requestFrame(callback: FrameRequestCallback): number {
   return typeof globalThis.requestAnimationFrame === "function"
     ? globalThis.requestAnimationFrame(callback)
-    : globalThis.setTimeout(() => callback(Date.now()), 0);
+    : window.setTimeout(() => callback(Date.now()), 0);
 }
 
 export function cancelStudioFloatingPointerFrame(
@@ -71,7 +71,7 @@ export function cancelStudioFloatingPointerFrame(
   if (typeof globalThis.cancelAnimationFrame === "function") {
     globalThis.cancelAnimationFrame(session.frame);
   } else {
-    globalThis.clearTimeout(session.frame);
+    window.clearTimeout(session.frame);
   }
   session.frame = null;
 }
@@ -116,7 +116,7 @@ export function activateStudioFloatingPointerSession(
   if (session.active || session.finished) return;
   session.active = true;
   if (session.activationTimer !== null) {
-    globalThis.clearTimeout(session.activationTimer);
+    window.clearTimeout(session.activationTimer);
     session.activationTimer = null;
   }
   document.body.style.userSelect = "none";
