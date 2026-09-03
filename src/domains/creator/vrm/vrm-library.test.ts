@@ -14,6 +14,7 @@ import {
   SAMPLE_VRM_ENTRIES,
   SAMPLE_VRM_LIBRARY_ENTRY,
   SAMPLE_VRMS,
+  sampleVrmThumbnailUrl,
   sampleVrmUrl,
   selectableSampleVrmUrl,
   withDefaultVrmEntry,
@@ -202,6 +203,34 @@ describe("VRM library helpers", () => {
     });
 
     expect(problems).toEqual([]);
+  });
+
+  // 모든 번들 캐릭터가 200KB 이하의 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추고 있는지 전수 검사한다.
+  it("backs every bundled character with a high-quality 3D thumbnail (<200KB) and valid sampleVrmThumbnailUrl", () => {
+    expect(SAMPLE_VRMS.length).toBe(88);
+
+    for (const sample of SAMPLE_VRMS) {
+      expect(sample.thumbnailUrl, `${sample.id} thumbnailUrl should be defined`).toBeTruthy();
+      expect(sample.thumbnailUrl).toMatch(/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/);
+
+      const filePath = join(process.cwd(), "public", sample.thumbnailUrl!.replace(/^\//, ""));
+      expect(existsSync(filePath), `thumbnail file exists for ${sample.id} at ${filePath}`).toBe(true);
+
+      const { size } = statSync(filePath);
+      expect(size, `${sample.id} thumbnail size should be > 1KB`).toBeGreaterThan(1024);
+      expect(size, `${sample.id} thumbnail size should be < 200KB`).toBeLessThan(200 * 1024);
+
+      // sampleVrmThumbnailUrl helper 검증
+      expect(sampleVrmThumbnailUrl(sample.id)).toBe(sample.thumbnailUrl);
+    }
+
+    // fallback 검증
+    expect(sampleVrmThumbnailUrl("non-existent-id")).toBe("/assets/3d/characters/thumbnails/non-existent-id.png");
+
+    // SAMPLE_VRM_ENTRIES 썸네일 전수 바인딩 검증
+    for (const entry of SAMPLE_VRM_ENTRIES) {
+      expect(entry.thumbnail).toMatch(/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/);
+    }
   });
 
   // 위 검사의 반대 방향. public/vrm 은 통째로 dist 로 복사돼 배포 산출물의 절반 이상을
