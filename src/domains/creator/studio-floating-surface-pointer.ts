@@ -47,7 +47,7 @@ export function startStudioFloatingSurfacePointerSession(
     if (session.finished) return;
     session.finished = true;
     if (session.activationTimer !== null) {
-      globalThis.clearTimeout(session.activationTimer);
+      window.clearTimeout(session.activationTimer);
       session.activationTimer = null;
     }
     cancelStudioFloatingPointerFrame(session);
@@ -137,7 +137,7 @@ export function startStudioFloatingSurfacePointerSession(
   if (session.kind === "resize") {
     activateStudioFloatingPointerSession(session);
   } else if (session.pointerType === "touch") {
-    session.activationTimer = globalThis.setTimeout(
+    session.activationTimer = window.setTimeout(
       () => activateStudioFloatingPointerSession(session),
       STUDIO_FLOATING_TOUCH_ACTIVATION_DELAY_MS,
     );
