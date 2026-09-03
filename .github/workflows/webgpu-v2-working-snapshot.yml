@@ -15,12 +15,12 @@ concurrency:
 
 jobs:
   restore-source:
-    runs-on: macos-15
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Restore and persist candidate source
         shell: bash
@@ -71,11 +71,16 @@ jobs:
                       raise SystemExit(f'unsupported archive member: {member.name}')
               archive.extractall('.', members=members)
           PY
-          rm -rf .bootstrap/webgpu-v2
-          rm -f .github/workflows/webgpu-v2-working-snapshot.yml
+          # The App token may write source but may not create a permanent workflow. That workflow
+          # is added later through the repository connector after the implementation is validated.
           rm -f .github/workflows/studio-webgpu-brush-v2.yml
           git add -A
+          if git diff --cached --quiet; then
+            echo 'candidate source is already materialized'
+            exit 0
+          fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           HUSKY=0 git commit -m "feat(brush): materialize WebGPU v2 benchmark candidate"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
