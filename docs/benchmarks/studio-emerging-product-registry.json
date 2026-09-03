@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-02",
+  "purpose": "Supplemental official-source registry for young companies, browser-native editors, creative startups, and rapidly changing tools that can reveal product-quality ideas not covered by the mature-product benchmark. Entries are watched for capability changes and converted into ToonSpectrum implementation work rather than copied blindly.",
+  "products": [
+    {
+      "id": "enkava",
+      "name": "Enkava",
+      "category": "comic-drawing",
+      "officialUrl": "https://enkava.com/",
+      "watchUrl": "https://enkava.com/",
+      "priority": "P0",
+      "focus": ["browser-paint", "editable-vector-stroke", "frame-animation", "onion-skin", "local-first-file"]
+    },
+    {
+      "id": "jitter",
+      "name": "Jitter",
+      "category": "animation-2d",
+      "officialUrl": "https://jitter.video/",
+      "watchUrl": "https://jitter.video/changelog/",
+      "priority": "P0",
+      "focus": ["editable-ai", "bulk-create", "shader-effects", "components", "batch-export", "timeline-ux"]
+    },
+    {
+      "id": "lumiere-graphics",
+      "name": "Lumiere Graphics",
+      "category": "animation-2d",
+      "officialUrl": "https://lumiere.graphics/",
+      "watchUrl": "https://lumiere.graphics/changelog",
+      "priority": "P0",
+      "focus": ["procedural-effects", "kuwahara", "glare", "halation", "kinetic-type"]
+    },
+    {
+      "id": "matte",
+      "name": "Matte",
+      "category": "animation-2d",
+      "officialUrl": "https://matte.video/",
+      "watchUrl": "https://matte.video/changelog",
+      "priority": "P0",
+      "focus": ["browser-timeline", "clip-trimming", "motion-presets", "fast-preview"]
+    },
+    {
+      "id": "raster-app",
+      "name": "Raster",
+      "category": "collaboration-design",
+      "officialUrl": "https://raster.app/",
+      "watchUrl": "https://raster.app/changelog",
+      "priority": "P0",
+      "focus": ["asset-variants", "default-version", "agent-automation", "video-variants", "review-workflow"]
+    },
+    {
+      "id": "llamagen",
+      "name": "LlamaGen",
+      "category": "ai-creative",
+      "officialUrl": "https://llamagen.ai/",
+      "watchUrl": "https://llamagen.ai/releases",
+      "priority": "P0",
+      "focus": ["dynamic-panel-flow", "camera-angle", "prompt-history", "comic-translation", "character-assets"]
+    },
+    {
+      "id": "firealpaca",
+      "name": "FireAlpaca",
+      "category": "comic-drawing",
+      "officialUrl": "https://firealpaca.com/",
+      "watchUrl": "https://firealpaca.com/download/",
+      "priority": "P1",
+      "focus": ["lightweight-paint", "comic-template", "brush-catalog", "cross-platform"]
+    },
+    {
+      "id": "trangram",
+      "name": "Trangram",
+      "category": "animation-2d",
+      "officialUrl": "https://www.trangram.com/",
+      "watchUrl": "https://www.trangram.com/",
+      "priority": "P1",
+      "focus": ["vector-morph", "corner-rounding", "boolean-operations", "trim-path", "timeline"]
+    },
+    {
+      "id": "glaxnimate",
+      "name": "Glaxnimate",
+      "category": "animation-2d",
+      "officialUrl": "https://glaxnimate.org/",
+      "watchUrl": "https://glaxnimate.org/",
+      "priority": "P1",
+      "focus": ["vector-tween", "lottie", "animated-svg", "dockable-ui", "python-extension"]
+    },
+    {
+      "id": "typeflow",
+      "name": "TypeFlow",
+      "category": "animation-2d",
+      "officialUrl": "https://www.typeflow.studio/",
+      "watchUrl": "https://www.typeflow.studio/changelog",
+      "priority": "P1",
+      "focus": ["kinetic-type", "template-gallery", "transparent-video", "four-k-export", "live-preview"]
+    },
+    {
+      "id": "vector-wizard",
+      "name": "Vector Wizard",
+      "category": "vector-infinite-canvas",
+      "officialUrl": "https://vectorwizard.ai/",
+      "watchUrl": "https://vectorwizard.ai/change-log",
+      "priority": "P1",
+      "focus": ["ai-vectorization", "svg-animation", "color-edit", "vector-sharing"]
+    },
+    {
+      "id": "expressive-animator",
+      "name": "Expressive Animator",
+      "category": "animation-2d",
+      "officialUrl": "https://expressive.app/expressive-animator/",
+      "watchUrl": "https://expressive.app/expressive-animator/changelog/",
+      "priority": "P1",
+      "focus": ["svg-animation", "easing", "timeline", "web-export", "motion-path"]
+    },
+    {
+      "id": "construct-animate",
+      "name": "Construct Animate",
+      "category": "animation-2d",
+      "officialUrl": "https://www.construct.net/en/animation-software",
+      "watchUrl": "https://www.construct.net/en/make-games/releases/stable",
+      "priority": "P1",
+      "focus": ["webgpu", "source-control-files", "brush-resources", "animation-editor", "browser-runtime"]
+    },
+    {
+      "id": "pixieditor",
+      "name": "PixiEditor",
+      "category": "image-editor",
+      "officialUrl": "https://pixieditor.net/",
+      "watchUrl": "https://github.com/PixiEditor/PixiEditor/releases",
+      "priority": "P1",
+      "focus": ["raster-vector", "node-graph", "pixel-art", "open-source", "non-destructive"]
+    },
+    {
+      "id": "rnote",
+      "name": "Rnote",
+      "category": "vector-infinite-canvas",
+      "officialUrl": "https://rnote.flxzt.net/",
+      "watchUrl": "https://github.com/flxzt/rnote/releases",
+      "priority": "P1",
+      "focus": ["infinite-canvas", "pen-input", "shape-recognition", "document-notes", "open-source"]
+    },
+    {
+      "id": "graphite-editor",
+      "name": "Graphite",
+      "category": "image-editor",
+      "officialUrl": "https://graphite.rs/",
+      "watchUrl": "https://github.com/GraphiteEditor/Graphite/releases",
+      "priority": "P1",
+      "focus": ["node-graph", "non-destructive", "vector-raster", "webgpu", "procedural-design"]
+    },
+    {
+      "id": "pikimov",
+      "name": "Pikimov",
+      "category": "animation-2d",
+      "officialUrl": "https://pikimov.com/",
+      "watchUrl": "https://pikimov.com/",
+      "priority": "P1",
+      "focus": ["browser-video", "motion-graphics", "local-processing", "timeline", "effects"]
+    },
+    {
+      "id": "wick-editor",
+      "name": "Wick Editor",
+      "category": "animation-2d",
+      "officialUrl": "https://www.wickeditor.com/",
+      "watchUrl": "https://github.com/Wicklets/wick-editor/releases",
+      "priority": "P2",
+      "focus": ["interactive-animation", "frame-animation", "scripting", "open-source", "browser-editor"]
+    },
+    {
+      "id": "svgator",
+      "name": "SVGator",
+      "category": "animation-2d",
+      "officialUrl": "https://www.svgator.com/",
+      "watchUrl": "https://www.svgator.com/blog/",
+      "priority": "P1",
+      "focus": ["svg-animation", "path-morph", "interactive-export", "timeline", "web-performance"]
+    },
+    {
+      "id": "cavalry",
+      "name": "Cavalry",
+      "category": "animation-2d",
+      "officialUrl": "https://cavalry.scenegroup.co/",
+      "watchUrl": "https://cavalry.scenegroup.co/releases/",
+      "priority": "P1",
+      "focus": ["procedural-animation", "data-driven", "deformers", "dynamic-render", "motion-design"]
+    },
+    {
+      "id": "linearity-move",
+      "name": "Linearity Move",
+      "category": "animation-2d",
+      "officialUrl": "https://www.linearity.io/move/",
+      "watchUrl": "https://www.linearity.io/blog/",
+      "priority": "P1",
+      "focus": ["auto-animate", "motion-design", "vector-import", "templates", "mobile-workflow"]
+    },
+    {
+      "id": "callipeg",
+      "name": "Callipeg",
+      "category": "mobile-drawing",
+      "officialUrl": "https://callipeg.com/",
+      "watchUrl": "https://callipeg.com/",
+      "priority": "P1",
+      "focus": ["mobile-animation", "onion-skin", "audio-timeline", "gesture-workflow", "stylus"]
+    },
+    {
+      "id": "ltx-studio",
+      "name": "LTX Studio",
+      "category": "storyboard",
+      "officialUrl": "https://ltx.studio/",
+      "watchUrl": "https://ltx.studio/",
+      "priority": "P1",
+      "focus": ["ai-storyboard", "shot-planning", "character-consistency", "camera-control", "previsualization"]
+    },
+    {
+      "id": "dashtoon",
+      "name": "Dashtoon",
+      "category": "ai-creative",
+      "officialUrl": "https://dashtoon.com/",
+      "watchUrl": "https://dashtoon.com/",
+      "priority": "P1",
+      "focus": ["ai-comic", "character-consistency", "episode-workflow", "publishing", "creator-platform"]
+    }
+  ]
+}

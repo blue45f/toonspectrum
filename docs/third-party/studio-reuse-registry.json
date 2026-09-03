@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-02",
+  "purpose": "Evidence-tracked registry for exact third-party reuse in ToonSpectrum Studio. The repository owner has supplied a campaign-wide reuse attestation, so accessible source code, brushes, 3D assets, model weights, UI assets, trademarks, and required license text may be integrated without repeated approval; every actual integration still pins source, version, hash, destination, and notice data for reproducibility and rollback.",
+  "ownerAttestation": {
+    "licenseId": "LicenseRef-ProjectOwnerAttestation-2026-09-02",
+    "reference": "repo:docs/third-party/studio-owner-attestation-2026-09-02.md",
+    "reviewedAt": "2026-09-02"
+  },
+  "entries": []
+}
