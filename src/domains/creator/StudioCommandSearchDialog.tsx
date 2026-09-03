@@ -12,11 +12,16 @@
  * 상한. 잘린 개수는 감추지 않고 "외 N건"으로 보고한다.
  */
 
-import { Ban, ChevronRight, HelpCircle, Search, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Ban, ChevronRight, HelpCircle, Play, Search, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
+import {
+  getStudioCommandExecutionBindings,
+  subscribeStudioCommandExecutionBindings,
+  type StudioCommandExecutionBinding,
+} from "./studio-command-execution-registry";
 import { buildStudioSearchIndex, searchStudio } from "./studio-command-search";
 import {
   STUDIO_COMMAND_SEARCH_SCOPE_KINDS,
@@ -89,6 +94,7 @@ function resultKey(result: StudioSearchResult): string {
  * 표시를 전부 그 계산에서 파생시킨다 — **배선이 없으면 광고도 없다.**
  */
 export type StudioCommandSearchActionKind =
+  | "execute"
   | "inspector"
   | "palette"
   | "tutorial"
@@ -126,7 +132,8 @@ const SELECTION_REQUIRED_ACTION: StudioCommandSearchAction = Object.freeze({
 function studioCommandSearchAction(
   entry: StudioSearchEntry,
   available: StudioCommandSearchHandlerAvailability,
-  inspectorContext?: StudioInspectorActionContext,
+  inspectorContext: StudioInspectorActionContext | undefined,
+  commandBindings: ReadonlyMap<string, StudioCommandExecutionBinding>,
 ): StudioCommandSearchAction {
   const target = entry.target;
   switch (target.type) {
@@ -145,14 +152,23 @@ function studioCommandSearchAction(
       return available.tutorial
         ? { kind: "tutorial", badge: "튜토리얼", hint: "튜토리얼 열기" }
         : NO_ACTION;
-    case "command":
-      // 명령을 **실행**하려면 CommandRegistry 배선이 StudioPage 밖으로 나와야
-      // 한다(아직 없다). 그때까지 명령 행이 할 수 있는 정직한 최선은 "이게
-      // 무엇이고 어디 있는지"를 여는 것이고, 배지·푸터가 실행이 아니라
-      // 도움말이라고 말한다.
+    case "command": {
+      const binding = commandBindings.get(target.commandId);
+      if (binding) {
+        return binding.disabled
+          ? {
+            kind: "none",
+            badge: "사용 불가",
+            hint: binding.unavailableReason ?? "현재 상태에서는 이 명령을 사용할 수 없습니다",
+          }
+          : { kind: "execute", badge: "실행", hint: "명령 실행" };
+      }
+      // Unreviewed and consequential commands stay help-only until their menu row explicitly
+      // opts in. Search never infers safety from a missing `danger` flag.
       return available.help
         ? { kind: "help", badge: "도움말", hint: "도움말 열기" }
         : NO_ACTION;
+    }
     default:
       // `panel`(자동 액션)처럼 아직 소비자가 없는 타깃. 열리는 척하지 않는다.
       return NO_ACTION;
@@ -162,6 +178,7 @@ function studioCommandSearchAction(
 const ACTION_ICON: Readonly<
   Record<StudioCommandSearchActionKind, typeof ChevronRight>
 > = Object.freeze({
+  execute: Play,
   inspector: ChevronRight,
   palette: ChevronRight,
   tutorial: ChevronRight,
@@ -207,6 +224,11 @@ export function StudioCommandSearchDialog({
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const commandExecutionBindings = useSyncExternalStore(
+    subscribeStudioCommandExecutionBindings,
+    getStudioCommandExecutionBindings,
+    getStudioCommandExecutionBindings,
+  );
 
   const searchIndex = useMemo(
     () => buildStudioSearchIndex(inspectorContext),
@@ -267,13 +289,14 @@ export function StudioCommandSearchDialog({
             result.entry,
             available,
             inspectorContext,
+            commandExecutionBindings,
           ),
         })),
       });
       consumed = base + section.results.length;
     }
     return groups;
-  }, [available, inspectorContext, listboxId, outcome]);
+  }, [available, commandExecutionBindings, inspectorContext, listboxId, outcome]);
 
   const flat = useMemo(() => grouped.flatMap((group) => group.rows), [grouped]);
   const activeRow = flat[activeIndex];
@@ -305,6 +328,7 @@ export function StudioCommandSearchDialog({
         result.entry,
         available,
         inspectorContext,
+        commandExecutionBindings,
       );
       switch (action.kind) {
         case "inspector": {
@@ -330,6 +354,14 @@ export function StudioCommandSearchDialog({
           onClose("action");
           return;
         }
+        case "execute": {
+          if (target.type !== "command") return;
+          const binding = commandExecutionBindings.get(target.commandId);
+          if (!binding || binding.disabled) return;
+          binding.execute();
+          onClose("action");
+          return;
+        }
         case "help": {
           if (target.type !== "command") return;
           // 도움말 표면도 모달이다. 검색을 열어 둔 채 겹치면 Esc 가 어느 쪽을
@@ -346,6 +378,7 @@ export function StudioCommandSearchDialog({
     },
     [
       available,
+      commandExecutionBindings,
       inspectorContext,
       onClose,
       onExpandPalette,

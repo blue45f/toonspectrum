@@ -130,6 +130,20 @@ const STUDIO_FILTER_PACK_MENU_SEPARATORS: ReadonlySet<StudioFilterPackKind> = ne
   "perlin-texture",
 ]);
 
+/** First row of each visible family in the otherwise 52-row Filter menu. */
+const STUDIO_FILTER_PACK_MENU_SECTION_LABELS: Readonly<
+  Partial<Record<StudioFilterPackKind, string>>
+> = Object.freeze({
+  mosaic: "픽셀화",
+  "radial-blur": "블러",
+  "chromatic-aberration": "렌즈·화면 효과",
+  emboss: "스타일화",
+  "line-cleanup": "선화·복원",
+  "noise-add": "노이즈",
+  "wave-warp": "왜곡",
+  "film-grain-pro": "질감·변환",
+});
+
 /** Core rows keep their bespoke drafts, their ⌘⇧n chords, and their declaration order. */
 const STUDIO_FILTER_CORE_MENU_ROWS = [
   { id: "gaussian-blur", label: "가우시안 블러", icon: Droplets, shortcut: "⌘⇧1" },
@@ -157,6 +171,7 @@ export function buildStudioFilterMenuItems({
     {
       id: "last-filter",
       commandId: "filter.last",
+      searchActivation: "execute",
       label: state.lastFilterDraft ? "마지막 필터 다시 열기" : "마지막 필터…",
       icon: HistoryIcon,
       disabled: !state.lastFilterDraft || state.filterDisabled,
@@ -172,9 +187,11 @@ export function buildStudioFilterMenuItems({
         }
       },
     },
-    ...STUDIO_FILTER_CORE_MENU_ROWS.map(({ id, label, icon, shortcut }) => ({
+    ...STUDIO_FILTER_CORE_MENU_ROWS.map(({ id, label, icon, shortcut }, index) => ({
       id,
       commandId: `filter.${id}`,
+      searchActivation: "execute" as const,
+      ...(index === 0 ? { sectionLabel: "기본 필터" } : {}),
       label,
       icon,
       shortcut,
@@ -196,9 +213,11 @@ export function buildStudioFilterMenuItems({
         icon: Spline,
         separatorAfter: true,
       },
-    ] as const).map(({ id, commandId, label, icon, ...rest }) => ({
+    ] as const).map(({ id, commandId, label, icon, ...rest }, index) => ({
       id,
       commandId,
+      searchActivation: "execute" as const,
+      ...(index === 0 ? { sectionLabel: "레이어 보정" } : {}),
       label,
       icon,
       ...("separatorAfter" in rest && rest.separatorAfter ? { separatorAfter: true } : {}),
@@ -215,6 +234,10 @@ export function buildStudioFilterMenuItems({
     ...STUDIO_FILTER_PACK_KINDS.map((kind) => ({
       id: kind,
       commandId: `filter.${kind}`,
+      searchActivation: "execute" as const,
+      ...(STUDIO_FILTER_PACK_MENU_SECTION_LABELS[kind]
+        ? { sectionLabel: STUDIO_FILTER_PACK_MENU_SECTION_LABELS[kind] }
+        : {}),
       label: STUDIO_FILTER_PACK_LABELS[kind],
       icon: STUDIO_FILTER_PACK_MENU_ICONS[kind],
       ...(STUDIO_FILTER_PACK_MENU_SEPARATORS.has(kind) ? { separatorAfter: true } : {}),
