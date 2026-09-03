@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_WATERMARK,
   WATERMARK_POSITIONS,
+  applyAntiAiNoisePattern,
+  generateWatermarkTilePositions,
   normalizeWatermark,
   shouldDrawWatermark,
   watermarkPlacement,
@@ -16,7 +18,7 @@ describe("normalizeWatermark", () => {
 
   it("유효 값을 읽고 잘못된 값은 보정", () => {
     const w = normalizeWatermark({ enabled: true, text: "© 작가", position: "tl", opacity: 0.3, size: 0.04 });
-    expect(w).toEqual({ enabled: true, text: "© 작가", position: "tl", opacity: 0.3, size: 0.04 });
+    expect(w).toMatchObject({ enabled: true, text: "© 작가", position: "tl", opacity: 0.3, size: 0.04 });
   });
 
   it("잘못된 position은 br, opacity·size는 클램프", () => {
@@ -85,3 +87,62 @@ describe("watermarkPlacement", () => {
     expect(pl.margin).toBeGreaterThanOrEqual(12);
   });
 });
+
+describe("CSP 3.0 / 3.1 / 4.0 Advanced Watermark Features", () => {
+  it("normalizes repeatTile, blendMode, and antiAiNoise settings", () => {
+    const w = normalizeWatermark({
+      enabled: true,
+      text: "Toon",
+      repeatTile: true,
+      tileSpacing: 250,
+      blendMode: "soft-light",
+      antiAiNoiseEnabled: true,
+      antiAiNoiseIntensity: 50,
+    });
+
+    expect(w.repeatTile).toBe(true);
+    expect(w.tileSpacing).toBe(250);
+    expect(w.blendMode).toBe("soft-light");
+    expect(w.antiAiNoiseEnabled).toBe(true);
+    expect(w.antiAiNoiseIntensity).toBe(50);
+  });
+
+  it("generates repeat tile grid coordinates across canvas", () => {
+    const tiles = generateWatermarkTilePositions(800, 1200, 200);
+    expect(tiles.length).toBeGreaterThan(10);
+    expect(tiles.every((t) => Number.isFinite(t.x) && Number.isFinite(t.y))).toBe(true);
+  });
+
+  it("applies anti-AI high-frequency perturbation while preserving alpha", () => {
+    const pixels = new Uint8ClampedArray([
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+    ]);
+
+    applyAntiAiNoisePattern(pixels, 2, 2, 40);
+
+    // Alpha remains completely untouched
+    expect(pixels[3]).toBe(255);
+    expect(pixels[7]).toBe(255);
+    expect(pixels[11]).toBe(255);
+    expect(pixels[15]).toBe(255);
+
+    // RGB channels receive subtle perturbation
+    const hasPerturbation = pixels[0] !== 128 || pixels[1] !== 128 || pixels[2] !== 128;
+    expect(hasPerturbation).toBe(true);
+  });
+
+  it("shouldDrawWatermark returns true if antiAiNoiseEnabled is true", () => {
+    expect(
+      shouldDrawWatermark({
+        ...DEFAULT_WATERMARK,
+        enabled: true,
+        text: "",
+        antiAiNoiseEnabled: true,
+      }),
+    ).toBe(true);
+  });
+});
+

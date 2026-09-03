@@ -97,6 +97,7 @@ import {
   type StudioBrushTipShapeId,
 } from "./studio-brush-tip-stamp";
 import {
+  StudioBrushColorDynamicsControls,
   StudioBrushDynamicsInputMatrix,
   StudioBrushGrainControls,
   StudioBrushTaperAdvancedControls,
@@ -1331,6 +1332,7 @@ export function StudioBrushStudio({
           onSettingsChange={onSettingsChange}
         />
         <StudioBrushDualBrushControls settings={settings} onSettingsChange={onSettingsChange} />
+        <StudioBrushColorDynamicsControls settings={settings} onSettingsChange={onSettingsChange} />
       </div>
     ) : brushId === "calligraphy" ? (
       <div className="space-y-2.5">

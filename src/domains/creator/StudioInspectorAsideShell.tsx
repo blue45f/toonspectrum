@@ -5,6 +5,7 @@ import {
 import { Suspense } from "react";
 
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
+import { StudioLayerCompsPanel } from "./layer/StudioLayerCompsPanel";
 import { CANVAS_W } from "./studio-assets";
 import { elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
@@ -499,6 +500,23 @@ export function StudioInspectorAsideShell({
                     onChange={(next) => patchEl(selected.id, { borderEffect: next } as Partial<El>)}
                   />
                 ) : null}
+                {/* CSP 3.0 / 4.0 Layer Comps (레이어 콤프) */}
+                <StudioLayerCompsPanel
+                  layers={layerNavigatorItems.map((item) => ({
+                    id: item.id,
+                    name: item.label,
+                    visible: !item.hidden,
+                    opacity: item.opacity ?? 1,
+                  }))}
+                  onApplyComp={(comp) => {
+                    for (const [id, state] of Object.entries(comp.layerStates)) {
+                      patchEl(id, {
+                        visible: state.visible,
+                        opacity: state.opacity,
+                      } as Partial<El>);
+                    }
+                  }}
+                />
               </>
             ) : null}
           </div>

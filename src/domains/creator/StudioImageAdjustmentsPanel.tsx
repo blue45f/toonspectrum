@@ -565,6 +565,28 @@ const StudioSketchSection = lazy(async () => {
   return { default: StudioSketchSection };
 });
 
+const StudioColorMatchSection = lazy(async () => {
+  const panelMod = await import("./StudioColorMatchPanel");
+  const Panel = panelMod.StudioColorMatchPanel;
+  function StudioColorMatchSection({ onPatch }: DeferredAdjustmentSectionProps) {
+    return (
+      <Panel
+        onApplyDataUrl={(dataUrl) => onPatch({ src: dataUrl } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioColorMatchSection };
+});
+
+const StudioShadingAssistSection = lazy(async () => {
+  const panelMod = await import("./shading/StudioShadingAssistPanel");
+  const Panel = panelMod.StudioShadingAssistPanel;
+  function StudioShadingAssistSection() {
+    return <Panel />;
+  }
+  return { default: StudioShadingAssistSection };
+});
+
 function hasAdjustmentValue(value: unknown) {
   if (value == null) return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -667,6 +689,8 @@ export function StudioImageAdjustmentsPanel({
     light: t("studio.imageAdjustments.section.light"),
     detail: t("studio.imageAdjustments.section.detail"),
     sketch: t("studio.imageAdjustments.section.sketch"),
+    colorMatch: "컬러 매치 (CSP 3.0)",
+    shadingAssist: "자동 음영 어시스트 (CSP 2.0)",
   };
   return (
     <>
@@ -977,6 +1001,20 @@ export function StudioImageAdjustmentsPanel({
         forceOpen={hasAdjustmentValue(selected.sketch)}
       >
         <StudioSketchSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+
+      <AdjustmentSection
+        title={sectionTitle.colorMatch}
+        loadingLabel={sectionLoading}
+      >
+        <StudioColorMatchSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+
+      <AdjustmentSection
+        title={sectionTitle.shadingAssist}
+        loadingLabel={sectionLoading}
+      >
+        <StudioShadingAssistSection />
       </AdjustmentSection>
     </>
   );

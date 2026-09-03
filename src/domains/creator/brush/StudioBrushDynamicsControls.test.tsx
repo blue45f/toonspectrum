@@ -10,6 +10,7 @@ import {
 } from "./studio-brush-dynamics";
 import { findStudioBrushDynamicsMapping } from "./studio-brush-dynamics-editor";
 import {
+  StudioBrushColorDynamicsControls,
   StudioBrushDynamicsInputMatrix,
   StudioBrushGrainControls,
   StudioBrushTaperAdvancedControls,
@@ -192,5 +193,30 @@ describe("advanced brush material controls", () => {
     });
     const textured = onSettingsChange.mock.calls.at(-1)?.[0];
     expect(textured.grain).toMatchObject({ space: "stroke-fixed", amount: 0.48 });
+  });
+
+  it("edits color jitter (hue, saturation, value) through StudioBrushColorDynamicsControls (CSP 1.10.5)", () => {
+    const settings = studioBrushDynamicsPresetSettings("ink-particle");
+    const onSettingsChange = vi.fn();
+    render(
+      <StudioBrushColorDynamicsControls
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+      />
+    );
+
+    expect(screen.getByText("색상 변화 및 지터 (Color Jitter)")).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("색조 지터 (Hue Jitter)"), {
+      target: { value: "45" },
+    });
+    const withHue = onSettingsChange.mock.calls.at(-1)?.[0];
+    expect(withHue.colorDynamics.hueJitter).toBe(45);
+
+    fireEvent.change(screen.getByLabelText("채도 지터 (Saturation Jitter)"), {
+      target: { value: "0.35" },
+    });
+    const withSat = onSettingsChange.mock.calls.at(-1)?.[0];
+    expect(withSat.colorDynamics.saturationJitter).toBe(0.35);
   });
 });
