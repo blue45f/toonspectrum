@@ -136,7 +136,7 @@ export type StudioLeftToolRailClient = EditorClient<StudioLeftToolRailSnapshot>;
 export type StudioLeftToolRailActionName = keyof StudioLeftToolRailActions;
 export type StudioLeftToolRailActionArguments<
   K extends StudioLeftToolRailActionName,
-> = StudioLeftToolRailActions[K] extends (...args: infer A) => unknown ? A : never;
+> = NonNullable<StudioLeftToolRailActions[K]> extends (...args: infer A) => unknown ? A : never;
 
 export const STUDIO_LEFT_TOOL_RAIL_COMMANDS = {
   activatePrimaryCanvasTool: "rail.tool.activate-primary",

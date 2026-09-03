@@ -46,13 +46,12 @@ const SESSION_BAG_ANY_BASELINE = {
 } as const;
 
 /**
- * ratchet: may only decrease.
- * 측정 2026-09-02 = 17 → 같은 날 `setTool` 을 `toggleHandTool`/`returnToSelectTool` 명령으로
- * 바꿔 16. Rail 이 호스트의 useState 세터를 그대로 받는다는 뜻이고,
- * 이것이 "props 로 위장한 호스트 상태 직결"의 정확한 개수다. 세터를 의미 있는 커맨드
- * (`selectTool(...)`)로 바꿀 때마다 이 숫자를 함께 내린다.
+ * ratchet: fixed at zero.
+ * 2026-09-04: the rail now receives one EditorClient and resolves all state changes through
+ * registered commands. Host-owned React setters remain behind the adapter and may not re-enter
+ * the component prop contract.
  */
-const RAIL_REACT_SETTER_PROPS_MAX = 16;
+const RAIL_REACT_SETTER_PROPS_MAX = 0;
 
 /**
  * ratchet: may only decrease.

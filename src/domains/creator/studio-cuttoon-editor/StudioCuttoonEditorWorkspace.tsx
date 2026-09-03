@@ -6,6 +6,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { Suspense } from "react";
+import { createStudioLeftToolRailClient } from "../editor-client/studio-left-tool-rail-client";
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
 import { cn } from "@/lib/utils";
 import { StudioCuttoonEditorCanvasColumn } from "./StudioCuttoonEditorCanvasColumn";
@@ -84,7 +85,6 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     setQuickShapeActive,
     setRailMoreOpen,
     setReferencePanelOpen,
-    setStrokeWidth,
     setViewTool,
     smudgeActive,
     studioLeftToolRailHandlers,
@@ -97,6 +97,62 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     presentationPanelsHidden,
     visibleLeftPanelOpen,
   } = s;
+  const studioLeftToolRailClient = createStudioLeftToolRailClient({
+    activeSurfaceReviewLocked,
+    pixelToolTargetAvailable,
+    rasterRetouchTargetAvailable,
+    advancedFillActive,
+    advancedFillUnsupportedReason,
+    appSettings,
+    appSettingsOpen,
+    canvasOnlyMode,
+    commentPinArmed: commentPlacementActive,
+    cropActive: cropRect !== null,
+    drawMode,
+    drawShape,
+    eyedropperActive,
+    frameAnimOpen,
+    frameAnimTargetId,
+    isRailToolVisible,
+    liquifyActive,
+    mobileImmersive,
+    perspectiveRulerActive,
+    pixelForceCircle,
+    pixelSel,
+    pixelTool,
+    quickShapeActive,
+    railMoreOpen,
+    referencePanelOpen,
+    mannequinPoserOpen: admittedMannequinPoserOpen,
+    poserVrmOpen: admittedPoserVrmOpen,
+    bg3dOpen: admittedBg3dOpen,
+    hybridDccOpen,
+    selected,
+    selectedImageMutationLocked,
+    dodgeBurnActive,
+    wetMixActive,
+    smudgeActive,
+    tool,
+    uiDensityMode,
+    viewTransformSuppressed,
+    viewTool,
+    setAppSettingsInitialTab,
+    setAppSettingsOpen,
+    setDrawShape,
+    setEyedropperActive,
+    setMenu,
+    setPerspectiveRulerActive,
+    setPixelForceCircle,
+    setPixelTool,
+    setQuickShapeActive,
+    setRailMoreOpen,
+    setReferencePanelOpen,
+    setMannequinPoserOpen,
+    setPoserVrmOpen,
+    setHybridDccOpen,
+    setViewTool,
+    ...studioLeftToolRailHandlers,
+  });
   return (
       <div
         data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
@@ -170,63 +226,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
             />
           )}
         >
-        <LazyStudioLeftToolRail
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          pixelToolTargetAvailable={pixelToolTargetAvailable}
-          rasterRetouchTargetAvailable={rasterRetouchTargetAvailable}
-          advancedFillActive={advancedFillActive}
-          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
-          appSettings={appSettings}
-          appSettingsOpen={appSettingsOpen}
-          canvasOnlyMode={canvasOnlyMode}
-          commentPinArmed={commentPlacementActive}
-          cropActive={cropRect !== null}
-          drawMode={drawMode}
-          drawShape={drawShape}
-          eyedropperActive={eyedropperActive}
-          frameAnimOpen={frameAnimOpen}
-          frameAnimTargetId={frameAnimTargetId}
-          isRailToolVisible={isRailToolVisible}
-          liquifyActive={liquifyActive}
-          mobileImmersive={mobileImmersive}
-          perspectiveRulerActive={perspectiveRulerActive}
-          pixelForceCircle={pixelForceCircle}
-          pixelSel={pixelSel}
-          pixelTool={pixelTool}
-          quickShapeActive={quickShapeActive}
-          railMoreOpen={railMoreOpen}
-          referencePanelOpen={referencePanelOpen}
-          mannequinPoserOpen={admittedMannequinPoserOpen}
-          poserVrmOpen={admittedPoserVrmOpen}
-          bg3dOpen={admittedBg3dOpen}
-          hybridDccOpen={hybridDccOpen}
-          selected={selected}
-          selectedImageMutationLocked={selectedImageMutationLocked}
-          setAppSettingsInitialTab={setAppSettingsInitialTab}
-          setAppSettingsOpen={setAppSettingsOpen}
-          setDrawShape={setDrawShape}
-          setEyedropperActive={setEyedropperActive}
-          setMenu={setMenu}
-          setPerspectiveRulerActive={setPerspectiveRulerActive}
-          setPixelForceCircle={setPixelForceCircle}
-          setPixelTool={setPixelTool}
-          setQuickShapeActive={setQuickShapeActive}
-          setRailMoreOpen={setRailMoreOpen}
-          setReferencePanelOpen={setReferencePanelOpen}
-          setMannequinPoserOpen={setMannequinPoserOpen}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setHybridDccOpen={setHybridDccOpen}
-          setStrokeWidth={setStrokeWidth}
-          setViewTool={setViewTool}
-          dodgeBurnActive={dodgeBurnActive}
-          wetMixActive={wetMixActive}
-          smudgeActive={smudgeActive}
-          tool={tool}
-          uiDensityMode={uiDensityMode}
-          viewTransformSuppressed={viewTransformSuppressed}
-          viewTool={viewTool}
-          stableHandlers={studioLeftToolRailHandlers}
-        />
+        <LazyStudioLeftToolRail client={studioLeftToolRailClient} />
         </Suspense>
 
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
