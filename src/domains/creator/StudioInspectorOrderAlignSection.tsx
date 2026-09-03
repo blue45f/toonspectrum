@@ -137,6 +137,12 @@ export function StudioInspectorOrderAlignSection({
           <button type="button" onClick={() => alignSelected("bottom")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="아래쪽 정렬">
             <AlignEndHorizontal size={14} />
           </button>
+          <button type="button" onClick={() => alignSelected("distributeH")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="가로 등간격 분포 (CSP 2.0)">
+            <AlignHorizontalJustifyCenter size={14} className="rotate-90" />
+          </button>
+          <button type="button" onClick={() => alignSelected("distributeV")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="세로 등간격 분포 (CSP 2.0)">
+            <AlignVerticalJustifyCenter size={14} className="rotate-90" />
+          </button>
         </div>
       </StudioInspectorSection>
       <div className="mt-3 flex flex-wrap gap-1.5">

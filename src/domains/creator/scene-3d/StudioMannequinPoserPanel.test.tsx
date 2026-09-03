@@ -727,4 +727,22 @@ describe("StudioMannequinPoserPanel", () => {
     });
     await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
   });
+
+  it("exposes 3D Head Model (Face Proportions) presets and morphing sliders (CSP 2.0)", async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
+
+    expect(screen.getByText("3D 헤드 모델 (Face Proportions)")).toBeDefined();
+    expect(screen.getByRole("button", { name: /웹툰\/애니형/ })).toBeDefined();
+    expect(screen.getByRole("button", { name: /날카로운 턱/ })).toBeDefined();
+
+    // Click '날카로운 턱' preset
+    fireEvent.click(screen.getByRole("button", { name: /날카로운 턱/ }));
+
+    // Verify chin/face sliders exist
+    const faceWidthSlider = screen.getByLabelText(/턱\/얼굴 너비/);
+    expect(faceWidthSlider).toBeDefined();
+    fireEvent.change(faceWidthSlider, { target: { value: "0.85" } });
+    await waitFor(() => expect((faceWidthSlider as HTMLInputElement).value).toBe("0.85"));
+  });
 });

@@ -220,8 +220,15 @@ async function browseTab(page: Page, tab: string, label: string, expected: numbe
     await pill.click();
     const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
     await catalog.waitFor({ state: "visible", timeout: 8_000 });
-    await catalog.getByRole("tab", { name: label, exact: true }).click();
-    const options = catalog.getByRole("button", { name: /선택$/ });
+    // Eraser mode renders no material-group tabs — there are two presets, so the picker offers
+    // 즐겨찾기 / 최근 / 전체 only. Asking for a 지우개 tab there hangs on a locator that will never
+    // resolve, which is what this check reported as a product failure for one whole run.
+    const tabLabel = tab === "eraser" ? "전체" : label;
+    await catalog.getByRole("tab", { name: tabLabel, exact: true }).click();
+    // Paint cards are labelled "<이름> 선택"; eraser cards read "<이름>, 38% 지움. …". Match both
+    // shapes rather than one, and never by an element hook the eraser cards do not carry.
+    // Anchored: the sheet's close control is also labelled "…선택 닫기" and must not count.
+    const options = catalog.getByRole("button", { name: /( 선택$|지움\. )/ });
     let mounted = await options.count();
     // Exhaust the progressive batches, then keep going a little to prove it has actually settled.
     for (let batch = 0; batch < 60; batch += 1) {
@@ -237,7 +244,7 @@ async function browseTab(page: Page, tab: string, label: string, expected: numbe
     }
     await page.keyboard.press("Escape");
     if (mounted < expected) {
-      return row("absent-from-picker", `browsing "${label}" mounted ${mounted} of ${expected}`);
+      return row("absent-from-picker", `browsing "${tabLabel}" mounted ${mounted} of ${expected}`);
     }
     return row("ok", `${mounted}/${expected}`);
   } catch (error) {

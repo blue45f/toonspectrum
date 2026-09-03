@@ -1,0 +1,122 @@
+name: Creator Marketplace authoring release gate
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-release-gate.yml"
+      - "e2e/marketplace-authoring-inapp.spec.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-authoring-release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Reconcile all product integration points
+        run: |
+          node scripts/marketplace/integrate-creator-authoring.mjs
+          node scripts/marketplace/integrate-authoring-detail-action.mjs
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Unit and component contracts
+        run: >-
+          pnpm exec vitest run
+          lib/creator-marketplace-authoring-workshop.test.ts
+          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
+          --reporter=verbose
+
+      - name: Type-check and lint
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run lint:quick
+
+      - name: Production build
+        run: pnpm run build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Existing market and new authoring browser matrix
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/market.spec.ts
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line,html
+
+      - name: Write verified release marker
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs";
+          writeFileSync("marketplace-authoring-release-gate.json", `${JSON.stringify({
+            status: "passed",
+            testedHead: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            browser: "Chromium",
+            profiles: ["desktop-1440", "mobile-390", "kakaotalk-android-360", "naver-android-412", "instagram-ios-390"],
+            gates: ["authoring-unit", "authoring-component", "typecheck", "lint-quick", "production-build", "market-existing-e2e", "authoring-e2e", "inapp-e2e"],
+            physicalDeviceVerified: false,
+            generatedAt: new Date().toISOString(),
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Commit verified integration and marker
+        run: |
+          git config user.name "toonstudio-marketplace-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/market/components/MarketResourceDetailArticle.tsx \
+            src/domains/creator \
+            marketplace-authoring-integration-report.json \
+            marketplace-authoring-detail-integration-report.json \
+            marketplace-authoring-release-gate.json
+          if git diff --cached --quiet; then
+            echo "Release gate passed; no product integration diff remains."
+          else
+            git commit -m "test(market): certify creator authoring release flow"
+            git push origin HEAD:feat/marketplace-creator-pipeline-20260903
+          fi
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-authoring-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            marketplace-authoring-integration-report.json
+            marketplace-authoring-detail-integration-report.json
+            marketplace-authoring-release-gate.json
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 30

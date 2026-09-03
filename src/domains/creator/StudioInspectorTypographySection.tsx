@@ -14,6 +14,7 @@ import {
   StudioTextEffectPanel,
   StudioTextPathPanel,
 } from "./studio-page-lazy-ui";
+import { StudioCircularTextPanel } from "./text/StudioCircularTextPanel";
 import { StudioPresetFontPreload } from "./studio-preset-font-loading";
 import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
@@ -185,6 +186,52 @@ export function StudioInspectorTypographySection({
               onReset={() => patchEl(selected.id, { textPath: undefined } as Partial<El>)}
             />
           </Suspense>
+        </div>
+      )}
+
+      {selected.type === "text" && (
+        <div className="mt-2.5 border-t border-line/40 pt-2.5">
+          <StudioCircularTextPanel
+            text={selected.text}
+            enabled={
+              selected.textPath?.shape === "circleUp" ||
+              selected.textPath?.shape === "circleDown"
+            }
+            options={{
+              centerX: selected.x + selected.width / 2,
+              centerY: selected.y + (selected.fontSize || 24),
+              radius: Math.max(30, (selected.textPath?.curve ?? 50) * 2),
+              startAngleDeg: -90,
+              direction:
+                selected.textPath?.shape === "circleDown"
+                  ? "counter-clockwise"
+                  : "clockwise",
+              orientation: "outward",
+            }}
+            onToggleEnabled={(enabled) => {
+              if (enabled) {
+                patchEl(selected.id, {
+                  textPath: { shape: "circleUp", curve: 50 },
+                } as Partial<El>);
+              } else {
+                patchEl(selected.id, {
+                  textPath: undefined,
+                } as Partial<El>);
+              }
+            }}
+            onOptionsChange={(options) => {
+              const shape =
+                options.direction === "counter-clockwise"
+                  ? "circleDown"
+                  : "circleUp";
+              patchEl(selected.id, {
+                textPath: {
+                  shape,
+                  curve: Math.round(options.radius / 2),
+                },
+              } as Partial<El>);
+            }}
+          />
         </div>
       )}
 

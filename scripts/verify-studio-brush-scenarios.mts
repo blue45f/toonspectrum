@@ -1187,7 +1187,13 @@ async function runScenario(
             + `coverage (${cumulativeInk.join(",")})`,
         });
       }
-      if (!profile.transparent && firstDarkness > 0 && finalDarkness < firstDarkness * 1.05) {
+      // A brush that is opaque by material has no headroom to darken into; only a brush that can
+      // build tone is asked to. (The pen at opacity 1 read 90.1 -> 92.2 here and was reported.)
+      const opaqueByMaterial = profile.item.defaultOpacity >= 0.999;
+      if (
+        !profile.transparent && !opaqueByMaterial
+        && firstDarkness > 0 && finalDarkness < firstDarkness * 1.05
+      ) {
         buildupFindings.push({
           level: "warning",
           code: "buildup-lost",
@@ -1200,6 +1206,8 @@ async function runScenario(
       buildupFindings.push(...judgeStudioBrushScenarioBuildupLadder(meanDarkness, {
         transparent: profile.transparent,
         softWet: profile.softWet,
+        // Opaque by material: no headroom, no ladder — see the judge for the pen measurement.
+        opaque: opaqueByMaterial,
       }));
       strokes.push({
         label: "buildup-summary",

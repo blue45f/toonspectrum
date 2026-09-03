@@ -316,6 +316,8 @@ export function analyzeStudioBrushScenarioDiscrepancy(
 export interface StudioBrushScenarioJudgementInput {
   readonly softWet: boolean;
   readonly transparent: boolean;
+  /** Opaque by material (stroke opacity at 1): it has no headroom, so there is no ladder to judge. */
+  readonly opaque?: boolean;
 }
 
 function finding(
@@ -482,6 +484,11 @@ export function judgeStudioBrushScenarioBuildupLadder(
   input: StudioBrushScenarioJudgementInput,
 ): StudioBrushScenarioFinding[] {
   if (input.transparent) return [];
+  // A brush that is opaque by material paints its ceiling on the first pass. What its second
+  // pass adds is anti-aliased edge coverage, not tone — measured on the pen: 89.8 -> 92.1 over
+  // twenty passes — and reading that as a ladder that then died is the judge inventing a contract
+  // the medium never made.
+  if (input.opaque) return [];
   if (meanDarkness.length < STUDIO_BRUSH_BUILDUP_LADDER_PASSES) return [];
   const gain = (pass: number): number => meanDarkness[pass - 1]! - meanDarkness[pass - 2]!;
   if (gain(2) < STUDIO_BRUSH_BUILDUP_MIN_PASS_GAIN) return [];

@@ -201,6 +201,118 @@ describe("studio live-stroke render backend coordinator", () => {
     expect(session(coordinator).acceptedGpuRequest).toEqual(first);
   });
 
+  it("keeps an already-presented prefix on screen across its own journal appends", () => {
+    // A suffix append grows the retained journal in place, so the surface still holds a valid
+    // prefix of this same stroke. Closing presentation here removed the whole live stroke from
+    // every frame between an append submit and its async queue fence — measured as ~115 blinks in
+    // one pen gesture, one per pointer sample.
+    const { coordinator, epoch } = beginWebGpu();
+    const first = requestGpu(coordinator, epoch, "stroke-a", "gpu:first");
+    receiptGpu(coordinator, first);
+
+    const appended = accepted(coordinator.requestGpuFrame({
+      epoch,
+      strokeId: "stroke-a",
+      requestId: "gpu:append",
+      surfaceContinuity: "append",
+    }));
+    expect(appended.effects).toEqual([
+      { type: "canvas-shadow.retain-hidden" },
+      { type: "gpu-overlay.linger" },
+      { type: "gpu-frame.await", token: appended.gpuRequest },
+    ]);
+    expect(session(coordinator)).toMatchObject({
+      presentationBackend: "webgpu",
+      gpuOverlayVisible: true,
+      // The Canvas draft stays suppressed: continuity reveals this stroke's own pixels, never a
+      // second renderer's.
+      canvasShadowVisible: false,
+      acceptedGpuRequest: first,
+      expectedGpuRequest: appended.gpuRequest,
+    });
+
+    // Authority is still receipt-gated: only the newest exact token may be accepted.
+    expect(coordinator.receiveGpuFrameReceipt({
+      token: first,
+      backend: "webgpu",
+      complete: true,
+    })).toMatchObject({ status: "rejected", reason: "stale-gpu-result" });
+
+    receiptGpu(coordinator, appended.gpuRequest as StudioLiveStrokeGpuRequestToken);
+    expect(session(coordinator)).toMatchObject({
+      gpuOverlayVisible: true,
+      acceptedGpuRequest: appended.gpuRequest,
+      expectedGpuRequest: null,
+    });
+  });
+
+  it("never exposes the opening frame of a stroke, even when it is an append", () => {
+    const { coordinator, epoch } = beginWebGpu();
+    const opening = accepted(coordinator.requestGpuFrame({
+      epoch,
+      strokeId: "stroke-a",
+      requestId: "gpu:opening",
+      surfaceContinuity: "append",
+    }));
+    // Nothing has been receipted yet, so there is no prefix to keep and continuity grants nothing.
+    expect(opening.effects).toContainEqual({ type: "gpu-overlay.hide" });
+    expect(session(coordinator)).toMatchObject({
+      presentationBackend: null,
+      gpuOverlayVisible: false,
+    });
+  });
+
+  it.each(["rewrite", undefined] as const)(
+    "closes presentation for a %s submission over a presented prefix",
+    (surfaceContinuity) => {
+      // Replacing the journal baseline or reassigning the backing store discards the presented
+      // pixels. Omitting continuity must behave exactly like declaring `rewrite`.
+      const { coordinator, epoch } = beginWebGpu();
+      const first = requestGpu(coordinator, epoch, "stroke-a", "gpu:first");
+      receiptGpu(coordinator, first);
+
+      const rewritten = accepted(coordinator.requestGpuFrame({
+        epoch,
+        strokeId: "stroke-a",
+        requestId: "gpu:rewrite",
+        ...(surfaceContinuity ? { surfaceContinuity } : {}),
+      }));
+      expect(rewritten.effects).toContainEqual({ type: "gpu-overlay.hide" });
+      expect(session(coordinator)).toMatchObject({
+        presentationBackend: null,
+        gpuOverlayVisible: false,
+        acceptedGpuRequest: first,
+      });
+    },
+  );
+
+  it("closes an append-continued overlay as soon as the selected engine fails", () => {
+    const { coordinator, epoch } = beginWebGpu();
+    const first = requestGpu(coordinator, epoch, "stroke-a", "gpu:first");
+    receiptGpu(coordinator, first);
+    const appended = accepted(coordinator.requestGpuFrame({
+      epoch,
+      strokeId: "stroke-a",
+      requestId: "gpu:append",
+      surfaceContinuity: "append",
+    }));
+    expect(session(coordinator).gpuOverlayVisible).toBe(true);
+
+    const failed = accepted(coordinator.reportGpuFailure({
+      epoch,
+      strokeId: "stroke-a",
+      reason: "timeout",
+      token: appended.gpuRequest,
+    }));
+    expect(failed.effects).toContainEqual({ type: "gpu-overlay.hide" });
+    expect(session(coordinator)).toMatchObject({
+      presentationBackend: null,
+      gpuOverlayVisible: false,
+      canvasShadowVisible: false,
+      unavailableReason: "timeout",
+    });
+  });
+
   it.each([
     "request-failed",
     "frame-invalid",
