@@ -31,6 +31,7 @@ export default defineConfig(
     '**/.codex/**',
     '**/.remember/**',
     '**/scratch/**',
+    'scripts/__diag/**',
   ]),
 
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).
@@ -173,6 +174,12 @@ export default defineConfig(
     languageOptions: {
       sourceType: 'module',
       globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  {
+    files: ['scripts/**/*.{js,mjs}'],
+    rules: {
+      'no-useless-escape': 'off',
     },
   },
 

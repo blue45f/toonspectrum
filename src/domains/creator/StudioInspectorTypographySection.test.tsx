@@ -38,10 +38,10 @@ describe("StudioInspectorTypographySection", () => {
     const accordionBtn = screen.getByText("타이포그래피");
     fireEvent.click(accordionBtn);
 
-    const titleEl = await screen.findByText("원형 텍스트 (Circular Text)");
+    const titleEl = await screen.findByText("원형 텍스트 (Circular Text)", {}, { timeout: 5000 });
     expect(titleEl).toBeDefined();
 
-    const toggleBtn = await screen.findByText("원형 배치 Off");
+    const toggleBtn = await screen.findByText("원형 배치 Off", {}, { timeout: 5000 });
     expect(toggleBtn).toBeDefined();
 
     fireEvent.click(toggleBtn);

@@ -3,12 +3,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MarketplaceBrushRecipeAccelerator } from "./MarketplaceBrushRecipeAccelerator";
+
 import {
   createCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
 } from "@/lib/creator-marketplace-authoring-workshop";
 
-import { MarketplaceBrushRecipeAccelerator } from "./MarketplaceBrushRecipeAccelerator";
 
 afterEach(() => {
   cleanup();
