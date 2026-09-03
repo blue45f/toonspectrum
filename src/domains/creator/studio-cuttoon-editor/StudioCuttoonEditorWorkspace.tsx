@@ -5,8 +5,8 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
-import { Suspense } from "react";
-import { createStudioLeftToolRailClient } from "../editor-client/studio-left-tool-rail-client";
+import { Suspense, useLayoutEffect, useState } from "react";
+import { createStudioLeftToolRailRuntime } from "../editor-client/studio-left-tool-rail-client";
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
 import { cn } from "@/lib/utils";
 import { StudioCuttoonEditorCanvasColumn } from "./StudioCuttoonEditorCanvasColumn";
@@ -97,7 +97,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     presentationPanelsHidden,
     visibleLeftPanelOpen,
   } = s;
-  const studioLeftToolRailClient = createStudioLeftToolRailClient({
+  const studioLeftToolRailInput = {
     activeSurfaceReviewLocked,
     pixelToolTargetAvailable,
     rasterRetouchTargetAvailable,
@@ -152,7 +152,14 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
     setHybridDccOpen,
     setViewTool,
     ...studioLeftToolRailHandlers,
-  });
+  };
+  const [studioLeftToolRailRuntime] = useState(() =>
+    createStudioLeftToolRailRuntime(studioLeftToolRailInput)
+  );
+  useLayoutEffect(() => {
+    studioLeftToolRailRuntime.update(studioLeftToolRailInput);
+  }, [studioLeftToolRailInput, studioLeftToolRailRuntime]);
+
   return (
       <div
         data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
@@ -226,7 +233,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
             />
           )}
         >
-        <LazyStudioLeftToolRail client={studioLeftToolRailClient} />
+        <LazyStudioLeftToolRail client={studioLeftToolRailRuntime.client} />
         </Suspense>
 
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
