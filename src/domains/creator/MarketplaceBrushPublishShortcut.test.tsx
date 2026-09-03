@@ -3,10 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  findStoredBrushSnapshotForMarketplace,
-  MarketplaceBrushPublishShortcut,
-} from "./MarketplaceBrushPublishShortcut";
+import { MarketplaceBrushPublishShortcut } from "./MarketplaceBrushPublishShortcut";
+import { findStoredBrushSnapshotForMarketplace } from "./marketplace-brush-publish-snapshot";
 
 function createStorage(entries: Readonly<Record<string, string>>): Storage {
   const keys = Object.keys(entries);
