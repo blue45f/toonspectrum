@@ -1,0 +1,70 @@
+name: Fix WebGPU sparse frame token
+
+on:
+  push:
+    branches:
+      - feat/webgpu-sparse-tiles-final-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-webgpu-sparse-token-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[sparse-token-fixed]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/webgpu-sparse-tiles-final-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Keep the frame-token brand literal
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts")
+          source = path.read_text(encoding="utf-8")
+          old = "[STUDIO_GPU_SPARSE_TILE_ATLAS_TOKEN]: true,"
+          new = "[STUDIO_GPU_SPARSE_TILE_ATLAS_TOKEN]: true as const,"
+          if source.count(old) != 1:
+              raise SystemExit(f"expected one sparse token marker, found {source.count(old)}")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+
+      - name: Re-run sparse contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.ts \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts \
+            src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Commit verified type repair
+        run: |
+          rm -f .github/workflows/fix-webgpu-sparse-token.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "fix(webgpu): retain sparse atlas frame token brand [sparse-token-fixed]"
+          git push --no-verify origin HEAD:feat/webgpu-sparse-tiles-final-20260904
