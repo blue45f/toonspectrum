@@ -47,6 +47,8 @@ jobs:
           src/domains/creator/brush/studio-wet-media-two-well-field-bridge.ts
           src/domains/creator/brush/studio-wet-media-two-well-field-bridge.test.ts
       - name: Full TypeScript check
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm exec tsc -p tsconfig.json --noEmit
       - name: Remove temporary verifier after success
         run: |
