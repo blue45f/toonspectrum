@@ -43,7 +43,21 @@ jobs:
           path.write_text(source)
           PY
       - name: Apply the one-shot migration
-        run: node .github/codex/apply-editor-client-rail.mjs
+        run: |
+          node .github/codex/apply-editor-client-rail.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/domains/creator/StudioLeftToolRail.test.tsx')
+          source = path.read_text()
+          old = '''    const stableHandlers = createHandlers();
+              stableHandlers.fitCanvasToWidthWithFocus = vi.fn();'''
+          new = '''    const stableHandlers: StudioLeftToolRailHandlers = {
+              ...createHandlers(),
+              fitCanvasToWidthWithFocus: vi.fn(),
+            };'''
+          assert source.count(old) == 1, 'readonly fit-width fixture not found'
+          path.write_text(source.replace(old, new))
+          PY
       - name: Check the changed Studio boundary
         run: |
           pnpm exec eslint --fix --max-warnings=0 \
