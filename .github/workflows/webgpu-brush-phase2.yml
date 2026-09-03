@@ -82,6 +82,8 @@ jobs:
           scripts/studio-webgpu-phase2-topology-benchmark.mts
 
       - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: pnpm exec tsc -p tsconfig.json --noEmit
 
       - name: Topology parity benchmark
