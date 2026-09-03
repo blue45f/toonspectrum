@@ -49,12 +49,8 @@ jobs:
           from pathlib import Path
           path = Path('src/domains/creator/StudioLeftToolRail.test.tsx')
           source = path.read_text()
-          old = '''    const stableHandlers = createHandlers();
-              stableHandlers.fitCanvasToWidthWithFocus = vi.fn();'''
-          new = '''    const stableHandlers: StudioLeftToolRailHandlers = {
-              ...createHandlers(),
-              fitCanvasToWidthWithFocus: vi.fn(),
-            };'''
+          old = "    const stableHandlers = createHandlers();\n    stableHandlers.fitCanvasToWidthWithFocus = vi.fn();"
+          new = "    const stableHandlers: StudioLeftToolRailHandlers = {\n      ...createHandlers(),\n      fitCanvasToWidthWithFocus: vi.fn(),\n    };"
           assert source.count(old) == 1, 'readonly fit-width fixture not found'
           path.write_text(source.replace(old, new))
           PY
