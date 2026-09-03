@@ -43,8 +43,8 @@ import {
 import {
   StudioVrmBroadcastPreviewPanel,
 } from "./StudioVrmBroadcastPreview";
-import {
-  type LightingTone,
+import type {
+  LightingTone,
 } from "./StudioVrmLighting";
 import {
   CONTROL_BUTTON,

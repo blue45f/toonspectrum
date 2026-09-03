@@ -144,11 +144,19 @@ describe("studio inspector layout", () => {
       drawing: false,
     });
 
+    // 자간·행간은 문단 섹션 한 곳에만 있다(감사 §5.8) — 검색도 그 한 곳으로 안내한다.
     expect(filterStudioInspectorActions(textActions, "자간")).toEqual([
+      expect.objectContaining({
+        id: "text-align",
+        focusTarget: "element.text-align",
+        path: "대상 › 글자 › 문단",
+      }),
+    ]);
+    expect(filterStudioInspectorActions(textActions, "글꼴")).toEqual([
       expect.objectContaining({
         id: "typography",
         focusTarget: "element.typography",
-        path: "속성 › 글자 › 타이포그래피",
+        path: "대상 › 글자 › 글꼴",
       }),
     ]);
     expect(textActions).toContainEqual(

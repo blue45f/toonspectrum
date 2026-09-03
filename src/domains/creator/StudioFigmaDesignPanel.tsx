@@ -1,14 +1,33 @@
 /**
  * Authoritative selection geometry fields (position / size / rotation / opacity).
  * Pure presentation — parent applies patches via onChange.
+ *
+ * ## Why the numbers are folded (UX 감사 2026-09-02 §5.7)
+ *
+ * This panel used to render X·Y·W·H·회전·불투명도 plus three action buttons at the very
+ * top of every selection — nine controls before the first type-specific property, while
+ * the density contract (`studio-inspector-density.ts`) demotes numeric geometry to the
+ * advanced tier because canvas handles are the primary path for it. The panel now shows
+ * one essential control (불투명도) and a one-line 변형 summary; the numeric grid opens on
+ * demand, remembers its state like every other inspector section, and still answers the
+ * `selection.geometry` deep link from search and menus.
  */
-import { FlipHorizontal2, FlipVertical2, ScanSearch } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, FlipHorizontal2, FlipVertical2, ScanSearch } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
+import { STUDIO_INSPECTOR_CANONICAL_LABELS } from "./studio-inspector-density";
 import {
   scrollStudioInspectorTargetIntoView,
   useStudioInspectorFocusRequest,
 } from "./studio-inspector-focus-effect";
+import {
+  readStudioInspectorSectionOpen,
+  writeStudioInspectorSectionOpen,
+} from "./studio-inspector-section-state";
+import {
+  STUDIO_SELECTION_GEOMETRY_SECTION_ID,
+  studioSelectionGeometrySummary,
+} from "./studio-selection-geometry-summary";
 
 import type {
   StudioFigmaSelectionLayoutMetrics,
@@ -27,10 +46,17 @@ export interface StudioFigmaDesignPanelProps {
   readonly onFlipVertical?: () => void;
   readonly onZoomToSelection?: () => void;
   readonly className?: string;
+  /**
+   * Opens the numeric grid on mount. Reserved for workspaces that promote precise
+   * layout (a Figma-style profile); the default is the remembered state, closed at first.
+   */
+  readonly defaultGeometryOpen?: boolean;
 }
 
 function Field({
   label,
+  controlId,
+  priority,
   value,
   disabled,
   disabledReason,
@@ -42,6 +68,10 @@ function Field({
   onCommit,
 }: {
   label: string;
+  /** `data-inspector-control-id` — the canonical property this field edits. */
+  controlId: string;
+  /** `data-inspector-priority` — what the DOM density audit counts this as. */
+  priority: "essential" | "advanced";
   value: number;
   disabled?: boolean;
   /** Shown as the field's tooltip while it is inert, so a grey box always says why. */
@@ -89,6 +119,8 @@ function Field({
           value={draft ?? (mixed ? "" : String(settled))}
           placeholder={mixed ? "혼합" : undefined}
           aria-label={label}
+          data-inspector-control-id={controlId}
+          data-inspector-priority={priority}
           className="w-0 min-w-0 flex-1 bg-transparent text-[0.8rem] font-semibold tabular-nums text-fg outline-none placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
           onChange={(event) => setDraft(event.currentTarget.value)}
           onBlur={commitDraft}
@@ -103,7 +135,7 @@ function Field({
           }}
         />
         {suffix ? (
-          <span className="shrink-0 text-[0.68rem] font-semibold text-fg-3">{suffix}</span>
+          <span className="shrink-0 text-[0.6875rem] font-semibold text-fg-3">{suffix}</span>
         ) : null}
       </span>
     </label>
@@ -118,14 +150,22 @@ export function StudioFigmaDesignPanel({
   onFlipVertical,
   onZoomToSelection,
   className,
+  defaultGeometryOpen = false,
 }: StudioFigmaDesignPanelProps) {
   const rootRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLButtonElement>(null);
+  const gridId = useId();
+  const [open, setOpen] = useState(() =>
+    readStudioInspectorSectionOpen(STUDIO_SELECTION_GEOMETRY_SECTION_ID, defaultGeometryOpen),
+  );
   const [focusHighlighted, setFocusHighlighted] = useState(false);
   useStudioInspectorFocusRequest("selection.geometry", () => {
+    // A deep link lands on the numbers, not on a folded header the artist still has to find.
+    setOpen(true);
     setFocusHighlighted(true);
     scrollStudioInspectorTargetIntoView(rootRef.current);
     globalThis.requestAnimationFrame?.(() => {
-      rootRef.current?.focus({ preventScroll: true });
+      headerRef.current?.focus({ preventScroll: true });
     });
   });
   useEffect(() => {
@@ -136,6 +176,14 @@ export function StudioFigmaDesignPanel({
 
   if (!metrics) return null;
   const multi = metrics.elementCount > 1;
+  const opacityLabel = STUDIO_INSPECTOR_CANONICAL_LABELS.opacity;
+
+  /** Only a header press is remembered; a search deep link must not rewrite the preference. */
+  const toggleOpen = () => {
+    const next = !open;
+    setOpen(next);
+    writeStudioInspectorSectionOpen(STUDIO_SELECTION_GEOMETRY_SECTION_ID, next);
+  };
 
   return (
     <section
@@ -144,6 +192,7 @@ export function StudioFigmaDesignPanel({
       data-studio-figma-design-panel="true"
       data-studio-selection-scope={multi ? "multiple" : "single"}
       data-inspector-section="selection.geometry"
+      data-inspector-section-open={open ? "true" : "false"}
       data-inspector-section-highlighted={focusHighlighted ? "true" : undefined}
       aria-label="위치와 크기"
       className={cn(
@@ -152,125 +201,24 @@ export function StudioFigmaDesignPanel({
         className,
       )}
     >
-      <header className="mb-2 flex items-center justify-between gap-2">
+      {/* Essential row — the one geometry-adjacent value every selection type edits from the
+          panel rather than from canvas handles. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,7rem)] items-end gap-2">
         <div className="min-w-0">
           <p className="text-xs font-extrabold tracking-tight text-fg">
-            위치와 크기
+            {multi ? `${metrics.elementCount}개 선택 · 공통 속성` : "선택 대상"}
           </p>
-          <p className="text-[0.7rem] font-medium text-fg-3">
+          <p className="truncate text-[0.6875rem] font-medium text-fg-3">
             {multi
-              ? `${metrics.elementCount}개 선택 · 공통 속성`
-              : "좌표 · 크기 · 회전 · 투명도"}
+              ? "위치와 불투명도는 묶음 전체에 함께 적용됩니다"
+              : "위치·크기는 캔버스 핸들 또는 아래 변형에서"}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {onZoomToSelection ? (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onZoomToSelection}
-              title="선택 영역으로 확대 (⇧F)"
-              aria-label="선택 영역으로 확대"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
-              })}
-            >
-              <ScanSearch size={14} aria-hidden />
-            </button>
-          ) : null}
-          {onFlipHorizontal ? (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onFlipHorizontal}
-              title="좌우 반전 (⇧H)"
-              aria-label="선택 좌우 반전"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
-              })}
-            >
-              <FlipHorizontal2 size={14} aria-hidden />
-            </button>
-          ) : null}
-          {onFlipVertical ? (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={onFlipVertical}
-              title="상하 반전 (⇧V)"
-              aria-label="선택 상하 반전"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
-              })}
-            >
-              <FlipVertical2 size={14} aria-hidden />
-            </button>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Field
-          key={`x:${metrics.selectionKey}`}
-          label="가로 위치 X"
-          value={metrics.x}
-          disabled={disabled}
-          suffix="px"
-          onCommit={(x) => onChange({ x })}
-        />
-        <Field
-          key={`y:${metrics.selectionKey}`}
-          label="세로 위치 Y"
-          value={metrics.y}
-          disabled={disabled}
-          suffix="px"
-          onCommit={(y) => onChange({ y })}
-        />
-        <Field
-          key={`w:${metrics.selectionKey}`}
-          label="너비 W"
-          value={metrics.width}
-          disabled={disabled || multi || !metrics.supportsWidth}
-          disabledReason={metrics.widthDisabledReason}
-          min={1}
-          suffix="px"
-          onCommit={(width) => onChange({ width })}
-        />
-        <Field
-          key={`h:${metrics.selectionKey}`}
-          label="높이 H"
-          value={metrics.height}
-          disabled={disabled || multi || !metrics.supportsHeight}
-          disabledReason={metrics.heightDisabledReason}
-          min={1}
-          suffix="px"
-          onCommit={(height) => onChange({ height })}
-        />
-      </div>
-
-      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-        <Field
-          key={`rotation:${metrics.selectionKey}`}
-          // A stroke has no stored angle, so the box is an "and now turn it this much" input
-          // rather than a readout. Labelling it plain 회전 would promise a state that the
-          // document does not carry.
-          label={metrics.rotationIsRelative ? "회전(상대)" : "회전"}
-          value={metrics.rotation}
-          disabled={disabled || multi || !metrics.supportsRotation}
-          disabledReason={metrics.rotationDisabledReason}
-          step={1}
-          suffix="°"
-          onCommit={(rotation) => onChange({ rotation })}
-        />
         <Field
           key={`opacity:${metrics.selectionKey}`}
-          label="불투명"
+          label={opacityLabel}
+          controlId="selection.opacity"
+          priority="essential"
           value={Math.round(metrics.opacity * 100)}
           disabled={disabled || !metrics.supportsOpacity}
           disabledReason={
@@ -287,33 +235,187 @@ export function StudioFigmaDesignPanel({
         />
       </div>
 
-      {multi ? (
-        <div className="mt-2 space-y-1.5 rounded-lg bg-canvas/45 px-2 py-2 text-[0.7rem] leading-relaxed text-fg-3">
-          <p>
-            가로·세로 위치는 선택 묶음 전체를 이동하고, 불투명도는 한 번에 적용합니다.
-            크기와 회전은 캔버스 핸들에서 조절해 주세요.
-          </p>
-          <p className="font-medium text-fg-2">
-            색상·글자·클리핑처럼 대상마다 다른 속성은 한 개만 선택하면 표시됩니다.
-          </p>
-        </div>
-      ) : null}
-      {!multi && (!metrics.supportsWidth || !metrics.supportsHeight) ? (
-        <p className="mt-2 rounded-md bg-canvas/45 px-2 py-1.5 text-[0.7rem] leading-relaxed text-fg-3">
-          {metrics.widthDisabledReason ?? metrics.heightDisabledReason}
-        </p>
-      ) : null}
-      {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
-        <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-          선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
-          더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
-        </p>
-      ) : null}
-      {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
-        <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-          {metrics.rotationDisabledReason}
-        </p>
-      ) : null}
+      {/* Folded 변형 — summary row while closed, numeric grid when open. */}
+      <button
+        ref={headerRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={gridId}
+        onClick={toggleOpen}
+        data-inspector-priority="chrome"
+        data-studio-selection-geometry-toggle="true"
+        className={cn(
+          "mt-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-line/70 bg-card/60 px-2 py-1 text-left transition-colors hover:border-line-strong hover:bg-raised lg:min-h-9 pointer-coarse:min-h-11",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        )}
+      >
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="shrink-0 text-xs font-bold text-fg">변형</span>
+          <span
+            className="truncate text-[0.6875rem] font-medium tabular-nums text-fg-3"
+            data-studio-selection-geometry-summary="true"
+          >
+            {studioSelectionGeometrySummary(metrics)}
+          </span>
+        </span>
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
+        />
+      </button>
+
+      <div id={gridId} hidden={!open}>
+        {open ? (
+          <div className="mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Field
+                key={`x:${metrics.selectionKey}`}
+                label="가로 위치 X"
+                controlId="selection.x"
+                priority="advanced"
+                value={metrics.x}
+                disabled={disabled}
+                suffix="px"
+                onCommit={(x) => onChange({ x })}
+              />
+              <Field
+                key={`y:${metrics.selectionKey}`}
+                label="세로 위치 Y"
+                controlId="selection.y"
+                priority="advanced"
+                value={metrics.y}
+                disabled={disabled}
+                suffix="px"
+                onCommit={(y) => onChange({ y })}
+              />
+              <Field
+                key={`w:${metrics.selectionKey}`}
+                label="너비 W"
+                controlId="selection.width"
+                priority="advanced"
+                value={metrics.width}
+                disabled={disabled || multi || !metrics.supportsWidth}
+                disabledReason={metrics.widthDisabledReason}
+                min={1}
+                suffix="px"
+                onCommit={(width) => onChange({ width })}
+              />
+              <Field
+                key={`h:${metrics.selectionKey}`}
+                label="높이 H"
+                controlId="selection.height"
+                priority="advanced"
+                value={metrics.height}
+                disabled={disabled || multi || !metrics.supportsHeight}
+                disabledReason={metrics.heightDisabledReason}
+                min={1}
+                suffix="px"
+                onCommit={(height) => onChange({ height })}
+              />
+              <Field
+                key={`rotation:${metrics.selectionKey}`}
+                // A stroke has no stored angle, so the box is an "and now turn it this much" input
+                // rather than a readout. Labelling it plain 회전 would promise a state that the
+                // document does not carry.
+                label={metrics.rotationIsRelative ? "회전(상대)" : "회전"}
+                controlId="selection.rotation"
+                priority="advanced"
+                value={metrics.rotation}
+                disabled={disabled || multi || !metrics.supportsRotation}
+                disabledReason={metrics.rotationDisabledReason}
+                step={1}
+                suffix="°"
+                onCommit={(rotation) => onChange({ rotation })}
+              />
+              <div className="flex items-end justify-end gap-1">
+                {onZoomToSelection ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={onZoomToSelection}
+                    title="선택 영역으로 확대 (⇧F)"
+                    aria-label="선택 영역으로 확대"
+                    data-inspector-control-id="selection.zoom"
+                    data-inspector-priority="advanced"
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "quiet",
+                      className: "size-9 gap-0 px-0 pointer-coarse:size-11",
+                    })}
+                  >
+                    <ScanSearch size={14} aria-hidden />
+                  </button>
+                ) : null}
+                {onFlipHorizontal ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={onFlipHorizontal}
+                    title="좌우 반전 (⇧H)"
+                    aria-label="선택 좌우 반전"
+                    data-inspector-control-id="selection.flip-horizontal"
+                    data-inspector-priority="advanced"
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "quiet",
+                      className: "size-9 gap-0 px-0 pointer-coarse:size-11",
+                    })}
+                  >
+                    <FlipHorizontal2 size={14} aria-hidden />
+                  </button>
+                ) : null}
+                {onFlipVertical ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={onFlipVertical}
+                    title="상하 반전 (⇧V)"
+                    aria-label="선택 상하 반전"
+                    data-inspector-control-id="selection.flip-vertical"
+                    data-inspector-priority="advanced"
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "quiet",
+                      className: "size-9 gap-0 px-0 pointer-coarse:size-11",
+                    })}
+                  >
+                    <FlipVertical2 size={14} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {multi ? (
+              <div className="mt-2 space-y-1.5 rounded-lg bg-canvas/45 px-2 py-2 text-[0.6875rem] leading-relaxed text-fg-3">
+                <p>
+                  가로·세로 위치는 선택 묶음 전체를 이동하고, 불투명도는 한 번에 적용합니다.
+                  크기와 회전은 캔버스 핸들에서 조절해 주세요.
+                </p>
+                <p className="font-medium text-fg-2">
+                  색상·글자·클리핑처럼 대상마다 다른 속성은 한 개만 선택하면 표시됩니다.
+                </p>
+              </div>
+            ) : null}
+            {!multi && (!metrics.supportsWidth || !metrics.supportsHeight) ? (
+              <p className="mt-2 rounded-md bg-canvas/45 px-2 py-1.5 text-[0.6875rem] leading-relaxed text-fg-3">
+                {metrics.widthDisabledReason ?? metrics.heightDisabledReason}
+              </p>
+            ) : null}
+            {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
+              <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
+                선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
+                더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+              </p>
+            ) : null}
+            {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
+              <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
+                {metrics.rotationDisabledReason}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

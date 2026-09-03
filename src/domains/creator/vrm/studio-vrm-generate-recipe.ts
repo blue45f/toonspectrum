@@ -12,13 +12,6 @@ import {
   type StudioVrmExportSceneSnapshot,
 } from "./studio-vrm-export-plan";
 import {
-  type StudioVrmExportExpression,
-  type StudioVrmExportExpressionPreset,
-  type StudioVrmExportFirstPersonAnnotation,
-  type StudioVrmExportHumanoidBones,
-  type StudioVrmExportSpringBoneConfig,
-} from "./studio-vrm-export-vrm-extension";
-import {
   studioVrmHairRigInverseBindMatrices,
   type StudioVrmHairRig,
 } from "./studio-vrm-hair-rig";
@@ -31,6 +24,14 @@ import {
   studioVrmRigInverseBindMatrices,
   type StudioVrmRig,
 } from "./studio-vrm-humanoid-rig";
+
+import type {
+  StudioVrmExportExpression,
+  StudioVrmExportExpressionPreset,
+  StudioVrmExportFirstPersonAnnotation,
+  StudioVrmExportHumanoidBones,
+  StudioVrmExportSpringBoneConfig,
+} from "./studio-vrm-export-vrm-extension";
 
 export const STUDIO_VRM_GENERATE_RECIPE_VERSION = 1 as const;
 export const STUDIO_VRM_GENERATE_GENERATOR = "ToonSpectrum Studio VRM Generate";

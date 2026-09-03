@@ -105,6 +105,8 @@ export interface StudioSearchOptions {
   minScore?: number;
   /** Restrict to one section. */
   kind?: StudioSearchKind;
+  /** Restrict to several sections — the unified dialog's scope chips. */
+  kinds?: readonly StudioSearchKind[];
 }
 
 export interface StudioSearchIndex {
@@ -452,6 +454,7 @@ export function searchStudio(
 
   for (const entry of index.entries) {
     if (options.kind && entry.kind !== options.kind) continue;
+    if (options.kinds && !options.kinds.includes(entry.kind)) continue;
     const scored = scoreEntry(entry, tokens, wholeQuery);
     if (!scored || scored.score < minScore) continue;
     const row: StudioSearchResult = {

@@ -220,9 +220,9 @@ describe("studio primary action reachability", () => {
     }
 
     const presentation = createStudioMainMenuPresentation(groups);
-    expect(presentation.coreGroupIds).toContain("brush");
-    expect(presentation.coreGroupIds).toContain("file");
-    expect(presentation.coreGroupIds).toContain("edit");
+    expect(presentation.presentedGroupIds).toContain("brush");
+    expect(presentation.presentedGroupIds).toContain("file");
+    expect(presentation.presentedGroupIds).toContain("edit");
 
     const chrome = [
       readFileSync(new URL("./StudioLeftToolRail.tsx", import.meta.url), "utf8"),

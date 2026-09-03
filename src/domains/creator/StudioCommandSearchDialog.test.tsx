@@ -190,6 +190,45 @@ describe("StudioCommandSearchDialog", () => {
  * D1 — "찾아놓고 실행이 안 된다". 네 경로 중 어느 하나라도 다시 no-op 이 되면
  * 아래가 깨진다.
  */
+describe("StudioCommandSearchDialog — 범위(scope)", () => {
+  it("범위 칩은 전체·현재 패널·명령·도움말 넷이고 기본은 전체다", () => {
+    openDialog(ALL_HANDLERS);
+    const group = screen.getByRole("radiogroup", { name: "검색 범위" });
+    expect(within(group).getAllByRole("radio").map((radio) => radio.textContent)).toEqual([
+      "전체",
+      "현재 패널",
+      "명령",
+      "도움말",
+    ]);
+    expect(within(group).getByRole("radio", { name: "전체" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("'현재 패널' 범위는 속성·패널 구획만 남긴다", () => {
+    openDialog({ ...ALL_HANDLERS, initialScope: "inspector" });
+    type("블러");
+    // 가우시안 블러는 명령 구획이라 현재 패널 범위에서는 나오지 않는다.
+    expect(screen.queryByText("가우시안 블러")).toBeNull();
+    expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
+  });
+
+  it("좁힌 범위가 비면 전체에서 몇 건이 맞는지 알려 주고 한 번에 넓힌다", () => {
+    openDialog({ ...ALL_HANDLERS, initialScope: "help" });
+    type("가우시안 블러");
+    const widen = screen.getByRole("button", { name: /전체에서 \d+건 보기/u });
+    fireEvent.click(widen);
+    expect(
+      screen.getByRole("radio", { name: "전체" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(screen.getByText("가우시안 블러")).toBeTruthy();
+  });
+
+  it("'명령' 범위에서는 속성 행이 나오지 않는다", () => {
+    openDialog({ ...ALL_HANDLERS, initialScope: "command" });
+    type("마스크");
+    expect(screen.queryByRole("option", { name: /대상 › 마스크/u })).toBeNull();
+  });
+});
+
 describe("StudioCommandSearchDialog — 결과 활성화", () => {
   it("명령 행을 클릭하면 도움말 소비자가 helpNodeId 와 commandId 를 함께 받는다", () => {
     const onOpenHelp = vi.fn();
@@ -382,7 +421,7 @@ describe("StudioCommandSearchHost", () => {
     fireEvent.click(trigger);
     await screen.findByRole("dialog");
     type("레이어 마스크");
-    fireEvent.click(screen.getByRole("option", { name: /속성 › 마스크/u }));
+    fireEvent.click(screen.getByRole("option", { name: /대상 › 마스크/u }));
     await waitFor(() => {
       expect(document.activeElement).toBe(
         screen.getByRole("button", { name: "목적지" }),

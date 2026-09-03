@@ -94,9 +94,9 @@ import {
 import {
   studioVrmProportionsRequireRuntime,
 } from "./StudioVrmViewportUtils";
-import {
-  type StudioVrmWardrobeCaptureSync,
-  type StudioVrmWardrobeSurfaceReceipt,
+import type {
+  StudioVrmWardrobeCaptureSync,
+  StudioVrmWardrobeSurfaceReceipt,
 } from "./StudioVrmWardrobePropsProjection";
 import {
   canonicalizeVrmContentHash,

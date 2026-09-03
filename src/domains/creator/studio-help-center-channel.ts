@@ -16,6 +16,8 @@
  * 순수 모듈이다. React·DOM·타이머 없음.
  */
 
+import type { StudioCommandSearchScope } from "./studio-command-search-scope";
+
 export type StudioHelpCenterSection =
   | "current-tool"
   | "terminology"
@@ -66,8 +68,14 @@ function createChannel<T>() {
   };
 }
 
+export type { StudioCommandSearchScope } from "./studio-command-search-scope";
+
+export interface StudioCommandSearchRequest {
+  readonly scope?: StudioCommandSearchScope;
+}
+
 const helpCenterChannel = createChannel<StudioHelpCenterRequest>();
-const commandSearchChannel = createChannel<void>();
+const commandSearchChannel = createChannel<StudioCommandSearchRequest>();
 
 /** 도움말 센터를 연다. 구독자가 없으면 `false` — 조용히 삼키지 않는다. */
 export function openStudioHelpCenter(request: StudioHelpCenterRequest): boolean {
@@ -80,13 +88,15 @@ export function subscribeStudioHelpCenter(
   return helpCenterChannel.subscribe(listener);
 }
 
-/** Wave D 의 통합 Command Search 다이얼로그(F1)를 메뉴에서 연다. */
-export function requestStudioCommandSearch(): boolean {
-  return commandSearchChannel.publish();
+/** Wave D 의 통합 Command Search 다이얼로그(F1)를 메뉴·인스펙터·모바일 도크에서 연다. */
+export function requestStudioCommandSearch(
+  request: StudioCommandSearchRequest = {},
+): boolean {
+  return commandSearchChannel.publish(request);
 }
 
 export function subscribeStudioCommandSearchRequests(
-  listener: Listener<void>,
+  listener: Listener<StudioCommandSearchRequest>,
 ): () => void {
   return commandSearchChannel.subscribe(listener);
 }

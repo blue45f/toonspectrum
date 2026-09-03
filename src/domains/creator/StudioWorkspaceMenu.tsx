@@ -173,9 +173,9 @@ const INSPECTOR_PRIMARY_LABELS: Record<
   StudioWorkspaceLayout["inspector"]["primary"],
   string
 > = {
-  properties: "도구 속성",
+  properties: "대상 속성",
   layers: "레이어",
-  document: "페이지 설정",
+  document: "문서 설정",
   publish: "작품 정보",
 };
 

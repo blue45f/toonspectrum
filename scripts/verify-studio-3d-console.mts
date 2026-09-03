@@ -676,6 +676,42 @@ function assertCondition(condition: unknown, message: string): asserts condition
   if (!condition) throw new Error(message);
 }
 
+/**
+ * Measures the VRM canvas repeatedly until two consecutive samples agree.
+ *
+ * `measureStudioVrmChroma` waits two animation frames, which is enough once the model has
+ * settled but not while textures, lighting and the avatar's own load-in are still resolving on
+ * the software rasterizer. A baseline captured mid-settle reads far more chromatic pixels than
+ * the steady frame, and the retention rule below then compares two different scenes: a runner
+ * measured baseline 0.0058 against a restored 0.0027 that exactly matched the steady value the
+ * same proof records elsewhere. Sampling to agreement removes that class of false failure
+ * without loosening a single threshold.
+ */
+async function measureSettledStudioVrmChroma(
+  page: Page,
+  canvas: Locator,
+  label: string,
+): Promise<StudioVrmChromaMetrics> {
+  const tolerance = 0.0004;
+  let previous = await measureStudioVrmChroma(page, canvas);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.waitForTimeout(400);
+    const next = await measureStudioVrmChroma(page, canvas);
+    if (
+      next.pixelCount === previous.pixelCount
+      && Math.abs(next.ratio - previous.ratio) <= tolerance
+    ) {
+      return next;
+    }
+    previous = next;
+  }
+  console.warn(
+    `[verify-studio-3d-console] ${label} chroma never settled; using the last sample `
+    + `(ratio=${previous.ratio.toFixed(4)})`,
+  );
+  return previous;
+}
+
 export function collectStudioVrmMannequinChromaFailures(
   baseline: StudioVrmChromaMetrics,
   mannequin: StudioVrmChromaMetrics,
@@ -812,11 +848,22 @@ async function dismissHydratedQuickStart(page: Page): Promise<void> {
   await quickStart.waitFor({ state: "detached", timeout: 3_000 });
 }
 
+/** Composite menubar title that absorbed the 3D group (studio-main-menu-presentation.ts). */
+const STUDIO_TOOLS_MENU_TITLE = "도구";
+
+/**
+ * Opens the dropdown that now carries the 3D rows.
+ *
+ * The §15.3 catalogue still owns a `3d` group, but the menubar presentation
+ * (UX 감사 2026-09-02) folds the six thin groups — 캔버스·변형·애니메이션·3D·협업·AI —
+ * into one 도구 title, so there is no top-level "3D" trigger any more. The rows
+ * themselves keep their ids and labels, so everything below this helper is unchanged.
+ */
 async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="3D"]');
+  await mainMenu.getByRole("menuitem", { name: STUDIO_TOOLS_MENU_TITLE, exact: true }).click();
+  const menu = page.locator(`[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]`);
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }
@@ -1032,7 +1079,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     exact: true,
   });
   await vrmCanvas.waitFor({ state: "visible", timeout: 5_000 });
-  const baselineChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  const baselineChroma = await measureSettledStudioVrmChroma(page, vrmCanvas, "baseline");
   await characterDialog.getByRole("tab", { name: "체형·색", exact: true }).click();
   const mannequinSwitch = characterDialog.getByRole("switch", {
     name: "중립 데생 인형 보기",
@@ -1043,13 +1090,13 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     await mannequinSwitch.getAttribute("aria-checked") === "true",
     "the mannequin switch did not activate",
   );
-  const mannequinChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  const mannequinChroma = await measureSettledStudioVrmChroma(page, vrmCanvas, "mannequin");
   await mannequinSwitch.click();
   assertCondition(
     await mannequinSwitch.getAttribute("aria-checked") === "false",
     "the mannequin switch did not deactivate",
   );
-  const restoredChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  const restoredChroma = await measureSettledStudioVrmChroma(page, vrmCanvas, "restored");
   const chromaFailures = collectStudioVrmMannequinChromaFailures(
     baselineChroma,
     mannequinChroma,
@@ -1145,6 +1192,21 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     babylonSpecialistRequests.length === 0,
     "opening the BG3D view tools must not request Babylon specialist code",
   );
+  // ADR-0018: no engine mounts itself. This lane has no WebGPU adapter, so the viewport stays
+  // behind the "WebGPU 사용 불가" gate — and every canvas assertion below waits for a canvas that
+  // will never appear — until WebGL2 is selected the way an artist without WebGPU selects it.
+  const backgroundWebgl2Preference = backgroundDialog.getByTestId(
+    "studio-bg3d-engine-preference-webgl2",
+  );
+  await backgroundWebgl2Preference.waitFor({ state: "visible", timeout: 15_000 });
+  if (await backgroundWebgl2Preference.getAttribute("aria-pressed") !== "true") {
+    await waitForLocatorEnabled(backgroundWebgl2Preference, page);
+    await backgroundWebgl2Preference.click();
+  }
+  await backgroundDialog
+    .getByTestId("studio-bg3d-engine-active-backend")
+    .filter({ hasText: "WebGL2 사용 중" })
+    .waitFor({ state: "visible", timeout: 60_000 });
   const babylonDiagnosticButton = backgroundDialog.getByTestId(
     BABYLON_DIAGNOSTIC_BUTTON_TEST_ID,
   );

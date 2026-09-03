@@ -4,8 +4,10 @@
  * The route sweep in `verify-studio-inapp-browser.mts` proves every Studio *route* survives an
  * embedded WebView. It never opens the 3D editor, which is a modal launched from inside the
  * editor, so nothing until now showed that the 3D surface itself works there — and that surface is
- * exactly where the engine-selection policy has to hold: a KakaoTalk or NAVER WebView must open the
- * editor on WebGL2, render real pixels, and keep its engine control reachable at 360px.
+ * exactly where the engine-selection policy has to hold: a KakaoTalk or NAVER WebView blocks WebGPU,
+ * and since ADR-0018 nothing mounts WebGL2 on its own, so the artist has to select WebGL2 in the
+ * 보기 tab. This verifier makes that same explicit choice, then requires the editor to render real
+ * pixels on WebGL2 and keep its engine control reachable at 360px.
  *
  * Every assertion here is about the shipped UI, not a harness reimplementation: the production
  * build is served, the routed `bg3d` surface is opened the way a shared link opens it, and the
@@ -130,7 +132,19 @@ async function dismissQuickStart(page: Page): Promise<void> {
     .then(() => true)
     .catch(() => false);
   if (!mounted) return;
-  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  // Since 4583af11 the coach is non-modal and no longer yields to a foreign modal. On the routed
+  // `/studio/bg3d` entry the editor dialog is already stacked above it, so a click on the card's
+  // close button only ever hits the dialog and times out. The card underneath changes nothing this
+  // verifier measures, so leave it and drive the dialog; on a plain `/studio` visit it still closes.
+  const editorOpen = await page
+    .locator('[data-testid="studio-bg3d-dialog"]')
+    .isVisible()
+    .catch(() => false);
+  if (editorOpen) return;
+  await quickStart
+    .locator('[data-studio-quickstart-dismiss="true"]')
+    .click({ timeout: 10_000 })
+    .catch(() => undefined);
   await quickStart.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
 }
 
@@ -253,7 +267,7 @@ async function readEnginePanel(page: Page): Promise<ProfileResult["engine"]> {
   const status = page.locator('[data-testid="studio-bg3d-engine-status"]').first();
 
   let smallest: number | null = null;
-  for (const option of ["auto", "webgpu", "webgl2"]) {
+  for (const option of ["webgpu", "webgl2"]) {
     const button = page.locator(`[data-testid="studio-bg3d-engine-preference-${option}"]`).first();
     await button.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => undefined);
     const box = await button.boundingBox().catch(() => null);
@@ -266,6 +280,48 @@ async function readEnginePanel(page: Page): Promise<ProfileResult["engine"]> {
     status: await status.textContent().catch(() => null),
     smallestTouchTargetPx: smallest,
   };
+}
+
+/**
+ * Selects the WebGL2 engine the way an artist inside this host has to.
+ *
+ * ADR-0018 §6: BG3D never mounts WebGL2 on its own. In an in-app WebView the admission policy
+ * blocks WebGPU (`inapp-browser-blocked`), so the routed editor opens on the "WebGPU 사용 불가"
+ * gate with no canvas until WebGL2 is chosen in the 보기 tab. Driving that choice here keeps the
+ * verifier on the shipped path: everything read back afterwards is the engine the artist selected,
+ * not a fallback the product no longer performs. The sidebar returns to whichever tab was active.
+ */
+async function selectWebGl2Engine(page: Page): Promise<void> {
+  const previousTabId = await page
+    .locator('[id^="bg3d-tab-"][role="tab"][aria-selected="true"]')
+    .first()
+    .getAttribute("id")
+    .catch(() => null);
+  const viewTab = page.locator("#bg3d-tab-view").first();
+  await viewTab.waitFor({ state: "visible", timeout: 30_000 });
+  await viewTab.click();
+
+  const webgl2Selector = '[data-testid="studio-bg3d-engine-preference-webgl2"]';
+  const webgl2 = page.locator(webgl2Selector).first();
+  await webgl2.waitFor({ state: "visible", timeout: 15_000 });
+  if ((await webgl2.getAttribute("aria-pressed")) !== "true") {
+    // Both preference buttons stay disabled while the capability probe is still running.
+    await page.waitForFunction((selector) => {
+      const button = document.querySelector<HTMLButtonElement>(selector);
+      return button !== null && !button.disabled;
+    }, webgl2Selector, { timeout: 30_000 });
+    await webgl2.click();
+  }
+  await page.waitForFunction(() => (
+    document
+      .querySelector('[data-testid="studio-bg3d-engine-active-backend"]')
+      ?.textContent
+      ?.includes("WebGL2 사용 중") ?? false
+  ), null, { timeout: 60_000 });
+
+  if (previousTabId && previousTabId !== "bg3d-tab-view") {
+    await page.locator(`#${previousTabId}`).first().click().catch(() => undefined);
+  }
 }
 
 /**
@@ -342,6 +398,7 @@ async function runProfile(
   try {
     await seedStudioPreferences(page);
     await openBackground3d(page, baseUrl);
+    await selectWebGl2Engine(page);
 
     canvas = await readCanvasSignal(page);
     opened = true;

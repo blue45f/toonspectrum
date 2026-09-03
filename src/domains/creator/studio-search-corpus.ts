@@ -99,7 +99,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "레이어 마스크",
       labelEn: "Layer mask",
-      location: "인스펙터 › 속성 › 마스크",
+      location: "인스펙터 › 대상 › 마스크",
       description: "비파괴 마스크를 추가하고 반전하거나 직접 칠합니다.",
       aliases: [
         csp("레이어 마스크"),
@@ -120,7 +120,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "아래 레이어에 클리핑",
       labelEn: "Clip to layer below",
-      location: "인스펙터 › 속성 › 혼합",
+      location: "인스펙터 › 대상 › 혼합",
       description: "바로 아래 레이어의 불투명 영역으로 이 레이어를 가둡니다.",
       aliases: [
         csp("아래 레이어에서 클리핑"),
@@ -141,7 +141,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "혼합 모드",
       labelEn: "Blend mode",
-      location: "인스펙터 › 속성 › 혼합",
+      location: "인스펙터 › 대상 › 혼합",
       description: "곱하기·스크린·오버레이 등 레이어 합성 방식을 고릅니다.",
       aliases: [
         csp("합성 모드"),
@@ -162,7 +162,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "불투명도",
       labelEn: "Opacity",
-      location: "인스펙터 › 속성 › 혼합",
+      location: "인스펙터 › 대상 › 혼합",
       description: "선택한 요소나 레이어의 불투명도를 조절합니다.",
       aliases: [
         csp("불투명도"),
@@ -184,7 +184,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "위치·크기",
       labelEn: "Position and size",
-      location: "인스펙터 › 속성 › 배치",
+      location: "인스펙터 › 대상 › 배치",
       description: "X·Y·너비·높이·회전을 숫자로 입력합니다.",
       aliases: [
         csp("확대·축소·회전"),
@@ -208,7 +208,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "레이어 스타일",
       labelEn: "Layer style",
-      location: "인스펙터 › 속성 › 효과",
+      location: "인스펙터 › 대상 › 효과",
       description: "그림자·테두리·광선 같은 레이어 효과를 켭니다.",
       aliases: [
         csp("경계 효과"),
@@ -230,7 +230,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "레벨 보정",
       labelEn: "Levels",
-      location: "인스펙터 › 속성 › 보정 › 레벨",
+      location: "인스펙터 › 대상 › 보정 › 레벨",
       description: "입력·출력 레벨과 감마로 밝기 분포를 다시 맞춥니다.",
       aliases: [
         csp("레벨 보정"),
@@ -249,7 +249,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       kind: "property",
       label: "톤 커브",
       labelEn: "Tone curve",
-      location: "인스펙터 › 속성 › 보정 › 톤 커브",
+      location: "인스펙터 › 대상 › 보정 › 톤 커브",
       description: "RGB 채널별 곡선으로 명암을 세밀하게 조절합니다.",
       aliases: [
         csp("톤 커브"),
