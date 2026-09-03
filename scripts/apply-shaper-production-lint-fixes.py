@@ -69,11 +69,21 @@ panel_test_source = panel_test_source.replace(
     'queryByRole("listitem",',
     'queryByRole("button",',
 )
+panel_test_source = panel_test_source.replace(
+    '/내추럴 웨이브/u',
+    '/풍성한 웨이브/u',
+)
+panel_test_source = panel_test_source.replace(
+    '/기본 계란형/u',
+    '/갸름한 달걀형/u',
+)
 if (
     'getByRole("listitem",' in panel_test_source
     or 'queryByRole("listitem",' in panel_test_source
 ):
     raise RuntimeError("StudioShaperPanel tests still query interactive list items")
+if '/내추럴 웨이브/u' in panel_test_source or '/기본 계란형/u' in panel_test_source:
+    raise RuntimeError("StudioShaperPanel tests still use stale catalogue labels")
 panel_test.write_text(panel_test_source, encoding="utf-8")
 
 appearance_test = (
