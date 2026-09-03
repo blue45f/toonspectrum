@@ -505,6 +505,13 @@ interface CapturedStroke {
   readonly gestureMs: number;
   /** Product alerts that say a stroke was refused, read right after this gesture. */
   readonly refusals: readonly string[];
+  /**
+   * The refused-stroke recovery rail's own DOM hook, counted right after pointer-up and again
+   * after settle. Read beside the presented-frame series it separates two blinks that look the
+   * same on screen: a rail parking a refused stroke and repainting it on the CPU (notice present)
+   * from a compositor hidden between a submit and its receipt (no notice).
+   */
+  readonly rejectedNotices: { readonly released: number; readonly settled: number };
   /** Presented frames while the pointer was down, in presentation order. */
   readonly inStroke: readonly StudioBrushScenarioInStrokeFrame[];
   /** Per-canvas ink over the gesture, when TOONSPECTRUM_SCENARIO_LAYER_PROBE=1. */
@@ -773,6 +780,7 @@ async function drawAndCapture(
   await page.mouse.up();
   const gestureMs = Date.now() - started;
   const released = await shot(page, clip);
+  const noticesAtRelease = await page.locator("[data-studio-rejected-stroke-notice]").count();
   const postRelease: Buffer[] = [];
   for (let index = 0; index < (options.postFrames ?? 8); index += 1) {
     await page.waitForTimeout(40);
@@ -781,6 +789,7 @@ async function drawAndCapture(
   await page.mouse.move(4, 4);
   await page.waitForTimeout(options.settleMs ?? 2_000);
   const settled = await shot(page, clip);
+  const noticesAtSettle = await page.locator("[data-studio-rejected-stroke-notice]").count();
   const { app: perf, captureInduced } = attributePerf(await readPerfProbe(page));
   const refusals = await page.evaluate(`Array.from(document.querySelectorAll('[role="alert"]'))
     .map((element) => (element.textContent || "").trim())
@@ -796,6 +805,7 @@ async function drawAndCapture(
     captureInducedLongTasks: captureInduced,
     gestureMs,
     refusals,
+    rejectedNotices: { released: noticesAtRelease, settled: noticesAtSettle },
     inStroke: measurePresentedInk(presented, clip),
     layers,
     presented,
@@ -877,6 +887,7 @@ interface StrokeRecord {
   readonly inkSettled: number;
   readonly flicker: StudioBrushScenarioFlickerAnalysis;
   readonly inStroke: StudioBrushScenarioInStrokeAnalysis;
+  readonly rejectedNotices: { readonly released: number; readonly settled: number };
   readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
   readonly regions: Readonly<Record<string, StudioBrushScenarioDiscrepancy>>;
   readonly perf: {
@@ -1025,6 +1036,7 @@ function analyzeStroke(
     inkSettled: stats(settled),
     flicker,
     inStroke,
+    rejectedNotices: captured.rejectedNotices,
     layers: captured.layers,
     regions: regionResults,
     perf: {
@@ -1228,6 +1240,9 @@ async function runScenario(
           blinkCount: 0,
           verdict: "stable",
         },
+        // The build-up summary is a synthetic record over many gestures; it has no single
+        // pointer-up to read the recovery rail at, so it reports none.
+        rejectedNotices: { released: 0, settled: 0 },
         layers: null,
         regions: {},
         perf: {
@@ -1339,6 +1354,9 @@ async function runScenario(
   const undoResidue = await undoTimes(page, clip, scenarioBaseline, undoCount);
   const findings = strokes.flatMap((stroke) => stroke.findings);
   if (undoResidue >= 24) {
+    // A residue count cannot say whether it is leftover ink or a layout shift from a banner;
+    // the frame can. Write it next to the stroke artifacts whenever residue is reported.
+    writeFileSync(join(directory, `${scenario}-06-after-undo.png`), await shot(page, clip));
     findings.push({
       level: findings.some((entry) => entry.code === "stroke-refused") ? "warning" : "error",
       code: "undo-residue",
