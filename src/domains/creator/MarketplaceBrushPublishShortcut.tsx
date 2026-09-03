@@ -129,7 +129,7 @@ export function MarketplaceBrushPublishShortcut({
   return (
     <aside
       data-testid="brush-studio-marketplace-shortcut"
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[125] max-w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-line bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-5 sm:right-5"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[195] max-w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-line bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-5 sm:right-5"
       aria-label="브러시 마켓 등록"
     >
       <div className="flex items-center gap-3">
