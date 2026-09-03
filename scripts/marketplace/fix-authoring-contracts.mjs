@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-useless-escape -- These migration utilities intentionally store escaped source-code templates. */
-
 import fs from "node:fs";
 
 const WORKSHOP_PATH = "lib/creator-marketplace-authoring-workshop.ts";

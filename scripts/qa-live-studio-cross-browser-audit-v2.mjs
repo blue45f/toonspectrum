@@ -584,7 +584,6 @@ async function runCase(browser, profile, route) {
   let dom = await inspectDom(page, profile);
   if (dom.bodyTextLength === 0 && dom.visualSurfaceCount === 0 && dom.loadingLike && pageErrors.length === 0) {
     await sleep(RETRY_SETTLE_MS);
-    dom = await inspectDom(page, profile);
   }
 
   const ready = await page

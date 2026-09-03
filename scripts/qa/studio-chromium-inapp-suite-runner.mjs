@@ -19,7 +19,10 @@ const CASE_PATTERN = (() => {
   try {
     return new RegExp(source, "u");
   } catch (error) {
-    throw new Error(`Invalid QA_CASE_PATTERN ${JSON.stringify(source)}: ${String(error)}`);
+    throw new Error(
+      `Invalid QA_CASE_PATTERN ${JSON.stringify(source)}: ${String(error)}`,
+      { cause: error },
+    );
   }
 })();
 const ROOT = path.resolve(

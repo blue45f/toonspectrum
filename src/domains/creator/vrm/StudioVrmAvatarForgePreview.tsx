@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Preview helpers are part of the public rendering contract. */
 import { useId, type ReactNode } from "react";
 
 import {

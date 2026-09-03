@@ -163,7 +163,7 @@ async function scanFiles(files) {
     if ((!textExtensions.has(extension) && !special) || info.size > MAX_TEXT_BYTES) continue;
 
     const content = await readFile(file, "utf8").catch(() => "");
-    if (!content || /\u0000/u.test(content.slice(0, 4_000))) continue;
+    if (!content || content.slice(0, 4_000).includes(String.fromCharCode(0))) continue;
 
     if (special || /error-context|failure|failed|summary|result/iu.test(relative)) {
       const trimmed = compact(content, 10_000);

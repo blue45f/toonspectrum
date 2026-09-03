@@ -189,7 +189,7 @@ async function runCompatibilityCase(browser) {
     await heading.waitFor({ state: "visible", timeout: 20_000 });
     visible = true;
   } catch {
-    visible = false;
+    // Keep the initialized false value when the modal is absent.
   }
   record("compat-modal-visible", visible, { viewport, pageErrors });
   if (!visible) {

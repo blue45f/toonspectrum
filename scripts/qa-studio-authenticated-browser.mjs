@@ -139,7 +139,7 @@ async function browserJson(page, pathname, options = {}) {
       try {
         json = text ? JSON.parse(text) : null;
       } catch {
-        json = null;
+        // Keep the initialized null value for non-JSON responses.
       }
       return {
         ok: response.ok,

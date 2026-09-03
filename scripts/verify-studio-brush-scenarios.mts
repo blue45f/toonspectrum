@@ -521,7 +521,7 @@ interface CapturedStroke {
   /** Canvas clear/resize/draw events over the gesture, when TOONSPECTRUM_SCENARIO_CLEAR_TRACE=1. */
   readonly clearTrace: Array<Record<string, unknown>> | null;
   /** Sizes of the presented frames (diagnostic — off-size frames are skipped by the ink series). */
-  readonly presentedMeta: typeof lastPresentedMeta;
+  readonly presentedMeta: PresentedFrameMeta | null;
   /** The presented frames themselves, so a detected blink can be written out to look at. */
   readonly presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>;
 }
@@ -929,11 +929,13 @@ async function drawAndCapture(
  * rather than by cropping; the first frame is the pre-gesture reference by construction.
  */
 /** Diagnostic: sizes of every presented frame of the last measured gesture (clip screenshots resize the cast). */
-let lastPresentedMeta: {
-  referenceWidth: number;
-  referenceHeight: number;
-  frames: Array<{ tMs: number; width: number; height: number }>;
-} | null = null;
+interface PresentedFrameMeta {
+  readonly referenceWidth: number;
+  readonly referenceHeight: number;
+  readonly frames: Array<{ tMs: number; width: number; height: number }>;
+}
+
+let lastPresentedMeta: PresentedFrameMeta | null = null;
 
 function measurePresentedInk(
   presented: ReadonlyArray<{ readonly tMs: number; readonly data: Buffer }>,
@@ -1016,7 +1018,7 @@ interface StrokeRecord {
   readonly rejectedNotices: { readonly released: number; readonly settled: number };
   readonly layers: { labels: string[]; samples: Array<[number, number[], number]> } | null;
   readonly clearTrace: Array<Record<string, unknown>> | null;
-  readonly presentedMeta: typeof lastPresentedMeta;
+  readonly presentedMeta: PresentedFrameMeta | null;
   readonly regions: Readonly<Record<string, StudioBrushScenarioDiscrepancy>>;
   readonly perf: {
     longTasks: number;
@@ -1367,6 +1369,10 @@ async function runScenario(
         // no in-stroke frames. Let the analyzer say that itself: a hand-written "stable" with
         // blinkCount 0 reads as a blink check that passed, when none ever ran.
         inStroke: analyzeStudioBrushScenarioInStroke([]),
+        inStrokeFrames: [],
+        rejectedNotices: { released: 0, settled: 0 },
+        clearTrace: null,
+        presentedMeta: null,
         layers: null,
         regions: {},
         perf: {
