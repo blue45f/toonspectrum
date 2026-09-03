@@ -14,6 +14,7 @@ const ACTIVE: StudioLayerBorderEffectSettings = {
   color: "#ff0000",
   type: "outer",
   antiAliased: true,
+  respectTransparency: true,
 };
 
 describe("StudioLayerBorderEffectPanel", () => {

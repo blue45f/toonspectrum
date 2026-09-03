@@ -187,7 +187,7 @@ describe("§15.3 menu group spec", () => {
       // 2026-08-27: View 중복이던 검수·미리보기 3종과 창 그룹의 앱 설정 두 번째
       // 진입점 extras 를 제거했다(40 → 36) — 단일 행은 Animation/Comic 그룹과
       // 편집 메뉴가 소유한다.
-      extras: 36,
+      extras: 38,
     });
   });
 
