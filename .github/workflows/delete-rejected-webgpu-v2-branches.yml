@@ -1,0 +1,80 @@
+name: Delete rejected WebGPU V2 branches
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/delete-rejected-webgpu-v2-branches.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const expected = new Map([
+              ["feat/webgpu-brush-v2-clean-20260904", "df8b6cf9d1f0211df5f733f4e58b282f7251ee64"],
+              ["feat/webgpu-brush-v2-final-20260904", "087227b73b2903d87fc806e7111a768b16e8cc85"],
+              ["feat/webgpu-brush-v2-main-final-20260904", "0e30bf6c478281d0717732760e5ca3f24d07d738"],
+            ]);
+            const prs = [651, 660, 661];
+            for (const number of prs) {
+              const { data } = await github.request(
+                "GET /repos/{owner}/{repo}/pulls/{pull_number}",
+                { owner, repo, pull_number: number },
+              );
+              if (data.state !== "closed" || data.merged_at !== null) {
+                core.setFailed(`PR #${number} is not closed/unmerged`);
+                return;
+              }
+            }
+            const open = await github.paginate(
+              "GET /repos/{owner}/{repo}/pulls",
+              { owner, repo, state: "open", per_page: 100 },
+            );
+            const used = new Set(open.flatMap((pr) => [pr.head.ref, pr.base.ref]));
+            const deleted = [];
+            const absent = [];
+            const preserved = [];
+            for (const [branch, sha] of expected) {
+              if (used.has(branch)) {
+                preserved.push(`${branch} — used by open PR`);
+                continue;
+              }
+              try {
+                const ref = await github.request(
+                  "GET /repos/{owner}/{repo}/git/ref/{ref}",
+                  { owner, repo, ref: `heads/${branch}` },
+                );
+                if (ref.data.object.sha !== sha) {
+                  preserved.push(`${branch} — moved to ${ref.data.object.sha}`);
+                  continue;
+                }
+                await github.request(
+                  "DELETE /repos/{owner}/{repo}/git/refs/{ref}",
+                  { owner, repo, ref: `heads/${branch}` },
+                );
+                deleted.push(`${branch} — ${sha}`);
+              } catch (error) {
+                if (error.status === 404) absent.push(`${branch} — absent`);
+                else throw error;
+              }
+            }
+            const report = [
+              "# Rejected WebGPU V2 cleanup",
+              `- Deleted: ${deleted.length}`,
+              `- Already absent: ${absent.length}`,
+              `- Preserved: ${preserved.length}`,
+              "", ...deleted.map((v) => `- ${v}`), ...absent.map((v) => `- ${v}`),
+              ...preserved.map((v) => `- ${v}`),
+            ].join("\n");
+            core.info(report);
+            await core.summary.addRaw(report).write();
+            if (preserved.length) core.setFailed("A rejected V2 branch was preserved");
