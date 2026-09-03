@@ -27,6 +27,7 @@ import {
   Upload,
   UserRound,
   Video,
+  Wand2,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -100,6 +101,7 @@ import {
   type StudioMannequinPoseLandmarker,
   type StudioMannequinWebcamErrorStage,
 } from "./studio-mannequin-webcam-tracking";
+import { StudioShaperPanel } from "./StudioShaperPanel";
 
 import type { ReactElement } from "react";
 
@@ -114,7 +116,7 @@ export interface StudioMannequinPoserPanelProps {
   readonly onInsert: (result: StudioMannequinCaptureResult) => Promise<boolean | void> | boolean | void;
 }
 
-type MannequinTabId = "body" | "pose" | "joint" | "camera";
+type MannequinTabId = "shaper" | "body" | "pose" | "joint" | "camera";
 type StudioMannequinWebcamLoadingStage = "engine" | "camera" | null;
 type StudioMannequinPersistenceStatus =
   | "idle"
@@ -140,6 +142,7 @@ const CAPTURE_SCALES = [1, 2, 3] as const;
 const STUDIO_MANNEQUIN_PHOTO_MIN_APPLIED_JOINTS = 6;
 
 const TABS: readonly { id: MannequinTabId; label: string; icon: ReactElement }[] = Object.freeze([
+  { id: "shaper", label: "셰이퍼", icon: <Wand2 size={13} aria-hidden /> },
   { id: "body", label: "체형", icon: <UserRound size={13} aria-hidden /> },
   { id: "pose", label: "포즈", icon: <PersonStanding size={13} aria-hidden /> },
   { id: "joint", label: "관절", icon: <Sliders size={13} aria-hidden /> },
@@ -1478,6 +1481,12 @@ export function StudioMannequinPoserPanel({
               ))}
             </nav>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {tab === "shaper" ? (
+                <StudioShaperPanel
+                  onTriggerPoseScanner={() => setTab("pose")}
+                  onInsertCanvas={handleCapture}
+                />
+              ) : null}
               {tab === "body" ? (
                 <StudioMannequinBodySection
                   params={params}
