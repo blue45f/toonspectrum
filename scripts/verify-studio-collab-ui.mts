@@ -57,6 +57,9 @@ async function attachPage(context: BrowserContext, label: string, pageErrors: st
   return page;
 }
 
+/** Composite menubar title that absorbed the 협업 group (studio-main-menu-presentation.ts). */
+const STUDIO_TOOLS_MENU_TITLE = "도구";
+
 async function revealOverflowMenuGroup(page: Page, label: string): Promise<boolean> {
   const overflow = page.locator('[data-studio-menubar-overflow-menu="true"]');
   if (!(await overflow.isVisible().catch(() => false))) return false;
@@ -125,8 +128,10 @@ async function presenceSnapshot(page: Page): Promise<string> {
 }
 
 async function openCollaborationItem(page: Page, item: string): Promise<void> {
-  await openMainMenuGroup(page, "협업");
-  const menu = page.locator(`[role="menu"][aria-label="협업"]`);
+  // 메뉴바 프레젠테이션(UX 감사 2026-09-02)이 협업을 도구 복합 타이틀로 접었다. 협업 행들은
+  // 그 드롭다운 안에서 자기 캡션과 id 를 그대로 유지한다.
+  await openMainMenuGroup(page, STUDIO_TOOLS_MENU_TITLE);
+  const menu = page.locator(`[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]`);
   await menu.getByRole("menuitem", { name: item }).click({ timeout: 5_000 });
   await page.waitForTimeout(400);
 }

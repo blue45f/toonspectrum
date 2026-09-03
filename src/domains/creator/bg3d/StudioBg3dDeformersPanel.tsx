@@ -1,9 +1,9 @@
 import { Move3d, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 
-import {
-  type DeformerKind,
-  type MeshDeformerConfig,
+import type {
+  DeformerKind,
+  MeshDeformerConfig,
 } from "../scene-3d/studio-3d-mesh-deformers";
 
 export interface StudioBg3dDeformersPanelProps {

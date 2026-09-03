@@ -107,8 +107,14 @@ describe("Studio layer navigator bundle boundary", () => {
   it("mounts the navigator only for the visible inspector layer tab with an accessible fallback", () => {
     const source = moduleEdges("../StudioInspectorAsideShell.tsx").source;
 
+    // The layers pane mounts for the 레이어 tab and, on panels ≥ 420px, under the 대상 tab as a
+    // split region (UX 감사 2026-09-02 §5.8). Either way the lazy navigator mounts only while the
+    // pane itself is visible — `layersPaneMounted` gates both the `hidden` attribute and the mount.
     expect(source).toMatch(
-      /id=\{tabA11y\.primary\.layers\.panelId\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{tabA11y\.primary\.layers\.tabId\}[\s\S]*?hidden=\{inspectorLayout\.primary !== "layers"\}[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,
+      /id=\{tabA11y\.primary\.layers\.panelId\}[\s\S]*?role=\{layersSplitWithProperties \? "region" : "tabpanel"\}[\s\S]*?aria-labelledby=\{layersSplitWithProperties \? undefined : tabA11y\.primary\.layers\.tabId\}[\s\S]*?hidden=\{!layersPaneMounted\}[\s\S]*?\{layersPaneMounted \? \([\s\S]*?<Suspense/,
+    );
+    expect(source).toContain(
+      'const layersPaneMounted = inspectorLayout.primary === "layers" || layersSplitWithProperties;',
     );
     expect(source).toMatch(
       /fallback=\{[\s\S]*?role="status"[\s\S]*?aria-live="polite"[\s\S]*?h-full min-h-72/,

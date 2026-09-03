@@ -3,7 +3,14 @@
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
  * Desktop IA (V5 §15.3):
- * - Visible: app menubar + 17 specification groups + AI + left tool rail
+ * - Catalogue: 17 specification groups + AI. That table is the coverage contract and it
+ *   does not move.
+ * - Presentation: twelve menubar titles. Eight catalogue groups are folded into two
+ *   composite titles (삽입 ← 텍스트·벡터, 도구 ← 캔버스·변형·애니메이션·3D·협업·AI); inside a
+ *   composite dropdown each source group keeps its own caption and every row keeps its id
+ *   and label. The dropdown's `aria-label` is the PRESENTED title, not the source group.
+ *   Source of truth: `src/domains/creator/studio-main-menu-presentation.ts` — this script
+ *   imports it rather than restating the fold.
  * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
@@ -13,125 +20,330 @@ import { spawn, type ChildProcess } from "node:child_process";
 
 import { chromium, type Locator, type Page } from "playwright";
 
+import {
+  STUDIO_MAIN_MENU_COMPOSITE_GROUPS,
+  STUDIO_MAIN_MENU_PRESENTATION_ORDER,
+  studioMainMenuPresentedTitleFor,
+} from "../src/domains/creator/studio-main-menu-presentation";
+
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
+
+import type { StudioMainMenuCompositeGroupId } from "../src/domains/creator/studio-main-menu-presentation";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 
-const MAIN_MENU: Record<string, string[]> = {
-  파일: [
-    "초안 저장",
-    "게시",
-    "프로젝트 가져오기…",
-    "PSD 가져오기…",
-    "ORA / CBZ / WILL 가져오기…",
-    "프로젝트 도구…",
-    "내보내기 / 다운로드",
-    "백업 (.json)",
-    "빠른 시작 · 새 작업…",
-    "버전 체크포인트…",
-    "게시 패키지…",
-    "에셋 권리 감사…",
-  ],
-  편집: [
-    "실행취소",
-    "다시실행",
-    "잘라내기",
-    "복사",
-    "붙여넣기",
-    "현재 위치에 붙여넣기",
-    "선택 제거",
-    "복제",
-    "작업 내역",
-    "펜 압력 설정…",
-    "애플리케이션 설정…",
-    "자동 액션 · 매크로…",
-  ],
-  보기: [
-    "확대",
-    "축소",
-    "왼쪽으로 90° 회전",
-    "오른쪽으로 90° 회전",
-    "화면에 맞게 조정",
-    "실제 픽셀 (100%)",
-    "현재 보기 저장",
-    "제작 인사이트…",
-    "미니맵 · 탐색",
-    "밑그림 오버레이 (이메레스)",
-  ],
-  캔버스: ["캔버스 크기 · 문서 설정…"],
-  레이어: [
-    "이미지…",
-    "레이어 · 맨 위로",
-    "레이어 · 맨 뒤로",
-    "레이어 자르기…",
-    "레이어 마스크 편집…",
-    "나만 숨긴 레이어 모두 표시",
-  ],
-  선택: ["모두 선택", "선택 해제", "선택 반전"],
-  변형: ["선택 변형"],
-  그리기: [
-    "펜",
-    "지우개",
-    "채우기",
-    "스마트 도형",
-    "브러시 프리셋 목록…",
-    "브러시 스튜디오…",
-    "자연 매체 · 안료…",
-    "내 브러시…",
-    "브러시 가져오기 (ABR · MYB · KPP)…",
-    "배경 · 톤",
-    "팔레트 · 브랜드",
-  ],
-  필터: [
-    "마지막 필터…",
-    "가우시안 블러",
-    "모션 블러",
-    "색조 / 채도 / 밝기",
-    "명도 / 대비",
-    "색상 커브",
-    "레이어 보정 · 레벨",
-    "색수차",
-    "스케치 선화 정리",
-    "노이즈 추가",
-  ],
-  벡터: ["요소 · 도형"],
-  텍스트: ["말풍선", "텍스트", "대사 일괄 편집…", "대사 번역 · 다국어…"],
-  만화: [
-    "새 페이지",
-    "콜라주",
-    "톤 · 스크린톤",
-    "Writer Room · 대본…",
-    "스토리보드 그리드…",
-    "제작 바이블…",
-    "이야기 연속성 검사…",
-    "세로 스크롤 미리보기…",
-    "애니매틱 타임라인…",
-  ],
-  애니메이션: ["프레임 애니메이션…"],
-  "3D": ["3D 데생 인형", "3D 캐릭터", "3D 배경"],
-  협업: ["팀 · 공유 권한…", "페이지 검토 · 승인…"],
-  창: [
-    "슈퍼심플 레이아웃",
-    "전체 레이아웃",
-    "패널 접어 넓게",
-    "캔버스만",
-    "템플릿 · 에셋",
-    "참고 이미지 창",
-    "멀티 디스플레이 작업공간…",
-  ],
-  AI: ["AI 어시스트", "스톡 이미지", "연동 설정"],
-  도움말: [
-    "명령 · 속성 통합 검색",
-    "CSP · Photoshop 용어 찾기",
-    "현재 도구 도움말",
-    "사용법 · 기능 튜토리얼",
-    "단축키 · 기본 조작",
-    "기기 · 브라우저 진단…",
-    "복구 가이드…",
-    "라이선스 · 서드파티 고지…",
-    "버그 리포트 패키지…",
-  ],
+interface CatalogueGroup {
+  /** §15.3 catalogue group id — the key the presentation folds on. */
+  readonly id: string;
+  /**
+   * Korean group name. For a title that stands on its own this is the menubar
+   * label; inside a composite dropdown it is the section caption printed above
+   * the group's first row (`data-studio-main-menu-section`).
+   */
+  readonly caption: string;
+  readonly items: readonly string[];
+}
+
+/**
+ * Every catalogue group and every row it must still expose. Rows are asserted under
+ * whichever title now owns them — folding two tables into one must never drop a row,
+ * so `buildPresentedMenus()` re-reports any group the presentation does not place.
+ */
+const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
+  {
+    id: "file",
+    caption: "파일",
+    items: [
+      "초안 저장",
+      "게시",
+      "프로젝트 가져오기…",
+      "PSD 가져오기…",
+      "ORA / CBZ / WILL 가져오기…",
+      "프로젝트 도구…",
+      "내보내기 / 다운로드",
+      "백업 (.json)",
+      "빠른 시작 · 새 작업…",
+      "버전 체크포인트…",
+      "게시 패키지…",
+      "에셋 권리 감사…",
+    ],
+  },
+  {
+    id: "edit",
+    caption: "편집",
+    items: [
+      "실행취소",
+      "다시실행",
+      "잘라내기",
+      "복사",
+      "붙여넣기",
+      "현재 위치에 붙여넣기",
+      "선택 제거",
+      "복제",
+      "작업 내역",
+      "펜 압력 설정…",
+      "애플리케이션 설정…",
+      "자동 액션 · 매크로…",
+    ],
+  },
+  {
+    id: "view",
+    caption: "보기",
+    items: [
+      "확대",
+      "축소",
+      "왼쪽으로 90° 회전",
+      "오른쪽으로 90° 회전",
+      "화면에 맞게 조정",
+      "실제 픽셀 (100%)",
+      "현재 보기 저장",
+      "제작 인사이트…",
+      "미니맵 · 탐색",
+      "밑그림 오버레이 (이메레스)",
+    ],
+  },
+  { id: "canvas", caption: "캔버스", items: ["캔버스 크기 · 문서 설정…"] },
+  {
+    id: "layer",
+    caption: "레이어",
+    items: [
+      "이미지…",
+      "레이어 · 맨 위로",
+      "레이어 · 맨 뒤로",
+      "레이어 자르기…",
+      "레이어 마스크 편집…",
+      "나만 숨긴 레이어 모두 표시",
+    ],
+  },
+  { id: "select", caption: "선택", items: ["모두 선택", "선택 해제", "선택 반전"] },
+  { id: "transform", caption: "변형", items: ["선택 변형"] },
+  {
+    id: "brush",
+    caption: "그리기",
+    items: [
+      "펜",
+      "지우개",
+      "채우기",
+      "스마트 도형",
+      "브러시 프리셋 목록…",
+      "브러시 스튜디오…",
+      "자연 매체 · 안료…",
+      "내 브러시…",
+      "브러시 가져오기 (ABR · MYB · KPP)…",
+      "배경 · 톤",
+      "팔레트 · 브랜드",
+    ],
+  },
+  {
+    id: "filter",
+    caption: "필터",
+    items: [
+      "마지막 필터…",
+      "가우시안 블러",
+      "모션 블러",
+      "색조 / 채도 / 밝기",
+      "명도 / 대비",
+      "색상 커브",
+      "레이어 보정 · 레벨",
+      "색수차",
+      "스케치 선화 정리",
+      "노이즈 추가",
+    ],
+  },
+  { id: "vector", caption: "벡터", items: ["요소 · 도형"] },
+  {
+    id: "text",
+    caption: "텍스트",
+    items: ["말풍선", "텍스트", "대사 일괄 편집…", "대사 번역 · 다국어…"],
+  },
+  {
+    id: "comic",
+    caption: "만화",
+    items: [
+      "새 페이지",
+      "콜라주",
+      "톤 · 스크린톤",
+      "Writer Room · 대본…",
+      "스토리보드 그리드…",
+      "제작 바이블…",
+      "이야기 연속성 검사…",
+      "세로 스크롤 미리보기…",
+      "애니매틱 타임라인…",
+    ],
+  },
+  { id: "animation", caption: "애니메이션", items: ["프레임 애니메이션…"] },
+  { id: "3d", caption: "3D", items: ["3D 데생 인형", "3D 캐릭터", "3D 배경"] },
+  { id: "collaboration", caption: "협업", items: ["팀 · 공유 권한…", "페이지 검토 · 승인…"] },
+  {
+    id: "window",
+    caption: "창",
+    items: [
+      "슈퍼심플 레이아웃",
+      "전체 레이아웃",
+      "패널 접어 넓게",
+      "캔버스만",
+      "템플릿 · 에셋",
+      "참고 이미지 창",
+      "멀티 디스플레이 작업공간…",
+    ],
+  },
+  { id: "ai", caption: "AI", items: ["AI 어시스트", "스톡 이미지", "연동 설정"] },
+  {
+    id: "help",
+    caption: "도움말",
+    items: [
+      "명령 · 속성 통합 검색",
+      "CSP · Photoshop 용어 찾기",
+      "현재 도구 도움말",
+      "사용법 · 기능 튜토리얼",
+      "단축키 · 기본 조작",
+      "기기 · 브라우저 진단…",
+      "복구 가이드…",
+      "라이선스 · 서드파티 고지…",
+      "버그 리포트 패키지…",
+    ],
+  },
+];
+
+/**
+ * Korean menubar titles for the two composite groups. `COMPOSITE_LABELS` in
+ * `src/domains/creator/studio-main-menu-presentation.ts` owns these strings but does not
+ * export them; the ids and the fold itself are imported from that module, so only the
+ * two words are restated here.
+ */
+const COMPOSITE_TITLES: Readonly<Record<StudioMainMenuCompositeGroupId, string>> = {
+  insert: "삽입",
+  tools: "도구",
 };
+
+interface PresentedMenu {
+  /** Presented (menubar) group id from the presentation order. */
+  readonly id: string;
+  /** Menubar title — also the dropdown's `aria-label`. */
+  readonly title: string;
+  /** `true` when several catalogue groups share this title (삽입 / 도구). */
+  readonly composite: boolean;
+  /** Catalogue groups this title owns, in the order their sections render. */
+  readonly sections: readonly CatalogueGroup[];
+}
+
+const PRESENTED_ORDER: readonly string[] = STUDIO_MAIN_MENU_PRESENTATION_ORDER;
+
+/**
+ * 메뉴바 감사가 확정한 제시 제목 12종 — 순서까지 포함한 계약.
+ *
+ * 이 목록만은 모듈에서 유도하지 않고 손으로 적는다. 스스로 기대값을 유도하는 검증기는
+ * 재접기(re-fold)를 절대 잡을 수 없기 때문이다: `PRESENTED_ORDER` 는
+ * `STUDIO_MAIN_MENU_PRESENTATION_ORDER` 그 자체이고 `buildPresentedMenus` 는 제품과 똑같은
+ * 매핑으로 카탈로그를 접는다. 그래서 순서에서 `insert` 를 빼고 텍스트·벡터를 다른 제목
+ * 밑으로 옮기는 "짝맞춘 수정" 이 들어오면 유도된 단언은 전부 초록 그대로인 채 메뉴바만
+ * 조용히 11개로 줄어든다. 그 경우를 깨는 것은 독립적으로 적어 둔 기대값뿐이다.
+ *
+ * 반대로 ROWS(각 드롭다운의 항목·섹션)는 계속 유도한다. 항목 구성은 카탈로그의 소관이고
+ * 여기에 다시 적으면 중복 대장이 하나 더 생길 뿐이다. 고정하는 것은 제목 목록뿐.
+ */
+const PINNED_PRESENTED_TITLES: readonly string[] = [
+  "파일",
+  "편집",
+  "보기",
+  "삽입",
+  "레이어",
+  "선택",
+  "그리기",
+  "만화",
+  "필터",
+  "도구",
+  "창",
+  "도움말",
+];
+
+function compositeSourceOrder(presentedId: string): readonly string[] | null {
+  return (
+    (STUDIO_MAIN_MENU_COMPOSITE_GROUPS as Readonly<Record<string, readonly string[]>>)[
+      presentedId
+    ] ?? null
+  );
+}
+
+/**
+ * Folds `CATALOGUE_GROUPS` exactly the way the product does: `studioMainMenuPresentedTitleFor`
+ * decides which title owns a group and `STUDIO_MAIN_MENU_COMPOSITE_GROUPS` decides the section
+ * order inside a composite dropdown. `orphans` catches any catalogue group the presentation
+ * would not place, so a future re-fold cannot silently retire rows from this verifier.
+ */
+function buildPresentedMenus(): { menus: PresentedMenu[]; orphans: string[] } {
+  const orphans: string[] = [];
+  const owned = new Map<string, CatalogueGroup[]>();
+  for (const group of CATALOGUE_GROUPS) {
+    const presentedId = studioMainMenuPresentedTitleFor(group.id);
+    if (!PRESENTED_ORDER.includes(presentedId)) {
+      orphans.push(`${group.caption} (${group.id}) → ${presentedId}`);
+      continue;
+    }
+    const bucket = owned.get(presentedId);
+    if (bucket) bucket.push(group);
+    else owned.set(presentedId, [group]);
+  }
+
+  const menus: PresentedMenu[] = [];
+  for (const presentedId of PRESENTED_ORDER) {
+    const sections = owned.get(presentedId);
+    if (!sections || sections.length === 0) {
+      orphans.push(`제시 제목에 대응하는 카탈로그 그룹 없음: ${presentedId}`);
+      continue;
+    }
+    const sourceOrder = compositeSourceOrder(presentedId);
+    const ordered = sourceOrder
+      ? [...sections].sort(
+        (a, b) => sourceOrder.indexOf(a.id) - sourceOrder.indexOf(b.id),
+      )
+      : sections;
+    menus.push({
+      id: presentedId,
+      // A stand-alone title renders its own catalogue caption; a composite renders the
+      // presentation's own word instead.
+      title: sourceOrder
+        ? COMPOSITE_TITLES[presentedId as StudioMainMenuCompositeGroupId]
+        : ordered[0].caption,
+      composite: sourceOrder !== null,
+      sections: ordered,
+    });
+  }
+  return { menus, orphans };
+}
+
+const { menus: PRESENTED_MENUS, orphans: PRESENTATION_ORPHANS } = buildPresentedMenus();
+
+/**
+ * 유도된 제시 제목이 고정 12종과 정확히(개수·순서·표기) 일치하는지 대조한다.
+ * 불일치는 `assertMainMenus` 가 실패로 올린다 — 여기서 throw 하면 리포트가 인쇄되기 전에
+ * 런이 죽어 어떤 제목이 어긋났는지 보이지 않는다.
+ */
+function pinnedTitleDrift(): string[] {
+  const presented = PRESENTED_MENUS.map((menu) => menu.title);
+  const matches =
+    presented.length === PINNED_PRESENTED_TITLES.length &&
+    presented.every((title, index) => title === PINNED_PRESENTED_TITLES[index]);
+  if (matches) return [];
+  return [
+    `제시 제목 12종 계약 위반 — 기대: [${PINNED_PRESENTED_TITLES.join(" ")}] / 실제: [${presented.join(" ")}]`,
+  ];
+}
+
+const PRESENTATION_TITLE_DRIFT = pinnedTitleDrift();
+
+/**
+ * Menubar title that currently owns a catalogue group (예: "ai" → 도구). An unmapped group
+ * falls back to its own caption instead of throwing: `PRESENTATION_ORPHANS` already reports
+ * that case as a failure, and a throw here would abort the run before the report is printed.
+ */
+function presentedTitleFor(catalogueGroupId: string): string {
+  const presentedId = studioMainMenuPresentedTitleFor(catalogueGroupId);
+  const menu = PRESENTED_MENUS.find((entry) => entry.id === presentedId);
+  if (menu) return menu.title;
+  const group = CATALOGUE_GROUPS.find((entry) => entry.id === catalogueGroupId);
+  return group?.caption ?? catalogueGroupId;
+}
 
 /** Left vertical rail — primary tool surface on desktop. */
 const RAIL_TOOLS = [
@@ -150,36 +362,42 @@ const RAIL_TOOLS = [
   "참고 이미지",
 ] as const;
 
-/** Open via main menu → assert popover chrome appears. */
+/**
+ * Open via main menu → assert popover chrome appears.
+ *
+ * Entries name the CATALOGUE group that owns the row; the runner resolves the menubar
+ * title through the presentation, so a row that moves under a composite title (AI now
+ * opens from 도구) keeps working without editing this table.
+ */
 const MENU_DRIVEN_POPOVERS: {
-  group: string;
+  groupId: string;
   item: string;
   /** Prefer unique headers so menubar labels are not false positives. */
   expectVisible: string[];
   expectDialogName?: string;
 }[] = [
   {
-    group: "창",
+    groupId: "window",
     item: "템플릿 · 에셋",
     expectVisible: ["템플릿", "이메레스", "장면", "클립", "효과"],
   },
   {
-    group: "그리기",
+    groupId: "brush",
     item: "배경 · 톤",
     expectVisible: ["배경 편집"],
   },
   {
-    group: "그리기",
+    groupId: "brush",
     item: "팔레트 · 브랜드",
     expectVisible: ["스타일", "팔레트", "브랜드"],
   },
   {
-    group: "AI",
+    groupId: "ai",
     item: "AI 어시스트",
     expectVisible: ["AI 연동", "어시스트", "스톡"],
   },
   {
-    group: "파일",
+    groupId: "file",
     item: "프로젝트 도구…",
     expectVisible: ["파일 · 프로젝트", "백업 · 복구 · 검토 · 내보내기"],
     expectDialogName: "프로젝트 작업",
@@ -232,6 +450,40 @@ async function hasVisibleMenuItem(menu: Locator, name: string): Promise<boolean>
       await row.scrollIntoViewIfNeeded().catch(() => undefined);
       if (await row.isVisible().catch(() => false)) return true;
     }
+  }
+  return false;
+}
+
+/**
+ * Section caption inside a composite dropdown. The caption is no longer hidden from
+ * assistive tech: `StudioMainMenu` wraps each source catalogue group in a
+ * `role="group"` whose `aria-labelledby` points at the caption node (which still carries
+ * `data-studio-main-menu-section`), so the caption *is* the section's accessible name and
+ * the rows keep their own `menuitem` roles.
+ *
+ * Given both handles, the accessible query is the one worth making: it passes only when
+ * the wrapper still has the group role AND `aria-labelledby` still resolves to a node
+ * holding exactly this caption — delete the caption and the name resolves to nothing, so
+ * the check fails, which is the property this helper owes its caller. A bare
+ * `[data-studio-main-menu-section="…"]` lookup is weaker in the direction that matters
+ * now: it would stay green if the labelling broke and the composite dropdown collapsed
+ * back into one unannounced flat list of ~15 rows.
+ *
+ * The visibility pass is still required — an accessible name says nothing about the
+ * caption being drawn — and it is scoped inside the matched group, using the data
+ * attribute purely as the pointer to the labelling node.
+ */
+async function hasVisibleSectionCaption(menu: Locator, caption: string): Promise<boolean> {
+  const groups = menu.getByRole("group", { name: caption, exact: true });
+  const count = await groups.count();
+  for (let index = 0; index < count; index += 1) {
+    const node = groups
+      .nth(index)
+      .locator(`[data-studio-main-menu-section="${caption}"]`)
+      .first();
+    if ((await node.count()) === 0) continue;
+    await node.scrollIntoViewIfNeeded().catch(() => undefined);
+    if (await node.isVisible().catch(() => false)) return true;
   }
   return false;
 }
@@ -298,31 +550,57 @@ async function assertChrome(page: Page): Promise<string[]> {
 
 async function assertMainMenus(page: Page): Promise<string[]> {
   const failures: string[] = [];
+  // The pinned twelve come first: if the presentation re-folded, every derived assertion
+  // below is measuring the wrong menubar and this line is the only one that says so.
+  for (const drift of PRESENTATION_TITLE_DRIFT) {
+    failures.push(drift);
+  }
+  // A catalogue group the presentation refuses to place would silently stop being
+  // asserted, so surface it as a failure rather than skipping it.
+  for (const orphan of PRESENTATION_ORPHANS) {
+    failures.push(`메뉴 표현 매핑 누락: ${orphan}`);
+  }
+
   const nav = page.locator('[data-studio-main-menu="true"]');
   if (!(await nav.isVisible().catch(() => false))) {
     failures.push("메인 메뉴 nav 미노출 (lg 이상 뷰포트 필요)");
     return failures;
   }
 
-  // Top-level group labels always visible
-  for (const group of Object.keys(MAIN_MENU)) {
-    if (!(await nav.getByRole("menuitem", { name: group, exact: true }).isVisible().catch(() => false))) {
-      failures.push(`메인 메뉴 그룹 버튼 미노출: ${group}`);
+  // Presented titles always visible. The folded catalogue groups (캔버스·변형·벡터·텍스트·
+  // 애니메이션·3D·협업·AI) are NOT titles any more, so asserting them here would be wrong.
+  for (const menu of PRESENTED_MENUS) {
+    if (!(await nav.getByRole("menuitem", { name: menu.title, exact: true }).isVisible().catch(() => false))) {
+      failures.push(`메인 메뉴 그룹 버튼 미노출: ${menu.title}`);
     }
   }
 
-  for (const [group, items] of Object.entries(MAIN_MENU)) {
+  for (const presented of PRESENTED_MENUS) {
     try {
-      await openMainMenuGroup(page, group);
-      const menu = page.locator(`[role="menu"][aria-label="${group}"]`);
-      for (const item of items) {
-        const visible = await hasVisibleMenuItem(menu, item);
-        if (!visible) failures.push(`메인 메뉴 [${group}] 항목 없음: ${item}`);
+      await openMainMenuGroup(page, presented.title);
+      const menu = page.locator(`[role="menu"][aria-label="${presented.title}"]`);
+      for (const section of presented.sections) {
+        // Only a composite dropdown captions its sections; a stand-alone title's caption
+        // is the menubar label itself and is not repeated inside the panel.
+        if (presented.composite && !(await hasVisibleSectionCaption(menu, section.caption))) {
+          failures.push(`메인 메뉴 [${presented.title}] 섹션 캡션 없음: ${section.caption}`);
+        }
+        for (const item of section.items) {
+          const visible = await hasVisibleMenuItem(menu, item);
+          if (!visible) {
+            const where = presented.composite
+              ? `${presented.title} ▸ ${section.caption}`
+              : presented.title;
+            failures.push(`메인 메뉴 [${where}] 항목 없음: ${item}`);
+          }
+        }
       }
       await page.keyboard.press("Escape");
       await page.waitForTimeout(100);
     } catch (err) {
-      failures.push(`메인 메뉴 [${group}] 열기 실패: ${err instanceof Error ? err.message : String(err)}`);
+      failures.push(
+        `메인 메뉴 [${presented.title}] 열기 실패: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
   return failures;
@@ -331,10 +609,12 @@ async function assertMainMenus(page: Page): Promise<string[]> {
 async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
   const failures: string[] = [];
   const panel = page.getByRole("region", { name: "포즈 참고 보드" });
+  // 창 stands on its own today; resolve it anyway so a future fold does not strand this check.
+  const windowTitle = presentedTitleFor("window");
   const openWindowMenu = async (): Promise<Locator> => {
-    await openMainMenuGroup(page, "창");
+    await openMainMenuGroup(page, windowTitle);
     return page
-      .locator('[role="menu"][aria-label="창"]')
+      .locator(`[role="menu"][aria-label="${windowTitle}"]`)
       .locator('[data-studio-menu-item-id="reference-window"]');
   };
 
@@ -431,10 +711,11 @@ async function closeFloatingUi(page: Page) {
 async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   const failures: string[] = [];
   for (const entry of MENU_DRIVEN_POPOVERS) {
+    const title = presentedTitleFor(entry.groupId);
     try {
       await closeFloatingUi(page);
-      await openMainMenuGroup(page, entry.group);
-      const menu = page.locator(`[role="menu"][aria-label="${entry.group}"]`);
+      await openMainMenuGroup(page, title);
+      const menu = page.locator(`[role="menu"][aria-label="${title}"]`);
       await menu.getByRole("menuitem", { name: entry.item }).click({ timeout: 4000 });
       // Lazy panels + fixed popovers need a beat after main-menu close
       await page.waitForTimeout(700);
@@ -450,15 +731,15 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
       }
       if (matched === 0) {
         failures.push(
-          `메뉴 연동 팝오버 내용 없음: ${entry.group} → ${entry.item} (expected ${entry.expectVisible.join(", ")})`
+          `메뉴 연동 팝오버 내용 없음: ${title} → ${entry.item} (expected ${entry.expectVisible.join(", ")})`
         );
       } else {
-        log(`  popover ok: ${entry.group} → ${entry.item} (${matched}/${entry.expectVisible.length} markers)`);
+        log(`  popover ok: ${title} → ${entry.item} (${matched}/${entry.expectVisible.length} markers)`);
       }
       await closeFloatingUi(page);
     } catch (err) {
       failures.push(
-        `메뉴 연동 팝오버 실패 (${entry.group}/${entry.item}): ${err instanceof Error ? err.message : String(err)}`
+        `메뉴 연동 팝오버 실패 (${title}/${entry.item}): ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }

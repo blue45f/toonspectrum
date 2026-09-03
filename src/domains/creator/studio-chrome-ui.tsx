@@ -13,6 +13,7 @@
  *
  * Pure presentation only — no document state.
  */
+import { ArrowUpRight } from "lucide-react";
 import {
   forwardRef,
   type ButtonHTMLAttributes,
@@ -251,6 +252,7 @@ export function StudioAppMenubar({
     <div
       role="banner"
       aria-label={ariaLabel}
+      data-testid="studio-menubar"
       data-studio-app-menubar="true"
       className={cn(
         // Sumo-class top bar — denser commercial app chrome, still canvas-max height.
@@ -264,10 +266,15 @@ export function StudioAppMenubar({
       )}
     >
       <div
+        data-testid="studio-menubar-scroll"
         data-studio-app-menubar-scroll="true"
         className={cn(
           "flex min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
-          "overflow-hidden"
+          // Mobile actions are a bounded 44px icon cluster and all overlays use portals. Keeping
+          // this lane visible prevents focus rings and the final Publish action from being hard
+          // clipped by the top-bar shell. Desktop keeps the clipping boundary around its long
+          // two-row application menu.
+          "max-md:overflow-visible md:overflow-hidden"
         )}
       >
         {children}
@@ -861,6 +868,14 @@ type StudioRailToolButtonBaseProps =
   description?: string;
   /** Group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
+  /**
+   * The button opens a panel or workspace instead of changing the canvas tool
+   * (3D 인형·캐릭터·배경, Hybrid DCC, 참고 이미지, 프레임 애니메이션). UX 감사 2026-09-02
+   * §4.3: direct tools and launchers shared one button grammar, so the artist could not
+   * predict whether a press would change the cursor or open a surface. Launchers get a
+   * corner ↗ glyph, a softer corner radius and `aria-haspopup="dialog"`.
+   */
+  launcher?: boolean;
   accented?: boolean;
   /** Why the underlying tool is unavailable; remains discoverable from the disabled coach. */
   unavailableReason?: string;
@@ -878,6 +893,7 @@ export function StudioRailToolButton({
   hintPreview,
   hintPreviewVariant,
   grouped = false,
+  launcher = false,
   accented = false,
   unavailableReason,
   className,
@@ -909,10 +925,14 @@ export function StudioRailToolButton({
       aria-keyshortcuts={ariaKeyShortcuts}
       title={nativeTitle}
       data-studio-tool-description={description ? "true" : undefined}
+      data-studio-rail-launcher={launcher ? "true" : undefined}
+      aria-haspopup={launcher ? "dialog" : undefined}
       aria-pressed={active}
       className={cn(
         // Fresco-style: slightly larger hit, soft radius, no hard bevel.
-        "relative grid size-10 place-items-center rounded-2xl border border-transparent xl:size-11",
+        "relative grid size-10 place-items-center border border-transparent xl:size-11",
+        // Direct tools stay pill-round; launchers square off so the two kinds read apart at a glance.
+        launcher ? "rounded-lg border-dashed border-line/60" : "rounded-2xl",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active
@@ -939,6 +959,14 @@ export function StudioRailToolButton({
         <span
           aria-hidden
           className="absolute bottom-0.5 right-0.5 size-0 border-b-[4px] border-r-[4px] border-b-current border-r-transparent opacity-55"
+        />
+      ) : null}
+      {launcher ? (
+        <ArrowUpRight
+          size={9}
+          strokeWidth={2.5}
+          aria-hidden
+          className="absolute right-0.5 top-0.5 opacity-60"
         />
       ) : null}
     </button>

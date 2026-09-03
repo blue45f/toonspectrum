@@ -2,7 +2,6 @@ import {
   alignStudioSelection,
   type StudioAlignMode,
 } from "../studio-cuttoon-editor/studio-align-selected";
-import { type El } from "../studio-element-model";
 import {
   planStudioMultiSelectionLayoutPatch,
   planStudioSelectionFlip,
@@ -12,6 +11,8 @@ import {
 } from "../studio-figma-selection-ux";
 import { planAtomicSelectionTranslation } from "../studio-group-selection";
 import { isEffectivelyLocked, reorderLayerItem, type LayerGroup } from "../studio-layers";
+
+import type { El } from "../studio-element-model";
 
 export interface StudioSelectionTransformOptions {
   elements: El[];

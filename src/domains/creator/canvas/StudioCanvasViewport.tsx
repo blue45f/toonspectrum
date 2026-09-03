@@ -11,11 +11,11 @@ import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import { renderStudioCanvasStickyBanners } from "./StudioCanvasStickyBanners";
 import { StudioCanvasViewportHudOverlays } from "./StudioCanvasViewportHudOverlays";
 import { StudioCanvasViewportStageHost } from "./StudioCanvasViewportStageHost";
-import {
-  type StudioCanvasViewportHandlers,
-  type StudioCanvasViewportProps,
-  type StudioHokusaiLiveOverlaySurfaceBinding,
-  type StudioLivingInkOverlaySurfaceBinding,
+import type {
+  StudioCanvasViewportHandlers,
+  StudioCanvasViewportProps,
+  StudioHokusaiLiveOverlaySurfaceBinding,
+  StudioLivingInkOverlaySurfaceBinding,
 } from "./StudioCanvasViewportTypes";
 
 import { cn } from "@/lib/utils";

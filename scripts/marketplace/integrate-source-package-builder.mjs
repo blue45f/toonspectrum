@@ -1,4 +1,3 @@
-/* eslint-disable no-useless-escape -- These migration utilities intentionally store escaped source-code templates. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -124,7 +123,7 @@ if (!source.includes("원본 파일 바이트가 현재 세션에 없습니다."
   source = source.replace(anchor, `${insert}${anchor}`);
 }
 
-const oldPackageButton = `          <button\n            type="button"\n            onClick={() => downloadJson(\n              \`\${normalized.title || \"marketplace-asset\"}.toonmarket.json\`,\n              buildCreatorMarketplaceAuthoringManifest(normalized),\n            )}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >패키지 내려받기</button>`;
+const oldPackageButton = `          <button\n            type="button"\n            onClick={() => downloadJson(\n              \`\${normalized.title || "marketplace-asset"}.toonmarket.json\`,\n              buildCreatorMarketplaceAuthoringManifest(normalized),\n            )}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >패키지 내려받기</button>`;
 const newPackageButton = `          <button\n            type="button"\n            onClick={() => void downloadPackage()}\n            className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"\n          >원본 포함 패키지 내려받기</button>`;
 replaceOnce(oldPackageButton, newPackageButton, "package download button");
 

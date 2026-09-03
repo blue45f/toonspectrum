@@ -13,8 +13,8 @@ import {
   createAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
-import {
-  type CostumeState,
+import type {
+  CostumeState,
 } from "./studio-vrm-costume";
 import {
   applyStudioVrmCostumeState,
@@ -52,8 +52,8 @@ import {
   createStudioVrmProportionVrmAdapter,
   measureStudioVrmProportionHeadLength,
 } from "./studio-vrm-proportion-vrm-adapter";
-import {
-  type StudioVrmCameraSettings,
+import type {
+  StudioVrmCameraSettings,
 } from "./studio-vrm-scene-document";
 import {
   DEFAULT_VRM_CUSTOM_COLORS,

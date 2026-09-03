@@ -1,9 +1,9 @@
 import { ShieldCheck, Sparkles, Box, CheckCircle2, AlertTriangle } from "lucide-react";
 
-import { type WebtoonLicenseTier } from "../models/market-webtoon-licensing";
-import {
-  type PolycountGrade,
-  type AssetFormatId,
+import type { WebtoonLicenseTier } from "../models/market-webtoon-licensing";
+import type {
+  PolycountGrade,
+  AssetFormatId,
 } from "../models/market-webtoon-spec-inspector";
 
 import { cn } from "@/lib/utils";

@@ -29,18 +29,18 @@ import {
   type BodyScale,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
-import {
-  type StudioVrmPoseTranslations,
+import type {
+  StudioVrmPoseTranslations,
 } from "./studio-vrm-scene-document";
 import {
   createStudioVrmSurfacePaintTool,
   type StudioVrmSurfacePaintToolSnapshot,
 } from "./studio-vrm-surface-paint-tool";
-import {
-  type StudioVrmTexturePaintRuntime,
+import type {
+  StudioVrmTexturePaintRuntime,
 } from "./studio-vrm-texture-paint-runtime";
-import {
-  type VrmTrackingData,
+import type {
+  VrmTrackingData,
 } from "./studio-vrm-webcam-tracking";
 import {
   CANONICAL_LIMB_BONES,
@@ -50,8 +50,8 @@ import {
   LOOK_EXPRESSION_NAMES,
   ZERO_EULER,
 } from "./StudioVrmPoserTypes";
-import {
-  type StudioVrmTexturePaintPanelSettings,
+import type {
+  StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
 import {
   VRM_FRAME_BASE_PRIORITY,

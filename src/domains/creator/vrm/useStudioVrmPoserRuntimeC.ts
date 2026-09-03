@@ -27,9 +27,9 @@ import {
 import {
   cloneStudioVrmPoseTranslations,
 } from "./studio-vrm-pose-translations";
-import {
-  type CharacterPanelSection,
-  type PanelTab,
+import type {
+  CharacterPanelSection,
+  PanelTab,
 } from "./studio-vrm-poser-catalogs";
 import {
   findCameraPreset,
@@ -63,15 +63,15 @@ import {
 import {
   commitStudioVrmFullStateHistoryTransaction,
 } from "./studio-vrm-state-history";
-import {
-  type StudioVrmAvatarReferenceSelection,
+import type {
+  StudioVrmAvatarReferenceSelection,
 } from "./StudioVrmAvatarReferenceRecommendationsPanel";
-import {
-  type LightingTone,
+import type {
+  LightingTone,
 } from "./StudioVrmLighting";
-import {
-  type CaptureState,
-  type CustomPose,
+import type {
+  CaptureState,
+  CustomPose,
 } from "./StudioVrmPoserTypes";
 import {
   createStudioVrmProportionPoseTransaction,

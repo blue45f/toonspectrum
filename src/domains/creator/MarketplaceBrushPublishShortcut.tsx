@@ -1,5 +1,7 @@
 import { useState, type ReactElement } from "react";
 
+import { findStoredBrushSnapshotForMarketplace } from "./marketplace-brush-publish-snapshot";
+
 import {
   createCreatorMarketplaceDraftFromBrushStudio,
   saveCreatorMarketplaceAuthoringDraft,
@@ -15,51 +17,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function scoreBrushSnapshot(value: unknown, depth = 0): number {
-  if (!isRecord(value) || depth > 4) return 0;
-  let score = 0;
-  const weights: Readonly<Record<string, number>> = {
-    enginePrograms: 80,
-    engineProgram: 40,
-    dualBrush: 22,
-    grain: 18,
-    tipLayers: 18,
-    extraTips: 16,
-    brushTip: 14,
-    pressureCurve: 12,
-    dynamics: 12,
-    colorDynamics: 10,
-    wetMix: 10,
-    watercolor: 10,
-    impasto: 10,
-    presetFamily: 8,
-  };
-  for (const [key, weight] of Object.entries(weights)) {
-    if (key in value) score += weight;
-  }
-  for (const nested of Object.values(value)) {
-    if (isRecord(nested)) score += Math.floor(scoreBrushSnapshot(nested, depth + 1) * 0.45);
-  }
-  return score;
-}
-
 function findStoredBrushSnapshot(): unknown {
   if (typeof window === "undefined") return null;
-  let best: { score: number; value: unknown } | null = null;
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (!key || !/(brush|preset|studio|ink|pencil)/iu.test(key)) continue;
-    const raw = window.localStorage.getItem(key);
-    if (!raw || raw.length > 8_000_000) continue;
-    try {
-      const value: unknown = JSON.parse(raw);
-      const score = scoreBrushSnapshot(value);
-      if (score > (best?.score ?? 0)) best = { score, value };
-    } catch {
-      // Non-JSON cache entries are unrelated to the portable authoring contract.
-    }
+  try {
+    return findStoredBrushSnapshotForMarketplace(window.localStorage);
+  } catch {
+    return null;
   }
-  return best?.value ?? null;
 }
 
 async function requestLiveSnapshot(): Promise<unknown> {
@@ -87,9 +51,11 @@ async function requestLiveSnapshot(): Promise<unknown> {
       MARKETPLACE_BRUSH_SNAPSHOT_RESPONSE_EVENT,
       listener as EventListener,
     );
-    window.dispatchEvent(new CustomEvent(MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT, {
-      detail: { requestId },
-    }));
+    window.dispatchEvent(
+      new CustomEvent(MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT, {
+        detail: { requestId },
+      }),
+    );
   });
 }
 
@@ -106,6 +72,7 @@ export function MarketplaceBrushPublishShortcut({
   const publish = async (): Promise<void> => {
     if (busy) return;
     setBusy(true);
+    setMessage("현재 브러시 원본을 확인하는 중입니다.");
     try {
       const live = snapshotProvider ? await snapshotProvider() : await requestLiveSnapshot();
       const source = live ?? snapshot ?? findStoredBrushSnapshot() ?? {
@@ -135,10 +102,19 @@ export function MarketplaceBrushPublishShortcut({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <strong className="block truncate text-sm text-fg">마켓에 브러시 등록</strong>
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-fg-2">{message}</p>
+          <p
+            role="status"
+            aria-atomic="true"
+            aria-live="polite"
+            className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-fg-2"
+          >
+            {message}
+          </p>
         </div>
         <button
           type="button"
+          data-testid="brush-studio-marketplace-publish"
+          aria-busy={busy}
           onClick={() => void publish()}
           disabled={busy}
           className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"

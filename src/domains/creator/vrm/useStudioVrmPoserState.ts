@@ -29,11 +29,11 @@ import {
   type StudioVrmBroadcastBackgroundId,
   type StudioVrmBroadcastPreviewReceipt,
 } from "./studio-vrm-broadcast-preview";
-import {
-  type CostumeState,
+import type {
+  CostumeState,
 } from "./studio-vrm-costume";
-import {
-  type StudioVrmCostumeMeshEntry,
+import type {
+  StudioVrmCostumeMeshEntry,
 } from "./studio-vrm-costume-runtime";
 import {
   createStudioVrmCreativeSqliteRepository,
@@ -51,9 +51,9 @@ import {
   EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
   cloneStudioVrmPoseTranslations,
 } from "./studio-vrm-pose-translations";
-import {
-  type CharacterPanelSection,
-  type PanelTab,
+import type {
+  CharacterPanelSection,
+  PanelTab,
 } from "./studio-vrm-poser-catalogs";
 import {
   studioVrmTexturePaintSceneIdentity,
@@ -72,47 +72,47 @@ import {
   type FullVrmState,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
-import {
-  type StudioVrmPoseBucketId,
+import type {
+  StudioVrmPoseBucketId,
 } from "./studio-vrm-poser-ux";
 import {
   DEFAULT_VRM_PROP_RIG_METRICS,
   scaleVrmPropRigMetrics,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
-import {
-  type StudioVrmProportionRigReceipt,
-  type StudioVrmProportionRigRuntime,
+import type {
+  StudioVrmProportionRigReceipt,
+  StudioVrmProportionRigRuntime,
 } from "./studio-vrm-proportion-rig-runtime";
-import {
-  type StudioVrmProportionHeadMeasurementReceipt,
+import type {
+  StudioVrmProportionHeadMeasurementReceipt,
 } from "./studio-vrm-proportion-vrm-adapter";
-import {
-  type PropInstance,
+import type {
+  PropInstance,
 } from "./studio-vrm-props";
-import {
-  type StudioVrmRigProfileId,
+import type {
+  StudioVrmRigProfileId,
 } from "./studio-vrm-rig-profile";
-import {
-  type StudioVrmCameraSettings,
-  type StudioVrmIkConstraint,
-  type StudioVrmPoseTranslations,
+import type {
+  StudioVrmCameraSettings,
+  StudioVrmIkConstraint,
+  StudioVrmPoseTranslations,
 } from "./studio-vrm-scene-document";
-import {
-  type ScenePropAttachmentConfig as PropAttachmentConfig,
+import type {
+  ScenePropAttachmentConfig as PropAttachmentConfig,
 } from "./studio-vrm-scene-props";
 import {
   createStudioVrmFullStateHistory,
 } from "./studio-vrm-state-history";
-import {
-  type StudioVrmSurfacePaintToolSnapshot,
+import type {
+  StudioVrmSurfacePaintToolSnapshot,
 } from "./studio-vrm-surface-paint-tool";
 import {
   planStudioVrmTexturePaintDeviceTier,
 } from "./studio-vrm-texture-paint-device-tier";
-import {
-  type StudioVrmTexturePaintRuntime,
-  type StudioVrmTexturePaintRuntimeSnapshot,
+import type {
+  StudioVrmTexturePaintRuntime,
+  StudioVrmTexturePaintRuntimeSnapshot,
 } from "./studio-vrm-texture-paint-runtime";
 import {
   CalibrationSampler,
@@ -141,14 +141,14 @@ import {
 import {
   countDetectedVrmHairMeshes,
 } from "./StudioVrmAvatarForge";
-import {
-  type StudioVrmIkAxisLock,
-  type StudioVrmIkDragMode,
-  type StudioVrmIkEffectorBone,
-  type StudioVrmJointHandleBone,
+import type {
+  StudioVrmIkAxisLock,
+  StudioVrmIkDragMode,
+  StudioVrmIkEffectorBone,
+  StudioVrmJointHandleBone,
 } from "./StudioVrmJointHandles";
-import {
-  type LightingTone,
+import type {
+  LightingTone,
 } from "./StudioVrmLighting";
 import {
   DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS,
@@ -168,12 +168,12 @@ import {
   type ViewportApi,
   type VrmCreativePersistenceStatus,
 } from "./StudioVrmPoserTypes";
-import {
-  type StudioVrmTexturePaintPanelSettings,
+import type {
+  StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
-import {
-  type StudioVrmWardrobeCaptureSync,
-  type StudioVrmWardrobeSurfaceReceipt,
+import type {
+  StudioVrmWardrobeCaptureSync,
+  StudioVrmWardrobeSurfaceReceipt,
 } from "./StudioVrmWardrobePropsProjection";
 import {
   useStudioVrmAvatarReferenceCatalogue,
@@ -199,8 +199,8 @@ import type {
   VRMHumanBoneName,
 } from "@pixiv/three-vrm";
 
-import {
-  type SharedAssetCatalogItem,
+import type {
+  SharedAssetCatalogItem,
 } from "@/src/infrastructure/creator-client";
 
 export function useStudioVrmPoserState({

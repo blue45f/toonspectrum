@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { studioCalligraphyRibbonWorkUpperBound } from "./brush/studio-calligraphy-ribbon";
+import { studioAngledNibCoverageWorkUpperBound } from "./brush/studio-stroke-local-coverage";
 import { studioCalligraphyMaximumNibRadius } from "./studio-brush";
 import {
+  STUDIO_LIVE_TRANSFORM_EXACT_MAX_ANGLED_RIBBON_SAMPLES,
   STUDIO_LIVE_TRANSFORM_EXACT_MAX_CALLIGRAPHY_SAMPLES,
   STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS,
   STUDIO_LIVE_TRANSFORM_EXACT_MAX_CAUSAL_DABS,
@@ -62,7 +64,95 @@ function perfectComplexity(sampleCount: number, strokeWidth = 4) {
   } as const;
 }
 
+function angledNibComplexity(sampleCount: number, strokeWidth = 4) {
+  const work = studioAngledNibCoverageWorkUpperBound(sampleCount);
+  return {
+    rendererEngine: "angled-ribbon",
+    sampleCount,
+    pathLength: Math.max(0, sampleCount - 1) * 3,
+    strokeWidth,
+    rendererExpandedScalarWork: work.canvasCoordinateScalars,
+    rendererPathCommandUpperBound: work.canvasPathCommands,
+    // The swept quadrilateral has no join expansion or halo, so the nib half-width IS the radius.
+    rendererMaxPaintRadius: strokeWidth / 2,
+  } as const;
+}
+
 describe("admitStudioLiveTransformExactDraft", () => {
+  it("charges the angled nib's per-segment quadrilateral fill, not its raw sample count", () => {
+    const admitted = decide({ complexity: angledNibComplexity(300) });
+    expect(admitted.admitted).toBe(true);
+    expect(admitted.admitted && admitted.lane).toBe("angled-nib-coverage");
+    // Reported work is the largest compiled dimension -- here the eight coordinate scalars each
+    // quadrilateral serializes.
+    expect(admitted.estimatedWork).toBe(
+      studioAngledNibCoverageWorkUpperBound(300).canvasCoordinateScalars,
+    );
+    // What actually BINDS is the path-command ceiling: five commands per segment reaches it at
+    // ~396 segments, well before the sample cap, so the raw sample count alone would let through
+    // a stroke emitting five times the established path-operation budget.
+    const overCommandBudget = decide({
+      complexity: angledNibComplexity(STUDIO_LIVE_TRANSFORM_EXACT_MAX_ANGLED_RIBBON_SAMPLES),
+    });
+    expect(overCommandBudget.admitted).toBe(false);
+    expect(overCommandBudget.admitted === false && overCommandBudget.reason).toBe(
+      "renderer-budget",
+    );
+  });
+
+  it("stops scaling the charge down when the commit preserves stroke width", () => {
+    // A multi-selection resize commits through `planStudioGroupUniformResize`, which does NOT
+    // re-weight line art. Charging a shrunken radius there is an UNDER-bound: the drafted stroke
+    // keeps its authored width however far the box shrinks, so a wide stroke could pass the 512px
+    // ceilings simply by being scaled down.
+    const wide = {
+      rendererEngine: "causal-ink",
+      sampleCount: 50,
+      pathLength: 200,
+      strokeWidth: 600,
+      causalMaxDabRadius: 510,
+    } as const;
+    const shrink = { x: 0, y: 0, width: 10, height: 5 };
+    // Under the default scaling policy the 0.1x box divides the charge and the frame is admitted.
+    expect(decide({ complexity: wide, targetBounds: shrink }).admitted).toBe(true);
+    // Told the truth about the commit, the same frame is refused on the width it will actually paint.
+    const preserved = decide({
+      complexity: wide,
+      targetBounds: shrink,
+      strokeWidthPolicy: "preserve",
+    });
+    expect(preserved.admitted).toBe(false);
+    expect(preserved.admitted === false && preserved.reason).toBe("renderer-budget");
+    // The ribbon lanes already clamped at 1, so the policy cannot make them cheaper either.
+    const ribbon = decide({
+      complexity: angledNibComplexity(40, 400),
+      targetBounds: shrink,
+      strokeWidthPolicy: "preserve",
+    });
+    expect(ribbon.admitted).toBe(
+      decide({ complexity: angledNibComplexity(40, 400), targetBounds: shrink }).admitted,
+    );
+  });
+
+  it("refuses an angled-nib frame that omits its compiled renderer facts", () => {
+    // The compiler supplies all three; a caller that does not is an unknown, not a licence.
+    const { rendererMaxPaintRadius: _radius, ...withoutRadius } = angledNibComplexity(40);
+    const decision = decide({ complexity: withoutRadius });
+    expect(decision.admitted).toBe(false);
+    expect(decision.admitted === false && decision.reason).toBe("invalid");
+  });
+
+  it("charges the angled nib's transformed footprint against zoom and DPR", () => {
+    // 100x50 -> 200x75 is a 2x centre-line scale, so a 512-wide nib enlarges past the stroke-width
+    // ceiling and the frame stands down before any planning runs.
+    const decision = decide({ complexity: angledNibComplexity(40, 400) });
+    expect(decision.admitted).toBe(false);
+    expect(decision.admitted === false && decision.reason).toBe("renderer-budget");
+    // Same geometry at a workable width, but rasterized at 4x backing scale, exceeds the paint cap.
+    const zoomed = decide({ complexity: angledNibComplexity(40, 40), rasterScale: 8 });
+    expect(zoomed.admitted).toBe(false);
+  });
+
   it("bounds calligraphy's one-point pressure Ellipse separately from its ribbon nib", () => {
     expect(studioCalligraphyMaximumNibRadius(4, 1, 1)).toBeCloseTo(3.4, 12);
     expect(studioCalligraphyMaximumNibRadius(4, 1, 1.3)).toBeCloseTo(4.24, 12);
@@ -71,11 +161,15 @@ describe("admitStudioLiveTransformExactDraft", () => {
   });
 
   it("admits a bounded causal frame using the 0.5px worst-case dab spacing", () => {
-    expect(decide()).toEqual({
+    const decision = decide();
+    expect(decision).toMatchObject({
       admitted: true,
       lane: "causal-dabs",
       estimatedWork: 1_000,
     });
+    // The shaded area is reported alongside the count so a multi-element caller can add up both;
+    // the two are independent dimensions and one frame pays for each.
+    expect(decision.admitted && decision.estimatedBackingPixels).toBeGreaterThan(0);
   });
 
   it("rejects a two-point causal segment whose transformed dab field exceeds the frame budget", () => {
@@ -261,7 +355,7 @@ describe("admitStudioLiveTransformExactDraft", () => {
       targetBounds: sourceBounds,
       complexity: generic,
       rasterScale: 1,
-    })).toEqual({ admitted: true, lane: "generic", estimatedWork: 100 });
+    })).toMatchObject({ admitted: true, lane: "generic", estimatedWork: 100 });
     expect(decide({
       sourceBounds,
       targetBounds: sourceBounds,

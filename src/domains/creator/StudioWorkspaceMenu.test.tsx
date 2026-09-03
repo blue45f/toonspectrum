@@ -61,6 +61,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     const html = renderMenu();
 
     expect(html).toContain('data-testid="studio-workspace-menu"');
+    expect(html).toContain('data-testid="studio-workspace-menu-toggle"');
     expect(html.match(/data-studio-shortcut-boundary="true"/g)).toHaveLength(2);
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('aria-expanded="false"');
@@ -110,7 +111,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain("3 페이지");
     expect(html).toContain("4 소재·빠른 실행");
     expect(html).toContain(
-      "왼쪽 페이지 176px · 오른쪽 도구 속성 304px · 모바일은 캔버스 우선 시트"
+      "왼쪽 페이지 176px · 오른쪽 대상 속성 304px · 모바일은 캔버스 우선 시트"
     );
     expect(html).toContain('title="1. 되돌리기"');
     expect(html).toContain('title="2. 다시 실행"');
@@ -242,7 +243,7 @@ describe("StudioWorkspaceMenu responsive settings", () => {
     expect(html).toContain('data-testid="studio-workspace-layout-preview"');
     expect(html).toContain('data-mobile-fallback="canvas-first-sheets"');
     expect(html).toContain("페이지 160px");
-    expect(html).toContain("페이지 설정 280px");
+    expect(html).toContain("문서 설정 320px");
     expect(html).toContain(
       "모바일은 캔버스 우선 · 페이지/속성 시트 · 오른손 주요 도구"
     );

@@ -29,6 +29,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { MarketplaceBrushStudioBridge } from "../MarketplaceBrushStudioBridge";
 import { BRUSH_PRESETS } from "../studio-brush";
 import {
   STUDIO_FOCUS_RING,
@@ -1686,6 +1687,8 @@ export function StudioBrushStudio({
         <ChevronRight size={16} className="shrink-0 text-fg-3" aria-hidden />
       </button>
       {typeof document === "undefined" || !modal ? modal : createPortal(modal, document.body)}
+      {/* brush-studio-marketplace-shortcut */}
+      <MarketplaceBrushStudioBridge snapshot={currentSnapshot} visible={open} />
     </>
   );
 }

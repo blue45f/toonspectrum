@@ -37,6 +37,12 @@ export interface StudioMainMenuItem {
   unavailableReason?: string;
   danger?: boolean;
   separatorAfter?: boolean;
+  /**
+   * Caption drawn above this row when a composite title (삽입·도구) presents rows
+   * from several catalogue groups. Set by `studio-main-menu-presentation.ts`,
+   * never by item modules — the catalogue does not know how it is presented.
+   */
+  sectionLabel?: string;
   onSelect: () => void;
 }
 

@@ -60,8 +60,8 @@ import {
 import {
   serializeWardrobe,
 } from "./studio-vrm-wardrobe";
-import {
-  type StudioVrmIkEffectorBone,
+import type {
+  StudioVrmIkEffectorBone,
 } from "./StudioVrmJointHandles";
 import {
   isStudioVrmTexturePaintBrushProductBlocked,

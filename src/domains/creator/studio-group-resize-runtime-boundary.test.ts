@@ -38,6 +38,12 @@ const selectionDecorationsSource = readFileSync(
   new URL("./canvas/StudioCanvasSelectionDecorations.tsx", import.meta.url),
   "utf8",
 );
+// The commit's planner choice, change detection and wording live in a pure module; the host
+// keeps the session guards and the single document commit.
+const commitPlanSource = readFileSync(
+  new URL("./studio-selection-transform-commit.ts", import.meta.url),
+  "utf8",
+);
 const browserVerifierSource = readFileSync(
   new URL("../../../scripts/verify-studio-groups.mts", import.meta.url),
   "utf8",
@@ -279,7 +285,12 @@ describe("Studio group uniform-resize runtime boundary", () => {
   it("bakes every member through the uniform planner in exactly one document commit", () => {
     const source = functionBody("commitCanvasSelectionResize");
 
-    expectSourceToken(source, "planStudioGroupUniformResize", "resize commit");
+    expectSourceToken(source, "planStudioSelectionTransformCommit(", "resize commit");
+    expectSourceToken(
+      commitPlanSource,
+      "planStudioGroupUniformResize({",
+      "resize commit planner",
+    );
     expectSourceToken(source, "groupResizeRef.current", "resize commit");
     expectSourceToken(source, "currentPageIdRef.current", "resize page identity");
     expectSourceToken(source, "masterEditModeRef.current", "resize master identity");

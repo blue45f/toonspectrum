@@ -130,7 +130,6 @@ import {
   resolveStudioStampBrushStyle,
 } from "./brush/studio-brush-stamp-engine";
 import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
-import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
@@ -186,8 +185,8 @@ import {
 import type {
   StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
-import {
-  type StudioAdvancedRuler,
+import type {
+  StudioAdvancedRuler,
 } from "./studio-advanced-ruler-document";
 import type {
   StudioAdvancedRulerSnapState,
@@ -524,10 +523,8 @@ import {
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
-import {
-  planStudioGroupUniformResize,
-  type StudioGroupUniformResizeBounds,
-} from "./studio-group-uniform-resize";
+import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
+import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 import {
   planHealCloneDabs,
 } from "./studio-heal-clone";
@@ -1003,9 +1000,9 @@ import {
   createStudioLifecycleEmergencyAutosave,
   type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
-import {
-  type PerspectiveRay,
-  type VanishingPoint,
+import type {
+  PerspectiveRay,
+  VanishingPoint,
 } from "./studio-perspective-guide";
 import {
   admitStudioPixelArtStrokeColor,
@@ -5146,16 +5143,33 @@ export function StudioCuttoonEditor({
       pendingBatch?.pageId === activePage.id
         ? new Set(pendingBatch.strokes.map((stroke) => stroke.id))
         : null;
-    setSelectedId((current) => {
-      if (!current) return null;
-      if (activeIds.has(current)) return current;
-      if (pendingIds?.has(current)) return current;
-      return null;
-    });
-    setMarqueeIds((current) => {
-      const next = current.filter((id) => activeIds.has(id));
-      return next.length === current.length ? current : next;
-    });
+    // 두 선택 권위를 각각 거른 뒤 정본 모양으로 되돌린다. `pagesHi` 가 deps 라 이 이펙트는
+    // 페이지 전환뿐 아니라 모든 커밋에서 돈다 — 그래서 `currentCanvasSelectionIds()` 하나로
+    // 합쳐 걸러서는 안 된다. 그 헬퍼는 marquee 가 비어 있지 않으면 selectedId 를 무시하므로,
+    // 삽입 흐름(텍스트·말풍선·스티커·이미지: commit 후 setSelectedId 만 호출)이 같은 커밋에서
+    // 세운 새 선택을 낡은 marquee 가 덮어써 새 요소가 선택되지 않는다.
+    //
+    // 살아남은 selectedId 가 이긴다 — 예전 쌍(개별 필터 + 배타 이펙트)이 만들던 결과와 같다.
+    // 그러면서도 원래 고치려던 사각지대는 유지된다: 두 획 마퀴에서 한쪽이 사라지면 selectedId
+    // 는 애초에 null 이라 marquee 하나가 `selectionShapeForIds` 를 타고 단일 선택으로 접힌다.
+    // 길이 1 을 그대로 두면 다중 선택 프록시 조건(`> 1`)에도 단일 선화 자유 변형 조건(marquee
+    // 비어 있음)에도 걸리지 않아 핸들이 통째로 사라진다.
+    const survives = (id: string) => activeIds.has(id) || pendingIds?.has(id) === true;
+    const survivingSelectedId =
+      selectedIdRef.current && survives(selectedIdRef.current) ? selectedIdRef.current : null;
+    const survivingMarqueeIds = marqueeIdsRef.current.filter(survives);
+    const nextShape = selectionShapeForIds(
+      survivingSelectedId ? [survivingSelectedId] : survivingMarqueeIds,
+    );
+    if (
+      nextShape.selectedId !== selectedIdRef.current
+      || nextShape.marqueeIds.length !== marqueeIdsRef.current.length
+    ) {
+      selectedIdRef.current = nextShape.selectedId;
+      marqueeIdsRef.current = nextShape.marqueeIds;
+      setSelectedId(nextShape.selectedId);
+      setMarqueeIds(nextShape.marqueeIds);
+    }
     // 작업면 전환 시 그룹 진입 상태는 항상 리셋 — 다른 페이지의 그룹 내부에 갇혀 있으면 안 된다.
     activeGroupIdRef.current = null;
     setActiveGroupId(null);
@@ -5376,70 +5390,24 @@ export function StudioCuttoonEditor({
       return false;
     }
 
-    // A single stroke is one point array, so it can absorb rotation and independent width/height
-    // exactly; the group planner stays authoritative for every mixed/multi selection, where a
-    // general affine is not a safe default. Both bake into `points` and hand the result to the
-    // one document commit below, so undo/redo and CRDT publication are identical either way.
-    const soleSelection =
-      session.selectedIds.length === 1
-        ? currentById.get(session.selectedIds[0]!)
-        : undefined;
-    const soleSelectedDraw =
-      soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
-        ? soleSelection
-        : undefined;
-    const next =
-      soleSelectedDraw?.type === "draw"
-        ? (() => {
-            const transformed = planStudioDrawObjectTransform({
-              el: soleSelectedDraw,
-              sourceBounds: session.sourceBounds,
-              targetBounds,
-              rotationDeg,
-            });
-            return transformed
-              ? currentElements.map((element) =>
-                  element.id === transformed.id ? transformed : element
-                )
-              : [...currentElements];
-          })()
-        : planStudioGroupUniformResize({
-            items: currentElements,
-            selectedIds: session.selectedIds,
-            sourceBounds: session.sourceBounds,
-            targetBounds,
-            isLocked: (element) =>
-              isEffectivelyLocked(element, activeGroupsRef.current),
-          });
-    const nextById = new Map(next.map((element) => [element.id, element]));
-    const changed = session.selectedIds.some(
-      (id) => nextById.get(id) !== currentById.get(id)
-    );
-    if (!changed) {
-      const boundsChanged =
-        Math.abs(targetBounds.x - session.sourceBounds.x) > 1e-7 ||
-        Math.abs(targetBounds.y - session.sourceBounds.y) > 1e-7 ||
-        Math.abs(targetBounds.width - session.sourceBounds.width) > 1e-7 ||
-        Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
-      if (boundsChanged) {
-        setError(
-          "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
-        );
-      }
+    // Which planner runs, whether anything changed and what to say about it are pure facts;
+    // `planStudioSelectionTransformCommit` owns them so this host keeps only its refs.
+    const plan = planStudioSelectionTransformCommit({
+      elements: currentElements,
+      selectedIds: session.selectedIds,
+      sourceBounds: session.sourceBounds,
+      targetBounds,
+      rotationDeg,
+      isLocked: (element) => isEffectivelyLocked(element, activeGroupsRef.current),
+    });
+    if (plan.kind === "unchanged") {
+      if (plan.refusal) setError(plan.refusal);
       return false;
     }
-    const committed = commit(next);
+    const committed = commit(plan.next);
     if (committed) {
-      const percent = Math.max(
-        1,
-        Math.round((targetBounds.width / session.sourceBounds.width) * 100)
-      );
       setError(null);
-      announceDrawingShortcut(
-        session.selectedIds.length === 1
-          ? `레이어 크기 조절 · ${percent}%`
-          : `그룹 크기 조절 · ${percent}%`,
-      );
+      announceDrawingShortcut(plan.announcement);
     }
     return committed;
   }
@@ -25750,9 +25718,10 @@ const puppetWarpArmed =
     // Cmd/Ctrl+A 직후 같은 입력 턴에서 그룹·정렬 같은 명령이 이어져도 ref 기반 명령 경계가
     // 이전 선택을 읽지 않게 한다. 개별 setter는 React 커밋 뒤에만 mirror ref가 갱신되지만,
     // 이 어댑터는 세 선택 권위(state + refs)를 한 번에 동기화한다.
+    // 모양은 `selectionShapeForIds`에 맡긴다 — 요소가 하나뿐인 페이지에서 marquee 길이 1 은
+    // 어느 변형 핸들 조건에도 걸리지 않는다(자세한 이유는 선택 가지치기 이펙트의 주석).
     applyGroupSelectionState({
-      selectedId: null,
-      marqueeIds: ids,
+      ...selectionShapeForIds(ids),
       activeGroupId: null,
     });
   }

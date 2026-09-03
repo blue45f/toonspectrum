@@ -60,6 +60,7 @@ const PANEL_SOURCE_FILES: Readonly<Record<StudioInspectorPanelId, readonly strin
     "StudioInspectorShapeSection.tsx",
     "StudioInspectorTypographySection.tsx",
     "StudioInspectorOrderAlignSection.tsx",
+    "StudioFigmaDesignPanel.tsx",
   ],
   "tool-properties": [
     "StudioInspectorDrawingSection.tsx",

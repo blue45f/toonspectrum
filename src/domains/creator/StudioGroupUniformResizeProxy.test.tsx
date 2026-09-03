@@ -529,8 +529,8 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(props.onCancel).not.toHaveBeenCalled();
   });
 
-  it("freeTransform은 회전 핸들과 8방향 앵커를 열고 비균등 스케일을 허용한다", () => {
-    const props = { ...commonProps(), freeTransform: true };
+  it("freeTransform+rotatable은 회전 핸들과 8방향 앵커를 열고 비균등 스케일을 허용한다", () => {
+    const props = { ...commonProps(), freeTransform: true, rotatable: true };
     render(<StudioGroupUniformResizeProxy {...props} />);
     const transformer = transformerProps();
 
@@ -549,8 +549,8 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(transformer.rotationSnaps).toEqual([0, 45, 90, 135, 180, 225, 270, 315]);
   });
 
-  it("freeTransform 커밋은 회전각을 박스와 함께 넘기고 proxy를 원복한다", () => {
-    const props = { ...commonProps(), freeTransform: true };
+  it("rotatable 커밋은 회전각을 박스와 함께 넘기고 proxy를 원복한다", () => {
+    const props = { ...commonProps(), freeTransform: true, rotatable: true };
     const rect = konvaHarness.rectNode as unknown as FakeRectNode;
     render(<StudioGroupUniformResizeProxy {...props} />);
 
@@ -575,7 +575,7 @@ describe("StudioGroupUniformResizeProxy", () => {
   });
 
   it("회전이 비유한 값이면 커밋 대신 취소한다", () => {
-    const props = { ...commonProps(), freeTransform: true };
+    const props = { ...commonProps(), freeTransform: true, rotatable: true };
     const rect = konvaHarness.rectNode as unknown as FakeRectNode;
     render(<StudioGroupUniformResizeProxy {...props} />);
 
@@ -759,7 +759,9 @@ describe("StudioGroupUniformResizeProxy", () => {
       const props = {
         ...commonProps(),
         freeTransform: true,
+        rotatable: true,
         livePreview: {
+          mode: "single" as const,
           scope: "page:page-1",
           element: LIVE_DRAW,
           elements: [LIVE_DRAW],

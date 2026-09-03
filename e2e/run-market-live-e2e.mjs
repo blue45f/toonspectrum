@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import pg from "pg";
 
 import {
   startIsolatedMarketApi,
@@ -15,9 +18,17 @@ import {
 const require = createRequire(import.meta.url);
 const PLAYWRIGHT_ENTRYPOINT = require.resolve("@playwright/test/cli");
 const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
+const EMPTY_DATABASE_BOOTSTRAP = resolve(
+  REPOSITORY_ROOT,
+  "scripts/bootstrap-empty-production-database.mjs",
+);
+const EMPTY_DATABASE_BOOTSTRAP_CONFIRMATION =
+  "BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE";
 const SIGNAL_EXIT_CODE = Object.freeze({ SIGINT: 130, SIGTERM: 143 });
+const { Client } = pg;
 
 let apiProcess = null;
+let bootstrapProcess = null;
 let playwrightProcess = null;
 let cleanupPromise = null;
 let receivedSignal = null;
@@ -56,10 +67,12 @@ async function cleanupChildren() {
   }
   const playwright = playwrightProcess;
   const api = apiProcess;
+  const bootstrap = bootstrapProcess;
   cleanupPromise = (async () => {
     const stops = [
       ...(playwright ? [stopDetachedProcessTree(playwright)] : []),
       ...(api ? [stopIsolatedMarketApi(api)] : []),
+      ...(bootstrap ? [stopDetachedProcessTree(bootstrap)] : []),
     ];
     const results = await Promise.allSettled(stops);
     const failures = results
@@ -71,6 +84,7 @@ async function cleanupChildren() {
   })().finally(() => {
     if (playwrightProcess === playwright) playwrightProcess = null;
     if (apiProcess === api) apiProcess = null;
+    if (bootstrapProcess === bootstrap) bootstrapProcess = null;
     cleanupPromise = null;
   });
   await cleanupPromise;
@@ -93,6 +107,92 @@ function installSignalHandlers() {
         });
     });
   }
+}
+
+function resolveReleaseSha() {
+  const environmentSha = process.env.GITHUB_SHA?.trim() ?? "";
+  if (/^[0-9a-f]{40}$/u.test(environmentSha)) return environmentSha;
+
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: REPOSITORY_ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  const repositorySha = result.status === 0 ? result.stdout.trim() : "";
+  if (!/^[0-9a-f]{40}$/u.test(repositorySha)) {
+    fail("Could not resolve the full repository SHA for isolated database bootstrap.");
+  }
+  return repositorySha;
+}
+
+async function databaseHasApplicationObjects(databaseUrl) {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    const result = await client.query(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_class AS relation
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = relation.relnamespace
+        WHERE namespace.nspname = 'public'
+          AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+      ) AS has_objects
+    `);
+    return result.rows[0]?.has_objects === true;
+  } finally {
+    await client.end();
+  }
+}
+
+function bootstrapEmptyDatabase(target) {
+  const runtimePassword = `Qa!${randomBytes(32).toString("base64url")}`;
+  const releaseSha = resolveReleaseSha();
+
+  bootstrapProcess = spawn(
+    process.execPath,
+    [
+      EMPTY_DATABASE_BOOTSTRAP,
+      "--execute",
+      "--allow-loopback",
+      "--runtime-database-role",
+      "webdex_runtime",
+      "--release-sha",
+      releaseSha,
+      "--confirmation",
+      EMPTY_DATABASE_BOOTSTRAP_CONFIRMATION,
+    ],
+    {
+      cwd: REPOSITORY_ROOT,
+      detached: process.platform !== "win32",
+      env: {
+        ...process.env,
+        BOOTSTRAP_RUNTIME_DATABASE_PASSWORD: runtimePassword,
+        MIGRATION_DATABASE_URL: target.databaseUrl,
+      },
+      stdio: "inherit",
+    },
+  );
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = bootstrapProcess;
+    child.once("error", () => {
+      if (bootstrapProcess === child) bootstrapProcess = null;
+      rejectPromise(new Error("The isolated database bootstrap process could not start."));
+    });
+    child.once("exit", (code, signal) => {
+      if (bootstrapProcess === child) bootstrapProcess = null;
+      if (signal) {
+        rejectPromise(new Error("The isolated database bootstrap process was interrupted."));
+        return;
+      }
+      if (code !== 0) {
+        rejectPromise(new Error("The isolated database bootstrap failed."));
+        return;
+      }
+      resolvePromise();
+    });
+  });
 }
 
 function runPlaywright(apiOrigin) {
@@ -133,6 +233,14 @@ function runPlaywright(apiOrigin) {
 
 async function main() {
   const target = requireLiveEnvironment();
+  if (!(await databaseHasApplicationObjects(target.databaseUrl))) {
+    console.log(
+      "Isolated marketplace QA database is empty; applying the verified production bootstrap.",
+    );
+    await bootstrapEmptyDatabase(target);
+  }
+  if (receivedSignal) return;
+
   apiProcess = await startIsolatedMarketApi(target, {
     onSpawn(child) {
       apiProcess = child;

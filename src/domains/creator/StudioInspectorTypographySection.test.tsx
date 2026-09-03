@@ -34,8 +34,9 @@ describe("StudioInspectorTypographySection", () => {
       />,
     );
 
-    // Open typography collapsible section
-    const accordionBtn = screen.getByText("타이포그래피");
+    // 원형 텍스트는 고급 조판 섹션이 소유한다(UX 감사 2026-09-02: 타이포그래피를 글꼴 / 외형 /
+    // 고급 조판 세 섹션으로 나눴다). 기본 접힘이므로 그 섹션을 열어야 패널이 마운트된다.
+    const accordionBtn = screen.getByText("고급 조판");
     fireEvent.click(accordionBtn);
 
     const titleEl = await screen.findByText("원형 텍스트 (Circular Text)", {}, { timeout: 5000 });
