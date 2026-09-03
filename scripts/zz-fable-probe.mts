@@ -632,13 +632,127 @@ async function recordPresentedFrames(page: Page, maxFrames = 900): Promise<Scree
  * over time. Opt in with TOONSPECTRUM_SCENARIO_LAYER_PROBE=1; it costs a readback per layer per
  * frame, which is too much to leave on for a whole matrix run.
  */
+async function installFableProbe(page: Page): Promise<void> {
+  await page.evaluate(`(() => {
+    const existing = window.__fableProbe;
+    if (existing) {
+      existing.events.length = 0;
+      existing.frames.length = 0;
+      existing.partialClears = {};
+      existing.t0 = performance.now();
+      return;
+    }
+    const state = { events: [], frames: [], partialClears: {}, t0: performance.now(), lastReleaseAt: null, lastSealAt: null };
+    window.__fableProbe = state;
+    const roleOf = (canvas) => {
+      if (!(canvas instanceof HTMLCanvasElement)) return null;
+      const d = canvas.dataset;
+      return d.studioLiveInkOverlay ? "live-ink"
+        : d.studioLiveRetainedActive ? "retained-active"
+        : d.studioLiveRetainedSettled ? "retained-settled"
+        : d.studioLiveDynamicActive ? "dynamic-active"
+        : d.studioLiveDynamicSettled ? "dynamic-settled"
+        : d.studioLiveDynamicCoverage ? "dynamic-coverage"
+        : d.studioLiveStampOverlay ? "stamp"
+        : d.studioLiveWetInkActive ? "wet-active"
+        : d.studioLiveWetInkSettled ? "wet-settled"
+        : d.studioLiveInkPrediction ? "prediction"
+        : d.studioGpuSurface ? "gpu-" + d.studioGpuSurface
+        : d.studioBrushCursorCanvas ? "cursor"
+        : canvas.closest(".konvajs-content") ? "konva"
+        : null;
+    };
+    const stackOf = () => (new Error().stack || "").split("\n").slice(2, 10).map((line) => line.trim()).join(" | ");
+    const push = (kind, canvas, detail) => {
+      const role = roleOf(canvas);
+      if (!role) return;
+      state.events.push({ t: Math.round(performance.now() - state.t0), kind, role, ...detail, stack: stackOf() });
+    };
+    const proto = CanvasRenderingContext2D.prototype;
+    const originalClearRect = proto.clearRect;
+    proto.clearRect = function (x, y, w, h) {
+      const canvas = this.canvas;
+      if (canvas instanceof HTMLCanvasElement) {
+        const role = roleOf(canvas);
+        if (role) {
+          const full = w * h >= canvas.width * canvas.height * 0.9;
+          if (full) push("clearRect-full", canvas, { x, y, w, h, cw: canvas.width, ch: canvas.height });
+          else state.partialClears[role] = (state.partialClears[role] || 0) + 1;
+        }
+      }
+      return originalClearRect.call(this, x, y, w, h);
+    };
+    for (const prop of ["width", "height"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, prop);
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, {
+        configurable: true,
+        enumerable: descriptor.enumerable,
+        get: descriptor.get,
+        set(value) {
+          push("resize-" + prop, this, { from: descriptor.get.call(this), to: value });
+          return descriptor.set.call(this, value);
+        },
+      });
+    }
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, attributes) {
+      const context = originalGetContext.call(this, type, attributes);
+      push("getContext", this, { type, attributes: JSON.stringify(attributes ?? null) });
+      return context;
+    };
+    const walk = (node, visit) => {
+      if (node instanceof HTMLCanvasElement) visit(node);
+      else if (node instanceof Element) node.querySelectorAll("canvas").forEach(visit);
+    };
+    const holdsOverlay = (element) => element instanceof Element
+      && (roleOf(element) !== null || element.querySelector("[data-studio-live-dynamic-active],[data-studio-live-retained-active],[data-studio-live-ink-overlay]") !== null);
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "childList") {
+          record.removedNodes.forEach((node) => walk(node, (canvas) => push("detached", canvas, {})));
+          record.addedNodes.forEach((node) => walk(node, (canvas) => push("attached", canvas, {})));
+        } else if (record.type === "attributes" && holdsOverlay(record.target)) {
+          const target = record.target;
+          state.events.push({
+            t: Math.round(performance.now() - state.t0),
+            kind: "attr:" + record.attributeName,
+            role: roleOf(target) || ("ancestor:" + target.tagName.toLowerCase() + (target.id ? "#" + target.id : "")),
+            value: String(target.getAttribute(record.attributeName)).slice(0, 160),
+            old: String(record.oldValue).slice(0, 160),
+          });
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["style", "class", "hidden", "width", "height"] });
+  })()`);
+}
+
+async function readFableProbe(page: Page): Promise<unknown> {
+  return await page.evaluate(`(() => {
+    const state = window.__fableProbe;
+    if (!state) return null;
+    const contexts = Array.from(document.querySelectorAll("canvas")).map((canvas) => {
+      const d = canvas.dataset;
+      const role = Object.keys(d).find((key) => key.startsWith("studioLive") || key === "studioGpuSurface") || (canvas.closest(".konvajs-content") ? "konva" : "other");
+      let attributes = null;
+      try {
+        const context = canvas.getContext("2d");
+        attributes = context && context.getContextAttributes ? context.getContextAttributes() : null;
+      } catch { attributes = "throw"; }
+      const style = getComputedStyle(canvas);
+      return { role, store: canvas.width + "x" + canvas.height, css: style.width + "x" + style.height, z: style.zIndex, pos: style.position, display: style.display, attributes };
+    });
+    return { events: state.events, frames: state.frames, partialClears: state.partialClears, contexts };
+  })()`);
+}
+
 async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
   await page.evaluate(`((clip) => {
     // The live overlays are siblings of the Konva stage, not children of it, and a GPU-lane brush
     // draws on neither — its pixels are on the WebGPU compositor child. A probe rooted only at
     // .konvajs-content reported "no layer changed" for a whole pen gesture whose every pixel was on
     // that compositor, which is what sent one investigation in circles. Watch all three families.
-    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-gpu-compositor]"));
+    const roots = Array.from(document.querySelectorAll(".konvajs-content, [data-studio-live-ink-overlay], [data-studio-live-retained-settled], [data-studio-live-retained-active], [data-studio-live-dynamic-settled], [data-studio-live-dynamic-active], [data-studio-live-dynamic-coverage], [data-studio-live-stamp-overlay], [data-studio-live-wet-ink-settled], [data-studio-live-wet-ink-active], [data-studio-live-ink-prediction], [data-studio-gpu-compositor]"));
     if (roots.length === 0) return;
     const collect = () => roots.flatMap((root) =>
       root instanceof HTMLCanvasElement ? [root] : Array.from(root.querySelectorAll("canvas")));
@@ -688,6 +802,13 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
         const role = canvas.dataset.studioLiveInkOverlay ? "live-ink"
           : canvas.dataset.studioLiveRetainedActive ? "retained-active"
           : canvas.dataset.studioLiveRetainedSettled ? "retained-settled"
+          : canvas.dataset.studioLiveDynamicActive ? "dynamic-active"
+          : canvas.dataset.studioLiveDynamicSettled ? "dynamic-settled"
+          : canvas.dataset.studioLiveDynamicCoverage ? "dynamic-coverage"
+          : canvas.dataset.studioLiveStampOverlay ? "stamp"
+          : canvas.dataset.studioLiveWetInkActive ? "wet-active"
+          : canvas.dataset.studioLiveWetInkSettled ? "wet-settled"
+          : canvas.dataset.studioLiveInkPrediction ? "prediction"
           : canvas.dataset.studioGpuSurface ? "gpu-" + canvas.dataset.studioGpuSurface
           : "konva";
         return index + ":" + role + ":store" + canvas.width + "x" + canvas.height
@@ -697,10 +818,27 @@ async function installLayerProbe(page: Page, clip: Clip): Promise<void> {
       // The compositor root is CSS-hidden between a GPU submission and its receipt; record that.
       const compositor = document.querySelector("[data-studio-gpu-compositor]");
       const shown = compositor ? getComputedStyle(compositor) : null;
+      const dyn = document.querySelector("[data-studio-live-dynamic-active]");
+      const dynVisible = dyn ? (dyn.checkVisibility ? (dyn.checkVisibility({ opacityProperty: true, visibilityProperty: true }) ? 1 : 0) : (dyn.getClientRects().length > 0 ? 1 : 0)) : -1;
+      const probe = window.__fableProbe;
+      if (probe) {
+        const release = window.__studioDynamicReleaseDebug;
+        if (release && release.at !== probe.lastReleaseAt) {
+          probe.lastReleaseAt = release.at;
+          probe.events.push({ t: Math.round(release.at - probe.t0), kind: "release-debug", role: "renderer", detail: JSON.stringify(release) });
+        }
+        const seal = window.__studioDynamicSealDebug;
+        if (seal && seal.at !== probe.lastSealAt) {
+          probe.lastSealAt = seal.at;
+          probe.events.push({ t: Math.round(seal.at - probe.t0), kind: "seal-debug", role: "renderer", detail: JSON.stringify(seal) });
+        }
+        probe.frames.push(Math.round(now - probe.t0));
+      }
       state.samples.push([
         Math.round(now),
         canvases.map(sampleOf),
         shown ? (shown.visibility === "hidden" || shown.opacity === "0" ? 0 : 1) : -1,
+        dynVisible,
       ]);
       state.raf = requestAnimationFrame(tick);
     };
@@ -753,6 +891,7 @@ async function drawAndCapture(
   const baseline = await shot(page, clip);
   await installPerfProbe(page);
   const cast = await recordPresentedFrames(page);
+  if (LAYER_PROBE) await installFableProbe(page);
   if (LAYER_PROBE) await installLayerProbe(page, clip);
   const started = Date.now();
   const first = points[0]!;
@@ -777,6 +916,8 @@ async function drawAndCapture(
   if (!live) live = liveEnd;
   const presented = await cast.stop();
   const layers = LAYER_PROBE ? await readLayerProbe(page) : null;
+  const fable = LAYER_PROBE ? await readFableProbe(page) : null;
+  if (layers && fable) (layers as { fable?: unknown }).fable = fable;
   await page.mouse.up();
   const gestureMs = Date.now() - started;
   const released = await shot(page, clip);
