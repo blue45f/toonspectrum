@@ -6,6 +6,7 @@ on:
       - fix/marketplace-brush-publish-hardening-main-20260903
     paths:
       - ".github/workflows/marketplace-wire-authoring-surfaces-606-once.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
