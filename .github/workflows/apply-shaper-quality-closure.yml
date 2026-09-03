@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: shaper-quality-closure
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-and-verify:
