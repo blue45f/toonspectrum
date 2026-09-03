@@ -5,6 +5,7 @@ import { StudioGpuPinReceiptWatchdog } from "./studio-webgpu-pin-receipt-watchdo
 
 import type {
   StudioLiveStrokeGpuFailureReason,
+  StudioLiveStrokeGpuSurfaceContinuity,
   StudioLiveStrokeUnavailableReason,
 } from "../live/studio-live-stroke-render-backend";
 import type { StudioLiveStrokeBackendAuditSession } from "../studio-page-editor-types";
@@ -84,7 +85,10 @@ export interface StudioLiveStrokeGpuAudit {
   readonly gpuPinReceiptWatchdog: () => StudioGpuPinReceiptWatchdog;
   readonly onWebGpuFrameInvalid: () => void;
   readonly onWebGpuFrameRequest: (request: StudioWebGpuSurfaceFrameRequest) => void;
-  readonly prepareLiveStrokeGpuSubmission: (strokeId: string) => boolean;
+  readonly prepareLiveStrokeGpuSubmission: (
+    strokeId: string,
+    surfaceContinuity?: StudioLiveStrokeGpuSurfaceContinuity
+  ) => boolean;
   readonly receiveLiveStrokeCanonicalCanvasAudit: (
     strokeIds: readonly string[],
     outcome: "drawn" | "failed" | "cancelled"
@@ -92,7 +96,11 @@ export interface StudioLiveStrokeGpuAudit {
   readonly receiveLiveStrokeGpuAuditReceipt: (
     receipt: StudioGpuFrameReceipt
   ) => StudioLiveStrokeGpuAuditReceiptOutcome;
-  readonly registerLiveStrokeGpuRequest: (strokeId: string, requestId: string) => boolean;
+  readonly registerLiveStrokeGpuRequest: (
+    strokeId: string,
+    requestId: string,
+    surfaceContinuity?: StudioLiveStrokeGpuSurfaceContinuity
+  ) => boolean;
   readonly reportAllLiveStrokeGpuAuditFailures: (
     reason: "device-lost" | "surface-lost"
   ) => void;
@@ -168,9 +176,33 @@ export function createStudioLiveStrokeGpuAudit(
       return accepted?.requestId === currentSurfaceRequestId
         && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(currentSurfaceRequestId) === true;
     });
+    // A session mid-append over pixels it already receipted keeps presenting them. The append only
+    // grows the retained journal, so the surface still holds a valid prefix of this same stroke;
+    // closing it between an append submit and its async queue fence is what blanked the canvas
+    // once per pointer sample. Every clause below is still required: the coordinator must have
+    // carried presentation across the append (`gpuOverlayVisible` with a newer request in flight),
+    // and the watchdog must confirm the already-presented request really was receipted.
+    // The clause is tied to the surface it is talking about, exactly like the one above: the
+    // session's in-flight append must be the request the surface ref now points at. Without that
+    // tie a SEALED previous stroke satisfied every other clause — pointer-up deliberately keeps
+    // its `gpuOverlayVisible` and `expectedGpuRequest`, and its accepted request really was
+    // receipted — and reopened the NEXT stroke's rewritten surface before that stroke's own
+    // first receipt. Its stale expected request never equals the new stroke's surface id.
+    const appendContinuedSessionVisible = currentSurfaceRequestId !== null && [
+      ...liveStrokeBackendAuditSessionsRef.current.values(),
+    ].some((session) => {
+      const snapshot = session.coordinator.getSnapshot();
+      if (snapshot.phase === "idle" || snapshot.pinnedBackend !== "webgpu") return false;
+      if (snapshot.unavailableReason !== null) return false;
+      if (!snapshot.gpuOverlayVisible) return false;
+      if (snapshot.expectedGpuRequest?.requestId !== currentSurfaceRequestId) return false;
+      const accepted = snapshot.acceptedGpuRequest;
+      return accepted !== null
+        && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(accepted.requestId) === true;
+    });
     // Pending geometry alone is never a visibility capability. Every surface rewrite invalidates
     // the prior pixels, so only a coordinator session holding an exact GPU receipt may reopen it.
-    const gpuOverlayVisible = receiptedSessionVisible;
+    const gpuOverlayVisible = receiptedSessionVisible || appendContinuedSessionVisible;
     gpuCanvasShadowVisibleRef.current = canvasShadowVisible;
     if (canvasShadowVisible) {
       // Restore the retained pixels synchronously before hiding the DOM GPU canvas. A deferred
@@ -184,7 +216,10 @@ export function createStudioLiveStrokeGpuAudit(
     }
   }
 
-  function prepareLiveStrokeGpuSubmission(strokeId: string): boolean {
+  function prepareLiveStrokeGpuSubmission(
+    strokeId: string,
+    surfaceContinuity: StudioLiveStrokeGpuSurfaceContinuity = "rewrite"
+  ): boolean {
     const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
     const snapshot = session?.coordinator.getSnapshot();
     if (
@@ -193,9 +228,16 @@ export function createStudioLiveStrokeGpuAudit(
       || snapshot.pinnedBackend !== "webgpu"
       || snapshot.unavailableReason !== null
     ) return false;
-    // Submission mutates the shared surface before its request id can be returned. Hide the prior
-    // GPU receipt until registration proves the new exact request; do not reveal another renderer.
+    // The surface's newest request is about to change either way, so the accepted id is stale here.
     gpuLiveAcceptedRequestIdRef.current = null;
+    if (surfaceContinuity === "append" && snapshot.gpuOverlayVisible) {
+      // An append cannot destroy the presented prefix, so there is nothing to hide and no Konva
+      // draft to restore. Skipping the drawScene also drops a full layer rasterisation per pointer
+      // sample; the draft stays suppressed because neither pin ref changed.
+      return true;
+    }
+    // A rewrite mutates the shared surface before its request id can be returned. Hide the prior
+    // GPU receipt until registration proves the new exact request; do not reveal another renderer.
     gpuCanvasShadowVisibleRef.current = false;
     liveDraftLayerRef.current?.drawScene();
     webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
@@ -242,7 +284,11 @@ export function createStudioLiveStrokeGpuAudit(
     return true;
   }
 
-  function registerLiveStrokeGpuRequest(strokeId: string, requestId: string): boolean {
+  function registerLiveStrokeGpuRequest(
+    strokeId: string,
+    requestId: string,
+    surfaceContinuity: StudioLiveStrokeGpuSurfaceContinuity = "rewrite"
+  ): boolean {
     const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
     if (!session) return false;
     // A resize can synchronously announce the exact request before the imperative journal call
@@ -265,6 +311,7 @@ export function createStudioLiveStrokeGpuAudit(
       epoch: session.epoch,
       strokeId,
       requestId,
+      surfaceContinuity,
     });
     if (transition.status !== "accepted" || !transition.gpuRequest) return false;
     session.seenGpuRequestIds.add(requestId);

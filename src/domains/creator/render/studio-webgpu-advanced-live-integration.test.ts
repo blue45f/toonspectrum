@@ -194,11 +194,33 @@ describe("Studio advanced WebGPU live-ink integration", () => {
         "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(gpuOverlayVisible)"
       ));
     expect(applySource).not.toContain(".setPinnedVisible(");
-    expect(page).toContain("function prepareLiveStrokeGpuSubmission(strokeId: string)");
+    // The append-continuity clause must be tied to the current surface, or a sealed previous
+    // stroke — which keeps its overlay flag and expected request on purpose — reopens the next
+    // stroke's rewritten surface before that stroke's first receipt.
+    expectInOrder(applySource, [
+      "const appendContinuedSessionVisible = currentSurfaceRequestId !== null && [",
+      "if (snapshot.expectedGpuRequest?.requestId !== currentSurfaceRequestId) return false;",
+      "gpuPinReceiptWatchdogRef.current?.hasExactReceipt(accepted.requestId) === true",
+    ]);
+    // Submission continuity is declared by the caller and defaults to the fail-closed `rewrite`,
+    // so a new call site cannot silently inherit "keep presenting" for a destructive submission.
+    expectInOrder(page, [
+      "function prepareLiveStrokeGpuSubmission(",
+      "strokeId: string,",
+      'surfaceContinuity: StudioLiveStrokeGpuSurfaceContinuity = "rewrite"',
+    ]);
     expect(page).toContain(
       "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
     );
+    // Only the suffix-append path may keep the presented prefix up; it grows the retained journal
+    // in place. Hiding it there once per pointer sample is what blanked the live pen stroke.
+    expect(page).toContain('if (!prepareLiveStrokeGpuSubmission(el.id, "append")) {');
+    expect(page).toContain(
+      'if (!registerLiveStrokeGpuRequest(el.id, outcome.requestId, "append")) {'
+    );
+    // Baseline replacement destroys the presented pixels, so it must NOT declare continuity.
     expect(page).toContain("if (!prepareLiveStrokeGpuSubmission(el.id)) return false");
+    expect(page).not.toContain('replacePinnedJournalBaseline(nextGpuStrokes, "append")');
     expect(page).toContain(
       "if (!prepareLiveStrokeGpuSubmission(activeDrawing.id))"
     );
