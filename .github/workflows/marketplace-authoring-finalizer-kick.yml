@@ -1,4 +1,4 @@
-name: Kick Creator Marketplace finalizer
+name: Repair and kick Creator Marketplace finalizer
 
 on:
   push:
@@ -9,12 +9,45 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 jobs:
-  dispatch:
+  repair-and-dispatch:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/marketplace-creator-pipeline-20260903
+
+      - name: Preserve target template expressions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/marketplace/integrate-source-package-builder.mjs")
+          source = path.read_text(encoding="utf-8")
+          replacements = {
+              "${file.type}": r"\${file.type}",
+              "${file.name}": r"\${file.name}",
+              "${normalized.title || \"marketplace-asset\"}": r"\${normalized.title || \"marketplace-asset\"}",
+          }
+          for before, after in replacements.items():
+              source = source.replace(before, after)
+          path.write_text(source, encoding="utf-8")
+          PY
+          node --check scripts/marketplace/integrate-source-package-builder.mjs
+
+      - name: Commit the verified script repair
+        run: |
+          set -euo pipefail
+          git add scripts/marketplace/integrate-source-package-builder.mjs
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "fix(market): preserve generated package expressions"
+            git push origin HEAD:feat/marketplace-creator-pipeline-20260903
+          fi
+
       - name: Dispatch the latest finalizer definition
         env:
           GH_TOKEN: ${{ github.token }}
