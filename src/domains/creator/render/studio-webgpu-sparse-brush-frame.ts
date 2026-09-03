@@ -209,7 +209,7 @@ export class StudioGpuSparseBrushFramePlanner {
       ...tile,
       assignment: atlasFrame.frame.assignments[index]!,
     }));
-    const token: StudioGpuSparseBrushFrameToken = Object.freeze({
+    const token = Object.freeze<StudioGpuSparseBrushFrameToken>({
       frameId: input.frameId,
       deviceGeneration: atlasFrame.frame.deviceGeneration,
       atlasToken: atlasFrame.frame.token,
