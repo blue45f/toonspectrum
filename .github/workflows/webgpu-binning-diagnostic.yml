@@ -62,13 +62,14 @@ jobs:
           if "var<uniform> meta: Meta;" in shaders or "meta." in shaders or re.search(r"\bactive\b", shaders):
               raise SystemExit("reserved identifier remained in WGSL")
 
+          patched = source[:start] + shaders + source[end:]
           marker = " * WGSL identifiers deliberately avoid evolving reserved words (`meta`, `active`).\n"
           header = "/**\n * Exact WebGPU count / prefix-scan / stable-scatter candidate for sparse dab tile binning.\n"
-          if marker not in source:
-              if header not in source:
+          if marker not in patched:
+              if header not in patched:
                   raise SystemExit("source header not found")
-              source = source.replace(header, header + marker, 1)
-          path.write_text(source[:start] + shaders + source[end:])
+              patched = patched.replace(header, header + marker, 1)
+          path.write_text(patched)
           PY
 
       - name: Focused unit tests
