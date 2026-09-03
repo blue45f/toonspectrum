@@ -1,33 +1,17 @@
-/**
- * StudioShaperPanel.tsx
- *
- * NAVER WEBTOON Shaper (3D 셰이퍼) Specialized Feature Suite Panel.
- * Implements the 4 signature pillars of Shaper:
- * 1. 14 Modular Presets (얼굴형, 눈, 코, 헤어, 체형, 의상, 포즈 등 14종 조합)
- * 2. 3D Model Surface Drawing (모델에 직접 그리기 / UV 페인팅)
- * 3. AI-driven Convenience (AI 프리셋 추천 + AI 포즈 인식)
- * 4. Creator Workflow (투명 배경 토글 + 다중 레이어 PSD 내보내기)
- */
-
 import {
-  Camera,
   Check,
   Download,
-  Eraser,
+  ImagePlus,
   Layers,
-  Paintbrush,
-  PenTool,
-  RotateCcw,
+  ScanSearch,
+  ShieldCheck,
   Sparkles,
-  Undo2,
   Wand2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  buildShaperLayeredPsd,
   DEFAULT_SHAPER_SELECTION,
-  DEFAULT_SHAPER_SURFACE_DRAW_STATE,
   recommendShaperPreset,
   SHAPER_AI_ARCHETYPES,
   SHAPER_CATEGORIES,
@@ -35,13 +19,13 @@ import {
   type ShaperAiArchetype,
   type ShaperPresetCategory,
   type ShaperPresetSelection,
-  type ShaperSurfaceDrawState,
 } from "./studio-shaper-model";
 
 import { cn } from "@/lib/utils";
 
 export interface StudioShaperPanelProps {
   readonly selection?: Partial<ShaperPresetSelection>;
+  readonly supportedCategories?: readonly ShaperPresetCategory[];
   readonly onSelectionChange?: (selection: ShaperPresetSelection) => void;
   readonly onExportPsd?: () => void;
   readonly onInsertCanvas?: () => void;
@@ -50,26 +34,116 @@ export interface StudioShaperPanelProps {
   readonly className?: string;
 }
 
-type ShaperSectionTab = "preset" | "drawing" | "ai" | "creator";
+type ShaperSectionTab = "recipes" | "assist" | "output";
 
 const SECTION_TABS: readonly { id: ShaperSectionTab; label: string }[] = [
-  { id: "preset", label: "프리셋" },
-  { id: "drawing", label: "모델에 직접 그리기" },
-  { id: "ai", label: "AI 편의 기능" },
-  { id: "creator", label: "창작자 편의 기능" },
+  { id: "recipes", label: "캐릭터 레시피" },
+  { id: "assist", label: "추천·포즈" },
+  { id: "output", label: "출력" },
 ];
 
-const PRESET_COLORS: readonly string[] = [
-  "#1a1a1a",
-  "#7a1f1f",
-  "#1d4ed8",
-  "#15803d",
-  "#b45309",
-  "#ffffff",
-];
+const DEFAULT_SUPPORTED_CATEGORIES: readonly ShaperPresetCategory[] = Object.freeze([
+  "face",
+  "eye",
+  "nose",
+  "body",
+  "bodypose",
+  "handpose",
+]);
+
+const VRM_ONLY_REASON: Readonly<Partial<Record<ShaperPresetCategory, string>>> = Object.freeze({
+  pupil: "홍채와 동공은 텍스처·morph가 있는 VRM 캐릭터에서 편집합니다.",
+  lip: "입술 형태는 호환 morph가 있는 VRM 캐릭터에서만 안전하게 편집합니다.",
+  ear: "귀 모양은 해당 메시·morph가 있는 VRM 캐릭터에서 편집합니다.",
+  hair: "고품질 헤어는 VRM 캐릭터 조형의 시각 헤어 레시피에서 편집합니다.",
+  top: "상의는 VRM 의상 슬롯과 스키닝 검증이 끝난 에셋만 적용합니다.",
+  bottom: "하의는 VRM 의상 슬롯과 스키닝 검증이 끝난 에셋만 적용합니다.",
+  shoes: "신발은 VRM 의상 슬롯에서 발 리그 호환성을 확인한 뒤 적용합니다.",
+  accessories: "액세서리는 VRM 소품 부착점과 라이선스가 확인된 에셋만 적용합니다.",
+});
+
+function visualToken(category: ShaperPresetCategory, presetId: string): string {
+  if (category === "face") {
+    if (presetId.includes("round") || presetId.includes("chibi")) return "rounded-[45%]";
+    if (presetId.includes("sharp")) return "[clip-path:polygon(18%_5%,82%_5%,96%_48%,50%_100%,4%_48%)]";
+    if (presetId.includes("square")) return "rounded-lg";
+    return "rounded-[48%_48%_44%_44%]";
+  }
+  if (category === "body") {
+    if (presetId.includes("chibi")) return "h-10 w-8";
+    if (presetId.includes("tall")) return "h-16 w-5";
+    if (presetId.includes("muscular")) return "h-14 w-10";
+    return "h-14 w-7";
+  }
+  return "";
+}
+
+function PresetPreview({
+  category,
+  presetId,
+}: {
+  readonly category: ShaperPresetCategory;
+  readonly presetId: string;
+}) {
+  if (category === "face") {
+    return (
+      <span className={cn(
+        "relative block h-14 w-11 border-2 border-current bg-[linear-gradient(145deg,oklch(0.92_0.03_65),oklch(0.78_0.06_55))]",
+        visualToken(category, presetId),
+      )}>
+        <span className="absolute left-2 top-5 size-1.5 rounded-full bg-current" />
+        <span className="absolute right-2 top-5 size-1.5 rounded-full bg-current" />
+        <span className="absolute bottom-3 left-1/2 h-px w-3 -translate-x-1/2 bg-current" />
+      </span>
+    );
+  }
+  if (category === "eye") {
+    const scale = presetId.includes("romance") ? "scale-110" : presetId.includes("action") ? "scale-y-75" : "";
+    return (
+      <span className={cn("flex items-center gap-2", scale)}>
+        <span className="h-3 w-7 rounded-[50%] border-2 border-current"><span className="mx-auto mt-0.5 block size-1.5 rounded-full bg-current" /></span>
+        <span className="h-3 w-7 rounded-[50%] border-2 border-current"><span className="mx-auto mt-0.5 block size-1.5 rounded-full bg-current" /></span>
+      </span>
+    );
+  }
+  if (category === "nose") {
+    return (
+      <span className={cn(
+        "block border-b-2 border-r-2 border-current",
+        presetId.includes("dot") ? "size-3 rounded-full border-2" : "h-9 w-4 skew-y-12",
+      )} />
+    );
+  }
+  if (category === "body") {
+    return (
+      <span className={cn("relative block rounded-t-full border-2 border-current bg-accent-soft", visualToken(category, presetId))}>
+        <span className="absolute -left-2 top-3 h-8 w-1.5 rotate-6 rounded-full bg-current" />
+        <span className="absolute -right-2 top-3 h-8 w-1.5 -rotate-6 rounded-full bg-current" />
+        <span className="absolute -bottom-7 left-1 h-8 w-1.5 rounded-full bg-current" />
+        <span className="absolute -bottom-7 right-1 h-8 w-1.5 rounded-full bg-current" />
+      </span>
+    );
+  }
+  if (category === "bodypose" || category === "handpose") {
+    return (
+      <span className="relative block h-16 w-16">
+        <span className="absolute left-1/2 top-0 size-4 -translate-x-1/2 rounded-full border-2 border-current" />
+        <span className={cn(
+          "absolute left-1/2 top-4 h-8 w-0.5 -translate-x-1/2 bg-current",
+          presetId.includes("run") || presetId.includes("sword") ? "rotate-12" : "",
+        )} />
+        <span className="absolute left-2 top-7 h-0.5 w-12 rotate-[-12deg] bg-current" />
+        <span className="absolute bottom-0 left-4 h-0.5 w-8 rotate-[55deg] bg-current" />
+        <span className="absolute bottom-0 right-4 h-0.5 w-8 rotate-[-55deg] bg-current" />
+      </span>
+    );
+  }
+  return <span className="grid size-14 place-items-center rounded-2xl border border-dashed border-line text-[0.58rem] text-fg-3">VRM</span>;
+}
 
 export function StudioShaperPanel({
   selection = DEFAULT_SHAPER_SELECTION,
+  supportedCategories = DEFAULT_SUPPORTED_CATEGORIES,
   onSelectionChange,
   onExportPsd,
   onInsertCanvas,
@@ -77,390 +151,261 @@ export function StudioShaperPanel({
   disabled = false,
   className,
 }: StudioShaperPanelProps) {
-  const [activeTab, setActiveTab] = useState<ShaperSectionTab>("preset");
-  const [activeCategory, setActiveCategory] = useState<ShaperPresetCategory>("face");
+  const supported = useMemo(() => new Set(supportedCategories), [supportedCategories]);
+  const firstSupported = SHAPER_CATEGORIES.find((category) => supported.has(category.id))?.id ?? "face";
+  const [activeTab, setActiveTab] = useState<ShaperSectionTab>("recipes");
+  const [activeCategory, setActiveCategory] = useState<ShaperPresetCategory>(firstSupported);
   const [currentSelection, setCurrentSelection] = useState<ShaperPresetSelection>({
     ...DEFAULT_SHAPER_SELECTION,
     ...selection,
   });
-  const [drawState, setDrawState] = useState<ShaperSurfaceDrawState>(DEFAULT_SHAPER_SURFACE_DRAW_STATE);
-  const [transparentBg, setTransparentBg] = useState<boolean>(true);
-  const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  const handleSelectPreset = (category: ShaperPresetCategory, presetId: string) => {
-    const next = { ...currentSelection, [category]: presetId };
+  useEffect(() => {
+    setCurrentSelection({ ...DEFAULT_SHAPER_SELECTION, ...selection });
+  }, [selection]);
+
+  useEffect(() => {
+    if (!supported.has(activeCategory)) setActiveCategory(firstSupported);
+  }, [activeCategory, firstSupported, supported]);
+
+  const supportedCount = SHAPER_CATEGORIES.filter((category) => supported.has(category.id)).length;
+  const unsupportedCategories = SHAPER_CATEGORIES.filter((category) => !supported.has(category.id));
+  const activePresets = SHAPER_PRESETS.filter((preset) => preset.category === activeCategory);
+
+  const commitSelection = (next: ShaperPresetSelection) => {
     setCurrentSelection(next);
     onSelectionChange?.(next);
   };
 
-  const handleApplyAiArchetype = (archetypeId: ShaperAiArchetype) => {
-    const recommended = recommendShaperPreset(archetypeId);
-    setCurrentSelection(recommended);
-    onSelectionChange?.(recommended);
+  const selectPreset = (category: ShaperPresetCategory, presetId: string) => {
+    if (disabled || !supported.has(category)) return;
+    commitSelection({ ...currentSelection, [category]: presetId });
   };
 
-  const handleExportPsdClick = async () => {
-    if (onExportPsd) {
-      onExportPsd();
-      return;
-    }
-
-    try {
-      setIsExporting(true);
-      // Fallback: Generate demo multi-layer PSD with transparent alpha background
-      const width = 512;
-      const height = 512;
-      const flat = new Uint8ClampedArray(width * height * 4);
-      const line = new Uint8ClampedArray(width * height * 4);
-      const shadow = new Uint8ClampedArray(width * height * 4);
-
-      // Fill character silhouettes
-      for (let i = 0; i < flat.length; i += 4) {
-        flat[i] = 240; // Flat R
-        flat[i + 1] = 210; // Flat G
-        flat[i + 2] = 190; // Flat B
-        flat[i + 3] = 255; // Alpha
-      }
-
-      const psdBlob = buildShaperLayeredPsd({
-        width,
-        height,
-        flatColor: flat,
-        shadowCel: shadow,
-        lineArt: line,
-      });
-
-      const url = URL.createObjectURL(psdBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `shaper-character-${Date.now()}.psd`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setIsExporting(false);
-    }
+  const applyArchetype = (archetypeId: ShaperAiArchetype) => {
+    if (disabled) return;
+    const recommended = recommendShaperPreset(archetypeId);
+    const next = { ...currentSelection };
+    for (const category of supportedCategories) next[category] = recommended[category];
+    commitSelection(next);
   };
 
   return (
-    <div
+    <section
       className={cn(
-        "rounded-xl border border-line bg-panel/40 p-3 select-none text-xs space-y-3 text-slate-200 shadow-sm",
+        "space-y-3 rounded-2xl border border-accent/25 bg-[linear-gradient(145deg,var(--color-card),color-mix(in_oklch,var(--color-accent)_6%,var(--color-panel)))] p-3 text-xs shadow-sm",
         className,
       )}
+      aria-label="웹툰 캐릭터 셰이퍼"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-line/60">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Wand2 size={14} className="text-emerald-400 shrink-0" aria-hidden />
-          <span className="font-semibold truncate">3D 셰이퍼 (Webtoon Shaper)</span>
-          <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-            SHAPER
+      <header className="space-y-2 border-b border-line/70 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-fg">
+              <Wand2 size={15} className="text-accent" aria-hidden />
+              웹툰 캐릭터 셰이퍼
+            </h3>
+            <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+              현재 데생 인형이 실제로 지원하는 얼굴·체형·포즈만 즉시 적용합니다.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.58rem] font-extrabold text-accent">
+            TOONSTUDIO
           </span>
         </div>
-        <span className="text-[10px] text-slate-400">네이버웹툰 3D 스타일</span>
-      </div>
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-panel/60 p-2">
+          <span className="rounded-lg bg-card px-2 py-1.5 text-[0.6rem] text-fg-3">
+            즉시 적용 <b className="text-fg">{supportedCount}개 범주</b>
+          </span>
+          <span className="rounded-lg bg-card px-2 py-1.5 text-[0.6rem] text-fg-3">
+            VRM 전용 <b className="text-fg">{unsupportedCategories.length}개 범주</b>
+          </span>
+        </div>
+      </header>
 
-      {/* Main Section Tabs */}
-      <div className="grid grid-cols-4 gap-1 p-0.5 rounded-lg bg-slate-950 border border-line/50">
+      <div role="tablist" aria-label="캐릭터 셰이퍼 작업" className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-panel/65 p-1">
         {SECTION_TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
-            disabled={disabled}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             className={cn(
-              "py-1.5 px-1 rounded text-[10px] text-center font-medium transition-colors truncate",
+              "min-h-11 rounded-lg border px-2 text-[0.62rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
               activeTab === tab.id
-                ? "bg-emerald-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60",
+                ? "border-accent/50 bg-accent-soft text-accent"
+                : "border-transparent text-fg-3 hover:bg-raised hover:text-fg",
             )}
+            onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* 1. Presets Section */}
-      {activeTab === "preset" && (
-        <div className="space-y-2">
-          {/* 14-Category Scroll Strip */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
-            {SHAPER_CATEGORIES.map((cat) => {
-              const isSelected = activeCategory === cat.id;
+      {activeTab === "recipes" ? (
+        <div role="tabpanel" aria-label="캐릭터 레시피" className="space-y-3">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="tablist" aria-label="셰이퍼 범주">
+            {SHAPER_CATEGORIES.map((category) => {
+              const available = supported.has(category.id);
+              const selected = activeCategory === category.id;
               return (
                 <button
-                  key={cat.id}
+                  key={category.id}
                   type="button"
-                  onClick={() => setActiveCategory(cat.id)}
-                  disabled={disabled}
+                  role="tab"
+                  aria-selected={selected}
+                  aria-disabled={!available}
+                  disabled={!available}
+                  title={available ? category.description : VRM_ONLY_REASON[category.id] ?? "현재 데생 인형에서 지원하지 않습니다."}
                   className={cn(
-                    "px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors border",
-                    isSelected
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                      : "bg-slate-900/80 border-line text-slate-400 hover:text-slate-200",
+                    "min-h-10 shrink-0 rounded-full border px-3 text-[0.6rem] font-bold transition-colors",
+                    selected
+                      ? "border-accent/60 bg-accent-soft text-accent"
+                      : available
+                        ? "border-line bg-card text-fg-2 hover:bg-raised"
+                        : "cursor-not-allowed border-line/60 bg-panel/40 text-fg-3 opacity-45",
                   )}
+                  onClick={() => {
+                    if (available) setActiveCategory(category.id);
+                  }}
                 >
-                  {cat.label}
+                  {category.label}
                 </button>
               );
             })}
           </div>
 
-          {/* Subcategory Description */}
-          <p className="text-[10px] text-slate-400">
-            {SHAPER_CATEGORIES.find((c) => c.id === activeCategory)?.description}
-          </p>
+          <div className="rounded-xl border border-line/70 bg-panel/55 px-3 py-2">
+            <p className="text-[0.66rem] font-bold text-fg-2">
+              {SHAPER_CATEGORIES.find((category) => category.id === activeCategory)?.label}
+            </p>
+            <p className="mt-0.5 text-[0.58rem] leading-relaxed text-fg-3">
+              {SHAPER_CATEGORIES.find((category) => category.id === activeCategory)?.description}
+            </p>
+          </div>
 
-          {/* Preset Grid for active category */}
-          <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-            {SHAPER_PRESETS.filter((p) => p.category === activeCategory).map((preset) => {
-              const isCurrent = currentSelection[activeCategory] === preset.id;
+          <div className="grid grid-cols-2 gap-2">
+            {activePresets.map((preset) => {
+              const selected = currentSelection[activeCategory] === preset.id;
               return (
                 <button
                   key={preset.id}
                   type="button"
-                  onClick={() => handleSelectPreset(activeCategory, preset.id)}
+                  aria-pressed={selected}
                   disabled={disabled}
                   className={cn(
-                    "flex items-center justify-between p-2 rounded-lg text-left text-[11px] font-medium transition-all border",
-                    isCurrent
-                      ? "bg-emerald-600/20 border-emerald-500/60 text-emerald-200 shadow-sm"
-                      : "bg-slate-900/60 border-line hover:border-slate-700 text-slate-300",
+                    "min-h-[8.5rem] overflow-hidden rounded-xl border text-left transition-[border-color,background-color,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40",
+                    selected
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-2 hover:-translate-y-0.5 hover:bg-raised",
                   )}
+                  onClick={() => selectPreset(activeCategory, preset.id)}
                 >
-                  <span className="truncate">{preset.label}</span>
-                  {isCurrent && <Check size={12} className="text-emerald-400 shrink-0 ml-1" />}
+                  <span className="grid h-[5.5rem] place-items-center border-b border-line/60 bg-panel/65">
+                    <PresetPreview category={activeCategory} presetId={preset.id} />
+                  </span>
+                  <span className="flex items-center gap-1.5 px-2.5 py-2 text-[0.63rem] font-bold">
+                    <span className="min-w-0 flex-1 truncate">{preset.label}</span>
+                    {selected ? <Check size={12} className="shrink-0 text-accent" aria-hidden /> : null}
+                  </span>
                 </button>
               );
             })}
           </div>
-        </div>
-      )}
 
-      {/* 2. Drawing on 3D Model Section */}
-      {activeTab === "drawing" && (
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-line">
-            <div className="flex items-center gap-1.5">
-              <Paintbrush size={13} className="text-emerald-400" />
-              <span className="text-[11px] font-medium">3D 모델 표면 드로잉 모드</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDrawState((s) => ({ ...s, active: !s.active }))}
-              disabled={disabled}
-              className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-medium transition-colors",
-                drawState.active
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-800 text-slate-400 hover:text-slate-200",
-              )}
-            >
-              {drawState.active ? "켜짐 (Active)" : "꺼짐"}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-slate-950 border border-line/50">
-            <button
-              type="button"
-              onClick={() => setDrawState((s) => ({ ...s, brushMode: "pen" }))}
-              disabled={disabled || !drawState.active}
-              className={cn(
-                "py-1 rounded text-[10px] flex items-center justify-center gap-1 transition-colors",
-                drawState.brushMode === "pen"
-                  ? "bg-emerald-600 text-white"
-                  : "text-slate-400 hover:text-slate-200",
-              )}
-            >
-              <PenTool size={11} />
-              <span>펜 브러시</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDrawState((s) => ({ ...s, brushMode: "eraser" }))}
-              disabled={disabled || !drawState.active}
-              className={cn(
-                "py-1 rounded text-[10px] flex items-center justify-center gap-1 transition-colors",
-                drawState.brushMode === "eraser"
-                  ? "bg-emerald-600 text-white"
-                  : "text-slate-400 hover:text-slate-200",
-              )}
-            >
-              <Eraser size={11} />
-              <span>지우개</span>
-            </button>
-          </div>
-
-          {/* Color Presets */}
-          <div className="space-y-1">
-            <span className="text-[10px] text-slate-400">브러시 색상</span>
-            <div className="flex items-center gap-1.5">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setDrawState((s) => ({ ...s, color: c }))}
-                  disabled={disabled || !drawState.active}
-                  style={{ backgroundColor: c }}
-                  className={cn(
-                    "size-5 rounded-full border transition-transform",
-                    drawState.color === c
-                      ? "border-emerald-400 scale-110 shadow-sm ring-1 ring-emerald-400"
-                      : "border-slate-700 hover:scale-105",
-                  )}
-                  aria-label={`색상 ${c}`}
-                />
+          <details className="rounded-xl border border-line bg-card/55 p-3">
+            <summary className="min-h-9 cursor-pointer text-[0.63rem] font-bold text-fg-2">
+              VRM 캐릭터에서 더 세밀하게 편집
+            </summary>
+            <div className="mt-2 space-y-1.5 border-t border-line/60 pt-2">
+              {unsupportedCategories.map((category) => (
+                <p key={category.id} className="text-[0.58rem] leading-relaxed text-fg-3">
+                  <b className="text-fg-2">{category.label}</b> · {VRM_ONLY_REASON[category.id] ?? "VRM 캐릭터 빌더에서 제공합니다."}
+                </p>
               ))}
             </div>
-          </div>
-
-          {/* Brush Size */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] text-slate-400">
-              <span>선 굵기</span>
-              <span className="font-mono text-emerald-300">{drawState.size}px</span>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              step={1}
-              value={drawState.size}
-              disabled={disabled || !drawState.active}
-              onChange={(e) => setDrawState((s) => ({ ...s, size: Number(e.target.value) }))}
-              aria-label="드로잉 굵기"
-              className="w-full accent-emerald-400 cursor-pointer"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 pt-1">
-            <button
-              type="button"
-              onClick={() => setDrawState((s) => ({ ...s, strokes: s.strokes.slice(0, -1) }))}
-              disabled={disabled || !drawState.active || drawState.strokes.length === 0}
-              className="flex-1 py-1 rounded bg-slate-900 border border-line text-[10px] text-slate-300 hover:text-white flex items-center justify-center gap-1 transition-colors disabled:opacity-40"
-            >
-              <Undo2 size={11} />
-              <span>획 취소</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDrawState((s) => ({ ...s, strokes: [] }))}
-              disabled={disabled || !drawState.active || drawState.strokes.length === 0}
-              className="flex-1 py-1 rounded bg-slate-900 border border-line text-[10px] text-rose-400 hover:text-rose-300 flex items-center justify-center gap-1 transition-colors disabled:opacity-40"
-            >
-              <RotateCcw size={11} />
-              <span>전체 초기화</span>
-            </button>
-          </div>
+          </details>
         </div>
-      )}
+      ) : null}
 
-      {/* 3. AI Features Section */}
-      {activeTab === "ai" && (
-        <div className="space-y-2.5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-300">
-              <Sparkles size={12} />
-              <span>AI 프리셋 원클릭 추천</span>
-            </div>
-            <p className="text-[10px] text-slate-400">
-              선호하는 웹툰 장르 분위기에 맞춰 14개 부위 프리셋을 1-클릭으로 자동 조합합니다.
+      {activeTab === "assist" ? (
+        <div role="tabpanel" aria-label="추천과 포즈" className="space-y-3">
+          <div className="flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft/30 p-3">
+            <Sparkles size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+            <p className="text-[0.61rem] leading-relaxed text-fg-2">
+              장르 레시피는 현재 인형이 실제로 지원하는 {supportedCount}개 범주만 바꿉니다. 의상·헤어를 적용한 것처럼 보이게 꾸미지 않습니다.
             </p>
           </div>
-
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {SHAPER_AI_ARCHETYPES.map((archetype) => (
               <button
                 key={archetype.id}
                 type="button"
-                onClick={() => handleApplyAiArchetype(archetype.id)}
                 disabled={disabled}
-                className="w-full p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-line hover:border-emerald-500/50 text-left transition-all group"
+                className="w-full rounded-xl border border-line bg-card p-3 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+                onClick={() => applyArchetype(archetype.id)}
+                aria-label={`${archetype.label} 지원 범주 적용`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-200 group-hover:text-emerald-300 text-[11px]">
-                    {archetype.label}
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[0.68rem] font-extrabold text-fg">{archetype.label}</span>
+                  <span className="rounded-full border border-accent/25 bg-accent-soft px-2 py-0.5 text-[0.56rem] font-bold text-accent">
+                    {supportedCount}개 적용
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    적용
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
-                  {archetype.description}
-                </p>
+                </span>
+                <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">{archetype.description}</span>
               </button>
             ))}
           </div>
-
-          {/* AI Pose Recognition Trigger */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={onTriggerPoseScanner}
-              disabled={disabled}
-              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-            >
-              <Camera size={13} />
-              <span>웹캠 / 사진으로 포즈 자동 인식</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={disabled || !onTriggerPoseScanner}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft px-3 text-[0.65rem] font-extrabold text-accent hover:bg-accent/15 disabled:opacity-40"
+            onClick={onTriggerPoseScanner}
+          >
+            <ScanSearch size={14} aria-hidden />
+            사진 위 랜드마크로 포즈 검수
+          </button>
         </div>
-      )}
+      ) : null}
 
-      {/* 4. Creator Workflow Section */}
-      {activeTab === "creator" && (
-        <div className="space-y-2.5">
-          {/* Transparent Background Toggle */}
-          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-line">
-            <label htmlFor="shaper-transparent-bg" className="space-y-0.5 cursor-pointer">
-              <span className="text-[11px] font-medium text-slate-200 block">투명 배경 (Transparent)</span>
-              <p className="text-[10px] text-slate-400">배경 없이 캐릭터만 투명 PNG/PSD로 추출</p>
-            </label>
-            <input
-              id="shaper-transparent-bg"
-              type="checkbox"
-              checked={transparentBg}
-              disabled={disabled}
-              onChange={(e) => setTransparentBg(e.target.checked)}
-              className="rounded border-line bg-slate-900 text-emerald-500 focus:ring-emerald-400 size-4 cursor-pointer"
-            />
-          </div>
-
-          {/* Multi-layer PSD Export */}
-          <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/30 space-y-2">
-            <div className="flex items-center gap-1.5 text-emerald-300 font-medium text-[11px]">
-              <Layers size={13} />
-              <span>다중 레이어 PSD 내보내기</span>
-            </div>
-            <p className="text-[10px] text-slate-300 leading-relaxed">
-              [선화], [3D 드로잉], [하이라이트], [음영], [밑색]이 각각 분리된 포토샵/클튜 호환 PSD 파일로 내보냅니다.
+      {activeTab === "output" ? (
+        <div role="tabpanel" aria-label="셰이퍼 출력" className="space-y-3">
+          <div className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3">
+            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-good" aria-hidden />
+            <p className="text-[0.61rem] leading-relaxed text-fg-2">
+              캡처와 PSD는 현재 3D 장면에서 생성합니다. 콜백이 연결되지 않은 환경에서는 가짜 픽셀이나 빈 PSD를 만들지 않습니다.
             </p>
-            <button
-              type="button"
-              onClick={handleExportPsdClick}
-              disabled={disabled || isExporting}
-              className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-medium text-xs transition-transform flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
-            >
-              <Download size={13} />
-              <span>{isExporting ? "PSD 파일 생성 중..." : "다중 레이어 PSD 파일 내려받기"}</span>
-            </button>
           </div>
-
-          {/* Direct Insert to Webtoon Canvas */}
-          {onInsertCanvas && (
-            <button
-              type="button"
-              onClick={onInsertCanvas}
-              disabled={disabled}
-              className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-colors flex items-center justify-center gap-1.5 border border-line"
-            >
-              <Check size={13} />
-              <span>현재 웹툰 컷 캔버스에 즉시 삽입</span>
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={disabled || !onInsertCanvas}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-accent/50 bg-accent px-3 text-[0.66rem] font-extrabold text-on-accent hover:bg-accent/90 disabled:opacity-40"
+            onClick={onInsertCanvas}
+          >
+            <ImagePlus size={14} aria-hidden />
+            현재 장면을 캔버스에 추가
+          </button>
+          <button
+            type="button"
+            disabled={disabled || !onExportPsd}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.66rem] font-extrabold text-fg-2 hover:bg-raised disabled:opacity-40"
+            onClick={onExportPsd}
+          >
+            <Layers size={14} aria-hidden />
+            레이어드 PSD 내보내기
+          </button>
+          <div className="rounded-xl border border-dashed border-line bg-card/45 p-3 text-[0.59rem] leading-relaxed text-fg-3">
+            <p className="flex items-center gap-1.5 font-bold text-fg-2">
+              <Download size={12} aria-hidden />
+              직접 표면 드로잉
+            </p>
+            <p className="mt-1">
+              UV가 있는 VRM 캐릭터의 표면 탭에서 B 브러시, F ColorDrop, I 스포이드를 사용합니다. 데생 인형에는 존재하지 않는 UV 기능을 가짜 토글로 노출하지 않습니다.
+            </p>
+          </div>
         </div>
-      )}
-    </div>
+      ) : null}
+    </section>
   );
 }

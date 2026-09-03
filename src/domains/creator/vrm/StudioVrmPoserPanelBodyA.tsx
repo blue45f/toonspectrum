@@ -13,6 +13,7 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import {
   EXPRESSION_PRESETS,
@@ -52,6 +53,9 @@ import {
 import {
   StudioVrmAvatarForgePanel,
 } from "./StudioVrmAvatarForgePanel";
+import {
+  inspectStudioVrmSemanticFaceMorphProfile,
+} from "./studio-vrm-semantic-face-morph";
 import {
   StudioVrmAvatarReferenceRecommendationsPanel,
 } from "./StudioVrmAvatarReferenceRecommendationsPanel";
@@ -226,6 +230,10 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
     handleExpressionPresetSelect,
     updateExpressionWeight,
   } = h;
+  const semanticFaceMorphProfile = useMemo(
+    () => inspectStudioVrmSemanticFaceMorphProfile(vrm),
+    [vrm],
+  );
   return (
               <>
               {activePanelTab === "character" ? (
@@ -323,6 +331,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                       ? proportionRigMessage || "리그 준비 상태를 확인할 수 없습니다."
                       : null
                   }
+                  semanticFaceMorphProfile={semanticFaceMorphProfile}
                   onChange={handleAvatarForgeChange}
                 />
                 <div className="mt-3">

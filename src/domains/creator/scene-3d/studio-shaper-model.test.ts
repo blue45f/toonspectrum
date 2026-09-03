@@ -11,7 +11,7 @@ import {
 } from "./studio-shaper-model";
 
 describe("studio-shaper-model", () => {
-  it("provides all 14 official Shaper categories", () => {
+  it("provides the 14 modular authoring categories", () => {
     expect(SHAPER_CATEGORIES.length).toBe(14);
     expect(DEFAULT_SHAPER_SELECTION.face).toBeDefined();
     const categoryIds = SHAPER_CATEGORIES.map((c) => c.id);

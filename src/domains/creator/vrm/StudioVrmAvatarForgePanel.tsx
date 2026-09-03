@@ -1,10 +1,14 @@
 import {
+  ArrowRight,
+  ArrowRightLeft,
   CircleUserRound,
   Download,
   Palette,
   PersonStanding,
   RotateCcw,
   Scissors,
+  Search,
+  SlidersHorizontal,
   Sparkles,
   UserPlus,
   WandSparkles,
@@ -18,9 +22,11 @@ import {
   AVATAR_FORGE_HAIR_LIMITS,
   AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
+  DEFAULT_AVATAR_FORGE_STATE,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
   serializeAvatarForgeState,
+  setAvatarForgeSemanticFaceMorph,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
@@ -45,6 +51,14 @@ import {
   type StudioVrmProportionKey,
   type StudioVrmProportionMetrics,
 } from "./studio-vrm-proportion-core";
+import {
+  countStudioVrmAvatarForgeChanges,
+  describeStudioVrmAvatarForgeState,
+  StudioVrmAvatarForgePreview,
+} from "./StudioVrmAvatarForgePreview";
+import { StudioVrmForgeRangeControl } from "./StudioVrmForgeRangeControl";
+
+import type { StudioVrmSemanticFaceMorphProfile } from "./studio-vrm-semantic-face-morph";
 
 /** 정밀 파라미터 슬라이더 순서 — 라벨/범위는 AVATAR_FORGE_HAIR_LIMITS가 단일 소스. */
 const HAIR_DETAIL_KEYS = ["strandWidth", "fringe", "curl", "shine", "wave", "ahoge", "tailHeight"] as const;
@@ -55,6 +69,100 @@ const ORDERED_PROPORTION_PRESETS = Object.freeze(
 );
 
 type ForgeView = "presets" | "body" | "hair" | "face";
+type ForgePresetFilter = "all" | "romance" | "modern" | "action" | "fantasy";
+
+const FORGE_PRESET_FILTERS: ReadonlyArray<{
+  readonly id: ForgePresetFilter;
+  readonly label: string;
+  readonly keywords: readonly string[];
+}> = [
+  { id: "all", label: "전체", keywords: [] },
+  { id: "romance", label: "로맨스", keywords: ["romance", "soft", "long", "bob", "diva", "로맨스", "소프트"] },
+  { id: "modern", label: "현대·학원", keywords: ["natural", "short", "pop", "modern", "senior", "내추럴", "숏", "팝"] },
+  { id: "action", label: "액션", keywords: ["action", "pony", "fire", "wolf", "액션", "파이어"] },
+  { id: "fantasy", label: "판타지", keywords: ["elegant", "silver", "mint", "gold", "fantasy", "엘리건트", "실버"] },
+] as const;
+
+const FACE_SHAPE_PRESETS: ReadonlyArray<{
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly face: AvatarForgeFaceParams;
+}> = [
+  {
+    id: "balanced",
+    label: "균형형",
+    hint: "대부분의 장르에 맞는 자연스러운 기준형",
+    face: { ...DEFAULT_AVATAR_FORGE_STATE.face },
+  },
+  {
+    id: "soft-round",
+    label: "부드러운 둥근형",
+    hint: "넓은 볼과 짧은 턱의 친근한 인상",
+    face: { headWidth: 1.1, headHeight: 0.96, headDepth: 1.02, cheekVolume: 0.72, chinLength: 0.94 },
+  },
+  {
+    id: "oval",
+    label: "계란형",
+    hint: "세로로 길고 균형 잡힌 로맨스형",
+    face: { headWidth: 0.98, headHeight: 1.08, headDepth: 1, cheekVolume: 0.42, chinLength: 1.05 },
+  },
+  {
+    id: "sharp",
+    label: "샤프형",
+    hint: "좁은 볼과 긴 턱의 선명한 인상",
+    face: { headWidth: 0.91, headHeight: 1.05, headDepth: 1.02, cheekVolume: 0.18, chinLength: 1.1 },
+  },
+  {
+    id: "soft-volume",
+    label: "볼륨형",
+    hint: "볼륨을 살리고 깊이는 부드럽게 정리",
+    face: { headWidth: 1.04, headHeight: 1.02, headDepth: 0.96, cheekVolume: 0.66, chinLength: 0.98 },
+  },
+  {
+    id: "chibi",
+    label: "SD 치비형",
+    hint: "넓고 짧은 얼굴과 풍부한 볼륨",
+    face: { headWidth: 1.14, headHeight: 0.93, headDepth: 1.06, cheekVolume: 0.8, chinLength: 0.9 },
+  },
+] as const;
+
+const HAIR_COLOR_PRESETS = [
+  { id: "ink", label: "잉크 블랙", baseColor: "#171515", shadowColor: "#070606", tipColor: "#5d5551" },
+  { id: "espresso", label: "에스프레소", baseColor: "#2b1d18", shadowColor: "#110b09", tipColor: "#8d6756" },
+  { id: "honey", label: "허니 블론드", baseColor: "#91611f", shadowColor: "#3c260b", tipColor: "#f4d67f" },
+  { id: "silver", label: "실버", baseColor: "#777b86", shadowColor: "#30333a", tipColor: "#f0f1f5" },
+  { id: "rose", label: "로즈", baseColor: "#713344", shadowColor: "#2b1119", tipColor: "#efa8bb" },
+  { id: "violet", label: "바이올렛", baseColor: "#33254f", shadowColor: "#130d20", tipColor: "#aa91dc" },
+  { id: "ocean", label: "오션", baseColor: "#173a58", shadowColor: "#071724", tipColor: "#70b9dc" },
+  { id: "mint", label: "민트", baseColor: "#174b48", shadowColor: "#071e1d", tipColor: "#8be0d5" },
+] as const;
+
+function deriveHairShadowColor(hex: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "#111111";
+  const value = Number.parseInt(match[1], 16);
+  const channel = (shift: number) => Math.round(((value >> shift) & 0xff) * 0.38)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
+
+function presetMatchesFilter(
+  preset: (typeof AVATAR_FORGE_PRESETS)[number],
+  filter: ForgePresetFilter,
+): boolean {
+  if (filter === "all") return true;
+  const group = FORGE_PRESET_FILTERS.find((candidate) => candidate.id === filter);
+  if (!group) return true;
+  const haystack = `${preset.id} ${preset.label} ${preset.hint}`.toLocaleLowerCase("ko-KR");
+  return group.keywords.some((keyword) => haystack.includes(keyword.toLocaleLowerCase("ko-KR")));
+}
+
+function sameFace(left: AvatarForgeFaceParams, right: AvatarForgeFaceParams): boolean {
+  return (Object.keys(left) as Array<keyof AvatarForgeFaceParams>)
+    .every((key) => Math.abs(left[key] - right[key]) < 1e-6);
+}
 
 type StudioVrmAvatarForgePanelProps = {
   state: AvatarForgeState;
@@ -69,6 +177,7 @@ type StudioVrmAvatarForgePanelProps = {
   proportionMetricsLabel?: string;
   proportionPresetNote?: string | null;
   proportionUnavailableReason?: string | null;
+  semanticFaceMorphProfile?: StudioVrmSemanticFaceMorphProfile | null;
   onChange: (state: AvatarForgeState) => void;
   onGeneratedFile?: (file: File) => void;
 };
@@ -85,10 +194,6 @@ const VIEWS: ReadonlyArray<{
   { id: "face", label: "얼굴", hint: "비율·디테일 조절", icon: CircleUserRound },
 ];
 
-function formatValue(value: number, unit?: string) {
-  return unit === "×" ? `${value.toFixed(2)}×` : `${Math.round(value * 100)}%`;
-}
-
 export function StudioVrmAvatarForgePanel({
   state,
   sculptSessionId,
@@ -98,16 +203,30 @@ export function StudioVrmAvatarForgePanel({
   proportionMetricsLabel = "모델 실측",
   proportionPresetNote = null,
   proportionUnavailableReason = null,
+  semanticFaceMorphProfile = null,
   onChange,
   onGeneratedFile,
 }: StudioVrmAvatarForgePanelProps) {
   const controlId = useId();
   const [view, setView] = useState<ForgeView>("presets");
+  const [presetQuery, setPresetQuery] = useState("");
+  const [presetFilter, setPresetFilter] = useState<ForgePresetFilter>("all");
+  const [precisionMode, setPrecisionMode] = useState(false);
   const [generateResult, setGenerateResult] = useState<StudioVrmGenerateResult | null>(null);
   const [generateBusy, setGenerateBusy] = useState(false);
   // 헤어 실루엣을 **직접 골랐는지**를 기억한다. 기본값이 이미 "없음"이라 목록에서 "없음"을
   // 눌러도 상태가 그대로여서, 상태 비교만으로는 의도한 민머리를 알아볼 수 없다.
   const [hairStyleChosen, setHairStyleChosen] = useState(false);
+  const baselineRef = useRef({
+    sessionId: sculptSessionId,
+    state: sanitizeAvatarForgeState(state),
+  });
+  if (baselineRef.current.sessionId !== sculptSessionId) {
+    baselineRef.current = {
+      sessionId: sculptSessionId,
+      state: sanitizeAvatarForgeState(state),
+    };
+  }
 
   // 이 의도는 **지금 편집 중인 조형 상태**에만 붙는다. 새 VRM 을 설치하면 부모가 조형 상태를
   // 통째로 초기화하는데(useStudioVrmPoserInstall) 패널은 마운트된 채로 남으므로, 그대로 두면
@@ -148,6 +267,13 @@ export function StudioVrmAvatarForgePanel({
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
     emit({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
+  };
+
+  const updateSemanticFaceMorph = (
+    id: Parameters<typeof setAvatarForgeSemanticFaceMorph>[1],
+    value: number,
+  ) => {
+    emit(setAvatarForgeSemanticFaceMorph(state, id, value));
   };
 
   const updateProportion = (key: StudioVrmProportionKey, value: number) => {
@@ -192,6 +318,22 @@ export function StudioVrmAvatarForgePanel({
   const selectedProportionPreset = STUDIO_VRM_PROPORTION_PRESETS.find(
     (preset) => preset.id === state.proportions.presetId,
   );
+  const visualSummary = describeStudioVrmAvatarForgeState(state, baselineRef.current.state);
+  const changedControlCount = countStudioVrmAvatarForgeChanges(
+    state,
+    baselineRef.current.state,
+  );
+  const normalizedPresetQuery = presetQuery.trim().toLocaleLowerCase("ko-KR");
+  const filteredPresets = useMemo(
+    () => AVATAR_FORGE_PRESETS.filter((preset) => {
+      if (!presetMatchesFilter(preset, presetFilter)) return false;
+      if (!normalizedPresetQuery) return true;
+      return `${preset.label} ${preset.hint} ${preset.id}`
+        .toLocaleLowerCase("ko-KR")
+        .includes(normalizedPresetQuery);
+    }),
+    [normalizedPresetQuery, presetFilter],
+  );
 
   return (
     <section className="overflow-hidden rounded-2xl border border-accent/30 bg-[linear-gradient(145deg,var(--color-card),color-mix(in_oklch,var(--color-accent)_7%,var(--color-panel)))] shadow-[0_12px_36px_oklch(0_0_0/0.12)]">
@@ -228,6 +370,52 @@ export function StudioVrmAvatarForgePanel({
           </button>
         </div>
 
+        <div className="mt-3 grid grid-cols-[7.4rem_minmax(0,1fr)] gap-3 rounded-2xl border border-line/70 bg-card/75 p-3 shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-line/80 bg-panel/70">
+            <StudioVrmAvatarForgePreview
+              state={state}
+              variant="hero"
+              label="현재 아바타 조형 미리보기"
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.6rem] font-extrabold text-accent">
+                실시간 조합
+              </span>
+              <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[0.6rem] font-bold text-fg-3">
+                변경 {changedControlCount}개
+              </span>
+            </div>
+            <p className="mt-2 text-[0.72rem] font-extrabold text-fg">
+              {visualSummary.face} · {visualSummary.hair}
+            </p>
+            <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
+              {visualSummary.bangs} · {visualSummary.body}. 카드로 큰 방향을 정한 뒤 숫자 입력으로 마무리하세요.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                aria-pressed={precisionMode}
+                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                onClick={() => setPrecisionMode((active) => !active)}
+              >
+                <SlidersHorizontal size={12} aria-hidden />
+                {precisionMode ? "빠른 편집" : "정밀 편집"}
+              </button>
+              <button
+                type="button"
+                disabled={disabled || changedControlCount === 0}
+                className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-35"
+                onClick={() => emit(sanitizeAvatarForgeState(baselineRef.current.state))}
+              >
+                <RotateCcw size={12} aria-hidden />
+                시작 상태
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div role="tablist" aria-label="아바타 조형 단계" className="mt-3 grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-panel/65 p-1">
           {VIEWS.map((item) => {
             const Icon = item.icon;
@@ -248,6 +436,7 @@ export function StudioVrmAvatarForgePanel({
               >
                 <Icon size={14} className="shrink-0 max-[360px]:hidden" aria-hidden />
                 <span className="min-w-0 truncate">{item.label}</span>
+                <span aria-hidden="true" className="sr-only">{item.hint}</span>
               </button>
             );
           })}
@@ -256,70 +445,136 @@ export function StudioVrmAvatarForgePanel({
 
       <div className="p-3.5">
         {view === "presets" ? (
-          <div role="tabpanel" aria-label="아바타 스타일 프리셋">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-[0.68rem] font-bold text-fg-2">완성형 스타일</p>
-              <span className="text-[0.62rem] text-fg-3">옆으로 넘겨 전체 보기</span>
-            </div>
-            <div className="-mx-3.5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3.5 pb-2 [scrollbar-width:thin]">
-              {AVATAR_FORGE_PRESETS.map((preset) => {
-                const selected = state.presetId === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    disabled={disabled}
-                    aria-pressed={selected}
-                    onClick={() => {
-                      setHairStyleChosen(false);
-                      emit(createAvatarForgeState(preset.id));
-                    }}
-                    className={`min-h-[5.6rem] w-[8.4rem] shrink-0 snap-start rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
-                      selected
-                        ? "border-accent bg-accent-soft text-accent"
-                        : "border-line bg-card text-fg hover:bg-raised"
-                    }`}
-                  >
-                    <span className="text-lg" aria-hidden>{preset.emoji}</span>
-                    <span className="mt-1 block text-[0.68rem] font-extrabold">{preset.label}</span>
-                    <span className="mt-0.5 line-clamp-2 block text-[0.6rem] leading-snug text-fg-3">{preset.hint}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-[0.68rem] font-bold text-fg-2">캐릭터 베리언트</p>
-                <span className="text-[0.62rem] text-fg-3">얼굴 비율을 유지한 채 헤어·체형 교체</span>
+          <div role="tabpanel" aria-label="아바타 스타일 프리셋" className="space-y-3.5">
+            <div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[0.7rem] font-extrabold text-fg">완성형 스타일</p>
+                  <p className="mt-0.5 text-[0.6rem] text-fg-3">실제 얼굴·헤어·색 조합을 보고 시작점을 고릅니다.</p>
+                </div>
+                <span className="text-[0.6rem] tabular-nums text-fg-3">{filteredPresets.length}개</span>
               </div>
-              <div className="-mx-3.5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3.5 pb-2 [scrollbar-width:thin]">
-                {listStudioVrmCharacterVariantSummaries().map((variant) => (
+              <label className="relative mt-2 block">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden />
+                <input
+                  type="search"
+                  value={presetQuery}
+                  aria-label="아바타 스타일 검색"
+                  placeholder="분위기·장르·헤어 검색"
+                  className="min-h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  onChange={(event) => setPresetQuery(event.currentTarget.value)}
+                />
+              </label>
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="radiogroup" aria-label="스타일 장르 필터">
+                {FORGE_PRESET_FILTERS.map((filter) => (
                   <button
-                    key={variant.id}
+                    key={filter.id}
                     type="button"
-                    disabled={disabled}
-                    aria-label={`${variant.label} 베리언트: ${variant.description}`}
-                    title={variant.tags.join(" · ")}
-                    onClick={() => emit(applyStudioVrmCharacterVariant(state, variant.id))}
-                    className="min-h-[5.2rem] w-[8.4rem] shrink-0 snap-start rounded-xl border border-line bg-card p-2.5 text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+                    role="radio"
+                    aria-checked={presetFilter === filter.id}
+                    className={`min-h-9 shrink-0 rounded-full border px-3 text-[0.61rem] font-bold transition-colors ${
+                      presetFilter === filter.id
+                        ? "border-accent/60 bg-accent-soft text-accent"
+                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                    }`}
+                    onClick={() => setPresetFilter(filter.id)}
                   >
-                    <span className="text-lg" aria-hidden>{variant.emoji}</span>
-                    <span className="mt-1 block text-[0.68rem] font-extrabold">{variant.label}</span>
-                    <span className="mt-0.5 line-clamp-2 block text-[0.6rem] leading-snug text-fg-3">
-                      {variant.description}
-                    </span>
+                    {filter.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="mt-2.5 rounded-xl border border-line/70 bg-panel/55 p-2.5">
-              <p className="flex items-center gap-1.5 text-[0.66rem] font-bold text-fg-2">
-                <WandSparkles size={13} className="text-accent" aria-hidden />
-                다음 단계
-              </p>
-              <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
-                스타일을 고른 뒤 체형 탭에서 실루엣을, 헤어·얼굴 탭에서 형태와 색을 세밀하게 조절하세요.
-              </p>
+
+            {filteredPresets.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {filteredPresets.map((preset) => {
+                  const selected = state.presetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={disabled}
+                      aria-pressed={selected}
+                      aria-label={`${preset.label} 스타일 적용: ${preset.hint}`}
+                      onClick={() => {
+                        setHairStyleChosen(false);
+                        emit(createAvatarForgeState(preset.id));
+                      }}
+                      className={`group min-h-[10.5rem] overflow-hidden rounded-2xl border text-left transition-[border-color,background-color,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
+                        selected
+                          ? "border-accent bg-accent-soft text-accent shadow-sm"
+                          : "border-line bg-card text-fg hover:-translate-y-0.5 hover:bg-raised"
+                      }`}
+                    >
+                      <span className="block h-[6.4rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1 pt-1">
+                        <StudioVrmAvatarForgePreview
+                          state={preset.state}
+                          variant="card"
+                          showBody
+                          label={`${preset.label} 조합 미리보기`}
+                        />
+                      </span>
+                      <span className="block p-2.5">
+                        <span className="block truncate text-[0.7rem] font-extrabold">{preset.label}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-[0.59rem] leading-relaxed text-fg-3">{preset.hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-line bg-card/55 p-4 text-center text-[0.65rem] text-fg-3">
+                검색 조건과 일치하는 스타일이 없습니다.
+              </div>
+            )}
+
+            <details className="group rounded-xl border border-line bg-card/55 p-3">
+              <summary className="flex min-h-9 cursor-pointer list-none items-center text-[0.68rem] font-bold text-fg-2 [&::-webkit-details-marker]:hidden">
+                캐릭터 베리언트
+                <span className="ml-auto text-[0.6rem] text-fg-3">얼굴 유지 · 실루엣 교체</span>
+              </summary>
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line/60 pt-3">
+                {listStudioVrmCharacterVariantSummaries().map((variant) => {
+                  const previewState = applyStudioVrmCharacterVariant(state, variant.id);
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      disabled={disabled}
+                      aria-label={`${variant.label} 베리언트: ${variant.description}`}
+                      title={variant.tags.join(" · ")}
+                      onClick={() => emit(previewState)}
+                      className="overflow-hidden rounded-xl border border-line bg-card text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+                    >
+                      <span className="block h-20 overflow-hidden border-b border-line/60 bg-panel/60 px-1">
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={`${variant.label} 미리보기`} />
+                      </span>
+                      <span className="block p-2.5">
+                        <span className="block truncate text-[0.67rem] font-extrabold">{variant.label}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-[0.58rem] leading-relaxed text-fg-3">{variant.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
+
+            <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-accent/25 bg-accent-soft/30 p-2">
+              {([
+                ["face", "얼굴형"],
+                ["hair", "헤어"],
+                ["body", "체형"],
+              ] as const).map(([target, label]) => (
+                <button
+                  key={target}
+                  type="button"
+                  className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.62rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  onClick={() => setView(target)}
+                >
+                  {label}
+                  <ArrowRight size={11} aria-hidden />
+                </button>
+              ))}
             </div>
           </div>
         ) : null}
@@ -334,6 +589,12 @@ export function StudioVrmAvatarForgePanel({
               <div className="grid grid-cols-2 gap-2">
                 {ORDERED_PROPORTION_PRESETS.map((preset) => {
                   const selected = state.proportions.presetId === preset.id;
+                  const previewState = sanitizeAvatarForgeState({
+                    ...state,
+                    presetId: undefined,
+                    bodyPresetId: undefined,
+                    proportions: preset.proportions,
+                  });
                   return (
                     <button
                       key={preset.id}
@@ -341,28 +602,19 @@ export function StudioVrmAvatarForgePanel({
                       disabled={proportionControlsDisabled}
                       aria-pressed={selected}
                       aria-label={`${preset.label} 체형: ${preset.hint}`}
-                      onClick={() => emit(sanitizeAvatarForgeState({
-                        ...state,
-                        presetId: undefined,
-                        bodyPresetId: undefined,
-                        proportions: preset.proportions,
-                      }))}
-                      className={`flex min-h-16 min-w-0 items-start gap-2 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
+                      onClick={() => emit(previewState)}
+                      className={`min-h-[8.5rem] overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                         selected
                           ? "border-accent bg-accent-soft text-accent"
                           : "border-line bg-card text-fg hover:bg-raised"
                       }`}
                     >
-                      <span className="mt-0.5 shrink-0 text-base leading-none" aria-hidden>
-                        {preset.emoji}
+                      <span className="block h-[5.2rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={`${preset.label} 체형 미리보기`} />
                       </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[0.68rem] font-extrabold">
-                          {preset.label}
-                        </span>
-                        <span className="mt-0.5 line-clamp-2 block text-[0.6rem] leading-snug text-fg-3">
-                          {preset.hint}
-                        </span>
+                      <span className="block p-2">
+                        <span className="block truncate text-[0.67rem] font-extrabold">{preset.label}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-[0.58rem] leading-snug text-fg-3">{preset.hint}</span>
                       </span>
                     </button>
                   );
@@ -384,28 +636,19 @@ export function StudioVrmAvatarForgePanel({
                 {STUDIO_VRM_PROPORTION_KEYS.map((key) => {
                   const limit = STUDIO_VRM_PROPORTION_LIMITS[key];
                   return (
-                    <label key={key} className="block">
-                      <span className="mb-1 flex items-center justify-between gap-2 text-[0.65rem] font-semibold text-fg-2">
-                        <span>
-                          {limit.label}
-                          <span className="ml-1 font-normal text-fg-3">· {limit.hint}</span>
-                        </span>
-                        <output className="tabular-nums text-fg-3">
-                          {formatValue(state.proportions[key], limit.unit)}
-                        </output>
-                      </span>
-                      <input
-                        type="range"
-                        aria-label={limit.label}
-                        min={limit.min}
-                        max={limit.max}
-                        step={limit.step}
-                        value={state.proportions[key]}
-                        disabled={proportionControlsDisabled}
-                        onChange={(event) => updateProportion(key, Number(event.target.value))}
-                        className="h-11 w-full cursor-pointer accent-accent disabled:cursor-not-allowed sm:h-8"
-                      />
-                    </label>
+                    <StudioVrmForgeRangeControl
+                      key={key}
+                      label={limit.label}
+                      hint={limit.hint}
+                      value={state.proportions[key]}
+                      minimum={limit.min}
+                      maximum={limit.max}
+                      step={limit.step}
+                      defaultValue={DEFAULT_AVATAR_FORGE_STATE.proportions[key]}
+                      unit={limit.unit ?? "%"}
+                      disabled={proportionControlsDisabled}
+                      onChange={(value) => updateProportion(key, value)}
+                    />
                   );
                 })}
               </div>
@@ -442,26 +685,34 @@ export function StudioVrmAvatarForgePanel({
           <div role="tabpanel" aria-label="프로시저럴 헤어 편집" className="space-y-3.5">
             <div>
               <p className="mb-2 text-[0.68rem] font-bold text-fg-2">헤어 실루엣</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => {
                   const selected = state.hair.style === option.id;
+                  const previewState = sanitizeAvatarForgeState({
+                    ...state,
+                    presetId: undefined,
+                    hair: { ...state.hair, style: option.id },
+                  });
                   return (
                     <button
                       key={option.id}
                       type="button"
                       disabled={disabled}
+                      aria-label={option.label}
                       aria-pressed={selected}
                       title={option.hint}
                       onClick={() => {
                         setHairStyleChosen(true);
                         updateHair("style", option.id);
                       }}
-                      className={`flex min-h-14 flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
+                      className={`min-h-[7.5rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
                         selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                       }`}
                     >
-                      <span className="text-sm leading-none" aria-hidden>{option.emoji}</span>
-                      <span className="mt-1 w-full truncate text-center">{option.label}</span>
+                      <span className="block h-[4.8rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${option.label} 헤어 미리보기`} />
+                      </span>
+                      <span className="block truncate px-1.5 py-2 text-center">{option.label}</span>
                     </button>
                   );
                 })}
@@ -473,99 +724,184 @@ export function StudioVrmAvatarForgePanel({
               <div className="grid grid-cols-3 gap-1.5">
                 {AVATAR_FORGE_BANG_STYLE_OPTIONS.map((option) => {
                   const selected = state.hair.bangStyle === option.id;
+                  const previewState = sanitizeAvatarForgeState({
+                    ...state,
+                    presetId: undefined,
+                    hair: { ...state.hair, bangStyle: option.id },
+                  });
                   return (
                     <button
                       key={option.id}
                       type="button"
                       disabled={disabled || state.hair.style === "none"}
+                      aria-label={option.label}
                       aria-pressed={selected}
                       title={option.hint}
                       onClick={() => updateHair("bangStyle", option.id)}
-                      className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-1.5 text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
+                      className={`min-h-[6.8rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
                         selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                       }`}
                     >
-                      <span className="text-sm leading-none" aria-hidden>{option.emoji}</span>
-                      <span className="min-w-0 truncate">{option.label}</span>
+                      <span className="block h-[4.1rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${option.label} 앞머리 미리보기`} />
+                      </span>
+                      <span className="block truncate px-1.5 py-1.5 text-center">{option.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {(["baseColor", "tipColor"] as const).map((key) => (
-                <label key={key} className="flex min-h-12 items-center gap-2 rounded-xl border border-line bg-card px-2.5 text-[0.66rem] font-bold text-fg-2">
-                  <Palette size={13} className="text-fg-3" aria-hidden />
-                  <span className="flex-1">{key === "baseColor" ? "뿌리색" : "끝색"}</span>
-                  <input
-                    type="color"
-                    value={state.hair[key]}
-                    disabled={disabled}
-                    onChange={(event) => updateHair(key, event.target.value)}
-                    className="size-8 cursor-pointer rounded-lg border border-line bg-transparent p-0 pointer-coarse:size-11"
-                    aria-label={key === "baseColor" ? "헤어 뿌리 색상" : "헤어 끝 색상"}
-                  />
-                </label>
-              ))}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[0.68rem] font-bold text-fg-2">헤어 컬러 조합</p>
+                <button
+                  type="button"
+                  disabled={disabled || state.hair.style === "none"}
+                  className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.59rem] font-bold text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-35"
+                  onClick={() => emit({
+                    ...state,
+                    presetId: undefined,
+                    hair: {
+                      ...state.hair,
+                      baseColor: state.hair.tipColor,
+                      tipColor: state.hair.baseColor,
+                    },
+                  })}
+                >
+                  <ArrowRightLeft size={11} aria-hidden />
+                  기본·하이라이트 교체
+                </button>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {HAIR_COLOR_PRESETS.map((palette) => {
+                  const selected = state.hair.baseColor === palette.baseColor
+                    && (state.hair.shadowColor ?? deriveHairShadowColor(state.hair.baseColor)) === palette.shadowColor
+                    && state.hair.tipColor === palette.tipColor;
+                  return (
+                    <button
+                      key={palette.id}
+                      type="button"
+                      disabled={disabled || state.hair.style === "none"}
+                      aria-label={`${palette.label} 헤어 컬러 적용`}
+                      aria-pressed={selected}
+                      title={palette.label}
+                      className={`min-h-12 rounded-xl border p-1 transition-colors disabled:opacity-35 ${
+                        selected ? "border-accent bg-accent-soft" : "border-line bg-card hover:bg-raised"
+                      }`}
+                      onClick={() => emit({
+                        ...state,
+                        presetId: undefined,
+                        hair: {
+                          ...state.hair,
+                          baseColor: palette.baseColor,
+                          shadowColor: palette.shadowColor,
+                          tipColor: palette.tipColor,
+                        },
+                      })}
+                    >
+                      <span
+                        aria-hidden
+                        className="block h-7 rounded-lg border border-white/15"
+                        style={{ background: `linear-gradient(135deg, ${palette.baseColor}, ${palette.tipColor})` }}
+                      />
+                      <span className="sr-only">{palette.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-line bg-card/70 p-3">
-              {(["volume", "length"] as const).map((key) => {
-                const limit = AVATAR_FORGE_HAIR_LIMITS[key];
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ["baseColor", "기본색"],
+                ["shadowColor", "그림자색"],
+                ["tipColor", "하이라이트"],
+              ] as const).map(([key, label]) => {
+                const value = key === "shadowColor"
+                  ? state.hair.shadowColor ?? deriveHairShadowColor(state.hair.baseColor)
+                  : state.hair[key];
                 return (
-                  <label key={key} className="block">
-                    <span className="mb-1 flex items-center justify-between gap-2 text-[0.66rem] font-semibold text-fg-2">
-                      {limit.label}
-                      <output className="tabular-nums text-fg-3">{formatValue(state.hair[key], limit.unit)}</output>
+                  <label key={key} className="flex min-h-12 min-w-0 flex-col justify-center gap-1 rounded-xl border border-line bg-card px-2 text-[0.58rem] font-bold text-fg-2">
+                    <span className="flex items-center gap-1 truncate">
+                      <Palette size={11} className="shrink-0 text-fg-3" aria-hidden />
+                      {label}
                     </span>
                     <input
-                      type="range"
-                      min={limit.min}
-                      max={limit.max}
-                      step={limit.step}
-                      value={state.hair[key]}
+                      type="color"
+                      value={value}
                       disabled={disabled || state.hair.style === "none"}
-                      onChange={(event) => updateHair(key, Number(event.target.value))}
-                      className="h-2 w-full accent-accent"
+                      onChange={(event) => updateHair(key, event.target.value)}
+                      className="h-8 w-full cursor-pointer rounded-lg border border-line bg-transparent p-0 disabled:opacity-35 pointer-coarse:h-11"
+                      aria-label={`헤어 ${label}`}
                     />
                   </label>
                 );
               })}
             </div>
 
-            <details className="group rounded-xl border border-line bg-card/55 p-3">
-              <summary className="flex min-h-6 cursor-pointer list-none items-center text-[0.68rem] font-bold text-fg-2 [&::-webkit-details-marker]:hidden">
-                정밀 헤어 파라미터
-                <span className="ml-auto text-[0.62rem] font-medium text-fg-3 group-open:hidden">
-                  {HAIR_DETAIL_KEYS.length}개
-                </span>
-                <span className="ml-auto hidden text-accent group-open:inline">−</span>
-              </summary>
-              <div className="mt-3 space-y-3 border-t border-line/60 pt-3">
+            <div className="space-y-3 rounded-xl border border-line bg-card/70 p-3">
+              {(["volume", "length"] as const).map((key) => {
+                const limit = AVATAR_FORGE_HAIR_LIMITS[key];
+                return (
+                  <StudioVrmForgeRangeControl
+                    key={key}
+                    label={limit.label}
+                    value={state.hair[key]}
+                    minimum={limit.min}
+                    maximum={limit.max}
+                    step={limit.step}
+                    defaultValue={DEFAULT_AVATAR_FORGE_STATE.hair[key]}
+                    unit={limit.unit ?? "%"}
+                    disabled={disabled || state.hair.style === "none"}
+                    onChange={(value) => updateHair(key, value)}
+                  />
+                );
+              })}
+            </div>
+
+            {precisionMode ? (
+              <div className="space-y-3 rounded-xl border border-accent/25 bg-accent-soft/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[0.68rem] font-bold text-fg-2">정밀 헤어 파라미터</p>
+                    <p className="mt-0.5 text-[0.58rem] text-fg-3">가닥 두께·웨이브·광택·묶음 위치를 숫자로 마감합니다.</p>
+                  </div>
+                  <span className="rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.58rem] font-bold text-accent">
+                    {HAIR_DETAIL_KEYS.length}개
+                  </span>
+                </div>
                 {HAIR_DETAIL_KEYS.map((key) => {
                   const limit = AVATAR_FORGE_HAIR_LIMITS[key];
                   return (
-                    <label key={key} className="block">
-                      <span className="mb-1 flex items-center justify-between gap-2 text-[0.65rem] font-semibold text-fg-2">
-                        {limit.label}
-                        <output className="tabular-nums text-fg-3">{formatValue(state.hair[key], limit.unit)}</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={limit.min}
-                        max={limit.max}
-                        step={limit.step}
-                        value={state.hair[key]}
-                        disabled={disabled || state.hair.style === "none"}
-                        onChange={(event) => updateHair(key, Number(event.target.value))}
-                        className="h-2 w-full accent-accent"
-                      />
-                    </label>
+                    <StudioVrmForgeRangeControl
+                      key={key}
+                      label={limit.label}
+                      value={state.hair[key]}
+                      minimum={limit.min}
+                      maximum={limit.max}
+                      step={limit.step}
+                      defaultValue={DEFAULT_AVATAR_FORGE_STATE.hair[key]}
+                      unit={limit.unit ?? "%"}
+                      disabled={disabled || state.hair.style === "none"}
+                      onChange={(value) => updateHair(key, value)}
+                    />
                   );
                 })}
               </div>
-            </details>
+            ) : (
+              <button
+                type="button"
+                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-dashed border-line bg-card/55 px-3 text-left text-[0.66rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                onClick={() => setPrecisionMode(true)}
+              >
+                <span>
+                  정밀 헤어 조절
+                  <span className="mt-0.5 block text-[0.58rem] font-normal text-fg-3">가닥·웨이브·광택 등 {HAIR_DETAIL_KEYS.length}개</span>
+                </span>
+                <SlidersHorizontal size={15} className="text-accent" aria-hidden />
+              </button>
+            )}
 
             <div className="flex min-h-12 items-center gap-2.5 rounded-xl border border-line bg-panel/55 px-3">
               <input
@@ -590,6 +926,49 @@ export function StudioVrmAvatarForgePanel({
 
         {view === "face" ? (
           <div role="tabpanel" aria-label="얼굴 비율과 디테일 편집" className="space-y-3.5">
+            <div>
+              <div className="mb-2 flex items-end justify-between gap-2">
+                <div>
+                  <p className="text-[0.68rem] font-bold text-fg-2">얼굴형 프리셋</p>
+                  <p className="mt-0.5 text-[0.58rem] text-fg-3">원본 눈·코·입 리그를 유지하면서 두상과 턱 실루엣만 안전하게 조절합니다.</p>
+                </div>
+                <span className="text-[0.58rem] text-fg-3">{FACE_SHAPE_PRESETS.length}종</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {FACE_SHAPE_PRESETS.map((preset) => {
+                  const selected = sameFace(state.face, preset.face);
+                  const previewState = sanitizeAvatarForgeState({
+                    ...state,
+                    presetId: undefined,
+                    face: preset.face,
+                  });
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={disabled}
+                      aria-label={`${preset.label} 얼굴형 적용: ${preset.hint}`}
+                      aria-pressed={selected}
+                      title={preset.hint}
+                      className={`min-h-[7.4rem] overflow-hidden rounded-xl border text-[0.61rem] font-bold transition-colors disabled:opacity-40 ${
+                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                      }`}
+                      onClick={() => emit({
+                        ...state,
+                        presetId: undefined,
+                        face: { ...preset.face },
+                      })}
+                    >
+                      <span className="block h-[4.7rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${preset.label} 얼굴형 미리보기`} />
+                      </span>
+                      <span className="block truncate px-1 py-1.5 text-center">{preset.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="rounded-xl border border-line bg-card/70 p-3">
               <p className="mb-1 text-[0.68rem] font-bold text-fg-2">리그 보존 얼굴 비율</p>
               <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
@@ -599,25 +978,76 @@ export function StudioVrmAvatarForgePanel({
                 {(Object.keys(AVATAR_FORGE_FACE_LIMITS) as Array<keyof AvatarForgeFaceParams>).map((key) => {
                   const limit = AVATAR_FORGE_FACE_LIMITS[key];
                   return (
-                    <label key={key} className="block">
-                      <span className="mb-1 flex items-center justify-between gap-2 text-[0.65rem] font-semibold text-fg-2">
-                        {limit.label}
-                        <output className="tabular-nums text-fg-3">{formatValue(state.face[key], limit.unit)}</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={limit.min}
-                        max={limit.max}
-                        step={limit.step}
-                        value={state.face[key]}
-                        disabled={disabled}
-                        onChange={(event) => updateFace(key, Number(event.target.value))}
-                        className="h-2 w-full accent-accent"
-                      />
-                    </label>
+                    <StudioVrmForgeRangeControl
+                      key={key}
+                      label={limit.label}
+                      value={state.face[key]}
+                      minimum={limit.min}
+                      maximum={limit.max}
+                      step={limit.step}
+                      defaultValue={DEFAULT_AVATAR_FORGE_STATE.face[key]}
+                      unit={limit.unit ?? "%"}
+                      disabled={disabled}
+                      onChange={(value) => updateFace(key, value)}
+                    />
                   );
                 })}
               </div>
+            </div>
+
+            <div
+              className="rounded-xl border border-accent/25 bg-accent-soft/20 p-3"
+              data-studio-vrm-semantic-face-morphs={semanticFaceMorphProfile?.status ?? "unavailable"}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[0.68rem] font-bold text-fg-2">적응형 얼굴 디테일</p>
+                  <p className="mt-0.5 text-[0.58rem] leading-relaxed text-fg-3">
+                    모델 고유 shape key를 먼저 사용하고, 없는 항목은 머리·눈 랜드마크와 얼굴 메시를 기반으로 부드럽게 조형합니다. 표정·립싱크 채널은 제외합니다.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.57rem] font-bold text-accent">
+                  {semanticFaceMorphProfile?.controls.length ?? 0}종
+                </span>
+              </div>
+              {semanticFaceMorphProfile?.status === "ready" ? (
+                <div className="mt-3 space-y-3">
+                  {semanticFaceMorphProfile.controls.map((control) => (
+                    <StudioVrmForgeRangeControl
+                      key={control.id}
+                      label={control.label}
+                      hint={`${control.provider === "native-morph" ? "모델 morph" : `적응형 mesh ${control.adaptiveMeshCount}개`} · ${control.hint}`}
+                      value={state.semanticFaceMorphs?.[control.id] ?? 0}
+                      minimum={control.minimum}
+                      maximum={control.maximum}
+                      step={0.01}
+                      defaultValue={0}
+                      unit="%"
+                      disabled={disabled}
+                      onChange={(value) => updateSemanticFaceMorph(control.id, value)}
+                    />
+                  ))}
+                  <details className="rounded-lg border border-line/70 bg-card/60 p-2.5">
+                    <summary className="min-h-8 cursor-pointer text-[0.59rem] font-bold text-fg-2">
+                      조형 공급자 확인
+                    </summary>
+                    <div className="mt-2 space-y-1 border-t border-line/60 pt-2">
+                      {semanticFaceMorphProfile.controls.map((control) => (
+                        <p key={control.id} className="break-all text-[0.55rem] leading-relaxed text-fg-3">
+                          <b className="text-fg-2">{control.label}</b> · {control.provider === "native-morph"
+                            ? `모델 morph · ${control.targetNames.join(" · ")}`
+                            : `적응형 mesh · 얼굴 메시 ${control.adaptiveMeshCount}개`}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-line bg-card/60 px-3 py-2 text-[0.6rem] leading-relaxed text-fg-3">
+                  {semanticFaceMorphProfile?.message
+                    ?? "모델을 불러오면 native morph와 적응형 얼굴 메시를 함께 검사합니다."}
+                </p>
+              )}
             </div>
 
             <div>
@@ -703,25 +1133,28 @@ export function StudioVrmAvatarForgePanel({
             않았을 때 기본 프리셋이 대신 들어가므로 둘이 갈릴 수 있다. */}
         <div
           data-studio-vrm-generate-preview=""
-          className="flex items-center gap-2 rounded-xl border border-line bg-card/70 px-3 py-2"
+          className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-xl border border-line bg-card/70 p-2.5"
         >
-          <span
-            className="size-7 rounded-full border border-line"
-            style={{ background: previewRecipe.state.hair.baseColor }}
-            aria-hidden
-          />
-          <span
-            className="size-7 rounded-full border border-line"
-            style={{ background: previewRecipe.state.hair.tipColor }}
-            aria-hidden
-          />
-          <div className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
-            <p>
-              헤어 {previewRecipe.state.hair.style} · 얼굴 폭{" "}
-              {previewRecipe.state.face.headWidth.toFixed(2)}× · 다리{" "}
-              {previewRecipe.state.proportions.legLength.toFixed(2)}×
-            </p>
-          </div>
+          <span className="block h-20 overflow-hidden rounded-lg border border-line/70 bg-panel/60 px-1">
+            <StudioVrmAvatarForgePreview
+              state={previewRecipe.state}
+              variant="compact"
+              label={`${previewRecipe.label} 생성 결과 미리보기`}
+            />
+          </span>
+          <span className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
+            <span className="block truncate text-[0.69rem] font-extrabold text-fg-2">{previewRecipe.label}</span>
+            <span className="mt-0.5 block">{describeStudioVrmAvatarForgeState(previewRecipe.state).face} · {describeStudioVrmAvatarForgeState(previewRecipe.state).hair}</span>
+            <span className="block">{formatStudioVrmHeadUnits(resolveStudioVrmProportionMetrics(previewRecipe.state.proportions).headUnits)} · {describeStudioVrmAvatarForgeState(previewRecipe.state).body}</span>
+            <span className="mt-1 flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="size-3 shrink-0 rounded-full border border-line/70 shadow-inner"
+                style={{ backgroundColor: previewRecipe.state.hair.baseColor }}
+              />
+              <span className="truncate">헤어 컬러 {previewRecipe.state.hair.baseColor.toUpperCase()}</span>
+            </span>
+          </span>
         </div>
 
         {previewRecipe.appliedDefaultPresetId ? (
