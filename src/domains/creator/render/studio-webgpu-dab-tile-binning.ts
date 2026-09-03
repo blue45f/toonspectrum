@@ -93,9 +93,6 @@ function dabTileSpan(
   columns: number,
   rows: number,
 ): StudioGpuDabTileSpan | null | "numeric-overflow" {
-  if (!finite(dab.x) || !finite(dab.y) || !finitePositive(dab.radius)) {
-    return null;
-  }
   const minimumX = dab.x - dab.radius;
   const minimumY = dab.y - dab.radius;
   const maximumX = dab.x + dab.radius;
@@ -192,6 +189,13 @@ export function planStudioGpuDabTileBinning(
   const tileCounts = new Uint32Array(tileCount);
   let referenceCount = 0;
   for (const dab of input.dabs) {
+    if (
+      typeof dab !== "object"
+      || dab === null
+      || !finite(dab.x)
+      || !finite(dab.y)
+      || !finitePositive(dab.radius)
+    ) return Object.freeze({ status: "rejected", reason: "invalid-input" });
     const span = dabTileSpan(
       dab,
       input.documentWidth,
@@ -203,10 +207,6 @@ export function planStudioGpuDabTileBinning(
     if (span === "numeric-overflow") {
       return Object.freeze({ status: "rejected", reason: "numeric-overflow" });
     }
-    if (
-      span === null
-      && (!finite(dab?.x) || !finite(dab?.y) || !finitePositive(dab?.radius))
-    ) return Object.freeze({ status: "rejected", reason: "invalid-input" });
     spans.push(span);
     if (!span) continue;
     referenceCount += span.referenceCount;
