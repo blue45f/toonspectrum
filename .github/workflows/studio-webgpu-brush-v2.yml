@@ -19,6 +19,7 @@ on:
       - "src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract*"
       - "src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2*"
       - "src/domains/creator/render/studio-webgpu-brush-visual-metrics*"
+  workflow_dispatch:
 
 permissions:
   contents: read
