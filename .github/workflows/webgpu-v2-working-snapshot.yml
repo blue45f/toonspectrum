@@ -1,0 +1,24 @@
+name: WebGPU v2 working snapshot
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-engine-v2-benchmark-20260904
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive tracked source
+        run: git archive --format=zip --output=toonspectrum-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: toonspectrum-webgpu-v2-source
+          path: toonspectrum-source.zip
+          if-no-files-found: error
+          retention-days: 1
