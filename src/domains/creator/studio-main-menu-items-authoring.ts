@@ -23,6 +23,7 @@ import {
   Languages,
   MessageSquare,
   Ruler,
+  ScanText,
   Stamp,
   StickyNote,
 } from "lucide-react";
@@ -114,7 +115,13 @@ export function buildStudioVectorEraserMenuItems({
   ];
 }
 
-/** Text ▸ Dialogue Link and Text ▸ Localization Layout. */
+/**
+ * Text ▸ Dialogue Link and Text ▸ Localization Layout (translate + 현지화 QA).
+ *
+ * 현지화 QA is the same translate panel opened straight onto its report screen
+ * (말풍선 넘침·영문 문체·MQM 점수), so the row is a second door onto one surface —
+ * `openLocalizationQa` sets the host's translate surface to `"qa"`.
+ */
 export function buildStudioDialogueMenuItems({
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
@@ -135,6 +142,15 @@ export function buildStudioDialogueMenuItems({
       icon: Languages,
       onSelect: () => {
         ui.openDialogueTranslate();
+      },
+    },
+    {
+      id: "localization-qa",
+      commandId: "text.localization-qa",
+      label: "현지화 QA · 넘침·문체 검사…",
+      icon: ScanText,
+      onSelect: () => {
+        ui.openLocalizationQa();
       },
     },
   ];

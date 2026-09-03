@@ -56,6 +56,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly toggleEraseToIntersection: () => unknown;
   readonly openDialogueBatch: () => unknown;
   readonly openDialogueTranslate: () => unknown;
+  readonly openLocalizationQa: () => unknown;
   readonly togglePixelArtMode: () => unknown;
   readonly insertDefaultStickyNote: () => unknown;
   readonly enableSilkSymmetry: () => unknown;
@@ -101,6 +102,7 @@ export function bindStudioMainMenuSurfaceActions(
     toggleVectorEraseToIntersection: actions.toggleEraseToIntersection,
     openDialogueBatch: actions.openDialogueBatch,
     openDialogueTranslate: actions.openDialogueTranslate,
+    openLocalizationQa: actions.openLocalizationQa,
     togglePixelArtMode: actions.togglePixelArtMode,
     insertDefaultStickyNote: actions.insertDefaultStickyNote,
     enableSilkSymmetry: actions.enableSilkSymmetry,

@@ -1655,7 +1655,6 @@ import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
-
 export function StudioCuttoonEditor({
   remixId,
   studioRoute,
@@ -3720,8 +3719,8 @@ export function StudioCuttoonEditor({
   const [dialogueScript, setDialogueScript] = useState("");
   // 배치된 대사 일괄 편집 패널(코미포식) — 목록 인라인 수정·찾아바꾸기·클릭 선택.
   const [dialogueBatchOpen, setDialogueBatchOpen] = useState(false);
-  // 대사 번역(BYOK) — studio-dialogue-translate.ts 통합 상태.
-  const [dialogueTranslateOpen, setDialogueTranslateOpen] = useState(false);
+  // 대사 번역(BYOK) — studio-dialogue-translate.ts 통합 상태. false | "translate" | "qa"(현지화 QA 화면).
+  const [dialogueTranslateOpen, setDialogueTranslateOpen] = useState<false | "translate" | "qa">(false);
   // 문서 전체에 지금 "표시 중"인 로케일 — SOURCE_LOCALE(원문)이 기본. switchDialogueLocale로만 바뀐다.
   const [activeDialogueLocale, setActiveDialogueLocale] = useState<string>(SOURCE_LOCALE);
   const [translateTargetLocale, setTranslateTargetLocale] = useState<string>(DIALOGUE_LOCALE_PRESETS[0].code);
@@ -27119,7 +27118,8 @@ function clearSelectionForEdit() {
       toggleCanvasGrid: () => setShowGrid((visible) => !visible),
       toggleEraseToIntersection: toggleEraseToIntersectionMode,
       openDialogueBatch: () => setDialogueBatchOpen(true),
-      openDialogueTranslate: () => setDialogueTranslateOpen(true),
+      openDialogueTranslate: () => setDialogueTranslateOpen("translate"),
+      openLocalizationQa: () => setDialogueTranslateOpen("qa"),
       togglePixelArtMode: () => {
         setPixelArtMode((current) =>
           current.enabled

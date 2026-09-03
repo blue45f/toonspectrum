@@ -242,7 +242,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-08-25: 크리에이티브 모드 해체 → 메뉴 재배치 5행 (188 → 193).
     // 2026-08-27: View 중복 검수·미리보기 3행 + 참고 이미지/앱 설정 중복 2행 제거 (193 → 188).
     // 2026-09-03: 웹툰 창작 보조 센터 + AI 슈퍼 스위트 추가 (188 → 190).
-    measuredCount: 190,
+    // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
+    measuredCount: 191,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -444,11 +445,12 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   // vector (2) — lifted out of insert, plus the eraser's vector mode
   "vector/elements",
   "vector/erase-to-intersection",
-  // text (4) — lifted out of insert, plus the two dialogue panels
+  // text (5) — lifted out of insert, plus the two dialogue panels and the QA door
   "text/bubble",
   "text/text",
   "text/dialogue-batch",
   "text/dialogue-translate",
+  "text/localization-qa",
   // comic (3) — lifted out of insert and view
   "comic/page",
   "comic/page-sequence",
@@ -2255,6 +2257,18 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("대사 번역 · 다국어"), en("Dialogue translation")],
       aliases: [ours("대사 번역"), ps("Translate")],
       origins: [menu("text/dialogue-translate")],
+    }),
+    defineCommand({
+      id: "text.localization-qa",
+      labels: [
+        ko(
+          "현지화 QA · 넘침·문체 검사",
+          "번역 대사의 말풍선 넘침과 영문 레터링 문체를 검사해 MQM 품질 점수를 냅니다.",
+        ),
+        en("Localization QA"),
+      ],
+      aliases: [ours("현지화 QA"), ours("번역 검수"), ours("넘침 보고서")],
+      origins: [menu("text/localization-qa")],
     }),
     defineCommand({
       id: "comic.tone",

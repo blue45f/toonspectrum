@@ -64,6 +64,7 @@ import type { StudioUiDensityMode } from "../studio-ui-density";
 import type { StudioViewRotation } from "../studio-view-controls";
 import type { StudioWorkAssetRenderPlaceholder, StudioWorkAssetRenderProjection } from "../studio-work-asset-render-projection";
 import type { CvdMode } from "../StudioColorBlindPreview";
+import type { StudioDialogueTranslateSurface } from "../StudioDialogueTranslatePanel";
 import type {
   StudioWebGpuCanvasHandle,
   StudioWebGpuSurfaceFrameRequest,
@@ -293,7 +294,8 @@ export interface StudioCanvasViewportProps {
   cropArmed: boolean;
   cropRect: CropRect | null;
   dialogueBatchOpen: boolean;
-  dialogueTranslateOpen: boolean;
+  /** 닫힘(false) 또는 처음 보여 줄 화면 — 메뉴의 대사 번역/현지화 QA 두 진입점이 이 값으로 갈린다. */
+  dialogueTranslateOpen: StudioDialogueTranslateSurface;
   drawingRef: import("react").RefObject<DrawEl | null>;
   drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;
   drawMode: DrawMode;
@@ -427,7 +429,7 @@ export interface StudioCanvasViewportProps {
   setContextMenu: import("react").Dispatch<import("react").SetStateAction<{ visible: boolean; x: number; y: number; elId: string | null; }>>;
   setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<StudioDialogueTranslateSurface>>;
   setError: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setFollowingStudioSessionId: import("react").Dispatch<import("react").SetStateAction<string | null>>;

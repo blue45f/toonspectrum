@@ -182,6 +182,7 @@ function createUiActions(): StudioMainMenuUiActions {
     toggleVectorEraseToIntersection: vi.fn(),
     openDialogueBatch: vi.fn(),
     openDialogueTranslate: vi.fn(),
+    openLocalizationQa: vi.fn(),
     togglePixelArtMode: vi.fn(),
     insertDefaultStickyNote: vi.fn(),
     enableSilkSymmetry: vi.fn(),

@@ -4,7 +4,7 @@
 
 웹툰 및 디지털 만화 제작 현장에서 생성형 AI(Generative AI) 및 AI 보조 도구는 단순한 이미지 생성을 넘어 **화풍 일치(Style Consistency), 광원에 따른 입체 셀 음영 계산(Shading Assist), 대본의 컷별 자동 연출 콘티화(Storyboard Auto-Directing), 캐릭터 대사 감정에 맞춘 말풍선 형태 자동 매칭(Emotion-to-Balloon), 작화 붕괴 방지 프롬프트 증강(Prompt Engineering)** 등 창작 파이프라인의 핵심 생산성 솔루션으로 급속히 진화하고 있습니다.
 
-본 프로젝트에서는 국내 대기업(네이버웹툰, 카카오엔터테인먼트), 글로벌 선도 소프트웨어(셀시스 클립스튜디오 페인트), 그리고 국내외 혁신 스타트업(투닝/투ンス퀘어, 오노마에이아이/투낫, 다쉬툰, 크레아 AI, 시나리오, 컴피UI 웹툰 파이프라인)의 AI 핵심 기능을 심층 분석하고, ToonSpectrum 스튜디오에 완전히 통합된 **AI 웹툰 생성 슈퍼 스위트 (Webtoon AI Super Suite)** 엔진 및 통합 모달 UI를 구축하였습니다.
+본 프로젝트에서는 국내 대기업(네이버웹툰, 카카오엔터테인먼트), 글로벌 선도 소프트웨어(셀시스 클립스튜디오 페인트), 그리고 국내외 혁신 스타트업(투닝/툰스퀘어(Tooning/Toonsquare), 오노마에이아이/투낫, 다쉬툰, 크레아 AI, 시나리오, 컴피UI 웹툰 파이프라인)의 AI 핵심 기능을 심층 분석하고, ToonSpectrum 스튜디오에 완전히 통합된 **AI 웹툰 생성 슈퍼 스위트 (Webtoon AI Super Suite)** 엔진 및 통합 모달 UI를 구축하였습니다.
 
 ---
 
@@ -46,12 +46,12 @@
 
 | 모듈 파일명 | 담당 기능 및 벤치마크 대상 | 주요 세부 사양 |
 |---|---|---|
-| [`studio-ai-webtoon-style-filter.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/studio-ai-webtoon-style-filter.ts) | **화풍 변환 툰필터 엔진**<br>(네이버 툰필터 & Krea AI 벤치마크) | • 4대 핵심 화풍: 로맨스 판타지, 소년 액션 극화체, 판타지 웹소설 표지, 스릴러 누아르<br>• 선화 굵기 계수, 명암비 부스트, 디노이징 강도(0.55~0.70) 합성 |
-| [`studio-ai-shading-assist.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/studio-ai-shading-assist.ts) | **AI 음영 어시스턴트**<br>(클립스튜디오 Shading Assist 벤치마크) | • 8방향 광원 나침반 및 역광 림라이트(Backlight Rim)<br>• 1차/2차 셀 그림자 투명도 및 오프셋 벡터 `(dx, dy)` 계산<br>• 4대 환경광 색온도(새벽, 대낮, 석양, 달빛) 그림자 틴트 결정 |
-| [`studio-ai-prompt-enhancer.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/studio-ai-prompt-enhancer.ts) | **웹툰 프롬프트 증강기**<br>(Midjourney & Dashtoon 벤치마크) | • 자연어 한국어/영어 대사 및 상황 문장 자동 장르 분류<br>• 고품질 웹툰 마스터피스 키워드 및 작화 붕괴 방지 15종 네거티브 프롬프트 주입 |
-| [`studio-ai-storyboard-director.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/studio-ai-storyboard-director.ts) | **콘티 자동 디렉터**<br>(오노마에이아이 TooNat 벤치마크) | • 줄글 대본을 컷별(Shot Scale, Camera Angle, Emotion, SFX, BG Prompt)로 자동 연출<br>• 모바일 세로 스크롤 완독 시간 및 페이싱 스코어 계산 |
-| [`studio-ai-emotion-bubble-matcher.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/studio-ai-emotion-bubble-matcher.ts) | **감정-말풍선 자동 매처**<br>(투닝 Tooning NLP 벤치마크) | • 대사 감정 분석 (외침, 충격, 은밀, 독백, 설렘, 평온)<br>• 외침 톱니바퀴, 찌그러진 테두리, 점선, 구름, 핑크 틴트 말풍선 및 테두리 두께 자동 추천 |
-| [`StudioAiSuperSuiteModal.tsx`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/creator/ai/StudioAiSuperSuiteModal.tsx) | **통합 슈퍼 스위트 모달 UI** | • 5개 탭 실시간 파라미터 제어, 프리뷰, 원클릭 복사 및 스튜디오 캔버스 생성기 즉시 연동 |
+| [`studio-ai-webtoon-style-filter.ts`](../src/domains/creator/ai/studio-ai-webtoon-style-filter.ts) | **화풍 변환 툰필터 엔진**<br>(네이버 툰필터 & Krea AI 벤치마크) | • 4대 핵심 화풍: 로맨스 판타지, 소년 액션 극화체, 판타지 웹소설 표지, 스릴러 누아르<br>• 선화 굵기 계수, 명암비 부스트, 디노이징 강도(0.55~0.70) 합성 |
+| [`studio-ai-shading-assist.ts`](../src/domains/creator/ai/studio-ai-shading-assist.ts) | **AI 음영 어시스턴트**<br>(클립스튜디오 Shading Assist 벤치마크) | • 8방향 광원 나침반 및 역광 림라이트(Backlight Rim)<br>• 1차/2차 셀 그림자 투명도 및 오프셋 벡터 `(dx, dy)` 계산<br>• 4대 환경광 색온도(새벽, 대낮, 석양, 달빛) 그림자 틴트 결정 |
+| [`studio-ai-prompt-enhancer.ts`](../src/domains/creator/ai/studio-ai-prompt-enhancer.ts) | **웹툰 프롬프트 증강기**<br>(Midjourney & Dashtoon 벤치마크) | • 자연어 한국어/영어 대사 및 상황 문장 자동 장르 분류<br>• 고품질 웹툰 마스터피스 키워드 및 작화 붕괴 방지 15종 네거티브 프롬프트 주입 |
+| [`studio-ai-storyboard-director.ts`](../src/domains/creator/ai/studio-ai-storyboard-director.ts) | **콘티 자동 디렉터**<br>(오노마에이아이 TooNat 벤치마크) | • 줄글 대본을 컷별(Shot Scale, Camera Angle, Emotion, SFX, BG Prompt)로 자동 연출<br>• 완독 시간은 컷당 6초 고정 추정, 페이싱 스코어는 8컷 기준 편차 공식(`95 - |컷수-8| × 3`)<br>• 세로 스크롤 시뮬레이션이 아니다 — 여백 기반 실측은 `assistant/webtoon-scroll-pacing-simulator.ts`가 담당한다 |
+| [`studio-ai-emotion-bubble-matcher.ts`](../src/domains/creator/ai/studio-ai-emotion-bubble-matcher.ts) | **감정-말풍선 자동 매처**<br>(투닝 Tooning NLP 벤치마크) | • 대사 감정 분석 (외침, 충격, 은밀, 독백, 설렘, 평온)<br>• 외침 톱니바퀴, 찌그러진 테두리, 점선, 구름, 핑크 틴트 말풍선 및 테두리 두께 자동 추천 |
+| [`StudioAiSuperSuiteModal.tsx`](../src/domains/creator/ai/StudioAiSuperSuiteModal.tsx) | **통합 슈퍼 스위트 모달 UI** | • 5개 탭 실시간 파라미터 제어, 프리뷰, 원클릭 복사 및 스튜디오 캔버스 생성기 즉시 연동 |
 
 ---
 
@@ -66,3 +66,27 @@
    - 설정 버튼 하단에 `AI 웹툰 생성 슈퍼 스위트` 원클릭 퀵 런처 버튼 배치.
 4. **호스트 바인딩**:
    - `StudioCuttoonEditorHost.tsx`에서 모달 상태 관리 및 AI 생성기 프롬프트 즉시 전달 파이프라인 구축.
+
+---
+
+## 5. 문서 ↔ 코드 대조 (2026-09-03)
+
+위 §3 표의 수치를 실제 소스와 하나씩 대조한 결과:
+
+| 문서 주장 | 코드 | 판정 |
+|---|---|---|
+| 4대 핵심 화풍 | `WEBTOON_ART_STYLES` = `romance-manhwa` · `action-shonen-ink` · `fantasy-noble-cel` · `thriller-noir-grit` | 일치 |
+| 디노이징 강도 0.55~0.70 | `recommendedDenoiserStrength` = 0.55 / 0.65 / 0.6 / 0.7 | 일치 |
+| 8방향 광원 + 역광 림라이트 | `LIGHT_DIRECTION_ANGLES_DEG` = 8방위 + `backlight-rim` | 일치 |
+| 4대 환경광 색온도 | `AmbientLightingTemperature` = `warm-dawn` · `neutral-day` · `cool-moon` · `sunset-golden` | 일치 |
+| 네거티브 프롬프트 15종 | `UNIVERSAL_NEGATIVE_PROMPTS` 15개 | 일치 |
+| 감정 6종 | `SpeechEmotionKind` 6개 · `BubbleShapePreset` 6개 | 일치 |
+| 슈퍼 스위트 모달 5개 탭 | `StudioAiSuperSuiteModal.tsx` 탭 5개 | 일치 |
+| 전역 190개 메뉴 명령 | `studio-command-catalog.test.ts` "covers the menu inventory (190)" | 일치 |
+| 별칭 4종 (`AI 슈퍼 스위트`/`툰필터`/`AI 음영`/`AI 콘티`) | `comic.ai-super-suite` aliases | 일치 |
+| ~~콘티 디렉터의 "모바일 세로 스크롤 완독 시간"~~ | `estimatedEpisodeReadingSec = cuts.length * 6` (컷당 6초 고정) | **불일치 → §3에서 정정** |
+| 회사명 "투ンス퀘어" | — | **표기 깨짐 → "툰스퀘어(Toonsquare)"로 정정** |
+| §3 표의 `file:///Users/hjunkim/...` 절대 경로 링크 | — | **다른 작업자 환경에서 열리지 않음 → 저장소 상대 경로로 정정** |
+
+§2의 외부 서비스 기능 설명은 벤치마킹 대상 제품에 대한 서술이며 1차 출처로 검증하지 않았다.
+플랫폼 규격처럼 수치를 판정 근거로 쓰는 대목은 이 문서에 없다.
