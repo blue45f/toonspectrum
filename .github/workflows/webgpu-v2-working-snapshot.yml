@@ -73,6 +73,7 @@ jobs:
           PY
           rm -rf .bootstrap/webgpu-v2
           rm -f .github/workflows/webgpu-v2-working-snapshot.yml
+          rm -f .github/workflows/studio-webgpu-brush-v2.yml
           git add -A
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
