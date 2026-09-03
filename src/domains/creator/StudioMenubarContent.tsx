@@ -1358,6 +1358,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             (2026-07-24: 패널 안 조건부 마운트 → 무반응 버그 수정 후, lazy menubar 레이스까지 제거) */}
         <div
           ref={menubarLaneRef}
+          data-testid="studio-menubar-primary"
           data-studio-menubar-primary="true"
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -1488,6 +1489,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
         <StudioMenubarOverflowMenu groups={overflowMenuGroups} onReveal={revealMenuGroup} />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
+          data-testid="studio-menubar-actions"
           data-studio-menubar-actions="true"
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
@@ -2187,6 +2189,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             >
               <button
                 type="button"
+                data-testid="studio-publish"
                 onClick={() => handleSave("published")}
                 disabled={saving || collaborationDocumentLocked}
                 aria-label={workId ? "수정 게시" : "게시하기"}
