@@ -8,6 +8,7 @@ import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
+import { StudioInspectorContextRouteSync } from "./StudioInspectorContextRouteSync";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
 import { StudioInspectorSelectionSection } from "./StudioInspectorSelectionSection";
@@ -28,6 +29,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
     elements,
     marqueeIds,
     inspectorInteractionPolicy,
+    changeInspectorLayout,
     startEditText,
     applyFigmaSelectionLayoutPatch,
     zoomToSelection,
@@ -41,6 +43,12 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
 
   return (
     <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
+      <StudioInspectorContextRouteSync
+        contentMode={inspectorContentMode}
+        layout={inspectorLayout}
+        selectedType={selected?.type ?? null}
+        onChange={changeInspectorLayout}
+      />
       <div
         id={tabA11y.primary.properties.panelId}
         role="tabpanel"
