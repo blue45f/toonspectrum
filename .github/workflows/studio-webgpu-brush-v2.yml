@@ -1,0 +1,73 @@
+name: WebGPU brush V2 parity and benchmark
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-v2-final-20260904
+  pull_request:
+    paths:
+      - ".github/workflows/studio-webgpu-brush-v2.yml"
+      - "scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts"
+      - "scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs"
+      - "src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract*"
+      - "src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-brush-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-v2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_WEBGPU_V2_BENCHMARK_DIR: ${{ runner.temp }}/toonstudio-webgpu-v2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate architecture and source quality
+        run: |
+          pnpm run validate:architecture
+          pnpm exec eslint --max-warnings=0 \
+            scripts/studio-engine-webgpu-textured-brush-v2-benchmark-browser.ts \
+            scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts \
+            src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Run deterministic V2 contracts
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-benchmark-contract.test.ts
+          src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts
+
+      - name: Install Chromium and prove real WebGPU parity
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/verify-studio-engine-webgpu-textured-brush-v2-benchmark.mjs
+
+      - name: Upload V1/V2 benchmark receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonstudio-webgpu-v2-${{ github.sha }}
+          path: ${{ env.TOONSPECTRUM_WEBGPU_V2_BENCHMARK_DIR }}
+          if-no-files-found: warn
+          retention-days: 14
