@@ -13,13 +13,13 @@ permissions:
 
 concurrency:
   group: apply-webgpu-brush-residency-uplift
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply:
     name: Apply verified WebGPU brush uplift
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: macos-14
+    timeout-minutes: 40
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
