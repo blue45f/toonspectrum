@@ -35,8 +35,17 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Validate architecture and focused source quality
+      - name: Normalize imports, validate architecture, and lint focused sources
         run: |
+          pnpm exec eslint --fix \
+            src/domains/creator/StudioAnimaticTimelineDialog.tsx \
+            src/domains/creator/StudioAnimaticTimelineDialog.test.tsx \
+            src/domains/creator/StudioPageReviewPanel.tsx \
+            src/domains/creator/StudioPageReviewPanel.test.tsx \
+            src/domains/creator/studio-floating-surface-preferences-sqlite.ts \
+            src/domains/creator/studio-floating-surface-preferences-sqlite.test.ts \
+            src/domains/creator/use-studio-floating-surface-layout.ts
+          git diff --check
           pnpm run validate:architecture
           pnpm exec eslint --max-warnings=0 \
             src/domains/creator/StudioAnimaticTimelineDialog.tsx \
