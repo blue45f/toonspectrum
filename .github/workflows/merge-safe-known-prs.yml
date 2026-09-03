@@ -1,0 +1,101 @@
+name: Merge safe known PRs
+
+on:
+  push:
+    branches:
+      - automation/merge-safe-known-prs-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-safe-known-prs-20260903
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  PR_NUMBERS: "595 596 597 598 599 600 601 602 603 604 605 606 607"
+
+jobs:
+  merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Merge only conflict-free PRs whose real checks pass
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          for number in $PR_NUMBERS; do
+            metadata="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" \
+              --json state,isDraft,mergeStateStatus,headRefOid,title,url 2>/dev/null || true)"
+            if [[ -z "$metadata" ]]; then
+              echo "PR #$number: unavailable; skipped."
+              continue
+            fi
+
+            state="$(jq -r '.state' <<<"$metadata")"
+            draft="$(jq -r '.isDraft' <<<"$metadata")"
+            merge_state="$(jq -r '.mergeStateStatus' <<<"$metadata")"
+            title="$(jq -r '.title' <<<"$metadata")"
+
+            if [[ "$state" != "OPEN" ]]; then
+              echo "PR #$number: state=$state; skipped."
+              continue
+            fi
+            if [[ "$draft" == "true" ]]; then
+              echo "PR #$number: draft; skipped."
+              continue
+            fi
+            if [[ "$merge_state" == "DIRTY" ]]; then
+              echo "PR #$number: merge conflict; preserved for integration branch, not forced."
+              gh pr comment "$number" --repo "$GITHUB_REPOSITORY" \
+                --body "자동 안전 병합에서 충돌 상태로 확인되어 강제 병합하지 않았습니다. 고유 변경은 lossless integration 브랜치에서 별도로 보존·검증합니다." || true
+              continue
+            fi
+
+            if [[ "$merge_state" == "BEHIND" ]]; then
+              echo "PR #$number: updating from latest main."
+              if ! gh pr update-branch "$number" --repo "$GITHUB_REPOSITORY"; then
+                echo "PR #$number: update-branch failed; skipped."
+                continue
+              fi
+              sleep 10
+            fi
+
+            core_count=0
+            for attempt in $(seq 1 90); do
+              checks="$(gh pr checks "$number" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+              core_count="$(jq '[.[] | select(.name | ascii_downcase | contains("core"))] | length' <<<"$checks")"
+              (( core_count > 0 )) && break
+              echo "PR #$number: waiting for core check ($attempt/90)."
+              sleep 20
+            done
+            if (( core_count == 0 )); then
+              echo "PR #$number: no core check; unchecked merge refused."
+              continue
+            fi
+
+            if ! gh pr checks "$number" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 20; then
+              echo "PR #$number: checks failed; kept open."
+              gh pr comment "$number" --repo "$GITHUB_REPOSITORY" \
+                --body "자동 안전 병합에서 최신 HEAD의 체크 실패를 확인해 병합하지 않았습니다. 변경 내용은 보존되어 있으며 실패 원인을 수정한 뒤 다시 검증합니다." || true
+              continue
+            fi
+
+            head_sha="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+            if gh pr merge "$number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --squash \
+              --match-head-commit "$head_sha" \
+              --subject "$title" \
+              --body "Merged by the preservation-safe queue after synchronization with current main and success of every registered check, including core, on the exact head."; then
+              echo "PR #$number: merged."
+            else
+              echo "PR #$number: merge was blocked by repository policy; kept open."
+            fi
+          done
