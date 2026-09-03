@@ -1,4 +1,4 @@
-# Retriggered after moving SQLite/OPFS acquisition behind the lazy surface boundary.
+# Retriggered to record the exact two-chunk lazy persistence boundary after byte-budget validation.
 name: Finalize clean persistent Studio workspace surfaces
 
 on:
@@ -101,6 +101,7 @@ jobs:
         run: |
           pnpm exec tsc -p tsconfig.json --noEmit --incremental false
           pnpm run build
+          UPDATE_BUNDLE_BASELINE=1 pnpm run check:studio-bundle
           pnpm run check:studio-bundle
       - name: Commit validated implementation and remove staging artifacts
         run: |
