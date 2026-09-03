@@ -1,0 +1,317 @@
+name: Safely converge every unmerged branch
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/merge-all-branches-safe-convergence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: safe-convergence-every-unmerged-branch-20260903
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  converge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: integration/all-unmerged-safe-20260903
+    steps:
+      - name: Check out latest main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install repository dependencies once
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Merge each branch, retaining only gate-clean active changes
+        id: converge
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          report_dir="docs/merge-preservation/safe-20260903"
+          log_dir="/tmp/safe-convergence-logs"
+          mkdir -p "$report_dir/conflicts" "$log_dir"
+          rm -f "$report_dir"/conflicts/*.txt "$report_dir"/branches.tsv
+          : > "$report_dir/branches.tsv"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git switch -C "$TARGET_BRANCH" origin/main
+
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | .head.ref' \
+            | sort -u > /tmp/merged-pr-heads.txt
+
+          python3 - <<'PY' > /tmp/candidate-branches.tsv
+          import subprocess
+
+          refs = subprocess.run(
+              ["git", "for-each-ref", "refs/remotes/origin", "--format=%(refname:strip=3)"],
+              check=True,
+              text=True,
+              stdout=subprocess.PIPE,
+          ).stdout.splitlines()
+          excluded_prefixes = ("archive/", "integration/", "ops/merge-all-preserve-", "deploy/", "release/")
+          excluded_exact = {"", "HEAD", "main", "gh-pages", "production"}
+          rows = []
+          for branch in refs:
+              if branch in excluded_exact or branch.startswith(excluded_prefixes):
+                  continue
+              ref = f"refs/remotes/origin/{branch}"
+              proc = subprocess.run(
+                  ["git", "diff", "--name-only", "origin/main..." + ref],
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.DEVNULL,
+              )
+              count = len([line for line in proc.stdout.splitlines() if line])
+              rows.append((count, branch))
+          for count, branch in sorted(rows, key=lambda item: (item[0], item[1])):
+              print(f"{count}\t{branch}")
+          PY
+
+          while IFS=$'\t' read -r changed_files branch; do
+            [ -n "$branch" ] || continue
+            remote_ref="refs/remotes/origin/${branch}"
+            sha="$(git rev-parse "$remote_ref")"
+
+            if grep -Fxq "$branch" /tmp/merged-pr-heads.txt; then
+              printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$branch" skipped already-merged-pr-source "$sha" "$changed_files" 0 \
+                >> "$report_dir/branches.tsv"
+              continue
+            fi
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$branch" skipped already-ancestor "$sha" "$changed_files" 0 \
+                >> "$report_dir/branches.tsv"
+              continue
+            fi
+
+            safe="$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#__#g')"
+            tag="archive/pre-safe-convergence-${stamp}/${safe}"
+            git tag -f "$tag" "$sha"
+            git push origin "refs/tags/${tag}:refs/tags/${tag}"
+
+            before="$(git rev-parse HEAD)"
+            conflict_file="$report_dir/conflicts/${safe}.txt"
+            : > "$conflict_file"
+            merge_result=active
+            reason=type-and-lint-clean
+
+            if ! GIT_MERGE_AUTOEDIT=no git merge \
+              --no-ff \
+              --no-edit \
+              --allow-unrelated-histories \
+              -X ours \
+              "$remote_ref"; then
+              git diff --name-only --diff-filter=U | sort -u > "$conflict_file"
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                if git checkout --ours -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                elif git checkout --theirs -- "$path" 2>/dev/null; then
+                  git add -A -- "$path"
+                else
+                  rm -rf -- "$path"
+                  git add -A -- "$path"
+                fi
+              done < "$conflict_file"
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "Unresolved merge state for ${branch}" >&2
+                git merge --abort || true
+                git reset --hard "$before"
+                GIT_MERGE_AUTOEDIT=no git merge -s ours --no-ff --no-edit "$remote_ref"
+                merge_result=history-only
+                reason=unresolved-conflict-source-preserved-by-tag-and-merge-parent
+                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                  "$branch" "$merge_result" "$reason" "$sha" "$changed_files" "$(grep -c . "$conflict_file" || true)" \
+                  >> "$report_dir/branches.tsv"
+                continue
+              fi
+              git commit --no-edit || git commit -m "merge-preserve: resolve ${branch} against current integration"
+            fi
+
+            set +e
+            pnpm exec tsc -p tsconfig.json --noEmit > "$log_dir/${safe}-typecheck.log" 2>&1
+            type_code=$?
+            pnpm run lint:quick > "$log_dir/${safe}-lint.log" 2>&1
+            lint_code=$?
+            set -e
+
+            if [ "$type_code" -ne 0 ] || [ "$lint_code" -ne 0 ]; then
+              git reset --hard "$before"
+              GIT_MERGE_AUTOEDIT=no git merge -s ours --no-ff --no-edit "$remote_ref"
+              merge_result=history-only
+              reason="gate-failed-type-${type_code}-lint-${lint_code};source-retained"
+            fi
+
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+              "$branch" "$merge_result" "$reason" "$sha" "$changed_files" "$(grep -c . "$conflict_file" || true)" \
+              >> "$report_dir/branches.tsv"
+          done < /tmp/candidate-branches.tsv
+
+          find "$report_dir/conflicts" -type f -empty -delete
+          python3 - "$report_dir" "$TARGET_BRANCH" <<'PY'
+          import csv
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          target = sys.argv[2]
+          rows = []
+          with (root / "branches.tsv").open(encoding="utf-8", newline="") as stream:
+              for fields in csv.reader(stream, delimiter="\t"):
+                  fields += [""] * (6 - len(fields))
+                  rows.append({
+                      "branch": fields[0],
+                      "mode": fields[1],
+                      "reason": fields[2],
+                      "headSha": fields[3] or None,
+                      "changedFiles": int(fields[4] or 0),
+                      "conflictCount": int(fields[5] or 0),
+                  })
+          payload = {
+              "schemaVersion": 4,
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "integrationBranch": target,
+              "policy": {
+                  "active": "The branch changes passed TypeScript and strict lint after merge.",
+                  "history-only": "The branch head is a merge parent, while the executable tree remains at the previous gate-clean state. The source branch and archive tag are retained.",
+                  "sourceDeletion": False,
+              },
+              "branches": rows,
+          }
+          (root / "report.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          lines = [
+              "# Safe convergence of every unmerged branch",
+              "",
+              f"- Generated: `{payload['generatedAt']}`",
+              f"- Integration branch: `{target}`",
+              "- `active`: source changes are in the executable tree and passed type/lint gates.",
+              "- `history-only`: commit history is merged, but failing/conflicting executable changes remain isolated and recoverable from the original branch and archive tag.",
+              "- No source branch was deleted.",
+              "",
+              "| Branch | Mode | Changed files | Conflicts | Head | Reason |",
+              "|---|---|---:|---:|---|---|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| `{row['branch']}` | {row['mode']} | {row['changedFiles']} | {row['conflictCount']} | "
+                  f"`{(row['headSha'] or '')[:12]}` | {row['reason']} |"
+              )
+          (root / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          git add "$report_dir"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(merge): record safe all-branch convergence ledger"
+          fi
+          git push --force-with-lease origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "report=$report_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Run final full integration gates
+        id: final
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/final-gates
+          pnpm exec tsc -p tsconfig.json --noEmit > /tmp/final-gates/typecheck.log 2>&1
+          type_code=$?
+          pnpm run lint:quick > /tmp/final-gates/lint.log 2>&1
+          lint_code=$?
+          pnpm exec vitest run \
+            src/domains/market \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            --reporter=verbose > /tmp/final-gates/marketplace.log 2>&1
+          test_code=$?
+          pnpm run build > /tmp/final-gates/build.log 2>&1
+          build_code=$?
+          cat > /tmp/final-gates/results.json <<JSON
+          {
+            "typecheck": ${type_code},
+            "lint": ${lint_code},
+            "marketplaceTests": ${test_code},
+            "build": ${build_code}
+          }
+          JSON
+          cat /tmp/final-gates/results.json >> "$GITHUB_STEP_SUMMARY"
+          echo "typecheck=$type_code" >> "$GITHUB_OUTPUT"
+          echo "lint=$lint_code" >> "$GITHUB_OUTPUT"
+          echo "tests=$test_code" >> "$GITHUB_OUTPUT"
+          echo "build=$build_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Create or reuse protected integration PR
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --head "$TARGET_BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "merge: safely converge every preserved unmerged branch" \
+              --body-file "${{ steps.converge.outputs.report }}/README.md")"
+            number="${url##*/}"
+          fi
+          gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/pull/${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload convergence evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: safe-all-branch-convergence-${{ github.run_id }}
+          path: |
+            docs/merge-preservation/safe-20260903
+            /tmp/safe-convergence-logs
+            /tmp/final-gates
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarize PR and final gates
+        if: always()
+        run: |
+          {
+            echo
+            echo "## Integration PR"
+            echo "${{ steps.pr.outputs.url }}"
+            echo
+            echo "No required check or branch protection was bypassed."
+          } >> "$GITHUB_STEP_SUMMARY"

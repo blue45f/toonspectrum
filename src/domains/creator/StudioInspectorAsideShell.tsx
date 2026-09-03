@@ -6,6 +6,8 @@ import { Suspense } from "react";
 
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { StudioLayerCompsPanel } from "./layer/StudioLayerCompsPanel";
+import { StudioLayerTonePanel } from "./layer/StudioLayerTonePanel";
+import { StudioSubViewPanel } from "./subview/StudioSubViewPanel";
 import { CANVAS_W } from "./studio-assets";
 import { elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
@@ -122,6 +124,7 @@ export function StudioInspectorAsideShell({
     setBg,
     setBgGrad,
     setCanvasH,
+    setColor,
     setDescription,
     setGridSize,
     setMagicResizeStrategy,
@@ -500,6 +503,14 @@ export function StudioInspectorAsideShell({
                     onChange={(next) => patchEl(selected.id, { borderEffect: next } as Partial<El>)}
                   />
                 ) : null}
+                {/* CSP 톤화 (Tone / Screentone) — 선택 이미지 레이어의 망점화. */}
+                {selected?.type === "image" ? (
+                  <StudioLayerTonePanel
+                    value={selected.halftone}
+                    disabled={inspectorInteractionPolicy.global.disabled}
+                    onChange={(next) => patchEl(selected.id, { halftone: next } as Partial<El>)}
+                  />
+                ) : null}
                 {/* CSP 3.0 / 4.0 Layer Comps (레이어 콤프) */}
                 <StudioLayerCompsPanel
                   layers={layerNavigatorItems.map((item) => ({
@@ -601,6 +612,11 @@ export function StudioInspectorAsideShell({
                   canvasRotation={canvasRotation}
                 />
               </div>
+            </div>
+
+            {/* CSP Sub View (서브 뷰 팔레트) */}
+            <div className="mt-3">
+              <StudioSubViewPanel onPickColor={(hex) => setColor(hex)} />
             </div>
           </div>
           <StudioInspectorPublishPanel

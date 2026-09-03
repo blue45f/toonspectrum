@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_PAGE_GRADE } from "./studio-page-grade";
 import {
+  StudioInspectorDrawColorControls,
   StudioInspectorPageGradeSurface,
   StudioInspectorPublishPanel,
 } from "./StudioInspectorUtilityPanels";
@@ -187,5 +188,44 @@ describe("StudioInspectorPageGradeSurface", () => {
     expect((document.getElementById(contentId!) as HTMLElement).hidden).toBe(false);
     fireEvent.click(expanded);
     expect(onExpandedChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("renders StudioInspectorDrawColorControls and toggles intermediate color palette", () => {
+    const onColorChange = vi.fn();
+    render(
+      <StudioInspectorDrawColorControls
+        color="#fcd5b5"
+        eyedropperActive={false}
+        onColorChange={onColorChange}
+        onEyedropperToggle={vi.fn()}
+      />,
+    );
+
+    const toggleBtn = screen.getByRole("button", { name: "중간색 (CSP)" });
+    expect(screen.queryByText("중간색 (Intermediate Color)")).toBeNull();
+
+    fireEvent.click(toggleBtn);
+    expect(screen.getByText("중간색 (Intermediate Color)")).toBeDefined();
+  });
+
+  it("toggles approximate and history color palettes from StudioInspectorDrawColorControls", () => {
+    render(
+      <StudioInspectorDrawColorControls
+        color="#fcd5b5"
+        eyedropperActive={false}
+        onColorChange={vi.fn()}
+        onEyedropperToggle={vi.fn()}
+      />,
+    );
+
+    const approxBtn = screen.getByRole("button", { name: "근사색 (CSP)" });
+    expect(screen.queryByText("근사색 (Approximate Color)")).toBeNull();
+
+    fireEvent.click(approxBtn);
+    expect(screen.getByText("근사색 (Approximate Color)")).toBeDefined();
+
+    const historyBtn = screen.getByRole("button", { name: "히스토리 (CSP)" });
+    fireEvent.click(historyBtn);
+    expect(screen.getByText("컬러 히스토리 (Color History)")).toBeDefined();
   });
 });
