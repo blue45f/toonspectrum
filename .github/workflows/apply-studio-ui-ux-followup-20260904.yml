@@ -37,7 +37,30 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Apply guarded UI UX patch and focused gates
-        run: python3 scripts/apply-studio-ui-ux-followup-20260904.py . --skip-base-check --test
+        run: |
+          python3 scripts/apply-studio-ui-ux-followup-20260904.py . --skip-base-check
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/StudioCommandSearchDialog.test.tsx")
+          text = path.read_text(encoding="utf-8")
+          needle = '    const option = screen.getByRole("option", { name: /가우시안 블러/u });'
+          replacement = '''    const option = screen.getAllByRole("option").find(
+                (candidate) => within(candidate).queryByText("가우시안 블러", { exact: true }),
+              );
+              if (!option) throw new Error("missing exact 가우시안 블러 option");'''
+          count = text.count(needle)
+          if count != 2:
+              raise SystemExit(f"expected two ambiguous selector rows, found {count}")
+          path.write_text(text.replace(needle, replacement), encoding="utf-8")
+          PY
+          pnpm exec vitest run \
+            src/domains/creator/studio-command-execution-registry.test.ts \
+            src/domains/creator/StudioCommandSearchDialog.test.tsx \
+            src/domains/creator/studio-main-menu-items-filter.test.ts \
+            src/domains/creator/studio-inspector-primary-text-edit.test.ts
+          pnpm run typecheck
+          pnpm run lint
 
       - name: Architecture and production build gates
         run: |
