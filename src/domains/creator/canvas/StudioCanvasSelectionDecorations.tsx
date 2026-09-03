@@ -51,6 +51,8 @@ export interface StudioCanvasSelectionDecorationsContext {
   readonly multiSelectionBounds: { x: number; y: number; w: number; h: number } | null;
   readonly selected: El | null;
   readonly selectionLockState: "unlocked" | "locked" | "mixed";
+  /** Whether the uniform-resize proxy may offer its rotation handle; see the interaction hook. */
+  readonly selectionRotatable: boolean;
   readonly singleDrawFreeScale: boolean;
   /** Small dedicated Layer the live transform gesture lifts into (single-object drag Layer). */
   readonly singleObjectDragLayerRef: RefObject<Konva.Layer | null>;
@@ -81,6 +83,7 @@ export function renderStudioCanvasSelectionDecorations({
   multiSelectionBounds,
   selected,
   selectionLockState,
+  selectionRotatable,
   singleDrawFreeScale,
   singleObjectDragLayerRef,
   liveTransformDraftStore,
@@ -232,9 +235,16 @@ export function renderStudioCanvasSelectionDecorations({
           mobile={isMobile}
           coarse={hasCoarsePointer}
           enabled={groupResizeEnabled}
-          // One stroke can absorb rotation and independent width/height exactly, so it
-          // gets the full handle set. A multi-selection stays on uniform corners.
+          // One stroke can absorb independent width/height exactly, so it gets the full handle
+          // set. A multi-selection stays on uniform corners: a non-uniform group scale would have
+          // to re-weight every stroke by direction, and it would stop commuting with rotation.
           freeTransform={singleDrawFreeScale}
+          // Rotation is safe for both. Uniform scale commutes with it, so a selection turns as a
+          // rigid body and each member's committed angle is simply its own plus the gesture's.
+          // The handle is offered from the planners' own verdicts (`selectionRotatable`, derived
+          // in the interaction hook): a member that cannot carry an angle makes the commit refuse
+          // or drop it, so offering the handle there could only end in a toast or a silent no-op.
+          rotatable={selectionRotatable}
           // The caller supplies document facts only. Route thresholds, arrow semantics, clip
           // ownership, drag-Layer lift and wrapper lookup are private to the Konva adapter.
           livePreview={

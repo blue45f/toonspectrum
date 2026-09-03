@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   isStudioBrushEraserAliasId,
 } from "../brush/studio-brush-alias-profile";
+import { studioDrawObjectRotationIsDropped } from "../brush/studio-draw-object-transform";
 import { shouldApplyLayerMask } from "../layer/studio-layer-mask";
 import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "../lettering/studio-bubble-merge";
 import { applyDialogueFormatPatch, convertTextElementsToBubbles } from "../lettering/studio-dialogue-format";
@@ -14,6 +15,7 @@ import {
 import { elBounds } from "../studio-element-geometry";
 import { unionStudioSelectionBounds } from "../studio-figma-selection-ux";
 import { planGroupClickSelectionRelease } from "../studio-group-selection";
+import { studioGroupUniformResizeMemberCanRotate } from "../studio-group-uniform-resize";
 import { uid } from "../studio-id";
 import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
 import { unionBounds } from "../studio-selection";
@@ -445,6 +447,14 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     && canvasSelectionEls[0]?.type === "draw"
     && !isEffectivelyHidden(canvasSelectionEls[0]!, groups)
     && !isEffectivelyLocked(canvasSelectionEls[0]!, groups);
+  // The proxy's rotation handle is offered only where the commit could honour it: a sole stroke
+  // follows the single-stroke planner's drop rule, a selection the group planner's all-or-nothing
+  // verdict. That verdict scans calligraphy strokes for effective stylus orientation, so it is
+  // derived here with the other per-selection facts rather than in the per-render decoration pass.
+  const soleSelectionEl = canvasSelectionEls[0];
+  const selectionRotatable = singleDrawFreeScale
+    ? soleSelectionEl?.type === "draw" && !studioDrawObjectRotationIsDropped(soleSelectionEl)
+    : canvasSelectionEls.every(studioGroupUniformResizeMemberCanRotate);
   const multiSelectionVisibleBounds =
     marqueeIds.length > 1 || singleDrawFreeScale
       ? canvasSelectionEls
@@ -656,6 +666,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     patchElementAfterDragRestore,
     selectionLockState,
     selectionMutationDisabledReason,
+    selectionRotatable,
     showBubbleMerge,
     singleDrawFreeScale,
     singleObjectDragLayerRef,

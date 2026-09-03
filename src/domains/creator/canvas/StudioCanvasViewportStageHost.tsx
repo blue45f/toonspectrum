@@ -178,6 +178,7 @@ export function StudioCanvasViewportStageHost({
     multiSelectionBounds,
     narrowCanvasSelectionOnRelease,
     selectionLockState,
+    selectionRotatable,
     singleDrawFreeScale,
   } = interaction;
   const liveTransformDraftScope = `${masterEditMode ? "master" : "page"}:${activePage.id}`;
@@ -676,6 +677,7 @@ export function StudioCanvasViewportStageHost({
                 multiSelectionBounds,
                 selected,
                 selectionLockState,
+                selectionRotatable,
                 singleDrawFreeScale,
                 singleObjectDragLayerRef: interaction.singleObjectDragLayerRef,
                 liveTransformDraftStore,

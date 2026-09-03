@@ -236,6 +236,56 @@ describe("planStudioDrawObjectTransform · rotation", () => {
     // (10,0) scales to (20,0), then rotates to (0,20), then translates by the target origin.
     expect(maxPointError(next!.points, [5, 5, 5, 25])).toBeLessThan(1e-9);
   });
+
+  it("drops the turn for a mirrored-symmetry stroke instead of tearing it against its copies", () => {
+    // The renderer re-reflects the committed base about world axes, so a turned base would put
+    // every mirrored copy at -theta. The move and resize still land; only the angle is dropped.
+    const el = drawEl({
+      points: [0, 0, 10, 0],
+      symmetry: { type: "vertical", centerX: 5, centerY: 5 },
+    });
+    const rotateOnly = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 90,
+    });
+    // A dropped turn with nothing else to do must hand back the original reference.
+    expect(rotateOnly).toBe(el);
+
+    const moved = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 5, y: 5, width: 20, height: 20 },
+      rotationDeg: 90,
+    });
+    expect(maxPointError(moved!.points, [5, 5, 25, 5])).toBeLessThan(1e-9);
+    expect(moved?.symmetry).toEqual({ type: "vertical", centerX: 15, centerY: 15 });
+  });
+
+  it("keeps the turn for radial symmetry, whose copies commute with the rotation", () => {
+    const plain = planStudioDrawObjectTransform({
+      el: drawEl({ points: [0, 0, 10, 0] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 90,
+    });
+    const radial = planStudioDrawObjectTransform({
+      el: drawEl({
+        points: [0, 0, 10, 0],
+        symmetry: { type: "radial", centerX: 5, centerY: 5, radialCount: 6 },
+      }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 90,
+    });
+
+    expect(maxPointError(radial!.points, plain!.points)).toBeLessThan(1e-9);
+    // The centre turns with the stroke: (5,5) about the origin lands at (-5,5).
+    expect(radial?.symmetry?.centerX).toBeCloseTo(-5, 9);
+    expect(radial?.symmetry?.centerY).toBeCloseTo(5, 9);
+    expect(radial?.symmetry?.radialCount).toBe(6);
+  });
 });
 
 describe("planStudioDrawObjectTransform · companion geometry", () => {

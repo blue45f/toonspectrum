@@ -59,6 +59,34 @@ export function studioDrawShapeIsBoundsDerived(kind: unknown): boolean {
 }
 
 /**
+ * Symmetry families whose copies are REFLECTIONS about world axes through the stored centre
+ * (`studioBrushSymmetryTransforms` regenerates them from the committed base at render time).
+ * A reflection conjugates rotation -- `reflect(R_θ p) = R_{-θ}(reflect p)` -- so turning the base
+ * points by θ turns every mirrored copy by −θ: the '/' half of a mirrored 'V' would go clockwise
+ * while its twin goes anticlockwise. The model stores no axis angle that could absorb θ, so a
+ * rotation has nowhere to go for these strokes. Radial copies are rotations about the same
+ * centre and commute with the frame rotation, so they carry θ exactly. Kept beside the planner
+ * that has to drop the angle; the group planner refuses from the same verdict.
+ */
+export function studioDrawSymmetryIsMirrored(symmetry: DrawEl["symmetry"]): boolean {
+  if (symmetry === undefined) return false;
+  return symmetry.type === "vertical"
+    || symmetry.type === "horizontal"
+    || symmetry.type === "kaleidoscope"
+    || symmetry.type === "silk";
+}
+
+/**
+ * The single-stroke planner's own drop rule: a stroke whose `points` cannot absorb a turn keeps
+ * its move and resize and stays upright (`studioDrawShapeIsBoundsDerived`,
+ * `studioDrawSymmetryIsMirrored`). Exported so the editor withholds the rotation handle from the
+ * same rule instead of offering a turn the commit would drop.
+ */
+export function studioDrawObjectRotationIsDropped(el: DrawEl): boolean {
+  return studioDrawShapeIsBoundsDerived(el.kind) || studioDrawSymmetryIsMirrored(el.symmetry);
+}
+
+/**
  * Whether the retained calligraphy renderer actually consumes stored orientation samples.
  *
  * Mouse/CRDT materialization may populate zero-filled arrays, but the renderer normalizes those
@@ -126,6 +154,12 @@ export interface StudioDrawObjectTransformInput {
 /** One point traversal produces both the durable candidate and the bounds its readers need. */
 export interface StudioDrawObjectTransformPlan {
   readonly element: DrawEl;
+  /**
+   * The angle actually baked into `element`: the requested one, or 0 when this planner dropped it
+   * (bounds-derived kinds, mirrored symmetry). A caller that must not tolerate a dropped turn --
+   * the group planner, whose other members did turn -- compares this with what it asked for.
+   */
+  readonly rotationDeg: number;
   /** Exact `elBounds(element)` result, without scanning the transformed points a second time. */
   readonly bounds: {
     readonly x: number;
@@ -254,7 +288,13 @@ export function planStudioDrawObjectTransformWithBounds(
   // applies, so the handle's move and resize land; only the turn is dropped, which is what the
   // renderer would have done with it regardless. These kinds are excluded from the live preview
   // for the same reason (studio-live-transform-preview-eligibility), so the two agree.
-  const rotationDeg = studioDrawShapeIsBoundsDerived(el.kind) ? 0 : requestedRotationDeg;
+  //
+  // Mirrored symmetry drops the turn from the other side: the points CAN carry theta, but the
+  // renderer re-reflects the turned base about world axes, so the copies come out turned by
+  // -theta and the artwork tears in place (`studioDrawSymmetryIsMirrored`). The stroke keeps its
+  // move and resize -- those commute with the reflections -- and stays upright, exactly as a
+  // bounds-derived shape does.
+  const rotationDeg = studioDrawObjectRotationIsDropped(el) ? 0 : requestedRotationDeg;
   if (
     !finiteEvenPoints(el.points) ||
     !finiteNonNegative(el.strokeWidth) ||
@@ -429,7 +469,7 @@ export function planStudioDrawObjectTransformWithBounds(
     && points.length === el.points.length
     && points.every((value, index) => value === el.points[index])
   ) {
-    return { element: el, bounds };
+    return { element: el, rotationDeg, bounds };
   }
 
   return {
@@ -442,6 +482,7 @@ export function planStudioDrawObjectTransformWithBounds(
       ...(shapeParams !== undefined ? { shapeParams } : {}),
       ...(symmetry !== undefined ? { symmetry } : {}),
     },
+    rotationDeg,
     bounds,
   };
 }
