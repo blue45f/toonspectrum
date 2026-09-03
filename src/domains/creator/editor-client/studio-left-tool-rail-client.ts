@@ -1,7 +1,6 @@
 import {
   CommandRegistry,
-  createEditorClient,
-  createEditorSnapshotStore,
+  createEditorClientRuntime,
   EDITOR_REQUEST_SERVICE_KEY,
 } from "@toonspectrum/studio-command-registry";
 
@@ -138,6 +137,12 @@ export type StudioLeftToolRailActionArguments<
   K extends StudioLeftToolRailActionName,
 > = NonNullable<StudioLeftToolRailActions[K]> extends (...args: infer A) => unknown ? A : never;
 
+/** Stable owner mounted once by the Studio workspace. */
+export interface StudioLeftToolRailRuntime {
+  readonly client: StudioLeftToolRailClient;
+  update(input: StudioLeftToolRailClientInput): boolean;
+}
+
 export const STUDIO_LEFT_TOOL_RAIL_COMMANDS = {
   activatePrimaryCanvasTool: "rail.tool.activate-primary",
   toggleHandTool: "rail.tool.toggle-hand",
@@ -183,7 +188,6 @@ export const STUDIO_LEFT_TOOL_RAIL_COMMANDS = {
 } as const satisfies Record<StudioLeftToolRailActionName, CommandId>;
 
 const ACTIONS_SERVICE_KEY = "studio.left-tool-rail.actions";
-let requestSequence = 0;
 
 type UnknownAction = (...args: unknown[]) => unknown;
 
@@ -234,8 +238,9 @@ for (const [action, id] of Object.entries(STUDIO_LEFT_TOOL_RAIL_COMMANDS) as Arr
 
 function snapshotFromInput(
   input: StudioLeftToolRailClientInput,
+  previous?: StudioLeftToolRailSnapshot,
 ): StudioLeftToolRailSnapshot {
-  return Object.freeze({
+  const next: StudioLeftToolRailSnapshot = {
     activeSurfaceReviewLocked: input.activeSurfaceReviewLocked,
     pixelToolTargetAvailable: input.pixelToolTargetAvailable,
     rasterRetouchTargetAvailable: input.rasterRetouchTargetAvailable,
@@ -274,33 +279,60 @@ function snapshotFromInput(
     uiDensityMode: input.uiDensityMode,
     viewTransformSuppressed: input.viewTransformSuppressed,
     viewTool: input.viewTool,
-  });
+  };
+
+  if (previous) {
+    const keys = Object.keys(next) as Array<keyof StudioLeftToolRailSnapshot>;
+    if (keys.every((key) => Object.is(next[key], previous[key]))) {
+      return previous;
+    }
+  }
+  return Object.freeze(next);
+}
+
+function commandContextForInput(
+  input: StudioLeftToolRailClientInput,
+): CommandContext {
+  return {
+    workspace: "comic",
+    services: new Map<string, unknown>([
+      [ACTIONS_SERVICE_KEY, input],
+    ]),
+  };
 }
 
 /**
- * Creates the strangler adapter used by the current monolithic host.
- *
- * The adapter is intentionally immutable for one React render. The parent
- * creates a fresh client when its closure snapshot changes; the rail itself
- * receives only this client, so host setters cannot leak through the UI prop
- * boundary while the rest of the editor is migrated incrementally.
+ * Creates a persistent rail runtime. Parent renders replace its immutable view
+ * snapshot and latest action ports, while the client identity and command
+ * lifecycle remain stable for the mounted workspace session.
+ */
+export function createStudioLeftToolRailRuntime(
+  initialInput: StudioLeftToolRailClientInput,
+): StudioLeftToolRailRuntime {
+  let requestSequence = 0;
+  const runtime = createEditorClientRuntime({
+    registry: RAIL_COMMAND_REGISTRY,
+    initialSnapshot: snapshotFromInput(initialInput),
+    initialContext: () => commandContextForInput(initialInput),
+    requestId: () =>
+      `rail-${Date.now().toString(36)}-${(requestSequence += 1).toString(36)}`,
+  });
+
+  return {
+    client: runtime.client,
+    update: (input) => runtime.update({
+      snapshot: snapshotFromInput(input, runtime.client.getSnapshot()),
+      context: () => commandContextForInput(input),
+    }),
+  };
+}
+
+/**
+ * Compatibility factory for isolated consumers and tests that need one static
+ * snapshot. Mounted product UI should keep a `StudioLeftToolRailRuntime`.
  */
 export function createStudioLeftToolRailClient(
   input: StudioLeftToolRailClientInput,
 ): StudioLeftToolRailClient {
-  const snapshot = snapshotFromInput(input);
-  const store = createEditorSnapshotStore(snapshot);
-  const services = new Map<string, unknown>([
-    [ACTIONS_SERVICE_KEY, input],
-  ]);
-
-  return createEditorClient({
-    registry: RAIL_COMMAND_REGISTRY,
-    store,
-    context: () => ({
-      workspace: "comic",
-      services,
-    }),
-    requestId: () => `rail-${Date.now().toString(36)}-${(requestSequence += 1).toString(36)}`,
-  });
+  return createStudioLeftToolRailRuntime(input).client;
 }
