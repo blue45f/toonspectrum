@@ -3,7 +3,9 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetStudioGpuFilterLaneAdmissionForTests } from "./render/studio-gpu-filter-lane-admission";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
+
 
 import type { StudioGpuFilterPreviewFrame } from "./render/studio-gpu-filter-apply";
 import type { ImageEl } from "./studio-element-model";
@@ -116,6 +118,26 @@ const imageHarness = {
   assigned: [] as ControlledImage[],
 };
 
+/**
+ * What this host's WebGPU looks like. Lane planning now settles adapter admission before it
+ * chooses a lane, so a test that expects GPU work has to describe a host that has an adapter —
+ * jsdom has no navigator.gpu at all, which reads as "refused" and routes every filter to the
+ * Worker. The default is an adapter that answers, matching what every GPU-lane test assumed.
+ */
+function installHostAdapter(adapter: object | null): void {
+  resetStudioGpuFilterLaneAdmissionForTests();
+  Object.defineProperty(globalThis.navigator, "gpu", {
+    configurable: true,
+    value: { requestAdapter: async () => adapter },
+  });
+}
+
+function uninstallHostAdapter(): void {
+  resetStudioGpuFilterLaneAdmissionForTests();
+  const navigatorRecord = globalThis.navigator as unknown as Record<string, unknown>;
+  if (Object.getOwnPropertyDescriptor(navigatorRecord, "gpu")) delete navigatorRecord.gpu;
+}
+
 class ControlledImage {
   height = 32;
   naturalHeight = 32;
@@ -209,6 +231,7 @@ function resolveRun(run: WorkerRun): void {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  installHostAdapter({});
   konvaCapture.current = null;
   workerHarness.createSession.mockClear();
   workerHarness.disposals.length = 0;
@@ -266,6 +289,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  uninstallHostAdapter();
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -725,6 +749,23 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(gpuHarness.apply).not.toHaveBeenCalled();
     expect(gpuHarness.present).toHaveBeenCalledTimes(1);
     expect(workerHarness.runs).toHaveLength(0);
+  });
+
+  it("routes a GPU-expressible program to the Worker when this host has no adapter", async () => {
+    // The shape a GPU-blocklisted, hardware-acceleration-off, VM or remote-desktop session
+    // presents: navigator.gpu exists, so any feature-detect passes, but requestAdapter() resolves
+    // null. Before admission was part of lane planning, the program check alone sent this to the
+    // gpu-chain lane, the presentation failed, and the branch returned without ever reaching the
+    // Worker — a selected image's filter applied as zero changed pixels with only a toast.
+    installHostAdapter(null);
+    gpuHarness.eligible = true;
+    render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(gpuHarness.present).not.toHaveBeenCalled();
+    expect(gpuHarness.apply).not.toHaveBeenCalled();
+    expect(workerHarness.runs).toHaveLength(1);
   });
 
   it("preserves full-image filtering when a mask is absent or explicitly disabled", async () => {
