@@ -6,7 +6,7 @@ const target = resolve(root, "src/domains/market/components/MarketplaceAuthoring
 if (!existsSync(target)) throw new Error("MarketplaceAuthoringInstallAction.tsx is missing");
 let source = readFileSync(target, "utf8");
 
-const packageImport = `import { extractCreatorMarketplaceManifestFromZip } from "@/lib/creator-marketplace-package-builder";`;
+const packageImport = `import { extractCreatorMarketplaceManifestFromZip as extractMarketplaceManifestFromZip } from "@/lib/creator-marketplace-package-builder";`;
 if (!source.includes(packageImport)) source = `${packageImport}\n\n${source}`;
 
 const manifestLimit = "const MAX_REMOTE_MANIFEST_BYTES = 8 * 1024 * 1024;";
@@ -47,7 +47,7 @@ const after = `async function loadRemoteEnvelope(url: string): Promise<Record<st
     if (bytes.byteLength > MAX_REMOTE_PACKAGE_BYTES) {
       throw new Error("제작 패키지가 브라우저 복구 허용 크기를 초과했습니다.");
     }
-    return findAuthoringEnvelope(extractCreatorMarketplaceManifestFromZip(bytes));
+    return findAuthoringEnvelope(extractMarketplaceManifestFromZip(bytes));
   }
   if (!/(json|text)/iu.test(contentType) && !/\\.json(?:$|\\?)/iu.test(url)) return null;
   const body = await response.text();
