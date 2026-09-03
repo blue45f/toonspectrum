@@ -7,6 +7,7 @@ on:
       - "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx"
       - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
       - "src/domains/creator/MarketplaceBrushStudioBridge.test.tsx"
+      - "src/domains/creator/marketplace-brush-publish-snapshot.ts"
       - ".github/workflows/marketplace-brush-publish-hardening.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx"
       - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
       - "src/domains/creator/MarketplaceBrushStudioBridge.test.tsx"
+      - "src/domains/creator/marketplace-brush-publish-snapshot.ts"
       - ".github/workflows/marketplace-brush-publish-hardening.yml"
   workflow_dispatch:
 
@@ -58,4 +60,5 @@ jobs:
             src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
             src/domains/creator/MarketplaceBrushStudioBridge.tsx \
             src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/creator/marketplace-brush-publish-snapshot.ts \
             --max-warnings=0
