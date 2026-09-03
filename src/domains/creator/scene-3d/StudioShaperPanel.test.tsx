@@ -6,82 +6,84 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioShaperPanel } from "./StudioShaperPanel";
 
 describe("StudioShaperPanel", () => {
-  afterEach(() => {
-    cleanup();
-  });
+  afterEach(cleanup);
 
-  it("renders with header, SHAPER badge, and 4 primary tabs", () => {
+  it("presents an independent ToonStudio workflow with three task tabs", () => {
     render(<StudioShaperPanel />);
 
-    expect(screen.getByText("3D 셰이퍼 (Webtoon Shaper)")).toBeDefined();
-    expect(screen.getByText("SHAPER")).toBeDefined();
-    expect(screen.getByText("프리셋")).toBeDefined();
-    expect(screen.getByText("모델에 직접 그리기")).toBeDefined();
-    expect(screen.getByText("AI 편의 기능")).toBeDefined();
-    expect(screen.getByText("창작자 편의 기능")).toBeDefined();
+    expect(screen.getByText("웹툰 캐릭터 셰이퍼")).toBeTruthy();
+    expect(screen.getByText("TOONSTUDIO")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "캐릭터 레시피" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "추천·포즈" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "출력" })).toBeTruthy();
+    expect(screen.queryByText("네이버웹툰 3D 스타일")).toBeNull();
   });
 
-  it("switches tabs and selects preset items", () => {
+  it("only commits categories that the active mannequin can actually render", () => {
     const onSelectionChange = vi.fn();
     render(<StudioShaperPanel onSelectionChange={onSelectionChange} />);
 
-    // Click on a preset category chip
-    const hairChip = screen.getByRole("button", { name: "헤어" });
-    fireEvent.click(hairChip);
-
-    // Click on hair preset item
-    const bobPreset = screen.getByRole("button", { name: /시스루 뱅 단발/i });
-    fireEvent.click(bobPreset);
+    fireEvent.click(screen.getByRole("tab", { name: "체형" }));
+    fireEvent.click(screen.getByRole("button", { name: "SD 귀여운 3등신" }));
 
     expect(onSelectionChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        hair: "hair-bob",
-      }),
+      expect.objectContaining({ body: "body-chibi" }),
     );
+
+    const hair = screen.getByRole("tab", { name: "헤어" });
+    expect((hair as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(hair);
+    expect(onSelectionChange).toHaveBeenCalledTimes(1);
   });
 
-  it("switches to drawing tab and toggles surface drawing", () => {
-    render(<StudioShaperPanel />);
-
-    const drawTab = screen.getByRole("button", { name: "모델에 직접 그리기" });
-    fireEvent.click(drawTab);
-
-    const toggleBtn = screen.getByRole("button", { name: "꺼짐" });
-    fireEvent.click(toggleBtn);
-
-    expect(screen.getByRole("button", { name: "켜짐 (Active)" })).toBeDefined();
-  });
-
-  it("switches to AI tab and applies archetype recommendation", () => {
+  it("applies only supported slices from an archetype recipe", () => {
     const onSelectionChange = vi.fn();
     render(<StudioShaperPanel onSelectionChange={onSelectionChange} />);
 
-    const aiTab = screen.getByRole("button", { name: "AI 편의 기능" });
-    fireEvent.click(aiTab);
-
-    const romanceCard = screen.getByRole("button", { name: /학원 로맨스 주인공/i });
-    fireEvent.click(romanceCard);
+    fireEvent.click(screen.getByRole("tab", { name: "추천·포즈" }));
+    fireEvent.click(screen.getByRole("button", { name: /학원 로맨스 주인공 지원 범주 적용/u }));
 
     expect(onSelectionChange).toHaveBeenCalledWith(
       expect.objectContaining({
         face: "face-oval",
         eye: "eye-romance",
-        hair: "hair-bob",
-        top: "top-school",
+        nose: "nose-dot",
+        body: "body-slim-female",
+        bodypose: "pose-hip",
+        hair: "hair-short",
       }),
     );
   });
 
-  it("switches to creator tab and triggers layered PSD export", () => {
+  it("routes pose review and scene output to real host callbacks", () => {
     const onExportPsd = vi.fn();
-    render(<StudioShaperPanel onExportPsd={onExportPsd} />);
+    const onInsertCanvas = vi.fn();
+    const onTriggerPoseScanner = vi.fn();
+    render(
+      <StudioShaperPanel
+        onExportPsd={onExportPsd}
+        onInsertCanvas={onInsertCanvas}
+        onTriggerPoseScanner={onTriggerPoseScanner}
+      />,
+    );
 
-    const creatorTab = screen.getByRole("button", { name: "창작자 편의 기능" });
-    fireEvent.click(creatorTab);
+    fireEvent.click(screen.getByRole("tab", { name: "추천·포즈" }));
+    fireEvent.click(screen.getByRole("button", { name: "사진 위 랜드마크로 포즈 검수" }));
+    expect(onTriggerPoseScanner).toHaveBeenCalledTimes(1);
 
-    const exportBtn = screen.getByRole("button", { name: "다중 레이어 PSD 파일 내려받기" });
-    fireEvent.click(exportBtn);
-
+    fireEvent.click(screen.getByRole("tab", { name: "출력" }));
+    fireEvent.click(screen.getByRole("button", { name: "현재 장면을 캔버스에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "레이어드 PSD 내보내기" }));
+    expect(onInsertCanvas).toHaveBeenCalledTimes(1);
     expect(onExportPsd).toHaveBeenCalledTimes(1);
+  });
+
+  it("never fabricates a fallback PSD or surface-paint mode", () => {
+    render(<StudioShaperPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: "출력" }));
+
+    expect((screen.getByRole("button", { name: "레이어드 PSD 내보내기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/가짜 픽셀이나 빈 PSD를 만들지 않습니다/u)).toBeTruthy();
+    expect(screen.getByText(/데생 인형에는 존재하지 않는 UV 기능/u)).toBeTruthy();
   });
 });

@@ -26,6 +26,7 @@ import {
   createAvatarForgeState,
   sanitizeAvatarForgeState,
   serializeAvatarForgeState,
+  setAvatarForgeSemanticFaceMorph,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
@@ -56,6 +57,8 @@ import {
   StudioVrmAvatarForgePreview,
 } from "./StudioVrmAvatarForgePreview";
 import { StudioVrmForgeRangeControl } from "./StudioVrmForgeRangeControl";
+
+import type { StudioVrmSemanticFaceMorphProfile } from "./studio-vrm-semantic-face-morph";
 
 /** 정밀 파라미터 슬라이더 순서 — 라벨/범위는 AVATAR_FORGE_HAIR_LIMITS가 단일 소스. */
 const HAIR_DETAIL_KEYS = ["strandWidth", "fringe", "curl", "shine", "wave", "ahoge", "tailHeight"] as const;
@@ -164,6 +167,7 @@ type StudioVrmAvatarForgePanelProps = {
   proportionMetricsLabel?: string;
   proportionPresetNote?: string | null;
   proportionUnavailableReason?: string | null;
+  semanticFaceMorphProfile?: StudioVrmSemanticFaceMorphProfile | null;
   onChange: (state: AvatarForgeState) => void;
   onGeneratedFile?: (file: File) => void;
 };
@@ -189,6 +193,7 @@ export function StudioVrmAvatarForgePanel({
   proportionMetricsLabel = "모델 실측",
   proportionPresetNote = null,
   proportionUnavailableReason = null,
+  semanticFaceMorphProfile = null,
   onChange,
   onGeneratedFile,
 }: StudioVrmAvatarForgePanelProps) {
@@ -252,6 +257,13 @@ export function StudioVrmAvatarForgePanel({
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
     emit({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
+  };
+
+  const updateSemanticFaceMorph = (
+    id: Parameters<typeof setAvatarForgeSemanticFaceMorph>[1],
+    value: number,
+  ) => {
+    emit(setAvatarForgeSemanticFaceMorph(state, id, value));
   };
 
   const updateProportion = (key: StudioVrmProportionKey, value: number) => {
@@ -958,6 +970,59 @@ export function StudioVrmAvatarForgePanel({
                   );
                 })}
               </div>
+            </div>
+
+            <div
+              className="rounded-xl border border-accent/25 bg-accent-soft/20 p-3"
+              data-studio-vrm-semantic-face-morphs={semanticFaceMorphProfile?.status ?? "unavailable"}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[0.68rem] font-bold text-fg-2">모델 고유 얼굴 모프</p>
+                  <p className="mt-0.5 text-[0.58rem] leading-relaxed text-fg-3">
+                    눈·코·입·귀 이름이 명확한 shape key만 탐지합니다. 표정·립싱크 채널은 제외합니다.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.57rem] font-bold text-accent">
+                  {semanticFaceMorphProfile?.controls.length ?? 0}종
+                </span>
+              </div>
+              {semanticFaceMorphProfile?.status === "ready" ? (
+                <div className="mt-3 space-y-3">
+                  {semanticFaceMorphProfile.controls.map((control) => (
+                    <StudioVrmForgeRangeControl
+                      key={control.id}
+                      label={control.label}
+                      hint={control.hint}
+                      value={state.semanticFaceMorphs?.[control.id] ?? 0}
+                      minimum={control.minimum}
+                      maximum={control.maximum}
+                      step={0.01}
+                      defaultValue={0}
+                      unit="%"
+                      disabled={disabled}
+                      onChange={(value) => updateSemanticFaceMorph(control.id, value)}
+                    />
+                  ))}
+                  <details className="rounded-lg border border-line/70 bg-card/60 p-2.5">
+                    <summary className="min-h-8 cursor-pointer text-[0.59rem] font-bold text-fg-2">
+                      연결된 shape key 확인
+                    </summary>
+                    <div className="mt-2 space-y-1 border-t border-line/60 pt-2">
+                      {semanticFaceMorphProfile.controls.map((control) => (
+                        <p key={control.id} className="break-all text-[0.55rem] leading-relaxed text-fg-3">
+                          <b className="text-fg-2">{control.label}</b> · {control.targetNames.join(" · ")}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-line bg-card/60 px-3 py-2 text-[0.6rem] leading-relaxed text-fg-3">
+                  {semanticFaceMorphProfile?.message
+                    ?? "모델을 불러오면 호환되는 상세 얼굴 morph를 검사합니다."}
+                </p>
+              )}
             </div>
 
             <div>

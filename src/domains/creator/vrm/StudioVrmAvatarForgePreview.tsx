@@ -60,6 +60,10 @@ export function countStudioVrmAvatarForgeChanges(
   const reference = sanitizeAvatarForgeState(baseline);
   let count = 0;
   count += changedNumericRecord(current.face, reference.face);
+  count += changedNumericRecord(
+    current.semanticFaceMorphs ?? {},
+    reference.semanticFaceMorphs ?? {},
+  );
   count += changedNumericRecord(current.proportions, reference.proportions);
   count += changedNumericRecord(current.hair, reference.hair);
   const referenceAccents = new Map(

@@ -142,15 +142,45 @@ describe("createAvatarForgeHairGeometry", () => {
     const after = positionsOf(waved);
     expect(after.count).toBe(before.count);
 
-    const spreadX = (values: Float32Array) => {
-      let min = Number.POSITIVE_INFINITY;
-      let max = Number.NEGATIVE_INFINITY;
-      for (let index = 0; index < values.length; index += 3) {
-        min = Math.min(min, values[index]);
-        max = Math.max(max, values[index]);
+    const ringCenterXs = (values: Float32Array) =>
+      Array.from({ length: 15 }, (_, row) => {
+        let total = 0;
+        for (let column = 0; column < 10; column += 1) {
+          total += values[(row * 10 + column) * 3] ?? 0;
+        }
+        return total / 10;
+      });
+    const beforeCenters = ringCenterXs(before.array);
+    const afterCenters = ringCenterXs(after.array);
+    const maximumCenterlineShift = Math.max(
+      ...afterCenters.map((value, index) => Math.abs(value - (beforeCenters[index] ?? 0))),
+    );
+    expect(maximumCenterlineShift).toBeGreaterThan(0.1);
+  });
+});
+
+
+describe("Avatar Forge toon-clump geometry quality", () => {
+  it("produces pointed, flattened toon clumps instead of constant-radius tubes", () => {
+    const strand = planFor("long").find((part) => part.primitive === "tapered-capsule")!;
+    const { array } = positionsOf(strand);
+    const radialSegments = 10;
+
+    const spread = (row: number, axis: 0 | 2) => {
+      let minimum = Number.POSITIVE_INFINITY;
+      let maximum = Number.NEGATIVE_INFINITY;
+      for (let column = 0; column < radialSegments; column += 1) {
+        const value = array[(row * radialSegments + column) * 3 + axis]!;
+        minimum = Math.min(minimum, value);
+        maximum = Math.max(maximum, value);
       }
-      return max - min;
+      return maximum - minimum;
     };
-    expect(spreadX(after.array)).toBeGreaterThan(spreadX(before.array) * 1.3);
+
+    const rootWidth = spread(1, 0);
+    const rootDepth = spread(1, 2);
+    const tipWidth = spread(14, 0);
+    expect(rootDepth).toBeLessThan(rootWidth * 0.5);
+    expect(tipWidth).toBeLessThan(rootWidth * 0.08);
   });
 });

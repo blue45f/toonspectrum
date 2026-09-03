@@ -10,6 +10,7 @@ import {
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
+import { applyStudioVrmSemanticFaceMorphs } from "./studio-vrm-semantic-face-morph";
 
 import type { StudioVrmAvatarForgeFaceController } from "./studio-vrm-avatar-forge-face-controller";
 import type { VRM } from "@pixiv/three-vrm";
@@ -192,21 +193,25 @@ function createTaperedStrandGeometry(part: AvatarForgeHairPart) {
   const positions: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
+  const centerline: Array<readonly [number, number, number]> = [];
   const base = new THREE.Color(part.baseColor);
   const tip = new THREE.Color(part.tipColor);
-  // v2 웨이브. 계획에 wave 키가 없으면(=v1 계획) 아래 분기가 통째로 꺼져 v1과 동일한 부동소수
-  // 결과가 나온다(+0 덧셈으로 -0 부호 비트가 바뀌는 일조차 없도록 분기로 차단).
+  const shadow = base.clone().multiplyScalar(0.5);
+  const highlight = tip.clone().lerp(new THREE.Color("#fff4e8"), 0.2 + part.shine * 0.25);
   const waveAmount = part.wave ?? 0;
   const waveFrequency = part.waveFrequency ?? 2.4;
-  // 가닥은 X/Z가 눌리고 Y가 늘어난 비등방 스케일로 배치된다. 웨이브 진폭을 "가닥 폭"이 아니라
-  // "가닥 길이" 기준으로 잡아야 어떤 굵기에서도 같은 세기로 보인다 → 종횡비만큼 되돌려 준다.
   const aspectX = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0])), 1, 10);
   const aspectZ = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2])), 1, 10);
 
   for (let row = 0; row <= lengthSegments; row += 1) {
     const t = row / lengthSegments;
     const y = 1 - t * 2;
-    const radius = Math.max(0.08, 1 - part.taper * Math.pow(t, 0.72));
+    // Anime hair reads as overlapping tapered clumps, not constant-radius tubes.
+    const taperExponent = 0.58 + part.taper * 0.72;
+    const tipProfile = Math.max(0.018, Math.pow(1 - t, taperExponent));
+    const rootEase = t < 0.08 ? 0.9 + (t / 0.08) * 0.1 : 1;
+    const radius = tipProfile * rootEase;
+    const depthRatio = 0.22 + (1 - t) * 0.1;
     const spineCurveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
     const spineCurveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
     const curveX = waveAmount > 0
@@ -215,12 +220,22 @@ function createTaperedStrandGeometry(part: AvatarForgeHairPart) {
     const curveZ = waveAmount > 0
       ? spineCurveZ + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.07 * aspectZ * t
       : spineCurveZ;
-    const color = base.clone().lerp(tip, t);
+    centerline.push([curveX, y, curveZ]);
+    const rootToTip = base.clone().lerp(tip, t);
 
     for (let column = 0; column < radialSegments; column += 1) {
       const angle = (column / radialSegments) * Math.PI * 2;
-      positions.push(curveX + Math.cos(angle) * radius, y, curveZ + Math.sin(angle) * radius);
-      colors.push(color.r, color.g, color.b);
+      const lightFacing = (Math.cos(angle - Math.PI * 0.3) + 1) / 2;
+      const vertexColor = rootToTip
+        .clone()
+        .lerp(shadow, (1 - lightFacing) * 0.28)
+        .lerp(highlight, Math.max(0, lightFacing - 0.72) * part.shine * 0.42);
+      positions.push(
+        curveX + Math.cos(angle) * radius,
+        y,
+        curveZ + Math.sin(angle) * radius * depthRatio,
+      );
+      colors.push(vertexColor.r, vertexColor.g, vertexColor.b);
     }
   }
 
@@ -236,10 +251,10 @@ function createTaperedStrandGeometry(part: AvatarForgeHairPart) {
   }
 
   const topCenter = positions.length / 3;
-  positions.push(0, 1, 0);
+  positions.push(...centerline[0]!);
   colors.push(base.r, base.g, base.b);
   const bottomCenter = positions.length / 3;
-  positions.push(0, -1, 0);
+  positions.push(...centerline[centerline.length - 1]!);
   colors.push(tip.r, tip.g, tip.b);
   for (let column = 0; column < radialSegments; column += 1) {
     const nextColumn = (column + 1) % radialSegments;
@@ -471,7 +486,8 @@ export type StudioVrmAvatarForgeProps = {
 
 /**
  * rigged VRM을 유지한 채 normalized head에 절차형 헤어/페이스 디테일을 포털 부착한다.
- * 얼굴 조형은 raw+normalized head scale만 사용하며 원본 mesh/geometry는 변경하지 않는다.
+ * 기본 얼굴형은 raw+normalized head scale로, 모델이 명시적으로 제공한 상세 shape key는
+ * exact semantic binding으로 적용한다. 원본 geometry와 표정 expression 채널은 변경하지 않는다.
  */
 export function StudioVrmAvatarForge({
   vrm,
@@ -510,6 +526,11 @@ export function StudioVrmAvatarForge({
       faceController.release();
     };
   }, [faceController, normalizedHead, rawHead, rigRevision, safeState.face]);
+
+  useLayoutEffect(
+    () => applyStudioVrmSemanticFaceMorphs(vrm, safeState.semanticFaceMorphs),
+    [safeState.semanticFaceMorphs, vrm],
+  );
 
   useEffect(() => {
     if (!safeState.hair.replaceOriginal || safeState.hair.style === "none") return;

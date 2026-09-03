@@ -62,6 +62,28 @@ export type AvatarForgeFaceParams = {
   chinLength: number;
 };
 
+export const AVATAR_FORGE_SEMANTIC_FACE_MORPH_IDS = [
+  "eyeSize",
+  "eyeSpacing",
+  "eyeTilt",
+  "irisSize",
+  "noseHeight",
+  "noseWidth",
+  "mouthWidth",
+  "lipFullness",
+  "earSize",
+] as const;
+
+export type AvatarForgeSemanticFaceMorphId =
+  (typeof AVATAR_FORGE_SEMANTIC_FACE_MORPH_IDS)[number];
+
+/**
+ * Optional model-native shape-key values. Zero values are omitted so v1-v4 documents and
+ * geometry-plan digests remain byte-compatible.
+ */
+export type AvatarForgeSemanticFaceMorphState =
+  Partial<Record<AvatarForgeSemanticFaceMorphId, number>>;
+
 export type AvatarForgeBodyParams = {
   shoulderWidth: number;
   torsoLength: number;
@@ -114,6 +136,11 @@ export type AvatarForgeState = {
   presetId?: string;
   bodyPresetId?: AvatarForgeBodyPresetId;
   face: AvatarForgeFaceParams;
+  /**
+   * Exact model-native shape keys only. Missing targets remain unsupported instead of being
+   * approximated through whole-head scaling.
+   */
+  semanticFaceMorphs?: AvatarForgeSemanticFaceMorphState;
   /**
    * v4 체형의 단일 권위. 관절을 이동하고 말단만 균등 스케일하는 안전한 비율 코어 상태다.
    */
@@ -426,6 +453,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function sanitizeAvatarForgeSemanticFaceMorphs(
+  raw: unknown,
+): AvatarForgeSemanticFaceMorphState | undefined {
+  const source = record(raw);
+  const next: AvatarForgeSemanticFaceMorphState = {};
+  for (const id of AVATAR_FORGE_SEMANTIC_FACE_MORPH_IDS) {
+    const numeric = typeof source[id] === "number" ? source[id] : Number(source[id]);
+    if (!Number.isFinite(numeric)) continue;
+    const bounded = Math.min(1, Math.max(-1, numeric));
+    if (Math.abs(bounded) >= 0.0001) next[id] = bounded;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
 function sanitizeLegacyAvatarForgeBody(raw: unknown): AvatarForgeBodyParams {
   const body = record(raw);
   return {
@@ -503,6 +544,9 @@ function documentVersion(raw: unknown): number {
 export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
   const source = record(raw);
   const face = record(source.face);
+  const semanticFaceMorphs = sanitizeAvatarForgeSemanticFaceMorphs(
+    source.semanticFaceMorphs,
+  );
   const hair = record(source.hair);
   const sourceVersion = documentVersion(source.version);
   const legacy = sourceVersion < 2;
@@ -560,6 +604,7 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
       cheekVolume: clampNumber(face.cheekVolume, AVATAR_FORGE_FACE_LIMITS.cheekVolume, DEFAULT_FACE.cheekVolume),
       chinLength: clampNumber(face.chinLength, AVATAR_FORGE_FACE_LIMITS.chinLength, DEFAULT_FACE.chinLength),
     },
+    ...(semanticFaceMorphs ? { semanticFaceMorphs } : {}),
     proportions,
     body: resolvedBody,
     ...(legacyHipWidth !== DEFAULT_BODY.hipWidth ? { legacyHipWidth } : {}),
@@ -614,6 +659,25 @@ export function parseAvatarForgeState(raw: unknown): AvatarForgeState {
 
 export function serializeAvatarForgeState(raw: unknown): AvatarForgeState {
   return sanitizeAvatarForgeState(raw);
+}
+
+export function setAvatarForgeSemanticFaceMorph(
+  state: AvatarForgeState,
+  id: AvatarForgeSemanticFaceMorphId,
+  value: number,
+): AvatarForgeState {
+  const current = sanitizeAvatarForgeState(state);
+  const next: AvatarForgeSemanticFaceMorphState = {
+    ...(current.semanticFaceMorphs ?? {}),
+  };
+  const bounded = Number.isFinite(value) ? Math.min(1, Math.max(-1, value)) : 0;
+  if (Math.abs(bounded) < 0.0001) delete next[id];
+  else next[id] = bounded;
+  return sanitizeAvatarForgeState({
+    ...current,
+    presetId: undefined,
+    semanticFaceMorphs: Object.keys(next).length > 0 ? next : undefined,
+  });
 }
 
 export function createAvatarForgeState(presetId?: string): AvatarForgeState {
