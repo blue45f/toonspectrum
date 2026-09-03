@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   restore-source:
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
