@@ -61,7 +61,7 @@ export interface StudioGpuSparseBrushAtlasTileWork
 }
 
 export interface StudioGpuSparseBrushAtlasPreparedFrame
-  extends Omit<StudioGpuSparseBrushPreparedFrame, "tiles"> {
+  extends Omit<StudioGpuSparseBrushPreparedFrame, "kind" | "tiles"> {
   readonly kind: "studio-gpu-sparse-brush-atlas-frame";
   readonly runtimeRevision:
     typeof STUDIO_GPU_SPARSE_BRUSH_ATLAS_RUNTIME_REVISION;
@@ -134,6 +134,8 @@ export function createStudioGpuSparseBrushAtlasRuntime(
     || typeof options !== "object"
     || !options.device
     || typeof options.device.createTexture !== "function"
+    || !options.device.lost
+    || typeof options.device.lost.then !== "function"
     || !positiveSafeInteger(options.columns)
     || !positiveSafeInteger(options.rows)
   ) return Object.freeze({ status: "rejected", reason: "invalid-options" });
@@ -143,6 +145,7 @@ export function createStudioGpuSparseBrushAtlasRuntime(
       runtime: new StudioGpuSparseBrushAtlasRuntime(options),
     });
   } catch {
+    safeDestroyDevice(options.device, options.ownsDevice === true);
     return Object.freeze({ status: "rejected", reason: "initialization-failed" });
   }
 }
@@ -187,17 +190,26 @@ export class StudioGpuSparseBrushAtlasRuntime {
     this.#atlasHeight = topology.atlasHeight;
     this.#tileSize = topology.tileSize;
     this.#bleed = topology.bleed;
-    this.#texture = this.#device.createTexture({
-      label: "Studio sparse physical RGBA16F brush atlas",
-      size: {
-        width: this.#atlasWidth,
-        height: this.#atlasHeight,
-        depthOrArrayLayers: 1,
-      },
-      format: STUDIO_GPU_SPARSE_BRUSH_ATLAS_FORMAT,
-      usage: STUDIO_GPU_SPARSE_BRUSH_ATLAS_USAGE,
-    });
-    this.#view = this.#texture.createView();
+    let texture: GPUTexture | null = null;
+    try {
+      texture = this.#device.createTexture({
+        label: "Studio sparse physical RGBA16F brush atlas",
+        size: {
+          width: this.#atlasWidth,
+          height: this.#atlasHeight,
+          depthOrArrayLayers: 1,
+        },
+        format: STUDIO_GPU_SPARSE_BRUSH_ATLAS_FORMAT,
+        usage: STUDIO_GPU_SPARSE_BRUSH_ATLAS_USAGE,
+      });
+      const view = texture.createView();
+      this.#texture = texture;
+      this.#view = view;
+    } catch (error) {
+      safeDestroyTexture(texture);
+      this.#planner.dispose();
+      throw error;
+    }
     void this.#device.lost.then((info) => {
       if (this.#disposed) return;
       this.#lost = true;
