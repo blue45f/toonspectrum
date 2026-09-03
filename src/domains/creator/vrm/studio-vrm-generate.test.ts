@@ -144,7 +144,7 @@ describe("studio VRM generate default preset", () => {
     const panel = readFileSync(new URL("./StudioVrmAvatarForgePanel.tsx", import.meta.url), "utf8");
     expect(panel).toContain("data-studio-vrm-generate-default-preset");
     // 미리보기 스와치는 편집 상태가 아니라 실제 생성될 상태를 읽어야 한다.
-    expect(panel).toContain("previewRecipe.state.hair.baseColor");
+    expect(panel).toContain("state={previewRecipe.state}");
   });
 });
 
