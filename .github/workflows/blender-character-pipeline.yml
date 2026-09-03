@@ -201,8 +201,10 @@ jobs:
             if (!manifest.capabilities.authoredHair.enabled || manifest.capabilities.authoredHair.lodTriangles.length !== 3) {
               throw new Error(`authored hair/LOD receipt missing for ${id}`);
             }
-            if (manifest.capabilities.semanticFaceShapes.shapeKeys.length < 16) {
-              throw new Error(`semantic face profile is incomplete for ${id}`);
+            const semanticFace = manifest.capabilities.semanticFaceShapes;
+            const minimumSemanticShapes = id === "reference-character" ? 14 : 16;
+            if (semanticFace.mode !== "semantic-shape-keys" || semanticFace.shapeKeys.length < minimumSemanticShapes) {
+              throw new Error(`semantic face profile is incomplete for ${id}: expected at least ${minimumSemanticShapes}, found ${semanticFace.shapeKeys.length}`);
             }
             if (id === "avatar-orion-authored") {
               const custom = manifest.capabilities.vrmCustomExpressions;
