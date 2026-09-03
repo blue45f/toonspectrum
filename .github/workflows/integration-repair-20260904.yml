@@ -1,0 +1,108 @@
+name: Integration repair 20260904
+
+on:
+  push:
+    branches:
+      - automation/source-snapshot-20260904
+    paths:
+      - .github/workflows/integration-repair-20260904.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integration-repair-20260904
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/shaper-adaptive-face-authored-hair-20260903
+          fetch-depth: 0
+
+      - name: Apply verified integration repairs
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          host = Path("src/domains/creator/StudioCuttoonEditorHost.tsx")
+          text = host.read_text(encoding="utf-8")
+          old = '''  function navigateStudio2dSurface(
+            surface: Studio2dWorkspaceSurface,
+            options?: { readonly replace?: boolean },
+          ) {
+            if (studioRoute.surface === surface) return;
+          '''
+          new = '''  function navigateStudio2dSurface(
+            surface: Studio2dWorkspaceSurface,
+            options?: { readonly force?: boolean; readonly replace?: boolean },
+          ) {
+            if (studioRoute.surface === surface && options?.force !== true) return;
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("navigateStudio2dSurface anchor changed")
+          text = text.replace(old, new, 1)
+
+          old = '''  const downgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
+            if (studioRoute.surface === surface) {
+              navigateStudio2dSurface("canvas", { replace: true });
+            }
+          });
+          '''
+          new = '''  const downgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
+            if (studioRoute.surface === surface || studioRoute.surface === "canvas") {
+              // Closing can happen while the route upgrade is still pending behind the heavyweight 3D
+              // surface. Force a same-canvas replace as the newest navigation so that stale bg3d/poser/
+              // timeline route commits cannot reopen an empty panel after a successful insert or update.
+              navigateStudio2dSurface("canvas", { force: true, replace: true });
+            }
+          });
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("downgradeRoutedSurface anchor changed")
+          host.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          panel = Path("src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx")
+          text = panel.read_text(encoding="utf-8")
+          old = '''            <span className="mt-0.5 block">{describeStudioVrmAvatarForgeState(previewRecipe.state).face} · {describeStudioVrmAvatarForgeState(previewRecipe.state).hair}</span>
+                      <span className="block">{formatStudioVrmHeadUnits(resolveStudioVrmProportionMetrics(previewRecipe.state.proportions).headUnits)} · {describeStudioVrmAvatarForgeState(previewRecipe.state).body}</span>
+          '''
+          new = '''            <span className="mt-0.5 block">{describeStudioVrmAvatarForgeState(previewRecipe.state).face} · {describeStudioVrmAvatarForgeState(previewRecipe.state).hair}</span>
+                      <span className="block">{formatStudioVrmHeadUnits(resolveStudioVrmProportionMetrics(previewRecipe.state.proportions).headUnits)} · {describeStudioVrmAvatarForgeState(previewRecipe.state).body}</span>
+                      <span className="mt-1 flex items-center gap-1.5">
+                        <span
+                          aria-hidden
+                          className="size-3 shrink-0 rounded-full border border-line/70 shadow-inner"
+                          style={{ backgroundColor: previewRecipe.state.hair.baseColor }}
+                        />
+                        <span className="truncate">헤어 컬러 {previewRecipe.state.hair.baseColor.toUpperCase()}</span>
+                      </span>
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("VRM preview anchor changed")
+          panel.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          git diff --check
+          grep -F 'options?: { readonly force?: boolean; readonly replace?: boolean }' src/domains/creator/StudioCuttoonEditorHost.tsx
+          grep -F 'navigateStudio2dSurface("canvas", { force: true, replace: true });' src/domains/creator/StudioCuttoonEditorHost.tsx
+          grep -F 'previewRecipe.state.hair.baseColor' src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx
+
+      - name: Commit and push repair
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No repair changes were needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/domains/creator/StudioCuttoonEditorHost.tsx src/domains/creator/vrm/StudioVrmAvatarForgePanel.tsx
+          git commit -m "fix(studio): stabilize routed 3D close and generated hair preview"
+          git push origin HEAD:feat/shaper-adaptive-face-authored-hair-20260903
