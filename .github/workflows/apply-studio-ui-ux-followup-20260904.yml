@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: feat/studio-ui-ux-followup-20260904
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: true
 
       - uses: pnpm/action-setup@v6
@@ -42,8 +42,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("src/domains/creator/StudioCommandSearchDialog.test.tsx")
-          text = path.read_text(encoding="utf-8")
+          search_test = Path("src/domains/creator/StudioCommandSearchDialog.test.tsx")
+          text = search_test.read_text(encoding="utf-8")
           needle = '    const option = screen.getByRole("option", { name: /가우시안 블러/u });'
           replacement = '''    const option = screen.getAllByRole("option").find(
                 (candidate) => within(candidate).queryByText("가우시안 블러", { exact: true }),
@@ -52,7 +52,19 @@ jobs:
           count = text.count(needle)
           if count != 2:
               raise SystemExit(f"expected two ambiguous selector rows, found {count}")
-          path.write_text(text.replace(needle, replacement), encoding="utf-8")
+          search_test.write_text(text.replace(needle, replacement), encoding="utf-8")
+
+          filter_menu = Path("src/domains/creator/studio-main-menu-items-filter.ts")
+          text = filter_menu.read_text(encoding="utf-8")
+          declaration = 'const STUDIO_FILTER_PACK_MENU_SECTION_LABELS = Object.freeze({'
+          typed_declaration = '''const STUDIO_FILTER_PACK_MENU_SECTION_LABELS: Readonly<
+            Partial<Record<StudioFilterPackKind, string>>
+          > = Object.freeze({'''
+          closing = '} satisfies Partial<Record<StudioFilterPackKind, string>>);'
+          if text.count(declaration) != 1 or text.count(closing) != 1:
+              raise SystemExit("filter section label map shape drifted")
+          text = text.replace(declaration, typed_declaration, 1).replace(closing, '});', 1)
+          filter_menu.write_text(text, encoding="utf-8")
           PY
           pnpm exec vitest run \
             src/domains/creator/studio-command-execution-registry.test.ts \
