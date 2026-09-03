@@ -1,15 +1,16 @@
 import { useEffect, useRef, type ReactElement } from "react";
 
 import {
-  loadCreatorMarketplaceAuthoringDraft,
-  type CreatorMarketplaceAuthoringDraft,
-} from "@/lib/creator-marketplace-authoring-workshop";
-
-import {
   MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT,
   MARKETPLACE_BRUSH_SNAPSHOT_RESPONSE_EVENT,
   MarketplaceBrushPublishShortcut,
 } from "./MarketplaceBrushPublishShortcut";
+
+import {
+  loadCreatorMarketplaceAuthoringDraft,
+  type CreatorMarketplaceAuthoringDraft,
+} from "@/lib/creator-marketplace-authoring-workshop";
+
 
 export const MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT =
   "toonspectrum:brush-studio-market-import";
