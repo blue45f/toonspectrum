@@ -3,7 +3,7 @@ name: WebGPU brush V2 parity and benchmark
 on:
   push:
     branches:
-      - feat/webgpu-brush-v2-clean-20260904
+      - main
     paths:
       - ".github/workflows/studio-webgpu-brush-v2.yml"
       - "scripts/studio-engine-webgpu-textured-brush-v2-*.ts"
