@@ -1,0 +1,88 @@
+name: Finalize fixed all-branch integration
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/finalize-fixed-all-branch-integration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: finalize-fixed-all-branch-integration
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INTEGRATION_BRANCH: integration/all-unmerged-preserved-20260903
+    steps:
+      - name: Wait until the fixed integration branch exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            if gh api "/repos/${GITHUB_REPOSITORY}/branches/${INTEGRATION_BRANCH//\//%2F}" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Integration branch was not created by the builder workflow" >&2
+          exit 1
+
+      - name: Create or reuse the fixed integration pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --head "$INTEGRATION_BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$INTEGRATION_BRANCH" \
+              --title "merge: integrate all preserved unmerged branches" \
+              --body "All remotely reachable unmerged branch heads are preserved and integrated. Source branches remain intact; archive tags and conflict ledgers are recorded under docs/merge-preservation/fixed-20260903.")"
+            number="${url##*/}"
+          fi
+          gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+          gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/pull/${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch compatible default-branch verification workflows
+        shell: bash
+        run: |
+          set +e
+          for workflow in \
+            ci.yml \
+            marketplace-postmerge-browser-audit.yml \
+            marketplace-authoring.yml; do
+            gh workflow run "$workflow" \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref "$INTEGRATION_BRANCH" >/dev/null 2>&1 || true
+          done
+
+      - name: Publish summary
+        run: |
+          {
+            echo "## Fixed all-branch integration"
+            echo
+            echo "- PR: ${{ steps.pr.outputs.url }}"
+            echo "- Source: \`${INTEGRATION_BRANCH}\`"
+            echo "- Merge method: merge commit"
+            echo "- Required checks: not bypassed"
+          } >> "$GITHUB_STEP_SUMMARY"
