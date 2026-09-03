@@ -22,6 +22,7 @@ jobs:
 
       - name: Pack editable source
         run: |
+          # Refresh marker: merge-readiness-product-integration-v1
           # Keep this list broad enough that an external hardening pass can reproduce the exact
           # authoring branch without generated catalog data or build products.
           candidates=(
