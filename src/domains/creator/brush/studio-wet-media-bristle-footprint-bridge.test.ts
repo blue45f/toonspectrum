@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  advanceStudioWetMediaBristleFootprint,
+} from "./studio-wet-media-bristle-footprint-bridge";
+import {
   applyStudioWetMediaTileFieldDepositions,
   createStudioWetMediaTileField,
   type StudioWetMediaTileFieldPaper,
   type StudioWetMediaTileFieldSettings,
   type StudioWetMediaTileFieldState,
 } from "./studio-wet-media-tile-field";
-import {
-  advanceStudioWetMediaBristleFootprint,
-} from "./studio-wet-media-bristle-footprint-bridge";
 import {
   createStudioWetMediaTwoWellState,
   type StudioWetMediaTwoWellSettings,
