@@ -1,0 +1,261 @@
+name: Repair lossless integration CI
+
+on:
+  push:
+    branches:
+      - integration/lossless-all-remote-branches-20260903
+    paths:
+      - ".github/workflows/repair-lossless-integration-ci.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-lossless-integration-ci
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  repair-verify-and-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: integration/lossless-all-remote-branches-20260903
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Repair deterministic merge defects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def update(path: str, transform):
+              file = Path(path)
+              source = file.read_text(encoding="utf-8")
+              result = transform(source)
+              if result == source:
+                  print(f"unchanged: {path}")
+              else:
+                  file.write_text(result, encoding="utf-8")
+                  print(f"patched: {path}")
+
+          def replace_once(source: str, before: str, after: str, label: str) -> str:
+              if after in source:
+                  return source
+              count = source.count(before)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one target, found {count}")
+              return source.replace(before, after, 1)
+
+          update(
+              "scripts/marketplace/fix-authoring-contracts.mjs",
+              lambda source: source.replace(
+                  "/* eslint-disable no-useless-escape -- These migration utilities intentionally store escaped source-code templates. */\n\n",
+                  "",
+                  1,
+              ),
+          )
+          update(
+              "scripts/marketplace/integrate-source-package-builder.mjs",
+              lambda source: source.replace(
+                  "/* eslint-disable no-useless-escape -- These migration utilities intentionally store escaped source-code templates. */\n",
+                  "",
+                  1,
+              ),
+          )
+
+          update(
+              "scripts/qa-live-studio-cross-browser-audit-v2.mjs",
+              lambda source: replace_once(
+                  source,
+                  """  if (dom.bodyTextLength === 0 && dom.visualSurfaceCount === 0 && dom.loadingLike && pageErrors.length === 0) {
+            await sleep(RETRY_SETTLE_MS);
+            dom = await inspectDom(page, profile);
+          }
+          """,
+                  """  if (dom.bodyTextLength === 0 && dom.visualSurfaceCount === 0 && dom.loadingLike && pageErrors.length === 0) {
+            await sleep(RETRY_SETTLE_MS);
+          }
+          """,
+                  "cross-browser retry assignment",
+              ),
+          )
+
+          update(
+              "scripts/qa-studio-authenticated-browser.mjs",
+              lambda source: replace_once(
+                  source,
+                  """      } catch {
+                  json = null;
+                }
+          """,
+                  """      } catch {
+                  // Keep the initialized null value for non-JSON responses.
+                }
+          """,
+                  "authenticated browser JSON fallback",
+              ),
+          )
+
+          update(
+              "scripts/qa-studio-browser-fault-injection.mjs",
+              lambda source: replace_once(
+                  source,
+                  """  } catch {
+              visible = false;
+            }
+          """,
+                  """  } catch {
+              // Keep the initialized false value when the compatibility modal never appears.
+            }
+          """,
+                  "fault-injection visibility fallback",
+              ),
+          )
+
+          update(
+              "scripts/qa-triage-playwright-artifacts.mjs",
+              lambda source: replace_once(
+                  source,
+                  """    if (!content || /\\u0000/u.test(content.slice(0, 4_000))) continue;
+          """,
+                  """    if (!content || content.slice(0, 4_000).includes(String.fromCharCode(0))) continue;
+          """,
+                  "artifact NUL detection",
+              ),
+          )
+
+          update(
+              "scripts/qa/studio-chromium-inapp-suite-runner.mjs",
+              lambda source: replace_once(
+                  source,
+                  """  } catch (error) {
+              throw new Error(`Invalid QA_CASE_PATTERN ${JSON.stringify(source)}: ${String(error)}`);
+            }
+          """,
+                  """  } catch (error) {
+              throw new Error(
+                `Invalid QA_CASE_PATTERN ${JSON.stringify(source)}: ${String(error)}`,
+                { cause: error },
+              );
+            }
+          """,
+                  "QA pattern error cause",
+              ),
+          )
+
+          def patch_avatar(source: str) -> str:
+              marker = "/* eslint-disable react-refresh/only-export-components -- Preview helpers are part of the public rendering contract. */\n"
+              return source if source.startswith(marker) else marker + source
+
+          update("src/domains/creator/vrm/StudioVrmAvatarForgePreview.tsx", patch_avatar)
+
+          def patch_brush(source: str) -> str:
+              source = replace_once(
+                  source,
+                  """let lastPresentedMeta: {
+            referenceWidth: number;
+            referenceHeight: number;
+            frames: Array<{ tMs: number; width: number; height: number }>;
+          } | null = null;
+          """,
+                  """interface PresentedFrameMeta {
+            readonly referenceWidth: number;
+            readonly referenceHeight: number;
+            readonly frames: Array<{ tMs: number; width: number; height: number }>;
+          }
+
+          let lastPresentedMeta: PresentedFrameMeta | null = null;
+          """,
+                  "presented frame meta type",
+              )
+              source = replace_once(
+                  source,
+                  "  readonly presentedMeta: typeof lastPresentedMeta;\n",
+                  "  readonly presentedMeta: PresentedFrameMeta | null;\n",
+                  "stroke record presented meta",
+              )
+              source = replace_once(
+                  source,
+                  """        inStroke: analyzeStudioBrushScenarioInStroke([]),
+                  layers: null,
+          """,
+                  """        inStroke: analyzeStudioBrushScenarioInStroke([]),
+                  inStrokeFrames: [],
+                  rejectedNotices: { released: 0, settled: 0 },
+                  clearTrace: null,
+                  presentedMeta: null,
+                  layers: null,
+          """,
+                  "buildup summary record contract",
+              )
+              return source
+
+          update("scripts/verify-studio-brush-scenarios.mts", patch_brush)
+          PY
+
+          git diff --check
+          node --check scripts/marketplace/fix-authoring-contracts.mjs
+          node --check scripts/marketplace/integrate-source-package-builder.mjs
+          node --check scripts/qa-live-studio-cross-browser-audit-v2.mjs
+          node --check scripts/qa-studio-authenticated-browser.mjs
+          node --check scripts/qa-studio-browser-fault-injection.mjs
+          node --check scripts/qa-triage-playwright-artifacts.mjs
+          node --check scripts/qa/studio-chromium-inapp-suite-runner.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify repaired integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint \
+            scripts/marketplace/fix-authoring-contracts.mjs \
+            scripts/marketplace/integrate-source-package-builder.mjs \
+            scripts/qa-live-studio-cross-browser-audit-v2.mjs \
+            scripts/qa-studio-authenticated-browser.mjs \
+            scripts/qa-studio-browser-fault-injection.mjs \
+            scripts/qa-triage-playwright-artifacts.mjs \
+            scripts/qa/studio-chromium-inapp-suite-runner.mjs \
+            scripts/verify-studio-brush-scenarios.mts \
+            src/domains/creator/vrm/StudioVrmAvatarForgePreview.tsx \
+            --max-warnings=0
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run build
+
+      - name: Commit only verified repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-lossless-integration-ci.yml
+          git add \
+            scripts/marketplace/fix-authoring-contracts.mjs \
+            scripts/marketplace/integrate-source-package-builder.mjs \
+            scripts/qa-live-studio-cross-browser-audit-v2.mjs \
+            scripts/qa-studio-authenticated-browser.mjs \
+            scripts/qa-studio-browser-fault-injection.mjs \
+            scripts/qa-triage-playwright-artifacts.mjs \
+            scripts/qa/studio-chromium-inapp-suite-runner.mjs \
+            scripts/verify-studio-brush-scenarios.mts \
+            src/domains/creator/vrm/StudioVrmAvatarForgePreview.tsx
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(integration): repair preserved branch CI contracts"
+          git push origin HEAD:integration/lossless-all-remote-branches-20260903
