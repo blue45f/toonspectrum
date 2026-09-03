@@ -179,7 +179,21 @@ replace_once(
     "    sceneRef.current?.setShaperAppearance?.(plan.appearance);",
 )
 
+host_test = "src/domains/creator/scene-3d/StudioMannequinPoserPanel.test.tsx"
+replace_once(
+    host_test,
+    '    expect(screen.getByText("3D 데생 인형")).toBeTruthy();',
+    '    expect(screen.getByText("3D 캐릭터 워크스페이스")).toBeTruthy();',
+)
+replace_once(
+    host_test,
+    '''    expect(screen.getByText("3D 셰이퍼 (Webtoon Shaper)")).toBeTruthy();
+    expect(screen.getByText("SHAPER")).toBeTruthy();''',
+    '''    expect(screen.getByText("3D 캐릭터 셰이퍼")).toBeTruthy();
+    expect(screen.getByText("VISUAL CHARACTER WORKSPACE")).toBeTruthy();''',
+)
+
 print(
     "Applied generated accessibility, precision, legacy-handle, "
-    "and regression corrections."
+    "independent-brand, and regression corrections."
 )
