@@ -260,6 +260,15 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(source, "masterEditModeRef.current", "resize master snapshot");
     expectSourceToken(source, "captureStudioMutationTicket()", "resize document snapshot");
     expectSourceToken(source, "isEffectivelyLocked", "resize begin");
+    // The source frame comes from the VISIBLE box, so a hidden member would be transformed by an
+    // affine that never accounted for it -- a turn about a box it sits outside throws it off-page
+    // with nothing on screen to show it. Refused at the gate, like a locked member.
+    expectSourceToken(source, "isEffectivelyHidden", "resize hidden-member guard");
+    expectSourceToken(
+      viewportSource,
+      "!selectionHasHiddenMember",
+      "group resize hidden-member gate",
+    );
     expectSourceToken(
       source,
       "finitePositiveGroupResizeBounds(sourceBounds)",
