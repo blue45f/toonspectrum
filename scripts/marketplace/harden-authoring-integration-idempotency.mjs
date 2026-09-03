@@ -3,116 +3,73 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 
-function replaceRequired(source, before, after, label) {
-  if (source.includes(after)) return source;
-  if (!source.includes(before)) throw new Error(`Missing ${label} integration script anchor.`);
-  return source.replace(before, after);
-}
-
-function updateScript(relativePath, transform) {
+function keepSingle(relativePath, pattern, label, normalize) {
   const path = resolve(root, relativePath);
   const before = readFileSync(path, "utf8");
-  const after = transform(before);
-  if (after !== before) writeFileSync(path, after);
-}
-
-function keepFirst(source, pattern, label) {
+  const matches = [...before.matchAll(pattern)];
+  if (matches.length === 0) throw new Error(`${label}: integration is missing`);
   let seen = false;
-  let count = 0;
-  const result = source.replace(pattern, (match) => {
-    count += 1;
+  let removed = 0;
+  const deduplicated = before.replace(pattern, (match) => {
     if (!seen) {
       seen = true;
       return match;
     }
+    removed += 1;
     return "";
   });
-  if (count === 0) throw new Error(`Expected ${label} integration was not present.`);
-  return { source: result, removed: Math.max(0, count - 1) };
+  const after = normalize(deduplicated);
+  if (after !== before) writeFileSync(path, after);
+  return { path: relativePath, duplicateInsertionsRemoved: removed };
 }
 
-updateScript("scripts/marketplace/integrate-creator-authoring.mjs", (source) => {
-  let next = replaceRequired(
-    source,
-    '"marketplace-authoring-workshop",',
-    '"<MarketplaceAuthoringWorkshop />",',
-    "publish marker",
-  );
-  next = replaceRequired(
-    next,
-    '"brush-studio-marketplace-shortcut",',
-    '"<MarketplaceBrushStudioBridge />",',
-    "Brush Studio marker",
-  );
-  return next;
-});
-
-updateScript("scripts/marketplace/integrate-authoring-detail-action.mjs", (source) =>
-  replaceRequired(
-    source,
-    'if (!source.includes("marketplace-authoring-install-action")) {',
-    'if (!source.includes("<MarketplaceAuthoringInstallAction record={record} />")) {',
-    "detail marker",
+const report = [
+  keepSingle(
+    "src/domains/market/pages/MarketPublishPage.tsx",
+    /\s*\{\/\* marketplace-authoring-workshop \*\/\}\s*<MarketplaceAuthoringWorkshop\s*\/>/gu,
+    "MarketplaceAuthoringWorkshop",
+    (source) => source.replace(
+      /\s*\{\/\* marketplace-authoring-workshop \*\/\}\s*<MarketplaceAuthoringWorkshop\s*\/>/u,
+      "\n      {/* marketplace-authoring-workshop */}\n      <MarketplaceAuthoringWorkshop />",
+    ),
   ),
-);
-
-updateScript("scripts/marketplace/integrate-brush-recipe-lab.mjs", (source) =>
-  replaceRequired(
-    source,
-    'if (!source.includes("market-brush-recipe-lab")) {',
-    'if (!source.includes("<MarketplaceBrushRecipeAccelerator")) {',
-    "recipe marker",
+  keepSingle(
+    "src/domains/creator/brush/StudioBrushStudio.tsx",
+    /\s*\{\/\* brush-studio-marketplace-shortcut \*\/\}\s*<MarketplaceBrushStudioBridge\s+snapshot=\{currentSnapshot\}\s+visible=\{open\}\s*\/>/gu,
+    "MarketplaceBrushStudioBridge",
+    (source) => source.replace(
+      /\s*\{\/\* brush-studio-marketplace-shortcut \*\/\}\s*<MarketplaceBrushStudioBridge\s+snapshot=\{currentSnapshot\}\s+visible=\{open\}\s*\/>/u,
+      "\n      {/* brush-studio-marketplace-shortcut */}\n      <MarketplaceBrushStudioBridge snapshot={currentSnapshot} visible={open} />",
+    ),
   ),
-);
-
-const productFiles = [
-  {
-    path: "src/domains/market/pages/MarketPublishPage.tsx",
-    pattern: /\s*<MarketplaceAuthoringWorkshop\s*\/>/gu,
-    label: "MarketplaceAuthoringWorkshop",
-  },
-  {
-    path: "src/domains/creator/StudioBrushStudio.tsx",
-    pattern: /\s*<MarketplaceBrushStudioBridge\s*\/>/gu,
-    label: "MarketplaceBrushStudioBridge",
-  },
-  {
-    path: "src/domains/market/components/MarketResourceDetailArticle.tsx",
-    pattern: /\s*<MarketplaceAuthoringInstallAction\s+record=\{record\}\s*\/>/gu,
-    label: "MarketplaceAuthoringInstallAction",
-  },
-  {
-    path: "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx",
-    pattern: /\s*<MarketplaceBrushRecipeAccelerator\s+draft=\{normalized\}\s+onChange=\{setDraft\}\s*\/>/gu,
-    label: "MarketplaceBrushRecipeAccelerator",
-  },
+  keepSingle(
+    "src/domains/market/components/MarketResourceDetailArticle.tsx",
+    /\s*<MarketplaceAuthoringInstallAction\s+record=\{record\}\s*\/>/gu,
+    "MarketplaceAuthoringInstallAction",
+    (source) => source.replace(
+      /\s*<MarketplaceAuthoringInstallAction\s+record=\{record\}\s*\/>/u,
+      "\n      <MarketplaceAuthoringInstallAction record={record} />",
+    ),
+  ),
+  keepSingle(
+    "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx",
+    /\s*<MarketplaceBrushRecipeAccelerator\s+draft=\{normalized\}\s+onChange=\{setDraft\}\s*\/>/gu,
+    "MarketplaceBrushRecipeAccelerator",
+    (source) => source.replace(
+      /\s*<MarketplaceBrushRecipeAccelerator\s+draft=\{normalized\}\s+onChange=\{setDraft\}\s*\/>/u,
+      "\n                <MarketplaceBrushRecipeAccelerator\n                  draft={normalized}\n                  onChange={setDraft}\n                />",
+    ),
+  ),
+  keepSingle(
+    "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx",
+    /\s*<MarketplaceAssetQualityMatrix\s+draft=\{normalized\}\s+onChange=\{setDraft\}\s*\/>/gu,
+    "MarketplaceAssetQualityMatrix",
+    (source) => source.replace(
+      /\s*<MarketplaceAssetQualityMatrix\s+draft=\{normalized\}\s+onChange=\{setDraft\}\s*\/>/u,
+      "\n            <MarketplaceAssetQualityMatrix\n              draft={normalized}\n              onChange={setDraft}\n            />",
+    ),
+  ),
 ];
-
-const report = [];
-for (const entry of productFiles) {
-  const path = resolve(root, entry.path);
-  const before = readFileSync(path, "utf8");
-  const result = keepFirst(before, entry.pattern, entry.label);
-  let after = result.source;
-  // Normalize the surviving insertion onto its own line after regex whitespace folding.
-  if (entry.label === "MarketplaceAuthoringWorkshop") {
-    after = after.replace("<MarketplaceAuthoringWorkshop />", "\n      <MarketplaceAuthoringWorkshop />\n");
-  } else if (entry.label === "MarketplaceBrushStudioBridge") {
-    after = after.replace("<MarketplaceBrushStudioBridge />", "\n      <MarketplaceBrushStudioBridge />\n");
-  } else if (entry.label === "MarketplaceAuthoringInstallAction") {
-    after = after.replace(
-      "<MarketplaceAuthoringInstallAction record={record} />",
-      "\n      <MarketplaceAuthoringInstallAction record={record} />\n",
-    );
-  } else {
-    after = after.replace(
-      "<MarketplaceBrushRecipeAccelerator\n                  draft={normalized}\n                  onChange={setDraft}\n                />",
-      "\n                <MarketplaceBrushRecipeAccelerator\n                  draft={normalized}\n                  onChange={setDraft}\n                />\n",
-    );
-  }
-  writeFileSync(path, after);
-  report.push({ path: entry.path, duplicateInsertionsRemoved: result.removed });
-}
 
 writeFileSync(
   resolve(root, "marketplace-authoring-idempotency-report.json"),
