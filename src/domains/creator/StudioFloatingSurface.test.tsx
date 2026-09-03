@@ -16,6 +16,24 @@ import {
 import { resetStudioFloatingSurfaceStackForTest } from "./studio-floating-surface-stack";
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
 
+class StudioFloatingSurfaceTestPointerEvent extends MouseEvent {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  readonly isPrimary: boolean;
+
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 0;
+    this.pointerType = init.pointerType ?? "mouse";
+    this.isPrimary = init.isPrimary ?? true;
+  }
+}
+
+Object.defineProperty(globalThis, "PointerEvent", {
+  configurable: true,
+  value: StudioFloatingSurfaceTestPointerEvent,
+});
+
 const DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = Object.freeze({
   version: 2,
   xRatio: 1,
