@@ -9,13 +9,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: webgpu-v2-source-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   restore-source:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-slim, ubuntu-24.04-arm]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -42,7 +42,10 @@ jobs:
           parts = sorted(Path('.bootstrap/webgpu-v2').glob('part-*'))
           if len(parts) != 7:
               raise SystemExit(f'expected 7 payload parts, got {len(parts)}')
-          encoded = ''.join(part.read_text(encoding='utf-8').split())
+          encoded = ''.join(
+              payload_part.read_text(encoding='utf-8').strip()
+              for payload_part in parts
+          )
           payload = base64.b64decode(encoded, validate=True)
           observed_sha = hashlib.sha256(payload).hexdigest()
           if observed_sha == CORRUPT_SHA:
@@ -74,12 +77,4 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           HUSKY=0 git commit -m "feat(brush): materialize WebGPU v2 benchmark candidate"
-          if git push origin "HEAD:${GITHUB_REF_NAME}"; then
-            exit 0
-          fi
-          git fetch origin "${GITHUB_REF_NAME}"
-          if git cat-file -e "FETCH_HEAD:src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.ts"; then
-            echo "candidate source was materialized by the parallel runner"
-            exit 0
-          fi
-          exit 1
+          git push origin "HEAD:${GITHUB_REF_NAME}"
