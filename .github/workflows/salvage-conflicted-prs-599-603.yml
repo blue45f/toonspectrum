@@ -1,0 +1,178 @@
+name: Salvage conflict-free files from PRs 599 and 603
+
+on:
+  push:
+    branches:
+      - automation/salvage-conflicted-prs-599-603-20260903
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: salvage-conflicted-prs-599-603-20260903
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  TARGET_BRANCH: integration/salvage-pr-599-603-safe-files-20260903
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  salvage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Select only files untouched by main since each PR base
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "toon-spectrum-salvage-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main --prune
+          git checkout -B "$TARGET_BRANCH" origin/main
+
+          report="docs/merge-preservation/pr-599-603-safe-slice.md"
+          mkdir -p "$(dirname "$report")"
+          cat > "$report" <<'EOF'
+          # Safe file-level salvage: PR #599 and PR #603
+
+          This branch takes a complete PR-head file only when the production path has not changed in
+          `main` since that PR's merge base. Paths changed on both sides are deliberately skipped,
+          preventing either side from being overwritten. Their exact head versions remain available
+          in the original PR refs and in the lossless preservation branch.
+
+          EOF
+
+          for number in 599 603; do
+            ref="refs/remotes/salvage/pr-$number"
+            if ! git fetch --no-tags origin "+refs/pull/$number/head:$ref"; then
+              printf '\n## PR #%s\n\nHead ref unavailable; no files selected.\n' "$number" >> "$report"
+              continue
+            fi
+
+            base="$(git merge-base origin/main "$ref")"
+            metadata="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json title,state,headRefOid 2>/dev/null || printf '{}')"
+            title="$(jq -r '.title // "unknown"' <<<"$metadata")"
+            head_sha="$(jq -r '.headRefOid // "unknown"' <<<"$metadata")"
+
+            printf '\n## PR #%s — %s\n\n' "$number" "$title" >> "$report"
+            printf -- '- Merge base: `%s`\n- PR head: `%s`\n\n' "$base" "$head_sha" >> "$report"
+            printf '### Applied complete files\n\n' >> "$report"
+
+            applied_file="/tmp/pr-$number-applied.txt"
+            skipped_file="/tmp/pr-$number-skipped.txt"
+            : > "$applied_file"
+            : > "$skipped_file"
+
+            mapfile -d '' paths < <(git diff --name-only -z "$base" "$ref")
+            for path in "${paths[@]}"; do
+              [[ -n "$path" ]] || continue
+
+              if git diff --quiet "$base" origin/main -- "$path"; then
+                if git cat-file -e "$ref:$path" 2>/dev/null; then
+                  mkdir -p "$(dirname "$path")"
+                  git checkout "$ref" -- "$path"
+                else
+                  git rm -f --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
+                fi
+                printf '%s\n' "$path" >> "$applied_file"
+              else
+                printf '%s\n' "$path" >> "$skipped_file"
+              fi
+            done
+
+            if [[ -s "$applied_file" ]]; then
+              sed 's|^|- `|; s|$|`|' "$applied_file" >> "$report"
+            else
+              printf '_None._\n' >> "$report"
+            fi
+
+            printf '\n### Skipped because main also changed\n\n' >> "$report"
+            if [[ -s "$skipped_file" ]]; then
+              sed 's|^|- `|; s|$|`|' "$skipped_file" >> "$report"
+            else
+              printf '_None._\n' >> "$report"
+            fi
+            printf '\n' >> "$report"
+
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(preserve): apply safe complete-file slice from PR #$number" \
+                -m "Only paths unchanged in main since the PR merge base are selected."
+            fi
+          done
+
+          git add "$report"
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(preserve): record safe salvage selection for PRs 599 and 603"
+          fi
+          git diff --check origin/main...HEAD
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify type, lint, focused tests, and production build
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run lint:quick
+          pnpm exec vitest run \
+            lib/creator-marketplace-authoring-safety.test.ts \
+            lib/creator-marketplace-authoring-workshop.test.ts \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/market \
+            --reporter=verbose
+          pnpm run build
+
+      - name: Push validated salvage branch and open PR
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git diff --quiet origin/main...HEAD; then
+            echo "No safe unique files remained after comparison; no PR required."
+            exit 0
+          fi
+
+          git push --force-with-lease origin "$TARGET_BRANCH"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+          body="$(cat <<'EOF'
+          ## 안전 복구 원칙
+
+          PR #599와 #603의 변경 파일 중, 각 PR의 merge base 이후 `main`에서 변경되지 않은 경로만
+          PR head의 완전한 파일로 반영했습니다. 양쪽이 동시에 수정한 경로는 덮어쓰지 않고
+          `docs/merge-preservation/pr-599-603-safe-slice.md`에 기록했습니다.
+
+          푸시 전에 TypeScript, quick lint, 마켓 집중 Vitest, production build를 통과했습니다.
+          저장소 기본 PR 체크도 별도로 통과한 동일 HEAD만 병합합니다.
+          EOF
+          )"
+          if [[ -z "$existing" ]]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "chore(integration): salvage conflict-free work from PRs 599 and 603" \
+              --body "$body"
+          else
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" \
+              --title "chore(integration): salvage conflict-free work from PRs 599 and 603" \
+              --body "$body"
+          fi
