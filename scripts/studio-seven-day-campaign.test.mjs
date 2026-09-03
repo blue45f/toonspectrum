@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import test from "node:test";
+import nodeTest from "node:test";
+import { test as vitestTest } from "vitest";
+
+const test = process.env.VITEST ? vitestTest : nodeTest;
 
 import {
   STUDIO_SEVEN_DAY_CAMPAIGN_CONFIG_PATH,

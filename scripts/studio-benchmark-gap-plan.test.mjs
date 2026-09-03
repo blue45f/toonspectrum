@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import nodeTest from "node:test";
+import { test as vitestTest } from "vitest";
+
+const test = process.env.VITEST ? vitestTest : nodeTest;
 
 import {
   buildStudioBenchmarkGapPlan,
