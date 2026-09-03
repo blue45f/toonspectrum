@@ -4,6 +4,7 @@ import {
   setSfxEnabled,
 } from "@toonspectrum/core/fx";
 import {
+  SlidersHorizontal,
   Volume2,
   Music,
   Copy,
@@ -288,6 +289,18 @@ export const PALETTE_STUDIO_TOOLS: PaletteStudioTool[] = [
     icon: ZoomIn,
     tip: "원하는 배율로 확대하거나 전체 캔버스 맞춤 보기를 실행합니다.",
     keywords: ["줌", "확대", "축소", "돋보기", "zoom", "fit"],
+  },
+  {
+    // ⌘K 팔레트는 스튜디오 F1 통합 검색과 별개의 목록이라, 한쪽에만 넣으면 다른 쪽에서 0건이
+    // 된다. 형제인 "레이어 패널"만 여기 있고 그 옆 패널이 빠져 있었다.
+    id: "tool-work-panel",
+    name: "작업 패널",
+    shortcutKey: "F1",
+    category: "panel",
+    icon: SlidersHorizontal,
+    tip: "선택한 대상의 속성과 그리기 도구 설정을 한곳에서 조절합니다.",
+    // "속성 패널"은 이 패널의 옛 이름이다 — 손버릇이 끊기지 않게 검색어로 남긴다.
+    keywords: ["작업", "속성", "패널", "대상", "인스펙터", "properties", "inspector", "panel"],
   },
   {
     id: "tool-layers",
