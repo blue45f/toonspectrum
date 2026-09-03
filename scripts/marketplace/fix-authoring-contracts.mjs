@@ -42,6 +42,12 @@ function patchPackageBuilder() {
   let source = fs.readFileSync(PACKAGE_PATH, "utf8");
   source = replaceOnce(
     source,
+    `function safePackageBaseName(value: string): string {\n  const normalized = value\n    .normalize(\"NFKC\")\n    .replace(/[\\\\/:*?\"<>|\\u0000-\\u001f]+/gu, \"-\")\n    .replace(/\\s+/gu, \"-\")\n    .replace(/^-+|-+$/gu, \"\")\n    .slice(0, 96);\n  return normalized || \"marketplace-asset\";\n}\n\nexport function sanitizeCreatorMarketplaceArchivePath(value: string): string {\n  const normalized = value.normalize(\"NFKC\").replaceAll(\"\\\\\", \"/\");\n  const parts = normalized\n    .split(\"/\")\n    .filter((part) => part.length > 0 && part !== \".\")\n    .map((part) => part.replace(/[\\u0000-\\u001f:*?\"<>|]+/gu, \"-\").slice(0, 120));\n  if (parts.some((part) => part === \"..\") || parts.length === 0) {\n    throw new CreatorMarketplacePackageError(\"unsafe-name\", \"안전하지 않은 패키지 파일 이름입니다.\");\n  }\n  return parts.join(\"/\");\n}`,
+    `function replaceUnsafeNameCharacters(value: string, forbidden: string): string {\n  return Array.from(value, (character) => {\n    const codePoint = character.codePointAt(0) ?? 0;\n    return codePoint < 32 || forbidden.includes(character) ? \"-\" : character;\n  }).join(\"\");\n}\n\nfunction safePackageBaseName(value: string): string {\n  const normalized = replaceUnsafeNameCharacters(\n    value.normalize(\"NFKC\"),\n    \"\\\\/:*?\\\"<>|\",\n  )\n    .replace(/\\s+/gu, \"-\")\n    .replace(/^-+|-+$/gu, \"\")\n    .slice(0, 96);\n  return normalized || \"marketplace-asset\";\n}\n\nexport function sanitizeCreatorMarketplaceArchivePath(value: string): string {\n  const normalized = value.normalize(\"NFKC\").replaceAll(\"\\\\\", \"/\");\n  const parts = normalized\n    .split(\"/\")\n    .filter((part) => part.length > 0 && part !== \".\")\n    .map((part) => replaceUnsafeNameCharacters(part, \":*?\\\"<>|\").slice(0, 120));\n  if (parts.some((part) => part === \"..\") || parts.length === 0) {\n    throw new CreatorMarketplacePackageError(\"unsafe-name\", \"안전하지 않은 패키지 파일 이름입니다.\");\n  }\n  return parts.join(\"/\");\n}`,
+    "archive path sanitization",
+  );
+  source = replaceOnce(
+    source,
     `  const digest = await crypto.subtle.digest(\n    \"SHA-256\",\n    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),\n  );`,
     `  const digestInput = Uint8Array.from(bytes);\n  const digest = await crypto.subtle.digest(\"SHA-256\", digestInput);`,
     "SubtleCrypto digest input",
