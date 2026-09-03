@@ -326,7 +326,7 @@ export function advanceStudioWetMediaBristleFootprint(
     input?.contact,
     fieldSettings.value.width * fieldSettings.value.height,
   );
-  if ("ok" in normalized && normalized.ok === false) return normalized;
+  if ("stage" in normalized) return normalized;
 
   let brushState = initialBrush.value;
   const operations: StudioWetMediaTileFieldDeposition[] = [];
