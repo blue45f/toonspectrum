@@ -2,6 +2,8 @@ name: WebGPU dab tile binning compute
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "src/domains/creator/render/studio-webgpu-dab-tile-binning.ts"
       - "src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts"
