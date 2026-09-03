@@ -1,0 +1,231 @@
+name: Finalize marketplace authoring wiring
+
+on:
+  push:
+    branches:
+      - automation/finalize-marketplace-wiring-20260903
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-marketplace-wiring-20260903
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  TARGET_BRANCH: fix/marketplace-wiring-preserved-20260903
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  integrate-test-push:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Rebuild the wiring patch from current main
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "toon-spectrum-marketplace-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main --prune
+          git checkout -B "$TARGET_BRANCH" origin/main
+
+          apply_patch_from_ref() {
+            local source_ref="$1"
+            local label="$2"
+            local patch="/tmp/${label}.patch"
+            local base
+            base="$(git merge-base origin/main "$source_ref")"
+            git diff --binary --full-index "$base" "$source_ref" > "$patch"
+            if [[ ! -s "$patch" ]]; then
+              echo "$label has no patch relative to main."
+              return 0
+            fi
+            git reset --hard HEAD
+            git clean -fd
+            if ! git apply --3way --index "$patch"; then
+              echo "Could not apply $label without semantic conflicts." >&2
+              git diff --name-only --diff-filter=U >&2 || true
+              exit 1
+            fi
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(marketplace): recover $label on current main"
+            fi
+          }
+
+          if git fetch --no-tags origin "+refs/pull/605/head:refs/remotes/preserve/pr-605"; then
+            apply_patch_from_ref "refs/remotes/preserve/pr-605" "pr-605-authoring-wiring"
+          fi
+
+          if git fetch --no-tags origin "+refs/heads/fix/marketplace-postmerge-browser-regressions-20260903:refs/remotes/preserve/marketplace-regressions"; then
+            apply_patch_from_ref "refs/remotes/preserve/marketplace-regressions" "postmerge-browser-regressions"
+          fi
+
+          if git fetch --no-tags origin "+refs/heads/fix/marketplace-brush-publish-hardening-main-20260903:refs/remotes/preserve/marketplace-hardening"; then
+            apply_patch_from_ref "refs/remotes/preserve/marketplace-hardening" "brush-publish-hardening"
+          fi
+
+          node scripts/marketplace/integrate-creator-authoring.mjs
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path("e2e/marketplace-authoring-inapp.spec.ts"): [
+                  (
+                      'await expect(workshop.getByText("파티클·산포"), profile.id).toBeVisible();',
+                      'await expect(\n'
+                      '      workshop\n'
+                      '        .getByTestId("market-authoring-engine-list")\n'
+                      '        .getByText("파티클·산포", { exact: true }),\n'
+                      '      profile.id,\n'
+                      '    ).toBeVisible();',
+                  ),
+              ],
+              Path("e2e/marketplace-authoring-workshop.spec.ts"): [
+                  (
+                      'await expect(page.getByText("stroke-sheet", { exact: true })).toBeVisible();',
+                      'await expect(\n'
+                      '      page.getByRole("button", { name: "stroke-sheet", exact: true }),\n'
+                      '    ).toBeVisible();',
+                  ),
+                  (
+                      'workshop.getByRole("button", { name: "브러시" })',
+                      'workshop.getByRole("button", { name: "브러시", exact: true })',
+                  ),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding="utf-8")
+              original = text
+              for old, new in pairs:
+                  if old in text:
+                      text = text.replace(old, new)
+              if text != original:
+                  path.write_text(text, encoding="utf-8")
+          PY
+
+          pnpm exec eslint --fix \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/creator/marketplace-brush-publish-snapshot.ts \
+            e2e/marketplace-authoring-workshop.spec.ts \
+            e2e/marketplace-authoring-inapp.spec.ts
+
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(marketplace): wire authoring surfaces and stabilize browser contracts"
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit, type, lint, and production build gates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator/brush/StudioBrushStudio.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/creator/marketplace-brush-publish-snapshot.ts \
+            e2e/marketplace-authoring-workshop.spec.ts \
+            e2e/marketplace-authoring-inapp.spec.ts
+          pnpm exec vitest run \
+            src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            --reporter=verbose
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run build
+          git diff --check
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify desktop, mobile, in-app, and native-program round trip
+        shell: bash
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line,html
+          --trace=retain-on-failure
+
+      - name: Push the exact validated branch and open its PR
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git push --force-with-lease origin "$TARGET_BRANCH"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+          body="$(cat <<'EOF'
+          ## 복구 범위
+
+          - `/market/publish`에 실제 제작 워크숍 연결
+          - Brush Studio에 마켓 브리지 연결
+          - 제한된 WebView 저장소 접근 안전화
+          - 데스크톱·모바일·Chromium 인앱·native engine program 왕복 검증
+          - 중복 텍스트에 의존하던 Playwright 선택자를 역할·영역 기준으로 고정
+
+          이 브랜치는 최신 `main`에서 다시 생성했으며, PR #605 및 후속 회귀 수정 브랜치의 고유
+          변경만 3-way 적용했습니다. 아래 로컬 게이트가 모두 통과한 동일 커밋만 푸시됩니다.
+
+          - focused ESLint
+          - focused Vitest
+          - TypeScript noEmit
+          - production build
+          - Playwright desktop/mobile/in-app/native-program round trip
+          EOF
+          )"
+          if [[ -z "$existing" ]]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "fix(marketplace): restore authoring surface wiring without work loss" \
+              --body "$body"
+          else
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" \
+              --title "fix(marketplace): restore authoring surface wiring without work loss" \
+              --body "$body"
+          fi
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: marketplace-wiring-validation-${{ github.run_id }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 30
