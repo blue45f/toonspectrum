@@ -1,4 +1,4 @@
-name: WebGPU binning diagnostic
+name: WebGPU binning reserved identifier fix
 
 on:
   push:
@@ -6,75 +6,113 @@ on:
       - fix/webgpu-dab-binning-real-gpu-20260904
     paths:
       - ".github/workflows/webgpu-binning-diagnostic.yml"
-      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: webgpu-binning-diagnostic-${{ github.ref }}
+  group: webgpu-binning-fix-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  diagnostic:
+  fix-and-verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: fix/webgpu-dab-binning-real-gpu-20260904
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11.4.0
           run_install: false
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24.16.0
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - name: Instrument scoped errors in the runner checkout
+
+      - name: Replace WGSL reserved identifiers
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          runtime = Path("src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts")
-          source = runtime.read_text()
-          scope_marker = '      if (errors.some((error) => error !== null)) {'
-          if scope_marker not in source:
-              raise SystemExit("scoped-error marker not found")
-          source = source.replace(
-              scope_marker,
-              '      console.error("[binning-compute-scoped]", JSON.stringify(errors.map((error) => error?.message ?? null)));\n'
-              + scope_marker,
-              1,
-          )
-          catch_marker = '    } catch {\n      while (errorScopeDepth > 0) {'
-          if catch_marker not in source:
-              raise SystemExit("catch marker not found")
-          source = source.replace(
-              catch_marker,
-              '    } catch (error) {\n'
-              '      console.error("[binning-compute-exception]", error instanceof Error ? error.stack ?? error.message : String(error));\n'
-              '      while (errorScopeDepth > 0) {',
-              1,
-          )
-          runtime.write_text(source)
+          path = Path("src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts")
+          source = path.read_text()
+          start = source.index("const COUNT_WGSL")
+          end = source.index("export const STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL")
+          shaders = source[start:end]
 
-          verifier = Path("scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs")
-          source = verifier.read_text()
-          console_marker = '    page.on("console", (message) => {\n'
-          if console_marker not in source:
-              raise SystemExit("verifier console marker not found")
-          source = source.replace(
-              console_marker,
-              console_marker + '      console.log(`[browser-console:${message.type()}] ${message.text()}`);\n',
-              1,
-          )
-          verifier.write_text(source)
+          uniform_count = shaders.count("var<uniform> meta: Meta;")
+          member_count = shaders.count("meta.")
+          active_count = len(re.findall(r"\bactive\b", shaders))
+          if uniform_count != 3 or member_count < 8 or active_count != 7:
+              raise SystemExit(
+                  f"unexpected shader shape: uniforms={uniform_count}, members={member_count}, active={active_count}"
+              )
+
+          shaders = shaders.replace("var<uniform> meta: Meta;", "var<uniform> config: Meta;")
+          shaders = shaders.replace("meta.", "config.")
+          shaders = re.sub(r"\bactive\b", "level_count", shaders)
+          if "var<uniform> meta: Meta;" in shaders or "meta." in shaders or re.search(r"\bactive\b", shaders):
+              raise SystemExit("reserved identifier remained in WGSL")
+
+          marker = " * WGSL identifiers deliberately avoid evolving reserved words (`meta`, `active`).\n"
+          header = "/**\n * Exact WebGPU count / prefix-scan / stable-scatter candidate for sparse dab tile binning.\n"
+          if marker not in source:
+              if header not in source:
+                  raise SystemExit("source header not found")
+              source = source.replace(header, header + marker, 1)
+          path.write_text(source[:start] + shaders + source[end:])
           PY
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Run exact compute verifier with diagnostics
+
+      - name: Focused unit tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+
+      - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Exact WebGPU compute binning proof
         env:
           TOONSPECTRUM_WEBGPU_HEADED: "1"
         run: >-
           xvfb-run -a --server-args="-screen 0 1920x1200x24"
           pnpm exec node scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs
+
+      - name: Existing professional bristle and impasto proof
+        env:
+          TOONSPECTRUM_WEBGPU_HEADED: "1"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm run verify:studio-professional-bristle-webgpu
+
+      - name: Commit verified runtime fix and remove one-shot workflow
+        run: |
+          rm .github/workflows/webgpu-binning-diagnostic.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts .github/workflows/webgpu-binning-diagnostic.yml
+          git commit -m "fix(webgpu): avoid reserved WGSL identifiers in tile binning"
+          git push origin HEAD:fix/webgpu-dab-binning-real-gpu-20260904
