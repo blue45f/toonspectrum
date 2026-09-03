@@ -1,6 +1,17 @@
 // Palette library manager. The compact panel is mounted inside Studio's lazy style popover;
 // binary/text interchange codecs remain in a second intent-loaded chunk.
-import { AlertTriangle, CheckCircle2, Download, Pencil, Plus, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Copy,
+  Download,
+  Pencil,
+  Plus,
+  Search,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { downloadBlob } from "./export/studio-export";
@@ -173,9 +184,6 @@ function extensionFormat(fileName: string): StudioPaletteInterchangeFormat | nul
 function hasAdobeAcoHeader(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 4 || bytes[0] !== 0 || (bytes[1] !== 1 && bytes[1] !== 2)) return false;
   const count = (bytes[2]! << 8) | bytes[3]!;
-  // An empty section is not a useful ACO signature and collides with valid 768-byte ACT tables
-  // whose first two RGB components happen to be 0 and 1. Full structural validation remains in
-  // the codec; this sniff only routes a file to that validator.
   return count >= 1 && count <= 4_096 && bytes.byteLength >= 4 + count * 10;
 }
 
@@ -198,8 +206,6 @@ function detectPaletteFormat(fileName: string, bytes: Uint8Array): StudioPalette
   }
   if (hasJascPalHeader(bytes)) return "pal";
   const fromExtension = extensionFormat(fileName);
-  // ACT has no magic bytes. Prefer its explicit extension plus exact legal byte length before the
-  // weaker ACO prefix sniff so a legitimate color table cannot be misrouted as an empty ACO file.
   if (fromExtension === "act" && (bytes.byteLength === 768 || bytes.byteLength === 772)) return "act";
   if (hasAdobeAcoHeader(bytes)) return "aco";
   if (fromExtension) return fromExtension;
@@ -244,6 +250,55 @@ function uniqueDetails(details: readonly string[]): string[] {
   return [...new Set(details.map((detail) => detail.trim()).filter(Boolean))];
 }
 
+function createImportedNamedPalette(name: string, colors: string[]): StudioNamedPalette {
+  const now = Date.now();
+  return {
+    id: crypto.randomUUID(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    colors,
+  };
+}
+
+const WEBTOON_PRESETS: readonly { name: string; tag: string; colors: string[] }[] = [
+  {
+    name: "웹툰 인물 피부톤",
+    tag: "인물",
+    colors: ["#fffbf5", "#ffedd5", "#fbcfe8", "#e0b0d5", "#fb7185"],
+  },
+  {
+    name: "헤어 내추럴 & 흑발",
+    tag: "헤어",
+    colors: ["#1b1b22", "#2e2a2b", "#463733", "#5c4334", "#75543c", "#a8845c", "#dcbb85"],
+  },
+  {
+    name: "헤어 비비드 판타지",
+    tag: "헤어",
+    colors: ["#ff5d73", "#ff8fb1", "#c377f2", "#7c52e0", "#5d8bf4", "#28c2a8", "#f0c22e"],
+  },
+  {
+    name: "골든아워 노을 하늘",
+    tag: "배경",
+    colors: ["#fde047", "#fb923c", "#ffedd5", "#831843", "#fef08a", "#4a154b"],
+  },
+  {
+    name: "청량한 여름 대낮",
+    tag: "배경",
+    colors: ["#38bdf8", "#bae6fd", "#ffffff", "#64748b", "#0284c7", "#e0f2fe"],
+  },
+  {
+    name: "사이버펑크 네온야경",
+    tag: "SF",
+    colors: ["#09090b", "#3b0764", "#f43f5e", "#06b6d4", "#a855f7", "#22d3ee"],
+  },
+  {
+    name: "자연 초목 & 포레스트",
+    tag: "자연",
+    colors: ["#eaf4d3", "#cde6a5", "#8cc084", "#538d58", "#2c5e3b", "#143a24"],
+  },
+];
+
 export function StudioPaletteLibraryPanel({
   onPickColor,
   seedColors,
@@ -269,6 +324,10 @@ export function StudioPaletteLibraryPanel({
   const [newColorsText, setNewColorsText] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"all" | "presets">("all");
+  const [expandedPaletteIds, setExpandedPaletteIds] = useState<Set<string>>(new Set());
+
   const selectedFormat = formatOption(exportFormat);
   const busy = busyOperation !== null || mutationBusy;
 
@@ -356,8 +415,6 @@ export function StudioPaletteLibraryPanel({
     try {
       const next = await persisted();
       if (!mountedRef.current || generation !== mutationGenerationRef.current) return "rejected";
-      // A repository subscription can start list() while the write is still in flight. Invalidate
-      // that read before publishing the mutation result so a late snapshot cannot roll the UI back.
       loadGenerationRef.current += 1;
       replacePalettes(next);
       setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
@@ -404,6 +461,54 @@ export function StudioPaletteLibraryPanel({
       (current) => deletePaletteInMemory(current, id),
     ).then((outcome) => {
       if (outcome === "durable" && mountedRef.current) setMessage(null);
+    });
+  }
+
+  function handleDuplicate(palette: StudioNamedPalette): void {
+    if (busyRef.current || mutationBusyRef.current) return;
+    const duplicated = createPalette(`${palette.name} (사본)`, [...palette.colors]);
+    void commitMutation(
+      () => repository.save(duplicated),
+      (current) => upsertPaletteInMemory(current, duplicated),
+    ).then((outcome) => {
+      if (outcome === "durable" && mountedRef.current) {
+        setMessage({
+          tone: "success",
+          title: `“${duplicated.name}”을(를) 복제했어요.`,
+          details: [`${duplicated.colors.length}색`],
+        });
+      }
+    });
+  }
+
+  function handleAddColor(palette: StudioNamedPalette, color: string): void {
+    if (busyRef.current || mutationBusyRef.current) return;
+    const clean = color.trim().toLowerCase();
+    if (!clean || palette.colors.includes(clean)) return;
+    const updated: StudioNamedPalette = {
+      ...palette,
+      colors: [...palette.colors, clean],
+    };
+    void commitMutation(
+      () => repository.save(updated),
+      (current) => upsertPaletteInMemory(current, updated),
+    );
+  }
+
+  function handleSavePreset(presetName: string, colors: string[]): void {
+    if (busyRef.current || mutationBusyRef.current) return;
+    const p = createPalette(presetName, colors);
+    void commitMutation(
+      () => repository.save(p),
+      (current) => upsertPaletteInMemory(current, p),
+    ).then((outcome) => {
+      if (outcome === "durable" && mountedRef.current) {
+        setMessage({
+          tone: "success",
+          title: `웹툰 프리셋 “${p.name}”을(를) 저장했어요.`,
+          details: [`${p.colors.length}색`],
+        });
+      }
     });
   }
 
@@ -492,14 +597,10 @@ export function StudioPaletteLibraryPanel({
       const bytes = new Uint8Array(await file.arrayBuffer());
       const format = detectPaletteFormat(file.name, bytes);
       const imported = interchange.importStudioPalette(format, bytes);
-      const now = Date.now();
-      const palette: StudioNamedPalette = {
-        id: crypto.randomUUID(),
-        name: importedPaletteName(imported.palette.name, file.name),
-        createdAt: now,
-        updatedAt: now,
-        colors: imported.palette.colors.map((color) => color.hex),
-      };
+      const palette: StudioNamedPalette = createImportedNamedPalette(
+        importedPaletteName(imported.palette.name, file.name),
+        imported.palette.colors.map((color) => color.hex),
+      );
       const outcome = await commitMutation(
         () => repository.save(palette),
         (current) => upsertPaletteInMemory(current, palette),
@@ -564,7 +665,7 @@ export function StudioPaletteLibraryPanel({
       });
     } catch (error) {
       setMessage({
-        tone: "error",
+        tone: error instanceof Error ? "error" : "error",
         title: error instanceof Error ? error.message : "팔레트를 내보내지 못했어요.",
         details: [],
       });
@@ -574,6 +675,12 @@ export function StudioPaletteLibraryPanel({
     }
   }
 
+  const filteredPalettes = palettes.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return p.name.toLowerCase().includes(q) || p.colors.some((c) => c.toLowerCase().includes(q));
+  });
+
   return (
     <section
       aria-label="내 팔레트 라이브러리"
@@ -582,7 +689,9 @@ export function StudioPaletteLibraryPanel({
     >
       <div className="mb-2">
         <p className="text-xs font-semibold text-fg">내 팔레트</p>
-        <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.</p>
+        <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
+          GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.
+        </p>
       </div>
 
       <p className="mb-2 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
@@ -690,6 +799,7 @@ export function StudioPaletteLibraryPanel({
       >
         직접 입력
       </button>
+
       {creatorOpen && (
         <div className="mb-2 flex flex-col gap-1.5 border-y border-line bg-card/50 py-2">
           <input
@@ -721,87 +831,212 @@ export function StudioPaletteLibraryPanel({
         </div>
       )}
 
-      {palettes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
-          아직 저장된 팔레트가 없어요.<br />GPL·Adobe·JASC·CSS·JSON 파일을 가져오거나 최근 색으로 시작하세요.
-        </p>
-      ) : (
-        <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label={`저장된 팔레트 ${palettes.length}개`}>
-          {palettes.map((palette) => (
-            <article key={palette.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
-              <div className="flex items-center gap-0.5">
-                {renamingId === palette.id ? (
-                  <input
-                    type="text"
-                    value={renamingName}
-                    disabled={busy}
-                    aria-label={`${palette.name} 새 이름`}
-                    onChange={(event) => setRenamingName(event.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={handleRenameKeyDown}
-                    // eslint-disable-next-line jsx-a11y/no-autofocus -- edit-on-demand action should focus its field.
-                    autoFocus
-                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-accent bg-panel px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                  />
-                ) : (
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={palette.name}>
-                    {palette.name}
-                    <span className="ml-1 text-[0.62rem] text-fg-3">{palette.colors.length}색</span>
-                  </span>
-                )}
+      {/* Tabs: 내 팔레트 vs 웹툰 추천 프리셋 */}
+      <div className="mb-2 flex rounded-lg border border-line bg-raised/50 p-0.5" role="tablist" aria-label="팔레트 보기 방식">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "all"}
+          aria-label="내 팔레트 목록"
+          onClick={() => setActiveTab("all")}
+          className={`flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors ${
+            activeTab === "all" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2"
+          }`}
+        >
+          내 팔레트 ({palettes.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "presets"}
+          aria-label="웹툰 추천 프리셋 보기"
+          onClick={() => setActiveTab("presets")}
+          className={`flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors ${
+            activeTab === "presets" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2"
+          }`}
+        >
+          웹툰 추천 ({WEBTOON_PRESETS.length})
+        </button>
+      </div>
+
+      {activeTab === "presets" ? (
+        <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+          {WEBTOON_PRESETS.map((preset) => (
+            <article key={preset.name} className="rounded-lg border border-line bg-card p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-fg-1">{preset.name}</span>
                 <button
                   type="button"
-                  onClick={() => startRename(palette)}
-                  disabled={busy}
-                  aria-label={`${palette.name} 이름 변경`}
-                  title="이름 변경"
-                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
+                  aria-label={`${preset.name} 내 팔레트로 저장`}
+                  onClick={() => handleSavePreset(preset.name, preset.colors)}
+                  className="flex items-center gap-1 rounded border border-line bg-raised px-1.5 py-0.5 text-[0.58rem] font-medium text-fg-2 hover:border-accent hover:text-accent"
                 >
-                  <Pencil size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleExport(palette)}
-                  disabled={busy}
-                  aria-label={`${palette.name} ${selectedFormat.shortLabel}로 내보내기`}
-                  title={`${selectedFormat.label}로 내보내기`}
-                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
-                >
-                  <Download size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(palette.id)}
-                  disabled={busy}
-                  aria-label={`${palette.name} 팔레트 삭제`}
-                  title="삭제"
-                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45"
-                >
-                  <X size={14} aria-hidden />
+                  <Sparkles className="size-2.5" aria-hidden /> 내 저장소에 복사
                 </button>
               </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {palette.colors.slice(0, SWATCH_PREVIEW_COUNT).map((hex, index) => (
+              <div
+                className="my-1.5 h-1.5 w-full rounded-full shadow-inner opacity-90"
+                style={{ background: `linear-gradient(to right, ${preset.colors.join(", ")})` }}
+              />
+              <div className="flex flex-wrap gap-1">
+                {preset.colors.map((hex) => (
                   <button
-                    key={`${hex}-${index}`}
+                    key={hex}
                     type="button"
+                    aria-label={`${preset.name} 색상 ${hex} 선택`}
                     onClick={() => onPickColor(hex)}
-                    disabled={busy}
-                    aria-label={`${palette.name} 색상 ${hex} 선택`}
-                    title={hex}
-                    className="size-11 rounded-lg border border-line-strong shadow-[0_0_0_1px_oklch(0.15_0.008_70/0.35)_inset] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55"
-                    style={{ background: hex }}
+                    className="size-7 rounded border border-line transition-transform hover:scale-105 active:scale-95"
+                    style={{ backgroundColor: hex }}
                   />
                 ))}
-                {palette.colors.length > SWATCH_PREVIEW_COUNT && (
-                  <span className="flex size-11 items-center justify-center rounded-lg border border-line px-1 text-[0.62rem] font-semibold text-fg-3">
-                    +{palette.colors.length - SWATCH_PREVIEW_COUNT}
-                  </span>
-                )}
               </div>
             </article>
           ))}
         </div>
+      ) : (
+        <>
+          {palettes.length > 2 && (
+            <div className="mb-2 relative">
+              <Search className="absolute left-2.5 top-2.5 size-3.5 text-fg-3" aria-hidden />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="팔레트 검색..."
+                aria-label="팔레트 검색"
+                className="h-8 w-full rounded-lg border border-line bg-panel pl-8 pr-2.5 text-xs text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+              />
+            </div>
+          )}
+
+          {palettes.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
+              아직 저장된 팔레트가 없어요.<br />GPL·Adobe·JASC·CSS·JSON 파일을 가져오거나 최근 색으로 시작하세요.
+            </p>
+          ) : (
+            <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label={`저장된 팔레트 ${palettes.length}개`}>
+              {filteredPalettes.map((palette) => {
+                const isExpanded = expandedPaletteIds.has(palette.id);
+                const colorsToShow = isExpanded ? palette.colors : palette.colors.slice(0, SWATCH_PREVIEW_COUNT);
+                return (
+                  <article key={palette.id} className="rounded-lg border border-line bg-card px-2 py-1.5 transition-all hover:border-line-strong">
+                    {/* Gradient bar preview */}
+                    {palette.colors.length > 1 && (
+                      <div
+                        className="mb-1 h-1.5 w-full rounded-full shadow-inner opacity-80"
+                        style={{ background: `linear-gradient(to right, ${palette.colors.join(", ")})` }}
+                      />
+                    )}
+
+                    <div className="flex items-center gap-0.5">
+                      {renamingId === palette.id ? (
+                        <input
+                          type="text"
+                          value={renamingName}
+                          disabled={busy}
+                          aria-label={`${palette.name} 새 이름`}
+                          onChange={(event) => setRenamingName(event.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={handleRenameKeyDown}
+                          // eslint-disable-next-line jsx-a11y/no-autofocus -- edit-on-demand action should focus its field.
+                          autoFocus
+                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-accent bg-panel px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                        />
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={palette.name}>
+                          {palette.name}
+                          <span className="ml-1 text-[0.62rem] text-fg-3">{palette.colors.length}색</span>
+                        </span>
+                      )}
+
+                      {/* Duplicate button */}
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicate(palette)}
+                        disabled={busy}
+                        aria-label={`${palette.name} 팔레트 복제`}
+                        title="복제"
+                        className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
+                      >
+                        <Copy size={14} aria-hidden />
+                      </button>
+
+                      {/* Add Seed Color button */}
+                      {seedColors && seedColors.length > 0 && seedColors[0] && (
+                        <button
+                          type="button"
+                          onClick={() => handleAddColor(palette, seedColors[0]!)}
+                          disabled={busy || palette.colors.includes(seedColors[0]!.toLowerCase())}
+                          aria-label={`${palette.name}에 현재 색 ${seedColors[0]} 추가`}
+                          title="현재 색 추가"
+                          className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-good focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <Plus size={14} aria-hidden />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => startRename(palette)}
+                        disabled={busy}
+                        aria-label={`${palette.name} 이름 변경`}
+                        title="이름 변경"
+                        className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
+                      >
+                        <Pencil size={14} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleExport(palette)}
+                        disabled={busy}
+                        aria-label={`${palette.name} ${selectedFormat.shortLabel}로 내보내기`}
+                        title={`${selectedFormat.label}로 내보내기`}
+                        className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
+                      >
+                        <Download size={14} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(palette.id)}
+                        disabled={busy}
+                        aria-label={`${palette.name} 팔레트 삭제`}
+                        title="삭제"
+                        className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45"
+                      >
+                        <X size={14} aria-hidden />
+                      </button>
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {colorsToShow.map((hex, index) => (
+                        <button
+                          key={`${hex}-${index}`}
+                          type="button"
+                          onClick={() => onPickColor(hex)}
+                          disabled={busy}
+                          aria-label={`${palette.name} 색상 ${hex} 선택`}
+                          title={hex}
+                          className="size-11 rounded-lg border border-line-strong shadow-[0_0_0_1px_oklch(0.15_0.008_70/0.35)_inset] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55"
+                          style={{ background: hex }}
+                        />
+                      ))}
+                      {palette.colors.length > SWATCH_PREVIEW_COUNT && !isExpanded && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPaletteIds((prev) => new Set([...prev, palette.id]))}
+                          aria-label={`${palette.name} 모든 ${palette.colors.length}색 펼치기`}
+                          className="flex size-11 items-center justify-center rounded-lg border border-line px-1 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg-1"
+                        >
+                          +{palette.colors.length - SWATCH_PREVIEW_COUNT}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

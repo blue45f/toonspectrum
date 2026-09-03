@@ -1699,6 +1699,87 @@ describe("StudioDrawNode orchestration", () => {
   );
 
   it.each([
+    "neon",
+    "glow",
+    "soft-glow",
+  ] as const)(
+    "grows the live %s draft into the same ribbon a whole-stroke render produces",
+    (brush) => {
+      // 위 parity 테스트는 완성된 획을 한 번에 마운트한다 — 라이브 초안이 실제로 지나는 경로,
+      // 즉 같은 컴포넌트 인스턴스가 점이 하나씩 늘어난 요소로 다시 렌더되는 경로는 지나지 않는다.
+      // 발광 리본은 이제 그 성장 과정에서 섹션·런·폴리곤을 유지하므로(패스당 증분 빌더), 마지막
+      // 프레임이 배치 플래너의 결과와 한 좌표라도 다르면 라이브와 커밋/SVG 가 갈라진다.
+      // 유지 Path2D 자체는 여기서 실행되지 않는다(jsdom 에 `Path2D` 가 없어 폴백 경로가 돈다) —
+      // 그쪽은 `studio-fx-luminous-ribbon-incremental.test.ts` 의 기록형 shim 이 잡는다.
+      const sampleCount = 24;
+      const points: number[] = [];
+      const pressures: number[] = [];
+      for (let index = 0; index < sampleCount; index += 1) {
+        // 자기 교차하는 리사주 — 겹침 위에서 성장해도 마지막 프레임이 배치와 일치하는지를 본다.
+        // 런 분할 분기는 여기서 지나지 않는다: 압력 경로 생산자가 만들 수 있는 입력으로는 런이
+        // 갈리지 않는다(평범한 곡선·중복점·큰 점프·압력 0 구간 모두 실측 런 1개). 그 분기는
+        // 방어 코드로 남아 있고, 어떤 테스트도 그것을 덮지 않는다고 적어 두는 편이 덮는다고
+        // 적어 두는 것보다 정직하다.
+        const t = index / (sampleCount - 1) * Math.PI * 2;
+        points.push(
+          Math.round((45 + Math.sin(t * 2) * 40) * 100) / 100,
+          Math.round((45 + Math.sin(t * 3) * 40) * 100) / 100,
+        );
+        pressures.push(0.3 + 0.6 * (1 + Math.sin(t * 5)) / 2);
+      }
+      const elementAt = (count: number) => drawEl({
+        id: `luminous-growing-${brush}`,
+        brush,
+        mode: "pen",
+        points: points.slice(0, count * 2),
+        pressures: pressures.slice(0, count),
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        sampleSpacing: 1,
+        stroke: "#13579b",
+        strokeWidth: 14,
+        opacity: 0.64,
+      });
+      const paintCapturedShapes = () => {
+        const context = new AliasSceneContext();
+        for (const shape of captured("Shape")) {
+          const sceneFunc = shape.props.sceneFunc as (
+            context: CanvasRenderingContext2D,
+          ) => void;
+          context.globalAlpha = 1;
+          sceneFunc(context as unknown as CanvasRenderingContext2D);
+        }
+        return {
+          alphas: context.fillAlphas.map(
+            (alpha) => Math.round(alpha * 1_000_000) / 1_000_000,
+          ),
+          paths: context.fillCompoundPaths.map((coordinates) => (
+            coordinates.map((coordinate) => Math.round(coordinate * 100) / 100 + 0)
+          )),
+        };
+      };
+
+      const view = render(
+        <StudioDrawNode activeDraft el={elementAt(2)} />,
+      );
+      let live = paintCapturedShapes();
+      for (let count = 3; count <= sampleCount; count += 1) {
+        konvaCapture.nodes.length = 0;
+        view.rerender(<StudioDrawNode activeDraft el={elementAt(count)} />);
+        live = paintCapturedShapes();
+      }
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+
+      // 같은 최종 획을 커밋 렌더(배치 플래너)로 다시 그린다.
+      render(<StudioDrawNode el={elementAt(sampleCount)} />);
+      const settled = paintCapturedShapes();
+
+      expect(live.paths).toHaveLength(luminousPassCount(brush, 14));
+      expect(live).toEqual(settled);
+    },
+  );
+
+  it.each([
     "highlighter",
     "chisel-highlighter",
     "pastel-highlighter",
