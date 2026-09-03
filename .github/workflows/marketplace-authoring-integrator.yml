@@ -1,0 +1,96 @@
+name: Marketplace authoring integrator
+
+on:
+  push:
+    branches:
+      - feat/marketplace-creator-pipeline-20260903
+    paths:
+      - ".github/workflows/marketplace-authoring-integrator.yml"
+      - "scripts/marketplace/integrate-creator-authoring.mjs"
+      - "lib/creator-marketplace-authoring-workshop.ts"
+      - "lib/creator-marketplace-authoring-workshop.test.ts"
+      - "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx"
+      - "src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx"
+      - "src/domains/creator/MarketplaceBrushPublishShortcut.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-authoring-integrator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrate-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply deterministic product integration
+        run: node scripts/marketplace/integrate-creator-authoring.mjs
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run authoring contract and UI tests
+        run: >-
+          pnpm exec vitest run
+          lib/creator-marketplace-authoring-workshop.test.ts
+          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
+          --reporter=verbose
+
+      - name: Type-check
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Quick lint
+        run: pnpm run lint:quick
+
+      - name: Production build
+        run: pnpm run build
+
+      - name: Commit verified integration
+        run: |
+          if git diff --quiet -- src/domains/market/pages/MarketPublishPage.tsx src/domains/creator marketplace-authoring-integration-report.json; then
+            echo "Integration is already committed."
+            exit 0
+          fi
+          git config user.name "toonstudio-marketplace-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            src/domains/market/pages/MarketPublishPage.tsx \
+            src/domains/creator \
+            marketplace-authoring-integration-report.json
+          git commit -m "feat(market): wire creator workshop into publish and Brush Studio"
+          git push origin HEAD:feat/marketplace-creator-pipeline-20260903
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-authoring-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            marketplace-authoring-integration-report.json
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 14

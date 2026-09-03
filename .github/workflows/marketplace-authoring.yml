@@ -1,0 +1,94 @@
+name: Marketplace authoring
+
+on:
+  pull_request:
+    paths:
+      - "lib/creator-marketplace-authoring-workshop*"
+      - "src/domains/market/**"
+      - "src/domains/creator/MarketplaceBrush*"
+      - "src/domains/creator/**/StudioBrushStudio.tsx"
+      - "e2e/marketplace-authoring-*.spec.ts"
+      - "marketplace-benchmark/**"
+      - ".github/workflows/marketplace-authoring.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lib/creator-marketplace-authoring-workshop*"
+      - "src/domains/market/**"
+      - "src/domains/creator/MarketplaceBrush*"
+      - "src/domains/creator/**/StudioBrushStudio.tsx"
+      - "e2e/marketplace-authoring-*.spec.ts"
+      - ".github/workflows/marketplace-authoring.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-authoring-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Authoring contract and component tests
+        run: >-
+          pnpm exec vitest run
+          lib/creator-marketplace-authoring-workshop.test.ts
+          src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
+          src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
+          --reporter=verbose
+      - run: pnpm exec tsc -p tsconfig.json --noEmit
+      - run: pnpm run lint:quick
+      - run: pnpm run build
+
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Chromium desktop, mobile and in-app authoring
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line,html
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-authoring-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 21

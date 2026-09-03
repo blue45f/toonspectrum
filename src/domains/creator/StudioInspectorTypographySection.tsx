@@ -22,6 +22,7 @@ import {
   StudioTextEffectPanel,
   StudioTextPathPanel,
 } from "./studio-page-lazy-ui";
+import { StudioCircularTextPanel } from "./text/StudioCircularTextPanel";
 import { StudioPresetFontPreload } from "./studio-preset-font-loading";
 import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
@@ -329,6 +330,52 @@ export function StudioInspectorTypographySection({
                 onReset={() => patchEl(text.id, { textPath: undefined } as Partial<El>)}
               />
             </Suspense>
+          </div>
+          {/* CSP 패리티(main 6ddf0406): 원형 텍스트. 외곽선·그림자는 외형 섹션이, 자간·행간은 문단
+              섹션이 이미 소유하므로 main 의 중복 블록은 들이지 않는다 — 밀도 감사의
+              duplicate-control-id 계약이 그 이유다. */}
+          <div className="mt-2.5 border-t border-line/40 pt-2.5">
+            <StudioCircularTextPanel
+              text={text.text}
+              enabled={
+                text.textPath?.shape === "circleUp" ||
+                text.textPath?.shape === "circleDown"
+              }
+              options={{
+                centerX: text.x + text.width / 2,
+                centerY: text.y + (text.fontSize || 24),
+                radius: Math.max(30, (text.textPath?.curve ?? 50) * 2),
+                startAngleDeg: -90,
+                direction:
+                  text.textPath?.shape === "circleDown"
+                    ? "counter-clockwise"
+                    : "clockwise",
+                orientation: "outward",
+              }}
+              onToggleEnabled={(enabled) => {
+                if (enabled) {
+                  patchEl(text.id, {
+                    textPath: { shape: "circleUp", curve: 50 },
+                  } as Partial<El>);
+                } else {
+                  patchEl(text.id, {
+                    textPath: undefined,
+                  } as Partial<El>);
+                }
+              }}
+              onOptionsChange={(options) => {
+                const shape =
+                  options.direction === "counter-clockwise"
+                    ? "circleDown"
+                    : "circleUp";
+                patchEl(text.id, {
+                  textPath: {
+                    shape,
+                    curve: Math.round(options.radius / 2),
+                  },
+                } as Partial<El>);
+              }}
+            />
           </div>
         </StudioInspectorSection>
       ) : null}

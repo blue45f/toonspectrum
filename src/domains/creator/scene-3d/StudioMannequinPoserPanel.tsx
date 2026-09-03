@@ -50,6 +50,8 @@ import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequ
 import {
   STUDIO_MANNEQUIN_BODY_PRESETS,
   STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
+  STUDIO_MANNEQUIN_HEAD_PARAM_RANGES,
+  STUDIO_MANNEQUIN_HEAD_PRESETS,
   STUDIO_MANNEQUIN_JOINT_IDS,
   STUDIO_MANNEQUIN_JOINT_LABELS,
   STUDIO_MANNEQUIN_MATERIAL_STYLES,
@@ -60,6 +62,9 @@ import {
   getStudioMannequinJointLimit,
   type StudioMannequinBodyParams,
   type StudioMannequinBodyPresetId,
+  type StudioMannequinCoreParamKey,
+  type StudioMannequinHeadParamKey,
+  type StudioMannequinHeadPresetId,
   type StudioMannequinJointId,
   type StudioMannequinMaterialStyle,
   type StudioMannequinVec3,
@@ -142,7 +147,7 @@ const TABS: readonly { id: MannequinTabId; label: string; icon: ReactElement }[]
 ]);
 
 const BODY_SLIDERS: readonly {
-  key: keyof StudioMannequinBodyParams;
+  key: StudioMannequinCoreParamKey;
   label: string;
   step: number;
   format: (v: number) => string;
@@ -159,6 +164,18 @@ const BODY_SLIDERS: readonly {
     step: 0.1,
     format: (v) => (v < 0.5 ? "마른" : v < 1.5 ? "표준" : v < 2.5 ? "근육" : "통통"),
   },
+]);
+
+const HEAD_SLIDERS: readonly {
+  key: keyof StudioMannequinBodyParams;
+  label: string;
+  step: number;
+  format: (v: number) => string;
+}[] = Object.freeze([
+  { key: "faceWidth", label: "턱/얼굴 너비", step: 0.02, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "chinLength", label: "턱 길이", step: 0.02, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "eyeScale", label: "눈 크기/비율", step: 0.02, format: (v) => `${Math.round(v * 100)}%` },
+  { key: "noseHeight", label: "코 높이", step: 0.02, format: (v) => `${Math.round(v * 100)}%` },
 ]);
 
 function getErrorText(cause: unknown, fallback: string): string {
@@ -240,6 +257,56 @@ export function StudioMannequinBodySection({
             />
           );
         })}
+      </div>
+
+      <div className="space-y-3 pt-3 border-t border-line/60">
+        <StudioSectionHeader
+          title="3D 헤드 모델 (Face Proportions)"
+          description="CSP 2.0 3D 헤드 모델: 웹툰/애니형, 턱선, 눈, 코 비율을 조절합니다."
+        />
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="헤드 프리셋">
+          {(Object.keys(STUDIO_MANNEQUIN_HEAD_PRESETS) as StudioMannequinHeadPresetId[]).map(
+            (headId) => (
+              <StudioPanelChip
+                key={headId}
+                onClick={() =>
+                  onParamsChange(
+                    clampStudioMannequinBodyParams({
+                      ...params,
+                      ...STUDIO_MANNEQUIN_HEAD_PRESETS[headId].params,
+                    }),
+                  )
+                }
+                title={`${STUDIO_MANNEQUIN_HEAD_PRESETS[headId].label} 헤드 프리셋 적용`}
+              >
+                {STUDIO_MANNEQUIN_HEAD_PRESETS[headId].label}
+              </StudioPanelChip>
+            ),
+          )}
+        </div>
+        <div className="space-y-2">
+          {HEAD_SLIDERS.map(({ key, label, step, format }) => {
+            const [min, max] =
+              STUDIO_MANNEQUIN_HEAD_PARAM_RANGES[key as StudioMannequinHeadParamKey];
+            const value = (params[key] as number | undefined) ?? 1.0;
+            return (
+              <StudioSliderRow
+                key={key}
+                label={label}
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={(next) =>
+                  onParamsChange(
+                    clampStudioMannequinBodyParams({ ...params, [key]: next }),
+                  )
+                }
+                readout={format(value)}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );

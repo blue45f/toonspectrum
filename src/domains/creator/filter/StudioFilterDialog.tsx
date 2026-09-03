@@ -1,6 +1,7 @@
 import {
   ChevronDown,
   Clock3,
+  Eye,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -449,6 +450,7 @@ export function StudioFilterDialog({
     () => canUseSelectionScope ? "inside" : "whole",
   );
   const [previewEnabled, setPreviewEnabled] = useState(true);
+  const [isComparingOriginal, setIsComparingOriginal] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryQuery, setGalleryQuery] = useState("");
   const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
@@ -670,12 +672,12 @@ export function StudioFilterDialog({
   useEffect(() => {
     let frameId: number | null = null;
     frameId = requestAnimationFrame(() => {
-      reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
+      reportPreview(previewEnabled && !isComparingOriginal ? studioFilterDraftToPatch(draft) : null);
     });
     return () => {
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
-  }, [draft, previewEnabled]);
+  }, [draft, previewEnabled, isComparingOriginal]);
 
   useEffect(() => {
     if (!canUseSelectionScope && applicationScope !== "whole") {
@@ -1208,6 +1210,23 @@ export function StudioFilterDialog({
               />
               캔버스 미리보기
             </label>
+            {previewEnabled && (
+              <button
+                type="button"
+                onPointerDown={() => setIsComparingOriginal(true)}
+                onPointerUp={() => setIsComparingOriginal(false)}
+                onPointerLeave={() => setIsComparingOriginal(false)}
+                className={buttonClass({
+                  size: "sm",
+                  variant: isComparingOriginal ? "solid" : "outline",
+                  className: "min-h-11 sm:min-h-8 pointer-coarse:min-h-11 text-[11px] gap-1 px-2 border-dashed border-accent/60 text-accent hover:bg-accent-soft",
+                })}
+                title="누르고 있는 동안 원본과 실시간 비교합니다 (CSP 4.0)"
+              >
+                <Eye className="size-3.5" aria-hidden />
+                <span>{isComparingOriginal ? "원본 표시 중" : "원본 비교 (CSP 4.0)"}</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -12,7 +12,13 @@
  * 사용자 노출 문자열은 한글.
  */
 
-import { shouldDrawWatermark, watermarkPlacement, type WatermarkSettings } from "../studio-watermark";
+import {
+  applyAntiAiNoisePattern,
+  generateWatermarkTilePositions,
+  shouldDrawWatermark,
+  watermarkPlacement,
+  type WatermarkSettings,
+} from "../studio-watermark";
 
 import {
   planStudioEpisodeByteBudget,
@@ -620,19 +626,65 @@ export function drawWatermarkOnSlice(canvas: HTMLCanvasElement, settings: Waterm
   if (!shouldDrawWatermark(settings)) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const placement = watermarkPlacement(canvas.width, canvas.height, settings);
+
+  // 1. Anti-AI Protection Noise Pattern (CSP 3.1/4.0)
+  if (settings.antiAiNoiseEnabled) {
+    try {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      applyAntiAiNoisePattern(
+        imgData.data,
+        canvas.width,
+        canvas.height,
+        settings.antiAiNoiseIntensity ?? 35,
+      );
+      ctx.putImageData(imgData, 0, 0);
+    } catch {
+      // Ignore if canvas is tainted by external resources
+    }
+  }
+
+  // 2. Text Watermark (Single or Repeat Tiling)
   const text = settings.text.trim();
+  if (text.length === 0) return;
+
+  const placement = watermarkPlacement(canvas.width, canvas.height, settings);
   ctx.save();
   ctx.globalAlpha = Math.min(1, Math.max(0, settings.opacity));
+  if (settings.blendMode && settings.blendMode !== "normal") {
+    ctx.globalCompositeOperation = settings.blendMode;
+  }
   ctx.font = `700 ${placement.fontPx}px "Pretendard", system-ui, sans-serif`;
-  ctx.textAlign = placement.textAlign;
-  ctx.textBaseline = placement.textBaseline;
   ctx.lineJoin = "round";
   ctx.lineWidth = Math.max(1.5, placement.fontPx * 0.09);
-  ctx.strokeStyle = "rgba(0,0,0,0.72)";
-  ctx.strokeText(text, placement.x, placement.y);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(text, placement.x, placement.y);
+
+  if (settings.repeatTile) {
+    // Tiled watermark across entire page
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tiles = generateWatermarkTilePositions(
+      canvas.width,
+      canvas.height,
+      settings.tileSpacing ?? 180,
+    );
+    for (const tile of tiles) {
+      ctx.save();
+      ctx.translate(tile.x, tile.y);
+      ctx.rotate((-25 * Math.PI) / 180);
+      ctx.strokeStyle = "rgba(0,0,0,0.45)";
+      ctx.strokeText(text, 0, 0);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+  } else {
+    // Single placement
+    ctx.textAlign = placement.textAlign;
+    ctx.textBaseline = placement.textBaseline;
+    ctx.strokeStyle = "rgba(0,0,0,0.72)";
+    ctx.strokeText(text, placement.x, placement.y);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, placement.x, placement.y);
+  }
   ctx.restore();
 }
 
