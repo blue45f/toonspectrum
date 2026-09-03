@@ -175,11 +175,11 @@ function validLogicalTileId(value: unknown): value is string {
 }
 
 function cloneEntries(entries: ReadonlyMap<string, AtlasEntry>): Map<string, AtlasEntry> {
-  return new Map(
+  return new Map<string, AtlasEntry>(
     [...entries].map(([logicalTileId, entry]) => [
       logicalTileId,
       { ...entry },
-    ]),
+    ] as const),
   );
 }
 
@@ -212,18 +212,18 @@ export class StudioGpuSparseTileAtlas {
         activeFrameId: this.#active.prepared.frameId,
       });
     }
+    const exceedsCapacity = Array.isArray(logicalTileIds)
+      && logicalTileIds.length > this.#options.capacity;
     if (
       !validLogicalTileId(frameId)
       || !Array.isArray(logicalTileIds)
-      || logicalTileIds.length > this.#options.capacity
+      || exceedsCapacity
       || logicalTileIds.some((id) => !validLogicalTileId(id))
       || new Set(logicalTileIds).size !== logicalTileIds.length
     ) {
       return Object.freeze({
         status: "rejected",
-        reason: logicalTileIds?.length > this.#options.capacity
-          ? "capacity"
-          : "invalid-input",
+        reason: exceedsCapacity ? "capacity" : "invalid-input",
       });
     }
 
