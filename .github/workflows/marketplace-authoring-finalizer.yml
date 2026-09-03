@@ -19,7 +19,7 @@ concurrency:
 jobs:
   finalize:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       CI: "true"
       NODE_OPTIONS: --max-old-space-size=8192
@@ -30,6 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p /tmp/marketplace-authoring-evidence
           for status in queued in_progress waiting pending requested; do
             gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${FEATURE_BRANCH}&status=${status}&per_page=100" \
               --jq '.workflow_runs[].id' 2>/dev/null || true
@@ -52,6 +53,7 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git fetch origin "$FEATURE_BRANCH" main
           git reset --hard "origin/$FEATURE_BRANCH"
+          git rev-parse HEAD > /tmp/marketplace-remote-feature-head.txt
           git merge --no-edit origin/main
           git rev-parse HEAD > /tmp/marketplace-verified-base-head.txt
           git rev-parse origin/main > /tmp/marketplace-main-head.txt
@@ -72,7 +74,6 @@ jobs:
           node scripts/marketplace/normalize-package-builder.mjs
           node scripts/marketplace/harden-authoring-payload.mjs
           node scripts/marketplace/integrate-quality-validation.mjs
-          node scripts/marketplace/harden-authoring-integration-idempotency.mjs
           node scripts/marketplace/integrate-creator-authoring.mjs
           node scripts/marketplace/integrate-authoring-detail-action.mjs
           node scripts/marketplace/integrate-brush-recipe-lab.mjs
@@ -80,9 +81,10 @@ jobs:
           node scripts/marketplace/integrate-source-package-builder.mjs
           node scripts/marketplace/integrate-package-recovery.mjs
           node scripts/marketplace/prepare-permanent-authoring-workflow.mjs
+          node scripts/marketplace/harden-authoring-integration-idempotency.mjs
           git diff --check
 
-      - name: Prove all integration scripts are idempotent
+      - name: Prove every product integration is idempotent
         run: |
           set -euo pipefail
           targets=(
@@ -90,7 +92,9 @@ jobs:
             src/domains/market/components/MarketResourceDetailArticle.tsx
             src/domains/market/components/MarketplaceAuthoringWorkshop.tsx
             src/domains/market/components/MarketplaceAuthoringInstallAction.tsx
-            src/domains/creator/StudioBrushStudio.tsx
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx
+            src/domains/creator/brush/StudioBrushStudio.tsx
             lib/creator-marketplace-authoring-workshop.ts
             lib/creator-marketplace-authoring-safety.ts
             lib/creator-marketplace-package-builder.ts
@@ -108,16 +112,18 @@ jobs:
           node scripts/marketplace/integrate-source-package-builder.mjs
           node scripts/marketplace/integrate-package-recovery.mjs
           node scripts/marketplace/prepare-permanent-authoring-workflow.mjs
+          node scripts/marketplace/harden-authoring-integration-idempotency.mjs
           sha256sum "${targets[@]}" > /tmp/marketplace-second.sha
           diff -u /tmp/marketplace-first.sha /tmp/marketplace-second.sha
           node --input-type=module <<'NODE'
           import { readFileSync } from "node:fs";
           const checks = [
             ["src/domains/market/pages/MarketPublishPage.tsx", "<MarketplaceAuthoringWorkshop />"],
-            ["src/domains/creator/StudioBrushStudio.tsx", "<MarketplaceBrushStudioBridge />"],
+            ["src/domains/creator/brush/StudioBrushStudio.tsx", "<MarketplaceBrushStudioBridge snapshot={currentSnapshot} visible={open} />"],
             ["src/domains/market/components/MarketResourceDetailArticle.tsx", "<MarketplaceAuthoringInstallAction record={record} />"],
             ["src/domains/market/components/MarketplaceAuthoringWorkshop.tsx", "<MarketplaceBrushRecipeAccelerator"],
             ["src/domains/market/components/MarketplaceAuthoringWorkshop.tsx", "<MarketplaceAssetQualityMatrix"],
+            ["src/domains/market/components/MarketplaceAuthoringInstallAction.tsx", "extractCreatorMarketplaceManifestFromZip"],
           ];
           for (const [file, token] of checks) {
             const source = readFileSync(file, "utf8");
@@ -136,6 +142,7 @@ jobs:
           lib/creator-marketplace-authoring-workshop.test.ts
           lib/creator-marketplace-package-builder.test.ts
           lib/creator-marketplace-quality-validation.test.ts
+          src/domains/creator/MarketplaceBrushStudioBridge.test.tsx
           src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
           src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
           src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx
@@ -157,7 +164,7 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run existing, authoring, mobile, and in-app browser flows
+      - name: Run desktop, mobile, and in-app marketplace flows
         run: >-
           xvfb-run -a --server-args="-screen 0 1920x1200x24"
           pnpm exec playwright test
@@ -195,6 +202,7 @@ jobs:
               "integration-idempotency",
               "portable-payload-safety",
               "native-engine-program-round-trip",
+              "live-brush-studio-snapshot-bridge",
               "source-package-build-and-recovery",
               "asset-quality-matrix",
               "marketplace-unit-regressions",
@@ -224,6 +232,7 @@ jobs:
           git restore --worktree -- public/data 2>/dev/null || true
           rm -f \
             .github/workflows/marketplace-source-snapshot.yml \
+            .github/workflows/marketplace-authoring-contract-fixer.yml \
             .github/workflows/marketplace-authoring-integrator.yml \
             .github/workflows/marketplace-authoring-browser.yml \
             .github/workflows/marketplace-authoring-detail-integrator.yml \
@@ -231,6 +240,7 @@ jobs:
             .github/workflows/marketplace-brush-recipe-integrator.yml \
             .github/workflows/marketplace-authoring-idempotency.yml \
             .github/workflows/marketplace-authoring-finalizer.yml \
+            scripts/marketplace/fix-authoring-contracts.mjs \
             scripts/marketplace/integrate-creator-authoring.mjs \
             scripts/marketplace/integrate-authoring-detail-action.mjs \
             scripts/marketplace/integrate-brush-recipe-lab.mjs \
@@ -254,7 +264,10 @@ jobs:
             marketplace-package-recovery-integration-report.json \
             marketplace-quality-validation-integration-report.json \
             marketplace-permanent-workflow-report.json \
-            marketplace-authoring-release-gate.json
+            marketplace-authoring-release-gate.json \
+            marketplace-benchmark/.route-marker \
+            marketplace-benchmark/.upload-probe.txt \
+            marketplace-benchmark/.upload-route-readme.md
           git diff --check
 
       - name: Commit and push the certified product
@@ -269,10 +282,10 @@ jobs:
             .filter(Boolean);
           const allowed = [
             /^\.github\/workflows\/marketplace-authoring\.yml$/,
-            /^\.github\/workflows\/marketplace-(?:source-snapshot|authoring-integrator|authoring-browser|authoring-detail-integrator|authoring-release-gate|brush-recipe-integrator|authoring-idempotency|authoring-finalizer)\.yml$/,
+            /^\.github\/workflows\/marketplace-(?:source-snapshot|authoring-contract-fixer|authoring-integrator|authoring-browser|authoring-detail-integrator|authoring-release-gate|brush-recipe-integrator|authoring-idempotency|authoring-finalizer)\.yml$/,
             /^lib\/creator-marketplace-/,
             /^src\/domains\/market\//,
-            /^src\/domains\/creator\/(?:MarketplaceBrush|StudioBrushStudio\.tsx)/,
+            /^src\/domains\/creator\/(?:MarketplaceBrush|brush\/StudioBrushStudio\.tsx)/,
             /^e2e\/marketplace-authoring-/,
             /^marketplace-benchmark\//,
             /^scripts\/marketplace\//,
@@ -282,14 +295,15 @@ jobs:
           if (unexpected.length > 0) {
             throw new Error(`Unexpected generated or unrelated changes: ${unexpected.join(", ")}`);
           }
+          if (changed.length === 0) throw new Error("Finalizer produced no certified product changes");
           NODE
-          git commit -m "feat(market): complete creator marketplace authoring lifecycle"
           remote_before="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
-          expected_remote="$(git rev-parse HEAD^1)"
-          if [[ "$remote_before" != "$expected_remote" && "$remote_before" != "$(cat /tmp/marketplace-verified-base-head.txt)" ]]; then
-            echo "Feature branch advanced after verification: ${remote_before}" >&2
+          expected_remote="$(cat /tmp/marketplace-remote-feature-head.txt)"
+          if [[ "$remote_before" != "$expected_remote" ]]; then
+            echo "Feature branch advanced after verification: expected ${expected_remote}, found ${remote_before}" >&2
             exit 1
           fi
+          git commit -m "feat(market): complete creator marketplace authoring lifecycle"
           git push origin HEAD:"$FEATURE_BRANCH"
 
       - name: Upload final verification evidence
