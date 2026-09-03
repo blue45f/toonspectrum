@@ -25,8 +25,8 @@ import {
   resolveStudioVelloHubProductCapability,
   STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
 } from "../render/studio-vello-hub";
-import {
-  type StudioRenderSurfaceAuthority,
+import type {
+  StudioRenderSurfaceAuthority,
 } from "../render/StudioRenderSurface";
 import { CANVAS_W } from "../studio-assets";
 import { containingPanel } from "../studio-element-geometry";

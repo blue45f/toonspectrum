@@ -31,14 +31,14 @@ test.describe("Creator Marketplace authoring workshop", () => {
     await page.getByTestId("market-authoring-add-engine").click();
 
     const list = page.getByTestId("market-authoring-engine-list");
-    await expect(list.getByText("수채 확산")).toBeVisible();
-    await expect(list.getByText("글로우")).toBeVisible();
+    await expect(list.getByText("수채 확산", { exact: true })).toBeVisible();
+    await expect(list.getByText("글로우", { exact: true })).toBeVisible();
     await expect(list.getByRole("button", { name: "위로 이동" })).toHaveCount(3);
 
     await page.getByRole("tab", { name: /미리보기/u }).click();
     await expect(page.getByTestId("market-authoring-brush-preview")).toBeVisible();
     await page.getByRole("button", { name: /stroke-sheet/u }).click();
-    await expect(page.getByText("stroke-sheet", { exact: true })).toBeVisible();
+    await expect(page.getByText("stroke-sheet", { exact: true })).toHaveCount(2);
 
     await expectNoHorizontalOverflow(page);
   });
@@ -48,13 +48,13 @@ test.describe("Creator Marketplace authoring workshop", () => {
     await openPublish(page);
 
     const workshop = page.getByTestId("marketplace-authoring-workshop");
-    await expect(workshop.getByRole("button", { name: "브러시" })).toBeVisible();
+    await expect(workshop.getByRole("button", { name: "브러시", exact: true })).toBeVisible();
     for (const name of ["제작 원본", "엔진·구성", "미리보기", "번들", "호환성", "권리", "검수·배포"]) {
       const tab = workshop.getByRole("tab", { name: new RegExp(name, "u") });
       await tab.scrollIntoViewIfNeeded();
       await expect(tab).toBeVisible();
     }
-    await workshop.getByRole("button", { name: "3D 에셋" }).click();
+    await workshop.getByRole("button", { name: "3D 에셋", exact: true }).click();
     await workshop.getByRole("tab", { name: /엔진·구성/u }).click();
     await expect(workshop.getByLabel("polygonCount")).toBeVisible();
     await expect(workshop.getByLabel("lodCount")).toBeVisible();
@@ -64,6 +64,12 @@ test.describe("Creator Marketplace authoring workshop", () => {
   test("Brush Studio handoff restores exact native engine programs", async ({ page }) => {
     await page.addInitScript(({ key }) => {
       const now = new Date().toISOString();
+      const dryProgram = { id: "dry", kind: "dry-media", grain: { scale: 0.7 } };
+      const waterProgram = {
+        id: "water",
+        kind: "watercolor-diffusion",
+        wetMix: { water: 0.5 },
+      };
       sessionStorage.setItem(key, JSON.stringify({
         schemaVersion: 2,
         id: "draft_e2e",
@@ -80,18 +86,25 @@ test.describe("Creator Marketplace authoring workshop", () => {
           name: "Native program handoff",
           studioSnapshot: {
             name: "Native program handoff",
-            enginePrograms: [
-              { id: "dry", kind: "dry-media", grain: { scale: 0.7 } },
-              { id: "water", kind: "watercolor-diffusion", wetMix: { water: 0.5 } },
-            ],
+            enginePrograms: [dryProgram, waterProgram],
           },
         },
         brush: {
-          engineNodes: [],
-          originalEnginePrograms: [
-            { id: "dry", kind: "dry-media", grain: { scale: 0.7 } },
-            { id: "water", kind: "watercolor-diffusion", wetMix: { water: 0.5 } },
+          engineNodes: [
+            {
+              id: "studio_program_0",
+              name: "Studio engine 1",
+              engine: "dry-media",
+              sourceProgram: dryProgram,
+            },
+            {
+              id: "studio_program_1",
+              name: "Studio engine 2",
+              engine: "watercolor-diffusion",
+              sourceProgram: waterProgram,
+            },
           ],
+          originalEnginePrograms: [dryProgram, waterProgram],
           deterministicSeed: 42,
           presetFamily: "hybrid",
           intendedUse: ["inking"],
@@ -136,6 +149,7 @@ test.describe("Creator Marketplace authoring workshop", () => {
     await openPublish(page);
     await expect(page.getByTestId("market-authoring-title")).toHaveValue("Native program handoff");
     await page.getByRole("tab", { name: /엔진·구성/u }).click();
-    await expect(page.getByText("Studio 원본 보존")).toHaveCount(2);
+    const list = page.getByTestId("market-authoring-engine-list");
+    await expect(list.getByText("Studio 원본 보존", { exact: true })).toHaveCount(2);
   });
 });

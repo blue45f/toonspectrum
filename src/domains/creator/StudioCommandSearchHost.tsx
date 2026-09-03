@@ -14,7 +14,10 @@ import { Search } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { subscribeStudioCommandSearchRequests } from "./studio-help-center-channel";
+import {
+  subscribeStudioCommandSearchRequests,
+  type StudioCommandSearchScope,
+} from "./studio-help-center-channel";
 
 import type {
   StudioCommandSearchCloseReason,
@@ -30,7 +33,7 @@ const StudioCommandSearchDialog = lazy(() =>
 
 export type StudioCommandSearchHostProps = Omit<
   StudioCommandSearchDialogProps,
-  "open" | "onClose"
+  "open" | "onClose" | "initialScope"
 > & {
   /** 트리거 버튼을 숨기고 F1 만 남긴다(모바일 등). */
   hideTrigger?: boolean;
@@ -64,6 +67,9 @@ export function StudioCommandSearchHost({
   ...dialogProps
 }: StudioCommandSearchHostProps) {
   const [open, setOpen] = useState(false);
+  // 어느 진입점이 열었는지에 따라 첫 범위가 다르다 — 인스펙터의 찾기는 '현재 패널',
+  // F1·메뉴·모바일 도크는 '전체'. 다이얼로그 안에서는 언제든 칩으로 바꿀 수 있다.
+  const [scope, setScope] = useState<StudioCommandSearchScope>("all");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const close = useCallback((reason: StudioCommandSearchCloseReason = "dismiss") => {
@@ -81,7 +87,7 @@ export function StudioCommandSearchHost({
       restore();
     }
   }, []);
-  const openSearch = useCallback(() => {
+  const openSearch = useCallback((nextScope: StudioCommandSearchScope = "all") => {
     if (!open && typeof document !== "undefined") {
       const activeElement = document.activeElement;
       restoreFocusRef.current =
@@ -90,6 +96,7 @@ export function StudioCommandSearchHost({
           : triggerRef.current;
     }
     onRequestOpen?.();
+    setScope(nextScope);
     setOpen(true);
   }, [onRequestOpen, open]);
 
@@ -106,10 +113,11 @@ export function StudioCommandSearchHost({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close, open, openSearch]);
 
-  // 메뉴 › 도움말 › 명령·속성 통합 검색. 메뉴 항목은 순수 데이터라 이 상태를 직접
-  // 만질 수 없으므로 채널로 요청만 받는다(§15.3 Help ▸ Command Search).
+  // 메뉴 › 도움말 › 기능·설정 찾기, 인스펙터 찾기, 모바일 도크 찾기. 그 진입점들은 순수
+  // 데이터거나 다른 트리에 있어 이 상태를 직접 만질 수 없으므로 채널로 요청만 받는다
+  // (§15.3 Help ▸ Command Search). 요청이 범위를 실어 보내면 그 범위로 연다.
   useEffect(
-    () => subscribeStudioCommandSearchRequests(openSearch),
+    () => subscribeStudioCommandSearchRequests((request) => openSearch(request.scope ?? "all")),
     [openSearch],
   );
 
@@ -124,9 +132,10 @@ export function StudioCommandSearchHost({
             <button
               ref={triggerRef}
               type="button"
-              onClick={openSearch}
+              onClick={() => openSearch("all")}
               data-testid="studio-command-search-trigger"
-              title="명령·속성 통합 검색 (F1)"
+              data-inspector-priority="chrome"
+              title="기능·설정 찾기 (F1)"
               className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-9"
             >
               <Search
@@ -136,9 +145,9 @@ export function StudioCommandSearchHost({
                 className={studioChromeIconClass({ tone: "default" })}
               />
               <span className="min-w-0 flex-1 truncate">
-                기능 검색 · CSP·Photoshop 용어
+                기능·설정 찾기 · CSP·Photoshop 용어
               </span>
-              <kbd className="shrink-0 rounded border border-line bg-card px-1.5 py-px text-[0.62rem]">
+              <kbd className="shrink-0 rounded border border-line bg-card px-1.5 py-px text-[0.6875rem]">
                 F1
               </kbd>
             </button>
@@ -148,7 +157,12 @@ export function StudioCommandSearchHost({
       )}
       {open ? (
         <Suspense fallback={null}>
-          <StudioCommandSearchDialog {...dialogProps} open onClose={close} />
+          <StudioCommandSearchDialog
+            {...dialogProps}
+            open
+            initialScope={scope}
+            onClose={close}
+          />
         </Suspense>
       ) : null}
     </>

@@ -286,11 +286,14 @@ describe("StudioBrushStudio", () => {
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
     await waitFor(() => {
-      const status = screen.getByRole("status");
-      expect(status.getAttribute("data-studio-brush-default-restore-status")).toBe(
+      const status = document.querySelector<HTMLElement>(
+        "[data-studio-brush-default-restore-status]",
+      );
+      expect(status).not.toBeNull();
+      expect(status?.getAttribute("data-studio-brush-default-restore-status")).toBe(
         "unchanged",
       );
-      expect(status.textContent).toContain("이미 이 브러시의 기본값입니다.");
+      expect(status?.textContent).toContain("이미 이 브러시의 기본값입니다.");
     });
     expect(onRestoreDefaults).not.toHaveBeenCalled();
   });

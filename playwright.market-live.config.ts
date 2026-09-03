@@ -6,7 +6,7 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "market-live.spec.ts",
+  testMatch: ["auth-account-matrix.spec.ts", "market-live.spec.ts"],
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,

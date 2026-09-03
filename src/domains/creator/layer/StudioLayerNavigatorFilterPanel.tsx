@@ -1,5 +1,5 @@
 import { Layers3, X } from "lucide-react";
-import { type RefObject } from "react";
+
 
 import {
   STUDIO_LAYER_COLORS,
@@ -18,6 +18,8 @@ import {
   STUDIO_LAYER_NAVIGATOR_FOCUS_RING as focusRing,
   STUDIO_LAYER_NAVIGATOR_KIND_ICONS as KIND_ICONS,
 } from "./studio-layer-navigator-row-ui";
+
+import type { RefObject } from "react";
 
 import { cn } from "@/lib/utils";
 

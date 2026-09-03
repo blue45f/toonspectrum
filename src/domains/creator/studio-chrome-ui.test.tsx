@@ -124,7 +124,11 @@ describe("studio chrome UI", () => {
         <span>스튜디오</span>
       </StudioAppMenubar>
     );
+    expect(html).toContain('data-testid="studio-menubar"');
+    expect(html).toContain('data-testid="studio-menubar-scroll"');
     expect(html).toContain('data-studio-app-menubar="true"');
+    expect(html).toContain("max-md:overflow-visible");
+    expect(html).toContain("md:overflow-hidden");
     expect(html).toContain("h-11");
     expect(html).toContain("스튜디오");
   });
@@ -295,6 +299,20 @@ describe("studio chrome UI", () => {
     expect(html).toContain("overflow-x-auto");
     expect(html).not.toContain("flex-wrap");
     expect(html).toContain("100%");
+  });
+
+  it("tells launchers apart from direct tools on the rail (감사 §4.3)", () => {
+    const html = renderToStaticMarkup(
+      <StudioVerticalToolRail>
+        <StudioRailToolButton icon={Pencil} label="펜 (B)" />
+        <StudioRailToolButton icon={Pencil} label="3D 캐릭터" launcher />
+      </StudioVerticalToolRail>
+    );
+    expect(html.match(/data-studio-rail-launcher="true"/g)).toHaveLength(1);
+    expect(html.match(/aria-haspopup="dialog"/g)).toHaveLength(1);
+    // The direct tool keeps the pill radius; the launcher squares off with a dashed edge.
+    expect(html).toContain("rounded-2xl");
+    expect(html).toContain("border-dashed");
   });
 
   it("lets the canvas owner offset the status bar above a measured drawing dock", () => {

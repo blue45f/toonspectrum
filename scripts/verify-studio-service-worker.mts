@@ -246,11 +246,6 @@ async function main(): Promise<void> {
       (entries.precache ?? 0) >= 10,
       `precache entries=${entries.precache ?? 0}, buildId=${String(state?.buildId)}`,
     );
-    check(
-      "runtime immutable bucket populated",
-      (entries.immutable ?? 0) > 0,
-      `immutable entries=${entries.immutable ?? 0}`,
-    );
 
     // ---- 4. Warm load -----------------------------------------------------
     await page.reload({ waitUntil: "load", timeout: 120_000 });
@@ -273,6 +268,14 @@ async function main(): Promise<void> {
     const warmState = await inspectWorker(page);
     report.workerStateAfterWarm = warmState;
     const warmEntries = (warmState?.entries ?? {}) as Record<string, number>;
+    // Runtime caches are intentionally demand-filled, so the cold controlled
+    // load may still report zero entries. The first warm navigation is the
+    // earliest deterministic point where immutable assets must be present.
+    check(
+      "runtime immutable bucket populated",
+      (warmEntries.immutable ?? 0) > 0,
+      `immutable entries=${warmEntries.immutable ?? 0}`,
+    );
     check(
       "studio navigation triggers the deferred i18n warm-up",
       warmState?.warmUpStarted === true && (warmEntries.data ?? 0) > 0,

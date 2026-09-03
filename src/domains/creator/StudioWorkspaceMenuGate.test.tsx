@@ -32,6 +32,7 @@ describe("StudioWorkspaceMenuGate", () => {
     const html = renderGate();
 
     expect(html).toContain('data-testid="studio-workspace-menu-gate"');
+    expect(html).toContain('data-testid="studio-workspace-toggle"');
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("작업공간: 스토리보드, 이 기기 저장 확인됨");

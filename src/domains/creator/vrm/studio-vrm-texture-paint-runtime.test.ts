@@ -328,7 +328,7 @@ describe("Studio VRM texture-paint runtime", () => {
     expect(stampStudioVrmTexturePaintMaterialLocator(material, 2)).toBeNull();
   });
 
-  it("leaves texture bytes, dirty uploads, revision, and Undo untouched for blocked product brushes", async () => {
+  it("leaves texture bytes, dirty uploads, revision, and Undo untouched for the legacy brush", async () => {
     const source = new THREE.Texture();
     source.flipY = false;
     const sourcePixels = rgba(8, 8, [17, 23, 31, 255]);
@@ -349,12 +349,11 @@ describe("Studio VRM texture-paint runtime", () => {
     const exportedBefore = unwrap(runtime.exportPaintedTargets());
 
     const attemptProductBrush = async (tool: "surface-brush" | "brush") => {
-      if (tool === "surface-brush" || tool === "brush") return;
+      if (tool === "brush") return;
       unwrap(await runtime.beginStroke({ pointerId: 91, hit: hit(mesh), style: INK }));
       unwrap(runtime.commitStroke(91));
     };
 
-    await attemptProductBrush("surface-brush");
     await attemptProductBrush("brush");
 
     expect(beginStroke).not.toHaveBeenCalled();

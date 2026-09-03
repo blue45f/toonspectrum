@@ -8,6 +8,11 @@ import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 export const STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY =
   "toonspectrum:studio:inspector-layout:v1";
 
+/**
+ * Every route the right panel can hold. `publish` stays a valid route (deep links,
+ * the 게시 workspace and the publish CTA all open it) but it is no longer a tab —
+ * see `STUDIO_INSPECTOR_PRIMARY_TABS`.
+ */
 export const STUDIO_INSPECTOR_PRIMARY_SECTIONS = [
   "properties",
   "layers",
@@ -15,12 +20,29 @@ export const STUDIO_INSPECTOR_PRIMARY_SECTIONS = [
   "publish",
 ] as const;
 
+/**
+ * The three tabs the navigator draws: 대상 · 레이어 · 문서 (UX 감사 2026-09-02 §5.3).
+ * 작품 정보 used to be a fourth, permanently visible tab although it is touched once
+ * per episode; it now opens as a "게시 준비" mode from the publish CTA, the 파일 menu
+ * and search, and the navigator shows a way back instead of a fourth tab.
+ */
+export const STUDIO_INSPECTOR_PRIMARY_TABS = [
+  "properties",
+  "layers",
+  "document",
+] as const;
+
+/**
+ * Canonical image sub-tab order — also the order the navigator draws them in.
+ * The model and the UI used to keep two different orders (audit P1 defect); the
+ * navigator now derives its strip from this constant.
+ */
 export const STUDIO_IMAGE_INSPECTOR_SECTIONS = [
   "quick",
   "fill",
+  "transform",
   "retouch",
   "mask",
-  "transform",
 ] as const;
 
 export const STUDIO_DOCUMENT_INSPECTOR_SECTIONS = [
@@ -31,6 +53,8 @@ export const STUDIO_DOCUMENT_INSPECTOR_SECTIONS = [
 
 export type StudioInspectorPrimarySection =
   (typeof STUDIO_INSPECTOR_PRIMARY_SECTIONS)[number];
+export type StudioInspectorPrimaryTab =
+  (typeof STUDIO_INSPECTOR_PRIMARY_TABS)[number];
 export type StudioImageInspectorSection =
   (typeof STUDIO_IMAGE_INSPECTOR_SECTIONS)[number];
 export type StudioDocumentInspectorSection =
@@ -182,7 +206,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["canvas", "배경", "높이", "gutter", "그리드", "가이드"],
     route: { primary: "document", document: "canvas" },
     kind: "panel",
-    path: "페이지 › 캔버스",
+    path: "문서 › 캔버스",
   },
   {
     id: "grade",
@@ -191,7 +215,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["grade", "color", "밝기", "대비", "채도", "무드", "비네트"],
     route: { primary: "document", document: "grade" },
     kind: "panel",
-    path: "페이지 › 색보정",
+    path: "문서 › 색보정",
   },
   {
     id: "navigator",
@@ -200,7 +224,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["navigator", "minimap", "미니맵", "이동", "스크롤"],
     route: { primary: "document", document: "navigator" },
     kind: "panel",
-    path: "페이지 › 미니맵",
+    path: "문서 › 미니맵",
   },
   {
     id: "publish",
@@ -209,7 +233,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["publish", "게시", "작품", "제목", "설명", "태그", "업로드"],
     route: { primary: "publish" },
     kind: "panel",
-    path: "작품 정보",
+    path: "게시 준비 › 작품 정보",
   },
   {
     id: "canvas-resize",
@@ -218,7 +242,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["canvas", "resize", "height", "캔버스", "높이", "크기", "여백"],
     route: { primary: "document", document: "canvas" },
     kind: "property",
-    path: "페이지 › 캔버스 › 크기",
+    path: "문서 › 캔버스 › 크기",
     focusTarget: "canvas.resize",
   },
   {
@@ -228,7 +252,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["guide", "snap", "grid", "가이드", "스냅", "그리드", "맞춤"],
     route: { primary: "document", document: "canvas" },
     kind: "property",
-    path: "페이지 › 캔버스 › 가이드",
+    path: "문서 › 캔버스 › 가이드",
     focusTarget: "canvas.guide-lines",
   },
   {
@@ -238,7 +262,7 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["paper", "style", "background", "용지", "종이", "질감", "배경", "테마"],
     route: { primary: "document", document: "canvas" },
     kind: "property",
-    path: "페이지 › 캔버스 › 스타일",
+    path: "문서 › 캔버스 › 스타일",
     focusTarget: "canvas.style",
   },
 ];
@@ -251,7 +275,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["image", "quick", "레이어 복원", "분리", "배경 제거", "ai", "채색", "팔레트", "보정"],
     route: { primary: "properties", image: "quick" },
     kind: "tool",
-    path: "속성 › 이미지 › 빠른 수정",
+    path: "대상 › 이미지 › 빠른 수정",
   },
   {
     id: "image-fill",
@@ -260,7 +284,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["fill", "bucket", "paint", "채우기", "선화", "틈 닫기", "참조"],
     route: { primary: "properties", image: "fill" },
     kind: "tool",
-    path: "속성 › 이미지 › 채우기·선화",
+    path: "대상 › 이미지 › 채우기·선화",
   },
   {
     id: "image-transform",
@@ -269,7 +293,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["transform", "crop", "warp", "크롭", "자르기", "퍼펫", "변형"],
     route: { primary: "properties", image: "transform" },
     kind: "tool",
-    path: "속성 › 이미지 › 변형",
+    path: "대상 › 이미지 › 변형",
   },
   {
     id: "image-retouch",
@@ -278,7 +302,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["retouch", "selection", "wand", "smudge", "heal", "clone", "선택", "마술봉", "복원"],
     route: { primary: "properties", image: "retouch" },
     kind: "tool",
-    path: "속성 › 이미지 › 선택·리터치",
+    path: "대상 › 이미지 › 선택·리터치",
   },
   {
     id: "image-mask",
@@ -287,7 +311,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     keywords: ["mask", "마스크", "비파괴", "반전", "페인팅"],
     route: { primary: "properties", image: "mask" },
     kind: "tool",
-    path: "속성 › 이미지 › 마스크",
+    path: "대상 › 이미지 › 마스크",
   },
 ];
 
@@ -305,7 +329,7 @@ export function studioInspectorActions(
       keywords: ["properties", "inspector", "속성", "선택", "배치", "스타일"],
       route: { primary: "properties" },
       kind: "property",
-      path: "속성 › 선택 요소",
+      path: "대상 › 선택 요소",
     });
 
     if (context.selectedType === "text") {
@@ -316,7 +340,7 @@ export function studioInspectorActions(
         keywords: ["text fill", "font color", "글자색", "채우기", "그라디언트", "패턴"],
         route: { primary: "properties" },
         kind: "property",
-        path: "속성 › 글자 › 채우기",
+        path: "대상 › 글자 › 채우기",
         focusTarget: "element.text-fill",
       });
     }
@@ -325,22 +349,22 @@ export function studioInspectorActions(
       contextual.push(
         {
           id: "typography",
-          label: "타이포그래피",
-          description: "글꼴, 크기, 자간과 행간을 조절합니다.",
-          keywords: ["typography", "font", "letter spacing", "line height", "글꼴", "폰트", "크기", "자간", "행간"],
+          label: "글꼴",
+          description: "글꼴, 크기, 굵기와 기울임을 고릅니다. 외곽선·그림자는 외형, 곡선 텍스트는 고급 조판에 있습니다.",
+          keywords: ["typography", "font", "타이포그래피", "글꼴", "폰트", "크기", "굵게", "기울임"],
           route: { primary: "properties" },
           kind: "property",
-          path: "속성 › 글자 › 타이포그래피",
+          path: "대상 › 글자 › 글꼴",
           focusTarget: "element.typography",
         },
         {
           id: "text-align",
-          label: "글자 정렬과 세로 쓰기",
-          description: "가로 정렬, 세로 쓰기와 말풍선 맞춤을 설정합니다.",
-          keywords: ["align", "vertical", "정렬", "왼쪽", "가운데", "오른쪽", "세로 쓰기"],
+          label: "문단 · 정렬과 자간·행간",
+          description: "가로 정렬, 세로 쓰기, 자간·행간과 말풍선 맞춤을 설정합니다.",
+          keywords: ["align", "vertical", "letter spacing", "line height", "정렬", "왼쪽", "가운데", "오른쪽", "세로 쓰기", "자간", "행간", "문단"],
           route: { primary: "properties" },
           kind: "property",
-          path: "속성 › 글자 › 정렬",
+          path: "대상 › 글자 › 문단",
           focusTarget: "element.text-align",
         },
       );
@@ -353,7 +377,7 @@ export function studioInspectorActions(
       keywords: ["layout", "position", "size", "rotation", "x", "y", "width", "height", "위치", "크기", "회전", "배치"],
       route: { primary: "properties" },
       kind: "property",
-      path: "속성 › 선택 요소 › 배치",
+      path: "대상 › 선택 요소 › 배치",
       focusTarget: "selection.geometry",
     });
 
@@ -365,7 +389,7 @@ export function studioInspectorActions(
         keywords: ["order", "align", "arrange", "정렬", "순서", "앞으로", "뒤로", "복제"],
         route: { primary: "properties" },
         kind: "property",
-        path: "속성 › 선택 요소 › 정렬·순서",
+        path: "대상 › 선택 요소 › 정렬·순서",
         focusTarget: "element.order-align",
       });
     }
@@ -377,7 +401,7 @@ export function studioInspectorActions(
       keywords: ["draw", "brush", "pen", "그리기", "브러시", "지우개", "필압", "대칭"],
       route: { primary: "properties" },
       kind: "tool",
-      path: "속성 › 그리기 도구",
+      path: "대상 › 그리기 도구",
     });
     if (context.drawingToolPropertiesAvailable !== false) {
       contextual.push(
@@ -388,7 +412,7 @@ export function studioInspectorActions(
           keywords: ["brush studio", "tip", "spacing", "pressure", "브러시", "간격", "필압", "질감"],
           route: { primary: "properties" },
           kind: "property",
-          path: "속성 › 그리기 › 브러시 스튜디오",
+          path: "대상 › 그리기 › 브러시 스튜디오",
           focusTarget: "tool.brush-studio",
         },
         {
@@ -398,7 +422,7 @@ export function studioInspectorActions(
           keywords: ["brush engine", "natural media", "브러시 엔진", "자연매체", "유화", "수채"],
           route: { primary: "properties" },
           kind: "property",
-          path: "속성 › 그리기 › 브러시 엔진",
+          path: "대상 › 그리기 › 브러시 엔진",
           focusTarget: "tool.brush-engines",
         },
       );

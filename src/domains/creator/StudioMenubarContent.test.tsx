@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER } from "./studio-main-menu-presentation";
+import { STUDIO_MAIN_MENU_PRESENTATION_ORDER } from "./studio-main-menu-presentation";
 import {
   StudioMenubarContent,
   resolveStudioMenubarLaneOverflow,
@@ -54,18 +54,11 @@ const MENU_GROUP_IDS = [
   "vector", "text", "comic", "animation", "3d", "collaboration", "window", "ai", "help",
 ] as const;
 
-const PRESENTED_MENU_GROUP_IDS = [
-  ...STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER,
-  "text",
-  "canvas",
-  "transform",
-  "vector",
-  "animation",
-  "filter",
-  "3d",
-  "collaboration",
-  "ai",
-] as const;
+/**
+ * The twelve presented titles (UX 감사 2026-09-02 §3.4): thin specialist groups fold into
+ * 삽입 / 도구 and Help is pinned last. The catalogue itself still ships all 17 (+AI).
+ */
+const PRESENTED_MENU_GROUP_IDS = [...STUDIO_MAIN_MENU_PRESENTATION_ORDER] as const;
 
 function createMenuGroups(): StudioMenubarContentProps["studioMainMenuGroups"] {
   return MENU_GROUP_IDS.map((id) => ({ id, label: id.toUpperCase(), items: [] }));
@@ -175,7 +168,7 @@ describe("resolveStudioMenubarLaneOverflow", () => {
 });
 
 describe("StudioMenubarContent menu presentation", () => {
-  it("puts the familiar comic-production menus before every specialist extension", () => {
+  it("presents the twelve-title menubar with composite 삽입/도구 and Help last", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
@@ -516,19 +509,28 @@ describe("StudioMenubarContent", () => {
   });
 
   it("keeps every windowed action touchable while exposing the primary lane at 320px", () => {
-    render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
+    const stableHandlers = { ...createHandlers(), togglePageSequence: vi.fn() };
+    render(<StudioMenubarContent {...createProps({ isMobile: true, stableHandlers })} />);
 
+    // 모바일 폭(≤429px) 전체에서 아이콘 전용 44px 로 접힌다 — 359px 경계로는 360~430px 창모드에서
+    // 액션 클러스터가 레인을 넘쳐 게시 버튼이 잘렸다(`verify:studio-mobile-top`).
     for (const name of ["전체 화면 드로잉", "초안 저장", "게시하기"] as const) {
       const action = screen.getByRole("button", { name });
-      expect(action.className).toContain("max-[359px]:size-11");
+      expect(action.className).toContain("max-[429px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
         span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
       );
-      expect(label?.className).toContain("max-[359px]:sr-only");
+      expect(label?.className).toContain("max-[429px]:sr-only");
     }
 
     expect(screen.getByRole("button", { name: "프로젝트 작업" }).className)
       .toContain("min-w-11");
+    // 페이지·다운로드는 하단 도크의 드로잉 행이 소유한다 — 메뉴바 사본은 모바일에서 숨긴다.
+    for (const name of [/페이지 목록/u, /현재 페이지$/u]) {
+      const duplicate = screen.getByRole("button", { name, hidden: true });
+      expect(duplicate.className).toContain("hidden");
+    }
+    expect(screen.getByRole("button", { name: "내보내기 옵션" }).className).toContain("min-w-11");
   });
 
   it("switches the mobile immersive coach from entering to exiting", () => {
@@ -627,10 +629,11 @@ describe("StudioMenubarContent", () => {
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
     const { triggers } = stubMenubarGeometry(container);
-    expect(triggers).toHaveLength(MENU_GROUP_IDS.length);
+    // 18개 카탈로그 그룹이 12개 타이틀로 표시된다(삽입·도구 복합 메뉴).
+    expect(triggers).toHaveLength(PRESENTED_MENU_GROUP_IDS.length);
     fireEvent.scroll(container.querySelector('[data-studio-menubar-primary="true"]')!);
 
-    // 600px 레인 안에 온전히 들어오는 건 앞 6개뿐 — 나머지 12개가 잘린다.
+    // 600px 레인 안에 온전히 들어오는 건 앞 6개뿐 — 나머지 6개가 잘린다.
     const clipped = PRESENTED_MENU_GROUP_IDS.slice(6);
     const overflowTrigger = await screen.findByRole("button", {
       name: `가려진 메뉴 ${clipped.length}개`,
@@ -690,8 +693,8 @@ describe("StudioMenubarContent", () => {
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
     // 600px 레인의 오른쪽 경계(600)를 걸치는 트리거를 만든다.
-    const { triggers } = stubMenubarGeometry(container, { triggerPitch: 40, triggerWidth: 90 });
-    const straddling = triggers[14]!; // left 560, right 650 → 오른쪽 경계에 걸친다
+    const { triggers } = stubMenubarGeometry(container, { triggerPitch: 50, triggerWidth: 90 });
+    const straddling = triggers[11]!; // left 550, right 640 → 오른쪽 경계에 걸친다
     fireEvent.focusIn(straddling);
     expect(straddling.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",

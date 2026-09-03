@@ -1,0 +1,465 @@
+{
+  "generatedAt": "2026-09-03T08:29:11.284603+00:00",
+  "baseMainSha": "f8e54c42afc3e4e595c1864444dfa2e48848cf42",
+  "workflowTree": "byte-identical to base main; alternate versions remain in merge-parent history",
+  "branches": [
+    {
+      "branch": "claude/main-core-red-repair",
+      "sha": "cd2e9cf3933ee2b0d3945360e768240537c20539",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/contracts/studio-work-asset-contract.ts",
+        "src/domains/creator/layer/StudioLayerBorderEffectPanel.test.tsx",
+        "src/domains/creator/studio-main-menu-group-spec.test.ts",
+        "src/domains/creator/studio-main-menu-group-spec.ts"
+      ],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "fix/studio-service-worker-warm-cache-check-20260903",
+      "sha": "cdc83a6e6ea7f27c86c8dab79b72271d43d0fe04",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "codex/studio-platform-preflight-safe-slicing",
+      "sha": "df17f4e4b97044116511e9db2711850882a80b6f",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "codex/studio-multilingual-emotion-bubbles",
+      "sha": "7b018b1cf04dfc43368b754fb49c4b4873206ead",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "claude/chatgpt-share-analysis-75d1d0",
+      "sha": "82f322cd2902ae5c383ef054205990e61ca8f316",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/StudioInspectorTypographySection.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "branch": "claude/filter-ui-ux-enhancement-0ec697",
+      "sha": "ab479142b2b01d2be6e9a8e74ea61920243e7150",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/StudioMainMenu.tsx",
+        "src/domains/creator/filter/StudioFilterDialog.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "branch": "claude/line-drawing-realtime-transform-c944b5",
+      "sha": "7b16d92953d6060afd1cbaec445c6b903ea8c182",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "feat/shaper-character-workshop-20260903",
+      "sha": "c8fcc6baa923f10d908b86c58275a9fab3b41d57",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/bootstrap-shaper-character-workshop.yml"
+      ]
+    },
+    {
+      "branch": "feat/shaper-surface-paint-20260903",
+      "sha": "adc5024a2762dedf5a2219c9bab40b274c9eb6f9",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "fix/marketplace-wire-authoring-surfaces-20260903",
+      "sha": "029204d27b171268828d2fc911d9ca3e4b52c0c4",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/marketplace-wire-authoring-surfaces-latest-main.yml",
+        ".github/workflows/marketplace-wire-authoring-surfaces-once.yml",
+        ".github/workflows/marketplace-wire-authoring-surfaces-repair.yml"
+      ]
+    },
+    {
+      "branch": "fix/marketplace-brush-publish-hardening-main-20260903",
+      "sha": "7ad88ff0e628972b6945a098c925d2b5b867e283",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/marketplace-brush-publish-hardening.yml",
+        ".github/workflows/marketplace-postmerge-browser-audit.yml"
+      ]
+    },
+    {
+      "branch": "fix/marketplace-brush-publish-storage-20260903",
+      "sha": "6fbf2c1f2fa6f8815df8aa327b689688b590053a",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx",
+        "src/domains/creator/MarketplaceBrushPublishShortcut.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "fix/marketplace-postmerge-browser-regressions-20260903",
+      "sha": "8d17da8aa8506584452721598603008ff6689c30",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        ".github/workflows/marketplace-authoring-finalizer.yml",
+        ".github/workflows/marketplace-source-snapshot.yml",
+        "e2e/marketplace-authoring-inapp.spec.ts",
+        "e2e/marketplace-authoring-workshop.spec.ts",
+        "scripts/marketplace/fix-authoring-contracts.mjs",
+        "scripts/marketplace/integrate-source-package-builder.mjs",
+        "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx",
+        "src/domains/creator/MarketplaceBrushPublishShortcut.tsx",
+        "src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx",
+        "src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx",
+        "src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/marketplace-brush-publish-hardening.yml",
+        ".github/workflows/marketplace-postmerge-autofix.yml",
+        ".github/workflows/marketplace-postmerge-browser-audit.yml"
+      ]
+    },
+    {
+      "branch": "brushfix/soak-harness",
+      "sha": "ee866cfd144ca112f6f1b5270af273602d868015",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "codex/studio-autonomous-upgrade-foundation",
+      "sha": "125ab665908465b45c6bb54d3d52ecb45d6807ce",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/studio-autonomous-risk-gate.yml",
+        ".github/workflows/studio-benchmark-gap-triage.yml",
+        ".github/workflows/studio-campaign-gate-dispatcher.yml",
+        ".github/workflows/studio-campaign-release-gate.yml",
+        ".github/workflows/studio-ci-supersession.yml",
+        ".github/workflows/studio-competitor-watch.yml",
+        ".github/workflows/studio-merged-branch-cleanup.yml",
+        ".github/workflows/studio-safe-automerge.yml",
+        ".github/workflows/studio-seven-day-campaign.yml",
+        ".github/workflows/studio-seven-day-hourly-trigger.yml",
+        ".github/workflows/studio-seven-day-immediate-continuation.yml"
+      ]
+    },
+    {
+      "branch": "codex/studio-vivid-watercolor-edge",
+      "sha": "02d608b18fc082ea1e786fde4f411ec5f5fa186a",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "qa/extended-matrix-20260902",
+      "sha": "0b9834a3da138a5ff28ead5a266eaf21f5326421",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-auth-lifecycle.yml",
+        ".github/workflows/qa-extended-matrix.yml",
+        ".github/workflows/qa-isolated-auth-market-matrix.yml",
+        ".github/workflows/qa-live-invalid-studio-route-probe.yml"
+      ]
+    },
+    {
+      "branch": "qa/extended-matrix-artifact-triage-20260902",
+      "sha": "7e75a830d61b822dab4e3bdd40484565f7f9d9b0",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-extended-matrix-artifact-triage.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-authenticated-browser-20260902",
+      "sha": "1ee6c3aa310d3bcc7860063f011a7920bb4a4964",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-studio-authenticated-browser.yml",
+        ".github/workflows/studio-soak-10h.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-browser-fault-injection-20260902",
+      "sha": "c3c3bdaee0f754a5f87d1b08fb7c0d293bdea852",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-studio-browser-fault-injection.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-chromium-inapp-20260902",
+      "sha": "cafa03a64b61e12376b9b7062476acbc5e1594ea",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        "src/domains/creator/StudioMenubarContent.test.tsx",
+        "src/domains/creator/StudioMenubarContent.tsx"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-apply-patch.yml",
+        ".github/workflows/qa-source-snapshot.yml",
+        ".github/workflows/qa-studio-chromium-inapp.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-cross-browser-matrix-20260902",
+      "sha": "1f01ab32cfee841e53c48e35a612c176b3257199",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-studio-10-runner-hour-soak-exact.yml",
+        ".github/workflows/qa-studio-10-runner-hour-soak.yml",
+        ".github/workflows/qa-studio-bg3d-inapp-targeted.yml",
+        ".github/workflows/qa-studio-cross-browser-matrix.yml",
+        ".github/workflows/qa-studio-live-cross-browser-triage.yml",
+        ".github/workflows/qa-studio-live-inapp-audit.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-inapp-full-audit-20260902",
+      "sha": "a20e504860231005b7c4ad7ff807ff0a0c2cc9ed",
+      "mode": "active-merge",
+      "status": "active-clean",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-studio-community-deeplink-targeted.yml"
+      ]
+    },
+    {
+      "branch": "qa/studio-soak-10h-20260902",
+      "sha": "4635522f3b047ea750692ff2c812c38ed95350c6",
+      "mode": "active-merge",
+      "status": "active-nonconflicting-current-tree-conflicts",
+      "conflictsResolvedToCurrentTree": [
+        ".github/workflows/qa-studio-authenticated-browser.yml"
+      ],
+      "workflowChangesPreservedInHistoryOnly": [
+        ".github/workflows/qa-studio-authenticated-browser.yml",
+        ".github/workflows/qa-studio-targeted-repro.yml",
+        ".github/workflows/studio-soak-10h.yml"
+      ]
+    },
+    {
+      "branch": "archive/main-after-preservation-merges-20260903",
+      "sha": "f8e54c42afc3e4e595c1864444dfa2e48848cf42",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-595-emotion-bubbles-premerge-20260903",
+      "sha": "7b018b1cf04dfc43368b754fb49c4b4873206ead",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-596-platform-preflight-premerge-20260903",
+      "sha": "df17f4e4b97044116511e9db2711850882a80b6f",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-598-service-worker-check-premerge-20260903",
+      "sha": "cdc83a6e6ea7f27c86c8dab79b72271d43d0fe04",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-599-full-head-premerge-20260903",
+      "sha": "cd2e9cf3933ee2b0d3945360e768240537c20539",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-599-main-core-repair-premerge-20260903",
+      "sha": "cd2e9cf3933ee2b0d3945360e768240537c20539",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-603-full-head-premerge-20260903",
+      "sha": "8d17da8aa8506584452721598603008ff6689c30",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-604-soak-harness-premerge-20260903",
+      "sha": "ee866cfd144ca112f6f1b5270af273602d868015",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-605-marketplace-wiring-premerge-20260903",
+      "sha": "ae8919d9632c66731f66e7b6dba327986c0fcc2e",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-606-marketplace-hardening-premerge-20260903",
+      "sha": "7ad88ff0e628972b6945a098c925d2b5b867e283",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "archive/pr-607-marketplace-regressions-premerge-20260903",
+      "sha": "8d17da8aa8506584452721598603008ff6689c30",
+      "mode": "already-ancestor",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/final-lossless-merge-sweep-20260903",
+      "sha": "fc01a4d9fc3b4c9bb71652f0b47960c15e26a59f",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-all-preserved-merges-v2-20260903",
+      "sha": "5f7bbf913f01e0f7a46a5947a8a114454c06764b",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-marketplace-pr-merge-20260903",
+      "sha": "56de02eb1aa239d80392d78f300086463b8a0958",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-marketplace-wiring-20260903",
+      "sha": "5f6649e56956d8ffbef06444b138be44db8102d0",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-marketplace-wiring-v2-20260903",
+      "sha": "cafbe6ef10af963096230cf37bbd596e9230b3b3",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-preserved-work-20260903",
+      "sha": "2a19e3e82472dbf01bfa64f407ff458c0f06c5ef",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/finalize-salvage-pr-599-603-20260903",
+      "sha": "ebf0a6e5e47463a02af9691c12c0bbbfa7b46dbc",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/merge-safe-known-prs-20260903",
+      "sha": "f87d421d7ebbee42b2c3ffa4085ac8422fbea3a5",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/preserve-open-work-runner-20260903",
+      "sha": "e9e7388a9ef93c3174358849ef964c460e8c732a",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "automation/salvage-conflicted-prs-599-603-20260903",
+      "sha": "de6cca7c97b9534eba3caca16026e261dd5d990a",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    },
+    {
+      "branch": "integration/preserve-open-work-20260903",
+      "sha": "521ba72f89f9a5b08bcad65d4518efce9d1536d4",
+      "mode": "history-only",
+      "status": "preserved",
+      "conflictsResolvedToCurrentTree": [],
+      "workflowChangesPreservedInHistoryOnly": []
+    }
+  ]
+}

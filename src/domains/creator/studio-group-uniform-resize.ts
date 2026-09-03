@@ -616,60 +616,74 @@ function transformElement(
  * The output always preserves document order. A successful plan replaces every selected element
  * with a transformed immutable copy; every failure returns only the original element references.
  */
-export function planStudioGroupUniformResize(
+/**
+ * The transformed SELECTION only, in `selectedIds` order, or `null` where the plan is refused.
+ *
+ * Split out of `planStudioGroupUniformResize` so a per-frame live preview can show what the commit
+ * will produce without allocating a whole-document array sixty times a second. The full planner is
+ * defined in terms of this function rather than beside it: the preview and the commit must not be
+ * able to answer differently about uniformity, locking, identity frames or a refused element, and
+ * two copies of these rules would eventually do exactly that.
+ *
+ * `null` means "leave the document untouched" -- the same all-or-nothing verdict the full planner
+ * expresses by returning its input unchanged.
+ */
+export function planStudioGroupUniformResizeSelection(
   input: StudioGroupUniformResizeInput
-): El[] {
+): El[] | null {
   const strokeWidthPolicy = input.strokeWidthPolicy ?? "preserve";
-  if (strokeWidthPolicy !== "preserve" && strokeWidthPolicy !== "scale") {
-    return unchanged(input.items);
-  }
+  if (strokeWidthPolicy !== "preserve" && strokeWidthPolicy !== "scale") return null;
   if (
     !validBounds(input.sourceBounds, true) ||
     !validBounds(input.targetBounds, true)
   ) {
-    return unchanged(input.items);
+    return null;
   }
 
   const requestedIds = new Set(input.selectedIds);
-  if (requestedIds.size === 0) return unchanged(input.items);
+  if (requestedIds.size === 0) return null;
   const selectedItems = input.items.filter((item) => requestedIds.has(item.id));
-  if (selectedItems.length !== requestedIds.size) return unchanged(input.items);
+  if (selectedItems.length !== requestedIds.size) return null;
 
   try {
-    if (selectedItems.some(input.isLocked)) return unchanged(input.items);
+    if (selectedItems.some(input.isLocked)) return null;
   } catch {
-    return unchanged(input.items);
+    return null;
   }
 
   const scaleX = input.targetBounds.width / input.sourceBounds.width;
   const scaleY = input.targetBounds.height / input.sourceBounds.height;
-  if (!finitePositive(scaleX) || !finitePositive(scaleY)) {
-    return unchanged(input.items);
-  }
-  if (!nearlyEqual(scaleX, scaleY, UNIFORM_SCALE_RELATIVE_EPSILON)) {
-    return unchanged(input.items);
-  }
+  if (!finitePositive(scaleX) || !finitePositive(scaleY)) return null;
+  if (!nearlyEqual(scaleX, scaleY, UNIFORM_SCALE_RELATIVE_EPSILON)) return null;
   const scale = (scaleX + scaleY) / 2;
   if (
     nearlyEqual(scale, 1, IDENTITY_RELATIVE_EPSILON) &&
     nearlyEqual(input.sourceBounds.x, input.targetBounds.x, IDENTITY_RELATIVE_EPSILON) &&
     nearlyEqual(input.sourceBounds.y, input.targetBounds.y, IDENTITY_RELATIVE_EPSILON)
   ) {
-    return unchanged(input.items);
+    return null;
   }
 
-  const transformedById = new Map<string, El>();
+  const transformed: El[] = [];
   for (const item of selectedItems) {
-    const transformed = transformElement(
+    const next = transformElement(
       item,
       input.sourceBounds,
       input.targetBounds,
       scale,
       strokeWidthPolicy
     );
-    if (!transformed) return unchanged(input.items);
-    transformedById.set(item.id, transformed);
+    if (!next) return null;
+    transformed.push(next);
   }
+  return transformed;
+}
 
+export function planStudioGroupUniformResize(
+  input: StudioGroupUniformResizeInput
+): El[] {
+  const transformed = planStudioGroupUniformResizeSelection(input);
+  if (!transformed) return unchanged(input.items);
+  const transformedById = new Map(transformed.map((item) => [item.id, item]));
   return input.items.map((item) => transformedById.get(item.id) ?? item);
 }

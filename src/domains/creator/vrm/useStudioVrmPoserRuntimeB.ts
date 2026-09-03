@@ -60,8 +60,8 @@ import {
 import {
   serializeWardrobe,
 } from "./studio-vrm-wardrobe";
-import {
-  type StudioVrmIkEffectorBone,
+import type {
+  StudioVrmIkEffectorBone,
 } from "./StudioVrmJointHandles";
 import {
   isStudioVrmTexturePaintBrushProductBlocked,
@@ -641,9 +641,16 @@ export function useStudioVrmPoserRuntimeB(h: StudioVrmPoserHost): void {
         : "";
   const texturePaintBrushProductBlocked =
     isStudioVrmTexturePaintBrushProductBlocked(texturePaintSettings.tool);
+  const texturePaintSurfaceStatus =
+    texturePaintSettings.tool === "surface-brush"
+    && texturePaintSurfaceToolSnapshot
+    && texturePaintSurfaceToolSnapshot.status !== "ready"
+      ? texturePaintSurfaceToolSnapshot.message
+      : "";
   const texturePaintStatus = texturePaintDisabledReason
     || texturePaintBudgetErrorStatus
     || (texturePaintBrushProductBlocked ? STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON : "")
+    || texturePaintSurfaceStatus
     || texturePaintSnapshot?.error?.message
     || texturePaintSnapshot?.guidance?.message
     || (texturePaintSnapshot?.status === "loading"
@@ -657,7 +664,9 @@ export function useStudioVrmPoserRuntimeB(h: StudioVrmPoserHost): void {
         : texturePaintEyedropperActive
           ? "스포이드가 준비됐습니다. 캐릭터 표면을 한 번 누르면 색상만 가져오고 ColorDrop으로 돌아갑니다."
         : texturePaintSnapshot?.activeTarget
-          ? "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다."
+          ? texturePaintSettings.tool === "surface-brush"
+            ? "모델 표면을 드래그해 직접 그리세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
+            : "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다."
           : "뷰포트에서 옷·피부·머리 표면을 누르면 해당 텍스처를 선택합니다.");
   const viewportCanUndo =
     !broadcastPreviewActive

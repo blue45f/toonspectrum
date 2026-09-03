@@ -80,10 +80,14 @@ export type StudioInspectorCanonicalKey =
   | "text-fill"
   | "bubble"
   | "typography"
+  | "typography-appearance"
+  | "typography-advanced"
   | "text-align"
   | "constraints"
   | "blend-extended"
   | "layout"
+  | "geometry"
+  | "skew"
   | "effect-lines"
   | "order-align"
   | "line-correction"
@@ -148,11 +152,15 @@ export const STUDIO_INSPECTOR_CANONICAL_LABELS: Readonly<
   "shape-style": "도형 스타일",
   "text-fill": "글자 채우기 스타일",
   bubble: "말풍선",
-  typography: "타이포그래피",
-  "text-align": "글자 정렬",
+  typography: "글꼴",
+  "typography-appearance": "외형",
+  "typography-advanced": "고급 조판",
+  "text-align": "문단",
   constraints: "배치 제약",
   "blend-extended": "확장 블렌드",
   layout: "배치",
+  geometry: "위치와 크기",
+  skew: "기울이기",
   "effect-lines": "집중선·속도선",
   "order-align": "정렬·순서",
   "line-correction": "선 보정",
@@ -200,7 +208,9 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("opacity"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorSelectionSection.tsx:1",
+    // 2026-09-02 감사: 표는 SelectionSection 을 가리켰지만 실제 컨트롤은 위치·크기 패널의
+    // 필수 행에 있다. 출처를 실제 렌더 위치로 바로잡았다.
+    source: "StudioFigmaDesignPanel.tsx:1",
     rationale:
       "프록시 3 — CSP 레이어 팔레트·PS 레이어 패널의 기본 행에 항상 있다.",
     searchEntryId: "property.opacity",
@@ -304,15 +314,36 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "말풍선 외형·모양·앵커·꼬리.",
   },
+  /**
+   * 2026-09-02 감사 §5.8: 타이포그래피 한 섹션이 15개를 접고 있어 열면 다시 과밀했다.
+   * 글꼴 / 외형 / 고급 조판 세 섹션으로 나누고, 정렬·자간·행간은 아래 문단 섹션 한 곳에만 둔다.
+   */
   {
     id: "element.typography",
     canonical: "typography",
     label: label("typography"),
     tier: "advanced",
-    leaves: 15,
+    leaves: 5,
     source: "StudioInspectorTypographySection.tsx:1",
-    rationale:
-      "글꼴·크기·굵기·기울임 + 효과·곡선 텍스트·외곽선·자간/행간·그림자. 파일에서 연속된 한 덩어리라 한 섹션으로 접는다.",
+    rationale: "글꼴 프리셋·사용자 글꼴·크기·굵게·기울임. 검색/메뉴의 타이포그래피 딥링크가 여기로 착지한다.",
+  },
+  {
+    id: "element.typography-appearance",
+    canonical: "typography-appearance",
+    label: label("typography-appearance"),
+    tier: "advanced",
+    leaves: 9,
+    source: "StudioInspectorTypographySection.tsx:1",
+    rationale: "외곽선(사용·색·두께) + 그림자(사용·색·흐림·X·Y·불투명도). 텍스트 요소에서만 렌더된다.",
+  },
+  {
+    id: "element.typography-advanced",
+    canonical: "typography-advanced",
+    label: label("typography-advanced"),
+    tier: "advanced",
+    leaves: 2,
+    source: "StudioInspectorTypographySection.tsx:1",
+    rationale: "글자 효과 프리셋 패널 + 곡선 텍스트. 둘 다 자체 패널을 가진 특수 조판이다.",
   },
   {
     id: "element.constraints",
@@ -329,9 +360,9 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     canonical: "text-align",
     label: label("text-align"),
     tier: "advanced",
-    leaves: 3,
+    leaves: 5,
     source: "StudioInspectorSelectionSection.tsx:1",
-    rationale: "정렬·세로 쓰기·높이를 텍스트에 맞춤.",
+    rationale: "문단 — 정렬·세로 쓰기·자간·행간·높이를 텍스트에 맞춤. 정렬은 이 한 곳에만 노출된다.",
   },
   {
     id: "element.blend-extended",
@@ -343,14 +374,30 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     rationale: "이미지 선택 전용 확장 블렌드.",
   },
   {
+    /**
+     * 2026-09-02 감사 P0 결함: 이 행은 X·Y·너비·높이·회전 7개를 여기 접혀 있다고 기록했지만,
+     * 그 값들은 이미 StudioFigmaDesignPanel 로 옮겨 가 **접히지 않은 채 최상단에** 그려지고
+     * 이 섹션에는 기울이기만 남아 있었다 — 표가 통과해도 화면의 점진적 노출은 깨져 있었다.
+     * 표를 실제 렌더에 맞춘다: 이 행은 기울이기, 숫자 배치는 아래 `selection.geometry`.
+     */
     id: "element.layout",
-    canonical: "layout",
-    label: label("layout"),
+    canonical: "skew",
+    label: label("skew"),
     tier: "advanced",
-    leaves: 7,
+    leaves: 2,
     source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
-      "프록시 4 — X·Y·너비·높이·회전·기울이기는 캔버스 핸들로 직접 조작 가능하다. 숫자 입력은 보조 경로다.",
+      "프록시 4 — 기울이기 X·Y 는 자유 변형 핸들로도 조작 가능하다. 숫자 입력은 보조 경로다.",
+  },
+  {
+    id: "selection.geometry",
+    canonical: "geometry",
+    label: label("geometry"),
+    tier: "advanced",
+    leaves: 8,
+    source: "StudioFigmaDesignPanel.tsx:1",
+    rationale:
+      "프록시 4 — X·Y·너비·높이·회전은 캔버스 핸들로 직접 조작 가능하고, 확대·좌우/상하 반전은 ⇧F·⇧H·⇧V 코드가 있다. 패널은 요약 한 줄만 보이고 숫자 그리드는 펼쳐서 연다.",
     searchEntryId: "property.transform-numeric",
   },
   {

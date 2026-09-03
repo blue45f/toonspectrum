@@ -279,10 +279,9 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
           screen.getByRole("button", { name: "프로젝트 작업" }),
           width,
         ),
-        "내보내기 옵션": isReachableAt(
-          screen.getByRole("button", { name: "내보내기 옵션" }),
-          width,
-        ),
+        "내보내기 옵션": screen
+          .getAllByRole("button", { name: "내보내기 옵션" })
+          .some((button) => isReachableAt(button, width)),
       };
       unmount();
       return map;
@@ -290,6 +289,8 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
 
     // 앱 메뉴바가 1600px 에서만 보이는 것은 의도된 설계다(몰입 모드는 1023px 이하 기본 ON).
     // 그래서 보기 메뉴는 데스크톱 발견성 경로일 뿐, 폰·태블릿의 유일한 경로가 될 수 없다.
+    // 내보내기 옵션 셰브론은 모바일에서도 44px 타깃으로 남는다(`isMobile && "min-h-11 min-w-11"`) —
+    // 430px 몰입 모드에서 닿는 것이 현재 계약이며, 예전 스냅샷의 false 는 그 승격 이전 값이었다.
     expect(Object.fromEntries(VIEWPORTS.map((w) => [w, hostsAt(w)]))).toMatchInlineSnapshot(`
       {
         "1600": {

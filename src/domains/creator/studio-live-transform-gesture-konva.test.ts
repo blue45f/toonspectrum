@@ -385,7 +385,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
       sourceBounds,
       ...nonUniform,
     });
-    expect(store.getSnapshot()?.element).toEqual(expected);
+    expect(store.getSnapshot()?.entries[0]?.element).toEqual(expected);
     expect(scene.wrapper.visible()).toBe(false);
     expect(scene.wrapper.scale()).toEqual({ x: 1, y: 1 });
 
@@ -602,7 +602,7 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
     gesture.close({ kind: "commit", terminalFrame });
     expect(scene.wrapper.getLayer()).toBe(scene.mainLayer);
     expect(scene.wrapper.visible()).toBe(false);
-    expect(store.getSnapshot()?.element).toEqual(expected);
+    expect(store.getSnapshot()?.entries[0]?.element).toEqual(expected);
     expect(store.getSnapshot()?.phase).toBe("active");
 
     expect(gesture.settle?.({ kind: "commit", committed: true })).toBe(false);

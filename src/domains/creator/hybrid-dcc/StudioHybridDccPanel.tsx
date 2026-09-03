@@ -96,7 +96,6 @@ import {
   workspaceWeldActive,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
-import { type StudioSculptBrushKind } from "./studio-hybrid-sculpt-kernel";
 import {
   StudioHybridDccModifierInspector,
   type StudioHybridDccModifierStackView,
@@ -106,6 +105,7 @@ import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
 import type { StudioHybridDccPersistenceReceiptEvidence } from "./studio-hybrid-dcc-persistence";
+import type { StudioSculptBrushKind } from "./studio-hybrid-sculpt-kernel";
 import type { StudioDccWorkbenchMode } from "../studio-workspace-route";
 
 const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [

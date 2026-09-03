@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-03",
+  "purpose": "Focused registry for domestic and international webtoon creation, drawing-assist, 3D production, localization, publishing, and creator-support products. Sources are first-party product pages where available; implementation work must reproduce capabilities and workflows without copying proprietary assets, code, models, or trade dress.",
+  "products": [
+    {
+      "id": "snaptoon",
+      "name": "Snaptoon",
+      "region": "KR",
+      "stage": "venture-startup",
+      "category": "three-d-webtoon-production",
+      "officialUrl": "https://snaptoon.co.kr/",
+      "watchUrl": "https://snaptoon.co.kr/",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "unreal-real-time-rendering",
+        "sketchup-direct-import",
+        "three-d-asset-warehouse",
+        "lighting-style-filters",
+        "camera-exposure",
+        "multi-scene"
+      ],
+      "laneHints": [
+        "three-d-import",
+        "three-d-render",
+        "materials-library",
+        "storyboard-camera-audio"
+      ],
+      "implementationNotes": "Prioritize canonical model ingest, searchable local/remote 3D materials, reproducible camera-light presets, and scene variants without coupling the document model to a single renderer."
+    },
+    {
+      "id": "naver-webtoon-shaper",
+      "name": "NAVER WEBTOON SHAPER",
+      "region": "KR",
+      "stage": "major-platform-lab",
+      "category": "three-d-character-authoring",
+      "officialUrl": "https://shaper.webtoons.com/",
+      "watchUrl": "https://shaper.webtoons.com/",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "three-d-character-presets",
+        "surface-direct-drawing",
+        "reference-image-preset-recommendation",
+        "camera-pose-capture",
+        "transparent-background",
+        "layered-psd-export"
+      ],
+      "laneHints": [
+        "three-d-rig-pose",
+        "three-d-surface",
+        "three-d-import",
+        "import-export"
+      ],
+      "implementationNotes": "Keep pose estimation optional and editable, preserve per-part ownership in project data, and export deterministic separated passes rather than only a flattened capture."
+    },
+    {
+      "id": "gentoon",
+      "name": "GenToon",
+      "region": "KR-global",
+      "stage": "startup",
+      "category": "ai-webtoon-creation",
+      "officialUrl": "https://www.gentoon.ai/",
+      "watchUrl": "https://www.gentoon.ai/webtoon-maker",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "character-consistency",
+        "automatic-panel-layout",
+        "automatic-speech-bubbles",
+        "vertical-scroll",
+        "multi-language",
+        "style-variants",
+        "creator-community"
+      ],
+      "laneHints": [
+        "structured-ai",
+        "comic-pages-panels",
+        "text-lettering",
+        "asset-variants",
+        "quality-delivery"
+      ],
+      "implementationNotes": "Prefer immutable character/style references, per-panel regeneration, editable lettering, and provenance receipts over one-shot page generation."
+    },
+    {
+      "id": "kaistory",
+      "name": "KAISTORY",
+      "region": "KR",
+      "stage": "startup",
+      "category": "webtoon-production-and-distribution",
+      "officialUrl": "https://kaistory.net/",
+      "watchUrl": "https://kaistory.net/",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "offline-first-conti",
+        "single-project-data-model",
+        "layered-psd",
+        "multi-language-translation",
+        "speaker-tts",
+        "browser-full-resolution-export",
+        "global-distribution"
+      ],
+      "laneHints": [
+        "storage-recovery",
+        "comic-pages-panels",
+        "text-lettering",
+        "import-export",
+        "storyboard-camera-audio",
+        "quality-delivery"
+      ],
+      "implementationNotes": "Use one versioned project envelope from storyboard to publish, keep local-first recovery authoritative, and treat translation/audio/rendered assets as derived revisions."
+    },
+    {
+      "id": "glimnavi",
+      "name": "GlimNavi",
+      "region": "KR",
+      "stage": "funded-startup",
+      "category": "ai-webtoon-assist",
+      "officialUrl": "https://glimnavi.com/",
+      "watchUrl": "https://glimnavi.com/",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "script-adaptation",
+        "automatic-shot-splitting",
+        "storyboard-layout",
+        "line-art",
+        "coloring",
+        "lighting-shadow",
+        "stage-by-stage-regeneration"
+      ],
+      "laneHints": [
+        "structured-ai",
+        "storyboard-camera-audio",
+        "co-creative",
+        "asset-variants",
+        "live-effects"
+      ],
+      "implementationNotes": "Model each AI stage as an explicit proposal over source layers with accept, reject, compare, rerun, undo, and provenance instead of destructive replacement."
+    },
+    {
+      "id": "ggooming",
+      "name": "GGOOMING",
+      "region": "KR",
+      "stage": "creator-startup",
+      "category": "social-comic-assist",
+      "officialUrl": "https://www.ggooms.com/",
+      "watchUrl": "https://www.ggooms.com/",
+      "priority": "P1",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "style-consistency",
+        "fast-panel-generation",
+        "creator-brand-collaboration",
+        "social-comic-workflow"
+      ],
+      "laneHints": [
+        "structured-ai",
+        "asset-variants",
+        "comic-pages-panels",
+        "quality-delivery"
+      ],
+      "implementationNotes": "Add repeatable creator style kits, panel-size presets, campaign variants, and rights/provenance checks without binding output to one social platform."
+    },
+    {
+      "id": "plask-motion",
+      "name": "Plask Motion",
+      "region": "KR-global",
+      "stage": "venture-startup",
+      "category": "ai-motion-capture",
+      "officialUrl": "https://plask.ai/",
+      "watchUrl": "https://plask.ai/",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "single-camera-motion-capture",
+        "vrm-animation",
+        "camera-lighting",
+        "motion-blur",
+        "depth-of-field",
+        "unreal-maya-blender-export"
+      ],
+      "laneHints": [
+        "three-d-rig-pose",
+        "animation-timeline",
+        "storyboard-camera-audio",
+        "three-d-render",
+        "three-d-import"
+      ],
+      "implementationNotes": "Separate inferred motion from editable keyframes, retain confidence/error metadata, support retargeting, and make cinematic effects optional render passes."
+    },
+    {
+      "id": "webtoon-canvas-creator-tools",
+      "name": "WEBTOON CANVAS creator tools",
+      "region": "US-KR-global",
+      "stage": "major-platform",
+      "category": "creator-publishing-support",
+      "officialUrl": "https://www.webtoons.com/en/canvas",
+      "watchUrl": "https://www.webtoons.com/en/notice/list",
+      "priority": "P0",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "contextual-glossary-translation",
+        "human-review",
+        "multi-language-publishing",
+        "creator-analytics",
+        "community-management",
+        "revenue-share"
+      ],
+      "laneHints": [
+        "text-lettering",
+        "structured-ai",
+        "quality-delivery",
+        "collaboration-crdt"
+      ],
+      "implementationNotes": "Keep translation opt-in and revisioned, expose glossary conflicts and reviewer state, and connect publish preflight with audience analytics without leaking editor documents."
+    },
+    {
+      "id": "manhwa-ai",
+      "name": "ManhwaAI",
+      "region": "US-global",
+      "stage": "startup",
+      "category": "ai-manhwa-planning",
+      "officialUrl": "https://www.manhwaai.net/",
+      "watchUrl": "https://www.manhwaai.net/",
+      "priority": "P1",
+      "evidenceAsOf": "2026-09-03",
+      "focus": [
+        "consistent-characters",
+        "editable-panels",
+        "speech-bubbles",
+        "vertical-webtoon-layouts",
+        "shared-character-briefs",
+        "panel-by-panel-generation"
+      ],
+      "laneHints": [
+        "structured-ai",
+        "comic-pages-panels",
+        "text-lettering",
+        "asset-variants",
+        "co-creative"
+      ],
+      "implementationNotes": "Use shared structured character bibles and panel briefs, but preserve manual layout and drawing as first-class authority."
+    }
+  ]
+}

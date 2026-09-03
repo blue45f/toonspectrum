@@ -120,6 +120,9 @@ describe("Studio menubar ownership boundary", () => {
     const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
 
+    expect(menubar).toContain('data-testid="studio-menubar-primary"');
+    expect(menubar).toContain('data-testid="studio-menubar-actions"');
+    expect(menubar).toContain('data-testid="studio-publish"');
     expect(menubar).toContain('data-studio-menubar-primary="true"');
     expect(menubar).toContain('data-studio-menubar-actions="true"');
     expect(menubar).toContain('data-studio-export-menu-panel="true"');

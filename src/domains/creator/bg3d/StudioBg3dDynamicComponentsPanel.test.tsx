@@ -16,6 +16,8 @@ describe("StudioBg3dDynamicComponentsPanel", () => {
     expect(screen.getByText("다이나믹 인터랙션 컴포넌트")).toBeDefined();
     expect(screen.getByText("단일 여닫이문 (Door Swing)")).toBeDefined();
 
+    // The button's only text IS the label, so `getByText` matched the <button> and its <span>
+    // both. Query the control by role instead — that is also the thing the user actually clicks.
     const toggleBtn = screen.getByRole("button", { name: /닫힘 \(Closed\)/ });
     fireEvent.click(toggleBtn);
 

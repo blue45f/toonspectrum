@@ -181,12 +181,18 @@ function browserFrameScheduler(): StudioLiveTransformPreviewScheduler {
 }
 
 /** Refuses a second transform writer while the stroke wrapper is already under a drag pointer. */
+/**
+ * @param wrapper the caller's already-resolved wrapper, when it has one. `findStudioDrawWrapperNode`
+ *   is a full `stage.find` traversal, and a multi-selection asks this per member right after
+ *   resolving each wrapper itself — repeating the walk there triples the begin-time scene cost.
+ */
 export function studioKonvaDrawTransformIsBusy(
   stage: Konva.Stage,
   elementId: string,
+  wrapper?: Konva.Node | null,
 ): boolean {
   return studioKonvaDrawTransformRecoveryPendingForElement(elementId)
-    || findStudioDrawWrapperNode(stage, elementId)?.isDragging() === true;
+    || (wrapper ?? findStudioDrawWrapperNode(stage, elementId))?.isDragging() === true;
 }
 
 interface StudioLiveTransformRasterMetrics {
@@ -443,7 +449,7 @@ export function beginStudioKonvaDrawTransformGesture(
     let published = false;
     mutateAndDrawSourceLayerSynchronously(() => {
       flushDraftPublication(() => {
-        draftClaim?.present({
+        draftClaim?.present([{
           element: transformed,
           clip: studioLiveTransformCommittedClip({
             targetBounds: frame.targetBounds,
@@ -452,14 +458,15 @@ export function beginStudioKonvaDrawTransformGesture(
             elements,
             ...(snapshot.noClip !== undefined ? { noClip: snapshot.noClip } : {}),
           }),
-        });
+        }]);
       });
       // A subscriber may synchronously supersede this generation while the publication barrier is
       // open. Never hide the source unless this exact object is still the store authority.
       const publishedSnapshot = options.preview.draftStore?.getSnapshot();
       if (
         publishedSnapshot?.scope !== options.preview.scope
-        || publishedSnapshot.element !== transformed
+        || publishedSnapshot.entries[0]?.element !== transformed
+        || publishedSnapshot.entries.length !== 1
       ) {
         return;
       }
@@ -607,7 +614,7 @@ export function beginStudioKonvaDrawTransformGesture(
     }
     draftClaim = options.preview.draftStore?.claim(
       options.preview.scope,
-      snapshot.elementId,
+      [snapshot.elementId],
     ) ?? null;
     sourceVisible = node.visible();
 
@@ -672,7 +679,7 @@ export function beginStudioKonvaDrawTransformGesture(
             return true;
           }
           if (!handoffRegistered) {
-            const retained = draftClaim.handoff(terminalDraft, () => {
+            const retained = draftClaim.handoff([terminalDraft], () => {
               // The store invokes this before publishing snapshot=null. Paint the source first; the
               // draft root's layout receipt then clears the isolated canvas in the same React commit.
               // These latches let common settlement distinguish "awaiting receipt" from a failed

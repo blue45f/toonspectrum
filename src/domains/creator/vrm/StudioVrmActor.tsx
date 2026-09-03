@@ -29,18 +29,18 @@ import {
   type BodyScale,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
-import {
-  type StudioVrmPoseTranslations,
+import type {
+  StudioVrmPoseTranslations,
 } from "./studio-vrm-scene-document";
 import {
   createStudioVrmSurfacePaintTool,
   type StudioVrmSurfacePaintToolSnapshot,
 } from "./studio-vrm-surface-paint-tool";
-import {
-  type StudioVrmTexturePaintRuntime,
+import type {
+  StudioVrmTexturePaintRuntime,
 } from "./studio-vrm-texture-paint-runtime";
-import {
-  type VrmTrackingData,
+import type {
+  VrmTrackingData,
 } from "./studio-vrm-webcam-tracking";
 import {
   CANONICAL_LIMB_BONES,
@@ -50,8 +50,8 @@ import {
   LOOK_EXPRESSION_NAMES,
   ZERO_EULER,
 } from "./StudioVrmPoserTypes";
-import {
-  type StudioVrmTexturePaintPanelSettings,
+import type {
+  StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
 import {
   VRM_FRAME_BASE_PRIORITY,
@@ -707,6 +707,41 @@ export function VrmActor({
       return;
     }
     if (isStudioVrmTexturePaintBrushProductBlocked(settings.tool)) return;
+    if (settings.tool !== "surface-brush") return;
+
+    runtime.clearError();
+    const begin = texturePaintSurfaceTool.begin({
+      runtime,
+      settings: {
+        color: settings.color,
+        sizeCssPixels: settings.sizeTexels,
+        opacity: settings.opacity,
+        flow: settings.tuning.flow,
+        hardness: settings.tuning.hardness,
+        minSize: settings.tuning.minSize,
+      },
+      sample: studioVrmSurfacePaintPointerSample(
+        event,
+        "down",
+        hit,
+        camera,
+        gl.domElement.getBoundingClientRect().height,
+        texturePaintSurfaceCameraPointRef.current,
+      ),
+    });
+    if (!begin.ok) return;
+
+    texturePaintSurfacePointerIdRef.current = event.pointerId;
+    const captureTarget =
+      event.currentTarget as unknown as StudioVrmTexturePaintPointerCaptureTarget;
+    texturePaintSurfaceCaptureTargetRef.current = captureTarget;
+    try {
+      captureTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Window lifecycle listeners still finish or cancel an admitted stroke without capture.
+      texturePaintSurfaceCaptureTargetRef.current = null;
+    }
+    invalidate();
   };
 
   const moveTexturePaint = (event: ThreeEvent<PointerEvent>) => {

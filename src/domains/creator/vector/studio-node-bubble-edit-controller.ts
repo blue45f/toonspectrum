@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NODE_SMOOTH_DEFAULT_STRENGTH } from "../studio-curve-smoothing";
-import {
-  type NodeDragSession,
-  type NodeEditTool,
+
+import type {
+  NodeDragSession,
+  NodeEditTool,
 } from "../studio-node-edit";
 
 export type BubbleShapePointerCaptureTarget = {

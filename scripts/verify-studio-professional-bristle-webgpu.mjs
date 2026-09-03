@@ -357,14 +357,37 @@ async function main() {
 
   let browser = null;
   try {
+    const headedWebGpu = process.env.TOONSPECTRUM_WEBGPU_HEADED === "1";
+    const launchArgs = process.platform === "darwin"
+      ? [
+          "--no-sandbox",
+          "--enable-unsafe-webgpu",
+          "--use-gpu-in-tests",
+        ]
+      : [
+          "--no-sandbox",
+          "--enable-unsafe-webgpu",
+          "--enable-features=CDPScreenshotNewSurface,Vulkan",
+          "--use-vulkan=swiftshader",
+          "--use-webgpu-adapter=swiftshader",
+          "--use-gpu-in-tests",
+          "--use-gl=angle",
+          "--use-angle=swiftshader",
+          "--enable-unsafe-swiftshader",
+        ];
     browser = await chromium.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--enable-unsafe-webgpu",
-        "--use-angle=swiftshader",
-      ],
+      channel: "chromium",
+      // Chromium 151 repeatedly loses Dawn's SwiftShader device on the first queue fence in
+      // new-headless Linux. The suite opts into the regular compositor under Xvfb; standalone
+      // callers retain headless mode unless they explicitly request the same proof boundary.
+      headless: !headedWebGpu,
+      args: launchArgs,
     });
+    console.log(
+      `[webgpu-browser] mode=${headedWebGpu ? "headed" : "headless"} `
+        + `adapterPath=${process.platform === "darwin" ? "native" : "forced-swiftshader"} `
+        + `version=${browser.version()}`,
+    );
     const context = await browser.newContext();
     const page = await context.newPage();
     const diagnostics = {

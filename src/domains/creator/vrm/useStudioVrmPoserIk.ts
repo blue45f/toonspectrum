@@ -42,11 +42,11 @@ import {
   STUDIO_VRM_USER_IK_CHAINS,
   type StudioVrmUserIkResult,
 } from "./studio-vrm-user-ik";
-import {
-  type StudioVrmIkEffectorBone,
-  type StudioVrmIkHandleControl,
-  type StudioVrmJointHandleBone,
-  type StudioVrmJointWorldPoint,
+import type {
+  StudioVrmIkEffectorBone,
+  StudioVrmIkHandleControl,
+  StudioVrmJointHandleBone,
+  StudioVrmJointWorldPoint,
 } from "./StudioVrmJointHandles";
 
 import type { StudioVrmIkConstraint } from "./studio-vrm-scene-document";

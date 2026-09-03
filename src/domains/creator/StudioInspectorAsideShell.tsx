@@ -25,6 +25,7 @@ import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
 import { resolveStudioTemplateGutterCapability } from "./studio-template-gutter-layout";
 import { StudioLayerNavigator } from "./studio-page-lazy-ui";
 import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
+import { STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH } from "./studio-workspace-layout-metrics";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
@@ -167,6 +168,16 @@ export function StudioInspectorAsideShell({
     withCanvasControlsGuard,
   } = model;
   const templateGutterCapability = resolveStudioTemplateGutterCapability(currentTemplate);
+  /**
+   * 넓은 패널(≥ 420px)에서는 대상 속성 아래에 레이어 목록을 함께 둔다(UX 감사 2026-09-02
+   * §5.8 레이어). 웹툰 작업은 레이어 순서와 선택 속성을 반복해 오가는데, 두 탭이 상호 배타라
+   * 왕복마다 탭 전환을 청구하고 있었다. 좁은 패널과 모바일 시트는 탭 모델을 그대로 쓴다.
+   */
+  const layersSplitWithProperties =
+    !isMobile
+    && inspectorLayout.primary === "properties"
+    && rightResize.width >= STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH;
+  const layersPaneMounted = inspectorLayout.primary === "layers" || layersSplitWithProperties;
   return (
         <aside
           ref={propsSheetRef}
@@ -219,9 +230,9 @@ export function StudioInspectorAsideShell({
                 <button
                   type="button"
                   onClick={() => setRightPanelOpen(false)}
-                  aria-label="속성 패널 접기"
+                  aria-label="작업 패널 접기"
                   className="mr-1 hidden min-h-9 shrink-0 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
-                  title="속성 패널 접기"
+                  title="작업 패널 접기"
                 >
                   접기 <ChevronRight size={12} aria-hidden />
                 </button>
@@ -451,12 +462,21 @@ export function StudioInspectorAsideShell({
           {children}
           <div
             id={tabA11y.primary.layers.panelId}
-            role="tabpanel"
-            aria-labelledby={tabA11y.primary.layers.tabId}
-            hidden={inspectorLayout.primary !== "layers"}
-            className="flex h-[min(31rem,54dvh)] min-h-72 flex-col gap-2 lg:h-[calc(100dvh-28rem)] lg:min-h-72"
+            // 분할 모드에서는 탭패널이 아니라 대상 탭 아래 붙는 보조 영역이다 — 탭패널로 두면
+            // 선택되지 않은 탭이 패널을 하나 더 가리키게 된다.
+            role={layersSplitWithProperties ? "region" : "tabpanel"}
+            aria-labelledby={layersSplitWithProperties ? undefined : tabA11y.primary.layers.tabId}
+            aria-label={layersSplitWithProperties ? "레이어" : undefined}
+            data-studio-inspector-layers-split={layersSplitWithProperties ? "true" : undefined}
+            hidden={!layersPaneMounted}
+            className={cn(
+              "flex flex-col gap-2",
+              layersSplitWithProperties
+                ? "mt-1 h-[min(22rem,38dvh)] min-h-56 shrink-0 border-t border-line/60 pt-2"
+                : "h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72",
+            )}
           >
-            {inspectorLayout.primary === "layers" ? (
+            {layersPaneMounted ? (
               <>
                 <div className="min-h-0 flex-1 [&>section]:h-full">
                   <Suspense
@@ -481,7 +501,7 @@ export function StudioInspectorAsideShell({
                       items={layerNavigatorItems}
                       groups={masterEditMode ? [] : groups}
                       selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
-                      pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
+                      pageKey={`${masterEditMode ? "master" : currentPageId}:${layersSplitWithProperties ? "split" : inspectorLayout.primary}`}
                       livePageId={masterEditMode ? null : currentPageId}
                       readOnly={inspectorInteractionPolicy.global.disabled}
                       groupingDisabled={masterEditMode}

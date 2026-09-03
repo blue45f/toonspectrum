@@ -84,6 +84,8 @@ const knownJira = [
   ["KAN-18", /(unnamed control.*accent-accent|Lift3D.*접근성 이름|icon-only control without an accessible name)/i],
   ["KAN-14", /(Production migration manifest must list every numbered SQL migration|0035_creator_marketplace_3d_asset_kind)/i],
   ["KAN-13", /(studio-bg3d-dialog.*(Expected|Received)|캡처할 3D 장면이 아직 준비되지|컬러 배경 추가.*(완료되지|열린 채))/i],
+  ["KAN-19", /(strict mode violation.*studio-central-3d-editor|studio-central-3d-editor.*resolved to \d+ elements|data-testid.*studio-central-3d-editor.*duplicate)/i],
+  ["KAN-20", /(snapshot.*(missing|does not exist).*1440.*900|desktop-1440.*snapshot|visual.*baseline.*1440)/i],
 ];
 
 function positiveInt(value, fallback) {

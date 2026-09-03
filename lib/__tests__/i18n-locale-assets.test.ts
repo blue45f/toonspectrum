@@ -39,10 +39,6 @@ const BASELINE_APP_KEY_COUNT = 525;
 const SHELL_ONLY_KEYS = [
   "control.language.group.englishBase",
   "control.language.group.translated",
-  "route.marketLibrary",
-  "route.marketManage",
-  "route.marketPublish",
-  "route.marketWishlist",
 ];
 /**
  * Translated strings for `contact` / `play` / `fortune` surfaces that neither ko nor en publish

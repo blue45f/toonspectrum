@@ -36,8 +36,12 @@ describe("Studio lazy i18n assets", () => {
       // (studio.toolsCompanion.exit.disconnected / .editor).
       // 1_325 → 1_328: 모바일 도크 "페이지" 버튼의 라벨·열기·닫기 aria 세 키
       // (studio.mobileDock.tool.pages / .pagesOpen / .pagesClose) — 하드코딩 한국어가 `en` 도구막대에
-      // 남아 있던 결함. 이 숫자는 래칫이므로 키를 늘리거나 줄이는 변경은 여기서 한 번 더 눈에 띄어야 한다.
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_328);
+      // 남아 있던 결함.
+      // 1_328 → 1_333: 도크 내보내기·찾기 진입점(studio.mobileDock.tool.export / .search / .search.title),
+      // 통합 검색 라벨(studio.commandSearch.label), 도구 복합 메뉴 제목(studio.mainMenu.group.tools.label)
+      // — UX 감사 2026-09-02 반영분. 이 숫자는 래칫이므로 키를 늘리거나 줄이는 변경은 여기서 한 번 더
+      // 눈에 띄어야 한다.
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_333);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
@@ -51,6 +55,10 @@ describe("Studio lazy i18n assets", () => {
       "studio.mobileDock.tool.pages",
       "studio.mobileDock.pagesOpen",
       "studio.mobileDock.pagesClose",
+      "studio.mobileDock.tool.export",
+      "studio.mobileDock.tool.search",
+      "studio.commandSearch.label",
+      "studio.mainMenu.group.tools.label",
       "studio.creativeModes.title",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {

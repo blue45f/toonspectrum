@@ -1,4 +1,3 @@
-import { type TemplateSpec } from "../studio-assets";
 import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   settleStudioDestructiveCommit,
@@ -6,9 +5,6 @@ import {
   studioSceneSnapshotReplaceRequest,
   studioStartFromExampleRequest,
 } from "../studio-destructive-command-catalog";
-import { type StudioEditorMutationTicket } from "../studio-editor-scope";
-import { type StudioMenu, type Tool } from "../studio-editor-tool-model";
-import { type El } from "../studio-element-model";
 import { comipoSeedsToEls } from "../studio-page-comipo-seeds";
 import {
   loadStudioComipoAssembly,
@@ -19,10 +15,14 @@ import {
   QUICK_SAMPLE_CANVAS_H,
   createQuickSampleFrames,
 } from "../studio-page-shell-runtime";
-import { type PageState } from "../studio-page-state";
-import { type StudioSceneSnapshot } from "../studio-scene-snapshot-library";
 
+import type { TemplateSpec } from "../studio-assets";
 import type { ComipoAssemblyInput } from "../studio-comipo-assembly";
+import type { StudioEditorMutationTicket } from "../studio-editor-scope";
+import type { StudioMenu, Tool } from "../studio-editor-tool-model";
+import type { El } from "../studio-element-model";
+import type { PageState } from "../studio-page-state";
+import type { StudioSceneSnapshot } from "../studio-scene-snapshot-library";
 
 export interface StudioQuickComicOptions {
   elements: El[];

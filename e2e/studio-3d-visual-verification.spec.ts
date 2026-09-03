@@ -290,6 +290,33 @@ async function forceBg3dWebGpu(page: Page): Promise<void> {
 }
 
 /**
+ * ADR-0018 §6: BG3D never mounts WebGL2 on its own. The software-GPU lane (ANGLE over
+ * SwiftShader, no WebGPU adapter) therefore sits behind the "WebGPU 사용 불가" gate with no
+ * canvas until the artist selects WebGL2 in the 보기 tab — exactly what a browser without WebGPU
+ * shows. Selecting it here is the explicit choice the policy requires, not a fallback. Asserting
+ * the active-backend badge and the absence of the gate keeps every frame assertion that follows
+ * from passing vacuously against the alert chrome of an unmounted viewport.
+ */
+async function ensureBg3dWebGl2(page: Page): Promise<void> {
+  const backend = page.locator('[data-testid="studio-bg3d-engine-active-backend"]').first();
+  await page.getByRole("tab", { name: "보기", exact: true }).click();
+  const webgl2Preference = page
+    .locator('[data-testid="studio-bg3d-engine-preference-webgl2"]')
+    .first();
+  await expect(webgl2Preference).toBeVisible();
+  // The preference persists per profile, so a reopened editor may already be on WebGL2.
+  if (await webgl2Preference.getAttribute("aria-pressed") !== "true") {
+    await expect(webgl2Preference).toBeEnabled({ timeout: 120_000 });
+    await webgl2Preference.click();
+  }
+  await expect(webgl2Preference).toHaveAttribute("aria-pressed", "true");
+  await expect(backend).toHaveText(/WebGL2 사용 중/, { timeout: 120_000 });
+  await expect(page.locator('[data-testid="studio-bg3d-engine-unavailable"]')).toHaveCount(0);
+  await page.getByRole("tab", { name: "도형", exact: true }).click();
+  await page.waitForTimeout(1_000);
+}
+
+/**
  * 같은 시작/끝과 같은 총 시간을 쓰되, 하나는 24개 중간 자세를 실제로 그리고 다른 하나는
  * 최종 자세만 그린다. mouse-up 뒤 WebGPU compositor가 버퍼를 정리하므로 반드시 누른 채 캡처한다.
  */
@@ -387,6 +414,58 @@ async function waitForFrameChange(
   );
 }
 
+/**
+ * 상태 레일의 알림을 닫아 문서 캡처의 레이아웃을 고정한다.
+ *
+ * 실시간 룸의 병합 알림은 `[data-studio-global-status-rail]`(문서 흐름, `empty:hidden`)에 뜨므로
+ * 알림이 있고 없음에 따라 작업 영역 높이가 달라지고, 문서 스코프 스크린샷의 크기와 칸 배치가
+ * 함께 움직인다. 알림의 존재 자체는 호출 전에 단언하고, 캡처 전에는 항상 같은 레이아웃으로 되돌린다.
+ * 오류 배너는 닫지 않는다 — 그것은 실패 증거다.
+ */
+async function dismissStudioStatusNotices(page: Page): Promise<void> {
+  const dismiss = page.locator("[data-studio-status-notice-dismiss]");
+  for (let attempt = 0; attempt < 5 && (await dismiss.count()) > 0; attempt += 1) {
+    await dismiss.first().click();
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(300);
+}
+
+/**
+ * 문서 스코프 프레임이 안정될 때까지 폴링한 뒤 그 프레임을 돌려준다.
+ *
+ * `waitForFrameChange`는 기준과 달라진 첫 프레임을 돌려주므로, 러너가 느리면 Transformer 제거와
+ * raster 교체 사이의 과도기 프레임이 잡힌다. 그 프레임을 뒤의 "유지되어야 한다" 비교의 기준으로
+ * 쓰면 실제 회귀가 없어도 한 자리 칸 차이가 난다. 연속 두 구간이 같은 크기·1 미만 채널차이면 정착이다.
+ */
+async function waitForStableDocumentFrame(
+  page: Page,
+  label: string,
+  timeoutMs = 20_000,
+): Promise<FrameStats> {
+  // 첫 표본 수집은 정착 대기가 아니므로 예산 밖이다. 이 호출이 예산 안에 들어가면 느린
+  // 러너에서 실제로 기다릴 수 있는 시간이 그만큼 줄어든다.
+  let previous = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+  const startedAt = Date.now();
+  let latest = previous;
+  let stableIntervals = 0;
+  let delta = Number.POSITIVE_INFINITY;
+  while (Date.now() - startedAt < timeoutMs) {
+    await page.waitForTimeout(300);
+    latest = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
+    delta = peakColorTileDelta(latest, previous);
+    const sameSurface = latest.width === previous.width && latest.height === previous.height;
+    stableIntervals = sameSurface && delta < 1 ? stableIntervals + 1 : 0;
+    if (stableIntervals >= 2) return latest;
+    previous = latest;
+  }
+  throw new Error(
+    `${label}: 문서 프레임이 ${timeoutMs}ms 안에 안정되지 않았습니다 `
+    + `(마지막 칸 최대 RGB 채널차 ${delta.toFixed(2)}, `
+    + `프레임 ${previous.width}×${previous.height} → ${latest.width}×${latest.height}).`,
+  );
+}
+
 /** 3D 표면은 치명적 런타임 오류 없이 렌더되어야 한다. */
 function collectFatalErrors(page: Page): string[] {
   const fatal: string[] = [];
@@ -437,15 +516,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     await openBg3d(page);
 
-    // 엔진은 선택한 백엔드로 정착해야 한다. WebGPU가 없으면 WebGL2로 내려간다. 능력 probe가
-    // 끝나기 전 배지는 "확인 중"이므로, 한 번 읽지 않고 정착할 때까지 폴링한다 — 영원히 "확인 중"에
-    // 머무는 것 자체가 이 스위트가 잡아야 할 회귀다.
-    const backendBadge = page
-      .locator('[data-testid="studio-bg3d-engine-active-backend"]')
-      .first();
-    if (await backendBadge.count()) {
-      await expect(backendBadge).toHaveText(/WebGL2|WebGPU/, { timeout: 120_000 });
-    }
+    // 엔진은 직접 선택한 백엔드로 정착해야 한다. WebGPU가 없어도 WebGL2로 내려가지 않으므로
+    // (ADR-0018) 이 레인은 WebGL2를 명시적으로 고른다. 능력 probe가 끝나기 전 배지는 "확인 중"
+    // 이므로 정착할 때까지 폴링한다 — 영원히 "확인 중"에 머무는 것 자체가 잡아야 할 회귀다.
+    await ensureBg3dWebGl2(page);
 
     // 빈 장면에도 접지 그리드가 있어 완전한 단색이 아니다 — 즉 렌더 루프가 살아 있다.
     const empty = await frameStats(page, BG3D_VIEWPORT);
@@ -533,6 +607,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const fatal = collectFatalErrors(page);
     await openStudio(page);
     await openBg3d(page);
+    await ensureBg3dWebGl2(page);
 
     const roomShell = page.locator(`${BG3D_DIALOG} [aria-label="오픈 룸 셸 장면에 추가"]`).first();
     await roomShell.scrollIntoViewIfNeeded();
@@ -589,7 +664,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
    * `?room=work-instant-…` 잼을 발행하므로 `isRealtimeTeamSession`이 참이고, 그 분기가 실패로
    * 닫혀 있는 동안에는 3D 배경을 캔버스에 붙이는 경로가 어디에도 없었다.
    */
-  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }) => {
+  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }, testInfo) => {
     // This case walks the whole round trip — insert, update, reopen, update again — while every
     // frame is rendered by SwiftShader. On the CI runner the other 3D cases in this file each
     // take 1.5–2.5 minutes, and this one does several times their work, so the 300s it inherited
@@ -603,6 +678,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     const emptyCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
     await openBg3d(page);
+    // 진입 경로 자체는 엔진과 무관하다. 다만 렌더된 프레임이 없으면 "컬러 배경 추가"가
+    // "캡처할 3D 장면이 아직 준비되지 않았습니다"로 닫히지 않고 남으므로 먼저 엔진을 고른다.
+    await ensureBg3dWebGl2(page);
 
     const emptyScene = await frameStats(page, BG3D_VIEWPORT);
     await page.locator('[aria-label="상자 추가"]').first().click();
@@ -628,18 +706,6 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await expect(page.getByText("3D LT 배경", { exact: false }).first()).toBeVisible({
       timeout: 30_000,
     });
-    // 삽입 직후 자동 선택된 Transformer/핸들을 제거하고 실제 문서 raster만 비교한다. 전체
-    // scroll viewport나 선택 테두리 변화는 빈/깨진 PNG도 성공으로 오판할 수 있다.
-    await page.getByRole("button", { name: "해제", exact: true }).click();
-    const insertedCanvas = await waitForFrameChange(
-      page,
-      STUDIO_DOCUMENT_SCOPE,
-      emptyCanvas,
-      "3D 배경 캔버스 합성",
-      30_000,
-    );
-    expect(insertedCanvas.distinctColors).toBeGreaterThan(1);
-
     // 실시간 룸에서는 병합 합성이 들어간다는 사실을 중립 알림으로 알려야 한다 — 오류가 아니다.
     const notice = page.locator("[data-studio-status-notice-dismiss]").first();
     if (await notice.count()) {
@@ -647,6 +713,21 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     }
     // 성공한 삽입이 빨간 오류 배너를 남겨서는 안 된다.
     await expect(page.locator("[data-studio-status-error-dismiss]")).toHaveCount(0);
+    // 알림은 상태 레일 높이를 바꾸므로, 빈 캔버스 기준과 같은 레이아웃으로 되돌린 뒤 캡처한다.
+    await dismissStudioStatusNotices(page);
+
+    // 삽입 직후 자동 선택된 Transformer/핸들을 제거하고 실제 문서 raster만 비교한다. 전체
+    // scroll viewport나 선택 테두리 변화는 빈/깨진 PNG도 성공으로 오판할 수 있다.
+    await page.getByRole("button", { name: "해제", exact: true }).click();
+    await waitForFrameChange(
+      page,
+      STUDIO_DOCUMENT_SCOPE,
+      emptyCanvas,
+      "3D 배경 캔버스 합성",
+      30_000,
+    );
+    const insertedCanvas = await waitForStableDocumentFrame(page, "3D 배경 캔버스 합성 정착");
+    expect(insertedCanvas.distinctColors).toBeGreaterThan(1);
 
     // 레이어 트리에서 방금 삽입한 원본을 다시 선택하고 ID를 기록한다. 업데이트가 delete +
     // reinsert로 바뀌어도 단순 count=1은 통과하므로 동일 identity를 직접 고정한다.
@@ -674,7 +755,13 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 원본 전달이 빠지면 빈 insert 장면과 "컬러 배경 추가" footer가 나타난다.
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    // 편집기는 정확히 하나여야 한다. 두 번째 인스턴스가 붙으면 아래 단언들은 업데이트 편집기를
+    // 보면서 닫기도 그쪽에만 걸리고, 남은 빈 insert 편집기 때문에 닫힘 단언이 계속 1을 본다 —
+    // 러너에서 실제로 관측된 실패 모양이므로 원인 위치를 여기서 고정한다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
+    await ensureBg3dWebGl2(page);
     await page.getByRole("tab", { name: "레이어" }).click();
     await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
     const restoredViewport = await frameStats(page, BG3D_VIEWPORT);
@@ -739,8 +826,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 먼저 재열기와 무관한 update 자체의 가시 결과를 고정한다. 이 지점에서 새 raster가 보이지
     // 않으면 캡처/patch/이미지 디코드 경로 결함이고, 여기서는 보이는데 아래 재열기 뒤 사라지면
     // route/modal 전환이 문서 화면을 되돌린 결함이다.
+    // 업데이트가 병합 알림을 다시 띄우므로 삽입 때와 같은 레이아웃으로 되돌린 뒤 캡처한다.
+    await dismissStudioStatusNotices(page);
     await page.getByRole("button", { name: "해제", exact: true }).click();
-    const updatedCanvas = await waitForFrameChange(
+    await waitForFrameChange(
       page,
       STUDIO_DOCUMENT_SCOPE,
       insertedCanvas,
@@ -748,7 +837,12 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
       30_000,
       "color",
     );
+    const updatedCanvas = await waitForStableDocumentFrame(page, "3D 배경 업데이트 캔버스 정착");
     expect(updatedCanvas.distinctColors).toBeGreaterThan(1);
+    await testInfo.attach("updated-document.png", {
+      body: await page.locator(STUDIO_DOCUMENT_SCOPE).first().screenshot(),
+      contentType: "image/png",
+    });
     // Same row, same `content-visibility:auto` caveat as the first selection above.
     await updatedLayer.scrollIntoViewIfNeeded();
     await updatedLayer.click({ position: { x: 12, y: 18 } });
@@ -758,7 +852,13 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     // 통과하고 아래 raster만 같다면 metadata update와 image capture 사이 결함이다.
     await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
     await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
+    // 편집기는 정확히 하나여야 한다. 두 번째 인스턴스가 붙으면 아래 단언들은 업데이트 편집기를
+    // 보면서 닫기도 그쪽에만 걸리고, 남은 빈 insert 편집기 때문에 닫힘 단언이 계속 1을 본다 —
+    // 러너에서 실제로 관측된 실패 모양이므로 원인 위치를 여기서 고정한다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "3D 배경 업데이트" })).toBeVisible();
+    // 선택은 프로필에 저장되므로 보통 이미 WebGL2다; 아니면 여기서 다시 고른다.
+    await ensureBg3dWebGl2(page);
     await page.getByRole("tab", { name: "레이어" }).click();
     await expect(page.getByRole("button", { name: "상자 1", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "구 1", exact: true })).toBeVisible();
@@ -766,14 +866,54 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await page.getByRole("tab", { name: "도형", exact: true }).click();
     await expect(page.getByRole("spinbutton", { name: "위치 X" }).first()).toHaveValue("2.5");
     await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
-    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0);
+    // 이 스위트의 다른 닫힘 단언과 같은 예산을 준다. 닫기 버튼은 캡처 중 비활성이고, 느린
+    // 소프트웨어 래스터라이저에서는 마지막 캡처가 끝나기까지 기본 30초를 넘길 수 있다.
+    await expect(page.locator(BG3D_DIALOG)).toHaveCount(0, { timeout: 120_000 });
 
-    // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다.
+    // 선택 장식을 다시 제거한 뒤에도 재열기 전의 업데이트 raster가 유지되어야 한다. 고정 대기는
+    // 러너 속도에 판정을 거는 셈이므로 프레임이 정착할 때까지 폴링한다.
+    await dismissStudioStatusNotices(page);
     await page.getByRole("button", { name: "해제", exact: true }).click();
-    await page.waitForTimeout(2_000);
-    const reopenedCanvas = await frameStats(page, STUDIO_DOCUMENT_SCOPE);
-    expect(peakColorTileDelta(reopenedCanvas, insertedCanvas)).toBeGreaterThan(3);
-    expect(peakColorTileDelta(reopenedCanvas, updatedCanvas)).toBeLessThan(3);
+    const reopenedCanvas = await waitForStableDocumentFrame(page, "재열기 뒤 캔버스 정착");
+    await testInfo.attach("reopened-document.png", {
+      body: await page.locator(STUDIO_DOCUMENT_SCOPE).first().screenshot(),
+      contentType: "image/png",
+    });
+
+    // "재열기가 문서 화면을 되돌리지 않았다"는 계약은 presenter 영수증으로 정확히 고정한다: 마지막으로
+    // 그린 raster 가 업데이트 PNG 그대로여야 하고, 기대와 영수증이 같은 src 를 가리켜야 한다.
+    const retained = await page.evaluate(() => {
+      const probe = window.__studioRasterImagePresentationProbe;
+      return {
+        expected: probe?.expected?.src ?? "",
+        receipt: probe?.receipt?.src ?? "",
+      };
+    });
+    expect(retained.expected).toBe(updatedCompositeSrc);
+    expect(retained.receipt).toBe(updatedCompositeSrc);
+
+    // 화면 비교는 방향으로 판정한다: 재열기 뒤 프레임은 삽입 raster 보다 업데이트 raster 에 가까워야
+    // 한다. 예전의 절대 임계(칸 RGB 차 < 3)는 러너별 글꼴·레이아웃 차이로 칸 경계가 한 픽셀 옮겨
+    // 가는 것(리눅스 러너에서 두 번 연속 정확히 3.55)까지 회귀로 읽었다 — 두 캡처가 모두 정착·알림
+    // 제거 뒤였고 값이 재현 가능해 시간 문제가 아니었다. 되돌림은 위 영수증 단언이 잡는다.
+    const reopenedToUpdated = peakColorTileDelta(reopenedCanvas, updatedCanvas);
+    const reopenedToInserted = peakColorTileDelta(reopenedCanvas, insertedCanvas);
+    const updatedToInserted = peakColorTileDelta(updatedCanvas, insertedCanvas);
+    await testInfo.attach("reopen-deltas.json", {
+      body: Buffer.from(JSON.stringify({
+        reopenedToUpdated,
+        reopenedToInserted,
+        updatedToInserted,
+        frames: {
+          inserted: [insertedCanvas.width, insertedCanvas.height],
+          updated: [updatedCanvas.width, updatedCanvas.height],
+          reopened: [reopenedCanvas.width, reopenedCanvas.height],
+        },
+      }, null, 2)),
+      contentType: "application/json",
+    });
+    expect(reopenedToInserted).toBeGreaterThan(3);
+    expect(reopenedToUpdated).toBeLessThan(reopenedToInserted);
 
     expect(fatal).toEqual([]);
   });

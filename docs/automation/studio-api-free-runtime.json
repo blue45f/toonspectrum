@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "mode": "api-free-connected-session",
+  "automaticCodeAuthoring": false,
+  "openAiApiKeyRequired": false,
+  "laneRegistry": "docs/automation/studio-seven-day-campaign.json",
+  "laneCount": 30,
+  "codeAuthoringOwner": "ChatGPT or Codex connected repository session",
+  "githubActionsResponsibilities": [
+    "competitor-and-research-audit",
+    "lint-typecheck-tests-and-build",
+    "pull-request-risk-gates",
+    "safe-main-merge",
+    "deployment-smoke",
+    "merged-branch-cleanup"
+  ],
+  "disabledCapabilities": [
+    "github-hosted-openai-model-calls",
+    "repository-openai-api-key",
+    "unattended-ai-code-authoring"
+  ],
+  "security": {
+    "acceptOpenAiApiKey": false,
+    "acceptPlaintextSecrets": false,
+    "requireRevocationOfExposedKeys": true
+  }
+}
