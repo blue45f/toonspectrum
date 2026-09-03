@@ -3,12 +3,20 @@
  *
  * Positions are stored as ratios of the available viewport travel instead of raw pixels. A layout
  * therefore survives monitor, browser-zoom, and panel-size changes without restoring off screen.
- * The view layer owns pointer sessions; this module only normalizes and resolves deterministic
- * geometry.
+ * Optional docking remains part of the same exact UI-only allowlist, so pre-docking v1 snapshots
+ * continue to normalize without migration I/O.
  */
 
 export const STUDIO_FLOATING_SURFACE_LAYOUT_VERSION = 1 as const;
 export const STUDIO_FLOATING_SURFACE_MAX_DIMENSION = 8_192;
+export const STUDIO_FLOATING_SURFACE_DOCK_EDGES = [
+  "left",
+  "right",
+  "bottom",
+] as const;
+
+export type StudioFloatingSurfaceDockEdge =
+  (typeof STUDIO_FLOATING_SURFACE_DOCK_EDGES)[number];
 
 export interface StudioFloatingSurfaceLayout {
   readonly version: typeof STUDIO_FLOATING_SURFACE_LAYOUT_VERSION;
@@ -16,6 +24,8 @@ export interface StudioFloatingSurfaceLayout {
   readonly yRatio: number;
   readonly width: number;
   readonly height: number;
+  /** Missing and null both mean an ordinary free-floating surface. */
+  readonly dock?: StudioFloatingSurfaceDockEdge | null;
 }
 
 export interface StudioFloatingSurfaceRect {
@@ -42,7 +52,7 @@ export interface StudioFloatingSurfaceConstraints {
   readonly snapDistance?: number;
 }
 
-interface StudioFloatingSurfaceBounds {
+export interface StudioFloatingSurfaceBounds {
   readonly left: number;
   readonly top: number;
   readonly right: number;
@@ -58,6 +68,8 @@ const DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = Object.freeze({
   width: 336,
   height: 720,
 });
+
+const DOCK_EDGE_SET = new Set<string>(STUDIO_FLOATING_SURFACE_DOCK_EDGES);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -79,13 +91,21 @@ function roundedRatio(value: number): number {
   return Math.round(clamp(value, 0, 1) * 10_000) / 10_000;
 }
 
+function normalizeDock(value: unknown): StudioFloatingSurfaceDockEdge | null {
+  return typeof value === "string" && DOCK_EDGE_SET.has(value)
+    ? value as StudioFloatingSurfaceDockEdge
+    : null;
+}
+
 function freezeLayout(layout: StudioFloatingSurfaceLayout): StudioFloatingSurfaceLayout {
+  const dock = normalizeDock(layout.dock);
   return Object.freeze({
     version: STUDIO_FLOATING_SURFACE_LAYOUT_VERSION,
     xRatio: roundedRatio(layout.xRatio),
     yRatio: roundedRatio(layout.yRatio),
     width: Math.round(clamp(layout.width, 1, STUDIO_FLOATING_SURFACE_MAX_DIMENSION)),
     height: Math.round(clamp(layout.height, 1, STUDIO_FLOATING_SURFACE_MAX_DIMENSION)),
+    ...(dock ? { dock } : {}),
   });
 }
 
@@ -108,13 +128,14 @@ export function normalizeStudioFloatingSurfaceLayout(
       yRatio: finite(readOwn(raw, "yRatio"), safeFallback.yRatio),
       width: finite(readOwn(raw, "width"), safeFallback.width),
       height: finite(readOwn(raw, "height"), safeFallback.height),
+      dock: normalizeDock(readOwn(raw, "dock")),
     });
   } catch {
     return safeFallback;
   }
 }
 
-function resolveBounds(
+export function resolveStudioFloatingSurfaceBounds(
   viewport: StudioFloatingSurfaceViewport,
 ): StudioFloatingSurfaceBounds {
   const viewportWidth = Math.max(1, finite(viewport.width, 1));
@@ -158,7 +179,7 @@ function constrainRect(
   viewport: StudioFloatingSurfaceViewport,
   constraints: StudioFloatingSurfaceConstraints,
 ): StudioFloatingSurfaceRect {
-  const bounds = resolveBounds(viewport);
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
   const [minWidth, maxWidth] = resolveDimensionRange(
     bounds.width,
     constraints.minWidth,
@@ -184,15 +205,15 @@ function constrainRect(
   return { x, y, width, height };
 }
 
-/** Resolves a persisted ratio layout into a visible, viewport-safe pixel rectangle. */
-export function resolveStudioFloatingSurfaceRect(
+/** Resolves only the floating rectangle, deliberately ignoring a persisted dock edge. */
+export function resolveStudioFloatingSurfaceFloatingRect(
   rawLayout: unknown,
   viewport: StudioFloatingSurfaceViewport,
   constraints: StudioFloatingSurfaceConstraints,
   fallback: StudioFloatingSurfaceLayout = DEFAULT_LAYOUT,
 ): StudioFloatingSurfaceRect {
   const layout = normalizeStudioFloatingSurfaceLayout(rawLayout, fallback);
-  const bounds = resolveBounds(viewport);
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
   const [minWidth, maxWidth] = resolveDimensionRange(
     bounds.width,
     constraints.minWidth,
@@ -215,14 +236,91 @@ export function resolveStudioFloatingSurfaceRect(
   };
 }
 
-/** Converts a visible rectangle back to the durable ratio representation. */
+/**
+ * Expands a preferred floating rectangle into a stable edge dock. Left/right docks retain their
+ * preferred width; the bottom dock retains its preferred height. The other dimension fills the
+ * safe viewport and deliberately ignores the floating maximum for that axis.
+ */
+export function resolveStudioFloatingSurfaceDockRect(
+  edge: StudioFloatingSurfaceDockEdge,
+  preferredRect: StudioFloatingSurfaceRect,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+): StudioFloatingSurfaceRect {
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
+  const constrained = constrainRect(preferredRect, viewport, constraints);
+  if (edge === "bottom") {
+    const [, maxHeight] = resolveDimensionRange(
+      bounds.height,
+      constraints.minHeight,
+      Math.min(
+        constraints.maxHeight ?? bounds.height,
+        Math.max(constraints.minHeight, Math.round(bounds.height * 0.72)),
+      ),
+    );
+    const height = Math.round(clamp(
+      constrained.height,
+      Math.min(constraints.minHeight, bounds.height),
+      maxHeight,
+    ));
+    return {
+      x: bounds.left,
+      y: bounds.bottom - height,
+      width: bounds.width,
+      height,
+    };
+  }
+
+  const [, maxWidth] = resolveDimensionRange(
+    bounds.width,
+    constraints.minWidth,
+    Math.min(
+      constraints.maxWidth ?? bounds.width,
+      Math.max(constraints.minWidth, Math.round(bounds.width * 0.55)),
+    ),
+  );
+  const width = Math.round(clamp(
+    constrained.width,
+    Math.min(constraints.minWidth, bounds.width),
+    maxWidth,
+  ));
+  return {
+    x: edge === "left" ? bounds.left : bounds.right - width,
+    y: bounds.top,
+    width,
+    height: bounds.height,
+  };
+}
+
+/** Resolves a persisted ratio layout into a visible, viewport-safe pixel rectangle. */
+export function resolveStudioFloatingSurfaceRect(
+  rawLayout: unknown,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+  fallback: StudioFloatingSurfaceLayout = DEFAULT_LAYOUT,
+): StudioFloatingSurfaceRect {
+  const layout = normalizeStudioFloatingSurfaceLayout(rawLayout, fallback);
+  const floating = resolveStudioFloatingSurfaceFloatingRect(
+    layout,
+    viewport,
+    constraints,
+    fallback,
+  );
+  const dock = normalizeDock(layout.dock);
+  return dock
+    ? resolveStudioFloatingSurfaceDockRect(dock, floating, viewport, constraints)
+    : floating;
+}
+
+/** Converts a preferred floating rectangle back to the durable ratio representation. */
 export function createStudioFloatingSurfaceLayout(
   rawRect: StudioFloatingSurfaceRect,
   viewport: StudioFloatingSurfaceViewport,
   constraints: StudioFloatingSurfaceConstraints,
+  dock: StudioFloatingSurfaceDockEdge | null = null,
 ): StudioFloatingSurfaceLayout {
   const rect = constrainRect(rawRect, viewport, constraints);
-  const bounds = resolveBounds(viewport);
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
   const xTravel = Math.max(0, bounds.width - rect.width);
   const yTravel = Math.max(0, bounds.height - rect.height);
   return freezeLayout({
@@ -231,6 +329,7 @@ export function createStudioFloatingSurfaceLayout(
     yRatio: yTravel > 0 ? (rect.y - bounds.top) / yTravel : 0,
     width: rect.width,
     height: rect.height,
+    dock,
   });
 }
 
@@ -239,7 +338,7 @@ function snapRectToBounds(
   viewport: StudioFloatingSurfaceViewport,
   snapDistance: number,
 ): StudioFloatingSurfaceRect {
-  const bounds = resolveBounds(viewport);
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
   const distance = Math.max(0, finite(snapDistance, 0));
   let x = rect.x;
   let y = rect.y;
@@ -281,7 +380,7 @@ export function resizeStudioFloatingSurfaceRect(
   viewport: StudioFloatingSurfaceViewport,
   constraints: StudioFloatingSurfaceConstraints,
 ): StudioFloatingSurfaceRect {
-  const bounds = resolveBounds(viewport);
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
   return constrainRect({
     ...start,
     width: Math.min(
@@ -292,6 +391,146 @@ export function resizeStudioFloatingSurfaceRect(
       start.height + finite(deltaHeight, 0),
       Math.max(1, bounds.bottom - start.y),
     ),
+  }, viewport, constraints);
+}
+
+/** Resizes the exposed edge of a dock while keeping the dock attached to its safe viewport edge. */
+export function resizeStudioFloatingSurfaceDockRect(
+  start: StudioFloatingSurfaceRect,
+  edge: StudioFloatingSurfaceDockEdge,
+  deltaX: number,
+  deltaY: number,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+): StudioFloatingSurfaceRect {
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
+  if (edge === "bottom") {
+    const preferred = {
+      ...start,
+      height: start.height - finite(deltaY, 0),
+    };
+    return resolveStudioFloatingSurfaceDockRect(
+      edge,
+      preferred,
+      viewport,
+      constraints,
+    );
+  }
+  const width = edge === "left"
+    ? start.width + finite(deltaX, 0)
+    : start.width - finite(deltaX, 0);
+  return resolveStudioFloatingSurfaceDockRect(
+    edge,
+    {
+      ...start,
+      width,
+      x: edge === "left" ? bounds.left : bounds.right - width,
+    },
+    viewport,
+    constraints,
+  );
+}
+
+/** Chooses the closest allowed safe edge while a floating panel is inside the activation band. */
+export function resolveStudioFloatingSurfaceDockCandidate(
+  rect: StudioFloatingSurfaceRect,
+  viewport: StudioFloatingSurfaceViewport,
+  allowedEdges: readonly StudioFloatingSurfaceDockEdge[],
+  activationDistance = 48,
+): StudioFloatingSurfaceDockEdge | null {
+  const bounds = resolveStudioFloatingSurfaceBounds(viewport);
+  const distance = Math.max(0, finite(activationDistance, 0));
+  let best: { readonly edge: StudioFloatingSurfaceDockEdge; readonly gap: number } | null = null;
+  for (const edge of allowedEdges) {
+    if (!DOCK_EDGE_SET.has(edge)) continue;
+    const gap = edge === "left"
+      ? Math.abs(rect.x - bounds.left)
+      : edge === "right"
+        ? Math.abs(bounds.right - (rect.x + rect.width))
+        : Math.abs(bounds.bottom - (rect.y + rect.height));
+    if (gap > distance || (best && best.gap <= gap)) continue;
+    best = { edge, gap };
+  }
+  return best?.edge ?? null;
+}
+
+function closestSnap(
+  current: number,
+  candidates: readonly number[],
+  distance: number,
+): number {
+  let value = current;
+  let bestGap = distance + 1;
+  for (const candidate of candidates) {
+    const gap = Math.abs(candidate - current);
+    if (gap > distance || gap >= bestGap) continue;
+    value = candidate;
+    bestGap = gap;
+  }
+  return value;
+}
+
+/** Magnetically aligns panel edges with peer surfaces without forcing overlap or a dock. */
+export function snapStudioFloatingSurfaceRectToPeers(
+  rect: StudioFloatingSurfaceRect,
+  peerRects: readonly StudioFloatingSurfaceRect[],
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+  snapDistance = constraints.snapDistance ?? 0,
+): StudioFloatingSurfaceRect {
+  const distance = Math.max(0, finite(snapDistance, 0));
+  if (distance === 0 || peerRects.length === 0) {
+    return constrainRect(rect, viewport, constraints);
+  }
+  const xCandidates: number[] = [];
+  const yCandidates: number[] = [];
+  for (const peer of peerRects) {
+    if (!(peer.width > 0) || !(peer.height > 0)) continue;
+    xCandidates.push(
+      peer.x,
+      peer.x + peer.width,
+      peer.x - rect.width,
+      peer.x + peer.width - rect.width,
+    );
+    yCandidates.push(
+      peer.y,
+      peer.y + peer.height,
+      peer.y - rect.height,
+      peer.y + peer.height - rect.height,
+    );
+  }
+  return constrainRect({
+    ...rect,
+    x: closestSnap(rect.x, xCandidates, distance),
+    y: closestSnap(rect.y, yCandidates, distance),
+  }, viewport, constraints);
+}
+
+/**
+ * Produces a sensible free-floating rectangle when a docked title bar starts moving. The pointer
+ * stays within the title-bar band rather than making the panel jump to an unrelated corner.
+ */
+export function undockStudioFloatingSurfaceRect(
+  rawLayout: StudioFloatingSurfaceLayout,
+  dockedRect: StudioFloatingSurfaceRect,
+  pointerX: number,
+  pointerY: number,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+): StudioFloatingSurfaceRect {
+  const floating = resolveStudioFloatingSurfaceFloatingRect(
+    { ...rawLayout, dock: null },
+    viewport,
+    constraints,
+    rawLayout,
+  );
+  const horizontalRatio = dockedRect.width > 0
+    ? clamp((pointerX - dockedRect.x) / dockedRect.width, 0.08, 0.92)
+    : 0.5;
+  return constrainRect({
+    ...floating,
+    x: pointerX - floating.width * horizontalRatio,
+    y: pointerY - Math.min(24, Math.max(12, pointerY - dockedRect.y)),
   }, viewport, constraints);
 }
 
@@ -307,6 +546,7 @@ export function studioFloatingSurfaceLayoutsEqual(
     && left.yRatio === right.yRatio
     && left.width === right.width
     && left.height === right.height
+    && normalizeDock(left.dock) === normalizeDock(right.dock)
   );
 }
 
@@ -317,6 +557,22 @@ export interface StudioFloatingSurfaceStorage {
 }
 
 export const STUDIO_FLOATING_SURFACE_MAX_SERIALIZED_LENGTH = 4_096;
+
+/** Serializes only the normalized documented fields. */
+export function encodeStudioFloatingSurfaceLayout(
+  layout: StudioFloatingSurfaceLayout,
+): string {
+  const normalized = normalizeStudioFloatingSurfaceLayout(layout);
+  const dock = normalizeDock(normalized.dock);
+  return JSON.stringify({
+    version: normalized.version,
+    xRatio: normalized.xRatio,
+    yRatio: normalized.yRatio,
+    width: normalized.width,
+    height: normalized.height,
+    ...(dock ? { dock } : {}),
+  });
+}
 
 /** Reads one bounded UI-only layout. Invalid values recover without mutating storage. */
 export function loadStudioFloatingSurfaceLayout(
@@ -350,14 +606,7 @@ export function saveStudioFloatingSurfaceLayout(
 ): boolean {
   if (!storage || !key || key.length > 256) return false;
   try {
-    const normalized = normalizeStudioFloatingSurfaceLayout(layout);
-    storage.setItem(key, JSON.stringify({
-      version: normalized.version,
-      xRatio: normalized.xRatio,
-      yRatio: normalized.yRatio,
-      width: normalized.width,
-      height: normalized.height,
-    }));
+    storage.setItem(key, encodeStudioFloatingSurfaceLayout(layout));
     return true;
   } catch {
     return false;

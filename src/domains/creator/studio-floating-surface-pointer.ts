@@ -25,9 +25,9 @@ export type {
 /**
  * Owns one mouse, pen, or touch pointer interaction for a floating Studio surface.
  *
- * The DOM receives rAF previews while React and persistence see a single commit. Cleanup always
- * runs before the external commit callback, so a failed owner update cannot strand pointer capture,
- * body cursor, or text-selection state.
+ * The DOM receives rAF previews while React and persistence see a single commit. Listener/capture
+ * cleanup always runs before the external commit callback, and onComplete still runs if the owner
+ * callback throws, so a failed state write cannot strand the session.
  */
 export function startStudioFloatingSurfacePointerSession(
   options: StartStudioFloatingSurfacePointerSessionOptions,
@@ -75,8 +75,11 @@ export function startStudioFloatingSurfacePointerSession(
     document.body.style.userSelect = session.previousBodyUserSelect;
     document.body.style.cursor = session.previousBodyCursor;
     if (session.active) session.onActiveChange(false);
-    session.onComplete();
-    if (committedRect) session.onCommit(committedRect);
+    try {
+      if (committedRect) session.onCommit(committedRect);
+    } finally {
+      session.onComplete();
+    }
   };
 
   function onMove(event: PointerEvent): void {

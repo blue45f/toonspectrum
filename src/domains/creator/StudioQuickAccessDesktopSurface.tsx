@@ -1,17 +1,14 @@
-import { useState } from "react";
-
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import {
   DEFAULT_STUDIO_QUICK_ACCESS_FLOATING_LAYOUT,
-  loadStudioQuickAccessFloatingLayout,
-  saveStudioQuickAccessFloatingLayout,
+  STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
 } from "./studio-quick-access-surface-layout";
 import { StudioQuickAccessPalette } from "./StudioQuickAccessPalette";
+import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
 
-import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
 import type { StudioQuickAccessSurfaceLeafProps } from "./studio-quick-access-surface-types";
 
-/** Movable, resizable desktop presentation backed by the shared Studio window chrome. */
+/** Movable, resizable, dockable desktop presentation backed by shared Studio window chrome. */
 export function StudioQuickAccessDesktopSurface({
   state,
   catalog,
@@ -21,15 +18,21 @@ export function StudioQuickAccessDesktopSurface({
   onExecute,
   onClose,
 }: StudioQuickAccessSurfaceLeafProps) {
-  const [layout, setLayout] = useState(loadStudioQuickAccessFloatingLayout);
-  const commitLayout = (next: StudioFloatingSurfaceLayout): void => {
-    setLayout(next);
-    saveStudioQuickAccessFloatingLayout(next);
-  };
+  const {
+    layout,
+    authority,
+    failure,
+    setLayout,
+  } = useStudioFloatingSurfaceLayout({
+    surfaceId: "quick-access",
+    defaultLayout: DEFAULT_STUDIO_QUICK_ACCESS_FLOATING_LAYOUT,
+    sessionKey: STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
+  });
 
   return (
     <StudioFloatingSurface
       ref={surfaceRef}
+      surfaceId="quick-access"
       label="빠른 액세스 팔레트"
       descriptionId={descriptionId}
       layout={layout}
@@ -42,12 +45,15 @@ export function StudioQuickAccessDesktopSurface({
       insetRight={12}
       insetBottom={12}
       insetLeft={12}
-      onLayoutChange={commitLayout}
+      chromeDensity="compact"
+      onLayoutChange={setLayout}
       onClose={onClose}
       rootDataAttributes={{
         "data-studio-quick-access-surface": "true",
         "data-studio-shortcut-boundary": "true",
         "data-mobile": "false",
+        "data-layout-authority": authority,
+        "data-layout-failure": failure ?? undefined,
       }}
       contentClassName="overflow-hidden"
     >

@@ -17,6 +17,8 @@ export interface StudioFloatingPointerSessionState {
   readonly startClientX: number;
   readonly startClientY: number;
   readonly startRect: StudioFloatingSurfaceRect;
+  readonly restoreRect: StudioFloatingSurfaceRect;
+  readonly activeCursor: string;
   readonly resolveRect: StartStudioFloatingSurfacePointerSessionOptions["resolveRect"];
   readonly onActiveChange: StartStudioFloatingSurfacePointerSessionOptions["onActiveChange"];
   readonly onCommit: StartStudioFloatingSurfacePointerSessionOptions["onCommit"];
@@ -45,6 +47,9 @@ export function createStudioFloatingPointerSessionState(
     latestClientX: options.clientX,
     latestClientY: options.clientY,
     startRect: options.startRect,
+    restoreRect: options.restoreRect ?? options.startRect,
+    activeCursor: options.activeCursor
+      ?? (options.kind === "move" ? "grabbing" : "se-resize"),
     resolveRect: options.resolveRect,
     onActiveChange: options.onActiveChange,
     onCommit: options.onCommit,
@@ -92,11 +97,17 @@ function applyPreview(session: StudioFloatingPointerSessionState): void {
     session.latestClientY - session.startClientY,
     false,
   );
+  session.node.style.width = `${rect.width}px`;
+  session.node.style.height = `${rect.height}px`;
   if (session.kind === "move") {
-    session.node.style.transform = `translate3d(${rect.x - session.startRect.x}px, ${rect.y - session.startRect.y}px, 0)`;
+    session.node.style.left = `${session.startRect.x}px`;
+    session.node.style.top = `${session.startRect.y}px`;
+    session.node.style.transform =
+      `translate3d(${rect.x - session.startRect.x}px, ${rect.y - session.startRect.y}px, 0)`;
   } else {
-    session.node.style.width = `${rect.width}px`;
-    session.node.style.height = `${rect.height}px`;
+    session.node.style.left = `${rect.x}px`;
+    session.node.style.top = `${rect.y}px`;
+    session.node.style.transform = "translate3d(0, 0, 0)";
   }
 }
 
@@ -120,7 +131,7 @@ export function activateStudioFloatingPointerSession(
     session.activationTimer = null;
   }
   document.body.style.userSelect = "none";
-  document.body.style.cursor = session.kind === "move" ? "grabbing" : "se-resize";
+  document.body.style.cursor = session.activeCursor;
   session.onActiveChange(true);
   scheduleStudioFloatingPointerPreview(session);
 }
@@ -128,9 +139,11 @@ export function activateStudioFloatingPointerSession(
 export function restoreStudioFloatingPointerStartRect(
   session: StudioFloatingPointerSessionState,
 ): void {
+  session.node.style.left = `${session.restoreRect.x}px`;
+  session.node.style.top = `${session.restoreRect.y}px`;
+  session.node.style.width = `${session.restoreRect.width}px`;
+  session.node.style.height = `${session.restoreRect.height}px`;
   session.node.style.transform = "translate3d(0, 0, 0)";
-  session.node.style.width = `${session.startRect.width}px`;
-  session.node.style.height = `${session.startRect.height}px`;
 }
 
 export function applyStudioFloatingPointerCommittedRect(
