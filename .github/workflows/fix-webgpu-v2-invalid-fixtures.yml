@@ -1,0 +1,74 @@
+name: Repair clean WebGPU V2 invalid fixtures
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-v2-clean-20260904
+    paths:
+      - ".github/workflows/fix-webgpu-v2-invalid-fixtures.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-webgpu-v2-invalid-fixtures-20260904
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/webgpu-brush-v2-clean-20260904
+          fetch-depth: 0
+      - name: Build invalid plans from the valid frozen fixture
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime-v2.test.ts')
+          source = path.read_text(encoding='utf-8')
+          old = '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              mode: "append",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              durableR8GrainSource: {} as never,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
+              batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
+            }))).toBe(false);'''.replace('            ', '')
+          new = '''    expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              mode: "append",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              durableR8GrainSource: {} as never,
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+            }))).toBe(false);
+            expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(deepFreeze({
+              ...valid,
+              batches: deepFreeze([{ ...valid.batches[0]!, porterDuff: "destination-out" }]),
+            }))).toBe(false);'''.replace('            ', '')
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one invalid fixture block, found {source.count(old)}')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
+          rm -f .github/workflows/fix-webgpu-v2-invalid-fixtures.yml
+          git diff --check
+      - name: Commit fixture repair
+        run: |
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "test(webgpu): keep invalid V2 fixtures structurally constructible"
+          git push origin HEAD:feat/webgpu-brush-v2-clean-20260904
