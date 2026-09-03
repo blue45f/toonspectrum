@@ -1,0 +1,112 @@
+name: Final lossless merge sweep
+
+on:
+  push:
+    branches:
+      - automation/final-lossless-merge-sweep-20260903
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: final-lossless-merge-sweep-20260903
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Merge every currently green exact head and record blockers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          declare -a candidates=(595 596 597 598 599 600 601 602 603 604 605 606 607)
+          for branch in \
+            integration/preserved-open-work-20260903 \
+            fix/marketplace-wiring-preserved-20260903 \
+            integration/salvage-pr-599-603-safe-files-20260903; do
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$branch" --json number --jq '.[0].number // empty')"
+            [[ -n "$number" ]] && candidates+=("$number")
+          done
+
+          printf '# Final lossless merge sweep\n\n' >> "$GITHUB_STEP_SUMMARY"
+          printf '| PR | Result | Detail |\n|---:|:---|:---|\n' >> "$GITHUB_STEP_SUMMARY"
+
+          declare -A seen=()
+          for number in "${candidates[@]}"; do
+            [[ -n "$number" ]] || continue
+            [[ -z "${seen[$number]:-}" ]] || continue
+            seen[$number]=1
+
+            metadata="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json state,isDraft,mergeStateStatus,headRefOid,title 2>/dev/null || true)"
+            if [[ -z "$metadata" ]]; then
+              printf '| #%s | skipped | metadata unavailable |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            state="$(jq -r '.state' <<<"$metadata")"
+            draft="$(jq -r '.isDraft' <<<"$metadata")"
+            merge_state="$(jq -r '.mergeStateStatus' <<<"$metadata")"
+            title="$(jq -r '.title' <<<"$metadata")"
+
+            if [[ "$state" != "OPEN" ]]; then
+              printf '| #%s | %s | already closed or merged |\n' "$number" "$state" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [[ "$draft" == "true" ]]; then
+              printf '| #%s | kept | draft |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [[ "$merge_state" == "DIRTY" ]]; then
+              printf '| #%s | preserved | merge conflict; no force merge |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [[ "$merge_state" == "BEHIND" ]]; then
+              if gh pr update-branch "$number" --repo "$GITHUB_REPOSITORY"; then
+                printf '| #%s | synchronized | waiting for checks on new head |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+                sleep 30
+              else
+                printf '| #%s | preserved | branch update failed |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+            fi
+
+            core_count=0
+            for attempt in $(seq 1 45); do
+              checks="$(gh pr checks "$number" --repo "$GITHUB_REPOSITORY" --json name,state,bucket 2>/dev/null || printf '[]')"
+              core_count="$(jq '[.[] | select(.name | ascii_downcase | contains("core"))] | length' <<<"$checks")"
+              (( core_count > 0 )) && break
+              sleep 20
+            done
+            if (( core_count == 0 )); then
+              printf '| #%s | preserved | no core check registered |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if ! gh pr checks "$number" --repo "$GITHUB_REPOSITORY" --watch --fail-fast --interval 20; then
+              printf '| #%s | preserved | one or more checks failed |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            head_sha="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+            if gh pr merge "$number" \
+              --repo "$GITHUB_REPOSITORY" \
+              --squash \
+              --match-head-commit "$head_sha" \
+              --subject "$title" \
+              --body "Final lossless sweep: synchronized with current main and merged only after every registered check, including core, passed on this exact head."; then
+              printf '| #%s | merged | exact passing head `%s` |\n' "$number" "${head_sha:0:12}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf '| #%s | preserved | repository merge policy blocked merge |\n' "$number" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
