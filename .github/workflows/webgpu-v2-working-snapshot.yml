@@ -15,10 +15,8 @@ concurrency:
 
 jobs:
   restore-source:
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 10
-    env:
-      PAYLOAD_ARCHIVE: /tmp/webgpu-v2-payload.tar.xz
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,16 +26,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t parts < <(find .bootstrap/webgpu-v2 -maxdepth 1 -type f -name 'part-*' | sort)
-          test "${#parts[@]}" -eq 7
-          cat "${parts[@]}" | base64 --decode > "$PAYLOAD_ARCHIVE"
-          xz --test "$PAYLOAD_ARCHIVE"
-          echo "candidate archive sha256=$(sha256sum "$PAYLOAD_ARCHIVE" | cut -d' ' -f1)"
-          if tar -tJf "$PAYLOAD_ARCHIVE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
-            echo "unsafe path in candidate archive" >&2
-            exit 1
-          fi
-          tar -xJf "$PAYLOAD_ARCHIVE"
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import base64
+          import hashlib
+          import io
+          import tarfile
+
+          parts = sorted(Path('.bootstrap/webgpu-v2').glob('part-*'))
+          if len(parts) != 7:
+              raise SystemExit(f'expected 7 payload parts, got {len(parts)}')
+          encoded = ''.join(part.read_text(encoding='utf-8').split())
+          payload = base64.b64decode(encoded, validate=True)
+          print(f'candidate archive sha256={hashlib.sha256(payload).hexdigest()}')
+          with tarfile.open(fileobj=io.BytesIO(payload), mode='r:xz') as archive:
+              members = archive.getmembers()
+              if not members:
+                  raise SystemExit('candidate archive is empty')
+              for member in members:
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or '..' in path.parts:
+                      raise SystemExit(f'unsafe path in candidate archive: {member.name}')
+                  if member.issym() or member.islnk() or member.isdev():
+                      raise SystemExit(f'unsupported archive member: {member.name}')
+              archive.extractall('.', members=members)
+          PY
           rm -rf .bootstrap/webgpu-v2
           rm -f .github/workflows/webgpu-v2-working-snapshot.yml
           git add -A
