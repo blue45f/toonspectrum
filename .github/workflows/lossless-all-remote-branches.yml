@@ -1,0 +1,377 @@
+name: Build lossless all-remote-branch integration
+
+on:
+  push:
+    branches:
+      - automation/lossless-all-remote-branches-20260903
+    paths:
+      - ".github/workflows/lossless-all-remote-branches.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: lossless-all-remote-branches-20260903
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  INTEGRATION_BRANCH: integration/lossless-all-remote-branches-20260903
+  AUTOMATION_BRANCH: automation/lossless-all-remote-branches-20260903
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      branch: ${{ steps.integrate.outputs.branch }}
+      sha: ${{ steps.integrate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure repository and fetch every remote branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Integrate active source while preserving every branch ancestry
+        id: integrate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          target="$INTEGRATION_BRANCH"
+          report_dir="docs/merge-preservation"
+          report_jsonl="$RUNNER_TEMP/lossless-branches.jsonl"
+          ordered_branches="$RUNNER_TEMP/lossless-branches.txt"
+          conflicts_file="$RUNNER_TEMP/merge-conflicts.txt"
+          suppressed_file="$RUNNER_TEMP/suppressed-workflows.txt"
+
+          mkdir -p "$report_dir"
+          : > "$report_jsonl"
+
+          git checkout -B "$target" origin/main
+
+          git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
+            | grep -v '^HEAD$' \
+            | python3 -c '
+          import sys
+          names = sorted({line.strip() for line in sys.stdin if line.strip()})
+          explicit = {
+              "claude/main-core-red-repair": 0,
+              "fix/studio-service-worker-warm-cache-check-20260903": 10,
+              "codex/studio-platform-preflight-safe-slicing": 20,
+              "codex/studio-multilingual-emotion-bubbles": 30,
+              "claude/chatgpt-share-analysis-75d1d0": 40,
+              "claude/filter-ui-ux-enhancement-0ec697": 50,
+              "claude/line-drawing-realtime-transform-c944b5": 60,
+              "feat/shaper-character-workshop-20260903": 70,
+              "feat/shaper-surface-paint-20260903": 80,
+              "fix/marketplace-wire-authoring-surfaces-20260903": 90,
+              "fix/marketplace-brush-publish-hardening-main-20260903": 100,
+              "fix/marketplace-brush-publish-storage-20260903": 110,
+              "fix/marketplace-postmerge-browser-regressions-20260903": 120,
+              "brushfix/soak-harness": 130,
+          }
+          def key(name):
+              if name in explicit:
+                  return (explicit[name], name)
+              if name.startswith("codex/") or name.startswith("claude/") or name.startswith("feat/") or name.startswith("fix/") or name.startswith("brushfix/"):
+                  return (200, name)
+              if name.startswith("qa/"):
+                  return (500, name)
+              if name.startswith("archive/"):
+                  return (800, name)
+              if name.startswith("automation/") or name.startswith("integration/"):
+                  return (900, name)
+              return (400, name)
+          print("\n".join(sorted(names, key=key)))
+          ' > "$ordered_branches"
+
+          resolve_to_current_tree() {
+            local path="$1"
+            if git cat-file -e "HEAD:$path" 2>/dev/null; then
+              git checkout --ours -- "$path"
+              git add -- "$path"
+            else
+              git rm -f --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
+            fi
+          }
+
+          sanitize_write_capable_workflows() {
+            : > "$suppressed_file"
+            while IFS= read -r path; do
+              [[ -n "$path" && -f "$path" ]] || continue
+              if grep -Eq 'contents:[[:space:]]*write|pull-requests:[[:space:]]*write|actions:[[:space:]]*write' "$path" \
+                && grep -Eq 'git[[:space:]]+push|gh[[:space:]]+pr[[:space:]]+merge|update-ref|git/refs|merges/' "$path"; then
+                printf '%s\n' "$path" >> "$suppressed_file"
+                resolve_to_current_tree "$path"
+              fi
+            done < <(git diff --name-only HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml' | sort -u)
+          }
+
+          record_branch() {
+            local branch="$1"
+            local sha="$2"
+            local mode="$3"
+            local status="$4"
+            BRANCH_NAME="$branch" BRANCH_SHA="$sha" MERGE_MODE="$mode" MERGE_STATUS="$status" \
+              CONFLICTS_FILE="$conflicts_file" SUPPRESSED_FILE="$suppressed_file" REPORT_JSONL="$report_jsonl" \
+              python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def lines(name: str) -> list[str]:
+              path = Path(os.environ[name])
+              if not path.exists():
+                  return []
+              return [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+          item = {
+              "branch": os.environ["BRANCH_NAME"],
+              "sha": os.environ["BRANCH_SHA"],
+              "mode": os.environ["MERGE_MODE"],
+              "status": os.environ["MERGE_STATUS"],
+              "conflictsResolvedToCurrentTree": lines("CONFLICTS_FILE"),
+              "writeCapableWorkflowsSuppressed": lines("SUPPRESSED_FILE"),
+          }
+          with Path(os.environ["REPORT_JSONL"]).open("a", encoding="utf-8") as handle:
+              handle.write(json.dumps(item, ensure_ascii=False) + "\n")
+          PY
+          }
+
+          while IFS= read -r branch; do
+            [[ -n "$branch" ]] || continue
+            if [[ "$branch" == "main" || "$branch" == "$target" || "$branch" == "$AUTOMATION_BRANCH" ]]; then
+              continue
+            fi
+
+            ref="refs/remotes/origin/$branch"
+            sha="$(git rev-parse "$ref")"
+            : > "$conflicts_file"
+            : > "$suppressed_file"
+
+            if git merge-base --is-ancestor "$sha" HEAD; then
+              record_branch "$branch" "$sha" "already-ancestor" "preserved"
+              continue
+            fi
+
+            if [[ "$branch" == automation/* || "$branch" == integration/* || "$branch" == archive/* ]]; then
+              git merge -s ours --no-ff -m "merge(preserve): attach history for $branch" "$sha"
+              record_branch "$branch" "$sha" "history-only" "preserved"
+              continue
+            fi
+
+            set +e
+            git merge --no-ff --no-commit "$sha"
+            merge_rc=$?
+            set -e
+
+            if [[ -f .git/MERGE_HEAD ]]; then
+              git ls-files -u | awk '{print $4}' | sort -u > "$conflicts_file"
+              while IFS= read -r path; do
+                [[ -n "$path" ]] || continue
+                if [[ "$path" == .github/workflows/* ]]; then
+                  resolve_to_current_tree "$path"
+                elif git cat-file -e "HEAD:$path" 2>/dev/null; then
+                  git checkout --ours -- "$path"
+                  git add -- "$path"
+                else
+                  git checkout --theirs -- "$path"
+                  git add -- "$path"
+                fi
+              done < "$conflicts_file"
+
+              sanitize_write_capable_workflows
+              git add -A
+              git commit -m "merge(preserve): integrate $branch"
+              if [[ "$merge_rc" -eq 0 ]]; then
+                status="active-clean"
+              else
+                status="active-nonconflicting-with-current-tree-conflicts"
+              fi
+              record_branch "$branch" "$sha" "active-merge" "$status"
+            else
+              git merge --abort >/dev/null 2>&1 || true
+              git merge -s ours --no-ff -m "merge(preserve): attach unmergeable history for $branch" "$sha"
+              record_branch "$branch" "$sha" "history-only-fallback" "preserved-after-merge-error"
+            fi
+
+            git merge-base --is-ancestor "$sha" HEAD
+          done < "$ordered_branches"
+
+          REPORT_JSONL="$report_jsonl" REPORT_DIR="$report_dir" BASE_SHA="$(git rev-parse origin/main)" \
+            python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          report_dir = Path(os.environ["REPORT_DIR"])
+          rows = [json.loads(line) for line in Path(os.environ["REPORT_JSONL"]).read_text(encoding="utf-8").splitlines() if line]
+          payload = {
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "baseMainSha": os.environ["BASE_SHA"],
+              "policy": {
+                  "productAndQaBranches": "regular merge; non-conflicting source activated",
+                  "conflicts": "current integrated tree wins; branch version remains recoverable from the recorded parent SHA",
+                  "automationArchiveIntegrationBranches": "history-only merge to prevent stale self-writing workflows from becoming active",
+                  "writeCapableWorkflows": "suppressed when they can push or merge automatically",
+              },
+              "branches": rows,
+          }
+          (report_dir / "all-remote-branches-2026-09-03.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          active = sum(row["mode"] == "active-merge" for row in rows)
+          history = sum(row["mode"].startswith("history-only") for row in rows)
+          ancestors = sum(row["mode"] == "already-ancestor" for row in rows)
+          conflict_count = sum(len(row["conflictsResolvedToCurrentTree"]) for row in rows)
+          suppressed_count = sum(len(row["writeCapableWorkflowsSuppressed"]) for row in rows)
+          lines = [
+              "# All remote branch preservation and integration report",
+              "",
+              f"- Base main: `{payload['baseMainSha']}`",
+              f"- Branch records: **{len(rows)}**",
+              f"- Active source merges: **{active}**",
+              f"- History-only safety merges: **{history}**",
+              f"- Already preserved ancestors: **{ancestors}**",
+              f"- Conflict paths resolved to the current integrated tree: **{conflict_count}**",
+              f"- Self-writing workflow paths suppressed: **{suppressed_count}**",
+              "",
+              "Every recorded branch tip is an ancestor of this integration branch. A conflict-resolved branch version remains recoverable with `git show <sha>:<path>`.",
+              "",
+              "| Branch | Tip | Mode | Result | Conflicts | Suppressed workflows |",
+              "|---|---|---|---|---:|---:|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| `{row['branch']}` | `{row['sha'][:12]}` | {row['mode']} | {row['status']} | "
+                  f"{len(row['conflictsResolvedToCurrentTree'])} | {len(row['writeCapableWorkflowsSuppressed'])} |"
+              )
+          (report_dir / "all-remote-branches-2026-09-03.md").write_text(
+              "\n".join(lines).rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          git add "$report_dir/all-remote-branches-2026-09-03.json" "$report_dir/all-remote-branches-2026-09-03.md"
+          git commit -m "docs(merge): record lossless all-branch integration"
+          git push --force-with-lease origin "HEAD:refs/heads/$target"
+
+          echo "branch=$target" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify all fetched branch tips are reachable
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git checkout --detach "origin/$INTEGRATION_BRANCH"
+          failures=0
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            [[ "$branch" == "HEAD" || "$branch" == "main" || "$branch" == "$INTEGRATION_BRANCH" || "$branch" == "$AUTOMATION_BRANCH" ]] && continue
+            sha="$(git rev-parse "$ref")"
+            if ! git merge-base --is-ancestor "$sha" HEAD; then
+              echo "::error::Unpreserved branch $branch at $sha"
+              failures=$((failures + 1))
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin)
+          test "$failures" -eq 0
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: all-remote-branch-integration-${{ github.run_id }}
+          path: docs/merge-preservation
+          if-no-files-found: error
+          retention-days: 30
+
+  static-validation:
+    needs: integrate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.integrate.outputs.branch }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript and architecture
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run validate:architecture
+      - name: Lint
+        run: pnpm run lint:quick
+
+  focused-tests:
+    needs: integrate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.integrate.outputs.branch }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Marketplace, Brush Studio, creator contracts, and deterministic core repairs
+        run: |
+          files=()
+          for path in \
+            lib/creator-marketplace-authoring-safety.test.ts \
+            lib/creator-marketplace-authoring-workshop.test.ts \
+            lib/creator-marketplace-package-builder.test.ts \
+            lib/creator-marketplace-quality-validation.test.ts \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            src/domains/market \
+            lib/__tests__/i18n-locale-assets.test.ts \
+            src/domains/creator/studio-main-menu-group-spec.test.ts; do
+            [[ -e "$path" ]] && files+=("$path")
+          done
+          pnpm exec vitest run "${files[@]}" --reporter=verbose
+
+  production-build:
+    needs: integrate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.integrate.outputs.branch }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: test -f dist/index.html
