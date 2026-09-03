@@ -1,0 +1,93 @@
+name: WebGPU brush completion wave 2
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-completion-wave2-20260904
+    paths:
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts"
+      - "src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.ts"
+      - "src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.test.ts"
+      - ".github/workflows/webgpu-brush-completion-wave2.yml"
+  pull_request:
+    paths:
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts"
+      - "src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.ts"
+      - "src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.test.ts"
+      - ".github/workflows/webgpu-brush-completion-wave2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-brush-completion-wave2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontier:
+    name: frontier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Focused unit tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+          src/domains/creator/brush/studio-wet-media-two-well-model.test.ts
+          src/domains/creator/brush/studio-wet-media-tile-field.test.ts
+          src/domains/creator/brush/studio-wet-media-two-well-field-bridge.test.ts
+          src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.test.ts
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+          src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.ts
+          src/domains/creator/brush/studio-wet-media-bristle-footprint-bridge.test.ts
+
+      - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Exact WebGPU compute binning proof
+        env:
+          TOONSPECTRUM_WEBGPU_HEADED: "1"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec node scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs
+
+      - name: Existing professional bristle and impasto proof
+        env:
+          TOONSPECTRUM_WEBGPU_HEADED: "1"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm run verify:studio-professional-bristle-webgpu
