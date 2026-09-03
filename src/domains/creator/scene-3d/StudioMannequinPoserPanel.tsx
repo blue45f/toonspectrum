@@ -1321,13 +1321,15 @@ export function StudioMannequinPoserPanel({
     }
 
     if (sel.face === "face-sharp") {
-      nextParams = { ...nextParams, headMorphJawWidth: -0.6, headMorphChinLength: 0.5 };
+      nextParams = { ...nextParams, ...STUDIO_MANNEQUIN_HEAD_PRESETS.sharp.params };
     } else if (sel.face === "face-round") {
-      nextParams = { ...nextParams, headMorphCheekVolume: 0.6, headMorphJawWidth: 0.4, headMorphChinLength: -0.4 };
+      nextParams = { ...nextParams, ...STUDIO_MANNEQUIN_HEAD_PRESETS.round.params };
     } else if (sel.face === "face-square") {
-      nextParams = { ...nextParams, headMorphJawWidth: 0.7, headMorphChinLength: 0.2 };
+      nextParams = { ...nextParams, faceWidth: 1.15, chinLength: 1.05, eyeScale: 1.0, noseHeight: 1.1 };
     } else if (sel.face === "face-chibi") {
-      nextParams = { ...nextParams, headMorphCheekVolume: 0.8, headMorphChinLength: -0.6 };
+      nextParams = { ...nextParams, ...STUDIO_MANNEQUIN_HEAD_PRESETS.chibi.params };
+    } else if (sel.face === "face-oval") {
+      nextParams = { ...nextParams, ...STUDIO_MANNEQUIN_HEAD_PRESETS.anime.params };
     }
     commitParams(nextParams);
 
