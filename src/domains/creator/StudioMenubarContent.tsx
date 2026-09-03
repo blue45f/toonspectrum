@@ -51,6 +51,10 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_CANVAS_WIDTH as CANVAS_W } from "./canvas/studio-canvas-constants";
+import {
+  createStudioCommandExecutionBindings,
+  installStudioCommandExecutionBindings,
+} from "./studio-command-execution-registry";
 import { createStudioMainMenuPresentation } from "./studio-main-menu-presentation";
 import {
   StudioExportMenuPanel,
@@ -1119,6 +1123,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     labels: { insert: compositeMenuLabel("insert"), tools: compositeMenuLabel("tools") },
   });
   const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
+
+  // Unified search executes only explicitly reviewed rows, using the menu's own closure.
+  // This is the first safe slice of the CommandRegistry strangler: no second implementation.
+  useEffect(
+    () =>
+      installStudioCommandExecutionBindings(
+        createStudioCommandExecutionBindings(studioMainMenuGroups),
+      ),
+    [studioMainMenuGroups],
+  );
 
   const menubarLaneRef = useRef<HTMLDivElement | null>(null);
   const [laneOverflow, setLaneOverflow] = useState<StudioMenubarLaneOverflow>(

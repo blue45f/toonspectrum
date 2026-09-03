@@ -34,7 +34,6 @@ import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 
 
-import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 export function StudioInspectorSelectionSection({
@@ -123,7 +122,6 @@ export function StudioInspectorSelectionSection({
     setSharedDocumentNotice,
     setTool,
     splitFrameSelected,
-    startEditText,
     studioFilterPreparationBusy,
     t,
     toggleBubbleAnchorPick,
@@ -557,13 +555,6 @@ export function StudioInspectorSelectionSection({
 
               <StudioInspectorSelectedImageTools model={model} tabA11y={tabA11y} />
 
-              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
-                {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
-                  <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
-                    글자 편집
-                  </button>
-                )}
-              </div>
               <StudioInspectorOrderAlignSection
                 selected={selected}
                 selectedBg3dEditSource={selectedBg3dEditSource}

@@ -38,6 +38,13 @@ export interface StudioMainMenuItem {
   danger?: boolean;
   separatorAfter?: boolean;
   /**
+   * Explicit opt-in for unified-search direct activation. The default stays help-only:
+   * save, publish, delete and other consequential commands must never become executable
+   * merely because they gained a menu row. Opted-in rows reuse this item's `onSelect`
+   * closure, so menu and search cannot drift into two implementations.
+   */
+  searchActivation?: "execute";
+  /**
    * Caption drawn above this row when a composite title (삽입·도구) presents rows
    * from several catalogue groups. Set by `studio-main-menu-presentation.ts`,
    * never by item modules — the catalogue does not know how it is presented.
