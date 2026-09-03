@@ -5,9 +5,12 @@ import {
   MousePointer2,
   Pipette,
 } from "lucide-react";
-import { Suspense, useId, useLayoutEffect, type RefObject } from "react";
+import { Suspense, useId, useLayoutEffect, useState, type RefObject } from "react";
 
 import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
+import { StudioApproximateColorPanel } from "./color/StudioApproximateColorPanel";
+import { StudioColorHistoryPanel } from "./color/StudioColorHistoryPanel";
+import { StudioIntermediateColorPanel } from "./color/StudioIntermediateColorPanel";
 import { StudioPageGradePanel } from "./studio-page-lazy-ui";
 import {
   STUDIO_WORK_DESCRIPTION_MAX_LENGTH,
@@ -141,10 +144,61 @@ export function StudioInspectorDrawColorControls({
   onColorChange: (color: string) => void;
   onEyedropperToggle: () => void;
 }) {
+  const [activeCspPalette, setActiveCspPalette] = useState<
+    "intermediate" | "approximate" | "history" | null
+  >(null);
+
   return (
     <div className="space-y-1.5 border-t border-line/35 pt-1.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <p className="text-[0.66rem] font-medium text-fg-3 mr-0.5">색상</p>
+          <button
+            type="button"
+            onClick={() =>
+              setActiveCspPalette((prev) => (prev === "intermediate" ? null : "intermediate"))
+            }
+            className={cn(
+              "px-1.5 py-0.2 rounded text-[9px] font-medium transition-colors border whitespace-nowrap",
+              activeCspPalette === "intermediate"
+                ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
+            )}
+            title="클립스튜디오 4코너 중간색 그리드 팔레트 열기"
+          >
+            중간색 (CSP)
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setActiveCspPalette((prev) => (prev === "approximate" ? null : "approximate"))
+            }
+            className={cn(
+              "px-1.5 py-0.2 rounded text-[9px] font-medium transition-colors border whitespace-nowrap",
+              activeCspPalette === "approximate"
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
+            )}
+            title="클립스튜디오 근사색 팔레트 열기"
+          >
+            근사색 (CSP)
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setActiveCspPalette((prev) => (prev === "history" ? null : "history"))
+            }
+            className={cn(
+              "px-1.5 py-0.2 rounded text-[9px] font-medium transition-colors border whitespace-nowrap",
+              activeCspPalette === "history"
+                ? "bg-violet-500/20 text-violet-300 border-violet-500/40"
+                : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
+            )}
+            title="클립스튜디오 컬러 히스토리 팔레트 열기"
+          >
+            히스토리 (CSP)
+          </button>
+        </div>
         <button
           type="button"
           onClick={onEyedropperToggle}
@@ -208,6 +262,30 @@ export function StudioInspectorDrawColorControls({
           </span>
         </label>
       </div>
+      {activeCspPalette === "intermediate" && (
+        <div className="pt-1">
+          <StudioIntermediateColorPanel
+            activeColor={color}
+            onSelectColor={onColorChange}
+          />
+        </div>
+      )}
+      {activeCspPalette === "approximate" && (
+        <div className="pt-1">
+          <StudioApproximateColorPanel
+            activeColor={color}
+            onSelectColor={onColorChange}
+          />
+        </div>
+      )}
+      {activeCspPalette === "history" && (
+        <div className="pt-1">
+          <StudioColorHistoryPanel
+            activeColor={color}
+            onSelectColor={onColorChange}
+          />
+        </div>
+      )}
     </div>
   );
 }

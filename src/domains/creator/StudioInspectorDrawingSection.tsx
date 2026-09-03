@@ -10,6 +10,11 @@ import {
   studioSubToolPaletteCategoryById,
   studioSubToolPalettePresetById,
 } from "./brush/studio-sub-tool-palette-data";
+import { StudioLineWidthAdjustmentPanel } from "./brush/StudioLineWidthAdjustmentPanel";
+import {
+  adjustDrawStrokeWidth,
+  calculateAdjustedStrokeWidth,
+} from "./brush/studio-line-width-adjust";
 import { StudioSubToolPalette } from "./brush/StudioSubToolPalette";
 import { CANVAS_W } from "./studio-assets";
 import {
@@ -38,6 +43,7 @@ import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
 
 import type { DrawShapeKind } from "./studio-editor-tool-model";
+import type { DrawEl, El } from "./studio-element-model";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 import { cn } from "@/lib/utils";
@@ -438,16 +444,29 @@ export function StudioInspectorDrawingSection({
 
                 {drawMode !== "pixel" ? (
                   <StudioInspectorSection sectionId="tool.line-correction" loadingLabel="선 보정을 여는 중...">
-                    <StudioLineCorrectionControls
-                      stabilizer={stabilizer}
-                      onStabilizerChange={setStabilizer}
-                      mode={stabilizerMode}
-                      onModeChange={setStabilizerMode}
-                      postCorrection={postCorrection}
-                      onPostCorrectionChange={setPostCorrection}
-                      preserveCorners={preserveCorners}
-                      onPreserveCornersChange={setPreserveCorners}
-                    />
+                    <div className="space-y-2">
+                      <StudioLineCorrectionControls
+                        stabilizer={stabilizer}
+                        onStabilizerChange={setStabilizer}
+                        mode={stabilizerMode}
+                        onModeChange={setStabilizerMode}
+                        postCorrection={postCorrection}
+                        onPostCorrectionChange={setPostCorrection}
+                        preserveCorners={preserveCorners}
+                        onPreserveCornersChange={setPreserveCorners}
+                      />
+                      <StudioLineWidthAdjustmentPanel
+                        currentWidth={strokeWidth}
+                        disabled={drawingAssistControlsDisabled}
+                        onApply={(options) => {
+                          const nextWidth = calculateAdjustedStrokeWidth(strokeWidth, options);
+                          setStrokeWidth(nextWidth);
+                          if (selected?.type === "draw") {
+                            model.patchEl(selected.id, adjustDrawStrokeWidth(selected as DrawEl, options) as Partial<El>);
+                          }
+                        }}
+                      />
+                    </div>
                   </StudioInspectorSection>
                 ) : null}
 

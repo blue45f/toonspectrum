@@ -1,0 +1,259 @@
+name: Preserve and integrate every unmerged branch v2
+
+on:
+  push:
+    branches:
+      - ops/merge-all-preserve-20260903
+    paths:
+      - .github/workflows/merge-all-branches-preserve-v2.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preserve-and-integrate-every-unmerged-branch-v2
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out current main with complete history
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure merge identity and fetch all refs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Mark draft pull requests ready and request protected auto-merge
+        run: |
+          set -euo pipefail
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | [.number, .draft] | @tsv' \
+            > /tmp/open-prs.tsv
+          while IFS=$'\t' read -r number draft; do
+            [ -n "$number" ] || continue
+            if [ "$draft" = "true" ]; then
+              gh pr ready "$number" --repo "$GITHUB_REPOSITORY" || true
+            fi
+            gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+          done < /tmp/open-prs.tsv
+
+      - name: Integrate every remote branch and preserve source heads
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          integration="integration/all-unmerged-preserved-${stamp}"
+          report_dir="docs/merge-preservation/${stamp}"
+          report_tsv="/tmp/branches-${stamp}.tsv"
+          mkdir -p "$report_dir/conflicts"
+          : > "$report_tsv"
+
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | .head.ref' \
+            | sort -u > /tmp/merged-pr-heads.txt
+
+          git switch -C "$integration" origin/main
+          mapfile -t branches < <(
+            git for-each-ref refs/remotes/origin --format='%(refname:strip=3)' | sort -u
+          )
+
+          for branch in "${branches[@]}"; do
+            case "$branch" in
+              ''|HEAD|main|gh-pages|production|archive/*|integration/*|ops/merge-all-preserve-*|deploy/*|release/*)
+                printf '%s\t%s\t%s\t%s\n' "$branch" skipped protected-or-generated "" >> "$report_tsv"
+                continue
+                ;;
+            esac
+
+            remote_ref="refs/remotes/origin/${branch}"
+            branch_sha="$(git rev-parse "$remote_ref")"
+
+            if grep -Fxq "$branch" /tmp/merged-pr-heads.txt; then
+              printf '%s\t%s\t%s\t%s\n' "$branch" skipped already-merged-pr-source "$branch_sha" >> "$report_tsv"
+              continue
+            fi
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              printf '%s\t%s\t%s\t%s\n' "$branch" skipped already-ancestor "$branch_sha" >> "$report_tsv"
+              continue
+            fi
+
+            safe="$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#__#g')"
+            archive_tag="archive/pre-merge-all-${stamp}/${safe}"
+            git tag -f "$archive_tag" "$branch_sha"
+            git push origin "refs/tags/${archive_tag}:refs/tags/${archive_tag}"
+
+            conflict_file="$report_dir/conflicts/${safe}.txt"
+            : > "$conflict_file"
+            result=merged
+            reason=clean-or-ort-resolved
+
+            if ! GIT_MERGE_AUTOEDIT=no git merge \
+              --no-ff \
+              --no-edit \
+              --allow-unrelated-histories \
+              -X ours \
+              "$remote_ref"; then
+              result=merged-with-conflict-ledger
+              reason=current-integration-side-retained-for-conflicting-hunks
+              git diff --name-only --diff-filter=U | sort -u > "$conflict_file"
+
+              python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          raw_paths = subprocess.run(
+              ["git", "diff", "--name-only", "--diff-filter=U", "-z"],
+              check=True,
+              stdout=subprocess.PIPE,
+          ).stdout.split(b"\0")
+
+          for raw in raw_paths:
+              if not raw:
+                  continue
+              path = raw.decode("utf-8", "surrogateescape")
+              stages = subprocess.run(
+                  ["git", "ls-files", "-u", "--", path],
+                  check=True,
+                  text=True,
+                  stdout=subprocess.PIPE,
+              ).stdout.splitlines()
+              stage_numbers = {
+                  fields[2]
+                  for line in stages
+                  if len((fields := line.split())) >= 3
+              }
+              if "2" in stage_numbers:
+                  subprocess.run(["git", "checkout", "--ours", "--", path], check=False)
+              elif "3" in stage_numbers:
+                  subprocess.run(["git", "checkout", "--theirs", "--", path], check=False)
+              else:
+                  Path(path).unlink(missing_ok=True)
+              subprocess.run(["git", "add", "-A", "--", path], check=True)
+          PY
+
+              if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "Unresolved conflicts remain" >&2
+                git diff --name-only --diff-filter=U >&2
+                exit 1
+              fi
+              git commit --no-edit || git commit -m "merge-preserve: integrate ${branch} with conflict ledger"
+            fi
+
+            conflict_count="$(grep -c . "$conflict_file" || true)"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+              "$branch" "$result" "$reason" "$branch_sha" "$archive_tag" "$conflict_count" \
+              >> "$report_tsv"
+          done
+
+          cp "$report_tsv" "$report_dir/branches.tsv"
+          python3 - "$report_tsv" "$report_dir" "$integration" <<'PY'
+          import csv
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          tsv = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          integration = sys.argv[3]
+          rows = []
+          with tsv.open(encoding="utf-8", newline="") as stream:
+              for fields in csv.reader(stream, delimiter="\t"):
+                  fields += [""] * (6 - len(fields))
+                  rows.append({
+                      "branch": fields[0],
+                      "status": fields[1],
+                      "reason": fields[2],
+                      "headSha": fields[3] or None,
+                      "archiveTag": fields[4] or None,
+                      "conflictCount": int(fields[5] or 0),
+                  })
+
+          payload = {
+              "schemaVersion": 2,
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "integrationBranch": integration,
+              "policy": {
+                  "history": "Each processed source head is merged as ancestry into the integration branch.",
+                  "conflicts": "The current integration side wins conflicting hunks; source refs and immutable archive tags remain available.",
+                  "deletion": "No source branch is deleted by this workflow.",
+              },
+              "branches": rows,
+          }
+          (output / "report.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          lines = [
+              "# All unmerged branches preservation report",
+              "",
+              f"- Generated: `{payload['generatedAt']}`",
+              f"- Integration branch: `{integration}`",
+              "- Source branches are retained.",
+              "- Every processed source head is represented in integration history.",
+              "- Conflicting paths are listed under `conflicts/` and recoverable from the archive tag.",
+              "",
+              "| Branch | Status | Head | Archive tag | Conflicts |",
+              "|---|---|---|---|---:|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| `{row['branch']}` | {row['status']} | `{(row['headSha'] or '')[:12]}` | "
+                  f"`{row['archiveTag'] or ''}` | {row['conflictCount']} |"
+              )
+          (output / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          find "$report_dir/conflicts" -type f -empty -delete
+          git add "$report_dir"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(merge): record preserved branch integration ledger"
+          fi
+          git diff --check HEAD^ HEAD || true
+          git push --set-upstream origin "$integration"
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$integration" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            pr_url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$integration" \
+              --title "merge: integrate all preserved unmerged branches ${stamp}" \
+              --body-file "$report_dir/README.md")"
+          else
+            pr_url="https://github.com/${GITHUB_REPOSITORY}/pull/${existing}"
+          fi
+          gh pr merge "$pr_url" --repo "$GITHUB_REPOSITORY" --auto --merge || true
+
+          echo "integration=$integration" >> "$GITHUB_OUTPUT"
+          echo "pr=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "report=$report_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Record integration result
+        run: |
+          {
+            echo "## Branch integration prepared"
+            echo
+            echo "- Branch: \`${{ steps.merge.outputs.integration }}\`"
+            echo "- PR: ${{ steps.merge.outputs.pr }}"
+            echo "- Ledger: \`${{ steps.merge.outputs.report }}\`"
+            echo
+            echo "Required checks remain enforced; no branch-protection bypass is used."
+          } >> "$GITHUB_STEP_SUMMARY"
