@@ -6,7 +6,11 @@
  * cloning Figma's branding.
  */
 
-import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
+import {
+  planStudioDrawObjectTransform,
+  studioDrawObjectRotationIsDropped,
+  studioDrawSymmetryIsMirrored,
+} from "./brush/studio-draw-object-transform";
 import { elBounds, type StudioElementBounds } from "./studio-element-geometry";
 import {
   normalizeStudioViewRotation,
@@ -67,10 +71,19 @@ export interface StudioFigmaSelectionLayoutMetrics {
  * box of their first two points (`drawBounds` in `StudioDrawNode`), so baking an angle into those
  * points would only move the box corners — the shape would resize, never turn. Freehand, `line`
  * and `arrow` keep their geometry in the raw point array, so rotation is exact for them.
+ *
+ * A mirrored-symmetry stroke is excluded for a second reason, and it must be checked against the
+ * planner's own rule rather than re-derived: `planStudioDrawObjectTransform` DROPS the angle for
+ * those (`studioDrawObjectRotationIsDropped`), because the renderer regenerates the copies by
+ * reflecting the committed base about world axes and a reflection turns them by −θ. Offering the
+ * field anyway would not merely no-op — the numeric path rotates the box about its own centre to
+ * turn the planner's origin rotation into a centre rotation, so a dropped angle leaves that pivot
+ * offset behind and the stroke TRANSLATES instead of turning.
  */
 function studioDrawRotationSupported(element: DrawEl): boolean {
   const kind = element.kind ?? "freehand";
-  return kind === "freehand" || kind === "line" || kind === "arrow";
+  if (kind !== "freehand" && kind !== "line" && kind !== "arrow") return false;
+  return !studioDrawObjectRotationIsDropped(element);
 }
 
 /** Element kinds whose model accepts an optional stored angle even when the key is absent at 0°. */
@@ -201,7 +214,9 @@ export function resolveStudioFigmaSelectionLayoutMetrics(
       : multi
         ? "여러 개를 선택하면 회전은 하나씩만 입력할 수 있어요."
         : single?.type === "draw"
-          ? "사각형·원·별·다각형 도형은 축에 정렬된 상자로 그려져서 각도를 가질 수 없어요. 자유곡선·직선·화살표는 회전할 수 있어요."
+          ? studioDrawSymmetryIsMirrored(single.symmetry)
+            ? "좌우·상하·만화경 대칭 획은 사본이 월드 축을 기준으로 다시 비치기 때문에 함께 돌릴 수 없어요. 대칭을 끄면 회전할 수 있어요."
+            : "사각형·원·별·다각형 도형은 축에 정렬된 상자로 그려져서 각도를 가질 수 없어요. 자유곡선·직선·화살표는 회전할 수 있어요."
           : "이 요소는 회전을 지원하지 않아요.",
     elementCount: elements.length,
   };
