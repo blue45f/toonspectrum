@@ -1,7 +1,12 @@
 /**
  * studio-shaper-model.ts
  *
- * Webtoon-specialized 3D Character Shaper Engine (NAVER WEBTOON Shaper feature suite).
+ * ToonStudio's independent webtoon-character recipe contract.
+ *
+ * The catalogue is broader than the procedural mannequin renderer. Consumers must publish an
+ * explicit capability set and never present a catalogue selection as applied when no runtime owns
+ * that category.
+ *
  * Provides:
  * 1. 14-Category Modular Presets (face, eye, pupil, nose, lip, ear, hair, body, top, bottom, shoes, accessories, bodypose, handpose)
  * 2. 3D Surface Texture Drawing Engine (Model Surface Painting / UV texture overlay)
@@ -147,6 +152,15 @@ export const SHAPER_PRESETS: readonly ShaperPresetItem[] = Object.freeze([
 ]);
 
 export type ShaperPresetSelection = Record<ShaperPresetCategory, string>;
+
+export const SHAPER_MANNEQUIN_SUPPORTED_CATEGORIES = Object.freeze([
+  "face",
+  "eye",
+  "nose",
+  "body",
+  "bodypose",
+  "handpose",
+] as const satisfies readonly ShaperPresetCategory[]);
 
 export const DEFAULT_SHAPER_SELECTION: Readonly<ShaperPresetSelection> = Object.freeze({
   face: "face-oval",
@@ -302,7 +316,7 @@ export function recommendShaperPreset(archetypeId: ShaperAiArchetype): ShaperPre
   return found ? { ...found.selection } : { ...DEFAULT_SHAPER_SELECTION };
 }
 
-// ── Multi-layer PSD Generation for Webtoon Shaper ────────────────────────────
+// ── Multi-layer PSD generation for ToonStudio ────────────────────────────
 
 export interface ShaperPsdRenderBuffers {
   readonly width: number;
@@ -337,31 +351,31 @@ export function buildShaperLayeredPsd(buffers: ShaperPsdRenderBuffers): Blob {
 
   // PSD layers are ordered bottom-to-top in PSD specification:
   // 1. Flat Color (밑색)
-  addLayer("3D Shaper · 밑색 (Flat)", buffers.flatColor);
+  addLayer("ToonStudio 3D · 밑색 (Flat)", buffers.flatColor);
 
   // 2. Shadow Cel (그림자)
   if (buffers.shadowCel) {
-    addLayer("3D Shaper · 음영 (Shadow)", buffers.shadowCel);
+    addLayer("ToonStudio 3D · 음영 (Shadow)", buffers.shadowCel);
   }
 
   // 3. Highlights (하이라이트)
   if (buffers.highlights) {
-    addLayer("3D Shaper · 하이라이트 (Highlight)", buffers.highlights);
+    addLayer("ToonStudio 3D · 하이라이트 (Highlight)", buffers.highlights);
   }
 
   // 4. Surface Drawn Strokes (모델 직접 드로잉)
   if (buffers.drawStrokes) {
-    addLayer("3D Shaper · 3D 드로잉 (Drawn Lines)", buffers.drawStrokes);
+    addLayer("ToonStudio 3D · 3D 드로잉 (Drawn Lines)", buffers.drawStrokes);
   }
 
   // 5. Line Art (선화 잉크)
   if (buffers.lineArt) {
-    addLayer("3D Shaper · 주선 (Line Art)", buffers.lineArt);
+    addLayer("ToonStudio 3D · 주선 (Line Art)", buffers.lineArt);
   }
 
   // If no optional layers are present, duplicate base or ensure at least 1 child
   if (layers.length === 0) {
-    addLayer("3D Shaper · 메인 렌더", buffers.flatColor);
+    addLayer("ToonStudio 3D · 메인 렌더", buffers.flatColor);
   }
 
   const psd: Psd = {

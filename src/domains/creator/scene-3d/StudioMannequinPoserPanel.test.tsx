@@ -264,19 +264,18 @@ describe("StudioMannequinPoserPanel", () => {
     expect(createScene).toHaveBeenCalledTimes(1);
   });
 
-  it("셰이퍼 탭을 클릭하면 Shaper 패널이 렌더링되고 프리셋 선택이 씬에 반영된다", async () => {
+  it("셰이퍼 탭은 독립 ToonStudio 레시피를 열고 지원되는 얼굴형을 씬에 반영한다", async () => {
     renderPanel();
-    const shaperTab = screen.getByRole("button", { name: /^셰이퍼/ });
-    fireEvent.click(shaperTab);
+    fireEvent.click(screen.getByRole("button", { name: /^셰이퍼/ }));
 
-    expect(screen.getByText("3D 셰이퍼 (Webtoon Shaper)")).toBeTruthy();
-    expect(screen.getByText("SHAPER")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "캐릭터 레시피" })).toBeTruthy();
+    expect(screen.queryByText("SHAPER")).toBeNull();
 
-    // Select hair preset
-    const hairChip = screen.getByRole("button", { name: "헤어" });
-    fireEvent.click(hairChip);
-    const bobPreset = screen.getByRole("button", { name: /시스루 뱅 단발/i });
-    fireEvent.click(bobPreset);
+    fireEvent.click(screen.getByRole("tab", { name: "얼굴형" }));
+    fireEvent.click(screen.getByRole("button", { name: /둥근 동안형/u }));
+    await waitFor(() => {
+      expect(sceneHandle.setBodySpec).toHaveBeenCalled();
+    });
   });
 
   it("포즈 탭에 모든 프리셋 칩이 있고 클릭하면 씬에 포즈가 반영된다", async () => {

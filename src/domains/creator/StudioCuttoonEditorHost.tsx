@@ -6856,9 +6856,9 @@ export function StudioCuttoonEditor({
 
   function navigateStudio2dSurface(
     surface: Studio2dWorkspaceSurface,
-    options?: { readonly replace?: boolean },
+    options?: { readonly force?: boolean; readonly replace?: boolean },
   ) {
-    if (studioRoute.surface === surface) return;
+    if (studioRoute.surface === surface && options?.force !== true) return;
     navigate(
       studio2dHref({
         remixSourceWorkId: studioRoute.remixSourceWorkId,
@@ -7715,10 +7715,13 @@ export function StudioCuttoonEditor({
     if (studioRoute.surface === "canvas") navigateStudio2dSurface(surface);
   });
   const downgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
-    if (studioRoute.surface === surface) {
-      navigateStudio2dSurface("canvas", { replace: true });
-    }
-  });
+  if (studioRoute.surface === surface || studioRoute.surface === "canvas") {
+    // Closing can happen while the route upgrade is still pending behind the heavyweight 3D
+    // surface. Force a same-canvas replace as the newest navigation so that stale bg3d/poser/
+    // timeline route commits cannot reopen an empty panel after a successful insert or update.
+    navigateStudio2dSurface("canvas", { force: true, replace: true });
+  }
+});
   const routedSurfacePanelSyncRef = useRef({
     animation: false,
     bg3d: false,

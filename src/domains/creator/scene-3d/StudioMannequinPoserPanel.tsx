@@ -103,6 +103,7 @@ import {
 } from "./studio-mannequin-webcam-tracking";
 import {
   buildShaperLayeredPsd,
+  SHAPER_MANNEQUIN_SUPPORTED_CATEGORIES,
   type ShaperPresetSelection,
 } from "./studio-shaper-model";
 import { StudioShaperPanel } from "./StudioShaperPanel";
@@ -1331,20 +1332,40 @@ export function StudioMannequinPoserPanel({
     } else if (sel.face === "face-oval") {
       nextParams = { ...nextParams, ...STUDIO_MANNEQUIN_HEAD_PRESETS.anime.params };
     }
+
+    if (sel.eye === "eye-romance") {
+      nextParams = { ...nextParams, eyeScale: 1.16 };
+    } else if (sel.eye === "eye-gentle") {
+      nextParams = { ...nextParams, eyeScale: 1.08 };
+    } else if (sel.eye === "eye-action") {
+      nextParams = { ...nextParams, eyeScale: 0.96 };
+    } else if (sel.eye === "eye-cat") {
+      nextParams = { ...nextParams, eyeScale: 1.04 };
+    }
+
+    if (sel.nose === "nose-dot") {
+      nextParams = { ...nextParams, noseHeight: 0.84 };
+    } else if (sel.nose === "nose-straight") {
+      nextParams = { ...nextParams, noseHeight: 1.04 };
+    } else if (sel.nose === "nose-bridge") {
+      nextParams = { ...nextParams, noseHeight: 1.14 };
+    }
     commitParams(nextParams);
 
-    if (sel.bodypose === "pose-run") {
+    if (sel.bodypose === "pose-stand") {
+      commitPose(createStudioMannequinRestPose());
+    } else if (sel.bodypose === "pose-run") {
       applyPosePreset("dash");
     } else if (sel.bodypose === "pose-sit") {
       applyPosePreset("sit-chair");
     } else if (sel.bodypose === "pose-hip") {
       applyPosePreset("cross-arms");
+    } else if (sel.bodypose === "pose-sword") {
+      applyPosePreset("sword-ready");
     }
 
-    if (sel.handpose) {
-      applyPosePreset(sel.handpose);
-    }
-  }, [applyPosePreset, commitParams, params]);
+    if (sel.handpose) applyPosePreset(sel.handpose);
+  }, [applyPosePreset, commitParams, commitPose, params]);
 
   const handleExportPsdFromScene = useCallback(async () => {
     const handle = sceneRef.current;
@@ -1367,30 +1388,81 @@ export function StudioMannequinPoserPanel({
       if (!ctx) return;
       ctx.drawImage(img, 0, 0);
       const imgData = ctx.getImageData(0, 0, result.width, result.height);
-      const flat = new Uint8ClampedArray(imgData.data);
-
-      const lineArt = new Uint8ClampedArray(flat.length);
+      const beauty = new Uint8ClampedArray(imgData.data);
+      const flatColor = new Uint8ClampedArray(beauty.length);
+      const shadowCel = new Uint8ClampedArray(beauty.length);
+      const highlights = new Uint8ClampedArray(beauty.length);
+      const lineArt = new Uint8ClampedArray(beauty.length);
       const w = result.width;
       const h = result.height;
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
+      const luminanceAt = (pixelIndex: number) => (
+        beauty[pixelIndex] * 0.2126
+        + beauty[pixelIndex + 1] * 0.7152
+        + beauty[pixelIndex + 2] * 0.0722
+      );
+
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
           const idx = (y * w + x) * 4;
-          const a = flat[idx + 3];
-          const aRight = flat[(y * w + (x + 1)) * 4 + 3];
-          const aDown = flat[((y + 1) * w + x) * 4 + 3];
-          if (a > 30 && (aRight < 30 || aDown < 30)) {
-            lineArt[idx] = 20;
-            lineArt[idx + 1] = 20;
-            lineArt[idx + 2] = 20;
-            lineArt[idx + 3] = 255;
-          }
+          const alpha = beauty[idx + 3];
+          if (alpha <= 4) continue;
+          const red = beauty[idx];
+          const green = beauty[idx + 1];
+          const blue = beauty[idx + 2];
+          const maximum = Math.max(red, green, blue, 1);
+          const normalize = Math.min(1.45, Math.max(0.72, 190 / maximum));
+          flatColor[idx] = Math.min(255, Math.round(red * normalize));
+          flatColor[idx + 1] = Math.min(255, Math.round(green * normalize));
+          flatColor[idx + 2] = Math.min(255, Math.round(blue * normalize));
+          flatColor[idx + 3] = alpha;
+
+          const luminance = luminanceAt(idx);
+          const shadowAmount = Math.min(1, Math.max(0, (172 - luminance) / 105));
+          shadowCel[idx] = 48;
+          shadowCel[idx + 1] = 36;
+          shadowCel[idx + 2] = 52;
+          shadowCel[idx + 3] = Math.round(alpha * shadowAmount * 0.76);
+
+          const highlightAmount = Math.min(1, Math.max(0, (luminance - 188) / 67));
+          highlights[idx] = 255;
+          highlights[idx + 1] = 241;
+          highlights[idx + 2] = 219;
+          highlights[idx + 3] = Math.round(alpha * highlightAmount * 0.58);
+        }
+      }
+
+      for (let y = 1; y < h - 1; y += 1) {
+        for (let x = 1; x < w - 1; x += 1) {
+          const idx = (y * w + x) * 4;
+          const alpha = beauty[idx + 3];
+          if (alpha <= 20) continue;
+          const left = idx - 4;
+          const right = idx + 4;
+          const up = idx - w * 4;
+          const down = idx + w * 4;
+          const boundary = Math.max(
+            Math.abs(alpha - beauty[left + 3]),
+            Math.abs(alpha - beauty[right + 3]),
+            Math.abs(alpha - beauty[up + 3]),
+            Math.abs(alpha - beauty[down + 3]),
+          );
+          const formEdge = Math.abs(luminanceAt(left) - luminanceAt(right))
+            + Math.abs(luminanceAt(up) - luminanceAt(down));
+          const lineAlpha = Math.min(255, Math.round(boundary * 1.4 + Math.max(0, formEdge - 46) * 2.1));
+          if (lineAlpha <= 18) continue;
+          lineArt[idx] = 24;
+          lineArt[idx + 1] = 20;
+          lineArt[idx + 2] = 28;
+          lineArt[idx + 3] = lineAlpha;
         }
       }
 
       const psdBlob = buildShaperLayeredPsd({
         width: result.width,
         height: result.height,
-        flatColor: flat,
+        flatColor,
+        shadowCel,
+        highlights,
         lineArt,
       });
 
@@ -1588,6 +1660,7 @@ export function StudioMannequinPoserPanel({
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {tab === "shaper" ? (
                 <StudioShaperPanel
+                  supportedCategories={SHAPER_MANNEQUIN_SUPPORTED_CATEGORIES}
                   onSelectionChange={handleShaperSelectionChange}
                   onExportPsd={handleExportPsdFromScene}
                   onTriggerPoseScanner={() => setTab("pose")}

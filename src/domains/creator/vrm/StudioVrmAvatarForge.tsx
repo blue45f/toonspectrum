@@ -3,6 +3,12 @@ import { useEffect, useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 
 import {
+  createStudioVrmAuthoredHairGeometry,
+  createStudioVrmAuthoredHairGradientTexture,
+  mergeStudioVrmAuthoredHairGeometry,
+  type StudioVrmAuthoredHairInstance,
+} from "./studio-vrm-authored-hair-geometry";
+import {
   buildAvatarForgeHairParts,
   sanitizeAvatarForgeState,
   type AvatarForgeFaceAccent,
@@ -10,11 +16,13 @@ import {
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
+import { applyStudioVrmSemanticFaceMorphs } from "./studio-vrm-semantic-face-morph";
 
 import type { StudioVrmAvatarForgeFaceController } from "./studio-vrm-avatar-forge-face-controller";
 import type { VRM } from "@pixiv/three-vrm";
 
 const AVATAR_FORGE_MARKER = "toonSpectrumAvatarForge";
+const AVATAR_FORGE_OWNED_TEXTURES = "toonSpectrumAvatarForgeOwnedTextures";
 const HAIR_VISIBILITY_LEASES = new WeakMap<THREE.Object3D, { count: number; visible: boolean }>();
 
 type HeadFit = {
@@ -166,123 +174,10 @@ function measureHeadFit(vrm: VRM, head: THREE.Object3D): HeadFit {
   return { center, eyeCenter, radiusX, radiusY, radiusZ, frontSign };
 }
 
-function setGradientColors(geometry: THREE.BufferGeometry, baseColor: string, tipColor: string) {
-  geometry.computeBoundingBox();
-  const position = geometry.getAttribute("position");
-  const box = geometry.boundingBox;
-  if (!position || !box) return;
-
-  const base = new THREE.Color(baseColor);
-  const tip = new THREE.Color(tipColor);
-  const height = Math.max(1e-5, box.max.y - box.min.y);
-  const colors = new Float32Array(position.count * 3);
-  for (let index = 0; index < position.count; index += 1) {
-    const mix = clamp((box.max.y - position.getY(index)) / height, 0, 1);
-    const color = base.clone().lerp(tip, mix);
-    colors[index * 3] = color.r;
-    colors[index * 3 + 1] = color.g;
-    colors[index * 3 + 2] = color.b;
-  }
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-}
-
-function createTaperedStrandGeometry(part: AvatarForgeHairPart) {
-  const radialSegments = 10;
-  const lengthSegments = 14;
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  const base = new THREE.Color(part.baseColor);
-  const tip = new THREE.Color(part.tipColor);
-  // v2 웨이브. 계획에 wave 키가 없으면(=v1 계획) 아래 분기가 통째로 꺼져 v1과 동일한 부동소수
-  // 결과가 나온다(+0 덧셈으로 -0 부호 비트가 바뀌는 일조차 없도록 분기로 차단).
-  const waveAmount = part.wave ?? 0;
-  const waveFrequency = part.waveFrequency ?? 2.4;
-  // 가닥은 X/Z가 눌리고 Y가 늘어난 비등방 스케일로 배치된다. 웨이브 진폭을 "가닥 폭"이 아니라
-  // "가닥 길이" 기준으로 잡아야 어떤 굵기에서도 같은 세기로 보인다 → 종횡비만큼 되돌려 준다.
-  const aspectX = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0])), 1, 10);
-  const aspectZ = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2])), 1, 10);
-
-  for (let row = 0; row <= lengthSegments; row += 1) {
-    const t = row / lengthSegments;
-    const y = 1 - t * 2;
-    const radius = Math.max(0.08, 1 - part.taper * Math.pow(t, 0.72));
-    const spineCurveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
-    const spineCurveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
-    const curveX = waveAmount > 0
-      ? spineCurveX + Math.sin(t * Math.PI * waveFrequency) * waveAmount * 0.17 * aspectX * t
-      : spineCurveX;
-    const curveZ = waveAmount > 0
-      ? spineCurveZ + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.07 * aspectZ * t
-      : spineCurveZ;
-    const color = base.clone().lerp(tip, t);
-
-    for (let column = 0; column < radialSegments; column += 1) {
-      const angle = (column / radialSegments) * Math.PI * 2;
-      positions.push(curveX + Math.cos(angle) * radius, y, curveZ + Math.sin(angle) * radius);
-      colors.push(color.r, color.g, color.b);
-    }
-  }
-
-  for (let row = 0; row < lengthSegments; row += 1) {
-    for (let column = 0; column < radialSegments; column += 1) {
-      const nextColumn = (column + 1) % radialSegments;
-      const topLeft = row * radialSegments + column;
-      const topRight = row * radialSegments + nextColumn;
-      const bottomLeft = (row + 1) * radialSegments + column;
-      const bottomRight = (row + 1) * radialSegments + nextColumn;
-      indices.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
-    }
-  }
-
-  const topCenter = positions.length / 3;
-  positions.push(0, 1, 0);
-  colors.push(base.r, base.g, base.b);
-  const bottomCenter = positions.length / 3;
-  positions.push(0, -1, 0);
-  colors.push(tip.r, tip.g, tip.b);
-  for (let column = 0; column < radialSegments; column += 1) {
-    const nextColumn = (column + 1) % radialSegments;
-    indices.push(topCenter, nextColumn, column);
-    const bottom = lengthSegments * radialSegments;
-    indices.push(bottomCenter, bottom + column, bottom + nextColumn);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  return geometry;
-}
-
-function createHairGeometry(part: AvatarForgeHairPart) {
-  if (part.primitive === "tapered-capsule") return createTaperedStrandGeometry(part);
-  const geometry = part.role === "cap"
-    ? new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.7)
-    : new THREE.SphereGeometry(1, 24, 16);
-  setGradientColors(geometry, part.baseColor, part.tipColor);
-  return geometry;
-}
-
-/**
- * 파츠 계획 하나를 실제 BufferGeometry로 굽는다. 컴포넌트 내부에서 쓰는 그대로를
- * 노출해 헤드리스 테스트가 정점 수·좌표를 직접 검증할 수 있게 한다(테스트용 별도 경로 없음).
- */
+/** The shipped runtime and tests share the same authored clump generator. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function createAvatarForgeHairGeometry(part: AvatarForgeHairPart) {
-  return createHairGeometry(part);
-}
-
-function createHairMaterial(part: AvatarForgeHairPart) {
-  return new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    roughness: clamp(0.82 - part.shine * 0.54, 0.22, 0.84),
-    metalness: clamp(0.015 + part.shine * 0.11, 0, 0.14),
-    side: THREE.DoubleSide,
-  });
+  return createStudioVrmAuthoredHairGeometry(part);
 }
 
 function transformHairPart(part: AvatarForgeHairPart, fit: HeadFit) {
@@ -308,21 +203,86 @@ function transformHairPart(part: AvatarForgeHairPart, fit: HeadFit) {
   return { position, rotation, scale };
 }
 
-function addHairParts(group: THREE.Group, state: AvatarForgeState, fit: HeadFit) {
-  for (const part of buildAvatarForgeHairParts(state)) {
-    const geometry = createHairGeometry(part);
-    const material = createHairMaterial(part);
-    const mesh = new THREE.Mesh(geometry, material);
-    const transform = transformHairPart(part, fit);
-    mesh.name = `ToonSpectrumAvatarForgeHair_${part.id}`;
-    mesh.position.copy(transform.position);
-    mesh.rotation.copy(transform.rotation);
-    mesh.scale.copy(transform.scale);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.renderOrder = 6;
-    group.add(mesh);
+function authoredHairInstance(
+  part: AvatarForgeHairPart,
+  fit: HeadFit,
+): StudioVrmAuthoredHairInstance {
+  const transform = transformHairPart(part, fit);
+  const matrix = new THREE.Matrix4().compose(
+    transform.position,
+    new THREE.Quaternion().setFromEuler(transform.rotation),
+    transform.scale,
+  );
+  return Object.freeze({ part, matrix });
+}
+
+function createExpandedOutlineGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry {
+  const outline = source.clone();
+  const position = outline.getAttribute("position");
+  const normal = outline.getAttribute("normal");
+  if (!position || !normal) return outline;
+  outline.computeBoundingSphere();
+  const thickness = Math.max(0.00045, (outline.boundingSphere?.radius ?? 0.08) * 0.0085);
+  const values = new Float32Array(position.count * 3);
+  for (let index = 0; index < position.count; index += 1) {
+    values[index * 3] = position.getX(index) + normal.getX(index) * thickness;
+    values[index * 3 + 1] = position.getY(index) + normal.getY(index) * thickness;
+    values[index * 3 + 2] = position.getZ(index) + normal.getZ(index) * thickness;
   }
+  outline.setAttribute("position", new THREE.Float32BufferAttribute(values, 3));
+  outline.computeBoundingBox();
+  outline.computeBoundingSphere();
+  return outline;
+}
+
+function createHairMaterial(state: AvatarForgeState, gradientMap: THREE.DataTexture) {
+  const material = new THREE.MeshToonMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    gradientMap,
+    side: THREE.DoubleSide,
+  });
+  material.emissive.set(state.hair.baseColor);
+  material.emissiveIntensity = clamp(0.012 + state.hair.shine * 0.045, 0.012, 0.057);
+  return material;
+}
+
+function createHairOutlineMaterial(state: AvatarForgeState) {
+  const outline = new THREE.Color(state.hair.shadowColor ?? state.hair.baseColor)
+    .lerp(new THREE.Color("#090708"), 0.62);
+  return new THREE.MeshBasicMaterial({
+    color: outline,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
+
+function addHairParts(group: THREE.Group, state: AvatarForgeState, fit: HeadFit) {
+  const parts = buildAvatarForgeHairParts(state);
+  const merged = mergeStudioVrmAuthoredHairGeometry(
+    parts.map((part) => authoredHairInstance(part, fit)),
+  );
+  if (!merged) return;
+
+  const gradientMap = createStudioVrmAuthoredHairGradientTexture();
+  const mesh = new THREE.Mesh(merged, createHairMaterial(state, gradientMap));
+  const outline = new THREE.Mesh(
+    createExpandedOutlineGeometry(merged),
+    createHairOutlineMaterial(state),
+  );
+  mesh.name = "ToonSpectrumAvatarForgeHair_AuthoredMerged";
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.renderOrder = 6;
+  mesh.userData.partCount = parts.length;
+  outline.name = "ToonSpectrumAvatarForgeHairOutline_AuthoredMerged";
+  outline.renderOrder = 5;
+  outline.userData.partCount = parts.length;
+  group.userData[AVATAR_FORGE_OWNED_TEXTURES] = [gradientMap];
+  group.add(outline, mesh);
 }
 
 function faceSurfaceZ(fit: HeadFit, x: number, y: number, outset: number) {
@@ -438,6 +398,12 @@ function disposeAvatarForgeObject(object: THREE.Object3D) {
   });
   geometries.forEach((geometry) => geometry.dispose());
   materials.forEach((material) => material.dispose());
+  const textures = object.userData[AVATAR_FORGE_OWNED_TEXTURES];
+  if (Array.isArray(textures)) {
+    for (const texture of textures) {
+      if (texture instanceof THREE.Texture) texture.dispose();
+    }
+  }
 }
 
 export type StudioVrmAvatarForgeProps = {
@@ -449,7 +415,8 @@ export type StudioVrmAvatarForgeProps = {
 
 /**
  * rigged VRM을 유지한 채 normalized head에 절차형 헤어/페이스 디테일을 포털 부착한다.
- * 얼굴 조형은 raw+normalized head scale만 사용하며 원본 mesh/geometry는 변경하지 않는다.
+ * 기본 얼굴형은 raw+normalized head scale로, 모델이 명시적으로 제공한 상세 shape key는
+ * exact semantic binding으로 적용한다. 원본 geometry와 표정 expression 채널은 변경하지 않는다.
  */
 export function StudioVrmAvatarForge({
   vrm,
@@ -488,6 +455,11 @@ export function StudioVrmAvatarForge({
       faceController.release();
     };
   }, [faceController, normalizedHead, rawHead, rigRevision, safeState.face]);
+
+  useLayoutEffect(
+    () => applyStudioVrmSemanticFaceMorphs(vrm, safeState.semanticFaceMorphs),
+    [safeState.semanticFaceMorphs, vrm],
+  );
 
   useEffect(() => {
     if (!safeState.hair.replaceOriginal || safeState.hair.style === "none") return;
