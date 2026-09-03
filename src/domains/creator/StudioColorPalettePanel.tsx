@@ -81,29 +81,29 @@ export function StudioColorPalettePanel({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/60 p-3 shadow-sm">
+    <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-panel/70 p-3.5 shadow-md backdrop-blur-md">
       {/* Header with Title and Count Selector */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-fg-1">
           {busy ? <Loader2 size={15} className="animate-spin text-accent" /> : <Palette size={15} className="text-accent" />}
           <span>이미지 주요 색상</span>
           {colors.length > 0 && (
-            <span className="rounded-full bg-accent/15 px-2 py-0.2 text-[0.62rem] font-bold text-accent">
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.62rem] font-bold text-accent">
               {colors.length}색
             </span>
           )}
         </div>
 
         {/* Extraction Count pills */}
-        <div className="flex items-center gap-1 rounded-md border border-line bg-card/60 p-0.5 text-[0.62rem]">
+        <div className="flex items-center gap-1 rounded-lg border border-line/60 bg-card/60 p-0.5 text-[0.62rem] backdrop-blur-sm">
           {[6, 8, 12].map((cnt) => (
             <button
               key={cnt}
               type="button"
               onClick={() => setSampleCount(cnt)}
-              className={`rounded px-1.5 py-0.5 font-medium transition-colors ${
+              className={`rounded-md px-2 py-0.5 font-medium transition-all ${
                 sampleCount === cnt
-                  ? "bg-accent text-on-accent"
+                  ? "bg-accent text-on-accent font-semibold shadow-sm"
                   : "text-fg-3 hover:text-fg-1"
               }`}
             >
@@ -123,7 +123,7 @@ export function StudioColorPalettePanel({
         <>
           {/* Gradient Banner Preview */}
           <div
-            className="h-2 w-full rounded-full shadow-inner opacity-90 transition-opacity hover:opacity-100"
+            className="h-2.5 w-full rounded-full shadow-inner opacity-90 transition-opacity hover:opacity-100 border border-white/10"
             style={{
               background: `linear-gradient(to right, ${colors.join(", ")})`,
             }}
@@ -144,14 +144,21 @@ export function StudioColorPalettePanel({
                   className="group flex flex-col items-center gap-1 transition-transform active:scale-95"
                 >
                   <span
-                    className="relative flex size-8 items-center justify-center rounded-lg border border-line shadow-sm transition-transform group-hover:scale-105"
+                    className="relative flex size-9 items-center justify-center rounded-xl border border-white/20 shadow-sm transition-all duration-150 group-hover:scale-110 group-hover:shadow-md"
                     style={{ backgroundColor: hex }}
                   >
+                    {/* Glossy sheen */}
+                    <span
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-xl opacity-25"
+                      style={{
+                        background: "linear-gradient(180deg, rgba(255,255,255,0.7) 0%, transparent 100%)",
+                      }}
+                    />
                     {isCopied && (
-                      <Check size={14} className="drop-shadow-[0_0_2px_rgba(0,0,0,0.9)] text-white" />
+                      <Check size={14} className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] text-white" />
                     )}
                   </span>
-                  <span className="font-mono text-[0.62rem] text-fg-3 group-hover:text-fg-1">
+                  <span className="font-mono text-[0.62rem] text-fg-3 group-hover:text-fg-1 tracking-tight">
                     {isCopied ? "복사됨" : hex}
                   </span>
                 </button>
@@ -160,11 +167,11 @@ export function StudioColorPalettePanel({
           </div>
 
           {/* Action Bar: Save to Library & Copy All */}
-          <div className="mt-1 flex items-center gap-1.5 pt-1 border-t border-line/50">
+          <div className="mt-1 flex items-center gap-1.5 pt-1.5 border-t border-line/50">
             <button
               type="button"
               onClick={handleSaveToLibrary}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[0.66rem] font-semibold text-accent transition-colors hover:bg-accent/20 active:scale-[0.98]"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 px-3 py-1.5 text-[0.66rem] font-semibold text-accent transition-all hover:bg-accent/20 hover:border-accent/60 active:scale-[0.98] shadow-sm"
             >
               <Sparkles size={13} aria-hidden />
               {savedToLibraryMessage ?? "내 팔레트에 저장"}
@@ -173,7 +180,7 @@ export function StudioColorPalettePanel({
             <button
               type="button"
               onClick={handleCopyAll}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-line bg-card/80 px-2.5 py-1.5 text-[0.66rem] font-medium text-fg-2 transition-all hover:bg-raised active:scale-[0.98] shadow-sm"
             >
               {copyAllMessage ? <Check size={13} className="text-good" /> : <Copy size={13} />}
               <span>{copyAllMessage ? "전체 복사됨" : "전체 복사"}</span>

@@ -106,7 +106,7 @@ export function StudioDualColorWell({
             hint={STUDIO_DUAL_COLOR_WELL_HINTS.secondary}
           >
             <label
-              className="block size-full cursor-pointer overflow-hidden rounded border border-line shadow-md"
+              className="block size-full cursor-pointer overflow-hidden rounded-md border border-white/20 shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform hover:scale-105 active:scale-95"
               style={{ background: secondary }}
             >
               <span className="sr-only">보조 색 선택 · 현재 {secondary}</span>
@@ -126,7 +126,7 @@ export function StudioDualColorWell({
           hint={STUDIO_DUAL_COLOR_WELL_HINTS.primary}
         >
           <label
-            className="block size-full cursor-pointer overflow-hidden rounded-lg border border-line shadow-md ring-1 ring-black/10"
+            className="block size-full cursor-pointer overflow-hidden rounded-lg border border-white/20 shadow-[0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
             style={{ background: primary }}
           >
             <span className="sr-only">주 색 선택 · 현재 {primary}</span>

@@ -4,9 +4,10 @@
  * Procreate & Clip Studio Paint style interactive Color Disc (Color Wheel).
  * Features:
  * - Circular Hue Ring (0..360°) with radial angle tracking.
- * - Central Saturation-Value box with 2D gradient and crosshair indicator.
+ * - Central Saturation-Value box with 2D gradient and precision target reticle.
  * - Full touch, pen, and mouse support with PointerEvents and pointer capture.
  * - Keyboard accessible arrow key navigation.
+ * - Real-time H/S/V numeric readouts and visual feedback.
  */
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
@@ -48,7 +49,7 @@ export function StudioColorDiscPicker({
   }, [value]);
 
   const radius = size / 2;
-  const ringThickness = Math.round(size * 0.11); // ~23px
+  const ringThickness = Math.round(size * 0.115); // ~24px
   const innerRadius = radius - ringThickness;
   const svBoxSize = Math.round(innerRadius * 1.25); // ~114px box inside
 
@@ -190,96 +191,127 @@ export function StudioColorDiscPicker({
   const pureHueColor = `hsl(${hsv.h}, 100%, 50%)`;
 
   return (
-    <div
-      ref={containerRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      data-studio-color-disc="true"
-      className={`relative mx-auto select-none touch-none ${className ?? ""}`}
-      style={{
-        width: size,
-        height: size,
-      }}
-    >
-      {/* Outer Hue Ring via conic-gradient */}
+    <div className="flex flex-col items-center gap-2">
       <div
-        className="absolute inset-0 rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
+        ref={containerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        data-studio-color-disc="true"
+        className={`relative mx-auto select-none touch-none ${className ?? ""}`}
         style={{
-          background:
-            "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-          WebkitMask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
-          mask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
-        }}
-      />
-
-      {/* Hue Thumb (interactive via keyboard and touch) */}
-      <button
-        type="button"
-        role="slider"
-        aria-label="색상환 색조 각도"
-        aria-valuemin={0}
-        aria-valuemax={360}
-        aria-valuenow={hsv.h}
-        aria-valuetext={`${hsv.h}도`}
-        onKeyDown={handleHueKeyDown}
-        className="absolute size-5 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-transparent shadow-[0_0_4px_rgba(0,0,0,0.8),inset_0_0_2px_rgba(0,0,0,0.6)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        style={{
-          left: hueThumbX,
-          top: hueThumbY,
-          backgroundColor: pureHueColor,
-        }}
-      />
-
-      {/* Central Saturation-Value Square Box */}
-      <div
-        data-sv-box="true"
-        onPointerDown={handleSvPointerDown}
-        onPointerMove={handleSvPointerMove}
-        onPointerUp={handleSvPointerUp}
-        onPointerCancel={handleSvPointerUp}
-        className="absolute cursor-crosshair overflow-hidden rounded-md border border-line/60 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{
-          width: svBoxSize,
-          height: svBoxSize,
-          left: (size - svBoxSize) / 2,
-          top: (size - svBoxSize) / 2,
-          backgroundColor: pureHueColor,
+          width: size,
+          height: size,
         }}
       >
-        {/* Horizontal White gradient (Saturation 0% to 100%) */}
+        {/* Outer Ring Ambient Glow & Backdrop */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.2)]"
           style={{
-            background: "linear-gradient(to right, #ffffff, transparent)",
-          }}
-        />
-        {/* Vertical Black gradient (Value 100% to 0%) */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: "linear-gradient(to bottom, transparent, #000000)",
+            background:
+              "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+            WebkitMask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
+            mask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
           }}
         />
 
-        {/* SV Thumb cursor */}
+        {/* Inner boundary rim */}
+        <div
+          className="pointer-events-none absolute rounded-full border border-white/15"
+          style={{
+            width: innerRadius * 2,
+            height: innerRadius * 2,
+            left: ringThickness,
+            top: ringThickness,
+          }}
+        />
+
+        {/* Outer boundary rim */}
+        <div className="pointer-events-none absolute inset-0 rounded-full border border-black/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]" />
+
+        {/* Hue Thumb (interactive via keyboard and touch) */}
         <button
           type="button"
           role="slider"
-          aria-label="명도 및 채도 선택기"
+          aria-label="색상환 색조 각도"
           aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={hsv.v}
-          aria-valuetext={`채도 ${hsv.s}%, 명도 ${hsv.v}%`}
-          onKeyDown={handleSvKeyDown}
-          className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_3px_rgba(0,0,0,0.9)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          aria-valuemax={360}
+          aria-valuenow={hsv.h}
+          aria-valuetext={`${hsv.h}도`}
+          onKeyDown={handleHueKeyDown}
+          className="group absolute size-5 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.75),0_0_0_1px_rgba(0,0,0,0.3)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           style={{
-            left: svThumbX,
-            top: svThumbY,
-            backgroundColor: value,
+            left: hueThumbX,
+            top: hueThumbY,
+            backgroundColor: pureHueColor,
           }}
+        >
+          <span className="block size-full rounded-full border border-black/20 shadow-inner" />
+        </button>
+
+        {/* Central Saturation-Value Square Box */}
+        <div
+          data-sv-box="true"
+          onPointerDown={handleSvPointerDown}
+          onPointerMove={handleSvPointerMove}
+          onPointerUp={handleSvPointerUp}
+          onPointerCancel={handleSvPointerUp}
+          className="absolute cursor-crosshair overflow-hidden rounded-xl border border-white/20 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15),0_6px_16px_rgba(0,0,0,0.55)] transition-shadow hover:shadow-[0_8px_20px_rgba(0,0,0,0.65)]"
+          style={{
+            width: svBoxSize,
+            height: svBoxSize,
+            left: (size - svBoxSize) / 2,
+            top: (size - svBoxSize) / 2,
+            backgroundColor: pureHueColor,
+          }}
+        >
+          {/* Horizontal White gradient (Saturation 0% to 100%) */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(to right, #ffffff, transparent)",
+            }}
+          />
+          {/* Vertical Black gradient (Value 100% to 0%) */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(to bottom, transparent, #000000)",
+            }}
+          />
+
+          {/* SV Thumb precision crosshair cursor */}
+          <button
+            type="button"
+            role="slider"
+            aria-label="명도 및 채도 선택기"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={hsv.v}
+            aria-valuetext={`채도 ${hsv.s}%, 명도 ${hsv.v}%`}
+            onKeyDown={handleSvKeyDown}
+            className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_4px_rgba(0,0,0,0.9),0_0_0_1px_rgba(0,0,0,0.4)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            style={{
+              left: svThumbX,
+              top: svThumbY,
+              backgroundColor: value,
+            }}
+          >
+            <span className="block size-full rounded-full border border-black/30" />
+          </button>
+        </div>
+      </div>
+
+      {/* Floating Readout Pill: Exact H, S, V and Current Color Dot */}
+      <div className="flex items-center gap-2 rounded-full border border-line/60 bg-raised/70 px-2.5 py-0.5 shadow-sm backdrop-blur-sm">
+        <span
+          className="size-2.5 rounded-full border border-black/20 shadow-sm"
+          style={{ backgroundColor: value }}
         />
+        <span className="font-mono text-[0.62rem] font-medium text-fg-2">
+          H <span className="font-semibold text-fg-1">{hsv.h}°</span> · S <span className="font-semibold text-fg-1">{hsv.s}%</span> · V <span className="font-semibold text-fg-1">{hsv.v}%</span>
+        </span>
       </div>
     </div>
   );

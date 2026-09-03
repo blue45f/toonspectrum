@@ -177,7 +177,7 @@ async function selectOne(page: Page, item: StudioBrushCatalogItem): Promise<Row>
 async function spawnPreview(): Promise<{ origin: string; child: ChildProcess | null }> {
   const external = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (external) return { origin: external, child: null };
-  const port = 4600 + Math.floor(process.hrtime.bigint() % 300n);
+  const port = 4600 + Math.floor(Math.random() * 300);
   const child = spawn("npx", ["vite", "preview", "--port", String(port), "--strictPort"], {
     stdio: "ignore",
     detached: false,
