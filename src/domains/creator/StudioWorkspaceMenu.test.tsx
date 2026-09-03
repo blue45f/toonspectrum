@@ -61,6 +61,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     const html = renderMenu();
 
     expect(html).toContain('data-testid="studio-workspace-menu"');
+    expect(html).toContain('data-testid="studio-workspace-menu-toggle"');
     expect(html.match(/data-studio-shortcut-boundary="true"/g)).toHaveLength(2);
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('aria-expanded="false"');

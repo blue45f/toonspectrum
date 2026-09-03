@@ -252,6 +252,7 @@ export function StudioAppMenubar({
     <div
       role="banner"
       aria-label={ariaLabel}
+      data-testid="studio-menubar"
       data-studio-app-menubar="true"
       className={cn(
         // Sumo-class top bar — denser commercial app chrome, still canvas-max height.
@@ -265,10 +266,15 @@ export function StudioAppMenubar({
       )}
     >
       <div
+        data-testid="studio-menubar-scroll"
         data-studio-app-menubar-scroll="true"
         className={cn(
           "flex min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
-          "overflow-hidden"
+          // Mobile actions are a bounded 44px icon cluster and all overlays use portals. Keeping
+          // this lane visible prevents focus rings and the final Publish action from being hard
+          // clipped by the top-bar shell. Desktop keeps the clipping boundary around its long
+          // two-row application menu.
+          "max-md:overflow-visible md:overflow-hidden"
         )}
       >
         {children}

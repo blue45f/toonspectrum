@@ -279,10 +279,9 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
           screen.getByRole("button", { name: "프로젝트 작업" }),
           width,
         ),
-        "내보내기 옵션": isReachableAt(
-          screen.getByRole("button", { name: "내보내기 옵션" }),
-          width,
-        ),
+        "내보내기 옵션": screen
+          .getAllByRole("button", { name: "내보내기 옵션" })
+          .some((button) => isReachableAt(button, width)),
       };
       unmount();
       return map;
