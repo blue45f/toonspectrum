@@ -55,6 +55,15 @@ jobs:
           python3 -m unittest discover -s tests/blender -p 'test_*.py' -v
           node scripts/verify-blender-character-pipeline.mjs
 
+      - name: Normalize generated import ordering
+        run: >-
+          pnpm exec eslint --fix
+          scripts/import-blender-character-package.mts
+          scripts/setup-toonstudio-blender-pipeline.mts
+          scripts/verify-blender-character-pipeline.mjs
+          src/domains/creator/vrm/studio-vrm-blender-character-package.ts
+          src/domains/creator/vrm/studio-vrm-blender-character-package.test.ts
+
       - name: Lint package integration
         run: >-
           pnpm exec eslint --max-warnings=0
