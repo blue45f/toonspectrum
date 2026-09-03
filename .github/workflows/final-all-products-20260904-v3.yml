@@ -1,0 +1,90 @@
+name: Final all-product integration 20260904 v3
+
+on:
+  push:
+    branches:
+      - automation/final-all-products-20260904-v3
+    paths:
+      - .github/workflows/final-all-products-20260904-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: final-all-products-20260904-v3
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INTEGRATION_BRANCH: integration/final-all-products-20260904-v3
+    steps:
+      - name: Check out latest protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge all remaining product branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin \
+            main \
+            feat/blender-character-quality-pipeline-20260904 \
+            feat/studio-floating-surfaces-20260904 \
+            codex/studio-ink-live-commit-gate \
+            feat/studio-inspector-context-ux-20260904
+          git switch -c "$INTEGRATION_BRANCH" origin/main
+
+          for branch in \
+            feat/blender-character-quality-pipeline-20260904 \
+            feat/studio-floating-surfaces-20260904 \
+            codex/studio-ink-live-commit-gate \
+            feat/studio-inspector-context-ux-20260904
+          do
+            ref="origin/$branch"
+            if git merge-base --is-ancestor "$ref" HEAD; then
+              echo "$branch is already contained in the integration head."
+              continue
+            fi
+            echo "Merging $branch"
+            git merge --no-ff --no-edit "$ref"
+          done
+
+          test -z "$(git ls-files -u)"
+          git diff --check
+          git push origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
+
+      - name: Open or reuse one final integration pull request
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --head "$INTEGRATION_BRANCH" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$INTEGRATION_BRANCH" \
+              --title "feat: integrate every remaining Studio and Blender product branch" \
+              --body "Losslessly merges the latest Blender character-quality pipeline, draggable/resizable Studio floating surfaces, ink live-commit/quality gates, and inspector-context/lettering UX on top of protected main. Each source branch is retained as a merge parent; conflicts fail instead of choosing either side wholesale."
+          else
+            echo "Reusing PR #$number"
+          fi
+
+      - name: Remove the one-shot driver branch after success
+        if: success()
+        shell: bash
+        run: git push origin --delete automation/final-all-products-20260904-v3 || true
