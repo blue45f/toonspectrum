@@ -11,8 +11,9 @@ export type { StudioQuickAccessSurfaceProps } from "./studio-quick-access-surfac
 /**
  * Responsive owner for Quick Access.
  *
- * Desktop uses reusable floating-window chrome; mobile deliberately stays a bounded modal sheet so
- * a palette cannot cover both the canvas and thumb dock.
+ * Desktop portals the shared floating surface directly under `body`: an intermediate fixed/z-index
+ * wrapper would create a stacking context and defeat the global click-to-front registry. Mobile
+ * deliberately keeps the bounded modal sheet and its backdrop wrapper.
  */
 export function StudioQuickAccessSurface(props: StudioQuickAccessSurfaceProps) {
   const {
@@ -40,16 +41,16 @@ export function StudioQuickAccessSurface(props: StudioQuickAccessSurfaceProps) {
   };
 
   return createPortal(
-    <div
-      data-studio-quick-access-portal="true"
-      className="pointer-events-none fixed inset-0 z-[70]"
-    >
-      {isMobile ? (
+    isMobile ? (
+      <div
+        data-studio-quick-access-portal="true"
+        className="pointer-events-none fixed inset-0 z-[70]"
+      >
         <StudioQuickAccessMobileSurface {...leafProps} />
-      ) : (
-        <StudioQuickAccessDesktopSurface {...leafProps} />
-      )}
-    </div>,
+      </div>
+    ) : (
+      <StudioQuickAccessDesktopSurface {...leafProps} />
+    ),
     document.body,
   );
 }
