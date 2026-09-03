@@ -113,12 +113,7 @@ async function main(): Promise<void> {
   }
   const probe = [
     "import bpy, json",
-    "result = {",
-    "  'version': list(bpy.app.version[:3]),",
-    "  'toonstudio': hasattr(bpy.ops, 'toonstudio') and hasattr(bpy.ops.toonstudio, 'run_character_pipeline'),",
-    "  'vrmImport': hasattr(bpy.ops.import_scene, 'vrm'),",
-    "  'vrmExport': hasattr(bpy.ops.export_scene, 'vrm'),",
-    "}",
+    "result = {'version': list(bpy.app.version[:3]), 'toonstudio': hasattr(bpy.ops, 'toonstudio') and hasattr(bpy.ops.toonstudio, 'run_character_pipeline'), 'vrmImport': hasattr(bpy.ops.import_scene, 'vrm'), 'vrmExport': hasattr(bpy.ops.export_scene, 'vrm')}",
     "print('TOONSTUDIO_BLENDER_PROBE ' + json.dumps(result, sort_keys=True))",
   ].join("; ");
   const output = run(blender, ["--background", "--python-expr", probe]);
