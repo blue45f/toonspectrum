@@ -259,7 +259,7 @@ describe("wet-media bristle footprint bridge", () => {
     const seeded = applyStudioWetMediaTileFieldDepositions(fieldModel, empty, [{
       cellIndex: 0,
       waterMassDelta: 0,
-      pigmentMassDelta: 0.9,
+      pigmentMassDelta: 0.95,
       color: [0.2, 0.4, 0.8, 1],
     }]);
     expect(seeded.ok).toBe(true);
@@ -270,8 +270,8 @@ describe("wet-media bristle footprint bridge", () => {
       load: 1,
       mix: 0,
       pickupRate: 0,
-      depositionRate: 2,
-      reservoirPigmentCapacity: 10,
+      depositionRate: 0.1,
+      reservoirPigmentCapacity: 1,
       reservoirWaterCapacity: 0,
     });
     const brush = brushState(mixer);
@@ -288,8 +288,8 @@ describe("wet-media bristle footprint bridge", () => {
       stage: "tile-field",
       reason: "mass-budget-exceeded",
     });
-    expect(field.mobilePigmentMass[0]).toBeCloseTo(0.9, 12);
+    expect(field.mobilePigmentMass[0]).toBeCloseTo(0.95, 12);
     expect(brush.lastContactSequence).toBeNull();
-    expect(brush.reservoir.pigmentMass).toBe(10);
+    expect(brush.reservoir.pigmentMass).toBe(1);
   });
 });
