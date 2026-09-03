@@ -290,7 +290,12 @@ export function renderStudioCanvasSelectionDecorations({
         // nodes([]) and paints no pixels for that selection, so it cannot be treated as authored
         // z-order content that blocks the isolated exact draft Layer.
         studioLiveTransformZOrderExempt={selected?.type === "draw" ? true : undefined}
-        rotateEnabled
+        // A panel frame is the one type this Transformer can attach to whose model stores no
+        // angle: `StudioFramePanel`'s transformend commits {x, y, width, height} and never reads
+        // `rotation()`, so a turn here becomes a pure displacement while the live node keeps the
+        // angle until the next reload. Withhold the handle rather than drop the turn, the same
+        // verdict `studioGroupUniformResizeMemberCanRotate` reaches for a frame in a selection.
+        rotateEnabled={selected?.type !== "frame"}
         rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
         rotationSnapTolerance={6}
         keepRatio={selected?.type === "text" || selected?.type === "sticker" || !!selected?.lockAspect}
