@@ -49,6 +49,12 @@ jobs:
       - name: Validate architecture
         run: pnpm run validate:architecture
 
+      - name: Normalize generated import ordering
+        run: >-
+          pnpm exec eslint --fix
+          src/domains/creator/vrm/StudioVrmAvatarForge.tsx
+          src/domains/creator/vrm/studio-vrm-semantic-face-morph.ts
+
       - name: Lint changed quality surfaces
         run: >-
           pnpm exec eslint --max-warnings=0
