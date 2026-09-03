@@ -229,6 +229,9 @@ function NumberControl({
         step={step}
         value={value}
         onChange={(event) => updateRange(event.target.value)}
+        // The unit lives in a plain span beside the numeric field, which no screen reader ties to
+        // the slider — "반지름 24" alone does not say 24 of what.
+        aria-valuetext={suffix ? `${value}${suffix}` : undefined}
         className="h-11 w-full cursor-pointer accent-accent sm:h-8 pointer-coarse:h-11"
         data-autofocus={autofocus ? "true" : undefined}
       />
@@ -723,6 +726,34 @@ export function StudioFilterDialog({
     );
     setGalleryOpen(false);
   };
+  /** Roving focus inside the category radiogroup — one tab stop, arrows to move between chips. */
+  const moveGalleryViewWithKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    const jump = event.key === "Home" ? 0 : event.key === "End" ? -1 : null;
+    if (step === 0 && jump === null) return;
+    event.preventDefault();
+    const views = STUDIO_FILTER_GALLERY_VIEWS;
+    const current = views.findIndex((view) => view.id === galleryView);
+    const nextIndex =
+      jump === null
+        ? (current + step + views.length) % views.length
+        : jump === 0
+          ? 0
+          : views.length - 1;
+    const next = views[nextIndex];
+    if (!next) return;
+    setGalleryView(next.id);
+    // The handler sits on each radio rather than the group, because a keydown on a container that
+    // is not itself focusable is a listener nothing can ever reach by keyboard.
+    event.currentTarget.parentElement
+      ?.querySelector<HTMLElement>(`[data-studio-filter-gallery-view="${next.id}"]`)
+      ?.focus({ preventScroll: false });
+  };
   const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
     updateEffectFavoriteState((current) =>
       toggleStudioEffectFavorite(current, studioFilterEffectId(nextKind)),
@@ -883,8 +914,14 @@ export function StudioFilterDialog({
                     />
                   </label>
 
+                  {/*
+                    A radiogroup, not nine toggle buttons: exactly one category is ever active, and
+                    aria-pressed on each described nine independent on/off switches. Radio semantics
+                    also make the whole strip one tab stop with arrow keys inside it, instead of nine
+                    stops the artist tabs through on the way to the filters.
+                  */}
                   <div
-                    role="group"
+                    role="radiogroup"
                     aria-label="필터 분류"
                     className="flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
                   >
@@ -892,7 +929,11 @@ export function StudioFilterDialog({
                       <button
                         key={view.id}
                         type="button"
-                        aria-pressed={galleryView === view.id}
+                        role="radio"
+                        aria-checked={galleryView === view.id}
+                        tabIndex={galleryView === view.id ? 0 : -1}
+                        data-studio-filter-gallery-view={view.id}
+                        onKeyDown={moveGalleryViewWithKey}
                         onClick={() => setGalleryView(view.id)}
                         className={cn(
                           "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border px-3 text-[0.68rem] font-semibold",
@@ -963,7 +1004,10 @@ export function StudioFilterDialog({
                             <button
                               type="button"
                               aria-pressed={favorite}
-                              aria-label={`${entryTitle} 즐겨찾기 ${favorite ? "해제" : "추가"}`}
+                              // The name stays put and aria-pressed carries the state. Swapping the
+                              // name too announced "즐겨찾기 해제, pressed" — the undo action
+                              // described as already done.
+                              aria-label={`${entryTitle} 즐겨찾기`}
                               onClick={() => toggleGalleryFavorite(entry.kind)}
                               className={cn(
                                 "absolute right-1 top-1 grid size-11 place-items-center rounded-lg border border-white/20 bg-black/55 text-white shadow-sm hover:bg-black/75",
