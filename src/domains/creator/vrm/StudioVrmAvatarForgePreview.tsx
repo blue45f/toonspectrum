@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Pure visual-summary helpers are the preview renderer's canonical contract. */
 import { useId, type ReactNode } from "react";
 
 import {
@@ -33,13 +34,15 @@ function almostEqual(left: number, right: number): boolean {
 }
 
 function changedNumericRecord(
-  current: Readonly<Record<string, unknown>>,
-  baseline: Readonly<Record<string, unknown>>,
+  current: object,
+  baseline: object,
 ): number {
+  const currentRecord = current as Record<string, unknown>;
+  const baselineRecord = baseline as Record<string, unknown>;
   let count = 0;
-  for (const key of new Set([...Object.keys(current), ...Object.keys(baseline)])) {
-    const currentValue = current[key];
-    const baselineValue = baseline[key];
+  for (const key of new Set([...Object.keys(currentRecord), ...Object.keys(baselineRecord)])) {
+    const currentValue = currentRecord[key];
+    const baselineValue = baselineRecord[key];
     if (typeof currentValue === "number" && typeof baselineValue === "number") {
       if (!almostEqual(currentValue, baselineValue)) count += 1;
     } else if (currentValue !== baselineValue) {
@@ -78,7 +81,7 @@ export function countStudioVrmAvatarForgeChanges(
 function faceShapeLabel(state: AvatarForgeState): string {
   const { headWidth, headHeight, cheekVolume, chinLength } = state.face;
   if (headHeight >= 1.07 && chinLength >= 1.05) return "긴 계란형";
-  if (headWidth >= 1.07 && cheekVolume >= 0.55) return "둥근형";
+  if (headWidth >= 1.07 || cheekVolume >= 0.65) return "둥근형";
   if (headWidth <= 0.94 && chinLength >= 1.06) return "샤프형";
   if (cheekVolume >= 0.65) return "볼륨형";
   if (chinLength <= 0.94) return "짧은 턱";

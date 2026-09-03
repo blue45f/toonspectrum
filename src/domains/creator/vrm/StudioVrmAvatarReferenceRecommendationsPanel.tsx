@@ -28,6 +28,10 @@ import {
   type StudioVrmAvatarReferenceCatalogue,
   type StudioVrmAvatarReferenceRecommendationReceipt,
 } from "./studio-vrm-avatar-reference-recommendation";
+import {
+  describeStudioVrmAvatarForgeState,
+  StudioVrmAvatarForgePreview,
+} from "./StudioVrmAvatarForgePreview";
 
 /**
  * THESIS: A reference photo narrows the preset shelf but never edits the avatar by itself.
@@ -430,22 +434,36 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                   {receipt.recommendations.map((recommendation) => {
                     const preset = findStudioVrmAvatarReferencePreset(recommendation.presetId);
                     if (!preset) return null;
+                    const previewState = createAvatarForgeState(recommendation.presetId);
+                    const visual = describeStudioVrmAvatarForgeState(previewState);
                     return (
                       <li key={recommendation.presetId} className="py-2.5">
                         <div className="flex items-start gap-2.5">
-                          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel text-base" aria-hidden>
-                            {preset.emoji}
+                          <span className="block h-24 w-20 shrink-0 overflow-hidden rounded-xl border border-line bg-panel/70 px-1">
+                            <StudioVrmAvatarForgePreview
+                              state={previewState}
+                              variant="compact"
+                              showBody
+                              label={`${preset.label} 추천 미리보기`}
+                            />
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline justify-between gap-2">
                               <p className="truncate text-[0.68rem] font-extrabold text-fg">
                                 {recommendation.rank}. {preset.label}
                               </p>
-                              <span className="shrink-0 text-[0.58rem] tabular-nums text-fg-3">
-                                cosine {recommendation.similarity.toFixed(3)}
+                              <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.58rem] font-bold tabular-nums text-fg-3">
+                                {Math.round(recommendation.similarity * 100)}% 유사
                               </span>
                             </div>
                             <p className="mt-0.5 line-clamp-2 text-[0.6rem] leading-relaxed text-fg-3">{preset.hint}</p>
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {[visual.face, visual.hair, visual.body].map((label) => (
+                                <span key={label} className="rounded-full border border-line bg-panel px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg-3">
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
                             <div className="mt-2 grid grid-cols-2 gap-1.5">
                               <button
                                 type="button"
@@ -474,9 +492,12 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                     );
                   })}
                 </ol>
-                <p className="border-t border-line/70 pt-2 text-[0.56rem] leading-relaxed text-fg-3">
-                  {receipt.modelId} r{receipt.modelRevision} · model sha256 {receipt.modelSha256.slice(0, 12)}… · catalogue {receipt.catalogueRevision}
-                </p>
+                <details className="border-t border-line/70 pt-2 text-[0.56rem] leading-relaxed text-fg-3">
+                  <summary className="min-h-8 cursor-pointer font-semibold text-fg-3">분석 기술 정보</summary>
+                  <p className="mt-1 break-all">
+                    {receipt.modelId} r{receipt.modelRevision} · model sha256 {receipt.modelSha256.slice(0, 12)}… · catalogue {receipt.catalogueRevision}
+                  </p>
+                </details>
               </div>
             ) : null}
           </>
