@@ -95,9 +95,6 @@ jobs:
     needs: contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 75
-    env:
-      HOME: ${{ runner.temp }}/toonstudio-blender-home
-      BLENDER_USER_RESOURCES: ${{ runner.temp }}/toonstudio-blender-user
     steps:
       - uses: actions/checkout@v6
 
@@ -140,8 +137,12 @@ jobs:
           rm -f "$archive" "$checksum"
           mv "blender-${BLENDER_VERSION}-linux-x64.ready" "blender-${BLENDER_VERSION}-linux-x64"
 
-      - name: Export Blender path
+      - name: Export isolated Blender paths
         run: |
+          export HOME="$RUNNER_TEMP/toonstudio-blender-home"
+          export BLENDER_USER_RESOURCES="$RUNNER_TEMP/toonstudio-blender-user"
+          echo "HOME=$HOME" >> "$GITHUB_ENV"
+          echo "BLENDER_USER_RESOURCES=$BLENDER_USER_RESOURCES" >> "$GITHUB_ENV"
           echo "BLENDER_PATH=$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" >> "$GITHUB_ENV"
           mkdir -p "$HOME" "$BLENDER_USER_RESOURCES"
           "$GITHUB_WORKSPACE/.cache/blender-${BLENDER_VERSION}-linux-x64/blender" --version
