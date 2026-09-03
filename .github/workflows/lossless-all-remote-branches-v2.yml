@@ -1,0 +1,286 @@
+name: Build lossless all-remote-branch integration v2
+
+on:
+  push:
+    branches:
+      - automation/lossless-all-remote-branches-20260903
+    paths:
+      - ".github/workflows/lossless-all-remote-branches-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: lossless-all-remote-branches-v2-20260903
+  cancel-in-progress: false
+
+env:
+  INTEGRATION_BRANCH: integration/lossless-all-remote-branches-20260903
+  AUTOMATION_BRANCH: automation/lossless-all-remote-branches-20260903
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge every remote source and preserve every tip
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git checkout -B "$INTEGRATION_BRANCH" origin/main
+
+          report_dir="docs/merge-preservation"
+          jsonl="$RUNNER_TEMP/all-branches-v2.jsonl"
+          ordered="$RUNNER_TEMP/all-branches-v2.txt"
+          conflicts="$RUNNER_TEMP/conflicts-v2.txt"
+          workflows="$RUNNER_TEMP/workflows-v2.txt"
+          mkdir -p "$report_dir"
+          : > "$jsonl"
+
+          git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
+            | grep -v '^HEAD$' \
+            | python3 -c '
+          import sys
+          names = sorted({line.strip() for line in sys.stdin if line.strip()})
+          preferred = [
+              "claude/main-core-red-repair",
+              "fix/studio-service-worker-warm-cache-check-20260903",
+              "codex/studio-platform-preflight-safe-slicing",
+              "codex/studio-multilingual-emotion-bubbles",
+              "claude/chatgpt-share-analysis-75d1d0",
+              "claude/filter-ui-ux-enhancement-0ec697",
+              "claude/line-drawing-realtime-transform-c944b5",
+              "feat/shaper-character-workshop-20260903",
+              "feat/shaper-surface-paint-20260903",
+              "fix/marketplace-wire-authoring-surfaces-20260903",
+              "fix/marketplace-brush-publish-hardening-main-20260903",
+              "fix/marketplace-brush-publish-storage-20260903",
+              "fix/marketplace-postmerge-browser-regressions-20260903",
+              "brushfix/soak-harness",
+          ]
+          rank = {name: index for index, name in enumerate(preferred)}
+          def key(name):
+              if name in rank:
+                  return (0, rank[name], name)
+              if name.startswith(("codex/", "claude/", "feat/", "fix/", "brushfix/")):
+                  return (1, 0, name)
+              if name.startswith("qa/"):
+                  return (2, 0, name)
+              if name.startswith("archive/"):
+                  return (3, 0, name)
+              if name.startswith(("automation/", "integration/")):
+                  return (4, 0, name)
+              return (2, 1, name)
+          print("\n".join(sorted(names, key=key)))
+          ' > "$ordered"
+
+          restore_path_from_head() {
+            local path="$1"
+            if git cat-file -e "HEAD:$path" 2>/dev/null; then
+              git checkout HEAD -- "$path"
+            else
+              git rm -f --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
+            fi
+          }
+
+          suppress_workflow_changes_for_current_merge() {
+            : > "$workflows"
+            git diff --name-only HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+              | sort -u > "$workflows"
+            while IFS= read -r path; do
+              [[ -n "$path" ]] || continue
+              restore_path_from_head "$path"
+            done < "$workflows"
+          }
+
+          record() {
+            BRANCH="$1" SHA="$2" MODE="$3" STATUS="$4" JSONL="$jsonl" \
+              CONFLICT_FILE="$conflicts" WORKFLOW_FILE="$workflows" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def read_lines(name):
+              path = Path(os.environ[name])
+              return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+
+          row = {
+              "branch": os.environ["BRANCH"],
+              "sha": os.environ["SHA"],
+              "mode": os.environ["MODE"],
+              "status": os.environ["STATUS"],
+              "conflictsResolvedToCurrentTree": [item for item in read_lines("CONFLICT_FILE") if item],
+              "workflowChangesPreservedInHistoryOnly": [item for item in read_lines("WORKFLOW_FILE") if item],
+          }
+          with Path(os.environ["JSONL"]).open("a", encoding="utf-8") as handle:
+              handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+          PY
+          }
+
+          while IFS= read -r branch; do
+            [[ -n "$branch" ]] || continue
+            if [[ "$branch" == "main" || "$branch" == "$INTEGRATION_BRANCH" || "$branch" == "$AUTOMATION_BRANCH" ]]; then
+              continue
+            fi
+
+            ref="refs/remotes/origin/$branch"
+            sha="$(git rev-parse "$ref")"
+            : > "$conflicts"
+            : > "$workflows"
+
+            if git merge-base --is-ancestor "$sha" HEAD; then
+              record "$branch" "$sha" "already-ancestor" "preserved"
+              continue
+            fi
+
+            if [[ "$branch" == automation/* || "$branch" == integration/* || "$branch" == archive/* ]]; then
+              git merge -s ours --no-ff -m "merge(preserve): attach history for $branch" "$sha"
+              record "$branch" "$sha" "history-only" "preserved"
+              continue
+            fi
+
+            set +e
+            git merge --no-ff --no-commit "$sha"
+            merge_rc=$?
+            set -e
+
+            if [[ -f .git/MERGE_HEAD ]]; then
+              git ls-files -u | awk '{print $4}' | sort -u > "$conflicts"
+              while IFS= read -r path; do
+                [[ -n "$path" ]] || continue
+                if git cat-file -e "HEAD:$path" 2>/dev/null; then
+                  git checkout --ours -- "$path"
+                  git add -- "$path"
+                else
+                  git checkout --theirs -- "$path"
+                  git add -- "$path"
+                fi
+              done < "$conflicts"
+
+              suppress_workflow_changes_for_current_merge
+              git add -A
+              git commit -m "merge(preserve): integrate $branch"
+              if [[ "$merge_rc" -eq 0 ]]; then
+                result="active-clean"
+              else
+                result="active-nonconflicting-current-tree-conflicts"
+              fi
+              record "$branch" "$sha" "active-merge" "$result"
+            else
+              git merge --abort >/dev/null 2>&1 || true
+              git merge -s ours --no-ff -m "merge(preserve): attach unmergeable history for $branch" "$sha"
+              record "$branch" "$sha" "history-only-fallback" "preserved-after-merge-error"
+            fi
+
+            git merge-base --is-ancestor "$sha" HEAD
+          done < "$ordered"
+
+          # GitHub Apps without the separate workflows permission may push source code but may
+          # not update workflow definitions. Keep the active workflow tree byte-identical to main;
+          # every branch version remains reachable through its merge parent.
+          git diff --name-only origin/main -- '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+            | sort -u > "$workflows"
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            if git cat-file -e "origin/main:$path" 2>/dev/null; then
+              git checkout origin/main -- "$path"
+            else
+              git rm -f --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
+            fi
+          done < "$workflows"
+          if ! git diff --cached --quiet || ! git diff --quiet; then
+            git add -A
+            git commit -m "chore(merge): retain the protected main workflow tree"
+          fi
+
+          JSONL="$jsonl" REPORT_DIR="$report_dir" BASE_SHA="$(git rev-parse origin/main)" python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          rows = [json.loads(line) for line in Path(os.environ["JSONL"]).read_text(encoding="utf-8").splitlines() if line]
+          payload = {
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "baseMainSha": os.environ["BASE_SHA"],
+              "workflowTree": "byte-identical to base main; alternate versions remain in merge-parent history",
+              "branches": rows,
+          }
+          out = Path(os.environ["REPORT_DIR"])
+          out.mkdir(parents=True, exist_ok=True)
+          (out / "all-remote-branches-2026-09-03.json").write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          active = sum(row["mode"] == "active-merge" for row in rows)
+          history = sum(row["mode"].startswith("history-only") for row in rows)
+          inherited = sum(row["mode"] == "already-ancestor" for row in rows)
+          conflicts = sum(len(row["conflictsResolvedToCurrentTree"]) for row in rows)
+          workflows = sum(len(row["workflowChangesPreservedInHistoryOnly"]) for row in rows)
+          lines = [
+              "# Lossless all-remote-branch integration",
+              "",
+              f"- Base main: `{payload['baseMainSha']}`",
+              f"- Recorded branch tips: **{len(rows)}**",
+              f"- Active source merges: **{active}**",
+              f"- History-only safety merges: **{history}**",
+              f"- Already inherited tips: **{inherited}**",
+              f"- Conflict paths kept from the current integrated tree: **{conflicts}**",
+              f"- Workflow path changes retained through parent history: **{workflows}**",
+              "",
+              "Every recorded tip is an ancestor of the integration branch. Conflict alternatives can be restored with `git show <tip-sha>:<path>`.",
+              "",
+              "| Branch | Tip | Mode | Status | Conflicts | Workflow paths |",
+              "|---|---|---|---|---:|---:|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| `{row['branch']}` | `{row['sha'][:12]}` | {row['mode']} | {row['status']} | "
+                  f"{len(row['conflictsResolvedToCurrentTree'])} | {len(row['workflowChangesPreservedInHistoryOnly'])} |"
+              )
+          (out / "all-remote-branches-2026-09-03.md").write_text(
+              "\n".join(lines).rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          git add "$report_dir/all-remote-branches-2026-09-03.json" "$report_dir/all-remote-branches-2026-09-03.md"
+          git commit -m "docs(merge): record every preserved remote branch tip"
+          git diff --exit-code origin/main -- .github/workflows
+          git push --force-with-lease origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
+
+      - name: Verify every fetched tip is an ancestor of the pushed integration branch
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          integration="refs/remotes/origin/$INTEGRATION_BRANCH"
+          failures=0
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            [[ "$branch" == "HEAD" || "$branch" == "main" || "$branch" == "$INTEGRATION_BRANCH" || "$branch" == "$AUTOMATION_BRANCH" ]] && continue
+            sha="$(git rev-parse "$ref")"
+            if ! git merge-base --is-ancestor "$sha" "$integration"; then
+              echo "::error::Branch tip is not preserved: $branch $sha"
+              failures=$((failures + 1))
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin)
+          test "$failures" -eq 0
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: lossless-all-remote-branches-v2-${{ github.run_id }}
+          path: docs/merge-preservation
+          if-no-files-found: error
+          retention-days: 30
