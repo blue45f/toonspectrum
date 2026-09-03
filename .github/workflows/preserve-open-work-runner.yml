@@ -1,0 +1,217 @@
+name: Preserve outstanding PR work
+
+on:
+  push:
+    branches:
+      - automation/preserve-open-work-runner-20260903
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preserve-open-work-20260903
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: integration/preserved-open-work-20260903
+  PR_NUMBERS: "595 596 598 599 603 604 606 607"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  preserve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Integrate every unique patch without discarding conflicts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          git config user.name "toon-spectrum-preservation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main --prune
+          git checkout -B "$TARGET_BRANCH" origin/main
+
+          report=".merge-preservation/REPORT.md"
+          mkdir -p "$(dirname "$report")"
+          cat > "$report" <<'EOF'
+          # Outstanding work preservation report
+
+          This branch was rebuilt from the latest `main`. For each pull request, its head patch was
+          applied with a three-way merge. Conflict-free changes remain at their production paths.
+          When a path could not be reconciled mechanically, `main` stays authoritative at the
+          production path and the exact PR-head version is retained under
+          `.merge-preservation/pr-<number>/theirs/` for explicit semantic resolution.
+
+          | PR | State | Result | Conflicting paths |
+          |---:|:---:|:---|---:|
+          EOF
+          git add "$report"
+          git commit -m "chore(preserve): initialize outstanding-work ledger"
+
+          total_conflicts=0
+
+          for number in $PR_NUMBERS; do
+            metadata="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json state,title,headRefName,headRefOid,url 2>/dev/null || true)"
+            if [[ -z "$metadata" ]]; then
+              printf '| #%s | missing | skipped: PR metadata unavailable | 0 |\n' "$number" >> "$report"
+              continue
+            fi
+
+            state="$(jq -r '.state' <<<"$metadata")"
+            title="$(jq -r '.title' <<<"$metadata")"
+            head_sha="$(jq -r '.headRefOid' <<<"$metadata")"
+
+            if [[ "$state" == "MERGED" ]]; then
+              printf '| #%s | merged | skipped: already represented in `main` | 0 |\n' "$number" >> "$report"
+              continue
+            fi
+
+            ref="refs/remotes/preserve/pr-$number"
+            if ! git fetch --no-tags origin "+refs/pull/$number/head:$ref"; then
+              printf '| #%s | %s | skipped: head ref unavailable | 0 |\n' "$number" "$state" >> "$report"
+              continue
+            fi
+
+            base="$(git merge-base origin/main "$ref")"
+            patch="/tmp/pr-$number.patch"
+            git diff --binary --full-index "$base" "$ref" > "$patch"
+
+            if [[ ! -s "$patch" ]]; then
+              printf '| #%s | %s | skipped: empty patch | 0 |\n' "$number" "$state" >> "$report"
+              continue
+            fi
+
+            git reset --hard HEAD
+            git clean -fd
+            conflict_dir=".merge-preservation/pr-$number"
+            manifest="$conflict_dir/MANIFEST.md"
+            conflicts=0
+
+            if git apply --3way --index "$patch"; then
+              if git diff --cached --quiet; then
+                printf '| #%s | %s | skipped: patch already present | 0 |\n' "$number" "$state" >> "$report"
+                continue
+              fi
+              git commit -m "chore(preserve): integrate unique work from PR #$number" \
+                -m "$title" \
+                -m "Source head: $head_sha"
+              printf '| #%s | %s | integrated at production paths | 0 |\n' "$number" "$state" >> "$report"
+              continue
+            fi
+
+            mkdir -p "$conflict_dir/theirs"
+            cat > "$manifest" <<EOF
+          # PR #$number conflict preservation
+
+          - Title: $title
+          - State at preservation time: $state
+          - Source head: \\`$head_sha\`
+          - Merge base with current main: \\`$base\`
+
+          The files below could not be reconciled safely without semantic review. The current
+          `main` version remains at the production path. The exact PR-head variant is stored below
+          `theirs/`, so no source content is discarded.
+
+          ## Paths
+          EOF
+
+            mapfile -d '' conflicted_paths < <(git diff --name-only --diff-filter=U -z)
+            for path in "${conflicted_paths[@]}"; do
+              [[ -n "$path" ]] || continue
+              conflicts=$((conflicts + 1))
+              total_conflicts=$((total_conflicts + 1))
+              printf -- '- `%s`\n' "$path" >> "$manifest"
+
+              target="$conflict_dir/theirs/$path"
+              mkdir -p "$(dirname "$target")"
+              if git cat-file -e "$ref:$path" 2>/dev/null; then
+                git show "$ref:$path" > "$target"
+              else
+                printf 'PR_HEAD_DELETES_THIS_PATH\n' > "$target.__deleted__"
+              fi
+
+              if git cat-file -e ":2:$path" 2>/dev/null; then
+                git checkout --ours -- "$path"
+                git add -- "$path"
+              else
+                rm -f -- "$path"
+                git add -A -- "$path"
+              fi
+            done
+
+            git add -A
+            if git diff --cached --quiet; then
+              printf '| #%s | %s | no applicable production change; variants preserved | %s |\n' "$number" "$state" "$conflicts" >> "$report"
+            else
+              git commit -m "chore(preserve): retain conflict-free work from PR #$number" \
+                -m "$title" \
+                -m "Exact conflicting PR variants are stored under $conflict_dir/theirs/." \
+                -m "Source head: $head_sha"
+              printf '| #%s | %s | conflict-free hunks integrated; variants preserved | %s |\n' "$number" "$state" "$conflicts" >> "$report"
+            fi
+          done
+
+          git add "$report"
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(preserve): record outstanding PR integration results"
+          fi
+
+          if grep -RIl $'<<<<<<<\|=======\|>>>>>>>' --exclude='REPORT.md' --exclude='MANIFEST.md' . \
+            | grep -v '^./.git/' \
+            | grep -v '^./.merge-preservation/' \
+            | grep -q .; then
+            echo "Unresolved conflict markers remain in production paths." >&2
+            exit 1
+          fi
+
+          git push --force-with-lease origin "$TARGET_BRANCH"
+
+          body_file="/tmp/preservation-pr-body.md"
+          cat > "$body_file" <<EOF
+          ## 목적
+
+          열린/미병합 작업을 최신 \\`main\\` 위에서 최대한 손실 없이 통합합니다.
+
+          - 이미 병합된 PR은 건너뜀
+          - 충돌 없는 고유 패치는 실제 제품 경로에 적용
+          - 기계적으로 안전하게 결합할 수 없는 파일은 현재 \\`main\\`을 유지하면서 PR 원본을
+            \\`.merge-preservation/\\` 아래에 바이트 단위로 보존
+          - 전체 결과는 \\`.merge-preservation/REPORT.md\\`에 기록
+
+          자동 보존 과정에서 확인된 충돌 파일 수: **$total_conflicts**
+
+          제품 경로에 충돌 마커가 남아 있지 않은 것을 확인했습니다. 이 PR의 일반 CI와 브라우저
+          테스트를 통과한 뒤 병합하며, 보존 디렉터리의 파일은 후속 semantic-resolution PR에서
+          원래 경로로 반영합니다.
+          EOF
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$TARGET_BRANCH" --json number --jq '.[0].number // empty')"
+          if [[ -z "$existing" ]]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$TARGET_BRANCH" \
+              --title "chore(integration): preserve outstanding work without loss" \
+              --body-file "$body_file"
+          else
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" \
+              --title "chore(integration): preserve outstanding work without loss" \
+              --body-file "$body_file"
+          fi
+
+      - name: Publish preservation report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: outstanding-work-preservation-${{ github.run_id }}
+          path: .merge-preservation
+          if-no-files-found: warn
+          retention-days: 30
