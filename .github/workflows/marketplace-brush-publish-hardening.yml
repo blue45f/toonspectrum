@@ -1,0 +1,61 @@
+name: Marketplace Brush Studio publish hardening
+
+on:
+  pull_request:
+    paths:
+      - "src/domains/creator/MarketplaceBrushPublishShortcut.tsx"
+      - "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.test.tsx"
+      - ".github/workflows/marketplace-brush-publish-hardening.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/domains/creator/MarketplaceBrushPublishShortcut.tsx"
+      - "src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.tsx"
+      - "src/domains/creator/MarketplaceBrushStudioBridge.test.tsx"
+      - ".github/workflows/marketplace-brush-publish-hardening.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-brush-publish-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify blocked-storage and live-snapshot publishing
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            --reporter=verbose
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm exec eslint \
+            src/domains/creator/MarketplaceBrushPublishShortcut.tsx \
+            src/domains/creator/MarketplaceBrushPublishShortcut.test.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.tsx \
+            src/domains/creator/MarketplaceBrushStudioBridge.test.tsx \
+            --max-warnings=0
