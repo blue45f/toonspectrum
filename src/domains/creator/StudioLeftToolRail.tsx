@@ -32,17 +32,27 @@ import {
   UsersRound,
   Wind,
 } from "lucide-react";
-import { memo, useEffect, useId, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  StudioEditorClientProvider,
+  useEditorSelector,
+  useStudioEditorClient,
+} from "./editor-client";
+import {
+  STUDIO_LEFT_TOOL_RAIL_COMMANDS,
+  type StudioLeftToolRailActionArguments,
+  type StudioLeftToolRailActionName,
+  type StudioLeftToolRailClient,
+  type StudioLeftToolRailHandlersContract,
+  type StudioLeftToolRailSnapshot,
+} from "./editor-client/studio-left-tool-rail-client";
 import { preloadStudioRasterRetouchRuntime } from "./render/studio-raster-retouch-preload";
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   formatStudioShortcutChord,
   studioRailToolLabel,
-  type StudioAppSettings,
-  type StudioAppSettingsTab,
-  type StudioRailToolId,
 } from "./studio-app-settings";
 import {
   STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER,
@@ -70,18 +80,12 @@ import {
   STUDIO_RETOUCH_EDITABLE_COPY_NOTE,
   studioRetouchToolHelp,
 } from "./studio-retouch-help";
-import {
-  isSelectionUsable,
-  type PixelSelection,
-  type SelectionToolKind,
-} from "./studio-selection-tools";
+import { isSelectionUsable } from "./studio-selection-tools";
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { StudioLeftToolRailViewToolsCluster } from "./StudioLeftToolRailViewToolsCluster";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
-import type { BubbleVariant } from "./studio-assets";
-import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
-import type { El } from "./studio-element-model";
+import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
 
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -102,6 +106,12 @@ type PositionedStudioRailMore = StudioRailMorePosition & { readonly maxHeight: n
 
 function labelWithShortcut(label: string, shortcut: string | undefined): string {
   return shortcut ? `${label} (${formatStudioShortcutChord(shortcut)})` : label;
+}
+
+function resolveStateAction<T>(next: SetStateAction<T>, current: T): T {
+  return typeof next === "function"
+    ? (next as (value: T) => T)(current)
+    : next;
 }
 
 function preloadRasterRetouchIntent(): void {
@@ -160,176 +170,69 @@ function measureStudioRailMorePosition(
   };
 }
 
-export interface StudioLeftToolRailHandlers {
-  /**
-   * 선택/그리기 전환의 단일 정본. 진행 중인 획 취소 → 픽셀 도구 disarm(스포이드 포함) →
-   * tool/drawMode 커밋을 한 순서로 수행한다. 레일이 setTool/setDrawMode를 직접 만지면
-   * 같은 명령이 진입점마다 다른 부수효과를 갖게 되므로 항상 이 핸들러를 거친다.
-   */
-  activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
-  /**
-   * 핸드(팬) 토글. 켜면 `hand`, 다시 누르면 `select` — 오늘과 같은 의미다. 레일이 `setTool`
-   * 업데이터를 직접 들고 있으면 "지금 도구가 무엇인지"에 대한 판단이 UI 로 새어 나오므로,
-   * 상태가 아니라 명령을 받는다.
-   */
-  toggleHandTool: () => void;
-  /**
-   * 픽셀 선택 도구 무장·"선택 후 변형" 복구처럼 **지금 도구를 내려놓고 선택으로 돌아가는**
-   * 경로. 기본 도구 전이(`activatePrimaryCanvasTool`)와는 다른 명령이다 — 획 취소·disarm 은
-   * 이 경로의 호출자들이 필요한 만큼 직접 부른다.
-   */
-  returnToSelectTool: () => void;
-  fitCanvasToWidth: () => void;
-  fitCanvasToWidthWithFocus?: () => void;
-  openFrameAnimationForSelected: () => void;
-  openPixelSelectionTransform: () => void;
-  openSelectedLayerCrop: () => void;
-  /** 선택한 BG3D 레이어가 있으면 재편집하고, 없으면 빈 장면을 여는 레일 전용 토글. */
-  toggleBg3dEditor: () => void;
-  addBubble: (
-    variant: BubbleVariant,
-    at?: { x: number; y: number; },
-    editImmediately?: boolean
-  ) => void;
-  addText: (at?: { x: number; y: number; }, editImmediately?: boolean) => void;
-  announceDrawingShortcut: (message: string) => void;
-  clearPolyLassoDraft: () => void;
-  commitAppSettings: (next: StudioAppSettings) => void;
-  disarmAllPixelTools: () => void;
-  onRequestPixelSelection: () => void;
-  onRequestSelectImage: () => void;
-  onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  /**
-   * CSP/PPT-style: when a draw tool is picked from the rail, surface the
-   * properties inspector so size/color/brush options are one glance away.
-   */
-  revealDrawToolProperties: () => void;
-  toggleAdvancedFill: () => void;
-  toggleDodgeBurnTool: () => void;
-  toggleWetMixTool: () => void;
-  toggleLiquifyTool: () => void;
-  togglePixelMarquee: (kind: "rect" | "circle") => void;
-  toggleSmudgeTool: () => void;
-  toggleStudioCommentPinPlacement: () => void;
+export type StudioLeftToolRailHandlers = StudioLeftToolRailHandlersContract;
+
+export interface StudioLeftToolRailProps {
+  readonly client: StudioLeftToolRailClient;
 }
 
-interface StudioLeftToolRailProps {
-  activeSurfaceReviewLocked: boolean;
-  /** 선택한 편집 가능 이미지가 필요한 픽셀 변형·프레임 애니메이션의 활성 판정. */
-  pixelToolTargetAvailable: boolean;
-  /** 선택 이미지 또는 현재 페이지 합성본을 자동 준비할 수 있는 래스터 리터치 도구 활성 판정. */
-  rasterRetouchTargetAvailable: boolean;
-  advancedFillActive: boolean;
-  advancedFillUnsupportedReason: string | null;
-  appSettings: StudioAppSettings;
-  appSettingsOpen: boolean;
-  canvasOnlyMode: boolean;
-  commentPinArmed: boolean;
-  cropActive: boolean;
-  drawMode: DrawMode;
-  drawShape: DrawShapeKind;
-  eyedropperActive: boolean;
-  frameAnimOpen: boolean;
-  frameAnimTargetId: string | null;
-  isRailToolVisible: (id: StudioRailToolId) => boolean;
-  liquifyActive: boolean;
-  mobileImmersive: boolean;
-  perspectiveRulerActive: boolean;
-  pixelForceCircle: boolean;
-  pixelSel: PixelSelection | null;
-  pixelTool: SelectionToolKind | "wand" | null;
-  quickShapeActive: boolean;
-  railMoreOpen: boolean;
-  referencePanelOpen: boolean;
-  mannequinPoserOpen?: boolean;
-  poserVrmOpen?: boolean;
-  bg3dOpen?: boolean;
-  hybridDccOpen?: boolean;
-  selected: El | null;
-  selectedImageMutationLocked: boolean;
-  setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
-  setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
-  setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
-  setPerspectiveRulerActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPixelTool: import("react").Dispatch<import("react").SetStateAction<SelectionToolKind | "wand" | null>>;
-  setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setRailMoreOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setMannequinPoserOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setHybridDccOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
-  dodgeBurnActive: boolean;
-  wetMixActive: boolean;
-  smudgeActive: boolean;
-  tool: Tool;
-  uiDensityMode: "simple" | "full" | "focus";
-  viewTransformSuppressed: boolean;
-  viewTool: "zoom" | "rotate" | null;
-  stableHandlers: StudioLeftToolRailHandlers;
-}
+const selectStudioLeftToolRailSnapshot = (
+  snapshot: StudioLeftToolRailSnapshot,
+): StudioLeftToolRailSnapshot => snapshot;
 
 export const StudioLeftToolRail = memo(function StudioLeftToolRail({
-  activeSurfaceReviewLocked,
-  pixelToolTargetAvailable,
-  rasterRetouchTargetAvailable,
-  advancedFillActive,
-  advancedFillUnsupportedReason,
-  appSettings,
-  appSettingsOpen,
-  canvasOnlyMode,
-  commentPinArmed,
-  cropActive,
-  drawMode,
-  drawShape,
-  eyedropperActive,
-  frameAnimOpen,
-  frameAnimTargetId,
-  isRailToolVisible,
-  liquifyActive,
-  mobileImmersive,
-  perspectiveRulerActive,
-  pixelForceCircle,
-  pixelSel,
-  pixelTool,
-  quickShapeActive,
-  railMoreOpen,
-  referencePanelOpen,
-  mannequinPoserOpen = false,
-  poserVrmOpen = false,
-  bg3dOpen = false,
-  hybridDccOpen = false,
-  selected,
-  selectedImageMutationLocked,
-  setAppSettingsInitialTab,
-  setAppSettingsOpen,
-  setDrawShape,
-  setEyedropperActive,
-  setMenu,
-  setPerspectiveRulerActive,
-  setPixelForceCircle,
-  setPixelTool,
-  setQuickShapeActive,
-  setRailMoreOpen,
-  setReferencePanelOpen,
-  setMannequinPoserOpen,
-  setPoserVrmOpen,
-  setHybridDccOpen,
-  setStrokeWidth: _setStrokeWidth,
-  setViewTool,
-  dodgeBurnActive,
-  wetMixActive,
-  smudgeActive,
-  tool,
-  uiDensityMode,
-  viewTransformSuppressed,
-  viewTool,
-  stableHandlers,
+  client,
 }: StudioLeftToolRailProps) {
+  return (
+    <StudioEditorClientProvider client={client}>
+      <StudioLeftToolRailConnected />
+    </StudioEditorClientProvider>
+  );
+});
+
+function StudioLeftToolRailConnected() {
+  const snapshot = useEditorSelector(selectStudioLeftToolRailSnapshot);
+  const client = useStudioEditorClient<StudioLeftToolRailSnapshot>();
+  const {
+    activeSurfaceReviewLocked,
+    pixelToolTargetAvailable,
+    rasterRetouchTargetAvailable,
+    advancedFillActive,
+    advancedFillUnsupportedReason,
+    appSettings,
+    appSettingsOpen,
+    canvasOnlyMode,
+    commentPinArmed,
+    cropActive,
+    drawMode,
+    drawShape,
+    eyedropperActive,
+    frameAnimOpen,
+    frameAnimTargetId,
+    isRailToolVisible,
+    liquifyActive,
+    mobileImmersive,
+    perspectiveRulerActive,
+    pixelForceCircle,
+    pixelSel,
+    pixelTool,
+    quickShapeActive,
+    railMoreOpen,
+    referencePanelOpen,
+    mannequinPoserOpen,
+    poserVrmOpen,
+    bg3dOpen,
+    hybridDccOpen,
+    selected,
+    selectedImageMutationLocked,
+    dodgeBurnActive,
+    wetMixActive,
+    smudgeActive,
+    tool,
+    uiDensityMode,
+    viewTransformSuppressed,
+    viewTool,
+  } = snapshot;
   const railMoreDialogId = useId();
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
@@ -414,33 +317,134 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     maxHeight: STUDIO_RAIL_MORE_MAX_HEIGHT_PX,
     top: 8,
   });
-  const {
-    activatePrimaryCanvasTool,
-    addBubble,
-    addText,
-    announceDrawingShortcut,
-    clearPolyLassoDraft,
-    commitAppSettings,
-    disarmAllPixelTools,
-    fitCanvasToWidth,
-    fitCanvasToWidthWithFocus,
-    onRequestPixelSelection,
-    onRequestSelectImage,
-    returnToSelectTool,
-    toggleHandTool,
-    onPickImage,
-    revealDrawToolProperties,
-    toggleAdvancedFill,
-    toggleStudioCommentPinPlacement,
-    toggleDodgeBurnTool,
-    toggleWetMixTool,
-    toggleLiquifyTool,
-    togglePixelMarquee,
-    toggleSmudgeTool,
-    openFrameAnimationForSelected,
-    openPixelSelectionTransform,
-    openSelectedLayerCrop,
-  } = stableHandlers;
+  const invokeRail = useCallback(
+    function invoke<K extends StudioLeftToolRailActionName>(
+      action: K,
+      ...args: StudioLeftToolRailActionArguments<K>
+    ) {
+      return client.dispatch({
+        id: STUDIO_LEFT_TOOL_RAIL_COMMANDS[action],
+        payload: args,
+        source: "rail",
+      });
+    },
+    [client],
+  );
+
+  function bindVoidAction<K extends StudioLeftToolRailActionName>(
+    action: K,
+  ): (...args: StudioLeftToolRailActionArguments<K>) => void {
+    return (...args) => {
+      void invokeRail(action, ...args);
+    };
+  }
+
+  const setAppSettingsInitialTab = (
+    value: StudioLeftToolRailActionArguments<"setAppSettingsInitialTab">[0],
+  ): void => {
+    void invokeRail("setAppSettingsInitialTab", value);
+  };
+  const setAppSettingsOpen = (next: SetStateAction<boolean>): void => {
+    void invokeRail("setAppSettingsOpen", resolveStateAction(next, appSettingsOpen));
+  };
+  const setDrawShape = (next: SetStateAction<typeof drawShape>): void => {
+    void invokeRail("setDrawShape", resolveStateAction(next, drawShape));
+  };
+  const setEyedropperActive = (next: SetStateAction<boolean>): void => {
+    void invokeRail("setEyedropperActive", resolveStateAction(next, eyedropperActive));
+  };
+  const setMenu = (
+    value: StudioLeftToolRailActionArguments<"setMenu">[0],
+  ): void => {
+    void invokeRail("setMenu", value);
+  };
+  const setPerspectiveRulerActive = (next: SetStateAction<boolean>): void => {
+    void invokeRail(
+      "setPerspectiveRulerActive",
+      resolveStateAction(next, perspectiveRulerActive),
+    );
+  };
+  const setPixelForceCircle = (next: SetStateAction<boolean>): void => {
+    void invokeRail("setPixelForceCircle", resolveStateAction(next, pixelForceCircle));
+  };
+  const setPixelTool = (next: SetStateAction<typeof pixelTool>): void => {
+    void invokeRail("setPixelTool", resolveStateAction(next, pixelTool));
+  };
+  const setQuickShapeActive = (next: SetStateAction<boolean>): void => {
+    void invokeRail("setQuickShapeActive", resolveStateAction(next, quickShapeActive));
+  };
+  const setRailMoreOpen = useCallback((next: SetStateAction<boolean>): void => {
+    void invokeRail("setRailMoreOpen", resolveStateAction(next, railMoreOpen));
+  }, [invokeRail, railMoreOpen]);
+  const setReferencePanelOpen = (next: SetStateAction<boolean>): void => {
+    void invokeRail("setReferencePanelOpen", resolveStateAction(next, referencePanelOpen));
+  };
+  const setMannequinPoserOpen = client.availability(
+    STUDIO_LEFT_TOOL_RAIL_COMMANDS.setMannequinPoserOpen,
+  ).state === "enabled"
+    ? (next: SetStateAction<boolean>): void => {
+        void invokeRail(
+          "setMannequinPoserOpen",
+          resolveStateAction(next, mannequinPoserOpen),
+        );
+      }
+    : undefined;
+  const setPoserVrmOpen = client.availability(
+    STUDIO_LEFT_TOOL_RAIL_COMMANDS.setPoserVrmOpen,
+  ).state === "enabled"
+    ? (next: SetStateAction<boolean>): void => {
+        void invokeRail("setPoserVrmOpen", resolveStateAction(next, poserVrmOpen));
+      }
+    : undefined;
+  const setHybridDccOpen = client.availability(
+    STUDIO_LEFT_TOOL_RAIL_COMMANDS.setHybridDccOpen,
+  ).state === "enabled"
+    ? (next: SetStateAction<boolean>): void => {
+        void invokeRail("setHybridDccOpen", resolveStateAction(next, hybridDccOpen));
+      }
+    : undefined;
+  const setViewTool = (next: SetStateAction<typeof viewTool>): void => {
+    void invokeRail("setViewTool", resolveStateAction(next, viewTool));
+  };
+
+  const activatePrimaryCanvasTool = bindVoidAction("activatePrimaryCanvasTool");
+  const addBubble = bindVoidAction("addBubble");
+  const addText = bindVoidAction("addText");
+  const announceDrawingShortcut = bindVoidAction("announceDrawingShortcut");
+  const clearPolyLassoDraft = bindVoidAction("clearPolyLassoDraft");
+  const commitAppSettings = bindVoidAction("commitAppSettings");
+  const disarmAllPixelTools = bindVoidAction("disarmAllPixelTools");
+  const fitCanvasToWidth = bindVoidAction("fitCanvasToWidth");
+  const fitCanvasToWidthWithFocus = client.availability(
+    STUDIO_LEFT_TOOL_RAIL_COMMANDS.fitCanvasToWidthWithFocus,
+  ).state === "enabled"
+    ? bindVoidAction("fitCanvasToWidthWithFocus")
+    : undefined;
+  const onRequestPixelSelection = bindVoidAction("onRequestPixelSelection");
+  const onRequestSelectImage = bindVoidAction("onRequestSelectImage");
+  const returnToSelectTool = bindVoidAction("returnToSelectTool");
+  const toggleHandTool = bindVoidAction("toggleHandTool");
+  const onPickImage: StudioLeftToolRailHandlers["onPickImage"] = async (...args) => {
+    await invokeRail("onPickImage", ...args);
+  };
+  const revealDrawToolProperties = bindVoidAction("revealDrawToolProperties");
+  const toggleAdvancedFill = bindVoidAction("toggleAdvancedFill");
+  const toggleStudioCommentPinPlacement = bindVoidAction(
+    "toggleStudioCommentPinPlacement",
+  );
+  const toggleDodgeBurnTool = bindVoidAction("toggleDodgeBurnTool");
+  const toggleWetMixTool = bindVoidAction("toggleWetMixTool");
+  const toggleLiquifyTool = bindVoidAction("toggleLiquifyTool");
+  const togglePixelMarquee = bindVoidAction("togglePixelMarquee");
+  const toggleSmudgeTool = bindVoidAction("toggleSmudgeTool");
+  const toggleBg3dEditor = bindVoidAction("toggleBg3dEditor");
+  const openFrameAnimationForSelected = bindVoidAction(
+    "openFrameAnimationForSelected",
+  );
+  const openPixelSelectionTransform = bindVoidAction(
+    "openPixelSelectionTransform",
+  );
+  const openSelectedLayerCrop = bindVoidAction("openSelectedLayerCrop");
 
   const fitCanvasToWidthWithWorkspace =
     fitCanvasToWidthWithFocus ?? fitCanvasToWidth;
@@ -1216,7 +1220,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
               active={bg3dOpen}
               accented
-              onClick={stableHandlers.toggleBg3dEditor}
+              onClick={toggleBg3dEditor}
             />
             ) : null}
 {isRailToolVisible("hybrid-dcc") ? (
@@ -1281,4 +1285,4 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
         ) : null}
     </>
   );
-});
+}

@@ -16,3 +16,17 @@ export { useEditorCommand } from "./useEditorCommand";
 export type { EditorCommandDispatcher } from "./useEditorCommand";
 
 export { useEditorSelector } from "./useEditorSelector";
+
+export {
+  STUDIO_LEFT_TOOL_RAIL_COMMANDS,
+  createStudioLeftToolRailClient,
+} from "./studio-left-tool-rail-client";
+export type {
+  StudioLeftToolRailActionArguments,
+  StudioLeftToolRailActionName,
+  StudioLeftToolRailActions,
+  StudioLeftToolRailClient,
+  StudioLeftToolRailClientInput,
+  StudioLeftToolRailHandlersContract,
+  StudioLeftToolRailSnapshot,
+} from "./studio-left-tool-rail-client";
