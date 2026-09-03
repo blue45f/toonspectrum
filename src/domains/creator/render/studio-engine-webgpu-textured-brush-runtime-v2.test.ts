@@ -202,6 +202,7 @@ describe("compact textured WebGPU brush v2", () => {
     expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(valid)).toBe(true);
     expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
       mode: "append",
+      commandSequence: 2,
     }))).toBe(false);
     expect(studioEngineWebGpuTexturedBrushV2SupportsPlan(texturedPlan(3, {
       durableR8GrainSource: {} as never,

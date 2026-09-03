@@ -208,7 +208,7 @@ function makeTip(kind: CaseDefinition["tip"]): Uint8Array {
       const dx = (x + 0.5) / size * 2 - 1;
       const dy = (y + 0.5) / size * 2 - 1;
       const radial = Math.max(0, 1 - Math.hypot(dx, dy));
-      let texture = 1;
+      let texture: number;
       if (kind === "fibre") {
         texture = 0.78 + 0.22 * Math.sin(x * 1.73 + y * 0.29);
       } else if (kind === "rake") {
