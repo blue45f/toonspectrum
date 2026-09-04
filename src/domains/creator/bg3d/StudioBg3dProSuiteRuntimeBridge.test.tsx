@@ -72,7 +72,7 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
     expect(runtime.onUseCurrentFrameAsAiReference).toHaveBeenCalledTimes(1);
   });
 
-  it("commits a production angle preset through the canonical camera command", () => {
+  it("commits a production angle preset around the current focus target", () => {
     const runtime = createRuntime();
     render(
       <StudioBg3dProSuiteRuntimeContext.Provider value={runtime}>
@@ -84,8 +84,8 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
 
     expect(runtime.onApplyCameraView).toHaveBeenCalledTimes(1);
     const camera = vi.mocked(runtime.onApplyCameraView).mock.calls[0]?.[0];
-    expect(camera?.position).toEqual([0, 1.3, 2.5]);
-    expect(camera?.target).toEqual([0, 1, 0]);
+    expect(camera?.position).toEqual([0, 1.7, 2.5]);
+    expect(camera?.target).toEqual([0, 1.4, 0]);
     expect(camera?.fovDegrees).toBe(28);
     expect(camera?.projection).toBe("perspective");
     expect(camera?.zoom).toBe(1);
