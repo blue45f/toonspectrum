@@ -102,6 +102,38 @@ describe("studio batch rename", () => {
     expect(sensitive.next[1]).toBe(b);
   });
 
+  it("treats replacement metacharacters and current names as literal text", () => {
+    const a = image("a", 0, 0, "$& 원본");
+    const b = image("b", 0, 20, "Panel B");
+    const template = planStudioBatchRename(
+      [a, b],
+      ["a", "b"],
+      {
+        mode: "template",
+        template: "{name} {n}",
+        order: "layer-bottom",
+        start: -1,
+        step: 2,
+        digits: 2,
+      },
+    );
+    expect(template.kind).toBe("changed");
+    if (template.kind !== "changed") return;
+    expect(template.previews.map((preview) => preview.nextName)).toEqual([
+      "$& 원본 -01",
+      "Panel B 01",
+    ]);
+
+    const replacement = planStudioBatchRename(
+      [a, b],
+      ["a", "b"],
+      { mode: "replace", search: "panel", replacement: "$&" },
+    );
+    expect(replacement.kind).toBe("changed");
+    if (replacement.kind !== "changed") return;
+    expect(replacement.next[1]?.name).toBe("$& B");
+  });
+
   it("warns only when a changed result collides with another layer name", () => {
     const a = image("a", 0, 0, "A");
     const b = image("b", 0, 20, "B");
