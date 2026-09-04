@@ -12,14 +12,20 @@ const MAX_CAMPAIGN_TOKEN_LENGTH = 96;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const BOT_PATTERN =
   /\b(bot|crawler|spider|slurp|headlesschrome|lighthouse|pagespeed|facebookexternalhit|twitterbot|bingpreview|preview)\b/iu;
+const SCREEN_CLASSES = new Set([
+  "small",
+  "medium",
+  "desktop",
+  "large",
+  "unknown",
+]);
 
 export type TrafficPageViewPayload = {
   visitorId?: unknown;
   sessionId?: unknown;
   path?: unknown;
   referrer?: unknown;
-  screenWidth?: unknown;
-  screenHeight?: unknown;
+  screenClass?: unknown;
   loadTimeMs?: unknown;
   utmSource?: unknown;
   utmMedium?: unknown;
@@ -81,6 +87,12 @@ export function normalizeTrafficCampaignToken(value: unknown): string | null {
   const token = raw.replace(/[^A-Za-z0-9._~:-]+/gu, "-");
   const normalized = token.replace(/^-+|-+$/gu, "");
   return normalized || null;
+}
+
+export function normalizeTrafficScreenClass(value: unknown): string {
+  if (typeof value !== "string") return "unknown";
+  const normalized = value.trim().toLowerCase();
+  return SCREEN_CLASSES.has(normalized) ? normalized : "unknown";
 }
 
 export function requireTrafficIdentifier(
@@ -168,16 +180,6 @@ export function normalizeTrafficCountryCode(
 ): string | null {
   const normalized = value?.trim().toUpperCase() ?? "";
   return /^[A-Z]{2}$/u.test(normalized) ? normalized : null;
-}
-
-export function trafficScreenClass(width: number, height: number): string {
-  const longest = Math.max(width, height);
-  const shortest = Math.min(width, height);
-  if (shortest <= 0 || longest <= 0) return "unknown";
-  if (shortest < 600) return "small";
-  if (shortest < 900) return "medium";
-  if (longest >= 1_920) return "large";
-  return "desktop";
 }
 
 export function classifyTrafficDevice(
