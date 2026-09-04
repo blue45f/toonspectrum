@@ -1,0 +1,57 @@
+name: PR 690 final isolated reconciliation
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/pr690-reconcile-final.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr690-reconcile-final
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reconcile architecture branch with current main
+        shell: bash
+        run: python3 scripts/pr690-reconcile.py
+
+      - name: Remove final and superseded reconciliation transports
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm --ignore-unmatch \
+            .github/workflows/pr690-reconcile-final.yml \
+            scripts/pr690-reconcile-v2.py
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(architecture): remove reconciliation transport"
+            git push origin HEAD:refactor/layered-architecture-20260904
+          fi
+
+      - name: Confirm reconciliation transports are absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in \
+            .github/workflows/pr690-reconcile-main.yml \
+            .github/workflows/pr690-reconcile-slim.yml \
+            .github/workflows/pr690-reconcile-now.yml \
+            .github/workflows/pr690-reconcile-final.yml \
+            scripts/pr690-reconcile.py \
+            scripts/pr690-reconcile-v2.py
+          do
+            test ! -e "$path"
+          done
