@@ -37,6 +37,39 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Tighten preview memory and exact-optional construction
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("scripts/apply-inkwash-live-preview-quality-wave.mjs")
+          source = path.read_text(encoding="utf-8")
+          old = '''  const baseRadius = Math.max(0.75, options.radius);
+            const absorption = spectralColor({ ...options, samples: [] });
+            return {'''
+          new = '''  const baseRadius = Math.max(0.75, options.radius);
+            const absorption = spectralColor({
+              tool: options.tool,
+              samples: [],
+              radius: options.radius,
+              pigmentLoad: options.pigmentLoad,
+              wetnessLoad: options.wetnessLoad,
+              ...(options.spectralAbsorption
+                ? { spectralAbsorption: options.spectralAbsorption }
+                : {}),
+              ...(options.inkColor ? { inkColor: options.inkColor } : {}),
+            });
+            return {'''
+          if source.count(old) != 1:
+              raise SystemExit(f"preview construction target count={source.count(old)}")
+          source = source.replace(old, new, 1)
+          source = source.replace(
+              "const INKWASH_PREVIEW_TILE_SIZE = 128;",
+              "const INKWASH_PREVIEW_TILE_SIZE = 64;",
+              1,
+          )
+          source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
+          path.write_text(source, encoding="utf-8")
       - name: Apply quality-first preview patch
         run: node scripts/apply-inkwash-live-preview-quality-wave.mjs
       - name: Normalize changed files
