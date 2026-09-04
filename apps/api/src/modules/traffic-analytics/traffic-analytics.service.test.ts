@@ -17,7 +17,7 @@ describe("traffic analytics privacy boundaries", () => {
     ).toBe("/title/demo");
   });
 
-  it("rejects API paths and excludes administrator routes", () => {
+  it("rejects APIs, excludes admin, and templates private identifiers", () => {
     expect(() => normalizeTrafficPath("/api/admin/users")).toThrow(
       "수집할 수 없는 페이지 경로",
     );
@@ -25,6 +25,16 @@ describe("traffic analytics privacy boundaries", () => {
     expect(isExcludedTrafficPath("/admin/members")).toBe(true);
     expect(isExcludedTrafficPath("/studio")).toBe(false);
     expect(normalizeTrafficPath("/apiculture")).toBe("/apiculture");
+    expect(normalizeTrafficPath("/u/user-private-id")).toBe("/u/:userId");
+    expect(normalizeTrafficPath("/create/work-private-id")).toBe(
+      "/create/:id",
+    );
+    expect(normalizeTrafficPath("/create/series/series-private-id")).toBe(
+      "/create/series/:id",
+    );
+    expect(normalizeTrafficPath("/studio/projects/private-id")).toBe(
+      "/studio/*",
+    );
   });
 
   it("classifies common devices without retaining the user-agent string", () => {
@@ -45,10 +55,14 @@ describe("traffic analytics privacy boundaries", () => {
     ).toBe(true);
   });
 
-  it("normalizes campaign labels without retaining free-form personal data", () => {
-    expect(normalizeTrafficCampaignToken(" launch user@example.com ")).toBe(
-      "launch-user-example.com",
+  it("rejects PII-like campaign labels and normalizes safe labels", () => {
+    expect(normalizeTrafficCampaignToken("launch newsletter")).toBe(
+      "launch-newsletter",
     );
+    expect(normalizeTrafficCampaignToken("user@example.com")).toBeNull();
+    expect(normalizeTrafficCampaignToken("user%40example.com")).toBeNull();
+    expect(normalizeTrafficCampaignToken("01012345678")).toBeNull();
+    expect(normalizeTrafficCampaignToken("campaign?id=123")).toBeNull();
     expect(normalizeTrafficCampaignToken("한글 캠페인")).toBeNull();
   });
 
