@@ -1,0 +1,40 @@
+name: Export current brush quality sources
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/workflows/export-brush-quality-source-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Stage current quality source
+        run: |
+          set -euo pipefail
+          mkdir -p export/src/domains/creator export/scripts export/.github/workflows
+          cp package.json pnpm-lock.yaml tsconfig.json export/
+          cp -R src/domains/creator/brush export/src/domains/creator/
+          cp -R src/domains/creator/live export/src/domains/creator/
+          cp src/domains/creator/studio-brush.ts export/src/domains/creator/
+          cp src/domains/creator/studio-creative-ux.ts export/src/domains/creator/
+          cp scripts/verify-studio-long-stroke.mts export/scripts/
+          cp scripts/run-studio-all-brush-long-stroke-shard.mts export/scripts/
+          cp scripts/aggregate-studio-all-brush-long-stroke.mts export/scripts/
+          cp scripts/analyze-studio-brush-similarity.mts export/scripts/
+          cp .github/workflows/studio-all-brush-long-stroke-quality.yml export/.github/workflows/
+          printf '%s\n' "${GITHUB_SHA}" > export/SOURCE_SHA
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-brush-quality-source-${{ github.sha }}
+          path: export
+          if-no-files-found: error
+          retention-days: 1
