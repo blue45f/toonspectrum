@@ -15,7 +15,6 @@ const SESSION_UPPER_BOUND = "traffic:st:";
 const DEFAULT_RETENTION_DAYS = 90;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const MAX_PATH_LENGTH = 320;
-const MAX_TITLE_LENGTH = 160;
 const MAX_REFERRER_LENGTH = 256;
 const MAX_CAMPAIGN_TOKEN_LENGTH = 96;
 const MAX_ENGAGED_SECONDS = 12 * 60 * 60;
@@ -24,6 +23,7 @@ const RATE_WINDOW_MS = 60_000;
 const MAX_PAGE_VIEWS_PER_SESSION_WINDOW = 120;
 const MAX_HEARTBEATS_PER_SESSION_WINDOW = 4;
 const MAX_RATE_LIMIT_ENTRIES = 10_000;
+const MAX_GLOBAL_EVENTS_PER_WINDOW = 5_000;
 const BOT_PATTERN =
   /\b(bot|crawler|spider|slurp|headlesschrome|lighthouse|pagespeed|facebookexternalhit|twitterbot|bingpreview|preview)\b/iu;
 
@@ -31,14 +31,9 @@ type TrafficPageViewPayload = {
   visitorId?: unknown;
   sessionId?: unknown;
   path?: unknown;
-  title?: unknown;
   referrer?: unknown;
-  language?: unknown;
-  timezone?: unknown;
   screenWidth?: unknown;
   screenHeight?: unknown;
-  connectionType?: unknown;
-  navigationType?: unknown;
   loadTimeMs?: unknown;
   utmSource?: unknown;
   utmMedium?: unknown;
@@ -53,11 +48,11 @@ type TrafficHeartbeatPayload = {
 };
 
 export type TrafficRequestContext = {
-  userId?: string;
   userAgent?: string;
   host?: string;
   referer?: string;
   countryCode?: string;
+  privacyOptOut?: boolean;
 };
 
 type DeviceContext = {
@@ -78,11 +73,23 @@ function boundedInteger(
   return Math.min(maximum, Math.max(minimum, Math.round(parsed)));
 }
 
-function optionalToken(value: unknown, maximum = MAX_CAMPAIGN_TOKEN_LENGTH): string | null {
+function optionalToken(
+  value: unknown,
+  maximum = MAX_CAMPAIGN_TOKEN_LENGTH,
+): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, maximum);
+}
+
+function campaignToken(value: unknown): string | null {
+  const token = optionalToken(value)?.replace(
+    /[^A-Za-z0-9._~:-]+/gu,
+    "-",
+  );
+  const normalized = token?.replace(/^-+|-+$/gu, "") ?? "";
+  return normalized || null;
 }
 
 function requiredOpaqueIdentifier(value: unknown, label: string): string {
@@ -148,30 +155,6 @@ function normalizeReferrerHost(
 function normalizeCountryCode(value: string | undefined): string | null {
   const normalized = value?.trim().toUpperCase() ?? "";
   return /^[A-Z]{2}$/u.test(normalized) ? normalized : null;
-}
-
-function normalizeLanguage(value: unknown): string | null {
-  const normalized = optionalToken(value, 35);
-  return normalized?.replace(/[^A-Za-z0-9_-]/gu, "").slice(0, 35) || null;
-}
-
-function normalizeTimezone(value: unknown): string | null {
-  const normalized = optionalToken(value, 64);
-  return normalized && /^[A-Za-z0-9_+\-/]+$/u.test(normalized)
-    ? normalized
-    : null;
-}
-
-function normalizeNavigationType(value: unknown): string | null {
-  const normalized = optionalToken(value, 24)?.toLowerCase();
-  return normalized && ["navigate", "reload", "back_forward", "prerender"].includes(normalized)
-    ? normalized
-    : null;
-}
-
-function normalizeConnectionType(value: unknown): string | null {
-  const normalized = optionalToken(value, 24)?.toLowerCase();
-  return normalized && /^[a-z0-9_-]+$/u.test(normalized) ? normalized : null;
 }
 
 function screenClass(width: number, height: number): string {
@@ -297,7 +280,7 @@ function analyticsSecret(): string {
   return "traffic-v1:toonspectrum-local-development";
 }
 
-function hashIdentifier(kind: "visitor" | "session" | "user", value: string): string {
+function hashIdentifier(kind: "visitor" | "session", value: string): string {
   return createHmac("sha256", analyticsSecret())
     .update(`${kind}:${value}`)
     .digest("hex");
@@ -316,6 +299,8 @@ type RateLimitState = {
 @Injectable()
 export class TrafficAnalyticsService {
   private lastCleanupAt = 0;
+  private globalWindowStartedAt = 0;
+  private globalEvents = 0;
   private cleanupPromise: Promise<void> | null = null;
   private readonly rateLimits = new Map<string, RateLimitState>();
 
@@ -324,7 +309,26 @@ export class TrafficAnalyticsService {
     kind: "page-view" | "heartbeat",
   ): void {
     const now = Date.now();
+    if (now - this.globalWindowStartedAt >= RATE_WINDOW_MS) {
+      this.globalWindowStartedAt = now;
+      this.globalEvents = 0;
+    }
+    this.globalEvents += 1;
+    if (this.globalEvents > MAX_GLOBAL_EVENTS_PER_WINDOW) {
+      throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+    }
+
     const current = this.rateLimits.get(sessionHash);
+    if (!current && this.rateLimits.size >= MAX_RATE_LIMIT_ENTRIES) {
+      for (const [key, entry] of this.rateLimits) {
+        if (now - entry.windowStartedAt >= RATE_WINDOW_MS) {
+          this.rateLimits.delete(key);
+        }
+      }
+      if (this.rateLimits.size >= MAX_RATE_LIMIT_ENTRIES) {
+        throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+      }
+    }
     const state =
       !current || now - current.windowStartedAt >= RATE_WINDOW_MS
         ? { windowStartedAt: now, pageViews: 0, heartbeats: 0 }
@@ -342,55 +346,52 @@ export class TrafficAnalyticsService {
       }
     }
     this.rateLimits.set(sessionHash, state);
-
-    if (this.rateLimits.size <= MAX_RATE_LIMIT_ENTRIES) return;
-    for (const [key, entry] of this.rateLimits) {
-      if (now - entry.windowStartedAt >= RATE_WINDOW_MS) {
-        this.rateLimits.delete(key);
-      }
-      if (this.rateLimits.size <= MAX_RATE_LIMIT_ENTRIES) break;
-    }
   }
 
   async recordPageView(
     payload: TrafficPageViewPayload,
     context: TrafficRequestContext,
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
+    if (context.privacyOptOut) {
+      return { accepted: false, excluded: true };
+    }
     const path = normalizeTrafficPath(payload.path);
     if (isExcludedTrafficPath(path)) {
       return { accepted: false, excluded: true };
     }
+    const device = classifyTrafficDevice(context.userAgent);
+    if (device.isBot) {
+      return { accepted: false, excluded: true };
+    }
 
-    const visitorId = requiredOpaqueIdentifier(payload.visitorId, "방문자 식별자");
-    const sessionId = requiredOpaqueIdentifier(payload.sessionId, "세션 식별자");
+    const visitorId = requiredOpaqueIdentifier(
+      payload.visitorId,
+      "방문자 식별자",
+    );
+    const sessionId = requiredOpaqueIdentifier(
+      payload.sessionId,
+      "세션 식별자",
+    );
     const occurredAt = new Date();
     const visitorHash = hashIdentifier("visitor", visitorId);
     const sessionHash = hashIdentifier("session", sessionId);
     this.enforceRateLimit(sessionHash, "page-view");
-    const userHash = context.userId
-      ? hashIdentifier("user", context.userId)
-      : null;
-    const device = classifyTrafficDevice(context.userAgent);
     const referrerHost = normalizeReferrerHost(
       payload.referrer,
       context.referer,
       context.host,
     );
     const source = classifyTrafficSource({
-      utmSource: optionalToken(payload.utmSource),
-      utmMedium: optionalToken(payload.utmMedium),
-      utmCampaign: optionalToken(payload.utmCampaign),
+      utmSource: campaignToken(payload.utmSource),
+      utmMedium: campaignToken(payload.utmMedium),
+      utmCampaign: campaignToken(payload.utmCampaign),
       referrerHost,
     });
     const screenWidth = boundedInteger(payload.screenWidth, 0, 0, 20_000);
     const screenHeight = boundedInteger(payload.screenHeight, 0, 0, 20_000);
-    const loadTimeMs = boundedInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
-    const language = normalizeLanguage(payload.language);
-    const timezone = normalizeTimezone(payload.timezone);
+    const loadTimeMs =
+      boundedInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
     const countryCode = normalizeCountryCode(context.countryCode);
-    const title = optionalToken(payload.title, MAX_TITLE_LENGTH);
-    const connectionType = normalizeConnectionType(payload.connectionType);
-    const navigationType = normalizeNavigationType(payload.navigationType);
     const eventKey = `${pageViewRangeKey(occurredAt)}:${randomUUID()}`;
     const sessionKey = `${SESSION_PREFIX}${sessionHash}`;
 
@@ -399,9 +400,7 @@ export class TrafficAnalyticsService {
       occurredAt: occurredAt.toISOString(),
       visitorHash,
       sessionHash,
-      userHash,
       path,
-      title,
       referrerHost,
       source: source.source,
       medium: source.medium,
@@ -410,20 +409,13 @@ export class TrafficAnalyticsService {
       deviceType: device.deviceType,
       browser: device.browser,
       os: device.os,
-      language,
-      timezone,
       screenClass: screenClass(screenWidth, screenHeight),
-      screenWidth,
-      screenHeight,
-      connectionType,
-      navigationType,
       loadTimeMs,
       isBot: device.isBot,
     };
     const sessionValue = {
       version: 1,
       visitorHash,
-      userHash,
       firstSeenAt: occurredAt.toISOString(),
       lastSeenAt: occurredAt.toISOString(),
       entryPath: path,
@@ -436,8 +428,6 @@ export class TrafficAnalyticsService {
       deviceType: device.deviceType,
       browser: device.browser,
       os: device.os,
-      language,
-      timezone,
       screenClass: screenClass(screenWidth, screenHeight),
       pageViews: 1,
       engagedSeconds: 0,
@@ -498,21 +488,30 @@ export class TrafficAnalyticsService {
     payload: TrafficHeartbeatPayload,
     context: TrafficRequestContext,
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
+    if (context.privacyOptOut) {
+      return { accepted: false, excluded: true };
+    }
     const path = normalizeTrafficPath(payload.path);
     if (isExcludedTrafficPath(path)) {
       return { accepted: false, excluded: true };
     }
+    const device = classifyTrafficDevice(context.userAgent);
+    if (device.isBot) {
+      return { accepted: false, excluded: true };
+    }
 
-    const visitorId = requiredOpaqueIdentifier(payload.visitorId, "방문자 식별자");
-    const sessionId = requiredOpaqueIdentifier(payload.sessionId, "세션 식별자");
+    const visitorId = requiredOpaqueIdentifier(
+      payload.visitorId,
+      "방문자 식별자",
+    );
+    const sessionId = requiredOpaqueIdentifier(
+      payload.sessionId,
+      "세션 식별자",
+    );
     const occurredAt = new Date();
     const visitorHash = hashIdentifier("visitor", visitorId);
     const sessionHash = hashIdentifier("session", sessionId);
     this.enforceRateLimit(sessionHash, "heartbeat");
-    const userHash = context.userId
-      ? hashIdentifier("user", context.userId)
-      : null;
-    const device = classifyTrafficDevice(context.userAgent);
     const engagedSeconds = boundedInteger(
       payload.engagedSeconds,
       0,
@@ -523,7 +522,6 @@ export class TrafficAnalyticsService {
     const sessionValue = {
       version: 1,
       visitorHash,
-      userHash,
       firstSeenAt: occurredAt.toISOString(),
       lastSeenAt: occurredAt.toISOString(),
       entryPath: path,
