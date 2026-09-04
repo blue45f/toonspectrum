@@ -107,8 +107,11 @@ function samePassSet(
   right: readonly StudioBg3dShotBatchPass[],
 ): boolean {
   if (left.length !== right.length) return false;
+  const leftSet = new Set(left);
   const rightSet = new Set(right);
-  return left.every((pass) => rightSet.has(pass));
+  if (leftSet.size !== left.length || rightSet.size !== right.length) return false;
+  return leftSet.size === rightSet.size &&
+    [...leftSet].every((pass) => rightSet.has(pass));
 }
 
 export function resolveStudioBg3dProductionBatchPreset(
