@@ -12,9 +12,10 @@ import {
   STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT,
   studioBrushListedUniquenessKey,
 } from "./studio-brush-listed-uniqueness";
-import { studioBrushPackDescriptorById, STUDIO_BRUSH_PACK_DESCRIPTORS  } from "./studio-brush-pack-index";
-import { materializeStudioBrushPackSelection, materializeAllStudioBrushPackSelections  } from "./studio-brush-pack-runtime";
+import { studioBrushPackDescriptorById, STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import { materializeStudioBrushPackSelection, materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
 import { auditStudioBrushPlannerQualityCatalogue } from "./studio-brush-planner-quality-audit";
+import { STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS } from "./studio-brush-quality-portfolio";
 import {
   isStudioBrushQuarantinedPresetId,
   STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID,
@@ -26,11 +27,13 @@ import {
 } from "./studio-brush-runtime-contract";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 
-describe("listed paint uniqueness (2026-09-02 feel-cull)", () => {
-  it("shrinks the picker-listed paint inventory below the pre-change count", () => {
+describe("listed paint uniqueness (2026-09-04 quality portfolio)", () => {
+  it("shrinks the picker-listed paint inventory to the quality portfolio", () => {
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length)
       .toBeLessThan(STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT);
-    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(185);
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length)
+      .toBe(STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint);
+    expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(46);
     expect(
       STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.every(
         (item) => !isStudioBrushQuarantinedPresetId(item.id),
