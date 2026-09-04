@@ -39,6 +39,24 @@ jobs:
 
       - name: Apply deterministic source patch
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/patch-all-brush-hardware-evidence.py")
+          source = path.read_text()
+          start = source.index("    markdown_counts =")
+          end = source.index("\n    policy_sentence =", start)
+          replacement = """    source = replace_once(
+              source,
+              '    `- GPU 품질 승인: ${approved.length}`,',
+              '''    `- GPU 품질 승인 후보: ${approved.length}`,
+              `- 물리 GPU 증거: ${hardwareAdapterFingerprints.length > 0 ? hardwareAdapterFingerprints.join(", ") : "없음(진단 전용)"}`,
+              `- 반복 측정: ${measurementRunCount}회 (자동 승격 최소 3회)`,
+              `- 증거 만료: ${expiresAt}`,''',
+              "aggregator markdown metadata",
+          )
+          """
+          path.write_text(source[:start] + replacement + source[end:])
+          PY
           python3 -m py_compile scripts/patch-all-brush-hardware-evidence.py
           python3 scripts/patch-all-brush-hardware-evidence.py
           git diff --check
