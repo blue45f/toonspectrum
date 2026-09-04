@@ -80,8 +80,6 @@ jobs:
 
       - name: Execute every run step from the protected CI core job
         shell: bash
-        env:
-          GITHUB_SHA: ${{ env.CANDIDATE_SHA }}
         run: |
           python3 - <<'PY'
           from __future__ import annotations
@@ -95,6 +93,7 @@ jobs:
           workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
           steps = workflow["jobs"]["verify"]["steps"]
           inherited = os.environ.copy()
+          inherited["GITHUB_SHA"] = inherited["CANDIDATE_SHA"]
 
           for index, step in enumerate(steps, start=1):
               command = step.get("run")
