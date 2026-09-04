@@ -5,13 +5,54 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { auditStudioInspectorDensity } from "./studio-inspector-dom-density";
 import { resetStudioInspectorSectionStateCache } from "./studio-inspector-section-state";
-import { StudioInspectorSelectionActions } from "./StudioInspectorOrderAlignSection";
+import {
+  StudioInspectorOrderAlignSection,
+  StudioInspectorSelectionActions,
+} from "./StudioInspectorOrderAlignSection";
+
+import type { El } from "./studio-element-model";
 
 beforeEach(() => {
   globalThis.localStorage?.clear();
   resetStudioInspectorSectionStateCache();
 });
 afterEach(cleanup);
+
+const dummyEl: El = {
+  id: "el-1",
+  type: "image",
+  src: "data:image/png;base64,abc",
+  x: 10,
+  y: 20,
+  width: 100,
+  height: 100,
+  rotation: 0,
+  opacity: 1,
+};
+
+function renderOrderAlignSection() {
+  const alignSelected = vi.fn();
+  const view = render(
+    <StudioInspectorOrderAlignSection
+      selected={dummyEl}
+      selectedBg3dEditSource={null}
+      patchEl={vi.fn()}
+      reorder={vi.fn()}
+      alignSelected={alignSelected}
+      duplicateSelected={vi.fn()}
+      removeSelected={vi.fn()}
+      setPoserInitialDataUrl={vi.fn()}
+      setPoserInitialElementId={vi.fn()}
+      setPoserVrmOpen={vi.fn()}
+      setBg3dInitialScene={vi.fn()}
+      setBg3dInitialDataUrl={vi.fn()}
+      setBg3dInitialElementId={vi.fn()}
+      setBg3dOpen={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^정렬·순서/u }));
+  return { ...view, alignSelected };
+}
 
 function renderActions(selectionCount: number) {
   const alignSelected = vi.fn();
@@ -30,6 +71,22 @@ function renderActions(selectionCount: number) {
   fireEvent.click(screen.getByRole("button", { name: /^정렬·순서/u }));
   return { ...view, alignSelected, duplicateSelected, removeSelected, reorder };
 }
+
+describe("StudioInspectorOrderAlignSection", () => {
+  it("keeps single-selection alignment live and explains why distribution is unavailable", () => {
+    const { alignSelected } = renderOrderAlignSection();
+
+    fireEvent.click(screen.getByRole("button", { name: "왼쪽 정렬" }));
+    expect(alignSelected).toHaveBeenCalledWith("left");
+
+    const distH = screen.getByRole("button", { name: "가로 등간격 분배" }) as HTMLButtonElement;
+    const distV = screen.getByRole("button", { name: "세로 등간격 분배" }) as HTMLButtonElement;
+    expect(distH.disabled).toBe(true);
+    expect(distV.disabled).toBe(true);
+    expect(distH.title).toContain("3개 이상");
+    expect(distV.title).toContain("3개 이상");
+  });
+});
 
 describe("StudioInspectorSelectionActions", () => {
   it("surfaces the same labelled order and alignment commands for a marquee selection", () => {
