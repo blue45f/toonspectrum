@@ -5,11 +5,11 @@ import {
   type StudioEngineWebGpuPresentationLayout,
   type StudioEngineWebGpuPresentationSurface,
 } from "./render/studio-engine-webgpu-presentation-surface";
-import { acquireStudioGpuPresentationDevice } from "./render/studio-gpu-presentation-device";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime,
   type StudioEngineWebGpuTexturedBrushRuntime,
 } from "./render/studio-engine-webgpu-textured-brush-runtime";
+import { acquireStudioGpuPresentationDevice } from "./render/studio-gpu-presentation-device";
 import {
   StudioCanonicalVNextDryMediaPresentationController,
   type StudioCanonicalVNextDryMediaFinalParityResult,

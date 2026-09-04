@@ -182,4 +182,54 @@ describe("StudioVrmPhotoPoseScanner", () => {
       [scannerRuntimeMocks.bitmaps[1]],
     ]);
   });
+
+  it("scans an image handed over by the surrounding surface without a second file pick", async () => {
+    const file = new File([new Uint8Array([9, 9, 9])], "handed.png", { type: "image/png" });
+    const { rerender } = render(
+      <StudioVrmPhotoPoseScanner
+        includeHandDetection={false}
+        handoff={{ file, token: 1 }}
+        onApply={() => true}
+      />,
+    );
+
+    await waitFor(() => expect(scannerRuntimeMocks.detector.detect).toHaveBeenCalledTimes(1));
+    expect(scannerRuntimeMocks.files).toEqual([file]);
+
+    // A re-render with the same token must not rescan — the creator is looking at the result.
+    rerender(
+      <StudioVrmPhotoPoseScanner
+        includeHandDetection={false}
+        handoff={{ file, token: 1 }}
+        onApply={() => true}
+      />,
+    );
+    expect(scannerRuntimeMocks.detector.detect).toHaveBeenCalledTimes(1);
+
+    // A new token is how the surface says "read this one again".
+    rerender(
+      <StudioVrmPhotoPoseScanner
+        includeHandDetection={false}
+        handoff={{ file, token: 2 }}
+        onApply={() => true}
+      />,
+    );
+    await waitFor(() => expect(scannerRuntimeMocks.detector.detect).toHaveBeenCalledTimes(2));
+  });
+
+  it("ignores a handed-over image while the scanner is disabled", async () => {
+    const file = new File([new Uint8Array([1])], "blocked.png", { type: "image/png" });
+    render(
+      <StudioVrmPhotoPoseScanner
+        disabled
+        includeHandDetection={false}
+        handoff={{ file, token: 1 }}
+        onApply={() => true}
+      />,
+    );
+
+    await Promise.resolve();
+    expect(scannerRuntimeMocks.detector.detect).not.toHaveBeenCalled();
+    expect(scannerRuntimeMocks.files).toEqual([]);
+  });
 });

@@ -77,8 +77,9 @@ describe("studio brush catalog lifecycle", () => {
     expect(brushLifecycleStageOf("gpen")).toBe("core");
     expect(brushLifecycleStageOf("standard-eraser")).toBe("core");
     // 2026-08-21 로스터 축소 웨이브에서 glass-pen 은 pen 과 실행 서명이 같아 delist 됐습니다.
-    // "extended" 대표는 같은 성격의 코어 확장 프리셋인 perfect-ink 로 옮깁니다.
-    expect(brushLifecycleStageOf("perfect-ink")).toBe("extended");
+    // 2026-09-04 quality-first 큐레이션이 perfect-ink 를 펜 서브 툴 팔레트 대표로 올리면서
+    // 그 자리는 core 가 됐습니다 — "extended" 대표는 아래 watercolor-salt-bloom 이 지킵니다.
+    expect(brushLifecycleStageOf("perfect-ink")).toBe("core");
     expect(brushLifecycleStageOf("glass-pen")).toBe("quarantined");
     expect(brushLifecycleStageOf("watercolor-salt-bloom")).toBe("extended");
     expect(brushLifecycleStageOf("gpen--croquis-capsule")).toBe("experimental");

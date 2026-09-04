@@ -67,6 +67,7 @@ interface FakeHostState {
   activeExpressionId: string;
   expressionWeights: Record<string, number>;
   isCapturing: boolean;
+  wardrobeInteractionLocked: boolean;
 }
 
 interface FakeHost {
@@ -93,6 +94,7 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
     activeExpressionId: "preset:xf_joy",
     expressionWeights: { happy: 1 },
     isCapturing: false,
+    wardrobeInteractionLocked: false,
     ...overrides,
   };
   const calls: FakeHost["calls"] = { forge: [], pose: [], hands: [], expressionPresets: [] };
@@ -106,6 +108,7 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
     detectedOriginalHairCount: 2,
     texturePaintDisabledReason: "",
     get isCapturing() { return state.isCapturing; },
+    get wardrobeInteractionLocked() { return state.wardrobeInteractionLocked; },
     isSharingPose: false,
     isThumbnailCapturing: false,
     broadcastPreviewActive: false,
@@ -263,6 +266,20 @@ describe("useCharacterShaperBinding", () => {
     expect(outcome).toMatchObject({ ok: false, reason: "캡처가 끝난 뒤에 다시 적용할 수 있습니다." });
     expect(fake.calls.forge).toHaveLength(0);
     expect(result.current.history.canUndo).toBe(false);
+  });
+
+  it("refuses a mutation whenever the host itself reports the wardrobe locked", () => {
+    // 잠금 사유가 캡처·방송 미리보기가 아닌 다른 이유일 때에도 셰이퍼는 멈춰야 한다.
+    const fake = createFakeHost({ wardrobeInteractionLocked: true });
+    const { result } = renderBinding(fake);
+
+    expect(result.current.busyReason).toBe("지금은 옷을 바꿀 수 없습니다. 잠시 뒤 다시 시도해 주세요.");
+    let outcome: { ok: boolean; reason: string | null } | null = null;
+    act(() => {
+      outcome = result.current.commit(entryOf("eyes:romance-sparkle"));
+    });
+    expect(outcome).toMatchObject({ ok: false });
+    expect(fake.calls.forge).toHaveLength(0);
   });
 
   it("undo restores the raw host state of every authority the step touched, and redo re-applies it", () => {

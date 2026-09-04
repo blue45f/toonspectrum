@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import {
   DEFAULT_STUDIO_QUICK_ACCESS_FLOATING_LAYOUT,
   loadStudioQuickAccessFloatingLayout,
   saveStudioQuickAccessFloatingLayout,
 } from "./studio-quick-access-surface-layout";
+import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import { StudioQuickAccessPalette } from "./StudioQuickAccessPalette";
 
 import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";

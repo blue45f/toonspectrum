@@ -4,6 +4,7 @@ import {
 } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
+import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 import type { StudioBg3dViewPanelProps } from "./StudioBg3dViewPanelContent";
 
 export {
@@ -18,13 +19,21 @@ export type {
   StudioBg3dViewPanelProps,
 } from "./StudioBg3dViewPanelContent";
 
+function normalizeSelectedPasses(
+  availablePasses: readonly StudioBg3dShotBatchPass[],
+  requestedPasses: readonly StudioBg3dShotBatchPass[],
+): Set<StudioBg3dShotBatchPass> {
+  const available = new Set(availablePasses);
+  return new Set(requestedPasses.filter((pass) => available.has(pass)));
+}
+
 /**
  * Production bridge for the view-panel layout.
  *
  * The dense camera/environment presentation stays isolated in the content component while this
  * thin shell publishes its existing SceneDocument commands to nested 3D specialist tools. This
- * avoids duplicating shot state and keeps every director action on the editor's undoable command
- * path.
+ * avoids duplicating shot state and keeps every director and batch action on the editor's undo,
+ * recovery and archive-integrity paths.
  */
 export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
   const { context } = props;
@@ -37,6 +46,56 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
     productionShots: context.savedShots,
+    productionBatch: {
+      selectedShotIds: context.shotBatchSelectedIds,
+      availablePasses: context.STUDIO_BG3D_SHOT_BATCH_PASSES,
+      selectedPasses: context.selectedShotBatchPasses,
+      passLabels: context.STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+      exportHeight: context.shotBatchExportHeight,
+      exportHeightOptions: context.LT_EXPORT_HEIGHTS,
+      includeLayeredPsd: context.shotBatchIncludeLayeredPsd,
+      includeContactSheet: context.shotBatchIncludeContactSheet,
+      recoveryReady: context.recoveryScope !== null,
+      blockedReason: context.shotBatchBlockedReason,
+      isRendering: context.isBatchRenderingShots,
+      progress: context.shotBatchProgress,
+      recoverySummary: context.shotBatchRecoverySummary,
+      selectAllShots: () => context.setShotBatchExcludedIds(new Set()),
+      clearShotSelection: () => context.setShotBatchExcludedIds(
+        new Set(context.savedShots.map((shot) => shot.id)),
+      ),
+      setShotSelected: (shotId, selected) => {
+        if (!context.savedShots.some((shot) => shot.id === shotId)) return;
+        context.setShotBatchExcludedIds((current) => {
+          const next = new Set(current);
+          if (selected) next.delete(shotId);
+          else next.add(shotId);
+          return next;
+        });
+      },
+      setSelectedPasses: (passes) => context.setShotBatchPasses(
+        normalizeSelectedPasses(context.STUDIO_BG3D_SHOT_BATCH_PASSES, passes),
+      ),
+      setPassSelected: (pass, selected) => {
+        if (!context.STUDIO_BG3D_SHOT_BATCH_PASSES.includes(pass)) return;
+        context.setShotBatchPasses((current) => {
+          const next = new Set(current);
+          if (selected) next.add(pass);
+          else next.delete(pass);
+          return next;
+        });
+      },
+      setExportHeight: (height) => {
+        if (
+          height !== "per-shot" &&
+          !context.LT_EXPORT_HEIGHTS.some((candidate) => candidate === height)
+        ) return;
+        context.setShotBatchExportHeight(height);
+      },
+      setIncludeLayeredPsd: context.setShotBatchIncludeLayeredPsd,
+      setIncludeContactSheet: context.setShotBatchIncludeContactSheet,
+      startExport: context.exportSavedShotsAsZip,
+    },
     onApplyCameraView: (camera) => context.updateCameraLens(() => camera),
     onPreviewCameraView: (camera) => context.previewCameraLens(() => camera),
     onFinishCameraViewPreview: context.finishCameraLensGesture,

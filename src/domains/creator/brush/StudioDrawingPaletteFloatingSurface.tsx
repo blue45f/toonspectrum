@@ -1,12 +1,13 @@
 import { MoreHorizontal } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 
-import { StudioFloatingSurface } from "../StudioFloatingSurface";
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
   STUDIO_TOUCH_TARGET,
 } from "../studio-panel-ui";
+import { StudioFloatingSurface } from "../StudioFloatingSurface";
+
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_FLOATING_LAYOUTS,
   loadStudioDrawingPaletteFloatingLayout,

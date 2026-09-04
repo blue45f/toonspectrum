@@ -30,8 +30,6 @@ function planner() {
     wetnessLoad: 0.16,
     inkColor: { r: 28, g: 21, b: 118 },
     spectralAbsorption: { r: 1, g: 0.96, b: 0.88 },
-    radiusScale: 1.164,
-    pigmentScale: 1.26,
   });
 }
 

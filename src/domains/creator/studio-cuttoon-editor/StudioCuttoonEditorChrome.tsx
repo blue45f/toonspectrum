@@ -38,6 +38,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     activeToolbarGroup,
     admittedBg3dOpen,
     admittedMannequinPoserOpen,
+    admittedCharacterShaperOpen,
     admittedPoserVrmOpen,
     advancedFillActive,
     advancedFillUnsupportedReason,
@@ -247,6 +248,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     setMannequinPoserOpen,
     setMenu,
     setPageReviewOpen,
+    setCharacterShaperOpen,
     setPoserVrmOpen,
     setProductionBibleOpen,
     setProductionInsightsOpen,
@@ -877,6 +879,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           mannequinPoserOpen={admittedMannequinPoserOpen}
           setMannequinPoserOpen={setMannequinPoserOpen}
           poserVrmOpen={admittedPoserVrmOpen}
+          characterShaperOpen={admittedCharacterShaperOpen}
           presentationPanelsHidden={presentationPanelsHidden}
           publishingId={publishingId}
           rasterFavoriteOnly={rasterFavoriteOnly}
@@ -934,6 +937,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           setMenu={setMenu}
           setPageReviewOpen={setPageReviewOpen}
           setPoserVrmOpen={setPoserVrmOpen}
+          setCharacterShaperOpen={setCharacterShaperOpen}
           setRasterFavoriteOnly={setRasterFavoriteOnly}
           setReferencePanelOpen={setReferencePanelOpen}
           setRenamingAssetId={setRenamingAssetId}

@@ -72,7 +72,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
   it("routes every native ToolBelt button through the shared single-open hint target", () => {
     const buttons = nativeControls("button", sourceFiles);
 
-    expect(buttons).toHaveLength(38);
+    expect(buttons).toHaveLength(39);
     expect(buttons.filter((button) => nearestHintTarget(button) === null)).toEqual([]);
     expect(allSource).toContain('<StudioToolHintTarget preferredSide="bottom" {...props} />');
     expect(allSource).not.toContain('role="tooltip"');

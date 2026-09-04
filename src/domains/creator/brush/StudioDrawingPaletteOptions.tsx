@@ -18,6 +18,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
 import { StudioDrawingPaletteFloatingSurface } from "./StudioDrawingPaletteFloatingSurface";
 
 import type {

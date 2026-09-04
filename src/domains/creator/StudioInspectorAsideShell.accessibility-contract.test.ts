@@ -28,7 +28,10 @@ describe("StudioInspectorAsideShell mobile accessibility contract", () => {
   });
 
   it("reopens a collapsed desktop Inspector before command-search navigation or palette focus", () => {
-    expect(asideSource.match(/setRightPanelOpen\(true\)/g)).toHaveLength(3);
+    // 세 경로(엣지 레일 onRequestOpen · 인스펙터 내비게이션 · 팔레트 펼치기)에 더해, 분리형 패널
+    // 웨이브가 "인스펙터를 띄울 때도 접힌 패널을 먼저 편다"는 네 번째 경로를 넣었다.
+    expect(asideSource.match(/setRightPanelOpen\(true\)/g)).toHaveLength(4);
+    expect(asideSource).toContain("if (next) setRightPanelOpen(true);");
     expect(asideSource).toContain(
       "onRequestOpen={() => setRightPanelOpen(true)}",
     );

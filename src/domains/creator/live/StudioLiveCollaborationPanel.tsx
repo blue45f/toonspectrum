@@ -3,6 +3,7 @@ import {
   Check,
   Download,
   Eye,
+  EyeOff,
   LoaderCircle,
   MessageCircle,
   MonitorUp,
@@ -40,10 +41,19 @@ import {
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
 import {
+  presentStudioLiveCursorQuality,
+  type StudioLiveCursorQualitySnapshot,
+} from "./studio-live-cursor-quality";
+import {
   formatStudioLiveLastAck,
   presentStudioLiveSyncSnapshot,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
+import {
+  toggleStudioLiveRemoteCursors,
+  useStudioLiveViewPreferences,
+} from "./studio-live-view-preferences";
+import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
 
 import type {
   StudioLiveChatMessage,
@@ -118,6 +128,8 @@ export interface StudioLiveCollaborationPanelViewProps {
   syncSnapshot?: StudioLiveSyncSnapshot;
   recovery?: StudioLiveRecoveryState | null;
   followingSessionId?: string | null;
+  remoteCursorsVisible?: boolean;
+  cursorQuality?: StudioLiveCursorQualitySnapshot | null;
   videoRef?: Ref<HTMLVideoElement>;
   onChatDraftChange: (value: string) => void;
   onChatSubmit: () => void;
@@ -129,6 +141,7 @@ export interface StudioLiveCollaborationPanelViewProps {
   onExportRecovery: () => void;
   onReloadAuthoritative: () => void;
   onToggleFollow?: (sessionId: string) => void;
+  onToggleRemoteCursors?: () => void;
   onApproveRequest: (request: StudioScreenShareRequest) => void;
   onRejectRequest: (request: StudioScreenShareRequest) => void;
   onStopViewer: (viewer: StudioScreenShareViewer) => void;
@@ -208,6 +221,8 @@ export function StudioLiveCollaborationPanelView({
   syncSnapshot,
   recovery,
   followingSessionId = null,
+  remoteCursorsVisible = true,
+  cursorQuality = null,
   videoRef,
   onChatDraftChange,
   onChatSubmit,
@@ -219,6 +234,7 @@ export function StudioLiveCollaborationPanelView({
   onExportRecovery,
   onReloadAuthoritative,
   onToggleFollow,
+  onToggleRemoteCursors,
   onApproveRequest,
   onRejectRequest,
   onStopViewer,
@@ -237,6 +253,9 @@ export function StudioLiveCollaborationPanelView({
     screenNetworkMode === null &&
     (busyAction === "start-share" || busyAction?.startsWith("[") === true);
   const renderedPeers = visibleLivePeers(peers, followingSessionId);
+  const cursorQualityPresentation = cursorQuality
+    ? presentStudioLiveCursorQuality(cursorQuality)
+    : null;
 
   useEffect(() => {
     const log = chatLogRef.current;
@@ -326,6 +345,58 @@ export function StudioLiveCollaborationPanelView({
           ? "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다."
           : "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다."}
       </p>
+
+      {onToggleRemoteCursors ? (
+        <div
+          className="mt-3 rounded-xl border border-line bg-card/55 p-3"
+          data-studio-live-visual-controls="true"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+              {remoteCursorsVisible ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-fg">팀원 커서와 작업 위치</p>
+              <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                커서를 숨겨도 획·문서 변경·댓글·잠금 동기화는 계속됩니다. 단축키 Ctrl/⌘+Alt+\
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={remoteCursorsVisible}
+              aria-label={remoteCursorsVisible ? "팀원 커서 숨기기" : "팀원 커서 표시하기"}
+              className={cn(
+                "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                remoteCursorsVisible
+                  ? "border-accent/50 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-2 hover:bg-raised"
+              )}
+              data-studio-remote-cursor-visibility={remoteCursorsVisible ? "visible" : "hidden"}
+              onClick={onToggleRemoteCursors}
+            >
+              {remoteCursorsVisible ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
+              {remoteCursorsVisible ? "표시 중" : "숨김"}
+            </button>
+          </div>
+          {cursorQuality && cursorQualityPresentation ? (
+            <div
+              className="mt-2.5 border-t border-line/80 pt-2.5"
+              data-studio-cursor-quality-detail={cursorQuality.tier}
+            >
+              <div className="flex items-center justify-between gap-3 text-[0.7rem]">
+                <span className="font-semibold text-fg-2">{cursorQualityPresentation.shortLabel}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-fg-3">
+                  {cursorQuality.cadenceMs}ms · 팀원 {cursorQuality.peerCount}명
+                </span>
+              </div>
+              <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                {cursorQualityPresentation.detail}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {syncSnapshot && syncPresentation ? (
         <div
@@ -894,6 +965,8 @@ export function StudioLiveCollaborationPanel({
   onToggleFollow,
 }: StudioLiveCollaborationPanelProps) {
   const live = useStudioLiveCollaboration();
+  const { remoteCursorsVisible } = useStudioLiveViewPreferences();
+  const cursorQuality = useStudioLiveCursorQuality(live.room?.workId ?? null);
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
   const screenIceSessionRef = useRef<{
     controller: StudioScreenShareController;
@@ -1178,6 +1251,8 @@ export function StudioLiveCollaborationPanel({
       syncSnapshot={live.sync}
       recovery={live.recovery}
       followingSessionId={followingSessionId}
+      remoteCursorsVisible={remoteCursorsVisible}
+      cursorQuality={cursorQuality}
       mode={live.mode}
       peers={live.peers}
       screenState={screenState}
@@ -1203,6 +1278,7 @@ export function StudioLiveCollaborationPanel({
       onExportRecovery={() => void handleExportRecovery()}
       onReloadAuthoritative={live.reloadAuthoritative}
       onToggleFollow={onToggleFollow}
+      onToggleRemoteCursors={toggleStudioLiveRemoteCursors}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
       onWatchShare={(share) => void handleWatchShare(share)}

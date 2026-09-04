@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_VRM_BODY_SILHOUETTE_VERSION,
+  sampleBodySilhouette,
+  type BodySilhouette,
+  type BodySilhouetteRing,
+} from "./studio-vrm-body-silhouette";
+import {
   FALLBACK_WARDROBE_METRICS,
   DEFAULT_WARDROBE_OPTIONS,
   VRM_WARDROBE_VERSION,
@@ -30,6 +36,7 @@ import {
   wardrobeItemsBySlot,
   resolveWardrobeItemForNewSelection,
   type GarmentPart,
+  type GarmentShape,
   type WardrobeMetrics,
   type WardrobeState,
 } from "./studio-vrm-wardrobe";
@@ -352,6 +359,325 @@ describe("파츠 빌더", () => {
 
   it("미지의 아이템은 빈 배열을 준다", () => {
     expect(buildGarmentParts("no-such-item", FALLBACK_WARDROBE_METRICS)).toEqual([]);
+  });
+});
+
+describe("실측 몸통 재단", () => {
+  // 합성 실측 몸 — 골반이 넓고, 허리가 잘록하고, 가슴은 넓으면서 얕다.
+  // 어깨 폭 배수로 재단하면 절대 만들 수 없는 조합이라 "원통이 사라졌는가"를 이 몸으로 판정한다.
+  const HIP_T = 0.05;
+  const WAIST_T = 0.35;
+  const CHEST_T = 0.7;
+  const BODY_RINGS: readonly BodySilhouetteRing[] = [
+    { t: HIP_T, halfWidth: 0.15, halfDepth: 0.115, centerX: 0, centerZ: 0 },
+    { t: 0.2, halfWidth: 0.14, halfDepth: 0.108, centerX: 0, centerZ: 0 },
+    { t: WAIST_T, halfWidth: 0.108, halfDepth: 0.1, centerX: 0, centerZ: 0 },
+    { t: 0.5, halfWidth: 0.12, halfDepth: 0.098, centerX: 0, centerZ: 0 },
+    { t: CHEST_T, halfWidth: 0.165, halfDepth: 0.098, centerX: 0, centerZ: 0 },
+    { t: 0.85, halfWidth: 0.158, halfDepth: 0.096, centerX: 0, centerZ: 0 },
+    { t: 0.95, halfWidth: 0.12, halfDepth: 0.09, centerX: 0, centerZ: 0 },
+  ];
+
+  const silhouette = (rings: readonly BodySilhouetteRing[] = BODY_RINGS): BodySilhouette => ({
+    version: STUDIO_VRM_BODY_SILHOUETTE_VERSION,
+    source: "measured",
+    rings,
+    sampleCount: 4200,
+    measuredRingCount: rings.length,
+  });
+
+  const measured = (rings: readonly BodySilhouetteRing[] = BODY_RINGS): WardrobeMetrics =>
+    sanitizeWardrobeMetrics({ ...FALLBACK_WARDROBE_METRICS, torso: silhouette(rings) });
+
+  /** 아이템이 스스로 신고한 여유분. 테스트가 상수를 새로 지어내지 않게 카탈로그에서 읽는다. */
+  const clearanceBand = (itemId: string): { min: number; max: number } => {
+    const item = wardrobeItemById(itemId);
+    if (!item) throw new Error(`unknown item ${itemId}`);
+    const { baseBodyClearanceM, motionAllowanceM, layerClearanceM } = item.fitProfile;
+    // 최소: 아이템이 약속한 몸 여유. 최대: 세 여유를 다 더한 값 + 품 배율 여유(≤1.25).
+    return { min: baseBodyClearanceM, max: (baseBodyClearanceM + motionAllowanceM + layerClearanceM) * 1.25 };
+  };
+
+  const torsoShellOf = (parts: readonly GarmentPart[]) => {
+    const shell = parts.find((part) => part.bone === "spine" && part.shape.kind === "lathe");
+    if (shell?.shape.kind !== "lathe") throw new Error("torso shell missing");
+    return { shell, profile: shell.shape.profile };
+  };
+
+  /** 파츠 로컬 y → 실측 링. up이 +Y인 폴백 골격을 쓰므로 offset[1]이 그대로 셸 중심 높이다. */
+  const ringAtProfileY = (
+    m: WardrobeMetrics,
+    shell: GarmentPart,
+    y: number,
+  ): BodySilhouetteRing => {
+    const spineY = y + shell.offset[1];
+    const t = (spineY + m.hipsToSpine) / (m.hipsToSpine + m.spineToNeck);
+    return sampleBodySilhouette(silhouette(), t);
+  };
+
+  const nearestPointToT = (
+    m: WardrobeMetrics,
+    shell: GarmentPart,
+    profile: readonly { radius: number; y: number; depth?: number }[],
+    t: number,
+  ) => {
+    const span = m.hipsToSpine + m.spineToNeck;
+    const targetY = t * span - m.hipsToSpine - shell.offset[1];
+    return profile.reduce((best, point) => (
+      Math.abs(point.y - targetY) < Math.abs(best.y - targetY) ? point : best
+    ));
+  };
+
+  it("티셔츠 몸통은 어깨 폭 배수가 아니라 실측 링 위에 아이템 여유분만 얹는다", () => {
+    const m = measured();
+    const { shell, profile } = torsoShellOf(buildGarmentParts("tshirt", m, 1));
+    const band = clearanceBand("tshirt");
+
+    // 5점 프로파일로는 허리와 가슴이 한 링에 뭉친다 — 링이 충분히 많아야 둘이 분리된다.
+    expect(profile.length).toBeGreaterThanOrEqual(12);
+    for (const point of profile) {
+      const ring = ringAtProfileY(m, shell, point.y);
+      const gap = point.radius - ring.halfWidth;
+      expect(gap, `radius@${point.y}`).toBeGreaterThanOrEqual(band.min);
+      expect(gap, `radius@${point.y}`).toBeLessThanOrEqual(band.max);
+      // 앞뒤 반지름도 같은 띠 안에 있어야 링마다 다른 타원이 실제로 몸을 감싼다.
+      const depthGap = point.radius * (point.depth ?? 1) - ring.halfDepth;
+      expect(depthGap, `depth@${point.y}`).toBeGreaterThanOrEqual(band.min);
+      expect(depthGap, `depth@${point.y}`).toBeLessThanOrEqual(band.max);
+    }
+  });
+
+  it("겉옷도 같은 규칙으로 재단된다 — 여유분만 아이템에 따라 커진다", () => {
+    const m = measured();
+    const coat = torsoShellOf(buildGarmentParts("coat", m, 1));
+    const tshirt = torsoShellOf(buildGarmentParts("tshirt", m, 1));
+    const band = clearanceBand("coat");
+
+    for (const point of coat.profile) {
+      const ring = ringAtProfileY(m, coat.shell, point.y);
+      const gap = point.radius - ring.halfWidth;
+      expect(gap).toBeGreaterThanOrEqual(band.min);
+      expect(gap).toBeLessThanOrEqual(band.max);
+    }
+    expect(Math.max(...coat.profile.map((point) => point.radius)))
+      .toBeGreaterThan(Math.max(...tshirt.profile.map((point) => point.radius)));
+  });
+
+  it("허리는 가슴보다 좁고 두 링의 깊이비가 다르다 — 원통이 사라졌다", () => {
+    const m = measured();
+    const { shell, profile } = torsoShellOf(buildGarmentParts("tshirt", m, 1));
+    const waist = nearestPointToT(m, shell, profile, WAIST_T);
+    const chest = nearestPointToT(m, shell, profile, CHEST_T);
+
+    expect(waist.radius).toBeLessThan(chest.radius * 0.85);
+    // 하나의 squash로는 표현할 수 없는 차이 — 가슴은 넓고 얕게, 허리는 좁고 둥글게 남는다.
+    expect(chest.depth).toBeLessThan(0.75);
+    expect(waist.depth).toBeGreaterThan((chest.depth ?? 1) + 0.1);
+    expect(shell.squash).toBeUndefined();
+  });
+
+  it("fit을 최소로 줄여도 셸은 실측 표면 바깥에 남는다 — 줄어드는 것은 여유분뿐", () => {
+    const m = measured();
+    for (const itemId of ["tshirt", "hoodie", "coat", "dress"]) {
+      const tight = torsoShellOf(buildGarmentParts(itemId, m, WARDROBE_FIT_MIN));
+      const loose = torsoShellOf(buildGarmentParts(itemId, m, WARDROBE_FIT_MAX));
+      for (const point of tight.profile) {
+        const ring = ringAtProfileY(m, tight.shell, point.y);
+        expect(point.radius, `${itemId} radius@${point.y}`).toBeGreaterThan(ring.halfWidth);
+        expect(point.radius * (point.depth ?? 1), `${itemId} depth@${point.y}`).toBeGreaterThan(ring.halfDepth);
+      }
+      expect(Math.max(...tight.profile.map((point) => point.radius)), itemId)
+        .toBeLessThan(Math.max(...loose.profile.map((point) => point.radius)));
+    }
+  });
+
+  it("실측 몸이 굵어지면 셸도 굵어진다 — fit이 아니라 몸이 치수를 정한다", () => {
+    const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.3 }));
+    const slim = torsoShellOf(buildGarmentParts("tshirt", measured(), 1));
+    const broad = torsoShellOf(buildGarmentParts("tshirt", measured(wider), 1));
+    expect(Math.max(...broad.profile.map((point) => point.radius)))
+      .toBeGreaterThan(Math.max(...slim.profile.map((point) => point.radius)) * 1.2);
+  });
+
+  it("어깨 요크가 목에서 어깨 관절까지 이어지고 소매는 진동 안으로 들어간다", () => {
+    const m = measured();
+    const parts = buildGarmentParts("tshirt", m, 1);
+    const yoke = parts.find((part) => (
+      part.bone === "spine" && part.shape.kind === "cylinder" && part.align?.[0] === 1
+    ));
+    const sleeve = parts.find((part) => part.bone === "leftUpperArm");
+    if (yoke?.shape.kind !== "cylinder" || sleeve?.shape.kind !== "cylinder") {
+      throw new Error("shoulder yoke or sleeve missing");
+    }
+
+    // 요크는 좌우 어깨 관절까지는 반드시 닿아야 소매를 만난다.
+    expect(yoke.shape.h).toBeGreaterThanOrEqual(m.shoulderW);
+    expect(yoke.shape.rTop).toBeGreaterThanOrEqual(sleeve.shape.rTop);
+    expect(yoke.squash?.[2]).toBeLessThan(1);
+
+    // 소매는 어깨 관절보다 몸쪽에서 시작하고(음수 start) 끝단은 그대로다.
+    const measuredStart = sleeve.offset[0] - sleeve.shape.h / 2;
+    const measuredEnd = sleeve.offset[0] + sleeve.shape.h / 2;
+    const fallback = buildGarmentParts("tshirt", FALLBACK_WARDROBE_METRICS, 1)
+      .find((part) => part.bone === "leftUpperArm");
+    if (fallback?.shape.kind !== "cylinder") throw new Error("fallback sleeve missing");
+    expect(measuredStart).toBeLessThan(0);
+    expect(fallback.offset[0] - fallback.shape.h / 2).toBeCloseTo(0, 10);
+    expect(measuredEnd).toBeCloseTo(fallback.offset[0] + fallback.shape.h / 2, 10);
+  });
+
+  it("요크 폭은 실측 어깨에서 나온다", () => {
+    const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.4 }));
+    const spanOf = (m: WardrobeMetrics): number => {
+      const yoke = buildGarmentParts("tshirt", m, 1).find((part) => (
+        part.bone === "spine" && part.shape.kind === "cylinder" && part.align?.[0] === 1
+      ));
+      if (yoke?.shape.kind !== "cylinder") throw new Error("shoulder yoke missing");
+      return yoke.shape.h;
+    };
+    expect(spanOf(measured(wider))).toBeGreaterThan(spanOf(measured()));
+  });
+
+  it("스커트 허리는 실측 골반 링에서 나오고 밑단은 그대로 완만하다", () => {
+    const m = measured();
+    const skirt = buildGarmentParts("pleated", m, 1)
+      .find((part) => part.bone === "hips" && part.shape.kind === "lathe");
+    if (skirt?.shape.kind !== "lathe") throw new Error("skirt cone missing");
+    const profile = skirt.shape.profile;
+    const rTop = profile[profile.length - 1]!.radius;
+    const band = clearanceBand("pleated");
+    const hip = BODY_RINGS.find((ring) => ring.t === HIP_T)!;
+
+    expect(rTop - hip.halfWidth).toBeGreaterThanOrEqual(band.min);
+    expect(rTop - hip.halfWidth).toBeLessThanOrEqual(band.max);
+    // 골격 폴백은 골반 "관절 거리"를 썼기 때문에 살보다 좁았다.
+    expect(rTop).toBeGreaterThan(Math.max(m.hipW * 0.95, m.shoulderW * 0.42));
+    expect(profile).toHaveLength(5);
+    expect(profile[0]!.radius).toBeGreaterThan(rTop);
+    expect(profile.every((point, index, points) => index === 0 || point.y > points[index - 1]!.y)).toBe(true);
+  });
+
+  it("실측 골반이 넓어지면 스커트 허리도 넓어진다", () => {
+    const rTopOf = (m: WardrobeMetrics): number => {
+      const skirt = buildGarmentParts("longskirt", m, 1)
+        .find((part) => part.bone === "hips" && part.shape.kind === "lathe");
+      if (skirt?.shape.kind !== "lathe") throw new Error("skirt cone missing");
+      return skirt.shape.profile[skirt.shape.profile.length - 1]!.radius;
+    };
+    const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.25 }));
+    expect(rTopOf(measured(wider))).toBeGreaterThan(rTopOf(measured()));
+  });
+
+  it("같은 몸이면 같은 파츠를 준다(결정론)", () => {
+    const m = measured();
+    for (const itemId of ["tshirt", "coat", "pleated"]) {
+      expect(buildGarmentParts(itemId, m, 1)).toEqual(buildGarmentParts(itemId, m, 1));
+    }
+  });
+});
+
+describe("실측이 없을 때의 골격 폴백", () => {
+  const fmt = (value: number): string => value.toFixed(6);
+  const vec = (values: readonly number[] | undefined): string => (values ? values.map(fmt).join(",") : "-");
+  const shapeFingerprint = (shape: GarmentShape): string => {
+    switch (shape.kind) {
+      case "cylinder":
+        return `cylinder(${fmt(shape.rTop)},${fmt(shape.rBottom)},${fmt(shape.h)},${shape.open ?? false})`;
+      case "lathe":
+        return `lathe(${shape.segments ?? "-"};${shape.profile
+          .map((point) => `${fmt(point.radius)}@${fmt(point.y)}${point.depth === undefined ? "" : `*${fmt(point.depth)}`}`)
+          .join(" ")})`;
+      case "box":
+        return `box(${fmt(shape.w)},${fmt(shape.h)},${fmt(shape.d)})`;
+      case "sphere":
+        return `sphere(${fmt(shape.r)})`;
+      case "torus":
+        return `torus(${fmt(shape.r)},${fmt(shape.tube)},${shape.arc === undefined ? "-" : fmt(shape.arc)})`;
+    }
+  };
+  const fingerprint = (part: GarmentPart): string => [
+    part.bone,
+    part.skinMode ?? "-",
+    shapeFingerprint(part.shape),
+    `off(${vec(part.offset)})`,
+    `align(${vec(part.align)})`,
+    `squash(${vec(part.squash)})`,
+    part.color ?? "-",
+    part.roughness === undefined ? "-" : fmt(part.roughness),
+    part.metalness === undefined ? "-" : fmt(part.metalness),
+  ].join(" ");
+
+  const fallbackParts = (itemId: string): string[] =>
+    buildGarmentParts(itemId, FALLBACK_WARDROBE_METRICS, 1).map(fingerprint);
+
+  it("측정이 없으면 실루엣이 생기기 전 파츠를 그대로 만든다", () => {
+    // 이 스냅샷은 실측 재단이 들어오기 전 출력이다. 실측 없는 캐릭터에서 옷이 바뀌면
+    // 그건 개선이 아니라 회귀다 — 정직 규칙(측정 실패 시 골격 폴백 무변경).
+    expect({
+      tshirt: fallbackParts("tshirt"),
+      hoodie: fallbackParts("hoodie"),
+      coat: fallbackParts("coat"),
+      pleated: fallbackParts("pleated"),
+    }).toMatchInlineSnapshot(`
+      {
+        "coat": [
+          "spine - lathe(32;0.188190@-0.255200 0.192031@-0.193952 0.165146@-0.030624 0.192031@0.122496 0.204288@0.204160 0.159345@0.255200) off(0.000000,0.039200,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.850000) - 0.780000 -",
+          "hips lower-body-drape lathe(32;0.247289@-0.148750 0.239870@-0.124950 0.222110@-0.023800 0.191087@0.119000 0.187340@0.148750) off(0.000000,-0.099250,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.880000) - - -",
+          "leftUpperArm - cylinder(0.056012,0.056012,0.224400,true) off(0.112200,0.000000,0.000000) align(1.000000,0.000000,0.000000) squash(-) - 0.780000 -",
+          "leftLowerArm - cylinder(0.050996,0.050996,0.211200,true) off(0.105600,0.000000,0.000000) align(1.000000,0.000000,0.000000) squash(-) - 0.780000 -",
+          "rightUpperArm - cylinder(0.056012,0.056012,0.224400,true) off(-0.112200,0.000000,0.000000) align(-1.000000,0.000000,0.000000) squash(-) - 0.780000 -",
+          "rightLowerArm - cylinder(0.050996,0.050996,0.211200,true) off(-0.105600,0.000000,0.000000) align(-1.000000,0.000000,0.000000) squash(-) - 0.780000 -",
+          "spine - torus(0.099200,0.019200,-) off(0.000000,0.288000,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.740000) - 0.780000 -",
+        ],
+        "hoodie": [
+          "spine - lathe(32;0.210739@-0.255200 0.215040@-0.193952 0.184934@-0.030624 0.202138@0.122496 0.215040@0.204160 0.167731@0.255200) off(0.000000,0.039200,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.850000) - 0.850000 -",
+          "leftUpperArm - cylinder(0.059356,0.059356,0.224400,true) off(0.112200,0.000000,0.000000) align(1.000000,0.000000,0.000000) squash(-) - 0.850000 -",
+          "leftLowerArm - cylinder(0.054340,0.054340,0.211200,true) off(0.105600,0.000000,0.000000) align(1.000000,0.000000,0.000000) squash(-) - 0.850000 -",
+          "rightUpperArm - cylinder(0.059356,0.059356,0.224400,true) off(-0.112200,0.000000,0.000000) align(-1.000000,0.000000,0.000000) squash(-) - 0.850000 -",
+          "rightLowerArm - cylinder(0.054340,0.054340,0.211200,true) off(-0.105600,0.000000,0.000000) align(-1.000000,0.000000,0.000000) squash(-) - 0.850000 -",
+          "spine - sphere(0.108800) off(0.000000,0.262400,-0.096000) align(-) squash(0.900000,0.820000,0.720000) - 0.850000 -",
+        ],
+        "pleated": [
+          "hips lower-body-drape lathe(32;0.274550@-0.101500 0.266313@-0.085260 0.227069@-0.016240 0.164730@0.081200 0.161500@0.101500) off(0.000000,-0.052000,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.880000) - - -",
+          "hips - torus(0.161500,0.012000,-) off(0.000000,0.049500,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.780000) - 0.700000 -",
+        ],
+        "tshirt": [
+          "spine - lathe(32;0.171682@-0.255200 0.175186@-0.193952 0.150660@-0.030624 0.175186@0.122496 0.186368@0.204160 0.145367@0.255200) off(0.000000,0.039200,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.850000) - 0.820000 -",
+          "leftUpperArm - cylinder(0.052668,0.052668,0.092400,true) off(0.046200,0.000000,0.000000) align(1.000000,0.000000,0.000000) squash(-) - 0.820000 -",
+          "rightUpperArm - cylinder(0.052668,0.052668,0.092400,true) off(-0.046200,0.000000,0.000000) align(-1.000000,0.000000,0.000000) squash(-) - 0.820000 -",
+          "spine - torus(0.073600,0.012000,-) off(0.000000,0.291200,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.740000) - 0.860000 -",
+          "hips - torus(0.170000,0.011000,-) off(0.000000,0.045000,0.000000) align(0.000000,1.000000,0.000000) squash(1.000000,1.000000,0.840000) - 0.860000 -",
+          "spine - box(0.051200,0.051200,0.012000) off(0.048000,0.121600,0.172800) align(-) squash(-) - 0.860000 -",
+        ],
+      }
+    `);
+  });
+
+  it("폴백 파츠에는 링별 깊이도, 어깨 요크도, 진동에 파고든 소매도 없다", () => {
+    for (const item of WARDROBE_ITEMS) {
+      const parts = buildGarmentParts(item.id, FALLBACK_WARDROBE_METRICS, 1);
+      for (const part of parts) {
+        if (part.shape.kind === "lathe") {
+          expect(part.shape.profile.every((point) => point.depth === undefined), item.id).toBe(true);
+        }
+        // 좌우 축으로 누운 spine 실린더는 요크뿐이다.
+        const lateral = part.bone === "spine" && part.shape.kind === "cylinder" && part.align?.[0] === 1;
+        expect(lateral, item.id).toBe(false);
+      }
+      for (const part of parts) {
+        if (part.bone !== "leftUpperArm" && part.bone !== "rightUpperArm") continue;
+        if (part.shape.kind !== "cylinder") continue;
+        const axis = part.bone === "leftUpperArm" ? 1 : -1;
+        expect(part.offset[0] * axis - part.shape.h / 2, item.id).toBeCloseTo(0, 10);
+      }
+    }
+  });
+
+  it("몸통 셸은 폴백에서 여전히 6점 프로파일과 고정 타원을 쓴다", () => {
+    const shell = buildGarmentParts("tshirt", FALLBACK_WARDROBE_METRICS, 1)[0];
+    if (shell?.shape.kind !== "lathe") throw new Error("torso shell missing");
+    expect(shell.shape.profile).toHaveLength(6);
+    expect(shell.squash).toEqual([1, 1, 0.85]);
   });
 });
 

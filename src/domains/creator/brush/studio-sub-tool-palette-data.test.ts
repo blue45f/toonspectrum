@@ -30,8 +30,7 @@ describe("studio sub tool palette data", () => {
     }
   });
 
-  it("keeps every category usable after fail-closed filtering", () => {
-    // A silently emptied tab means the mapping table rotted (renamed/removed preset ids).
+  it("keeps every curated category usable after fail-closed filtering", () => {
     for (const category of STUDIO_SUB_TOOL_PALETTE_CATEGORIES) {
       expect(category.tools.length, category.id).toBeGreaterThanOrEqual(2);
     }
@@ -48,7 +47,7 @@ describe("studio sub tool palette data", () => {
     }
   });
 
-  it("names palette rows with the real preset names (honesty contract)", () => {
+  it("names palette rows with the real preset names", () => {
     for (const category of STUDIO_SUB_TOOL_PALETTE_CATEGORIES) {
       for (const tool of category.tools) {
         const preset = BRUSH_PRESETS.find((candidate) => candidate.id === tool.id);
@@ -57,7 +56,7 @@ describe("studio sub tool palette data", () => {
     }
   });
 
-  it("assigns each preset to at most one category tab", () => {
+  it("assigns each representative to at most one category tab", () => {
     const seen = new Set<string>();
     for (const category of STUDIO_SUB_TOOL_PALETTE_CATEGORIES) {
       for (const tool of category.tools) {
@@ -82,18 +81,20 @@ describe("studio sub tool palette data", () => {
         expect(studioSubToolPaletteCategoryIdForBrushId(tool.id)).toBe(category.id);
       }
     }
-    expect(studioSubToolPaletteCategoryIdForBrushId("pen")).toBeNull();
+    // Similar historical nib variants remain searchable in the library, not duplicated here.
+    expect(studioSubToolPaletteCategoryIdForBrushId("school-pen")).toBeNull();
     expect(studioSubToolPaletteCategoryIdForBrushId(null)).toBeNull();
   });
 
-  it("resolves listed sub tool ids to presets and stays fail-closed otherwise", () => {
+  it("resolves curated sub tool ids to presets and stays fail-closed otherwise", () => {
     const gpen = studioSubToolPalettePresetById("gpen");
     expect(gpen?.id).toBe("gpen");
+    const directPen = studioSubToolPalettePresetById("pen");
+    expect(directPen?.id).toBe("pen");
     const eraser = studioSubToolPalettePresetById("standard-eraser");
     expect(eraser?.operation).toBe("erase");
-    // Exists in the catalogue but is deliberately not a palette row.
-    expect(CORE_PRESET_IDS.has("pen")).toBe(true);
-    expect(studioSubToolPalettePresetById("pen")).toBeNull();
+    expect(CORE_PRESET_IDS.has("school-pen")).toBe(true);
+    expect(studioSubToolPalettePresetById("school-pen")).toBeNull();
     expect(studioSubToolPalettePresetById("no-such-brush")).toBeNull();
     expect(studioSubToolPalettePresetById(42)).toBeNull();
   });

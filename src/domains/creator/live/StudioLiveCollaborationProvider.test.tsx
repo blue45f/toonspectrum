@@ -292,6 +292,24 @@ vi.mock("./studio-live-collaboration-room", () => {
   return { StudioLiveRoom };
 });
 
+// The provider resolves the room and the adaptive cursor transport in one Promise.all. Leaving the
+// transport module real adds a second module graph to that await, so the room is not constructed
+// within the microtask budget renderProvider spends — every room assertion then reads undefined.
+// The stub also records which base factory was wrapped, which is the observable this suite needs.
+vi.mock("./studio-live-adaptive-cursor-transport", () => ({
+  STUDIO_LIVE_CURSOR_CAPTURE_INTERVAL_MS: 16,
+  createStudioAdaptiveCursorTransportFactory: (
+    dependencies: { baseFactory?: unknown } = {},
+  ) => {
+    const factory = (): never => {
+      throw new Error("The mocked room must not open a real transport.");
+    };
+    (factory as { wrappedBaseFactory?: unknown }).wrappedBaseFactory =
+      dependencies.baseFactory ?? null;
+    return factory;
+  },
+}));
+
 vi.mock("./studio-crdt-document", () => ({
   StudioCrdtDocument: class StudioCrdtDocument {
     readonly record = { destroyCount: 0 };
@@ -471,7 +489,9 @@ async function renderProvider(
   options: RenderProviderOptions = {}
 ): Promise<StudioLiveCollaborationContextValue> {
   renderProviderOnce(options);
-  for (let tick = 0; tick < 16; tick += 1) await Promise.resolve();
+  // The gated effect now awaits two dynamic imports (room + adaptive cursor transport) before it
+  // constructs anything, so the drain has to outlast that chain rather than a single import.
+  for (let tick = 0; tick < 64; tick += 1) await Promise.resolve();
   return renderProviderOnce(options);
 }
 
@@ -603,7 +623,12 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     const live = await renderProvider({ serverRequired: false });
 
     expect(rooms.instances).toHaveLength(1);
-    expect(rooms.instances[0]?.options.dependencies?.transportFactory).toBeUndefined();
+    // The adaptive cursor transport is always installed; a same-origin jam is the case where it
+    // wraps no server base factory.
+    const jamFactory = rooms.instances[0]?.options.dependencies?.transportFactory as
+      { wrappedBaseFactory?: unknown } | undefined;
+    expect(jamFactory).toBeTypeOf("function");
+    expect(jamFactory?.wrappedBaseFactory ?? null).toBeNull();
     expect(live.usingLocalFallback).toBe(true);
     expect(live.availability).not.toBe("error");
   });

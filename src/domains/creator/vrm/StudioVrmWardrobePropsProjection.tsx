@@ -3,6 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
+import {
+  buildBodySilhouette,
+  type BodySilhouette,
+  type BodySilhouetteSample,
+} from "./studio-vrm-body-silhouette";
 import { PHYSICS_PREVIEW_MAX_DELTA } from "./studio-vrm-physics";
 import { refineVrmGripFingerWrap } from "./studio-vrm-poser-utils";
 import {
@@ -41,6 +46,7 @@ import {
   wardrobeItemById,
   type GarmentPart,
   type LimbMetric,
+  type Vec3,
   type WardrobeBone,
   type WardrobeEquip,
   type WardrobeMetrics,
@@ -478,6 +484,283 @@ export function StudioVrmPropAttachment({
 
 /* ── 실장착 워드로브(studio-vrm-wardrobe) — 측정·조립·본 부착 ────────── */
 
+/** 몸통 표면으로 인정하는 휴머노이드 본. 이 본이 최대 가중치인 정점만 링 재료가 된다. */
+const TORSO_SILHOUETTE_BONES: readonly VRMHumanBoneName[] = ["hips", "spine", "chest", "upperChest"];
+
+/**
+ * 메시 하나에서 훑는 정점 수 상한(12k). 20만 정점짜리 모델이 로딩을 붙잡지 않도록 일정 간격으로
+ * 솎아낸다. 간격은 정점 수만으로 정해지므로 같은 모델은 언제 재도 같은 정점을 고른다.
+ */
+const TORSO_MESH_VERTEX_BUDGET = 12_000;
+
+/** 씬 전체 상한(48k). vrm.scene 순회 순서가 결정적이라 예산이 어디서 끊기는지도 결정적이다. */
+/** 이 스튜디오가 만들어 붙인 노드의 이름 규약 — 의상은 `wardrobe:<slot>:<id>`, 소품은 `prop:<id>`. */
+const STUDIO_ATTACHMENT_NAME = /^(wardrobe:(outer|top|bottom|shoes)\b|prop:)/u;
+const STUDIO_ATTACHMENT_ANCESTRY_DEPTH = 32;
+
+/** 이름(또는 조상의 이름)이 스튜디오 부착물이면 실측 대상이 아니다. */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure predicate shared with its colocated test.
+export function isStudioAuthoredAttachment(object: THREE.Object3D): boolean {
+  let node: THREE.Object3D | null = object;
+  for (let depth = 0; node && depth < STUDIO_ATTACHMENT_ANCESTRY_DEPTH; depth += 1) {
+    if (node.name && STUDIO_ATTACHMENT_NAME.test(node.name)) return true;
+    node = node.parent;
+  }
+  return false;
+}
+
+const TORSO_SCENE_VERTEX_BUDGET = 48_000;
+
+/** 실측으로 인정할 최소 표면 정점 수. 이보다 적으면 실루엣 없이 골격 폴백에 맡긴다. */
+const TORSO_MIN_SAMPLES = 96;
+
+/** hips↔목 높이차가 이보다 짧으면 t 정규화의 분모로 쓸 수 없다. */
+const TORSO_MIN_SPAN_M = 0.02;
+
+/** 몸통 실측 좌표계. 세 축 모두 spine 로컬 공간의 단위 벡터다. */
+export interface TorsoMeasureFrame {
+  /** 위 = spine → 목. 높이를 재는 축. */
+  up: Vec3;
+  /** 왼쪽 = 오른팔 → 왼팔에서 up 성분을 제거한 축. 샘플의 x. */
+  left: Vec3;
+  /** 앞 = 왼쪽 × 위. footForward와 같은 해부학 규약이다. 샘플의 z. */
+  forward: Vec3;
+  /** t = 0 인 높이(hips 관절의 up 투영값). */
+  hipsHeight: number;
+  /** t = 1 까지의 높이(목 관절 − hips 관절). */
+  span: number;
+}
+
+function normalizedVec3(x: number, y: number, z: number): Vec3 | null {
+  const length = Math.hypot(x, y, z);
+  if (!Number.isFinite(length) || length < 1e-6) return null;
+  return [x / length, y / length, z / length];
+}
+
+function dotVec3(axis: Vec3, x: number, y: number, z: number): number {
+  return axis[0] * x + axis[1] * y + axis[2] * z;
+}
+
+function matrixIsFinite(matrix: THREE.Matrix4): boolean {
+  return matrix.elements.every((value) => Number.isFinite(value));
+}
+
+/**
+ * spine 로컬 관절 위치에서 몸통 실측 프레임을 만든다. 어깨선이 기울어도 높이 축이 오염되지
+ * 않도록 좌우 축에서 up 성분을 빼고, 앞 축은 기존 footForward와 같은 왼쪽×위로 잡는다.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure rig math tested beside the projection that is its only caller.
+export function buildTorsoMeasureFrame(anchors: {
+  /** spine → 목 벡터. WardrobeMetrics.up과 같은 축이라 재단 압출 방향과 어긋나지 않는다. */
+  up: Vec3;
+  hips: Vec3;
+  neck: Vec3;
+  leftUpperArm: Vec3;
+  rightUpperArm: Vec3;
+}): TorsoMeasureFrame | null {
+  const up = normalizedVec3(anchors.up[0], anchors.up[1], anchors.up[2]);
+  if (!up) return null;
+  const shoulderX = anchors.leftUpperArm[0] - anchors.rightUpperArm[0];
+  const shoulderY = anchors.leftUpperArm[1] - anchors.rightUpperArm[1];
+  const shoulderZ = anchors.leftUpperArm[2] - anchors.rightUpperArm[2];
+  const alongUp = dotVec3(up, shoulderX, shoulderY, shoulderZ);
+  const left = normalizedVec3(
+    shoulderX - up[0] * alongUp,
+    shoulderY - up[1] * alongUp,
+    shoulderZ - up[2] * alongUp,
+  );
+  if (!left) return null;
+  const forward = normalizedVec3(
+    left[1] * up[2] - left[2] * up[1],
+    left[2] * up[0] - left[0] * up[2],
+    left[0] * up[1] - left[1] * up[0],
+  );
+  if (!forward) return null;
+  const hipsHeight = dotVec3(up, anchors.hips[0], anchors.hips[1], anchors.hips[2]);
+  const span = dotVec3(up, anchors.neck[0], anchors.neck[1], anchors.neck[2]) - hipsHeight;
+  if (!(span > TORSO_MIN_SPAN_M)) return null;
+  return { up, left, forward, hipsHeight, span };
+}
+
+/**
+ * spine 로컬 점 하나를 실루엣 샘플로 바꾼다. hips(0)~목(1) 밖은 몸통 단면이 아니므로 버린다 —
+ * 머리·다리에 걸친 정점이 링을 부풀리지 않게 하는 1차 필터다.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure rig math tested beside the projection that is its only caller.
+export function projectTorsoSample(
+  frame: TorsoMeasureFrame,
+  x: number,
+  y: number,
+  z: number,
+): BodySilhouetteSample | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  const t = (dotVec3(frame.up, x, y, z) - frame.hipsHeight) / frame.span;
+  if (!(t >= 0 && t <= 1)) return null;
+  return { t, x: dotVec3(frame.left, x, y, z), z: dotVec3(frame.forward, x, y, z) };
+}
+
+/**
+ * 정점 하나의 스킨 영향 4개 중 가장 큰 것. 가중치가 같으면 앞선 슬롯을 택해 같은 모델이
+ * 언제나 같은 본을 고르게 한다(결정론). 유효한 양의 가중치가 없으면 null.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure rig math tested beside the projection that is its only caller.
+export function pickDominantSkinInfluence(
+  boneIndices: ArrayLike<number>,
+  weights: ArrayLike<number>,
+): { boneIndex: number; weight: number } | null {
+  let boneIndex = -1;
+  let weight = 0;
+  const slots = Math.min(4, boneIndices.length, weights.length);
+  for (let slot = 0; slot < slots; slot += 1) {
+    const candidate = weights[slot];
+    if (!Number.isFinite(candidate) || candidate <= weight) continue;
+    const candidateIndex = boneIndices[slot];
+    if (!Number.isFinite(candidateIndex) || candidateIndex < 0) continue;
+    boneIndex = Math.trunc(candidateIndex);
+    weight = candidate;
+  }
+  return boneIndex < 0 ? null : { boneIndex, weight };
+}
+
+/** 정점 수와 예산으로 정하는 고정 샘플 간격. 입력이 같으면 결과도 같다. */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure rig math tested beside the projection that is its only caller.
+export function torsoVertexStride(vertexCount: number, budget: number): number {
+  if (!Number.isFinite(vertexCount) || vertexCount <= 0) return 1;
+  const cap = Number.isFinite(budget) && budget >= 1 ? Math.trunc(budget) : 1;
+  return Math.max(1, Math.ceil(vertexCount / cap));
+}
+
+/**
+ * 스킨 메시에서 몸통 표면 정점을 모아 실루엣을 만든다. 골격이 아니라 실제 표면을 재므로
+ * 가슴은 넓고 얕게, 허리는 좁게 나온다. 재료가 모자라면 null을 돌려 골격 폴백에 맡긴다 —
+ * 없는 측정을 지어내는 것보다 예전 재단이 그대로 도는 편이 정직하다.
+ *
+ * 좌표계는 나머지 치수와 같은 spine 로컬 rest 공간이다. 정점은 지배 본 하나로만 스킨해
+ * 월드로 보낸 뒤 spine 로컬로 들어오므로, Avatar Forge가 raw 리그를 바꾼 뒤에도 옷과 몸이
+ * 같은 공간에 남는다. 모프타깃은 적용하지 않는다 — 재단 기준은 기본 형상이다.
+ */
+function measureTorsoSilhouette(vrm: VRM, anchors: {
+  spine: THREE.Object3D | null;
+  /** spine 로컬 위 방향. 나머지는 월드 좌표. */
+  up: THREE.Vector3 | null;
+  hips: THREE.Vector3 | null;
+  neck: THREE.Vector3 | null;
+  leftUpperArm: THREE.Vector3 | null;
+  rightUpperArm: THREE.Vector3 | null;
+}): BodySilhouette | null {
+  const humanoid = vrm.humanoid;
+  const spine = anchors.spine;
+  if (!humanoid || !spine || !anchors.up) return null;
+  if (!matrixIsFinite(spine.matrixWorld) || Math.abs(spine.matrixWorld.determinant()) < 1e-12) return null;
+
+  const spineLocal = (worldPoint: THREE.Vector3 | null): Vec3 | null => {
+    if (!worldPoint) return null;
+    const local = spine.worldToLocal(worldPoint.clone());
+    return Number.isFinite(local.x) && Number.isFinite(local.y) && Number.isFinite(local.z)
+      ? [local.x, local.y, local.z]
+      : null;
+  };
+  const hips = spineLocal(anchors.hips);
+  const neck = spineLocal(anchors.neck);
+  const leftUpperArm = spineLocal(anchors.leftUpperArm);
+  const rightUpperArm = spineLocal(anchors.rightUpperArm);
+  if (!hips || !neck || !leftUpperArm || !rightUpperArm) return null;
+  const frame = buildTorsoMeasureFrame({
+    up: [anchors.up.x, anchors.up.y, anchors.up.z],
+    hips,
+    neck,
+    leftUpperArm,
+    rightUpperArm,
+  });
+  if (!frame) return null;
+
+  const torsoNodes = new Set<THREE.Object3D>();
+  for (const boneName of TORSO_SILHOUETTE_BONES) {
+    const boneNode = humanoid.getRawBoneNode(boneName);
+    if (boneNode) torsoNodes.add(boneNode);
+  }
+  if (torsoNodes.size === 0) return null;
+
+  const worldToSpine = new THREE.Matrix4().copy(spine.matrixWorld).invert();
+  const boneToSpine = new THREE.Matrix4();
+  const vertex = new THREE.Vector3();
+  const influenceIndices = [0, 0, 0, 0];
+  const influenceWeights = [0, 0, 0, 0];
+  const samples: BodySilhouetteSample[] = [];
+  let inspected = 0;
+
+  vrm.scene.traverse((object) => {
+    if (inspected >= TORSO_SCENE_VERTEX_BUDGET) return;
+    const mesh = object as THREE.SkinnedMesh;
+    if (!mesh.isSkinnedMesh) return;
+    // 이 스튜디오가 입힌 절차형 의상은 vrm.scene 안으로 포털되고 몸통 본에 스킨된다. 걸러 내지
+    // 않으면 "몸"이 아니라 이미 입은 옷을 재게 되고, 다음 옷은 그 위에 또 여유분을 얹는다.
+    if (isStudioAuthoredAttachment(mesh)) return;
+    const skeleton = mesh.skeleton;
+    if (!skeleton || skeleton.bones.length === 0) return;
+    const geometry = mesh.geometry;
+    if (
+      !geometry.hasAttribute("position")
+      || !geometry.hasAttribute("skinIndex")
+      || !geometry.hasAttribute("skinWeight")
+    ) return;
+    if (
+      !matrixIsFinite(mesh.bindMatrix)
+      || !matrixIsFinite(mesh.bindMatrixInverse)
+      || !matrixIsFinite(mesh.matrixWorld)
+    ) return;
+    const position = geometry.getAttribute("position");
+    const skinIndex = geometry.getAttribute("skinIndex");
+    const skinWeight = geometry.getAttribute("skinWeight");
+    if (skinIndex.itemSize < 4 || skinWeight.itemSize < 4) return;
+    if (skinIndex.count < position.count || skinWeight.count < position.count) return;
+
+    // 몸통 본은 이름이 아니라 노드 동일성으로 고른다 — 본 이름은 모델마다 제각각이다.
+    const torsoTransforms = new Map<number, THREE.Matrix4>();
+    for (let boneIndex = 0; boneIndex < skeleton.bones.length; boneIndex += 1) {
+      const bone = skeleton.bones[boneIndex];
+      const boneInverse = skeleton.boneInverses[boneIndex];
+      if (!bone || !boneInverse || !torsoNodes.has(bone)) continue;
+      // three 스키닝과 같은 식(지배 본 하나, 가중치 1)으로 월드에 놓고 spine 로컬까지 한 번에 옮긴다.
+      boneToSpine
+        .copy(worldToSpine)
+        .multiply(mesh.matrixWorld)
+        .multiply(mesh.bindMatrixInverse)
+        .multiply(bone.matrixWorld)
+        .multiply(boneInverse)
+        .multiply(mesh.bindMatrix);
+      if (!matrixIsFinite(boneToSpine)) continue;
+      torsoTransforms.set(boneIndex, boneToSpine.clone());
+    }
+    if (torsoTransforms.size === 0) return;
+
+    const stride = torsoVertexStride(position.count, TORSO_MESH_VERTEX_BUDGET);
+    for (let index = 0; index < position.count; index += stride) {
+      if (inspected >= TORSO_SCENE_VERTEX_BUDGET) break;
+      inspected += 1;
+      // 정규화 속성(ubyte/ushort 가중치)까지 풀어주는 접근자로 읽는다.
+      influenceIndices[0] = skinIndex.getX(index);
+      influenceIndices[1] = skinIndex.getY(index);
+      influenceIndices[2] = skinIndex.getZ(index);
+      influenceIndices[3] = skinIndex.getW(index);
+      influenceWeights[0] = skinWeight.getX(index);
+      influenceWeights[1] = skinWeight.getY(index);
+      influenceWeights[2] = skinWeight.getZ(index);
+      influenceWeights[3] = skinWeight.getW(index);
+      const dominant = pickDominantSkinInfluence(influenceIndices, influenceWeights);
+      if (!dominant) continue;
+      const transform = torsoTransforms.get(dominant.boneIndex);
+      if (!transform) continue;
+      vertex.fromBufferAttribute(position, index).applyMatrix4(transform);
+      const sample = projectTorsoSample(frame, vertex.x, vertex.y, vertex.z);
+      if (sample) samples.push(sample);
+    }
+  });
+
+  if (samples.length < TORSO_MIN_SAMPLES) return null;
+  return buildBodySilhouette(samples);
+}
+
 /**
  * 실제 스킨을 움직이는 raw 휴머노이드에서 본 로컬 치수를 잰다.
  * Avatar Forge가 raw 체형을 바꾼 뒤에도 같은 좌표계를 사용하므로 의상과 몸이 갈라지지 않는다.
@@ -563,6 +846,15 @@ export function measureStudioVrmWardrobeMetrics(vrm: VRM): WardrobeMetrics {
 
   return sanitizeWardrobeMetrics({
     source: rigSource,
+    // 스킨 표면 실측. 앵커나 표면 정점이 모자라면 null이 되고, 재단은 아래 골격 치수만 쓴다.
+    torso: measureTorsoSilhouette(vrm, {
+      spine: node("spine"),
+      up: upLocal,
+      hips,
+      neck: neckW,
+      leftUpperArm: lUpArm,
+      rightUpperArm: rUpArm,
+    }),
     shoulderW: localDistanceBetween("spine", lUpArm, rUpArm),
     hipW: localDistanceBetween("hips", lUpLeg, rUpLeg),
     hipsToSpine: spine ? localVector("hips", spine)?.length() : undefined,

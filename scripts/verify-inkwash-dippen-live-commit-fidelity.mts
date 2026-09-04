@@ -31,8 +31,10 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 interface FidelityCaseDefinition {
-  readonly id: "inkwash-pen" | "glass-pen";
+  readonly id: "inkwash-pen" | "pen";
   readonly brushName: string;
+  /** Catalogue default width, pinned so a preview build measures the shipped configuration. */
+  readonly brushWidth: number;
   readonly contract: string;
 }
 
@@ -63,15 +65,24 @@ interface CaseResult {
   readonly error: string | null;
 }
 
+/**
+ * Each case must be a brush a user can actually reach in the picker. `glass-pen` was the original
+ * thin-line representative, but the quarantine ledger delisted it — "선언된 \"잉크 흐름\"으로
+ * 분기하는 렌더러가 없어" — so the catalogue never lists it and the probe timed out selecting a
+ * brush that is not there. The ledger names its replacements; `pen` is the one that survived the
+ * later feel-cull (fineliner is quarantined too).
+ */
 const FIDELITY_CASES = Object.freeze([
   {
     id: "inkwash-pen",
     brushName: "잉크워시 딥펜(유체 잉크)",
+    brushWidth: 8,
     contract: "fluid wet-ink live overlay → committed document pixels",
   },
   {
-    id: "glass-pen",
-    brushName: "유리펜(잉크 흐름)",
+    id: "pen",
+    brushName: "펜(매끈)",
+    brushWidth: 6,
     contract: "thin-line causal filtering → committed document geometry",
   },
 ] as const satisfies readonly FidelityCaseDefinition[]);
@@ -125,6 +136,11 @@ async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult> 
       ...process.env,
       TOONSPECTRUM_VERIFY_DIR: caseRoot,
       TOONSPECTRUM_LONG_STROKE_BRUSH: definition.brushName,
+      // A preview build cannot serve the /src catalogue module the child probe reads, so without
+      // these two pins it falls back to a 12px default and measures a width the product never
+      // ships. The id also lands in the child report, making the selected brush auditable.
+      TOONSPECTRUM_LONG_STROKE_BRUSH_ID: definition.id,
+      TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH: String(definition.brushWidth),
       TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW: SPAWN_PREVIEW ? "1" : "0",
       // The required gate measures the deterministic shipped compatibility path. Hardware/WebGPU
       // device-loss coverage is kept in its dedicated fault-injection suites, not silently mixed
