@@ -146,13 +146,13 @@ function normalizeTags(value: unknown): string[] {
 
 function commentCanDelete(
   row: MarketplaceSocialRow,
-  resource: MarketplaceResourceIdentityRow,
+  publisherId: string,
   viewerId: string | null,
   viewerIsAdmin: boolean,
 ): boolean {
   return row.deletedAt === null && Boolean(
     viewerIsAdmin
-      || (viewerId && (viewerId === row.userId || viewerId === resource.publisherId)),
+      || (viewerId && (viewerId === row.userId || viewerId === publisherId)),
   );
 }
 
@@ -162,6 +162,16 @@ function reviewCanDelete(
   viewerIsAdmin: boolean,
 ): boolean {
   return viewerIsAdmin || Boolean(viewerId && viewerId === row.userId);
+}
+
+function reviewLockKey(
+  resource: MarketplaceResourceIdentityRow,
+  userId: string,
+): string {
+  return "toonspectrum:creator-marketplace-social-review:v1:"
+    + `${resource.publisherId.length}:${resource.publisherId}`
+    + `${resource.packageId.length}:${resource.packageId}`
+    + `${userId.length}:${userId}`;
 }
 
 @Injectable()
@@ -209,10 +219,13 @@ export class CreatorMarketplaceSocialRepository {
           WITH roots AS (
             SELECT comment."id"
             FROM public."creator_marketplace_comment" AS comment
-            WHERE comment."resourceId" = $1
+            JOIN public."creator_marketplace_resource" AS comment_resource
+              ON comment_resource."id" = comment."resourceId"
+            WHERE comment_resource."publisherId" = $1
+              AND comment_resource."packageId" = $2
               AND comment."parentId" IS NULL
             ORDER BY comment."createdAt" DESC, comment."id" DESC
-            LIMIT $3
+            LIMIT $4
           ), selected_comments AS (
             SELECT comment.*
             FROM public."creator_marketplace_comment" AS comment
@@ -230,20 +243,20 @@ export class CreatorMarketplaceSocialRepository {
             comment."updatedAt",
             account."name" AS "authorName",
             COALESCE(account."image", account."avatar") AS "authorImage",
-            (comment."userId" = resource."publisherId") AS "isPublisher",
+            (comment."userId" = comment_resource."publisherId") AS "isPublisher",
             EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
               WHERE library."userId" = comment."userId"
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+                AND library."publisherId" = comment_resource."publisherId"
+                AND library."packageId" = comment_resource."packageId"
             ) AS "isLibraryMember",
             EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
               WHERE library."userId" = comment."userId"
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+                AND library."publisherId" = comment_resource."publisherId"
+                AND library."packageId" = comment_resource."packageId"
                 AND library."lastConfirmedAt" IS NOT NULL
             ) AS "isStudioVerified",
             (
@@ -251,15 +264,15 @@ export class CreatorMarketplaceSocialRepository {
               FROM public."creator_marketplace_comment_like" AS reaction
               WHERE reaction."commentId" = comment."id"
             ) AS "reactionCount",
-            CASE WHEN $2::text IS NULL THEN false ELSE EXISTS (
+            CASE WHEN $3::text IS NULL THEN false ELSE EXISTS (
               SELECT 1
               FROM public."creator_marketplace_comment_like" AS reaction
               WHERE reaction."commentId" = comment."id"
-                AND reaction."userId" = $2::text
+                AND reaction."userId" = $3::text
             ) END AS "reactedByViewer"
           FROM selected_comments AS comment
-          JOIN public."creator_marketplace_resource" AS resource
-            ON resource."id" = comment."resourceId"
+          JOIN public."creator_marketplace_resource" AS comment_resource
+            ON comment_resource."id" = comment."resourceId"
           JOIN public."user" AS account
             ON account."id" = comment."userId"
           ORDER BY
@@ -272,7 +285,7 @@ export class CreatorMarketplaceSocialRepository {
             comment."createdAt" ASC,
             comment."id" ASC
         `,
-        [resourceId, viewerId, rootLimit],
+        [resource.publisherId, resource.packageId, viewerId, rootLimit],
       ),
       dbPool.query<MarketplaceReviewRow>(
         `
@@ -289,20 +302,20 @@ export class CreatorMarketplaceSocialRepository {
             review."updatedAt",
             account."name" AS "authorName",
             COALESCE(account."image", account."avatar") AS "authorImage",
-            (review."userId" = resource."publisherId") AS "isPublisher",
+            (review."userId" = review_resource."publisherId") AS "isPublisher",
             EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
               WHERE library."userId" = review."userId"
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+                AND library."publisherId" = review_resource."publisherId"
+                AND library."packageId" = review_resource."packageId"
             ) AS "isLibraryMember",
             EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
               WHERE library."userId" = review."userId"
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+                AND library."publisherId" = review_resource."publisherId"
+                AND library."packageId" = review_resource."packageId"
                 AND library."lastConfirmedAt" IS NOT NULL
             ) AS "isStudioVerified",
             (
@@ -310,23 +323,24 @@ export class CreatorMarketplaceSocialRepository {
               FROM public."creator_marketplace_review_helpful" AS reaction
               WHERE reaction."reviewId" = review."id"
             ) AS "reactionCount",
-            CASE WHEN $2::text IS NULL THEN false ELSE EXISTS (
+            CASE WHEN $3::text IS NULL THEN false ELSE EXISTS (
               SELECT 1
               FROM public."creator_marketplace_review_helpful" AS reaction
               WHERE reaction."reviewId" = review."id"
-                AND reaction."userId" = $2::text
+                AND reaction."userId" = $3::text
             ) END AS "reactedByViewer"
           FROM public."creator_marketplace_review" AS review
-          JOIN public."creator_marketplace_resource" AS resource
-            ON resource."id" = review."resourceId"
+          JOIN public."creator_marketplace_resource" AS review_resource
+            ON review_resource."id" = review."resourceId"
           JOIN public."user" AS account
             ON account."id" = review."userId"
-          WHERE review."resourceId" = $1
+          WHERE review_resource."publisherId" = $1
+            AND review_resource."packageId" = $2
             AND review."deletedAt" IS NULL
           ORDER BY "reactionCount" DESC, review."createdAt" DESC, review."id" DESC
-          LIMIT $3
+          LIMIT $4
         `,
-        [resourceId, viewerId, reviewLimit],
+        [resource.publisherId, resource.packageId, viewerId, reviewLimit],
       ),
       dbPool.query<MarketplaceReviewStatsRow>(
         `
@@ -340,43 +354,48 @@ export class CreatorMarketplaceSocialRepository {
             count(*) FILTER (WHERE review."rating" = 4)::integer AS "fourStar",
             count(*) FILTER (WHERE review."rating" = 5)::integer AS "fiveStar"
           FROM public."creator_marketplace_review" AS review
-          WHERE review."resourceId" = $1
+          JOIN public."creator_marketplace_resource" AS review_resource
+            ON review_resource."id" = review."resourceId"
+          WHERE review_resource."publisherId" = $1
+            AND review_resource."packageId" = $2
             AND review."deletedAt" IS NULL
         `,
-        [resourceId],
+        [resource.publisherId, resource.packageId],
       ),
       dbPool.query<MarketplaceViewerRow>(
         `
           SELECT
-            ($2::text IS NOT NULL) AS "authenticated",
-            COALESCE($2::text = resource."publisherId", false) AS "isPublisher",
-            CASE WHEN $2::text IS NULL THEN false ELSE EXISTS (
+            ($3::text IS NOT NULL) AS "authenticated",
+            COALESCE($3::text = $1::text, false) AS "isPublisher",
+            CASE WHEN $3::text IS NULL THEN false ELSE EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
-              WHERE library."userId" = $2::text
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+              WHERE library."userId" = $3::text
+                AND library."publisherId" = $1
+                AND library."packageId" = $2
             ) END AS "isLibraryMember",
-            CASE WHEN $2::text IS NULL THEN false ELSE EXISTS (
+            CASE WHEN $3::text IS NULL THEN false ELSE EXISTS (
               SELECT 1
               FROM public."creator_marketplace_library_item" AS library
-              WHERE library."userId" = $2::text
-                AND library."publisherId" = resource."publisherId"
-                AND library."packageId" = resource."packageId"
+              WHERE library."userId" = $3::text
+                AND library."publisherId" = $1
+                AND library."packageId" = $2
                 AND library."lastConfirmedAt" IS NOT NULL
             ) END AS "isStudioVerified",
             (
               SELECT review."id"
               FROM public."creator_marketplace_review" AS review
-              WHERE review."resourceId" = resource."id"
-                AND review."userId" = $2::text
+              JOIN public."creator_marketplace_resource" AS review_resource
+                ON review_resource."id" = review."resourceId"
+              WHERE review_resource."publisherId" = $1
+                AND review_resource."packageId" = $2
+                AND review."userId" = $3::text
                 AND review."deletedAt" IS NULL
+              ORDER BY review."updatedAt" DESC, review."id" DESC
               LIMIT 1
             ) AS "reviewId"
-          FROM public."creator_marketplace_resource" AS resource
-          WHERE resource."id" = $1
         `,
-        [resourceId, viewerId],
+        [resource.publisherId, resource.packageId, viewerId],
       ),
     ]);
 
@@ -401,7 +420,12 @@ export class CreatorMarketplaceSocialRepository {
         deleted: row.deletedAt !== null,
         likeCount: row.reactionCount,
         likedByViewer: row.reactedByViewer,
-        canDelete: commentCanDelete(row, resource, viewerId, viewerIsAdmin),
+        canDelete: commentCanDelete(
+          row,
+          resource.publisherId,
+          viewerId,
+          viewerIsAdmin,
+        ),
         createdAt: toIsoString(row.createdAt),
         updatedAt: toIsoString(row.updatedAt),
       });
@@ -416,7 +440,12 @@ export class CreatorMarketplaceSocialRepository {
       deleted: row.deletedAt !== null,
       likeCount: row.reactionCount,
       likedByViewer: row.reactedByViewer,
-      canDelete: commentCanDelete(row, resource, viewerId, viewerIsAdmin),
+      canDelete: commentCanDelete(
+        row,
+        resource.publisherId,
+        viewerId,
+        viewerIsAdmin,
+      ),
       createdAt: toIsoString(row.createdAt),
       updatedAt: toIsoString(row.updatedAt),
       replies: repliesByParent.get(row.id) ?? [],
@@ -506,21 +535,35 @@ export class CreatorMarketplaceSocialRepository {
     input: CreateCreatorMarketplaceCommentInput,
     parentId: string | null,
   ): Promise<string> {
-    await this.requireResource(resourceId);
+    const resource = await this.requireResource(resourceId);
+    let targetResourceId = resourceId;
+
     if (parentId) {
-      const parent = await dbPool.query<{ parentId: string | null; deletedAt: Date | null }>(
+      const parent = await dbPool.query<{
+        resourceId: string;
+        parentId: string | null;
+        deletedAt: Date | null;
+      }>(
         `
-          SELECT comment."parentId", comment."deletedAt"
+          SELECT
+            comment."resourceId",
+            comment."parentId",
+            comment."deletedAt"
           FROM public."creator_marketplace_comment" AS comment
-          WHERE comment."id" = $1 AND comment."resourceId" = $2
+          JOIN public."creator_marketplace_resource" AS parent_resource
+            ON parent_resource."id" = comment."resourceId"
+          WHERE comment."id" = $1
+            AND parent_resource."publisherId" = $2
+            AND parent_resource."packageId" = $3
           LIMIT 1
         `,
-        [parentId, resourceId],
+        [parentId, resource.publisherId, resource.packageId],
       );
       const row = parent.rows[0];
       if (!row || row.parentId !== null || row.deletedAt !== null) {
         throw new CreatorMarketplaceSocialReplyRejectedError();
       }
+      targetResourceId = row.resourceId;
     }
 
     const id = randomUUID();
@@ -530,7 +573,7 @@ export class CreatorMarketplaceSocialRepository {
           "id", "resourceId", "parentId", "userId", "content"
         ) VALUES ($1, $2, $3, $4, $5)
       `,
-      [id, resourceId, parentId, userId, input.content],
+      [id, targetResourceId, parentId, userId, input.content],
     );
     return id;
   }
@@ -541,30 +584,29 @@ export class CreatorMarketplaceSocialRepository {
     actorId: string,
     actorIsAdmin: boolean,
   ): Promise<void> {
+    const resource = await this.requireResource(resourceId);
     const target = await dbPool.query<{
       userId: string;
-      publisherId: string;
       deletedAt: Date | null;
     }>(
       `
-        SELECT
-          comment."userId",
-          resource."publisherId",
-          comment."deletedAt"
+        SELECT comment."userId", comment."deletedAt"
         FROM public."creator_marketplace_comment" AS comment
-        JOIN public."creator_marketplace_resource" AS resource
-          ON resource."id" = comment."resourceId"
-        WHERE comment."id" = $1 AND comment."resourceId" = $2
+        JOIN public."creator_marketplace_resource" AS comment_resource
+          ON comment_resource."id" = comment."resourceId"
+        WHERE comment."id" = $1
+          AND comment_resource."publisherId" = $2
+          AND comment_resource."packageId" = $3
         LIMIT 1
       `,
-      [commentId, resourceId],
+      [commentId, resource.publisherId, resource.packageId],
     );
     const row = target.rows[0];
     if (!row) throw new CreatorMarketplaceSocialTargetNotFoundError("comment");
     if (
       !actorIsAdmin
       && actorId !== row.userId
-      && actorId !== row.publisherId
+      && actorId !== resource.publisherId
     ) {
       throw new CreatorMarketplaceSocialPermissionError();
     }
@@ -574,9 +616,9 @@ export class CreatorMarketplaceSocialRepository {
         UPDATE public."creator_marketplace_comment"
         SET "deletedAt" = statement_timestamp(),
             "updatedAt" = statement_timestamp()
-        WHERE "id" = $1 AND "resourceId" = $2 AND "deletedAt" IS NULL
+        WHERE "id" = $1 AND "deletedAt" IS NULL
       `,
-      [commentId, resourceId],
+      [commentId],
     );
   }
 
@@ -586,16 +628,20 @@ export class CreatorMarketplaceSocialRepository {
     userId: string,
     active: boolean,
   ): Promise<CreatorMarketplaceReactionReceipt> {
+    const resource = await this.requireResource(resourceId);
     const target = await dbPool.query<{ id: string }>(
       `
         SELECT comment."id"
         FROM public."creator_marketplace_comment" AS comment
+        JOIN public."creator_marketplace_resource" AS comment_resource
+          ON comment_resource."id" = comment."resourceId"
         WHERE comment."id" = $1
-          AND comment."resourceId" = $2
+          AND comment_resource."publisherId" = $2
+          AND comment_resource."packageId" = $3
           AND comment."deletedAt" IS NULL
         LIMIT 1
       `,
-      [commentId, resourceId],
+      [commentId, resource.publisherId, resource.packageId],
     );
     if (!target.rows[0]) {
       throw new CreatorMarketplaceSocialTargetNotFoundError("comment");
@@ -657,34 +703,81 @@ export class CreatorMarketplaceSocialRepository {
       throw new CreatorMarketplaceSocialReviewEligibilityError("library_required");
     }
 
-    const id = randomUUID();
-    const result = await dbPool.query<{ id: string }>(
-      `
-        INSERT INTO public."creator_marketplace_review" (
-          "id", "resourceId", "userId", "rating", "title", "content", "roleTag", "tags"
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-        ON CONFLICT ("resourceId", "userId") DO UPDATE
-        SET "rating" = EXCLUDED."rating",
-            "title" = EXCLUDED."title",
-            "content" = EXCLUDED."content",
-            "roleTag" = EXCLUDED."roleTag",
-            "tags" = EXCLUDED."tags",
-            "deletedAt" = NULL,
-            "updatedAt" = statement_timestamp()
-        RETURNING "id"
-      `,
-      [
-        id,
-        resourceId,
-        userId,
-        input.rating,
-        input.title,
-        input.content,
-        input.roleTag,
-        JSON.stringify(input.tags),
-      ],
-    );
-    return result.rows[0]?.id ?? id;
+    const client = await dbPool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1, 0))",
+        [reviewLockKey(resource, userId)],
+      );
+      const existing = await client.query<{ id: string }>(
+        `
+          SELECT review."id"
+          FROM public."creator_marketplace_review" AS review
+          JOIN public."creator_marketplace_resource" AS review_resource
+            ON review_resource."id" = review."resourceId"
+          WHERE review_resource."publisherId" = $1
+            AND review_resource."packageId" = $2
+            AND review."userId" = $3
+          ORDER BY review."updatedAt" DESC, review."id" DESC
+          LIMIT 1
+          FOR UPDATE OF review
+        `,
+        [resource.publisherId, resource.packageId, userId],
+      );
+      const existingId = existing.rows[0]?.id;
+      const id = existingId ?? randomUUID();
+      if (existingId) {
+        await client.query(
+          `
+            UPDATE public."creator_marketplace_review"
+            SET "resourceId" = $2,
+                "rating" = $3,
+                "title" = $4,
+                "content" = $5,
+                "roleTag" = $6,
+                "tags" = $7::jsonb,
+                "deletedAt" = NULL,
+                "updatedAt" = statement_timestamp()
+            WHERE "id" = $1
+          `,
+          [
+            existingId,
+            resourceId,
+            input.rating,
+            input.title,
+            input.content,
+            input.roleTag,
+            JSON.stringify(input.tags),
+          ],
+        );
+      } else {
+        await client.query(
+          `
+            INSERT INTO public."creator_marketplace_review" (
+              "id", "resourceId", "userId", "rating", "title", "content", "roleTag", "tags"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+          `,
+          [
+            id,
+            resourceId,
+            userId,
+            input.rating,
+            input.title,
+            input.content,
+            input.roleTag,
+            JSON.stringify(input.tags),
+          ],
+        );
+      }
+      await client.query("COMMIT");
+      return id;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async deleteReview(
@@ -693,14 +786,19 @@ export class CreatorMarketplaceSocialRepository {
     actorId: string,
     actorIsAdmin: boolean,
   ): Promise<void> {
+    const resource = await this.requireResource(resourceId);
     const target = await dbPool.query<{ userId: string; deletedAt: Date | null }>(
       `
         SELECT review."userId", review."deletedAt"
         FROM public."creator_marketplace_review" AS review
-        WHERE review."id" = $1 AND review."resourceId" = $2
+        JOIN public."creator_marketplace_resource" AS review_resource
+          ON review_resource."id" = review."resourceId"
+        WHERE review."id" = $1
+          AND review_resource."publisherId" = $2
+          AND review_resource."packageId" = $3
         LIMIT 1
       `,
-      [reviewId, resourceId],
+      [reviewId, resource.publisherId, resource.packageId],
     );
     const row = target.rows[0];
     if (!row) throw new CreatorMarketplaceSocialTargetNotFoundError("review");
@@ -713,9 +811,9 @@ export class CreatorMarketplaceSocialRepository {
         UPDATE public."creator_marketplace_review"
         SET "deletedAt" = statement_timestamp(),
             "updatedAt" = statement_timestamp()
-        WHERE "id" = $1 AND "resourceId" = $2 AND "deletedAt" IS NULL
+        WHERE "id" = $1 AND "deletedAt" IS NULL
       `,
-      [reviewId, resourceId],
+      [reviewId],
     );
   }
 
@@ -725,16 +823,20 @@ export class CreatorMarketplaceSocialRepository {
     userId: string,
     active: boolean,
   ): Promise<CreatorMarketplaceReactionReceipt> {
+    const resource = await this.requireResource(resourceId);
     const target = await dbPool.query<{ userId: string }>(
       `
         SELECT review."userId"
         FROM public."creator_marketplace_review" AS review
+        JOIN public."creator_marketplace_resource" AS review_resource
+          ON review_resource."id" = review."resourceId"
         WHERE review."id" = $1
-          AND review."resourceId" = $2
+          AND review_resource."publisherId" = $2
+          AND review_resource."packageId" = $3
           AND review."deletedAt" IS NULL
         LIMIT 1
       `,
-      [reviewId, resourceId],
+      [reviewId, resource.publisherId, resource.packageId],
     );
     const row = target.rows[0];
     if (!row) throw new CreatorMarketplaceSocialTargetNotFoundError("review");
