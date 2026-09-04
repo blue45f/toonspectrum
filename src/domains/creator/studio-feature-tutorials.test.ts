@@ -61,7 +61,7 @@ describe("studio-feature-tutorials catalog", () => {
     for (const id of newIds) {
       expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has(id), `missing tutorial: ${id}`).toBe(true);
     }
-    expect(STUDIO_FEATURE_TUTORIALS.length).toBe(32);
+    expect(STUDIO_FEATURE_TUTORIALS.length).toBe(33);
   });
 
   it("자주 막히는 기본 작업 8종을 행동 중심 3단계로 안내하고 가짜 실행 버튼을 만들지 않는다", () => {
@@ -117,6 +117,7 @@ describe("studio-feature-tutorials catalog", () => {
       "template",
       "layers",
       "character",
+      "character-shaper",
       "bg3d",
       "ai-assist",
       "dialogue",

@@ -391,6 +391,28 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       target: { type: "inspector", primary: "properties" },
     },
     {
+      // 캐릭터 셰이퍼는 명령 카탈로그에도 있지만, 기본 '전체' 탭이 오프라인으로 뒤지는 것은 이
+      // 코퍼스다. "셰이퍼"·"캐릭터 만들기"·"프리셋" 같은 손버릇이 0건이 되지 않게 여기 둔다.
+      id: "panel.character-shaper",
+      kind: "panel",
+      label: "캐릭터 셰이퍼",
+      labelEn: "Character Shaper",
+      location: "3D › 캐릭터 셰이퍼",
+      description: "프리셋 카드로 얼굴·헤어·체형·의상을 고르고 포즈를 잡아 투명 PNG·레이어 PSD로 내보냅니다.",
+      aliases: [
+        ours("셰이퍼"),
+        ours("캐릭터 만들기"),
+        ours("프리셋"),
+        ours("3D 캐릭터"),
+        ours("포즈"),
+        ours("의상"),
+        ours("VRM"),
+      ],
+      keywords: ["셰이퍼", "shaper", "캐릭터 만들기", "프리셋", "preset", "3D 캐릭터", "포즈", "pose", "의상", "vrm"],
+      helpNodeId: "help/panel/character-shaper",
+      target: { type: "panel", panelId: "character-shaper" },
+    },
+    {
       id: "panel.layer-list",
       kind: "panel",
       label: "레이어 목록",

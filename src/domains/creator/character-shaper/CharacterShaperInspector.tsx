@@ -40,6 +40,7 @@ import {
   characterSlotSelection,
   describeAvailabilityBadge,
 } from "./character-shaper-ui-model";
+import { CharacterShaperBlenderPackage } from "./CharacterShaperBlenderPackage";
 import { CharacterChipGroup, CharacterColorControl, CharacterRangeControl } from "./CharacterShaperControls";
 
 import type { CharacterSlotEntry, CharacterSlotKind } from "./character-shaper-contract";
@@ -474,6 +475,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
               />
             );
           })}
+        </Section>
+        <Section title="정밀 제작" hint="Blender 파이프라인으로 만든 캐릭터 패키지를 이 셰이퍼로 가져옵니다.">
+          <CharacterShaperBlenderPackage h={h} disabled={locked} />
         </Section>
       </>
     );

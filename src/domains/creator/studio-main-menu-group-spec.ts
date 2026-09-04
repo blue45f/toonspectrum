@@ -525,7 +525,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     },
     rows: [
       gap("Scene/Outliner", "레이어 목록 탭으로 있으나 3D 배경 대화상자 안의 탭이라 메뉴가 직접 열 대상이 아니다."),
-      has("VRM/Pose/Expression", "3d/mannequin3d", "3d/char"),
+      has("VRM/Pose/Expression", "3d/mannequin3d", "3d/char", "3d/character"),
       gap("Camera/Light", "카메라·조명 스튜디오는 3D 배경 대화상자 ▸ 뷰 탭 ▸ 카메라 섹션 안에 있다."),
       part("Room Builder", "3D 배경 패널 안에서만 구성한다.", "3d/bg3d"),
       has("Sculpt", "3d/sculpt"),

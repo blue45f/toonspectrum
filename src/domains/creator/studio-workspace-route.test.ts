@@ -24,6 +24,8 @@ describe("studio workspace routes", () => {
     ["/studio/work/work-1/brushes", "", "brushes", "work-1", null, "/studio/work/work-1/brushes"],
     ["/studio/work/work-1/bg3d", "", "bg3d", "work-1", null, "/studio/work/work-1/bg3d"],
     ["/studio/work/work-1/poser", "", "poser", "work-1", null, "/studio/work/work-1/poser"],
+    ["/studio/character", "", "character", null, null, "/studio/character"],
+    ["/studio/work/work-1/character", "", "character", "work-1", null, "/studio/work/work-1/character"],
     ["/studio/remix/source-1/canvas", "", "canvas", null, null, "/studio/remix/source-1/canvas"],
     ["/studio?remix=source-1", "?remix=source-1", "canvas", null, null, "/studio/remix/source-1/canvas"],
     ["/studio/3d", "", "dcc", null, "model", "/studio/3d/dcc/model"],

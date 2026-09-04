@@ -265,6 +265,7 @@ export const STUDIO_CHROME_RAIL_TOOL_GROUPS = [
       "frame-anim",
       "mannequin3d",
       "vrm3d",
+      "character-shaper",
       "bg3d",
       "hybrid-dcc",
       "reference",

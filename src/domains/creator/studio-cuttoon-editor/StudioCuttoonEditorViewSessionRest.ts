@@ -225,6 +225,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   setPointCommentComposer: any;
   setPoserInitialDataUrl: any;
   setPoserInitialElementId: any;
+  setCharacterShaperOpen: (value: boolean | ((current: boolean) => boolean)) => void;
   setPoserVrmOpen: any;
   setPostCorrection: any;
   setPreserveCorners: any;

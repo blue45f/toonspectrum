@@ -288,6 +288,8 @@ export interface StudioLazyPanelStackProps {
   /** Elements 3D rail one-shot prop seed for VRM (cleared after consume). */
   poserSeedPropId: string | null;
   poserVrmOpen: boolean;
+  /** 캐릭터 셰이퍼(`/studio/character`) 표면 열림 여부. */
+  characterShaperOpen: boolean;
   productionInsightsOpen: boolean;
   productionInsightsResult: StudioProductionInsights | null;
   publicationAnalytics: StudioPublicationAnalyticsDocument;
@@ -355,6 +357,7 @@ export interface StudioLazyPanelStackProps {
   setPoserInitialDataUrl: Dispatch<SetStateAction<string | undefined>>;
   setPoserInitialElementId: Dispatch<SetStateAction<string | undefined>>;
   setPoserVrmOpen: Dispatch<SetStateAction<boolean>>;
+  setCharacterShaperOpen: Dispatch<SetStateAction<boolean>>;
   setProductionInsightsOpen: Dispatch<SetStateAction<boolean>>;
   setPublicationOperationsOpen: Dispatch<SetStateAction<boolean>>;
   setPublishPackageOpen: Dispatch<SetStateAction<boolean>>;
@@ -495,6 +498,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   poserInitialElementId,
   poserSeedPropId,
   poserVrmOpen,
+  characterShaperOpen,
   productionInsightsOpen,
   productionInsightsResult,
   publicationAnalytics,
@@ -562,6 +566,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setPoserInitialDataUrl,
   setPoserInitialElementId,
   setPoserVrmOpen,
+  setCharacterShaperOpen,
   setProductionInsightsOpen,
   setPublicationOperationsOpen,
   setPublishPackageOpen,
@@ -680,6 +685,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         poserInitialElementId={poserInitialElementId}
         poserSeedPropId={poserSeedPropId}
         poserVrmOpen={poserVrmOpen}
+        characterShaperOpen={characterShaperOpen}
         quickActionsAnchor={quickActionsAnchor}
         quickActionsDisabledActions={quickActionsDisabledActions}
         quickActionsOpen={quickActionsOpen}
@@ -693,6 +699,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         setPoserInitialDataUrl={setPoserInitialDataUrl}
         setPoserInitialElementId={setPoserInitialElementId}
         setPoserVrmOpen={setPoserVrmOpen}
+        setCharacterShaperOpen={setCharacterShaperOpen}
         setQuickActionsOpen={setQuickActionsOpen}
         setQuickActionsPreferences={setQuickActionsPreferences}
         setStoryboardGridOpen={setStoryboardGridOpen}

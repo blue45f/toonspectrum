@@ -132,6 +132,7 @@ function createUiActions(): StudioMainMenuUiActions {
     requestImageInsert: vi.fn(),
     openMannequinPoser: vi.fn(),
     openVrmPoser: vi.fn(),
+    openCharacterShaper: vi.fn(),
     openBackground3d: vi.fn(),
     openReferencePanel: vi.fn(),
     stepZoom: vi.fn(),

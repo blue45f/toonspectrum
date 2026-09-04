@@ -226,6 +226,13 @@ export function CommandPalette({
     const tool = PALETTE_STUDIO_TOOLS.find((t) => t.id === toolId);
     if (!tool) return;
 
+    // 단축키가 없는 도구(작업실 표면)는 자기 라우트로 간다. 키 이벤트를 흉내 내면
+    // 아무 일도 일어나지 않으면서 "선택됨" 토스트만 뜬다.
+    if (tool.actionPath) {
+      go(tool.actionPath);
+      return;
+    }
+
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     if (currentPath.startsWith("/studio")) {
       // Dispatch key event to Studio canvas
@@ -694,9 +701,11 @@ export function CommandPalette({
                         <span className="font-medium text-fg">{tool.name}</span>
                         <p className="truncate text-xs text-fg-3">{tool.tip}</p>
                       </div>
-                      <kbd className="rounded border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-accent">
-                        {tool.shortcutKey}
-                      </kbd>
+                      {tool.shortcutKey ? (
+                        <kbd className="rounded border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-accent">
+                          {tool.shortcutKey}
+                        </kbd>
+                      ) : null}
                     </Command.Item>
                   );
                 })}
