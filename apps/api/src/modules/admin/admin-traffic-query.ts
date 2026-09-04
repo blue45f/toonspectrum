@@ -252,7 +252,7 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
         COALESCE((SELECT average_engaged_seconds FROM engagement), 0),
       'pageViewsPerSession',
         COALESCE((SELECT page_views_per_session FROM engagement), 0)
-    END,
+    ),
     'series', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'bucket', bucket,
