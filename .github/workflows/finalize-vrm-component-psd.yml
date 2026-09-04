@@ -1,0 +1,68 @@
+name: Finalize component-aware VRM PSD
+
+on:
+  push:
+    branches:
+      - feat/vrm-component-psd-linked-render-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-vrm-component-psd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[vrm-component-psd-finalized]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-component-psd-linked-render-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply component PSD implementation and contracts
+        run: python3 scripts/apply-vrm-component-psd-linked-render.py
+
+      - name: Inspect generated diff
+        run: git diff --check && git status --short
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint component PSD surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/vrm/studio-vrm-component-psd.ts
+          src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+
+      - name: Run focused component PSD tests
+        run: pnpm exec vitest run src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+
+      - name: Type-check web workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio
+        run: pnpm run build
+
+      - name: Commit verified implementation
+        run: |
+          rm -f scripts/apply-vrm-component-psd-linked-render.py
+          rm -f .github/workflows/finalize-vrm-component-psd.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(studio): add component-aware VRM PSD and linked rerender [vrm-component-psd-finalized]"
+          git push --no-verify origin HEAD:feat/vrm-component-psd-linked-render-20260904
