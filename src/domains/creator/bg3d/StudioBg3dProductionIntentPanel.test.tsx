@@ -146,6 +146,25 @@ describe("StudioBg3dProductionIntentPanel", () => {
     expect(runtime.onSetTransparentBackground).toHaveBeenCalledWith(true);
   });
 
+  it("restores the exact shot, pass, package and look state from before a preset", () => {
+    const batch = createBatch();
+    const runtime = createRuntime(batch);
+    renderPanel(runtime);
+
+    fireEvent.click(screen.getByRole("button", { name: /웹툰 원고/ }));
+    fireEvent.click(screen.getByRole("button", { name: "이전 설정 복원" }));
+
+    expect(batch.clearShotSelection).toHaveBeenCalledTimes(1);
+    expect(batch.setShotSelected).toHaveBeenCalledWith("shot-a", true);
+    expect(batch.setSelectedPasses).toHaveBeenLastCalledWith(["beauty", "lt-composite"]);
+    expect(batch.setIncludeLayeredPsd).toHaveBeenLastCalledWith(false);
+    expect(batch.setIncludeContactSheet).toHaveBeenLastCalledWith(true);
+    expect(runtime.onSetLineArtPreview).toHaveBeenLastCalledWith(false);
+    expect(runtime.onSetTransparentBackground).toHaveBeenLastCalledWith(false);
+    expect(screen.getByText("이전 제작 설정을 복원했습니다.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "이전 설정 복원" })).toBeNull();
+  });
+
   it("marks only an exact current intent as selected", () => {
     const batch = createBatch({
       selectedPasses: ["beauty", "main-line", "depth"],
