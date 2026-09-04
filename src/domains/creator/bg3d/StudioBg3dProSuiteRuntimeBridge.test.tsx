@@ -33,6 +33,7 @@ function createRuntime(
         camera: { position: [0, 1.6, 2], target: [0, 1.5, 0], fovDegrees: 24 },
       },
     ],
+    onApplyCameraView: vi.fn(),
     onCaptureCurrentShot: vi.fn(),
     onApplyProductionShot: vi.fn(),
     onMoveProductionShot: vi.fn(),
@@ -69,6 +70,27 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "현재 컷을 AI 구도·포즈 참조로 보내기" }));
     expect(runtime.onUseCurrentFrameAsAiReference).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits a production angle preset through the canonical camera command", () => {
+    const runtime = createRuntime();
+    render(
+      <StudioBg3dProSuiteRuntimeContext.Provider value={runtime}>
+        <StudioBg3dCinematicDirectorPanel />
+      </StudioBg3dProSuiteRuntimeContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /로우 앵글 앙각/ }));
+
+    expect(runtime.onApplyCameraView).toHaveBeenCalledTimes(1);
+    const camera = vi.mocked(runtime.onApplyCameraView).mock.calls[0]?.[0];
+    expect(camera?.position).toEqual([0, 1.3, 2.5]);
+    expect(camera?.target).toEqual([0, 1, 0]);
+    expect(camera?.fovDegrees).toBe(28);
+    expect(camera?.projection).toBe("perspective");
+    expect(camera?.zoom).toBe(1);
+    expect(camera?.lensShift).toEqual([0, 0]);
+    expect(camera?.up).toEqual([0, 1, 0]);
   });
 
   it("inherits capture locks in the nested multipass exporter", () => {
