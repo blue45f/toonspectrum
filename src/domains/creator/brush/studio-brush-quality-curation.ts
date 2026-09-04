@@ -303,13 +303,16 @@ function representativeComparator(
   left: StudioBrushCurationCandidate,
   right: StudioBrushCurationCandidate,
 ): number {
-  if (left.protectedFromCulling !== right.protectedFromCulling) {
-    return left.protectedFromCulling ? -1 : 1;
-  }
+  // An exposed canonical is never more important than a mark that actually passed the
+  // measured quality contract. Protection only resolves a genuine quality tie.
+  if (left.qualityPassed !== right.qualityPassed) return left.qualityPassed ? -1 : 1;
   const leftScore = candidateQualityScore(left);
   const rightScore = candidateQualityScore(right);
   const qualityDelta = leftScore - rightScore;
   if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+  if (left.protectedFromCulling !== right.protectedFromCulling) {
+    return left.protectedFromCulling ? -1 : 1;
+  }
   // GPU is only a tie-breaker after quality is effectively equal.
   if (left.gpuApproved !== right.gpuApproved) return left.gpuApproved ? -1 : 1;
   if (left.frameP95Milliseconds !== right.frameP95Milliseconds) {

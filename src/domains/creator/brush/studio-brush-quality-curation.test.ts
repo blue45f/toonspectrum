@@ -90,6 +90,22 @@ describe("quality-first brush curation", () => {
     expect(tied[0]?.representativeId).toBe("gpu");
   });
 
+  it("never lets a protected but failing brush beat a passing representative", () => {
+  const clusters = curateStudioBrushCandidates([
+    candidate("protected-failing", {
+      protectedFromCulling: true,
+      qualityPassed: false,
+      listedOrder: 0,
+    }),
+    candidate("passing", {
+      protectedFromCulling: false,
+      qualityPassed: true,
+      listedOrder: 1,
+    }),
+  ]);
+  expect(clusters[0]?.representativeId).toBe("passing");
+});
+
   it("never suggests removing more than one protected canonical brush automatically", () => {
     const clusters = curateStudioBrushCandidates([
       candidate("canonical-a", { protectedFromCulling: true }),
