@@ -1,0 +1,307 @@
+name: Brush measured curation patch candidate
+
+on:
+  workflow_run:
+    workflows:
+      - Studio all-brush screen-fill quality election
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: brush-measured-curation-patch-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: >-
+      github.event.workflow_run.head_branch == 'feat/all-brush-long-stroke-quality-election-20260904'
+      && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+      BENCHMARK_HEAD: ${{ github.event.workflow_run.head_sha }}
+      BENCHMARK_RUN_ID: ${{ github.event.workflow_run.id }}
+      BENCHMARK_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+    steps:
+      - name: Download aggregate evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: all-brush-quality-election-and-curation-*
+          path: aggregate
+          merge-multiple: true
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require benchmarked HEAD to remain current
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BENCHMARK_HEAD"
+
+      - name: Generate evidence-bound UI-quarantine patch
+        id: generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          quality_paths = list(Path('aggregate').rglob('all-brush-gpu-quality-report.json'))
+          curation_paths = list(Path('aggregate').rglob('brush-curation-report.json'))
+          if len(quality_paths) != 1 or len(curation_paths) != 1:
+              raise SystemExit(
+                  f'expected one quality and one curation report, got {len(quality_paths)}/{len(curation_paths)}'
+              )
+          quality = json.loads(quality_paths[0].read_text(encoding='utf-8'))
+          curation = json.loads(curation_paths[0].read_text(encoding='utf-8'))
+
+          quarantine = curation.get('suggestedQuarantineIds') or curation.get('quarantineIds') or []
+          clusters = curation.get('clusters') or []
+          direct_map = curation.get('canonicalByQuarantinedId') or {}
+          if not isinstance(quarantine, list) or not all(isinstance(item, str) for item in quarantine):
+              raise SystemExit('invalid quarantine ID list')
+          if len(set(quarantine)) != len(quarantine):
+              raise SystemExit('duplicate quarantine IDs')
+          if not isinstance(clusters, list) or not isinstance(direct_map, dict):
+              raise SystemExit('invalid curation cluster/map shape')
+
+          canonical_map = {
+              str(key): str(value)
+              for key, value in direct_map.items()
+              if isinstance(key, str) and isinstance(value, str)
+          }
+
+          def id_of(value):
+              if isinstance(value, str):
+                  return value
+              if isinstance(value, dict):
+                  for key in ('id', 'brushId', 'candidateId'):
+                      if isinstance(value.get(key), str):
+                          return value[key]
+              return None
+
+          for cluster in clusters:
+              if not isinstance(cluster, dict):
+                  continue
+              canonical = None
+              for key in ('canonicalId', 'winnerId', 'selectedId', 'canonical'):
+                  canonical = id_of(cluster.get(key))
+                  if canonical:
+                      break
+              members = None
+              for key in ('memberIds', 'members', 'brushIds', 'candidateIds'):
+                  if isinstance(cluster.get(key), list):
+                      members = [id_of(value) for value in cluster[key]]
+                      break
+              members = [value for value in (members or []) if value]
+              if canonical:
+                  for member in members:
+                      if member != canonical and member in quarantine:
+                          canonical_map.setdefault(member, canonical)
+
+          missing = [brush_id for brush_id in quarantine if brush_id not in canonical_map]
+          if missing:
+              raise SystemExit(f'missing canonical mapping for: {missing}')
+          invalid = [
+              brush_id for brush_id, canonical in canonical_map.items()
+              if brush_id == canonical or brush_id not in quarantine or canonical in quarantine
+          ]
+          if invalid:
+              raise SystemExit(f'invalid quarantine mapping: {invalid}')
+
+          generated = Path('src/domains/creator/brush/studio-brush-quality-curation.generated.ts')
+          generated.write_text(
+              '/**\n'
+              ' * Generated from the complete screen-filling all-brush quality benchmark.\n'
+              ' * Runtime IDs are retained so saved documents and direct lookup remain replayable.\n'
+              ' * Only visible catalogue exposure is quarantined.\n'
+              ' */\n'
+              'export const STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE = '
+              + json.dumps(
+                  {
+                      'schemaVersion': 1,
+                      'benchmarkDigest': quality.get('benchmarkDigest'),
+                      'benchmarkHeadSha': os.environ['BENCHMARK_HEAD'],
+                      'benchmarkRunId': int(os.environ['BENCHMARK_RUN_ID']),
+                      'generatedAt': os.environ['BENCHMARK_UPDATED_AT'],
+                      'quarantineIds': quarantine,
+                      'canonicalByQuarantinedId': canonical_map,
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+              )
+              + ' as const;\n\n'
+              'export const STUDIO_MEASURED_BRUSH_QUARANTINE_IDS =\n'
+              '  STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.quarantineIds;\n',
+              encoding='utf-8',
+          )
+
+          quarantine_path = Path('src/domains/creator/brush/studio-brush-quarantine.ts')
+          source = quarantine_path.read_text(encoding='utf-8')
+          import_line = (
+              'import { STUDIO_MEASURED_BRUSH_QUARANTINE_IDS } '
+              'from "./studio-brush-quality-curation.generated";'
+          )
+          if 'STUDIO_MEASURED_BRUSH_QUARANTINE_IDS' not in source:
+              imports = list(re.finditer(r'^import[\s\S]*?;\s*$', source, flags=re.MULTILINE))
+              if not imports:
+                  raise SystemExit('no import block in studio-brush-quarantine.ts')
+              pos = imports[-1].end()
+              source = source[:pos] + '\n' + import_line + source[pos:]
+
+          if '...(STUDIO_MEASURED_BRUSH_QUARANTINE_IDS' not in source:
+              patterns = (
+                  re.compile(
+                      r'((?:export\s+)?const\s+([A-Za-z0-9_]*QUARANTIN[A-Za-z0-9_]*)'
+                      r'\s*(?::[^=]+)?=\s*new Set(?:<[^>]+>)?\(\s*\[)',
+                      re.IGNORECASE,
+                  ),
+                  re.compile(
+                      r'((?:export\s+)?const\s+([A-Za-z0-9_]*QUARANTIN[A-Za-z0-9_]*)'
+                      r'\s*(?::[^=]+)?=\s*\[)',
+                      re.IGNORECASE,
+                  ),
+              )
+              match = next(
+                  (candidate for pattern in patterns for candidate in pattern.finditer(source)),
+                  None,
+              )
+              if match is None:
+                  raise SystemExit('could not locate the catalogue quarantine collection')
+              pos = match.end(1)
+              source = (
+                  source[:pos]
+                  + '\n  ...(STUDIO_MEASURED_BRUSH_QUARANTINE_IDS as readonly StudioBrushId[]),'
+                  + source[pos:]
+              )
+          quarantine_path.write_text(source, encoding='utf-8')
+
+          test_path = Path(
+              'src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts'
+          )
+          test_path.write_text(
+              'import { describe, expect, it } from "vitest";\n\n'
+              'import { STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE } '
+              'from "./studio-brush-quality-curation.generated";\n\n'
+              'describe("measured brush curation evidence", () => {\n'
+              '  it("keeps a unique, non-self canonical mapping for every quarantined ID", () => {\n'
+              '    const ids = [...STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.quarantineIds];\n'
+              '    const mapping = STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.canonicalByQuarantinedId;\n'
+              '    expect(new Set(ids).size).toBe(ids.length);\n'
+              '    expect(Object.keys(mapping).sort()).toEqual([...ids].sort());\n'
+              '    for (const id of ids) {\n'
+              '      expect(mapping[id as keyof typeof mapping]).not.toBe(id);\n'
+              '      expect(ids).not.toContain(mapping[id as keyof typeof mapping]);\n'
+              '    }\n'
+              '  });\n'
+              '});\n',
+              encoding='utf-8',
+          )
+
+          Path('measured-brush-curation-summary.json').write_text(
+              json.dumps(
+                  {
+                      'benchmarkHeadSha': os.environ['BENCHMARK_HEAD'],
+                      'benchmarkRunId': int(os.environ['BENCHMARK_RUN_ID']),
+                      'benchmarkDigest': quality.get('benchmarkDigest'),
+                      'quarantineIds': quarantine,
+                      'canonicalByQuarantinedId': canonical_map,
+                      'clusterCount': len(clusters),
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+              ) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          git diff --check
+          echo "quarantine_count=$(python3 -c 'import json; print(len(json.load(open("measured-brush-curation-summary.json"))["quarantineIds"]))')" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate patch without publishing it
+        run: |
+          set -euo pipefail
+          tests=(
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          )
+          if [[ -f src/domains/creator/brush/studio-brush-quarantine.test.ts ]]; then
+            tests+=(src/domains/creator/brush/studio-brush-quarantine.test.ts)
+          fi
+          pnpm exec vitest run "${tests[@]}"
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Package reviewable curation patch
+        run: |
+          set -euo pipefail
+          git diff --binary > measured-brush-curation.patch
+          git diff --stat > measured-brush-curation.stat.txt
+
+      - name: Upload measured patch candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: measured-brush-curation-patch-${{ github.event.workflow_run.id }}
+          path: |
+            measured-brush-curation.patch
+            measured-brush-curation.stat.txt
+            measured-brush-curation-summary.json
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Post candidate receipt
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: [
+                '✅ **측정 기반 브러시 노출 축소 패치 후보 생성 완료**',
+                '',
+                `- benchmark HEAD: \`${context.payload.workflow_run.head_sha}\``,
+                `- 격리 후보: **${{ steps.generate.outputs.quarantine_count }}개**`,
+                '- 기존 runtime brush ID와 저장 문서 재생은 유지',
+                '- UI 노출 quarantine만 추가',
+                '- complete-link committed/live/pressure·tilt·speed 동등성 결과만 사용',
+                `- benchmark run: ${context.payload.workflow_run.html_url}`,
+                `- patch artifact: \`measured-brush-curation-patch-${context.payload.workflow_run.id}\``,
+                '',
+                '이 단계는 검증된 패치만 생성하며 제품 브랜치에는 아직 적용하지 않습니다.',
+              ].join('\n'),
+            });
