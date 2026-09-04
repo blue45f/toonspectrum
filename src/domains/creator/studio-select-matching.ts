@@ -22,6 +22,17 @@ export interface StudioSelectMatchingOption {
   readonly count: number;
 }
 
+const ELEMENT_TYPE_LABELS: Record<El["type"], string> = {
+  image: "이미지",
+  text: "텍스트",
+  bubble: "말풍선",
+  sticker: "스티커",
+  draw: "선화",
+  frame: "프레임",
+  focusLines: "집중선",
+  speedLines: "스피드라인",
+};
+
 function normalizeColor(value: string | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
   return normalized ? normalized : null;
@@ -47,6 +58,37 @@ function stableValue(value: unknown, depth = 0): string {
   return typeof value;
 }
 
+function compositeKey(element: El): readonly unknown[] {
+  return [element.opacity ?? 1, element.blendMode ?? "source-over"];
+}
+
+function drawFillKey(element: Extract<El, { type: "draw" }>): readonly unknown[] {
+  // The renderer's precedence is pattern > gradient > solid. Ignore stale lower-priority values so
+  // two visually identical strokes still match after switching fill modes back and forth.
+  if (element.pattern) return ["pattern", element.pattern];
+  if (element.gradient) return ["gradient", element.gradient];
+  return ["solid", normalizeColor(element.fill)];
+}
+
+function textFillKey(element: Extract<El, { type: "text" }>): readonly unknown[] {
+  if (element.gradient) return ["gradient", element.gradient];
+  if (element.fillType === "gradient") {
+    return [
+      "legacy-gradient",
+      normalizeColor(element.gradientColorStart),
+      normalizeColor(element.gradientColorEnd),
+      element.gradientDirection ?? null,
+    ];
+  }
+  return ["solid", normalizeColor(element.fill)];
+}
+
+function bubbleFillKey(element: Extract<El, { type: "bubble" }>): readonly unknown[] {
+  return element.gradient
+    ? ["gradient", element.gradient]
+    : ["solid", normalizeColor(element.fill)];
+}
+
 function paintKey(element: El): string | null {
   switch (element.type) {
     case "draw":
@@ -58,47 +100,52 @@ function paintKey(element: El): string | null {
         element.brush ?? null,
         normalizeColor(element.stroke),
         element.strokeWidth,
-        element.opacity ?? 1,
-        normalizeColor(element.fill),
-        element.gradient ?? null,
-        element.pattern ?? null,
+        compositeKey(element),
+        drawFillKey(element),
         element.strokeStyle ?? null,
         element.shapeParams ?? null,
         element.sketch ?? null,
+        element.paintModel ?? null,
+        element.brushDynamics ?? null,
+        element.brushEnginePrograms ?? null,
+        element.brushTip ?? null,
+        element.stamp ?? null,
+        element.pressureModel ?? null,
+        element.paperModel ?? null,
+        element.outlineStroke ?? null,
+        element.materialPressureModel ?? null,
+        element.materialMinimumDiameterRatio ?? null,
+        element.inkWash ?? null,
       ]);
     case "text":
       return stableValue([
         element.type,
-        normalizeColor(element.fill),
+        textFillKey(element),
         normalizeColor(element.stroke),
         element.strokeWidth ?? 0,
-        element.fillType ?? "solid",
-        normalizeColor(element.gradientColorStart),
-        normalizeColor(element.gradientColorEnd),
-        element.gradientDirection ?? null,
-        element.gradient ?? null,
         normalizeColor(element.shadowColor),
         element.shadowBlur ?? 0,
         element.shadowOffsetX ?? 0,
         element.shadowOffsetY ?? 0,
         element.shadowOpacity ?? 0,
+        compositeKey(element),
       ]);
     case "bubble":
       return stableValue([
         element.type,
         element.variant,
-        normalizeColor(element.fill),
+        bubbleFillKey(element),
         normalizeColor(element.textFill),
         normalizeColor(element.stroke),
         element.strokeWidth ?? 0,
         element.strokeStyle ?? null,
-        element.gradient ?? null,
         element.outlineStyle ?? null,
         normalizeColor(element.shadowColor),
         element.shadowBlur ?? 0,
         element.shadowOffsetX ?? 0,
         element.shadowOffsetY ?? 0,
         element.shadowOpacity ?? 0,
+        compositeKey(element),
       ]);
     case "frame":
       return stableValue([
@@ -107,27 +154,28 @@ function paintKey(element: El): string | null {
         normalizeColor(element.stroke),
         element.strokeWidth ?? 0,
         element.dashStyle ?? "solid",
+        compositeKey(element),
       ]);
     case "focusLines":
       return stableValue([
         element.type,
         normalizeColor(element.stroke),
         element.strokeWidth,
-        element.opacity ?? 1,
         element.lineCount,
         element.innerRadius,
         element.outerRadius,
         element.noise,
+        compositeKey(element),
       ]);
     case "speedLines":
       return stableValue([
         element.type,
         normalizeColor(element.stroke),
         element.strokeWidth,
-        element.opacity ?? 1,
         element.lineCount,
         element.direction,
         element.noise ?? 0,
+        compositeKey(element),
       ]);
     case "image":
     case "sticker":
@@ -263,7 +311,7 @@ function criterionLabel(
     case "type":
       return {
         label: "같은 유형",
-        description: `현재 페이지의 다른 ${source.type} 요소를 함께 선택합니다.`,
+        description: `현재 페이지의 다른 ${ELEMENT_TYPE_LABELS[source.type]} 요소를 함께 선택합니다.`,
       };
     case "paint":
       return {
