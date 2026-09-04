@@ -59,16 +59,24 @@ import {
 } from "./lib/studio-verify-preview-harness.mjs";
 
 const BRUSH_NAME_ENV = process.env.TOONSPECTRUM_LONG_STROKE_BRUSH?.trim() || null;
+const BRUSH_ID_ENV = process.env.TOONSPECTRUM_LONG_STROKE_BRUSH_ID?.trim() || null;
+const BRUSH_OPERATION_ENV = process.env.TOONSPECTRUM_LONG_STROKE_OPERATION === "erase"
+  ? "erase" as const
+  : "paint" as const;
+const BRUSH_WIDTH_ENV = Number(process.env.TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH ?? "");
 const DEVICE_SCALE_FACTOR = Number(process.env.TOONSPECTRUM_LONG_STROKE_DPR ?? "1") || 1;
 const WEBGPU = process.env.TOONSPECTRUM_LONG_STROKE_WEBGPU === "1";
+const HEADED = process.env.TOONSPECTRUM_LONG_STROKE_HEADED === "1";
+const SCREEN_FILL_PATH = process.env.TOONSPECTRUM_LONG_STROKE_PATH === "screen-fill";
 const SPAWN_PREVIEW = process.env.TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW === "1";
 const OUT_DIR = join(process.env.TOONSPECTRUM_VERIFY_DIR ?? tmpdir(), "studio-long-stroke");
 const REPORT_PATH = join(OUT_DIR, "report.json");
 const VIEWPORT = { width: 1600, height: 1000 } as const;
 
 // ── 임계값(리포트 thresholds 에 그대로 실린다) ─────────────────────────────────────────────
-const PERF_SAMPLES = 3_200; // 성능 패스 샘플 수(probe-studio-brush-sweep LONG_SAMPLES 와 동일)
-const PARITY_SAMPLES = 600; // 라이브/커밋 패리티 패스 샘플 수
+const PERF_SAMPLES = Number(process.env.TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES ?? "3200") || 3_200;
+const PARITY_SAMPLES = Number(process.env.TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES ?? "1200") || 1_200;
+const GESTURE_BATCHES = SCREEN_FILL_PATH ? 48 : 20;
 const COMMIT_SETTLE_MS = 300; // pointerup → 커밋 캡처 정착 대기
 const PENDING_RECHECK_MS = 900; // 미완 획 검사용 2차 캡처 시점(pointerup 기준)
 const POINT_COUNT_TOLERANCE = 0.15; // 커밋 점 수 하한: 기대치의 -15%
@@ -104,7 +112,7 @@ interface Point { readonly x: number; readonly y: number }
 interface Region { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
 interface Assertion { readonly id: string; readonly ok: boolean; readonly detail: string }
 interface PerfSampling {
-  readonly frameCount: number; readonly p50: number; readonly p95: number; readonly max: number;
+  readonly frameCount: number; readonly p50: number; readonly p95: number; readonly p99: number; readonly max: number;
   readonly longTaskCount: number; readonly longTaskTotalMs: number;
 }
 interface DiffResult {
@@ -116,7 +124,19 @@ interface CommittedStroke {
   readonly drawCount: number; readonly points: number[];
   readonly sampleSpacing: number | null; readonly pendingStrokeDurability: unknown;
 }
-interface BrushChoice { readonly name: string | null; readonly width: number; readonly source: string }
+interface BrushChoice {
+  readonly id: string | null;
+  readonly name: string | null;
+  readonly width: number;
+  readonly operation: "paint" | "erase";
+  readonly source: string;
+}
+interface SurfaceEvidence {
+  readonly gpuEverActive: boolean;
+  readonly gpuEverAuthorized: boolean;
+  readonly gpuSurfaceKinds: readonly string[];
+  readonly refusedStrokeNotices: number;
+}
 type GateGlobals = typeof globalThis & {
   __longStrokeGate?: { moves: number; coalesced: number; rejections: number };
   __longStrokeFrames?: number[];
@@ -188,28 +208,47 @@ async function paperBox(page: Page): Promise<{ readonly full: Box; readonly visi
   return { full, visible };
 }
 
-/** 'b' 로 그리기 도구를 켠다(드로잉 옵션 바는 도구 활성 뒤 마운트). 안 켜지면 툴레일 펜 클릭 후 재시도. */
-async function activatePen(page: Page): Promise<void> {
-  const penActive = (): Promise<boolean> => page.evaluate(() => document
-    .querySelector('[data-studio-draw-options="true"]')?.getAttribute("data-studio-active-draw-mode") === "pen");
+/** 브러시 작업 모드를 켠다. */
+async function activateBrushOperation(
+  page: Page,
+  operation: "paint" | "erase",
+): Promise<void> {
+  const expectedMode = operation === "erase" ? "eraser" : "pen";
+  const active = (): Promise<boolean> => page.evaluate((mode) => document
+    .querySelector('[data-studio-draw-options="true"]')
+    ?.getAttribute("data-studio-active-draw-mode") === mode, expectedMode);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (attempt === 0) await page.keyboard.press("b");
-    else await page.locator('[aria-label^="펜"]').first().click({ timeout: 3_000 }).catch(() => undefined);
+    if (attempt === 0) await page.keyboard.press(operation === "erase" ? "e" : "b");
+    else {
+      const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
+      await toolbar.getByRole("button", {
+        name: operation === "erase" ? "지우개" : "펜",
+        exact: true,
+      }).click({ timeout: 3_000 }).catch(() => undefined);
+    }
     const deadline = Date.now() + 5_000;
     while (Date.now() < deadline) {
-      if (await penActive()) return;
+      if (await active()) return;
       await page.waitForTimeout(100);
     }
   }
-  throw new Error(`pen tool never activated; dom=${await domSummary(page)}`);
+  throw new Error(`${operation} tool never activated; dom=${await domSummary(page)}`);
 }
 
-/** probe-studio-brush-sweep selectBrush 포트(데스크톱 카탈로그 searchbox → `${name} 선택`). */
-async function selectBrush(page: Page, name: string): Promise<void> {
+/** 데스크톱 전체 카탈로그에서 정확한 브러시를 선택한다. */
+async function selectBrush(
+  page: Page,
+  name: string,
+  operation: "paint" | "erase",
+): Promise<void> {
+  await activateBrushOperation(page, operation);
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (await pill.count() === 0) {
-    await toolbar.getByRole("button", { name: "펜", exact: true }).click();
+    await toolbar.getByRole("button", {
+      name: operation === "erase" ? "지우개" : "펜",
+      exact: true,
+    }).click();
     pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   }
   await pill.waitFor({ state: "visible", timeout: 10_000 });
@@ -231,24 +270,48 @@ async function selectBrush(page: Page, name: string): Promise<void> {
   );
 }
 
-/** 브러시 결정: env → dev 서버 카탈로그 모듈(첫 paint) → preview 폴백(활성 펜 그대로, 폭 12 가정). */
+/** 브러시 결정: env → dev 서버 전체 카탈로그 → preview env fallback. */
 async function resolveBrush(page: Page): Promise<BrushChoice> {
-  const catalog = await page.evaluate(async ({ wanted, modulePath }) => {
+  const catalog = await page.evaluate(async ({ wantedId, wantedName, modulePath }) => {
     try {
-      const module = await import(/* @vite-ignore */ modulePath) as
-        unknown as { STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: ReadonlyArray<{ name: string; defaultWidth: number }> };
-      const items = module.STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS;
-      const item = wanted ? items.find((entry) => entry.name === wanted) ?? null : items[0] ?? null;
-      return item ? { name: item.name, width: item.defaultWidth } : null;
+      const module = await import(/* @vite-ignore */ modulePath) as unknown as {
+        STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: ReadonlyArray<{
+          id: string; name: string; defaultWidth: number; operation: "paint" | "erase";
+        }>;
+      };
+      const items = module.STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
+      const item = wantedId
+        ? items.find((entry) => entry.id === wantedId) ?? null
+        : wantedName
+          ? items.find((entry) => entry.name === wantedName) ?? null
+          : items.find((entry) => entry.operation === "paint") ?? null;
+      return item ? {
+        id: item.id,
+        name: item.name,
+        width: item.defaultWidth,
+        operation: item.operation,
+      } : null;
     } catch {
       return null;
     }
-  }, { wanted: BRUSH_NAME_ENV, modulePath: DEV_MODULES.catalog });
-  if (catalog) return { ...catalog, source: BRUSH_NAME_ENV ? "env+catalog" : "catalog-first-paint" };
-  if (BRUSH_NAME_ENV) return { name: BRUSH_NAME_ENV, width: 12, source: "env" };
+  }, { wantedId: BRUSH_ID_ENV, wantedName: BRUSH_NAME_ENV, modulePath: DEV_MODULES.catalog });
+  if (catalog) return { ...catalog, source: "catalog" };
+  if (BRUSH_NAME_ENV) return {
+    id: BRUSH_ID_ENV,
+    name: BRUSH_NAME_ENV,
+    width: Number.isFinite(BRUSH_WIDTH_ENV) && BRUSH_WIDTH_ENV > 0 ? BRUSH_WIDTH_ENV : 12,
+    operation: BRUSH_OPERATION_ENV,
+    source: "env",
+  };
   const label = await page.locator('[data-studio-brush-active-pill="true"]').first()
     .getAttribute("aria-label").catch(() => null);
-  return { name: null, width: 12, source: `active-pill:${label ?? "unknown"}` };
+  return {
+    id: null,
+    name: null,
+    width: 12,
+    operation: "paint",
+    source: `active-pill:${label ?? "unknown"}`,
+  };
 }
 
 /** pointermove(캡처)·unhandledrejection 카운터 — 제스처 전에 document 시작 시점에 심는다. */
@@ -309,6 +372,36 @@ async function installPerfSampler(page: Page): Promise<void> {
   throw new Error("rAF sampler never produced a frame; headless page is suspended");
 }
 
+async function sampleSurfaceEvidence(
+  page: Page,
+  previous: SurfaceEvidence,
+): Promise<SurfaceEvidence> {
+  const current = await page.evaluate(() => {
+    const compositor = document.querySelector('[data-studio-gpu-compositor="true"]');
+    const gpuSurfaceKinds = Array.from(document.querySelectorAll('[data-studio-gpu-surface]'))
+      .map((node) => node.getAttribute("data-studio-gpu-surface") ?? "")
+      .filter(Boolean);
+    const noticeText = Array.from(document.querySelectorAll(
+      '[role="alert"], [data-studio-rejected-stroke], [data-studio-live-ink-unavailable]',
+    )).map((node) => node.textContent ?? "").join("\n");
+    return {
+      gpuActive: compositor?.getAttribute("data-studio-gpu-active") === "true",
+      gpuAuthorized: compositor?.getAttribute("data-studio-gpu-frame-authorized") === "true",
+      gpuSurfaceKinds,
+      refusedStrokeNotices: (noticeText.match(/선택 거부 사유|stroke refused|획 복구/giu) ?? []).length,
+    };
+  });
+  return {
+    gpuEverActive: previous.gpuEverActive || current.gpuActive,
+    gpuEverAuthorized: previous.gpuEverAuthorized || current.gpuAuthorized,
+    gpuSurfaceKinds: Object.freeze([...new Set([
+      ...previous.gpuSurfaceKinds,
+      ...current.gpuSurfaceKinds,
+    ])].sort()),
+    refusedStrokeNotices: Math.max(previous.refusedStrokeNotices, current.refusedStrokeNotices),
+  };
+}
+
 async function collectPerfSampling(page: Page): Promise<PerfSampling> {
   return page.evaluate((longTaskMinMs) => {
     const scope = globalThis as GateGlobals;
@@ -324,28 +417,68 @@ async function collectPerfSampling(page: Page): Promise<PerfSampling> {
     delete scope.__longStrokeObserver;
     delete scope.__longStrokeStop;
     return {
-      frameCount: frames.length, p50: pick(0.5), p95: pick(0.95), max: frames.at(-1) ?? 0,
+      frameCount: frames.length, p50: pick(0.5), p95: pick(0.95), p99: pick(0.99), max: frames.at(-1) ?? 0,
       longTaskCount: longTasks.length, longTaskTotalMs: longTasks.reduce((sum, ms) => sum + ms, 0),
     };
   }, 50);
 }
 
-/**
- * 제스처 경로 — 보이는 종이 안쪽 x 12→62%, y 20→62% 의 살짝 구부러진 대각선(직선 전용 레인을 걸러내지
- * 않도록). 이 범위는 우상단 저장 배너·우하단 GPU 토스트·하단 툴바를 pad 를 더해도 피한다.
- */
+/** 화면 충전 모드는 노출된 종이를 5회 왕복해 긴 선·회전·곡률을 한 획에서 함께 압박한다. */
+function screenFillControlPoints(box: Box): readonly Point[] {
+  const left = box.x + box.width * 0.08;
+  const right = box.x + box.width * 0.92;
+  const top = box.y + box.height * 0.12;
+  const bottom = box.y + box.height * 0.82;
+  const rows = 5;
+  const points: Point[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    const y = top + (bottom - top) * row / (rows - 1);
+    const startX = row % 2 === 0 ? left : right;
+    const endX = row % 2 === 0 ? right : left;
+    if (row === 0) points.push({ x: startX, y });
+    points.push({ x: endX, y });
+    if (row + 1 < rows) {
+      const nextY = top + (bottom - top) * (row + 1) / (rows - 1);
+      points.push({ x: endX, y: nextY });
+    }
+  }
+  return points;
+}
+
+function pointOnPolyline(points: readonly Point[], amount: number): Point {
+  const lengths: number[] = [];
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const length = Math.hypot(
+      points[index]!.x - points[index - 1]!.x,
+      points[index]!.y - points[index - 1]!.y,
+    );
+    lengths.push(length);
+    total += length;
+  }
+  let target = Math.max(0, Math.min(1, amount)) * total;
+  for (let index = 0; index < lengths.length; index += 1) {
+    const length = lengths[index]!;
+    if (target <= length || index === lengths.length - 1) {
+      const from = points[index]!;
+      const to = points[index + 1]!;
+      const local = length > 0 ? target / length : 0;
+      return { x: from.x + (to.x - from.x) * local, y: from.y + (to.y - from.y) * local };
+    }
+    target -= length;
+  }
+  return points.at(-1)!;
+}
+
 function gesturePoint(box: Box, t: number): Point {
+  if (SCREEN_FILL_PATH) return pointOnPolyline(screenFillControlPoints(box), t);
   return {
     x: box.x + box.width * (0.12 + 0.5 * t),
     y: box.y + box.height * (0.2 + 0.42 * t) - Math.sin(t * Math.PI) * box.height * 0.12,
   };
 }
 
-/**
- * 실제로 디스패치되는 폴리라인의 CSS 길이 — drawGesture 는 20 배치 목표점 사이를 steps 로 선형 보간하므로
- * 배치 목표점 20 구간의 합이 곧 입력 경로 길이다.
- */
-function gesturePolylineLength(box: Box, batches = 20): number {
+function gesturePolylineLength(box: Box, batches = GESTURE_BATCHES): number {
   let total = 0;
   for (let batch = 1; batch <= batches; batch += 1) {
     const from = gesturePoint(box, (batch - 1) / batches);
@@ -355,9 +488,10 @@ function gesturePolylineLength(box: Box, batches = 20): number {
   return total;
 }
 
-/** 경로 t∈[t0,t1] 의 경계상자를 pad 만큼 확장한 뷰포트 CSS 사각형. */
 function pathBounds(box: Box, t0: number, t1: number, pad: number): Box {
-  const points = Array.from({ length: 51 }, (_, index) => gesturePoint(box, t0 + ((t1 - t0) * index) / 50));
+  const samples = SCREEN_FILL_PATH ? 201 : 51;
+  const points = Array.from({ length: samples }, (_, index) =>
+    gesturePoint(box, t0 + ((t1 - t0) * index) / Math.max(1, samples - 1)));
   const left = Math.min(...points.map((point) => point.x)) - pad;
   const top = Math.min(...points.map((point) => point.y)) - pad;
   return {
@@ -386,7 +520,7 @@ async function drawGesture(page: Page, box: Box, samples: number, onHalf?: () =>
     const state = (globalThis as GateGlobals).__longStrokeGate;
     if (state) { state.moves = 0; state.coalesced = 0; }
   });
-  const batches = 20;
+  const batches = GESTURE_BATCHES;
   const perBatch = Math.max(1, Math.floor(samples / batches));
   for (let batch = 1; batch <= batches; batch += 1) {
     const target = gesturePoint(box, batch / batches);
@@ -570,6 +704,8 @@ async function main(): Promise<void> {
     kind: "toonspectrum-studio-long-stroke-gate-v1",
     generatedAt: new Date().toISOString(),
     studioUrl, viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE_FACTOR, webgpuFlag: WEBGPU,
+    brushId: BRUSH_ID_ENV, brushOperation: BRUSH_OPERATION_ENV,
+    pathMode: SCREEN_FILL_PATH ? "screen-fill-serpentine" : "diagonal",
     thresholds: {
       PERF_SAMPLES, PARITY_SAMPLES, COMMIT_SETTLE_MS, PENDING_RECHECK_MS, POINT_COUNT_TOLERANCE,
       POINT_COUNT_EXTRA_MAX, INPUT_DELIVERY_MIN, FIRST_HALF_CHANGED_RATIO_MAX, INK_MIN_CHANGED_PIXELS, PAD_MIN_CSS,
@@ -578,8 +714,17 @@ async function main(): Promise<void> {
   };
   try {
     browser = await chromium.launch({
-      headless: true,
-      args: [...(WEBGPU ? ["--enable-unsafe-webgpu"] : []), "--js-flags=--expose-gc", "--no-sandbox"],
+      headless: !HEADED,
+      args: [
+        ...(WEBGPU ? [
+          "--enable-unsafe-webgpu",
+          "--use-gl=angle",
+          "--use-angle=swiftshader",
+          "--enable-unsafe-swiftshader",
+        ] : ["--disable-features=WebGPU"]),
+        "--js-flags=--expose-gc",
+        "--no-sandbox",
+      ],
     });
     const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE_FACTOR });
     const page = await context.newPage();
@@ -600,9 +745,9 @@ async function main(): Promise<void> {
     await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 60_000 })
       .catch(() => undefined);
     await dismissChrome(page);
-    await activatePen(page);
     const brush = await resolveBrush(page);
-    if (brush.name) await selectBrush(page, brush.name);
+    await activateBrushOperation(page, brush.operation);
+    if (brush.name) await selectBrush(page, brush.name, brush.operation);
     log(`brush: ${brush.name ?? "(active pen)"} width ${brush.width} (${brush.source}) · webgpu flag ${WEBGPU}`);
     report.brush = brush;
     report.frameGraphDocument = await page.locator("[data-studio-frame-graph-document]").first()
@@ -613,15 +758,24 @@ async function main(): Promise<void> {
     const padCss = Math.max(PAD_MIN_CSS, brush.width * 2);
     const clip = pathBounds(box, 0, 1, padCss);
     const midX = gesturePoint(box, 0.5).x;
-    const firstHalf = pathBounds(box, 0, 0.5, padCss);
-    const secondHalf = pathBounds(box, 0.5, 1, padCss);
-    const regions = {
-      // 전반부는 중점 − pad 까지, 후반부는 중점 + pad 부터 — 중점의 커서 링과 이음매를 양쪽에서 뺀다.
+    const firstHalf = pathBounds(box, 0, SCREEN_FILL_PATH ? 0.46 : 0.5, padCss);
+    const secondHalf = pathBounds(box, SCREEN_FILL_PATH ? 0.54 : 0.5, 1, padCss);
+    const regions = SCREEN_FILL_PATH ? {
+      firstHalf: toRegion(firstHalf, clip, DEVICE_SCALE_FACTOR),
+      secondHalf: toRegion(secondHalf, clip, DEVICE_SCALE_FACTOR),
+    } : {
       firstHalf: toRegion({ ...firstHalf, width: midX - padCss - firstHalf.x }, clip, DEVICE_SCALE_FACTOR),
       secondHalf: toRegion({ ...secondHalf, x: midX + padCss, width: secondHalf.x + secondHalf.width - midX - padCss },
         clip, DEVICE_SCALE_FACTOR),
     };
-    report.paper = { full, visible: box, clip, padCss, regions };
+    const localPathPoints = Array.from({ length: 257 }, (_, index) => {
+      const point = gesturePoint(box, index / 256);
+      return { x: point.x - clip.x, y: point.y - clip.y };
+    });
+    report.paper = {
+      full, visible: box, clip, padCss, regions, localPathPoints,
+      pathMode: SCREEN_FILL_PATH ? "screen-fill-serpentine" : "diagonal",
+    };
     check("stage-present", true,
       `paper ${Math.round(full.width)}×${Math.round(full.height)} @ (${Math.round(full.x)},${Math.round(full.y)}),`
       + ` visible ${Math.round(box.width)}×${Math.round(box.height)}, clip ${Math.round(clip.width)}×${Math.round(clip.height)}`);
@@ -630,8 +784,15 @@ async function main(): Promise<void> {
 
     // 패스 A — 라이브 vs 커밋 (600 샘플). 커서 링이 diff 에 섞이지 않도록 up 뒤 마우스를 clip 밖으로 옮긴다.
     const blankShot = await shot(page, clip, "00-blank");
+    let surfaceEvidence: SurfaceEvidence = {
+      gpuEverActive: false,
+      gpuEverAuthorized: false,
+      gpuSurfaceKinds: Object.freeze([]),
+      refusedStrokeNotices: 0,
+    };
     let liveShot = "";
     const dispatched = await drawGesture(page, box, PARITY_SAMPLES, async () => {
+      surfaceEvidence = await sampleSurfaceEvidence(page, surfaceEvidence);
       liveShot = await shot(page, clip, "01-live");
     });
     await page.mouse.up({ button: "left" });
@@ -639,6 +800,7 @@ async function main(): Promise<void> {
     await page.mouse.move(4, 4);
     await page.waitForTimeout(COMMIT_SETTLE_MS);
     const committedShot = await shot(page, clip, "02-committed");
+    surfaceEvidence = await sampleSurfaceEvidence(page, surfaceEvidence);
     await page.waitForTimeout(PENDING_RECHECK_MS - COMMIT_SETTLE_MS);
     const settledShot = await shot(page, clip, "03-settled");
     const committed = await readCommittedStroke(page);
@@ -716,8 +878,12 @@ async function main(): Promise<void> {
     await page.waitForTimeout(300);
     const heapBefore = await heapUsed(page, cdp, true);
     await installPerfSampler(page);
-    const perfDispatched = await drawGesture(page, box, PERF_SAMPLES);
+    const perfStarted = performance.now();
+    const perfDispatched = await drawGesture(page, box, PERF_SAMPLES, async () => {
+      surfaceEvidence = await sampleSurfaceEvidence(page, surfaceEvidence);
+    });
     await page.mouse.up({ button: "left" });
+    const drawMilliseconds = performance.now() - perfStarted;
     await page.waitForTimeout(400);
     const perf = await collectPerfSampling(page);
     const perfCounters = await readCounters(page);
@@ -726,9 +892,12 @@ async function main(): Promise<void> {
     await page.waitForTimeout(1_000);
     const heapAfterRelease = await heapUsed(page, cdp, true);
     const perfDelivery = Math.min(1, Math.max(perfCounters.moves, perfCounters.coalesced) / perfDispatched);
+    surfaceEvidence = await sampleSurfaceEvidence(page, surfaceEvidence);
+    report.surfaceEvidence = surfaceEvidence;
     report.perf = {
       dispatchedMoves: perfDispatched, observedPointerMoves: perfCounters.moves,
-      inputDeliveryRatio: perfDelivery, frames: perf, undoClicks: { afterParity: undoneA, afterPerf: undoneB },
+      inputDeliveryRatio: perfDelivery, drawMilliseconds, frames: perf,
+      undoClicks: { afterParity: undoneA, afterPerf: undoneB },
     };
     check("frame-time-p95", perf.p95 <= FRAME_P95_BUDGET_MS,
       `p50=${perf.p50.toFixed(1)} p95=${perf.p95.toFixed(1)} max=${perf.max.toFixed(1)}ms`

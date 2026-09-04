@@ -8,6 +8,7 @@ import {
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/brush/studio-brush-catalog";
+
 import {
   findFreePort,
   spawnVitePreview,
@@ -85,6 +86,7 @@ function runCase(
           TOONSPECTRUM_LONG_STROKE_BRUSH: item.name,
           TOONSPECTRUM_LONG_STROKE_BRUSH_ID: item.id,
           TOONSPECTRUM_LONG_STROKE_OPERATION: item.operation,
+          TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH: String(item.defaultWidth),
           TOONSPECTRUM_LONG_STROKE_PATH: "screen-fill",
           TOONSPECTRUM_LONG_STROKE_HEADED: "1",
           TOONSPECTRUM_LONG_STROKE_WEBGPU: MODE === "gpu" ? "1" : "0",

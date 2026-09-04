@@ -15,7 +15,6 @@ import {
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/brush/studio-brush-catalog";
-import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
 import {
   electStudioBrushGpuQuality,
   type StudioBrushCrossEngineQualityEvidence,
@@ -23,10 +22,12 @@ import {
   type StudioBrushLongStrokePerformanceEvidence,
   type StudioBrushLongStrokeQualityEvidence,
 } from "../src/domains/creator/brush/studio-brush-gpu-quality-election";
-import { materializeStudioBrushCatalogSelection } from "../src/domains/creator/brush/studio-brush-selection";
-import { studioWetInkBrushDepositsPigment } from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
 import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
+import { materializeStudioBrushCatalogSelection } from "../src/domains/creator/brush/studio-brush-selection";
+import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { studioWetInkBrushDepositsPigment } from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
 import { studioCc0MypaintPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
+
 import {
   classifyStudioLongBrushQualityPolicy,
 } from "./studio-brush-long-matrix-quality";
@@ -183,7 +184,7 @@ function locateCases(): Map<string, Map<"baseline" | "gpu", LocatedCase>> {
       const caseDirectoryName = basename(originalCaseRoot);
       const caseRoot = join(shardDirectory, caseDirectoryName, "studio-long-stroke");
       const reportPath = join(caseRoot, "report.json");
-      let report: LongStrokeReport | null = null;
+      let report: LongStrokeReport | null;
       try {
         report = parseJson<LongStrokeReport>(reportPath);
       } catch {
@@ -215,7 +216,7 @@ function decode(path: string): DecodedImage {
     width: image.width,
     height: image.height,
     channels: image.channels,
-    data: image.data as Uint8Array,
+    data: image.getRawImage().data as Uint8Array,
   };
 }
 
