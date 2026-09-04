@@ -1,4 +1,4 @@
-name: Validate all-brush quality-first v3 sources on macOS
+name: Apply quality-first all-brush source hardening
 
 on:
   push:
@@ -14,14 +14,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-all-brush-quality-v3-macos-${{ github.ref }}
+  group: apply-all-brush-quality-v3-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   source-verify-publish:
     if: ${{ !contains(github.event.head_commit.message, '[quality-v3-source-validated]') }}
-    runs-on: macos-15
-    timeout-minutes: 40
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
@@ -45,6 +45,7 @@ jobs:
 
       - name: Apply source hardening
         run: |
+          set -euo pipefail
           python3 -m py_compile \
             scripts/patch-all-brush-quality-v3.py \
             scripts/patch-all-brush-quality-v3b.py
@@ -62,45 +63,6 @@ jobs:
                   f"complete live capture marker: expected one, found {source.count(before)}"
               )
           verifier.write_text(source.replace(before, after, 1), encoding="utf-8")
-
-          curation = Path(
-              "src/domains/creator/brush/studio-brush-quality-curation.ts"
-          )
-          source = curation.read_text(encoding="utf-8")
-          before = '''function representativeComparator(
-            left: StudioBrushCurationCandidate,
-            right: StudioBrushCurationCandidate,
-          ): number {
-            if (left.protectedFromCulling !== right.protectedFromCulling) {
-              return left.protectedFromCulling ? -1 : 1;
-            }
-            const leftScore = candidateQualityScore(left);
-            const rightScore = candidateQualityScore(right);
-            const qualityDelta = leftScore - rightScore;
-            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
-            // GPU is only a tie-breaker after quality is effectively equal.'''
-          after = '''function representativeComparator(
-            left: StudioBrushCurationCandidate,
-            right: StudioBrushCurationCandidate,
-          ): number {
-            // A protected catalogue starter must never outrank a mark that failed the measured
-            // quality contract. Protection only resolves a genuine quality tie.
-            if (left.qualityPassed !== right.qualityPassed) {
-              return left.qualityPassed ? -1 : 1;
-            }
-            const leftScore = candidateQualityScore(left);
-            const rightScore = candidateQualityScore(right);
-            const qualityDelta = leftScore - rightScore;
-            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
-            if (left.protectedFromCulling !== right.protectedFromCulling) {
-              return left.protectedFromCulling ? -1 : 1;
-            }
-            // GPU is only a tie-breaker after quality is effectively equal.'''
-          if source.count(before) != 1:
-              raise SystemExit(
-                  f"curation comparator marker: expected one, found {source.count(before)}"
-              )
-          curation.write_text(source.replace(before, after, 1), encoding="utf-8")
           PY
           git diff --check
 
@@ -118,6 +80,9 @@ jobs:
           pnpm exec eslint --max-warnings=0
           scripts/run-studio-all-brush-long-stroke-shard.mts
           scripts/aggregate-studio-all-brush-long-stroke.mts
+          scripts/analyze-studio-brush-similarity.mts
+          scripts/studio-brush-long-matrix-quality.ts
+          scripts/studio-brush-long-matrix-quality.test.ts
           scripts/verify-studio-long-stroke.mts
           src/domains/creator/brush/studio-brush-gpu-quality-election.ts
           src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
@@ -134,13 +99,17 @@ jobs:
 
       - name: Publish validated source changes
         run: |
+          set -euo pipefail
           git config user.name toonstudio-bot
           git config user.email actions@users.noreply.github.com
+          git rm \
+            scripts/patch-all-brush-quality-v3.py \
+            scripts/patch-all-brush-quality-v3b.py
+          rm -rf scripts/__pycache__
           git add \
             scripts/verify-studio-long-stroke.mts \
             scripts/run-studio-all-brush-long-stroke-shard.mts \
-            scripts/aggregate-studio-all-brush-long-stroke.mts \
-            src/domains/creator/brush/studio-brush-quality-curation.ts
+            scripts/aggregate-studio-all-brush-long-stroke.mts
           git diff --cached --check
           git commit -m "test(brush): harden quality-first all-brush election [quality-v3-source-validated]"
           git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
