@@ -1,9 +1,7 @@
 import { Suspense, useId } from "react";
 
-import {
-  resolveStudioFigmaSelectionLayoutMetrics,
-  selectStudioFigmaDesignTargets,
-} from "./studio-figma-selection-ux";
+import { selectStudioFigmaDesignTargets } from "./studio-figma-selection-ux";
+import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
@@ -11,6 +9,7 @@ import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
 import { StudioInspectorContextRouteSync } from "./StudioInspectorContextRouteSync";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
+import { StudioInspectorMultiSelectionSection } from "./StudioInspectorMultiSelectionSection";
 import { StudioInspectorSelectionSection } from "./StudioInspectorSelectionSection";
 import { StudioInspectorUnselectedImageTools } from "./StudioInspectorUnselectedImageTools";
 import { useStudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
@@ -88,7 +87,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           {inspectorContentMode === "selection" && (
             <div>
               <StudioFigmaDesignPanel
-                metrics={resolveStudioFigmaSelectionLayoutMetrics(
+                metrics={resolveStudioInspectorSelectionLayoutMetrics(
                   selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
                 )}
                 disabled={inspectorInteractionPolicy.selection.disabled}
@@ -101,7 +100,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           )}
           {!hasMultiSelection ? (
             <StudioInspectorSelectionSection model={model} tabA11y={tabA11y} />
-          ) : null}
+          ) : (
+            <StudioInspectorMultiSelectionSection model={model} />
+          )}
           {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
               aria-label="도형 결합"
