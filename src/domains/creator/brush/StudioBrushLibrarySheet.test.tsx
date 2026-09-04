@@ -489,7 +489,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
       exhaustiveFirstBatchProCount,
     );
-    expect(screen.getAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);
+    expect(screen.queryAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);
     expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
     while (container.querySelector('[data-studio-brush-progressive-fallback="true"]')) {
       fireEvent.click(
