@@ -1,0 +1,43 @@
+name: Apply Studio menu IA optimization
+
+on:
+  push:
+    branches:
+      - feat/studio-menu-ia-optimization-20260905
+    paths:
+      - scripts/apply-menu-ia-optimization.mjs
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-menu-ia-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply workflow-first menu information architecture
+        run: node scripts/apply-menu-ia-optimization.mjs
+
+      - name: Validate and commit generated patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No menu IA changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(studio): optimize menu information architecture"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
