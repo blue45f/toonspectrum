@@ -140,6 +140,7 @@ const ROUTES: readonly RouteProbe[] = Object.freeze([
 const IGNORED_CONSOLE = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/analytics/traffic/",
   "fonts.googleapis.com",
   "fonts.gstatic.com",
   "cdn.jsdelivr.net",

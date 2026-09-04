@@ -105,6 +105,13 @@ function campaign(search: string): {
   };
 }
 
+/**
+ * Set once the collector answers 5xx or the request fails outright. Analytics must never keep
+ * hammering an endpoint that is not there — a preview build without the Nest API would otherwise
+ * emit a browser network error on every single navigation.
+ */
+let trafficEndpointUnavailable = false;
+
 function postTrafficEvent(
   endpoint: "page-view" | "heartbeat",
   body: Record<string, unknown>,
@@ -119,9 +126,17 @@ function postTrafficEvent(
     },
     body: JSON.stringify(body),
   });
-  void fetch(apiPath(`/api/analytics/traffic/${endpoint}`), init).catch(() => {
-    // Analytics is fail-soft and never blocks navigation or editing.
-  });
+  if (trafficEndpointUnavailable) return;
+  void fetch(apiPath(`/api/analytics/traffic/${endpoint}`), init)
+    .then((response) => {
+      // A 5xx means the collector is not there; it will not be there on the next navigation
+      // either. Give up for the session rather than re-firing on every route change.
+      if (response.status >= 500) trafficEndpointUnavailable = true;
+    })
+    .catch(() => {
+      // Analytics is fail-soft and never blocks navigation or editing.
+      trafficEndpointUnavailable = true;
+    });
 }
 
 function createRuntimeIdentifiers(): {
