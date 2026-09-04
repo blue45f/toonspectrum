@@ -1,6 +1,7 @@
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dMultiPassExporterPanel as StudioBg3dMultiPassExporterPanelContent } from "./StudioBg3dMultiPassExporterPanelContent";
 import { StudioBg3dProductionMultiPassExporterPanel } from "./StudioBg3dProductionMultiPassExporterPanel";
+import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowPanel";
 
 import type { StudioBg3dMultiPassExporterPanelProps } from "./StudioBg3dMultiPassExporterPanelContent";
 
@@ -19,11 +20,17 @@ export function StudioBg3dMultiPassExporterPanel(
 
   if (runtime?.productionBatch && props.onStartMultiPassExport === undefined) {
     return (
-      <StudioBg3dProductionMultiPassExporterPanel
-        disabled={disabled}
-        shots={runtime.productionShots}
-        batch={runtime.productionBatch}
-      />
+      <>
+        <StudioBg3dProductionWorkflowPanel
+          variant="export"
+          defaultExpanded={false}
+        />
+        <StudioBg3dProductionMultiPassExporterPanel
+          disabled={disabled}
+          shots={runtime.productionShots}
+          batch={runtime.productionBatch}
+        />
+      </>
     );
   }
 
