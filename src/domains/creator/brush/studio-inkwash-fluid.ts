@@ -83,6 +83,51 @@ export interface StudioInkwashFluidStrokeInput {
   readonly inkColor?: Readonly<{ r: number; g: number; b: number }>;
 }
 
+/**
+ * Causal, suffix-only preview planner. It emits the same Gaussian/Beer-Lambert material inputs as
+ * the committed InkWash deposit without mutating the authoritative shared wash or running Stam.
+ * The two explicit scales compensate only for the diffusion/darkening that is deliberately absent
+ * from pointer frames; committed pixels and physical constants stay untouched.
+ */
+export interface StudioInkwashFluidPreviewPlannerOptions {
+  readonly tool: "pen" | "water";
+  readonly radius: number;
+  readonly pigmentLoad: number;
+  readonly wetnessLoad: number;
+  readonly spectralAbsorption?: Readonly<{ r: number; g: number; b: number }>;
+  readonly inkColor?: Readonly<{ r: number; g: number; b: number }>;
+  readonly radiusScale?: number;
+  readonly pigmentScale?: number;
+}
+
+export interface StudioInkwashFluidPreviewPlannerState {
+  readonly tool: "pen" | "water";
+  readonly baseRadius: number;
+  readonly spacing: number;
+  readonly pigmentLoad: number;
+  readonly wetnessLoad: number;
+  readonly absorption: readonly [number, number, number];
+  readonly radiusScale: number;
+  readonly pigmentScale: number;
+  started: boolean;
+  previousX: number;
+  previousY: number;
+  previousPressure: number;
+  untilNextStamp: number;
+  meanSegmentLength: number;
+  segmentCount: number;
+}
+
+export interface StudioInkwashFluidPreviewPlan {
+  readonly stamps: readonly StudioInkwashFluidStamp[];
+  readonly dirtyBounds: Readonly<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
+}
+
 export interface StudioInkwashFluidCell {
   readonly wet: number;
   readonly mobile: readonly [number, number, number];
@@ -232,6 +277,218 @@ function spectralColor(
     -Math.log(reflectanceG) * spec.g,
     -Math.log(reflectanceB) * spec.b,
   ];
+}
+
+function positiveFiniteOr(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : fallback;
+}
+
+export function createStudioInkwashFluidPreviewPlanner(
+  options: StudioInkwashFluidPreviewPlannerOptions,
+): StudioInkwashFluidPreviewPlannerState {
+  const baseRadius = Math.max(0.75, options.radius);
+const absorption = spectralColor({
+  tool: options.tool,
+  samples: [],
+  radius: options.radius,
+  pigmentLoad: options.pigmentLoad,
+  wetnessLoad: options.wetnessLoad,
+  ...(options.spectralAbsorption
+    ? { spectralAbsorption: options.spectralAbsorption }
+    : {}),
+  ...(options.inkColor ? { inkColor: options.inkColor } : {}),
+});
+return {
+    tool: options.tool,
+    baseRadius,
+    spacing: Math.max(
+      0.35,
+      baseRadius * STUDIO_INKWASH_STAMP_SPACING_RATIO,
+    ),
+    pigmentLoad: Math.max(0, options.pigmentLoad),
+    wetnessLoad: clamp01(options.wetnessLoad),
+    absorption,
+    radiusScale: positiveFiniteOr(options.radiusScale, 1),
+    pigmentScale: positiveFiniteOr(options.pigmentScale, 1),
+    started: false,
+    previousX: 0,
+    previousY: 0,
+    previousPressure: 0.55,
+    untilNextStamp: 0,
+    meanSegmentLength: 0,
+    segmentCount: 0,
+  };
+}
+
+/**
+ * Emits only new stamps for an accepted sample suffix. Chunk boundaries are invisible: persistent
+ * arc-length phase, previous pressure and the running local pace all live in the planner state.
+ */
+export function planStudioInkwashFluidPreviewStamps(
+  state: StudioInkwashFluidPreviewPlannerState,
+  inputSamples: readonly StudioInkwashFluidStrokeSample[],
+): StudioInkwashFluidPreviewPlan {
+  const samples = inputSamples.filter(
+    (sample) => finite(sample.x) && finite(sample.y),
+  );
+  if (samples.length === 0) return { stamps: [], dirtyBounds: null };
+
+  const stamps: StudioInkwashFluidStamp[] = [];
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  const isWater = state.tool === "water";
+
+  const emit = (
+    x: number,
+    y: number,
+    pressure: number,
+    directionX: number,
+    directionY: number,
+    speed: number,
+  ): void => {
+    const normalizedPressure = clamp01(pressure);
+    const speedShrink = 1 / (1 + speed * (isWater ? 0.35 : 0.85));
+    const pressureGrow = 0.35 + 0.65 * normalizedPressure;
+    const radius =
+      state.baseRadius
+      * pressureGrow
+      * speedShrink
+      * state.radiusScale;
+    const densityScale =
+      state.pigmentLoad
+      * state.pigmentScale
+      * (0.4 + 0.6 * normalizedPressure)
+      * speedShrink;
+    const impulse = isWater
+      ? 0.55 * Math.min(1.8, 0.35 + speed * 8)
+      : 0;
+    const stamp: StudioInkwashFluidStamp = {
+      x,
+      y,
+      radius,
+      pigment: isWater || densityScale <= 0
+        ? [0, 0, 0]
+        : [
+          state.absorption[0] * densityScale,
+          state.absorption[1] * densityScale,
+          state.absorption[2] * densityScale,
+        ],
+      wetness: isWater
+        ? state.wetnessLoad * (0.55 + 0.45 * normalizedPressure)
+        : state.wetnessLoad,
+      velocity: isWater
+        ? [directionX * impulse, directionY * impulse]
+        : [0, 0],
+    };
+    stamps.push(stamp);
+    const reach = radius * 2 + 1;
+    minX = Math.min(minX, x - reach);
+    minY = Math.min(minY, y - reach);
+    maxX = Math.max(maxX, x + reach);
+    maxY = Math.max(maxY, y + reach);
+  };
+
+  let firstIndex = 0;
+  if (!state.started) {
+    const first = samples[0]!;
+    emit(
+      first.x,
+      first.y,
+      first.pressure,
+      0,
+      0,
+      STUDIO_INKWASH_NOMINAL_PACE,
+    );
+    state.started = true;
+    state.previousX = first.x;
+    state.previousY = first.y;
+    state.previousPressure = clamp01(first.pressure);
+    state.untilNextStamp = state.spacing;
+    firstIndex = 1;
+  }
+
+  for (let index = firstIndex; index < samples.length; index += 1) {
+    const sample = samples[index]!;
+    const dx = sample.x - state.previousX;
+    const dy = sample.y - state.previousY;
+    const span = Math.hypot(dx, dy);
+    if (span <= 1e-9) {
+      state.previousX = sample.x;
+      state.previousY = sample.y;
+      state.previousPressure = clamp01(sample.pressure);
+      continue;
+    }
+
+    const referenceSegment = state.segmentCount === 0
+      ? span
+      : state.meanSegmentLength;
+    const relativePace = referenceSegment > 1e-6
+      ? span / referenceSegment
+      : 1;
+    const speed =
+      STUDIO_INKWASH_NOMINAL_PACE * Math.min(4, relativePace);
+    const directionX = dx / span;
+    const directionY = dy / span;
+    const currentPressure = clamp01(sample.pressure);
+
+    for (
+      let travelled = state.untilNextStamp;
+      travelled <= span + 1e-9;
+      travelled += state.spacing
+    ) {
+      const amount = travelled / span;
+      emit(
+        state.previousX + dx * amount,
+        state.previousY + dy * amount,
+        state.previousPressure
+          + (currentPressure - state.previousPressure) * amount,
+        directionX,
+        directionY,
+        speed,
+      );
+      state.untilNextStamp = travelled + state.spacing;
+    }
+    state.untilNextStamp -= span;
+    state.meanSegmentLength = (
+      state.meanSegmentLength * state.segmentCount + span
+    ) / (state.segmentCount + 1);
+    state.segmentCount += 1;
+    state.previousX = sample.x;
+    state.previousY = sample.y;
+    state.previousPressure = currentPressure;
+  }
+
+  return {
+    stamps,
+    dirtyBounds: stamps.length === 0
+      ? null
+      : {
+          x: Math.floor(minX),
+          y: Math.floor(minY),
+          width: Math.max(1, Math.ceil(maxX) - Math.floor(minX) + 1),
+          height: Math.max(1, Math.ceil(maxY) - Math.floor(minY) + 1),
+        },
+  };
+}
+
+/**
+ * Convenience reference for tests and non-sparse callers. The product overlay bins the returned
+ * stamps into preview tiles so long strokes never require a page-sized transient field.
+ */
+export function appendStudioInkwashFluidPreviewStroke(
+  session: StudioInkwashFluidSession,
+  state: StudioInkwashFluidPreviewPlannerState,
+  samples: readonly StudioInkwashFluidStrokeSample[],
+): StudioInkwashFluidPreviewPlan {
+  const plan = planStudioInkwashFluidPreviewStamps(state, samples);
+  for (const stamp of plan.stamps) {
+    depositStudioInkwashFluidStamp(session, stamp);
+  }
+  return plan;
 }
 
 /**

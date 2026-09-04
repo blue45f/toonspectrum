@@ -76,12 +76,16 @@ describe("live wet-ink product boundary", () => {
     expect(overlaySource).not.toContain('status: "fallback"');
   });
 
-  it("keeps InkWash pointer frames off grow/deposit/Stam", () => {
+  it("uses a causal tiled Beer-Lambert InkWash preview without running Stam", () => {
     const suffixStart = overlaySource.indexOf("private paintInkwashSuffix(");
     const suffixEnd = overlaySource.indexOf("private paintInkwashLivePolyline(");
     expect(suffixStart).toBeGreaterThan(0);
     expect(suffixEnd).toBeGreaterThan(suffixStart);
     const suffix = overlaySource.slice(suffixStart, suffixEnd);
+    expect(suffix).toContain("paintInkwashPreviewSamples");
+    expect(suffix).toContain("planStudioInkwashFluidPreviewStamps");
+    expect(suffix).toContain("resolveStudioInkwashFluidDisplay");
+    expect(suffix).toContain("INKWASH_PREVIEW_TILE_SIZE");
     expect(suffix).not.toContain("growInkwashWash");
     expect(suffix).not.toContain("depositStudioInkwashFluidStroke");
     expect(suffix).not.toContain("stepStudioInkwashFluid");
