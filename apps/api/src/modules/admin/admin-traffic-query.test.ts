@@ -6,13 +6,22 @@ import {
 } from "./admin-traffic-query";
 
 describe("admin traffic query contracts", () => {
-  it("uses indexable key ranges instead of wildcard scans", () => {
-    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain("WHERE key >= $2");
-    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain("AND key < $3");
-    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain("WHERE key >= $7");
-    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain("AND key < $10");
-    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toMatch(/key\s+LIKE/iu);
-    expect(ADMIN_TRAFFIC_PULSE_QUERY).not.toMatch(/key\s+LIKE/iu);
+  it("uses typed time-indexed relations instead of the settings key-value store", () => {
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "FROM public.traffic_page_view",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "FROM public.traffic_session",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "occurred_at >= $1::timestamptz",
+    );
+    expect(ADMIN_TRAFFIC_PULSE_QUERY).toContain(
+      "last_seen_at >= $1::timestamptz",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toContain("app_setting");
+    expect(ADMIN_TRAFFIC_PULSE_QUERY).not.toContain("app_setting");
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toMatch(/->>|::jsonb/iu);
   });
 
   it("zero-fills historical and realtime chart buckets", () => {
@@ -27,7 +36,10 @@ describe("admin traffic query contracts", () => {
     );
   });
 
-  it("does not regress duplicate clauses or duplicate JSON keys", () => {
+  it("publishes the dedicated storage version and avoids duplicate clauses", () => {
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "'storageMode', 'first-party-postgres-v2'",
+    );
     expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toMatch(
       /FROM events\s+FROM events/iu,
     );
