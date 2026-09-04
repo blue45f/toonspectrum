@@ -5,18 +5,22 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "scripts/audit-studio-brush-pressure-curves.mts"
       - "scripts/audit-studio-brush-semantic-quality.mts"
       - "src/domains/creator/StudioActiveBrushSummary.test.tsx"
       - "src/domains/creator/StudioActiveBrushSummary.tsx"
       - "src/domains/creator/brush/studio-brush-catalog.ts"
       - "src/domains/creator/brush/studio-brush-material-distinctness.test.ts"
       - "src/domains/creator/brush/studio-brush-material-distinctness.ts"
+      - "src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts"
+      - "src/domains/creator/brush/studio-brush-pressure-curve-quality.ts"
       - "src/domains/creator/brush/studio-brush-semantic-quality.test.ts"
       - "src/domains/creator/brush/studio-brush-semantic-quality.ts"
       - ".github/workflows/studio-brush-semantic-quality.yml"
   push:
     branches: [main]
     paths:
+      - "scripts/audit-studio-brush-pressure-curves.mts"
       - "scripts/audit-studio-brush-semantic-quality.mts"
       - "src/domains/creator/StudioActiveBrushSummary.test.tsx"
       - "src/domains/creator/StudioActiveBrushSummary.tsx"
@@ -59,6 +63,7 @@ jobs:
           pnpm exec vitest run
           src/domains/creator/brush/studio-brush-semantic-quality.test.ts
           src/domains/creator/brush/studio-brush-material-distinctness.test.ts
+          src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts
           src/domains/creator/StudioActiveBrushSummary.test.tsx
           src/domains/creator/brush/studio-brush-catalog-lazy-boundary.test.ts
 
@@ -68,15 +73,24 @@ jobs:
           --check
           --out-dir=${{ runner.temp }}/studio-brush-semantic-quality
 
+      - name: Audit full-range hardware-pressure curves
+        run: >-
+          pnpm exec tsx scripts/audit-studio-brush-pressure-curves.mts
+          --check
+          --out-dir=${{ runner.temp }}/studio-brush-semantic-quality
+
       - name: Lint semantic quality surfaces
         run: >-
           pnpm exec eslint --max-warnings=0
+          scripts/audit-studio-brush-pressure-curves.mts
           scripts/audit-studio-brush-semantic-quality.mts
           src/domains/creator/StudioActiveBrushSummary.test.tsx
           src/domains/creator/StudioActiveBrushSummary.tsx
           src/domains/creator/brush/studio-brush-catalog.ts
           src/domains/creator/brush/studio-brush-material-distinctness.test.ts
           src/domains/creator/brush/studio-brush-material-distinctness.ts
+          src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts
+          src/domains/creator/brush/studio-brush-pressure-curve-quality.ts
           src/domains/creator/brush/studio-brush-semantic-quality.test.ts
           src/domains/creator/brush/studio-brush-semantic-quality.ts
 
@@ -86,7 +100,7 @@ jobs:
       - name: Build production Studio
         run: pnpm run build
 
-      - name: Upload semantic and material receipts
+      - name: Upload semantic, material and pressure receipts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
