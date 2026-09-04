@@ -1,0 +1,64 @@
+name: Temporary Studio UX convergence
+
+on:
+  push:
+    branches:
+      - codex/studio-ux-convergence-20260905
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-ux-convergence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: codex/studio-ux-convergence-20260905
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Studio UX convergence patch
+        run: python3 .github/scripts/apply-studio-ux-convergence.py
+      - name: Check patch whitespace
+        run: git diff --check
+      - name: Run focused Studio UX tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-workspace-landmarks.test.ts
+          src/domains/creator/StudioWorkspaceNavigator.test.tsx
+          src/domains/creator/StudioSurfaceState.test.tsx
+          src/domains/creator/StudioProjectCenterSearch.test.tsx
+          src/domains/creator/studio-ux-convergence-boundary.test.ts
+          src/domains/creator/studio-chrome-ui.test.tsx
+          src/domains/creator/StudioMenubarContent.test.tsx
+          src/domains/creator/studio-review-entry-point-viewports.test.tsx
+          src/domains/creator/StudioCompanionAssistantDisplay.test.tsx
+          scripts/verify-studio-hybrid-dcc-integration.test.ts
+      - name: Lint changed source quickly
+        run: pnpm run lint:quick
+      - name: Typecheck repository
+        run: pnpm run typecheck
+      - name: Remove temporary bootstrap files
+        run: |
+          rm .github/scripts/apply-studio-ux-convergence.py
+          rm .github/workflows/studio-ux-convergence-temp.yml
+      - name: Commit verified product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(studio): converge navigation states and project center UX"
+          git push origin HEAD:codex/studio-ux-convergence-20260905
