@@ -30,7 +30,7 @@ function createRoom(
     dependencies: {
       transportFactory: createStudioMemoryLiveTransportFactory(hub),
       randomId: () => `control-${name}-${++idSeed.value}`,
-      cursorIntervalMs: 40,
+      cursorIntervalMs: 16,
     },
   });
 }
@@ -40,13 +40,13 @@ describe("StudioLiveRoom collaboration controls", () => {
     const hub = new StudioMemoryBroadcastHub();
     const idSeed = { value: 0 };
     const author = createRoom(hub, "author", "owner", idSeed);
-    const viewer = createRoom(hub, "reviewer", "commenter", idSeed);
+    const reviewer = createRoom(hub, "reviewer", "commenter", idSeed);
     const events: StudioLiveRoomEvent[] = [];
-    const unsubscribe = viewer.subscribe((event) => events.push(event));
+    const unsubscribe = reviewer.subscribe((event) => events.push(event));
 
     try {
       await author.start();
-      await viewer.start();
+      await reviewer.start();
       author.updatePresence({ pageId: "page-2", tool: "brush" });
 
       expect(author.sendCursorChat("눈 방향을 여기로 맞춰 주세요")).toBe(true);
@@ -71,16 +71,16 @@ describe("StudioLiveRoom collaboration controls", () => {
         pageId: "page-2",
       });
       expect(attention?.expiresAt).toBeGreaterThan(attention?.sentAt ?? 0);
-      expect(viewer.getChatMessages()).toEqual([]);
+      expect(reviewer.getChatMessages()).toEqual([]);
       expect(author.getChatMessages()).toEqual([]);
     } finally {
       unsubscribe();
       author.close();
-      viewer.close();
+      reviewer.close();
     }
   });
 
-  it("keeps control permissions fail-closed and accepts runtime cadence changes", async () => {
+  it("keeps control permissions fail-closed while ordinary room chat remains available", async () => {
     const hub = new StudioMemoryBroadcastHub();
     const idSeed = { value: 0 };
     const viewer = createRoom(hub, "viewer", "viewer", idSeed);
@@ -94,9 +94,9 @@ describe("StudioLiveRoom collaboration controls", () => {
       expect(viewer.requestAttention()).toBe(false);
       expect(commenter.sendCursorChat("검토 의견")).toBe(true);
       expect(commenter.requestAttention()).toBe(false);
-      expect(commenter.setCursorIntervalMs(1)).toBe(16);
-      expect(commenter.getCursorIntervalMs()).toBe(16);
-      expect(commenter.setCursorIntervalMs(10_000)).toBe(1_000);
+      expect(commenter.sendChatMessage("일반 채팅은 그대로 동작합니다")).not.toBeNull();
+      expect(viewer.getChatMessages()).toHaveLength(1);
+      expect(viewer.getChatMessages()[0]?.text).toBe("일반 채팅은 그대로 동작합니다");
     } finally {
       viewer.close();
       commenter.close();
