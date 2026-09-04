@@ -633,7 +633,7 @@ describe("StudioBrushLibrarySheet", () => {
         onSelect={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole("tab", { name: TEXTURE_TAB_LABEL }));
+    fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));
 
     const remainingAfterFirstBatch = exhaustiveCatalogCount - 48;
     const fallback = screen.getByRole("button", {
