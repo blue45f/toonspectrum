@@ -90,6 +90,23 @@ describe("quality-first brush curation", () => {
     expect(tied[0]?.representativeId).toBe("gpu");
   });
 
+  it("does not let frame speed compensate for lower measured mark quality", () => {
+  const clusters = curateStudioBrushCandidates([
+    candidate("slower-quality", {
+      frameP95Milliseconds: 180,
+      textureQuality: 0.9,
+      listedOrder: 0,
+    }),
+    candidate("fast-gpu-lower-quality", {
+      gpuApproved: true,
+      frameP95Milliseconds: 5,
+      textureQuality: 0.84,
+      listedOrder: 1,
+    }),
+  ]);
+  expect(clusters[0]?.representativeId).toBe("slower-quality");
+});
+
   it("never lets a protected but failing brush beat a passing representative", () => {
   const clusters = curateStudioBrushCandidates([
     candidate("protected-failing", {

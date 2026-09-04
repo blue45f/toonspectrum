@@ -287,15 +287,14 @@ function candidateQualityScore(candidate: StudioBrushCurationCandidate): number 
   if (!candidate.qualityPassed) return -1;
   const errorPenalty = Math.min(1, candidate.browserErrorCount * 0.25)
     + Math.min(1, candidate.refusedStrokeCount * 0.25);
-  const responsiveness = Number.isFinite(candidate.frameP95Milliseconds)
-    ? clamp01(1 - Math.max(0, candidate.frameP95Milliseconds - 16.667) / 83.333)
-    : 0;
-  return 0.28 * clamp01(candidate.centerlineCoverage)
-    + 0.22 * clamp01(candidate.liveCommitFidelity)
-    + 0.18 * clamp01(candidate.settledStability)
-    + 0.17 * clamp01(candidate.inputDeliveryRatio)
-    + 0.1 * clamp01(candidate.textureQuality)
-    + 0.05 * responsiveness
+  // This score deliberately excludes frame time. The representative is chosen by mark
+  // quality and interaction fidelity; GPU/backend performance is considered only after
+  // the measured quality score is tied.
+  return 0.25 * clamp01(candidate.textureQuality)
+    + 0.25 * clamp01(candidate.liveCommitFidelity)
+    + 0.2 * clamp01(candidate.centerlineCoverage)
+    + 0.15 * clamp01(candidate.settledStability)
+    + 0.15 * clamp01(candidate.inputDeliveryRatio)
     - 0.2 * errorPenalty;
 }
 
@@ -309,7 +308,7 @@ function representativeComparator(
   const leftScore = candidateQualityScore(left);
   const rightScore = candidateQualityScore(right);
   const qualityDelta = leftScore - rightScore;
-  if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+  if (Math.abs(qualityDelta) > 0.005) return qualityDelta > 0 ? -1 : 1;
   if (left.protectedFromCulling !== right.protectedFromCulling) {
     return left.protectedFromCulling ? -1 : 1;
   }
