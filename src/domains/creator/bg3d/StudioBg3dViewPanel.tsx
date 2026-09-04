@@ -2,6 +2,7 @@ import {
   StudioBg3dProSuiteRuntimeContext,
   type StudioBg3dProSuiteRuntimeValue,
 } from "./studio-bg3d-pro-suite-runtime-context";
+import { summarizeStudioBg3dProductionScene } from "./studio-bg3d-production-workflow";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
@@ -42,10 +43,19 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     context.isBatchRenderingShots ||
     context.isRestoringScene ||
     context.physicsInteractionLocked;
+  const sceneSummary = summarizeStudioBg3dProductionScene({
+    document: context.sceneBaseDocument,
+    selectedNodeCount: context.selectedIds.size,
+    lineArtPreview: context.lineArtPreview,
+    transparentBackground: context.transparentInsert,
+  });
   const runtime: StudioBg3dProSuiteRuntimeValue = {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
     productionShots: context.savedShots,
+    sceneSummary,
+    onSetLineArtPreview: context.setLineArtPreview,
+    onSetTransparentBackground: context.updateBackgroundTransparency,
     productionBatch: {
       selectedShotIds: context.shotBatchSelectedIds,
       availablePasses: context.STUDIO_BG3D_SHOT_BATCH_PASSES,
