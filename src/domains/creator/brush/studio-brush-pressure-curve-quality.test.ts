@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { studioBrushDynamicsSettingsForBrushId } from "./studio-brush-dynamics";
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
   analyzeStudioBrushPressureCurveSamples,
   profileStudioBrushPressureCurve,
@@ -10,13 +11,15 @@ import {
 } from "./studio-brush-pressure-curve-quality";
 
 function profile(id: string) {
-  const settings = studioBrushDynamicsSettingsForBrushId(id);
+  const packSelection = materializeStudioBrushPackSelection(id);
+  const settings = packSelection?.brushDynamics
+    ?? studioBrushDynamicsSettingsForBrushId(id);
   if (!settings) throw new Error(`${id}: missing dynamic settings fixture`);
   return profileStudioBrushPressureCurve({
     catalogId: id,
     runtimeBrushId: id,
-    defaultWidth: id === "airbrush" ? 48 : 18,
-    defaultOpacity: id === "airbrush" ? 0.5 : 0.8,
+    defaultWidth: packSelection?.defaultWidth ?? (id === "airbrush" ? 48 : 18),
+    defaultOpacity: packSelection?.defaultOpacity ?? (id === "airbrush" ? 0.5 : 0.8),
     settings,
     seed: 73,
   });
