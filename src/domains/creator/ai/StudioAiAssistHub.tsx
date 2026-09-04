@@ -1,6 +1,6 @@
 /**
  * StudioAiAssistHub — tabbed AI assist shell (PicsArt/Canva-class).
- * Connection status · tool tabs · prompt presets · recent chips · tool slot.
+ * Connection status · production director · tool tabs · prompt presets · recent chips · tool slot.
  *
  * Layout contract: parent must give a bounded height (flex + min-h-0). This hub is
  * column-flex with a scrollable tool body so generate actions stay reachable.
@@ -60,7 +60,11 @@ export interface StudioAiAssistHubProps {
   providerSlot?: ReactNode;
   recentState: StudioAiRecentPromptsState;
   onApplyPresetPrompt: (tool: StudioAiAssistToolId, prompt: string) => void;
+  /** Opens the episode-level script → continuity → batch → QA workflow. */
+  onOpenEpisodeProduction?: () => void;
+  onPreloadEpisodeProduction?: () => void;
   onOpenSuperSuite?: () => void;
+  onPreloadSuperSuite?: () => void;
   toolPanel: ReactNode;
   className?: string;
 }
@@ -77,7 +81,10 @@ export function StudioAiAssistHub({
   providerSlot,
   recentState,
   onApplyPresetPrompt,
+  onOpenEpisodeProduction,
+  onPreloadEpisodeProduction,
   onOpenSuperSuite,
+  onPreloadSuperSuite,
   toolPanel,
   className,
 }: StudioAiAssistHubProps): ReactElement {
@@ -113,7 +120,7 @@ export function StudioAiAssistHub({
         onMouseEnter={onPreloadSettings}
         onFocus={onPreloadSettings}
         className={cn(
-          "flex shrink-0 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
+          "flex min-h-11 shrink-0 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           connectionOk
@@ -137,22 +144,58 @@ export function StudioAiAssistHub({
         </span>
       </button>
 
+      {onOpenEpisodeProduction ? (
+        <button
+          type="button"
+          onClick={onOpenEpisodeProduction}
+          onMouseEnter={onPreloadEpisodeProduction}
+          onFocus={onPreloadEpisodeProduction}
+          onPointerDown={onPreloadEpisodeProduction}
+          data-studio-ai-episode-production-launcher="true"
+          className={cn(
+            "flex min-h-16 shrink-0 items-center justify-between gap-3 rounded-xl border border-accent/45 bg-accent/10 px-3 py-2.5 text-left hover:bg-accent/15",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING
+          )}
+        >
+          <span className="flex min-w-0 items-start gap-2">
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent">
+              <Clapperboard size={15} aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <strong className="block text-xs font-black text-fg">회차 AI 프로덕션</strong>
+              <span className="mt-0.5 block text-[0.61rem] leading-relaxed text-fg-3">
+                대본 → 연속성 잠금 → 생성 묶음 → 품질 QA
+              </span>
+            </span>
+          </span>
+          <ChevronRight size={15} className="shrink-0 text-accent" aria-hidden />
+        </button>
+      ) : null}
+
       {onOpenSuperSuite ? (
         <button
           type="button"
           onClick={onOpenSuperSuite}
+          onMouseEnter={onPreloadSuperSuite}
+          onFocus={onPreloadSuperSuite}
+          onPointerDown={onPreloadSuperSuite}
           className={cn(
-            "flex shrink-0 items-center justify-between gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-left transition-colors hover:bg-accent/15",
+            "flex min-h-11 shrink-0 items-center justify-between gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-left transition-colors hover:bg-accent/15",
             STUDIO_EASE,
-            STUDIO_FOCUS_RING,
+            STUDIO_FOCUS_RING
           )}
         >
           <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-accent">
-            <Sparkles size={14} className="shrink-0 text-accent animate-pulse" aria-hidden />
+            <Sparkles
+              size={14}
+              className="shrink-0 animate-pulse text-accent motion-reduce:animate-none"
+              aria-hidden
+            />
             AI 웹툰 생성 슈퍼 스위트
           </span>
           <span className="text-[0.62rem] font-medium text-accent/80">
-            툰필터 · 음영 · 콘티 · 말풍선 →
+            화풍 · 음영 · 콘티 · 말풍선 →
           </span>
         </button>
       ) : null}
