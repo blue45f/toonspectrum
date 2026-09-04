@@ -1,0 +1,37 @@
+name: Cleanup merged branch backlog on rollout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cleanup-merged-pr-branches.yml"
+      - ".github/workflows/cleanup-merged-branch-backlog.yml"
+      - "scripts/cleanup-merged-branches.mjs"
+      - "scripts/cleanup-merged-branches.d.mts"
+      - "scripts/cleanup-merged-branches.test.ts"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cleanup-merged-pr-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup-backlog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+
+      - name: Remove every unprotected branch whose current HEAD is already in main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/cleanup-merged-branches.mjs --all --apply
