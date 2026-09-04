@@ -62,6 +62,28 @@ function unchanged(refusal: string | null = null): StudioInspectorMultiSelection
   return { kind: "unchanged", refusal };
 }
 
+function invalidPatchReason(patch: StudioFigmaSelectionLayoutPatch): string | null {
+  if (patch.x !== undefined && !finite(patch.x)) {
+    return "가로 위치에 유효한 숫자를 입력해 주세요.";
+  }
+  if (patch.y !== undefined && !finite(patch.y)) {
+    return "세로 위치에 유효한 숫자를 입력해 주세요.";
+  }
+  if (patch.width !== undefined && !finitePositive(patch.width)) {
+    return "전체 너비와 높이는 0보다 큰 숫자로 입력해 주세요.";
+  }
+  if (patch.height !== undefined && !finitePositive(patch.height)) {
+    return "전체 너비와 높이는 0보다 큰 숫자로 입력해 주세요.";
+  }
+  if (patch.rotation !== undefined && !finite(patch.rotation)) {
+    return "회전에 유효한 각도를 입력해 주세요.";
+  }
+  if (patch.opacity !== undefined && !finite(patch.opacity)) {
+    return "불투명도에 유효한 숫자를 입력해 주세요.";
+  }
+  return null;
+}
+
 /**
  * Where an unrotated target box origin must move so that the shared group planner rotates the
  * box around its centre instead of around its top-left origin.
@@ -160,6 +182,12 @@ export function planStudioInspectorMultiSelectionLayoutPatch(
   const selected = new Set(selectedIds);
   const targets = elements.filter((element) => selected.has(element.id));
   if (targets.length < 2) return unchanged();
+  if (targets.length !== selected.size) {
+    return unchanged("선택 정보가 바뀌었어요. 대상을 다시 선택한 뒤 시도해 주세요.");
+  }
+
+  const patchRefusal = invalidPatchReason(patch);
+  if (patchRefusal) return unchanged(patchRefusal);
 
   const isLocked = options.isLocked ?? NEVER_LOCKED;
   if (targets.some(isLocked)) {
@@ -167,21 +195,20 @@ export function planStudioInspectorMultiSelectionLayoutPatch(
       "잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.",
     );
   }
+  if (finite(patch.opacity) && targets.some((element) => element.type === "frame")) {
+    return unchanged("프레임이 포함된 선택에는 불투명도를 함께 적용할 수 없어요.");
+  }
 
   const bounds = unionStudioSelectionBounds(targets);
-  if (!bounds) return unchanged("선택 영역을 계산할 수 없어 변경하지 않았어요.");
+  if (!bounds || bounds.w <= 0 || bounds.h <= 0) {
+    return unchanged("선택 영역을 계산할 수 없어 변경하지 않았어요.");
+  }
   const sourceBounds = {
     x: bounds.x,
     y: bounds.y,
     width: bounds.w,
     height: bounds.h,
   };
-
-  const widthProvided = patch.width !== undefined;
-  const heightProvided = patch.height !== undefined;
-  if ((widthProvided && !finitePositive(patch.width)) || (heightProvided && !finitePositive(patch.height))) {
-    return unchanged("전체 너비와 높이는 0보다 큰 숫자로 입력해 주세요.");
-  }
 
   const widthScale = finitePositive(patch.width) ? patch.width / sourceBounds.width : null;
   const heightScale = finitePositive(patch.height) ? patch.height / sourceBounds.height : null;
