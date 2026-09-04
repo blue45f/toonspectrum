@@ -1,4 +1,5 @@
-export const TRAFFIC_AUTO_REFRESH_MS = 30_000;
+export const TRAFFIC_PULSE_REFRESH_MS = 15_000;
+export const TRAFFIC_OVERVIEW_REFRESH_MS = 5 * 60_000;
 export const TRAFFIC_RANGE_DAYS = [1, 7, 30, 90] as const;
 
 export type TrafficRangeDays = (typeof TRAFFIC_RANGE_DAYS)[number];
@@ -8,6 +9,17 @@ export type TrafficSeriesPoint = {
   pageViews: number;
   visitors: number;
   sessions?: number;
+};
+
+export type TrafficPulse = {
+  generatedAt: string;
+  windowMinutes: number;
+  activeVisitors: number;
+  activeSessions: number;
+  pageViews5m: number;
+  pageViews30m: number;
+  latestAt: string | null;
+  series: TrafficSeriesPoint[];
 };
 
 export type TrafficBreakdown = {
