@@ -4,6 +4,7 @@ import {
   isStudioEditorMutationContinuationAllowed,
   type StudioEditorMutationTicket,
 } from "../../studio-editor-scope";
+
 import type { StudioProjectDocumentSessionProvenance } from "../../studio-project-document-session";
 
 interface UseStudioMutationAuthorityRuntimeOptions {
@@ -115,16 +116,20 @@ export function useStudioMutationAuthorityRuntime({
     };
   }, []);
 
+  const advanceStudioRevisionProjectGeneration = useCallback((): void => {
+    studioRevisionProjectGenerationRef.current += 1;
+  }, []);
+
   const tryMarkStudioDocumentChangedQuietly = useCallback((): boolean => {
     if (documentSaveInFlightRef.current) return false;
-    studioRevisionProjectGenerationRef.current += 1;
+    advanceStudioRevisionProjectGeneration();
     const current = collaborationAccessRef.current;
     collaborationAccessRef.current = {
       ...current,
       documentGeneration: current.documentGeneration + 1,
     };
     return true;
-  }, []);
+  }, [advanceStudioRevisionProjectGeneration]);
 
   const markStudioDocumentChanged = useCallback((): boolean => {
     if (!tryMarkStudioDocumentChangedQuietly()) {
@@ -163,6 +168,7 @@ export function useStudioMutationAuthorityRuntime({
   }, []);
 
   return {
+    advanceStudioRevisionProjectGeneration,
     canApplyStudioMutation,
     captureStudioMutationTicket,
     collaborationAccessRef,

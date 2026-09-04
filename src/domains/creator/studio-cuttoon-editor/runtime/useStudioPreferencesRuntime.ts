@@ -18,9 +18,10 @@ import {
   type StudioEffectFavoriteState,
   type StudioEffectId,
 } from "../../studio-effect-favorites";
+import { acquireProductStudioUiPreferencesRepository } from "../../studio-legacy-editor-runtime-helpers";
+
 import type { StudioUiDensityMode } from "../../studio-ui-density";
 import type { StudioUiBooleanPreferenceKey } from "../../studio-ui-preferences-sqlite";
-import { acquireProductStudioUiPreferencesRepository } from "../../studio-legacy-editor-runtime-helpers";
 
 interface UseStudioPreferencesRuntimeOptions {
   readonly applyMirroredSettings: (settings: StudioAppSettings) => void;

@@ -16,14 +16,9 @@ import {
   createEmptyDocumentMaster,
   type DocumentMaster,
 } from "../../studio-master-page";
-import type { StudioPageHistoryJournal } from "../../studio-page-editor-types";
-import type { El } from "../../studio-element-model";
 import {
   createEmptyStudioPublicationAnalyticsSnapshot,
 } from "../../studio-publication-analytics-loader";
-import type {
-  StudioPublicationAnalyticsDocument,
-} from "../../studio-publication-analytics";
 import {
   areStudioReferenceBoardDocumentsEqual,
   createDefaultStudioReferenceBoardDocument,
@@ -33,14 +28,20 @@ import {
 import {
   createEmptyStudioReleaseScheduleSnapshot,
 } from "../../studio-release-schedule-loader";
+
+import type { El } from "../../studio-element-model";
+import type { StudioPageHistoryJournal } from "../../studio-page-editor-types";
+import type {
+  StudioPublicationAnalyticsDocument,
+} from "../../studio-publication-analytics";
 import type { StudioReleaseSchedule } from "../../studio-release-schedule";
 
 interface UseStudioDocumentSidecarsRuntimeOptions {
+  readonly advanceStudioRevisionProjectGeneration: () => void;
   readonly beforeRecordSidecar: () => void;
   readonly commitStudioHistoryJournal: (journal: StudioPageHistoryJournal) => void;
   readonly historyJournalRef: RefObject<StudioPageHistoryJournal>;
   readonly markStudioDocumentChanged: () => boolean;
-  readonly studioRevisionProjectGenerationRef: RefObject<number>;
 }
 
 /**
@@ -49,11 +50,11 @@ interface UseStudioDocumentSidecarsRuntimeOptions {
  * mutation gate so autosave and collaboration see one consistent revision stream.
  */
 export function useStudioDocumentSidecarsRuntime({
+  advanceStudioRevisionProjectGeneration,
   beforeRecordSidecar,
   commitStudioHistoryJournal,
   historyJournalRef,
   markStudioDocumentChanged,
-  studioRevisionProjectGenerationRef,
 }: UseStudioDocumentSidecarsRuntimeOptions) {
   const [master, setMasterState] = useState<DocumentMaster<El>>(
     () => createEmptyDocumentMaster<El>(),
@@ -89,7 +90,7 @@ export function useStudioDocumentSidecarsRuntime({
   function setAiProvenanceOperationState(
     next: Parameters<typeof setAiProvenanceState>[0],
   ): void {
-    studioRevisionProjectGenerationRef.current += 1;
+    advanceStudioRevisionProjectGeneration();
     setAiProvenanceState(next);
   }
 

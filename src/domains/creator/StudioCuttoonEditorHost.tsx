@@ -1513,11 +1513,8 @@ export function StudioCuttoonEditor({
     appSettingsOpen,
     appSettingsPersistenceState,
     appSettingsRef,
-    appSettingsUserRevisionRef,
     commitAppSettings,
     effectFavoriteState,
-    effectFavoriteStateRef,
-    effectFavoriteUserRevisionRef,
     isRailToolVisible,
     persistAppSettings,
     persistStudioUiBooleanPreference,
@@ -1527,11 +1524,9 @@ export function StudioCuttoonEditor({
     setAppSettingsInitialTab,
     setAppSettingsOpen,
     setAppSettingsPersistenceState,
-    setEffectFavoriteState,
     setRailMoreOpen,
     setStudioUiDensity,
     setStudioUiDensityFromCompanion,
-    setUiDensityMode,
     toggleEffectFavorite,
     uiBooleanPreferenceRevisionsRef,
     uiDensityMode,
@@ -1692,6 +1687,7 @@ export function StudioCuttoonEditor({
     }
   }
   const {
+    advanceStudioRevisionProjectGeneration,
     authorizedWorkAssetScopeId,
     autosaveKey,
     canApplyStudioMutation,
@@ -1790,7 +1786,6 @@ export function StudioCuttoonEditor({
   });
   const {
     commitStudioHistoryJournal,
-    historyJournal,
     historyJournalRef,
     recordStudioHistoryJournalPages,
     resetStudioHistoryJournal,
@@ -1823,7 +1818,7 @@ export function StudioCuttoonEditor({
   const [currentPageId, setCurrentPageIdState] = useState<string>(pages[0]?.id || "");
   const currentPageIdRef = useRef(currentPageId);
   currentPageIdRef.current = currentPageId;
-  function setCurrentPageId(next: Parameters<typeof setCurrentPageIdState>[0]): boolean {
+  const setCurrentPageId = useCallback((next: Parameters<typeof setCurrentPageIdState>[0]): boolean => {
     const currentPage = currentPageIdRef.current;
     const nextPageId = typeof next === "function" ? next(currentPage) : next;
     if (nextPageId !== currentPage) {
@@ -1846,7 +1841,7 @@ export function StudioCuttoonEditor({
     currentPageIdRef.current = nextPageId;
     setCurrentPageIdState(nextPageId);
     return true;
-  }
+  }, []);
 
   const {
     aiProvenance,
@@ -1881,13 +1876,13 @@ export function StudioCuttoonEditor({
     setWriterRoom,
     writerRoom,
   } = useStudioDocumentSidecarsRuntime({
+    advanceStudioRevisionProjectGeneration,
     beforeRecordSidecar: () => {
       if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
     },
     commitStudioHistoryJournal,
     historyJournalRef,
     markStudioDocumentChanged,
-    studioRevisionProjectGenerationRef,
   });
   const {
     setStudioCommentInteractionNotice,
@@ -2074,7 +2069,14 @@ export function StudioCuttoonEditor({
         snapshotFields: ["sceneElements"] as const,
       }
     );
-  }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
+  }, [
+    activePage.id,
+    authorizedWorkAssetScopeId,
+    setStudioWorkAssetLimitExceeded,
+    setStudioWorkAssetReferences,
+    studioCrdtDocument,
+    studioWorkAssetHydrator,
+  ]);
 
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
@@ -2166,7 +2168,20 @@ export function StudioCuttoonEditor({
         snapshotFields: ["strokes", "sceneElements", "pages", "layerGroups"] as const,
       }
     );
-  }, [sourceHydrationPending, studioCrdtDocument, studioWorkAssetHydrator]);
+  }, [
+    collaborationAccessRef,
+    editorMountedRef,
+    pagesHiRef,
+    pagesHistoryRef,
+    rebaseStudioHistoryJournal,
+    setPagesHistoryState,
+    setStudioCrdtReconciledDocument,
+    sourceHydrationPending,
+    studioCrdtDocument,
+    studioCrdtSceneRuntimeRef,
+    studioRevisionProjectGenerationRef,
+    studioWorkAssetHydrator,
+  ]);
 
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
@@ -2216,8 +2231,13 @@ export function StudioCuttoonEditor({
     );
     setPagesHistoryState(reconciled.history);
   }, [
+    pagesHiRef,
+    pagesHistoryRef,
+    rebaseStudioHistoryJournal,
+    setPagesHistoryState,
     sourceHydrationPending,
     studioCrdtDocument,
+    studioCrdtSceneRuntimeRef,
     studioWorkAssetHydrator,
     studioWorkAssetHydrationRevision,
     studioWorkAssetReferences,
@@ -3033,12 +3053,31 @@ export function StudioCuttoonEditor({
       }
       refreshSession.dispose();
     };
-  }, [studioTeamCommentsWorkId]);
+  }, [
+    setStudioCommentSyncError,
+    setStudioTeamCommentCapabilities,
+    setStudioTeamCommentsState,
+    setStudioTeamCommentsSyncing,
+    setStudioTeamUnreadCommentIds,
+    studioTeamCommentActivitySequenceRef,
+    studioTeamCommentLiveRefreshFlightRef,
+    studioTeamCommentLiveTargetSequenceRef,
+    studioTeamCommentMutationFlightRef,
+    studioTeamCommentOperationScopeRegistryRef,
+    studioTeamCommentReadFlightRef,
+    studioTeamCommentReadSequenceRef,
+    studioTeamCommentReanchorFlightRef,
+    studioTeamCommentReanchorQueueRef,
+    studioTeamCommentRefreshSessionRef,
+    studioTeamCommentsLoadGenerationRef,
+    studioTeamCommentsScopeRef,
+    studioTeamCommentsWorkId,
+  ]);
   useEffect(() => {
     if (commentsOpen) {
       studioTeamCommentRefreshSessionRef.current?.request("panel-open");
     }
-  }, [commentsOpen]);
+  }, [commentsOpen, studioTeamCommentRefreshSessionRef]);
   // 의도된 변경(2026-08, B-06): 라이브 새로고침 큐 본문(refresh/queue)은
   // studio-page-comments-runtime.ts 로 추출 — 시퀀스 프론티어·세대 가드 계약은 그대로다.
   const {
@@ -3073,7 +3112,7 @@ export function StudioCuttoonEditor({
     setPublishPackageOpen(false);
     setDialogueBatchOpen(false);
     setDialogueTranslateOpen(false);
-  }, [collaborationDocumentLocked]);
+  }, [collaborationDocumentLocked, setMasterEditMode, setMasterPanelOpen]);
   useEffect(() => {
     const availableIds = new Set(pages.map((page) => page.id));
     const fallbackId = availableIds.has(currentPageId) ? currentPageId : pages[0]?.id;
@@ -4818,7 +4857,7 @@ export function StudioCuttoonEditor({
       }
       clipsLoadRef.current = null;
     };
-  }, [menu]);
+  }, [editorMountedRef, menu]);
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -6236,21 +6275,21 @@ export function StudioCuttoonEditor({
           fresh.revision === expectedRevision;
       },
     });
-  }, []);
+  }, [documentSaveInFlightRef, editorMountedRef, studioRevisionProjectGenerationRef]);
   const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationPageIdRef = useRef<string | null>(null);
   useEffect(() => {
     poserMutationTicketRef.current = poserVrmOpen ? captureStudioMutationTicket() : null;
-  }, [poserVrmOpen]);
+  }, [captureStudioMutationTicket, poserVrmOpen]);
   const mannequinMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   useEffect(() => {
     mannequinMutationTicketRef.current = mannequinPoserOpen ? captureStudioMutationTicket() : null;
-  }, [mannequinPoserOpen]);
+  }, [captureStudioMutationTicket, mannequinPoserOpen]);
   useEffect(() => {
     bg3dMutationTicketRef.current = bg3dOpen ? captureStudioMutationTicket() : null;
     bg3dMutationPageIdRef.current = bg3dOpen ? currentPageIdRef.current : null;
-  }, [bg3dOpen]);
+  }, [bg3dOpen, captureStudioMutationTicket]);
 
   // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 SQLite/OPFS 행으로 분리하고,
   // 로그인 사용자가 바뀌는 한 렌더 동안 이전 계정의 별표가 보이거나 새 키에 기록되지 않게 owner와
@@ -6286,7 +6325,7 @@ export function StudioCuttoonEditor({
         );
       })
       .catch(() => setAppSettingsPersistenceState("session-only"));
-  }, [studioAuthUserId]);
+  }, [setAppSettingsPersistenceState, studioAuthUserId]);
 
   function commitAssetFavoriteState(state: StudioAssetFavoriteState): void {
     const next = { userId: studioAuthUserId, state };
@@ -7143,7 +7182,13 @@ export function StudioCuttoonEditor({
     studioLifecycleBaselineScopeRef.current = scope;
     studioLifecycleDurableGenerationRef.current = studioRevisionProjectGenerationRef.current;
     studioLifecycleDurablePendingFingerprintRef.current = "";
-  }, [remixId, studioAuthUserId, workHydrated, workId]);
+  }, [
+    remixId,
+    studioAuthUserId,
+    studioRevisionProjectGenerationRef,
+    workHydrated,
+    workId,
+  ]);
 
   const { buildCurrentStudioProjectFileSnapshot } = useStudioStableHandlers<{
     buildCurrentStudioProjectFileSnapshot: (
@@ -7408,6 +7453,9 @@ export function StudioCuttoonEditor({
     workId,
     remixId,
     sharedDocument,
+    pagesHiRef,
+    pagesHistoryRef,
+    studioRevisionProjectGenerationRef,
   ]);
 
   // 서버 자동저장 — 위 로컬 임시저장(브라우저 저장소)과 별개로, 손을 놓은 지 45초가 지나면
@@ -7453,6 +7501,7 @@ export function StudioCuttoonEditor({
     collaborationDocumentLocked,
     workHydrated,
     title,
+    documentSaveInFlightRef,
   ]);
 
   // An unresolved recovery remains authoritative until the artist restores or clears it. New edits
@@ -10018,6 +10067,9 @@ export function StudioCuttoonEditor({
     studioCrdtAuthoritativeBarrierGeneration,
     studioCrdtDocument,
     studioCrdtOperationSyncReady,
+    collaborationAccessRef,
+    studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtDocumentRef,
   ]);
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
@@ -11482,7 +11534,7 @@ export function StudioCuttoonEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAppSettingsPersistenceState]);
   // 고급 채우기 무효화/정리 effect — studio-page-advanced-fill 훅으로 추출.
   // 상태·setter·ref 는 위에서 페이지가 소유하고(핫패스 제스처 소유권 검사와 명령 경로가 안정
   // 참조를 요구한다), 훅은 그 안정 참조로 동일한 effect 계약만 수행한다.
@@ -12281,7 +12333,7 @@ export function StudioCuttoonEditor({
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
-  }, [canvasPointerGestureIsOwned]);
+  }, [appSettingsRef, canvasPointerGestureIsOwned]);
 
   // 모바일 핀치 줌 — 두 손가락 거리 변화를 zoom에 반영(한 손가락 스크롤=네이티브 패닝은 그대로).
   useEffect(() => {
@@ -12449,7 +12501,7 @@ export function StudioCuttoonEditor({
       node.removeEventListener("touchend", onTouchEnd);
       node.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [canvasEditingGestureIsOwned, canvasPointerGestureIsOwned]);
+  }, [appSettingsRef, canvasEditingGestureIsOwned, canvasPointerGestureIsOwned]);
 
   // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
   useEffect(() => {
@@ -12511,7 +12563,11 @@ export function StudioCuttoonEditor({
     studioProjectDocumentSessionScopeRef.current =
       studioProjectDocumentSessionScopeKey;
     studioProjectDocumentSessionRef.current = null;
-  }, [studioProjectDocumentSessionScopeKey]);
+  }, [
+    studioProjectDocumentSessionRef,
+    studioProjectDocumentSessionScopeKey,
+    studioProjectDocumentSessionScopeRef,
+  ]);
   const mutationScopeKey = JSON.stringify([studioAuthUserId, workId]);
   useLayoutEffect(() => {
     if (previousMutationScopeRef.current === mutationScopeKey) return;
@@ -12529,7 +12585,16 @@ export function StudioCuttoonEditor({
     setIsExporting(false);
     setServerRevisionLoading(false);
     setFxPanelLoading(false);
-  }, [mutationScopeKey]);
+  }, [
+    documentRevalidateAbortRef,
+    documentSaveInFlightRef,
+    mutationScopeKey,
+    ownerDetailAbortRef,
+    previousMutationScopeRef,
+    serverRevisionAbortRef,
+    sharedDocumentRestoreAbortRef,
+    sharedDocumentSaveAbortRef,
+  ]);
   // Export loops switch pages asynchronously. This marker is updated only after React has committed
   // the requested page and capture mode, so a slow phone cannot accidentally snapshot the previous
   // page merely because an arbitrary 120/180ms sleep elapsed.
@@ -12996,7 +13061,13 @@ export function StudioCuttoonEditor({
       companionCommandHandlerRef.current = () => undefined;
     };
     // 훅 반환 ref 는 안정 객체 — deps 에 넣어도 재구독을 일으키지 않는다.
-  }, [companionCommandHandlerRef, companionPendingTextTimerRef, companionUiRef, setLeftPanelOpenWithOverride]);
+  }, [
+    companionCommandHandlerRef,
+    companionPendingTextTimerRef,
+    companionUiRef,
+    setLeftPanelOpenWithOverride,
+    setStudioUiDensityFromCompanion,
+  ]);
 
   // 컴패니언에 현재 UI 상태 미러 (채널·미러 판정은 useStudioCompanionRuntime 이 소유).
   useEffect(() => {
@@ -14403,7 +14474,7 @@ const puppetWarpArmed =
   // "페이지 요소 + 마스터 합성"이어야 하고, 마스터 편집 화면(고스트 포함)이 찍히면 안 된다.
   useEffect(() => {
     if (isExporting) setMasterEditMode(false);
-  }, [isExporting]);
+  }, [isExporting, setMasterEditMode]);
 
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
@@ -14649,10 +14720,34 @@ const puppetWarpArmed =
       controller.abort();
     };
   }, [
+    advancedFillAbortRef,
+    advancedFillRunIdRef,
+    advancedFillTapGestureRef,
+    advancedFillTapPayloadRef,
+    advancedFillTouchPanRef,
+    collaborationAccessRef,
     commitStudioHistoryJournal,
     hydrateStudioSidecarDocuments,
+    pagesHistoryCommandJournalRef,
+    referenceBoardLatestRequestedRef,
     remixId,
     resetStudioHistoryRetention,
+    setAiProvenanceState,
+    setCurrentPageId,
+    setDocumentReloadRequired,
+    setMasterState,
+    setPagesHiState,
+    setPagesHistoryState,
+    setPublicationAnalyticsState,
+    setReferenceBoardState,
+    setReleaseScheduleState,
+    setSharedDocumentScope,
+    setStudioCommentsState,
+    setWorkHydrated,
+    setWorkHydrationFailed,
+    setWorkHydrationUnsupportedFormat,
+    studioProjectDocumentSessionRef,
+    studioRevisionProjectGenerationRef,
     workAuthScopeKey,
     workId,
   ]);
@@ -14972,7 +15067,7 @@ const puppetWarpArmed =
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAppSettingsPersistenceState]);
   useEffect(() => {
     const controller = new AbortController();
     void getStudioServerAiStatus(controller.signal)
@@ -25792,6 +25887,8 @@ function clearSelectionForEdit() {
       viewTransformSuppressed,
       studioMainMenuSurfaceActions,
       studioMainMenuSurfaceState,
+      setAppSettingsInitialTab,
+      setAppSettingsOpen,
       setLeftPanelOpenWithOverride,
       setRightPanelOpenWithOverride,
       toggleCanvasWideMode,
@@ -26515,7 +26612,17 @@ function clearSelectionForEdit() {
     return () => {
       controller.abort();
     };
-  }, [checkpointKey, checkpointPanelOpen, loggedIn, serverCurrentRevision, sharedDocument?.role, studioAuthUserId, workId]);
+  }, [
+    checkpointKey,
+    checkpointPanelOpen,
+    currentStudioDocumentScopeRef,
+    editorMountedRef,
+    loggedIn,
+    serverCurrentRevision,
+    sharedDocument?.role,
+    studioAuthUserId,
+    workId,
+  ]);
 
   async function openOwnerFxPanel() {
     if (loadedWork && !sharedDocument) {
