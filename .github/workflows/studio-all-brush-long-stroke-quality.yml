@@ -2,10 +2,17 @@ name: Studio all-brush screen-fill quality election
 
 on:
   push:
-    branches:
-      - feat/all-brush-long-stroke-quality-election-20260904
+    branches: [main]
     paths:
-      - .github/trigger/all-brush-quality-benchmark.txt
+      - ".github/trigger/all-brush-quality-benchmark.txt"
+      - ".github/workflows/studio-all-brush-long-stroke-quality.yml"
+      - "scripts/verify-studio-long-stroke.mts"
+      - "scripts/run-studio-all-brush-long-stroke-shard.mts"
+      - "scripts/aggregate-studio-all-brush-long-stroke.mts"
+      - "scripts/analyze-studio-brush-similarity.mts"
+      - "scripts/studio-brush-long-matrix-quality.ts"
+      - "src/domains/creator/brush/**"
+      - "src/domains/creator/live/**"
   schedule:
     - cron: "17 18 * * 6"
   workflow_dispatch:
@@ -16,6 +23,14 @@ permissions:
 concurrency:
   group: studio-all-brush-screen-fill-${{ github.ref }}
   cancel-in-progress: true
+
+# GitHub-hosted Linux does not provide trustworthy physical-GPU evidence. The GPU lane below is
+# intentionally forced to SwiftShader and is diagnostic only. Runtime GPU admission remains
+# fail-closed until the generated-evidence contract receives at least three recent, independent,
+# non-fallback physical-adapter runs with the same renderer contract and quality-equivalent output.
+
+env:
+  TOONSPECTRUM_ALL_BRUSH_EVIDENCE_CLASS: hosted-software-diagnostic
 
 jobs:
   build:
@@ -56,7 +71,7 @@ jobs:
           retention-days: 3
 
   benchmark:
-    name: ${{ matrix.mode }}-${{ matrix.shard }}
+    name: diagnostic-${{ matrix.mode }}-${{ matrix.shard }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -91,6 +106,7 @@ jobs:
           TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: ${{ matrix.shard }}
           TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 8
           TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/all-brush-long-stroke
+          TOONSPECTRUM_LONG_STROKE_FORCE_SWIFTSHADER: ${{ matrix.mode == 'gpu' && '1' || '0' }}
           TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 1200
           TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 3200
           TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 480000
@@ -114,7 +130,7 @@ jobs:
           retention-days: 7
 
   aggregate:
-    name: aggregate-quality-first-election-and-curation
+    name: aggregate-quality-first-diagnostic-and-curation
     needs: benchmark
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -133,22 +149,30 @@ jobs:
         with:
           pattern: all-brush-long-*-${{ github.sha }}
           path: artifacts/all-brush-long-stroke-input
-      - name: Aggregate every listed brush and elect a quality-safe backend
+      - name: Aggregate every listed brush with fail-closed GPU admission
         env:
           TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
           TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
-          TOONSPECTRUM_GPU_EVIDENCE_OUTPUT: src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          TOONSPECTRUM_GPU_EVIDENCE_OUTPUT: artifacts/all-brush-long-stroke-aggregate/studio-brush-gpu-quality-evidence.generated.ts
         run: pnpm exec tsx scripts/aggregate-studio-all-brush-long-stroke.mts
       - name: Find only visually near-identical brush exposure candidates
         env:
           TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
           TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
         run: pnpm exec tsx scripts/analyze-studio-brush-similarity.mts
+      - name: Prove hosted diagnostics cannot promote a production GPU lane
+        run: |
+          if grep -Eq 'decision:[[:space:]]*"gpu"' \
+            artifacts/all-brush-long-stroke-aggregate/studio-brush-gpu-quality-evidence.generated.ts; then
+            echo "Hosted SwiftShader diagnostics attempted to publish a production GPU decision." >&2
+            exit 1
+          fi
       - name: Validate election, curation and product admission
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
           pnpm exec vitest run \
+            scripts/studio-brush-long-matrix-quality.test.ts \
             src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
             src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
             src/domains/creator/brush/studio-brush-quality-curation.test.ts \
@@ -172,7 +196,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: all-brush-quality-election-and-curation-${{ github.sha }}
+          name: all-brush-quality-diagnostic-and-curation-${{ github.sha }}
           path: artifacts/all-brush-long-stroke-aggregate
           if-no-files-found: error
           retention-days: 30
