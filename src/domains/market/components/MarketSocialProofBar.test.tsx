@@ -3,6 +3,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { MarketSocialProofBar } from "./MarketSocialProofBar";
+
 const mocks = vi.hoisted(() => ({
   useMarketSocial: vi.fn(),
 }));
@@ -28,8 +30,6 @@ vi.mock("@/src/compat/auth-session-store", () => ({
     update: vi.fn(),
   }),
 }));
-
-import { MarketSocialProofBar } from "./MarketSocialProofBar";
 
 const RESOURCE_ID = "20000000-0000-4000-8000-000000000001";
 
