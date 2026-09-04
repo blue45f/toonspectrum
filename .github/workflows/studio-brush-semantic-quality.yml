@@ -9,7 +9,13 @@ on:
       - "scripts/audit-studio-brush-semantic-quality.mts"
       - "src/domains/creator/StudioActiveBrushSummary.test.tsx"
       - "src/domains/creator/StudioActiveBrushSummary.tsx"
+      - "src/domains/creator/brush/StudioBrushEngineMixer.test.tsx"
+      - "src/domains/creator/brush/StudioBrushEngineMixer.tsx"
+      - "src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx"
+      - "src/domains/creator/brush/StudioBrushEngineProgramControls.tsx"
       - "src/domains/creator/brush/studio-brush-catalog.ts"
+      - "src/domains/creator/brush/studio-brush-engine-mix.test.ts"
+      - "src/domains/creator/brush/studio-brush-engine-mix.ts"
       - "src/domains/creator/brush/studio-brush-material-distinctness.test.ts"
       - "src/domains/creator/brush/studio-brush-material-distinctness.ts"
       - "src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts"
@@ -58,7 +64,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify runtime-grounded brush semantics
+      - name: Verify runtime-grounded brush semantics and engine composition
         run: >-
           pnpm exec vitest run
           src/domains/creator/brush/studio-brush-semantic-quality.test.ts
@@ -66,6 +72,9 @@ jobs:
           src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts
           src/domains/creator/StudioActiveBrushSummary.test.tsx
           src/domains/creator/brush/studio-brush-catalog-lazy-boundary.test.ts
+          src/domains/creator/brush/studio-brush-engine-mix.test.ts
+          src/domains/creator/brush/StudioBrushEngineMixer.test.tsx
+          src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
 
       - name: Audit every listed name and material response
         run: >-
@@ -79,14 +88,20 @@ jobs:
           --check
           --out-dir=${{ runner.temp }}/studio-brush-semantic-quality
 
-      - name: Lint semantic quality surfaces
+      - name: Lint semantic quality and engine-composer surfaces
         run: >-
           pnpm exec eslint --max-warnings=0
           scripts/audit-studio-brush-pressure-curves.mts
           scripts/audit-studio-brush-semantic-quality.mts
           src/domains/creator/StudioActiveBrushSummary.test.tsx
           src/domains/creator/StudioActiveBrushSummary.tsx
+          src/domains/creator/brush/StudioBrushEngineMixer.test.tsx
+          src/domains/creator/brush/StudioBrushEngineMixer.tsx
+          src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
+          src/domains/creator/brush/StudioBrushEngineProgramControls.tsx
           src/domains/creator/brush/studio-brush-catalog.ts
+          src/domains/creator/brush/studio-brush-engine-mix.test.ts
+          src/domains/creator/brush/studio-brush-engine-mix.ts
           src/domains/creator/brush/studio-brush-material-distinctness.test.ts
           src/domains/creator/brush/studio-brush-material-distinctness.ts
           src/domains/creator/brush/studio-brush-pressure-curve-quality.test.ts
