@@ -6,6 +6,7 @@ on:
       - feat/all-brush-long-stroke-quality-election-20260904
     paths:
       - scripts/patch-all-brush-quality-v3.py
+      - scripts/patch-all-brush-quality-v3b.py
       - .github/workflows/apply-all-brush-quality-v3.yml
   workflow_dispatch:
 
@@ -44,8 +45,11 @@ jobs:
 
       - name: Apply quality-first source hardening
         run: |
-          python3 -m py_compile scripts/patch-all-brush-quality-v3.py
+          python3 -m py_compile \
+            scripts/patch-all-brush-quality-v3.py \
+            scripts/patch-all-brush-quality-v3b.py
           python3 scripts/patch-all-brush-quality-v3.py
+          python3 scripts/patch-all-brush-quality-v3b.py
           git diff --check
 
       - name: Focused quality and admission tests
@@ -128,16 +132,26 @@ jobs:
               for entry in report["results"]:
                   case = Path(entry["reportPath"]).parent
                   data = json.loads((case / "report.json").read_text())
-                  for image in ("00-blank.png", "01-live-half.png", "01-live.png", "02-committed.png", "03-settled.png"):
+                  for image in (
+                      "00-blank.png",
+                      "01-live-half.png",
+                      "01-live.png",
+                      "02-committed.png",
+                      "03-settled.png",
+                  ):
                       if not (case / image).is_file():
                           raise SystemExit(f"{mode}/{entry['id']}: missing {image}")
                   if entry["id"] == "standard-eraser":
                       primer = data.get("eraserPrimer") or {}
                       if primer.get("applied") is not True or primer.get("count") != 2:
-                          raise SystemExit(f"{mode}/standard-eraser: invalid primer evidence {primer}")
-                  log = Path(case.parent / "verifier.log").read_text(errors="replace")
+                          raise SystemExit(
+                              f"{mode}/standard-eraser: invalid primer evidence {primer}"
+                          )
+                  log = (case.parent / "verifier.log").read_text(errors="replace")
                   if "/src/domains/creator" in log and "404" in log:
-                      raise SystemExit(f"{mode}/{entry['id']}: production preview emitted /src 404")
+                      raise SystemExit(
+                          f"{mode}/{entry['id']}: production preview emitted /src 404"
+                      )
           PY
 
       - name: Commit validated source only
