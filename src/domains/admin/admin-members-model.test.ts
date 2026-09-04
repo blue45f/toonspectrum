@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildMemberCsv,
   buildMemberQuery,
   clampPage,
   getPageCount,
@@ -44,6 +45,25 @@ describe("admin member model", () => {
     expect(getPageCount(101, 25)).toBe(5);
     expect(clampPage(10, 12, 25)).toBe(1);
     expect(clampPage(-3, 100, 25)).toBe(1);
+  });
+
+  it("exports spreadsheet-safe UTF-8 CSV for the visible member page", () => {
+    const csv = buildMemberCsv([
+      {
+        id: "member-1",
+        name: "=HYPERLINK(\"https://example.com\")",
+        email: "member@example.com",
+        role: "creator",
+        status: "active",
+        createdAt: "2026-09-05T00:00:00.000Z",
+      },
+    ]);
+
+    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(csv).toContain(
+      "\"'=HYPERLINK(\"\"https://example.com\"\")\"",
+    );
+    expect(csv).toContain("\"member@example.com\"");
   });
 
   it("toggles one or all visible member selections without dropping hidden pages", () => {

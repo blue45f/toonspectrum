@@ -90,6 +90,42 @@ export function toggleVisibleMemberSelection(
   return next;
 }
 
+export interface MemberCsvRow {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role: string;
+  status: string;
+  createdAt?: string | null;
+}
+
+function spreadsheetSafeCsvCell(value: unknown): string {
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+export function buildMemberCsv(rows: readonly MemberCsvRow[]): string {
+  const header = ["ID", "Name", "Email", "Role", "Status", "CreatedAt"]
+    .map(spreadsheetSafeCsvCell)
+    .join(",");
+  const body = rows
+    .map((row) =>
+      [
+        row.id,
+        row.name ?? "",
+        row.email ?? "",
+        row.role,
+        row.status,
+        row.createdAt ?? "",
+      ]
+        .map(spreadsheetSafeCsvCell)
+        .join(","),
+    )
+    .join("\n");
+  return `\uFEFF${header}\n${body}`;
+}
+
 export function interpolateCount(template: string, count: number): string {
   return template.replace("{count}", count.toLocaleString());
 }
