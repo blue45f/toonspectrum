@@ -37,13 +37,37 @@ jobs:
 
           patcher = Path('.github/scripts/apply-studio-ux-convergence.py')
           source = patcher.read_text(encoding='utf-8')
-          replacements = {
-              '    "  return (\\n      <div\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        className={cn(\\n",':
-              '    "  return (\\n      <div\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",',
-              '    "  return (\\n      <div\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-canvas-workspace\\"\\n        role=\\"region\\"\\n        aria-label=\\"캔버스 작업영역\\"\\n        tabIndex={-1}\\n        className={cn(\\n",':
-              '    "  return (\\n          <div\\n            className={cn(\\n",\n    "  return (\\n          <div\\n            id=\\"studio-canvas-workspace\\"\\n            role=\\"region\\"\\n            aria-label=\\"캔버스 작업영역\\"\\n            tabIndex={-1}\\n            className={cn(\\n",',
-          }
-          for old, new in replacements.items():
+          replacements = [
+              (
+                  '''WORKSPACE = "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx"
+replace_once(
+    WORKSPACE,
+    "  return (\\n      <div\\n        className={cn(\\n",
+    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        className={cn(\\n",
+)''',
+                  '''WORKSPACE = "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx"
+replace_once(
+    WORKSPACE,
+    "  return (\\n      <div\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",
+    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",
+)''',
+              ),
+              (
+                  '''CANVAS = "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx"
+replace_once(
+    CANVAS,
+    "  return (\\n      <div\\n        className={cn(\\n",
+    "  return (\\n      <div\\n        id=\\"studio-canvas-workspace\\"\\n        role=\\"region\\"\\n        aria-label=\\"캔버스 작업영역\\"\\n        tabIndex={-1}\\n        className={cn(\\n",
+)''',
+                  '''CANVAS = "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx"
+replace_once(
+    CANVAS,
+    "  return (\\n          <div\\n            className={cn(\\n",
+    "  return (\\n          <div\\n            id=\\"studio-canvas-workspace\\"\\n            role=\\"region\\"\\n            aria-label=\\"캔버스 작업영역\\"\\n            tabIndex={-1}\\n            className={cn(\\n",
+)''',
+              ),
+          ]
+          for old, new in replacements:
               if source.count(old) != 1:
                   raise SystemExit(f'bootstrap anchor not unique: {old[:80]!r} -> {source.count(old)}')
               source = source.replace(old, new, 1)
