@@ -15,12 +15,12 @@ import {
   normalizeTrafficCountryCode,
   normalizeTrafficPath,
   normalizeTrafficReferrerHost,
+  normalizeTrafficScreenClass,
   requireTrafficIdentifier,
   TRAFFIC_DEFAULT_RETENTION_DAYS,
   TRAFFIC_MAX_ENGAGED_SECONDS,
   trafficPageViewRangeKey,
   TRAFFIC_SESSION_PREFIX,
-  trafficScreenClass,
   type TrafficHeartbeatPayload,
   type TrafficPageViewPayload,
   type TrafficRequestContext,
@@ -161,19 +161,7 @@ export class TrafficAnalyticsService {
       utmCampaign: normalizeTrafficCampaignToken(payload.utmCampaign),
       referrerHost,
     });
-    const screenWidth = boundedTrafficInteger(
-      payload.screenWidth,
-      0,
-      0,
-      20_000,
-    );
-    const screenHeight = boundedTrafficInteger(
-      payload.screenHeight,
-      0,
-      0,
-      20_000,
-    );
-    const screenClass = trafficScreenClass(screenWidth, screenHeight);
+    const screenClass = normalizeTrafficScreenClass(payload.screenClass);
     const countryCode = normalizeTrafficCountryCode(context.countryCode);
     const loadTimeMs =
       boundedTrafficInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
