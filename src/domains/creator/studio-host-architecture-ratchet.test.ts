@@ -22,6 +22,10 @@ const SRC_DIR = path.resolve(CREATOR_DIR, "../..");
 
 const HOST_FILE = path.join(CREATOR_DIR, "StudioCuttoonEditorHost.tsx");
 const RAIL_FILE = path.join(CREATOR_DIR, "StudioLeftToolRail.tsx");
+const APP_ROUTER_FILE = path.join(SRC_DIR, "app/routes/AppRouter.tsx");
+const STUDIO_ROUTER_FILE = path.join(CREATOR_DIR, "studio-router/StudioRouter.tsx");
+const STUDIO_RUNTIME_DIR = path.join(CREATOR_DIR, "studio-cuttoon-editor/runtime");
+const APP_ROUTE_GROUP_DIR = path.join(SRC_DIR, "app/routes/groups");
 const SESSION_CORE_FILE = path.join(
   CREATOR_DIR,
   "studio-cuttoon-editor/StudioCuttoonEditorViewSessionCore.ts",
@@ -37,7 +41,10 @@ const SESSION_REST_FILE = path.join(
  * 31,011줄로 늘려 상한을 실측값으로 재설정했다 — 그 커밋들은 이 래칫이 생기기 전에 작성된 것이다.
  * 이후로는 다시 올리지 않는다.
  */
-const HOST_MAX_LINES = 31_011;
+const HOST_MAX_LINES = 29_352;
+const ROUTER_SEAM_MAX_LINES = 100;
+const STUDIO_RUNTIME_MODULE_MAX_LINES = 300;
+const APP_ROUTE_GROUP_MAX_LINES = 120;
 
 /** ratchet: may only decrease. 측정 2026-09-02. */
 const SESSION_BAG_ANY_BASELINE = {
@@ -223,6 +230,52 @@ describe("studio host architecture ratchet", () => {
     // ratchet: may only decrease.
     const lines = readFileSync(HOST_FILE, "utf8").split("\n").length;
     expect(lines).toBeLessThanOrEqual(HOST_MAX_LINES);
+  });
+
+  it("keeps application and Studio routers as small composition seams", () => {
+    const measured = {
+      AppRouter: readFileSync(APP_ROUTER_FILE, "utf8").split("\n").length,
+      StudioRouter: readFileSync(STUDIO_ROUTER_FILE, "utf8").split("\n").length,
+    };
+    expect(
+      Object.entries(measured)
+        .filter(([, lines]) => lines > ROUTER_SEAM_MAX_LINES)
+        .map(([name, lines]) => `${name}: ${lines}`),
+    ).toEqual([]);
+  });
+
+  it("keeps new Studio runtime modules typed, focused, and independent of the host", () => {
+    const violations: string[] = [];
+    for (const entry of readdirSync(STUDIO_RUNTIME_DIR, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".ts") || entry.name.includes(".test.")) continue;
+      const file = path.join(STUDIO_RUNTIME_DIR, entry.name);
+      const source = readFileSync(file, "utf8");
+      const sourceFile = parseSource(file, source);
+      const lines = source.split("\n").length;
+      if (lines > STUDIO_RUNTIME_MODULE_MAX_LINES) {
+        violations.push(`${entry.name}: ${lines} lines`);
+      }
+      const explicitAny = countAnyKeywords(sourceFile);
+      if (explicitAny > 0) violations.push(`${entry.name}: ${explicitAny} explicit any`);
+      if (moduleSpecifiers(sourceFile).some((specifier) =>
+        /(^|\/)StudioCuttoonEditorHost$/u.test(specifier),
+      )) {
+        violations.push(`${entry.name}: imports StudioCuttoonEditorHost`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps domain route registries small and free of broad barrel files", () => {
+    const violations: string[] = [];
+    for (const entry of readdirSync(APP_ROUTE_GROUP_DIR, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".tsx") || entry.name.includes(".test.")) continue;
+      const source = readFileSync(path.join(APP_ROUTE_GROUP_DIR, entry.name), "utf8");
+      const lines = source.split("\n").length;
+      if (lines > APP_ROUTE_GROUP_MAX_LINES) violations.push(`${entry.name}: ${lines} lines`);
+      if (entry.name === "index.tsx") violations.push("index.tsx barrel is not allowed");
+    }
+    expect(violations).toEqual([]);
   });
 
   it("holds the session closure bags under their frozen `any` ceilings", () => {

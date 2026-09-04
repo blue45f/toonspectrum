@@ -223,13 +223,14 @@ describe("Studio lazy i18n assets", () => {
       ),
       "utf8",
     );
-    const routerSource = readFileSync(
+    const creatorRoutesSource = readFileSync(
       path.resolve(
         process.cwd(),
         "src",
         "app",
         "routes",
-        "AppRouter.tsx",
+        "groups",
+        "creator.routes.tsx",
       ),
       "utf8",
     );
@@ -237,6 +238,6 @@ describe("Studio lazy i18n assets", () => {
     expect(i18nSource).not.toMatch(/^\s+"studio\.[^"]+":/mu);
     expect(studioPageSource).not.toContain("studio-i18n");
     expect(companionSource).not.toContain("studio-i18n");
-    expect(routerSource).toContain("loadStudioI18nDictionaries()");
+    expect(creatorRoutesSource).toContain("loadStudioI18nDictionaries()");
   });
 });
