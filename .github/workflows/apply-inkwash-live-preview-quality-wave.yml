@@ -71,6 +71,9 @@ jobs:
               1,
           )
           source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
+          # Keep nested TypeScript templates literal while this JavaScript applicator executes.
+          source = source.replace("${name}", "\\${name}")
+          source = source.replace('${label ?? "unknown"}', '\\${label ?? "unknown"}')
           expression_open = "$" + "{{"
           escaped_open = "\\$" + "{{"
           source = source.replace(expression_open, escaped_open)
