@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
 import { apiPath } from "../../infrastructure/api";
@@ -134,19 +134,40 @@ export function TrafficAnalyticsBridge() {
     document.visibilityState === "visible" ? performance.now() : null,
   );
 
-  useEffect(() => {
+  const accumulateVisibleTime = useCallback(() => {
+    const visibleSince = visibleSinceRef.current;
+    if (visibleSince === null) return;
     const now = performance.now();
+    engagedMsRef.current += Math.max(0, now - visibleSince);
+    visibleSinceRef.current = now;
+  }, []);
+
+  const sendEngagementSnapshot = useCallback((path: string) => {
+    if (!analyticsEnabled(path)) return;
+    const engagedSeconds = Math.floor(engagedMsRef.current / 1_000);
+    if (engagedSeconds < MIN_HEARTBEAT_SECONDS) return;
+    identifiersRef.current ??= createRuntimeIdentifiers();
+    postTrafficEvent("heartbeat", {
+      ...identifiersRef.current,
+      path,
+      engagedSeconds,
+    });
+  }, []);
+
+  useEffect(() => {
     const previousPath = currentPathRef.current;
-    if (analyticsEnabled(previousPath) && visibleSinceRef.current !== null) {
-      engagedMsRef.current += Math.max(0, now - visibleSinceRef.current);
+    const previousEnabled = analyticsEnabled(previousPath);
+    const nextEnabled = analyticsEnabled(location.pathname);
+    if (previousEnabled) accumulateVisibleTime();
+    if (previousEnabled && !nextEnabled) {
+      sendEngagementSnapshot(previousPath);
     }
     currentPathRef.current = location.pathname;
     visibleSinceRef.current =
-      analyticsEnabled(location.pathname)
-      && document.visibilityState === "visible"
-        ? now
+      nextEnabled && document.visibilityState === "visible"
+        ? performance.now()
         : null;
-  }, [location.pathname]);
+  }, [accumulateVisibleTime, location.pathname, sendEngagementSnapshot]);
 
   useEffect(() => {
     if (!analyticsEnabled(location.pathname)) return;
@@ -180,25 +201,11 @@ export function TrafficAnalyticsBridge() {
   }, [location.key, location.pathname, location.search]);
 
   useEffect(() => {
-    const accumulateVisibleTime = () => {
-      const visibleSince = visibleSinceRef.current;
-      if (visibleSince === null) return;
-      const now = performance.now();
-      engagedMsRef.current += Math.max(0, now - visibleSince);
-      visibleSinceRef.current = now;
-    };
-
     const sendHeartbeat = () => {
-      if (!analyticsEnabled(currentPathRef.current)) return;
-      identifiersRef.current ??= createRuntimeIdentifiers();
+      const path = currentPathRef.current;
+      if (!analyticsEnabled(path)) return;
       accumulateVisibleTime();
-      const engagedSeconds = Math.floor(engagedMsRef.current / 1_000);
-      if (engagedSeconds < MIN_HEARTBEAT_SECONDS) return;
-      postTrafficEvent("heartbeat", {
-        ...identifiersRef.current,
-        path: currentPathRef.current,
-        engagedSeconds,
-      });
+      sendEngagementSnapshot(path);
     };
 
     const handleVisibilityChange = () => {
@@ -226,7 +233,7 @@ export function TrafficAnalyticsBridge() {
       globalThis.removeEventListener("pagehide", handlePageHide);
       sendHeartbeat();
     };
-  }, []);
+  }, [accumulateVisibleTime, sendEngagementSnapshot]);
 
   return null;
 }
