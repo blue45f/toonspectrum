@@ -58,10 +58,10 @@ function syncSnapshot(
 }
 
 const peers = [
-  peer("viewer-id", "지우", { role: "viewer", visibility: "background" }),
+  peer("viewer-id", "지우", { role: "viewer", visibility: "idle" }),
   peer("owner-id", "희준", { role: "owner" }),
   peer("commenter-id", "서연", { role: "commenter" }),
-  peer("followed-id", "민호", { role: "editor", visibility: "background" }),
+  peer("followed-id", "민호", { role: "editor", visibility: "idle" }),
   peer("admin-id", "가람", { role: "admin" }),
 ];
 
@@ -110,6 +110,7 @@ describe("StudioLiveCollaborationCommandCenter", () => {
         updateCount: 3,
         exportAvailable: true,
         exported: false,
+        message: "복구 파일을 내보내 주세요.",
       },
     });
     expect(recovery.target).toBe("sync");
@@ -182,7 +183,7 @@ describe("StudioLiveCollaborationCommandCenter", () => {
     expect(html).toContain('data-studio-collaboration-jump="screen"');
     expect(html).toContain('data-studio-collaboration-jump="sync"');
     expect(html).toContain("전체 참여 탭 찾기");
-    expect(html).toContain("민호 따라가기 중지");
+    expect(html).toContain("집중 모드 종료 · 민호");
     expect(html).toContain("인계 요약 복사");
   });
 });

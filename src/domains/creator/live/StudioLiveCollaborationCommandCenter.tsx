@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- command-center view models are intentionally unit-tested beside the component. */
 import {
   AlertCircle,
   Check,
@@ -11,7 +12,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { studioLiveParticipantColor } from "./studio-live-canvas-overlay-model";
 
@@ -315,7 +316,8 @@ export function buildStudioLiveHandoffSummary({
   if (orderedPeers.length > 0) lines.push(`연결 탭: ${truncateSummaryNames(orderedPeers)}`);
   if (followedPeer) lines.push(`집중 따라가기: ${followedPeer.displayName}`);
   if ((recovery?.updateCount ?? 0) > 0) {
-    lines.push(`주의: 분리된 로컬 변경 ${recovery!.updateCount.toLocaleString("ko-KR")}개 복구 필요`);
+    const recoveryCount = recovery?.updateCount ?? 0;
+    lines.push(`주의: 분리된 로컬 변경 ${recoveryCount.toLocaleString("ko-KR")}개 복구 필요`);
   }
   return lines.join("\n");
 }
@@ -363,7 +365,7 @@ function CommandMetric({
   detail,
   section,
 }: {
-  readonly icon: React.ReactNode;
+  readonly icon: ReactNode;
   readonly label: string;
   readonly value: string;
   readonly detail: string;
@@ -601,10 +603,10 @@ export function StudioLiveCollaborationCommandCenter({
         >
           {followedPeer ? <Check size={14} aria-hidden /> : <MousePointer2 size={14} aria-hidden />}
           {followedPeer
-            ? `${followedPeer.displayName} 따라가기 중지`
+            ? `집중 모드 종료 · ${followedPeer.displayName}`
             : activePeer
-              ? `${activePeer.displayName} 바로 따라가기`
-              : "따라갈 활성 탭 없음"}
+              ? `집중 모드 시작 · ${activePeer.displayName}`
+              : "집중할 활성 탭 없음"}
         </button>
       </div>
 
@@ -684,7 +686,7 @@ export function StudioLiveCollaborationCommandCenter({
                     <span className="min-w-0 flex-1">
                       <strong className="block truncate text-[0.7rem] text-fg">{peer.displayName}</strong>
                       <span className="mt-0.5 block truncate text-[0.62rem] text-fg-3">
-                        {ROLE_LABEL[peer.role]} · {peer.visibility === "active" ? "활성 탭" : "백그라운드 탭"}
+                        {ROLE_LABEL[peer.role]} · {peer.visibility === "active" ? "활성 탭" : "유휴 탭"}
                         {peer.pageId ? " · 캔버스 위치 공유 중" : ""}
                       </span>
                     </span>
