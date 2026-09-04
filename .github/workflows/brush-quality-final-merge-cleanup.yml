@@ -1,0 +1,324 @@
+name: One-shot brush quality final merge and cleanup
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: brush-quality-final-merge-cleanup
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/validate-merge-cleanup-all-brush-quality-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Wait for evidence-bound curation publication
+        id: ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${GITHUB_REPOSITORY}"
+          content_path="src/domains/creator/brush/studio-brush-quality-curation.generated.ts"
+          ready_sha=""
+          for _ in $(seq 1 360); do
+            ready_sha="$(gh api "repos/${repository}/git/ref/heads/${TARGET_BRANCH}" --jq .object.sha 2>/dev/null || true)"
+            if [[ -n "$ready_sha" ]]; then
+              if gh api "repos/${repository}/contents/${content_path}?ref=${TARGET_BRANCH}" \
+                --jq .content 2>/dev/null \
+                | tr -d '\n' \
+                | base64 --decode > /tmp/curation-generated.ts 2>/dev/null; then
+                if grep -q 'benchmarkRunId' /tmp/curation-generated.ts \
+                  && ! grep -q 'benchmarkRunId[[:space:]]*:[[:space:]]*null' /tmp/curation-generated.ts \
+                  && grep -q 'canonicalByQuarantinedId' /tmp/curation-generated.ts; then
+                  break
+                fi
+              fi
+            fi
+            ready_sha=""
+            sleep 30
+          done
+          if [[ -z "$ready_sha" ]]; then
+            echo "Measured curation was not published before timeout." >&2
+            exit 1
+          fi
+          echo "head_sha=$ready_sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify evidence ancestry, curation mapping, and clean source boundary
+        id: evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_head="$(git rev-parse HEAD)"
+          test "$current_head" = "${{ steps.ready.outputs.head_sha }}"
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path('src/domains/creator/brush/studio-brush-quality-curation.generated.ts')
+          source = path.read_text(encoding='utf-8')
+          match = re.search(
+              r'export const STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE\s*=\s*(\{[\s\S]*?\})\s+as const;',
+              source,
+          )
+          if not match:
+              raise SystemExit('could not parse generated curation evidence')
+          evidence = json.loads(match.group(1))
+          benchmark_head = evidence.get('benchmarkHeadSha')
+          run_id = evidence.get('benchmarkRunId')
+          quarantine = evidence.get('quarantineIds')
+          mapping = evidence.get('canonicalByQuarantinedId')
+          if not isinstance(benchmark_head, str) or not re.fullmatch(r'[0-9a-f]{40}', benchmark_head):
+              raise SystemExit('invalid benchmark HEAD')
+          if not isinstance(run_id, int) or run_id <= 0:
+              raise SystemExit('invalid benchmark run ID')
+          if not isinstance(quarantine, list) or not all(isinstance(value, str) for value in quarantine):
+              raise SystemExit('invalid quarantine IDs')
+          if len(quarantine) != len(set(quarantine)):
+              raise SystemExit('duplicate quarantine IDs')
+          if not isinstance(mapping, dict) or set(mapping) != set(quarantine):
+              raise SystemExit('canonical mapping must exactly cover quarantine IDs')
+          invalid = [
+              brush_id
+              for brush_id, canonical in mapping.items()
+              if not isinstance(canonical, str)
+              or canonical == brush_id
+              or canonical in quarantine
+          ]
+          if invalid:
+              raise SystemExit(f'invalid canonical mappings: {invalid}')
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as stream:
+              stream.write(f'benchmark_head={benchmark_head}\n')
+              stream.write(f'benchmark_run_id={run_id}\n')
+              stream.write(f'quarantine_count={len(quarantine)}\n')
+          PY
+
+          git merge-base --is-ancestor "${{ steps.evidence.outputs.benchmark_head }}" HEAD || true
+          benchmark_head="$(python3 - <<'PY'
+          import json, re
+          source = open('src/domains/creator/brush/studio-brush-quality-curation.generated.ts').read()
+          print(json.loads(re.search(r'=\s*(\{[\s\S]*?\})\s+as const;', source).group(1))['benchmarkHeadSha'])
+          PY
+          )"
+          git merge-base --is-ancestor "$benchmark_head" HEAD
+
+          grep -q 'STUDIO_MEASURED_BRUSH_QUARANTINE_IDS' \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          grep -q '\.\.\.(STUDIO_MEASURED_BRUSH_QUARANTINE_IDS' \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+
+          temporary="$({ git ls-files \
+            '.github/brush-quality-payloads/**' \
+            '.github/workflows/apply-all-brush-quality-v3-macos.yml' \
+            '.github/workflows/export-brush-quality-source-v2.yml' \
+            '.github/workflows/finalize-response-aware-brush-quality.yml' \
+            '.github/workflows/patch-brush-quality-policy.yml' \
+            'scripts/patch-all-brush-quality-v3.py' \
+            'scripts/patch-all-brush-quality-v3b.py' || true; } | sed '/^$/d' | wc -l | tr -d ' ')"
+          test "$temporary" = 0
+          test -z "$(git status --porcelain)"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run final quality-first validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            scripts/studio-brush-long-matrix-quality.test.ts
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          )
+          [[ -f src/domains/creator/brush/studio-brush-quarantine.test.ts ]] \
+            && tests+=(src/domains/creator/brush/studio-brush-quarantine.test.ts)
+          pnpm exec vitest run "${tests[@]}"
+          pnpm exec eslint --max-warnings=0 \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/analyze-studio-brush-similarity.mts \
+            scripts/studio-brush-long-matrix-quality.ts \
+            scripts/studio-brush-long-matrix-quality.test.ts \
+            scripts/verify-studio-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run build
+          node - <<'NODE'
+          const { scripts = {} } = require('./package.json');
+          const optional = ['check:bundle-size', 'bundle:check', 'check:bundle'];
+          for (const name of optional) {
+            if (scripts[name]) console.log(name);
+          }
+          NODE
+          while IFS= read -r script; do
+            [[ -n "$script" ]] && pnpm run "$script"
+          done < <(node -e "const s=require('./package.json').scripts||{}; for (const n of ['check:bundle-size','bundle:check','check:bundle']) if(s[n]) console.log(n)")
+          test -z "$(git status --porcelain)"
+
+      - name: Confirm PR head and merge quality branch
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_head="$(git rev-parse HEAD)"
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/679")"
+          pr_head="$(jq -r .head.sha <<<"$pr_json")"
+          pr_state="$(jq -r .state <<<"$pr_json")"
+          pr_draft="$(jq -r .draft <<<"$pr_json")"
+          test "$pr_head" = "$current_head"
+          test "$pr_state" = open
+          test "$pr_draft" = false
+
+          response="$(gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/679/merge" \
+            -f merge_method=squash \
+            -f commit_title='feat(studio): quality-first full-catalogue brush engine election' \
+            -f commit_message='Adds screen-filling long-stroke evidence for every listed paint brush, quality-first CPU/GPU election, response-aware duplicate curation, and replay-compatible UI quarantine. GPU is selected only after measured live/commit/hand-feel equivalence.')"
+          merged="$(jq -r .merged <<<"$response")"
+          message="$(jq -r .message <<<"$response")"
+          if [[ "$merged" != true ]]; then
+            echo "PR merge failed: $message" >&2
+            exit 1
+          fi
+          merge_sha="$(jq -r .sha <<<"$response")"
+          echo "merge_sha=$merge_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Remove experiment-only workflows through cleanup PR
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          cleanup_branch="ci/remove-brush-quality-experiment-workflows-${GITHUB_RUN_ID}"
+          git switch --force-create "$cleanup_branch" origin/main
+          git rm -f --ignore-unmatch \
+            .github/workflows/brush-quality-maintenance-command.yml \
+            .github/workflows/brush-quality-status-command.yml \
+            .github/workflows/brush-quality-finalize-benchmark-command-v2.yml \
+            .github/workflows/brush-quality-finalize-benchmark-command-v3.yml \
+            .github/workflows/brush-quality-benchmark-receipt.yml \
+            .github/workflows/brush-quality-full-run-orchestrator.yml \
+            .github/workflows/brush-measured-curation-patch-candidate.yml \
+            .github/workflows/brush-measured-curation-apply-command.yml \
+            .github/workflows/brush-quality-final-merge-cleanup.yml
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git commit -m "ci(brush): remove completed quality experiment workflows"
+          git push origin "$cleanup_branch"
+
+          cleanup_json="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f title='ci(brush): remove completed quality experiment workflows' \
+            -f head="$cleanup_branch" \
+            -f base=main \
+            -f body='Removes only the one-shot workflows used to finalize, benchmark, validate, apply and merge PR #679. Product benchmark code and measured evidence remain in main.')"
+          cleanup_pr="$(jq -r .number <<<"$cleanup_json")"
+          cleanup_response="$(gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${cleanup_pr}/merge" \
+            -f merge_method=squash \
+            -f commit_title='ci(brush): remove completed quality experiment workflows' \
+            -f commit_message='Removes temporary PR #679 orchestration and receipt workflows after the quality-first brush experiment completed.')"
+          test "$(jq -r .merged <<<"$cleanup_response")" = true
+          echo "cleanup_pr=$cleanup_pr" >> "$GITHUB_OUTPUT"
+          echo "cleanup_merge_sha=$(jq -r .sha <<<"$cleanup_response")" >> "$GITHUB_OUTPUT"
+
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import urllib.parse
+
+          branches = [
+              'ci/brush-quality-maintenance-command-20260904',
+              'ci/brush-quality-status-command-20260904',
+              'ci/brush-quality-finalize-benchmark-command-20260904-v2',
+              'ci/brush-quality-finalize-benchmark-command-20260904-v3',
+              'ci/brush-quality-benchmark-receipt-20260904',
+              'ci/brush-quality-full-run-orchestrator-20260904',
+              'ci/brush-measured-curation-patch-candidate-20260904',
+              'ci/brush-measured-curation-apply-command-20260904',
+              'ci/brush-quality-final-merge-cleanup-20260904',
+          ]
+          repo = os.environ['GITHUB_REPOSITORY']
+          for branch in branches:
+              path = f'repos/{repo}/git/refs/heads/{urllib.parse.quote(branch, safe="")}'
+              subprocess.run(['gh', 'api', '--method', 'DELETE', path], check=False)
+          PY
+
+      - name: Post final success receipt
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: [
+                '✅ **전체 브러시 품질 우선 실험·적용·메인 병합·원격 정리 완료**',
+                '',
+                `- product merge: \`${{ steps.merge.outputs.merge_sha }}\``,
+                `- UI 노출 격리: **${{ steps.evidence.outputs.quarantine_count }}개**`,
+                `- benchmark HEAD: \`${{ steps.evidence.outputs.benchmark_head }}\``,
+                `- benchmark run: **${{ steps.evidence.outputs.benchmark_run_id }}**`,
+                `- cleanup PR: **#${{ steps.cleanup.outputs.cleanup_pr }}**`,
+                `- cleanup merge: \`${{ steps.cleanup.outputs.cleanup_merge_sha }}\``,
+                '- runtime brush IDs와 저장 문서 재생 호환성 유지',
+                '- 품질 동률인 경우에만 물리 GPU 우선',
+                '- 로컬 브랜치·워크트리는 사용자 요청대로 변경하지 않음',
+              ].join('\n'),
+            });
+
+      - name: Post failure receipt
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: `❌ 최종 품질 게이트·메인 병합·원격 정리 중 한 단계가 실패했습니다. 통과하지 않은 상태를 완료로 처리하지 않습니다: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
