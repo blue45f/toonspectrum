@@ -15,20 +15,20 @@ import { ensureUserLifecycleSchema, normalizeUserAccountStatus } from "./user-li
 export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
   try {
-  await ensureUserLifecycleSchema();
-  const u = await getSessionUserCached(userId, async (id) => {
-    const [row] = await db
-      .select({ role: users.role, email: users.email, status: users.status })
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    return row ?? null;
-  });
-  if (!u) return false;
-  if (normalizeUserAccountStatus(u.status) !== "active") return false;
-  const role = String(u.role ?? "").toLowerCase();
-  if (role === "admin" || role === "operator") return true;
-  return isWhitelistedAdminEmail(u.email);
+    await ensureUserLifecycleSchema();
+    const u = await getSessionUserCached(userId, async (id) => {
+      const [row] = await db
+        .select({ role: users.role, email: users.email, status: users.status })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      return row ?? null;
+    });
+    if (!u) return false;
+    if (normalizeUserAccountStatus(u.status) !== "active") return false;
+    const role = String(u.role ?? "").toLowerCase();
+    if (role === "admin" || role === "operator") return true;
+    return isWhitelistedAdminEmail(u.email);
   } catch {
     return false; // DB(Neon) 불가 시 관리자 아님으로 안전 폴백.
   }
@@ -96,8 +96,12 @@ function sanitize(patch: Partial<AppConfig>): Partial<AppConfig> {
 export async function getAppConfig(): Promise<AppConfig> {
   try {
     await ensureSettingsTable();
-    const rows = await db.select().from(appSettings);
-    const raw = (rows.find((r) => r.key === CONFIG_KEY)?.value ?? {}) as Partial<AppConfig>;
+    const rows = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, CONFIG_KEY))
+      .limit(1);
+    const raw = (rows[0]?.value ?? {}) as Partial<AppConfig>;
     return { ...DEFAULTS, ...sanitize(raw) };
   } catch {
     // DB(Neon) 불가(쿼터/장애) 시 기본값(전 기능 무료·광고 없음)으로 폴백 — 설정 조회가 페이지를 깨지 않게.
