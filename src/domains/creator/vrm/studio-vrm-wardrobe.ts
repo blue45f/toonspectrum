@@ -8,6 +8,8 @@
 //  - 사이징은 모델별 골격 실측 치수(WardrobeMetrics)로 계산 → 어떤 VRM에도 자동 핏.
 //  - 부착 본은 VRM 필수 humanoid 본만 사용(spine/hips/팔다리/발) — chest·neck 등 옵셔널 본 미의존.
 
+import { sanitizeBodySilhouette, type BodySilhouette } from "./studio-vrm-body-silhouette";
+
 import type { CostumeSlot, CostumeState } from "./studio-vrm-costume";
 
 export const VRM_WARDROBE_VERSION = 2 as const;
@@ -224,6 +226,11 @@ export interface WardrobeMetrics {
   lowerArm: SideMetric;
   upperLeg: SideMetric;
   lowerLeg: SideMetric;
+  /**
+   * 스킨 메시에서 실측한 몸통 단면(hips→목). 있으면 절차형 셸이 어깨 폭 배수 대신 이 표면 위에
+   * 여유분을 얹어 재단된다. 측정 실패·부분 리그에서는 null이고 재단은 골격 폴백을 쓴다.
+   */
+  torso: BodySilhouette | null;
 }
 
 /** VRoid 표준 성인 체형 근사값 — 측정 실패 시(또는 테스트) 폴백. */
@@ -240,6 +247,7 @@ export const FALLBACK_WARDROBE_METRICS: WardrobeMetrics = {
   lowerArm: { left: { len: 0.22, axis: [1, 0, 0] }, right: { len: 0.22, axis: [-1, 0, 0] } },
   upperLeg: { left: { len: 0.35, axis: [0, -1, 0] }, right: { len: 0.35, axis: [0, -1, 0] } },
   lowerLeg: { left: { len: 0.4, axis: [0, -1, 0] }, right: { len: 0.4, axis: [0, -1, 0] } },
+  torso: null,
 };
 
 const LEN_MIN = 0.02;
@@ -293,6 +301,7 @@ export function sanitizeWardrobeMetrics(raw: Partial<WardrobeMetrics> | null | u
     lowerArm: sanitizeSide(raw.lowerArm, f.lowerArm),
     upperLeg: sanitizeSide(raw.upperLeg, f.upperLeg),
     lowerLeg: sanitizeSide(raw.lowerLeg, f.lowerLeg),
+    torso: sanitizeBodySilhouette(raw.torso),
   };
 }
 
@@ -734,8 +743,13 @@ export type GarmentShape =
   | { kind: "cylinder"; rTop: number; rBottom: number; h: number; open?: boolean }
   | {
       kind: "lathe";
-      /** Bottom-to-top garment silhouette in the part's local +Y axis. */
-      profile: readonly { radius: number; y: number }[];
+      /**
+       * Bottom-to-top garment silhouette in the part's local +Y axis.
+       * `depth` is the ring's Z radius as a ratio of `radius`; omitted rings stay circular and
+       * fall back to the part-wide `squash`. Per-ring depth is what lets a chest read wide and
+       * shallow while the waist stays narrow — a single squash cannot express both.
+       */
+      profile: readonly { radius: number; y: number; depth?: number }[];
       segments?: number;
     }
   | { kind: "box"; w: number; h: number; d: number }
