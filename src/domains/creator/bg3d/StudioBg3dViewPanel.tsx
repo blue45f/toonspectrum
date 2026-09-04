@@ -2,6 +2,7 @@ import {
   StudioBg3dProSuiteRuntimeContext,
   type StudioBg3dProSuiteRuntimeValue,
 } from "./studio-bg3d-pro-suite-runtime-context";
+import { summarizeStudioBg3dProductionLook } from "./studio-bg3d-production-pass-readiness";
 import { summarizeStudioBg3dProductionScene } from "./studio-bg3d-production-workflow";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
@@ -49,6 +50,9 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     lineArtPreview: context.lineArtPreview,
     transparentBackground: context.transparentInsert,
   });
+  const productionLook = summarizeStudioBg3dProductionLook(
+    context.sceneBaseDocument.output,
+  );
   const runtime: StudioBg3dProSuiteRuntimeValue = {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
@@ -61,6 +65,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
       availablePasses: context.STUDIO_BG3D_SHOT_BATCH_PASSES,
       selectedPasses: context.selectedShotBatchPasses,
       passLabels: context.STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+      look: productionLook,
       exportHeight: context.shotBatchExportHeight,
       exportHeightOptions: context.LT_EXPORT_HEIGHTS,
       includeLayeredPsd: context.shotBatchIncludeLayeredPsd,
