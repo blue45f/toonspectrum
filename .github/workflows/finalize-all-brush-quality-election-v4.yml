@@ -1,0 +1,259 @@
+name: Finalize quality-first all-brush election
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/workflows/finalize-all-brush-quality-election-v4.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-quality-first-all-brush-election-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-publish-clean-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      FINAL_BRANCH: feat/all-brush-quality-election-final-20260904
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/all-brush-long-stroke-quality-election-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Converge quality-first source state
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! grep -q 'TOONSPECTRUM_LONG_STROKE_FORCE_SWIFTSHADER' scripts/verify-studio-long-stroke.mts; then
+            python3 scripts/patch-all-brush-quality-v3.py
+          fi
+          if grep -q '^function transitionRatio' scripts/aggregate-studio-all-brush-long-stroke.mts; then
+            python3 scripts/patch-all-brush-quality-v3b.py
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+
+          verifier = Path('scripts/verify-studio-long-stroke.mts')
+          text = verifier.read_text(encoding='utf-8')
+          text = text.replace(
+              '    const liveShot = await shot(page, clip, "01-live");',
+              '    await shot(page, clip, "01-live");',
+          )
+          verifier.write_text(text, encoding='utf-8')
+
+          curation = Path('src/domains/creator/brush/studio-brush-quality-curation.ts')
+          text = curation.read_text(encoding='utf-8')
+          old = '''function representativeComparator(
+            left: StudioBrushCurationCandidate,
+            right: StudioBrushCurationCandidate,
+          ): number {
+            if (left.protectedFromCulling !== right.protectedFromCulling) {
+              return left.protectedFromCulling ? -1 : 1;
+            }
+            const leftScore = candidateQualityScore(left);
+            const rightScore = candidateQualityScore(right);
+            const qualityDelta = leftScore - rightScore;
+            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+            // GPU is only a tie-breaker after quality is effectively equal.'''
+          new = '''function representativeComparator(
+            left: StudioBrushCurationCandidate,
+            right: StudioBrushCurationCandidate,
+          ): number {
+            // A protected catalogue starter must never outrank a mark that failed the measured
+            // quality contract. Protection only resolves a genuine quality tie.
+            if (left.qualityPassed !== right.qualityPassed) {
+              return left.qualityPassed ? -1 : 1;
+            }
+            const leftScore = candidateQualityScore(left);
+            const rightScore = candidateQualityScore(right);
+            const qualityDelta = leftScore - rightScore;
+            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+            if (left.protectedFromCulling !== right.protectedFromCulling) {
+              return left.protectedFromCulling ? -1 : 1;
+            }
+            // GPU is only a tie-breaker after quality is effectively equal.'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          curation.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
+
+      - name: Focused quality, election, admission and curation tests
+        run: >-
+          pnpm exec vitest run
+          scripts/studio-brush-long-matrix-quality.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Focused zero-warning lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/verify-studio-long-stroke.mts
+          scripts/run-studio-all-brush-long-stroke-shard.mts
+          scripts/aggregate-studio-all-brush-long-stroke.mts
+          scripts/studio-brush-long-matrix-quality.ts
+          scripts/studio-brush-long-matrix-quality.test.ts
+          scripts/analyze-studio-brush-similarity.mts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          src/domains/creator/brush/studio-brush-quality-curation.ts
+          src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Typecheck complete repository
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Representative baseline screen-fill smoke
+        env:
+          VITE_STUDIO_LIVE_INK_BACKEND: canvas2d
+          TOONSPECTRUM_ALL_BRUSH_MODE: baseline
+          TOONSPECTRUM_ALL_BRUSH_IDS: pen,inkwash-pen,standard-eraser
+          TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: 0
+          TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 1
+          TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/final-quality-smoke
+          TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 384
+          TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 640
+          TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 180000
+        run: |
+          rm -rf dist
+          pnpm build
+          xvfb-run -a --server-args='-screen 0 1920x1200x24' \
+            pnpm exec tsx scripts/run-studio-all-brush-long-stroke-shard.mts
+
+      - name: Software-GPU diagnostic screen-fill smoke
+        env:
+          VITE_STUDIO_LIVE_INK_BACKEND: webgpu
+          TOONSPECTRUM_ALL_BRUSH_MODE: gpu
+          TOONSPECTRUM_ALL_BRUSH_IDS: pen,inkwash-pen,standard-eraser
+          TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: 0
+          TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 1
+          TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/final-quality-smoke
+          TOONSPECTRUM_LONG_STROKE_FORCE_SWIFTSHADER: "1"
+          TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 384
+          TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 640
+          TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 180000
+        run: |
+          rm -rf dist
+          pnpm build
+          xvfb-run -a --server-args='-screen 0 1920x1200x24' \
+            pnpm exec tsx scripts/run-studio-all-brush-long-stroke-shard.mts
+
+      - name: Validate smoke evidence contracts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('artifacts/final-quality-smoke')
+          expected = {'pen', 'inkwash-pen', 'standard-eraser'}
+          for mode in ('baseline', 'gpu'):
+              shard = root / mode / 'shard-0-of-1'
+              report = json.loads((shard / 'shard-report.json').read_text())
+              ids = {entry['id'] for entry in report['results']}
+              if ids != expected:
+                  raise SystemExit(f'{mode}: measured {sorted(ids)}, expected {sorted(expected)}')
+              for entry in report['results']:
+                  case = Path(entry['reportPath']).parent
+                  for image in (
+                      '00-blank.png',
+                      '01-live-half.png',
+                      '01-live.png',
+                      '02-committed.png',
+                      '03-settled.png',
+                  ):
+                      if not (case / image).is_file():
+                          raise SystemExit(f"{mode}/{entry['id']}: missing {image}")
+                  data = json.loads((case / 'report.json').read_text())
+                  if entry['id'] == 'standard-eraser':
+                      primer = data.get('eraserPrimer') or {}
+                      if primer.get('applied') is not True or primer.get('count') != 2:
+                          raise SystemExit(f'{mode}/standard-eraser: bad primer {primer}')
+                  log = (case.parent / 'verifier.log').read_text(errors='replace')
+                  if '/src/domains/creator' in log and '404' in log:
+                      raise SystemExit(f"{mode}/{entry['id']}: preview emitted /src 404")
+          PY
+
+      - name: Build clean integration branch from latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+
+          git add \
+            scripts/verify-studio-long-stroke.mts \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(brush): finish quality-first matrix hardening'
+          fi
+          PATCHED_HEAD=$(git rev-parse HEAD)
+          git fetch origin main
+          git diff --binary origin/main..."$PATCHED_HEAD" -- \
+            . \
+            ':(exclude).github/workflows/**' \
+            ':(exclude)scripts/patch-all-brush*.py' \
+            ':(exclude)scripts/export-brush-quality*.py' \
+            > /tmp/quality-election.patch
+          test -s /tmp/quality-election.patch
+
+          git switch --detach origin/main
+          git branch -D "$FINAL_BRANCH" 2>/dev/null || true
+          git switch -c "$FINAL_BRANCH"
+          git apply --index --3way /tmp/quality-election.patch
+
+          if git diff --cached --name-only | grep -E '(^|/)(patch-all-brush|apply-all-brush|export-brush-quality|finalize-all-brush)'; then
+            echo 'temporary machinery leaked into final branch' >&2
+            exit 1
+          fi
+
+          pnpm exec vitest run \
+            scripts/studio-brush-long-matrix-quality.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --cached --check
+          git commit -m 'feat(brush): add quality-first all-brush GPU backend election'
+          git push --force-with-lease origin HEAD:"$FINAL_BRANCH"
+
+      - name: Upload representative evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-quality-first-screen-fill-${{ github.run_id }}
+          path: artifacts/final-quality-smoke
+          if-no-files-found: warn
+          retention-days: 14
