@@ -22,9 +22,11 @@ import {
   formatTrafficDateTime,
   formatTrafficDuration,
   formatTrafficMilliseconds,
-  TRAFFIC_AUTO_REFRESH_MS,
+  TRAFFIC_OVERVIEW_REFRESH_MS,
+  TRAFFIC_PULSE_REFRESH_MS,
   TRAFFIC_RANGE_DAYS,
   type TrafficOverview,
+  type TrafficPulse,
   type TrafficRangeDays,
 } from "./admin-traffic-model";
 import { adminFetch, formatNum } from "./admin-client";
@@ -44,58 +46,133 @@ import {
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+function withPulse(
+  overview: TrafficOverview,
+  pulse: TrafficPulse,
+): TrafficOverview {
+  return {
+    ...overview,
+    generatedAt: pulse.generatedAt,
+    status:
+      overview.status === "live" || pulse.pageViews30m > 0
+        ? "live"
+        : "empty",
+    realtime: {
+      windowMinutes: pulse.windowMinutes,
+      activeVisitors: pulse.activeVisitors,
+      activeSessions: pulse.activeSessions,
+      pageViews5m: pulse.pageViews5m,
+      pageViews30m: pulse.pageViews30m,
+      latestAt: pulse.latestAt,
+    },
+    realtimeSeries: pulse.series,
+  };
+}
+
 export function AdminTraffic({ uid }: { uid: string }) {
   const t = useT();
   const locale = useI18n((state) => state.lang);
   const [days, setDays] = useState<TrafficRangeDays>(7);
   const [data, setData] = useState<TrafficOverview | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [pulseError, setPulseError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const requestSequence = useRef(0);
+  const dataRef = useRef<TrafficOverview | null>(null);
+  const overviewSequence = useRef(0);
+  const pulseSequence = useRef(0);
+  const emptyRefreshRequestedAt = useRef(0);
 
-  const load = useCallback(
+  const publishData = useCallback((next: TrafficOverview) => {
+    dataRef.current = next;
+    setData(next);
+  }, []);
+
+  const loadOverview = useCallback(
     async (background = false) => {
-      const sequence = ++requestSequence.current;
+      const sequence = ++overviewSequence.current;
       if (!background) setRefreshing(true);
       try {
         const next = await adminFetch<TrafficOverview>(
           `/traffic?days=${days}`,
           uid,
         );
-        if (sequence !== requestSequence.current) return;
-        setData(next);
-        setError(null);
+        if (sequence !== overviewSequence.current) return;
+        publishData(next);
+        setOverviewError(null);
       } catch (caught) {
-        if (sequence !== requestSequence.current) return;
-        setError(
+        if (sequence !== overviewSequence.current) return;
+        setOverviewError(
           caught instanceof Error
             ? caught.message
             : t("admin.traffic.loadError"),
         );
       } finally {
-        if (sequence === requestSequence.current && !background) {
+        if (sequence === overviewSequence.current && !background) {
           setRefreshing(false);
         }
       }
     },
-    [days, t, uid],
+    [days, publishData, t, uid],
   );
 
+  const loadPulse = useCallback(async () => {
+    const sequence = ++pulseSequence.current;
+    try {
+      const pulse = await adminFetch<TrafficPulse>("/traffic/pulse", uid);
+      if (sequence !== pulseSequence.current) return;
+      const current = dataRef.current;
+      if (current) publishData(withPulse(current, pulse));
+      setPulseError(null);
+
+      if (
+        current?.status === "empty"
+        && pulse.pageViews30m > 0
+        && Date.now() - emptyRefreshRequestedAt.current > 30_000
+      ) {
+        emptyRefreshRequestedAt.current = Date.now();
+        void loadOverview(true);
+      }
+    } catch (caught) {
+      if (sequence !== pulseSequence.current) return;
+      setPulseError(
+        caught instanceof Error
+          ? caught.message
+          : t("admin.traffic.loadError"),
+      );
+    }
+  }, [loadOverview, publishData, t, uid]);
+
   useEffect(() => {
-    setError(null);
-    void load();
-  }, [load]);
+    setOverviewError(null);
+    void loadOverview();
+    void loadPulse();
+  }, [loadOverview, loadPulse]);
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = globalThis.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void load(true);
-    }, TRAFFIC_AUTO_REFRESH_MS);
-    return () => globalThis.clearInterval(interval);
-  }, [autoRefresh, load]);
+    const refreshWhenVisible = (task: () => void) => {
+      if (document.visibilityState === "visible") task();
+    };
+    const pulseInterval = globalThis.setInterval(
+      () => refreshWhenVisible(() => void loadPulse()),
+      TRAFFIC_PULSE_REFRESH_MS,
+    );
+    const overviewInterval = globalThis.setInterval(
+      () => refreshWhenVisible(() => void loadOverview(true)),
+      TRAFFIC_OVERVIEW_REFRESH_MS,
+    );
+    return () => {
+      globalThis.clearInterval(pulseInterval);
+      globalThis.clearInterval(overviewInterval);
+    };
+  }, [autoRefresh, loadOverview, loadPulse]);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([loadOverview(), loadPulse()]);
+  }, [loadOverview, loadPulse]);
+
+  const error = overviewError ?? pulseError;
   if (!data && !error) return <AdminSpinner />;
   if (!data && error) {
     return (
@@ -103,7 +180,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
         <AdminNotice title={t("admin.traffic.loadError")} body={error} />
         <button
           type="button"
-          onClick={() => void load()}
+          onClick={() => void refreshAll()}
           className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent"
         >
           {t("admin.traffic.retry")}
@@ -113,7 +190,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
   }
   if (!data) return null;
 
-  const statusStale = Boolean(error);
+  const statusStale = Boolean(overviewError || pulseError);
   const coverage = data.totals.coverageStartAt
     ? `${t("admin.traffic.coverage")} ${formatTrafficDateTime(
         data.totals.coverageStartAt,
@@ -196,7 +273,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
             </button>
             <button
               type="button"
-              onClick={() => void load()}
+              onClick={() => void refreshAll()}
               disabled={refreshing}
               className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-medium text-fg-2 hover:border-accent/50 hover:text-fg disabled:opacity-50"
             >
@@ -220,7 +297,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
             role="status"
             className="mt-3 rounded-xl bg-warn/10 px-3 py-2 text-xs text-warn"
           >
-            {error}
+            {[overviewError, pulseError].filter(Boolean).join(" · ")}
           </p>
         ) : null}
       </header>
@@ -266,17 +343,17 @@ export function AdminTraffic({ uid }: { uid: string }) {
               icon={<Users className="size-4" />}
               label={t("admin.traffic.uniqueVisitors")}
               value={formatNum(data.totals.uniqueVisitors)}
-              detail={`${formatNum(
-                data.totals.returningVisitors,
-              )} ${t("admin.traffic.returningVisitors")}`}
+              detail={`${formatNum(data.totals.returningVisitors)} ${t(
+                "admin.traffic.returningVisitors",
+              )}`}
             />
             <TrafficMetricCard
               icon={<Activity className="size-4" />}
               label={t("admin.traffic.sessions")}
               value={formatNum(data.totals.sessions)}
-              detail={`${formatNum(
-                data.engagement.engagedSessions,
-              )} ${t("admin.traffic.engagedSessions")}`}
+              detail={`${formatNum(data.engagement.engagedSessions)} ${t(
+                "admin.traffic.engagedSessions",
+              )}`}
             />
             <TrafficMetricCard
               icon={<TrendingUp className="size-4" />}
@@ -295,18 +372,12 @@ export function AdminTraffic({ uid }: { uid: string }) {
             <TrafficMetricCard
               icon={<Clock3 className="size-4" />}
               label={t("admin.traffic.bounceRate")}
-              value={`${Number(
-                data.engagement.bounceRate || 0,
-              ).toFixed(1)}%`}
+              value={`${Number(data.engagement.bounceRate || 0).toFixed(1)}%`}
             />
           </section>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.75fr)]">
-            <TrafficTrendChart
-              points={data.series}
-              locale={locale}
-              t={t}
-            />
+            <TrafficTrendChart points={data.series} locale={locale} t={t} />
             <TrafficRealtimeBars
               points={data.realtimeSeries}
               locale={locale}
