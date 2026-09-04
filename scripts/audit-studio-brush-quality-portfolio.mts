@@ -16,14 +16,16 @@ import {
   studioBrushCatalogItemById,
 } from "../src/domains/creator/brush/studio-brush-catalog";
 import {
-  STUDIO_BRUSH_FULLSCREEN_LONG_STROKE_EXPERIMENT,
   STUDIO_BRUSH_HAND_FEEL_PROFILES,
-  STUDIO_BRUSH_QUALITY_ALIAS_TO_REPRESENTATIVE,
   STUDIO_BRUSH_QUALITY_ENGINE_PINS,
-  STUDIO_BRUSH_QUALITY_PORTFOLIO,
-  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS,
   STUDIO_BRUSH_QUALITY_SCORE_WEIGHTS,
   STUDIO_BRUSH_TEXTURE_PROFILES,
+} from "../src/domains/creator/brush/studio-brush-quality-foundation";
+import {
+  STUDIO_BRUSH_FULLSCREEN_LONG_STROKE_EXPERIMENT,
+  STUDIO_BRUSH_QUALITY_ALIAS_TO_REPRESENTATIVE,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS,
 } from "../src/domains/creator/brush/studio-brush-quality-portfolio";
 import { isStudioBrushQuarantinedPresetId } from "../src/domains/creator/brush/studio-brush-quarantine";
 
