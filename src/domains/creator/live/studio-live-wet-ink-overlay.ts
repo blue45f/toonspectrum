@@ -10,9 +10,16 @@
 
 import { mapStudioBrushAliasPressure } from "../brush/studio-brush-alias-profile";
 import {
+  createStudioInkwashFluidPreviewPlanner,
+  createStudioInkwashFluidSession,
+  depositStudioInkwashFluidStamp,
   depositStudioInkwashFluidStroke,
+  planStudioInkwashFluidPreviewStamps,
+  resolveStudioInkwashFluidDisplay,
   studioInkwashActiveRegionSteps,
   studioInkwashFluidStepParams,
+  type StudioInkwashFluidPreviewPlannerState,
+  type StudioInkwashFluidSession,
 } from "../brush/studio-inkwash-fluid";
 import { isStudioInkwashFluidBrush } from "../brush/studio-inkwash-fluid-brushes";
 import {
@@ -80,6 +87,14 @@ const LIVE_SIMULATION_STEPS_MIN = 3;
 const LIVE_SIMULATION_STEPS_MAX = 8;
 const LIVE_SIMULATION_CATCH_UP_CAP = 4;
 const POINT_EPSILON = 1e-6;
+/**
+ * InkWash live preview is intentionally lower resolution than the 4× committed wash. It still
+ * uses the real Gaussian deposition and Beer-Lambert optical model, but bins into bounded sparse
+ * tiles and never runs Stam on pointer frames.
+ */
+const INKWASH_PREVIEW_FIELD_SCALE = 2;
+const INKWASH_PREVIEW_TILE_SIZE = 64;
+const INKWASH_PREVIEW_MAX_TILES = 512;
 
 /** Exported for tests — how many diffusion steps a live dirty suffix should take. */
 export function resolveStudioLiveWetInkSimulationSteps(
@@ -211,6 +226,20 @@ interface ActiveWetInkStroke {
   paintFrames: number;
 }
 
+interface InkwashPreviewTile {
+  readonly tileX: number;
+  readonly tileY: number;
+  readonly session: StudioInkwashFluidSession;
+}
+
+interface InkwashPreviewDirtyTile {
+  readonly tile: InkwashPreviewTile;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 interface ActiveInkwashStroke {
   readonly recipe: StudioWetInkBrushPhysicalRecipe;
   readonly styleSignature: string;
@@ -218,8 +247,10 @@ interface ActiveInkwashStroke {
   consumedSourcePoints: number;
   previousSourceX: number;
   previousSourceY: number;
-  /** Document-space x,y pairs for the live polyline. Physics waits until pointer-up. */
+  /** Water keeps the low-cost blue guide; pigment tools use the tiled optical preview below. */
   readonly livePoints: number[];
+  readonly previewPlanner: StudioInkwashFluidPreviewPlannerState;
+  readonly previewTiles: Map<string, InkwashPreviewTile>;
 }
 
 interface PreparedUpload {
@@ -888,6 +919,7 @@ export class StudioLiveWetInkOverlayRenderer {
     originX: number,
     originY: number,
     replaceTiles: boolean,
+    fieldScale = STUDIO_WET_INK_BRUSH_FIELD_SCALE,
   ): boolean {
     const prepared = this.prepareUploads(uploads);
     if (!prepared) return false;
@@ -898,14 +930,10 @@ export class StudioLiveWetInkOverlayRenderer {
     }
     try {
       for (const item of prepared) {
-        const destinationX =
-          originX + item.upload.x / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
-        const destinationY =
-          originY + item.upload.y / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
-        const destinationWidth =
-          item.upload.width / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
-        const destinationHeight =
-          item.upload.height / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+        const destinationX = originX + item.upload.x / fieldScale;
+        const destinationY = originY + item.upload.y / fieldScale;
+        const destinationWidth = item.upload.width / fieldScale;
+        const destinationHeight = item.upload.height / fieldScale;
         if (replaceTiles) {
           context.clearRect(
             destinationX,
@@ -1049,8 +1077,12 @@ export class StudioLiveWetInkOverlayRenderer {
     }
     const active = this.active;
     if (this.activeInkwash) {
-      const recipe = this.activeInkwash.recipe;
-      if (!this.paintInkwashLivePolyline(this.activeInkwash.livePoints, recipe)) {
+      const activeInkwash = this.activeInkwash;
+      const recipe = activeInkwash.recipe;
+      const painted = recipe.brushId === "inkwash-water-brush"
+        ? this.paintInkwashLivePolyline(activeInkwash.livePoints, recipe)
+        : this.drawInkwashPreviewTiles(activeInkwash);
+      if (!painted) {
         this.failActive("surface-render");
         return;
       }
@@ -1114,6 +1146,26 @@ export class StudioLiveWetInkOverlayRenderer {
       previousSourceX: firstX,
       previousSourceY: firstY,
       livePoints: [],
+      previewPlanner: createStudioInkwashFluidPreviewPlanner({
+        tool: recipe.brushId === "inkwash-water-brush" ? "water" : "pen",
+        radius: recipe.baseWidth * INKWASH_PREVIEW_FIELD_SCALE * 0.5,
+        pigmentLoad: recipe.material.pigmentLoad,
+        wetnessLoad: recipe.material.wetnessLoad,
+        spectralAbsorption: recipe.material.spectralAbsorption,
+        inkColor: recipe.inkColor,
+        // Measured live→commit gap for the deep pen was +16.45% width and +29.53% density.
+        // These bounded preview-only factors estimate the missing diffusion/edge darkening while
+        // leaving the committed 4× physical field and every stored brush value unchanged.
+        radiusScale:
+          1
+          + recipe.material.bleed * 0.45
+          + recipe.material.granulation * 0.1,
+        pigmentScale:
+          1
+          + recipe.material.bleed * 0.55
+          + recipe.material.edgeDarkening * 0.12,
+      }),
+      previewTiles: new Map(),
     };
     this.setActiveCanvasOpacity(recipe.compositeOpacity);
     const painted = this.paintInkwashSuffix(element, 0);
@@ -1122,7 +1174,7 @@ export class StudioLiveWetInkOverlayRenderer {
     return {
       status: "started",
       consumedSourcePoints: this.activeInkwash.consumedSourcePoints,
-      appendedDabs: 1,
+      appendedDabs: painted.appendedDabs,
     };
   }
 
@@ -1297,45 +1349,149 @@ export class StudioLiveWetInkOverlayRenderer {
       };
     }
     const samples: Array<{ x: number; y: number; pressure: number }> = [];
-    if (fromIndex > 0) {
-      samples.push({
-        x: active.previousSourceX,
-        y: active.previousSourceY,
-        pressure: 0.55,
-      });
-    }
     for (let index = fromIndex; index < total; index += 1) {
       const x = finiteCoordinate(element.points[index * 2]);
       const y = finiteCoordinate(element.points[index * 2 + 1]);
       if (x === null || y === null) return this.failActive("invalid-sample");
-      samples.push({
-        x,
-        y,
-        pressure: mapStudioBrushAliasPressure(
-          active.recipe.brushId,
-          element.pressures?.[index],
-          0.55,
-        ),
-      });
+      const pressure = mapStudioBrushAliasPressure(
+        active.recipe.brushId,
+        element.pressures?.[index],
+        0.55,
+      );
+      samples.push({ x, y, pressure });
       active.livePoints.push(x, y);
       active.previousSourceX = x;
       active.previousSourceY = y;
     }
     active.consumedSourcePoints = total;
-    // 접미사만 덧그리면 이전 점의 둥근 캡이 두 번 칠해져 시작점과 모든 포인터 프레임 경계에
-    // 알파가 두 배인 "구슬"이 남는다(실측: 물붓 라이브 프레임의 시작 원 2901px, 반투명 펜의
-    // 마디). 라이브 폴리라인은 매 프레임 지우고 전체를 한 번에 긋는다 — 한 path 의 stroke 는
-    // 자기 자신과 겹쳐도 알파를 더하지 않는다.
-    this.clearActiveRect();
-    if (!this.paintInkwashLivePolyline(active.livePoints, active.recipe)) {
-      return this.failActive("surface-render");
+
+    if (active.recipe.brushId === "inkwash-water-brush") {
+      // Water carries no pigment, so keep the inexpensive directional guide until pointer-up.
+      this.clearActiveRect();
+      if (!this.paintInkwashLivePolyline(active.livePoints, active.recipe)) {
+        return this.failActive("surface-render");
+      }
+      return {
+        status: "appended",
+        consumedSourcePoints: total,
+        appendedDabs: samples.length,
+        uploadedTiles: 1,
+      };
     }
+
+    const painted = this.paintInkwashPreviewSamples(active, samples);
+    if (!painted) return this.failActive("surface-render");
     return {
-      status: "appended",
+      status: painted.stamps === 0 ? "noop" : "appended",
       consumedSourcePoints: total,
-      appendedDabs: samples.length,
-      uploadedTiles: 1,
+      appendedDabs: painted.stamps,
+      uploadedTiles: painted.uploadedTiles,
     };
+  }
+
+  private paintInkwashPreviewSamples(
+    active: ActiveInkwashStroke,
+    samples: ReadonlyArray<{ x: number; y: number; pressure: number }>,
+  ): { readonly stamps: number; readonly uploadedTiles: number } | null {
+    const scale = INKWASH_PREVIEW_FIELD_SCALE;
+    const planned = planStudioInkwashFluidPreviewStamps(
+      active.previewPlanner,
+      samples.map((sample) => ({
+        x: sample.x * scale,
+        y: sample.y * scale,
+        pressure: sample.pressure,
+      })),
+    );
+    if (planned.stamps.length === 0) return { stamps: 0, uploadedTiles: 0 };
+
+    const dirtyTiles = new Map<string, InkwashPreviewDirtyTile>();
+    for (const stamp of planned.stamps) {
+      const reach = stamp.radius * 2 + 1;
+      const firstTileX = Math.floor((stamp.x - reach) / INKWASH_PREVIEW_TILE_SIZE);
+      const lastTileX = Math.floor((stamp.x + reach) / INKWASH_PREVIEW_TILE_SIZE);
+      const firstTileY = Math.floor((stamp.y - reach) / INKWASH_PREVIEW_TILE_SIZE);
+      const lastTileY = Math.floor((stamp.y + reach) / INKWASH_PREVIEW_TILE_SIZE);
+      for (let tileY = firstTileY; tileY <= lastTileY; tileY += 1) {
+        for (let tileX = firstTileX; tileX <= lastTileX; tileX += 1) {
+          const key = tileX + ":" + tileY;
+          let tile = active.previewTiles.get(key);
+          if (!tile) {
+            if (active.previewTiles.size >= INKWASH_PREVIEW_MAX_TILES) return null;
+            tile = {
+              tileX,
+              tileY,
+              session: createStudioInkwashFluidSession({
+                width: INKWASH_PREVIEW_TILE_SIZE,
+                height: INKWASH_PREVIEW_TILE_SIZE,
+                coarseBase: 16,
+              }),
+            };
+            active.previewTiles.set(key, tile);
+          }
+          const originX = tileX * INKWASH_PREVIEW_TILE_SIZE;
+          const originY = tileY * INKWASH_PREVIEW_TILE_SIZE;
+          depositStudioInkwashFluidStamp(tile.session, {
+            ...stamp,
+            x: stamp.x - originX,
+            y: stamp.y - originY,
+          });
+          const x0 = Math.max(0, Math.floor(stamp.x - originX - reach));
+          const y0 = Math.max(0, Math.floor(stamp.y - originY - reach));
+          const x1 = Math.min(
+            INKWASH_PREVIEW_TILE_SIZE,
+            Math.ceil(stamp.x - originX + reach) + 1,
+          );
+          const y1 = Math.min(
+            INKWASH_PREVIEW_TILE_SIZE,
+            Math.ceil(stamp.y - originY + reach) + 1,
+          );
+          if (x1 <= x0 || y1 <= y0) continue;
+          const dirty = dirtyTiles.get(key);
+          if (dirty) {
+            dirty.x0 = Math.min(dirty.x0, x0);
+            dirty.y0 = Math.min(dirty.y0, y0);
+            dirty.x1 = Math.max(dirty.x1, x1);
+            dirty.y1 = Math.max(dirty.y1, y1);
+          } else {
+            dirtyTiles.set(key, { tile, x0, y0, x1, y1 });
+          }
+        }
+      }
+    }
+
+    const uploads = [...dirtyTiles.values()]
+      .sort((left, right) => (
+        left.tile.tileY - right.tile.tileY
+        || left.tile.tileX - right.tile.tileX
+      ))
+      .map(({ tile, x0, y0, x1, y1 }) => resolveStudioInkwashFluidDisplay(
+        tile.session,
+        {
+          originX: tile.tileX * INKWASH_PREVIEW_TILE_SIZE,
+          originY: tile.tileY * INKWASH_PREVIEW_TILE_SIZE,
+          clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+        },
+      ));
+    if (!this.drawUploadsToActive(uploads, 0, 0, true, scale)) return null;
+    return { stamps: planned.stamps.length, uploadedTiles: uploads.length };
+  }
+
+  private drawInkwashPreviewTiles(active: ActiveInkwashStroke): boolean {
+    const uploads = [...active.previewTiles.values()]
+      .sort((left, right) => (
+        left.tileY - right.tileY || left.tileX - right.tileX
+      ))
+      .map((tile) => resolveStudioInkwashFluidDisplay(tile.session, {
+        originX: tile.tileX * INKWASH_PREVIEW_TILE_SIZE,
+        originY: tile.tileY * INKWASH_PREVIEW_TILE_SIZE,
+      }));
+    return this.drawUploadsToActive(
+      uploads,
+      0,
+      0,
+      false,
+      INKWASH_PREVIEW_FIELD_SCALE,
+    );
   }
 
   private paintInkwashLivePolyline(
@@ -1454,6 +1610,7 @@ export class StudioLiveWetInkOverlayRenderer {
   }
 
   private resetActiveState(): void {
+    this.activeInkwash?.previewTiles.clear();
     this.active = null;
     this.activeInkwash = null;
     this.setActiveCanvasOpacity(1);
