@@ -498,7 +498,6 @@ export type StudioCuttoonEditorViewSessionCore = {
   poserInitialElementId: any;
   poserSeedPropId: any;
   poserVrmOpen: any;
-  characterShaperOpen: boolean;
   postCorrection: any;
   preserveCorners: any;
   pressureCurve: any;

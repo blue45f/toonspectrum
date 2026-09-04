@@ -30281,7 +30281,6 @@ function clearSelectionForEdit() {
       poserInitialElementId={poserInitialElementId}
       poserSeedPropId={poserSeedPropId}
       poserVrmOpen={poserVrmOpen}
-      characterShaperOpen={characterShaperOpen}
       postCorrection={postCorrection}
       preserveCorners={preserveCorners}
       pressureCurve={pressureCurve}
