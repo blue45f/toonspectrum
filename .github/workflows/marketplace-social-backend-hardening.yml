@@ -1,3 +1,4 @@
+# Registered in the previous commit; this change starts the one-shot verification.
 name: Marketplace social backend hardening
 
 on:
