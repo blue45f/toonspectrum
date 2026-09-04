@@ -1,0 +1,52 @@
+name: Temporary 3D production multipass check
+
+on:
+  push:
+    branches:
+      - feat/3d-production-multipass-wave2-20260904
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporary-3d-production-multipass-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck application
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Lint changed 3D modules
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/bg3d/StudioBg3dMultiPassExporterPanel.tsx
+          src/domains/creator/bg3d/StudioBg3dProductionMultiPassExporterPanel.tsx
+          src/domains/creator/bg3d/StudioBg3dProductionMultiPassExporterPanel.test.tsx
+          src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx
+          src/domains/creator/bg3d/StudioBg3dViewPanel.tsx
+          src/domains/creator/bg3d/studio-bg3d-artifact-rasterization.ts
+          src/domains/creator/bg3d/studio-bg3d-artifact-rasterization.test.ts
+          src/domains/creator/bg3d/studio-bg3d-production-multipass.ts
+          src/domains/creator/bg3d/studio-bg3d-production-multipass.test.ts
+          src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx
+      - name: Run focused 3D tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/bg3d/studio-bg3d-production-multipass.test.ts
+          src/domains/creator/bg3d/StudioBg3dProductionMultiPassExporterPanel.test.tsx
+          src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx
+          src/domains/creator/bg3d/studio-bg3d-artifact-rasterization.test.ts
