@@ -6,7 +6,8 @@ import {
   normalizePgConnectionStringForTls,
   observePgPoolIdleErrors,
 } from "./pg-connection";
-import * as schema from "./schema";
+import * as creatorMarketplaceSocialSchema from "./creator-marketplace-social.schema";
+import * as coreSchema from "./schema";
 
 // PostgreSQL(Neon) — node-postgres 드라이버. 로컬 검증은 docker postgres(:55432), 운영/원격은 Neon.
 // pg v9의 sslmode=require 의미 변경에 기대지 않고 원격은 verify-full로 정규화한다.
@@ -57,7 +58,12 @@ observePgPoolIdleErrors(pool, {
   logger: new Logger("PostgresPool"),
 });
 
-export const db = drizzle(pool, { schema });
+const drizzleSchema = {
+  ...coreSchema,
+  ...creatorMarketplaceSocialSchema,
+};
+
+export const db = drizzle(pool, { schema: drizzleSchema });
 
 // 기존 libSQL `dbClient.execute()` 호출부 호환 shim.
 //  - execute(sqlString) 또는 execute({ sql, args })
@@ -83,3 +89,4 @@ export const dbClient = {
 export const dbPool = pool;
 export * from "./schema";
 export * from "./creator-asset-object-storage.schema";
+export * from "./creator-marketplace-social.schema";
