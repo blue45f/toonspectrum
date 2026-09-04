@@ -8,6 +8,7 @@ import { apiPath } from "../infrastructure/api";
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
+import { TrafficAnalyticsBridge } from "./traffic-analytics/TrafficAnalyticsBridge";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
@@ -198,6 +199,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <TrafficAnalyticsBridge />
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
