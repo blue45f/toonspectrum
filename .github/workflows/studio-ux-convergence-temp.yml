@@ -30,8 +30,40 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Normalize extraction-era source anchors
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          patcher = Path('.github/scripts/apply-studio-ux-convergence.py')
+          source = patcher.read_text(encoding='utf-8')
+          replacements = {
+              '    "  return (\\n      <div\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        className={cn(\\n",':
+              '    "  return (\\n      <div\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-workspace\\"\\n        role=\\"group\\"\\n        aria-label=\\"편집 작업공간\\"\\n        tabIndex={-1}\\n        data-studio-mobile-canvas-workspace={isMobile ? \\\"true\\\" : undefined}\\n        className={cn(\\n",',
+              '    "  return (\\n      <div\\n        className={cn(\\n",\n    "  return (\\n      <div\\n        id=\\"studio-canvas-workspace\\"\\n        role=\\"region\\"\\n        aria-label=\\"캔버스 작업영역\\"\\n        tabIndex={-1}\\n        className={cn(\\n",':
+              '    "  return (\\n          <div\\n            className={cn(\\n",\n    "  return (\\n          <div\\n            id=\\"studio-canvas-workspace\\"\\n            role=\\"region\\"\\n            aria-label=\\"캔버스 작업영역\\"\\n            tabIndex={-1}\\n            className={cn(\\n",',
+          }
+          for old, new in replacements.items():
+              if source.count(old) != 1:
+                  raise SystemExit(f'bootstrap anchor not unique: {old[:80]!r} -> {source.count(old)}')
+              source = source.replace(old, new, 1)
+          patcher.write_text(source, encoding='utf-8')
+          PY
       - name: Apply Studio UX convergence patch
         run: python3 .github/scripts/apply-studio-ux-convergence.py
+      - name: Align source-contract tests with desktop landmarks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/domains/creator/StudioInspectorAsideShell.accessibility-contract.test.ts')
+          source = path.read_text(encoding='utf-8')
+          old = 'expect(asideSource).toContain(\'aria-label={isMobile ? "작업 패널" : undefined}\');'
+          new = 'expect(asideSource).toContain(\'aria-label="작업 패널"\');'
+          if source.count(old) != 1:
+              raise SystemExit(f'inspector accessibility assertion anchor count: {source.count(old)}')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Check patch whitespace
         run: git diff --check
       - name: Run focused Studio UX tests
@@ -46,6 +78,7 @@ jobs:
           src/domains/creator/StudioMenubarContent.test.tsx
           src/domains/creator/studio-review-entry-point-viewports.test.tsx
           src/domains/creator/StudioCompanionAssistantDisplay.test.tsx
+          src/domains/creator/StudioInspectorAsideShell.accessibility-contract.test.ts
           scripts/verify-studio-hybrid-dcc-integration.test.ts
       - name: Lint changed source quickly
         run: pnpm run lint:quick
