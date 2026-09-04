@@ -1,0 +1,102 @@
+name: One-shot brush quality status command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: brush-quality-status-command
+  cancel-in-progress: true
+
+jobs:
+  inspect:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/check-response-aware-brush-quality'
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Inspect published source state
+        id: inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$(git rev-parse HEAD)"
+          response_profile=no
+          live_fingerprint=no
+          analyzer_response=no
+          temp_helpers=0
+
+          grep -q 'responseProfile' \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            && response_profile=yes
+          grep -q 'liveFingerprint' \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            && live_fingerprint=yes
+          grep -q 'responseProfile' \
+            scripts/analyze-studio-brush-similarity.mts \
+            && analyzer_response=yes
+
+          while IFS= read -r path; do
+            [[ -n "$path" ]] && temp_helpers=$((temp_helpers + 1))
+          done < <(git ls-files \
+            '.github/brush-quality-payloads/**' \
+            '.github/workflows/apply-all-brush-quality-v3-macos.yml' \
+            '.github/workflows/export-brush-quality-source-v2.yml' \
+            '.github/workflows/finalize-response-aware-brush-quality.yml' \
+            '.github/workflows/patch-brush-quality-policy.yml' \
+            'scripts/patch-all-brush-quality-v3.py' \
+            'scripts/patch-all-brush-quality-v3b.py')
+
+          verdict=failed
+          if [[ "$response_profile" == yes \
+             && "$live_fingerprint" == yes \
+             && "$analyzer_response" == yes \
+             && "$temp_helpers" == 0 ]]; then
+            verdict=passed
+          fi
+
+          {
+            echo "head_sha=$head_sha"
+            echo "response_profile=$response_profile"
+            echo "live_fingerprint=$live_fingerprint"
+            echo "analyzer_response=$analyzer_response"
+            echo "temp_helpers=$temp_helpers"
+            echo "verdict=$verdict"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish inspection receipt to PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const o = ${{ toJSON(steps.inspect.outputs) }};
+            const icon = o.verdict === 'passed' ? '✅' : '❌';
+            const body = [
+              `${icon} **Response-aware brush quality publication check: ${o.verdict}**`,
+              '',
+              `- feature HEAD: \`${o.head_sha}\``,
+              `- curation response profile: **${o.response_profile}**`,
+              `- curation live fingerprint: **${o.live_fingerprint}**`,
+              `- analyzer response vector: **${o.analyzer_response}**`,
+              `- temporary helper files remaining: **${o.temp_helpers}**`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body,
+            });
