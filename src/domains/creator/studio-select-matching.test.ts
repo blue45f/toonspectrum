@@ -79,11 +79,44 @@ describe("studio select matching", () => {
       opacity: 1,
     });
     const otherWidth = draw({ id: "other-width", stroke: "#aabbcc", strokeWidth: 8 });
-    const otherBrush = draw({ id: "other-brush", stroke: "#aabbcc", strokeWidth: 6, brush: "pencil" });
+    const otherBrush = draw({
+      id: "other-brush",
+      stroke: "#aabbcc",
+      strokeWidth: 6,
+      brush: "pencil",
+    });
+    const otherComposite = draw({
+      id: "other-composite",
+      stroke: "#aabbcc",
+      strokeWidth: 6,
+      blendMode: "multiply",
+    });
 
     expect(
       selectStudioMatchingElementIds(
-        [source, otherWidth, same, otherBrush],
+        [source, otherWidth, same, otherBrush, otherComposite],
+        "source",
+        "paint",
+      ),
+    ).toEqual(["source", "same"]);
+  });
+
+  it("compares the rendered fill and ignores stale lower-priority solid values", () => {
+    const gradient = {
+      type: "linear",
+      angle: 45,
+      stops: [
+        { offset: 0, color: "#111111" },
+        { offset: 1, color: "#eeeeee" },
+      ],
+    } as unknown as NonNullable<DrawEl["gradient"]>;
+    const source = draw({ id: "source", fill: "#ff0000", gradient });
+    const sameRenderedFill = draw({ id: "same", fill: "#0000ff", gradient });
+    const solidOnly = draw({ id: "solid", fill: "#ff0000" });
+
+    expect(
+      selectStudioMatchingElementIds(
+        [source, solidOnly, sameRenderedFill],
         "source",
         "paint",
       ),
