@@ -1,0 +1,162 @@
+name: Apply all-brush quality-first v3 hardening
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - scripts/patch-all-brush-quality-v3.py
+      - .github/workflows/apply-all-brush-quality-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-all-brush-quality-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch-verify-publish:
+    if: ${{ !contains(github.event.head_commit.message, '[quality-v3-validated]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/all-brush-long-stroke-quality-election-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply quality-first source hardening
+        run: |
+          python3 -m py_compile scripts/patch-all-brush-quality-v3.py
+          python3 scripts/patch-all-brush-quality-v3.py
+          git diff --check
+
+      - name: Focused quality and admission tests
+        run: >-
+          pnpm exec vitest run
+          scripts/studio-brush-long-matrix-quality.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Zero-warning focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/run-studio-all-brush-long-stroke-shard.mts
+          scripts/aggregate-studio-all-brush-long-stroke.mts
+          scripts/verify-studio-long-stroke.mts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Typecheck complete repository
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Baseline screen-fill smoke
+        env:
+          VITE_STUDIO_LIVE_INK_BACKEND: canvas2d
+          TOONSPECTRUM_ALL_BRUSH_MODE: baseline
+          TOONSPECTRUM_ALL_BRUSH_IDS: pen,inkwash-pen,standard-eraser
+          TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: 0
+          TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 1
+          TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/quality-v3-smoke
+          TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 384
+          TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 640
+          TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 180000
+        run: |
+          rm -rf dist
+          pnpm build
+          xvfb-run -a --server-args='-screen 0 1920x1200x24' \
+            pnpm exec tsx scripts/run-studio-all-brush-long-stroke-shard.mts
+
+      - name: Software-GPU diagnostic screen-fill smoke
+        env:
+          VITE_STUDIO_LIVE_INK_BACKEND: webgpu
+          TOONSPECTRUM_ALL_BRUSH_MODE: gpu
+          TOONSPECTRUM_ALL_BRUSH_IDS: pen,inkwash-pen,standard-eraser
+          TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: 0
+          TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 1
+          TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/quality-v3-smoke
+          TOONSPECTRUM_LONG_STROKE_FORCE_SWIFTSHADER: "1"
+          TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 384
+          TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 640
+          TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 180000
+        run: |
+          rm -rf dist
+          pnpm build
+          xvfb-run -a --server-args='-screen 0 1920x1200x24' \
+            pnpm exec tsx scripts/run-studio-all-brush-long-stroke-shard.mts
+
+      - name: Validate smoke evidence contracts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("artifacts/quality-v3-smoke")
+          for mode in ("baseline", "gpu"):
+              shard = root / mode / "shard-0-of-1"
+              report = json.loads((shard / "shard-report.json").read_text())
+              ids = {entry["id"] for entry in report["results"]}
+              expected = {"pen", "inkwash-pen", "standard-eraser"}
+              if ids != expected:
+                  raise SystemExit(f"{mode}: measured {sorted(ids)}, expected {sorted(expected)}")
+              for entry in report["results"]:
+                  case = Path(entry["reportPath"]).parent
+                  data = json.loads((case / "report.json").read_text())
+                  for image in ("00-blank.png", "01-live-half.png", "01-live.png", "02-committed.png", "03-settled.png"):
+                      if not (case / image).is_file():
+                          raise SystemExit(f"{mode}/{entry['id']}: missing {image}")
+                  if entry["id"] == "standard-eraser":
+                      primer = data.get("eraserPrimer") or {}
+                      if primer.get("applied") is not True or primer.get("count") != 2:
+                          raise SystemExit(f"{mode}/standard-eraser: invalid primer evidence {primer}")
+                  log = Path(case.parent / "verifier.log").read_text(errors="replace")
+                  if "/src/domains/creator" in log and "404" in log:
+                      raise SystemExit(f"{mode}/{entry['id']}: production preview emitted /src 404")
+          PY
+
+      - name: Commit validated source only
+        run: |
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            scripts/verify-studio-long-stroke.mts \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts
+          git diff --cached --check
+          git commit -m "test(brush): harden quality-first all-brush election [quality-v3-validated]"
+          git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-brush-quality-v3-smoke-${{ github.run_id }}
+          path: artifacts/quality-v3-smoke
+          if-no-files-found: warn
+          retention-days: 14
