@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useEffectEvent,
   useRef,
   useState,
 } from "react";
@@ -140,7 +139,7 @@ export function useStudioPreferencesRuntime({
     };
   }, [applyMirroredSettings, closeRightPanelForFocusMode]);
 
-  function persistAppSettings(next: StudioAppSettings): void {
+  const persistAppSettings = useCallback((next: StudioAppSettings): void => {
     const revision = ++appSettingsUserRevisionRef.current;
     setAppSettingsPersistenceState("loading");
     void acquireProductStudioUiPreferencesRepository()
@@ -155,19 +154,19 @@ export function useStudioPreferencesRuntime({
           setAppSettingsPersistenceState("session-only");
         }
       });
-  }
+  }, []);
 
-  function persistStudioUiBooleanPreference(
+  const persistStudioUiBooleanPreference = useCallback((
     key: StudioUiBooleanPreferenceKey,
     value: boolean,
-  ): void {
+  ): void => {
     uiBooleanPreferenceRevisionsRef.current[key] += 1;
     void acquireProductStudioUiPreferencesRepository()
       .then((repository) => repository.saveBooleanPreference(key, value))
       .catch(() => setAppSettingsPersistenceState("session-only"));
-  }
+  }, []);
 
-  function setStudioUiDensity(mode: StudioUiDensityMode): void {
+  const setStudioUiDensity = useCallback((mode: StudioUiDensityMode): void => {
     if (mode === "focus") closeRightPanelForFocusMode();
     setUiDensityMode(mode);
     const current = appSettingsRef.current;
@@ -176,23 +175,25 @@ export function useStudioPreferencesRuntime({
       : { ...current, general: { ...current.general, densityMode: mode } };
     if (next !== current) setAppSettings(next);
     persistAppSettings(next);
-  }
+  }, [closeRightPanelForFocusMode, persistAppSettings]);
 
-  function commitAppSettings(next: StudioAppSettings): void {
+  const commitAppSettings = useCallback((next: StudioAppSettings): void => {
     appSettingsRef.current = next;
     setAppSettings(next);
     persistAppSettings(next);
     setUiDensityMode(next.general.densityMode);
     applyMirroredSettings(next);
-  }
+  }, [applyMirroredSettings, persistAppSettings]);
 
-  const setStudioUiDensityFromCompanion = useEffectEvent(setStudioUiDensity);
+  // Effect Events must stay inside the effect that consumes them. This command is part of the
+  // hook's public API, so expose the stable callback that already reads current settings via refs.
+  const setStudioUiDensityFromCompanion = setStudioUiDensity;
   const isRailToolVisible = useCallback(
     (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
     [appSettings.toolbar.visibleIds],
   );
 
-  function persistEffectFavoriteState(next: StudioEffectFavoriteState): void {
+  const persistEffectFavoriteState = useCallback((next: StudioEffectFavoriteState): void => {
     const revision = ++effectFavoriteUserRevisionRef.current;
     effectFavoriteStateRef.current = next;
     setEffectFavoriteState(next);
@@ -203,15 +204,15 @@ export function useStudioPreferencesRuntime({
           setAppSettingsPersistenceState("session-only");
         }
       });
-  }
+  }, []);
 
-  function toggleEffectFavorite(effectId: StudioEffectId): void {
+  const toggleEffectFavoriteCommand = useCallback((effectId: StudioEffectId): void => {
     persistEffectFavoriteState(toggleStudioEffectFavorite(effectFavoriteStateRef.current, effectId));
-  }
+  }, [persistEffectFavoriteState]);
 
-  function rememberEffectRecent(effectId: StudioEffectId): void {
+  const rememberEffectRecent = useCallback((effectId: StudioEffectId): void => {
     persistEffectFavoriteState(rememberStudioEffectRecent(effectFavoriteStateRef.current, effectId));
-  }
+  }, [persistEffectFavoriteState]);
 
   return {
     appSettings,
@@ -238,7 +239,7 @@ export function useStudioPreferencesRuntime({
     setStudioUiDensity,
     setStudioUiDensityFromCompanion,
     setUiDensityMode,
-    toggleEffectFavorite,
+    toggleEffectFavorite: toggleEffectFavoriteCommand,
     uiBooleanPreferenceRevisionsRef,
     uiDensityMode,
   } as const;
