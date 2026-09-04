@@ -18,6 +18,7 @@ import {
 import { useId, useMemo, useState } from "react";
 
 import { resolveStudioBg3dProductionBatchPreset } from "./studio-bg3d-production-multipass";
+import { resolveStudioBg3dProductionBatchPresetForLook } from "./studio-bg3d-production-pass-readiness";
 import {
   planStudioBg3dProductionWorkflow,
   type StudioBg3dProductionWorkflowActionKind,
@@ -164,7 +165,16 @@ export function StudioBg3dProductionWorkflowPanel({
         case "apply-manuscript-preset":
           if (!batch) return;
           batch.setSelectedPasses(
-            resolveStudioBg3dProductionBatchPreset(batch.availablePasses, "manuscript"),
+            batch.look
+              ? resolveStudioBg3dProductionBatchPresetForLook(
+                  batch.availablePasses,
+                  "manuscript",
+                  batch.look,
+                )
+              : resolveStudioBg3dProductionBatchPreset(
+                  batch.availablePasses,
+                  "manuscript",
+                ),
           );
           return;
         case "enable-line-preview":
