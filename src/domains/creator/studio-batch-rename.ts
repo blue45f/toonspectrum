@@ -132,17 +132,19 @@ function renderTemplate(
     .replaceAll("{type}", TYPE_LABELS[element.type]);
 }
 
-function duplicateResultNames(elements: readonly El[], renameById: ReadonlyMap<string, string>): string[] {
+function duplicateResultNames(elements: readonly El[], changedIds: ReadonlySet<string>): string[] {
   const counts = new Map<string, { display: string; count: number }>();
+  const changedNameKeys = new Set<string>();
   for (const element of elements) {
-    const display = renameById.get(element.id) ?? currentLayerName(element);
+    const display = currentLayerName(element);
     const key = display.toLocaleLowerCase("ko-KR");
     const current = counts.get(key);
     counts.set(key, current ? { display: current.display, count: current.count + 1 } : { display, count: 1 });
+    if (changedIds.has(element.id)) changedNameKeys.add(key);
   }
-  return [...counts.values()]
-    .filter((entry) => entry.count > 1)
-    .map((entry) => entry.display)
+  return [...counts.entries()]
+    .filter(([key, entry]) => changedNameKeys.has(key) && entry.count > 1)
+    .map(([, entry]) => entry.display)
     .sort((a, b) => a.localeCompare(b, "ko-KR"));
 }
 
@@ -256,7 +258,7 @@ export function planStudioBatchRename(
     if (!changedIds.has(element.id)) return element;
     return { ...element, name: renameById.get(element.id)! } as El;
   });
-  const duplicateNames = duplicateResultNames(next, new Map());
+  const duplicateNames = duplicateResultNames(next, changedIds);
   return {
     kind: "changed",
     next,
