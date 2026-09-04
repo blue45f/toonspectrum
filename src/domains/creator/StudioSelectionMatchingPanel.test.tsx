@@ -29,7 +29,7 @@ describe("StudioSelectionMatchingPanel", () => {
     const onSelect = vi.fn();
     render(<StudioSelectionMatchingPanel options={OPTIONS} onSelect={onSelect} />);
 
-    expect(screen.getByLabelText("같은 항목 선택 기준")).toHaveValue("paint");
+    expect((screen.getByLabelText("같은 항목 선택 기준") as HTMLSelectElement).value).toBe("paint");
     expect(screen.getByText("채우기와 선이 같은 요소를 선택합니다.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "같은 외형 4개 전체 선택" }));
@@ -55,6 +55,6 @@ describe("StudioSelectionMatchingPanel", () => {
     const view = render(
       <StudioSelectionMatchingPanel options={[]} onSelect={vi.fn()} />,
     );
-    expect(view.container).toBeEmptyDOMElement();
+    expect(view.container.childElementCount).toBe(0);
   });
 });
