@@ -1,0 +1,39 @@
+name: Temporary filter source export
+
+on:
+  push:
+    branches:
+      - feat/studio-filter-exhaustive-20260905
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Package filter implementation and contracts
+        run: |
+          tar -czf filter-source.tar.gz \
+            src/domains/creator/filter \
+            src/domains/creator/studio-filter-menu.ts \
+            src/domains/creator/studio-filter-pack.ts \
+            src/domains/creator/studio-filter-union-wave.ts \
+            src/domains/creator/render/studio-konva-filter-fields.ts \
+            src/domains/creator/studio-effect-favorites.ts \
+            src/domains/creator/studio-ui-preferences-sqlite.ts \
+            scripts/verify-studio-filter-dialog.mts \
+            package.json \
+            pnpm-lock.yaml \
+            tsconfig.json \
+            vitest.config.* \
+            .github/workflows/studio-filter-dialog.yml 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filter-source
+          path: filter-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
