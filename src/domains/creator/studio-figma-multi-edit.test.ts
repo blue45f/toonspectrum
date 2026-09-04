@@ -89,8 +89,14 @@ describe("studio figma multi-edit", () => {
     expect(plan.kind).toBe("changed");
     if (plan.kind !== "changed") return;
     // Box elements store their rotated top-left origin. Their visual boxes exchange places.
-    expect(elementById(plan.next, "a")).toMatchObject({ x: 100, y: 20, rotation: 180 });
-    expect(elementById(plan.next, "b")).toMatchObject({ x: 20, y: 20, rotation: 180 });
+    const turnedFirst = elementById(plan.next, "a") as ImageEl;
+    const turnedSecond = elementById(plan.next, "b") as ImageEl;
+    expect(turnedFirst.x).toBeCloseTo(100, 9);
+    expect(turnedFirst.y).toBeCloseTo(20, 9);
+    expect(turnedFirst.rotation).toBeCloseTo(180, 9);
+    expect(turnedSecond.x).toBeCloseTo(20, 9);
+    expect(turnedSecond.y).toBeCloseTo(20, 9);
+    expect(turnedSecond.rotation).toBeCloseTo(180, 9);
     expect(plan.announcement).toContain("회전 180°");
   });
 
