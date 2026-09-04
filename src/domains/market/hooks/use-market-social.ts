@@ -170,8 +170,9 @@ export interface UseMarketSocialResult extends MarketSocialSnapshot {
  */
 export function useMarketSocial(
   resourceId: string,
-  viewerKey: string,
+  viewerKey: string | null | undefined,
 ): UseMarketSocialResult {
+  const normalizedViewerKey = viewerKey?.trim() || "guest";
   const store = getStore(resourceId);
   const snapshot = useSyncExternalStore(
     (listener) => {
@@ -183,10 +184,10 @@ export function useMarketSocial(
   );
 
   useEffect(() => {
-    const viewerChanged = store.viewerKey !== viewerKey;
-    store.viewerKey = viewerKey;
+    const viewerChanged = store.viewerKey !== normalizedViewerKey;
+    store.viewerKey = normalizedViewerKey;
     void loadStore(store, viewerChanged);
-  }, [store, viewerKey]);
+  }, [normalizedViewerKey, store]);
 
   const refresh = useCallback(
     () => loadStore(store, true),
