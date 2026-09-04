@@ -6,10 +6,12 @@ on:
       - feat/all-brush-long-stroke-quality-election-20260904
     paths:
       - .github/trigger/all-brush-quality-benchmark.txt
+  schedule:
+    - cron: "17 18 * * 6"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: studio-all-brush-screen-fill-${{ github.ref }}
@@ -51,7 +53,7 @@ jobs:
           name: studio-all-brush-build-${{ matrix.mode }}-${{ github.sha }}
           path: dist
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 3
 
   benchmark:
     name: ${{ matrix.mode }}-${{ matrix.shard }}
@@ -109,17 +111,15 @@ jobs:
             all-brush-shard.log
             all-brush-shard-exit-code.txt
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 7
 
   aggregate:
-    name: aggregate-quality-first-election
+    name: aggregate-quality-first-election-and-curation
     needs: benchmark
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.4.0
@@ -133,48 +133,46 @@ jobs:
         with:
           pattern: all-brush-long-*-${{ github.sha }}
           path: artifacts/all-brush-long-stroke-input
-      - name: Aggregate every listed brush and generate allowlist
+      - name: Aggregate every listed brush and elect a quality-safe backend
         env:
           TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
           TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
           TOONSPECTRUM_GPU_EVIDENCE_OUTPUT: src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
         run: pnpm exec tsx scripts/aggregate-studio-all-brush-long-stroke.mts
-      - name: Validate election and product admission
+      - name: Find only visually near-identical brush exposure candidates
+        env:
+          TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
+          TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
+        run: pnpm exec tsx scripts/analyze-studio-brush-similarity.mts
+      - name: Validate election, curation and product admission
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           pnpm exec vitest run \
             src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
             src/domains/creator/live/studio-live-ink-lane-admission.test.ts
           pnpm exec eslint --max-warnings=0 \
             scripts/run-studio-all-brush-long-stroke-shard.mts \
             scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/analyze-studio-brush-similarity.mts \
             scripts/verify-studio-long-stroke.mts \
             src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
             src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
             src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
             src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
             src/domains/creator/live/studio-live-ink-lane-admission.ts \
             src/domains/creator/live/studio-live-ink-lane-admission.test.ts
-          NODE_OPTIONS='--max-old-space-size=8192' pnpm exec tsc -p tsconfig.json --noEmit
-      - name: Stage durable report and remove one-shot workflow
-        run: |
-          set -euo pipefail
-          mkdir -p docs/reports
-          cp artifacts/all-brush-long-stroke-aggregate/all-brush-gpu-quality-report.json \
-            docs/reports/studio-all-brush-gpu-quality-2026-09-04.json
-          cp artifacts/all-brush-long-stroke-aggregate/all-brush-gpu-quality-report.md \
-            docs/reports/studio-all-brush-gpu-quality-2026-09-04.md
-          rm -f .github/trigger/all-brush-quality-benchmark.txt
-          rm -f .github/workflows/studio-all-brush-long-stroke-quality.yml
-          git config user.name toonstudio-bot
-          git config user.email actions@users.noreply.github.com
-          git add -A
-          git diff --cached --check
-          git commit -m 'test(brush): record all-brush screen-fill GPU quality election'
-          git push origin HEAD:${GITHUB_REF_NAME}
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: all-brush-quality-election-${{ github.sha }}
+          name: all-brush-quality-election-and-curation-${{ github.sha }}
           path: artifacts/all-brush-long-stroke-aggregate
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
