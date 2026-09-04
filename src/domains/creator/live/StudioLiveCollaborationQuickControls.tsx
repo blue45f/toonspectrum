@@ -11,8 +11,9 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { studioLivePresenceAlwaysVisible } from "../studio-commercial-residuals";
-import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
+
 import { studioLiveParticipantColor } from "./studio-live-canvas-overlay-model";
+import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
 import {
   setStudioLiveCursorFocus,
   setStudioLiveCursorTrails,

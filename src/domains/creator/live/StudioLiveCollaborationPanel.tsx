@@ -35,25 +35,25 @@ import {
   studioLiveParticipantColor,
 } from "./studio-live-canvas-overlay-model";
 import {
-  presentStudioLiveCursorQuality,
-  type StudioLiveCursorQualitySnapshot,
-} from "./studio-live-cursor-quality";
-import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
   type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
-import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
 import {
-  toggleStudioLiveRemoteCursors,
-  useStudioLiveViewPreferences,
-} from "./studio-live-view-preferences";
+  presentStudioLiveCursorQuality,
+  type StudioLiveCursorQualitySnapshot,
+} from "./studio-live-cursor-quality";
 import {
   formatStudioLiveLastAck,
   presentStudioLiveSyncSnapshot,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
+import {
+  toggleStudioLiveRemoteCursors,
+  useStudioLiveViewPreferences,
+} from "./studio-live-view-preferences";
+import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
 
 import type {
   StudioLiveChatMessage,

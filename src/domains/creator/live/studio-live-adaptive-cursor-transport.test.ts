@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  createStudioAdaptiveCursorTransportFactory,
+} from "./studio-live-adaptive-cursor-transport";
+import {
   createStudioLiveEnvelope,
   type StudioLiveEnvelope,
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
-import {
-  createStudioAdaptiveCursorTransportFactory,
-} from "./studio-live-adaptive-cursor-transport";
 import {
   getStudioLiveCursorQualitySnapshot,
   resetStudioLiveCursorQualityForTests,

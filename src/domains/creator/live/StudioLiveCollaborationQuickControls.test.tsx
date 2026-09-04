@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioLiveCollaborationQuickControls } from "./StudioLiveCollaborationQuickControls";
 import {
   EMPTY_STUDIO_LIVE_CONTEXT,
   StudioLiveCollaborationContext,
@@ -13,6 +12,7 @@ import {
   setStudioLiveCursorTrails,
   setStudioLiveCursorVisibility,
 } from "./studio-live-viewport-preferences";
+import { StudioLiveCollaborationQuickControls } from "./StudioLiveCollaborationQuickControls";
 
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 

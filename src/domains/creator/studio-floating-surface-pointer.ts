@@ -1,4 +1,3 @@
-import type { StudioFloatingSurfaceRect } from "./studio-floating-surface";
 import {
   activateStudioFloatingPointerSession,
   applyStudioFloatingPointerCommittedRect,
@@ -11,6 +10,8 @@ import {
   STUDIO_FLOATING_TOUCH_ACTIVATION_DELAY_MS,
   STUDIO_FLOATING_TOUCH_ACTIVATION_TOLERANCE,
 } from "./studio-floating-surface-pointer-state";
+
+import type { StudioFloatingSurfaceRect } from "./studio-floating-surface";
 import type {
   StartStudioFloatingSurfacePointerSessionOptions,
   StudioFloatingSurfacePointerSession,

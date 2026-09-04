@@ -38,11 +38,6 @@ import {
   studioPresenceVisiblePeerCount,
 } from "../studio-commercial-residuals";
 
-import { StudioLiveQuickCollaborationControls } from "./StudioLiveQuickCollaborationControls";
-import {
-  presentStudioLiveCursorQuality,
-  type StudioLiveCursorQualitySnapshot,
-} from "./studio-live-cursor-quality";
 import {
   planStudioCommentPinPreviewPosition,
   studioLiveCursorActivityLabel,
@@ -52,17 +47,13 @@ import {
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
 import { selectStudioLivePresentedCursors } from "./studio-live-cursor-presentation";
+import {
+  presentStudioLiveCursorQuality,
+  type StudioLiveCursorQualitySnapshot,
+} from "./studio-live-cursor-quality";
 import { openStudioLiveCompanionTab } from "./studio-live-jam-session";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import { useStudioRemoteCursors } from "./studio-live-remote-cursor-store";
-import { useStudioLiveCursorChatBubbles } from "./use-studio-live-cursor-chat-bubbles";
-import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
-import {
-  isStudioLiveCursorVisibilityShortcut,
-  isStudioLiveShortcutTextTarget,
-  toggleStudioLiveRemoteCursors,
-  useStudioLiveViewPreferences,
-} from "./studio-live-view-preferences";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   formatStudioLiveLastAck,
@@ -70,6 +61,15 @@ import {
   type StudioLiveSyncPhase,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
+import {
+  isStudioLiveCursorVisibilityShortcut,
+  isStudioLiveShortcutTextTarget,
+  toggleStudioLiveRemoteCursors,
+  useStudioLiveViewPreferences,
+} from "./studio-live-view-preferences";
+import { StudioLiveQuickCollaborationControls } from "./StudioLiveQuickCollaborationControls";
+import { useStudioLiveCursorChatBubbles } from "./use-studio-live-cursor-chat-bubbles";
+import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
 
 import type {
   StudioLiveCursorPayload,

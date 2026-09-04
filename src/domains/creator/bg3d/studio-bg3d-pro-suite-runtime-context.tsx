@@ -1,10 +1,10 @@
 import { createContext, useContext } from "react";
 
-import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 import type {
   StudioBg3dCameraSettings,
   StudioBg3dShot,
 } from "./studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 
 export interface StudioBg3dProductionBatchProgress {
   readonly stage: "render" | "contact" | "archive";

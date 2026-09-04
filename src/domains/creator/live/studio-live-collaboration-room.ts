@@ -12,7 +12,6 @@ import {
   isStudioLiveChatControlMessageId,
   parseStudioLiveChatControl,
 } from "./studio-live-chat-control";
-
 import {
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   assertStudioLiveCursorPayload,

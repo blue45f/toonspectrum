@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 
+import { studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
 import {
   STUDIO_BG3D_DEFERRED_ARTIFACT_PASSES,
   STUDIO_BG3D_PRODUCTION_BATCH_PRESETS,
@@ -18,7 +19,6 @@ import {
   resolveStudioBg3dProductionBatchPreset,
   type StudioBg3dProductionBatchPreset,
 } from "./studio-bg3d-production-multipass";
-import { studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
 
 import type { StudioBg3dProductionBatchRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import type { StudioBg3dShot } from "./studio-bg3d-scene-document";

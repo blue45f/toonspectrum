@@ -1,10 +1,10 @@
 import { isStudioLiveCursorCleared } from "./studio-live-collaboration-protocol";
 
-import type { StudioLiveCursorQualityTier } from "./studio-live-cursor-quality";
 import type {
   StudioLivePeer,
   StudioLivePeerCursor,
 } from "./studio-live-collaboration-room";
+import type { StudioLiveCursorQualityTier } from "./studio-live-cursor-quality";
 
 export interface StudioLiveCursorPresentationOptions {
   cursors: readonly StudioLivePeerCursor[];
