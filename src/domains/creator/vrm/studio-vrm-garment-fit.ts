@@ -1,7 +1,13 @@
 import {
+  bodySilhouetteSignature,
+  sampleBodySilhouette,
+  type BodySilhouette,
+} from "./studio-vrm-body-silhouette";
+import {
   WARDROBE_FIT_MAX,
   WARDROBE_FIT_MIN,
   WARDROBE_SLOTS,
+  measuredTorsoClearanceM,
   sanitizeWardrobeMetrics,
   wardrobeItemById,
   type WardrobeGarmentRegion,
@@ -81,19 +87,57 @@ function intersectRegions(
   return a.filter((region) => bSet.has(region));
 }
 
+/** Chest span in silhouette t (waist → neck) — the height band a top or an outer has to clear. */
+const CHEST_BAND_T = { low: 0.5, high: 1 } as const;
+
+/** Hip span in silhouette t. The pelvis is widest a little above the hips joint, so a band. */
+const HIP_BAND_T = { low: 0, high: 0.2 } as const;
+
+/**
+ * A reference radius divides a shortfall into fit steps, so it may never approach zero. This floor
+ * is a division guard and not a claim about the body: a measured torso narrower than a human one
+ * (chibi proportions) keeps its own smaller radius as long as it stays above the guard.
+ */
+const MIN_MEASURED_REFERENCE_M = 0.02;
+
+/** Widest measured half-width inside a height band, floored by the guard above. */
+function measuredRadiusM(silhouette: BodySilhouette, band: { low: number; high: number }): number {
+  let widest = 0;
+  for (const ring of silhouette.rings) {
+    if (ring.t < band.low || ring.t > band.high) continue;
+    widest = Math.max(widest, ring.halfWidth);
+  }
+  // A silhouette with no ring inside the band still measured the body somewhere: sampling clamps
+  // to the nearest measured ring, which beats reporting a width nobody measured.
+  const measured = widest > 0
+    ? widest
+    : sampleBodySilhouette(silhouette, (band.low + band.high) / 2).halfWidth;
+  return Math.max(measured, MIN_MEASURED_REFERENCE_M);
+}
+
 function referenceRadiusM(slot: WardrobeSlot, metrics: WardrobeMetrics): number {
   const average = (left: number, right: number) => (left + right) / 2;
+  const torso = metrics.torso;
   switch (slot) {
     case "outer":
     case "top":
-      return Math.max(metrics.shoulderW * 0.56, metrics.hipW * 0.95, 0.08);
+      // shoulderW is the joint-to-joint span, which is exactly the assumption the cut is being
+      // fixed for: it over-reports penetration on a narrow chest and under-reports it on a broad
+      // one. Measured, the garment has to clear the widest cross-section above the waist.
+      return torso
+        ? measuredRadiusM(torso, CHEST_BAND_T)
+        : Math.max(metrics.shoulderW * 0.56, metrics.hipW * 0.95, 0.08);
     case "bottom":
-      return Math.max(
-        metrics.hipW * 0.95,
-        average(metrics.upperLeg.left.len, metrics.upperLeg.right.len) * 0.175,
-        0.065,
-      );
+      return torso
+        ? measuredRadiusM(torso, HIP_BAND_T)
+        : Math.max(
+          metrics.hipW * 0.95,
+          average(metrics.upperLeg.left.len, metrics.upperLeg.right.len) * 0.175,
+          0.065,
+        );
     case "shoes":
+      // The silhouette spans hips → neck, so a measured body says nothing about feet. Shoes keep
+      // the skeleton radius on purpose; there is no measurement here that was forgotten.
       return Math.max(
         metrics.ankleH,
         average(metrics.lowerLeg.left.len, metrics.lowerLeg.right.len) * 0.1,
@@ -137,10 +181,17 @@ export function buildStudioVrmGarmentFitInputSignature(
         upperArm: [round(metrics.upperArm.left.len), round(metrics.upperArm.right.len)],
         upperLeg: [round(metrics.upperLeg.left.len), round(metrics.upperLeg.right.len)],
         lowerLeg: [round(metrics.lowerLeg.left.len), round(metrics.lowerLeg.right.len)],
+        // The skeleton fields cannot see a re-measured body: two silhouettes on the same rig share
+        // every joint distance yet give a top a different reference radius, so a cached report
+        // keyed on the skeleton alone would survive a measurement it no longer describes.
+        torso: bodySilhouetteSignature(metrics.torso),
         slots,
       }
     : { source: "unavailable", slots };
-  return `garfit1:${hashSignature(JSON.stringify(payload))}`;
+  // garfit2 (was garfit1): the payload gained the measurement, and on a measured body every
+  // penetration number a garfit1 receipt carries came from the skeleton radius instead. Those
+  // receipts have to be recomputed rather than matched, so the tag says so out loud.
+  return `garfit2:${hashSignature(JSON.stringify(payload))}`;
 }
 
 /**
@@ -170,14 +221,26 @@ export function inspectStudioVrmGarmentFit(
     const item = equip ? wardrobeItemById(equip.itemId) : undefined;
     if (!equip || !item || item.slot !== slot) return [];
     const radius = referenceRadiusM(slot, metrics);
-    const bodyClearance = item.fitProfile.baseBodyClearanceM + (equip.fit - 1) * radius;
-    const bodyShortfall = Math.max(0, item.fitProfile.motionAllowanceM - bodyClearance);
+    // 실측 재단은 fit을 여유분에만 곱한다(몸 쪽에 곱하면 fit을 줄였을 때 옷이 살을 파고든다).
+    // 그래서 fit 한 칸이 벌어 주는 폭은 반경 배율이 아니라 여유분 배율이다. 공식을 여기서 다시
+    // 쓰는 대신 재단이 실제로 남긴 여유를 재서, 두 모델이 다시 어긋나지 않게 한다. 실측 여유는
+    // fit에 정비례하므로(여유분 × 아이템 배율 × fit) 한 번 재면 나머지 fit은 나눗셈으로 얻는다.
+    const measured = measuredTorsoClearanceM(equip.itemId, metrics, equip.fit);
+    const perFitStepM = measured === null
+      ? radius
+      : Math.max(EPSILON_M, measured / Math.max(EPSILON_M, equip.fit));
+    const clearanceAt = measured === null
+      ? (value: number) => item.fitProfile.baseBodyClearanceM + (value - 1) * radius
+      : (value: number) => perFitStepM * value;
+    const bodyShortfall = Math.max(0, item.fitProfile.motionAllowanceM - clearanceAt(equip.fit));
     return [{
       slot,
       equip,
       item,
       radius,
-      suggestedFit: clampFit(equip.fit + bodyShortfall / radius),
+      clearanceAt,
+      perFitStepM,
+      suggestedFit: clampFit(equip.fit + bodyShortfall / perFitStepM),
     }];
   });
 
@@ -190,15 +253,12 @@ export function inspectStudioVrmGarmentFit(
     for (const inner of ordered) {
       if (inner === outer || inner.item.fitProfile.layerRank >= outer.item.fitProfile.layerRank) continue;
       if (intersectRegions(outer.item.fitProfile.regions, inner.item.fitProfile.regions).length === 0) continue;
-      const innerEnvelope = inner.item.fitProfile.baseBodyClearanceM
-        + (inner.suggestedFit - 1) * inner.radius;
-      const outerEnvelope = outer.item.fitProfile.baseBodyClearanceM
-        + (outer.suggestedFit - 1) * outer.radius;
       const shortfall = Math.max(
         0,
-        outer.item.fitProfile.layerClearanceM - (outerEnvelope - innerEnvelope),
+        outer.item.fitProfile.layerClearanceM
+          - (outer.clearanceAt(outer.suggestedFit) - inner.clearanceAt(inner.suggestedFit)),
       );
-      outer.suggestedFit = clampFit(outer.suggestedFit + shortfall / outer.radius);
+      outer.suggestedFit = clampFit(outer.suggestedFit + shortfall / outer.perFitStepM);
     }
   }
 
@@ -207,8 +267,7 @@ export function inspectStudioVrmGarmentFit(
     const effectiveFit = candidate.equip.fitMode === "auto"
       ? candidate.suggestedFit
       : candidate.equip.fit;
-    const estimatedBodyClearanceM = candidate.item.fitProfile.baseBodyClearanceM
-      + (effectiveFit - 1) * candidate.radius;
+    const estimatedBodyClearanceM = candidate.clearanceAt(effectiveFit);
     slots[candidate.slot] = {
       slot: candidate.slot,
       itemId: candidate.equip.itemId,
@@ -217,7 +276,11 @@ export function inspectStudioVrmGarmentFit(
       effectiveFit: round(effectiveFit),
       referenceRadiusM: round(candidate.radius),
       estimatedBodyClearanceM: round(estimatedBodyClearanceM),
-      autoAdjustmentM: round(Math.max(0, (effectiveFit - candidate.equip.fit) * candidate.radius)),
+      // 자동 보정이 셸을 실제로 얼마나 밀어냈는지 — 같은 여유분 모델로 잰다.
+      autoAdjustmentM: round(Math.max(
+        0,
+        candidate.clearanceAt(effectiveFit) - candidate.clearanceAt(candidate.equip.fit),
+      )),
     };
   }
 

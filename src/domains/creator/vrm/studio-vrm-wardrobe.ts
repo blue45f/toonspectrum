@@ -1110,6 +1110,39 @@ function shoeParts(
 }
 
 /**
+ * 실측 재단에서 이 아이템의 몸통 셸이 실제로 남기는 몸 여유(미터). 못 재면 null.
+ *
+ * 공식을 다시 쓰지 않고 **파츠를 만들어 잰다**. 여유분 계산이 재단과 보고서 두 곳에 따로 있으면
+ * 반드시 어긋나고, 실제로 어긋났다 — 골격 재단은 반경 전체에 fit을 곱했지만 실측 재단은 여유분
+ * 에만 곱하므로, 반경 배율을 가정한 보고서는 fit 한 칸이 벌어 주는 폭을 몇 배로 과대평가했다.
+ */
+export function measuredTorsoClearanceM(
+  itemId: string,
+  metricsRaw: WardrobeMetrics,
+  fit = 1,
+): number | null {
+  const m = sanitizeWardrobeMetrics(metricsRaw);
+  const silhouette = m.torso;
+  if (!silhouette) return null;
+  const shell = buildGarmentParts(itemId, m, fit).find(
+    (part) => part.bone === "spine"
+      && part.shape.kind === "lathe"
+      && part.shape.profile.some((ring) => ring.depth !== undefined),
+  );
+  if (!shell || shell.shape.kind !== "lathe") return null;
+
+  // 셸은 spine 로컬 centerY를 중심으로 놓이므로, 링의 로컬 y를 그 오프셋만큼 되돌려야 실루엣과
+  // 같은 높이를 가리킨다. 오프셋은 항상 up 축 위에 있다(torsoShell이 그렇게 만든다).
+  const centerY = shell.offset[0] * m.up[0] + shell.offset[1] * m.up[1] + shell.offset[2] * m.up[2];
+  let narrowest = Infinity;
+  for (const ring of shell.shape.profile) {
+    const body = sampleBodySilhouette(silhouette, torsoT(m, ring.y + centerY));
+    narrowest = Math.min(narrowest, ring.radius - (Math.abs(body.centerX) + body.halfWidth));
+  }
+  return Number.isFinite(narrowest) ? narrowest : null;
+}
+
+/**
  * 아이템 + 실측 치수 → 본 부착 파츠 스펙 목록.
  * fit은 반경(품)에만 적용되어 길이는 체형을 따른다.
  */
