@@ -1,6 +1,10 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { isStudioLiveCursorCleared } from "./studio-live-collaboration-protocol";
+import {
+  selectStudioRemoteCursorsForViewport,
+  useStudioLiveViewportPreferences,
+} from "./studio-live-viewport-preferences";
 
 import type {
   StudioLivePeerCursor,
@@ -192,5 +196,14 @@ export function useStudioRemoteCursors(
   room: StudioLiveRoom | null,
 ): readonly StudioLivePeerCursor[] {
   const store = storeForRoom(room);
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const cursors = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
+  const preferences = useStudioLiveViewportPreferences();
+  return useMemo(
+    () => selectStudioRemoteCursorsForViewport(cursors, preferences),
+    [cursors, preferences],
+  );
 }

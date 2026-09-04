@@ -4,6 +4,16 @@ import {
 } from "../studio-team-comment-live-event";
 
 import {
+  STUDIO_LIVE_ATTENTION_FALLBACK_TEXT,
+  STUDIO_LIVE_ATTENTION_VISIBLE_MS,
+  STUDIO_LIVE_CURSOR_CHAT_MAX_LENGTH,
+  createStudioLiveAttentionMessageId,
+  createStudioLiveCursorChatMessageId,
+  isStudioLiveChatControlMessageId,
+  parseStudioLiveChatControl,
+} from "./studio-live-chat-control";
+
+import {
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   assertStudioLiveCursorPayload,
   createStudioLiveEnvelope,
@@ -189,6 +199,24 @@ export interface StudioLiveChatMessage {
   self: boolean;
 }
 
+/** One transient Figma-style message rendered beside the author's current cursor. */
+export interface StudioLiveCursorChatMessage {
+  id: string;
+  participant: StudioLiveParticipant;
+  text: string;
+  sentAt: number;
+  expiresAt: number;
+}
+
+/** A short-lived Miro-style invitation to follow the sender's current page and future moves. */
+export interface StudioLiveAttentionRequest {
+  requestId: string;
+  participant: StudioLiveParticipant;
+  pageId: string | null;
+  sentAt: number;
+  expiresAt: number;
+}
+
 export type StudioLiveRoomEvent =
   | { type: "presence"; peers: StudioLivePeer[] }
   | {
@@ -198,6 +226,8 @@ export type StudioLiveRoomEvent =
     }
   | { type: "locks"; locks: StudioLiveLock[] }
   | { type: "chat"; message: StudioLiveChatMessage }
+  | { type: "cursor-chat"; message: StudioLiveCursorChatMessage }
+  | { type: "attention"; request: StudioLiveAttentionRequest }
   | {
       type: "gesture-preview";
       participant: StudioLiveParticipant;
@@ -618,6 +648,52 @@ export class StudioLiveRoom {
       message: { ...message, participant: copyParticipant(message.participant) },
     });
     return { ...message, participant: copyParticipant(message.participant) };
+  }
+
+  /** Sends a five-second cursor-anchored note without adding it to session chat history. */
+  sendCursorChat(text: string): boolean {
+    if (!this.ready || this.participant.role === "viewer") return false;
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.length > STUDIO_LIVE_CURSOR_CHAT_MAX_LENGTH) return false;
+    try {
+      return this.post("chat:message", {
+        messageId: createStudioLiveCursorChatMessageId(this.randomId()),
+        text: trimmed,
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /** Broadcasts a short-lived invitation to follow this editor's current page. */
+  requestAttention(): boolean {
+    if (
+      !this.ready ||
+      !canEditStudioLiveGesturePreview(this.participant) ||
+      !this.presence.pageId
+    ) {
+      return false;
+    }
+    const now = this.now();
+    try {
+      // Ordered transports deliver this presence refresh first, so the accept action can navigate
+      // immediately. If it arrives later, the existing follow effect moves on the next heartbeat.
+      this.sendPresence("presence:heartbeat");
+      return this.post(
+        "chat:message",
+        {
+          messageId: createStudioLiveAttentionMessageId(
+            this.randomId(),
+            now + STUDIO_LIVE_ATTENTION_VISIBLE_MS
+          ),
+          text: STUDIO_LIVE_ATTENTION_FALLBACK_TEXT,
+        },
+        null,
+        now
+      );
+    } catch {
+      return false;
+    }
   }
 
   updatePresence(patch: Partial<StudioLivePresencePayload>): void {
@@ -1922,6 +1998,41 @@ export class StudioLiveRoom {
         return;
       case "chat:message": {
         const payload = envelope.payload as StudioLiveChatMessagePayload;
+        const control = parseStudioLiveChatControl({
+          messageId: payload.messageId,
+          text: payload.text,
+          receivedAt,
+        });
+        if (control?.kind === "cursor-chat") {
+          if (envelope.sender.role === "viewer") return;
+          this.emit({
+            type: "cursor-chat",
+            message: {
+              id: payload.messageId,
+              participant: copyParticipant(envelope.sender),
+              text: control.text,
+              sentAt: envelope.sentAt,
+              expiresAt: control.expiresAt,
+            },
+          });
+          return;
+        }
+        if (control?.kind === "attention") {
+          if (!canEditStudioLiveGesturePreview(envelope.sender)) return;
+          this.emit({
+            type: "attention",
+            request: {
+              requestId: control.requestId,
+              participant: copyParticipant(envelope.sender),
+              pageId: this.peers.get(envelope.sender.sessionId)?.pageId ?? null,
+              sentAt: envelope.sentAt,
+              expiresAt: control.expiresAt,
+            },
+          });
+          return;
+        }
+        // A malformed reserved id is never downgraded into a visible chat line.
+        if (isStudioLiveChatControlMessageId(payload.messageId)) return;
         const message: StudioLiveChatMessage = {
           id: payload.messageId,
           participant: copyParticipant(envelope.sender),
