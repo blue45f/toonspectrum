@@ -2,7 +2,10 @@ import {
   StudioBg3dProSuiteRuntimeContext,
   type StudioBg3dProSuiteRuntimeValue,
 } from "./studio-bg3d-pro-suite-runtime-context";
-import { summarizeStudioBg3dProductionLook } from "./studio-bg3d-production-pass-readiness";
+import {
+  evaluateStudioBg3dProductionPassReadiness,
+  summarizeStudioBg3dProductionLook,
+} from "./studio-bg3d-production-pass-readiness";
 import { summarizeStudioBg3dProductionScene } from "./studio-bg3d-production-workflow";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
@@ -53,6 +56,12 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
   const productionLook = summarizeStudioBg3dProductionLook(
     context.sceneBaseDocument.output,
   );
+  const passReadiness = evaluateStudioBg3dProductionPassReadiness(
+    context.selectedShotBatchPasses,
+    productionLook,
+  );
+  const productionBlockedReason =
+    context.shotBatchBlockedReason ?? passReadiness.blockingReason;
   const runtime: StudioBg3dProSuiteRuntimeValue = {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
@@ -71,7 +80,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
       includeLayeredPsd: context.shotBatchIncludeLayeredPsd,
       includeContactSheet: context.shotBatchIncludeContactSheet,
       recoveryReady: context.recoveryScope !== null,
-      blockedReason: context.shotBatchBlockedReason,
+      blockedReason: productionBlockedReason,
       isRendering: context.isBatchRenderingShots,
       progress: context.shotBatchProgress,
       recoverySummary: context.shotBatchRecoverySummary,
