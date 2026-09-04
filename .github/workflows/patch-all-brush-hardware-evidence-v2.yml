@@ -41,6 +41,42 @@ jobs:
         run: |
           python3 -m py_compile scripts/patch-all-brush-hardware-evidence-v2.py
           python3 scripts/patch-all-brush-hardware-evidence-v2.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/verify-studio-long-stroke.mts")
+          source = path.read_text()
+          before = '''    const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
+              if (!adapter) return null;
+              const info = adapter.info ?? {};
+              const text = (value: unknown): string =>
+                typeof value === "string" ? value.trim() : "";
+              const vendor = text(info.vendor);
+              const architecture = text(info.architecture);
+              const device = text(info.device);
+              const description = text(info.description);
+              const isFallbackAdapter = typeof adapter.isFallbackAdapter === "boolean"
+                ? adapter.isFallbackAdapter
+                : null;'''
+          after = '''    const adapter = await gpu.requestAdapter({
+                powerPreference: "high-performance",
+              }) as AdapterLike | null;
+              if (!adapter) return null;
+              const info = adapter.info ?? {};
+              const text = (value: unknown): string =>
+                typeof value === "string" ? value.trim() : "";
+              const vendor = text(info.vendor);
+              const architecture = text(info.architecture);
+              const device = text(info.device);
+              const description = text(info.description);
+              const fallbackValue = adapter.isFallbackAdapter;
+              const isFallbackAdapter = typeof fallbackValue === "boolean"
+                ? fallbackValue
+                : null;'''
+          if source.count(before) != 1:
+              raise SystemExit("fallback adapter source block not found exactly once")
+          path.write_text(source.replace(before, after, 1))
+          PY
           git diff --check
 
       - name: Focused quality election tests
