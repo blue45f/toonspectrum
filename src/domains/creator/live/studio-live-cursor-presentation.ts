@@ -1,10 +1,6 @@
 import { isStudioLiveCursorCleared } from "./studio-live-collaboration-protocol";
-import { resolveStudioLiveCursorLimit } from "./studio-live-collaboration-preferences";
 
-import type {
-  StudioLiveCollaborationPreferences,
-  StudioLiveNetworkHints,
-} from "./studio-live-collaboration-preferences";
+import type { StudioLiveCursorQualityTier } from "./studio-live-cursor-quality";
 import type {
   StudioLivePeer,
   StudioLivePeerCursor,
@@ -16,8 +12,14 @@ export interface StudioLiveCursorPresentationOptions {
   pageId: string;
   followingSessionId?: string | null;
   pinnedSessionIds?: ReadonlySet<string>;
-  preferences: Readonly<StudioLiveCollaborationPreferences>;
-  networkHints?: StudioLiveNetworkHints;
+  visible?: boolean;
+  qualityTier?: StudioLiveCursorQualityTier | null;
+}
+
+function presentationLimit(tier: StudioLiveCursorQualityTier | null): number {
+  if (tier === "constrained") return 20;
+  if (tier === "balanced") return 40;
+  return 64;
 }
 
 function activityScore(
@@ -35,8 +37,8 @@ function activityScore(
 
 /**
  * Figma-style cursor admission: cursor-chat authors, the followed collaborator, active strokes and
- * active editors win before idle pointers. The local visibility preference is presentation-only
- * and never affects CRDT, locks, presence or another participant's cursor.
+ * active editors win before idle pointers. Outbound cadence remains owned by the adaptive transport;
+ * this function only bounds local DOM/SVG work and never affects CRDT, locks or another participant.
  */
 export function selectStudioLivePresentedCursors({
   cursors,
@@ -44,24 +46,15 @@ export function selectStudioLivePresentedCursors({
   pageId,
   followingSessionId = null,
   pinnedSessionIds = new Set<string>(),
-  preferences,
-  networkHints,
+  visible = true,
+  qualityTier = null,
 }: StudioLiveCursorPresentationOptions): StudioLivePeerCursor[] {
-  if (preferences.cursorVisibility === "hidden") return [];
+  if (!visible) return [];
   const peerBySession = new Map(peers.map((peer) => [peer.sessionId, peer] as const));
-  const eligible = cursors.filter((entry) => {
-    if (isStudioLiveCursorCleared(entry.cursor) || entry.cursor.pageId !== pageId) return false;
-    const sessionId = entry.participant.sessionId;
-    if (pinnedSessionIds.has(sessionId) || sessionId === followingSessionId) return true;
-    if (preferences.cursorVisibility === "drawing") return entry.cursor.drawing === true;
-    if (preferences.cursorVisibility === "active") {
-      return (
-        entry.cursor.drawing === true ||
-        peerBySession.get(sessionId)?.visibility === "active"
-      );
-    }
-    return true;
-  });
+  const eligible = cursors.filter(
+    (entry) =>
+      !isStudioLiveCursorCleared(entry.cursor) && entry.cursor.pageId === pageId
+  );
 
   eligible.sort((left, right) => {
     const scoreDelta =
@@ -82,8 +75,5 @@ export function selectStudioLivePresentedCursors({
     return left.participant.sessionId.localeCompare(right.participant.sessionId);
   });
 
-  return eligible.slice(
-    0,
-    resolveStudioLiveCursorLimit(preferences.cursorQuality, networkHints)
-  );
+  return eligible.slice(0, presentationLimit(qualityTier));
 }
