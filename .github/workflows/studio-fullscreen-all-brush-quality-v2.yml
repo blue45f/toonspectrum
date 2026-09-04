@@ -1,0 +1,150 @@
+name: Studio full-screen all-brush quality and performance v2
+
+on:
+  push:
+    branches:
+      - bench/studio-fullscreen-all-brush-quality-20260904
+    paths:
+      - ".github/workflows/studio-fullscreen-all-brush-quality-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exhaustive-fullscreen:
+    name: full-screen-v2-${{ matrix.backend }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [canvas2d, webgpu]
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: "1"
+      TOONSPECTRUM_BRUSH_LONG_ONLY: "1"
+      TOONSPECTRUM_BRUSH_LONG_SURVEY: "1"
+      TOONSPECTRUM_FULLSCREEN_BRUSH_BENCHMARK: "1"
+      TOONSPECTRUM_FULLSCREEN_BRUSH_STEPS: "1200"
+      TOONSPECTRUM_FULLSCREEN_BRUSH_BACKEND: ${{ matrix.backend }}
+      VITE_STUDIO_LIVE_INK_BACKEND: ${{ matrix.backend }}
+      VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT: "100"
+      VITE_STUDIO_LIVE_INK_KILL_SWITCH: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Resolve artifact paths after runner allocation
+        run: |
+          echo "TOONSPECTRUM_BRUSH_VERIFY_DIR=${RUNNER_TEMP}/fullscreen-brush-${{ matrix.backend }}" >> "$GITHUB_ENV"
+          mkdir -p "${RUNNER_TEMP}/fullscreen-brush-${{ matrix.backend }}"
+
+      - name: Apply full-screen exhaustive instrumentation
+        run: |
+          python3 scripts/patch-fullscreen-all-brush-benchmark.py
+          python3 scripts/fix-fullscreen-benchmark-type-casts.py
+          git diff --check
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+
+      - name: Enable repository pnpm through Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.15.1 --activate
+          pnpm --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate patched benchmark source
+        run: |
+          pnpm exec eslint --max-warnings=0 scripts/verify-studio-brushes.mts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Install Chromium and Linux GPU dependencies
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build the exact backend preference
+        run: pnpm run build
+
+      - name: Run every listed brush across the longest unobstructed canvas lane
+        shell: bash
+        run: |
+          set +e
+          if [[ "${{ matrix.backend }}" == "webgpu" ]]; then
+            xvfb-run -a pnpm exec tsx scripts/verify-studio-brushes.mts \
+              2>&1 | tee "${TOONSPECTRUM_BRUSH_VERIFY_DIR}/benchmark.log"
+          else
+            pnpm exec tsx scripts/verify-studio-brushes.mts \
+              2>&1 | tee "${TOONSPECTRUM_BRUSH_VERIFY_DIR}/benchmark.log"
+          fi
+          status=${PIPESTATUS[0]}
+          printf '%s\n' "$status" > "${TOONSPECTRUM_BRUSH_VERIFY_DIR}/exit-code.txt"
+          echo "Benchmark process exit code: $status"
+          exit 0
+
+      - name: Record environment
+        if: always()
+        run: |
+          {
+            echo "backend=${{ matrix.backend }}"
+            echo "runner=${RUNNER_OS}-${RUNNER_ARCH}"
+            echo "node=$(node --version 2>/dev/null || true)"
+            echo "pnpm=$(pnpm --version 2>/dev/null || true)"
+            echo "commit=${GITHUB_SHA}"
+          } > "${TOONSPECTRUM_BRUSH_VERIFY_DIR}/environment.txt"
+
+      - name: Upload exhaustive quality and performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullscreen-v2-${{ matrix.backend }}-${{ github.run_id }}
+          path: ${{ env.TOONSPECTRUM_BRUSH_VERIFY_DIR }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
+
+  summarize:
+    name: quality-first-v2-summary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs: exhaustive-fullscreen
+    if: always()
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+      - name: Enable repository pnpm through Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: fullscreen-v2-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/fullscreen-artifacts
+      - name: Generate quality-first CPU versus GPU report
+        run: |
+          mkdir -p "${RUNNER_TEMP}/fullscreen-summary"
+          TOONSPECTRUM_FULLSCREEN_ARTIFACT_ROOT="${RUNNER_TEMP}/fullscreen-artifacts" \
+          TOONSPECTRUM_FULLSCREEN_SUMMARY_DIR="${RUNNER_TEMP}/fullscreen-summary" \
+            pnpm exec tsx scripts/summarize-fullscreen-all-brush-benchmark.mts
+      - name: Include raw benchmark process codes
+        if: always()
+        run: |
+          find "${RUNNER_TEMP}/fullscreen-artifacts" -name exit-code.txt -print -exec cat {} \; \
+            > "${RUNNER_TEMP}/fullscreen-summary/raw-exit-codes.txt" || true
+      - name: Upload final all-brush comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullscreen-v2-all-brush-summary-${{ github.run_id }}
+          path: ${{ runner.temp }}/fullscreen-summary
+          if-no-files-found: error
+          retention-days: 30
