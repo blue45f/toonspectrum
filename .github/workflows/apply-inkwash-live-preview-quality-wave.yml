@@ -19,24 +19,13 @@ concurrency:
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[inkwash-live-preview-applied]') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           ref: fix/inkwash-live-preview-quality-20260904
           fetch-depth: 1
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-          run_install: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - name: Tighten preview memory and applicator source
         shell: python
         run: |
@@ -77,41 +66,11 @@ jobs:
           escaped_open = "\\$" + "{{"
           source = source.replace(expression_open, escaped_open)
           path.write_text(source, encoding="utf-8")
-      - name: Validate applicator syntax
-        run: node --check scripts/apply-inkwash-live-preview-quality-wave.mjs
       - name: Apply quality-first preview patch
-        run: node scripts/apply-inkwash-live-preview-quality-wave.mjs
-      - name: Normalize and validate generated sources
         run: |
-          pnpm exec eslint --fix \
-            src/domains/creator/brush/studio-inkwash-fluid.ts \
-            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
-            src/domains/creator/live/studio-live-wet-ink-overlay.ts \
-            src/domains/creator/live/studio-live-wet-ink-integration.test.ts \
-            scripts/verify-studio-long-stroke.mts \
-            scripts/verify-inkwash-dippen-live-commit-fidelity.mts
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-          import { parse } from "yaml";
-          parse(readFileSync(".github/workflows/studio-inkwash-live-preview-quality.yml", "utf8"));
-          NODE
-          git diff --check
-      - name: Focused validation before materializing
-        run: |
-          pnpm exec vitest run \
-            src/domains/creator/brush/studio-inkwash-fluid-deposit.test.ts \
-            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
-            src/domains/creator/live/studio-live-wet-ink-overlay.test.ts \
-            src/domains/creator/live/studio-live-wet-ink-integration.test.ts
-          pnpm exec eslint --max-warnings=0 \
-            src/domains/creator/brush/studio-inkwash-fluid.ts \
-            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
-            src/domains/creator/live/studio-live-wet-ink-overlay.ts \
-            src/domains/creator/live/studio-live-wet-ink-integration.test.ts \
-            scripts/verify-studio-long-stroke.mts \
-            scripts/verify-inkwash-dippen-live-commit-fidelity.mts
-          pnpm exec tsc -p tsconfig.json --noEmit
-      - name: Commit product changes
+          node --check scripts/apply-inkwash-live-preview-quality-wave.mjs
+          node scripts/apply-inkwash-live-preview-quality-wave.mjs
+      - name: Commit product changes for full validation
         run: |
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
