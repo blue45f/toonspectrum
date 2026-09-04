@@ -1,0 +1,227 @@
+name: Finalize architecture PR 690 against latest main
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/architecture-finalize-pr690.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: architecture-main-sync-pr690
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: synchronize, verify, and merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      BRANCH_NAME: refactor/layered-architecture-20260904
+      PR_NUMBER: "690"
+      FINALIZER_PATH: .github/workflows/architecture-finalize-pr690.yml
+      EARLIER_SYNC_PATH: .github/workflows/architecture-main-sync-pr690.yml
+    steps:
+      - name: Check out the architecture branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/layered-architecture-20260904
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Configure repository identity and refresh branch
+        run: |
+          git config user.name "toonstudio-architecture-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin "$BRANCH_NAME" main
+          git reset --hard "origin/$BRANCH_NAME"
+
+      - name: Stop when PR is already merged
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STATE="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.state + ":" + (.merged|tostring)')"
+          echo "state=$STATE" >> "$GITHUB_OUTPUT"
+          if [ "$STATE" = "closed:true" ]; then
+            echo "PR #$PR_NUMBER is already merged"
+          fi
+
+      - name: Remove one-off synchronization workflows from candidate tree
+        if: steps.pr.outputs.state != 'closed:true'
+        run: |
+          changed=0
+          for path in "$FINALIZER_PATH" "$EARLIER_SYNC_PATH"; do
+            if [ -f "$path" ]; then
+              git rm "$path"
+              changed=1
+            fi
+          done
+          if [ "$changed" -eq 1 ]; then
+            git commit -m "chore(architecture): remove one-off synchronization workflows"
+          fi
+
+      - name: Merge current main while preserving current product changes
+        if: steps.pr.outputs.state != 'closed:true'
+        id: merge
+        run: |
+          git fetch origin main
+          BASE="$(git merge-base HEAD origin/main)"
+          echo "merge_base=$BASE" >> "$GITHUB_OUTPUT"
+          git merge --no-edit --no-ff -X theirs origin/main
+          git diff --check origin/main...HEAD
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "candidate_tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+
+      - name: Guard main additions and architecture invariants
+        if: steps.pr.outputs.state != 'closed:true'
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import subprocess
+          from pathlib import Path
+
+          merge_base = subprocess.check_output(
+              ["git", "merge-base", "HEAD", "origin/main"], text=True
+          ).strip()
+
+          # A synchronization pass must not remove files introduced on current main.
+          main_added = subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=A", f"{merge_base}..origin/main"],
+              text=True,
+          ).splitlines()
+          missing = [path for path in main_added if not Path(path).exists()]
+          if missing:
+              raise SystemExit(
+                  "latest-main additions are missing from the candidate tree:\n"
+                  + "\n".join(f" - {path}" for path in missing)
+              )
+
+          forbidden = [
+              ".github/workflows/architecture-finalize-pr690.yml",
+              ".github/workflows/architecture-main-sync-pr690.yml",
+              ".github/workflows/architecture-source-snapshot.yml",
+              ".github/workflows/architecture-snapshot.yml",
+          ]
+          leftovers = [path for path in forbidden if Path(path).exists()]
+          if leftovers:
+              raise SystemExit(
+                  "one-off architecture workflow leaked into candidate tree:\n"
+                  + "\n".join(f" - {path}" for path in leftovers)
+              )
+
+          required = [
+              "src/app/routes/AppRouter.tsx",
+              "src/domains/creator/studio-router/StudioRouter.tsx",
+              "src/domains/creator/studio-host-architecture-ratchet.test.ts",
+              "scripts/validate-architecture.mjs",
+          ]
+          absent = [path for path in required if not Path(path).exists()]
+          if absent:
+              raise SystemExit(
+                  "required architecture boundaries are absent:\n"
+                  + "\n".join(f" - {path}" for path in absent)
+              )
+          print("main-addition and architecture-boundary guards passed")
+          PY
+
+      - name: Set up pnpm
+        if: steps.pr.outputs.state != 'closed:true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        if: steps.pr.outputs.state != 'closed:true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.pr.outputs.state != 'closed:true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Run architecture and complete repository gates
+        if: steps.pr.outputs.state != 'closed:true'
+        run: |
+          pnpm run validate:architecture
+          pnpm run ci
+          git diff --check
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "verification changed tracked files" >&2
+            git status --short
+            git diff --stat
+            exit 1
+          fi
+
+      - name: Push the exact verified candidate
+        if: steps.pr.outputs.state != 'closed:true'
+        id: push
+        run: |
+          VERIFIED_SHA="$(git rev-parse HEAD)"
+          git push origin "HEAD:$BRANCH_NAME"
+          echo "sha=$VERIFIED_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Publish required core result for exact verified SHA
+        if: steps.pr.outputs.state != 'closed:true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.sha }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/statuses/$VERIFIED_SHA" \
+            -f state=success \
+            -f context=core \
+            -f description="Latest-main synchronized tree passed complete pnpm CI" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Squash merge PR 690 at exact verified SHA
+        if: steps.pr.outputs.state != 'closed:true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.sha }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if gh api \
+              --method PUT \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${{ github.repository }}/pulls/$PR_NUMBER/merge" \
+              -f merge_method=squash \
+              -f sha="$VERIFIED_SHA" \
+              -f commit_title="refactor(architecture): layer routes and extract studio runtimes (#690)" \
+              -f commit_message="Adopt layered route ownership, preserve latest main features, extract Studio runtimes, and enforce architecture ratchets."; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Clean up one-off workflows after pre-push failure
+        if: failure() && steps.pr.outputs.state != 'closed:true' && steps.push.outcome != 'success'
+        run: |
+          git fetch origin "$BRANCH_NAME"
+          git reset --hard "origin/$BRANCH_NAME"
+          changed=0
+          for path in "$FINALIZER_PATH" "$EARLIER_SYNC_PATH"; do
+            if [ -f "$path" ]; then
+              git rm "$path"
+              changed=1
+            fi
+          done
+          if [ "$changed" -eq 1 ]; then
+            git commit -m "chore(architecture): remove failed one-off synchronization workflows"
+            git push origin "HEAD:$BRANCH_NAME"
+          fi
