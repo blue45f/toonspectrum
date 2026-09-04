@@ -81,16 +81,21 @@ jobs:
         run: node --check scripts/apply-inkwash-live-preview-quality-wave.mjs
       - name: Apply quality-first preview patch
         run: node scripts/apply-inkwash-live-preview-quality-wave.mjs
-      - name: Normalize changed files
-        run: >-
-          pnpm exec prettier --write
-          src/domains/creator/brush/studio-inkwash-fluid.ts
-          src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts
-          src/domains/creator/live/studio-live-wet-ink-overlay.ts
-          src/domains/creator/live/studio-live-wet-ink-integration.test.ts
-          scripts/verify-studio-long-stroke.mts
-          scripts/verify-inkwash-dippen-live-commit-fidelity.mts
-          .github/workflows/studio-inkwash-live-preview-quality.yml
+      - name: Normalize and validate generated sources
+        run: |
+          pnpm exec eslint --fix \
+            src/domains/creator/brush/studio-inkwash-fluid.ts \
+            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
+            src/domains/creator/live/studio-live-wet-ink-overlay.ts \
+            src/domains/creator/live/studio-live-wet-ink-integration.test.ts \
+            scripts/verify-studio-long-stroke.mts \
+            scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          import { parse } from "yaml";
+          parse(readFileSync(".github/workflows/studio-inkwash-live-preview-quality.yml", "utf8"));
+          NODE
+          git diff --check
       - name: Focused validation before materializing
         run: |
           pnpm exec vitest run \
