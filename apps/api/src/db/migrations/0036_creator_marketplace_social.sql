@@ -172,4 +172,66 @@ REVOKE ALL ON TABLE public."creator_marketplace_review" FROM PUBLIC;
 REVOKE ALL ON TABLE public."creator_marketplace_review_helpful" FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.enforce_creator_marketplace_comment_parent() FROM PUBLIC;
 
+-- Incremental production upgrades run this migration before the post-migration ACL normalizer.
+-- Discover only already-established, non-privileged marketplace runtime roles by their existing
+-- least-privilege contract, then extend that contract to the new social relations. Empty-database
+-- bootstrap is also safe: its later runtime ACL normalization grants these relations explicitly.
+DO $creator_marketplace_social_runtime_acl$
+DECLARE
+  runtime_role record;
+BEGIN
+  FOR runtime_role IN
+    SELECT role.rolname
+    FROM pg_catalog.pg_roles AS role
+    WHERE role.rolcanlogin
+      AND NOT role.rolsuper
+      AND NOT role.rolcreaterole
+      AND NOT role.rolcreatedb
+      AND NOT role.rolreplication
+      AND NOT role.rolbypassrls
+      AND NOT pg_catalog.has_schema_privilege(role.rolname, 'public', 'CREATE')
+      AND pg_catalog.has_table_privilege(
+        role.rolname,
+        'public.creator_marketplace_resource',
+        'SELECT'
+      )
+      AND pg_catalog.has_table_privilege(
+        role.rolname,
+        'public.creator_marketplace_resource',
+        'INSERT'
+      )
+      AND pg_catalog.has_column_privilege(
+        role.rolname,
+        'public.creator_marketplace_resource',
+        'delistedAt',
+        'UPDATE'
+      )
+      AND pg_catalog.has_table_privilege(
+        role.rolname,
+        'public.creator_marketplace_library_item',
+        'SELECT'
+      )
+      AND pg_catalog.has_table_privilege(
+        role.rolname,
+        'public.creator_marketplace_library_item',
+        'INSERT'
+      )
+      AND pg_catalog.has_table_privilege(
+        role.rolname,
+        'public.creator_marketplace_publish_gate',
+        'SELECT, INSERT, UPDATE, DELETE'
+      )
+  LOOP
+    EXECUTE format(
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE '
+      || 'public.creator_marketplace_comment, '
+      || 'public.creator_marketplace_comment_like, '
+      || 'public.creator_marketplace_review, '
+      || 'public.creator_marketplace_review_helpful TO %I',
+      runtime_role.rolname
+    );
+  END LOOP;
+END
+$creator_marketplace_social_runtime_acl$;
+
 COMMIT;
