@@ -2,17 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { selectStudioLivePresentedCursors } from "./studio-live-cursor-presentation";
 
-import type { StudioLiveCollaborationPreferences } from "./studio-live-collaboration-preferences";
 import type {
   StudioLivePeer,
   StudioLivePeerCursor,
 } from "./studio-live-collaboration-room";
-
-const BASE_PREFERENCES: StudioLiveCollaborationPreferences = {
-  cursorVisibility: "all",
-  cursorQuality: "smooth",
-  showCursorLabels: true,
-};
 
 function peer(
   sessionId: string,
@@ -50,13 +43,14 @@ function cursor(
 }
 
 describe("selectStudioLivePresentedCursors", () => {
-  it("keeps the followed collaborator first, then drawing and active peers", () => {
+  it("keeps cursor chat, followed, drawing and active collaborators in that order", () => {
     const selected = selectStudioLivePresentedCursors({
       cursors: [
-        cursor("idle", { updatedAt: 400 }),
-        cursor("active", { updatedAt: 300 }),
-        cursor("drawing", { drawing: true, updatedAt: 200 }),
-        cursor("followed", { updatedAt: 100 }),
+        cursor("idle", { updatedAt: 500 }),
+        cursor("active", { updatedAt: 400 }),
+        cursor("drawing", { drawing: true, updatedAt: 300 }),
+        cursor("followed", { updatedAt: 200 }),
+        cursor("cursor-chat", { updatedAt: 100 }),
         cursor("other-page", { pageId: "page-2" }),
       ],
       peers: [
@@ -64,15 +58,17 @@ describe("selectStudioLivePresentedCursors", () => {
         peer("active"),
         peer("drawing", "idle"),
         peer("followed", "idle"),
+        peer("cursor-chat", "idle"),
         peer("other-page"),
       ],
       pageId: "page-1",
       followingSessionId: "followed",
-      preferences: BASE_PREFERENCES,
-      networkHints: {},
+      pinnedSessionIds: new Set(["cursor-chat"]),
+      qualityTier: "live",
     });
 
     expect(selected.map((entry) => entry.participant.sessionId)).toEqual([
+      "cursor-chat",
       "followed",
       "drawing",
       "active",
@@ -80,46 +76,31 @@ describe("selectStudioLivePresentedCursors", () => {
     ]);
   });
 
-  it("honors local visibility modes without losing the followed peer", () => {
-    const drawingOnly = selectStudioLivePresentedCursors({
-      cursors: [cursor("followed"), cursor("drawing", { drawing: true }), cursor("idle")],
-      peers: [peer("followed", "idle"), peer("drawing"), peer("idle", "idle")],
-      pageId: "page-1",
-      followingSessionId: "followed",
-      preferences: { ...BASE_PREFERENCES, cursorVisibility: "drawing" },
-      networkHints: {},
-    });
-    expect(drawingOnly.map((entry) => entry.participant.sessionId)).toEqual([
-      "followed",
-      "drawing",
-    ]);
-
+  it("honors the local hide-cursors preference", () => {
     expect(
       selectStudioLivePresentedCursors({
         cursors: [cursor("followed")],
         peers: [peer("followed")],
         pageId: "page-1",
         followingSessionId: "followed",
-        preferences: { ...BASE_PREFERENCES, cursorVisibility: "hidden" },
-        networkHints: {},
+        visible: false,
       })
     ).toEqual([]);
   });
 
-  it("caps low-bandwidth rendering after applying activity priority", () => {
-    const cursors = Array.from({ length: 24 }, (_, index) =>
-      cursor(`peer-${index}`, { drawing: index === 23, updatedAt: index })
+  it("bounds constrained DOM rendering after applying activity priority", () => {
+    const cursors = Array.from({ length: 32 }, (_, index) =>
+      cursor(`peer-${index}`, { drawing: index === 31, updatedAt: index })
     );
     const peers = cursors.map((entry) => peer(entry.participant.sessionId));
     const selected = selectStudioLivePresentedCursors({
       cursors,
       peers,
       pageId: "page-1",
-      preferences: { ...BASE_PREFERENCES, cursorQuality: "data-saver" },
-      networkHints: { saveData: true },
+      qualityTier: "constrained",
     });
 
-    expect(selected).toHaveLength(12);
-    expect(selected[0]?.participant.sessionId).toBe("peer-23");
+    expect(selected).toHaveLength(20);
+    expect(selected[0]?.participant.sessionId).toBe("peer-31");
   });
 });
