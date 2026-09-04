@@ -1,10 +1,10 @@
 import {
+  STUDIO_BRUSH_GPU_QUALITY_RENDER_CONTRACT_VERSION,
+} from "./studio-brush-gpu-quality-election";
+import {
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE,
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_SCHEMA_VERSION,
 } from "./studio-brush-gpu-quality-evidence.generated";
-import {
-  STUDIO_BRUSH_GPU_QUALITY_RENDER_CONTRACT_VERSION,
-} from "./studio-brush-gpu-quality-election";
 
 export { STUDIO_BRUSH_GPU_QUALITY_EVIDENCE };
 
