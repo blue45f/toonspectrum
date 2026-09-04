@@ -1,0 +1,40 @@
+name: Temporary Studio comments source export
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Package comment implementation and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            find src/domains/creator apps/api/src scripts -type f \
+              \( -iname '*comment*' -o -iname '*review-task*' \) -print0
+            printf '%s\0' \
+              src/domains/creator/studio-page-lazy-ui.ts \
+              src/domains/creator/studio-page-comments-runtime.ts \
+              package.json \
+              pnpm-lock.yaml \
+              tsconfig.json \
+              vitest.config.ts \
+              eslint.config.js
+          } | sort -zu > /tmp/studio-comment-files
+          tar --null -czf studio-comments-source.tar.gz --files-from=/tmp/studio-comment-files
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-comments-source
+          path: studio-comments-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
