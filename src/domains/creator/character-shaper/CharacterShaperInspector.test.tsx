@@ -399,8 +399,36 @@ describe("CharacterShaperInspector per slot", () => {
     fireEvent.click(screen.getByRole("button", { name: "왼손" }));
     expect(binding.setHandSide).toHaveBeenCalledWith("left");
 
-    commitRange("왼손 굽힘", "30");
+    commitRange("왼손 전체 굽힘", "30");
     expect(h.updateFingerCurl).toHaveBeenCalledWith("left", 30);
+  });
+
+  it("hand-pose bends one finger at a time without moving the others", () => {
+    const { h } = renderInspector("hand-pose");
+    fireEvent.click(screen.getByRole("button", { name: "왼손" }));
+
+    commitRange("왼손 검지", "45");
+    expect(h.updateFingerCurl).toHaveBeenLastCalledWith("left", 45, "index");
+
+    commitRange("왼손 엄지", "20");
+    expect(h.updateFingerCurl).toHaveBeenLastCalledWith("left", 20, "thumb");
+  });
+
+  it("hand-pose reads each finger slider from its own bone", () => {
+    const rad = (degrees: number) => (degrees * Math.PI) / 180;
+    const h = makeHost({
+      fingerEdits: {
+        leftIndexProximal: [0, 0, -rad(30)],
+        leftLittleProximal: [0, 0, -rad(50)],
+      },
+    });
+    renderInspector("hand-pose", { h });
+    // 각 슬라이더가 제 본을 읽어야 한다 — 예전처럼 검지 값을 전부에 보여 주면 거짓말이다.
+    expect((screen.getByRole("slider", { name: "왼손 검지" }) as HTMLInputElement).value).toBe("30");
+    expect((screen.getByRole("slider", { name: "왼손 새끼" }) as HTMLInputElement).value).toBe("50");
+    expect((screen.getByRole("slider", { name: "왼손 중지" }) as HTMLInputElement).value).toBe("0");
+    // 오른손 슬라이더는 왼손 편집을 따라가지 않는다.
+    expect((screen.getByRole("slider", { name: "오른손 검지" }) as HTMLInputElement).value).toBe("0");
   });
 
   it("locks every control while the binding reports a busy reason", () => {

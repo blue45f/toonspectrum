@@ -11,7 +11,7 @@
  * wardrobe, costume, props, expression, pose and hands write to the poser host directly, which
  * already owns their undo.
  */
-import { Check, Eye, EyeOff, Info, RotateCcw, Trash2, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronRight, Eye, EyeOff, Info, RotateCcw, Trash2, TriangleAlert, X } from "lucide-react";
 import { useId } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
@@ -24,6 +24,11 @@ import {
   applyAvatarForgeBodyPreset,
 } from "../vrm/studio-vrm-avatar-forge";
 import { COSTUME_PALETTES, COSTUME_SLOT_LABELS } from "../vrm/studio-vrm-costume";
+import {
+  STUDIO_VRM_FINGER_LABELS,
+  STUDIO_VRM_FINGER_NAMES,
+  readStudioVrmFingerCurlDegrees,
+} from "../vrm/studio-vrm-finger-curl";
 import {
   STUDIO_VRM_PROPORTION_KEYS,
   STUDIO_VRM_PROPORTION_LIMITS,
@@ -118,17 +123,51 @@ const SWATCH_TONE = "grid size-11 place-items-center rounded-lg border border-li
 function Section({
   title,
   hint,
+  collapsible = false,
+  defaultOpen = true,
   children,
 }: {
   readonly title: string;
   readonly hint?: string;
+  /** 자주 쓰지 않는 정밀 조절은 접어 둔다 — 인스펙터는 프리셋이 먼저 보여야 한다. */
+  readonly collapsible?: boolean;
+  readonly defaultOpen?: boolean;
   readonly children: ReactNode;
 }) {
+  const body = (
+    <>
+      {hint ? <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">{hint}</p> : null}
+      <div className="mt-2 space-y-2">{children}</div>
+    </>
+  );
+  if (collapsible) {
+    return (
+      <details
+        className="group border-t border-line/60 px-3 py-3 first:border-t-0"
+        data-character-inspector-section={title}
+        open={defaultOpen}
+      >
+        <summary
+          className={cn(
+            "flex cursor-pointer list-none items-center gap-1.5 text-[0.78rem] font-bold text-fg",
+            STUDIO_FOCUS_RING,
+          )}
+        >
+          <ChevronRight
+            size={13}
+            aria-hidden
+            className="shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+          />
+          {title}
+        </summary>
+        {body}
+      </details>
+    );
+  }
   return (
     <section className="border-t border-line/60 px-3 py-3 first:border-t-0" data-character-inspector-section={title}>
       <h3 className="text-[0.78rem] font-bold text-fg">{title}</h3>
-      {hint ? <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">{hint}</p> : null}
-      <div className="mt-2 space-y-2">{children}</div>
+      {body}
     </section>
   );
 }
@@ -742,13 +781,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
 
   const renderHandPose = () => {
     const fingerEdits = (h.fingerEdits ?? {}) as Record<string, readonly number[] | undefined>;
-    const curlDegrees = (side: "left" | "right") => {
-      const rotation = fingerEdits[`${side}IndexProximal`];
-      const radians = Array.isArray(rotation) && typeof rotation[2] === "number" ? rotation[2] : 0;
-      return Math.round(Math.abs((radians * 180) / Math.PI));
-    };
     const sides: readonly ("left" | "right")[] =
       binding.handSide === "both" ? ["left", "right"] : [binding.handSide];
+    const sideLabel = (side: "left" | "right") => (side === "left" ? "왼손" : "오른손");
     return (
       <>
         <Section title="어느 손에 적용할지" hint="카드로 고른 손 모양이 이 선택을 따릅니다.">
@@ -763,13 +798,13 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
         </Section>
         <Section
           title="손가락 말아쥐기"
-          hint="런타임은 손 단위로 네 손가락과 엄지를 함께 굽힙니다. 손가락 하나씩은 고급 편집에서 조절합니다."
+          hint="다섯 손가락을 함께 굽히거나, 아래에서 손가락 하나씩 따로 굽힙니다."
         >
           {sides.map((side) => (
             <CharacterRangeControl
               key={side}
-              label={side === "left" ? "왼손 굽힘" : "오른손 굽힘"}
-              value={curlDegrees(side)}
+              label={`${sideLabel(side)} 전체 굽힘`}
+              value={readStudioVrmFingerCurlDegrees(fingerEdits, side, "index")}
               min={0}
               max={60}
               step={1}
@@ -780,6 +815,32 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             />
           ))}
         </Section>
+        {sides.map((side) => (
+          <Section
+            key={`fingers-${side}`}
+            title={`${sideLabel(side)} 손가락 하나씩`}
+            hint="검지만 펴는 손짓처럼 손가락마다 각도가 달라야 하는 포즈를 만듭니다."
+            collapsible
+            defaultOpen={false}
+          >
+            {STUDIO_VRM_FINGER_NAMES.map((finger) => (
+              <CharacterRangeControl
+                key={finger}
+                // 양손을 함께 보여 줄 때 두 슬라이더가 똑같이 "검지"라 불리면 스크린 리더에서
+                // 어느 손인지 알 수 없다. 이름에 손을 넣어 각 컨트롤을 유일하게 만든다.
+                label={`${sideLabel(side)} ${STUDIO_VRM_FINGER_LABELS[finger]}`}
+                value={readStudioVrmFingerCurlDegrees(fingerEdits, side, finger)}
+                min={0}
+                max={60}
+                step={1}
+                unit="°"
+                defaultValue={0}
+                disabled={locked}
+                onCommit={(value) => h.updateFingerCurl(side, value, finger)}
+              />
+            ))}
+          </Section>
+        ))}
       </>
     );
   };
