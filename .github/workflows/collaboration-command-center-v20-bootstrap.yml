@@ -111,9 +111,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format changed files
+      - name: Auto-fix changed files with repository ESLint
         run: >-
-          pnpm exec prettier --write
+          pnpm exec eslint --fix --max-warnings=0
           src/domains/creator/live/StudioLiveCollaborationCommandCenter.tsx
           src/domains/creator/live/StudioLiveCollaborationCommandCenter.test.tsx
           src/domains/creator/live/studio-live-collaboration-command-center.integration.test.ts
