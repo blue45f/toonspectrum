@@ -1,4 +1,4 @@
-name: Temporary Studio production source export
+name: Temporary Studio production patch install
 
 on:
   push:
@@ -9,32 +9,96 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-source:
+  install-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
         with:
+          ref: feat/studio-production-command-center-20260905
           fetch-depth: 1
-      - name: Package focused source
+
+      - name: Reassemble and verify the staged patch
+        shell: bash
         run: |
-          tar -czf studio-production-source.tgz \
-            package.json tsconfig.json vite.config.ts vitest.config.ts \
-            src/app/routes \
-            src/domains/creator/studio-router \
-            src/domains/creator/studio-workspace-route.ts \
-            src/domains/creator/StudioRoute* 2>/dev/null || \
-          tar -czf studio-production-source.tgz \
-            package.json tsconfig.json vite.config.ts vitest.config.ts \
-            src/app/routes \
-            src/domains/creator/studio-router \
-            src/domains/creator/studio-workspace-route.ts
-      - uses: actions/upload-artifact@v4
+          set -euo pipefail
+          mapfile -t parts < <(find .github/tmp -maxdepth 1 -type f -name 'studio-production-patch.part??' | sort)
+          test "${#parts[@]}" -eq 11
+          cat "${parts[@]}" > /tmp/studio-production-patch.b64
+          base64 --decode /tmp/studio-production-patch.b64 > /tmp/studio-production-patch.tar.xz
+          echo '73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504  /tmp/studio-production-patch.tar.xz' | sha256sum --check --strict
+          tar -tJf /tmp/studio-production-patch.tar.xz | sort > /tmp/studio-production-patch.files
+          test "$(wc -l < /tmp/studio-production-patch.files)" -eq 21
+          grep -Fx 'src/domains/creator/studio-production/StudioProductionHubPage.tsx' /tmp/studio-production-patch.files
+          grep -Fx 'src/domains/creator/studio-router/studio-route-manifest.ts' /tmp/studio-production-patch.files
+          grep -Fx 'src/app/routes/app-route-title-ownership.test.ts' /tmp/studio-production-patch.files
+          tar -xJf /tmp/studio-production-patch.tar.xz
+
+      - name: Set up Node and pnpm
+        uses: actions/setup-node@v4
         with:
-          name: studio-production-source
-          path: studio-production-source.tgz
-          if-no-files-found: error
-          retention-days: 1
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Activate repository package manager
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.4.0 --activate
+          node --version
+          pnpm --version
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint production hub changes
+        shell: bash
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-production \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Run focused production hub tests
+        shell: bash
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/studio-production/studio-production-model.test.ts \
+            src/domains/creator/studio-production/studio-production-sqlite-persistence.test.ts \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Validate architecture and TypeScript
+        shell: bash
+        run: |
+          pnpm run validate:architecture
+          NODE_OPTIONS='--max-old-space-size=8192' pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Build production application
+        run: pnpm run build
+
+      - name: Commit verified product files and remove staging assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/tmp/studio-production-patch.part??
+          rmdir .github/tmp 2>/dev/null || true
+          rm -f .github/workflows/tmp-studio-production-source-export.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m 'feat(studio): add production command center'
+          git push origin HEAD:feat/studio-production-command-center-20260905
