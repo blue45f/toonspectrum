@@ -9,7 +9,12 @@ import {
   Req,
 } from "@nestjs/common";
 
-import { TOONSPECTRUM_CSRF_HEADER_VALUE } from "../../../../../lib/csrf";
+import {
+  TOONSPECTRUM_CSRF_HEADER,
+  TOONSPECTRUM_CSRF_HEADER_VALUE,
+} from "../../../../../lib/csrf";
+
+import { isAllowedCsrfOrigin, isSameRequestOrigin } from "../../csrf-middleware";
 
 import {
   TrafficAnalyticsService,
@@ -24,14 +29,22 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
 
 function requestContext(request: Request): TrafficRequestContext {
   return {
-    userId: singleHeader(request.headers["x-user-id"]),
     userAgent: singleHeader(request.headers["user-agent"]),
     host: singleHeader(request.headers.host),
     referer: singleHeader(request.headers.referer),
     countryCode:
       singleHeader(request.headers["x-vercel-ip-country"])
       ?? singleHeader(request.headers["cf-ipcountry"]),
+    privacyOptOut:
+      singleHeader(request.headers.dnt) === "1"
+      || singleHeader(request.headers["sec-gpc"]) === "1",
   };
+}
+
+function recordBody(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 @Controller("analytics/traffic")
@@ -41,8 +54,31 @@ export class TrafficAnalyticsController {
     private readonly trafficAnalyticsService: TrafficAnalyticsService,
   ) {}
 
-  private requireBrowserProof(proof: string | undefined): void {
+  private requireBrowserProof(
+    request: Request,
+    proof: string | undefined,
+  ): void {
     if (proof !== TOONSPECTRUM_CSRF_HEADER_VALUE) {
+      throw new ForbiddenException("트래픽 수집 요청의 출처를 확인할 수 없습니다.");
+    }
+
+    const origin = singleHeader(request.headers.origin);
+    if (origin) {
+      if (
+        !isSameRequestOrigin(origin, request)
+        && !isAllowedCsrfOrigin(origin)
+      ) {
+        throw new ForbiddenException("트래픽 수집 요청의 출처를 확인할 수 없습니다.");
+      }
+      return;
+    }
+
+    const fetchSite = singleHeader(request.headers["sec-fetch-site"]);
+    const fetchMode = singleHeader(request.headers["sec-fetch-mode"]);
+    if (
+      fetchSite !== "same-origin"
+      || (fetchMode !== "cors" && fetchMode !== "same-origin")
+    ) {
       throw new ForbiddenException("트래픽 수집 요청의 출처를 확인할 수 없습니다.");
     }
   }
@@ -51,12 +87,12 @@ export class TrafficAnalyticsController {
   @HttpCode(202)
   async recordPageView(
     @Req() request: Request,
-    @Headers("x-toonspectrum-csrf") proof: string | undefined,
-    @Body() body: Record<string, unknown>,
+    @Headers(TOONSPECTRUM_CSRF_HEADER) proof: string | undefined,
+    @Body() body: unknown,
   ) {
-    this.requireBrowserProof(proof);
+    this.requireBrowserProof(request, proof);
     return this.trafficAnalyticsService.recordPageView(
-      body,
+      recordBody(body),
       requestContext(request),
     );
   }
@@ -65,12 +101,12 @@ export class TrafficAnalyticsController {
   @HttpCode(202)
   async recordHeartbeat(
     @Req() request: Request,
-    @Headers("x-toonspectrum-csrf") proof: string | undefined,
-    @Body() body: Record<string, unknown>,
+    @Headers(TOONSPECTRUM_CSRF_HEADER) proof: string | undefined,
+    @Body() body: unknown,
   ) {
-    this.requireBrowserProof(proof);
+    this.requireBrowserProof(request, proof);
     return this.trafficAnalyticsService.recordHeartbeat(
-      body,
+      recordBody(body),
       requestContext(request),
     );
   }
