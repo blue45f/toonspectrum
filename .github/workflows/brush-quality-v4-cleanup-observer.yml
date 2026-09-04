@@ -1,0 +1,160 @@
+name: Brush quality v4 success cleanup observer
+
+on:
+  workflow_run:
+    workflows:
+      - One-shot deterministic all-brush quality finalizer v4
+    types: [completed]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: brush-quality-v4-success-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Require product PR #679 to be merged by the successful run
+        id: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/679")"
+          test "$(jq -r .merged <<<"$pr")" = true
+          echo "merge_sha=$(jq -r .merge_commit_sha <<<"$pr")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Remove only experiment orchestration and payload files
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup_branch="ci/remove-completed-brush-quality-v4-${GITHUB_RUN_ID}"
+          git switch --force-create "$cleanup_branch" origin/main
+          git rm -f --ignore-unmatch \
+            .github/workflows/brush-quality-maintenance-command.yml \
+            .github/workflows/brush-quality-status-command.yml \
+            .github/workflows/brush-quality-finalize-benchmark-command-v2.yml \
+            .github/workflows/brush-quality-finalize-benchmark-command-v3.yml \
+            .github/workflows/brush-quality-benchmark-receipt.yml \
+            .github/workflows/brush-quality-full-run-orchestrator.yml \
+            .github/workflows/brush-measured-curation-patch-candidate.yml \
+            .github/workflows/brush-measured-curation-apply-command.yml \
+            .github/workflows/brush-quality-final-merge-cleanup.yml \
+            .github/workflows/brush-quality-e2e-v4.yml \
+            .github/workflows/brush-quality-v4-cleanup-observer.yml \
+            .github/workflows/apply-all-brush-quality-v3-macos.yml \
+            .github/workflows/export-brush-quality-source-v2.yml \
+            .github/workflows/finalize-response-aware-brush-quality.yml \
+            .github/workflows/patch-brush-quality-policy.yml \
+            .github/workflows/export-brush-quality-source.yml \
+            .github/workflows/patch-all-brush-hardware-evidence.yml \
+            .github/workflows/patch-all-brush-hardware-evidence-v2.yml \
+            .github/workflows/apply-all-brush-quality-v3.yml \
+            scripts/patch-all-brush-quality-v3.py \
+            scripts/patch-all-brush-quality-v3b.py
+          if [[ -d .github/brush-quality-payloads ]]; then
+            git rm -r .github/brush-quality-payloads
+          fi
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "cleanup_pr=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "ci(brush): remove completed quality experiment orchestration"
+          git push origin "$cleanup_branch"
+          pr_json="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f title='ci(brush): remove completed quality experiment orchestration' \
+            -f head="$cleanup_branch" \
+            -f base=main \
+            -f body='Removes only one-shot workflows, verified source payloads, and patch helpers used by PR #679. The production all-brush benchmark, quality election, generated evidence, curation policy, and replay-compatible quarantine remain.')"
+          cleanup_pr="$(jq -r .number <<<"$pr_json")"
+          merge="$(gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${cleanup_pr}/merge" \
+            -f merge_method=squash \
+            -f commit_title='ci(brush): remove completed quality experiment orchestration' \
+            -f commit_message='Removes temporary PR #679 control workflows and payloads after the deterministic quality run and product merge succeeded.')"
+          test "$(jq -r .merged <<<"$merge")" = true
+          echo "cleanup_pr=$cleanup_pr" >> "$GITHUB_OUTPUT"
+          echo "cleanup_sha=$(jq -r .sha <<<"$merge")" >> "$GITHUB_OUTPUT"
+
+      - name: Delete experiment remote branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import urllib.parse
+
+          branches = [
+              'ci/brush-quality-maintenance-command-20260904',
+              'ci/brush-quality-status-command-20260904',
+              'ci/brush-quality-finalize-benchmark-command-20260904-v2',
+              'ci/brush-quality-finalize-benchmark-command-20260904-v3',
+              'ci/brush-quality-benchmark-receipt-20260904',
+              'ci/brush-quality-full-run-orchestrator-20260904',
+              'ci/brush-measured-curation-patch-candidate-20260904',
+              'ci/brush-measured-curation-apply-command-20260904',
+              'ci/brush-quality-final-merge-cleanup-20260904',
+              'ci/brush-quality-resume-finalize-v2-20260904',
+              'ci/brush-quality-e2e-v4-20260904',
+              'ci/brush-quality-v4-cleanup-observer-20260904',
+          ]
+          repository = os.environ['GITHUB_REPOSITORY']
+          for branch in branches:
+              endpoint = (
+                  f'repos/{repository}/git/refs/heads/'
+                  + urllib.parse.quote(branch, safe='')
+              )
+              subprocess.run(['gh', 'api', '--method', 'DELETE', endpoint], check=False)
+          PY
+
+      - name: Post cleanup receipt
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: [
+                '✅ **브러시 품질 실험 후처리 완료**',
+                '',
+                `- product merge: \`${{ steps.product.outputs.merge_sha }}\``,
+                `- cleanup PR: **${{ steps.cleanup.outputs.cleanup_pr }}**`,
+                `- cleanup merge: \`${{ steps.cleanup.outputs.cleanup_sha || 'no changes' }}\``,
+                '- 일회성 워크플로·payload·patch helper 제거',
+                '- 제품용 전체 브러시 벤치마크·품질 선거·생성 증거·런타임 호환성 코드는 유지',
+                '- 사용자 로컬 브랜치와 워크트리는 변경하지 않음',
+              ].join('\n'),
+            });
+
+  failure-receipt:
+    if: github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: `❌ 결정적 v4 품질 실행이 ${context.payload.workflow_run.conclusion ?? 'unknown'} 상태로 끝나 후처리와 병합 정리를 실행하지 않았습니다: ${context.payload.workflow_run.html_url}`,
+            });
