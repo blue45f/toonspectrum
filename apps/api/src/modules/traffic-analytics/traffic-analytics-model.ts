@@ -103,7 +103,11 @@ export function normalizeTrafficPath(value: unknown): string {
     throw new BadRequestException("페이지 경로가 올바르지 않습니다.");
   }
   const normalized = pathname.replace(/\/{2,}/gu, "/").slice(0, MAX_PATH_LENGTH);
-  if (!normalized.startsWith("/") || normalized.startsWith("/api")) {
+  if (
+    !normalized.startsWith("/")
+    || normalized === "/api"
+    || normalized.startsWith("/api/")
+  ) {
     throw new BadRequestException("수집할 수 없는 페이지 경로입니다.");
   }
   return normalized || "/";
@@ -201,7 +205,7 @@ function isSearchReferrer(host: string): boolean {
 }
 
 function isSocialReferrer(host: string): boolean {
-  return /(?:instagram|facebook|twitter|youtube|tiktok)\.com$|(?:t|x)\.co$|youtu\.be$|threads\.net$|linkedin\.com$/iu.test(
+  return /(?:instagram|facebook|twitter|x|youtube|tiktok)\.com$|(?:t|x)\.co$|youtu\.be$|threads\.net$|linkedin\.com$/iu.test(
     host,
   );
 }
