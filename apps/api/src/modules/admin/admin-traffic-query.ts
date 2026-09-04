@@ -1,79 +1,59 @@
 export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
-  WITH raw_events AS (
+  WITH events AS (
     SELECT
-      NULLIF(value->>'occurredAt', '')::timestamptz AS occurred_at,
-      value->>'visitorHash' AS visitor_hash,
-      value->>'sessionHash' AS session_hash,
-      COALESCE(NULLIF(value->>'path', ''), '/') AS path,
-      NULLIF(value->>'title', '') AS title,
-      COALESCE(NULLIF(value->>'source', ''), 'direct') AS source,
-      COALESCE(NULLIF(value->>'medium', ''), 'none') AS medium,
-      NULLIF(value->>'countryCode', '') AS country_code,
-      COALESCE(NULLIF(value->>'deviceType', ''), 'other') AS device_type,
-      COALESCE(NULLIF(value->>'browser', ''), 'Other') AS browser,
-      NULLIF(value->>'loadTimeMs', '')::integer AS load_time_ms,
-      COALESCE(NULLIF(value->>'isBot', '')::boolean, false) AS is_bot
-    FROM app_setting
-    WHERE key >= $2
-      AND key < $3
-  ),
-  events AS (
-    SELECT *
-    FROM raw_events
+      occurred_at,
+      visitor_hash,
+      session_hash,
+      path,
+      title,
+      source,
+      medium,
+      country_code,
+      device_type,
+      browser,
+      load_time_ms
+    FROM public.traffic_page_view
     WHERE occurred_at >= $1::timestamptz
-      AND occurred_at <= $5::timestamptz
-      AND visitor_hash IS NOT NULL
-      AND session_hash IS NOT NULL
+      AND occurred_at <= $3::timestamptz
       AND NOT is_bot
   ),
-  raw_sessions AS (
-    SELECT
-      value->>'visitorHash' AS visitor_hash,
-      substring(key from char_length($6::text) + 1) AS session_hash,
-      NULLIF(value->>'firstSeenAt', '')::timestamptz AS first_seen_at,
-      COALESCE(NULLIF(value->>'pageViews', '')::integer, 0) AS page_views,
-      COALESCE(NULLIF(value->>'engagedSeconds', '')::integer, 0)
-        AS engaged_seconds,
-      COALESCE(NULLIF(value->>'isBot', '')::boolean, false) AS is_bot,
-      "updatedAt" AS updated_at
-    FROM app_setting
-    WHERE key >= $7
-      AND key < $10
-      AND "updatedAt" >= $1::timestamptz
-  ),
   sessions AS (
-    SELECT *
-    FROM raw_sessions
+    SELECT
+      visitor_hash,
+      session_hash,
+      page_views,
+      engaged_seconds,
+      first_seen_at,
+      last_seen_at
+    FROM public.traffic_session
     WHERE first_seen_at >= $1::timestamptz
-      AND first_seen_at <= $5::timestamptz
-      AND visitor_hash IS NOT NULL
+      AND first_seen_at <= $3::timestamptz
       AND NOT is_bot
   ),
   active_sessions AS (
-    SELECT *
-    FROM raw_sessions
-    WHERE updated_at >= $5::timestamptz - interval '5 minutes'
-      AND visitor_hash IS NOT NULL
+    SELECT visitor_hash, session_hash
+    FROM public.traffic_session
+    WHERE last_seen_at >= $3::timestamptz - interval '5 minutes'
       AND NOT is_bot
   ),
   series_buckets AS (
     SELECT generate_series(
       to_timestamp(
-        floor(extract(epoch FROM $1::timestamptz) / $4::integer)
-          * $4::integer
+        floor(extract(epoch FROM $1::timestamptz) / $2::integer)
+          * $2::integer
       ),
       to_timestamp(
-        floor(extract(epoch FROM $5::timestamptz) / $4::integer)
-          * $4::integer
+        floor(extract(epoch FROM $3::timestamptz) / $2::integer)
+          * $2::integer
       ),
-      make_interval(secs => $4::integer)
+      make_interval(secs => $2::integer)
     ) AS bucket
   ),
   series_aggregates AS (
     SELECT
       to_timestamp(
-        floor(extract(epoch FROM occurred_at) / $4::integer)
-          * $4::integer
+        floor(extract(epoch FROM occurred_at) / $2::integer)
+          * $2::integer
       ) AS bucket,
       count(*)::integer AS page_views,
       count(DISTINCT visitor_hash)::integer AS visitors,
@@ -93,8 +73,8 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
   ),
   realtime_buckets AS (
     SELECT generate_series(
-      date_trunc('minute', $5::timestamptz) - interval '29 minutes',
-      date_trunc('minute', $5::timestamptz),
+      date_trunc('minute', $3::timestamptz) - interval '29 minutes',
+      date_trunc('minute', $3::timestamptz),
       interval '1 minute'
     ) AS bucket
   ),
@@ -104,7 +84,7 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
       count(*)::integer AS page_views,
       count(DISTINCT visitor_hash)::integer AS visitors
     FROM events
-    WHERE occurred_at >= $5::timestamptz - interval '30 minutes'
+    WHERE occurred_at >= $3::timestamptz - interval '30 minutes'
     GROUP BY bucket
   ),
   realtime_rows AS (
@@ -213,13 +193,13 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
     WHERE page_views > 0
   )
   SELECT jsonb_build_object(
-    'generatedAt', $5::timestamptz,
-    'rangeDays', $8::integer,
-    'bucketSeconds', $4::integer,
+    'generatedAt', $3::timestamptz,
+    'rangeDays', $4::integer,
+    'bucketSeconds', $2::integer,
     'status',
       CASE WHEN (SELECT page_views FROM totals) > 0 THEN 'live' ELSE 'empty' END,
-    'storageMode', 'first-party-kv-v1',
-    'retentionDays', $9::integer,
+    'storageMode', 'first-party-postgres-v2',
+    'retentionDays', $5::integer,
     'privacy', jsonb_build_object(
       'storesRawIp', false,
       'storesQueryString', false,
@@ -233,11 +213,11 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
       'activeSessions', COALESCE((SELECT count(*) FROM active_sessions), 0),
       'pageViews5m', COALESCE((
         SELECT count(*) FROM events
-        WHERE occurred_at >= $5::timestamptz - interval '5 minutes'
+        WHERE occurred_at >= $3::timestamptz - interval '5 minutes'
       ), 0),
       'pageViews30m', COALESCE((
         SELECT count(*) FROM events
-        WHERE occurred_at >= $5::timestamptz - interval '30 minutes'
+        WHERE occurred_at >= $3::timestamptz - interval '30 minutes'
       ), 0),
       'latestAt', (SELECT latest_at FROM totals)
     ),
@@ -272,7 +252,7 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
         COALESCE((SELECT average_engaged_seconds FROM engagement), 0),
       'pageViewsPerSession',
         COALESCE((SELECT page_views_per_session FROM engagement), 0)
-    ),
+    END,
     'series', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'bucket', bucket,
@@ -351,26 +331,22 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
 
 export const ADMIN_TRAFFIC_PULSE_QUERY = `
   WITH active_sessions AS (
-    SELECT value->>'visitorHash' AS visitor_hash
-    FROM app_setting
-    WHERE key >= $1
-      AND key < $2
-      AND "updatedAt" >= $3::timestamptz
-      AND NOT COALESCE(NULLIF(value->>'isBot', '')::boolean, false)
+    SELECT visitor_hash, session_hash
+    FROM public.traffic_session
+    WHERE last_seen_at >= $1::timestamptz
+      AND NOT is_bot
   ),
   recent_page_views AS (
-    SELECT
-      NULLIF(value->>'occurredAt', '')::timestamptz AS occurred_at,
-      value->>'visitorHash' AS visitor_hash
-    FROM app_setting
-    WHERE key >= $4
-      AND key < $5
-      AND NOT COALESCE(NULLIF(value->>'isBot', '')::boolean, false)
+    SELECT occurred_at, visitor_hash
+    FROM public.traffic_page_view
+    WHERE occurred_at >= $2::timestamptz
+      AND occurred_at <= $3::timestamptz
+      AND NOT is_bot
   ),
   realtime_buckets AS (
     SELECT generate_series(
-      date_trunc('minute', $6::timestamptz) - interval '29 minutes',
-      date_trunc('minute', $6::timestamptz),
+      date_trunc('minute', $3::timestamptz) - interval '29 minutes',
+      date_trunc('minute', $3::timestamptz),
       interval '1 minute'
     ) AS bucket
   ),
@@ -392,14 +368,14 @@ export const ADMIN_TRAFFIC_PULSE_QUERY = `
     ORDER BY bucket.bucket
   )
   SELECT jsonb_build_object(
-    'generatedAt', $6::timestamptz,
+    'generatedAt', $3::timestamptz,
     'windowMinutes', 5,
     'activeVisitors',
       COALESCE((SELECT count(DISTINCT visitor_hash) FROM active_sessions), 0),
     'activeSessions', COALESCE((SELECT count(*) FROM active_sessions), 0),
     'pageViews5m', COALESCE((
       SELECT count(*) FROM recent_page_views
-      WHERE occurred_at >= $3::timestamptz
+      WHERE occurred_at >= $1::timestamptz
     ), 0),
     'pageViews30m', COALESCE((SELECT count(*) FROM recent_page_views), 0),
     'latestAt', (SELECT max(occurred_at) FROM recent_page_views),
