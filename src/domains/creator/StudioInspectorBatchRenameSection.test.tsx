@@ -26,6 +26,27 @@ function image(id: string, name: string, y: number, locked = false): ImageEl {
 afterEach(cleanup);
 
 describe("StudioInspectorBatchRenameSection", () => {
+  it("exposes a real Inspector disclosure contract and expands on demand", () => {
+    const { container } = render(
+      <StudioInspectorBatchRenameSection
+        elements={[image("a", "A", 0), image("b", "B", 20)]}
+        selectedIds={["a", "b"]}
+        groups={[]}
+        commit={vi.fn(() => true)}
+        announce={vi.fn()}
+      />,
+    );
+    const section = container.querySelector('[data-inspector-section="selection.batch-rename"]');
+    const toggle = screen.getByRole("button", { name: /^일괄 이름 변경/u });
+
+    expect(section?.getAttribute("data-inspector-section-open")).toBe("false");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    expect(section?.getAttribute("data-inspector-section-open")).toBe("true");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("이름 형식")).toBeTruthy();
+  });
+
   it("previews layer order and commits the complete rename exactly once", () => {
     const commit = vi.fn(() => true);
     const announce = vi.fn();
