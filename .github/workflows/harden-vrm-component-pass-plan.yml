@@ -1,0 +1,72 @@
+name: Harden VRM component capture planning
+
+on:
+  push:
+    branches:
+      - feat/vrm-component-psd-linked-render-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-vrm-component-psd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  harden-plan:
+    if: ${{ !contains(github.event.head_commit.message, '[vrm-component-plan-hardened]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-component-psd-linked-render-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Synchronize with the latest feature head
+        run: |
+          git fetch origin feat/vrm-component-psd-linked-render-20260904
+          git reset --hard origin/feat/vrm-component-psd-linked-render-20260904
+          test -f src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts
+
+      - name: Apply capture-plan hardening
+        run: python3 scripts/harden-vrm-component-pass-plan.py
+
+      - name: Validate generated diff
+        run: git diff --check && git status --short
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify component capture and PSD contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.ts \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm run build
+
+      - name: Commit verified capture plan
+        run: |
+          rm -f scripts/harden-vrm-component-pass-plan.py
+          rm -f .github/workflows/harden-vrm-component-pass-plan.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(studio): add semantic VRM component capture planning [vrm-component-plan-hardened]"
+          git push --no-verify origin HEAD:feat/vrm-component-psd-linked-render-20260904
