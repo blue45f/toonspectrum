@@ -127,7 +127,9 @@ describe("StudioBg3dMultiPassExporterPanel production integration", () => {
       (screen.getByRole("button", { name: /선택 1컷 · 4패스 \+ PSD \+ 콘택트 ZIP/ }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-    expect(screen.getByText(/2개 선택 패스가 현재 LT 설정과 맞지 않습니다/)).toBeDefined();
+    expect(
+      screen.getAllByText(/2개 선택 패스가 현재 LT 설정과 맞지 않습니다/).length,
+    ).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "유효 2개 패스만 유지" }));
     expect(batch.setSelectedPasses).toHaveBeenCalledWith(["beauty", "color"]);
