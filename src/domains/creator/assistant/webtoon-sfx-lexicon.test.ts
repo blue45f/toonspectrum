@@ -1,46 +1,70 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  WebtoonSfxLexiconEngine,
   SFX_LEXICON_DATABASE,
+  WebtoonSfxLexiconEngine,
+  type SfxCategory,
 } from "./webtoon-sfx-lexicon";
 
 describe("WebtoonSfxLexiconEngine", () => {
   const engine = new WebtoonSfxLexiconEngine();
 
-  it("contains rich database spanning 8 categories", () => {
-    expect(SFX_LEXICON_DATABASE.length).toBeGreaterThanOrEqual(18);
-    const categories = engine.listCategories();
-    expect(categories.length).toBe(8);
+  it("contains 48 unique effects balanced across 8 categories", () => {
+    expect(SFX_LEXICON_DATABASE).toHaveLength(48);
+    expect(new Set(SFX_LEXICON_DATABASE.map((item) => item.id)).size).toBe(48);
+    expect(engine.listCategories()).toHaveLength(8);
+
+    for (const category of engine.listCategories()) {
+      expect(engine.search("", category.id)).toHaveLength(6);
+    }
   });
 
   it("filters items by category correctly", () => {
     const impacts = engine.search("", "impact");
-    expect(impacts.length).toBeGreaterThanOrEqual(4);
-    expect(impacts.every((i) => i.category === "impact")).toBe(true);
+    expect(impacts).toHaveLength(6);
+    expect(impacts.every((item) => item.category === "impact")).toBe(true);
 
     const magic = engine.search("", "magic-scifi");
-    expect(magic.length).toBeGreaterThanOrEqual(2);
+    expect(magic).toHaveLength(6);
   });
 
-  it("searches by keyword in text, meaning, or tags", () => {
-    // Search by word
-    const res1 = engine.search("쿵");
-    expect(res1.some((i) => i.text === "쿵")).toBe(true);
-
-    // Search by tag
-    const res2 = engine.search("암살");
-    expect(res2.some((i) => i.text === "스윽")).toBe(true);
-
-    // Search by meaning
-    const res3 = engine.search("천둥");
-    expect(res3.some((i) => i.text === "콰르릉")).toBe(true);
+  it("searches by text, tag, meaning, category, and normalized whitespace", () => {
+    expect(engine.search("쿵")[0]?.text).toBe("쿵");
+    expect(engine.search("암살").some((item) => item.text === "스윽")).toBe(true);
+    expect(engine.search("천둥").some((item) => item.text === "콰르릉")).toBe(true);
+    expect(engine.search("특수").every((item) => item.category === "magic-scifi")).toBe(true);
+    expect(engine.search("두 근")[0]?.text).toBe("두근");
   });
 
-  it("retrieves item by unique ID", () => {
+  it("ranks exact text ahead of tag and meaning matches", () => {
+    const results = engine.search("펑");
+
+    expect(results[0]?.text).toBe("펑");
+    expect(results.some((item) => item.text === "퍼엉")).toBe(true);
+  });
+
+  it("combines ranked search with category filtering", () => {
+    const categories: readonly SfxCategory[] = ["impact", "destruction", "magic-scifi"];
+    for (const category of categories) {
+      expect(engine.search("폭발", category).every((item) => item.category === category)).toBe(true);
+    }
+  });
+
+  it("retrieves an item by unique ID", () => {
     const item = engine.getById("sfx-dugeun");
     expect(item).toBeDefined();
     expect(item?.text).toBe("두근");
     expect(item?.category).toBe("emotion");
+    expect(engine.getById("missing")).toBeUndefined();
+  });
+
+  it("recommends related alternatives without returning the selected effect", () => {
+    const related = engine.getRelated("sfx-dugeun", 5);
+
+    expect(related).toHaveLength(5);
+    expect(related.some((item) => item.id === "sfx-dugeun")).toBe(false);
+    expect(related.some((item) => item.tags.includes("심장"))).toBe(true);
+    expect(engine.getRelated("missing")).toEqual([]);
+    expect(engine.getRelated("sfx-dugeun", 0)).toEqual([]);
   });
 });
