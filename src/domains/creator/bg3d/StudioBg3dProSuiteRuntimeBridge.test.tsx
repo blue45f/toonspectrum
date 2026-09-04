@@ -84,16 +84,20 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
 
     expect(runtime.onApplyCameraView).toHaveBeenCalledTimes(1);
     const camera = vi.mocked(runtime.onApplyCameraView).mock.calls[0]?.[0];
-    expect(camera?.position).toEqual([0, 1.7, 2.5]);
-    expect(camera?.target).toEqual([0, 1.4, 0]);
-    expect(camera?.fovDegrees).toBe(28);
-    expect(camera?.projection).toBe("perspective");
-    expect(camera?.zoom).toBe(1);
-    expect(camera?.lensShift).toEqual([0, 0]);
+    expect(camera).toBeDefined();
+    if (!camera) return;
+    expect(camera.position[0]).toBeCloseTo(0, 10);
+    expect(camera.position[1]).toBeCloseTo(1.7, 10);
+    expect(camera.position[2]).toBeCloseTo(2.5, 10);
+    expect(camera.target).toEqual([0, 1.4, 0]);
+    expect(camera.fovDegrees).toBe(28);
+    expect(camera.projection).toBe("perspective");
+    expect(camera.zoom).toBe(1);
+    expect(camera.lensShift).toEqual([0, 0]);
 
-    const up = camera?.up;
+    const up = camera.up;
     expect(up).toBeDefined();
-    if (!up || !camera) return;
+    if (!up) return;
     const forward = [
       camera.target[0] - camera.position[0],
       camera.target[1] - camera.position[1],
