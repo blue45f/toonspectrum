@@ -24,6 +24,7 @@ import {
   Pipette,
   Settings2,
   Shapes,
+  Sparkles,
   Square,
   SquareDashedMousePointer,
   Sun,
@@ -221,6 +222,7 @@ function StudioLeftToolRailConnected() {
     referencePanelOpen,
     mannequinPoserOpen,
     poserVrmOpen,
+    characterShaperOpen,
     bg3dOpen,
     hybridDccOpen,
     selected,
@@ -394,6 +396,13 @@ function StudioLeftToolRailConnected() {
   ).state === "enabled"
     ? (next: SetStateAction<boolean>): void => {
         void invokeRail("setPoserVrmOpen", resolveStateAction(next, poserVrmOpen));
+      }
+    : undefined;
+  const setCharacterShaperOpen = client.availability(
+    STUDIO_LEFT_TOOL_RAIL_COMMANDS.setCharacterShaperOpen,
+  ).state === "enabled"
+    ? (next: SetStateAction<boolean>): void => {
+        void invokeRail("setCharacterShaperOpen", resolveStateAction(next, characterShaperOpen));
       }
     : undefined;
   const setHybridDccOpen = client.availability(
@@ -1209,6 +1218,18 @@ function StudioLeftToolRailConnected() {
               active={poserVrmOpen}
               accented
               onClick={() => setPoserVrmOpen?.((v) => !v)}
+            />
+            ) : null}
+{isRailToolVisible("character-shaper") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="character-shaper"
+              launcher
+              icon={Sparkles}
+              label="캐릭터 셰이퍼"
+              description="프리셋 카드로 얼굴·헤어·체형·의상을 고르고, 사진·웹캠으로 포즈를 잡고, 투명 PNG나 레이어 PSD로 내보냅니다."
+              active={characterShaperOpen}
+              accented
+              onClick={() => setCharacterShaperOpen?.((v) => !v)}
             />
             ) : null}
 {isRailToolVisible("bg3d") ? (

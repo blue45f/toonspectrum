@@ -14,6 +14,7 @@ export const STUDIO_2D_WORKSPACE_SURFACES = [
   "brushes",
   "bg3d",
   "poser",
+  "character",
 ] as const;
 
 export type StudioDccWorkbenchMode =

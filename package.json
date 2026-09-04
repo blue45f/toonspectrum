@@ -134,6 +134,7 @@
     "studio:vrm-generate-mcp": "tsx scripts/studio-vrm-generate-mcp-host.mts",
     "studio:avatar-reference-catalogue:write": "tsx scripts/generate-studio-vrm-avatar-reference-catalogue.mts --write",
     "studio:avatar-reference-catalogue:check": "tsx scripts/generate-studio-vrm-avatar-reference-catalogue.mts --check",
+    "verify:studio-character-shaper": "tsx scripts/verify-studio-character-shaper.mts",
     "verify:studio-menus": "tsx scripts/verify-studio-menus.mts",
     "verify:studio-mobile-top": "tsx scripts/verify-studio-mobile-top.mts",
     "verify:studio-inapp-browser": "tsx scripts/verify-studio-inapp-browser.mts",

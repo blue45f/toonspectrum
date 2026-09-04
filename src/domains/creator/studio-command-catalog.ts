@@ -243,7 +243,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-08-27: View 중복 검수·미리보기 3행 + 참고 이미지/앱 설정 중복 2행 제거 (193 → 188).
     // 2026-09-03: 웹툰 창작 보조 센터 + AI 슈퍼 스위트 추가 (188 → 190).
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
-    measuredCount: 191,
+    // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
+    measuredCount: 192,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -469,9 +470,10 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "animation/timeline",
   "animation/frame-anim",
   "animation/onion-skin",
-  // 3d (4) — insert tools + sculpt workbench (was creative-modes pill)
+  // 3d (5) — insert tools + 캐릭터 셰이퍼 + sculpt workbench (was creative-modes pill)
   "3d/mannequin3d",
   "3d/char",
+  "3d/character",
   "3d/bg3d",
   "3d/sculpt",
   // collaboration (4) — Wave E doors + ephemeral whiteboard
@@ -1711,6 +1713,12 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("3D 캐릭터"), en("3D character")],
       aliases: [csp("3D 소재"), ours("VRM 캐릭터")],
       origins: [menu("3d/char")],
+    }),
+    defineCommand({
+      id: "insert.character-shaper",
+      labels: [ko("캐릭터 셰이퍼"), en("Character Shaper")],
+      aliases: [ours("3D 캐릭터 작업실"), ours("셰이퍼"), ours("프리셋 캐릭터")],
+      origins: [menu("3d/character")],
     }),
     defineCommand({
       id: "insert.background-3d",

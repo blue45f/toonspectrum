@@ -33,6 +33,16 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
     ],
   },
   {
+    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
+    titleKey: "footer.section.create",
+    links: [
+      { key: "footer.link.create", href: "/create" },
+      { key: "footer.link.studio", href: "/studio" },
+      { key: "footer.link.shaper", href: "/shaper" },
+      { key: "footer.link.market", href: "/market" },
+    ],
+  },
+  {
     titleKey: "footer.section.brand",
     links: [
       { key: "footer.link.news", href: "/news" },
@@ -68,7 +78,8 @@ export function SiteFooter() {
         className="pointer-events-none absolute inset-x-0 top-0 h-px"
         style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러", "드라마"], 90) }}
       />
-      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
+      {/* 다섯 개 링크 칼럼 — md 에서는 3열(브랜드 + 2/3열), xl 부터 한 줄에 펼친다(칼럼당 ≥ 8rem 유지). */}
+      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-3 xl:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr] xl:gap-8">
         <div className="max-w-sm">
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />

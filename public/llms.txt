@@ -5,6 +5,7 @@
 ## 핵심 페이지
 
 - [웹툰 창작 스튜디오](https://www.toonstudio.cloud/studio): 브라우저 기반 드로잉·편집·3D·협업 작업 공간
+- [캐릭터 셰이퍼](https://www.toonstudio.cloud/shaper): 프리셋·표면 드로잉·기기 내 AI 보조로 3D 웹툰 캐릭터를 만들어 투명 PNG·레이어 PSD로 내보내는 스튜디오 도구 안내
 - [통합 검색](https://www.toonstudio.cloud/search): 전 플랫폼 작품을 한 번에 검색
 - [통합 랭킹](https://www.toonstudio.cloud/ranking): 공개 산식 기반 8축 랭킹(인기·급상승·평점·숨은명작 등)
 - [랭킹 산정 방식](https://www.toonstudio.cloud/guide): 베이즈 평점·도달가중·신뢰계수 등 산식 전면 공개

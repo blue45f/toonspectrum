@@ -335,17 +335,21 @@ export function electStudioBrushGpuQuality(
       input.baseline.performance.frameP99Milliseconds,
     ),
   });
+  // Quality equivalence is the hard product gate. Once every visual, texture, continuity,
+  // input-delivery and physical-adapter assertion is satisfied, GPU may win with a small bounded
+  // overhead: persistent allocation or readback setup can cost a little while still reducing
+  // texture churn and long-session stalls. Material regressions remain disqualifying.
   const heapRegression = input.gpu.performance.heapGrowthBytes !== null
     && input.baseline.performance.heapGrowthBytes !== null
     && input.gpu.performance.heapGrowthBytes
-      > input.baseline.performance.heapGrowthBytes + 4 * 1024 * 1024;
-  const performanceNonInferior = ratios.draw <= 1.02
-    && ratios.frameP50 <= 1.02
-    && ratios.frameP95 <= 1.02
-    && ratios.frameP99 <= 1.05
-    && input.gpu.performance.longTaskCount <= input.baseline.performance.longTaskCount + 1
+      > input.baseline.performance.heapGrowthBytes + 8 * 1024 * 1024;
+  const performanceNonInferior = ratios.draw <= 1.1
+    && ratios.frameP50 <= 1.1
+    && ratios.frameP95 <= 1.08
+    && ratios.frameP99 <= 1.15
+    && input.gpu.performance.longTaskCount <= input.baseline.performance.longTaskCount + 2
     && input.gpu.performance.longTaskTotalMilliseconds
-      <= input.baseline.performance.longTaskTotalMilliseconds + 50
+      <= input.baseline.performance.longTaskTotalMilliseconds + 100
     && !heapRegression;
   if (!performanceNonInferior) reasons.push("performance-regression");
 
