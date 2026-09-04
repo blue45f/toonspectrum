@@ -8,7 +8,6 @@ import { apiPath } from "../infrastructure/api";
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
-import { TrafficAnalyticsBridge } from "./traffic-analytics/TrafficAnalyticsBridge";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
@@ -33,6 +32,11 @@ const SiteFooter = lazy(() =>
 const StudioBg3dRetainedOwnerHost = lazy(() =>
   import("../domains/creator/bg3d/StudioBg3dRetainedOwnerHost").then((mod) => ({
     default: mod.StudioBg3dRetainedOwnerHost,
+  })),
+);
+const TrafficAnalyticsBridge = lazy(() =>
+  import("./traffic-analytics/TrafficAnalyticsBridge").then((mod) => ({
+    default: mod.TrafficAnalyticsBridge,
   })),
 );
 
@@ -199,7 +203,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <TrafficAnalyticsBridge />
+      <Suspense fallback={null}>
+        <TrafficAnalyticsBridge />
+      </Suspense>
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
