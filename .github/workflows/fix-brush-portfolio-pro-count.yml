@@ -1,0 +1,50 @@
+name: Fix brush portfolio zero PRO count assertion
+
+on:
+  push:
+    branches:
+      - fix/brush-portfolio-exhaustive-contract-20260904
+    paths:
+      - ".github/workflows/fix-brush-portfolio-pro-count.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-brush-portfolio-pro-count-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/brush-portfolio-exhaustive-contract-20260904
+          fetch-depth: 0
+
+      - name: Preserve the valid zero-PRO first batch and remove this one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx")
+          source = path.read_text(encoding="utf-8")
+          old = 'expect(screen.getAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);'
+          new = 'expect(screen.queryAllByText("PRO")).toHaveLength(exhaustiveFirstBatchProCount);'
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(f"expected one zero-count-unsafe PRO assertion, found {count}")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+          rm -f .github/workflows/fix-brush-portfolio-pro-count.yml
+          git diff --check
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit --no-verify -m "fix(brush): allow a core-only first exhaustive batch"
+          git push --no-verify origin HEAD:fix/brush-portfolio-exhaustive-contract-20260904
