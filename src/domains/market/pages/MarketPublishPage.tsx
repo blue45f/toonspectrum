@@ -183,7 +183,7 @@ export function MarketPublishPage() {
   };
 
   return (
-    <Container size="wide" className="py-7 sm:py-10">
+    <Container size="wide" className="min-w-0 py-7 sm:py-10">
       <MarketNavHeader />
       {/* marketplace-authoring-workshop */}
       <MarketplaceAuthoringWorkshop />
@@ -250,10 +250,10 @@ export function MarketPublishPage() {
         </div>
       ) : (
         /* Multi-step Registration Wizard */
-        <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-6 grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
           {/* Form Column */}
-          <div className="space-y-6">
-            <div className="rounded-xl border border-line bg-card p-6 shadow-sm">
+          <div className="min-w-0 space-y-6">
+            <div className="min-w-0 rounded-xl border border-line bg-card p-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <PackagePlus className="size-5 text-accent" />
                 <h1 className="text-xl font-bold text-fg">새 창작 에셋 등록</h1>
@@ -263,7 +263,7 @@ export function MarketPublishPage() {
               </p>
 
               {/* Step indicator */}
-              <div className="mt-5 flex items-center gap-2 border-t border-line/60 pt-4 text-xs font-semibold">
+              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line/60 pt-4 text-xs font-semibold">
                 <span
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full text-xs",
@@ -298,11 +298,11 @@ export function MarketPublishPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="min-w-0 space-y-6">
               {step === 1 && (
-                <div className="rounded-xl border border-line bg-card p-6 space-y-4">
+                <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-4">
                   <h2 className="text-sm font-bold text-fg">어떤 종류의 창작 리소스인가요?</h2>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {MARKET_KINDS.map((k) => {
                       const Icon = k.icon;
                       const selected = kind === k.kind;
@@ -312,7 +312,7 @@ export function MarketPublishPage() {
                           type="button"
                           onClick={() => setKind(k.kind)}
                           className={cn(
-                            "flex flex-col items-start rounded-xl border p-4 text-left transition-all duration-150",
+                            "min-w-0 flex flex-col items-start rounded-xl border p-4 text-left transition-all duration-150",
                             selected
                               ? "border-accent bg-accent/10 shadow-sm ring-1 ring-accent"
                               : "border-line bg-panel/50 hover:border-line-strong hover:bg-panel",
@@ -344,7 +344,7 @@ export function MarketPublishPage() {
               )}
 
               {step === 2 && (
-                <div className="rounded-xl border border-line bg-card p-6 space-y-5">
+                <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-5">
                   <h2 className="text-sm font-bold text-fg">에셋 기본 정보 & 상세 스펙</h2>
 
                   <div>
@@ -389,15 +389,15 @@ export function MarketPublishPage() {
                   </div>
 
                   {/* Type-specific parameter controls */}
-                  <div className="rounded-xl border border-line/70 bg-panel/40 p-4 space-y-3">
+                  <div className="min-w-0 rounded-xl border border-line/70 bg-panel/40 p-4 space-y-3">
                     <p className="text-xs font-bold text-fg flex items-center gap-1.5">
                       <Layers className="size-3.5 text-accent" />
                       <span>{marketKindMeta(kind).label} 세부 파라미터 프리셋</span>
                     </p>
 
                     {kind === "brush" ? (
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div>
+                      <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+                        <div className="min-w-0">
                           <label htmlFor="publish-brush-size" className="block text-[0.7rem] text-fg-3">기본 크기 (px)</label>
                           <input
                             id="publish-brush-size"
@@ -409,7 +409,7 @@ export function MarketPublishPage() {
                             className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg"
                           />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <label htmlFor="publish-brush-opacity" className="block text-[0.7rem] text-fg-3">불투명도 (%)</label>
                           <input
                             id="publish-brush-opacity"
@@ -421,7 +421,7 @@ export function MarketPublishPage() {
                             className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg"
                           />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <label htmlFor="publish-brush-blending" className="block text-[0.7rem] text-fg-3">블렌딩 모드</label>
                           <select
                             id="publish-brush-blending"
@@ -436,7 +436,7 @@ export function MarketPublishPage() {
                         </div>
                       </div>
                     ) : kind === "palette" ? (
-                      <div>
+                      <div className="min-w-0">
                         <label htmlFor="publish-palette-hexes" className="block text-[0.7rem] text-fg-3">HEX 색상 목록 (쉼표 구분)</label>
                         <input
                           id="publish-palette-hexes"
@@ -462,7 +462,7 @@ export function MarketPublishPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
                     <button
                       type="button"
                       onClick={() => setStep(1)}
@@ -488,7 +488,7 @@ export function MarketPublishPage() {
               )}
 
               {step === 3 && (
-                <div className="rounded-xl border border-line bg-card p-6 space-y-5">
+                <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-5">
                   <h2 className="text-sm font-bold text-fg">사용권 라이선스 & 배포 확인</h2>
 
                   <div>
@@ -566,7 +566,7 @@ export function MarketPublishPage() {
                     </span>
                   </label>
 
-                  <div className="flex items-center justify-between border-t border-line pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
                     <button
                       type="button"
                       onClick={() => setStep(2)}
@@ -594,22 +594,22 @@ export function MarketPublishPage() {
           </div>
 
           {/* Right Live Preview Column */}
-          <div className="space-y-4">
-            <div className="sticky top-20 rounded-xl border border-line bg-card p-4">
+          <div className="min-w-0 space-y-4">
+            <div className="sticky top-20 min-w-0 overflow-hidden rounded-xl border border-line bg-card p-4">
               <p className="eyebrow text-accent">Live Preview</p>
               <h3 className="mt-1 text-sm font-bold text-fg">실시간 마켓 카드 미리보기</h3>
               <p className="mt-0.5 text-xs text-fg-3">
                 마켓 둘러보기 및 검색 화면에 표시되는 형태입니다.
               </p>
 
-              <div className="mt-4 pointer-events-none">
-                <MarketResourceCard record={livePreviewRecord} />
+              <div className="mt-4 min-w-0 pointer-events-none">
+                <MarketResourceCard record={livePreviewRecord} className="min-w-0" />
               </div>
 
-              <div className="mt-4 rounded-lg bg-panel p-3 text-xs text-fg-3 space-y-1">
-                <p>· 등록자: {publisherName}</p>
+              <div className="mt-4 min-w-0 rounded-lg bg-panel p-3 text-xs text-fg-3 space-y-1">
+                <p className="break-words">· 등록자: {publisherName}</p>
                 <p>· 종류: {marketKindMeta(kind).label}</p>
-                <p>· 라이선스: {marketLicenseMeta(license).label}</p>
+                <p className="break-words">· 라이선스: {marketLicenseMeta(license).label}</p>
               </div>
             </div>
           </div>

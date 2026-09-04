@@ -74,6 +74,9 @@ const OPTIONAL_LOOPBACK_PREVIEW_PATHS = new Set([
   "/api/auth/session",
   "/api/studio-ai/status",
   "/api/kmas/merge-on-access",
+  // Exact paths, because this set is matched with `has(url.pathname)` rather than a prefix.
+  "/api/analytics/traffic/page-view",
+  "/api/analytics/traffic/heartbeat",
 ]);
 
 interface ScreenPoint {

@@ -34,12 +34,20 @@ const StudioBg3dRetainedOwnerHost = lazy(() =>
     default: mod.StudioBg3dRetainedOwnerHost,
   })),
 );
+const TrafficAnalyticsBridge = lazy(() =>
+  import("./traffic-analytics/TrafficAnalyticsBridge").then((mod) => ({
+    default: mod.TrafficAnalyticsBridge,
+  })),
+);
 
 const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_SURVEYDESK_URL ||
   import.meta.env.VITE_CHANGELOGDESK_URL ||
   import.meta.env.VITE_NOTIFYDESK_URL,
 );
+const TRAFFIC_ANALYTICS_ENABLED =
+  import.meta.env.PROD
+  && import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED !== "false";
 let kmasEntryMergeStarted = false;
 
 function useDeferredByScroll(timeoutMs = 6500) {
@@ -198,6 +206,11 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {TRAFFIC_ANALYTICS_ENABLED ? (
+        <Suspense fallback={null}>
+          <TrafficAnalyticsBridge />
+        </Suspense>
+      ) : null}
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell

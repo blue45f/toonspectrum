@@ -5,11 +5,13 @@ import { AdminMembersService } from "./admin-members.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminModerationService } from "./admin-moderation.service";
 import { AdminRevenueService } from "./admin-revenue.service";
+import { AdminTrafficController } from "./admin-traffic.controller";
+import { AdminTrafficService } from "./admin-traffic.service";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
 
 @Module({
-  controllers: [AdminController],
+  controllers: [AdminController, AdminTrafficController],
   providers: [
     AdminService,
     AdminCampaignsService,
@@ -17,6 +19,7 @@ import { AdminService } from "./admin.service";
     AdminMetricsService,
     AdminModerationService,
     AdminRevenueService,
+    AdminTrafficService,
   ],
 })
 export class AdminModule {}

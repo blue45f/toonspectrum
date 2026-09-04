@@ -382,6 +382,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0033_creator_marketplace_cloud_library",
       "0034_creator_marketplace_package_moderation",
       "0035_creator_marketplace_3d_asset_kind",
+      "0036_traffic_analytics_relations",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

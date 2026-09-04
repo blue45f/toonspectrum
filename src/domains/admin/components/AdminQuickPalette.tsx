@@ -1,19 +1,20 @@
 import { Command } from "cmdk";
 import {
-  Search,
-  LayoutDashboard,
-  CreditCard,
-  Receipt,
-  Ticket,
-  Megaphone,
-  Flag,
-  ShieldCheck,
-  History,
-  Download,
+  Activity,
   AlertTriangle,
-  Gauge
+  CreditCard,
+  Download,
+  Flag,
+  Gauge,
+  History,
+  LayoutDashboard,
+  Megaphone,
+  Receipt,
+  Search,
+  ShieldCheck,
+  Ticket,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { adminFetch } from "./admin-client";
 
@@ -23,15 +24,26 @@ interface AdminQuickPaletteProps {
   userId: string;
   onSelectTab: (tabKey: string) => void;
 }
-export function AdminQuickPalette({ userId, onSelectTab }: AdminQuickPaletteProps) {
+
+export function AdminQuickPalette({
+  userId,
+  onSelectTab,
+}: AdminQuickPaletteProps) {
   const [open, setOpen] = useState(false);
+  // A command palette should land on its input, but `autoFocus` grabs focus wherever the node
+  // mounts and reads as an unexplained jump to a screen reader. Focusing on open is the same
+  // behaviour, scoped to the moment the palette actually appears.
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
   const t = useT();
 
   useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpen((open) => !open);
+    const down = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setOpen((current) => !current);
       }
     };
     document.addEventListener("keydown", down);
@@ -48,10 +60,11 @@ export function AdminQuickPalette({ userId, onSelectTab }: AdminQuickPaletteProp
       const csv = await adminFetch<string>("/users/export/csv", userId);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "members.csv";
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "members.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
     } catch {
       alert("다운로드 실패");
     }
@@ -62,10 +75,11 @@ export function AdminQuickPalette({ userId, onSelectTab }: AdminQuickPaletteProp
       const csv = await adminFetch<string>("/revenue/export/csv", userId);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "revenue_ledger.csv";
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "revenue_ledger.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
     } catch {
       alert("다운로드 실패");
     }
@@ -74,120 +88,152 @@ export function AdminQuickPalette({ userId, onSelectTab }: AdminQuickPaletteProp
   if (!open) {
     return (
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-all backdrop-blur-xl"
+        className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 backdrop-blur-xl transition-all hover:border-slate-700 hover:text-slate-200 md:flex"
       >
-        <Search className="w-3.5 h-3.5" />
+        <Search className="size-3.5" />
         <span>{t("admin.palette.trigger")}</span>
-        <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] font-mono text-slate-300">
+        <kbd className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
           ⌘K
         </kbd>
       </button>
     );
   }
 
+  const itemClass =
+    "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-indigo-600/20 hover:text-indigo-300";
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-start justify-center pt-20 p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-md"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) setOpen(false);
+      }}
+    >
+      <div className="animate-in fade-in zoom-in-95 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-150">
         <Command className="w-full">
           <div className="flex items-center border-b border-slate-800 px-4">
-            <Search className="w-4 h-4 text-slate-400 mr-2" />
+            <Search className="mr-2 size-4 text-slate-400" />
             <Command.Input
+              ref={inputRef}
               placeholder={t("admin.palette.placeholder")}
-              className="w-full bg-transparent py-4 text-sm text-white focus:outline-none placeholder:text-slate-500"
+              className="w-full bg-transparent py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
             />
           </div>
-          <Command.List className="max-h-80 overflow-y-auto p-2 space-y-1">
+          <Command.List className="max-h-80 space-y-1 overflow-y-auto p-2">
             <Command.Empty className="py-6 text-center text-xs text-slate-500">
               {t("admin.palette.empty")}
             </Command.Empty>
 
-            <Command.Group heading={t("admin.palette.groupNav")} className="text-[10px] font-semibold text-slate-500 px-2 py-1 uppercase">
+            <Command.Group
+              heading={t("admin.palette.groupNav")}
+              className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-500"
+            >
               <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("dashboard"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                onSelect={() =>
+                  runCommand(() => onSelectTab("dashboard"))
+                }
+                className={itemClass}
               >
-                <LayoutDashboard className="w-4 h-4 text-indigo-400" />
+                <LayoutDashboard className="size-4 text-indigo-400" />
                 {t("admin.tabs.dashboard")}
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("plans"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                onSelect={() => runCommand(() => onSelectTab("traffic"))}
+                className={itemClass}
               >
-                <CreditCard className="w-4 h-4 text-indigo-400" />
+                <Activity className="size-4 text-cyan-400" />
+                {t("admin.tabs.traffic")}
+              </Command.Item>
+              <Command.Item
+                onSelect={() => runCommand(() => onSelectTab("plans"))}
+                className={itemClass}
+              >
+                <CreditCard className="size-4 text-indigo-400" />
                 {t("admin.tabs.plans")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("revenue"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <Receipt className="w-4 h-4 text-emerald-400" />
+                <Receipt className="size-4 text-emerald-400" />
                 {t("admin.tabs.revenue")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("promos"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <Ticket className="w-4 h-4 text-indigo-400" />
+                <Ticket className="size-4 text-indigo-400" />
                 {t("admin.tabs.promos")}
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("announcements"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                onSelect={() =>
+                  runCommand(() => onSelectTab("announcements"))
+                }
+                className={itemClass}
               >
-                <Megaphone className="w-4 h-4 text-indigo-400" />
+                <Megaphone className="size-4 text-indigo-400" />
                 {t("admin.announcements.title")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("reports"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <Flag className="w-4 h-4 text-amber-400" />
+                <Flag className="size-4 text-amber-400" />
                 {t("admin.reports.title")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("security"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <ShieldCheck className="size-4 text-emerald-400" />
                 {t("admin.security.title")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("audit"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <History className="w-4 h-4 text-indigo-400" />
+                <History className="size-4 text-indigo-400" />
                 {t("admin.audit.title")}
               </Command.Item>
             </Command.Group>
 
-            <Command.Group heading={t("admin.palette.groupQuick")} className="text-[10px] font-semibold text-slate-500 px-2 py-1 uppercase border-t border-slate-800 mt-2">
+            <Command.Group
+              heading={t("admin.palette.groupQuick")}
+              className="mt-2 border-t border-slate-800 px-2 py-1 text-[10px] font-semibold uppercase text-slate-500"
+            >
               <Command.Item
-                onSelect={() => runCommand(() => void handleExportUsers())}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                onSelect={() =>
+                  runCommand(() => void handleExportUsers())
+                }
+                className={itemClass}
               >
-                <Download className="w-4 h-4 text-cyan-400" />
+                <Download className="size-4 text-cyan-400" />
                 {t("admin.palette.exportUsers")}
               </Command.Item>
               <Command.Item
-                onSelect={() => runCommand(() => void handleExportRevenue())}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                onSelect={() =>
+                  runCommand(() => void handleExportRevenue())
+                }
+                className={itemClass}
               >
-                <Download className="w-4 h-4 text-cyan-400" />
+                <Download className="size-4 text-cyan-400" />
                 {t("admin.palette.exportRevenue")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("ops"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-indigo-600/20 hover:text-indigo-300 rounded-xl cursor-pointer transition-colors"
+                className={itemClass}
               >
-                <Gauge className="w-4 h-4 text-emerald-400" />
+                <Gauge className="size-4 text-emerald-400" />
                 {t("admin.ops.benchmarkTitle")}
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("ops"))}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-rose-600/20 hover:text-rose-300 rounded-xl cursor-pointer transition-colors"
+                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-rose-600/20 hover:text-rose-300"
               >
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <AlertTriangle className="size-4 text-rose-400" />
                 {t("admin.palette.maintenance")}
               </Command.Item>
             </Command.Group>

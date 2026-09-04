@@ -21,6 +21,7 @@ import { LegalModule } from "./modules/legal/legal.module";
 import { MeModule } from "./modules/me/me.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
 import { createStudioRealtimeTicketDynamicModule } from "./modules/studio-realtime-ticket/studio-realtime-ticket.integration";
+import { TrafficAnalyticsModule } from "./modules/traffic-analytics/traffic-analytics.module";
 
 const studioRealtimeTicketModule =
   createStudioRealtimeTicketDynamicModule(process.env);
@@ -45,6 +46,7 @@ const studioRealtimeTicketModule =
     CommunityModule,
     CatalogModule,
     AdminModule,
+    TrafficAnalyticsModule,
     FeedbackModule,
     CreatorMarketplaceModule,
     CreatorModule,

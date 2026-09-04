@@ -40,6 +40,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/analytics/traffic/",
 ] as const;
 
 export interface StudioLaunchRect {

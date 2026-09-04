@@ -1,6 +1,8 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notLike } from "drizzle-orm";
 
 import { fromDb } from "../../../../lib/api-helpers";
+import { CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX } from "../../../../lib/creator-marketplace-social-namespace";
+import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
 import {
   db,
   users,
@@ -15,6 +17,8 @@ import {
 
 import { invalidateSessionUser } from "./session";
 import { ensureUserLifecycleSchema, normalizeUserAccountStatus, softDeleteUserAccount } from "./user-lifecycle";
+
+const MARKET_THREAD_PATTERN = `${CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX}%`;
 
 // 로그인 사용자의 전체 데이터를 클라이언트 하이드레이션 형태로 반환 (GET /api/me · POST /api/me/merge 공용)
 export async function loadMe(uid: string) {
@@ -33,21 +37,45 @@ export async function loadMe(uid: string) {
       };
     }
     const [rt, rd, sub, rv, lk, cols] = await Promise.all([
-      db.select().from(ratings).where(eq(ratings.userId, uid)),
-      db.select().from(reads).where(eq(reads.userId, uid)),
-      db.select().from(subscriptions).where(eq(subscriptions.userId, uid)),
-      db.select().from(reviews).where(eq(reviews.userId, uid)),
+      db.select().from(ratings).where(and(
+        eq(ratings.userId, uid),
+        notLike(ratings.titleId, MARKET_THREAD_PATTERN),
+      )),
+      db.select().from(reads).where(and(
+        eq(reads.userId, uid),
+        notLike(reads.titleId, MARKET_THREAD_PATTERN),
+      )),
+      db.select().from(subscriptions).where(and(
+        eq(subscriptions.userId, uid),
+        notLike(subscriptions.titleId, MARKET_THREAD_PATTERN),
+      )),
+      db.select().from(reviews).where(and(
+        eq(reviews.userId, uid),
+        notLike(reviews.titleId, MARKET_THREAD_PATTERN),
+      )),
       db.select().from(reviewLikes).where(eq(reviewLikes.userId, uid)),
       db.select().from(collections).where(eq(collections.userId, uid)),
     ]);
 
+    const marketInteractions = await findCreatorMarketplaceSocialInteractionIds(
+      lk.map((like) => like.reviewId),
+    );
+    const ordinaryLikes = lk.filter(
+      (like) => !marketInteractions.has(like.reviewId),
+    );
+
     // 컬렉션 아이템은 이 사용자의 컬렉션 id로 한정 조회 (전체 테이블 스캔 방지)
-    const colIds = cols.map((c) => c.id);
+    const colIds = cols.map((collection) => collection.id);
     const colItems = colIds.length
-      ? await db.select().from(collectionItems).where(inArray(collectionItems.collectionId, colIds))
+      ? await db.select().from(collectionItems).where(and(
+          inArray(collectionItems.collectionId, colIds),
+          notLike(collectionItems.titleId, MARKET_THREAD_PATTERN),
+        ))
       : [];
     const itemsByCol: Record<string, string[]> = {};
-    for (const it of colItems) (itemsByCol[it.collectionId] ??= []).push(it.titleId);
+    for (const item of colItems) {
+      (itemsByCol[item.collectionId] ??= []).push(item.titleId);
+    }
 
     return {
       profile: {
@@ -59,28 +87,30 @@ export async function loadMe(uid: string) {
         bio: me?.bio,
         status: me?.status,
       },
-      ratings: Object.fromEntries(rt.map((r) => [r.titleId, fromDb(r.value)])),
-      reads: Object.fromEntries(rd.map((r) => [r.titleId, r.state])),
-      subscriptions: Object.fromEntries(sub.map((s) => [s.titleId, true])),
+      ratings: Object.fromEntries(rt.map((row) => [row.titleId, fromDb(row.value)])),
+      reads: Object.fromEntries(rd.map((row) => [row.titleId, row.state])),
+      subscriptions: Object.fromEntries(sub.map((row) => [row.titleId, true])),
       reviews: Object.fromEntries(
-        rv.map((r) => [
-          r.titleId,
+        rv.map((row) => [
+          row.titleId,
           {
-            rating: fromDb(r.rating),
-            text: r.text,
-            tags: r.tags,
-            spoiler: r.spoiler,
-            createdAt: new Date(r.createdAt ?? Date.now()).toISOString(),
+            rating: fromDb(row.rating),
+            text: row.text,
+            tags: row.tags,
+            spoiler: row.spoiler,
+            createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
           },
-        ])
+        ]),
       ),
-      likedReviews: Object.fromEntries(lk.map((l) => [l.reviewId, true])),
-      collections: cols.map((c) => ({
-        id: c.id,
-        name: c.name,
-        emoji: c.emoji,
-        titleIds: itemsByCol[c.id] ?? [],
-        createdAt: new Date(c.createdAt ?? Date.now()).toISOString(),
+      likedReviews: Object.fromEntries(
+        ordinaryLikes.map((like) => [like.reviewId, true]),
+      ),
+      collections: cols.map((collection) => ({
+        id: collection.id,
+        name: collection.name,
+        emoji: collection.emoji,
+        titleIds: itemsByCol[collection.id] ?? [],
+        createdAt: new Date(collection.createdAt ?? Date.now()).toISOString(),
       })),
     };
   } catch {

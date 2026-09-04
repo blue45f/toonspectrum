@@ -73,6 +73,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/analytics/traffic/",
 ] as const;
 /** `Konva.dblClickWindow` — the shipped renderer's own double-click coalescing window. */
 const KONVA_DOUBLE_CLICK_WINDOW_MS = 400;
