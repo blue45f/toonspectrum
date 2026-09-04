@@ -36,9 +36,19 @@ interface MarketSocialStore {
   request: Promise<void> | null;
   controller: AbortController | null;
   viewerKey: string | null;
+  browserCleanup: (() => void) | null;
+}
+
+interface MarketSocialBroadcastMessage {
+  readonly source: "toonspectrum-market-social";
+  readonly resourceId: string;
+  readonly publisherId: string;
+  readonly packageId: string;
 }
 
 const stores = new Map<string, MarketSocialStore>();
+const CHANNEL_NAME = "toonspectrum:market-social:v1";
+let broadcastChannel: BroadcastChannel | null | undefined;
 
 function createStore(resourceId: string): MarketSocialStore {
   return {
@@ -53,6 +63,7 @@ function createStore(resourceId: string): MarketSocialStore {
     request: null,
     controller: null,
     viewerKey: null,
+    browserCleanup: null,
   };
 }
 
@@ -85,10 +96,7 @@ async function loadStore(
 
   const controller = new AbortController();
   store.controller = controller;
-  publish(store, {
-    status: "loading",
-    error: null,
-  });
+  publish(store, { status: "loading", error: null });
 
   const request = getCreatorMarketplaceSocialPage(
     store.resourceId,
@@ -96,11 +104,7 @@ async function loadStore(
   )
     .then((data) => {
       if (controller.signal.aborted) return;
-      publish(store, {
-        status: "ready",
-        data,
-        error: null,
-      });
+      publish(store, { status: "ready", data, error: null });
     })
     .catch((error: unknown) => {
       if (controller.signal.aborted) return;
@@ -120,6 +124,86 @@ async function loadStore(
   return request;
 }
 
+function isBroadcastMessage(value: unknown): value is MarketSocialBroadcastMessage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<MarketSocialBroadcastMessage>;
+  return candidate.source === "toonspectrum-market-social"
+    && typeof candidate.resourceId === "string"
+    && typeof candidate.publisherId === "string"
+    && typeof candidate.packageId === "string";
+}
+
+function channel(): BroadcastChannel | null {
+  if (broadcastChannel !== undefined) return broadcastChannel;
+  if (typeof BroadcastChannel === "undefined") {
+    broadcastChannel = null;
+    return null;
+  }
+  broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
+  broadcastChannel.addEventListener("message", (event) => {
+    if (!isBroadcastMessage(event.data)) return;
+    for (const store of stores.values()) {
+      const data = store.snapshot.data;
+      const samePackage = data
+        && data.publisherId === event.data.publisherId
+        && data.packageId === event.data.packageId;
+      if (store.resourceId === event.data.resourceId || samePackage) {
+        void loadStore(store, true);
+      }
+    }
+  });
+  return broadcastChannel;
+}
+
+function announceChange(
+  currentStore: MarketSocialStore,
+  data: CreatorMarketplaceSocialPage,
+): void {
+  for (const store of stores.values()) {
+    if (store === currentStore) continue;
+    const candidate = store.snapshot.data;
+    if (
+      candidate?.publisherId === data.publisherId
+      && candidate.packageId === data.packageId
+    ) {
+      void loadStore(store, true);
+    }
+  }
+  channel()?.postMessage({
+    source: "toonspectrum-market-social",
+    resourceId: data.resourceId,
+    publisherId: data.publisherId,
+    packageId: data.packageId,
+  } satisfies MarketSocialBroadcastMessage);
+}
+
+function attachBrowserRefresh(store: MarketSocialStore): void {
+  if (store.browserCleanup || typeof window === "undefined") return;
+  const refresh = () => void loadStore(store, true);
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") refresh();
+  };
+  window.addEventListener("focus", refresh);
+  window.addEventListener("pageshow", refresh);
+  document.addEventListener("visibilitychange", onVisibility);
+  channel();
+  store.browserCleanup = () => {
+    window.removeEventListener("focus", refresh);
+    window.removeEventListener("pageshow", refresh);
+    document.removeEventListener("visibilitychange", onVisibility);
+    store.browserCleanup = null;
+  };
+}
+
+function subscribe(store: MarketSocialStore, listener: () => void): () => void {
+  if (store.listeners.size === 0) attachBrowserRefresh(store);
+  store.listeners.add(listener);
+  return () => {
+    store.listeners.delete(listener);
+    if (store.listeners.size === 0) store.browserCleanup?.();
+  };
+}
+
 async function mutateStore(
   store: MarketSocialStore,
   action: string,
@@ -132,11 +216,8 @@ async function mutateStore(
   publish(store, { pendingAction: action, error: null });
   try {
     const data = await mutation(controller.signal);
-    publish(store, {
-      status: "ready",
-      data,
-      error: null,
-    });
+    publish(store, { status: "ready", data, error: null });
+    announceChange(store, data);
   } catch (error) {
     publish(store, {
       error: errorMessage(error, "마켓 작업을 완료하지 못했습니다."),
@@ -165,8 +246,9 @@ export interface UseMarketSocialResult extends MarketSocialSnapshot {
 }
 
 /**
- * Both social sections on a detail page subscribe to one resource store. This keeps comments,
- * reviews, aggregate ratings, and Studio-verification state consistent without duplicate GETs.
+ * Both social sections on a detail page subscribe to one resource store. Reads are deduplicated,
+ * package siblings are invalidated together, and focus/BroadcastChannel revalidation keeps tabs
+ * aligned after returning from Studio or writing in another browser tab.
  */
 export function useMarketSocial(
   resourceId: string,
@@ -175,10 +257,7 @@ export function useMarketSocial(
   const normalizedViewerKey = viewerKey?.trim() || "guest";
   const store = getStore(resourceId);
   const snapshot = useSyncExternalStore(
-    (listener) => {
-      store.listeners.add(listener);
-      return () => store.listeners.delete(listener);
-    },
+    (listener) => subscribe(store, listener),
     () => store.snapshot,
     () => store.snapshot,
   );
@@ -189,10 +268,7 @@ export function useMarketSocial(
     void loadStore(store, viewerChanged);
   }, [normalizedViewerKey, store]);
 
-  const refresh = useCallback(
-    () => loadStore(store, true),
-    [store],
-  );
+  const refresh = useCallback(() => loadStore(store, true), [store]);
   const createComment = useCallback(
     (input: CreateCreatorMarketplaceSocialComment) => mutateStore(
       store,
@@ -275,6 +351,11 @@ export function useMarketSocial(
 }
 
 export function resetMarketSocialStoresForTests(): void {
-  for (const store of stores.values()) store.controller?.abort();
+  for (const store of stores.values()) {
+    store.controller?.abort();
+    store.browserCleanup?.();
+  }
   stores.clear();
+  broadcastChannel?.close();
+  broadcastChannel = undefined;
 }

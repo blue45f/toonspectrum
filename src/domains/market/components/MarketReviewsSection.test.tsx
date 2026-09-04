@@ -30,6 +30,9 @@ vi.mock("../hooks/use-market-social", () => ({
     toggleReviewHelpful: mocks.toggleReviewHelpful,
     data: {
       resourceId: "11111111-1111-4111-8111-111111111111",
+      publisherId: "publisher-1",
+      packageId: "brush.ink.production",
+      resourceVersion: "2.1.0",
       comments: [],
       reviews: [
         {
@@ -46,6 +49,9 @@ vi.mock("../hooks/use-market-social", () => ({
           content: "설치 후 브러시 목록에 바로 나타났고 선화 지연도 없었습니다.",
           roleTag: "현역 웹툰 작가",
           tags: ["선화 최적"],
+          qualification: "studio",
+          sourceResourceVersion: "2.1.0",
+          installedResourceVersion: "2.1.0",
           helpfulCount: 7,
           helpfulByViewer: false,
           isMine: false,
@@ -62,9 +68,11 @@ vi.mock("../hooks/use-market-social", () => ({
       viewer: {
         authenticated: true,
         libraryMembership: "active",
+        studioVerificationSupported: true,
         studioInstallVerified: true,
         canComment: true,
         canReview: true,
+        reviewQualification: "studio",
         reviewRequirement: "none",
         myReviewId: null,
       },
@@ -92,7 +100,7 @@ const session = {
 };
 
 describe("MarketReviewsSection", () => {
-  it("renders verified reviews and saves a Studio-qualified evaluation", async () => {
+  it("renders a Studio-confirmed review and saves a qualified evaluation", async () => {
     render(
       <SessionContext.Provider value={session}>
         <MarketReviewsSection resourceId="11111111-1111-4111-8111-111111111111" />
@@ -100,9 +108,9 @@ describe("MarketReviewsSection", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: /Studio 검증 평점 & 활용 리뷰/i }),
+      screen.getByRole("heading", { name: /검증 평점 & 활용 리뷰/i }),
     ).toBeDefined();
-    expect(screen.getAllByText("Studio 사용 인증").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Studio 설치 확인/).length).toBeGreaterThan(0);
     expect(screen.getByText("실제 컷에서 바로 쓸 수 있었습니다")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "리뷰 작성" }));

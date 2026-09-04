@@ -19,7 +19,9 @@ const PROFILES = [
 ] as const;
 
 test("marketplace authoring remains operable in Chromium in-app profiles", async ({ browser }, testInfo) => {
-  const baseURL = String(testInfo.project.use.baseURL ?? "http://127.0.0.1:5173");
+  const baseURL = String(
+    testInfo.project.use.baseURL ?? "http://127.0.0.1:5173",
+  );
 
   for (const profile of PROFILES) {
     const context = await browser.newContext({
@@ -50,19 +52,23 @@ test("marketplace authoring remains operable in Chromium in-app profiles", async
     }
 
     await workshop.getByRole("tab", { name: /엔진·구성/u }).click();
-    await expect(workshop.getByTestId("market-authoring-add-engine"), profile.id).toBeVisible();
+    await expect(
+      workshop.getByTestId("market-authoring-add-engine"),
+      profile.id,
+    ).toBeVisible();
     await workshop.getByLabel("추가할 엔진").selectOption("particle-scatter");
     await workshop.getByTestId("market-authoring-add-engine").click();
     const engineList = workshop.getByTestId("market-authoring-engine-list");
     await expect(
-      engineList.getByText("파티클·산포", { exact: true }),
+      engineList.getByRole("checkbox", { name: /파티클·산포/u }),
       profile.id,
     ).toBeVisible();
 
     const geometry = await workshop.evaluate((root) => {
       const documentOverflow = Math.max(
         0,
-        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        document.documentElement.scrollWidth
+          - document.documentElement.clientWidth,
         document.body.scrollWidth - document.body.clientWidth,
       );
       const clippedButtons: string[] = [];
@@ -71,18 +77,35 @@ test("marketplace authoring remains operable in Chromium in-app profiles", async
         const element = button as HTMLElement;
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) continue;
-        if (rect.right > document.documentElement.clientWidth + 1 || rect.left < -1) {
-          clippedButtons.push(element.getAttribute("aria-label") || element.textContent?.trim() || "button");
+        if (
+          style.display === "none"
+          || style.visibility === "hidden"
+          || rect.width === 0
+          || rect.height === 0
+        ) continue;
+        if (
+          rect.right > document.documentElement.clientWidth + 1
+          || rect.left < -1
+        ) {
+          clippedButtons.push(
+            element.getAttribute("aria-label")
+              || element.textContent?.trim()
+              || "button",
+          );
         }
         if (rect.width < 40 || rect.height < 40) {
-          undersizedButtons.push(element.getAttribute("aria-label") || element.textContent?.trim() || "button");
+          undersizedButtons.push(
+            element.getAttribute("aria-label")
+              || element.textContent?.trim()
+              || "button",
+          );
         }
       }
       return { documentOverflow, clippedButtons, undersizedButtons };
     });
 
-    expect(geometry.documentOverflow, `${profile.id} overflow`).toBeLessThanOrEqual(1);
+    expect(geometry.documentOverflow, `${profile.id} overflow`)
+      .toBeLessThanOrEqual(1);
     expect(geometry.clippedButtons, `${profile.id} clipped buttons`).toEqual([]);
     expect(geometry.undersizedButtons, `${profile.id} touch targets`).toEqual([]);
     expect(pageErrors, `${profile.id} page errors`).toEqual([]);

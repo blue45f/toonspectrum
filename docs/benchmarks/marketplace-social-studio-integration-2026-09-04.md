@@ -2,106 +2,126 @@
 
 Date: 2026-09-04
 
-## Scope
+## Product loop reviewed
 
-This pass focuses on the acquisition-to-production loop rather than adding another catalog-only surface:
+This pass optimizes the complete creator-resource loop instead of adding another catalog-only surface:
 
-1. discover a resource,
-2. inspect compatibility and usage evidence,
-3. add it to an account library,
-4. install or apply it in Studio,
-5. return with credible feedback,
-6. let the publisher answer questions and improve the package.
+1. discover a resource;
+2. inspect previews, compatibility, license and release history;
+3. add the package to an account library;
+4. install or open it in Studio;
+5. return with credible production feedback;
+6. let publishers answer questions and improve the next immutable release.
 
-## Competitive patterns reviewed
+## Competitive patterns
 
-| Service | Product pattern | Decision for ToonSpectrum |
+| Service | Pattern | ToonSpectrum decision |
 | --- | --- | --- |
-| [CLIP STUDIO ASSETS](https://assets.clip-studio.com/) | Creator-tool-specific resource taxonomy, free/paid facets, publisher type, compatible app/grade, newest and popular ordering, and saved searches. | Keep resource-kind and license filtering, but make Studio compatibility and application status first-class on the detail page instead of treating the market as a generic download store. |
-| [BlenderKit](https://www.blenderkit.com/docs/tutorials/ratings/) | Search, acquisition and insertion occur inside Blender. Ratings include production-value signals such as quality and work-hours saved; authors receive comments and validation feedback. | Verify that a reviewer actually completed the ToonSpectrum Studio install/apply flow before accepting a rating. Keep comments open to signed-in members for pre-install questions. |
-| [Fab](https://dev.epicgames.com/documentation/en-us/fab/purchasing-and-downloading-assets-in-fab) | Detailed listing metadata, library entitlement, interactive previews, supported formats, changelogs, ratings/comments and export into target DCC/engine workflows. | Preserve immutable release history, rich preview/spec metadata, account library state and direct Studio handoff in one detail journey. |
-| [ACON](https://www.acon3d.com/en) | Webtoon-focused categories across 3D, 2D, brushes, sound and making tools; review events and top-rated merchandising emphasize purchased-user evidence. | Keep webtoon-specific usage guides and verified-user badges. Rank and merchandising work should consume server aggregates rather than browser-local seed data. |
-| [itch.io creator interaction](https://itch.io/docs/creators/interact) | Account-based threaded comments, configurable voting, project community boards, creator access to ratings and buyer communication. | Use account-authored threads, one-level replies for compact product Q&A, persistent reactions and a future publisher notification queue. |
-| [CGTrader seller analytics](https://help.cgtrader.com/hc/en-us/articles/360015211878-Where-can-I-find-my-personal-Sales-data) | Purchased customers can leave positive or negative reviews; negative reviews require explanatory text and sellers can appeal unreasonable feedback. | Require review title and body for every score, preserve moderation/report pathways, and later expose aggregate review quality in creator analytics. |
-| Unity Asset Store publisher workflow | Reviews, publisher replies and abuse reporting are part of the listing lifecycle. | Derive a publisher badge from server ownership and keep deletion/moderation authorization on the server rather than exposing client-only controls. |
+| [CLIP STUDIO ASSETS](https://assets.clip-studio.com/) | Creator-tool-specific taxonomy, free/paid facets, compatible app/grade, publisher identity, newest/popular ordering and saved discovery state. | Keep resource-kind/license filters and make Studio compatibility, immutable versions and the next Studio action explicit on detail. |
+| [BlenderKit](https://www.blenderkit.com/docs/tutorials/ratings/) | Search, acquisition and insertion happen inside Blender. Ratings capture production value such as quality and work-hours saved, while creators receive comments and validation feedback. | Make actual Studio install confirmation the strongest reviewer qualification and preserve package-level discussion across releases. |
+| [Fab](https://dev.epicgames.com/documentation/en-us/fab/purchasing-and-downloading-assets-in-fab) | Detailed metadata, entitlement library, interactive previews, formats, changelogs, ratings/comments and export into target DCC/engine workflows. | Keep preview/spec, account library, release history, report flow and Studio handoff in one detail journey. |
+| [ACON](https://www.acon3d.com/en) | Webtoon-focused 3D/2D/brush/tool categories and review merchandising emphasize production suitability. | Retain webtoon-specific usage guidance and show the exact evidence level behind every review. |
+| [itch.io creator interaction](https://itch.io/docs/creators/interact) | Account-based threaded comments, voting, project communities and creator access to audience feedback. | Use signed-in account authorship, one-level product Q&A, persistent reactions and publisher badges. |
+| [CGTrader seller analytics](https://help.cgtrader.com/hc/en-us/articles/360015211878-Where-can-I-find-my-personal-Sales-data) | Purchased users can leave positive or negative reviews and sellers use the feedback operationally. | Require a title and substantive body for every score, retain moderation visibility, and expose aggregate review signals separately from title reviews. |
+| Unity Asset Store publisher workflow | Reviews, publisher replies and abuse reporting are part of the listing lifecycle. | Derive publisher authority on the server and keep delete/moderation permission out of browser-local state. |
 
-## Gap found in the existing implementation
+## Existing strengths confirmed
 
-The marketplace already had a strong detail shell: interactive brush/filter/palette/template/3D previews, release history, license/provenance metadata, account library actions, wishlists, and a real `installMarketResource` Studio deep link.
+The market already had a substantial production shell:
 
-The social layer was the weak boundary:
+- dedicated home, browse, detail, library, wishlist, publish and manage pages;
+- brush, filter, palette, template, procedural asset and 3D previews;
+- release history, version, engine, delivery, license, AI/provenance and webtoon compatibility metadata;
+- account cloud-library acquisition and archive state;
+- direct `/studio?installMarketResource=…&assetMarket=community` handoff;
+- local install receipts and account-level install confirmation for supported package kinds;
+- reporting and package moderation.
 
-- comments, replies, likes, ratings and reviews were seeded and persisted only in `localStorage`;
-- visitors on different browsers never saw the same discussion;
-- a visitor could type any nickname and receive a buyer-looking badge;
-- review eligibility was not connected to account acquisition or Studio use;
-- aggregate scores were therefore decorative rather than marketplace evidence.
+## Gap found
+
+The visible comment/review UI was not marketplace truth:
+
+- comments, replies, likes, ratings and reviews lived only in `localStorage`;
+- different users and devices never saw the same discussion;
+- a visitor could type an arbitrary nickname and receive a buyer-looking badge;
+- review eligibility was not connected to account acquisition or Studio installation;
+- aggregate ratings were seeded browser decoration rather than shared evidence;
+- discussion was keyed by release, which would fragment every new immutable package version.
 
 ## Implemented architecture
 
-### Persistent, account-authored discussion
+### Package-level social identity
 
-Marketplace discussion reuses the existing production `review_reply` tree under a collision-resistant resource namespace:
+All discussion is keyed by a SHA-256 digest of the canonical publisher/package identity:
 
 ```text
-toonspectrum:market-resource:<resource UUID>
+toonspectrum:market-package:<sha256(canonical publisher/package identity)>
 ```
 
-The API supplies the authenticated account identity. A client cannot submit a display name or badge. Root comments and one-level replies are supported; root comments with replies use soft deletion so the thread remains coherent.
+A new release therefore keeps the same questions, publisher answers and rating history. The public response still carries the exact resource version currently being viewed.
 
-### Persistent reactions and reviews
+### Persistent account-authored threads
 
-The existing `review_like` table stores comment likes and review-helpful reactions. The existing `review` table stores one marketplace review per account/resource. Review metadata uses a versioned JSON envelope in the existing text column while tags stay queryable in JSONB.
+The implementation reuses the mature production review/reply/reaction relations under the isolated market-package namespace. This avoids a risky schema cutover while providing:
 
-No new relation or deployment migration is required for this pass, reducing schema cutover risk.
+- root comments and one-level replies;
+- server-owned account identity;
+- publisher/library/Studio badges derived from database evidence;
+- persistent likes;
+- author/admin delete permission;
+- soft deletion for root comments that already have replies.
 
-### Studio-qualified review gate
+The ordinary title-review feed and homepage title-review totals explicitly exclude the marketplace namespace, so the two product domains do not contaminate each other.
 
-A review is accepted only when all server-side conditions are true:
+### Honest, tiered review qualification
 
-1. the caller has a verified authenticated session;
-2. the caller is not the package publisher;
-3. the caller has the publisher/package in the account marketplace library;
-4. the library record has `lastConfirmedAt`, written only after the Studio install/apply confirmation flow succeeds.
+A review always requires a signed-in account and account-library membership. The strongest evidence depends on what the current Studio installer can durably prove:
 
-The detail UI explains the missing step and provides a direct Studio handoff when installation has not yet been confirmed.
+- **brush, filter, palette:** review requires `lastConfirmedAt` plus an exact confirmed package version written after Studio installation;
+- **asset, template, 3D preset, 3D asset:** the current Studio flow opens/inserts these resources but does not yet issue the same durable package-install receipt, so reviews are allowed after account-library acquisition and are labeled **account library verified**, never “Studio verified.”
 
-### Server-derived credibility badges
+Every review stores its qualification type, viewed resource version and, when available, the exact Studio-confirmed installed version. The publisher cannot review its own package and a reviewer cannot mark their own review helpful.
 
-The API derives, rather than accepts, these badges:
+### Shared, revalidated detail state
 
-- `publisher`
-- `studio-verified`
-- `library-member`
-- `member`
+Comments and reviews share one resource-scoped external store:
 
-This makes review and discussion credibility portable across browsers and prevents local impersonation.
+- duplicate detail-social GETs are collapsed;
+- every mutation returns and publishes the refreshed aggregate projection;
+- sibling release pages for the same package are invalidated together;
+- `BroadcastChannel` synchronizes browser tabs;
+- focus, pageshow and visibility revalidation refresh eligibility after returning from Studio.
 
-### Shared detail-page state
+### Compatibility fallback
 
-Comments and reviews subscribe to one resource-scoped external store. The first section starts the request and the second reuses it, avoiding duplicate detail-social GETs. Every mutation returns the complete refreshed social projection so comment counts, rating distribution, viewer eligibility and reaction state stay synchronized.
+The old browser-local seeded store is removed. Loading, retry, anonymous-read, empty, permission, truncation and pending states are rendered explicitly.
 
-## Product behavior delivered
+## Delivered product behavior
 
-- public reading of comments, replies, ratings and reviews;
+- public reading of package-persistent comments, replies, ratings and reviews;
 - authenticated comments and one-level replies;
-- author/admin deletion with soft deletion for threaded roots;
-- persistent comment likes;
-- Studio-verified review create/update/delete;
-- one review per account and immutable server-owned author identity;
-- average, distribution and recommendation percentage computed from the database;
-- helpful reactions and helpful/newest/rating sorting;
-- publisher, library-member and Studio-verified badges;
-- loading, retry, empty and truncated states;
-- account-library and Studio-install requirement guidance.
+- persistent comment likes and soft-delete thread preservation;
+- one review per account/package with create, edit and delete;
+- database-computed average, distribution and recommendation percentage;
+- helpful, newest and highest-rating sorting;
+- publisher, account-library and exact Studio-install badges;
+- source-version and installed-version evidence on reviews;
+- self-helpful prevention;
+- direct Studio installation CTA for missing supported-kind confirmation;
+- cross-tab and return-from-Studio refresh;
+- title-review feed isolation;
+- responsive and in-app-browser authoring regression coverage.
 
-## Follow-up benchmark waves
+## Browser regression found during this pass
 
-The next highest-value marketplace waves are intentionally separated from this social cut:
+The production UI correctly rendered numbered engine rows such as `2 수채 확산`, but the Playwright checks searched for an exact unnumbered text node. The browser evidence therefore failed while the intended row was visibly present. The checks now use accessible checkbox names, which assert the actual interactive engine row and remain stable when row numbering changes.
 
-1. **Discovery ranking:** verified-rating Bayesian score, install-to-first-use conversion, update adoption and abuse-resistant popularity windows.
-2. **Publisher operations:** notifications for questions/replies, response SLA, review trend and compatibility issue clusters.
-3. **Moderation:** social-content reports, audit history, rate limits shared across instances and duplicate/spam detection.
-4. **Rich evidence:** optional Studio-generated before/after image, brush stroke sample, scene screenshot or compatibility telemetry attached to a verified review.
-5. **Collections and bundles:** project-scoped asset sets, dependency/conflict preview, batch install and update planning.
-6. **Commercial readiness:** entitlement tiers, regional tax/payment handling, refunds and license-seat management when paid assets are introduced.
+## Next benchmark waves
+
+1. **Durable Studio usage receipts for every kind:** confirm direct 2D insertion, selected template application, 3D placement and scene-preset application at the mutation boundary—not merely when a catalog opens.
+2. **Discovery ranking:** Bayesian verified rating, install-to-first-use conversion, update adoption and abuse-resistant popularity windows.
+3. **Publisher operations:** question/reply notifications, response SLA, version-scoped issue clusters and review trend analytics.
+4. **Social moderation:** dedicated report queue, distributed rate gates, duplicate/spam detection and auditable edits.
+5. **Rich proof:** optional Studio-generated stroke sheet, before/after frame, 3D scene capture or compatibility telemetry attached to a verified review.
+6. **Bundles:** project-scoped collections, dependency/conflict preview, batch install and coordinated updates.
+7. **Commercial readiness:** entitlement tiers, regional payment/tax handling, refunds and license-seat management when paid assets are introduced.

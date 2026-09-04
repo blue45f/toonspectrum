@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,10 +18,20 @@ import {
 } from "drizzle-orm";
 
 import {
+  CREATOR_MARKETPLACE_SOCIAL_COMMENT_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_SOCIAL_COMMENT_PAGE_SIZE,
+  CREATOR_MARKETPLACE_SOCIAL_MAX_TAGS,
+  CREATOR_MARKETPLACE_SOCIAL_REVIEW_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_SOCIAL_REVIEW_PAGE_SIZE,
+  CREATOR_MARKETPLACE_SOCIAL_REVIEW_TITLE_MAX_CHARACTERS,
+  CREATOR_MARKETPLACE_SOCIAL_ROLE_MAX_CHARACTERS,
+  CREATOR_MARKETPLACE_SOCIAL_TAG_MAX_CHARACTERS,
   CreatorMarketplaceSocialPageSchema,
 } from "../../../../../lib/creator-marketplace-social-contract";
+import {
+  CREATOR_MARKETPLACE_STUDIO_CONFIRMABLE_KINDS,
+  creatorMarketplacePackageIdentityPreimage,
+} from "../../../../../lib/creator-marketplace-cloud-library-contract";
 import {
   db,
   reviewLikes,
@@ -37,12 +49,17 @@ import type {
   CreatorMarketplaceSocialAuthor,
   CreatorMarketplaceSocialAuthorBadge,
   CreatorMarketplaceSocialPage,
+  CreatorMarketplaceSocialReviewQualification,
   UpsertCreatorMarketplaceSocialReview,
 } from "../../../../../lib/creator-marketplace-social-contract";
 import type { CreatorMarketplaceResourceRecord } from "../../../../../lib/creator-marketplace-resource-contract";
 
-const MARKET_SOCIAL_KEY_PREFIX = "toonspectrum:market-resource:";
-const MARKET_REVIEW_STORAGE_SCHEMA = "toonspectrum.market-review.v1";
+const MARKET_SOCIAL_KEY_PREFIX = "toonspectrum:market-package:";
+const MARKET_REVIEW_STORAGE_SCHEMA = "toonspectrum.market-review.v2";
+const LEGACY_MARKET_REVIEW_STORAGE_SCHEMA = "toonspectrum.market-review.v1";
+const STUDIO_CONFIRMABLE_KINDS = new Set<string>(
+  CREATOR_MARKETPLACE_STUDIO_CONFIRMABLE_KINDS,
+);
 
 interface SocialUserRow {
   readonly userId: string;
@@ -56,49 +73,168 @@ interface StoredMarketReviewPayload {
   readonly title: string;
   readonly content: string;
   readonly roleTag: string | null;
+  readonly qualification: CreatorMarketplaceSocialReviewQualification;
+  readonly sourceResourceVersion: string;
+  readonly installedResourceVersion: string | null;
 }
 
 interface MembershipEvidence {
   readonly membership: "active" | "archived";
   readonly studioInstallVerified: boolean;
+  readonly lastConfirmedResourceVersion: string | null;
 }
 
-function socialKey(resourceId: string): string {
-  return `${MARKET_SOCIAL_KEY_PREFIX}${resourceId}`;
+interface ReviewEligibility {
+  readonly qualification: CreatorMarketplaceSocialReviewQualification;
+  readonly installedResourceVersion: string | null;
+}
+
+function studioVerificationSupported(
+  resource: CreatorMarketplaceResourceRecord,
+): boolean {
+  return STUDIO_CONFIRMABLE_KINDS.has(resource.kind);
+}
+
+function socialKey(resource: CreatorMarketplaceResourceRecord): string {
+  const packageHash = createHash("sha256")
+    .update(creatorMarketplacePackageIdentityPreimage(
+      resource.publisher.id,
+      resource.packageId,
+    ))
+    .digest("hex");
+  return `${MARKET_SOCIAL_KEY_PREFIX}${packageHash}`;
 }
 
 function isoDate(value: Date | null | undefined): string {
   return (value ?? new Date()).toISOString();
 }
 
-function serializeReview(input: UpsertCreatorMarketplaceSocialReview): string {
+function boundedText(
+  value: unknown,
+  fallback: string,
+  maximum: number,
+): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, maximum) : fallback;
+}
+
+function nullableBoundedText(value: unknown, maximum: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized ? normalized.slice(0, maximum) : null;
+}
+
+function normalizedTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const candidate of value) {
+    if (typeof candidate !== "string") continue;
+    const tag = candidate.trim().slice(
+      0,
+      CREATOR_MARKETPLACE_SOCIAL_TAG_MAX_CHARACTERS,
+    );
+    if (!tag) continue;
+    unique.add(tag);
+    if (unique.size >= CREATOR_MARKETPLACE_SOCIAL_MAX_TAGS) break;
+  }
+  return [...unique];
+}
+
+function fallbackReviewQualification(
+  evidence: MembershipEvidence | undefined,
+): ReviewEligibility {
+  if (
+    evidence?.studioInstallVerified
+    && evidence.lastConfirmedResourceVersion
+  ) {
+    return {
+      qualification: "studio",
+      installedResourceVersion: evidence.lastConfirmedResourceVersion,
+    };
+  }
+  return {
+    qualification: "library",
+    installedResourceVersion: null,
+  };
+}
+
+function serializeReview(
+  input: UpsertCreatorMarketplaceSocialReview,
+  resource: CreatorMarketplaceResourceRecord,
+  eligibility: ReviewEligibility,
+): string {
   const payload: StoredMarketReviewPayload = {
     schema: MARKET_REVIEW_STORAGE_SCHEMA,
     title: input.title,
     content: input.content,
     roleTag: input.roleTag || null,
+    qualification: eligibility.qualification,
+    sourceResourceVersion: resource.resourceVersion,
+    installedResourceVersion: eligibility.installedResourceVersion,
   };
   return JSON.stringify(payload);
 }
 
 function parseStoredReview(
   value: string,
+  resource: CreatorMarketplaceResourceRecord,
+  evidence: MembershipEvidence | undefined,
 ): StoredMarketReviewPayload {
+  const fallbackEligibility = fallbackReviewQualification(evidence);
   try {
-    const parsed = JSON.parse(value) as Partial<StoredMarketReviewPayload>;
-    if (
-      parsed.schema === MARKET_REVIEW_STORAGE_SCHEMA
-      && typeof parsed.title === "string"
-      && parsed.title.trim()
-      && typeof parsed.content === "string"
-      && parsed.content.trim()
-      && (parsed.roleTag === null || typeof parsed.roleTag === "string")
-    ) {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const title = boundedText(
+      parsed.title,
+      "Studio 활용 리뷰",
+      CREATOR_MARKETPLACE_SOCIAL_REVIEW_TITLE_MAX_CHARACTERS,
+    );
+    const content = boundedText(
+      parsed.content,
+      "작성된 리뷰 내용이 없습니다.",
+      CREATOR_MARKETPLACE_SOCIAL_REVIEW_MAX_CHARACTERS,
+    );
+    const roleTag = nullableBoundedText(
+      parsed.roleTag,
+      CREATOR_MARKETPLACE_SOCIAL_ROLE_MAX_CHARACTERS,
+    );
+
+    if (parsed.schema === MARKET_REVIEW_STORAGE_SCHEMA) {
+      const qualification = parsed.qualification === "studio"
+        && typeof parsed.installedResourceVersion === "string"
+        && parsed.installedResourceVersion.trim()
+        ? "studio"
+        : "library";
       return {
         schema: MARKET_REVIEW_STORAGE_SCHEMA,
-        title: parsed.title.trim(),
-        content: parsed.content.trim(),
-        roleTag: parsed.roleTag?.trim() || null,
+        title,
+        content,
+        roleTag,
+        qualification,
+        sourceResourceVersion: boundedText(
+          parsed.sourceResourceVersion,
+          resource.resourceVersion,
+          40,
+        ),
+        installedResourceVersion: qualification === "studio"
+          ? boundedText(
+              parsed.installedResourceVersion,
+              resource.resourceVersion,
+              40,
+            )
+          : null,
+      };
+    }
+
+    if (parsed.schema === LEGACY_MARKET_REVIEW_STORAGE_SCHEMA) {
+      return {
+        schema: MARKET_REVIEW_STORAGE_SCHEMA,
+        title,
+        content,
+        roleTag,
+        qualification: fallbackEligibility.qualification,
+        sourceResourceVersion: resource.resourceVersion,
+        installedResourceVersion: fallbackEligibility.installedResourceVersion,
       };
     }
   } catch {
@@ -107,8 +243,15 @@ function parseStoredReview(
   return {
     schema: MARKET_REVIEW_STORAGE_SCHEMA,
     title: "Studio 활용 리뷰",
-    content: value.trim() || "작성된 리뷰 내용이 없습니다.",
+    content: boundedText(
+      value,
+      "작성된 리뷰 내용이 없습니다.",
+      CREATOR_MARKETPLACE_SOCIAL_REVIEW_MAX_CHARACTERS,
+    ),
     roleTag: null,
+    qualification: fallbackEligibility.qualification,
+    sourceResourceVersion: resource.resourceVersion,
+    installedResourceVersion: fallbackEligibility.installedResourceVersion,
   };
 }
 
@@ -140,8 +283,11 @@ function authorFromRow(
   }
   return {
     id: row.userId,
-    name: row.authorName?.trim() || "창작자",
-    avatar: row.avatarImage?.trim() || row.avatarColor?.trim() || null,
+    name: boundedText(row.authorName, "창작자", 80),
+    avatar: nullableBoundedText(
+      row.avatarImage || row.avatarColor,
+      2_048,
+    ),
     badge: authorBadge(row.userId, resource, evidence),
   };
 }
@@ -175,6 +321,8 @@ export class CreatorMarketplaceSocialService {
         userId: creatorMarketplaceLibraryItems.userId,
         archivedAt: creatorMarketplaceLibraryItems.archivedAt,
         lastConfirmedAt: creatorMarketplaceLibraryItems.lastConfirmedAt,
+        lastConfirmedResourceVersion:
+          creatorMarketplaceLibraryItems.lastConfirmedResourceVersion,
       })
       .from(creatorMarketplaceLibraryItems)
       .where(and(
@@ -187,7 +335,10 @@ export class CreatorMarketplaceSocialService {
       row.userId,
       {
         membership: row.archivedAt ? "archived" : "active",
-        studioInstallVerified: Boolean(row.lastConfirmedAt),
+        studioInstallVerified: Boolean(
+          row.lastConfirmedAt && row.lastConfirmedResourceVersion,
+        ),
+        lastConfirmedResourceVersion: row.lastConfirmedResourceVersion,
       } satisfies MembershipEvidence,
     ]));
   }
@@ -195,9 +346,11 @@ export class CreatorMarketplaceSocialService {
   private async assertReviewEligible(
     resource: CreatorMarketplaceResourceRecord,
     userId: string,
-  ): Promise<void> {
+  ): Promise<ReviewEligibility> {
     if (resource.publisher.id === userId) {
-      throw new ForbiddenException("배급자는 자신의 리소스를 평가할 수 없습니다.");
+      throw new ForbiddenException(
+        "배급자는 자신의 리소스를 평가할 수 없습니다.",
+      );
     }
     const evidence = await this.membershipEvidence(resource, [userId]);
     const membership = evidence.get(userId);
@@ -206,11 +359,21 @@ export class CreatorMarketplaceSocialService {
         "계정 라이브러리에 리소스를 추가한 뒤 평가할 수 있습니다.",
       );
     }
-    if (!membership.studioInstallVerified) {
+    if (membership.studioInstallVerified) {
+      return {
+        qualification: "studio",
+        installedResourceVersion: membership.lastConfirmedResourceVersion,
+      };
+    }
+    if (studioVerificationSupported(resource)) {
       throw new ForbiddenException(
-        "Studio에서 설치 또는 적용을 완료한 뒤 평가할 수 있습니다.",
+        "Studio에서 설치를 완료한 뒤 평가할 수 있습니다.",
       );
     }
+    return {
+      qualification: "library",
+      installedResourceVersion: null,
+    };
   }
 
   async page(
@@ -218,7 +381,7 @@ export class CreatorMarketplaceSocialService {
     viewerId: string | null,
   ): Promise<CreatorMarketplaceSocialPage> {
     const resource = await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const key = socialKey(resource);
     const rootLimit = CREATOR_MARKETPLACE_SOCIAL_COMMENT_PAGE_SIZE;
     const reviewLimit = CREATOR_MARKETPLACE_SOCIAL_REVIEW_PAGE_SIZE;
 
@@ -233,10 +396,22 @@ export class CreatorMarketplaceSocialService {
       avatarImage: users.image,
       avatarColor: users.avatar,
     };
+    const reviewSelect = {
+      id: reviews.id,
+      rating: reviews.rating,
+      text: reviews.text,
+      tags: reviews.tags,
+      createdAt: reviews.createdAt,
+      userId: users.id,
+      authorName: users.name,
+      avatarImage: users.image,
+      avatarColor: users.avatar,
+    };
 
     const [
       rootRows,
       reviewRowsWithSentinel,
+      myReviewRows,
       commentCountRows,
       statsRows,
     ] = await Promise.all([
@@ -251,17 +426,7 @@ export class CreatorMarketplaceSocialService {
         .orderBy(desc(reviewReplies.createdAt), desc(reviewReplies.id))
         .limit(rootLimit + 1),
       db
-        .select({
-          id: reviews.id,
-          rating: reviews.rating,
-          text: reviews.text,
-          tags: reviews.tags,
-          createdAt: reviews.createdAt,
-          userId: users.id,
-          authorName: users.name,
-          avatarImage: users.image,
-          avatarColor: users.avatar,
-        })
+        .select(reviewSelect)
         .from(reviews)
         .innerJoin(users, eq(reviews.userId, users.id))
         .where(and(
@@ -270,6 +435,18 @@ export class CreatorMarketplaceSocialService {
         ))
         .orderBy(desc(reviews.createdAt), desc(reviews.id))
         .limit(reviewLimit + 1),
+      viewerId
+        ? db
+            .select(reviewSelect)
+            .from(reviews)
+            .innerJoin(users, eq(reviews.userId, users.id))
+            .where(and(
+              eq(reviews.titleId, key),
+              eq(reviews.userId, viewerId),
+              eq(reviews.hidden, false),
+            ))
+            .limit(1)
+        : Promise.resolve([]),
       db
         .select({ count: sql<number>`count(*)` })
         .from(reviewReplies)
@@ -309,6 +486,13 @@ export class CreatorMarketplaceSocialService {
     const replyPage = replyRows.slice(0, rootLimit);
     const commentRows = [...rootPage, ...replyPage];
     const reviewRows = reviewRowsWithSentinel.slice(0, reviewLimit);
+    const myReviewRow = myReviewRows[0];
+    if (
+      myReviewRow
+      && !reviewRows.some((candidate) => candidate.id === myReviewRow.id)
+    ) {
+      reviewRows.push(myReviewRow);
+    }
 
     const authorIds = uniqueStrings([
       ...commentRows.map((row) => row.userId),
@@ -353,24 +537,30 @@ export class CreatorMarketplaceSocialService {
 
     const viewerEvidence = viewerId ? evidence.get(viewerId) : undefined;
     const viewerIsPublisher = viewerId === resource.publisher.id;
+    const verificationSupported = studioVerificationSupported(resource);
     const reviewRequirement = !viewerId
       ? "login"
       : viewerIsPublisher
         ? "publisher-cannot-review"
         : !viewerEvidence
           ? "add-to-library"
-          : !viewerEvidence.studioInstallVerified
+          : verificationSupported && !viewerEvidence.studioInstallVerified
             ? "open-in-studio"
             : "none";
-    const myReview = viewerId
-      ? reviewRows.find((row) => row.userId === viewerId)
-      : undefined;
+    const reviewQualification = reviewRequirement !== "none"
+      ? "none"
+      : viewerEvidence?.studioInstallVerified
+        ? "studio"
+        : "library";
     const totalReviews = Number(statsRows[0]?.total ?? 0);
     const recommended = Number(statsRows[0]?.recommend ?? 0);
     const totalCommentCount = Number(commentCountRows[0]?.count ?? 0);
 
     return CreatorMarketplaceSocialPageSchema.parse({
       resourceId,
+      publisherId: resource.publisher.id,
+      packageId: resource.packageId,
+      resourceVersion: resource.resourceVersion,
       comments: commentRows.map((row) => {
         const deleted = Boolean(row.deletedAt);
         return {
@@ -379,7 +569,13 @@ export class CreatorMarketplaceSocialService {
           parentId: row.parentId,
           depth: row.parentId ? 1 : 0,
           author: authorFromRow(row, resource, evidence, deleted),
-          content: deleted ? "" : row.text,
+          content: deleted
+            ? ""
+            : boundedText(
+                row.text,
+                "",
+                CREATOR_MARKETPLACE_SOCIAL_COMMENT_MAX_CHARACTERS,
+              ),
           deleted,
           likeCount: deleted ? 0 : (likeCounts.get(row.id) ?? 0),
           likedByViewer: !deleted && viewerLikes.has(row.id),
@@ -390,7 +586,11 @@ export class CreatorMarketplaceSocialService {
         };
       }),
       reviews: reviewRows.map((row) => {
-        const payload = parseStoredReview(row.text);
+        const payload = parseStoredReview(
+          row.text,
+          resource,
+          evidence.get(row.userId),
+        );
         return {
           id: row.id,
           resourceId,
@@ -399,15 +599,14 @@ export class CreatorMarketplaceSocialService {
           title: payload.title,
           content: payload.content,
           roleTag: payload.roleTag,
-          tags: Array.isArray(row.tags)
-            ? row.tags.filter((tag): tag is string => typeof tag === "string")
-            : [],
+          tags: normalizedTags(row.tags),
+          qualification: payload.qualification,
+          sourceResourceVersion: payload.sourceResourceVersion,
+          installedResourceVersion: payload.installedResourceVersion,
           helpfulCount: likeCounts.get(row.id) ?? 0,
           helpfulByViewer: viewerLikes.has(row.id),
           isMine: row.userId === viewerId,
-          canDelete: Boolean(
-            viewerId && (viewerId === row.userId || viewerIsAdmin),
-          ),
+          canDelete: Boolean(viewerId && viewerId === row.userId),
           createdAt: isoDate(row.createdAt),
         };
       }),
@@ -428,11 +627,13 @@ export class CreatorMarketplaceSocialService {
       viewer: {
         authenticated: Boolean(viewerId),
         libraryMembership: viewerEvidence?.membership ?? "none",
+        studioVerificationSupported: verificationSupported,
         studioInstallVerified: viewerEvidence?.studioInstallVerified ?? false,
         canComment: Boolean(viewerId),
         canReview: reviewRequirement === "none",
+        reviewQualification,
         reviewRequirement,
-        myReviewId: myReview?.id ?? null,
+        myReviewId: myReviewRow?.id ?? null,
       },
       totalCommentCount,
       generatedAt: new Date().toISOString(),
@@ -450,8 +651,8 @@ export class CreatorMarketplaceSocialService {
     userId: string,
     input: CreateCreatorMarketplaceSocialComment,
   ): Promise<CreatorMarketplaceSocialPage> {
-    await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const resource = await this.visibleResource(resourceId);
+    const key = socialKey(resource);
     const parentId = input.parentId ?? null;
 
     if (parentId) {
@@ -467,12 +668,18 @@ export class CreatorMarketplaceSocialService {
           eq(reviewReplies.reviewId, key),
         ))
         .limit(1);
-      if (!parent) throw new NotFoundException("답글 대상 댓글을 찾을 수 없습니다.");
+      if (!parent) {
+        throw new NotFoundException("답글 대상 댓글을 찾을 수 없습니다.");
+      }
       if (parent.parentId) {
-        throw new BadRequestException("답글은 한 단계까지만 작성할 수 있습니다.");
+        throw new BadRequestException(
+          "답글은 한 단계까지만 작성할 수 있습니다.",
+        );
       }
       if (parent.deletedAt) {
-        throw new BadRequestException("삭제된 댓글에는 답글을 작성할 수 없습니다.");
+        throw new BadRequestException(
+          "삭제된 댓글에는 답글을 작성할 수 없습니다.",
+        );
       }
     }
 
@@ -492,8 +699,8 @@ export class CreatorMarketplaceSocialService {
     commentId: string,
     userId: string,
   ): Promise<CreatorMarketplaceSocialPage> {
-    await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const resource = await this.visibleResource(resourceId);
+    const key = socialKey(resource);
     const [comment] = await db
       .select({
         id: reviewReplies.id,
@@ -543,8 +750,8 @@ export class CreatorMarketplaceSocialService {
     commentId: string,
     userId: string,
   ): Promise<CreatorMarketplaceSocialPage> {
-    await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const resource = await this.visibleResource(resourceId);
+    const key = socialKey(resource);
     const [comment] = await db
       .select({ id: reviewReplies.id, deletedAt: reviewReplies.deletedAt })
       .from(reviewReplies)
@@ -587,8 +794,8 @@ export class CreatorMarketplaceSocialService {
     input: UpsertCreatorMarketplaceSocialReview,
   ): Promise<CreatorMarketplaceSocialPage> {
     const resource = await this.visibleResource(resourceId);
-    await this.assertReviewEligible(resource, userId);
-    const key = socialKey(resourceId);
+    const eligibility = await this.assertReviewEligible(resource, userId);
+    const key = socialKey(resource);
 
     await db
       .insert(reviews)
@@ -597,7 +804,7 @@ export class CreatorMarketplaceSocialService {
         userId,
         titleId: key,
         rating: input.rating * 10,
-        text: serializeReview(input),
+        text: serializeReview(input, resource, eligibility),
         tags: input.tags,
         spoiler: false,
         hidden: false,
@@ -606,7 +813,7 @@ export class CreatorMarketplaceSocialService {
         target: [reviews.userId, reviews.titleId],
         set: {
           rating: input.rating * 10,
-          text: serializeReview(input),
+          text: serializeReview(input, resource, eligibility),
           tags: input.tags,
           spoiler: false,
           hidden: false,
@@ -620,10 +827,10 @@ export class CreatorMarketplaceSocialService {
     resourceId: string,
     userId: string,
   ): Promise<CreatorMarketplaceSocialPage> {
-    await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const resource = await this.visibleResource(resourceId);
+    const key = socialKey(resource);
     const [review] = await db
-      .select({ id: reviews.id, ownerId: reviews.userId })
+      .select({ id: reviews.id })
       .from(reviews)
       .where(and(
         eq(reviews.titleId, key),
@@ -646,10 +853,10 @@ export class CreatorMarketplaceSocialService {
     reviewId: string,
     userId: string,
   ): Promise<CreatorMarketplaceSocialPage> {
-    await this.visibleResource(resourceId);
-    const key = socialKey(resourceId);
+    const resource = await this.visibleResource(resourceId);
+    const key = socialKey(resource);
     const [review] = await db
-      .select({ id: reviews.id })
+      .select({ id: reviews.id, ownerId: reviews.userId })
       .from(reviews)
       .where(and(
         eq(reviews.id, reviewId),
@@ -658,6 +865,11 @@ export class CreatorMarketplaceSocialService {
       ))
       .limit(1);
     if (!review) throw new NotFoundException("리뷰를 찾을 수 없습니다.");
+    if (review.ownerId === userId) {
+      throw new ForbiddenException(
+        "자신의 리뷰에는 도움 반응을 남길 수 없습니다.",
+      );
+    }
 
     await db.transaction(async (transaction) => {
       const [existing] = await transaction

@@ -14,12 +14,22 @@ const CreatorMarketplaceSocialIdentifierSchema = z
   .trim()
   .min(1)
   .max(180);
+const CreatorMarketplaceSocialVersionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40);
 
 export const CreatorMarketplaceSocialAuthorBadgeSchema = z.enum([
   "publisher",
   "studio-verified",
   "library-member",
   "member",
+]);
+
+export const CreatorMarketplaceSocialReviewQualificationSchema = z.enum([
+  "library",
+  "studio",
 ]);
 
 export const CreatorMarketplaceSocialAuthorSchema = z
@@ -76,13 +86,38 @@ export const CreatorMarketplaceSocialReviewSchema = z
         CREATOR_MARKETPLACE_SOCIAL_TAG_MAX_CHARACTERS,
       ),
     ).max(CREATOR_MARKETPLACE_SOCIAL_MAX_TAGS),
+    qualification: CreatorMarketplaceSocialReviewQualificationSchema,
+    sourceResourceVersion: CreatorMarketplaceSocialVersionSchema,
+    installedResourceVersion: CreatorMarketplaceSocialVersionSchema.nullable(),
     helpfulCount: z.number().int().min(0),
     helpfulByViewer: z.boolean(),
     isMine: z.boolean(),
     canDelete: z.boolean(),
     createdAt: z.string().datetime({ offset: true }),
   })
-  .strict();
+  .strict()
+  .superRefine((review, context) => {
+    if (
+      review.qualification === "studio"
+      && review.installedResourceVersion === null
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installedResourceVersion"],
+        message: "Studio 확인 리뷰에는 설치 확인 버전이 필요합니다.",
+      });
+    }
+    if (
+      review.qualification === "library"
+      && review.installedResourceVersion !== null
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["installedResourceVersion"],
+        message: "보관함 확인 리뷰에는 Studio 설치 버전을 표시할 수 없습니다.",
+      });
+    }
+  });
 
 export const CreatorMarketplaceSocialReviewStatsSchema = z
   .object({
@@ -105,9 +140,11 @@ export const CreatorMarketplaceSocialViewerSchema = z
   .object({
     authenticated: z.boolean(),
     libraryMembership: z.enum(["none", "active", "archived"]),
+    studioVerificationSupported: z.boolean(),
     studioInstallVerified: z.boolean(),
     canComment: z.boolean(),
     canReview: z.boolean(),
+    reviewQualification: z.enum(["none", "library", "studio"]),
     reviewRequirement: z.enum([
       "none",
       "login",
@@ -117,11 +154,50 @@ export const CreatorMarketplaceSocialViewerSchema = z
     ]),
     myReviewId: CreatorMarketplaceSocialIdentifierSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((viewer, context) => {
+    if (viewer.canReview !== (viewer.reviewRequirement === "none")) {
+      context.addIssue({
+        code: "custom",
+        path: ["canReview"],
+        message: "리뷰 가능 여부와 요구 조건이 일치해야 합니다.",
+      });
+    }
+    if (viewer.canReview === (viewer.reviewQualification === "none")) {
+      context.addIssue({
+        code: "custom",
+        path: ["reviewQualification"],
+        message: "리뷰 가능 계정에는 검증 수준이 필요합니다.",
+      });
+    }
+    if (
+      viewer.reviewQualification === "studio"
+      && (!viewer.studioVerificationSupported || !viewer.studioInstallVerified)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["reviewQualification"],
+        message: "Studio 검증 리뷰에는 지원되는 설치 확인이 필요합니다.",
+      });
+    }
+    if (
+      viewer.reviewQualification === "library"
+      && viewer.libraryMembership === "none"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["libraryMembership"],
+        message: "보관함 검증 리뷰에는 계정 라이브러리 멤버십이 필요합니다.",
+      });
+    }
+  });
 
 export const CreatorMarketplaceSocialPageSchema = z
   .object({
     resourceId: z.string().uuid(),
+    publisherId: CreatorMarketplaceSocialIdentifierSchema,
+    packageId: CreatorMarketplaceSocialIdentifierSchema,
+    resourceVersion: CreatorMarketplaceSocialVersionSchema,
     comments: z.array(CreatorMarketplaceSocialCommentSchema),
     reviews: z.array(CreatorMarketplaceSocialReviewSchema),
     stats: CreatorMarketplaceSocialReviewStatsSchema,
@@ -174,12 +250,16 @@ export const UpsertCreatorMarketplaceSocialReviewSchema = z
         ),
       )
       .max(CREATOR_MARKETPLACE_SOCIAL_MAX_TAGS)
+      .transform((tags) => [...new Set(tags)])
       .default([]),
   })
   .strict();
 
 export type CreatorMarketplaceSocialAuthorBadge = z.infer<
   typeof CreatorMarketplaceSocialAuthorBadgeSchema
+>;
+export type CreatorMarketplaceSocialReviewQualification = z.infer<
+  typeof CreatorMarketplaceSocialReviewQualificationSchema
 >;
 export type CreatorMarketplaceSocialAuthor = z.infer<
   typeof CreatorMarketplaceSocialAuthorSchema

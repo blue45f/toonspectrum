@@ -1,11 +1,26 @@
-import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  notLike,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { fromDb } from "../../../../lib/api-helpers";
 import { getTitle } from "../../../../packages/core/src/server/catalog-store";
 import { db, reviewLikes, reviews, users } from "../db";
 
-
 export type ReviewSort = "recent" | "likes" | "high" | "low";
+
+const MARKET_REVIEW_TITLE_PREFIX = "toonspectrum:market-package:";
+const NON_MARKET_REVIEW_CONDITION = notLike(
+  reviews.titleId,
+  `${MARKET_REVIEW_TITLE_PREFIX}%`,
+);
 
 export async function getReviewGlobalStats() {
   try {
@@ -15,7 +30,8 @@ export async function getReviewGlobalStats() {
         distinctUsers: sql<number>`count(distinct ${reviews.userId})`.as("distinctUsers"),
         distinctTitles: sql<number>`count(distinct ${reviews.titleId})`.as("distinctTitles"),
       })
-      .from(reviews);
+      .from(reviews)
+      .where(NON_MARKET_REVIEW_CONDITION);
 
     const first = rows[0];
     return {
@@ -56,34 +72,45 @@ export function normalizeReviewSort(sort?: string): ReviewSort {
 
 function sortReviews<T extends { createdAt: string; likes: number; rating: number }>(
   list: T[],
-  sort: ReviewSort
+  sort: ReviewSort,
 ): T[] {
   const copy = [...list];
   switch (sort) {
     case "likes":
-      return copy.sort((a, b) => b.likes - a.likes || b.createdAt.localeCompare(a.createdAt));
+      return copy.sort(
+        (a, b) => b.likes - a.likes || b.createdAt.localeCompare(a.createdAt),
+      );
     case "high":
       return copy.sort((a, b) => b.rating - a.rating);
     case "low":
       return copy.sort((a, b) => a.rating - b.rating);
     case "recent":
     default:
-      return copy.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      return copy.sort(
+        (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+      );
   }
 }
 
 function buildReviewFeedFromRows(feedRows: ReviewWithTitle[]) {
   const total = feedRows.length;
-  const avg = total ? feedRows.reduce((s, r) => s + r.rating, 0) / total : 0;
-  const spoilerCount = feedRows.filter((r) => r.spoiler).length;
+  const avg = total
+    ? feedRows.reduce((sum, review) => sum + review.rating, 0) / total
+    : 0;
+  const spoilerCount = feedRows.filter((review) => review.spoiler).length;
   const spoilerPct = total ? Math.round((spoilerCount / total) * 100) : 0;
-  const distinctTitles = new Set(feedRows.map((r) => r.title.id)).size;
+  const distinctTitles = new Set(feedRows.map((review) => review.title.id)).size;
 
   const byTitle = new Map<string, number>();
-  for (const r of feedRows) byTitle.set(r.titleId, (byTitle.get(r.titleId) ?? 0) + 1);
+  for (const review of feedRows) {
+    byTitle.set(review.titleId, (byTitle.get(review.titleId) ?? 0) + 1);
+  }
   const topReviewed = Array.from(byTitle.entries())
     .map(([titleId, count]) => ({ title: getTitle(titleId), count }))
-    .filter((x): x is { title: NonNullable<ReturnType<typeof getTitle>>; count: number } => !!x.title)
+    .filter((entry): entry is {
+      title: NonNullable<ReturnType<typeof getTitle>>;
+      count: number;
+    } => Boolean(entry.title))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
@@ -98,16 +125,15 @@ export async function getReviewsData(opts: {
   includeHidden?: boolean;
 }) {
   const sort = normalizeReviewSort(opts.sort);
-
-  const conditions: SQL[] = [];
-  if (opts.userId) conditions.push(eq(reviews.userId, opts.userId)); // 특정 회원의 리뷰만(프로필 페이지)
+  const conditions: SQL[] = [NON_MARKET_REVIEW_CONDITION];
+  if (opts.userId) conditions.push(eq(reviews.userId, opts.userId));
   if (opts.spoiler === "hide") conditions.push(eq(reviews.spoiler, false));
   if (opts.rating === "high") conditions.push(gte(reviews.rating, 40));
   else if (opts.rating === "low") conditions.push(lte(reviews.rating, 30));
-  if (!opts.includeHidden) conditions.push(eq(reviews.hidden, false)); // 비노출 리뷰 제외(관리자 제외)
+  if (!opts.includeHidden) conditions.push(eq(reviews.hidden, false));
 
   try {
-    let query = db
+    const dbRows = await db
       .select({
         id: reviews.id,
         userId: reviews.userId,
@@ -122,26 +148,23 @@ export async function getReviewsData(opts: {
       })
       .from(reviews)
       .innerJoin(users, eq(reviews.userId, users.id))
-      .orderBy(desc(reviews.createdAt))
-      .$dynamic();
+      .where(and(...conditions))
+      .orderBy(desc(reviews.createdAt));
 
-    const whereClause = conditions.length ? and(...conditions) : undefined;
-    if (whereClause) {
-      query = query.where(whereClause);
-    }
-
-    const dbRows = await query;
-
-    const reviewIds = dbRows.map((r) => r.id);
-    const likeRows =
-      reviewIds.length > 0
-        ? await db
-            .select({ reviewId: reviewLikes.reviewId, count: sql<number>`count(*)`.as("count") })
-            .from(reviewLikes)
-            .where(inArray(reviewLikes.reviewId, reviewIds))
-            .groupBy(reviewLikes.reviewId)
-        : [];
-    const likeCount = new Map(likeRows.map((row) => [row.reviewId, Number(row.count)]));
+    const reviewIds = dbRows.map((review) => review.id);
+    const likeRows = reviewIds.length > 0
+      ? await db
+          .select({
+            reviewId: reviewLikes.reviewId,
+            count: sql<number>`count(*)`.as("count"),
+          })
+          .from(reviewLikes)
+          .where(inArray(reviewLikes.reviewId, reviewIds))
+          .groupBy(reviewLikes.reviewId)
+      : [];
+    const likeCount = new Map(
+      likeRows.map((row) => [row.reviewId, Number(row.count)]),
+    );
 
     const feedRaw = dbRows
       .map((row) => {
@@ -156,7 +179,7 @@ export async function getReviewsData(opts: {
           rating: fromDb(row.rating),
           text: row.text,
           tags: row.tags ?? [],
-          spoiler: !!row.spoiler,
+          spoiler: Boolean(row.spoiler),
           likes: likeCount.get(row.id) ?? 0,
           createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
           progress: "정주행중",
@@ -164,10 +187,11 @@ export async function getReviewsData(opts: {
         };
         return item;
       })
-      .filter((r): r is ReviewWithTitle => r !== null);
+      .filter((review): review is ReviewWithTitle => review !== null);
 
     const feed = sortReviews(feedRaw, sort);
-    const { total, avg, spoilerPct, distinctTitles, topReviewed } = buildReviewFeedFromRows(feedRaw);
+    const { total, avg, spoilerPct, distinctTitles, topReviewed } =
+      buildReviewFeedFromRows(feedRaw);
 
     return {
       sort,
@@ -179,7 +203,8 @@ export async function getReviewsData(opts: {
     };
   } catch {
     const feed: ReviewWithTitle[] = [];
-    const { total, avg, spoilerPct, distinctTitles, topReviewed } = buildReviewFeedFromRows(feed);
+    const { total, avg, spoilerPct, distinctTitles, topReviewed } =
+      buildReviewFeedFromRows(feed);
 
     return {
       sort,
