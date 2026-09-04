@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/studio-fullscreen-all-brush-quality.yml"
       - "scripts/patch-fullscreen-all-brush-benchmark.py"
+      - "scripts/fix-fullscreen-benchmark-type-casts.py"
       - "scripts/summarize-fullscreen-all-brush-benchmark.mts"
   workflow_dispatch:
 
@@ -52,6 +53,7 @@ jobs:
       - name: Apply full-screen exhaustive instrumentation
         run: |
           python3 scripts/patch-fullscreen-all-brush-benchmark.py
+          python3 scripts/fix-fullscreen-benchmark-type-casts.py
           git diff --check
 
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
