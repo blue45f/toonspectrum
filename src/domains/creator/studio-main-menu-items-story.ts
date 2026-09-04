@@ -20,6 +20,7 @@ import {
   Shapes,
   Sparkles,
   Type as TypeIcon,
+  Wand2,
   WandSparkles,
 } from "lucide-react";
 
@@ -137,6 +138,15 @@ export function buildStudio3dMenuItems({
       icon: Sparkles,
       onSelect: () => {
         ui.openVrmPoser();
+      },
+    },
+    {
+      id: "character",
+      commandId: "insert.character-shaper",
+      label: "캐릭터 셰이퍼",
+      icon: Wand2,
+      onSelect: () => {
+        ui.openCharacterShaper();
       },
     },
     {

@@ -261,6 +261,7 @@ const VRM_PROP_BASES = [
   { id: "gun", label: "권총", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, -90], defaultScale: 0.95, defaultColor: "#374151", hint: "액션·스릴러 컷." },
   // 추가 머리 소품
   { id: "catEars", label: "고양이 귀", category: "head", defaultBone: "head", defaultPosition: [0, 0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f5c6a0", hint: "코스프레·귀여운 컷." },
+  { id: "elfEars", label: "엘프 귀", category: "head", defaultBone: "head", defaultPosition: [0, 0.03, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f5c6a0", hint: "엘프·요정 컷. 머리 양옆에서 뒤로 살짝 뻗은 뾰족 귀." },
   { id: "horns", label: "뿔", category: "head", defaultBone: "head", defaultPosition: [0, 0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#2b2b2b", hint: "악마·판타지." },
   { id: "halo", label: "후광", category: "head", defaultBone: "head", defaultPosition: [0, 0.16, 0], defaultRotationDeg: [90, 0, 0], defaultScale: 1, defaultColor: "#fde68a", hint: "천사·성스러운 컷." },
   { id: "eyepatch", label: "안대", category: "head", defaultBone: "head", defaultPosition: [0.03, 0.02, 0.07], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#111827", hint: "해적·다크 히어로." },
@@ -545,6 +546,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     fit: fit("hand", 0.075, 0.72, 1.35),
   },
   catEars: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  elfEars: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   horns: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.5) },
   halo: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   eyepatch: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.4), wearSocket: "face" },
@@ -2115,6 +2117,22 @@ export function buildPropObject(
         const inner = mesh(new three.ConeGeometry(0.018, 0.04, 8), mat(0.6, 0.05, "#f9a8d4"));
         inner.position.set(side * 0.055, 0.035, 0.01);
         inner.rotation.set(0, 0, side * 0.25);
+        group.add(inner);
+      }
+      break;
+    }
+    case "elfEars": {
+      // Two tapered cones per side: the outer ear points outward, slightly up and swept back
+      // (Euler XYZ: Rz tilts +Y toward ±X, Ry sweeps the tip toward -Z); the inner ear is a
+      // smaller, lighter cone nested just in front of it.
+      for (const side of [-1, 1] as const) {
+        const ear = mesh(new three.ConeGeometry(0.022, 0.085, 8), mat(0.55, 0.05));
+        ear.position.set(side * 0.105, 0.014, -0.024);
+        ear.rotation.set(0, side * 0.5, side * -1.22);
+        group.add(ear);
+        const inner = mesh(new three.ConeGeometry(0.011, 0.05, 8), mat(0.6, 0.05, "#f9c9c0"));
+        inner.position.set(side * 0.1, 0.012, -0.015);
+        inner.rotation.set(0, side * 0.5, side * -1.22);
         group.add(inner);
       }
       break;
