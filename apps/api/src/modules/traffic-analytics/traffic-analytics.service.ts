@@ -1,9 +1,10 @@
 import { createHmac, randomUUID } from "node:crypto";
 
 import {
+  HttpException,
+  HttpStatus,
   Injectable,
   ServiceUnavailableException,
-  TooManyRequestsException,
 } from "@nestjs/common";
 
 import {
@@ -71,6 +72,14 @@ function hashIdentifier(kind: "visitor" | "session", value: string): string {
     .digest("hex");
 }
 
+/**
+ * Nest exports no `TooManyRequestsException`, so 429 is raised through `HttpException` directly.
+ * Kept as one helper so every rate-limit path returns the same status and shape.
+ */
+function tooManyRequests(message: string): HttpException {
+  return new HttpException(message, HttpStatus.TOO_MANY_REQUESTS);
+}
+
 @Injectable()
 export class TrafficAnalyticsService {
   private lastCleanupAt = 0;
@@ -90,7 +99,7 @@ export class TrafficAnalyticsService {
     }
     this.globalEvents += 1;
     if (this.globalEvents > MAX_GLOBAL_EVENTS_PER_WINDOW) {
-      throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+      throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
     }
 
     const current = this.rateLimits.get(sessionHash);
@@ -101,7 +110,7 @@ export class TrafficAnalyticsService {
         }
       }
       if (this.rateLimits.size >= MAX_RATE_LIMIT_ENTRIES) {
-        throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+        throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
       }
     }
 
@@ -112,12 +121,12 @@ export class TrafficAnalyticsService {
     if (kind === "page-view") {
       state.pageViews += 1;
       if (state.pageViews > MAX_PAGE_VIEWS_PER_SESSION_WINDOW) {
-        throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+        throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
       }
     } else {
       state.heartbeats += 1;
       if (state.heartbeats > MAX_HEARTBEATS_PER_SESSION_WINDOW) {
-        throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
+        throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
       }
     }
     this.rateLimits.set(sessionHash, state);
