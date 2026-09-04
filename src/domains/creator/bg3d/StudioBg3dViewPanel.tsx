@@ -37,6 +37,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
     productionShots: context.savedShots,
+    onApplyCameraView: (camera) => context.updateCameraLens(() => camera),
     onCaptureCurrentShot: context.captureCurrentShot,
     onApplyProductionShot: context.applySavedShot,
     onMoveProductionShot: context.moveSavedShot,
