@@ -1,11 +1,12 @@
 import { CheckCircle2, TriangleAlert, WandSparkles } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 
 import { evaluateStudioBg3dProductionPassReadiness } from "./studio-bg3d-production-pass-readiness";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 
 export function StudioBg3dProductionPassPreflightPanel() {
   const runtime = useStudioBg3dProSuiteRuntime();
+  const titleId = useId();
   const batch = runtime?.productionBatch;
   const readiness = useMemo(
     () => batch?.look
@@ -32,7 +33,7 @@ export function StudioBg3dProductionPassPreflightPanel() {
   return (
     <section
       className="mx-3 mt-3 rounded-2xl border border-warn/45 bg-warn/8 p-3"
-      aria-labelledby="studio-bg3d-production-pass-preflight-title"
+      aria-labelledby={titleId}
       role="alert"
     >
       <div className="flex items-start gap-2">
@@ -41,7 +42,7 @@ export function StudioBg3dProductionPassPreflightPanel() {
         </span>
         <div className="min-w-0 flex-1">
           <h3
-            id="studio-bg3d-production-pass-preflight-title"
+            id={titleId}
             className="text-[0.66rem] font-bold text-warn"
           >
             출력 전 LT 패스 확인
