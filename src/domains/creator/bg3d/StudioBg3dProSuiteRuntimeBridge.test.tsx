@@ -4,10 +4,54 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioBg3dProSuiteRuntimeContext,
+  type StudioBg3dProductionBatchRuntime,
   type StudioBg3dProSuiteRuntimeValue,
 } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dCinematicDirectorPanel } from "./StudioBg3dCinematicDirectorPanel";
 import { StudioBg3dMultiPassExporterPanel } from "./StudioBg3dMultiPassExporterPanel";
+
+function createProductionBatch(): StudioBg3dProductionBatchRuntime {
+  return {
+    selectedShotIds: ["shot-a"],
+    availablePasses: [
+      "beauty",
+      "lt-composite",
+      "color",
+      "tone",
+      "texture-line",
+      "main-line",
+      "depth",
+    ],
+    selectedPasses: ["beauty", "lt-composite"],
+    passLabels: {
+      beauty: "원본 렌더",
+      "lt-composite": "LT 합성",
+      color: "컬러",
+      tone: "톤",
+      "texture-line": "질감선",
+      "main-line": "주선",
+      depth: "깊이",
+    },
+    exportHeight: "per-shot",
+    exportHeightOptions: [640, 1080, 1440, 2160, 4096],
+    includeLayeredPsd: false,
+    includeContactSheet: false,
+    recoveryReady: true,
+    blockedReason: null,
+    isRendering: false,
+    progress: null,
+    recoverySummary: null,
+    selectAllShots: vi.fn(),
+    clearShotSelection: vi.fn(),
+    setShotSelected: vi.fn(),
+    setSelectedPasses: vi.fn(),
+    setPassSelected: vi.fn(),
+    setExportHeight: vi.fn(),
+    setIncludeLayeredPsd: vi.fn(),
+    setIncludeContactSheet: vi.fn(),
+    startExport: vi.fn(async () => undefined),
+  };
+}
 
 function createRuntime(
   overrides: Partial<StudioBg3dProSuiteRuntimeValue> = {},
@@ -110,6 +154,45 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
     ) / (forwardLength * upLength);
     expect(upLength).toBeCloseTo(1, 8);
     expect(alignment).toBeCloseTo(0, 8);
+  });
+
+  it("selects the production-connected multipass panel when the editor runtime is available", () => {
+    const productionBatch = createProductionBatch();
+    const runtime = createRuntime({ productionBatch });
+    render(
+      <StudioBg3dProSuiteRuntimeContext.Provider value={runtime}>
+        <StudioBg3dMultiPassExporterPanel />
+      </StudioBg3dProSuiteRuntimeContext.Provider>,
+    );
+
+    expect(screen.getByText("프로덕션 컷 멀티패스")).toBeDefined();
+    expect(screen.getByText("배치 컷 1/2")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "AI 참조" }));
+    expect(productionBatch.setSelectedPasses).toHaveBeenCalledWith([
+      "beauty",
+      "main-line",
+      "depth",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /선택 1컷 · 2패스 ZIP/ }));
+    expect(productionBatch.startExport).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps explicit standalone exports available for tests and embedding", () => {
+    const productionBatch = createProductionBatch();
+    const runtime = createRuntime({ productionBatch });
+    const onStartMultiPassExport = vi.fn();
+    render(
+      <StudioBg3dProSuiteRuntimeContext.Provider value={runtime}>
+        <StudioBg3dMultiPassExporterPanel
+          onStartMultiPassExport={onStartMultiPassExport}
+        />
+      </StudioBg3dProSuiteRuntimeContext.Provider>,
+    );
+
+    expect(screen.getByText("멀티패스 레이어 자동 분리 내보내기")).toBeDefined();
+    expect(screen.queryByText("프로덕션 컷 멀티패스")).toBeNull();
   });
 
   it("inherits capture locks in the nested multipass exporter", () => {
