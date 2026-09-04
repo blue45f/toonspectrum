@@ -8,7 +8,7 @@ const editorSource = [
   readStudioBg3dEditorSource(),
   ...[
     "./StudioBg3dShapesPanel.tsx",
-    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dViewPanelContent.tsx",
     "./StudioBg3dLtPanel.tsx",
   ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")),
 ].join("\n");
