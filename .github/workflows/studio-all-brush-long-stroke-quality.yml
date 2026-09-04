@@ -1,0 +1,180 @@
+name: Studio all-brush screen-fill quality election
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/trigger/all-brush-quality-benchmark.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-all-brush-screen-fill-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build-${{ matrix.mode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [baseline, gpu]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build explicit comparison backend
+        env:
+          BENCHMARK_MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          if [ "$BENCHMARK_MODE" = gpu ]; then
+            export VITE_STUDIO_LIVE_INK_BACKEND=webgpu
+          else
+            export VITE_STUDIO_LIVE_INK_BACKEND=canvas2d
+          fi
+          pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-all-brush-build-${{ matrix.mode }}-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 2
+
+  benchmark:
+    name: ${{ matrix.mode }}-${{ matrix.shard }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [baseline, gpu]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-all-brush-build-${{ matrix.mode }}-${{ github.sha }}
+          path: dist
+      - name: Run screen-filling long strokes for this catalogue shard
+        env:
+          TOONSPECTRUM_ALL_BRUSH_MODE: ${{ matrix.mode }}
+          TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX: ${{ matrix.shard }}
+          TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT: 8
+          TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR: artifacts/all-brush-long-stroke
+          TOONSPECTRUM_LONG_STROKE_PARITY_SAMPLES: 1200
+          TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES: 3200
+          TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS: 480000
+        run: |
+          set +e
+          xvfb-run -a --server-args='-screen 0 1920x1200x24' \
+            pnpm exec tsx scripts/run-studio-all-brush-long-stroke-shard.mts \
+            2>&1 | tee all-brush-shard.log
+          status=${PIPESTATUS[0]}
+          echo "$status" > all-brush-shard-exit-code.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: all-brush-long-${{ matrix.mode }}-${{ matrix.shard }}-${{ github.sha }}
+          path: |
+            artifacts/all-brush-long-stroke/${{ matrix.mode }}/shard-${{ matrix.shard }}-of-8
+            all-brush-shard.log
+            all-brush-shard-exit-code.txt
+          if-no-files-found: error
+          retention-days: 5
+
+  aggregate:
+    name: aggregate-quality-first-election
+    needs: benchmark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: all-brush-long-*-${{ github.sha }}
+          path: artifacts/all-brush-long-stroke-input
+      - name: Aggregate every listed brush and generate allowlist
+        env:
+          TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
+          TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
+          TOONSPECTRUM_GPU_EVIDENCE_OUTPUT: src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+        run: pnpm exec tsx scripts/aggregate-studio-all-brush-long-stroke.mts
+      - name: Validate election and product admission
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/verify-studio-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          NODE_OPTIONS='--max-old-space-size=8192' pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Stage durable report and remove one-shot workflow
+        run: |
+          set -euo pipefail
+          mkdir -p docs/reports
+          cp artifacts/all-brush-long-stroke-aggregate/all-brush-gpu-quality-report.json \
+            docs/reports/studio-all-brush-gpu-quality-2026-09-04.json
+          cp artifacts/all-brush-long-stroke-aggregate/all-brush-gpu-quality-report.md \
+            docs/reports/studio-all-brush-gpu-quality-2026-09-04.md
+          rm -f .github/trigger/all-brush-quality-benchmark.txt
+          rm -f .github/workflows/studio-all-brush-long-stroke-quality.yml
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'test(brush): record all-brush screen-fill GPU quality election'
+          git push origin HEAD:${GITHUB_REF_NAME}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: all-brush-quality-election-${{ github.sha }}
+          path: artifacts/all-brush-long-stroke-aggregate
+          if-no-files-found: error
+          retention-days: 14
