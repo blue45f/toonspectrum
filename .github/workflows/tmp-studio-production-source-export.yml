@@ -38,16 +38,19 @@ jobs:
           grep -Fx 'src/app/routes/app-route-title-ownership.test.ts' /tmp/studio-production-patch.files
           tar -xJf /tmp/studio-production-patch.tar.xz
 
-      - name: Set up Node and pnpm
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24.16.0
           cache: pnpm
-      - name: Activate repository package manager
+      - name: Verify repository toolchain
         shell: bash
         run: |
-          corepack enable
-          corepack prepare pnpm@11.4.0 --activate
           node --version
           pnpm --version
       - name: Install locked dependencies
