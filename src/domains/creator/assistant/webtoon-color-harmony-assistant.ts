@@ -179,7 +179,7 @@ export class WebtoonColorHarmonyAssistant {
    *   muddy black overlays.
    * - Saturation is deliberately bounded. Very light skin bases often report HSL saturation near
    *   100%; carrying that value into darker shadows produces neon red, not a usable cel-shading ramp.
-   * - Lightness ordering is deterministic: highlight >= base > shadow1 > shadow2, modulo 8-bit rounding.
+   * - Lightness ordering is deterministic: highlight >= base >= shadow1 >= shadow2, modulo 8-bit rounding.
    */
   public generateHueShiftShadow(baseHex: string): {
     shadow1: string;
@@ -196,8 +196,8 @@ export class WebtoonColorHarmonyAssistant {
     const h2 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 65);
     const s1 = clamp(0.12 + hsl.s * 0.38, 0.14, 0.5);
     const s2 = clamp(0.18 + hsl.s * 0.32, 0.2, 0.52);
-    const l1 = clamp(hsl.l * 0.86, 0.08, 0.88);
-    const l2 = clamp(hsl.l * 0.68, 0.04, 0.72);
+    const l1 = clamp(hsl.l * 0.86, 0, 0.88);
+    const l2 = clamp(hsl.l * 0.68, 0, 0.72);
 
     const highlightBaseHue = hsl.s < 0.02 ? WARM_HIGHLIGHT_TARGET_HUE : hsl.h;
     const hh = shiftHueToward(highlightBaseHue, WARM_HIGHLIGHT_TARGET_HUE, 12);
@@ -211,7 +211,10 @@ export class WebtoonColorHarmonyAssistant {
     return {
       shadow1: this.rgbToHex(rgb1.r, rgb1.g, rgb1.b),
       shadow2: this.rgbToHex(rgb2.r, rgb2.g, rgb2.b),
-      highlight: this.rgbToHex(rgbHighlight.r, rgbHighlight.g, rgbHighlight.b),
+      highlight:
+        hsl.l >= 0.985
+          ? normalizedHex
+          : this.rgbToHex(rgbHighlight.r, rgbHighlight.g, rgbHighlight.b),
     };
   }
 
