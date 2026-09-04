@@ -28,8 +28,7 @@ jobs:
               package.json \
               pnpm-lock.yaml \
               tsconfig.json \
-              vitest.config.ts \
-              eslint.config.js
+              vitest.config.ts
           } | sort -zu > /tmp/studio-comment-files
           tar --null -czf studio-comments-source.tar.gz --files-from=/tmp/studio-comment-files
       - uses: actions/upload-artifact@v4
