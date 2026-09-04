@@ -11,11 +11,16 @@
  * 않으므로 기존 오류 처리 경로를 바꾸지 않는다.
  */
 
+import {
+  STUDIO_RENDER_FAILURE_EVENT,
+  type StudioRenderFailureDetail,
+} from "../../../lib/render-failure-event";
+
 import { redactStudioDiagnosticText } from "./studio-diagnostic-redaction";
 
 export interface StudioErrorJournalEntry {
   readonly at: number;
-  readonly source: "window-error" | "unhandled-rejection" | "reported";
+  readonly source: "window-error" | "unhandled-rejection" | "render-failure" | "reported";
   readonly name: string;
   readonly message: string;
 }
@@ -91,13 +96,21 @@ export function installStudioErrorJournal(
     const detail = event as PromiseRejectionEvent;
     recordStudioError(detail.reason ?? event.type, "unhandled-rejection");
   };
+  // React 에러 바운더리가 잡은 예외는 window "error" 로 오지 않는다 — 바운더리가 이미 삼켰기
+  // 때문이다. 그래서 무너진 패널은 이 저널에도, 버그 리포트의 "최근 오류"에도 없었다.
+  const onRenderFailure = (event: Event) => {
+    const detail = (event as CustomEvent<StudioRenderFailureDetail>).detail;
+    recordStudioError(detail?.error ?? event.type, "render-failure");
+  };
 
   target.addEventListener("error", onError);
   target.addEventListener("unhandledrejection", onRejection);
+  target.addEventListener(STUDIO_RENDER_FAILURE_EVENT, onRenderFailure);
 
   installed = () => {
     target.removeEventListener("error", onError);
     target.removeEventListener("unhandledrejection", onRejection);
+    target.removeEventListener(STUDIO_RENDER_FAILURE_EVENT, onRenderFailure);
     installed = null;
   };
   return installed;

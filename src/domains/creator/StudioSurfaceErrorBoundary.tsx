@@ -1,3 +1,4 @@
+
 import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react";
 import {
   Component,
@@ -9,6 +10,8 @@ import {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
+
+import { announceStudioRenderFailure } from "../../../lib/render-failure-event";
 
 import { activateStudioModalSheet } from "./useStudioModalSheet";
 
@@ -181,6 +184,11 @@ export class StudioSurfaceErrorBoundary extends Component<
     } catch {
       // Diagnostics are observational. A failing sink must not escape this surface boundary.
     }
+    announceStudioRenderFailure({
+      surface: this.props.surfaceLabel,
+      error,
+      componentStack: info.componentStack ?? null,
+    });
     if (import.meta.env.DEV) {
       console.error(`Studio surface failed (${this.props.surfaceLabel}):`, error, info.componentStack);
     }

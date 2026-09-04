@@ -158,7 +158,17 @@ const STUDIO_LOCAL_BINARY_LANES: readonly string[] = Object.freeze([
 ]);
 
 function defaultBroadcastChannelFactory(name: string): StudioBroadcastChannelLike {
-  return new BroadcastChannel(name);
+  // isStudioLocalLiveTransportSupported() 는 `typeof BroadcastChannel === "function"` 만 본다.
+  // 존재는 생성 가능성이 아니다 — 스토리지가 분할된 인앱 WebView 는 생성자를 노출한 채 `new`
+  // 에서 SecurityError 를 던지므로, 그 게이트를 통과한 세션이 여기서 날 DOMException 으로
+  // 깨졌다. 지원되지 않는 것으로 보고해 트랜스포트의 정상 경로를 타게 한다.
+  try {
+    return new BroadcastChannel(name);
+  } catch (cause) {
+    // createStudioLocalLiveTransport 가 지원되지 않을 때 던지는 것과 같은 모양으로 맞춘다.
+    // 호출부는 이미 그 문장을 처리하고 있고, 여기서 raw DOMException 이 새면 처리하지 못한다.
+    throw new Error("이 브라우저는 로컬 탭 공동작업 채널을 지원하지 않습니다.", { cause });
+  }
 }
 
 // Re-exported for the existing call sites that already import it from here. Callers that only
