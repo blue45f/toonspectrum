@@ -16,13 +16,6 @@ import {
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/brush/studio-brush-catalog";
 import {
-  STUDIO_BRUSH_HAND_FEEL_PROFILES,
-  STUDIO_BRUSH_TEXTURE_PROFILES,
-} from "../src/domains/creator/brush/studio-brush-quality-foundation";
-import {
-  STUDIO_BRUSH_QUALITY_PORTFOLIO,
-} from "../src/domains/creator/brush/studio-brush-quality-portfolio";
-import {
   studioBrushDynamicsSettingsForBrushId,
   type StudioBrushDynamicsSettings,
 } from "../src/domains/creator/brush/studio-brush-dynamics";
@@ -33,6 +26,13 @@ import {
 } from "../src/domains/creator/brush/studio-brush-material-distinctness";
 import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
 import { materializeStudioBrushPackSelection } from "../src/domains/creator/brush/studio-brush-pack-runtime";
+import {
+  STUDIO_BRUSH_HAND_FEEL_PROFILES,
+  STUDIO_BRUSH_TEXTURE_PROFILES,
+} from "../src/domains/creator/brush/studio-brush-quality-foundation";
+import {
+  STUDIO_BRUSH_QUALITY_PORTFOLIO,
+} from "../src/domains/creator/brush/studio-brush-quality-portfolio";
 import {
   resolveStudioBrushRuntimeContract,
 } from "../src/domains/creator/brush/studio-brush-runtime-contract";
