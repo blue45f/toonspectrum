@@ -1,0 +1,150 @@
+name: Architecture PR 690 exact core verification
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/architecture-core-expedite-pr690.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: architecture-core-expedite-pr690
+  cancel-in-progress: true
+
+jobs:
+  exact-core:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: webdex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webdex -d webdex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex:webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: webdex_runtime
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH_NAME: refactor/layered-architecture-20260904
+      PR_NUMBER: "690"
+    steps:
+      - name: Check out the latest architecture branch
+        uses: actions/checkout@v6
+        with:
+          ref: refactor/layered-architecture-20260904
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Materialize the exact merge candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-architecture-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch --no-tags origin main
+          git rm --ignore-unmatch \
+            .github/workflows/architecture-main-sync-pr690.yml \
+            .github/workflows/architecture-core-expedite-pr690.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(architecture): remove one-off verification transport"
+          fi
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            git merge --no-edit --no-ff origin/main
+          fi
+          git diff --check origin/main...HEAD
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install workflow parser
+        shell: bash
+        run: python3 -m pip install --user --disable-pip-version-check PyYAML
+
+      - name: Execute every run step from the protected CI core job
+        shell: bash
+        env:
+          GITHUB_SHA: ${{ env.CANDIDATE_SHA }}
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import subprocess
+          from pathlib import Path
+
+          import yaml
+
+          workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+          steps = workflow["jobs"]["verify"]["steps"]
+          inherited = os.environ.copy()
+
+          for index, step in enumerate(steps, start=1):
+              command = step.get("run")
+              if command is None:
+                  continue
+              name = step.get("name") or f"run step {index}"
+              if "${{" in command:
+                  raise SystemExit(f"unexpanded GitHub expression in protected core step: {name}")
+              env = inherited.copy()
+              for key, value in (step.get("env") or {}).items():
+                  value = str(value)
+                  if "${{" in value:
+                      raise SystemExit(f"unexpanded GitHub expression in env for core step: {name}")
+                  env[str(key)] = value
+              cwd = step.get("working-directory") or "."
+              print(f"\n::group::{name}", flush=True)
+              result = subprocess.run(
+                  ["/usr/bin/bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", command],
+                  cwd=cwd,
+                  env=env,
+                  text=True,
+              )
+              print("::endgroup::", flush=True)
+              if result.returncode != 0:
+                  raise SystemExit(result.returncode)
+          PY
+
+      - name: Publish and merge only the verified exact candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$CANDIDATE_SHA" = "$(git rev-parse HEAD)"
+          git diff --check
+          test -z "$(git status --short)"
+          git push origin "HEAD:$BRANCH_NAME"
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/statuses/$CANDIDATE_SHA" \
+            -f state=success \
+            -f context=core \
+            -f description="Exact candidate passed every protected CI core run step" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/pulls/$PR_NUMBER/merge" \
+            -f merge_method=squash \
+            -f sha="$CANDIDATE_SHA" \
+            -f commit_title="refactor(architecture): layer routes and extract studio runtimes (#690)" \
+            -f commit_message="Adopt layered route ownership, extract Studio runtimes, preserve current Studio capabilities, and enforce architecture ratchets."
