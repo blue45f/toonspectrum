@@ -91,6 +91,11 @@ jobs:
           command_center = "src/domains/creator/live/StudioLiveCollaborationCommandCenter.tsx"
           replace_once(
               command_center,
+              'import {\n  AlertCircle,',
+              '/* eslint-disable react-refresh/only-export-components -- command-center view models are intentionally unit-tested beside the component. */\nimport {\n  AlertCircle,',
+          )
+          replace_once(
+              command_center,
               'import { useEffect, useId, useMemo, useRef, useState } from "react";',
               'import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";',
           )
