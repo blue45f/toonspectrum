@@ -17,6 +17,8 @@ export interface StudioBg3dProSuiteRuntimeValue {
   readonly baseCamera: StudioBg3dCameraSettings;
   readonly productionShots: readonly StudioBg3dShot[];
   readonly onApplyCameraView: (camera: StudioBg3dCameraSettings) => void;
+  readonly onPreviewCameraView?: (camera: StudioBg3dCameraSettings) => void;
+  readonly onFinishCameraViewPreview?: () => void;
   readonly onCaptureCurrentShot: () => void;
   readonly onApplyProductionShot: (shotId: string) => void;
   readonly onMoveProductionShot: (shotId: string, targetIndex: number) => void;
