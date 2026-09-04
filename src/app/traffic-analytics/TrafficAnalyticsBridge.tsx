@@ -10,11 +10,8 @@ const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";
 const HEARTBEAT_INTERVAL_MS = 60_000;
 const MIN_HEARTBEAT_SECONDS = 5;
 
-type NavigatorWithPrivacyAndConnection = Navigator & {
+type NavigatorWithPrivacy = Navigator & {
   globalPrivacyControl?: boolean;
-  connection?: {
-    effectiveType?: string;
-  };
 };
 
 let lastPageViewSignature = "";
@@ -35,10 +32,7 @@ function randomIdentifier(): string {
     .slice(2)}`;
 }
 
-function storageIdentifier(
-  storage: Storage,
-  key: string,
-): string {
+function storageIdentifier(storage: Storage, key: string): string {
   try {
     const existing = storage.getItem(key);
     if (existing && /^[A-Za-z0-9_-]{16,128}$/u.test(existing)) return existing;
@@ -51,7 +45,7 @@ function storageIdentifier(
 }
 
 function browserPrivacyOptOut(): boolean {
-  const currentNavigator = navigator as NavigatorWithPrivacyAndConnection;
+  const currentNavigator = navigator as NavigatorWithPrivacy;
   return (
     currentNavigator.globalPrivacyControl === true
     || currentNavigator.doNotTrack === "1"
@@ -74,22 +68,14 @@ function analyticsEnabled(pathname: string): boolean {
   return !browserPrivacyOptOut();
 }
 
-function navigationTiming(): {
-  loadTimeMs: number | null;
-  navigationType: string | null;
-} {
-  if (navigationTimingConsumed) {
-    return { loadTimeMs: null, navigationType: null };
-  }
+function navigationLoadTimeMs(): number | null {
+  if (navigationTimingConsumed) return null;
   navigationTimingConsumed = true;
   const entry = performance.getEntriesByType("navigation")[0] as
     | PerformanceNavigationTiming
     | undefined;
-  if (!entry) return { loadTimeMs: null, navigationType: null };
-  return {
-    loadTimeMs: Math.max(0, Math.round(entry.duration)) || null,
-    navigationType: entry.type || null,
-  };
+  if (!entry) return null;
+  return Math.max(0, Math.round(entry.duration)) || null;
 }
 
 function campaign(search: string): {
@@ -107,11 +93,6 @@ function campaign(search: string): {
     utmMedium: token("utm_medium"),
     utmCampaign: token("utm_campaign"),
   };
-}
-
-function connectionType(): string | null {
-  const currentNavigator = navigator as NavigatorWithPrivacyAndConnection;
-  return currentNavigator.connection?.effectiveType?.slice(0, 24) || null;
 }
 
 function postTrafficEvent(
@@ -146,9 +127,8 @@ function createRuntimeIdentifiers(): {
 export function TrafficAnalyticsBridge() {
   const location = useLocation();
   const currentPathRef = useRef(location.pathname);
-  const identifiersRef = useRef<ReturnType<typeof createRuntimeIdentifiers> | null>(
-    null,
-  );
+  const identifiersRef =
+    useRef<ReturnType<typeof createRuntimeIdentifiers> | null>(null);
   const engagedMsRef = useRef(0);
   const visibleSinceRef = useRef<number | null>(
     document.visibilityState === "visible" ? performance.now() : null,
@@ -157,10 +137,7 @@ export function TrafficAnalyticsBridge() {
   useEffect(() => {
     const now = performance.now();
     const previousPath = currentPathRef.current;
-    if (
-      analyticsEnabled(previousPath)
-      && visibleSinceRef.current !== null
-    ) {
+    if (analyticsEnabled(previousPath) && visibleSinceRef.current !== null) {
       engagedMsRef.current += Math.max(0, now - visibleSinceRef.current);
     }
     currentPathRef.current = location.pathname;
@@ -188,19 +165,13 @@ export function TrafficAnalyticsBridge() {
     lastPageViewAt = now;
 
     const timer = globalThis.setTimeout(() => {
-      const timing = navigationTiming();
       postTrafficEvent("page-view", {
         ...identifiers,
         path: location.pathname,
-        title: document.title,
         referrer: document.referrer || null,
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         screenWidth: window.screen.width,
         screenHeight: window.screen.height,
-        connectionType: connectionType(),
-        navigationType: timing.navigationType,
-        loadTimeMs: timing.loadTimeMs,
+        loadTimeMs: navigationLoadTimeMs(),
         ...campaign(location.search),
       });
     }, 0);
