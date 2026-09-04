@@ -1,7 +1,14 @@
 import { ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
+import { getAdminAdvancedCopy } from "./admin-advanced-copy";
 import { loadAdminI18nLocale } from "./admin-i18n-loader";
+import {
+  ADMIN_TAB_KEYS,
+  buildAdminTabHref,
+  parseAdminTab,
+  type AdminTabKey,
+} from "./admin-console-model";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
 import { AdminAnnouncements } from "./components/AdminAnnouncements";
@@ -22,54 +29,87 @@ import { AdminTraffic } from "./components/AdminTraffic";
 import { Container } from "@/components/section";
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
-
-type TabKey =
-  | "dashboard"
-  | "traffic"
-  | "plans"
-  | "revenue"
-  | "promos"
-  | "announcements"
-  | "reports"
-  | "security"
-  | "audit"
-  | "campaigns"
-  | "ops";
 
 export function AdminPage() {
   const { gate, uid } = useAdminGate();
-  const [tab, setTab] = useState<TabKey>("dashboard");
   const t = useT();
-  const lang = useI18n((s) => s.lang);
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminAdvancedCopy(lang);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tab = parseAdminTab(searchParams.get("tab"));
 
   useEffect(() => {
     void loadAdminI18nLocale(lang);
   }, [lang]);
 
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: "dashboard", label: t("admin.tabs.dashboard") },
-    { key: "traffic", label: t("admin.tabs.traffic") },
-    { key: "plans", label: t("admin.tabs.plans") },
-    { key: "revenue", label: t("admin.tabs.revenue") },
-    { key: "promos", label: t("admin.tabs.promos") },
-    { key: "announcements", label: t("admin.tabs.announcements") },
-    { key: "reports", label: t("admin.tabs.reports") },
-    { key: "security", label: t("admin.tabs.security") },
-    { key: "audit", label: t("admin.tabs.audit") },
-    { key: "campaigns", label: t("admin.tabs.campaigns") },
-    { key: "ops", label: t("admin.tabs.ops") },
-  ];
+  const tabLabels: Record<AdminTabKey, string> = {
+    dashboard: t("admin.tabs.dashboard"),
+    traffic: t("admin.tabs.traffic"),
+    plans: t("admin.tabs.plans"),
+    revenue: t("admin.tabs.revenue"),
+    promos: t("admin.tabs.promos"),
+    announcements: t("admin.tabs.announcements"),
+    reports: t("admin.tabs.reports"),
+    security: t("admin.tabs.security"),
+    audit: t("admin.tabs.audit"),
+    campaigns: t("admin.tabs.campaigns"),
+    ops: t("admin.tabs.ops"),
+  };
 
   const splitRoutes = [
     { href: "/admin/community", label: t("admin.splitRoutes.community") },
     { href: "/admin/members", label: t("admin.splitRoutes.members") },
   ];
 
+  const selectTab = (nextTab: AdminTabKey, focusTab = false) => {
+    if (nextTab !== tab) {
+      router.replace(
+        buildAdminTabHref(pathname, searchParams, nextTab),
+        { scroll: false },
+      );
+    }
+    if (focusTab) {
+      globalThis.requestAnimationFrame(() => {
+        document.getElementById(`admin-tab-${nextTab}`)?.focus();
+      });
+    }
+  };
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentTab: AdminTabKey,
+  ) => {
+    const currentIndex = ADMIN_TAB_KEYS.indexOf(currentTab);
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % ADMIN_TAB_KEYS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + ADMIN_TAB_KEYS.length) % ADMIN_TAB_KEYS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = ADMIN_TAB_KEYS.length - 1;
+    }
+
+    if (nextIndex == null) return;
+    event.preventDefault();
+    selectTab(ADMIN_TAB_KEYS[nextIndex], true);
+  };
+
   return (
     <AdminToastProvider>
-      <Container size="wide" className="py-10 space-y-6">
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <Container size="wide" className="space-y-6 py-10">
+        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <ShieldCheck size={13} /> {t("admin.console")}
@@ -82,52 +122,65 @@ export function AdminPage() {
             </p>
           </div>
 
-          {gate.kind === "admin" && uid && (
+          {gate.kind === "admin" && uid ? (
             <AdminQuickPalette
               userId={uid}
-              onSelectTab={(key) => setTab(key as TabKey)}
+              onSelectTab={(key) => selectTab(parseAdminTab(key))}
             />
-          )}
+          ) : null}
         </header>
 
         <AdminGateFallback gate={gate} />
 
-        {gate.kind === "admin" && uid && (
+        {gate.kind === "admin" && uid ? (
           <div className="flex flex-col gap-6">
             <AdminHeaderStats userId={uid} />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-fg-3">
-                {gate.me.name ?? gate.me.email} · {t("admin.role")}{" "}
-                <span className="font-semibold text-accent">
-                  {gate.me.role}
-                </span>
-              </div>
+            <div className="text-xs text-fg-3">
+              {gate.me.name ?? gate.me.email} · {t("admin.role")} {" "}
+              <span className="font-semibold text-accent">{gate.me.role}</span>
+            </div>
+
+            <div className="sticky top-2 z-30 -mx-2 flex items-center gap-2 overflow-x-auto rounded-2xl border border-line bg-card/95 p-2 shadow-xl shadow-black/10 backdrop-blur-xl [scrollbar-width:thin]">
               <nav
-                className="inline-flex flex-wrap rounded-xl border border-line bg-card p-1 shadow-sm"
-                aria-label="관리 영역"
+                className="inline-flex shrink-0 items-center gap-1"
+                aria-label={copy.console.navLabel}
+                role="tablist"
               >
-                {tabs.map((tabItem) => (
+                {ADMIN_TAB_KEYS.map((tabKey) => (
                   <button
-                    key={tabItem.key}
-                    onClick={() => setTab(tabItem.key)}
-                    aria-pressed={tab === tabItem.key}
+                    key={tabKey}
+                    id={`admin-tab-${tabKey}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === tabKey}
+                    aria-controls={`admin-panel-${tabKey}`}
+                    tabIndex={tab === tabKey ? 0 : -1}
+                    onClick={() => selectTab(tabKey)}
+                    onKeyDown={(event) => handleTabKeyDown(event, tabKey)}
                     className={cn(
-                      "rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
-                      tab === tabItem.key
-                        ? "bg-accent text-on-accent shadow-md shadow-accent/20 font-semibold"
-                        : "text-fg-2 hover:text-fg hover:bg-slate-800/40",
+                      "min-h-10 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                      tab === tabKey
+                        ? "bg-accent font-semibold text-on-accent shadow-md shadow-accent/20"
+                        : "text-fg-2 hover:bg-slate-800/40 hover:text-fg",
                     )}
                   >
-                    {tabItem.label}
+                    {tabLabels[tabKey]}
                   </button>
                 ))}
-                <span className="mx-1 my-1 w-px bg-line" aria-hidden />
+              </nav>
+
+              <span className="h-7 w-px shrink-0 bg-line" aria-hidden />
+
+              <nav
+                className="inline-flex shrink-0 items-center gap-1"
+                aria-label={t("admin.splitRoutes.members")}
+              >
                 {splitRoutes.map((route) => (
                   <Link
                     key={route.href}
                     href={route.href}
-                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:text-fg hover:bg-slate-800/40"
+                    className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-slate-800/40 hover:text-fg"
                   >
                     {route.label}
                   </Link>
@@ -135,23 +188,32 @@ export function AdminPage() {
               </nav>
             </div>
 
-            <main className="min-h-[500px]">
-              {tab === "dashboard" && <AdminDashboard uid={uid} />}
-              {tab === "traffic" && <AdminTraffic uid={uid} />}
-              {tab === "plans" && <AdminPlans uid={uid} />}
-              {tab === "revenue" && <AdminRevenue uid={uid} />}
-              {tab === "promos" && <AdminPromos userId={uid} />}
-              {tab === "announcements" && (
+            <main
+              id={`admin-panel-${tab}`}
+              role="tabpanel"
+              aria-labelledby={`admin-tab-${tab}`}
+              aria-label={copy.console.tabPanelLabel}
+              className="min-h-[500px] focus:outline-none"
+              tabIndex={-1}
+            >
+              {tab === "dashboard" ? (
+                <AdminDashboard uid={uid} onNavigate={selectTab} />
+              ) : null}
+              {tab === "traffic" ? <AdminTraffic uid={uid} /> : null}
+              {tab === "plans" ? <AdminPlans uid={uid} /> : null}
+              {tab === "revenue" ? <AdminRevenue uid={uid} /> : null}
+              {tab === "promos" ? <AdminPromos userId={uid} /> : null}
+              {tab === "announcements" ? (
                 <AdminAnnouncements userId={uid} />
-              )}
-              {tab === "reports" && <AdminReports userId={uid} />}
-              {tab === "security" && <AdminSecurity userId={uid} />}
-              {tab === "audit" && <AdminAuditLogs userId={uid} />}
-              {tab === "campaigns" && <AdminCampaigns uid={uid} />}
-              {tab === "ops" && <AdminOps uid={uid} />}
+              ) : null}
+              {tab === "reports" ? <AdminReports userId={uid} /> : null}
+              {tab === "security" ? <AdminSecurity userId={uid} /> : null}
+              {tab === "audit" ? <AdminAuditLogs userId={uid} /> : null}
+              {tab === "campaigns" ? <AdminCampaigns uid={uid} /> : null}
+              {tab === "ops" ? <AdminOps uid={uid} /> : null}
             </main>
           </div>
-        )}
+        ) : null}
       </Container>
     </AdminToastProvider>
   );
