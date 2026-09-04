@@ -6,17 +6,21 @@ import { appSettings, db, dbClient, users } from "../db";
 
 import { isWhitelistedAdminEmail } from "./admin-emails";
 import { getSessionUserCached } from "./session";
-import { ensureUserLifecycleSchema, normalizeUserAccountStatus } from "./user-lifecycle";
+import {
+  ensureUserLifecycleSchema,
+  normalizeUserAccountStatus,
+} from "./user-lifecycle";
 
 // 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
 // 세션 마이크로캐시(TTL 30초) 적용: admin-authed 요청마다 나가던 users SELECT 를 흡수한다.
 // 역할 변경 경로는 invalidateSessionUser 로 즉시 무효화된다(admin.service·me 갱신 참조).
-
-export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
+export async function isAdminUser(
+  userId: string | null | undefined,
+): Promise<boolean> {
   if (!userId) return false;
   try {
     await ensureUserLifecycleSchema();
-    const u = await getSessionUserCached(userId, async (id) => {
+    const user = await getSessionUserCached(userId, async (id) => {
       const [row] = await db
         .select({ role: users.role, email: users.email, status: users.status })
         .from(users)
@@ -24,11 +28,11 @@ export async function isAdminUser(userId: string | null | undefined): Promise<bo
         .limit(1);
       return row ?? null;
     });
-    if (!u) return false;
-    if (normalizeUserAccountStatus(u.status) !== "active") return false;
-    const role = String(u.role ?? "").toLowerCase();
+    if (!user) return false;
+    if (normalizeUserAccountStatus(user.status) !== "active") return false;
+    const role = String(user.role ?? "").toLowerCase();
     if (role === "admin" || role === "operator") return true;
-    return isWhitelistedAdminEmail(u.email);
+    return isWhitelistedAdminEmail(user.email);
   } catch {
     return false; // DB(Neon) 불가 시 관리자 아님으로 안전 폴백.
   }
@@ -61,9 +65,9 @@ export interface AppConfig {
   showAvailability: boolean; // 플랫폼 유통·유료무료 "어디서 봐"
   showSynopsis: boolean; // 시놉시스 원문
   showRelatedInfo: boolean; // 관련 정보(크롤 링크: 유튜브·뉴스·위키)
-  // 전역 비상 점검 모드 스위치
-  maintenanceModeEnabled?: boolean;
-  maintenanceMessage?: string;
+  // 전역 비상 점검 모드 스위치.
+  maintenanceModeEnabled: boolean;
+  maintenanceMessage: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -79,18 +83,36 @@ const DEFAULTS: AppConfig = {
   maintenanceMessage: "시스템 점검 중입니다.",
 };
 const CONFIG_KEY = "config";
+const MAX_MAINTENANCE_MESSAGE_LENGTH = 500;
 
-const CONTENT_FLAGS = ["showCovers", "showPricing", "showAvailability", "showSynopsis", "showRelatedInfo"] as const;
+const CONTENT_FLAGS = [
+  "showCovers",
+  "showPricing",
+  "showAvailability",
+  "showSynopsis",
+  "showRelatedInfo",
+] as const;
 
 function sanitize(patch: Partial<AppConfig>): Partial<AppConfig> {
-  const out: Partial<AppConfig> = {};
-  if (typeof patch.monetizationEnabled === "boolean") out.monetizationEnabled = patch.monetizationEnabled;
-  if (typeof patch.authKakao === "boolean") out.authKakao = patch.authKakao;
-  if (typeof patch.authNaver === "boolean") out.authNaver = patch.authNaver;
-  for (const key of CONTENT_FLAGS) {
-    if (typeof patch[key] === "boolean") out[key] = patch[key];
+  const output: Partial<AppConfig> = {};
+  if (typeof patch.monetizationEnabled === "boolean") {
+    output.monetizationEnabled = patch.monetizationEnabled;
   }
-  return out;
+  if (typeof patch.authKakao === "boolean") output.authKakao = patch.authKakao;
+  if (typeof patch.authNaver === "boolean") output.authNaver = patch.authNaver;
+  for (const key of CONTENT_FLAGS) {
+    if (typeof patch[key] === "boolean") output[key] = patch[key];
+  }
+  if (typeof patch.maintenanceModeEnabled === "boolean") {
+    output.maintenanceModeEnabled = patch.maintenanceModeEnabled;
+  }
+  if (typeof patch.maintenanceMessage === "string") {
+    const message = patch.maintenanceMessage
+      .trim()
+      .slice(0, MAX_MAINTENANCE_MESSAGE_LENGTH);
+    if (message) output.maintenanceMessage = message;
+  }
+  return output;
 }
 
 export async function getAppConfig(): Promise<AppConfig> {
@@ -109,12 +131,18 @@ export async function getAppConfig(): Promise<AppConfig> {
   }
 }
 
-export async function setAppConfig(patch: Partial<AppConfig>): Promise<AppConfig> {
+export async function setAppConfig(
+  patch: Partial<AppConfig>,
+): Promise<AppConfig> {
   await ensureSettingsTable();
   const next: AppConfig = { ...(await getAppConfig()), ...sanitize(patch) };
+  const updatedAt = new Date();
   await db
     .insert(appSettings)
-    .values({ key: CONFIG_KEY, value: next, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: appSettings.key, set: { value: next, updatedAt: new Date() } });
+    .values({ key: CONFIG_KEY, value: next, updatedAt })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: next, updatedAt },
+    });
   return next;
 }
