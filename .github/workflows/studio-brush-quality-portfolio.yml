@@ -46,7 +46,7 @@ concurrency:
 jobs:
   quality-portfolio:
     name: quality-portfolio
-    runs-on: ubuntu-slim
+    runs-on: windows-2025
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
