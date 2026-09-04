@@ -1,0 +1,215 @@
+{
+  "path": "src/domains/creator/StudioCuttoonEditorHost.tsx",
+  "lineCount": 30906,
+  "byteCount": 1319535,
+  "topLevelDeclarationCount": 17,
+  "sectionMarkers": [],
+  "declarations": [
+    {
+      "line": 1655,
+      "name": "StudioCuttoonEditor",
+      "signature": "export function StudioCuttoonEditor({",
+      "spanLines": 13854
+    },
+    {
+      "line": 15509,
+      "name": "selectedContentMutationLocked",
+      "signature": "const selectedContentMutationLocked = activeSurfaceReviewLocked || selectedContentLockedByGroup;",
+      "spanLines": 1
+    },
+    {
+      "line": 15510,
+      "name": "selectedWorkAssetMutationLocked",
+      "signature": "const selectedWorkAssetMutationLocked = selectedWorkAssetDestructiveEditReason !== null;",
+      "spanLines": 1
+    },
+    {
+      "line": 15511,
+      "name": "selectedImageMutationLocked",
+      "signature": "const selectedImageMutationLocked = selectedContentMutationLocked || selectedWorkAssetMutationLocked;",
+      "spanLines": 3
+    },
+    {
+      "line": 15514,
+      "name": "pixelToolArmed",
+      "signature": "const pixelToolArmed =",
+      "spanLines": 134
+    },
+    {
+      "line": 15648,
+      "name": "cropArmed",
+      "signature": "const cropArmed =",
+      "spanLines": 109
+    },
+    {
+      "line": 15757,
+      "name": "smudgeArmed",
+      "signature": "const smudgeArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15759,
+      "name": "dodgeBurnArmed",
+      "signature": "const dodgeBurnArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15761,
+      "name": "wetMixArmed",
+      "signature": "const wetMixArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15763,
+      "name": "liquifyArmed",
+      "signature": "const liquifyArmed =",
+      "spanLines": 5
+    },
+    {
+      "line": 15768,
+      "name": "healCloneArmed",
+      "signature": "const healCloneArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15770,
+      "name": "layerMaskPaintArmed",
+      "signature": "const layerMaskPaintArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15772,
+      "name": "filterMaskPaintArmed",
+      "signature": "const filterMaskPaintArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15774,
+      "name": "quickMaskArmed",
+      "signature": "const quickMaskArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15776,
+      "name": "historyBrushArmed",
+      "signature": "const historyBrushArmed =",
+      "spanLines": 4
+    },
+    {
+      "line": 15780,
+      "name": "puppetWarpArmed",
+      "signature": "const puppetWarpArmed =",
+      "spanLines": 9991
+    },
+    {
+      "line": 25771,
+      "name": "clearSelectionForEdit",
+      "signature": "function clearSelectionForEdit() {",
+      "spanLines": 5136
+    }
+  ],
+  "largestDeclarationSpans": [
+    {
+      "line": 1655,
+      "name": "StudioCuttoonEditor",
+      "signature": "export function StudioCuttoonEditor({",
+      "spanLines": 13854
+    },
+    {
+      "line": 15780,
+      "name": "puppetWarpArmed",
+      "signature": "const puppetWarpArmed =",
+      "spanLines": 9991
+    },
+    {
+      "line": 25771,
+      "name": "clearSelectionForEdit",
+      "signature": "function clearSelectionForEdit() {",
+      "spanLines": 5136
+    },
+    {
+      "line": 15514,
+      "name": "pixelToolArmed",
+      "signature": "const pixelToolArmed =",
+      "spanLines": 134
+    },
+    {
+      "line": 15648,
+      "name": "cropArmed",
+      "signature": "const cropArmed =",
+      "spanLines": 109
+    },
+    {
+      "line": 15763,
+      "name": "liquifyArmed",
+      "signature": "const liquifyArmed =",
+      "spanLines": 5
+    },
+    {
+      "line": 15776,
+      "name": "historyBrushArmed",
+      "signature": "const historyBrushArmed =",
+      "spanLines": 4
+    },
+    {
+      "line": 15511,
+      "name": "selectedImageMutationLocked",
+      "signature": "const selectedImageMutationLocked = selectedContentMutationLocked || selectedWorkAssetMutationLocked;",
+      "spanLines": 3
+    },
+    {
+      "line": 15757,
+      "name": "smudgeArmed",
+      "signature": "const smudgeArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15759,
+      "name": "dodgeBurnArmed",
+      "signature": "const dodgeBurnArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15761,
+      "name": "wetMixArmed",
+      "signature": "const wetMixArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15768,
+      "name": "healCloneArmed",
+      "signature": "const healCloneArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15770,
+      "name": "layerMaskPaintArmed",
+      "signature": "const layerMaskPaintArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15772,
+      "name": "filterMaskPaintArmed",
+      "signature": "const filterMaskPaintArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15774,
+      "name": "quickMaskArmed",
+      "signature": "const quickMaskArmed =",
+      "spanLines": 2
+    },
+    {
+      "line": 15509,
+      "name": "selectedContentMutationLocked",
+      "signature": "const selectedContentMutationLocked = activeSurfaceReviewLocked || selectedContentLockedByGroup;",
+      "spanLines": 1
+    },
+    {
+      "line": 15510,
+      "name": "selectedWorkAssetMutationLocked",
+      "signature": "const selectedWorkAssetMutationLocked = selectedWorkAssetDestructiveEditReason !== null;",
+      "spanLines": 1
+    }
+  ]
+}
