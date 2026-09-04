@@ -143,6 +143,12 @@ const TOOL_BELT_HINTS = {
     undefined,
     "character-3d"
   ),
+  characterShaper: studioToolHintFromLabel(
+    "캐릭터 셰이퍼",
+    "프리셋 카드로 얼굴·헤어·체형·의상을 고르고, 사진·웹캠으로 포즈를 잡고, 투명 PNG나 레이어 PSD로 내보냅니다.",
+    undefined,
+    "character-3d"
+  ),
   mannequin3d: studioToolHintFromLabel(
     "3D 데생 인형",
     "모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다.",
@@ -549,6 +555,7 @@ export interface StudioToolBeltContentProps {
   panelLayoutsError: string | null;
   panelLayoutsLoading: boolean;
   poserVrmOpen: boolean;
+  characterShaperOpen: boolean;
   presentationPanelsHidden: boolean;
   publishingId: string | null;
   rasterFavoriteOnly: boolean;
@@ -607,6 +614,7 @@ export interface StudioToolBeltContentProps {
   setMannequinPoserOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPageReviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCharacterShaperOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRasterFavoriteOnly: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRenamingAssetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;

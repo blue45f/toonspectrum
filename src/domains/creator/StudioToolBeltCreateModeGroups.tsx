@@ -13,6 +13,7 @@ import {
   UsersRound,
   PersonStanding,
   PictureInPicture2,
+  Sparkles,
   SquareSplitHorizontal,
   WandSparkles,
 } from "lucide-react";
@@ -89,6 +90,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     menuRef,
     mannequinPoserOpen,
     poserVrmOpen,
+    characterShaperOpen,
     referencePanelOpen,
     selected,
     stableHandlers,
@@ -98,6 +100,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     setMannequinPoserOpen,
     setMenu,
     setPoserVrmOpen,
+    setCharacterShaperOpen,
     setReferencePanelOpen,
   } = toolBelt;
 
@@ -364,6 +367,21 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   className={studioToolIconClass({ tone: "accent" })}
                 />
                 3D 캐릭터
+              </button>
+            </StudioToolBeltHintTarget>
+            <StudioToolBeltHintTarget hint={hints.characterShaper}>
+              <button
+                type="button"
+                onClick={() => setCharacterShaperOpen(true)}
+                className={cn(toolBtn(characterShaperOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+              >
+                <Sparkles
+                  size={STUDIO_ICON_SIZE.toolCompact}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioToolIconClass({ tone: "accent" })}
+                />
+                캐릭터 셰이퍼
               </button>
             </StudioToolBeltHintTarget>
             <StudioToolBeltHintTarget hint={hints.mannequin3d}>

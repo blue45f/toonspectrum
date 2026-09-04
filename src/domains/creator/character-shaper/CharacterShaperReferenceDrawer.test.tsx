@@ -44,10 +44,19 @@ vi.mock("../vrm/StudioVrmAvatarReferenceRecommendationsPanel", () => ({
 }));
 
 vi.mock("../vrm/StudioVrmPhotoPoseScanner", () => ({
-  StudioVrmPhotoPoseScanner: ({ onApply }: { onApply: (payload: { sourceName: string }) => boolean }) => (
-    <button type="button" onClick={() => onApply({ sourceName: "pose.png" })}>
-      사진 포즈 적용
-    </button>
+  StudioVrmPhotoPoseScanner: ({
+    handoff,
+    onApply,
+  }: {
+    handoff?: { file: File; token: number } | null;
+    onApply: (payload: { sourceName: string }) => boolean;
+  }) => (
+    <>
+      <button type="button" onClick={() => onApply({ sourceName: "pose.png" })}>
+        사진 포즈 적용
+      </button>
+      <p data-testid="photo-handoff">{handoff ? `${handoff.file.name}#${handoff.token}` : "none"}</p>
+    </>
   ),
 }));
 
@@ -142,7 +151,20 @@ function renderDrawer(
       onClose={onClose}
     />,
   );
-  return { ...view, h, binding, onModeChange, onClose };
+  // The drawer does not own `mode` — the shell does. Switching tabs in a test therefore means
+  // re-rendering the same element with the mode the shell would have set.
+  const setMode = (next: Exclude<CharacterShaperDrawerMode, null>) => {
+    view.rerender(
+      <CharacterShaperReferenceDrawer
+        h={h}
+        binding={binding}
+        mode={next}
+        onModeChange={onModeChange}
+        onClose={onClose}
+      />,
+    );
+  };
+  return { ...view, h, binding, onModeChange, onClose, setMode };
 }
 
 beforeEach(() => {
@@ -257,6 +279,30 @@ describe("CharacterShaperReferenceDrawer reference tab", () => {
 
     expect(await screen.findByText("이미지 파일만 읽을 수 있습니다.")).toBeTruthy();
     expect(extractCharacterReferencePalette).not.toHaveBeenCalled();
+  });
+
+  it("hands the already-chosen reference image to the photo tab so it is picked only once", async () => {
+    const { onModeChange, setMode } = renderDrawer({ mode: "reference" });
+
+    const input = screen.getByLabelText("참고 이미지 선택");
+    const file = new File(["binary"], "ref.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    const handoffButton = await screen.findByRole("button", { name: "이 사진에서 포즈도 읽기" });
+    fireEvent.click(handoffButton);
+    expect(onModeChange).toHaveBeenCalledWith("photo");
+
+    setMode("photo");
+    expect(screen.getByTestId("photo-handoff").textContent).toBe("ref.png#1");
+  });
+
+  it("offers no photo handoff for a file the palette refused", async () => {
+    renderDrawer({ mode: "reference" });
+    const input = screen.getByLabelText("참고 이미지 선택");
+    fireEvent.change(input, { target: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] } });
+
+    expect(await screen.findByText("이미지 파일만 읽을 수 있습니다.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "이 사진에서 포즈도 읽기" })).toBeNull();
   });
 
   it("forwards the recommendation panel's apply to the host", () => {

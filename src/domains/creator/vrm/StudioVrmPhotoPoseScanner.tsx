@@ -31,12 +31,23 @@ import type {
 } from "./studio-vrm-photo-hand";
 import type { BoneEulerMap } from "./studio-vrm-pose-solver";
 
+/**
+ * An image the surrounding surface already asked the creator for. Handing it over means the same
+ * photo is not picked twice — `token` is what re-triggers a scan, so re-handing the same File
+ * object with a new token rescans, and a re-render alone never does.
+ */
+export interface StudioVrmPhotoPoseHandoff {
+  readonly file: File;
+  readonly token: number;
+}
+
 export interface StudioVrmPhotoPoseScannerProps {
   readonly disabled?: boolean;
   /** Mannequin scans do not need the optional hand model or finger controls. */
   readonly includeHandDetection?: boolean;
   /** Defaults to `low` for backwards-compatible VRM review/apply behavior. */
   readonly minimumApplyQuality?: StudioVrmPhotoPoseConfidenceSummary["quality"];
+  readonly handoff?: StudioVrmPhotoPoseHandoff | null;
   readonly onApply: (payload: StudioVrmPhotoPoseApplyPayload) => boolean;
 }
 
@@ -293,6 +304,7 @@ export function StudioVrmPhotoPoseScanner({
   disabled = false,
   includeHandDetection = true,
   minimumApplyQuality = "low",
+  handoff = null,
   onApply,
 }: StudioVrmPhotoPoseScannerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -342,10 +354,33 @@ export function StudioVrmPhotoPoseScanner({
     };
   }, []);
 
-  async function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
+  // 넘겨받은 사진을 스캔한다. 스캔 함수는 매 렌더 새로 만들어지므로 ref로 최신본만 들고 있고,
+  // 실제 트리거는 토큰이다 — 같은 File을 다시 넘기려면 토큰을 올리면 되고, 리렌더만으로는
+  // 사용자가 이미 본 결과를 지우고 다시 읽는 일이 없다.
+  const scanRef = useRef<(file: File) => void>(() => {});
+  useEffect(() => {
+    scanRef.current = (file: File) => {
+      void scanPhotoFile(file);
+    };
+  });
+
+  const handledHandoffRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!handoff || disabled) return;
+    if (handledHandoffRef.current === handoff.token) return;
+    handledHandoffRef.current = handoff.token;
+    scanRef.current(handoff.file);
+  }, [handoff, disabled]);
+
+  function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || disabled) return;
+    if (!file) return;
+    void scanPhotoFile(file);
+  }
+
+  async function scanPhotoFile(file: File) {
+    if (disabled) return;
 
     replacePreviewUrl(file);
     setBusy(true);
