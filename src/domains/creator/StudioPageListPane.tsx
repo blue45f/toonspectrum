@@ -9,6 +9,8 @@ import {
   LayoutTemplate,
   Maximize2,
   Minimize2,
+  Move,
+  PanelLeft,
   Pencil,
   Plus,
   Trash2,
@@ -23,6 +25,11 @@ import {
   studioDeletePagesBulkRequest,
 } from "./studio-destructive-command-catalog";
 import {
+  DEFAULT_STUDIO_PAGE_LIST_FLOATING_LAYOUT,
+  loadStudioDetachablePanelState,
+  saveStudioDetachablePanelState,
+} from "./studio-detachable-panels";
+import {
   STUDIO_MOBILE_PAGES_SHEET_ID,
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
@@ -36,6 +43,7 @@ import {
 } from "./studio-page-meta";
 import { shotTagBadgeText, shotTagBadgeTitle } from "./studio-panel-shot-tags";
 import { STUDIO_WORKSPACE_LEFT_PANEL_WIDTH } from "./studio-workspaces";
+import { StudioDetachablePanelSlot } from "./StudioDetachablePanelSlot";
 
 import type { El } from "./studio-element-model";
 import type { DocumentMaster } from "./studio-master-page";
@@ -268,6 +276,15 @@ export const StudioPageListPane = memo(function StudioPageListPane({
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
+  const [detached, setDetached] = useState(() =>
+    loadStudioDetachablePanelState("page-list")
+  );
+  const desktopDetached = !isMobile && detached;
+  const setPageListDetached = (next: boolean): void => {
+    setDetached(next);
+    saveStudioDetachablePanelState("page-list", next);
+    if (next) setLeftPanelOpen(true);
+  };
   return (
     <>
         {!visibleLeftPanelOpen && !presentationPanelsHidden && (
@@ -279,12 +296,25 @@ export const StudioPageListPane = memo(function StudioPageListPane({
             title="페이지 목록 펼치기"
           />
         )}
+        <StudioDetachablePanelSlot
+          detached={desktopDetached && visibleLeftPanelOpen}
+          surfaceId="page-list"
+          label="페이지 목록"
+          defaultLayout={DEFAULT_STUDIO_PAGE_LIST_FLOATING_LAYOUT}
+          minWidth={320}
+          minHeight={420}
+          maxWidth={720}
+          maxHeight={1_100}
+          allowedDockEdges={["left", "right"]}
+          onClose={() => setLeftPanelOpen(false)}
+        >
         <div
           id={STUDIO_MOBILE_PAGES_SHEET_ID}
           ref={pagesSheetRef}
           role={isMobile && mobileSheet === "pages" ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
           data-studio-sheet-id="pages"
+          data-studio-panel-detached={desktopDetached ? "true" : undefined}
           data-studio-ui-preferences-authority={preferenceAuthority}
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileSnap : undefined}
@@ -300,6 +330,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
             // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
+            desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:border-0 lg:bg-transparent lg:p-0",
             !visibleLeftPanelOpen && "lg:hidden"
           )}
           style={
@@ -308,7 +339,9 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   bottom: safeMobileKeyboardInset,
                   ...studioMobileSheetSizeStyle(mobileSnap, safeMobileKeyboardInset),
                 }
-              : { width: leftResize.width, minWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum }
+              : desktopDetached
+                ? { width: "100%", minWidth: 0 }
+                : { width: leftResize.width, minWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum }
           }
         >
           <div className="shrink-0 border-b border-line/50 pb-1.5">
@@ -338,6 +371,20 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 페이지
               </span>
               <div className="flex shrink-0 items-center gap-1">
+                {!isMobile ? (
+                  <button
+                    type="button"
+                    onClick={() => setPageListDetached(!detached)}
+                    aria-label={detached
+                      ? "페이지 목록을 왼쪽 패널에 붙이기"
+                      : "페이지 목록을 창으로 분리"}
+                    aria-pressed={desktopDetached}
+                    title={detached ? "왼쪽 패널에 붙이기" : "자유 배치 창으로 분리"}
+                    className="grid size-8 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {detached ? <PanelLeft size={14} aria-hidden /> : <Move size={14} aria-hidden />}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setMobileSheet(null)}
@@ -775,9 +822,10 @@ export const StudioPageListPane = memo(function StudioPageListPane({
             })}
           </div>
         </div>
+        </StudioDetachablePanelSlot>
 
         {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
-        {visibleLeftPanelOpen && (
+        {visibleLeftPanelOpen && !desktopDetached && (
           <StudioPageListResizeHandle leftResize={leftResize} />
         )}
     </>

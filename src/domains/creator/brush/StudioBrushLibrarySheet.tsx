@@ -24,12 +24,15 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { DEFAULT_STUDIO_BRUSH_CATALOG_FLOATING_LAYOUT } from "../studio-detachable-panels";
 import { planGlowBrushPasses, planNeonBrushPasses } from "../studio-fx-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import {
   StudioEraserQuickPicker,
   type StudioEraserQuickPickerId,
 } from "../StudioEraserQuickPicker";
+import { StudioFloatingSurface } from "../StudioFloatingSurface";
+import { useStudioFloatingSurfaceLayout } from "../use-studio-floating-surface-layout";
 
 import {
   filterStudioBrushCatalogItems,
@@ -78,6 +81,9 @@ export interface StudioBrushLibrarySheetProps {
    * A height media query covers genuinely short viewports without requiring a resize render.
    */
   compact?: boolean;
+  embedded?: boolean;
+  closeOnSelection?: boolean;
+  dismissOnOutsidePointer?: boolean;
   triggerElement?: HTMLElement | null;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
@@ -766,6 +772,9 @@ export function StudioBrushLibrarySheet({
   activeBrushId,
   operation = "paint",
   compact = false,
+  embedded = false,
+  closeOnSelection = true,
+  dismissOnOutsidePointer = true,
   triggerElement = null,
   favoriteIds = [],
   recentIds = [],
@@ -887,7 +896,7 @@ export function StudioBrushLibrarySheet({
   }, [open, onClose]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !dismissOnOutsidePointer) return;
     function onPointerDown(event: PointerEvent) {
       if (!(event.target instanceof Node)) return;
       if (
@@ -900,7 +909,7 @@ export function StudioBrushLibrarySheet({
     }
     globalThis.addEventListener("pointerdown", onPointerDown, true);
     return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open, onClose, triggerElement]);
+  }, [dismissOnOutsidePointer, open, onClose, triggerElement]);
 
   const normalizedQuery = query.trim();
   const items = filterStudioBrushCatalogItems({
@@ -1031,7 +1040,7 @@ export function StudioBrushLibrarySheet({
       if (!requestIsCurrent()) return;
       selectionRequestEpochRef.current += 1;
       setPendingSelectionId(null);
-      onClose("selection");
+      if (closeOnSelection) onClose("selection");
     } catch (error) {
       if (!requestIsCurrent()) return;
       setSelectionError(
@@ -1115,9 +1124,12 @@ export function StudioBrushLibrarySheet({
   return (
     <div
       ref={rootRef}
-      role="dialog"
-      aria-labelledby={titleId}
-      aria-describedby={`${titleId}-description`}
+      role={embedded ? "region" : "dialog"}
+      aria-label={embedded
+        ? operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"
+        : undefined}
+      aria-labelledby={embedded ? undefined : titleId}
+      aria-describedby={embedded ? undefined : `${titleId}-description`}
       data-studio-brush-library="true"
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
@@ -1125,10 +1137,13 @@ export function StudioBrushLibrarySheet({
       data-studio-brush-compact={compact ? "true" : undefined}
       style={style}
       className={cn(
-        "absolute left-2 top-[calc(100%+0.35rem)] z-[60] flex max-h-[min(32rem,calc(100dvh-1rem))] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
+        embedded
+          ? "relative flex h-full max-h-none w-full flex-col overflow-hidden bg-panel"
+          : "absolute left-2 top-[calc(100%+0.35rem)] z-[60] flex max-h-[min(32rem,calc(100dvh-1rem))] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
         className
       )}
     >
+      {!embedded ? (
       <div
         data-studio-brush-catalog-header="true"
         className={cn(
@@ -1173,6 +1188,7 @@ export function StudioBrushLibrarySheet({
           <X size={15} aria-hidden />
         </button>
       </div>
+      ) : null}
 
       <div
         data-studio-brush-catalog-controls="true"
@@ -1663,60 +1679,12 @@ export function StudioBrushCatalogPortal({
   onSelect,
   onToggleFavorite,
 }: StudioBrushCatalogPortalProps): ReactElement | null {
-  const [desktopStyle, setDesktopStyle] = useState<CSSProperties>({
-    bottom: 72,
-    left: 8,
-    width: "min(22rem, calc(100vw - 1rem))",
+  const desktop = placement === "desktop-dock";
+  const { layout, setLayout, authority, failure } = useStudioFloatingSurfaceLayout({
+    surfaceId: `brush-catalog:${operation}`,
+    defaultLayout: DEFAULT_STUDIO_BRUSH_CATALOG_FLOATING_LAYOUT,
+    enabled: open && desktop,
   });
-
-  useLayoutEffect(() => {
-    if (!open || placement !== "desktop-dock") return;
-
-    const updatePosition = () => {
-      const viewportWidth = Math.max(320, globalThis.innerWidth || 0);
-      const viewportHeight = Math.max(320, globalThis.innerHeight || 0);
-      const catalogWidth = Math.min(352, Math.max(304, viewportWidth - 16));
-      const anchor = triggerElement?.getBoundingClientRect();
-      const anchorLeft = anchor?.left ?? (viewportWidth - catalogWidth) / 2;
-      const left = Math.min(
-        Math.max(8, anchorLeft),
-        Math.max(8, viewportWidth - catalogWidth - 8)
-      );
-      const spaceAbove = anchor ? Math.max(1, anchor.top - 16) : Math.max(1, viewportHeight - 80);
-      const spaceBelow = anchor ? Math.max(1, viewportHeight - anchor.bottom - 16) : 1;
-      // Prefer the side with real room. Never invent a minimum height larger than the viewport:
-      // on short laptop windows that pushed the fixed dialog above y=0 and hid its close/search UI.
-      setDesktopStyle(spaceAbove >= spaceBelow
-        ? {
-            bottom: anchor ? Math.max(8, viewportHeight - anchor.top + 8) : 72,
-            left,
-            maxHeight: spaceAbove,
-            top: "auto",
-            width: catalogWidth,
-          }
-        : {
-            bottom: "auto",
-            left,
-            maxHeight: spaceBelow,
-            top: Math.max(8, (anchor?.bottom ?? 0) + 8),
-            width: catalogWidth,
-          });
-    };
-
-    updatePosition();
-    const resizeObserver =
-      triggerElement && typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updatePosition)
-        : null;
-    if (triggerElement) resizeObserver?.observe(triggerElement);
-    globalThis.addEventListener("resize", updatePosition);
-    globalThis.addEventListener("scroll", updatePosition, true);
-    return () => {
-      resizeObserver?.disconnect();
-      globalThis.removeEventListener("resize", updatePosition);
-      globalThis.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [open, placement, triggerElement]);
 
   if (!open || !globalThis.document) return null;
 
@@ -1726,13 +1694,15 @@ export function StudioBrushCatalogPortal({
   const mobileStyle: CSSProperties = {
     bottom: `calc(7.5rem + env(safe-area-inset-bottom) + ${safeMobileKeyboardInset}px)`,
   };
-
-  return createPortal(
+  const sheet = (
     <StudioBrushLibrarySheet
       open
       activeBrushId={activeBrushId}
       operation={operation}
-      compact={placement === "mobile-sheet" && safeMobileKeyboardInset >= 80}
+      compact={!desktop && safeMobileKeyboardInset >= 80}
+      embedded={desktop}
+      closeOnSelection={!desktop}
+      dismissOnOutsidePointer={!desktop}
       triggerElement={triggerElement}
       favoriteIds={favoriteIds}
       recentIds={recentIds}
@@ -1741,17 +1711,42 @@ export function StudioBrushCatalogPortal({
       onClose={onClose}
       onSelect={onSelect}
       onToggleFavorite={onToggleFavorite}
-      className={cn(
-        "fixed pointer-events-auto",
-        placement === "desktop-dock"
-          ? "bottom-auto left-auto top-auto"
-          // 상한을 완전히 풀면(max-h-none) 낮은 브라우저 창에서 시트가 뷰포트 밖으로 흘러
-          // 검색창 아래 카테고리·목록·버튼이 잘린다. 위/아래 여백을 뺀 값으로 상한을 걸어
-          // 시트는 화면 안에 머물고 목록(min-h-0 flex-1 overflow-y-auto)만 스크롤되게 한다.
-          : "inset-x-2 top-3 w-auto max-h-[calc(100dvh-1.5rem)]"
-      )}
-      style={placement === "desktop-dock" ? desktopStyle : mobileStyle}
-    />,
-    globalThis.document.body
+      className={desktop
+        ? "h-full w-full"
+        : "fixed pointer-events-auto inset-x-2 top-3 w-auto max-h-[calc(100dvh-1.5rem)]"}
+      style={desktop ? undefined : mobileStyle}
+    />
+  );
+
+  return createPortal(
+    desktop ? (
+      <StudioFloatingSurface
+        surfaceId={`brush-catalog:${operation}`}
+        label={operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"}
+        layout={layout}
+        defaultLayout={DEFAULT_STUDIO_BRUSH_CATALOG_FLOATING_LAYOUT}
+        minWidth={360}
+        minHeight={420}
+        maxWidth={900}
+        maxHeight={1_100}
+        insetTop={76}
+        insetRight={12}
+        insetBottom={12}
+        insetLeft={12}
+        snapDistance={12}
+        allowedDockEdges={["left", "right"]}
+        onLayoutChange={setLayout}
+        onClose={() => onClose("explicit")}
+        rootDataAttributes={{
+          "data-studio-brush-floating": operation,
+          "data-studio-floating-layout-authority": authority,
+          "data-studio-floating-layout-failure": failure ?? undefined,
+        }}
+        contentClassName="flex min-h-0 flex-1"
+      >
+        {sheet}
+      </StudioFloatingSurface>
+    ) : sheet,
+    globalThis.document.body,
   );
 }
