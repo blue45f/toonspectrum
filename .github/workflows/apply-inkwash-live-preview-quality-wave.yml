@@ -1,0 +1,74 @@
+name: Apply InkWash live preview quality wave
+
+on:
+  push:
+    branches:
+      - fix/inkwash-live-preview-quality-20260904
+    paths:
+      - "scripts/apply-inkwash-live-preview-quality-wave.mjs"
+      - ".github/workflows/apply-inkwash-live-preview-quality-wave.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-inkwash-live-preview-quality-wave
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[inkwash-live-preview-applied]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/inkwash-live-preview-quality-20260904
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply quality-first preview patch
+        run: node scripts/apply-inkwash-live-preview-quality-wave.mjs
+      - name: Normalize changed files
+        run: >-
+          pnpm exec prettier --write
+          src/domains/creator/brush/studio-inkwash-fluid.ts
+          src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts
+          src/domains/creator/live/studio-live-wet-ink-overlay.ts
+          src/domains/creator/live/studio-live-wet-ink-integration.test.ts
+          scripts/verify-studio-long-stroke.mts
+          scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+          .github/workflows/studio-inkwash-live-preview-quality.yml
+      - name: Focused validation before materializing
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/brush/studio-inkwash-fluid-deposit.test.ts \
+            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
+            src/domains/creator/live/studio-live-wet-ink-overlay.test.ts \
+            src/domains/creator/live/studio-live-wet-ink-integration.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/brush/studio-inkwash-fluid.ts \
+            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts \
+            src/domains/creator/live/studio-live-wet-ink-overlay.ts \
+            src/domains/creator/live/studio-live-wet-ink-integration.test.ts \
+            scripts/verify-studio-long-stroke.mts \
+            scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+          pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Commit product changes
+        run: |
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(brush): add causal tiled InkWash live preview [inkwash-live-preview-applied]"
+          git push --no-verify origin HEAD:fix/inkwash-live-preview-quality-20260904
