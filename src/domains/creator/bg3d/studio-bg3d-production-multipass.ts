@@ -13,19 +13,25 @@ export type StudioBg3dProductionBatchPreset =
 export const STUDIO_BG3D_PRODUCTION_CONTACT_SHEET_SHOTS_PER_PAGE = 12;
 export const STUDIO_BG3D_PRODUCTION_BATCH_MAX_SHOTS = 64;
 
+function freezePasses(
+  ...passes: StudioBg3dShotBatchPass[]
+): readonly StudioBg3dShotBatchPass[] {
+  return Object.freeze(passes);
+}
+
 const PRESET_PASSES: Readonly<
   Record<StudioBg3dProductionBatchPreset, readonly StudioBg3dShotBatchPass[]>
 > = Object.freeze({
-  review: Object.freeze(["beauty", "lt-composite"] as const),
-  manuscript: Object.freeze([
+  review: freezePasses("beauty", "lt-composite"),
+  manuscript: freezePasses(
     "lt-composite",
     "color",
     "tone",
     "texture-line",
     "main-line",
-  ] as const),
-  "ai-reference": Object.freeze(["beauty", "main-line", "depth"] as const),
-  all: Object.freeze([
+  ),
+  "ai-reference": freezePasses("beauty", "main-line", "depth"),
+  all: freezePasses(
     "beauty",
     "lt-composite",
     "color",
@@ -33,7 +39,7 @@ const PRESET_PASSES: Readonly<
     "texture-line",
     "main-line",
     "depth",
-  ] as const),
+  ),
 });
 
 export type StudioBg3dDeferredArtifactPassKind =
