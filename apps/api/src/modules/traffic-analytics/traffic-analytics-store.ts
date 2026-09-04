@@ -50,13 +50,121 @@ export async function persistTrafficPageView(input: {
   const { event, session } = input;
   await dbPool.query(
     `
-      WITH admitted AS (
-        SELECT NOT EXISTS (
-          SELECT 1
-          FROM public.traffic_session
-          WHERE session_hash = $4
-            AND visitor_hash <> $3
-        ) AS accepted
+      WITH admitted_session AS (
+        INSERT INTO public.traffic_session (
+          session_hash,
+          visitor_hash,
+          first_seen_at,
+          last_seen_at,
+          entry_path,
+          last_path,
+          referrer_host,
+          source,
+          medium,
+          campaign,
+          country_code,
+          device_type,
+          browser,
+          os,
+          screen_class,
+          page_views,
+          engaged_seconds,
+          is_bot,
+          updated_at
+        )
+        VALUES (
+          $4,
+          $3,
+          $18,
+          $19,
+          $20,
+          $21,
+          $22,
+          $23,
+          $24,
+          $25,
+          $26,
+          $27,
+          $28,
+          $29,
+          $30,
+          0,
+          $31,
+          $32,
+          $19
+        )
+        ON CONFLICT (session_hash) DO UPDATE SET
+          entry_path = CASE
+            WHEN public.traffic_session.page_views = 0
+              THEN EXCLUDED.entry_path
+            ELSE public.traffic_session.entry_path
+          END,
+          referrer_host = CASE
+            WHEN public.traffic_session.page_views = 0
+              THEN EXCLUDED.referrer_host
+            ELSE public.traffic_session.referrer_host
+          END,
+          source = CASE
+            WHEN public.traffic_session.page_views = 0
+              THEN EXCLUDED.source
+            ELSE public.traffic_session.source
+          END,
+          medium = CASE
+            WHEN public.traffic_session.page_views = 0
+              THEN EXCLUDED.medium
+            ELSE public.traffic_session.medium
+          END,
+          campaign = CASE
+            WHEN public.traffic_session.page_views = 0
+              THEN EXCLUDED.campaign
+            ELSE public.traffic_session.campaign
+          END,
+          last_seen_at = GREATEST(
+            public.traffic_session.last_seen_at,
+            EXCLUDED.last_seen_at
+          ),
+          last_path = CASE
+            WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+              THEN EXCLUDED.last_path
+            ELSE public.traffic_session.last_path
+          END,
+          country_code = COALESCE(
+            public.traffic_session.country_code,
+            EXCLUDED.country_code
+          ),
+          device_type = CASE
+            WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+              THEN EXCLUDED.device_type
+            ELSE public.traffic_session.device_type
+          END,
+          browser = CASE
+            WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+              THEN EXCLUDED.browser
+            ELSE public.traffic_session.browser
+          END,
+          os = CASE
+            WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+              THEN EXCLUDED.os
+            ELSE public.traffic_session.os
+          END,
+          screen_class = CASE
+            WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+              THEN COALESCE(
+                NULLIF(EXCLUDED.screen_class, 'unknown'),
+                public.traffic_session.screen_class
+              )
+            ELSE public.traffic_session.screen_class
+          END,
+          engaged_seconds = GREATEST(
+            public.traffic_session.engaged_seconds,
+            EXCLUDED.engaged_seconds
+          ),
+          updated_at = GREATEST(
+            public.traffic_session.updated_at,
+            EXCLUDED.updated_at
+          )
+        WHERE public.traffic_session.visitor_hash = EXCLUDED.visitor_hash
+        RETURNING session_hash, visitor_hash
       ),
       inserted_event AS (
         INSERT INTO public.traffic_page_view (
@@ -96,77 +204,15 @@ export async function persistTrafficPageView(input: {
           $15,
           $16,
           $17
-        FROM admitted
-        WHERE accepted
+        FROM admitted_session
         ON CONFLICT (id) DO NOTHING
-        RETURNING 1
+        RETURNING session_hash, visitor_hash
       )
-      INSERT INTO public.traffic_session (
-        session_hash,
-        visitor_hash,
-        first_seen_at,
-        last_seen_at,
-        entry_path,
-        last_path,
-        referrer_host,
-        source,
-        medium,
-        campaign,
-        country_code,
-        device_type,
-        browser,
-        os,
-        screen_class,
-        page_views,
-        engaged_seconds,
-        is_bot,
-        updated_at
-      )
-      SELECT
-        $4,
-        $3,
-        $18,
-        $19,
-        $20,
-        $21,
-        $22,
-        $23,
-        $24,
-        $25,
-        $26,
-        $27,
-        $28,
-        $29,
-        $30,
-        1,
-        $31,
-        $32,
-        $19
+      UPDATE public.traffic_session AS target
+      SET page_views = target.page_views + 1
       FROM inserted_event
-      ON CONFLICT (session_hash) DO UPDATE SET
-        last_seen_at = GREATEST(
-          public.traffic_session.last_seen_at,
-          EXCLUDED.last_seen_at
-        ),
-        last_path = EXCLUDED.last_path,
-        country_code = COALESCE(
-          public.traffic_session.country_code,
-          EXCLUDED.country_code
-        ),
-        device_type = EXCLUDED.device_type,
-        browser = EXCLUDED.browser,
-        os = EXCLUDED.os,
-        screen_class = EXCLUDED.screen_class,
-        page_views = public.traffic_session.page_views + 1,
-        engaged_seconds = GREATEST(
-          public.traffic_session.engaged_seconds,
-          EXCLUDED.engaged_seconds
-        ),
-        updated_at = GREATEST(
-          public.traffic_session.updated_at,
-          EXCLUDED.updated_at
-        )
-      WHERE public.traffic_session.visitor_hash = EXCLUDED.visitor_hash
+      WHERE target.session_hash = inserted_event.session_hash
+        AND target.visitor_hash = inserted_event.visitor_hash
     `,
     [
       event.id,
@@ -241,15 +287,38 @@ export async function persistTrafficHeartbeat(input: {
           public.traffic_session.last_seen_at,
           EXCLUDED.last_seen_at
         ),
-        last_path = EXCLUDED.last_path,
+        last_path = CASE
+          WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+            THEN EXCLUDED.last_path
+          ELSE public.traffic_session.last_path
+        END,
         country_code = COALESCE(
           public.traffic_session.country_code,
           EXCLUDED.country_code
         ),
-        device_type = EXCLUDED.device_type,
-        browser = EXCLUDED.browser,
-        os = EXCLUDED.os,
-        screen_class = EXCLUDED.screen_class,
+        device_type = CASE
+          WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+            THEN EXCLUDED.device_type
+          ELSE public.traffic_session.device_type
+        END,
+        browser = CASE
+          WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+            THEN EXCLUDED.browser
+          ELSE public.traffic_session.browser
+        END,
+        os = CASE
+          WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+            THEN EXCLUDED.os
+          ELSE public.traffic_session.os
+        END,
+        screen_class = CASE
+          WHEN EXCLUDED.last_seen_at >= public.traffic_session.last_seen_at
+            THEN COALESCE(
+              NULLIF(EXCLUDED.screen_class, 'unknown'),
+              public.traffic_session.screen_class
+            )
+          ELSE public.traffic_session.screen_class
+        END,
         engaged_seconds = GREATEST(
           public.traffic_session.engaged_seconds,
           EXCLUDED.engaged_seconds
