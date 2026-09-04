@@ -20,9 +20,9 @@ export function MarketSocialProofBar({
   const viewerKey = session.ready && session.status === "authenticated"
     ? session.data.user.id
     : "anonymous";
-  const { snapshot, loading } = useMarketSocial(resourceId, viewerKey);
+  const { data, status } = useMarketSocial(resourceId, viewerKey);
 
-  if (loading && !snapshot) {
+  if (status === "loading" && !data) {
     return (
       <div
         role="status"
@@ -35,9 +35,9 @@ export function MarketSocialProofBar({
     );
   }
 
-  if (!snapshot) return null;
+  if (!data) return null;
 
-  const hasReviews = snapshot.reviewStats.totalCount > 0;
+  const hasReviews = data.stats.totalCount > 0;
   return (
     <nav
       aria-label="이 리소스의 평가와 질문 요약"
@@ -57,10 +57,10 @@ export function MarketSocialProofBar({
           aria-hidden="true"
         />
         <span className="numeral tnum">
-          {hasReviews ? snapshot.reviewStats.average.toFixed(1) : "평가 전"}
+          {hasReviews ? data.stats.average.toFixed(1) : "평가 전"}
         </span>
         <span className="font-normal text-fg-3">
-          {snapshot.reviewStats.totalCount}개
+          {data.stats.totalCount}개
         </span>
       </a>
       <a
@@ -68,7 +68,7 @@ export function MarketSocialProofBar({
         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <ThumbsUp className="size-3.5 text-good" aria-hidden="true" />
-        <span className="numeral tnum">{snapshot.reviewStats.recommendPercentage}%</span>
+        <span className="numeral tnum">{data.stats.recommendPercentage}%</span>
         <span className="font-normal text-fg-3">추천</span>
       </a>
       <a
@@ -76,10 +76,10 @@ export function MarketSocialProofBar({
         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <MessageSquare className="size-3.5 text-accent" aria-hidden="true" />
-        <span className="numeral tnum">{snapshot.commentCount}</span>
+        <span className="numeral tnum">{data.totalCommentCount}</span>
         <span className="font-normal text-fg-3">질문·답글</span>
       </a>
-      {snapshot.viewer.isStudioVerified ? (
+      {data.viewer.studioInstallVerified ? (
         <span className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-good/30 bg-good/10 px-3 text-xs font-semibold text-good">
           <ShieldCheck className="size-3.5" aria-hidden="true" />
           내 계정 Studio 사용 인증
