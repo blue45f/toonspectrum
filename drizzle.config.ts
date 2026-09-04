@@ -16,6 +16,7 @@ export default defineConfig({
     "./apps/api/src/db/creator-marketplace-report.schema.ts",
     "./apps/api/src/db/creator-marketplace-library.schema.ts",
     "./apps/api/src/db/creator-marketplace-package-moderation.schema.ts",
+    "./apps/api/src/db/creator-marketplace-social.schema.ts",
     "./apps/api/src/db/creator-asset-object-storage.schema.ts",
     "./apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
     "./apps/api/src/db/studio-raster-asset.schema.ts",
