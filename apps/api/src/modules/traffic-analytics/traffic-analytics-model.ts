@@ -70,11 +70,16 @@ function optionalToken(
 }
 
 export function normalizeTrafficCampaignToken(value: unknown): string | null {
-  const token = optionalToken(value)?.replace(
-    /[^A-Za-z0-9._~:-]+/gu,
-    "-",
-  );
-  const normalized = token?.replace(/^-+|-+$/gu, "") ?? "";
+  const raw = optionalToken(value);
+  if (
+    !raw
+    || /@|%40|[?&=#]/iu.test(raw)
+    || /(?:^|\D)\d{7,}(?:\D|$)/u.test(raw)
+  ) {
+    return null;
+  }
+  const token = raw.replace(/[^A-Za-z0-9._~:-]+/gu, "-");
+  const normalized = token.replace(/^-+|-+$/gu, "");
   return normalized || null;
 }
 
@@ -109,6 +114,19 @@ export function normalizeTrafficPath(value: unknown): string {
     || normalized.startsWith("/api/")
   ) {
     throw new BadRequestException("수집할 수 없는 페이지 경로입니다.");
+  }
+  if (normalized === "/studio" || normalized.startsWith("/studio/")) {
+    return "/studio/*";
+  }
+  if (/^\/u\/[^/]+$/u.test(normalized)) return "/u/:userId";
+  if (/^\/create\/series\/[^/]+$/u.test(normalized)) {
+    return "/create/series/:id";
+  }
+  if (
+    normalized !== "/create/challenges"
+    && /^\/create\/[^/]+$/u.test(normalized)
+  ) {
+    return "/create/:id";
   }
   return normalized || "/";
 }
