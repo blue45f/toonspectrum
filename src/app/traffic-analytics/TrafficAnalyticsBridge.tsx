@@ -1,0 +1,261 @@
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
+
+import { apiPath } from "../../infrastructure/api";
+
+import { withCsrfProtection } from "@/lib/csrf";
+
+const VISITOR_STORAGE_KEY = "toonspectrum-traffic-visitor-v1";
+const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const MIN_HEARTBEAT_SECONDS = 5;
+
+type NavigatorWithPrivacyAndConnection = Navigator & {
+  globalPrivacyControl?: boolean;
+  connection?: {
+    effectiveType?: string;
+  };
+};
+
+let lastPageViewSignature = "";
+let lastPageViewAt = 0;
+let navigationTimingConsumed = false;
+
+function randomIdentifier(): string {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(24);
+  globalThis.crypto?.getRandomValues?.(bytes);
+  if (bytes.some((value) => value !== 0)) {
+    return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random()
+    .toString(36)
+    .slice(2)}`;
+}
+
+function storageIdentifier(
+  storage: Storage,
+  key: string,
+): string {
+  try {
+    const existing = storage.getItem(key);
+    if (existing && /^[A-Za-z0-9_-]{16,128}$/u.test(existing)) return existing;
+    const created = randomIdentifier();
+    storage.setItem(key, created);
+    return created;
+  } catch {
+    return randomIdentifier();
+  }
+}
+
+function browserPrivacyOptOut(): boolean {
+  const currentNavigator = navigator as NavigatorWithPrivacyAndConnection;
+  return (
+    currentNavigator.globalPrivacyControl === true
+    || currentNavigator.doNotTrack === "1"
+  );
+}
+
+function excludedPath(pathname: string): boolean {
+  return (
+    pathname === "/admin"
+    || pathname.startsWith("/admin/")
+    || pathname === "/auth/callback"
+    || pathname.startsWith("/auth/callback/")
+  );
+}
+
+function analyticsEnabled(pathname: string): boolean {
+  if (!import.meta.env.PROD) return false;
+  if (import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED === "false") return false;
+  if (excludedPath(pathname)) return false;
+  return !browserPrivacyOptOut();
+}
+
+function navigationTiming(): {
+  loadTimeMs: number | null;
+  navigationType: string | null;
+} {
+  if (navigationTimingConsumed) {
+    return { loadTimeMs: null, navigationType: null };
+  }
+  navigationTimingConsumed = true;
+  const entry = performance.getEntriesByType("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  if (!entry) return { loadTimeMs: null, navigationType: null };
+  return {
+    loadTimeMs: Math.max(0, Math.round(entry.duration)) || null,
+    navigationType: entry.type || null,
+  };
+}
+
+function campaign(search: string): {
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+} {
+  const params = new URLSearchParams(search);
+  const token = (key: string): string | null => {
+    const value = params.get(key)?.trim();
+    return value ? value.slice(0, 96) : null;
+  };
+  return {
+    utmSource: token("utm_source"),
+    utmMedium: token("utm_medium"),
+    utmCampaign: token("utm_campaign"),
+  };
+}
+
+function connectionType(): string | null {
+  const currentNavigator = navigator as NavigatorWithPrivacyAndConnection;
+  return currentNavigator.connection?.effectiveType?.slice(0, 24) || null;
+}
+
+function postTrafficEvent(
+  endpoint: "page-view" | "heartbeat",
+  body: Record<string, unknown>,
+): void {
+  const init = withCsrfProtection({
+    method: "POST",
+    cache: "no-store",
+    credentials: "include",
+    keepalive: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  void fetch(apiPath(`/api/analytics/traffic/${endpoint}`), init).catch(() => {
+    // Analytics is fail-soft and never blocks navigation or editing.
+  });
+}
+
+function createRuntimeIdentifiers(): {
+  visitorId: string;
+  sessionId: string;
+} {
+  return {
+    visitorId: storageIdentifier(localStorage, VISITOR_STORAGE_KEY),
+    sessionId: storageIdentifier(sessionStorage, SESSION_STORAGE_KEY),
+  };
+}
+
+export function TrafficAnalyticsBridge() {
+  const location = useLocation();
+  const currentPathRef = useRef(location.pathname);
+  const identifiersRef = useRef<ReturnType<typeof createRuntimeIdentifiers> | null>(
+    null,
+  );
+  const engagedMsRef = useRef(0);
+  const visibleSinceRef = useRef<number | null>(
+    document.visibilityState === "visible" ? performance.now() : null,
+  );
+
+  useEffect(() => {
+    const now = performance.now();
+    const previousPath = currentPathRef.current;
+    if (
+      analyticsEnabled(previousPath)
+      && visibleSinceRef.current !== null
+    ) {
+      engagedMsRef.current += Math.max(0, now - visibleSinceRef.current);
+    }
+    currentPathRef.current = location.pathname;
+    visibleSinceRef.current =
+      analyticsEnabled(location.pathname)
+      && document.visibilityState === "visible"
+        ? now
+        : null;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!analyticsEnabled(location.pathname)) return;
+
+    identifiersRef.current ??= createRuntimeIdentifiers();
+    const identifiers = identifiersRef.current;
+    const signature = `${location.key}:${location.pathname}:${location.search}`;
+    const now = Date.now();
+    if (
+      signature === lastPageViewSignature
+      && now - lastPageViewAt < 2_000
+    ) {
+      return;
+    }
+    lastPageViewSignature = signature;
+    lastPageViewAt = now;
+
+    const timer = globalThis.setTimeout(() => {
+      const timing = navigationTiming();
+      postTrafficEvent("page-view", {
+        ...identifiers,
+        path: location.pathname,
+        title: document.title,
+        referrer: document.referrer || null,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        connectionType: connectionType(),
+        navigationType: timing.navigationType,
+        loadTimeMs: timing.loadTimeMs,
+        ...campaign(location.search),
+      });
+    }, 0);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [location.key, location.pathname, location.search]);
+
+  useEffect(() => {
+    const accumulateVisibleTime = () => {
+      const visibleSince = visibleSinceRef.current;
+      if (visibleSince === null) return;
+      const now = performance.now();
+      engagedMsRef.current += Math.max(0, now - visibleSince);
+      visibleSinceRef.current = now;
+    };
+
+    const sendHeartbeat = () => {
+      if (!analyticsEnabled(currentPathRef.current)) return;
+      identifiersRef.current ??= createRuntimeIdentifiers();
+      accumulateVisibleTime();
+      const engagedSeconds = Math.floor(engagedMsRef.current / 1_000);
+      if (engagedSeconds < MIN_HEARTBEAT_SECONDS) return;
+      postTrafficEvent("heartbeat", {
+        ...identifiersRef.current,
+        path: currentPathRef.current,
+        engagedSeconds,
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        visibleSinceRef.current = analyticsEnabled(currentPathRef.current)
+          ? performance.now()
+          : null;
+        return;
+      }
+      sendHeartbeat();
+      visibleSinceRef.current = null;
+    };
+
+    const handlePageHide = () => {
+      sendHeartbeat();
+    };
+
+    const interval = globalThis.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    globalThis.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      globalThis.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      globalThis.removeEventListener("pagehide", handlePageHide);
+      sendHeartbeat();
+    };
+  }, []);
+
+  return null;
+}
