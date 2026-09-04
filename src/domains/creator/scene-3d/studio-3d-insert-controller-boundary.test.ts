@@ -146,16 +146,23 @@ describe("Studio 3D insert controller boundary", () => {
     expect(controllerTest.wholeClauseTypeImports).toContain("./studio-3d-insert-contract");
     expect(controllerTest.allImports).not.toContain("../bg3d/StudioBackground3D");
     expect(controllerTest.allImports).not.toContain("../vrm/StudioVrmPoser");
-    expect(page.source).toContain(
-      "function captureStudioMutationTicket(): StudioEditorMutationTicket"
+    // 984251d8c 가 티켓 발급/검사를 useStudioMutationAuthorityRuntime 으로 옮겼다. 티켓은 여전히
+    // 이름 있는 타입으로만 오간다 — 호스트도 런타임도 ReturnType 추론에 기대지 않는다.
+    const mutationAuthority = moduleShape(
+      "../studio-cuttoon-editor/runtime/useStudioMutationAuthorityRuntime.ts"
     );
-    expect(page.source).toContain(
+    expect(mutationAuthority.source).toContain(
+      "const captureStudioMutationTicket = useCallback((): StudioEditorMutationTicket =>"
+    );
+    expect(mutationAuthority.source).toContain(
       "ticket: StudioEditorMutationTicket,"
     );
     expect(page.source).toContain(
       "useRef<StudioEditorMutationTicket | null>(null)"
     );
-    expect(page.source).not.toContain("ReturnType<typeof captureStudioMutationTicket>");
+    for (const source of [page.source, mutationAuthority.source]) {
+      expect(source).not.toContain("ReturnType<typeof captureStudioMutationTicket>");
+    }
   });
 
   it("exposes only semantic boolean insert transactions to the lazy modal stack", () => {

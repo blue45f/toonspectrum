@@ -14,12 +14,16 @@ function source(file: string): string {
 describe("Studio checkpoint lazy product boundary", () => {
   it("keeps the durable SQLite implementation behind a dynamic import", () => {
     const loader = source("./studio-checkpoint-loader.ts");
-    const page = source("./StudioCuttoonEditorHost.tsx");
+    // The checkpoint import moved into a host runtime hook when the routes were layered, so the
+    // surface spans both files and the specifier is now "../../" rather than "./". Match the
+    // module rather than the relative depth — the boundary is which module is imported.
+    const page = source("./StudioCuttoonEditorHost.tsx")
+      + source("./studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts");
 
     expect(loader).toContain('import("./studio-checkpoints")');
     expect(loader).not.toMatch(/from\s+["']\.\/studio-checkpoints["']/u);
-    expect(page).toContain('from "./studio-checkpoint-loader"');
-    expect(page).not.toMatch(/from\s+["']\.\/studio-checkpoints["']/u);
+    expect(page).toMatch(/from\s+["'][^"']*studio-checkpoint-loader["']/u);
+    expect(page).not.toMatch(/from\s+["'][^"']*studio-checkpoints["']/u);
   });
 
   it.each([

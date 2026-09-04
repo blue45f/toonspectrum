@@ -389,7 +389,11 @@ const HISTORY_LEGACY_IDB_PROOF =
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
-  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  // Intentional change (2026-09, 984251d8c): the key expression moved into
+  // useStudioDocumentAccessRuntime as `const autosaveKey = studioAutosaveKey({ userId:
+  // studioAuthUserId, workId, remixId })` and reaches the host destructured. Same value, same
+  // single deletion — only the expression at the call site changed.
+  allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/StudioCuttoonEditorHost.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   // Intentional change (2026-08, B-17): the recovery-banner "clear" browser-mirror cleanup moved

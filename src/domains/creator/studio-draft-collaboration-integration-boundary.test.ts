@@ -8,7 +8,11 @@ function source(fileName: string): string {
 
 describe("unsaved Studio collaboration identity wiring", () => {
   it("uses the stable local draft ID before the per-tab fallback without eagerly requiring a server room", () => {
-    const page = source("./StudioCuttoonEditorHost.tsx");
+    // The draft-collaboration wiring moved out of the host body into its runtime hook when the
+    // routes were layered; the boundary is unchanged, so read both halves.
+    const page = source("./StudioCuttoonEditorHost.tsx")
+      + source("./studio-cuttoon-editor/runtime/useStudioDraftCollaborationRuntime.ts")
+      + source("./studio-cuttoon-editor/runtime/useStudioCollaborationAccessRuntime.ts");
 
     expect(page).toContain("loadOrCreateStudioDraftCollaborationIdentity(");
     expect(page).toContain("documentScopeKey: autosaveKey");

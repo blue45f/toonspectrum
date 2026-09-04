@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const studioPage = [
+  // 984251d8c 가 퀵슬롯 배선을 이 훅으로 빼냈다. 추출본을 앞에 둬야 거기서 시작한 순서 비교가
+  // 호스트 쪽 토큰까지 그대로 이어진다.
+  new URL("./useStudioBrushQuickSlots.ts", import.meta.url),
   new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
   new URL("../studio-page-editor-runtime-loaders.ts", import.meta.url),
   new URL("../studio-page-shell-runtime.ts", import.meta.url),
@@ -31,9 +34,11 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
   });
 
   it("uses a stable owner and bounded deterministic browser/device profile", () => {
-    expect(studioPage).toContain('const brushSlotsOwnerScope = studioAuthUserId ?? "guest";');
+    // 984251d8c 이후 스코프는 useStudioBrushQuickSlots 안에서 만들어지고, 호스트는 계정 id 만 준다.
+    expect(studioPage).toContain("ownerScope: studioAuthUserId,");
+    expect(studioPage).toContain('ownerScope: ownerScope ?? "guest",');
     expect(studioPage).toContain(
-      "const [brushSlotsDeviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);",
+      "const [deviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);",
     );
     expect(studioPage).toContain(".slice(0, 80).join(\"\") || \"unknown\"");
     expect(studioPage).toContain("browser-v1:${browserFamily}:${platform}:touch-");
@@ -41,17 +46,17 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
   });
 
   it("fences late hydration behind both scope and local mutation generations", () => {
-    const hydration = studioPage.indexOf("brushSlotsHydrationGenerationRef.current !== generation");
+    const hydration = studioPage.indexOf("hydrationGenerationRef.current !== generation");
     const mutation = studioPage.indexOf(
-      "brushSlotsMutationGenerationRef.current !== mutationGeneration",
+      "mutationGenerationRef.current !== mutationGeneration",
       hydration,
     );
     const scope = studioPage.indexOf(
-      "brushSlotsScopeRef.current.key !== request.key",
+      "scopeRef.current.key !== request.key",
       mutation,
     );
     const projectionCommit = studioPage.indexOf(
-      "setBrushSlotsProjection(projection);",
+      "setProjection(nextProjection);",
       scope,
     );
     expect(hydration).toBeGreaterThan(0);
@@ -62,9 +67,9 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
 
   it("serializes mutations, preserves dirty slots, and carries the SQLite revision", () => {
     expect(studioPage).toContain(
-      "const operation = brushSlotsMutationTailRef.current.then(persist, persist);",
+      "const operation = mutationTailRef.current.then(persist, persist);",
     );
-    expect(studioPage).toContain("brushSlotsDirtyGenerationsByScopeRef");
+    expect(studioPage).toContain("dirtyGenerationsByScopeRef");
     expect(studioPage).toContain("applyDirtySlots(durable, activeDirtySlots)");
     expect(studioPage).toContain("durable.revision");
     expect(studioPage).toContain("dirtyGenerations[slotIndex] === marker");
@@ -85,15 +90,16 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
   });
 
   it("announces assignment success only from the verified persistence path", () => {
+    // 커밋 본문은 훅 안의 `commit` 이고, 호스트는 그것을 commitStudioBrushSlotsMutation 으로 받는다.
     const persistenceFunction = studioPage.slice(
-      studioPage.indexOf("function commitStudioBrushSlotsMutation("),
-      studioPage.indexOf("/** Procreate size/opacity lock"),
+      studioPage.indexOf("  function commit("),
+      studioPage.indexOf("return { commitStudioBrushSlotsMutation: commit,"),
     );
     expect(persistenceFunction).toContain("saved = await repository.save(");
-    expect(persistenceFunction).toContain("announceDrawingShortcut(options.successMessage)");
+    expect(persistenceFunction).toContain("announceRef.current(options.successMessage)");
     expect(persistenceFunction.indexOf("saved = await repository.save("))
       .toBeLessThan(persistenceFunction.lastIndexOf(
-        "announceDrawingShortcut(options.successMessage)",
+        "announceRef.current(options.successMessage)",
       ));
     expect(studioPage).toContain(
       "현재 슬롯은 이 화면에만 유지되며 저장 완료로 처리하지 않았어요.",
@@ -103,14 +109,14 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
   it("soft-degrades multi-tab OPFS ownership without dumping Worker lock text to setError", () => {
     expect(studioPage).toContain("isStudioLocalDatabaseOwnershipBusyError(cause)");
     expect(studioPage).toContain("STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT");
-    expect(studioPage).toContain("brushSlotsOwnershipBusyAnnouncedRef");
+    expect(studioPage).toContain("ownershipBusyAnnouncedRef");
     const hydrateCatch = studioPage.slice(
-      studioPage.indexOf(".catch((cause) => {", studioPage.indexOf("getProductStudioBrushQuickSlotsSqliteRepository().load(")),
-      studioPage.indexOf("function commitStudioBrushSlotsMutation("),
+      studioPage.indexOf(".catch((cause: unknown) => {", studioPage.indexOf("getProductStudioBrushQuickSlotsSqliteRepository().load(")),
+      studioPage.indexOf("  function commit("),
     );
     expect(hydrateCatch).toContain("isStudioLocalDatabaseOwnershipBusyError(cause)");
     expect(hydrateCatch).toContain(
-      "announceDrawingShortcutRef.current(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT)",
+      "announceRef.current(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT)",
     );
     // Ownership busy must return before the generic setError that embeds cause.message.
     const ownershipGuard = hydrateCatch.indexOf("isStudioLocalDatabaseOwnershipBusyError(cause)");

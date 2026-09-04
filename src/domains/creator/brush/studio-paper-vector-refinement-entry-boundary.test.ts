@@ -111,9 +111,10 @@ describe("Paper vector refinement production entry boundary", () => {
     const panel = moduleEdges("../StudioNodeEditPanel.tsx").source;
 
     expect(page).toContain("paperVectorRefinementAbortRef.current?.abort()");
-    expect(page).toContain(
-      "paperVectorRefinementEngineEpochRef.current = client.advanceEngineEpoch()",
-    );
+    // 984251d8c 이후 무효화는 useStudioVectorOperationRuntime 안에 있고, 클라이언트가 없을 때를
+    // 대비해 삼항으로 갈라진다 — 에폭을 클라이언트에게서 받는다는 계약은 그대로다.
+    expect(page).toContain("paperVectorRefinementEngineEpochRef.current = client");
+    expect(page).toContain("? client.advanceEngineEpoch()");
     expect(page).toContain(
       "paperVectorRefinementClientRef.current?.dispose()",
     );
@@ -135,7 +136,11 @@ describe("Paper vector refinement production entry boundary", () => {
   });
 
   it("does not recycle the Paper Worker for an outer history-array identity change", () => {
-    const page = moduleEdges("../StudioCuttoonEditorHost.tsx").source;
+    // The cancellation effect moved into the extracted vector runtime; the host now passes the
+    // frontier index in as `pagesHistoryIndex` instead of closing over `pagesHi`.
+    const page = moduleEdges(
+      "../studio-cuttoon-editor/runtime/useStudioVectorOperationRuntime.ts",
+    ).source;
     const effectStart = page.indexOf(
       "if (pathBooleanActiveRef.current) {",
     );
@@ -147,11 +152,18 @@ describe("Paper vector refinement production entry boundary", () => {
 
     expect(effectStart).toBeGreaterThan(0);
     expect(invalidationEffect).toContain(
-      "}, [activePage.id, masterEditMode, pagesHi]);",
+      "}, [activePageId, invalidatePaperVectorRefinement, masterEditMode, pagesHistoryIndex]);",
     );
     expect(invalidationEffect).not.toContain("pagesHistory, pagesHi");
-    expect(invalidationEffect).toContain(
-      "paperVectorRefinementAbortRef.current?.abort()",
+    expect(invalidationEffect).toContain("invalidatePaperVectorRefinement(false)");
+    // 그 무효화가 실제로 진행 중인 Worker 요청을 끊는다.
+    const invalidate = page.slice(
+      page.indexOf("const invalidatePaperVectorRefinement = useCallback("),
+      page.indexOf("const cancelPaperVectorRefinement = useCallback("),
     );
+    expect(invalidate).toContain("paperVectorRefinementAbortRef.current?.abort()");
+    // 호스트는 프론티어 인덱스를 그대로 넘긴다 — 히스토리 배열 정체성은 넘기지 않는다.
+    const host = moduleEdges("../StudioCuttoonEditorHost.tsx").source;
+    expect(host).toContain("pagesHistoryIndex: pagesHi,");
   });
 });

@@ -40,8 +40,12 @@ const SESSION_REST_FILE = path.join(
  * 들어간 3D 에디터 배선(14469764)·live-ink 지우개(b49203df)·ink-wash settle(3201a1e2) 이 호스트를
  * 31,011줄로 늘려 상한을 실측값으로 재설정했다 — 그 커밋들은 이 래칫이 생기기 전에 작성된 것이다.
  * 이후로는 다시 올리지 않는다.
+ *
+ * 2026-09-04: 런타임 훅 추출(984251d8c)이 30,929 → 29,482줄로 줄이면서 상한을 29,459 로 적었는데
+ * 그 값은 같은 커밋의 트리보다 23줄 낮아 어느 시점에도 성립한 적이 없다(호스트가 자란 것이 아니라
+ * 상한이 실측보다 낮게 적힌 것). 마지막으로 성립했던 31,011 대비 1,529줄 내린 실측값으로 고정한다.
  */
-const HOST_MAX_LINES = 29_459;
+const HOST_MAX_LINES = 29_482;
 const ROUTER_SEAM_MAX_LINES = 100;
 const STUDIO_RUNTIME_MODULE_MAX_LINES = 300;
 const APP_ROUTE_GROUP_MAX_LINES = 120;

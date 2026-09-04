@@ -38,10 +38,17 @@ const SAVED_AT = "2026-08-10T09:00:00.000Z";
 const LEGACY_REFERENCE_STORAGE_PREFIX =
   "toonspectrum-studio-ai-image-references:v1";
 
-const studioPageSource = readFileSync(
+// 984251d8c 가 참조 문서 state 를 useStudioDocumentAccessRuntime 으로 빼냈다. 추출본을 앞에 둬야
+// 거기서 시작한 슬라이스가 호스트 쪽 끝 토큰까지 나아간다.
+const studioPageSource = [
+  new URL(
+    "../studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
+    import.meta.url,
+  ),
   new URL("../StudioCuttoonEditorHost.tsx", import.meta.url),
-  "utf8",
-);
+]
+  .map((url) => readFileSync(url, "utf8"))
+  .join("\n");
 const legacyStorageSource = readFileSync(
   new URL("./studio-ai-image-reference-storage.ts", import.meta.url),
   "utf8",
@@ -271,7 +278,7 @@ describe("AI image reference project authority", () => {
   it("wires StudioPage snapshots and restore to project state without the legacy storage adapter", () => {
     const referenceState = sourceBetween(
       "const [scenarioImageReferenceDocument",
-      "const loggedIn",
+      "const draftRuntime = useStudioDraftCollaborationRuntime({",
     );
     const snapshotBoundary = sourceBetween(
       "return buildStudioProjectFileSnapshot({",

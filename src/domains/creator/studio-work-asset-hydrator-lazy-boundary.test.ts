@@ -27,12 +27,12 @@ describe("Studio work-asset hydrator lazy boundary", () => {
   });
 
   it("preserves StudioPage's stable constructor and useSyncExternalStore contract", () => {
-    expect(studioPageSource).toContain(
-      'import { StudioWorkAssetHydrator } from "./studio-work-asset-hydrator";'
+    expect(studioPageSource).toMatch(
+      /import \{ StudioWorkAssetHydrator \} from ["'][^"']*studio-work-asset-hydrator["']/u
     );
     expect(studioPageSource).toContain("() => new StudioWorkAssetHydrator(null)");
     expect(studioPageSource).toMatch(
-      /useSyncExternalStore\(\s*studioWorkAssetHydrator\.subscribe,\s*studioWorkAssetHydrator\.getVersion,\s*studioWorkAssetHydrator\.getVersion\s*\)/u
+      /useSyncExternalStore\(\s*studioWorkAssetHydrator\.subscribe,\s*studioWorkAssetHydrator\.getVersion,\s*studioWorkAssetHydrator\.getVersion,?\s*\)/u
     );
   });
 

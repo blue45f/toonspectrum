@@ -1267,13 +1267,22 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       new URL("./StudioCuttoonEditorHost.tsx", import.meta.url),
       "utf8",
     );
+    // The keyed lifecycle teardown moved out of the host into the raster publication runtime hook;
+    // the host still owns the component the hook is keyed by.
+    const rasterPublicationSource = readFileSync(
+      new URL(
+        "./studio-cuttoon-editor/runtime/useStudioRasterPublicationRuntime.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    );
 
     expect(studioPageSource).toContain("function StudioCuttoonEditor(");
-    expect(studioPageSource).toContain(
+    expect(rasterPublicationSource).toContain(
       "disposeStudioDynamicCoverageCommittedCache();",
     );
-    expect(studioPageSource.indexOf("disposeStudioDynamicCoverageCommittedCache();"))
-      .toBeGreaterThan(studioPageSource.indexOf("useLayoutEffect(() => () => {"));
+    expect(rasterPublicationSource.indexOf("disposeStudioDynamicCoverageCommittedCache();"))
+      .toBeGreaterThan(rasterPublicationSource.indexOf("useLayoutEffect(() => () => {"));
   });
 
   it("uses identical 2x live and committed surface scale at the handoff", () => {
