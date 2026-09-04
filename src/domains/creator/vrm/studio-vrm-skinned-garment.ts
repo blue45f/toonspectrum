@@ -335,15 +335,127 @@ function boundedSegments(value: number | undefined, fallback: number, minimum: n
   return Math.min(maximum, Math.max(minimum, Math.trunc(value!)));
 }
 
+type GarmentLatheProfile = Extract<GarmentShape, { kind: "lathe" }>["profile"];
+
+/** depth를 선언하지 않은 링은 정원 — 파츠 전체 squash가 그대로 그 높이의 단면을 정한다. */
+const LATHE_RING_DEFAULT_DEPTH = 1;
+
+interface EllipticalLatheRing {
+  radius: number;
+  y: number;
+  /** radius × depth. 이 링의 z 반경. */
+  zRadius: number;
+  depth: number;
+  /** 프로파일 접선 — 양 끝은 한쪽 차분, 중간은 중앙 차분. */
+  dRadius: number;
+  dY: number;
+  dZRadius: number;
+}
+
+function resolveEllipticalLatheRings(profile: GarmentLatheProfile): EllipticalLatheRing[] {
+  const last = profile.length - 1;
+  // depth는 링에 붙은 값이고 정점은 언제나 링 위에 있으므로, "정점 y에서의 depth 보간"은
+  // 그 링의 depth 그 자체다. 생략된 링을 이웃에서 끌어오면 계약(생략 = 정원)이 깨진다.
+  const zRadii = profile.map((point) => point.radius * (point.depth ?? LATHE_RING_DEFAULT_DEPTH));
+  return profile.map((point, index) => {
+    const low = Math.max(0, index - 1);
+    const high = Math.min(last, index + 1);
+    return {
+      radius: point.radius,
+      y: point.y,
+      zRadius: zRadii[index],
+      depth: point.depth ?? LATHE_RING_DEFAULT_DEPTH,
+      dRadius: profile[high].radius - profile[low].radius,
+      dY: profile[high].y - profile[low].y,
+      dZRadius: zRadii[high] - zRadii[low],
+    };
+  });
+}
+
+/**
+ * depth 링이 섞인 프로파일을 타원 단면 표면으로 돌린다.
+ *
+ * LatheGeometry는 2D 윤곽을 그대로 회전시키므로 단면이 언제나 정원이고, 넓고 얕은 가슴과
+ * 좁은 허리를 파츠 하나의 squash로는 같이 표현할 수 없다. 여기서는 링마다 z 반경을
+ * radius × depth로 따로 잡는다. 법선은 z를 누른 뒤의 접선에서 다시 구한다 — 정원 법선을
+ * 그대로 옮기면 눌린 앞뒤 면이 부풀어 보인다.
+ *
+ * 정점 순서·UV·인덱스 winding은 LatheGeometry와 같게 두어, depth가 모두 1이면 같은 표면이
+ * 나오고 상체 template의 소매 접합(가장 가까운 몸통 정점 탐색)도 그대로 동작한다.
+ */
+function buildEllipticalLatheGeometry(
+  profile: GarmentLatheProfile,
+  segments: number,
+): THREE.BufferGeometry {
+  const rings = resolveEllipticalLatheRings(profile);
+  const ringCount = rings.length;
+  const lastRing = ringCount - 1;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const normal = new THREE.Vector3();
+  // 각도 계산은 LatheGeometry와 같은 식으로 둔다 — depth가 모두 1인 프로파일이 회전체와
+  // 비트 단위로 같은 정점을 내야 아이템이 depth를 붙이는 순간 형태가 흔들리지 않는다.
+  const inverseSegments = 1 / segments;
+
+  for (let segment = 0; segment <= segments; segment += 1) {
+    const u = segment / segments;
+    const phi = segment * inverseSegments * (Math.PI * 2);
+    const sin = Math.sin(phi);
+    const cos = Math.cos(phi);
+    for (let index = 0; index < ringCount; index += 1) {
+      const ring = rings[index];
+      positions.push(ring.radius * sin, ring.y, ring.zRadius * cos);
+      uvs.push(u, index / Math.max(1, lastRing));
+      // 타원 표면의 법선 = (∂P/∂φ × ∂P/∂ring) / radius. radius로 나눈 형태라 반경 0인 링에서도
+      // 살아 있고, depth가 모두 1이면 LatheGeometry의 (dY, -dRadius, 0) 회전 법선과 같아진다.
+      normal.set(
+        ring.depth * ring.dY * sin,
+        -ring.depth * ring.dRadius * sin * sin - ring.dZRadius * cos * cos,
+        ring.dY * cos,
+      ).normalize();
+      // 접선이 통째로 소멸한 링(중복 정점 등)만 반경 방향으로 되돌린다.
+      if (normal.lengthSq() < 0.5) normal.set(sin, 0, cos);
+      normals.push(normal.x, normal.y, normal.z);
+    }
+  }
+
+  for (let segment = 0; segment < segments; segment += 1) {
+    for (let index = 0; index < lastRing; index += 1) {
+      const base = index + segment * ringCount;
+      const a = base;
+      const b = base + ringCount;
+      const c = base + ringCount + 1;
+      const d = base + 1;
+      indices.push(a, b, d, c, d, b);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(indices);
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  return geometry;
+}
+
 export function buildStudioVrmGarmentGeometry(shape: GarmentShape): THREE.BufferGeometry {
   switch (shape.kind) {
     case "cylinder":
       return new THREE.CylinderGeometry(shape.rTop, shape.rBottom, shape.h, 40, 4, shape.open ?? false);
-    case "lathe":
+    case "lathe": {
+      const segments = boundedSegments(shape.segments, 40, 40, 256);
+      // 어떤 링도 depth를 선언하지 않으면 단면은 정원이라 회전체와 완전히 같다. 이때는 three
+      // 구현을 그대로 써야 기존 아이템의 정점·영수증 서명이 한 비트도 움직이지 않는다.
+      if (shape.profile.some((point) => point.depth !== undefined)) {
+        return buildEllipticalLatheGeometry(shape.profile, segments);
+      }
       return new THREE.LatheGeometry(
         shape.profile.map(({ radius, y }) => new THREE.Vector2(radius, y)),
-        boundedSegments(shape.segments, 40, 40, 256),
+        segments,
       );
+    }
     case "box":
       return new THREE.BoxGeometry(shape.w, shape.h, shape.d, 2, 2, 2);
     case "sphere":
@@ -483,11 +595,14 @@ function partValidationReason(part: GarmentPart): "non-finite-geometry" | "inval
       return null;
     case "lathe": {
       if (part.shape.segments !== undefined && !Number.isFinite(part.shape.segments)) return "non-finite-geometry";
-      if (part.shape.profile.some((point) => !Number.isFinite(point.radius) || !Number.isFinite(point.y))) {
+      if (part.shape.profile.some((point) => !Number.isFinite(point.radius)
+        || !Number.isFinite(point.y)
+        || (point.depth !== undefined && !Number.isFinite(point.depth)))) {
         return "non-finite-geometry";
       }
+      // 음수 depth는 단면을 뒤집어 winding이 반대인 면을 만든다 — 음수 radius와 같게 막는다.
       if (part.shape.profile.length < 2
-        || part.shape.profile.some((point) => point.radius < 0)
+        || part.shape.profile.some((point) => point.radius < 0 || (point.depth !== undefined && point.depth < 0))
         || Math.max(...part.shape.profile.map((point) => point.radius)) <= GEOMETRY_EPSILON
         || !shapeAxialRange(part.shape)) return "invalid-topology";
       return null;
