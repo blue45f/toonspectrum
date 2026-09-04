@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   reconcile:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-slim
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
