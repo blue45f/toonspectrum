@@ -112,6 +112,7 @@ export function StudioBg3dCinematicDirectorPanel(
   const runtime = useStudioBg3dProSuiteRuntime();
   const animationFrameRef = useRef<number | null>(null);
   const transitionActiveRef = useRef(false);
+  const finishCameraPreviewRef = useRef<(() => void) | undefined>(undefined);
   const {
     disabled,
     baseCamera,
@@ -135,6 +136,7 @@ export function StudioBg3dCinematicDirectorPanel(
   const runtimeApplyCameraView = runtime?.onApplyCameraView;
   const runtimePreviewCameraView = runtime?.onPreviewCameraView;
   const runtimeFinishCameraPreview = runtime?.onFinishCameraViewPreview;
+  finishCameraPreviewRef.current = runtimeFinishCameraPreview;
 
   const cancelPreviewAnimation = useCallback((finish: boolean) => {
     if (
@@ -144,9 +146,9 @@ export function StudioBg3dCinematicDirectorPanel(
       globalThis.cancelAnimationFrame(animationFrameRef.current);
     }
     animationFrameRef.current = null;
-    if (finish && transitionActiveRef.current) runtimeFinishCameraPreview?.();
+    if (finish && transitionActiveRef.current) finishCameraPreviewRef.current?.();
     transitionActiveRef.current = false;
-  }, [runtimeFinishCameraPreview]);
+  }, []);
 
   useEffect(() => () => cancelPreviewAnimation(false), [cancelPreviewAnimation]);
 
@@ -193,7 +195,7 @@ export function StudioBg3dCinematicDirectorPanel(
       if (rawProgress >= 1) {
         animationFrameRef.current = null;
         transitionActiveRef.current = false;
-        runtimeFinishCameraPreview();
+        finishCameraPreviewRef.current?.();
         return;
       }
       animationFrameRef.current = globalThis.requestAnimationFrame(animate);
