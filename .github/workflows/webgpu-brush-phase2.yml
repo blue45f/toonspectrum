@@ -1,0 +1,102 @@
+name: WebGPU brush phase 2
+
+on:
+  push:
+    branches:
+      - feat/webgpu-brush-phase2-sparse-tiles-20260904
+    paths:
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-frame.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-frame.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.test.ts"
+      - "scripts/studio-webgpu-phase2-topology-benchmark.mts"
+      - ".github/workflows/webgpu-brush-phase2.yml"
+  pull_request:
+    paths:
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-frame.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-frame.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.test.ts"
+      - "scripts/studio-webgpu-phase2-topology-benchmark.mts"
+      - ".github/workflows/webgpu-brush-phase2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-brush-phase2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phase2:
+    name: phase2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Focused unit tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-frame.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.test.ts
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts
+          src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-frame.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-frame.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-atlas-runtime.test.ts
+          scripts/studio-webgpu-phase2-topology-benchmark.mts
+
+      - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Topology parity benchmark
+        run: >-
+          pnpm exec tsx scripts/studio-webgpu-phase2-topology-benchmark.mts
+          --check
+          --output artifacts/webgpu-brush-phase2-topology.json
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webgpu-brush-phase2-topology
+          path: artifacts/webgpu-brush-phase2-topology.json
+          if-no-files-found: warn
+          retention-days: 14

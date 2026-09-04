@@ -514,12 +514,12 @@ const SCENARIOS: readonly OpenScenario[] = [
     description: "인스펙터(속성) 패널 닫았다 재오픈 — 콜드 비용은 부팅에 포함됨",
     // Both toggles expose their text through `title`, not `aria-label`.
     setup: async ({ page }) => {
-      const collapsed = await forceClick(page, '[title="속성 패널 접기"]');
+      const collapsed = await forceClick(page, '[title="작업 패널 접기"]');
       await page.waitForTimeout(900);
       return collapsed;
     },
     open: async ({ page }) => {
-      for (const selector of ['[title="속성 패널 펼치기"]', '[aria-label="레이어 패널 열기"]']) {
+      for (const selector of ['[title="작업 패널 펼치기"]', '[aria-label="레이어 패널 열기"]']) {
         if (await forceClick(page, selector)) return true;
       }
       return false;

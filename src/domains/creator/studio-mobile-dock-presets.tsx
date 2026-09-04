@@ -46,7 +46,7 @@ export function StudioInspectorAsideFallback({
       role={isMobile ? "dialog" : undefined}
       aria-modal={isMobile ? true : undefined}
       aria-busy="true"
-      aria-label="속성 패널 불러오는 중"
+      aria-label="작업 패널 불러오는 중"
       data-studio-sheet-id="props"
       data-studio-mobile-sheet={isMobile ? "true" : undefined}
       data-studio-sheet-snap={isMobile ? snap : undefined}

@@ -305,6 +305,33 @@ describe("studio figma selection ux", () => {
     }
   });
 
+  it("keeps rotation off a mirrored-symmetry stroke, which the planner would translate instead", () => {
+    // The renderer regenerates mirrored copies by reflecting the committed base about world axes,
+    // so the commit planner drops the angle. This field turns the planner's origin rotation into a
+    // centre rotation by pre-rotating the box, so a dropped angle would leave that pivot offset
+    // behind: the stroke would MOVE, not turn. Offer nothing rather than a field that lies.
+    for (const type of ["vertical", "horizontal", "kaleidoscope", "silk"] as const) {
+      const stroke = draw({
+        id: type,
+        points: [10, 10, 110, 60],
+        symmetry: { type, centerX: 60, centerY: 35 },
+      });
+      const metrics = resolveStudioFigmaSelectionLayoutMetrics([stroke]);
+      expect(metrics!.supportsRotation).toBe(false);
+      expect(metrics!.rotationDisabledReason).toContain("대칭");
+      // And a typed angle is inert rather than a disguised move.
+      expect(planStudioSelectionLayoutPatch(stroke, { rotation: 30 })).toBeNull();
+    }
+    // Radial copies are rotations about the same centre, so they commute with the frame and turn.
+    const radial = draw({
+      id: "radial",
+      points: [10, 10, 110, 60],
+      symmetry: { type: "radial", centerX: 60, centerY: 35, radialCount: 6 },
+    });
+    expect(resolveStudioFigmaSelectionLayoutMetrics([radial])!.supportsRotation).toBe(true);
+    expect(planStudioSelectionLayoutPatch(radial, { rotation: 30 })).not.toBeNull();
+  });
+
   it("resizes a stroke to exactly the width that was typed", () => {
     const stroke = draw({ id: "s", points: [10, 10, 110, 10, 110, 60], strokeWidth: 8 });
     const before = resolveStudioFigmaSelectionLayoutMetrics([stroke])!;

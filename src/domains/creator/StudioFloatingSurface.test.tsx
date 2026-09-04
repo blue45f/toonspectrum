@@ -16,6 +16,24 @@ import {
 import { resetStudioFloatingSurfaceStackForTest } from "./studio-floating-surface-stack";
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
 
+class StudioFloatingSurfaceTestPointerEvent extends MouseEvent {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  readonly isPrimary: boolean;
+
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 0;
+    this.pointerType = init.pointerType ?? "mouse";
+    this.isPrimary = init.isPrimary ?? true;
+  }
+}
+
+Object.defineProperty(globalThis, "PointerEvent", {
+  configurable: true,
+  value: StudioFloatingSurfaceTestPointerEvent,
+});
+
 const DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = Object.freeze({
   version: 2,
   xRatio: 1,
@@ -82,6 +100,12 @@ afterEach(() => {
   document.body.style.userSelect = "";
 });
 
+// `PointerEventInit.isPrimary` defaults to **false** (UI Events spec), so a synthetic pointerdown
+// looks like a secondary pointer of a multi-touch gesture unless the test says otherwise. A real
+// mouse press always reports `isPrimary: true`, and StudioFloatingSurface.beginPointerSession
+// rightly refuses non-primary pointers — so omitting the flag here silently started no drag session
+// at all and every assertion below read the untouched layout.
+
 describe("StudioFloatingSurface", () => {
   it("renders viewport-safe desktop window chrome", () => {
     render(<Harness />);
@@ -108,6 +132,7 @@ describe("StudioFloatingSurface", () => {
     fireEvent.pointerDown(handle, {
       pointerId: 11,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 800,
       clientY: 80,
@@ -131,6 +156,7 @@ describe("StudioFloatingSurface", () => {
     fireEvent.pointerDown(handle, {
       pointerId: 12,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 800,
       clientY: 80,
@@ -171,6 +197,7 @@ describe("StudioFloatingSurface", () => {
     fireEvent.pointerDown(handle, {
       pointerId: 21,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 800,
       clientY: 80,
@@ -204,6 +231,7 @@ describe("StudioFloatingSurface", () => {
     fireEvent.pointerDown(resize, {
       pointerId: 31,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 990,
       clientY: 460,
@@ -254,6 +282,7 @@ describe("StudioFloatingSurface", () => {
     fireEvent.pointerDown(west, {
       pointerId: 41,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 690,
       clientY: 260,

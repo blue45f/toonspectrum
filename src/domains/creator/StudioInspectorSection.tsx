@@ -130,6 +130,10 @@ export function StudioInspectorSection({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={toggleOpen}
+        // 디스클로저 헤더는 밀도 감사 어휘에서 chrome — 이동 비용이지 속성이 아니다.
+        // 선언이 없으면 이 섹션을 마운트하는 모든 감사가 헤더를 unclassified 로 보고한다.
+        data-inspector-control-id={`section.${sectionId}`}
+        data-inspector-priority="chrome"
         // 터치에서는 44px, 데스크톱 마우스에서는 32px. 이전 min-h-6(24px)은
         // 손가락 대상으로 쓰기에 너무 작았다.
         className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-1.5 py-1 text-left text-xs font-semibold text-fg transition-colors hover:bg-raised/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8 pointer-coarse:min-h-11"

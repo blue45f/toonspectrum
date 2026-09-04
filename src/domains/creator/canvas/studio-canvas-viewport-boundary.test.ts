@@ -242,7 +242,7 @@ describe("Studio canvas viewport module boundary", () => {
     );
     const viewportIndex = canvas.source.indexOf("<StudioCanvasViewport");
     const pointCommentIndex = canvas.source.indexOf("{pointCommentComposer ?", viewportIndex);
-    const resizeHandleIndex = inspector.source.indexOf("캔버스 ↔ 속성 패널 너비 스플리터");
+    const resizeHandleIndex = inspector.source.indexOf("캔버스 ↔ 작업 패널 너비 스플리터");
     const inspectorIndex = inspector.source.indexOf("<LazyStudioInspectorAside", resizeHandleIndex);
 
     expect(workspaceIndex).toBeGreaterThan(-1);

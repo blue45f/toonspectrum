@@ -637,6 +637,81 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toContain("min-h-11 w-full min-w-0");
     expect(filterDialogSource).toContain("grid-cols-2");
     expect(filterDialogSource).toContain("max-h-[min(44dvh,24rem)]");
+    // ArrowUp/ArrowDown move by one visual row, so a later grid-cols-3 must not silently
+    // desync the arrow step from what the artist sees.
+    expect(filterDialogSource).toContain("STUDIO_FILTER_GALLERY_COLUMNS = 2");
+  });
+
+  it("keeps the expanded gallery to one tab stop per card", () => {
+    renderInteractiveMotionFilterDialog();
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    // Scope the stars to the grid: the browse toggle's own name ends in 즐겨찾기 too, and
+    // counting from the gallery region sweeps it in.
+    const grid = within(screen.getByRole("group", { name: "필터 카드" }));
+    const cards = grid.getAllByRole("button", { name: /필터 선택$/ });
+    expect(cards).toHaveLength(filterDialogCatalogCount);
+    expect(cards.filter((card) => card.tabIndex === 0)).toHaveLength(1);
+    expect(cards.filter((card) => card.tabIndex === -1))
+      .toHaveLength(filterDialogCatalogCount - 1);
+    expect(
+      grid.getAllByRole("button", { name: /즐겨찾기$/ }).filter((star) => star.tabIndex === 0),
+    ).toHaveLength(1);
+  });
+
+  it("moves gallery focus by row and column without leaving the grid", () => {
+    renderInteractiveMotionFilterDialog();
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    const grid = within(screen.getByRole("group", { name: "필터 카드" }));
+    const cards = grid.getAllByRole("button", { name: /필터 선택$/ });
+    const nameOf = (index: number) => cards[index]!.getAttribute("aria-label");
+
+    cards[0]!.focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(nameOf(1));
+
+    cards[0]!.focus();
+    // Two columns, so one row down is two cards along.
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(nameOf(2));
+
+    cards[0]!.focus();
+    // Clamped, not wrapped: wrapping here would throw focus to the bottom of a scrolling grid.
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(nameOf(0));
+
+    fireEvent.keyDown(document.activeElement!, { key: "End" });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(nameOf(cards.length - 1));
+    fireEvent.keyDown(document.activeElement!, { key: "Home" });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(nameOf(0));
+  });
+
+  it("hands the roving stop to the first remaining card when a search drops it", () => {
+    renderInteractiveMotionFilterDialog();
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    const grid = () => within(screen.getByRole("group", { name: "필터 카드" }));
+    const before = grid().getAllByRole("button", { name: /필터 선택$/ });
+    fireEvent.focus(before.at(-1)!);
+
+    // Search runs per keystroke, so the remembered card disappears constantly. Without the
+    // fallback the grid would be left with no tabbable entry at all.
+    fireEvent.change(within(gallery).getByRole("searchbox", { name: "필터 검색" }), {
+      target: { value: "가우시안" },
+    });
+    const after = grid().getAllByRole("button", { name: /필터 선택$/ });
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.length).toBeLessThan(before.length);
+    const tabbable = after.filter((card) => card.tabIndex === 0);
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toBe(after[0]);
   });
 
   it("persists filter favorites in SQLite preferences and restores the favorites view", async () => {

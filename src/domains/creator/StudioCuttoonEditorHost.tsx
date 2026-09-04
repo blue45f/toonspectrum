@@ -5309,6 +5309,15 @@ export function StudioCuttoonEditor({
         return Boolean(
           element && isEffectivelyLocked(element, activeGroupsRef.current)
         );
+      }) ||
+      // The source frame is derived from the VISIBLE box, so a hidden member would be transformed
+      // by an affine that never accounted for it -- a turn about a box it sits outside throws it
+      // far off-page, and nothing shows that until it is unhidden. Refuse like a locked member.
+      selectedIds.some((id) => {
+        const element = currentById.get(id);
+        return Boolean(
+          element && isEffectivelyHidden(element, activeGroupsRef.current)
+        );
       })
     ) {
       setError(
@@ -5316,7 +5325,7 @@ export function StudioCuttoonEditor({
           ? collaborationAccessRef.current.locked
             ? collaborationLockMessage()
             : "이 작업면은 검토 잠금 상태예요. 잠금을 해제한 뒤 크기를 조절하세요."
-          : "크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
+          : "크기를 조절할 수 없어요. 선택과 잠금·숨김 상태를 확인하세요."
       );
       return false;
     }

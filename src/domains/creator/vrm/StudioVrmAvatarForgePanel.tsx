@@ -1143,7 +1143,14 @@ export function StudioVrmAvatarForgePanel({
             />
           </span>
           <span className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
-            <span className="block truncate text-[0.69rem] font-extrabold text-fg-2">{previewRecipe.label}</span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="size-3 rounded-full border border-line shrink-0"
+                style={{ background: previewRecipe.state.hair.baseColor }}
+                aria-hidden
+              />
+              <span className="truncate text-[0.69rem] font-extrabold text-fg-2">{previewRecipe.label}</span>
+            </span>
             <span className="mt-0.5 block">{describeStudioVrmAvatarForgeState(previewRecipe.state).face} · {describeStudioVrmAvatarForgeState(previewRecipe.state).hair}</span>
             <span className="block">{formatStudioVrmHeadUnits(resolveStudioVrmProportionMetrics(previewRecipe.state.proportions).headUnits)} · {describeStudioVrmAvatarForgeState(previewRecipe.state).body}</span>
             <span className="mt-1 flex items-center gap-1.5">

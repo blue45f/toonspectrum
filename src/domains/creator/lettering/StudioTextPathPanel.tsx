@@ -32,6 +32,9 @@ const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
 const RANGE_CLASS = "w-24 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-40";
 const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
 
+// 모양이 "없음"이면 휘어짐이 의미가 없어 잠근다 — 잠긴 이유는 컨트롤이 직접 말해야 한다.
+const CURVE_LOCKED_REASON = "모양이 \"없음\"이면 휘어짐을 조절할 수 없습니다. 다른 모양을 먼저 고르세요.";
+
 export function StudioTextPathPanel({
   value,
   onPatch,
@@ -60,6 +63,10 @@ export function StudioTextPathPanel({
           disabled={flat}
           className={buttonClass({ size: "sm", variant: "quiet" })}
           title="경로 효과를 제거하고 직선 텍스트로 되돌립니다."
+          // 고급 조판 디스클로저 안에서만 보이므로 advanced. 비활성일 때도 title 이 이유를
+          // 말하므로 밀도 감사의 disabled-without-reason 을 통과한다.
+          data-inspector-control-id="typography.path.reset"
+          data-inspector-priority="advanced"
         >
           <RotateCcw className="size-3.5" />
           직선으로
@@ -76,6 +83,8 @@ export function StudioTextPathPanel({
               type="button"
               onClick={() => onApplyPreset(preset.value)}
               title={preset.tip}
+              data-inspector-control-id={`typography.path.preset.${preset.id}`}
+              data-inspector-priority="advanced"
               className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
             >
               {preset.label}
@@ -93,6 +102,8 @@ export function StudioTextPathPanel({
               key={s.id}
               type="button"
               onClick={() => onPatch({ shape: s.id })}
+              data-inspector-control-id={`typography.path.shape.${s.id}`}
+              data-inspector-priority="advanced"
               className={cn(SHAPE_BTN_CLASS, active && "border-accent bg-raised text-fg")}
             >
               {s.label}
@@ -112,7 +123,12 @@ export function StudioTextPathPanel({
             step={TEXT_PATH_CURVE_RANGE.step}
             value={value.curve}
             disabled={curveDisabled}
+            // 잠긴 이유를 슬라이더 자신이 말한다 — 회색 상자는 사유 없이 두지 않는다
+            // (밀도 감사 `disabled-without-reason`).
+            title={curveDisabled ? CURVE_LOCKED_REASON : undefined}
             onChange={(e) => onPatch({ curve: Number(e.target.value) })}
+            data-inspector-control-id="typography.path.curve"
+            data-inspector-priority="advanced"
             className={RANGE_CLASS}
           />
           <span className={READOUT_CLASS}>{value.curve}%</span>

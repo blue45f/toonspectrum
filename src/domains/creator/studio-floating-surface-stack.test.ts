@@ -7,6 +7,8 @@ import {
   studioFloatingSurfaceZIndex,
   studioFloatingSurfaceStackSnapshot,
   subscribeStudioFloatingSurfaceStack,
+  requestStudioFloatingSurfaceLayoutReset,
+  subscribeStudioFloatingSurfaceLayoutReset,
 } from "./studio-floating-surface-stack";
 
 afterEach(resetStudioFloatingSurfaceStackForTest);
@@ -59,5 +61,33 @@ describe("studio floating surface stack", () => {
     expect(studioFloatingSurfaceZIndex("surface-5")).toBe(50);
 
     for (const release of releases) release();
+  });
+});
+
+describe("global layout reset broadcast", () => {
+  it("asks every subscriber once and survives one unsubscribing mid-broadcast", () => {
+    const calls: string[] = [];
+    const unsubscribeA = subscribeStudioFloatingSurfaceLayoutReset(() => {
+      calls.push("a");
+      // A surface may unmount as a direct result of resetting; the broadcast must survive it.
+      unsubscribeA();
+    });
+    const unsubscribeB = subscribeStudioFloatingSurfaceLayoutReset(() => calls.push("b"));
+
+    requestStudioFloatingSurfaceLayoutReset();
+    expect(calls).toEqual(["a", "b"]);
+
+    requestStudioFloatingSurfaceLayoutReset();
+    expect(calls).toEqual(["a", "b", "b"]);
+    unsubscribeB();
+  });
+
+  it("stops calling a listener once it unsubscribes", () => {
+    let seen = 0;
+    const unsubscribe = subscribeStudioFloatingSurfaceLayoutReset(() => { seen += 1; });
+    requestStudioFloatingSurfaceLayoutReset();
+    unsubscribe();
+    requestStudioFloatingSurfaceLayoutReset();
+    expect(seen).toBe(1);
   });
 });

@@ -1,0 +1,66 @@
+name: Studio editor client runtime
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-editor-client-runtime.yml"
+      - "packages/studio-command-registry/src/**"
+      - "src/domains/creator/editor-client/**"
+      - "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx"
+      - "src/domains/creator/studio-left-tool-rail-boundary.test.ts"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-editor-client-runtime.yml"
+      - "packages/studio-command-registry/src/**"
+      - "src/domains/creator/editor-client/**"
+      - "src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx"
+      - "src/domains/creator/studio-left-tool-rail-boundary.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-editor-client-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: editor-client-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Focused unit and architecture tests
+        run: >-
+          pnpm exec vitest run
+          packages/studio-command-registry/src/__tests__/editor-client-runtime.test.ts
+          src/domains/creator/editor-client/studio-left-tool-rail-client.test.ts
+          src/domains/creator/studio-left-tool-rail-boundary.test.ts
+      - name: Strict focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          packages/studio-command-registry/src/editor-client-runtime.ts
+          packages/studio-command-registry/src/__tests__/editor-client-runtime.test.ts
+          packages/studio-command-registry/src/index.ts
+          src/domains/creator/editor-client/index.ts
+          src/domains/creator/editor-client/studio-left-tool-rail-client.ts
+          src/domains/creator/editor-client/studio-left-tool-rail-client.test.ts
+          src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx
+          src/domains/creator/studio-left-tool-rail-boundary.test.ts
+      - name: Command registry package typecheck
+        run: pnpm exec tsc -p packages/studio-command-registry/tsconfig.json
+      - name: Studio app typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit

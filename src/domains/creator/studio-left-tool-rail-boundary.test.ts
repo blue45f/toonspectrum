@@ -107,7 +107,7 @@ describe("Studio left tool rail module boundary", () => {
     expect(page.topLevelDeclarations.has("StudioLeftToolRailHandlers")).toBe(false);
   });
 
-  it("mounts the rail through one EditorClient prop", () => {
+  it("mounts the rail through one persistent EditorClient runtime", () => {
     const rail = moduleShape("./StudioLeftToolRail.tsx");
     const workspace = moduleShape(
       "./studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx",
@@ -115,9 +115,14 @@ describe("Studio left tool rail module boundary", () => {
 
     expect(rail.source).toContain("readonly client: StudioLeftToolRailClient;");
     expect(rail.source).not.toContain('import("react").Dispatch<');
+    expect(workspace.source).toContain("createStudioLeftToolRailRuntime(");
     expect(workspace.source).toContain(
-      "<LazyStudioLeftToolRail client={studioLeftToolRailClient} />",
+      "studioLeftToolRailRuntime.update(studioLeftToolRailInput);",
     );
+    expect(workspace.source).toContain(
+      "<LazyStudioLeftToolRail client={studioLeftToolRailRuntime.client} />",
+    );
+    expect(workspace.source).not.toContain("createStudioLeftToolRailClient(");
     expect(workspace.source).not.toContain(
       "stableHandlers={studioLeftToolRailHandlers}",
     );

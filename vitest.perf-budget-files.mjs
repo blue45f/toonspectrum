@@ -8,15 +8,31 @@
 // code it times. Sequencing them behind the main run removes the competition without touching
 // a single threshold — every budget in these files stays exactly as tight as it was.
 //
-// Add a file here when a test times a code path with performance.now() and asserts on the
-// elapsed value. Do not add tests that assert on counts, geometry or output bytes — those are
-// deterministic and belong in the main run. vitest.perf-budget-partition.test.ts pins that
-// every entry exists and really times something.
+// Add a file here when a test times a code path and asserts on the elapsed value — whether it
+// calls performance.now() itself or reaches it through studio-perf-calibration, which owns the
+// clock for every calibrated budget. That second form is how four files stayed in the parallel
+// run after this partition was created: the original guard only looked for a literal
+// performance.now(), so a file that times through the shared helper read as deterministic.
+// studio-oil-ribbon-carrier.impasto-relief then failed main at 8.582x against an 8.55x budget,
+// on three retries, with nothing in the timed code changed.
+//
+// A calibrated budget divides work by a reference kernel measured on the same machine, so it
+// already survives a uniformly slow runner. What it cannot divide out is *contention*: four
+// workers over ~3,000 files perturb the work and the reference by different amounts, and the
+// ratio drifts. Sequencing is what fixes that, not a looser threshold.
+//
+// Do not add tests that assert on counts, geometry or output bytes — those are deterministic and
+// belong in the main run. vitest.perf-budget-partition.test.ts pins that every entry exists and
+// really times something.
 export const PERF_BUDGET_TEST_FILES = Object.freeze([
   "src/domains/creator/brush/studio-brush-stamp-engine.test.ts",
   "src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts",
+  "src/domains/creator/brush/studio-long-stroke-per-move-cost.test.ts",
   "src/domains/creator/brush/studio-oil-ribbon-carrier.bristle-physics.test.ts",
+  "src/domains/creator/brush/studio-oil-ribbon-carrier.impasto-relief.test.ts",
+  "src/domains/creator/brush/studio-paper-media-profile-v1.test.ts",
   "src/domains/creator/brush/studio-perf-budget-calibration.test.ts",
+  "src/domains/creator/brush/studio-perf-calibration.test.ts",
   "src/domains/creator/brush/studio-wet-edge-bloom-v1.test.ts",
   "src/domains/creator/brush/studio-wet-ribbon-carrier.test.ts",
   "src/domains/creator/live/studio-live-dynamic-brush-overlay.test.ts",

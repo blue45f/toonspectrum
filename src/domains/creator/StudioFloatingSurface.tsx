@@ -53,6 +53,8 @@ import {
 import {
   bringStudioFloatingSurfaceToFront,
   registerStudioFloatingSurface,
+  requestStudioFloatingSurfaceLayoutReset,
+  subscribeStudioFloatingSurfaceLayoutReset,
   studioFloatingSurfaceStackSnapshot,
   studioFloatingSurfaceZIndex,
   subscribeStudioFloatingSurfaceStack,
@@ -168,6 +170,12 @@ export interface StudioFloatingSurfaceProps {
   readonly insetLeft?: number;
   readonly className?: string;
   readonly contentClassName?: string;
+  /**
+   * Edges this surface may dock to. Omit to offer all of them. A surface that only makes sense
+   * along one axis — the animatic timeline is a bottom strip — would otherwise advertise a dock
+   * the layout never wears well. "free" is always offered: undocking must stay reachable.
+   */
+  readonly allowedDockEdges?: readonly StudioFloatingSurfaceDock[];
   readonly rootDataAttributes?: Readonly<Record<`data-${string}`, string | undefined>>;
 }
 
@@ -261,8 +269,16 @@ export const StudioFloatingSurface = forwardRef<
   insetLeft = 12,
   className,
   contentClassName,
+  allowedDockEdges,
   rootDataAttributes,
 }, forwardedRef) {
+  // "free" always survives the filter — a surface whose only dock was removed still has to be
+  // undockable, or the menu would strand it against an edge with no way back.
+  const dockChoices = allowedDockEdges === undefined
+    ? DOCK_CHOICES
+    : DOCK_CHOICES.filter(
+      (choice) => choice.dock === "free" || allowedDockEdges.includes(choice.dock),
+    );
   const generatedSurfaceId = useId();
   const stackSurfaceId = surfaceId?.trim() || generatedSurfaceId;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -378,6 +394,19 @@ export const StudioFloatingSurface = forwardRef<
     setMenuOpen(false);
     commitLayout(normalizeStudioFloatingSurfaceLayout(normalizedDefault));
   };
+
+  // A surface dragged past the viewport or shrunk to a sliver can no longer be reached by its own
+  // header, so the recovery has to arrive from outside. Each surface still resets itself here —
+  // the broadcast only carries the request, and `normalizedDefault` stays this surface's own.
+  // Latest-ref written in an effect, not during render: the React Compiler is on.
+  const resetLayoutRef = useRef(resetLayout);
+  useEffect(() => {
+    resetLayoutRef.current = resetLayout;
+  });
+  useEffect(
+    () => subscribeStudioFloatingSurfaceLayoutReset(() => resetLayoutRef.current()),
+    [],
+  );
 
   const beginPointerSession = (
     event: ReactPointerEvent<HTMLElement>,
@@ -655,7 +684,7 @@ export const StudioFloatingSurface = forwardRef<
           <p className="px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wider text-fg-3">
             화면 가장자리
           </p>
-          {DOCK_CHOICES.map(({ dock, label: dockLabel, Icon, iconClassName }) => (
+          {dockChoices.map(({ dock, label: dockLabel, Icon, iconClassName }) => (
             <button
               key={dock}
               type="button"
@@ -730,6 +759,22 @@ export const StudioFloatingSurface = forwardRef<
           >
             <RotateCcw size={15} aria-hidden className="shrink-0 text-accent" />
             위치·크기·잠금 초기화
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={cn(
+              "flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-xs text-fg-2 hover:bg-raised hover:text-fg",
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING,
+            )}
+            onClick={() => {
+              setMenuOpen(false);
+              requestStudioFloatingSurfaceLayoutReset();
+            }}
+          >
+            <RotateCcw size={15} aria-hidden className="shrink-0 text-fg-3" />
+            열린 창 모두 초기화
           </button>
         </div>
       ) : null}

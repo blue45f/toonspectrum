@@ -1,0 +1,93 @@
+name: WebGPU dab tile binning compute
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-wgsl-compat.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts"
+      - "scripts/studio-webgpu-dab-tile-binning-compute-browser.ts"
+      - "scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs"
+      - ".github/workflows/webgpu-dab-tile-binning-compute.yml"
+  pull_request:
+    paths:
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts"
+      - "src/domains/creator/render/studio-webgpu-dab-tile-binning-wgsl-compat.test.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts"
+      - "src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts"
+      - "scripts/studio-webgpu-dab-tile-binning-compute-browser.ts"
+      - "scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs"
+      - ".github/workflows/webgpu-dab-tile-binning-compute.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-dab-tile-binning-compute-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-webgpu:
+    name: real-webgpu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Focused unit tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-wgsl-compat.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-compute.test.ts
+          src/domains/creator/render/studio-webgpu-dab-tile-binning-wgsl-compat.test.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.ts
+          src/domains/creator/render/studio-webgpu-sparse-brush-compute-runtime.test.ts
+
+      - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Exact WebGPU count-scan-scatter proof
+        env:
+          TOONSPECTRUM_WEBGPU_HEADED: "1"
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec node scripts/verify-studio-webgpu-dab-tile-binning-compute.mjs

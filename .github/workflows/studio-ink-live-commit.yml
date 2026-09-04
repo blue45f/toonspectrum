@@ -38,7 +38,6 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
-      TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification
     steps:
       - uses: actions/checkout@v6
         with:
@@ -50,6 +49,10 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - name: Resolve the verification directory after runner allocation
+        run: |
+          echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/toonspectrum-verification" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/toonspectrum-verification"
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build production Studio assets
@@ -61,6 +64,6 @@ jobs:
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
         with:
           name: studio-ink-live-commit-${{ github.run_id }}
-          path: ${{ env.TOONSPECTRUM_VERIFY_DIR }}/studio-ink-live-commit
+          path: ${{ runner.temp }}/toonspectrum-verification/studio-ink-live-commit
           if-no-files-found: warn
           retention-days: 14

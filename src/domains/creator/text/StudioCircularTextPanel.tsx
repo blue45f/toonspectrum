@@ -70,6 +70,10 @@ export function StudioCircularTextPanel({
         <button
           type="button"
           onClick={() => onToggleEnabled(!enabled)}
+          // 고급 조판 디스클로저 안에서만 보이므로 advanced. 선언이 없는 상호작용 요소는
+          // 밀도 감사가 unclassified-control 로 보고한다.
+          data-inspector-control-id="typography.circular.enabled"
+          data-inspector-priority="advanced"
           className={buttonClass({
             size: "sm",
             variant: enabled ? "solid" : "outline",
@@ -171,6 +175,8 @@ export function StudioCircularTextPanel({
                     radius: Number(e.target.value),
                   })
                 }
+                data-inspector-control-id="typography.circular.radius"
+                data-inspector-priority="advanced"
                 className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-pink-400"
               />
             </div>
@@ -195,6 +201,8 @@ export function StudioCircularTextPanel({
                     startAngleDeg: Number(e.target.value),
                   })
                 }
+                data-inspector-control-id="typography.circular.start-angle"
+                data-inspector-priority="advanced"
                 className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-pink-400"
               />
             </div>
@@ -208,6 +216,8 @@ export function StudioCircularTextPanel({
                   onClick={() =>
                     onOptionsChange({ ...options, direction: "clockwise" })
                   }
+                  data-inspector-control-id="typography.circular.direction.clockwise"
+                  data-inspector-priority="advanced"
                   className={buttonClass({
                     size: "sm",
                     variant:
@@ -232,6 +242,8 @@ export function StudioCircularTextPanel({
                       direction: "counter-clockwise",
                     })
                   }
+                  data-inspector-control-id="typography.circular.direction.counter-clockwise"
+                  data-inspector-priority="advanced"
                   className={buttonClass({
                     size: "sm",
                     variant:
@@ -260,6 +272,8 @@ export function StudioCircularTextPanel({
                   onClick={() =>
                     onOptionsChange({ ...options, orientation: "outward" })
                   }
+                  data-inspector-control-id="typography.circular.orientation.outward"
+                  data-inspector-priority="advanced"
                   className={buttonClass({
                     size: "sm",
                     variant:
@@ -281,6 +295,8 @@ export function StudioCircularTextPanel({
                   onClick={() =>
                     onOptionsChange({ ...options, orientation: "inward" })
                   }
+                  data-inspector-control-id="typography.circular.orientation.inward"
+                  data-inspector-priority="advanced"
                   className={buttonClass({
                     size: "sm",
                     variant:
