@@ -19,7 +19,7 @@ concurrency:
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[inkwash-live-preview-applied]') }}
-    runs-on: macos-15
+    runs-on: windows-2025
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -124,14 +124,17 @@ jobs:
           source = source.replace(expression_open, "\\$" + "{{")
           path.write_text(source, encoding="utf-8")
       - name: Apply quality-first preview patch
+        shell: bash
         run: |
           node --check scripts/apply-inkwash-live-preview-quality-wave.mjs
           node scripts/apply-inkwash-live-preview-quality-wave.mjs
       - name: Keep the product commit free of workflow mutations
+        shell: bash
         run: |
           git checkout HEAD -- .github/workflows/apply-inkwash-live-preview-quality-wave.yml
           rm -f .github/workflows/studio-inkwash-live-preview-quality.yml
       - name: Commit product changes for full validation
+        shell: bash
         run: |
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
