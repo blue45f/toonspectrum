@@ -50,7 +50,6 @@ jobs:
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v6
 
@@ -77,6 +76,8 @@ jobs:
           src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
 
       - name: Run static texture and hand-feel audit
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}
         run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
 
       - name: Lint changed quality surfaces
