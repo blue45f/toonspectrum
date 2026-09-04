@@ -35,8 +35,10 @@ interface MarketSocialStore {
   snapshot: MarketSocialSnapshot;
   request: Promise<void> | null;
   controller: AbortController | null;
+  mutationController: AbortController | null;
   viewerKey: string | null;
   browserCleanup: (() => void) | null;
+  lastTouchedAt: number;
 }
 
 interface MarketSocialBroadcastMessage {
@@ -47,6 +49,7 @@ interface MarketSocialBroadcastMessage {
 }
 
 const stores = new Map<string, MarketSocialStore>();
+const MAX_MARKET_SOCIAL_STORES = 64;
 const CHANNEL_NAME = "toonspectrum:market-social:v1";
 let broadcastChannel: BroadcastChannel | null | undefined;
 
@@ -62,16 +65,51 @@ function createStore(resourceId: string): MarketSocialStore {
     },
     request: null,
     controller: null,
+    mutationController: null,
     viewerKey: null,
     browserCleanup: null,
+    lastTouchedAt: Date.now(),
   };
+}
+
+function touchStore(store: MarketSocialStore): void {
+  store.lastTouchedAt = Date.now();
+}
+
+function disposeStore(store: MarketSocialStore): void {
+  store.controller?.abort();
+  store.mutationController?.abort();
+  store.browserCleanup?.();
+  stores.delete(store.resourceId);
+}
+
+function pruneInactiveStores(preserve?: MarketSocialStore): void {
+  if (stores.size <= MAX_MARKET_SOCIAL_STORES) return;
+  const candidates = [...stores.values()]
+    .filter((store) =>
+      store !== preserve
+      && store.listeners.size === 0
+      && !store.request
+      && !store.snapshot.pendingAction
+      && !store.mutationController
+    )
+    .sort((left, right) => left.lastTouchedAt - right.lastTouchedAt);
+  while (stores.size > MAX_MARKET_SOCIAL_STORES) {
+    const candidate = candidates.shift();
+    if (!candidate) break;
+    disposeStore(candidate);
+  }
 }
 
 function getStore(resourceId: string): MarketSocialStore {
   const existing = stores.get(resourceId);
-  if (existing) return existing;
+  if (existing) {
+    touchStore(existing);
+    return existing;
+  }
   const created = createStore(resourceId);
   stores.set(resourceId, created);
+  pruneInactiveStores(created);
   return created;
 }
 
@@ -80,7 +118,31 @@ function publish(
   patch: Partial<MarketSocialSnapshot>,
 ): void {
   store.snapshot = { ...store.snapshot, ...patch };
+  touchStore(store);
   for (const listener of store.listeners) listener();
+}
+
+function setStoreViewerKey(
+  store: MarketSocialStore,
+  viewerKey: string,
+): boolean {
+  const changed = store.viewerKey !== viewerKey;
+  if (!changed) {
+    touchStore(store);
+    return false;
+  }
+
+  store.viewerKey = viewerKey;
+  store.controller?.abort();
+  store.mutationController?.abort();
+  store.mutationController = null;
+  publish(store, {
+    status: "idle",
+    data: null,
+    error: null,
+    pendingAction: null,
+  });
+  return true;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -119,6 +181,7 @@ async function loadStore(
     .finally(() => {
       if (store.request === request) store.request = null;
       if (store.controller === controller) store.controller = null;
+      pruneInactiveStores();
     });
   store.request = request;
   return request;
@@ -198,9 +261,12 @@ function attachBrowserRefresh(store: MarketSocialStore): void {
 function subscribe(store: MarketSocialStore, listener: () => void): () => void {
   if (store.listeners.size === 0) attachBrowserRefresh(store);
   store.listeners.add(listener);
+  touchStore(store);
   return () => {
     store.listeners.delete(listener);
     if (store.listeners.size === 0) store.browserCleanup?.();
+    touchStore(store);
+    pruneInactiveStores();
   };
 }
 
@@ -213,20 +279,27 @@ async function mutateStore(
     throw new Error("다른 마켓 작업이 진행 중입니다.");
   }
   const controller = new AbortController();
+  store.mutationController = controller;
   publish(store, { pendingAction: action, error: null });
   try {
     const data = await mutation(controller.signal);
+    if (controller.signal.aborted) return;
     publish(store, { status: "ready", data, error: null });
     announceChange(store, data);
   } catch (error) {
+    if (controller.signal.aborted) return;
     publish(store, {
       error: errorMessage(error, "마켓 작업을 완료하지 못했습니다."),
     });
     throw error;
   } finally {
+    if (store.mutationController === controller) {
+      store.mutationController = null;
+    }
     if (store.snapshot.pendingAction === action) {
       publish(store, { pendingAction: null });
     }
+    pruneInactiveStores();
   }
 }
 
@@ -263,8 +336,7 @@ export function useMarketSocial(
   );
 
   useEffect(() => {
-    const viewerChanged = store.viewerKey !== normalizedViewerKey;
-    store.viewerKey = normalizedViewerKey;
+    const viewerChanged = setStoreViewerKey(store, normalizedViewerKey);
     void loadStore(store, viewerChanged);
   }, [normalizedViewerKey, store]);
 
@@ -350,11 +422,12 @@ export function useMarketSocial(
   };
 }
 
+export function getMarketSocialStoreCountForTests(): number {
+  return stores.size;
+}
+
 export function resetMarketSocialStoresForTests(): void {
-  for (const store of stores.values()) {
-    store.controller?.abort();
-    store.browserCleanup?.();
-  }
+  for (const store of [...stores.values()]) disposeStore(store);
   stores.clear();
   broadcastChannel?.close();
   broadcastChannel = undefined;
