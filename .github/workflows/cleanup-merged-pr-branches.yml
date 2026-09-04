@@ -1,0 +1,49 @@
+name: Cleanup merged PR branches
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Inspect without deleting branches
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cleanup-merged-pr-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+
+      - name: Remove only refs proven to be contained in main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          apply_flag='--apply'
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' && "${{ inputs.dry_run }}" == 'true' ]]; then
+            apply_flag=''
+          fi
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            node scripts/cleanup-merged-branches.mjs --pr "${{ github.event.pull_request.number }}" $apply_flag
+          else
+            node scripts/cleanup-merged-branches.mjs --all $apply_flag
+          fi
