@@ -17,7 +17,11 @@ concurrency:
 
 jobs:
   fix:
-    runs-on: ubuntu-slim
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-slim, ubuntu-24.04-arm, macos-15]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -43,16 +47,14 @@ jobs:
 
           module_path = Path("src/domains/creator/brush/studio-brush-quality-portfolio.ts")
           module = module_path.read_text(encoding="utf-8")
-          module = module.replace('export * from "./studio-brush-quality-foundation";\n\n', "", 1)
+          export_line = 'export * from "./studio-brush-quality-foundation";\n'
+          module = module.replace(export_line + "\n", "", 1)
           module = module.replace("  STUDIO_BRUSH_HAND_FEEL_PROFILES,\n", "", 1)
           anchor = 'import { STUDIO_BRUSH_QUALITY_PORTFOLIO } from "./studio-brush-quality-portfolio-data";\n'
-          if anchor not in module:
-              raise SystemExit("portfolio module import anchor missing")
-          module = module.replace(
-              anchor,
-              anchor + '\nexport * from "./studio-brush-quality-foundation";\n',
-              1,
-          )
+          if export_line not in module:
+              if anchor not in module:
+                  raise SystemExit("portfolio module import anchor missing")
+              module = module.replace(anchor, anchor + "\n" + export_line, 1)
           module_path.write_text(module, encoding="utf-8")
           PY
           rm -f .github/workflows/fix-brush-portfolio-lint-final.yml
@@ -60,5 +62,17 @@ jobs:
           git config user.name "toonstudio-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
           git commit --no-verify -m "fix(brush): normalize quality portfolio imports"
-          git push --no-verify origin HEAD:fix/brush-portfolio-exhaustive-contract-20260904
+          if git push --no-verify origin HEAD:fix/brush-portfolio-exhaustive-contract-20260904; then
+            exit 0
+          fi
+          git fetch origin fix/brush-portfolio-exhaustive-contract-20260904
+          git show FETCH_HEAD:src/domains/creator/brush/studio-brush-quality-portfolio-data.ts | sed -n '1,3p' | grep -Fx ''
+          git show FETCH_HEAD:src/domains/creator/brush/studio-brush-quality-portfolio.ts | sed -n '1,15p' | grep -F 'export * from "./studio-brush-quality-foundation";'
+          if git cat-file -e FETCH_HEAD:.github/workflows/fix-brush-portfolio-lint-final.yml 2>/dev/null; then
+            echo "remote still contains the one-shot workflow" >&2
+            exit 1
+          fi
