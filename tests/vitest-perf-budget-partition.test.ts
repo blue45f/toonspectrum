@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -21,10 +21,32 @@ describe("wall-clock budget partition", () => {
   });
 
   it("lists only files that measure wall-clock time", () => {
-    const notTimed = PERF_BUDGET_TEST_FILES.filter(
-      (file) => !readFileSync(path.join(root, file), "utf8").includes("performance.now("),
-    );
-    expect(notTimed, "no performance.now() — this belongs in the main run").toEqual([]);
+    // Two ways to time: call the clock, or reach it through studio-perf-calibration, which owns
+    // performance.now() for every calibrated budget. Looking only for the literal call is what
+    // left four calibrated-budget files in the parallel run until one of them reddened main.
+    const notTimed = PERF_BUDGET_TEST_FILES.filter((file) => {
+      const source = readFileSync(path.join(root, file), "utf8");
+      return !source.includes("performance.now(")
+        && !source.includes("evaluateStudioCalibrated");
+    });
+    expect(
+      notTimed,
+      "neither performance.now() nor a calibrated budget — this belongs in the main run",
+    ).toEqual([]);
+  });
+
+  it("does not leave a calibrated-budget file behind in the parallel run", () => {
+    // The partition is a hand-maintained list, and the failure mode is silent: a new calibrated
+    // budget lands in the main run, passes on a quiet machine, and reddens main weeks later.
+    const brushDir = path.join(root, "src/domains/creator/brush");
+    const stragglers = readdirSync(brushDir)
+      .filter((name) => name.endsWith(".test.ts"))
+      .filter((name) =>
+        readFileSync(path.join(brushDir, name), "utf8").includes("evaluateStudioCalibrated"))
+      .map((name) => `src/domains/creator/brush/${name}`)
+      .filter((file) => !PERF_BUDGET_TEST_FILES.includes(file));
+
+    expect(stragglers, "add these to vitest.perf-budget-files.mjs").toEqual([]);
   });
 
   it("keeps the list sorted so additions diff cleanly", () => {
