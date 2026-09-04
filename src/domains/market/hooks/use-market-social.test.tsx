@@ -7,6 +7,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  getMarketSocialStoreCountForTests,
+  resetMarketSocialStoresForTests,
+  useMarketSocial,
+} from "./use-market-social";
+
 const RESOURCE_ID = "11111111-1111-4111-8111-111111111111";
 
 const mocks = vi.hoisted(() => ({
@@ -28,12 +34,6 @@ vi.mock("@/src/infrastructure/creator-marketplace-social-client", () => ({
   toggleCreatorMarketplaceReviewHelpful: mocks.toggleReviewHelpful,
   upsertCreatorMarketplaceReview: mocks.upsertReview,
 }));
-
-import {
-  getMarketSocialStoreCountForTests,
-  resetMarketSocialStoresForTests,
-  useMarketSocial,
-} from "./use-market-social";
 
 function page(commentCount = 0) {
   return {
