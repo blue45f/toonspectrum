@@ -8,6 +8,7 @@ import type { StudioGpuDab } from "./studio-webgpu-dab-plan-contract";
 
 /**
  * Bounded exact WebGPU count / scan / stable-scatter candidate.
+ * WGSL identifiers deliberately avoid evolving reserved words (`meta`, `active`).
  *
  * The CPU prepares only four integer span bounds per dab. Tile counts, the exclusive prefix scan,
  * and stable CSR reference emission run on the leased GPU. The output order is byte-for-byte
@@ -403,12 +404,12 @@ struct Meta {
 
 @group(0) @binding(0) var<storage, read> spans: array<vec4u>;
 @group(0) @binding(1) var<storage, read_write> tile_counts: array<atomic<u32>>;
-@group(0) @binding(2) var<uniform> meta: Meta;
+@group(0) @binding(2) var<uniform> config: Meta;
 
 @compute @workgroup_size(${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let dab_index = gid.x;
-  if (dab_index >= meta.dab_count) {
+  if (dab_index >= config.dab_count) {
     return;
   }
   let span = spans[dab_index];
@@ -419,8 +420,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   loop {
     var column = span.x;
     loop {
-      let tile_index = row * meta.columns + column;
-      if (tile_index < meta.tile_count) {
+      let tile_index = row * config.columns + column;
+      if (tile_index < config.tile_count) {
         atomicAdd(&tile_counts[tile_index], 1u);
       }
       if (column >= span.y) {
@@ -446,7 +447,7 @@ struct Meta {
 
 @group(0) @binding(0) var<storage, read_write> tile_counts: array<atomic<u32>>;
 @group(0) @binding(1) var<storage, read_write> tile_offsets: array<u32>;
-@group(0) @binding(2) var<uniform> meta: Meta;
+@group(0) @binding(2) var<uniform> config: Meta;
 var<workgroup> scratch: array<u32, ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS}>;
 
 @compute @workgroup_size(${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE})
@@ -457,7 +458,7 @@ fn main(@builtin(local_invocation_id) local_id: vec3u) {
     if (index >= ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS}u) {
       break;
     }
-    if (index < meta.tile_count) {
+    if (index < config.tile_count) {
       scratch[index] = atomicLoad(&tile_counts[index]);
     } else {
       scratch[index] = 0u;
@@ -467,14 +468,14 @@ fn main(@builtin(local_invocation_id) local_id: vec3u) {
   workgroupBarrier();
 
   var offset = 1u;
-  var active = ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS / 2}u;
+  var level_count = ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS / 2}u;
   loop {
-    if (active == 0u) {
+    if (level_count == 0u) {
       break;
     }
     var operation = lane;
     loop {
-      if (operation >= active) {
+      if (operation >= level_count) {
         break;
       }
       let left = offset * (2u * operation + 1u) - 1u;
@@ -483,7 +484,7 @@ fn main(@builtin(local_invocation_id) local_id: vec3u) {
       operation += ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE}u;
     }
     offset *= 2u;
-    active >>= 1u;
+    level_count >>= 1u;
     workgroupBarrier();
   }
 
@@ -492,15 +493,15 @@ fn main(@builtin(local_invocation_id) local_id: vec3u) {
   }
   workgroupBarrier();
 
-  active = 1u;
+  level_count = 1u;
   offset = ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS / 2}u;
   loop {
-    if (active >= ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS}u) {
+    if (level_count >= ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_SCAN_ELEMENTS}u) {
       break;
     }
     var operation = lane;
     loop {
-      if (operation >= active) {
+      if (operation >= level_count) {
         break;
       }
       let left = offset * (2u * operation + 1u) - 1u;
@@ -510,21 +511,21 @@ fn main(@builtin(local_invocation_id) local_id: vec3u) {
       scratch[right] += temporary;
       operation += ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE}u;
     }
-    active *= 2u;
+    level_count *= 2u;
     offset >>= 1u;
     workgroupBarrier();
   }
 
   index = lane;
   loop {
-    if (index >= meta.tile_count) {
+    if (index >= config.tile_count) {
       break;
     }
     tile_offsets[index] = scratch[index];
     index += ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE}u;
   }
   if (lane == 0u) {
-    tile_offsets[meta.tile_count] = meta.reference_count;
+    tile_offsets[config.tile_count] = config.reference_count;
   }
 }
 `;
@@ -540,7 +541,7 @@ struct Meta {
 @group(0) @binding(0) var<storage, read> spans: array<vec4u>;
 @group(0) @binding(1) var<storage, read> tile_offsets: array<u32>;
 @group(0) @binding(2) var<storage, read_write> dab_indices: array<u32>;
-@group(0) @binding(3) var<uniform> meta: Meta;
+@group(0) @binding(3) var<uniform> config: Meta;
 
 var<workgroup> inclusive: array<u32, ${STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WORKGROUP_SIZE}>;
 var<workgroup> output_cursor: u32;
@@ -549,8 +550,8 @@ fn span_contains_tile(span: vec4u, tile_index: u32) -> bool {
   if (span.x == ${OUTSIDE_DOCUMENT}u) {
     return false;
   }
-  let row = tile_index / meta.columns;
-  let column = tile_index - row * meta.columns;
+  let row = tile_index / config.columns;
+  let column = tile_index - row * config.columns;
   return column >= span.x
     && column <= span.y
     && row >= span.z
@@ -564,7 +565,7 @@ fn main(
 ) {
   let tile_index = group_id.x;
   let lane = local_id.x;
-  if (tile_index >= meta.tile_count) {
+  if (tile_index >= config.tile_count) {
     return;
   }
   if (lane == 0u) {
@@ -574,12 +575,12 @@ fn main(
 
   var chunk_start = 0u;
   loop {
-    if (chunk_start >= meta.dab_count) {
+    if (chunk_start >= config.dab_count) {
       break;
     }
     let dab_index = chunk_start + lane;
     var hit = false;
-    if (dab_index < meta.dab_count) {
+    if (dab_index < config.dab_count) {
       hit = span_contains_tile(spans[dab_index], tile_index);
     }
     inclusive[lane] = select(0u, 1u, hit);
@@ -606,7 +607,7 @@ fn main(
       let local_offset = inclusive[lane] - 1u;
       let output_index =
         tile_offsets[tile_index] + output_cursor + local_offset;
-      if (output_index < meta.reference_count) {
+      if (output_index < config.reference_count) {
         dab_indices[output_index] = dab_index;
       }
     }
