@@ -17,6 +17,9 @@ describe("StudioPressureCurveGraph", () => {
     expect(html).toContain('data-studio-pressure-curve-handle="true"');
     expect(html).toContain('role="slider"');
     expect(html).toContain('aria-label="필압 곡선 제어점"');
+    expect(html).toContain('aria-orientation="vertical"');
+    expect(html).toContain('aria-valuenow="50"');
+    expect(html).toContain("중간 필압 출력 50%");
     expect(html).toContain('data-studio-pressure-test-pad="true"');
     expect(html).toContain("실시간 필압 테스트");
     expect(html).toContain("자동 보정");
