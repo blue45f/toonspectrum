@@ -71,9 +71,9 @@ jobs:
               1,
           )
           source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
-          # GitHub expressions are emitted into a generated YAML template. Escape them so Node does
-          # not parse `${{ ... }}` as JavaScript template interpolation.
-          source = source.replace("${{", "\\${{")
+          expression_open = "$" + "{{"
+          escaped_open = "\\$" + "{{"
+          source = source.replace(expression_open, escaped_open)
           path.write_text(source, encoding="utf-8")
       - name: Validate applicator syntax
         run: node --check scripts/apply-inkwash-live-preview-quality-wave.mjs
