@@ -45,6 +45,11 @@ jobs:
               source = source.replace(before, after, 1)
 
           replace_one(
+              '  const source = readFileSync(path, "utf8");',
+              '  const source = readFileSync(path, "utf8").replace(/\\r\\n/g, "\\n");',
+              "cross-platform line endings",
+          )
+          replace_one(
               (
                   "  const baseRadius = Math.max(0.75, options.radius);\n"
                   "  const absorption = spectralColor({ ...options, samples: [] });\n"
