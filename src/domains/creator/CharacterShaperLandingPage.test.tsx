@@ -137,8 +137,10 @@ describe("CharacterShaperLandingPage", () => {
 
 describe("/shaper registration", () => {
   it("is wired into the router, titles, manifest, sitemap, footer and mobile navigation", () => {
-    expect(readRepoFile("src/app/routes/AppRouter.tsx")).toContain(
-      '<Route path="/shaper" element={<CharacterShaperLandingPage />} />',
+    // AppRouter now renders one <Route> per entry of the grouped route table, so the /shaper
+    // registration lives in the creator group rather than in the router JSX.
+    expect(readRepoFile("src/app/routes/groups/creator.routes.tsx")).toContain(
+      '{ id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> }',
     );
     expect(readRepoFile("src/app/routes/route-titles.ts")).toContain('"/shaper": "route.shaper"');
     expect(readRepoFile("src/app/routes/route-manifest.ts")).toContain(

@@ -126,7 +126,10 @@ describe("CanvasKit PathOps product entry boundary", () => {
   });
 
   it("owns cancellation, Worker lifetime, timeline cleanup, and selection ref synchronization", () => {
-    const page = moduleEdges("../StudioCuttoonEditorHost.tsx").source;
+    // 984251d8c 가 취소/수명 관리 effect 들을 이 런타임 훅으로 옮겼다.
+    const page = moduleEdges(
+      "../studio-cuttoon-editor/runtime/useStudioVectorOperationRuntime.ts",
+    ).source;
     const handler = pathBooleanHandler();
 
     expect(page).toContain("pathBooleanAbortRef.current?.abort()");

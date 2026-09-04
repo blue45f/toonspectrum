@@ -289,8 +289,13 @@ describe("Studio companion Reference runtime boundaries", () => {
 
   it("publishes only one atomically committed Reference snapshot outside React", () => {
     const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
+    // 984251d8c 가 레퍼런스 보드 state·커밋 경계·가드 세터를 이 런타임 훅으로 옮겼다. 호스트에는
+    // 커밋된 스냅샷을 읽기만 하는 컴패니언 투영이 남았다.
+    const sidecars = moduleEdges(
+      "./studio-cuttoon-editor/runtime/useStudioDocumentSidecarsRuntime.ts"
+    );
     const committedRef = "referenceBoardCommittedSnapshotRef";
-    const writes = refCurrentAssignments(page.sourceFile, committedRef);
+    const writes = refCurrentAssignments(sidecars.sourceFile, committedRef);
 
     expect(writes).toHaveLength(1);
     expect(isInsideHookCall(writes[0]!, "useLayoutEffect")).toBe(true);
@@ -307,12 +312,15 @@ describe("Studio companion Reference runtime boundaries", () => {
     expect(bootstrapProjectionCallbacks).toHaveLength(1);
     expect(countRefCurrentAccesses(bootstrapProjectionCallbacks[0]!, committedRef)).toBe(1);
 
-    const pageSource = page.sourceFile.getFullText();
+    const sidecarsSource = sidecars.sourceFile.getFullText();
+    const pageSource = [page.sourceFile.getFullText(), sidecarsSource].join("\n");
     expect(pageSource).not.toContain("referenceBoardRef");
     expect(pageSource).not.toContain("referenceBoardRevisionRef");
-    const guardedSetterStart = pageSource.indexOf("const setReferenceBoard = (");
-    const guardedSetterEnd = pageSource.indexOf("const [masterEditMode", guardedSetterStart);
-    const guardedSetter = pageSource.slice(guardedSetterStart, guardedSetterEnd);
+    const guardedSetterStart = sidecarsSource.indexOf(
+      "function setReferenceBoard(next: StudioReferenceBoardDocument): boolean {"
+    );
+    const guardedSetterEnd = sidecarsSource.indexOf("const [masterEditMode", guardedSetterStart);
+    const guardedSetter = sidecarsSource.slice(guardedSetterStart, guardedSetterEnd);
     expect(guardedSetterStart).toBeGreaterThan(-1);
     expect(guardedSetterEnd).toBeGreaterThan(guardedSetterStart);
     expect(guardedSetter).toContain("referenceBoardLatestRequestedRef.current");

@@ -207,8 +207,11 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
       record.indexOf("recordStudioHistoryJournalSidecarEdit"),
     );
     expect(record.indexOf("onBeforeRecordSidecar?.()")).toBeGreaterThanOrEqual(0);
-    const wiring = sourceBetween("onBeforeRecordSidecar: () => {", "historyJournalRef,");
+    // 984251d8c 이후 호스트는 useStudioDocumentSidecarsRuntime 에 `beforeRecordSidecar` 로 걸고,
+    // 그 런타임이 컨트롤러의 onBeforeRecordSidecar 로 그대로 넘긴다.
+    const wiring = sourceBetween("beforeRecordSidecar: () => {", "commitStudioHistoryJournal,");
     expect(wiring).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
+    expect(studioPageSource).toContain("onBeforeRecordSidecar: beforeRecordSidecar,");
   });
 
   it("undo 는 최신 항목이 사이드카면 문서만 되돌리고 pagesHi 는 건드리지 않는다", () => {
@@ -241,11 +244,14 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
 
   it("저널은 스냅샷 히스토리가 앞을 버릴 때 같이 버린다", () => {
     // 상한을 넘겨 잘려 나간 스냅샷 단계 수만큼 저널도 `pages` 항목을 버려야 둘이 어긋나지 않는다.
+    // 저널 기록기는 useStudioUnifiedHistoryJournal 로 추출되면서 useCallback 형태가 됐다.
     const record = sourceBetween(
-      "function recordStudioHistoryJournalPages(addedSteps: number, nextUndoDepth: number): void {",
-      "/** 문서 전체 수화(프로젝트 로드",
+      "const recordStudioHistoryJournalPages = useCallback((",
+      "const resetStudioHistoryJournal = useCallback((",
     );
-    expect(record).toContain("recordStudioHistoryJournalPagesSteps(historyJournalRef.current, { addedSteps, nextUndoDepth })");
+    expect(record).toContain("recordStudioHistoryJournalPagesSteps(historyJournalRef.current, {");
+    expect(record).toContain("addedSteps,");
+    expect(record).toContain("nextUndoDepth,");
 
     // 새 단계를 만드는 모든 경로가 실제 결과 인덱스를 그대로 넘긴다(기대값을 다시 계산하지 않는다).
     // 커밋 엔진 경로(commit/commitCoalesced/펼치기)는 studio-deferred-stroke-commit.ts 로

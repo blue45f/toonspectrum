@@ -25,10 +25,14 @@ describe("Studio product UI preference authority", () => {
   );
 
   it("hydrates page-owned UI preferences from SQLite/OPFS with late-load fences", () => {
-    const page = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
-      "utf8",
-    );
+    // Preferences hydration moved into its runtime hook when the routes were layered; the
+    // boundary is unchanged, so read the host together with that hook.
+    const page = [
+      "src/domains/creator/StudioCuttoonEditorHost.tsx",
+      "src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts",
+    ]
+      .map((relativePath) => readFileSync(resolve(process.cwd(), relativePath), "utf8"))
+      .join("\n");
     const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
     expect(page).toContain("acquireProductStudioUiPreferencesRepository");

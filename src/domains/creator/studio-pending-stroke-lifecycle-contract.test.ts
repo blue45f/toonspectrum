@@ -160,9 +160,10 @@ describe("pending stroke lifecycle source contract", () => {
   });
 
   it("복구 탐지 전 primary를 보존하고 교차 페이지 입력은 성공한 flush 뒤에만 허용한다", () => {
+    // 984251d8c 이후 페이지 선택 게이트는 호스트 안에서 useCallback 형태로 남았다.
     const pageSelection = sourceBetween(
-      "function setCurrentPageId(next:",
-      "// ── 문서 마스터"
+      "const setCurrentPageId = useCallback((next:",
+      "setCurrentPageIdState(nextPageId);"
     );
     const drawingStart = sourceBetween(
       "if (tool === \"draw\")",

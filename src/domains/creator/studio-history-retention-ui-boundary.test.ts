@@ -38,7 +38,13 @@ describe("Studio history retention UI boundary", () => {
   });
 
   it("resets document-scoped diagnostics on both hard hydration paths", () => {
-    expect(count("resetStudioHistoryRetention();")).toBe(1);
+    // The retention state moved into useStudioHistoryRetention (984251d8c). The server hydration
+    // path no longer open-codes the ref+setState pair; both hard paths now call the one reset,
+    // and that reset is still the only place a fresh diagnostics state is committed.
+    expect(count("resetStudioHistoryRetention();")).toBe(2);
+    expect(
+      count("commitStudioHistoryRetention(createStudioHistoryRetentionUiState());")
+    ).toBe(1);
 
     const autosaveReset = studioPage.slice(
       studioPage.indexOf("pagesHistoryRef.current = [restoredPages];"),
@@ -50,13 +56,7 @@ describe("Studio history retention UI boundary", () => {
       studioPage.indexOf("const hydratedPages = hydratedProject.pagesList"),
       studioPage.indexOf("setPagesHistoryState([hydratedPages]);")
     );
-    expect(serverHydration).toContain(
-      "const freshHistoryRetention = createStudioHistoryRetentionUiState();"
-    );
-    expect(serverHydration).toContain(
-      "studioHistoryRetentionRef.current = freshHistoryRetention;"
-    );
-    expect(serverHydration).toContain("setStudioHistoryRetention(freshHistoryRetention);");
+    expect(serverHydration).toContain("resetStudioHistoryRetention();");
   });
 
   it("exposes honest last-measured diagnostics and the authoritative undo depth", () => {

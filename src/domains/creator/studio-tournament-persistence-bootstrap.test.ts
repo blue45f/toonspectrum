@@ -169,7 +169,10 @@ describe("Studio tournament persistence bootstrap", () => {
     expect(page).not.toMatch(
       /^import .*studio-tournament-sqlite-persistence/mu,
     );
-    expect(page).toContain('from "./studio-tournament-persistence-bootstrap"');
+    // The boot call moved into its runtime hook when the routes were layered, so the specifier is
+    // now "../../" rather than "./". The boundary is which module the surface imports, not how
+    // deep the importer sits.
+    expect(page).toMatch(/from\s+["'][^"']*studio-tournament-persistence-bootstrap["']/u);
     expect(bootstrap).toContain(
       'import("./studio-tournament-sqlite-persistence")',
     );

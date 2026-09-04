@@ -98,11 +98,23 @@ describe("Studio mobile immersive preference", () => {
   });
 
   it("clears a temporary inspector override when entering the super-simple layout", () => {
-    const densitySetter = studioPageSource.slice(
-      studioPageSource.indexOf("function setStudioUiDensity("),
-      studioPageSource.indexOf("function commitAppSettings("),
+    const preferencesSource = readFileSync(
+      new URL(
+        "./studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts",
+        import.meta.url,
+      ),
+      "utf8",
     );
-    expect(densitySetter).toContain('if (mode === "focus") setForceRightPanelOpen(false);');
+    const densitySetter = preferencesSource.slice(
+      preferencesSource.indexOf("const setStudioUiDensity ="),
+      preferencesSource.indexOf("const commitAppSettings ="),
+    );
+    expect(densitySetter).toContain('if (mode === "focus") closeRightPanelForFocusModeRef.current();');
+    // The host owns the panel state the runtime hook closes over.
+    const hostCloser = studioPageSource.slice(
+      studioPageSource.indexOf("const closeStudioRightPanelForFocusMode ="),
+    );
+    expect(hostCloser.slice(0, 200)).toContain("setForceRightPanelOpen(false);");
   });
 
   it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
