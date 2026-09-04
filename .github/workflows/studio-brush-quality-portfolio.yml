@@ -2,23 +2,6 @@
 name: Studio brush quality portfolio
 
 on:
-  push:
-    branches:
-      - fix/brush-portfolio-exhaustive-contract-20260904
-    paths:
-      - "scripts/audit-studio-brush-quality-portfolio.mts"
-      - "src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx"
-      - "src/domains/creator/brush/studio-brush-catalog-core.ts"
-      - "src/domains/creator/brush/studio-brush-catalog.ts"
-      - "src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts"
-      - "src/domains/creator/brush/studio-brush-quality-foundation.ts"
-      - "src/domains/creator/brush/studio-brush-quality-portfolio-counts.ts"
-      - "src/domains/creator/brush/studio-brush-quality-portfolio-data.ts"
-      - "src/domains/creator/brush/studio-brush-quality-portfolio.test.ts"
-      - "src/domains/creator/brush/studio-brush-quality-portfolio.ts"
-      - "src/domains/creator/brush/studio-sub-tool-palette-data.test.ts"
-      - "src/domains/creator/brush/studio-sub-tool-palette-data.ts"
-      - ".github/workflows/studio-brush-quality-portfolio.yml"
   pull_request:
     branches: [main]
     paths:
@@ -34,6 +17,12 @@ on:
       - "src/domains/creator/brush/studio-brush-quality-portfolio.ts"
       - "src/domains/creator/brush/studio-sub-tool-palette-data.test.ts"
       - "src/domains/creator/brush/studio-sub-tool-palette-data.ts"
+      - ".github/workflows/studio-brush-quality-portfolio.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/audit-studio-brush-quality-portfolio.mts"
+      - "src/domains/creator/brush/**"
       - ".github/workflows/studio-brush-quality-portfolio.yml"
   workflow_dispatch:
 
