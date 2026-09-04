@@ -1,0 +1,40 @@
+name: Temporary Studio production source export
+
+on:
+  push:
+    branches:
+      - feat/studio-production-command-center-20260905
+    paths:
+      - .github/workflows/tmp-studio-production-source-export.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Package focused source
+        run: |
+          tar -czf studio-production-source.tgz \
+            package.json tsconfig.json vite.config.ts vitest.config.ts \
+            src/app/routes \
+            src/domains/creator/studio-router \
+            src/domains/creator/studio-workspace-route.ts \
+            src/domains/creator/StudioRoute* 2>/dev/null || \
+          tar -czf studio-production-source.tgz \
+            package.json tsconfig.json vite.config.ts vitest.config.ts \
+            src/app/routes \
+            src/domains/creator/studio-router \
+            src/domains/creator/studio-workspace-route.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-production-source
+          path: studio-production-source.tgz
+          if-no-files-found: error
+          retention-days: 1
