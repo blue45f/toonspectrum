@@ -25,6 +25,7 @@ const requiredPaths = [
   "DESIGN.md",
   "docs/ranking-architecture.md",
   "docs/competitor-analysis.md",
+  "docs/architecture/frontend-layered-architecture.md",
   "pnpm-workspace.yaml",
   "tsconfig.json",
   "commitlint.config.cjs",
@@ -35,6 +36,11 @@ const requiredPaths = [
   "deploy/oci/crawl-update.sh",
   "scripts/vercel-workflow-policy.mjs",
   "scripts/vercel-workflow-policy.test.mjs",
+  "src/app/routes/app-route-definition.ts",
+  "src/app/routes/groups/app-routes.tsx",
+  "src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
+  "src/domains/creator/studio-router/routes/StudioPublishRoute.tsx",
+  "src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
   ".husky/pre-commit",
   ".husky/commit-msg",
 ];
@@ -107,6 +113,14 @@ const forbiddenParallelPaths = [
 ];
 for (const forbidden of forbiddenParallelPaths) {
   if (exists(forbidden)) issues.push(`forbidden parallel studio path exists: ${forbidden}`);
+}
+
+// One-off QA receipts are execution artifacts, not maintained source. Keeping dated trigger notes
+// in the tree makes repository search noisy and gives transient evidence the same status as ADRs.
+for (const receiptDir of [".github/qa", "scripts/qa/runs"]) {
+  if (exists(receiptDir)) {
+    issues.push(`ephemeral QA receipt directory belongs in Actions artifacts: ${receiptDir}`);
+  }
 }
 for (const base of ["packages", "crates", "apps"]) {
   if (!exists(base)) continue;

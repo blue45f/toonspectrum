@@ -11,6 +11,18 @@ const appRouterSource = readFileSync(
   resolve(process.cwd(), "src/app/routes/AppRouter.tsx"),
   "utf8",
 );
+const creatorRoutesSource = readFileSync(
+  resolve(process.cwd(), "src/app/routes/groups/creator.routes.tsx"),
+  "utf8",
+);
+const editorRouteSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-router/routes/StudioEditorRoute.tsx"),
+  "utf8",
+);
+const publishRouteSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-router/routes/StudioPublishRoute.tsx"),
+  "utf8",
+);
 const legacyEditorSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioCuttoonEditorHost.tsx"),
   "utf8",
@@ -41,22 +53,26 @@ const dccWorkbenchRouteSource =
   `${dccWorkbenchNavigationSource}\n${dccWorkbenchSurfaceSource}`;
 
 describe("Studio router bundle boundaries", () => {
-  it("loads the publish screen without a static dependency on the legacy editor", () => {
-    expect(routerSource).toContain('import("../StudioUploadPublish")');
-    expect(routerSource).toContain('import("../studio-legacy-editor-adapter")');
+  it("loads editor and publish surfaces through independent route modules", () => {
+    expect(publishRouteSource).toContain('import("../../StudioUploadPublish")');
+    expect(editorRouteSource).toContain('import("../../studio-legacy-editor-adapter")');
+    expect(routerSource).not.toContain("StudioUploadPublish");
+    expect(routerSource).not.toContain("studio-legacy-editor-adapter");
     expect(routerSource).not.toMatch(/from\s+["']\.\.\/StudioPage["']/u);
     expect(legacyEditorSource).not.toContain("StudioUploadPublish,");
   });
 
-  it("gives AppRouter one lazy Studio entry instead of competing flat routes", () => {
-    expect(appRouterSource).toContain(
+  it("gives AppRouter one domain-owned lazy Studio entry instead of competing flat routes", () => {
+    expect(appRouterSource).toContain('import { appRoutes } from "./groups/app-routes"');
+    expect(appRouterSource).toContain("appRoutes.map");
+    expect(creatorRoutesSource).toContain(
       'import("@/src/domains/creator/studio-router/StudioRouter")',
     );
-    expect(appRouterSource).toContain(
-      '<Route path="/studio/*" element={<StudioRouter />} />',
+    expect(creatorRoutesSource).toContain(
+      '{ id: "creator-studio", path: "/studio/*", element: <StudioRouter /> }',
     );
-    expect(appRouterSource).not.toContain('path="/studio/tools-companion"');
-    expect(appRouterSource).not.toContain('import("@/src/domains/creator/StudioPage")');
+    expect(creatorRoutesSource).not.toContain('path: "/studio/tools-companion"');
+    expect(creatorRoutesSource).not.toContain('import("@/src/domains/creator/StudioPage")');
   });
 
   it("keeps URL and editor-key ownership outside the legacy adapter", () => {
@@ -71,15 +87,15 @@ describe("Studio router bundle boundaries", () => {
   it("nests the document layout inside the runtime boundary without collapsing the key layers", () => {
     // Two-layer keying: the boundary keys by auth+epoch (studioEditorInstanceKey), the layout does
     // not key at all — it inherits the boundary's lifetime so surface switches preserve it.
-    const boundaryOpenIndex = routerSource.indexOf(
+    const boundaryOpenIndex = editorRouteSource.indexOf(
       "<StudioDocumentRuntimeBoundary documentKey={editorKey}>",
     );
-    const layoutOpenIndex = routerSource.indexOf("<StudioDocumentLayout");
-    const adapterIndex = routerSource.indexOf("<LegacyStudioEditorAdapter");
+    const layoutOpenIndex = editorRouteSource.indexOf("<StudioDocumentLayout");
+    const adapterIndex = editorRouteSource.indexOf("<LegacyStudioEditorAdapter");
     expect(boundaryOpenIndex).toBeGreaterThanOrEqual(0);
     expect(layoutOpenIndex).toBeGreaterThan(boundaryOpenIndex);
     expect(adapterIndex).toBeGreaterThan(layoutOpenIndex);
-    expect(routerSource).toContain("draftSessionEpoch={draftScope.epoch}");
+    expect(editorRouteSource).toContain("draftSessionEpoch={draftScope.epoch}");
     expect(documentLayoutSource).not.toMatch(/import[^;]*studio-editor-scope/u);
     expect(documentLayoutSource).not.toMatch(/\skey=\{/u);
   });
