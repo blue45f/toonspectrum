@@ -20,6 +20,10 @@ import {
   type StudioBrushCatalogItem,
 } from "./studio-brush-catalog-core";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import {
+  STUDIO_BRUSH_QUALITY_PORTFOLIO,
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
+} from "./studio-brush-quality-portfolio";
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
 
@@ -76,17 +80,18 @@ export function studioBrushCatalogItemById(
 }
 
 /**
- * V17.1 quarantine: picker exposure derives from the lifecycle stage. Quarantined ids (see
- * `studio-brush-quarantine.ts`) leave every default listing/search below, but the SSOT arrays
- * above deliberately keep them — persisted documents still resolve metadata by id
- * (`studioBrushCatalogItemById`), replay through their own runtime contract, and the variant-group
- * manifest still partitions them. No "숨김 포함" affordance exists today, so exclusion from the
- * listing is complete until an id is delisted from the quarantine ledger.
+ * Resolution-complete selectable inventory. This keeps the historical `LISTED_ALL` contract used
+ * by exhaustive browser, long-session and durability gates: every non-quarantined brush that a
+ * user can reach through search or an explicit pin remains in this list.
  */
 export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
     STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
   );
+
+/** Explicit alias for call sites that want to document search/expert-lane intent. */
+export const STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS =
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
 
 export const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
@@ -98,6 +103,57 @@ export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatal
     STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
   );
 
+function materializeDefaultQualityPortfolio(): readonly StudioBrushCatalogItem[] {
+  const portfolio = STUDIO_BRUSH_QUALITY_PORTFOLIO.map((entry) => {
+    const item = STUDIO_BRUSH_CATALOG_BY_ID.get(entry.id);
+    if (!item) {
+      throw new Error(`Studio quality portfolio references an unregistered brush: ${entry.id}`);
+    }
+    if (item.source !== entry.source) {
+      throw new Error(
+        `Studio quality portfolio source drift for ${entry.id}: ${item.source} != ${entry.source}`,
+      );
+    }
+    if (isStudioBrushQuarantinedPresetId(item.id)) {
+      throw new Error(`Studio quality portfolio cannot expose quarantined brush: ${item.id}`);
+    }
+    return item;
+  });
+  if (new Set(portfolio.map((item) => item.id)).size !== STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length) {
+    throw new Error("Studio quality portfolio contains duplicate catalogue ids");
+  }
+  return Object.freeze(portfolio);
+}
+
+/**
+ * Compact first-choice picker inventory. Absorbed variants are not deleted: the exhaustive listed
+ * inventory, exact search, favorites, recent history and persisted documents retain their ids.
+ */
+export const STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  materializeDefaultQualityPortfolio();
+
+export const STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+  );
+
+export const STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+  );
+
+function operationInventory(
+  operation: StudioToolOperation | undefined,
+  exhaustive: boolean,
+): readonly StudioBrushCatalogItem[] {
+  const inventory = exhaustive
+    ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+    : STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS;
+  return operation === undefined
+    ? inventory
+    : inventory.filter((item) => item.operation === operation);
+}
+
 export function filterStudioBrushCatalogItems(options: {
   operation?: StudioToolOperation;
   category?: StudioBrushTrayCategory | "favorites" | "recent";
@@ -107,20 +163,39 @@ export function filterStudioBrushCatalogItems(options: {
 } = {}): StudioBrushCatalogItem[] {
   const { operation, ...libraryOptions } = options;
   const query = (libraryOptions.query ?? "").trim();
-  // Search is deliberately catalogue-wide. Artists should not have to guess which category owns a
-  // named brush before they can find it; the category tabs resume as soon as the query is cleared.
-  // `operation`, however, is a tool-family boundary and remains active during global search.
   const category = query ? "all" : libraryOptions.category;
+  const pinnedLane = category === "favorites" || category === "recent";
+  const exhaustive = Boolean(query) || pinnedLane || category === "all";
   return filterStudioBrushLibraryItems({
     ...libraryOptions,
     category,
     query,
-    catalogItems: operation === undefined
-      ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
-      : operation === "paint"
-        ? STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS
-        : STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+    // Initial and material views use the compact portfolio. Search, user-owned pins, and the
+    // explicit "전체" tab retain the complete non-quarantined inventory for compatibility and
+    // exhaustive quality auditing.
+    catalogItems: operationInventory(operation, exhaustive),
   }) as StudioBrushCatalogItem[];
+}
+
+function quickCatalogInventory(options: {
+  favoriteIds?: readonly string[];
+  recentIds?: readonly string[];
+  limit?: number;
+}): readonly StudioBrushCatalogItem[] {
+  const requestedIds = [...(options.favoriteIds ?? []), ...(options.recentIds ?? [])];
+  const byId = new Map(
+    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]),
+  );
+  for (const id of requestedIds) {
+    const item = STUDIO_BRUSH_CATALOG_BY_ID.get(id);
+    if (item && !isStudioBrushQuarantinedPresetId(item.id)) byId.set(item.id, item);
+  }
+  // Explicit large audit callers historically requested the complete shelf by setting a limit
+  // larger than the compact portfolio. Preserve that diagnostic contract without expanding UI.
+  if ((options.limit ?? 0) > STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.length) {
+    return STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
+  }
+  return [...byId.values()];
 }
 
 export function listStudioQuickBrushCatalogItems(options: {
@@ -131,11 +206,6 @@ export function listStudioQuickBrushCatalogItems(options: {
 } = {}): StudioQuickBrushTrayItem[] {
   return listStudioQuickBrushTrayItems({
     ...options,
-    // Missing injection must never silently collapse the shelf to core-only tools, but the quick
-    // shelf is a LISTING lane, so its fresh default is the listed (non-quarantined) inventory —
-    // otherwise a quarantined id persisted in favorites/MRU re-surfaces as a picker affordance.
-    // Metadata RESOLUTION for saved documents stays on the unfiltered SSOT via
-    // `studioBrushCatalogItemById`; callers who inject `catalogItems` own their lane's filtering.
-    catalogItems: options.catalogItems ?? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
+    catalogItems: options.catalogItems ?? quickCatalogInventory(options),
   });
 }
