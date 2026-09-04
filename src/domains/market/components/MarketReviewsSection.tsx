@@ -149,7 +149,7 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
   const [roleTag, setRoleTag] = useState<string>(ROLE_TAGS[0]);
   const [tags, setTags] = useState<string[]>([]);
 
-  const reviews = social.data?.reviews ?? [];
+  const reviews = useMemo(() => social.data?.reviews ?? [], [social.data?.reviews]);
   const displayed = useMemo(() => sortReviews(reviews, sort), [reviews, sort]);
   const mine = social.data?.viewer.myReviewId
     ? reviews.find((review) => review.id === social.data?.viewer.myReviewId) ?? null
