@@ -1,15 +1,11 @@
 import {
   LocateFixed,
-  MessageCircleMore,
+  MessageCircle,
   SendHorizontal,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import {
-  resolveStudioLiveCursorIntervalMs,
-  useStudioLiveCollaborationPreferences,
-} from "./studio-live-collaboration-preferences";
 import { STUDIO_LIVE_CURSOR_CHAT_MAX_LENGTH } from "./studio-live-chat-control";
 
 import type {
@@ -33,15 +29,26 @@ function canDirectAttention(room: StudioLiveRoom): boolean {
   );
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target.closest('[role="textbox"]') !== null)
+  );
+}
+
 export function StudioLiveQuickCollaborationControls({
   room,
   peers,
   followingSessionId,
   onToggleFollow,
 }: StudioLiveQuickCollaborationControlsProps) {
-  const preferences = useStudioLiveCollaborationPreferences();
   const inputRef = useRef<HTMLInputElement>(null);
   const attentionTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -49,11 +56,21 @@ export function StudioLiveQuickCollaborationControls({
   const canChat = room.participant.role !== "viewer";
   const canSpotlight = canDirectAttention(room) && peers.length > 0;
 
-  useEffect(() => {
-    room.setCursorIntervalMs(
-      resolveStudioLiveCursorIntervalMs(preferences.cursorQuality)
-    );
-  }, [preferences.cursorQuality, room]);
+  const announce = (message: string) => {
+    setNotice(message);
+    if (noticeTimerRef.current !== null) {
+      globalThis.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = globalThis.setTimeout(() => {
+      setNotice(null);
+      noticeTimerRef.current = null;
+    }, 3_000);
+  };
+
+  const openComposer = () => {
+    setComposerOpen(true);
+    globalThis.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
+  };
 
   useEffect(() => {
     const unsubscribe = room.subscribe((event) => {
@@ -90,17 +107,43 @@ export function StudioLiveQuickCollaborationControls({
     }
   }, [attention, peers]);
 
+  useEffect(() => {
+    if (!canChat || !room.ready || typeof document === "undefined") return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.key !== "/" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isEditableTarget(event.target)
+      ) return;
+      event.preventDefault();
+      openComposer();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [canChat, room]);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current !== null) {
+      globalThis.clearTimeout(noticeTimerRef.current);
+    }
+  }, []);
+
   const submitCursorChat = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
     if (!room.sendCursorChat(text)) {
-      setNotice("커서 메시지를 보내지 못했습니다.");
+      announce("커서 메시지를 보내지 못했습니다.");
       return;
     }
     setDraft("");
     setComposerOpen(false);
-    setNotice("커서 메시지를 보냈습니다.");
+    announce("커서 메시지를 보냈습니다.");
   };
 
   const acceptAttention = () => {
@@ -108,13 +151,13 @@ export function StudioLiveQuickCollaborationControls({
     if (followingSessionId !== attention.participant.sessionId) {
       onToggleFollow(attention.participant.sessionId);
     }
-    setNotice(`${attention.participant.displayName} 작업 위치를 따라갑니다.`);
+    announce(`${attention.participant.displayName} 작업 위치를 따라갑니다.`);
     setAttention(null);
   };
 
   return (
     <>
-      <span aria-live="polite" className="sr-only" role="status">
+      <span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
         {notice}
       </span>
 
@@ -192,18 +235,16 @@ export function StudioLiveQuickCollaborationControls({
         </form>
       ) : canChat ? (
         <button
-          aria-label="커서 메시지 입력"
+          aria-keyshortcuts="/"
+          aria-label="커서 메시지 입력, 단축키 슬래시"
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
           data-studio-live-cursor-chat-action="true"
           disabled={!room.ready}
-          title="커서 메시지"
+          title="커서 메시지 · /"
           type="button"
-          onClick={() => {
-            setComposerOpen(true);
-            globalThis.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
-          }}
+          onClick={openComposer}
         >
-          <MessageCircleMore size={16} aria-hidden />
+          <MessageCircle size={16} aria-hidden />
         </button>
       ) : null}
 
@@ -215,7 +256,7 @@ export function StudioLiveQuickCollaborationControls({
           title="모두 내 위치로 초대"
           type="button"
           onClick={() => {
-            setNotice(
+            announce(
               room.requestAttention()
                 ? "팀원에게 현재 작업 위치 초대를 보냈습니다."
                 : "현재 페이지 초대를 보내지 못했습니다."
