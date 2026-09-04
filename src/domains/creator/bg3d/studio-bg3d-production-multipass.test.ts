@@ -36,7 +36,7 @@ describe("studio-bg3d-production-multipass", () => {
     ]);
   });
 
-  it("detects exact presets without treating a custom subset as all passes", () => {
+  it("detects exact presets without treating custom or duplicate selections as presets", () => {
     expect(detectStudioBg3dProductionBatchPreset(
       AVAILABLE,
       ["lt-composite", "color", "tone", "texture-line", "main-line"],
@@ -44,6 +44,10 @@ describe("studio-bg3d-production-multipass", () => {
     expect(detectStudioBg3dProductionBatchPreset(
       AVAILABLE,
       ["beauty", "depth"],
+    )).toBe("custom");
+    expect(detectStudioBg3dProductionBatchPreset(
+      AVAILABLE,
+      ["beauty", "beauty"],
     )).toBe("custom");
   });
 
