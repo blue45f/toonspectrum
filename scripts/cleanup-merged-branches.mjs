@@ -20,6 +20,25 @@ export function compareProvesMerged(compare) {
   );
 }
 
+export function mergedPullRequestProvesHead(
+  pull,
+  repositoryFullName,
+  defaultBranch,
+  branch,
+  currentSha,
+) {
+  return Boolean(
+    pull
+    && typeof pull === "object"
+    && typeof pull.merged_at === "string"
+    && pull.merged_at.length > 0
+    && pull.base?.ref === defaultBranch
+    && pull.head?.repo?.full_name === repositoryFullName
+    && pull.head?.ref === branch
+    && pull.head?.sha === currentSha
+  );
+}
+
 export function classifyBranchDeletion({
   branch,
   defaultBranch,
@@ -28,14 +47,20 @@ export function classifyBranchDeletion({
   sameRepository,
   currentSha,
   compare,
+  mergedPullRequestHeadMatch = false,
 }) {
   if (!sameRepository) return { allowed: false, reason: "fork" };
   if (!branch || branch === defaultBranch) return { allowed: false, reason: "default-branch" };
   if (workflowBranch && branch === workflowBranch) return { allowed: false, reason: "active-workflow-branch" };
   if (protectedBranch) return { allowed: false, reason: "protected-branch" };
   if (!SHA_PATTERN.test(String(currentSha ?? ""))) return { allowed: false, reason: "invalid-sha" };
-  if (!compareProvesMerged(compare)) return { allowed: false, reason: "unique-commits" };
-  return { allowed: true, reason: "merged" };
+  if (compareProvesMerged(compare)) {
+    return { allowed: true, reason: "merged-ancestor" };
+  }
+  if (mergedPullRequestHeadMatch) {
+    return { allowed: true, reason: "merged-pull-request-head" };
+  }
+  return { allowed: false, reason: "unique-commits" };
 }
 
 function parseArguments(argv) {
@@ -128,12 +153,30 @@ async function compareBranchToDefault(repository, branchSha, defaultBranch, toke
 }
 
 async function openPullRequestsForBranch(repository, branch, token) {
-  const pulls = await github(
-    `/repos/${repository.owner}/${repository.repo}/pulls?state=open&head=${encodeURIComponent(repository.owner)}:${encodeURIComponent(branch)}&per_page=100`,
-    { token },
+  return paginate(
+    `/repos/${repository.owner}/${repository.repo}/pulls?state=open&head=${encodeURIComponent(`${repository.owner}:${branch}`)}`,
+    token,
   );
-  if (!Array.isArray(pulls)) throw new Error("Expected an array of open pull requests");
-  return pulls;
+}
+
+async function exactMergedPullRequestForBranch(
+  repository,
+  branch,
+  currentSha,
+  defaultBranch,
+  token,
+) {
+  const pulls = await paginate(
+    `/repos/${repository.owner}/${repository.repo}/pulls?state=closed&head=${encodeURIComponent(`${repository.owner}:${branch}`)}&sort=updated&direction=desc`,
+    token,
+  );
+  return pulls.find((pull) => mergedPullRequestProvesHead(
+    pull,
+    repository.fullName,
+    defaultBranch,
+    branch,
+    currentSha,
+  )) ?? null;
 }
 
 async function reportAndMaybeClosePullRequests(repository, branch, pulls, token, apply, report) {
@@ -143,7 +186,7 @@ async function reportAndMaybeClosePullRequests(repository, branch, pulls, token,
       await github(`/repos/${repository.owner}/${repository.repo}/issues/${pull.number}/comments`, {
         method: "POST",
         token,
-        body: { body: `이 브랜치의 현재 HEAD가 이미 \`${report.defaultBranch}\`에 포함되어 중복 PR을 닫고 브랜치를 정리합니다.` },
+        body: { body: `이 브랜치의 현재 HEAD가 이미 \`${report.defaultBranch}\`에 반영되어 중복 PR을 닫고 브랜치를 정리합니다.` },
       });
       await github(`/repos/${repository.owner}/${repository.repo}/pulls/${pull.number}`, {
         method: "PATCH",
@@ -168,16 +211,38 @@ async function currentRefSha(repository, branch, token) {
   }
 }
 
-async function inspectAndMaybeDelete(repository, rawBranch, context) {
+async function inspectAndMaybeDelete(
+  repository,
+  rawBranch,
+  context,
+  knownMergedPullRequest = null,
+) {
   const { token, apply, defaultBranch, workflowBranch, report } = context;
   const name = rawBranch?.name;
   const currentSha = rawBranch?.commit?.sha;
   if (typeof name !== "string" || typeof currentSha !== "string") return;
 
   let compare = null;
+  let mergedPullRequest = knownMergedPullRequest;
   if (name !== defaultBranch && name !== workflowBranch && !rawBranch.protected && SHA_PATTERN.test(currentSha)) {
     compare = await compareBranchToDefault(repository, currentSha, defaultBranch, token);
+    if (!compareProvesMerged(compare) && !mergedPullRequest) {
+      mergedPullRequest = await exactMergedPullRequestForBranch(
+        repository,
+        name,
+        currentSha,
+        defaultBranch,
+        token,
+      );
+    }
   }
+  const mergedPullRequestHeadMatch = mergedPullRequestProvesHead(
+    mergedPullRequest,
+    repository.fullName,
+    defaultBranch,
+    name,
+    currentSha,
+  );
   const decision = classifyBranchDeletion({
     branch: name,
     defaultBranch,
@@ -186,6 +251,7 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
     sameRepository: true,
     currentSha,
     compare,
+    mergedPullRequestHeadMatch,
   });
   if (!decision.allowed) {
     report.skipped.push({ branch: name, sha: currentSha, reason: decision.reason });
@@ -193,6 +259,17 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
   }
 
   const openPulls = await openPullRequestsForBranch(repository, name, token);
+  const nonDefaultPulls = openPulls.filter((pull) => pull.base?.ref !== defaultBranch);
+  if (nonDefaultPulls.length > 0) {
+    report.skipped.push({
+      branch: name,
+      sha: currentSha,
+      reason: "open-nondefault-pull-request",
+      pullRequests: nonDefaultPulls.map((pull) => pull.number),
+    });
+    return;
+  }
+
   const verifiedSha = await currentRefSha(repository, name, token);
   if (verifiedSha === null) {
     report.skipped.push({ branch: name, sha: currentSha, reason: "already-deleted" });
@@ -223,7 +300,13 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
     }
   }
   await reportAndMaybeClosePullRequests(repository, name, openPulls, token, apply, report);
-  report.deleted.push({ branch: name, sha: currentSha, applied: apply });
+  report.deleted.push({
+    branch: name,
+    sha: currentSha,
+    applied: apply,
+    proof: decision.reason,
+    mergedPullRequest: mergedPullRequest?.number ?? null,
+  });
 }
 
 async function cleanupPullRequest(repository, number, context) {
@@ -247,7 +330,16 @@ async function cleanupPullRequest(repository, number, context) {
     context.report.skipped.push({ branch: pull.head.ref, reason: "already-deleted", number });
     return;
   }
-  await inspectAndMaybeDelete(repository, branch, context);
+  const exactDefaultBranchMerge = mergedPullRequestProvesHead(
+    pull,
+    repository.fullName,
+    context.defaultBranch,
+    branch.name,
+    branch.commit.sha,
+  )
+    ? pull
+    : null;
+  await inspectAndMaybeDelete(repository, branch, context, exactDefaultBranchMerge);
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {

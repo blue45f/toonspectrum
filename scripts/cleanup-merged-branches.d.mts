@@ -12,12 +12,14 @@ export type BranchDeletionCandidate = Readonly<{
   sameRepository: boolean;
   currentSha: string;
   compare: GitHubCompareSummary | null;
+  mergedPullRequestHeadMatch?: boolean;
 }>;
 
 export type BranchDeletionDecision = Readonly<{
   allowed: boolean;
   reason:
-    | "merged"
+    | "merged-ancestor"
+    | "merged-pull-request-head"
     | "fork"
     | "default-branch"
     | "active-workflow-branch"
@@ -28,5 +30,12 @@ export type BranchDeletionDecision = Readonly<{
 
 export function encodeGitRef(branch: string): string;
 export function compareProvesMerged(compare: GitHubCompareSummary | null | undefined): boolean;
+export function mergedPullRequestProvesHead(
+  pull: unknown,
+  repositoryFullName: string,
+  defaultBranch: string,
+  branch: string,
+  currentSha: string,
+): boolean;
 export function classifyBranchDeletion(candidate: BranchDeletionCandidate): BranchDeletionDecision;
 export function main(argv?: string[], env?: NodeJS.ProcessEnv): Promise<void>;
