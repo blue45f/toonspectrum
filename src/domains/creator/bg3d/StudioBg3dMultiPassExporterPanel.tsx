@@ -25,13 +25,20 @@ export function StudioBg3dMultiPassExporterPanel(
 
   if (runtime?.productionBatch && props.onStartMultiPassExport === undefined) {
     const batch = runtime.productionBatch;
-    const passReadiness = batch.look
+    const selectedPassReadiness = batch.look
       ? evaluateStudioBg3dProductionPassReadiness(batch.selectedPasses, batch.look)
       : null;
+    const availablePassReadiness = batch.look
+      ? evaluateStudioBg3dProductionPassReadiness(batch.availablePasses, batch.look)
+      : null;
     const effectiveBatch =
-      passReadiness?.blockingReason && batch.blockedReason === null
-        ? { ...batch, blockedReason: passReadiness.blockingReason }
+      selectedPassReadiness?.blockingReason && batch.blockedReason === null
+        ? { ...batch, blockedReason: selectedPassReadiness.blockingReason }
         : batch;
+    const displayBatch =
+      availablePassReadiness && availablePassReadiness.issues.length > 0
+        ? { ...effectiveBatch, availablePasses: availablePassReadiness.readyPasses }
+        : effectiveBatch;
     const effectiveRuntime =
       effectiveBatch === batch
         ? runtime
@@ -47,7 +54,7 @@ export function StudioBg3dMultiPassExporterPanel(
         <StudioBg3dProductionMultiPassExporterPanel
           disabled={disabled}
           shots={runtime.productionShots}
-          batch={effectiveBatch}
+          batch={displayBatch}
         />
       </StudioBg3dProSuiteRuntimeContext.Provider>
     );
