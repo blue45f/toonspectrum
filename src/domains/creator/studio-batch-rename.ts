@@ -96,7 +96,7 @@ function replaceAllText(
   caseSensitive: boolean,
 ): string {
   if (caseSensitive) return source.split(search).join(replacement);
-  return source.replace(new RegExp(escapeRegExp(search), "giu"), replacement);
+  return source.replace(new RegExp(escapeRegExp(search), "giu"), () => replacement);
 }
 
 function orderTargets(
@@ -118,6 +118,11 @@ function orderTargets(
   });
 }
 
+function formatSequence(sequence: number, digits: number): string {
+  const sign = sequence < 0 ? "-" : "";
+  return `${sign}${String(Math.abs(sequence)).padStart(digits, "0")}`;
+}
+
 function renderTemplate(
   template: string,
   element: El,
@@ -125,11 +130,11 @@ function renderTemplate(
   sequence: number,
   digits: number,
 ): string {
-  const number = String(sequence).padStart(digits, "0");
+  const number = formatSequence(sequence, digits);
   return template
-    .replaceAll("{n}", number)
-    .replaceAll("{name}", currentName)
-    .replaceAll("{type}", TYPE_LABELS[element.type]);
+    .replaceAll("{n}", () => number)
+    .replaceAll("{name}", () => currentName)
+    .replaceAll("{type}", () => TYPE_LABELS[element.type]);
 }
 
 function duplicateResultNames(elements: readonly El[], changedIds: ReadonlySet<string>): string[] {
