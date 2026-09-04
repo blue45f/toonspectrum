@@ -81,8 +81,7 @@ describe("StudioBg3dProductionMultiPassExporterPanel", () => {
     expect(screen.getByText("프로덕션 컷 멀티패스")).toBeDefined();
     expect(screen.getByText("장면 연동")).toBeDefined();
     expect(screen.getByText("배치 컷 1/2")).toBeDefined();
-    expect(screen.getByText("PNG")).toBeDefined();
-    expect(screen.getByText("2")).toBeDefined();
+    expect(screen.getByLabelText("멀티패스 패키지 계획").textContent).toContain("PNG2");
 
     fireEvent.click(screen.getByRole("button", { name: "원고" }));
     expect(batch.setSelectedPasses).toHaveBeenCalledWith([
@@ -125,8 +124,9 @@ describe("StudioBg3dProductionMultiPassExporterPanel", () => {
   });
 
   it("shows progress and recovery evidence while blocking unsafe exports", () => {
+    const blockedReason = "불러오기에 실패한 3D 모델이 있어 출력을 막았습니다.";
     const batch = createBatch({
-      blockedReason: "불러오기에 실패한 3D 모델이 있어 출력을 막았습니다.",
+      blockedReason,
       progress: {
         stage: "render",
         completed: 1,
@@ -147,10 +147,12 @@ describe("StudioBg3dProductionMultiPassExporterPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("status").textContent).toContain("불러오기에 실패한 3D 모델");
+    expect(screen.getByText(blockedReason)).toBeDefined();
     expect(screen.getByText(/렌더 · 표정 클로즈업/)).toBeDefined();
     expect(screen.getByText(/완료 1\/2컷 · 복구 저장소 · 다운로드 이력 보존/)).toBeDefined();
-    expect(screen.getByRole("button", { name: /선택 1컷 · 2패스 ZIP/ })).toBeDisabled();
+    expect(
+      (screen.getByRole("button", { name: /선택 1컷 · 2패스 ZIP/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("lists deferred capture-v2 artifacts without presenting them as production checkboxes", () => {
