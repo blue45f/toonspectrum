@@ -1,7 +1,9 @@
 import { AlertCircle, AlertTriangle, Compass, Globe, Monitor, RefreshCw, X } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
+import { copyText } from "../../lib/copy-text";
 import { checkBrowserCompatibility, getBrowserInfo } from "../compat/browser-check";
+
 
 interface BrowserCompatModalProps {
   isOpen: boolean;
@@ -18,7 +20,17 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
   missingFeatures = [],
   isBlocking = false,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"copied" | "failed" | null>(null);
+  // 언마운트 뒤 setState 를 막는다. 이 모달은 새로고침 버튼과 같은 화면에 있어 실제로 사라진다.
+  const copyStateRef = useRef(true);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    copyStateRef.current = true;
+    return () => {
+      copyStateRef.current = false;
+      if (copyResetRef.current !== null) clearTimeout(copyResetRef.current);
+    };
+  }, []);
   if (!isOpen) return null;
 
   const browser = getBrowserInfo();
@@ -29,12 +41,20 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
     window.location.reload();
   };
 
+  // 이 버튼은 지원되지 않는 인앱 브라우저에서 사용자가 진짜 브라우저로 빠져나가는 유일한
+  // 출구다. 그런데 인앱 WebView 는 clipboard 를 아예 안 주거나 사용자 제스처를 비동기
+  // 클립보드까지 전달하지 않아 NotAllowedError 로 거절한다. 예전 코드는 결과를 기다리지 않고
+  // "복사됨"을 띄웠으므로, 출구가 막힌 사용자에게 성공했다고 말하고 있었다.
   const handleCopyLink = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    const href = window.location.href;
+    void copyText(href).then((ok) => {
+      if (!copyStateRef.current) return;
+      setCopyState(ok ? "copied" : "failed");
+      if (copyResetRef.current !== null) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => {
+        if (copyStateRef.current) setCopyState(null);
+      }, 2000);
+    });
   };
 
   return (
@@ -166,7 +186,11 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
             onClick={handleCopyLink}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 text-xs font-medium text-fg hover:bg-white/10 transition-colors"
           >
-            {copied ? "주소 복사됨!" : "접속 주소 복사"}
+            {copyState === "copied"
+              ? "주소 복사됨!"
+              : copyState === "failed"
+                ? "복사할 수 없어요 — 주소창에서 직접 복사해 주세요"
+                : "접속 주소 복사"}
           </button>
 
           <button
