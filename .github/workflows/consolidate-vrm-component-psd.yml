@@ -1,0 +1,92 @@
+name: Consolidate component-aware VRM PSD
+
+on:
+  push:
+    branches:
+      - feat/vrm-component-psd-linked-render-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-vrm-component-psd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  consolidate:
+    if: ${{ !contains(github.event.head_commit.message, '[vrm-component-psd-consolidated]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-component-psd-linked-render-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Synchronize latest feature state
+        run: |
+          git fetch origin feat/vrm-component-psd-linked-render-20260904
+          git reset --hard origin/feat/vrm-component-psd-linked-render-20260904
+
+      - name: Apply only missing implementation stages
+        run: |
+          set -euo pipefail
+          module='src/domains/creator/vrm/studio-vrm-component-psd.ts'
+          if ! grep -Fq 'const COMPONENT_PASS_KINDS' "$module"; then
+            python3 scripts/apply-vrm-component-psd-linked-render.py
+          fi
+          if ! grep -Fq 'const layerNameCounts' "$module"; then
+            python3 scripts/harden-vrm-component-psd.py
+          fi
+          plan='src/domains/creator/vrm/studio-vrm-component-pass-plan.ts'
+          if ! grep -Fq 'const winnerEntry = ranked[0]' "$plan"; then
+            python3 scripts/harden-vrm-component-pass-plan.py
+          fi
+
+      - name: Remove one-shot implementation machinery
+        run: |
+          rm -f \
+            scripts/apply-vrm-component-psd-linked-render.py \
+            scripts/harden-vrm-component-psd.py \
+            scripts/harden-vrm-component-pass-plan.py \
+            .github/workflows/finalize-vrm-component-psd.yml \
+            .github/workflows/harden-vrm-component-psd.yml \
+            .github/workflows/harden-vrm-component-pass-plan.yml \
+            .github/workflows/consolidate-vrm-component-psd.yml
+          git diff --check
+          git status --short
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run focused and workspace verification
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/vrm/studio-vrm-component-psd.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.ts \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts
+          pnpm run validate:architecture
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm run build
+
+      - name: Commit consolidated implementation
+        run: |
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "feat(studio): finalize component PSD linked rendering [vrm-component-psd-consolidated]"
+          git push --no-verify origin HEAD:feat/vrm-component-psd-linked-render-20260904
