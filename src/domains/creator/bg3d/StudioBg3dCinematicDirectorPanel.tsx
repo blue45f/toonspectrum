@@ -8,6 +8,7 @@ import {
 } from "./studio-bg3d-camera-orientation";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dCinematicDirectorPanel as StudioBg3dCinematicDirectorPanelContent } from "./StudioBg3dCinematicDirectorPanelContent";
+import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowPanel";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 import type { StudioBg3dCinematicDirectorPanelProps } from "./StudioBg3dCinematicDirectorPanelContent";
@@ -219,20 +220,23 @@ export function StudioBg3dCinematicDirectorPanel(
     : onUseCurrentFrameAsAiReference ?? runtime?.onUseCurrentFrameAsAiReference;
 
   return (
-    <StudioBg3dCinematicDirectorPanelContent
-      {...rest}
-      disabled={resolvedDisabled}
-      aiReferenceBusy={aiReferenceBusy ?? runtime?.aiReferenceBusy ?? false}
-      {...(resolvedBaseCamera ? { baseCamera: resolvedBaseCamera } : {})}
-      {...(resolvedShots ? { productionShots: resolvedShots } : {})}
-      {...(resolvedCapture ? { onCaptureCurrentShot: resolvedCapture } : {})}
-      {...(resolvedApply ? { onApplyProductionShot: resolvedApply } : {})}
-      {...(resolvedMove ? { onMoveProductionShot: resolvedMove } : {})}
-      {...(resolvedRemove ? { onRemoveProductionShot: resolvedRemove } : {})}
-      {...(resolvedBookmark ? { onApplyShotBookmark: resolvedBookmark } : {})}
-      {...(resolvedAiReference
-        ? { onUseCurrentFrameAsAiReference: resolvedAiReference }
-        : {})}
-    />
+    <>
+      <StudioBg3dProductionWorkflowPanel variant="director" />
+      <StudioBg3dCinematicDirectorPanelContent
+        {...rest}
+        disabled={resolvedDisabled}
+        aiReferenceBusy={aiReferenceBusy ?? runtime?.aiReferenceBusy ?? false}
+        {...(resolvedBaseCamera ? { baseCamera: resolvedBaseCamera } : {})}
+        {...(resolvedShots ? { productionShots: resolvedShots } : {})}
+        {...(resolvedCapture ? { onCaptureCurrentShot: resolvedCapture } : {})}
+        {...(resolvedApply ? { onApplyProductionShot: resolvedApply } : {})}
+        {...(resolvedMove ? { onMoveProductionShot: resolvedMove } : {})}
+        {...(resolvedRemove ? { onRemoveProductionShot: resolvedRemove } : {})}
+        {...(resolvedBookmark ? { onApplyShotBookmark: resolvedBookmark } : {})}
+        {...(resolvedAiReference
+          ? { onUseCurrentFrameAsAiReference: resolvedAiReference }
+          : {})}
+      />
+    </>
   );
 }
