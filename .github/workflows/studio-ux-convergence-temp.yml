@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   apply-and-verify:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 40
     env:
       NODE_OPTIONS: --max-old-space-size=8192
