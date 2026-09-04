@@ -256,6 +256,8 @@ export function evaluateWebtoonShotEasing(
   rawProgress: number,
 ): number {
   const progress = Math.max(0, Math.min(1, rawProgress));
+  if (progress <= 0) return 0;
+  if (progress >= 1) return 1;
   switch (easing) {
     case "linear":
       return progress;
