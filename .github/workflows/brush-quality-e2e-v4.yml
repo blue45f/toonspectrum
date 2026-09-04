@@ -1,0 +1,555 @@
+name: One-shot deterministic all-brush quality finalizer v4
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: deterministic-all-brush-quality-finalizer-v4
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/run-deterministic-all-brush-quality-v4'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+      BENCHMARK_WORKFLOW: studio-all-brush-long-stroke-quality.yml
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Restore response-aware sources only when absent
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_state=already-response-aware
+          if ! grep -q 'responseProfile' src/domains/creator/brush/studio-brush-quality-curation.ts \
+            || ! grep -q 'liveFingerprint' src/domains/creator/brush/studio-brush-quality-curation.ts \
+            || ! grep -q 'responseProfile' scripts/analyze-studio-brush-similarity.mts; then
+            source_state=restored-from-verified-payload
+            python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import gzip
+          import hashlib
+
+          files = (
+              (
+                  ".github/brush-quality-payloads/curation.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.ts",
+                  "3904f19aeb0ebc9dd951cd4722d195307dce2840b62c210c0bc6ec47f9ab8748",
+              ),
+              (
+                  ".github/brush-quality-payloads/curation.test.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.test.ts",
+                  "6a37d4d3753e5eee800064ed858e10af3e1b794fe72e8fe5c2c661b13d9cc7bb",
+              ),
+              (
+                  ".github/brush-quality-payloads/analyze.mts.gz.b64",
+                  "scripts/analyze-studio-brush-similarity.mts",
+                  "9b10f1a811bf8f22ea0fcfbcf1e2fbe439126f74ae0f2b55ec9bc3856bfbf479",
+              ),
+          )
+          for payload_path, target_path, expected_sha256 in files:
+              payload = Path(payload_path)
+              if not payload.exists():
+                  raise SystemExit(f"missing response-aware source and payload: {payload_path}")
+              restored = gzip.decompress(base64.b64decode(payload.read_text().strip()))
+              actual = hashlib.sha256(restored).hexdigest()
+              if actual != expected_sha256:
+                  raise SystemExit(f"{target_path}: sha256 mismatch {actual} != {expected_sha256}")
+              target = Path(target_path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(restored)
+          PY
+          fi
+          grep -q 'responseProfile' src/domains/creator/brush/studio-brush-quality-curation.ts
+          grep -q 'liveFingerprint' src/domains/creator/brush/studio-brush-quality-curation.ts
+          grep -q 'responseProfile' scripts/analyze-studio-brush-similarity.mts
+          echo "source_state=$source_state" >> "$GITHUB_OUTPUT"
+          git diff --check
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate quality-first policy before starting the expensive sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            scripts/studio-brush-long-matrix-quality.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/analyze-studio-brush-similarity.mts \
+            scripts/studio-brush-long-matrix-quality.ts \
+            scripts/studio-brush-long-matrix-quality.test.ts \
+            scripts/verify-studio-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Publish a unique current-head benchmark trigger
+        id: trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/trigger
+          printf 'deterministic all-brush v4 requested=%s command-run=%s\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_RUN_ID" \
+            > .github/trigger/all-brush-quality-benchmark.txt
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            .github/trigger/all-brush-quality-benchmark.txt \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            scripts/analyze-studio-brush-similarity.mts
+          git diff --cached --check
+          git commit -m "test(brush): run deterministic full-catalogue quality sweep v4"
+          git push origin HEAD:${TARGET_BRANCH}
+          head_sha="$(git rev-parse HEAD)"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Cancel stale branch benchmark runs
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.trigger.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${BENCHMARK_WORKFLOW}/runs?branch=${TARGET_BRANCH}&per_page=100" \
+            --jq '.workflow_runs[] | select((.status == "queued" or .status == "in_progress") and .head_sha != env.HEAD_SHA) | .id' \
+            | while read -r run_id; do
+                [[ -z "$run_id" ]] && continue
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" || true
+              done
+
+      - name: Wait for the exact triggered full-catalogue run
+        id: benchmark
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.trigger.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          run_id=""
+          for _ in $(seq 1 120); do
+            run_id="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/${BENCHMARK_WORKFLOW}/runs?branch=${TARGET_BRANCH}&per_page=100" \
+              --jq ".workflow_runs | map(select(.head_sha == \"${HEAD_SHA}\" and .event == \"push\")) | sort_by(.created_at) | reverse | .[0].id // empty")"
+            [[ -n "$run_id" ]] && break
+            sleep 10
+          done
+          if [[ -z "$run_id" ]]; then
+            echo "No benchmark run appeared for ${HEAD_SHA}." >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >> "$GITHUB_OUTPUT"
+
+          for _ in $(seq 1 660); do
+            payload="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+            status="$(jq -r .status <<<"$payload")"
+            conclusion="$(jq -r '.conclusion // empty' <<<"$payload")"
+            echo "benchmark ${run_id}: ${status}/${conclusion:-pending}"
+            if [[ "$status" == completed ]]; then
+              echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+              test "$conclusion" = success
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for benchmark ${run_id}." >&2
+          exit 1
+
+      - name: Ensure the measured HEAD did not move
+        shell: bash
+        env:
+          BENCHMARK_HEAD: ${{ steps.trigger.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          current="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          test "$current" = "$BENCHMARK_HEAD"
+          git reset --hard "$current"
+
+      - name: Download every raw baseline and GPU shard artifact
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.benchmark.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/all-brush-long-stroke-input artifacts/all-brush-long-stroke-aggregate
+          mkdir -p artifacts/all-brush-long-stroke-input
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false and (.name | startswith("all-brush-long-"))) | [.id, .name] | @tsv' \
+            > /tmp/all-brush-artifacts.tsv
+          count="$(wc -l < /tmp/all-brush-artifacts.tsv | tr -d ' ')"
+          if [[ "$count" -lt 16 ]]; then
+            echo "Expected at least 16 raw shard artifacts, found $count." >&2
+            cat /tmp/all-brush-artifacts.tsv >&2
+            exit 1
+          fi
+          while IFS=$'\t' read -r artifact_id artifact_name; do
+            destination="artifacts/all-brush-long-stroke-input/${artifact_name}"
+            mkdir -p "$destination"
+            gh api -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+              > "/tmp/${artifact_id}.zip"
+            unzip -q "/tmp/${artifact_id}.zip" -d "$destination"
+          done < /tmp/all-brush-artifacts.tsv
+
+      - name: Re-aggregate raw evidence into the product GPU allowlist and curation report
+        shell: bash
+        env:
+          TOONSPECTRUM_ALL_BRUSH_INPUT_DIR: artifacts/all-brush-long-stroke-input
+          TOONSPECTRUM_ALL_BRUSH_AGGREGATE_DIR: artifacts/all-brush-long-stroke-aggregate
+          TOONSPECTRUM_GPU_EVIDENCE_OUTPUT: src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/aggregate-studio-all-brush-long-stroke.mts
+          pnpm exec tsx scripts/analyze-studio-brush-similarity.mts
+          test -f artifacts/all-brush-long-stroke-aggregate/all-brush-gpu-quality-report.json
+          test -f artifacts/all-brush-long-stroke-aggregate/brush-curation-report.json
+          test -f src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          git diff --check
+
+      - name: Generate replay-compatible UI-only curation from complete-link evidence
+        id: curation
+        shell: bash
+        env:
+          BENCHMARK_HEAD: ${{ steps.trigger.outputs.head_sha }}
+          BENCHMARK_RUN_ID: ${{ steps.benchmark.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path('artifacts/all-brush-long-stroke-aggregate')
+          quality = json.loads((root / 'all-brush-gpu-quality-report.json').read_text(encoding='utf-8'))
+          curation = json.loads((root / 'brush-curation-report.json').read_text(encoding='utf-8'))
+          quarantine = curation.get('suggestedQuarantineIds') or []
+          clusters = curation.get('clusters') or []
+          if not isinstance(quarantine, list) or not all(isinstance(value, str) for value in quarantine):
+              raise SystemExit('invalid curation quarantine list')
+          if len(quarantine) != len(set(quarantine)):
+              raise SystemExit('duplicate curation IDs')
+
+          canonical = {}
+          for key, value in (curation.get('canonicalByQuarantinedId') or {}).items():
+              if isinstance(key, str) and isinstance(value, str):
+                  canonical[key] = value
+          for cluster in clusters:
+              if not isinstance(cluster, dict):
+                  continue
+              representative = cluster.get('representativeId') or cluster.get('canonicalId') or cluster.get('winnerId')
+              if not isinstance(representative, str):
+                  continue
+              suggested = cluster.get('suggestedQuarantineIds') or []
+              if isinstance(suggested, list):
+                  for brush_id in suggested:
+                      if isinstance(brush_id, str):
+                          canonical.setdefault(brush_id, representative)
+          missing = sorted(set(quarantine) - set(canonical))
+          invalid = sorted(
+              brush_id for brush_id in quarantine
+              if canonical.get(brush_id) == brush_id or canonical.get(brush_id) in quarantine
+          )
+          if missing or invalid:
+              raise SystemExit(f'invalid canonical mapping missing={missing} invalid={invalid}')
+
+          evidence = {
+              'schemaVersion': 1,
+              'benchmarkDigest': quality.get('benchmarkDigest'),
+              'benchmarkHeadSha': os.environ['BENCHMARK_HEAD'],
+              'benchmarkRunId': int(os.environ['BENCHMARK_RUN_ID']),
+              'quarantineIds': quarantine,
+              'canonicalByQuarantinedId': {brush_id: canonical[brush_id] for brush_id in quarantine},
+          }
+          generated = Path('src/domains/creator/brush/studio-brush-quality-curation.generated.ts')
+          reason_map = {
+              brush_id: (
+                  '전체 화면 장획의 commit/live 질감과 pressure·tilt·speed·twist·direction 반응이 '
+                  f'{canonical[brush_id]} 과 complete-link 동등 기준을 모두 통과해 UI 노출만 격리합니다. '
+                  '런타임 ID와 저장 문서 재생은 유지됩니다.'
+              )
+              for brush_id in quarantine
+          }
+          generated.write_text(
+              '/** Generated from a complete screen-filling all-brush quality run. */\n'
+              'export const STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE = Object.freeze('\
+              + json.dumps(evidence, ensure_ascii=False, indent=2) + ' as const);\n\n'
+              'export const STUDIO_MEASURED_BRUSH_QUARANTINE_REASON_BY_PRESET_ID = Object.freeze('\
+              + json.dumps(reason_map, ensure_ascii=False, indent=2) + ' as const);\n',
+              encoding='utf-8',
+          )
+
+          quarantine_path = Path('src/domains/creator/brush/studio-brush-quarantine.ts')
+          source = quarantine_path.read_text(encoding='utf-8')
+          begin = '    // BEGIN GENERATED MEASURED QUALITY CURATION\n'
+          end = '    // END GENERATED MEASURED QUALITY CURATION\n'
+          block = begin + ''.join(
+              f'    {json.dumps(brush_id)}: {json.dumps(reason_map[brush_id], ensure_ascii=False)},\n'
+              for brush_id in quarantine
+          ) + end
+          if begin in source:
+              source = re.sub(
+                  re.escape(begin) + r'[\s\S]*?' + re.escape(end),
+                  block,
+                  source,
+                  count=1,
+              )
+          else:
+              pattern = re.compile(
+                  r'(export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID:[\s\S]*?Object\.freeze\(\{\n)'
+              )
+              source, count = pattern.subn(r'\1' + block, source, count=1)
+              if count != 1:
+                  raise SystemExit('could not locate quarantine reason ledger')
+          quarantine_path.write_text(source, encoding='utf-8')
+
+          test_path = Path('src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts')
+          test_path.write_text(
+              'import { describe, expect, it } from "vitest";\n\n'
+              'import { studioBrushCatalogItemById } from "./studio-brush-catalog";\n'
+              'import { STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE } from "./studio-brush-quality-curation.generated";\n'
+              'import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";\n\n'
+              'describe("measured response-aware brush curation", () => {\n'
+              '  it("quarantines only exposure while retaining each runtime identity", () => {\n'
+              '    const ids = [...STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.quarantineIds];\n'
+              '    const mapping = STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.canonicalByQuarantinedId;\n'
+              '    expect(new Set(ids).size).toBe(ids.length);\n'
+              '    expect(Object.keys(mapping).sort()).toEqual([...ids].sort());\n'
+              '    for (const id of ids) {\n'
+              '      const representative = mapping[id as keyof typeof mapping];\n'
+              '      expect(representative).not.toBe(id);\n'
+              '      expect(ids).not.toContain(representative);\n'
+              '      expect(isStudioBrushQuarantinedPresetId(id), id).toBe(true);\n'
+              '      expect(studioBrushCatalogItemById(id), id).not.toBeNull();\n'
+              '      expect(studioBrushCatalogItemById(representative), representative).not.toBeNull();\n'
+              '    }\n'
+              '  });\n'
+              '});\n',
+              encoding='utf-8',
+          )
+
+          uniqueness_test = Path('src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts')
+          source = uniqueness_test.read_text(encoding='utf-8')
+          import_line = (
+              'import { STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE } '
+              'from "./studio-brush-quality-curation.generated";\n'
+          )
+          if 'STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE' not in source:
+              source = source.replace(
+                  'import { BRUSH_PRESETS } from "../studio-brush";\n',
+                  'import { BRUSH_PRESETS } from "../studio-brush";\n\n' + import_line,
+                  1,
+              )
+          source = source.replace(
+              'expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(185);',
+              'expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(\n'
+              '      185 - STUDIO_MEASURED_BRUSH_CURATION_EVIDENCE.quarantineIds.length,\n'
+              '    );',
+              1,
+          )
+          uniqueness_test.write_text(source, encoding='utf-8')
+
+          Path('/tmp/curation-count').write_text(str(len(quarantine)))
+          Path('/tmp/curation-clusters').write_text(str(len(clusters)))
+          PY
+          echo "quarantine_count=$(cat /tmp/curation-count)" >> "$GITHUB_OUTPUT"
+          echo "cluster_count=$(cat /tmp/curation-clusters)" >> "$GITHUB_OUTPUT"
+          git diff --check
+
+      - name: Validate generated GPU evidence, curation, replay compatibility, and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            scripts/studio-brush-long-matrix-quality.test.ts
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts
+            src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          )
+          [[ -f src/domains/creator/brush/studio-brush-quarantine.test.ts ]] \
+            && tests+=(src/domains/creator/brush/studio-brush-quarantine.test.ts)
+          pnpm exec vitest run "${tests[@]}"
+          pnpm exec eslint --max-warnings=0 \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/analyze-studio-brush-similarity.mts \
+            scripts/studio-brush-long-matrix-quality.ts \
+            scripts/verify-studio-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run build
+          git diff --check
+
+      - name: Publish only measured product evidence and UI curation
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(brush): apply measured quality-equivalent engine and catalogue curation"
+            git push origin HEAD:${TARGET_BRANCH}
+          fi
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the protected core check on the final feature HEAD
+        shell: bash
+        env:
+          FINAL_HEAD: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 240); do
+            checks="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${FINAL_HEAD}/check-runs?per_page=100")"
+            core_success="$(jq '[.check_runs[] | select((.name == "core" or .name | endswith(" / core")) and .conclusion == "success")] | length' <<<"$checks")"
+            core_failure="$(jq '[.check_runs[] | select((.name == "core" or .name | endswith(" / core")) and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length' <<<"$checks")"
+            if [[ "$core_success" -gt 0 ]]; then
+              exit 0
+            fi
+            if [[ "$core_failure" -gt 0 ]]; then
+              echo "Protected core check failed on ${FINAL_HEAD}." >&2
+              jq '.check_runs[] | select(.name == "core" or (.name | endswith(" / core"))) | {name,status,conclusion,details_url}' <<<"$checks" >&2
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "Protected core check did not complete in time." >&2
+          exit 1
+
+      - name: Merge PR #679 only at the fully validated head
+        id: merge
+        shell: bash
+        env:
+          FINAL_HEAD: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/679")"
+          state="$(jq -r .state <<<"$pr")"
+          merged_at="$(jq -r '.merged_at // empty' <<<"$pr")"
+          if [[ -n "$merged_at" ]]; then
+            echo "merge_sha=$(jq -r .merge_commit_sha <<<"$pr")" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$state" = open
+          test "$(jq -r .head.sha <<<"$pr")" = "$FINAL_HEAD"
+          response="$(gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/679/merge" \
+            -f sha="$FINAL_HEAD" \
+            -f merge_method=squash \
+            -f commit_title='feat(studio): quality-first full-catalogue brush engine election' \
+            -f commit_message='Measures every listed brush with screen-filling live/commit/settle strokes, elects physical GPU only after visual and hand-feel equivalence, and quarantines only complete-link duplicate UI exposure while preserving runtime IDs and saved-document replay.')"
+          if [[ "$(jq -r .merged <<<"$response")" != true ]]; then
+            jq . <<<"$response" >&2
+            exit 1
+          fi
+          echo "merge_sha=$(jq -r .sha <<<"$response")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload final aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-all-brush-quality-v4-${{ steps.benchmark.outputs.run_id }}
+          path: artifacts/all-brush-long-stroke-aggregate
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Post final success receipt
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: [
+                '✅ **결정적 전체 브러시 품질 실험·적용·병합 완료**',
+                '',
+                `- benchmark HEAD: \`${{ steps.trigger.outputs.head_sha }}\``,
+                `- final feature HEAD: \`${{ steps.publish.outputs.head_sha }}\``,
+                `- main merge: \`${{ steps.merge.outputs.merge_sha }}\``,
+                `- benchmark run: ${{ steps.benchmark.outputs.run_url }}`,
+                `- complete-link 유사 군집: **${{ steps.curation.outputs.cluster_count }}개**`,
+                `- UI 노출 격리: **${{ steps.curation.outputs.quarantine_count }}개**`,
+                '- runtime brush ID 삭제 없음',
+                '- 저장 문서 조회·재생 호환성 유지',
+                '- 물리 GPU는 live/commit/settle 및 pressure·tilt·speed·twist·direction 품질 동률일 때만 선정',
+              ].join('\n'),
+            });
+
+      - name: Post failure receipt
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: `❌ 결정적 전체 브러시 품질 파이프라인이 중단됐습니다. 실패한 증거를 통과로 취급하거나 PR을 병합하지 않았습니다: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
