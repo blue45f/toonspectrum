@@ -33,6 +33,8 @@ const ROLE_LABELS = Object.freeze({
   motion: "모션",
 } as const);
 
+type ActiveMultiPassPreset = MultiPassExportPreset | "custom";
+
 export interface StudioBg3dMultiPassExporterPanelProps {
   readonly disabled?: boolean;
   readonly onStartMultiPassExport?: (config: MultiPassExportConfig) => void;
@@ -59,11 +61,11 @@ export function StudioBg3dMultiPassExporterPanel({
     includeVelocity: false,
     format: "png-zip",
   });
-  const [activePreset, setActivePreset] = useState<MultiPassExportPreset>("manuscript");
+  const [activePreset, setActivePreset] = useState<ActiveMultiPassPreset>("manuscript");
   const planned = useMemo(() => planMultiPassExport(config), [config]);
 
   const togglePass = (key: MultiPassBooleanConfigKey) => {
-    setActivePreset("complete");
+    setActivePreset("custom");
     setConfig((current) => ({ ...current, [key]: !Boolean(current[key]) }));
   };
 
@@ -90,9 +92,16 @@ export function StudioBg3dMultiPassExporterPanel({
       </div>
 
       <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="멀티패스 빠른 프리셋">
-        <div className="flex items-center gap-1 text-[0.68rem] font-bold text-fg-2">
-          <Sparkles className="size-3.5 text-accent" />
-          작업 목적 프리셋
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1 text-[0.68rem] font-bold text-fg-2">
+            <Sparkles className="size-3.5 text-accent" />
+            작업 목적 프리셋
+          </span>
+          {activePreset === "custom" ? (
+            <span className="rounded bg-raised px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg-3">
+              사용자 설정
+            </span>
+          ) : null}
         </div>
         <div className="grid grid-cols-4 gap-1">
           {(Object.keys(PRESET_LABELS) as MultiPassExportPreset[]).map((preset) => (
