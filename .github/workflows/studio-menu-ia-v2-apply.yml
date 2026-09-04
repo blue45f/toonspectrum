@@ -1,0 +1,44 @@
+name: Apply Studio menu IA v2
+
+on:
+  push:
+    branches:
+      - feat/studio-menu-ia-v2-20260905
+    paths:
+      - scripts/apply-menu-ia-v2.mjs
+      - .github/workflows/studio-menu-ia-v2-apply.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-menu-ia-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply audited menu information architecture
+        run: node scripts/apply-menu-ia-v2.mjs
+
+      - name: Validate patch shape
+        run: |
+          git diff --check
+          test -z "$(git status --porcelain --untracked-files=no | grep -E 'apply-menu-ia-v2|studio-menu-ia-v2-apply' || true)"
+          git status --short
+
+      - name: Commit optimized menu IA
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "Migration produced no changes"; exit 1; }
+          git commit -m "feat(studio): optimize menu information architecture"
+          git push origin HEAD:${GITHUB_REF_NAME}
