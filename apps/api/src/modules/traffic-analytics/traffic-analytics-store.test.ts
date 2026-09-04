@@ -8,25 +8,39 @@ const source = readFileSync(
 );
 
 describe("traffic analytics persistence contract", () => {
-  it("commits each page view and its session update atomically", () => {
-    expect(source).toContain("WITH inserted_event AS");
-    expect(source).toContain("INSERT INTO app_setting");
-    expect(source).toContain("SELECT $4, $5::jsonb, $3");
+  it("commits an idempotent page view and matching session update atomically", () => {
+    expect(source).toContain("WITH admitted AS");
+    expect(source).toContain("visitor_hash <> $3");
+    expect(source).toContain("INSERT INTO public.traffic_page_view");
+    expect(source).toContain("ON CONFLICT (id) DO NOTHING");
     expect(source).toContain("FROM inserted_event");
-    expect(source).toContain("ON CONFLICT (key) DO UPDATE SET");
-    expect(source).toContain("'pageViews'");
-    expect(source).toContain("'engagedSeconds'");
+    expect(source).toContain("INSERT INTO public.traffic_session");
+    expect(source).toContain("ON CONFLICT (session_hash) DO UPDATE SET");
+    expect(source).toContain(
+      "public.traffic_session.visitor_hash = EXCLUDED.visitor_hash",
+    );
+    expect(source).not.toContain("app_setting");
   });
 
-  it("coordinates retention cleanup through a database lease", () => {
-    expect(source).toContain('"traffic:maintenance:retention"');
-    expect(source).toContain("WITH cleanup_lease AS");
-    expect(source).toContain("WHERE app_setting.\"updatedAt\" < $3");
-    expect(source).toContain("DELETE FROM app_setting");
-    expect(source).toContain(
-      "WHERE EXISTS (SELECT 1 FROM cleanup_lease)",
+  it("keeps heartbeat engagement monotonic without incrementing page views", () => {
+    const heartbeat = source.slice(source.indexOf("persistTrafficHeartbeat"));
+    expect(heartbeat).toContain("engaged_seconds = GREATEST(");
+    expect(heartbeat).not.toContain(
+      "page_views = public.traffic_session.page_views + 1",
     );
-    expect(source).toContain("TRAFFIC_PAGE_VIEW_PREFIX");
-    expect(source).toContain("TRAFFIC_SESSION_UPPER_BOUND");
+    expect(heartbeat).toContain(
+      "public.traffic_session.visitor_hash = EXCLUDED.visitor_hash",
+    );
+  });
+
+  it("coordinates retention cleanup with a PostgreSQL advisory lock", () => {
+    expect(source).toContain(
+      '"toonspectrum:traffic-analytics:retention:v2"',
+    );
+    expect(source).toContain("pg_try_advisory_xact_lock(hashtext($1))");
+    expect(source).toContain("DELETE FROM public.traffic_page_view");
+    expect(source).toContain("DELETE FROM public.traffic_session");
+    expect(source).toContain("occurred_at < $2");
+    expect(source).toContain("last_seen_at < $2");
   });
 });
