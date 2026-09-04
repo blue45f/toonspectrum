@@ -1,3 +1,4 @@
+# Registered workflow trigger: the previous commit created this workflow file.
 name: Finalize marketplace social quality
 
 on:
