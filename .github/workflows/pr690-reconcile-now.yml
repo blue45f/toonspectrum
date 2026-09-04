@@ -1,0 +1,40 @@
+name: PR 690 reconciliation on supported runner
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/pr690-reconcile-now.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr690-reconcile-supported
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Reconcile architecture branch with current main
+        shell: bash
+        run: python3 scripts/pr690-reconcile.py
+
+      - name: Remove one-off reconciliation workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm --ignore-unmatch .github/workflows/pr690-reconcile-now.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(architecture): remove reconciliation transport"
+            git push origin HEAD:refactor/layered-architecture-20260904
+          fi
