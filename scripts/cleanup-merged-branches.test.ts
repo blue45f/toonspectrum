@@ -52,15 +52,17 @@ describe("merged branch cleanup safety", () => {
     expect(classifyBranchDeletion(candidate(overrides))).toEqual({ allowed: false, reason });
   });
 
-  it("rechecks the remote ref before closing a stale PR or deleting its branch", () => {
+  it("deletes only after the final ref recheck and closes duplicate PRs afterward", () => {
     const source = readFileSync(new URL("./cleanup-merged-branches.mjs", import.meta.url), "utf8");
     const decision = source.indexOf("if (!decision.allowed)");
-    const recheck = source.indexOf("const verifiedSha = await currentRefSha", decision);
-    const closePulls = source.indexOf("await closeIntegratedPullRequests", decision);
-    const deleteRef = source.indexOf('method: "DELETE"', closePulls);
-    expect(recheck).toBeGreaterThan(decision);
-    expect(closePulls).toBeGreaterThan(recheck);
-    expect(deleteRef).toBeGreaterThan(closePulls);
+    const listPulls = source.indexOf("const openPulls = await openPullRequestsForBranch", decision);
+    const recheck = source.indexOf("const verifiedSha = await currentRefSha", listPulls);
+    const deleteRef = source.indexOf('method: "DELETE"', recheck);
+    const closePulls = source.indexOf("await reportAndMaybeClosePullRequests", deleteRef);
+    expect(listPulls).toBeGreaterThan(decision);
+    expect(recheck).toBeGreaterThan(listPulls);
+    expect(deleteRef).toBeGreaterThan(recheck);
+    expect(closePulls).toBeGreaterThan(deleteRef);
     expect(source).toContain('reason: "head-changed-after-verification"');
   });
 });

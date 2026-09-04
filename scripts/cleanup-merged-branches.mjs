@@ -127,11 +127,16 @@ async function compareBranchToDefault(repository, branchSha, defaultBranch, toke
   );
 }
 
-async function closeIntegratedPullRequests(repository, branch, token, apply, report) {
+async function openPullRequestsForBranch(repository, branch, token) {
   const pulls = await github(
     `/repos/${repository.owner}/${repository.repo}/pulls?state=open&head=${encodeURIComponent(repository.owner)}:${encodeURIComponent(branch)}&per_page=100`,
     { token },
   );
+  if (!Array.isArray(pulls)) throw new Error("Expected an array of open pull requests");
+  return pulls;
+}
+
+async function reportAndMaybeClosePullRequests(repository, branch, pulls, token, apply, report) {
   for (const pull of pulls) {
     const item = { number: pull.number, branch, url: pull.html_url };
     if (apply) {
@@ -187,6 +192,7 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
     return;
   }
 
+  const openPulls = await openPullRequestsForBranch(repository, name, token);
   const verifiedSha = await currentRefSha(repository, name, token);
   if (verifiedSha === null) {
     report.skipped.push({ branch: name, sha: currentSha, reason: "already-deleted" });
@@ -202,7 +208,6 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
     return;
   }
 
-  await closeIntegratedPullRequests(repository, name, token, apply, report);
   if (apply) {
     try {
       await github(`/repos/${repository.owner}/${repository.repo}/git/refs/heads/${encodeGitRef(name)}`, {
@@ -217,6 +222,7 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
       throw error;
     }
   }
+  await reportAndMaybeClosePullRequests(repository, name, openPulls, token, apply, report);
   report.deleted.push({ branch: name, sha: currentSha, applied: apply });
 }
 
