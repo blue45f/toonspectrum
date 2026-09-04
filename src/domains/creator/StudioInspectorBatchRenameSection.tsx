@@ -20,7 +20,7 @@ const inputClass =
 export interface StudioInspectorBatchRenameSectionProps {
   readonly elements: readonly El[];
   readonly selectedIds: readonly string[];
-  readonly groups: readonly LayerGroup[];
+  readonly groups: LayerGroup[];
   readonly commit: (next: El[]) => boolean;
   readonly announce: (message: string) => void;
 }
@@ -100,6 +100,8 @@ export function StudioInspectorBatchRenameSection({
   return (
     <section
       data-studio-inspector-batch-rename="true"
+      data-inspector-section="selection.batch-rename"
+      data-inspector-section-open={open ? "true" : "false"}
       className="mt-3 rounded-lg border border-line/70 bg-canvas/35"
     >
       <button
