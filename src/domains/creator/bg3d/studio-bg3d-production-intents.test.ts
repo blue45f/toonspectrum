@@ -15,14 +15,27 @@ const AVAILABLE_PASSES = [
   "depth",
 ] as const;
 
+const COLOR_LOOK = Object.freeze({
+  lineEnabled: true,
+  lineStrength: 0.8,
+  textureLineEnabled: true,
+  textureLineStrength: 0.5,
+  toneMode: "flat" as const,
+  toneType: "color" as const,
+  toneOpacity: 1,
+});
+
 describe("Studio BG3D production intents", () => {
-  it("plans only renderer-proven manuscript passes", () => {
-    const plan = planStudioBg3dProductionIntent(AVAILABLE_PASSES, "manuscript");
+  it("plans only renderer-proven and LT-configured manuscript passes", () => {
+    const plan = planStudioBg3dProductionIntent(
+      AVAILABLE_PASSES,
+      "manuscript",
+      COLOR_LOOK,
+    );
 
     expect(plan.selectedPasses).toEqual([
       "lt-composite",
       "color",
-      "tone",
       "texture-line",
       "main-line",
     ]);
@@ -32,12 +45,15 @@ describe("Studio BG3D production intents", () => {
   });
 
   it("makes 2D compositing explicit instead of silently removing the background", () => {
-    const plan = planStudioBg3dProductionIntent(AVAILABLE_PASSES, "composite");
+    const plan = planStudioBg3dProductionIntent(
+      AVAILABLE_PASSES,
+      "composite",
+      COLOR_LOOK,
+    );
 
     expect(plan.selectedPasses).toEqual([
       "lt-composite",
       "color",
-      "tone",
       "texture-line",
       "main-line",
     ]);
@@ -49,6 +65,7 @@ describe("Studio BG3D production intents", () => {
     expect(detectStudioBg3dProductionIntent({
       availablePasses: AVAILABLE_PASSES,
       selectedPasses: ["beauty", "main-line", "depth"],
+      look: COLOR_LOOK,
       includeLayeredPsd: false,
       includeContactSheet: false,
       lineArtPreview: true,
@@ -58,6 +75,7 @@ describe("Studio BG3D production intents", () => {
     expect(detectStudioBg3dProductionIntent({
       availablePasses: AVAILABLE_PASSES,
       selectedPasses: ["beauty", "main-line", "depth"],
+      look: COLOR_LOOK,
       includeLayeredPsd: true,
       includeContactSheet: false,
       lineArtPreview: true,
@@ -65,12 +83,16 @@ describe("Studio BG3D production intents", () => {
     })).toBeNull();
   });
 
-  it("degrades presets to the passes actually available in the active renderer", () => {
+  it("degrades presets to the passes actually available and configured", () => {
     const plan = planStudioBg3dProductionIntent(
       ["beauty", "main-line"],
       "ai-reference",
+      {
+        ...COLOR_LOOK,
+        lineEnabled: false,
+      },
     );
 
-    expect(plan.selectedPasses).toEqual(["beauty", "main-line"]);
+    expect(plan.selectedPasses).toEqual(["beauty"]);
   });
 });
