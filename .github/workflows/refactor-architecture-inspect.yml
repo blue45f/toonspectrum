@@ -1,0 +1,111 @@
+name: Refactor architecture inspection
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/refactor-architecture-inspect.yml
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/layered-architecture-20260904
+          fetch-depth: 1
+
+      - name: Build source structure report
+        shell: python
+        run: |
+          from __future__ import annotations
+
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path.cwd()
+          host = root / "src/domains/creator/StudioCuttoonEditorHost.tsx"
+          lines = host.read_text(encoding="utf-8").splitlines()
+
+          declaration_pattern = re.compile(
+              r"^(?:export\s+)?(?:declare\s+)?(?:async\s+)?"
+              r"(?:(?:function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)"
+              r"|const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=)"
+          )
+          section_pattern = re.compile(r"^/\*\s*-{8,}\s*\*/$")
+          declarations = []
+          section_lines = []
+
+          for index, line in enumerate(lines, start=1):
+              if line[:1].isspace():
+                  continue
+              match = declaration_pattern.match(line)
+              if match:
+                  declarations.append({
+                      "line": index,
+                      "name": match.group(1) or match.group(2),
+                      "signature": line[:240],
+                  })
+              if section_pattern.match(line):
+                  section_lines.append(index)
+
+          for index, item in enumerate(declarations):
+              next_line = declarations[index + 1]["line"] if index + 1 < len(declarations) else len(lines) + 1
+              item["spanLines"] = next_line - item["line"]
+
+          imports_end = 0
+          for index, line in enumerate(lines, start=1):
+              if line.startswith("import ") or (imports_end and index <= imports_end):
+                  imports_end = index
+              elif imports_end and line.strip() and not line.startswith((" ", "\t", "}", ";")):
+                  break
+
+          long_declarations = sorted(declarations, key=lambda item: item["spanLines"], reverse=True)[:100]
+          report = {
+              "path": str(host.relative_to(root)),
+              "lineCount": len(lines),
+              "byteCount": host.stat().st_size,
+              "topLevelDeclarationCount": len(declarations),
+              "sectionMarkers": section_lines,
+              "declarations": declarations,
+              "largestDeclarationSpans": long_declarations,
+          }
+
+          output_dir = root / "docs/architecture"
+          output_dir.mkdir(parents=True, exist_ok=True)
+          json_path = output_dir / "studio-host-structure.generated.json"
+          md_path = output_dir / "studio-host-structure.generated.md"
+          json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+          rows = [
+              "# Studio host structure inspection",
+              "",
+              f"- File: `{report['path']}`",
+              f"- Lines: {report['lineCount']:,}",
+              f"- Bytes: {report['byteCount']:,}",
+              f"- Top-level declarations: {report['topLevelDeclarationCount']:,}",
+              "",
+              "## Largest top-level declaration spans",
+              "",
+              "| span | line | name | signature |",
+              "| ---: | ---: | --- | --- |",
+          ]
+          for item in long_declarations:
+              signature = item["signature"].replace("|", "\\|")
+              rows.append(f"| {item['spanLines']} | {item['line']} | `{item['name']}` | `{signature}` |")
+          md_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+      - name: Commit report
+        shell: bash
+        run: |
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/architecture/studio-host-structure.generated.json docs/architecture/studio-host-structure.generated.md
+          git commit -m "chore(architecture): record studio host structure [skip ci]"
+          git push origin HEAD:refactor/layered-architecture-20260904
