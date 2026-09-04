@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_BRUSH_GPU_QUALITY_RENDER_CONTRACT_VERSION,
+} from "./studio-brush-gpu-quality-election";
+import {
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE,
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MAX_AGE_MS,
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT,
@@ -8,9 +11,6 @@ import {
   studioBrushGpuQualityEvidenceRecordAllows,
   type StudioBrushGpuQualityEvidenceRecord,
 } from "./studio-brush-gpu-quality-evidence";
-import {
-  STUDIO_BRUSH_GPU_QUALITY_RENDER_CONTRACT_VERSION,
-} from "./studio-brush-gpu-quality-election";
 
 const NOW = Date.parse("2026-09-04T00:00:00.000Z");
 
