@@ -96,7 +96,15 @@ const LONG_TASK_MAX = Number(process.env.TOONSPECTRUM_LONG_STROKE_LONG_TASK_MAX 
 const HEAP_GROWTH_MAX_BYTES = 64 * 1024 * 1024; // 해제 후 힙 증가 상한
 const COMMIT_READ_TIMEOUT_MS = 8_000; // 커밋 획이 SQLite 자동저장에 나타날 때까지 폴링 상한
 /** 개발 서버에서 API(:4001)가 없을 때 나는 선택적 루프백 실패 — 게이트 결함이 아니다. */
-const EXPECTED_DEV_NOISE = /\/api\/(?:auth\/session|studio-ai\/status|kmas\/merge-on-access)|socket\.io/u;
+const EXPECTED_DEV_NOISE =
+  /\/api\/(?:auth\/session|studio-ai\/status|kmas\/merge-on-access|analytics\/traffic\/)|socket\.io/u;
+/**
+ * `vite preview` serves the production build, where the `/src/**` module specifiers below do not
+ * exist. The probe already degrades to its env/fallback path when those imports fail; their 404s
+ * are the expected shape of that degradation, not a page defect. A dev-server run keeps counting
+ * them, because there the same 404 means the module really is missing.
+ */
+const PREVIEW_DEV_MODULE_NOISE = /\/src\/domains\/creator\/(?:brush\/studio-brush-catalog|studio-autosave(?:-sqlite-store)?)\.ts/u;
 /** WebGPU 검증 경고(console.warning) — 실패 원인 진단용으로 센다. */
 const GPU_VALIDATION_WARNING = /is invalid due to a previous error|WebGPU|GPUDevice/u;
 /** 개발 서버가 /src 로 서빙하는 모듈 — 페이지 안에서 import 해 stale-dist 없이 카탈로그·자동저장을 읽는다. */
@@ -815,7 +823,10 @@ async function main(): Promise<void> {
     page.on("console", (message) => {
       if (message.type() === "warning" && GPU_VALIDATION_WARNING.test(message.text())) gpuValidationWarnings += 1;
       const text = message.type() === "error" ? `${message.text()} @ ${message.location().url}` : null;
-      if (text && !EXPECTED_DEV_NOISE.test(text)) consoleErrors.push(text.slice(0, 300));
+      if (!text) return;
+      const expected = EXPECTED_DEV_NOISE.test(text)
+        || (SPAWN_PREVIEW && PREVIEW_DEV_MODULE_NOISE.test(text));
+      if (!expected) consoleErrors.push(text.slice(0, 300));
     });
     // tsx(esbuild keepNames)가 직렬화된 page.evaluate 함수에 남기는 __name 헬퍼 — 브라우저에는 없다
     // (verify-studio-brush-latency.mts 와 같은 shim). 문자열 스크립트라 자신은 변환되지 않는다.
