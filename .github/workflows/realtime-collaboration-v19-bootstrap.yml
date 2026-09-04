@@ -1,0 +1,40 @@
+name: Realtime collaboration V19 bootstrap
+
+on:
+  push:
+    branches: [feat/realtime-collaboration-v19]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-integration-patch:
+    if: contains(github.event.head_commit.message, '[bootstrap-v19]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Integrate adaptive collaboration modules
+        run: node scripts/apply-realtime-collaboration-v19.mjs
+      - name: Verify generated patch shape
+        run: |
+          git diff --check
+          git diff --exit-code -- src/domains/creator/live/studio-live-collaboration-protocol.ts
+          git diff --exit-code -- src/domains/creator/live/studio-live-collaboration-transport.ts
+          git diff --stat
+      - name: Commit integrated sources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/domains/creator/live/StudioLiveCollaborationProvider.tsx \
+            src/domains/creator/live/StudioLiveCanvasOverlay.tsx \
+            src/domains/creator/live/StudioLiveCollaborationPanel.tsx
+          git commit -m "feat(studio): integrate adaptive realtime collaboration"
+          git push origin HEAD:${GITHUB_REF_NAME}
