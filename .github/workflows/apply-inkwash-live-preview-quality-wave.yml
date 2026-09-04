@@ -26,7 +26,7 @@ jobs:
         with:
           ref: fix/inkwash-live-preview-quality-20260904
           fetch-depth: 1
-      - name: Tighten preview memory and applicator source
+      - name: Tighten quality semantics and generated workflow
         shell: python
         run: |
           from pathlib import Path
@@ -60,9 +60,46 @@ jobs:
               1,
           )
           source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
+          pressure_old = '''        state.previousPressure
+                  + (currentPressure - state.previousPressure) * amount,
+          '''
+          if source.count(pressure_old) != 1:
+              raise SystemExit(f"pressure semantics target count={source.count(pressure_old)}")
+          source = source.replace(pressure_old, "        currentPressure,\n", 1)
+
+          source = source.replace(
+              '''  push:
+              branches:
+                - fix/inkwash-live-preview-quality-20260904
+          ''',
+              '''  push:
+              branches:
+                - main
+                - fix/inkwash-live-preview-quality-20260904
+          ''',
+              1,
+          )
+          expression_open = "$" + "{{"
+          verify_env = (
+              "      TOONSPECTRUM_VERIFY_DIR: "
+              + expression_open
+              + " runner.temp }}/studio-inkwash-live-preview-quality\n"
+          )
+          source = source.replace(verify_env, "", 1)
+          source = source.replace(
+              '''      - uses: actions/checkout@v6
+                - uses: pnpm/action-setup@v4
+          ''',
+              '''      - uses: actions/checkout@v6
+                - name: Resolve verification directory after runner allocation
+                  run: echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/studio-inkwash-live-preview-quality" >> "$GITHUB_ENV"
+                - uses: pnpm/action-setup@v4
+          ''',
+              1,
+          )
+
           source = source.replace("${name}", "\\${name}")
           source = source.replace('${label ?? "unknown"}', '\\${label ?? "unknown"}')
-          expression_open = "$" + "{{"
           escaped_open = "\\$" + "{{"
           source = source.replace(expression_open, escaped_open)
           path.write_text(source, encoding="utf-8")
