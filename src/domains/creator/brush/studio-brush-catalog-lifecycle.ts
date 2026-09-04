@@ -72,26 +72,26 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   // 2026-09-02 feel-cull: fineliner · pencil-6b · colored-pencil · flat-brush · crosshatch 격리.
   "standard-eraser",
   "kneaded-eraser",
+  // 2026-09-04 quality-first 큐레이션: 서브 툴 팔레트가 계열마다 대표 하나만 남기면서
+  // maru-pen·calligraphy·erodible-pencil·ink-brush·gouache·oil·airbrush-fine·web-dot-tone 이
+  // 셸프에서 빠지고 perfect-ink·charcoal--compressed-edge·gouache--matte-body·
+  // oil--filbert-ribbon 이 그 자리를 대신한다. 셸프가 SSOT 이고 이 표는 그 거울이다.
   // 서브 툴 팔레트 — 펜
-  "maru-pen",
-  "calligraphy",
+  "perfect-ink",
   // 서브 툴 팔레트 — 연필 (2026-09-02 feel-cull: 6b·colored-pencil 격리, 남은 연필 레인 유지)
   "pencil-grain",
-  "erodible-pencil",
   "pencil--side-shade",
+  "charcoal--compressed-edge",
   // 서브 툴 팔레트 — 붓 (2026-08-22: ink-wash 는 watercolor 와 같은 서명이라 격리 D′로 delist)
-  "ink-brush",
-  "gouache",
-  "oil",
+  "gouache--matte-body",
+  "oil--filbert-ribbon",
   // 서브 툴 팔레트 — 에어브러시
   "hard-airbrush",
-  "airbrush-fine",
   "spray",
   "splatter",
   // 서브 툴 팔레트 — 만화
   "web-radial-burst",
   "screentone",
-  "web-dot-tone",
   "web-cross-hatch-pen",
 ]);
 

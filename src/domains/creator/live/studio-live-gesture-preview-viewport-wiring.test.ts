@@ -126,7 +126,8 @@ describe("Studio live gesture preview viewport wiring", () => {
       "trailSuppressedSessionIds?.has(value.participant.sessionId)",
     );
     expect(liveOverlaySource).toContain(
-      "cursor: { ...value.cursor, points: undefined }",
+      // The suppression is a ternary on the cursor field, so the branch is its own line.
+      "? { ...value.cursor, points: undefined }",
     );
   });
 
