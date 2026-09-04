@@ -1,0 +1,132 @@
+name: One-shot brush quality maintenance command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: brush-quality-maintenance-command
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/publish-response-aware-brush-quality'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Restore exact locally validated response-aware sources
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import gzip
+          import hashlib
+
+          files = (
+              (
+                  ".github/brush-quality-payloads/curation.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.ts",
+                  "3904f19aeb0ebc9dd951cd4722d195307dce2840b62c210c0bc6ec47f9ab8748",
+              ),
+              (
+                  ".github/brush-quality-payloads/curation.test.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.test.ts",
+                  "6a37d4d3753e5eee800064ed858e10af3e1b794fe72e8fe5c2c661b13d9cc7bb",
+              ),
+              (
+                  ".github/brush-quality-payloads/analyze.mts.gz.b64",
+                  "scripts/analyze-studio-brush-similarity.mts",
+                  "9b10f1a811bf8f22ea0fcfbcf1e2fbe439126f74ae0f2b55ec9bc3856bfbf479",
+              ),
+          )
+          for payload_path, target_path, expected_sha256 in files:
+              encoded = Path(payload_path).read_text(encoding="utf-8").strip()
+              restored = gzip.decompress(base64.b64decode(encoded))
+              actual_sha256 = hashlib.sha256(restored).hexdigest()
+              if actual_sha256 != expected_sha256:
+                  raise SystemExit(
+                      f"{target_path}: sha256 mismatch {actual_sha256} != {expected_sha256}"
+                  )
+              target = Path(target_path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(restored)
+              print(f"restored {target_path} ({len(restored)} bytes)")
+          PY
+          git diff --check
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Focused quality-first tests
+        run: >-
+          pnpm exec vitest run
+          scripts/studio-brush-long-matrix-quality.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Focused zero-warning lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/run-studio-all-brush-long-stroke-shard.mts
+          scripts/aggregate-studio-all-brush-long-stroke.mts
+          scripts/analyze-studio-brush-similarity.mts
+          scripts/studio-brush-long-matrix-quality.ts
+          scripts/studio-brush-long-matrix-quality.test.ts
+          scripts/verify-studio-long-stroke.mts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-quality-curation.ts
+          src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Typecheck complete repository
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Remove temporary implementation helpers and publish
+        run: |
+          set -euo pipefail
+          rm -rf .github/brush-quality-payloads
+          rm -f \
+            .github/workflows/apply-all-brush-quality-v3-macos.yml \
+            .github/workflows/export-brush-quality-source-v2.yml \
+            .github/workflows/finalize-response-aware-brush-quality.yml \
+            .github/workflows/patch-brush-quality-policy.yml \
+            scripts/patch-all-brush-quality-v3.py \
+            scripts/patch-all-brush-quality-v3b.py
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(brush): finalize quality-first response-aware curation"
+          git push origin HEAD:${TARGET_BRANCH}
