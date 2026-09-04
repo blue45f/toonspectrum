@@ -1,0 +1,116 @@
+# Quality-first merge gate: catalogue integrity and exhaustive reachability are mandatory.
+name: Studio brush quality portfolio
+
+on:
+  push:
+    branches:
+      - fix/brush-portfolio-exhaustive-contract-20260904
+    paths:
+      - "scripts/audit-studio-brush-quality-portfolio.mts"
+      - "src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx"
+      - "src/domains/creator/brush/studio-brush-catalog-core.ts"
+      - "src/domains/creator/brush/studio-brush-catalog.ts"
+      - "src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts"
+      - "src/domains/creator/brush/studio-brush-quality-foundation.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio-counts.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio-data.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio.test.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio.ts"
+      - "src/domains/creator/brush/studio-sub-tool-palette-data.test.ts"
+      - "src/domains/creator/brush/studio-sub-tool-palette-data.ts"
+      - ".github/workflows/studio-brush-quality-portfolio.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/audit-studio-brush-quality-portfolio.mts"
+      - "src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx"
+      - "src/domains/creator/brush/studio-brush-catalog-core.ts"
+      - "src/domains/creator/brush/studio-brush-catalog.ts"
+      - "src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts"
+      - "src/domains/creator/brush/studio-brush-quality-foundation.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio-counts.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio-data.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio.test.ts"
+      - "src/domains/creator/brush/studio-brush-quality-portfolio.ts"
+      - "src/domains/creator/brush/studio-sub-tool-palette-data.test.ts"
+      - "src/domains/creator/brush/studio-sub-tool-palette-data.ts"
+      - ".github/workflows/studio-brush-quality-portfolio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-brush-quality-portfolio-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-portfolio:
+    name: quality-portfolio
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify quality-first catalogue contracts
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
+          src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
+          src/domains/creator/brush/studio-brush-catalog-contract.test.ts
+          src/domains/creator/brush/studio-brush-catalog-core.test.ts
+          src/domains/creator/brush/studio-sub-tool-palette-data.test.ts
+          src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          src/domains/creator/brush/StudioBrushTray.test.tsx
+          src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
+
+      - name: Run static texture and hand-feel audit
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}
+        run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
+
+      - name: Lint changed quality surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/audit-studio-brush-quality-portfolio.mts
+          src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          src/domains/creator/brush/studio-brush-catalog-core.ts
+          src/domains/creator/brush/studio-brush-catalog.ts
+          src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
+          src/domains/creator/brush/studio-brush-quality-foundation.ts
+          src/domains/creator/brush/studio-brush-quality-portfolio-counts.ts
+          src/domains/creator/brush/studio-brush-quality-portfolio-data.ts
+          src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
+          src/domains/creator/brush/studio-brush-quality-portfolio.ts
+          src/domains/creator/brush/studio-sub-tool-palette-data.test.ts
+          src/domains/creator/brush/studio-sub-tool-palette-data.ts
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio
+        run: pnpm run build
+
+      - name: Upload quality audit receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-brush-quality-portfolio
+          path: ${{ runner.temp }}/studio-brush-quality-portfolio
+          if-no-files-found: warn
+          retention-days: 14

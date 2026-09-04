@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BRUSH_PRESETS } from "../studio-brush";
 
 import {
+  STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
 } from "./studio-brush-catalog";
@@ -12,9 +13,10 @@ import {
   STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT,
   studioBrushListedUniquenessKey,
 } from "./studio-brush-listed-uniqueness";
-import { studioBrushPackDescriptorById, STUDIO_BRUSH_PACK_DESCRIPTORS  } from "./studio-brush-pack-index";
-import { materializeStudioBrushPackSelection, materializeAllStudioBrushPackSelections  } from "./studio-brush-pack-runtime";
+import { studioBrushPackDescriptorById, STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import { materializeStudioBrushPackSelection, materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
 import { auditStudioBrushPlannerQualityCatalogue } from "./studio-brush-planner-quality-audit";
+import { STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS } from "./studio-brush-quality-portfolio";
 import {
   isStudioBrushQuarantinedPresetId,
   STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID,
@@ -26,19 +28,27 @@ import {
 } from "./studio-brush-runtime-contract";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 
-describe("listed paint uniqueness (2026-09-02 feel-cull)", () => {
-  it("shrinks the picker-listed paint inventory below the pre-change count", () => {
+describe("listed paint uniqueness and default quality portfolio", () => {
+  it("keeps the exhaustive listed inventory while curating 46 default paint representatives", () => {
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length)
       .toBeLessThan(STUDIO_LISTED_PAINT_PRE_CHANGE_COUNT);
     expect(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length).toBe(185);
+    expect(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS.length)
+      .toBe(STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint);
+    expect(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(46);
     expect(
       STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.every(
         (item) => !isStudioBrushQuarantinedPresetId(item.id),
       ),
     ).toBe(true);
+    expect(
+      STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS.every(
+        (item) => STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.includes(item),
+      ),
+    ).toBe(true);
   });
 
-  it("keeps no two listed paint ids on the same uniqueness key", () => {
+  it("keeps no two exhaustive listed paint ids on the same uniqueness key", () => {
     expect(listStudioListedPaintUniquenessCollisions()).toEqual([]);
     const keys = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => {
       const key = studioBrushListedUniquenessKey(item.id);
@@ -48,7 +58,7 @@ describe("listed paint uniqueness (2026-09-02 feel-cull)", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("keeps listed planner exact and perceptual fingerprints unique", () => {
+  it("keeps exhaustive listed planner exact and perceptual fingerprints unique", () => {
     const listedIds = new Set(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id));
     const core = BRUSH_PRESETS
       .filter((preset) => listedIds.has(preset.id) && preset.operation !== "erase")
