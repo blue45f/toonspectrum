@@ -24,6 +24,7 @@ describe("traffic analytics privacy boundaries", () => {
     expect(isExcludedTrafficPath("/admin")).toBe(true);
     expect(isExcludedTrafficPath("/admin/members")).toBe(true);
     expect(isExcludedTrafficPath("/studio")).toBe(false);
+    expect(normalizeTrafficPath("/apiculture")).toBe("/apiculture");
   });
 
   it("classifies common devices without retaining the user-agent string", () => {
@@ -76,5 +77,13 @@ describe("traffic analytics privacy boundaries", () => {
       medium: "organic",
       campaign: null,
     });
+    expect(
+      classifyTrafficSource({
+        utmSource: null,
+        utmMedium: null,
+        utmCampaign: null,
+        referrerHost: "x.com",
+      }),
+    ).toEqual({ source: "x.com", medium: "social", campaign: null });
   });
 });
