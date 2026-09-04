@@ -289,18 +289,18 @@ export function createStudioInkwashFluidPreviewPlanner(
   options: StudioInkwashFluidPreviewPlannerOptions,
 ): StudioInkwashFluidPreviewPlannerState {
   const baseRadius = Math.max(0.75, options.radius);
-const absorption = spectralColor({
-  tool: options.tool,
-  samples: [],
-  radius: options.radius,
-  pigmentLoad: options.pigmentLoad,
-  wetnessLoad: options.wetnessLoad,
-  ...(options.spectralAbsorption
-    ? { spectralAbsorption: options.spectralAbsorption }
-    : {}),
-  ...(options.inkColor ? { inkColor: options.inkColor } : {}),
-});
-return {
+  const absorption = spectralColor({
+    tool: options.tool,
+    samples: [],
+    radius: options.radius,
+    pigmentLoad: options.pigmentLoad,
+    wetnessLoad: options.wetnessLoad,
+    ...(options.spectralAbsorption
+      ? { spectralAbsorption: options.spectralAbsorption }
+      : {}),
+    ...(options.inkColor ? { inkColor: options.inkColor } : {}),
+  });
+  return {
     tool: options.tool,
     baseRadius,
     spacing: Math.max(
