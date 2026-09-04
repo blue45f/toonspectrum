@@ -33,6 +33,15 @@ function createBatch(
       "main-line": "주선",
       depth: "깊이",
     },
+    look: {
+      lineEnabled: true,
+      lineStrength: 0.8,
+      textureLineEnabled: true,
+      textureLineStrength: 0.5,
+      toneMode: "flat",
+      toneType: "color",
+      toneOpacity: 1,
+    },
     exportHeight: "per-shot",
     exportHeightOptions: [640, 1080, 1440, 2160, 4096],
     includeLayeredPsd: false,
@@ -112,7 +121,7 @@ function renderPanel(runtime: StudioBg3dProSuiteRuntimeValue) {
 describe("StudioBg3dProductionIntentPanel", () => {
   afterEach(() => cleanup());
 
-  it("applies the manuscript intent across shots, passes, package and look state", () => {
+  it("applies the manuscript intent across shots, configured passes, package and look state", () => {
     const batch = createBatch();
     const runtime = createRuntime(batch);
     renderPanel(runtime);
@@ -123,7 +132,6 @@ describe("StudioBg3dProductionIntentPanel", () => {
     expect(batch.setSelectedPasses).toHaveBeenCalledWith([
       "lt-composite",
       "color",
-      "tone",
       "texture-line",
       "main-line",
     ]);
