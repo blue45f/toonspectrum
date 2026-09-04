@@ -8,84 +8,28 @@ on:
       - "src/domains/creator/MarketplaceBrush*"
       - "src/domains/creator/**/StudioBrushStudio.tsx"
       - "e2e/marketplace-authoring-*.spec.ts"
+      - "marketplace-benchmark/**"
       - ".github/workflows/marketplace-authoring.yml"
   push:
     branches:
       - main
-      - feat/marketplace-social-studio-integration-20260904
     paths:
       - "lib/creator-marketplace-authoring-workshop*"
       - "src/domains/market/**"
       - "src/domains/creator/MarketplaceBrush*"
       - "src/domains/creator/**/StudioBrushStudio.tsx"
       - "e2e/marketplace-authoring-*.spec.ts"
-      - "scripts/finalize-marketplace-social-quality.py"
       - ".github/workflows/marketplace-authoring.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: marketplace-authoring-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  finalize-social-quality:
-    if: ${{ github.event_name == 'push' && github.ref_name == 'feat/marketplace-social-studio-integration-20260904' && !contains(github.event.head_commit.message, '[market-social-finalized]') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      CI: "true"
-      NODE_OPTIONS: --max-old-space-size=8192
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: feat/marketplace-social-studio-integration-20260904
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-      - name: Apply social quality hardening
-        run: python3 scripts/finalize-marketplace-social-quality.py
-      - name: Validate generated diff
-        run: |
-          python3 -m py_compile scripts/finalize-marketplace-social-quality.py
-          git diff --check
-      - run: pnpm install --frozen-lockfile
-      - name: Focused social verification
-        run: |
-          pnpm run validate:architecture
-          pnpm exec eslint --max-warnings=0 \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social.service.ts \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts \
-            src/domains/market/hooks/use-market-social.ts \
-            src/domains/market/hooks/use-market-social.test.tsx
-          pnpm exec vitest run \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.guard.test.ts \
-            apps/api/src/modules/creator-marketplace/creator-marketplace-social-generic-api-boundary.test.ts \
-            lib/creator-marketplace-social-contract.test.ts \
-            lib/creator-marketplace-social-namespace.test.ts \
-            src/domains/market/hooks/use-market-social.test.tsx \
-            src/domains/market/components/MarketCommentsSection.test.tsx \
-            src/domains/market/components/MarketReviewsSection.test.tsx \
-            src/domains/market/models/market-studio-handoff.test.ts
-          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
-      - name: Commit verified product changes and restore workflow
-        run: |
-          git checkout HEAD^ -- .github/workflows/marketplace-authoring.yml
-          rm -f scripts/finalize-marketplace-social-quality.py
-          rm -f .github/workflows/finalize-marketplace-social-quality.yml
-          git config user.name "toonstudio-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit --no-verify -m "fix(market): harden social cache and privacy [market-social-finalized]"
-          git push --no-verify origin HEAD:feat/marketplace-social-studio-integration-20260904
-
   contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
