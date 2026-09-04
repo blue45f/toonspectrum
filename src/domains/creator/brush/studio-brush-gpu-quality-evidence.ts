@@ -10,6 +10,7 @@ export { STUDIO_BRUSH_GPU_QUALITY_EVIDENCE };
 
 export const STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MAX_AGE_MS =
   30 * 24 * 60 * 60 * 1_000;
+export const STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT = 3;
 
 export interface StudioBrushGpuQualityEvidenceRecord {
   readonly schemaVersion: number;
@@ -38,7 +39,7 @@ function finiteTimestamp(value: string | null): number | null {
 
 /**
  * Pure fail-closed validator so tests and rollout code use exactly the same freshness, hardware,
- * renderer-contract, and brush-id rules.
+ * renderer-contract, repeated-run, and brush-id rules.
  */
 export function studioBrushGpuQualityEvidenceRecordAllows(
   evidence: StudioBrushGpuQualityEvidenceRecord,
@@ -62,7 +63,8 @@ export function studioBrushGpuQualityEvidenceRecordAllows(
     && typeof evidence.benchmarkDigest === "string"
     && DIGEST_PATTERN.test(evidence.benchmarkDigest)
     && Number.isSafeInteger(evidence.measurementRunCount)
-    && evidence.measurementRunCount > 0
+    && evidence.measurementRunCount
+      >= STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT
     && Number.isSafeInteger(evidence.measuredBrushCount)
     && evidence.measuredBrushCount > 0
     && evidence.hardwareClass === "hardware"
