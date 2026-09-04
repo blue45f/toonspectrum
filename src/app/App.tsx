@@ -45,6 +45,9 @@ const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_CHANGELOGDESK_URL ||
   import.meta.env.VITE_NOTIFYDESK_URL,
 );
+const TRAFFIC_ANALYTICS_ENABLED =
+  import.meta.env.PROD
+  && import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED !== "false";
 let kmasEntryMergeStarted = false;
 
 function useDeferredByScroll(timeoutMs = 6500) {
@@ -203,9 +206,11 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={null}>
-        <TrafficAnalyticsBridge />
-      </Suspense>
+      {TRAFFIC_ANALYTICS_ENABLED ? (
+        <Suspense fallback={null}>
+          <TrafficAnalyticsBridge />
+        </Suspense>
+      ) : null}
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
