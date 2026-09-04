@@ -1,7 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 
 import {
-  BadRequestException,
   Injectable,
   ServiceUnavailableException,
   TooManyRequestsException,
@@ -9,260 +8,45 @@ import {
 
 import { dbPool } from "../../db";
 
-const PAGE_VIEW_PREFIX = "traffic:pv:";
-const SESSION_PREFIX = "traffic:ss:";
-const SESSION_UPPER_BOUND = "traffic:st:";
-const DEFAULT_RETENTION_DAYS = 90;
+import {
+  boundedTrafficInteger,
+  classifyTrafficDevice,
+  classifyTrafficSource,
+  isExcludedTrafficPath,
+  normalizeTrafficCampaignToken,
+  normalizeTrafficCountryCode,
+  normalizeTrafficPath,
+  normalizeTrafficReferrerHost,
+  requireTrafficIdentifier,
+  TRAFFIC_DEFAULT_RETENTION_DAYS,
+  TRAFFIC_MAX_ENGAGED_SECONDS,
+  TRAFFIC_PAGE_VIEW_PREFIX,
+  trafficPageViewRangeKey,
+  TRAFFIC_SESSION_PREFIX,
+  TRAFFIC_SESSION_UPPER_BOUND,
+  trafficScreenClass,
+  type TrafficHeartbeatPayload,
+  type TrafficPageViewPayload,
+  type TrafficRequestContext,
+} from "./traffic-analytics-model";
+
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
-const MAX_PATH_LENGTH = 320;
-const MAX_REFERRER_LENGTH = 256;
-const MAX_CAMPAIGN_TOKEN_LENGTH = 96;
-const MAX_ENGAGED_SECONDS = 12 * 60 * 60;
-const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const RATE_WINDOW_MS = 60_000;
 const MAX_PAGE_VIEWS_PER_SESSION_WINDOW = 120;
 const MAX_HEARTBEATS_PER_SESSION_WINDOW = 4;
 const MAX_RATE_LIMIT_ENTRIES = 10_000;
 const MAX_GLOBAL_EVENTS_PER_WINDOW = 5_000;
-const BOT_PATTERN =
-  /\b(bot|crawler|spider|slurp|headlesschrome|lighthouse|pagespeed|facebookexternalhit|twitterbot|bingpreview|preview)\b/iu;
 
-type TrafficPageViewPayload = {
-  visitorId?: unknown;
-  sessionId?: unknown;
-  path?: unknown;
-  referrer?: unknown;
-  screenWidth?: unknown;
-  screenHeight?: unknown;
-  loadTimeMs?: unknown;
-  utmSource?: unknown;
-  utmMedium?: unknown;
-  utmCampaign?: unknown;
+type RateLimitState = {
+  windowStartedAt: number;
+  pageViews: number;
+  heartbeats: number;
 };
-
-type TrafficHeartbeatPayload = {
-  visitorId?: unknown;
-  sessionId?: unknown;
-  path?: unknown;
-  engagedSeconds?: unknown;
-};
-
-export type TrafficRequestContext = {
-  userAgent?: string;
-  host?: string;
-  referer?: string;
-  countryCode?: string;
-  privacyOptOut?: boolean;
-};
-
-type DeviceContext = {
-  browser: string;
-  os: string;
-  deviceType: "desktop" | "mobile" | "tablet" | "other";
-  isBot: boolean;
-};
-
-function boundedInteger(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number,
-): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(maximum, Math.max(minimum, Math.round(parsed)));
-}
-
-function optionalToken(
-  value: unknown,
-  maximum = MAX_CAMPAIGN_TOKEN_LENGTH,
-): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maximum);
-}
-
-function campaignToken(value: unknown): string | null {
-  const token = optionalToken(value)?.replace(
-    /[^A-Za-z0-9._~:-]+/gu,
-    "-",
-  );
-  const normalized = token?.replace(/^-+|-+$/gu, "") ?? "";
-  return normalized || null;
-}
-
-function requiredOpaqueIdentifier(value: unknown, label: string): string {
-  if (typeof value !== "string") {
-    throw new BadRequestException(`${label}가 올바르지 않습니다.`);
-  }
-  const normalized = value.trim();
-  if (!IDENTIFIER_PATTERN.test(normalized)) {
-    throw new BadRequestException(`${label}가 올바르지 않습니다.`);
-  }
-  return normalized;
-}
-
-export function normalizeTrafficPath(value: unknown): string {
-  if (typeof value !== "string") {
-    throw new BadRequestException("페이지 경로가 필요합니다.");
-  }
-  let pathname: string;
-  try {
-    pathname = new URL(value, "https://traffic.invalid").pathname;
-  } catch {
-    throw new BadRequestException("페이지 경로가 올바르지 않습니다.");
-  }
-  const normalized = pathname.replace(/\/{2,}/gu, "/").slice(0, MAX_PATH_LENGTH);
-  if (!normalized.startsWith("/") || normalized.startsWith("/api")) {
-    throw new BadRequestException("수집할 수 없는 페이지 경로입니다.");
-  }
-  return normalized || "/";
-}
-
-export function isExcludedTrafficPath(path: string): boolean {
-  return (
-    path === "/admin"
-    || path.startsWith("/admin/")
-    || path === "/auth/callback"
-    || path.startsWith("/auth/callback/")
-  );
-}
-
-function normalizeHost(value: string | undefined): string | null {
-  const normalized = value?.trim().toLowerCase().replace(/:\d+$/u, "") ?? "";
-  return normalized || null;
-}
-
-function normalizeReferrerHost(
-  value: unknown,
-  fallback: string | undefined,
-  requestHost: string | undefined,
-): string | null {
-  const candidate =
-    typeof value === "string" && value.trim() ? value.trim() : fallback?.trim();
-  if (!candidate) return null;
-  try {
-    const hostname = new URL(candidate).hostname.toLowerCase();
-    if (!hostname || hostname.length > MAX_REFERRER_LENGTH) return null;
-    if (hostname === normalizeHost(requestHost)) return null;
-    return hostname;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeCountryCode(value: string | undefined): string | null {
-  const normalized = value?.trim().toUpperCase() ?? "";
-  return /^[A-Z]{2}$/u.test(normalized) ? normalized : null;
-}
-
-function screenClass(width: number, height: number): string {
-  const longest = Math.max(width, height);
-  const shortest = Math.min(width, height);
-  if (shortest <= 0 || longest <= 0) return "unknown";
-  if (shortest < 600) return "small";
-  if (shortest < 900) return "medium";
-  if (longest >= 1_920) return "large";
-  return "desktop";
-}
-
-export function classifyTrafficDevice(userAgentValue: string | undefined): DeviceContext {
-  const userAgent = userAgentValue ?? "";
-  const lower = userAgent.toLowerCase();
-  const isBot = BOT_PATTERN.test(userAgent);
-  const isTablet = /ipad|tablet|kindle|silk|playbook/iu.test(userAgent);
-  const isMobile =
-    !isTablet && /mobi|iphone|ipod|android.*mobile|windows phone/iu.test(userAgent);
-
-  let browser = "Other";
-  if (lower.includes("edg/")) browser = "Edge";
-  else if (lower.includes("opr/") || lower.includes("opera")) browser = "Opera";
-  else if (lower.includes("samsungbrowser/")) browser = "Samsung Internet";
-  else if (lower.includes("firefox/") || lower.includes("fxios/")) browser = "Firefox";
-  else if (lower.includes("crios/") || lower.includes("chrome/")) browser = "Chrome";
-  else if (lower.includes("safari/")) browser = "Safari";
-
-  let os = "Other";
-  if (/iphone|ipad|ipod/iu.test(userAgent)) os = "iOS";
-  else if (/android/iu.test(userAgent)) os = "Android";
-  else if (/windows/iu.test(userAgent)) os = "Windows";
-  else if (/mac os x|macintosh/iu.test(userAgent)) os = "macOS";
-  else if (/linux/iu.test(userAgent)) os = "Linux";
-
-  return {
-    browser,
-    os,
-    deviceType: isTablet ? "tablet" : isMobile ? "mobile" : "desktop",
-    isBot,
-  };
-}
-
-function isSearchReferrer(host: string): boolean {
-  return /(google\.|bing\.com$|search\.naver\.com$|daum\.net$|yahoo\.|duckduckgo\.com$)/iu.test(
-    host,
-  );
-}
-
-function isSocialReferrer(host: string): boolean {
-  return /(instagram\.com$|facebook\.com$|t\.co$|twitter\.com$|x\.com$|youtube\.com$|youtu\.be$|tiktok\.com$|threads\.net$|linkedin\.com$)/iu.test(
-    host,
-  );
-}
-
-export function classifyTrafficSource(input: {
-  utmSource: string | null;
-  utmMedium: string | null;
-  utmCampaign: string | null;
-  referrerHost: string | null;
-}): {
-  source: string;
-  medium: string;
-  campaign: string | null;
-} {
-  if (input.utmSource) {
-    return {
-      source: input.utmSource.toLowerCase(),
-      medium: input.utmMedium?.toLowerCase() || "campaign",
-      campaign: input.utmCampaign,
-    };
-  }
-  if (!input.referrerHost) {
-    return { source: "direct", medium: "none", campaign: null };
-  }
-  if (isSearchReferrer(input.referrerHost)) {
-    return {
-      source: input.referrerHost,
-      medium: "organic",
-      campaign: null,
-    };
-  }
-  if (isSocialReferrer(input.referrerHost)) {
-    return {
-      source: input.referrerHost,
-      medium: "social",
-      campaign: null,
-    };
-  }
-  return {
-    source: input.referrerHost,
-    medium: "referral",
-    campaign: null,
-  };
-}
-
-function sortableTimestamp(date: Date): string {
-  return date.toISOString().replace(/\D/gu, "").slice(0, 17);
-}
-
-function pageViewRangeKey(date: Date): string {
-  return `${PAGE_VIEW_PREFIX}${sortableTimestamp(date)}`;
-}
 
 function retentionDays(): number {
-  return boundedInteger(
+  return boundedTrafficInteger(
     process.env.TRAFFIC_ANALYTICS_RETENTION_DAYS,
-    DEFAULT_RETENTION_DAYS,
+    TRAFFIC_DEFAULT_RETENTION_DAYS,
     7,
     365,
   );
@@ -275,7 +59,9 @@ function analyticsSecret(): string {
     || process.env.AUTH_STATE_SECRET;
   if (configured?.trim()) return `traffic-v1:${configured.trim()}`;
   if (process.env.NODE_ENV === "production") {
-    throw new ServiceUnavailableException("트래픽 분석 수집 키가 설정되지 않았습니다.");
+    throw new ServiceUnavailableException(
+      "트래픽 분석 수집 키가 설정되지 않았습니다.",
+    );
   }
   return "traffic-v1:toonspectrum-local-development";
 }
@@ -289,12 +75,6 @@ function hashIdentifier(kind: "visitor" | "session", value: string): string {
 function json(value: unknown): string {
   return JSON.stringify(value);
 }
-
-type RateLimitState = {
-  windowStartedAt: number;
-  pageViews: number;
-  heartbeats: number;
-};
 
 @Injectable()
 export class TrafficAnalyticsService {
@@ -329,11 +109,11 @@ export class TrafficAnalyticsService {
         throw new TooManyRequestsException("트래픽 수집 요청이 너무 많습니다.");
       }
     }
+
     const state =
       !current || now - current.windowStartedAt >= RATE_WINDOW_MS
         ? { windowStartedAt: now, pageViews: 0, heartbeats: 0 }
         : current;
-
     if (kind === "page-view") {
       state.pageViews += 1;
       if (state.pageViews > MAX_PAGE_VIEWS_PER_SESSION_WINDOW) {
@@ -352,23 +132,19 @@ export class TrafficAnalyticsService {
     payload: TrafficPageViewPayload,
     context: TrafficRequestContext,
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
-    if (context.privacyOptOut) {
-      return { accepted: false, excluded: true };
-    }
-    const path = normalizeTrafficPath(payload.path);
-    if (isExcludedTrafficPath(path)) {
-      return { accepted: false, excluded: true };
-    }
-    const device = classifyTrafficDevice(context.userAgent);
-    if (device.isBot) {
-      return { accepted: false, excluded: true };
-    }
+    if (context.privacyOptOut) return { accepted: false, excluded: true };
 
-    const visitorId = requiredOpaqueIdentifier(
+    const path = normalizeTrafficPath(payload.path);
+    if (isExcludedTrafficPath(path)) return { accepted: false, excluded: true };
+
+    const device = classifyTrafficDevice(context.userAgent);
+    if (device.isBot) return { accepted: false, excluded: true };
+
+    const visitorId = requireTrafficIdentifier(
       payload.visitorId,
       "방문자 식별자",
     );
-    const sessionId = requiredOpaqueIdentifier(
+    const sessionId = requireTrafficIdentifier(
       payload.sessionId,
       "세션 식별자",
     );
@@ -376,24 +152,36 @@ export class TrafficAnalyticsService {
     const visitorHash = hashIdentifier("visitor", visitorId);
     const sessionHash = hashIdentifier("session", sessionId);
     this.enforceRateLimit(sessionHash, "page-view");
-    const referrerHost = normalizeReferrerHost(
+
+    const referrerHost = normalizeTrafficReferrerHost(
       payload.referrer,
       context.referer,
       context.host,
     );
     const source = classifyTrafficSource({
-      utmSource: campaignToken(payload.utmSource),
-      utmMedium: campaignToken(payload.utmMedium),
-      utmCampaign: campaignToken(payload.utmCampaign),
+      utmSource: normalizeTrafficCampaignToken(payload.utmSource),
+      utmMedium: normalizeTrafficCampaignToken(payload.utmMedium),
+      utmCampaign: normalizeTrafficCampaignToken(payload.utmCampaign),
       referrerHost,
     });
-    const screenWidth = boundedInteger(payload.screenWidth, 0, 0, 20_000);
-    const screenHeight = boundedInteger(payload.screenHeight, 0, 0, 20_000);
+    const screenWidth = boundedTrafficInteger(
+      payload.screenWidth,
+      0,
+      0,
+      20_000,
+    );
+    const screenHeight = boundedTrafficInteger(
+      payload.screenHeight,
+      0,
+      0,
+      20_000,
+    );
     const loadTimeMs =
-      boundedInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
-    const countryCode = normalizeCountryCode(context.countryCode);
-    const eventKey = `${pageViewRangeKey(occurredAt)}:${randomUUID()}`;
-    const sessionKey = `${SESSION_PREFIX}${sessionHash}`;
+      boundedTrafficInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
+    const countryCode = normalizeTrafficCountryCode(context.countryCode);
+    const eventKey = `${trafficPageViewRangeKey(occurredAt)}:${randomUUID()}`;
+    const sessionKey = `${TRAFFIC_SESSION_PREFIX}${sessionHash}`;
+    const screenClass = trafficScreenClass(screenWidth, screenHeight);
 
     const eventValue = {
       version: 1,
@@ -409,9 +197,9 @@ export class TrafficAnalyticsService {
       deviceType: device.deviceType,
       browser: device.browser,
       os: device.os,
-      screenClass: screenClass(screenWidth, screenHeight),
+      screenClass,
       loadTimeMs,
-      isBot: device.isBot,
+      isBot: false,
     };
     const sessionValue = {
       version: 1,
@@ -428,10 +216,10 @@ export class TrafficAnalyticsService {
       deviceType: device.deviceType,
       browser: device.browser,
       os: device.os,
-      screenClass: screenClass(screenWidth, screenHeight),
+      screenClass,
       pageViews: 1,
       engagedSeconds: 0,
-      isBot: device.isBot,
+      isBot: false,
     };
 
     await dbPool.query(
@@ -488,23 +276,19 @@ export class TrafficAnalyticsService {
     payload: TrafficHeartbeatPayload,
     context: TrafficRequestContext,
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
-    if (context.privacyOptOut) {
-      return { accepted: false, excluded: true };
-    }
-    const path = normalizeTrafficPath(payload.path);
-    if (isExcludedTrafficPath(path)) {
-      return { accepted: false, excluded: true };
-    }
-    const device = classifyTrafficDevice(context.userAgent);
-    if (device.isBot) {
-      return { accepted: false, excluded: true };
-    }
+    if (context.privacyOptOut) return { accepted: false, excluded: true };
 
-    const visitorId = requiredOpaqueIdentifier(
+    const path = normalizeTrafficPath(payload.path);
+    if (isExcludedTrafficPath(path)) return { accepted: false, excluded: true };
+
+    const device = classifyTrafficDevice(context.userAgent);
+    if (device.isBot) return { accepted: false, excluded: true };
+
+    const visitorId = requireTrafficIdentifier(
       payload.visitorId,
       "방문자 식별자",
     );
-    const sessionId = requiredOpaqueIdentifier(
+    const sessionId = requireTrafficIdentifier(
       payload.sessionId,
       "세션 식별자",
     );
@@ -512,13 +296,13 @@ export class TrafficAnalyticsService {
     const visitorHash = hashIdentifier("visitor", visitorId);
     const sessionHash = hashIdentifier("session", sessionId);
     this.enforceRateLimit(sessionHash, "heartbeat");
-    const engagedSeconds = boundedInteger(
+    const engagedSeconds = boundedTrafficInteger(
       payload.engagedSeconds,
       0,
       0,
-      MAX_ENGAGED_SECONDS,
+      TRAFFIC_MAX_ENGAGED_SECONDS,
     );
-    const sessionKey = `${SESSION_PREFIX}${sessionHash}`;
+    const sessionKey = `${TRAFFIC_SESSION_PREFIX}${sessionHash}`;
     const sessionValue = {
       version: 1,
       visitorHash,
@@ -526,13 +310,13 @@ export class TrafficAnalyticsService {
       lastSeenAt: occurredAt.toISOString(),
       entryPath: path,
       lastPath: path,
-      countryCode: normalizeCountryCode(context.countryCode),
+      countryCode: normalizeTrafficCountryCode(context.countryCode),
       deviceType: device.deviceType,
       browser: device.browser,
       os: device.os,
       pageViews: 0,
       engagedSeconds,
-      isBot: device.isBot,
+      isBot: false,
     };
 
     await dbPool.query(
@@ -567,11 +351,13 @@ export class TrafficAnalyticsService {
 
   private scheduleCleanup(): void {
     const now = Date.now();
-    if (this.cleanupPromise || now - this.lastCleanupAt < CLEANUP_INTERVAL_MS) return;
+    if (this.cleanupPromise || now - this.lastCleanupAt < CLEANUP_INTERVAL_MS) {
+      return;
+    }
     this.lastCleanupAt = now;
     this.cleanupPromise = this.cleanup()
       .catch(() => {
-        // Telemetry retention is best-effort and must never fail a user request.
+        // Retention is best-effort and must never fail a user request.
       })
       .finally(() => {
         this.cleanupPromise = null;
@@ -593,10 +379,10 @@ export class TrafficAnalyticsService {
         )
       `,
       [
-        PAGE_VIEW_PREFIX,
-        pageViewRangeKey(cutoff),
-        SESSION_PREFIX,
-        SESSION_UPPER_BOUND,
+        TRAFFIC_PAGE_VIEW_PREFIX,
+        trafficPageViewRangeKey(cutoff),
+        TRAFFIC_SESSION_PREFIX,
+        TRAFFIC_SESSION_UPPER_BOUND,
         cutoff,
       ],
     );
