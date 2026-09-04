@@ -19,7 +19,7 @@ concurrency:
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[inkwash-live-preview-applied]') }}
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -71,7 +71,6 @@ jobs:
               1,
           )
           source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
-          # Keep nested TypeScript templates literal while this JavaScript applicator executes.
           source = source.replace("${name}", "\\${name}")
           source = source.replace('${label ?? "unknown"}', '\\${label ?? "unknown"}')
           expression_open = "$" + "{{"
