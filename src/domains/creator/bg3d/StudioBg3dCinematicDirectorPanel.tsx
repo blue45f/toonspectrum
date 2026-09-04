@@ -8,6 +8,7 @@ import {
 } from "./studio-bg3d-camera-orientation";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dCinematicDirectorPanel as StudioBg3dCinematicDirectorPanelContent } from "./StudioBg3dCinematicDirectorPanelContent";
+import { StudioBg3dProductionIntentPanel } from "./StudioBg3dProductionIntentPanel";
 import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowPanel";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
@@ -221,6 +222,7 @@ export function StudioBg3dCinematicDirectorPanel(
 
   return (
     <>
+      <StudioBg3dProductionIntentPanel />
       <StudioBg3dProductionWorkflowPanel variant="director" />
       <StudioBg3dCinematicDirectorPanelContent
         {...rest}
