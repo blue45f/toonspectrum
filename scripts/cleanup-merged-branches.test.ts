@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -48,5 +50,17 @@ describe("merged branch cleanup safety", () => {
     ["unique commits", { compare: { status: "diverged", behind_by: 1 } }, "unique-commits"],
   ])("preserves %s", (_label, overrides, reason) => {
     expect(classifyBranchDeletion(candidate(overrides))).toEqual({ allowed: false, reason });
+  });
+
+  it("rechecks the remote ref before closing a stale PR or deleting its branch", () => {
+    const source = readFileSync(new URL("./cleanup-merged-branches.mjs", import.meta.url), "utf8");
+    const decision = source.indexOf("if (!decision.allowed)");
+    const recheck = source.indexOf("const verifiedSha = await currentRefSha", decision);
+    const closePulls = source.indexOf("await closeIntegratedPullRequests", decision);
+    const deleteRef = source.indexOf('method: "DELETE"', closePulls);
+    expect(recheck).toBeGreaterThan(decision);
+    expect(closePulls).toBeGreaterThan(recheck);
+    expect(deleteRef).toBeGreaterThan(closePulls);
+    expect(source).toContain('reason: "head-changed-after-verification"');
   });
 });

@@ -150,6 +150,19 @@ async function closeIntegratedPullRequests(repository, branch, token, apply, rep
   }
 }
 
+async function currentRefSha(repository, branch, token) {
+  try {
+    const ref = await github(
+      `/repos/${repository.owner}/${repository.repo}/git/ref/heads/${encodeGitRef(branch)}`,
+      { token },
+    );
+    return typeof ref?.object?.sha === "string" ? ref.object.sha : null;
+  } catch (error) {
+    if (error.status === 404) return null;
+    throw error;
+  }
+}
+
 async function inspectAndMaybeDelete(repository, rawBranch, context) {
   const { token, apply, defaultBranch, workflowBranch, report } = context;
   const name = rawBranch?.name;
@@ -171,6 +184,21 @@ async function inspectAndMaybeDelete(repository, rawBranch, context) {
   });
   if (!decision.allowed) {
     report.skipped.push({ branch: name, sha: currentSha, reason: decision.reason });
+    return;
+  }
+
+  const verifiedSha = await currentRefSha(repository, name, token);
+  if (verifiedSha === null) {
+    report.skipped.push({ branch: name, sha: currentSha, reason: "already-deleted" });
+    return;
+  }
+  if (verifiedSha !== currentSha) {
+    report.skipped.push({
+      branch: name,
+      sha: currentSha,
+      currentSha: verifiedSha,
+      reason: "head-changed-after-verification",
+    });
     return;
   }
 
