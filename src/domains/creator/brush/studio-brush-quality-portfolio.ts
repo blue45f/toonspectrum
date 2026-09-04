@@ -1,12 +1,11 @@
-export * from "./studio-brush-quality-foundation";
-
 import {
-  STUDIO_BRUSH_HAND_FEEL_PROFILES,
   STUDIO_BRUSH_TEXTURE_PROFILES,
   type StudioBrushQualityPortfolioEntry,
   type StudioBrushTextureProfileId,
 } from "./studio-brush-quality-foundation";
 import { STUDIO_BRUSH_QUALITY_PORTFOLIO } from "./studio-brush-quality-portfolio-data";
+
+export * from "./studio-brush-quality-foundation";
 
 export { STUDIO_BRUSH_QUALITY_PORTFOLIO };
 

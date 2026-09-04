@@ -1,4 +1,5 @@
 import type { StudioBrushQualityPortfolioEntry } from "./studio-brush-quality-foundation";
+
 type Seed=readonly [string,string,StudioBrushQualityPortfolioEntry["source"],StudioBrushQualityPortfolioEntry["tier"],StudioBrushQualityPortfolioEntry["medium"],StudioBrushQualityPortfolioEntry["textureProfile"],StudioBrushQualityPortfolioEntry["handFeelProfile"],StudioBrushQualityPortfolioEntry["liveCommitGate"],StudioBrushQualityPortfolioEntry["enginePin"],string,string,readonly string[]];
 const seeds:readonly Seed[]=[
 ["pen","펜","core","essential","ink","clean-ink","direct","exact-rgba","gpu-causal-exact","round/causal/clean","기본 선화의 가장 직접적인 원형 잉크",["fineliner","ballpoint","gel-pen","glass-pen","ruling-pen","technical-pen"]],
