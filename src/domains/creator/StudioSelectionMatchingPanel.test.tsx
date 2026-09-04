@@ -66,7 +66,7 @@ describe("StudioSelectionMatchingPanel", () => {
 
     expect(descriptionId).toBeTruthy();
     expect(action.getAttribute("aria-describedby")).toBe(descriptionId);
-    expect(container.querySelector(`#${CSS.escape(descriptionId!)}`)?.textContent).toContain(
+    expect(container.ownerDocument.getElementById(descriptionId!)?.textContent).toContain(
       "채우기와 선",
     );
     expect(audit.count.contextual).toBe(2);
