@@ -1,6 +1,11 @@
-import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+import { evaluateStudioBg3dProductionPassReadiness } from "./studio-bg3d-production-pass-readiness";
+import {
+  StudioBg3dProSuiteRuntimeContext,
+  useStudioBg3dProSuiteRuntime,
+} from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dMultiPassExporterPanel as StudioBg3dMultiPassExporterPanelContent } from "./StudioBg3dMultiPassExporterPanelContent";
 import { StudioBg3dProductionMultiPassExporterPanel } from "./StudioBg3dProductionMultiPassExporterPanel";
+import { StudioBg3dProductionPassPreflightPanel } from "./StudioBg3dProductionPassPreflightPanel";
 import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowPanel";
 
 import type { StudioBg3dMultiPassExporterPanelProps } from "./StudioBg3dMultiPassExporterPanelContent";
@@ -19,18 +24,32 @@ export function StudioBg3dMultiPassExporterPanel(
   const disabled = (props.disabled ?? false) || (runtime?.disabled ?? false);
 
   if (runtime?.productionBatch && props.onStartMultiPassExport === undefined) {
+    const batch = runtime.productionBatch;
+    const passReadiness = batch.look
+      ? evaluateStudioBg3dProductionPassReadiness(batch.selectedPasses, batch.look)
+      : null;
+    const effectiveBatch =
+      passReadiness?.blockingReason && batch.blockedReason === null
+        ? { ...batch, blockedReason: passReadiness.blockingReason }
+        : batch;
+    const effectiveRuntime =
+      effectiveBatch === batch
+        ? runtime
+        : { ...runtime, productionBatch: effectiveBatch };
+
     return (
-      <>
+      <StudioBg3dProSuiteRuntimeContext.Provider value={effectiveRuntime}>
         <StudioBg3dProductionWorkflowPanel
           variant="export"
           defaultExpanded={false}
         />
+        <StudioBg3dProductionPassPreflightPanel />
         <StudioBg3dProductionMultiPassExporterPanel
           disabled={disabled}
           shots={runtime.productionShots}
-          batch={runtime.productionBatch}
+          batch={effectiveBatch}
         />
-      </>
+      </StudioBg3dProSuiteRuntimeContext.Provider>
     );
   }
 
