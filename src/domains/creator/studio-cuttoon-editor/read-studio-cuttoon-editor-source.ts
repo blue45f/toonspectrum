@@ -42,6 +42,27 @@ export function readStudioPageCompositionSource(): string {
   return [
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../StudioCuttoonEditorHost.tsx"),
+    // The route-layering refactor (984251d8c) moved host wiring into these runtimes. A scan that
+    // reads only the page and the host now stops short of the code it is asserting on.
+    resolve(baseDir, "./runtime/useStudioCollaborationAccessRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioCommentDocumentsRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioCrdtRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDocumentAccessRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDocumentSidecarsRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDraftCollaborationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioHistoryDurability.ts"),
+    resolve(baseDir, "./runtime/useStudioHistoryRetention.ts"),
+    resolve(baseDir, "./runtime/useStudioHydrationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioLayerLiftRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioLiveSessionRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioMutationAuthorityRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioPageHistorySnapshots.ts"),
+    resolve(baseDir, "./runtime/useStudioPreferencesRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioRasterPublicationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioSharedDocumentRevalidation.ts"),
+    resolve(baseDir, "./runtime/useStudioTournamentPersistenceBoot.ts"),
+    resolve(baseDir, "./runtime/useStudioUnifiedHistoryJournal.ts"),
+    resolve(baseDir, "./runtime/useStudioVectorOperationRuntime.ts"),
   ]
     .map((filePath) => readFileSync(filePath, "utf8"))
     .join("\n");
@@ -94,6 +115,30 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../template/studio-template-layout-controller.ts"),
     resolve(baseDir, "../selection/studio-selection-transform-controller.ts"),
     resolve(baseDir, "../comipo/studio-quick-comic-controller.ts"),
+    // Host runtimes extracted by the route-layering refactor (984251d8c). They hold wiring
+    // that used to sit in the host body, so a scan that stops at the host now misses it —
+    // which is what reddened twenty-five boundary suites. Listed before the host for the
+    // same reason as the helpers above: a slice starting at an extracted symbol has to be
+    // able to run forward into StudioPage.tsx.
+    resolve(baseDir, "./runtime/useStudioCollaborationAccessRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioCommentDocumentsRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioCrdtRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDocumentAccessRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDocumentSidecarsRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioDraftCollaborationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioHistoryDurability.ts"),
+    resolve(baseDir, "./runtime/useStudioHistoryRetention.ts"),
+    resolve(baseDir, "./runtime/useStudioHydrationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioLayerLiftRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioLiveSessionRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioMutationAuthorityRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioPageHistorySnapshots.ts"),
+    resolve(baseDir, "./runtime/useStudioPreferencesRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioRasterPublicationRuntime.ts"),
+    resolve(baseDir, "./runtime/useStudioSharedDocumentRevalidation.ts"),
+    resolve(baseDir, "./runtime/useStudioTournamentPersistenceBoot.ts"),
+    resolve(baseDir, "./runtime/useStudioUnifiedHistoryJournal.ts"),
+    resolve(baseDir, "./runtime/useStudioVectorOperationRuntime.ts"),
     resolve(baseDir, "../StudioCuttoonEditorHost.tsx"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
