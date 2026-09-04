@@ -18,6 +18,7 @@ import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
 import { StudioInspectorContextRouteSync } from "./StudioInspectorContextRouteSync";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
+import { StudioInspectorMultiSelectionSection } from "./StudioInspectorMultiSelectionSection";
 import { StudioInspectorSelectionSection } from "./StudioInspectorSelectionSection";
 import { StudioInspectorUnselectedImageTools } from "./StudioInspectorUnselectedImageTools";
 import { StudioSelectionMatchingPanel } from "./StudioSelectionMatchingPanel";
@@ -62,12 +63,14 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const matchingSourceId =
     figmaDesignTargets.length === 1 ? figmaDesignTargets[0]!.id : null;
   const visibleMatchingElements = useMemo(
-    () => elements.filter(
-      (element) =>
-        !localHiddenElementIds.has(element.id)
-        && !isEffectivelyHidden(element, groups),
-    ),
-    [elements, groups, localHiddenElementIds],
+    () => matchingSourceId
+      ? elements.filter(
+          (element) =>
+            !localHiddenElementIds.has(element.id)
+            && !isEffectivelyHidden(element, groups),
+        )
+      : [],
+    [elements, groups, localHiddenElementIds, matchingSourceId],
   );
   const matchingOptions = useMemo(
     () => matchingSourceId
@@ -155,7 +158,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           )}
           {!hasMultiSelection ? (
             <StudioInspectorSelectionSection model={model} tabA11y={tabA11y} />
-          ) : null}
+          ) : (
+            <StudioInspectorMultiSelectionSection model={model} />
+          )}
           {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
               aria-label="도형 결합"
