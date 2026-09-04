@@ -1,0 +1,81 @@
+name: Apply realtime collaboration v19
+
+on:
+  push:
+    branches:
+      - feat/realtime-collaboration-v19
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: ${{ !contains(github.event.head_commit.message, '[collab-v19 applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/realtime-collaboration-v19
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Apply integration and verify focused collaboration paths
+        run: |
+          set -euo pipefail
+          {
+            python3 scripts/apply-realtime-collaboration-v19.py
+            pnpm install --frozen-lockfile
+            pnpm run validate:architecture
+            pnpm exec eslint \
+              src/domains/creator/live/studio-live-chat-control.ts \
+              src/domains/creator/live/studio-live-chat-control.test.ts \
+              src/domains/creator/live/studio-live-collaboration-preferences.ts \
+              src/domains/creator/live/studio-live-collaboration-preferences.test.ts \
+              src/domains/creator/live/studio-live-cursor-presentation.ts \
+              src/domains/creator/live/studio-live-cursor-presentation.test.ts \
+              src/domains/creator/live/use-studio-live-cursor-chat-bubbles.ts \
+              src/domains/creator/live/StudioLiveQuickCollaborationControls.tsx \
+              src/domains/creator/live/StudioLiveCollaborationPreferences.tsx \
+              src/domains/creator/live/studio-live-collaboration-room.ts \
+              src/domains/creator/live/studio-live-collaboration-room.controls.test.ts \
+              src/domains/creator/live/StudioLiveCanvasOverlay.tsx \
+              src/domains/creator/live/StudioLiveCollaborationPanel.tsx \
+              src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx
+            pnpm run typecheck
+            pnpm exec vitest run \
+              src/domains/creator/live/studio-live-chat-control.test.ts \
+              src/domains/creator/live/studio-live-collaboration-preferences.test.ts \
+              src/domains/creator/live/studio-live-cursor-presentation.test.ts \
+              src/domains/creator/live/studio-live-collaboration-room.controls.test.ts \
+              src/domains/creator/live/studio-live-collaboration-room.test.ts \
+              src/domains/creator/live/StudioLiveCanvasOverlay.test.tsx \
+              src/domains/creator/live/StudioLiveCollaborationPanel.test.tsx \
+              src/domains/creator/live/StudioLiveCollaborationPanel.following.test.tsx
+          } 2>&1 | tee collab-v19-verification.log
+      - name: Upload verification log
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: collab-v19-verification-${{ github.run_attempt }}
+          path: collab-v19-verification.log
+          if-no-files-found: ignore
+          retention-days: 5
+      - name: Commit integrated product changes
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/domains/creator/live/studio-live-collaboration-room.ts \
+            src/domains/creator/live/StudioLiveCanvasOverlay.tsx \
+            src/domains/creator/live/StudioLiveCollaborationPanel.tsx \
+            src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(studio): advance realtime collaboration controls [collab-v19 applied]"
+          git push origin HEAD:feat/realtime-collaboration-v19
