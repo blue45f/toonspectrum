@@ -1,6 +1,8 @@
 import adminEn from "../../../public/i18n/admin/en.json";
 import adminKo from "../../../public/i18n/admin/ko.json";
 
+import { adminTrafficEn, adminTrafficKo } from "./admin-traffic-i18n";
+
 import {
   getLocaleCandidates,
   registerI18nLocaleEntries,
@@ -10,6 +12,8 @@ import {
 // Synchronously register embedded base dictionaries for instant zero-latency rendering
 registerI18nLocaleEntries("ko", adminKo);
 registerI18nLocaleEntries("en", adminEn);
+registerI18nLocaleEntries("ko", adminTrafficKo);
+registerI18nLocaleEntries("en", adminTrafficEn);
 
 const pendingLoads = new Map<string, Promise<void>>();
 
