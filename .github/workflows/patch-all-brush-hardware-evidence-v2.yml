@@ -1,0 +1,83 @@
+name: Apply stable all-brush hardware evidence patch
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - scripts/patch-all-brush-hardware-evidence-v2.py
+      - .github/workflows/patch-all-brush-hardware-evidence-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stable-all-brush-hardware-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/all-brush-long-stroke-quality-election-20260904
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply hardware evidence source changes
+        run: |
+          python3 -m py_compile scripts/patch-all-brush-hardware-evidence-v2.py
+          python3 scripts/patch-all-brush-hardware-evidence-v2.py
+          git diff --check
+
+      - name: Focused quality election tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Focused zero-warning lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/verify-studio-long-stroke.mts
+          scripts/aggregate-studio-all-brush-long-stroke.mts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+
+      - name: Typecheck complete repository
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Commit verified source and remove temporary machinery
+        run: |
+          rm -f scripts/patch-all-brush-hardware-evidence.py
+          rm -f scripts/patch-all-brush-hardware-evidence-v2.py
+          rm -f .github/workflows/patch-all-brush-hardware-evidence.yml
+          rm -f .github/workflows/patch-all-brush-hardware-evidence-v2.yml
+          rm -rf scripts/__pycache__
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "test(brush): bind GPU rollout to repeated hardware evidence"
+          git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
