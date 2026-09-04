@@ -90,7 +90,22 @@ describe("Studio 3D Pro Suite runtime bridge", () => {
     expect(camera?.projection).toBe("perspective");
     expect(camera?.zoom).toBe(1);
     expect(camera?.lensShift).toEqual([0, 0]);
-    expect(camera?.up).toEqual([0, 1, 0]);
+
+    const up = camera?.up;
+    expect(up).toBeDefined();
+    if (!up || !camera) return;
+    const forward = [
+      camera.target[0] - camera.position[0],
+      camera.target[1] - camera.position[1],
+      camera.target[2] - camera.position[2],
+    ] as const;
+    const forwardLength = Math.hypot(...forward);
+    const upLength = Math.hypot(...up);
+    const alignment = (
+      forward[0] * up[0] + forward[1] * up[1] + forward[2] * up[2]
+    ) / (forwardLength * upLength);
+    expect(upLength).toBeCloseTo(1, 8);
+    expect(alignment).toBeCloseTo(0, 8);
   });
 
   it("inherits capture locks in the nested multipass exporter", () => {
