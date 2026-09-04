@@ -18,6 +18,7 @@ export type StudioCuttoonEditorViewSessionCore = {
   addPage: any;
   addText: any;
   admittedBg3dOpen: any;
+  admittedCharacterShaperOpen: boolean;
   admittedMannequinPoserOpen: any;
   admittedPoserVrmOpen: any;
   advancedFillActive: any;

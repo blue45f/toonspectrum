@@ -220,7 +220,7 @@ function writeSitemap(): void {
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
     "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/guide", "/news", "/create", "/market", "/market/browse", "/contact",
+    "/about", "/guide", "/news", "/create", "/shaper", "/market", "/market/browse", "/contact",
   ];
   // thin-content 방지를 위해 '평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
   // 표지 유무에 의존하지 않는다(표지 정책 off·19+ 제거와 무관하게 동작). 성인(19+) 작품은

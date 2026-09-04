@@ -21,7 +21,7 @@ const sourceFiles = [
   ...[
     "./studio-bg3d-editor-model-import-actions.ts",
     "./StudioBg3dShapesPanel.tsx",
-    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dViewPanelContent.tsx",
     "./StudioBg3dLtPanel.tsx",
   ].map((fileName) => {
     const fileUrl = new URL(fileName, import.meta.url);

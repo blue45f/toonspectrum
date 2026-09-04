@@ -1,5 +1,6 @@
 export interface StudioInteractiveThreeDSurfaceState {
   readonly bg3dOpen: boolean;
+  readonly characterShaperOpen: boolean;
   readonly dccRouteRequested: boolean;
   readonly mannequinPoserOpen: boolean;
   readonly poserVrmOpen: boolean;
@@ -7,6 +8,7 @@ export interface StudioInteractiveThreeDSurfaceState {
 
 export interface StudioInteractiveThreeDSurfaceAdmission {
   readonly bg3dOpen: boolean;
+  readonly characterShaperOpen: boolean;
   readonly mannequinPoserOpen: boolean;
   readonly poserVrmOpen: boolean;
 }
@@ -17,6 +19,7 @@ export interface StudioInteractiveThreeDSurfaceAdmission {
  */
 export function resolveStudioInteractiveThreeDSurfaceAdmission({
   bg3dOpen,
+  characterShaperOpen,
   dccRouteRequested,
   mannequinPoserOpen,
   poserVrmOpen,
@@ -24,9 +27,17 @@ export function resolveStudioInteractiveThreeDSurfaceAdmission({
   if (dccRouteRequested) {
     return {
       bg3dOpen: false,
+      characterShaperOpen: false,
       mannequinPoserOpen: false,
       poserVrmOpen: false,
     };
   }
-  return { bg3dOpen, mannequinPoserOpen, poserVrmOpen };
+  // The Character Shaper and the legacy poser both build a VRM runtime over the same document;
+  // only one of them may hold a renderer, and the Shaper is the surface the route names.
+  return {
+    bg3dOpen,
+    characterShaperOpen,
+    mannequinPoserOpen,
+    poserVrmOpen: poserVrmOpen && !characterShaperOpen,
+  };
 }

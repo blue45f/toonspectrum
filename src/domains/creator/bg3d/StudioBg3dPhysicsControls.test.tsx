@@ -14,7 +14,7 @@ import {
 } from "./StudioBg3dPhysicsControls";
 import physicsControlsSource from "./StudioBg3dPhysicsControls.tsx?raw";
 import shapesPanelSource from "./StudioBg3dShapesPanel.tsx?raw";
-import viewPanelSource from "./StudioBg3dViewPanel.tsx?raw";
+import viewPanelSource from "./StudioBg3dViewPanelContent.tsx?raw";
 
 const background3dSource = [
   readStudioBg3dEditorSource(),

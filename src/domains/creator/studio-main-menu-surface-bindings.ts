@@ -63,6 +63,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly openSculptWorkbench: () => unknown;
   readonly startEphemeralWhiteboard: () => unknown;
   readonly openVrmPoserFromMenu: () => unknown;
+  readonly openCharacterShaperFromMenu: () => unknown;
   readonly openBackground3dFromMenu: () => unknown;
   readonly openWebtoonAssistant?: () => unknown;
   readonly openAiSuperSuite?: () => unknown;
@@ -109,6 +110,7 @@ export function bindStudioMainMenuSurfaceActions(
     openSculptWorkbench: actions.openSculptWorkbench,
     startEphemeralWhiteboard: actions.startEphemeralWhiteboard,
     openVrmPoser: actions.openVrmPoserFromMenu,
+    openCharacterShaper: actions.openCharacterShaperFromMenu,
     openBackground3d: actions.openBackground3dFromMenu,
     openWebtoonAssistant: actions.openWebtoonAssistant,
     openAiSuperSuite: actions.openAiSuperSuite,

@@ -2735,6 +2735,8 @@ export function StudioCuttoonEditor({
       }
     } else if (studioRoute.surface === "poser") {
       setPoserVrmOpen(true);
+    } else if (studioRoute.surface === "character") {
+      setCharacterShaperOpen(true);
     } else if (studioRoute.surface === "animation") {
       // 매니페스트가 선언해 온 표면인데 소비자가 없어 죽은 세그먼트였다 — 딥링크/뒤·앞으로
       // 가기가 타임라인 프로덕션 표면을 실제로 연다.
@@ -2751,6 +2753,7 @@ export function StudioCuttoonEditor({
       else if (previousSurface === "comic") setStoryboardGridOpen(false);
       else if (previousSurface === "bg3d") setBg3dOpen(false);
       else if (previousSurface === "poser") setPoserVrmOpen(false);
+      else if (previousSurface === "character") setCharacterShaperOpen(false);
     }
   }, [studioRoute.surface]);
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -4611,6 +4614,9 @@ export function StudioCuttoonEditor({
       case "character":
         setPoserVrmOpen(true);
         break;
+      case "character-shaper":
+        openCharacterShaperFromMenu();
+        break;
       case "bg3d":
         openBackground3dFromMenu();
         break;
@@ -6049,6 +6055,8 @@ export function StudioCuttoonEditor({
   const sharedAssetContentInFlightRef = useRef(new Set<string>());
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
+  // 캐릭터 셰이퍼 — 같은 VRM 런타임 위의 프리셋 우선 작업실(`/studio/character`).
+  const [characterShaperOpen, setCharacterShaperOpen] = useState(false);
   // 3D 데생 인형(마네킹) — VRM과 달리 외부 모델 없이 파라메트릭 인형을 포즈해 캡처한다.
   const [mannequinPoserOpen, setMannequinPoserOpen] = useState(false);
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
@@ -6057,8 +6065,16 @@ export function StudioCuttoonEditor({
   const [poserSeedPropId, setPoserSeedPropId] = useState<string | null>(null);
   const [bg3dOpen, setBg3dOpen] = useState(false);
   function openVrmPoserFromMenu() {
+    // 두 VRM 표면이 같은 문서 위에 동시에 서지 않게 한다. 셰이퍼에서 레거시 빌더로 무손실
+    // 전환하는 길은 셰이퍼 안의 「고급 편집」이다.
+    setCharacterShaperOpen(false);
     setPoserVrmOpen(true);
     navigateStudio2dSurface("poser");
+  }
+  function openCharacterShaperFromMenu() {
+    setPoserVrmOpen(false);
+    setCharacterShaperOpen(true);
+    navigateStudio2dSurface("character");
   }
   function openBackground3dFromMenu() {
     setBg3dSeedTemplateId(null);
@@ -6076,11 +6092,13 @@ export function StudioCuttoonEditor({
   // state restored by browser Forward. Only these admitted booleans may reach a 3D renderer.
   const interactiveThreeDSurfaceAdmission = resolveStudioInteractiveThreeDSurfaceAdmission({
     bg3dOpen,
+    characterShaperOpen,
     dccRouteRequested: hybridDccRouteRequested,
     mannequinPoserOpen,
     poserVrmOpen,
   });
   const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
+  const admittedCharacterShaperOpen = interactiveThreeDSurfaceAdmission.characterShaperOpen;
   const admittedMannequinPoserOpen = interactiveThreeDSurfaceAdmission.mannequinPoserOpen;
   const admittedPoserVrmOpen = interactiveThreeDSurfaceAdmission.poserVrmOpen;
   const bg3dDccSourceRef = useRef<StudioShared3dStageDccSource | null>(null);
@@ -6489,11 +6507,12 @@ export function StudioCuttoonEditor({
   const routedSurfacePanelSyncRef = useRef({
     animation: false,
     bg3d: false,
+    character: false,
     comic: false,
     poser: false,
   });
   function useRoutedSurfacePanelSync(
-    surface: "animation" | "bg3d" | "comic" | "poser",
+    surface: "animation" | "bg3d" | "character" | "comic" | "poser",
     open: boolean,
   ): void {
     useEffect(() => {
@@ -6508,6 +6527,7 @@ export function StudioCuttoonEditor({
   useRoutedSurfacePanelSync("comic", storyboardGridOpen);
   useRoutedSurfacePanelSync("bg3d", bg3dOpen);
   useRoutedSurfacePanelSync("poser", poserVrmOpen);
+  useRoutedSurfacePanelSync("character", characterShaperOpen);
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
@@ -25645,6 +25665,7 @@ function clearSelectionForEdit() {
         announceDrawingShortcut(`${session.title} · ${session.roomCode}`);
       },
       openVrmPoserFromMenu,
+      openCharacterShaperFromMenu,
       openBackground3dFromMenu,
     });
   // 무장된 픽셀 선택 도구를 메뉴가 읽는 단일 문자열로 환원한다. 원형 마퀴는
@@ -28333,6 +28354,7 @@ function clearSelectionForEdit() {
       addPage={addPage}
       addText={addText}
       admittedBg3dOpen={admittedBg3dOpen}
+      admittedCharacterShaperOpen={admittedCharacterShaperOpen}
       admittedMannequinPoserOpen={admittedMannequinPoserOpen}
       admittedPoserVrmOpen={admittedPoserVrmOpen}
       advancedFillActive={advancedFillActive}
@@ -29092,6 +29114,7 @@ function clearSelectionForEdit() {
       setPointCommentComposer={setPointCommentComposer}
       setPoserInitialDataUrl={setPoserInitialDataUrl}
       setPoserInitialElementId={setPoserInitialElementId}
+      setCharacterShaperOpen={setCharacterShaperOpen}
       setPoserVrmOpen={setPoserVrmOpen}
       setPostCorrection={setPostCorrection}
       setPreserveCorners={setPreserveCorners}

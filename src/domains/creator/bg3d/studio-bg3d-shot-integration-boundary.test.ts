@@ -18,7 +18,7 @@ const source = [
   // 2026-08-21 intentional change: BgViewportController.readView moved into StudioBg3dSceneNodes.tsx.
   "./StudioBg3dSceneNodes.tsx",
   "./StudioBg3dShapesPanel.tsx",
-  "./StudioBg3dViewPanel.tsx",
+  "./StudioBg3dViewPanelContent.tsx",
   "./StudioBg3dLtPanel.tsx",
 ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n")
   + "\n" + readStudioBg3dEditorSource();
