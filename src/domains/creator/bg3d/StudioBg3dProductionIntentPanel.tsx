@@ -4,16 +4,22 @@ import {
   ClipboardCheck,
   Layers,
   Sparkles,
+  Undo2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import {
   detectStudioBg3dProductionIntent,
   planStudioBg3dProductionIntent,
   STUDIO_BG3D_PRODUCTION_INTENTS,
   type StudioBg3dProductionIntentId,
+  type StudioBg3dProductionIntentState,
 } from "./studio-bg3d-production-intents";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+
+interface PreviousProductionIntentState extends StudioBg3dProductionIntentState {
+  readonly selectedShotIds: readonly string[];
+}
 
 function IntentIcon({ id }: { readonly id: StudioBg3dProductionIntentId }) {
   switch (id) {
@@ -30,7 +36,9 @@ function IntentIcon({ id }: { readonly id: StudioBg3dProductionIntentId }) {
 
 export function StudioBg3dProductionIntentPanel() {
   const runtime = useStudioBg3dProSuiteRuntime();
+  const titleId = useId();
   const [appliedMessage, setAppliedMessage] = useState<string | null>(null);
+  const [previousState, setPreviousState] = useState<PreviousProductionIntentState | null>(null);
   const batch = runtime?.productionBatch;
   const scene = runtime?.sceneSummary;
 
@@ -48,9 +56,20 @@ export function StudioBg3dProductionIntentPanel() {
 
   if (!runtime || !batch || !scene) return null;
 
+  const snapshotCurrentState = (): PreviousProductionIntentState => Object.freeze({
+    availablePasses: [...batch.availablePasses],
+    selectedPasses: [...batch.selectedPasses],
+    selectedShotIds: [...batch.selectedShotIds],
+    includeLayeredPsd: batch.includeLayeredPsd,
+    includeContactSheet: batch.includeContactSheet,
+    lineArtPreview: scene.lineArtPreview,
+    transparentBackground: scene.transparentBackground,
+  });
+
   const applyIntent = (intentId: StudioBg3dProductionIntentId) => {
     if (runtime.disabled || batch.isRendering) return;
     const plan = planStudioBg3dProductionIntent(batch.availablePasses, intentId);
+    setPreviousState(snapshotCurrentState());
 
     if (runtime.productionShots.length > 0) batch.selectAllShots();
     batch.setSelectedPasses(plan.selectedPasses);
@@ -63,15 +82,30 @@ export function StudioBg3dProductionIntentPanel() {
     );
   };
 
+  const restorePreviousState = () => {
+    if (!previousState || runtime.disabled || batch.isRendering) return;
+    batch.clearShotSelection();
+    for (const shotId of previousState.selectedShotIds) {
+      batch.setShotSelected(shotId, true);
+    }
+    batch.setSelectedPasses(previousState.selectedPasses);
+    batch.setIncludeLayeredPsd(previousState.includeLayeredPsd);
+    batch.setIncludeContactSheet(previousState.includeContactSheet);
+    runtime.onSetLineArtPreview?.(previousState.lineArtPreview);
+    runtime.onSetTransparentBackground?.(previousState.transparentBackground);
+    setPreviousState(null);
+    setAppliedMessage("이전 제작 설정을 복원했습니다.");
+  };
+
   return (
     <section
       className="mx-3 mt-3 rounded-2xl border border-line bg-card/75 p-3 shadow-sm"
-      aria-labelledby="studio-bg3d-production-intent-title"
+      aria-labelledby={titleId}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3
-            id="studio-bg3d-production-intent-title"
+            id={titleId}
             className="flex items-center gap-1.5 text-[0.7rem] font-bold text-fg"
           >
             <Sparkles className="size-3.5 text-accent" aria-hidden />
@@ -117,15 +151,30 @@ export function StudioBg3dProductionIntentPanel() {
         })}
       </div>
 
-      {appliedMessage ? (
-        <p className="mt-2 text-[0.54rem] leading-relaxed text-good" role="status" aria-live="polite">
-          {appliedMessage}
-        </p>
-      ) : runtime.productionShots.length === 0 ? (
-        <p className="mt-2 text-[0.54rem] leading-relaxed text-warn">
-          프리셋 설정은 미리 적용됩니다. 현재 장면을 컷으로 저장하면 배치 선택 단계가 이어집니다.
-        </p>
-      ) : null}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          {appliedMessage ? (
+            <p className="text-[0.54rem] leading-relaxed text-good" role="status" aria-live="polite">
+              {appliedMessage}
+            </p>
+          ) : runtime.productionShots.length === 0 ? (
+            <p className="text-[0.54rem] leading-relaxed text-warn">
+              프리셋 설정은 미리 적용됩니다. 현재 장면을 컷으로 저장하면 배치 선택 단계가 이어집니다.
+            </p>
+          ) : null}
+        </div>
+        {previousState ? (
+          <button
+            type="button"
+            disabled={runtime.disabled || batch.isRendering}
+            onClick={restorePreviousState}
+            className="flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2.5 text-[0.56rem] font-bold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Undo2 className="size-3" aria-hidden />
+            이전 설정 복원
+          </button>
+        ) : null}
+      </div>
     </section>
   );
 }
