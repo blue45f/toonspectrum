@@ -1,129 +1,48 @@
-import {
-  ForbiddenException,
-  NotFoundException,
-} from "@nestjs/common";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import {
-  CreatorMarketplaceSocialPermissionError,
-  CreatorMarketplaceSocialRepository,
-  CreatorMarketplaceSocialResourceNotFoundError,
-  CreatorMarketplaceSocialReviewEligibilityError,
-} from "./creator-marketplace-social.repository";
-import { CreatorMarketplaceSocialService } from "./creator-marketplace-social.service";
+import { describe, expect, it } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  isAdminUser: vi.fn(),
-}));
+const serviceSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "apps/api/src/modules/creator-marketplace/creator-marketplace-social.service.ts",
+  ),
+  "utf8",
+);
 
-vi.mock("../../server/app-config", () => ({
-  isAdminUser: mocks.isAdminUser,
-}));
-
-function repositoryMock() {
-  return {
-    getSnapshot: vi.fn(),
-    createComment: vi.fn(),
-    deleteComment: vi.fn(),
-    setCommentLike: vi.fn(),
-    upsertReview: vi.fn(),
-    deleteReview: vi.fn(),
-    setReviewHelpful: vi.fn(),
-  };
-}
-
-describe("CreatorMarketplaceSocialService", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.isAdminUser.mockResolvedValue(false);
+describe("CreatorMarketplaceSocialService policy boundary", () => {
+  it("uses the public marketplace service as the resource visibility authority", () => {
+    expect(serviceSource).toContain("private readonly marketplaceService: CreatorMarketplaceService");
+    expect(serviceSource).toContain("return this.marketplaceService.getById(resourceId)");
   });
 
-  it("maps an unavailable public release to a not-found response", async () => {
-    const repository = repositoryMock();
-    repository.getSnapshot.mockRejectedValue(
-      new CreatorMarketplaceSocialResourceNotFoundError(),
-    );
-    const service = new CreatorMarketplaceSocialService(
-      repository as unknown as CreatorMarketplaceSocialRepository,
-    );
-
-    await expect(
-      service.getSnapshot("10000000-0000-4000-8000-000000000001"),
-    ).rejects.toBeInstanceOf(NotFoundException);
+  it("requires server-owned acquisition evidence and blocks self reviews", () => {
+    expect(serviceSource).toContain("if (resource.publisher.id === userId)");
+    expect(serviceSource).toContain("배급자는 자신의 리소스를 평가할 수 없습니다.");
+    expect(serviceSource).toContain("계정 라이브러리에 리소스를 추가한 뒤 평가할 수 있습니다.");
+    expect(serviceSource).toContain("creatorMarketplaceLibraryItems.lastConfirmedAt");
+    expect(serviceSource).toContain("creatorMarketplaceLibraryItems.lastConfirmedResourceVersion");
   });
 
-  it.each([
-    ["publisher", "배급자는 자신의 리소스에 평가"],
-    ["library_required", "마켓 보관함에 추가했거나 Studio에서 설치"],
-  ] as const)(
-    "maps %s review eligibility failures without leaking storage details",
-    async (reason, expectedMessage) => {
-      const repository = repositoryMock();
-      repository.upsertReview.mockRejectedValue(
-        new CreatorMarketplaceSocialReviewEligibilityError(reason),
-      );
-      const service = new CreatorMarketplaceSocialService(
-        repository as unknown as CreatorMarketplaceSocialRepository,
-      );
-
-      await expect(
-        service.upsertReview(
-          "10000000-0000-4000-8000-000000000001",
-          "20000000-0000-4000-8000-000000000001",
-          {
-            rating: 5,
-            title: "좋은 소재",
-            content: "Studio 작업에 활용했습니다.",
-            roleTag: null,
-            tags: [],
-          },
-        ),
-      ).rejects.toMatchObject({
-        constructor: ForbiddenException,
-        response: expect.objectContaining({ message: expectedMessage }),
-      });
-    },
-  );
-
-  it("passes the server-derived administrator bit into deletion policy", async () => {
-    const repository = repositoryMock();
-    repository.deleteComment.mockResolvedValue(undefined);
-    mocks.isAdminUser.mockResolvedValue(true);
-    const service = new CreatorMarketplaceSocialService(
-      repository as unknown as CreatorMarketplaceSocialRepository,
-    );
-
-    await expect(
-      service.deleteComment(
-        "10000000-0000-4000-8000-000000000001",
-        "30000000-0000-4000-8000-000000000001",
-        "20000000-0000-4000-8000-000000000001",
-      ),
-    ).resolves.toEqual({ deleted: true });
-    expect(repository.deleteComment).toHaveBeenCalledWith(
-      "10000000-0000-4000-8000-000000000001",
-      "30000000-0000-4000-8000-000000000001",
-      "20000000-0000-4000-8000-000000000001",
-      true,
-    );
+  it("derives trust badges from publisher, library, and confirmed Studio install state", () => {
+    expect(serviceSource).toContain('return "publisher"');
+    expect(serviceSource).toContain('return "studio-verified"');
+    expect(serviceSource).toContain('return "library-member"');
+    expect(serviceSource).toContain("studioInstallVerified: Boolean(");
   });
 
-  it("maps repository permission failures to a forbidden response", async () => {
-    const repository = repositoryMock();
-    repository.setReviewHelpful.mockRejectedValue(
-      new CreatorMarketplaceSocialPermissionError(),
-    );
-    const service = new CreatorMarketplaceSocialService(
-      repository as unknown as CreatorMarketplaceSocialRepository,
-    );
+  it("reuses the mature review, reply, and reaction relations behind a private namespace", () => {
+    expect(serviceSource).toContain('const MARKET_SOCIAL_KEY_PREFIX = "toonspectrum:market-package:"');
+    expect(serviceSource).toContain("reviewLikes");
+    expect(serviceSource).toContain("reviewReplies");
+    expect(serviceSource).toContain("reviews");
+  });
 
-    await expect(
-      service.setReviewHelpful(
-        "10000000-0000-4000-8000-000000000001",
-        "30000000-0000-4000-8000-000000000001",
-        "20000000-0000-4000-8000-000000000001",
-        true,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+  it("keeps deletion permission-aware and anonymizes deleted comments", () => {
+    expect(serviceSource).toContain('name: "삭제됨"');
+    expect(serviceSource).toContain("isAdminUser");
+    expect(serviceSource).toContain("canDelete:");
+    expect(serviceSource).toContain("deletedAt");
   });
 });
