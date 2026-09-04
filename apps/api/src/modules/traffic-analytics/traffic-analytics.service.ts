@@ -9,10 +9,9 @@ import {
 
 import { dbPool } from "../../db";
 
-import type { PoolClient } from "pg";
-
 const PAGE_VIEW_PREFIX = "traffic:pv:";
 const SESSION_PREFIX = "traffic:ss:";
+const SESSION_UPPER_BOUND = "traffic:st:";
 const DEFAULT_RETENTION_DAYS = 90;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const MAX_PATH_LENGTH = 320;
@@ -308,26 +307,6 @@ function json(value: unknown): string {
   return JSON.stringify(value);
 }
 
-async function queryWithTransaction(
-  work: (client: PoolClient) => Promise<void>,
-): Promise<void> {
-  const client = await dbPool.connect();
-  try {
-    await client.query("BEGIN");
-    await work(client);
-    await client.query("COMMIT");
-  } catch (error) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {
-      // Preserve the original database error.
-    }
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 type RateLimitState = {
   windowStartedAt: number;
   pageViews: number;
@@ -465,48 +444,51 @@ export class TrafficAnalyticsService {
       isBot: device.isBot,
     };
 
-    await queryWithTransaction(async (client) => {
-      await client.query(
-        `
+    await dbPool.query(
+      `
+        WITH inserted_event AS (
           INSERT INTO app_setting (key, value, "updatedAt")
           VALUES ($1, $2::jsonb, $3)
-        `,
-        [eventKey, json(eventValue), occurredAt],
-      );
-      await client.query(
-        `
-          INSERT INTO app_setting (key, value, "updatedAt")
-          VALUES ($1, $2::jsonb, $3)
-          ON CONFLICT (key) DO UPDATE SET
-            value =
-              app_setting.value
-              || jsonb_strip_nulls(EXCLUDED.value)
-              || jsonb_build_object(
-                'firstSeenAt',
-                  COALESCE(app_setting.value->'firstSeenAt', EXCLUDED.value->'firstSeenAt'),
-                'entryPath',
-                  COALESCE(app_setting.value->'entryPath', EXCLUDED.value->'entryPath'),
-                'referrerHost',
-                  COALESCE(app_setting.value->'referrerHost', EXCLUDED.value->'referrerHost'),
-                'source',
-                  COALESCE(app_setting.value->'source', EXCLUDED.value->'source'),
-                'medium',
-                  COALESCE(app_setting.value->'medium', EXCLUDED.value->'medium'),
-                'campaign',
-                  COALESCE(app_setting.value->'campaign', EXCLUDED.value->'campaign'),
-                'pageViews',
-                  COALESCE((app_setting.value->>'pageViews')::integer, 0) + 1,
-                'engagedSeconds',
-                  GREATEST(
-                    COALESCE((app_setting.value->>'engagedSeconds')::integer, 0),
-                    COALESCE((EXCLUDED.value->>'engagedSeconds')::integer, 0)
-                  )
-              ),
-            "updatedAt" = GREATEST(app_setting."updatedAt", EXCLUDED."updatedAt")
-        `,
-        [sessionKey, json(sessionValue), occurredAt],
-      );
-    });
+          RETURNING 1
+        )
+        INSERT INTO app_setting (key, value, "updatedAt")
+        SELECT $4, $5::jsonb, $3
+        FROM inserted_event
+        ON CONFLICT (key) DO UPDATE SET
+          value =
+            app_setting.value
+            || jsonb_strip_nulls(EXCLUDED.value)
+            || jsonb_build_object(
+              'firstSeenAt',
+                COALESCE(app_setting.value->'firstSeenAt', EXCLUDED.value->'firstSeenAt'),
+              'entryPath',
+                COALESCE(app_setting.value->'entryPath', EXCLUDED.value->'entryPath'),
+              'referrerHost',
+                COALESCE(app_setting.value->'referrerHost', EXCLUDED.value->'referrerHost'),
+              'source',
+                COALESCE(app_setting.value->'source', EXCLUDED.value->'source'),
+              'medium',
+                COALESCE(app_setting.value->'medium', EXCLUDED.value->'medium'),
+              'campaign',
+                COALESCE(app_setting.value->'campaign', EXCLUDED.value->'campaign'),
+              'pageViews',
+                COALESCE((app_setting.value->>'pageViews')::integer, 0) + 1,
+              'engagedSeconds',
+                GREATEST(
+                  COALESCE((app_setting.value->>'engagedSeconds')::integer, 0),
+                  COALESCE((EXCLUDED.value->>'engagedSeconds')::integer, 0)
+                )
+            ),
+          "updatedAt" = GREATEST(app_setting."updatedAt", EXCLUDED."updatedAt")
+      `,
+      [
+        eventKey,
+        json(eventValue),
+        occurredAt,
+        sessionKey,
+        json(sessionValue),
+      ],
+    );
 
     this.scheduleCleanup();
     return { accepted: true };
@@ -607,14 +589,16 @@ export class TrafficAnalyticsService {
           key >= $1
           AND key < $2
         ) OR (
-          key LIKE $3
-          AND "updatedAt" < $4
+          key >= $3
+          AND key < $4
+          AND "updatedAt" < $5
         )
       `,
       [
         PAGE_VIEW_PREFIX,
         pageViewRangeKey(cutoff),
-        `${SESSION_PREFIX}%`,
+        SESSION_PREFIX,
+        SESSION_UPPER_BOUND,
         cutoff,
       ],
     );
