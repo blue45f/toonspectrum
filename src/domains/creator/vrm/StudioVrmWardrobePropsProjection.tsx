@@ -494,6 +494,21 @@ const TORSO_SILHOUETTE_BONES: readonly VRMHumanBoneName[] = ["hips", "spine", "c
 const TORSO_MESH_VERTEX_BUDGET = 12_000;
 
 /** 씬 전체 상한(48k). vrm.scene 순회 순서가 결정적이라 예산이 어디서 끊기는지도 결정적이다. */
+/** 이 스튜디오가 만들어 붙인 노드의 이름 규약 — 의상은 `wardrobe:<slot>:<id>`, 소품은 `prop:<id>`. */
+const STUDIO_ATTACHMENT_NAME = /^(wardrobe:(outer|top|bottom|shoes)\b|prop:)/u;
+const STUDIO_ATTACHMENT_ANCESTRY_DEPTH = 32;
+
+/** 이름(또는 조상의 이름)이 스튜디오 부착물이면 실측 대상이 아니다. */
+// eslint-disable-next-line react-refresh/only-export-components -- Pure predicate shared with its colocated test.
+export function isStudioAuthoredAttachment(object: THREE.Object3D): boolean {
+  let node: THREE.Object3D | null = object;
+  for (let depth = 0; node && depth < STUDIO_ATTACHMENT_ANCESTRY_DEPTH; depth += 1) {
+    if (node.name && STUDIO_ATTACHMENT_NAME.test(node.name)) return true;
+    node = node.parent;
+  }
+  return false;
+}
+
 const TORSO_SCENE_VERTEX_BUDGET = 48_000;
 
 /** 실측으로 인정할 최소 표면 정점 수. 이보다 적으면 실루엣 없이 골격 폴백에 맡긴다. */
@@ -678,6 +693,9 @@ function measureTorsoSilhouette(vrm: VRM, anchors: {
     if (inspected >= TORSO_SCENE_VERTEX_BUDGET) return;
     const mesh = object as THREE.SkinnedMesh;
     if (!mesh.isSkinnedMesh) return;
+    // 이 스튜디오가 입힌 절차형 의상은 vrm.scene 안으로 포털되고 몸통 본에 스킨된다. 걸러 내지
+    // 않으면 "몸"이 아니라 이미 입은 옷을 재게 되고, 다음 옷은 그 위에 또 여유분을 얹는다.
+    if (isStudioAuthoredAttachment(mesh)) return;
     const skeleton = mesh.skeleton;
     if (!skeleton || skeleton.bones.length === 0) return;
     const geometry = mesh.geometry;

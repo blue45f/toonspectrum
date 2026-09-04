@@ -71,6 +71,12 @@ function clampRadius(value: number): number {
   return Math.min(MAX_RADIUS_M, Math.max(MIN_RADIUS_M, value));
 }
 
+/** 단면 중심의 허용 범위. 반경과 같은 상한을 쓰되 0을 중심으로 양쪽을 연다. */
+function clampCenter(value: unknown): number {
+  if (!isFiniteNumber(value)) return 0;
+  return Math.min(MAX_RADIUS_M, Math.max(-MAX_RADIUS_M, value));
+}
+
 /**
  * 정렬된 배열의 분위수. 선형 보간을 쓰므로 샘플 수가 적어도 계단이 생기지 않는다.
  * 호출자가 정렬 비용을 통제할 수 있도록 정렬된 입력을 요구한다.
@@ -207,8 +213,12 @@ export function sampleBodySilhouette(silhouette: BodySilhouette, t: number): Bod
   return { ...last, t: target };
 }
 
-/** 실루엣에서 가장 넓은 반폭 — 어깨 요크·소매 진동 계산의 기준이 된다. */
+/**
+ * 실루엣에서 가장 넓은 반폭 — 어깨 요크·소매 진동 계산의 기준이 된다.
+ * 손으로 만든 빈 실루엣에서는 sampleBodySilhouette 과 같은 중립 반경으로 물러선다.
+ */
 export function widestHalfWidth(silhouette: BodySilhouette): number {
+  if (silhouette.rings.length === 0) return MIN_RADIUS_M;
   return silhouette.rings.reduce((widest, ring) => Math.max(widest, ring.halfWidth), 0);
 }
 
@@ -235,8 +245,10 @@ function sanitizeRing(raw: unknown): BodySilhouetteRing | null {
     t: Math.min(1.5, Math.max(-0.5, ring.t)),
     halfWidth: clampRadius(ring.halfWidth),
     halfDepth: clampRadius(ring.halfDepth),
-    centerX: isFiniteNumber(ring.centerX) ? ring.centerX : 0,
-    centerZ: isFiniteNumber(ring.centerZ) ? ring.centerZ : 0,
+    // 중심도 반경과 같은 범위로 묶는다. 재단이 |center| 를 반경에 더하므로, 중심만 무제한으로
+    // 두면 저장된 값 하나가 옷을 임의로 크게 만들 수 있다.
+    centerX: clampCenter(ring.centerX),
+    centerZ: clampCenter(ring.centerZ),
   };
 }
 
@@ -249,11 +261,9 @@ export function sanitizeBodySilhouette(raw: unknown): BodySilhouette | null {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<BodySilhouette>;
   if (candidate.source !== "measured") return null;
-  // 버전 도장은 다른 알고리즘이 남긴 측정을 무효화하라고 있는 것이다. 모르는 버전을 1로
-  // 다시 찍어 받아들이면 그 도장이 아무 일도 하지 않게 된다.
-  if (candidate.version !== undefined && candidate.version !== STUDIO_VRM_BODY_SILHOUETTE_VERSION) {
-    return null;
-  }
+  // 버전 도장은 다른 알고리즘이 남긴 측정을 무효화하라고 있는 것이다. 모르는 버전은 물론이고
+  // 도장이 아예 없는 것도 받아 주면 안 된다 — 그러면 어느 알고리즘이 만든 값인지 영영 알 수 없다.
+  if (candidate.version !== STUDIO_VRM_BODY_SILHOUETTE_VERSION) return null;
   if (!Array.isArray(candidate.rings)) return null;
   const rings = candidate.rings
     .map(sanitizeRing)

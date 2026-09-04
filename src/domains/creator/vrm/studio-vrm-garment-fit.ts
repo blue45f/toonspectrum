@@ -338,13 +338,12 @@ export function inspectStudioVrmGarmentFit(
       if (regions.length === 0) continue;
       const innerResolved = slots[inner.slot];
       if (!innerResolved) continue;
-      const innerEnvelope = inner.item.fitProfile.baseBodyClearanceM
-        + (innerResolved.effectiveFit - 1) * inner.radius;
-      const outerEnvelope = outer.item.fitProfile.baseBodyClearanceM
-        + (outerResolved.effectiveFit - 1) * outer.radius;
+      // 해결기(위)와 같은 여유분 모델을 쓴다. 여기만 옛 선형식을 남겨 두면 자동 맞춤이 해결했다고
+      // 판단한 겹침을 경고가 계속 띄우거나 그 반대가 된다.
       const shortfall = Math.max(
         0,
-        outer.item.fitProfile.layerClearanceM - (outerEnvelope - innerEnvelope),
+        outer.item.fitProfile.layerClearanceM
+          - (outer.clearanceAt(outerResolved.effectiveFit) - inner.clearanceAt(innerResolved.effectiveFit)),
       );
       if (shortfall <= EPSILON_M) continue;
       issues.push({

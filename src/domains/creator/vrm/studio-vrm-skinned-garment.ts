@@ -415,8 +415,10 @@ function buildEllipticalLatheGeometry(
         -ring.depth * ring.dRadius * sin * sin - ring.dZRadius * cos * cos,
         ring.dY * cos,
       ).normalize();
-      // 접선이 통째로 소멸한 링(중복 정점 등)만 반경 방향으로 되돌린다.
-      if (normal.lengthSq() < 0.5) normal.set(sin, 0, cos);
+      // 접선이 통째로 소멸한 링(중복 정점 등)만 반경 방향으로 되돌린다. 정원의 반경 방향이 아니라
+      // **눌린 단면**의 바깥 방향이어야 한다 — (sin, 0, cos)로 되돌리면 이 함수가 없애려던
+      // "부푼 원기둥" 음영이 바로 그 링에서 되살아난다.
+      if (normal.lengthSq() < 0.5) normal.set(ring.depth * sin, 0, cos).normalize();
       normals.push(normal.x, normal.y, normal.z);
     }
   }

@@ -551,28 +551,28 @@ describe("sanitizeBodySilhouette", () => {
   });
 
   it("rejects a missing or non-array rings field", () => {
-    expect(sanitizeBodySilhouette({ source: "measured" })).toBeNull();
-    expect(sanitizeBodySilhouette({ source: "measured", rings: "x" })).toBeNull();
-    expect(sanitizeBodySilhouette({ source: "measured", rings: { 0: FOUR_RINGS[0] } })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured" })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: "x" })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: { 0: FOUR_RINGS[0] } })).toBeNull();
   });
 
   it("rejects fewer than four usable rings", () => {
-    expect(sanitizeBodySilhouette({ source: "measured", rings: [], sampleCount: 0 })).toBeNull();
-    expect(sanitizeBodySilhouette({ source: "measured", rings: FOUR_RINGS.slice(0, 3), sampleCount: 3 })).toBeNull();
-    expect(sanitizeBodySilhouette({ source: "measured", rings: [null, undefined, 1, "ring"], sampleCount: 4 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [], sampleCount: 0 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: FOUR_RINGS.slice(0, 3), sampleCount: 3 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [null, undefined, 1, "ring"], sampleCount: 4 })).toBeNull();
   });
 
   it("rejects duplicate and near-duplicate ring heights", () => {
     const duplicated = [ring(0.1, 0.2, 0.1), ring(0.1, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.8, 0.2, 0.1)];
-    expect(sanitizeBodySilhouette({ source: "measured", rings: duplicated, sampleCount: 4 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: duplicated, sampleCount: 4 })).toBeNull();
     const nearlyDuplicated = [ring(0.1, 0.2, 0.1), ring(0.1 + 1e-9, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.8, 0.2, 0.1)];
-    expect(sanitizeBodySilhouette({ source: "measured", rings: nearlyDuplicated, sampleCount: 4 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: nearlyDuplicated, sampleCount: 4 })).toBeNull();
   });
 
   it("rejects a silhouette whose heights collapse onto each other after clamping", () => {
     // t 는 [-0.5, 1.5] 로 접히므로, 범위를 벗어난 두 링이 같은 값으로 무너지면 재단이 불가능하다.
     const collapsing = [ring(9, 0.2, 0.1), ring(10, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)];
-    expect(sanitizeBodySilhouette({ source: "measured", rings: collapsing, sampleCount: 4 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: collapsing, sampleCount: 4 })).toBeNull();
   });
 
   it("drops rings with non-finite radii and rejects when too few survive", () => {
@@ -583,7 +583,7 @@ describe("sanitizeBodySilhouette", () => {
       ring(0.7, 0.2, 0.1),
       ring(0.9, 0.2, 0.1),
     ];
-    const survived = sanitizeBodySilhouette({ source: "measured", rings: withNaN, sampleCount: 9 });
+    const survived = sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: withNaN, sampleCount: 9 });
     expect(survived?.rings.map((current) => current.t)).toEqual([0.3, 0.5, 0.7, 0.9]);
 
     const tooFewLeft = [
@@ -594,12 +594,12 @@ describe("sanitizeBodySilhouette", () => {
       ring(Number.NaN, 0.2, 0.1),
       ring(0.9, 0.2, 0.1),
     ];
-    expect(sanitizeBodySilhouette({ source: "measured", rings: tooFewLeft, sampleCount: 9 })).toBeNull();
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: tooFewLeft, sampleCount: 9 })).toBeNull();
   });
 
   it("normalises negative and oversized radii instead of leaking them", () => {
     const broken = [ring(0.1, -0.5, -2), ring(0.3, 40, 40), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)];
-    const sanitized = sanitizeBodySilhouette({ source: "measured", rings: broken, sampleCount: 9 });
+    const sanitized = sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: broken, sampleCount: 9 });
     const rings = requireSilhouette(sanitized).rings;
     expect(rings[0].halfWidth).toBeCloseTo(0.01, 12);
     expect(rings[0].halfDepth).toBeCloseTo(0.01, 12);
@@ -615,15 +615,15 @@ describe("sanitizeBodySilhouette", () => {
       { t: 0.7, halfWidth: 0.2, halfDepth: 0.1 },
     ];
     const sanitized = requireSilhouette(
-      sanitizeBodySilhouette({ source: "measured", rings: partial, sampleCount: Number.NaN }),
+      sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: partial, sampleCount: Number.NaN }),
     );
     expect(sanitized.rings[0].centerX).toBe(0);
     expect(sanitized.rings[0].centerZ).toBe(0);
     expect(sanitized.rings[1].centerX).toBe(0);
     expect(sanitized.rings[1].centerZ).toBe(0.02);
     expect(sanitized.sampleCount).toBe(0);
-    expect(sanitizeBodySilhouette({ source: "measured", rings: partial, sampleCount: -7 })?.sampleCount).toBe(0);
-    expect(sanitizeBodySilhouette({ source: "measured", rings: partial, sampleCount: 12.9 })?.sampleCount).toBe(12);
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: partial, sampleCount: -7 })?.sampleCount).toBe(0);
+    expect(sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: partial, sampleCount: 12.9 })?.sampleCount).toBe(12);
   });
 
   it("round-trips a measured silhouette unchanged", () => {
@@ -640,7 +640,7 @@ describe("sanitizeBodySilhouette", () => {
     // 모듈 주석은 "t가 단조가 아니면 null"이라고 하지만 구현은 정렬해서 살린다. 어느 쪽이든
     // 밖으로 나가는 실루엣이 t 오름차순이라는 불변식은 반드시 지켜져야 한다.
     const scrambled = [ring(0.9, 0.11, 0.1), ring(0.1, 0.22, 0.1), ring(0.5, 0.33, 0.1), ring(0.7, 0.44, 0.1)];
-    const sanitized = sanitizeBodySilhouette({ source: "measured", rings: scrambled, sampleCount: 4 });
+    const sanitized = sanitizeBodySilhouette({ version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: scrambled, sampleCount: 4 });
     expect(sanitized === null || isWellFormed(sanitized)).toBe(true);
     const heights = sanitized === null ? [] : sanitized.rings.map((current) => current.t);
     const widths = sanitized === null ? [] : sanitized.rings.map((current) => current.halfWidth);
@@ -658,16 +658,16 @@ describe("sanitizeBodySilhouette", () => {
       "measured",
       [],
       {},
-      { source: "measured" },
-      { source: "measured", rings: [] },
-      { source: "measured", rings: [ring(0.1, 0.2, 0.1)] },
-      { source: "measured", rings: [null, undefined, 1, "ring"], sampleCount: 4 },
-      { source: "measured", rings: [ring(0.1, 0.2, 0.1), ring(0.1, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.8, 0.2, 0.1)] },
-      { source: "measured", rings: [ring(0.1, 0, 0), ring(0.3, -1, -1), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)] },
-      { source: "measured", rings: [ring(9, 0.2, 0.1), ring(10, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)] },
-      { source: "measured", rings: FOUR_RINGS, sampleCount: Number.NaN },
-      { source: "measured", rings: FOUR_RINGS, sampleCount: -12.5 },
-      { source: "measured", rings: FOUR_RINGS.map((current) => ({ ...current, t: Number.NaN })) },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured" },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [] },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [ring(0.1, 0.2, 0.1)] },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [null, undefined, 1, "ring"], sampleCount: 4 },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [ring(0.1, 0.2, 0.1), ring(0.1, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.8, 0.2, 0.1)] },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [ring(0.1, 0, 0), ring(0.3, -1, -1), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)] },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: [ring(9, 0.2, 0.1), ring(10, 0.2, 0.1), ring(0.5, 0.2, 0.1), ring(0.7, 0.2, 0.1)] },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: FOUR_RINGS, sampleCount: Number.NaN },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: FOUR_RINGS, sampleCount: -12.5 },
+      { version: STUDIO_VRM_BODY_SILHOUETTE_VERSION, source: "measured", rings: FOUR_RINGS.map((current) => ({ ...current, t: Number.NaN })) },
       { version: 7, source: "measured", rings: FOUR_RINGS, sampleCount: 4 },
       { source: "guessed", rings: FOUR_RINGS, sampleCount: 4 },
       requireSilhouette(buildBodySilhouette(taperedTorso(), DEFAULT_RINGS)),
@@ -766,10 +766,27 @@ describe("measurement honesty", () => {
 });
 
 describe("degradation instead of breakage", () => {
-  it("rejects a silhouette stamped with a version this build does not know", () => {
+  it("rejects a silhouette whose version stamp is foreign or missing", () => {
     const foreign = { ...silhouetteOf(FOUR_RINGS), version: 7 };
     // 버전 도장은 다른 알고리즘의 측정을 무효화하라고 있는 것이다. 1로 다시 찍으면 안 된다.
     expect(sanitizeBodySilhouette(foreign)).toBeNull();
+
+    // 도장이 아예 없는 것도 같다 — 어느 알고리즘이 만든 값인지 알 수 없으면 쓰지 않는다.
+    const unstamped: Record<string, unknown> = { ...silhouetteOf(FOUR_RINGS) };
+    delete unstamped.version;
+    expect(sanitizeBodySilhouette(unstamped)).toBeNull();
+  });
+
+  it("bounds the ring centres, which the cut turns straight into radius", () => {
+    const offset = silhouetteOf([{ ...FOUR_RINGS[0], centerX: 40, centerZ: -40 }, ...FOUR_RINGS.slice(1)]);
+    const sanitized = sanitizeBodySilhouette(offset);
+    expect(Math.abs(sanitized?.rings[0].centerX ?? 0)).toBeLessThanOrEqual(0.9);
+    expect(Math.abs(sanitized?.rings[0].centerZ ?? 0)).toBeLessThanOrEqual(0.9);
+  });
+
+  it("falls back to a neutral radius rather than zero on a hand-built empty silhouette", () => {
+    expect(widestHalfWidth(silhouetteOf([]))).toBeGreaterThan(0);
+    expect(narrowestHalfWidthBetween(silhouetteOf([]), 0, 1)).toBeGreaterThan(0);
   });
 
   it("caps a stored measured-ring count at the rings that actually survived", () => {

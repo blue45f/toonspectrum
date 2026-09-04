@@ -991,6 +991,19 @@ function skirtCone(
     ? widestHipHalfWidth(m.torso, torsoT(m, topY - m.hipsToSpine)) + cut.clearanceM * ease
     : Math.max(m.hipW * 0.95, m.shoulderW * 0.42) * ease;
   const rBottom = rTop * opts.flare;
+  // 허리 단면의 깊이비도 실측에서 온다. 폭만 재고 깊이는 0.88 상수를 남겨 두면 골반이 얕은 몸에서
+  // 치마가 앞뒤로 부풀고, 깊은 몸에서는 파고든다 — 한 축만 재는 것은 재지 않은 것과 비슷하다.
+  const waist = m.torso ? sampleBodySilhouette(m.torso, torsoT(m, topY - m.hipsToSpine)) : null;
+  const depth = waist
+    ? (Math.abs(waist.centerZ) + waist.halfDepth + cut.clearanceM * ease) / rTop
+    : null;
+  const profile = [
+    { radius: rBottom, y: -opts.len * 0.5 },
+    { radius: rBottom * 0.97, y: -opts.len * 0.42 },
+    { radius: rTop + (rBottom - rTop) * 0.58, y: -opts.len * 0.08 },
+    { radius: rTop * 1.02, y: opts.len * 0.4 },
+    { radius: rTop, y: opts.len * 0.5 },
+  ];
   return {
     bone: "hips",
     skinMode: "lower-body-drape",
@@ -998,18 +1011,16 @@ function skirtCone(
     // deterministic, inexpensive surface that can follow the hips bone in every browser.
     shape: {
       kind: "lathe",
-      profile: [
-        { radius: rBottom, y: -opts.len * 0.5 },
-        { radius: rBottom * 0.97, y: -opts.len * 0.42 },
-        { radius: rTop + (rBottom - rTop) * 0.58, y: -opts.len * 0.08 },
-        { radius: rTop * 1.02, y: opts.len * 0.4 },
-        { radius: rTop, y: opts.len * 0.5 },
-      ],
+      // 밑단은 허리보다 퍼지며 원형에 가까워진다 — 깊이비를 1 쪽으로 풀어 준다.
+      profile: depth === null
+        ? profile
+        : profile.map((ring, index) => ({ ...ring, depth: depth + (1 - depth) * (index <= 1 ? 0.6 : 0) })),
       segments: 32,
     },
     offset: scaleVec(m.up, topY - opts.len / 2),
     align: m.up,
-    squash: [1, 1, 0.88],
+    // 링마다 깊이를 실은 프로파일에는 파츠 전체 squash를 걸지 않는다 — 두 번 눌린다.
+    squash: depth === null ? [1, 1, 0.88] : undefined,
     color: opts.color,
   };
 }
@@ -1124,20 +1135,28 @@ export function measuredTorsoClearanceM(
   const m = sanitizeWardrobeMetrics(metricsRaw);
   const silhouette = m.torso;
   if (!silhouette) return null;
-  const shell = buildGarmentParts(itemId, m, fit).find(
-    (part) => part.bone === "spine"
-      && part.shape.kind === "lathe"
-      && part.shape.profile.some((ring) => ring.depth !== undefined),
-  );
-  if (!shell || shell.shape.kind !== "lathe") return null;
-
-  // 셸은 spine 로컬 centerY를 중심으로 놓이므로, 링의 로컬 y를 그 오프셋만큼 되돌려야 실루엣과
-  // 같은 높이를 가리킨다. 오프셋은 항상 up 축 위에 있다(torsoShell이 그렇게 만든다).
-  const centerY = shell.offset[0] * m.up[0] + shell.offset[1] * m.up[1] + shell.offset[2] * m.up[2];
+  const parts = buildGarmentParts(itemId, m, fit);
   let narrowest = Infinity;
-  for (const ring of shell.shape.profile) {
-    const body = sampleBodySilhouette(silhouette, torsoT(m, ring.y + centerY));
-    narrowest = Math.min(narrowest, ring.radius - (Math.abs(body.centerX) + body.halfWidth));
+
+  for (const part of parts) {
+    if (part.shape.kind !== "lathe") continue;
+    // 실측으로 재단된 파츠만 잰다: 몸통 셸(링마다 depth)과 골반 드레이프(치마). 나머지 파츠는
+    // 여전히 골격 반경을 쓰므로 여기서 재면 실측이 아닌 값을 실측인 척하게 된다.
+    const measuredShell = part.bone === "spine"
+      && part.shape.profile.some((ring) => ring.depth !== undefined);
+    const measuredDrape = part.bone === "hips" && part.skinMode === "lower-body-drape";
+    if (!measuredShell && !measuredDrape) continue;
+
+    // 파츠는 로컬 centerY를 중심으로 놓이므로, 링의 로컬 y를 그 오프셋만큼 되돌려야 실루엣과
+    // 같은 높이를 가리킨다. 오프셋은 항상 up 축 위에 있다(torsoShell·skirtCone이 그렇게 만든다).
+    const centerY = part.offset[0] * m.up[0] + part.offset[1] * m.up[1] + part.offset[2] * m.up[2];
+    const hipsAnchored = part.bone === "hips";
+    for (const ring of part.shape.profile) {
+      // 골반 부착 파츠의 로컬 높이는 hips 관절 기준이라 t로 옮기기 전에 spine 기준으로 맞춘다.
+      const spineLocalY = ring.y + centerY - (hipsAnchored ? m.hipsToSpine : 0);
+      const body = sampleBodySilhouette(silhouette, torsoT(m, spineLocalY));
+      narrowest = Math.min(narrowest, ring.radius - (Math.abs(body.centerX) + body.halfWidth));
+    }
   }
   return Number.isFinite(narrowest) ? narrowest : null;
 }

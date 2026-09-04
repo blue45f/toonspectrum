@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { bodySilhouetteSignature, buildBodySilhouette } from "./studio-vrm-body-silhouette";
 import {
+  isStudioAuthoredAttachment,
   buildTorsoMeasureFrame,
   measureStudioVrmWardrobeMetrics,
   pickDominantSkinInfluence,
@@ -332,5 +333,38 @@ describe("measureStudioVrmWardrobeMetrics torso", () => {
     attachEllipticalTorsoMesh(rig, hair, [hair]);
 
     expect(measureStudioVrmWardrobeMetrics(rig.vrm).torso).toBeNull();
+  });
+});
+
+describe("스튜디오가 입힌 옷은 몸이 아니다", () => {
+  function named(name: string, parent?: THREE.Object3D): THREE.Object3D {
+    const node = new THREE.Object3D();
+    node.name = name;
+    parent?.add(node);
+    return node;
+  }
+
+  it("의상·소품 노드와 그 자손을 실측 대상에서 뺀다", () => {
+    // 절차형 의상은 vrm.scene 안으로 포털되고 몸통 본에 스킨된다. 걸러 내지 않으면 "몸"이 아니라
+    // 이미 입은 옷을 재게 되고, 다음 옷은 그 위에 또 여유분을 얹는다.
+    for (const name of ["wardrobe:top:shirt", "wardrobe:outer:coat", "wardrobe:bottom:pleated", "wardrobe:shoes:boots", "prop:catEars"]) {
+      const root = named(name);
+      expect(isStudioAuthoredAttachment(root)).toBe(true);
+      expect(isStudioAuthoredAttachment(named("Surface", root))).toBe(true);
+      expect(isStudioAuthoredAttachment(named("deep", named("mid", root)))).toBe(true);
+    }
+  });
+
+  it("모델 자신의 메시는 그대로 잰다", () => {
+    for (const name of ["Body", "N00_000_00_HeadMesh", "Face", "", "wardrobe", "propeller", "my-wardrobe:top:shirt"]) {
+      expect(isStudioAuthoredAttachment(named(name))).toBe(false);
+    }
+  });
+
+  it("모델 자신의 메시가 의상 노드 밑에 없으면 조상 이름에 걸리지 않는다", () => {
+    const scene = named("VRMRoot");
+    const body = named("Body", scene);
+    named("wardrobe:top:shirt", scene);
+    expect(isStudioAuthoredAttachment(body)).toBe(false);
   });
 });
