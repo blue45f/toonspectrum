@@ -1,0 +1,376 @@
+name: One-shot all-brush quality run orchestrator
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: all-brush-quality-orchestrator
+  cancel-in-progress: true
+
+jobs:
+  orchestrate:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/orchestrate-all-brush-quality-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+      TARGET_WORKFLOW: studio-all-brush-long-stroke-quality.yml
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify feature source is finalized
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$(git rev-parse HEAD)"
+          grep -q 'responseProfile' src/domains/creator/brush/studio-brush-quality-curation.ts
+          grep -q 'liveFingerprint' src/domains/creator/brush/studio-brush-quality-curation.ts
+          grep -q 'responseProfile' scripts/analyze-studio-brush-similarity.mts
+
+          temporary="$({ git ls-files \
+            '.github/brush-quality-payloads/**' \
+            '.github/workflows/apply-all-brush-quality-v3-macos.yml' \
+            '.github/workflows/export-brush-quality-source-v2.yml' \
+            '.github/workflows/finalize-response-aware-brush-quality.yml' \
+            '.github/workflows/patch-brush-quality-policy.yml' \
+            'scripts/patch-all-brush-quality-v3.py' \
+            'scripts/patch-all-brush-quality-v3b.py' || true; } | sed '/^$/d' | wc -l | tr -d ' ')"
+          if [[ "$temporary" != 0 ]]; then
+            echo "temporary helper files remain: $temporary" >&2
+            git ls-files \
+              '.github/brush-quality-payloads/**' \
+              '.github/workflows/apply-all-brush-quality-v3-macos.yml' \
+              '.github/workflows/export-brush-quality-source-v2.yml' \
+              '.github/workflows/finalize-response-aware-brush-quality.yml' \
+              '.github/workflows/patch-brush-quality-policy.yml' \
+              'scripts/patch-all-brush-quality-v3.py' \
+              'scripts/patch-all-brush-quality-v3b.py' >&2
+            exit 1
+          fi
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Reuse or dispatch current-head benchmark
+        id: run
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.source.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          repository="${GITHUB_REPOSITORY}"
+          api="repos/${repository}/actions/workflows/${TARGET_WORKFLOW}/runs?branch=${TARGET_BRANCH}&per_page=100"
+
+          find_run() {
+            gh api "$api" --jq ".workflow_runs
+              | map(select(.head_sha == \"${HEAD_SHA}\" and .conclusion != \"cancelled\"))
+              | sort_by(.created_at) | reverse | .[0].id // empty"
+          }
+
+          run_id="$(find_run)"
+          if [[ -z "$run_id" ]]; then
+            gh api --method POST \
+              "repos/${repository}/actions/workflows/${TARGET_WORKFLOW}/dispatches" \
+              -f ref="${TARGET_BRANCH}"
+            for _ in $(seq 1 60); do
+              sleep 10
+              run_id="$(find_run)"
+              [[ -n "$run_id" ]] && break
+            done
+          fi
+          if [[ -z "$run_id" ]]; then
+            echo "benchmark run was not created for ${HEAD_SHA}" >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for complete catalogue benchmark
+        id: wait
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 600); do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq .status)"
+            conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq '.conclusion // empty')"
+            echo "benchmark ${RUN_ID}: ${status}/${conclusion:-pending}"
+            if [[ "$status" == completed ]]; then
+              echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+              [[ "$conclusion" == success ]]
+              exit
+            fi
+            sleep 30
+          done
+          echo "timed out waiting for benchmark ${RUN_ID}" >&2
+          exit 1
+
+      - name: Download aggregate evidence
+        id: artifact
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p aggregate
+          artifact_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+            --jq '.artifacts
+              | map(select(.expired == false and (.name | contains("all-brush-quality-election-and-curation"))))
+              | sort_by(.created_at) | reverse | .[0].id // empty')"
+          if [[ -z "$artifact_id" ]]; then
+            echo "aggregate quality artifact not found" >&2
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" --jq '.artifacts[].name' >&2
+            exit 1
+          fi
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > aggregate.zip
+          unzip -q aggregate.zip -d aggregate
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+
+      - name: Validate quality, hand-feel and GPU election evidence
+        id: receipt
+        shell: bash
+        env:
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+          HEAD_SHA: ${{ steps.source.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import math
+          import os
+          from pathlib import Path
+          from statistics import median
+
+          root = Path('aggregate')
+          quality_paths = list(root.rglob('all-brush-gpu-quality-report.json'))
+          curation_paths = list(root.rglob('brush-curation-report.json'))
+          if len(quality_paths) != 1:
+              raise SystemExit(f'expected one quality report, found {len(quality_paths)}')
+          if len(curation_paths) != 1:
+              raise SystemExit(f'expected one curation report, found {len(curation_paths)}')
+
+          quality = json.loads(quality_paths[0].read_text(encoding='utf-8'))
+          curation = json.loads(curation_paths[0].read_text(encoding='utf-8'))
+          cases = quality.get('cases')
+          if not isinstance(cases, list) or not cases:
+              raise SystemExit('quality report contains no cases')
+
+          def obj(value):
+              return value if isinstance(value, dict) else {}
+
+          def num(value, default=None):
+              if isinstance(value, (int, float)) and math.isfinite(value):
+                  return float(value)
+              return default
+
+          baseline_failures = []
+          input_failures = []
+          invalid_gpu = []
+          selected_gpu = []
+          selected_incumbent = []
+          physical_gpu = []
+          browser_errors = 0
+          refused = 0
+          baseline_p95 = []
+          gpu_p95 = []
+
+          for case in cases:
+              brush_id = str(case.get('id') or case.get('brushId') or '<unknown>')
+              baseline = obj(case.get('baseline'))
+              gpu = obj(case.get('gpu'))
+              bq = obj(baseline.get('quality'))
+              gq = obj(gpu.get('quality'))
+              bp = obj(baseline.get('performance'))
+              gp = obj(gpu.get('performance'))
+              election = obj(case.get('election'))
+
+              if bq.get('ownQualityPassed') is not True:
+                  baseline_failures.append(brush_id)
+              delivery = num(bp.get('inputDeliveryRatio'), 0.0)
+              if delivery < 0.98:
+                  input_failures.append(f'{brush_id}:{delivery:.4f}')
+
+              browser_errors += int(num(bq.get('browserErrorCount'), 0) or 0)
+              browser_errors += int(num(gq.get('browserErrorCount'), 0) or 0)
+              refused += int(num(bq.get('refusedStrokeCount'), 0) or 0)
+              refused += int(num(gq.get('refusedStrokeCount'), 0) or 0)
+
+              b95 = num(bp.get('frameP95Milliseconds'))
+              g95 = num(gp.get('frameP95Milliseconds'))
+              if b95 is not None:
+                  baseline_p95.append(b95)
+              if g95 is not None:
+                  gpu_p95.append(g95)
+
+              selected = election.get('selected') or election.get('selectedBackend') or election.get('winner')
+              if selected in ('gpu', 'webgpu', 'candidate'):
+                  selected_gpu.append(brush_id)
+                  adapter = obj(gpu.get('adapter') or case.get('gpuAdapter'))
+                  adapter_kind = str(adapter.get('kind') or adapter.get('type') or '').lower()
+                  if adapter_kind and all(token not in adapter_kind for token in ('swiftshader', 'software', 'unknown')):
+                      physical_gpu.append(brush_id)
+                  if not (
+                      election.get('qualityEquivalent') is True
+                      and election.get('performanceNonInferior') is True
+                      and election.get('hardwareEligible') is True
+                  ):
+                      invalid_gpu.append(brush_id)
+              else:
+                  selected_incumbent.append(brush_id)
+
+          quarantine = curation.get('suggestedQuarantineIds') or curation.get('quarantineIds') or []
+          clusters = curation.get('clusters') or []
+          if not isinstance(quarantine, list) or not isinstance(clusters, list):
+              raise SystemExit('invalid curation report')
+
+          failures = []
+          if baseline_failures:
+              failures.append(f'baseline-quality={len(baseline_failures)}')
+          if input_failures:
+              failures.append(f'input-delivery={len(input_failures)}')
+          if browser_errors:
+              failures.append(f'browser-errors={browser_errors}')
+          if refused:
+              failures.append(f'refused-strokes={refused}')
+          if invalid_gpu:
+              failures.append(f'invalid-gpu-elections={len(invalid_gpu)}')
+
+          receipt = {
+              'kind': 'toonspectrum-all-brush-quality-orchestrator-receipt-v1',
+              'runId': int(os.environ['RUN_ID']),
+              'headSha': os.environ['HEAD_SHA'],
+              'benchmarkDigest': quality.get('benchmarkDigest'),
+              'caseCount': len(cases),
+              'baselineFailureCount': len(baseline_failures),
+              'inputFailureCount': len(input_failures),
+              'browserErrorCount': browser_errors,
+              'refusedStrokeCount': refused,
+              'gpuSelectedCount': len(selected_gpu),
+              'physicalGpuSelectedCount': len(physical_gpu),
+              'incumbentSelectedCount': len(selected_incumbent),
+              'invalidGpuElectionCount': len(invalid_gpu),
+              'duplicateClusterCount': len(clusters),
+              'suggestedQuarantineCount': len(quarantine),
+              'suggestedQuarantineIds': quarantine,
+              'baselineFrameP95MedianMs': median(baseline_p95) if baseline_p95 else None,
+              'gpuFrameP95MedianMs': median(gpu_p95) if gpu_p95 else None,
+              'passed': not failures,
+              'failures': failures,
+              'baselineFailures': baseline_failures,
+              'inputFailures': input_failures,
+              'invalidGpuElections': invalid_gpu,
+          }
+          Path('brush-quality-orchestrator-receipt.json').write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+
+          md = [
+              '# ToonStudio 전체 브러시 화면 채움 장획 결과',
+              '',
+              f"- HEAD: `{receipt['headSha']}`",
+              f"- cases: **{receipt['caseCount']}**",
+              f"- GPU selected: **{receipt['gpuSelectedCount']}**",
+              f"- incumbent retained: **{receipt['incumbentSelectedCount']}**",
+              f"- duplicate clusters: **{receipt['duplicateClusterCount']}**",
+              f"- exposure quarantine suggestions: **{receipt['suggestedQuarantineCount']}**",
+              f"- baseline failures: **{receipt['baselineFailureCount']}**",
+              f"- input failures: **{receipt['inputFailureCount']}**",
+              f"- browser errors: **{receipt['browserErrorCount']}**",
+              f"- refused strokes: **{receipt['refusedStrokeCount']}**",
+              f"- verdict: **{'PASS' if receipt['passed'] else 'FAIL'}**",
+              '',
+              '## Suggested quarantine IDs',
+              '',
+          ]
+          md.extend(f'- `{brush_id}`' for brush_id in quarantine)
+          Path('brush-quality-orchestrator-receipt.md').write_text('\n'.join(md) + '\n', encoding='utf-8')
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as stream:
+              for key, value in {
+                  'passed': 'true' if receipt['passed'] else 'false',
+                  'case_count': receipt['caseCount'],
+                  'gpu_count': receipt['gpuSelectedCount'],
+                  'incumbent_count': receipt['incumbentSelectedCount'],
+                  'cluster_count': receipt['duplicateClusterCount'],
+                  'quarantine_count': receipt['suggestedQuarantineCount'],
+                  'baseline_failures': receipt['baselineFailureCount'],
+                  'input_failures': receipt['inputFailureCount'],
+                  'browser_errors': receipt['browserErrorCount'],
+                  'refused': receipt['refusedStrokeCount'],
+                  'invalid_gpu': receipt['invalidGpuElectionCount'],
+                  'baseline_p95': receipt['baselineFrameP95MedianMs'],
+                  'gpu_p95': receipt['gpuFrameP95MedianMs'],
+              }.items():
+                  stream.write(f'{key}={value}\n')
+
+          if failures:
+              raise SystemExit('; '.join(failures))
+          PY
+
+      - name: Upload orchestration receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-brush-quality-orchestrator-receipt-${{ steps.run.outputs.run_id }}
+          path: |
+            brush-quality-orchestrator-receipt.json
+            brush-quality-orchestrator-receipt.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Post result to PR #679
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const passed = '${{ steps.receipt.outputs.passed }}' === 'true';
+            const body = [
+              `${passed ? '✅' : '❌'} **전체 브러시 품질 오케스트레이션 결과**`,
+              '',
+              `- HEAD: \`${{ steps.source.outputs.head_sha }}\``,
+              `- cases: **${{ steps.receipt.outputs.case_count || 'unknown' }}**`,
+              `- GPU selected: **${{ steps.receipt.outputs.gpu_count || '0' }}**`,
+              `- incumbent retained: **${{ steps.receipt.outputs.incumbent_count || '0' }}**`,
+              `- duplicate clusters: **${{ steps.receipt.outputs.cluster_count || '0' }}**`,
+              `- quarantine suggestions: **${{ steps.receipt.outputs.quarantine_count || '0' }}**`,
+              `- baseline/input failures: **${{ steps.receipt.outputs.baseline_failures || 'unknown' }} / ${{ steps.receipt.outputs.input_failures || 'unknown' }}**`,
+              `- browser/refused: **${{ steps.receipt.outputs.browser_errors || 'unknown' }} / ${{ steps.receipt.outputs.refused || 'unknown' }}**`,
+              `- invalid GPU elections: **${{ steps.receipt.outputs.invalid_gpu || 'unknown' }}**`,
+              `- baseline/GPU frame p95 median: **${{ steps.receipt.outputs.baseline_p95 || 'n/a' }} / ${{ steps.receipt.outputs.gpu_p95 || 'n/a' }} ms**`,
+              `- benchmark run: ${{ steps.run.outputs.run_url }}`,
+              '',
+              passed
+                ? '품질·손맛·입력·GPU 증거가 유효합니다. 브러시 축소는 보고서의 완전연결 유사 군집만 다음 단계에 적용할 수 있습니다.'
+                : '품질 증거를 통과하지 못했으므로 GPU 선거와 브러시 축소는 적용하지 않습니다.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body,
+            });
+
+      - name: Enforce evidence verdict
+        if: steps.receipt.outcome != 'success'
+        run: exit 1
