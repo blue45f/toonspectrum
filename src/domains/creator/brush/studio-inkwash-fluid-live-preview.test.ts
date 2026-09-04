@@ -77,6 +77,7 @@ describe("causal InkWash live preview", () => {
 
   it("preserves pressure as both width and optical-density information", () => {
     const state = planner();
+    // Two sparse endpoints ensure the segment interpolates pressure instead of using only its tail.
     const planned = planStudioInkwashFluidPreviewStamps(state, [
       { x: 40, y: 80, pressure: 0.1 },
       { x: 480, y: 80, pressure: 1 },
