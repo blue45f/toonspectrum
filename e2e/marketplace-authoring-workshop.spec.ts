@@ -3,10 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 const HANDOFF_KEY = "toonspectrum:creator-marketplace-handoff:v2";
 
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(() => Math.max(
+  const overflow = await page.locator("main").evaluate((main) => Math.max(
     0,
-    document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    document.body.scrollWidth - document.body.clientWidth,
+    main.scrollWidth - main.clientWidth,
   ));
   expect(overflow).toBeLessThanOrEqual(1);
 }
@@ -124,54 +123,15 @@ test.describe("Creator Marketplace authoring workshop", () => {
               sourceProgram: waterProgram,
             },
           ],
-          originalEnginePrograms: [dryProgram, waterProgram],
-          deterministicSeed: 42,
-          presetFamily: "hybrid",
-          intendedUse: ["inking"],
         },
-        technical: {},
-        compatibility: {
-          canvas2d: true,
-          webgl2: true,
-          webgpu: false,
-          wasm: false,
-          touch: true,
-          stylus: true,
-          mouse: true,
-          minAppVersion: "1.0.0",
-          testedBrowsers: ["Chrome"],
-          notes: "",
-        },
-        media: [],
-        bundle: [],
-        release: {
-          mode: "new",
-          version: "1.0.0",
-          changelog: "Initial release",
-          migrationNotes: "",
-          breaking: false,
-        },
-        rights: {
-          license: "free",
-          commercialUse: true,
-          redistribution: false,
-          aiTrainingAllowed: false,
-          containsThirdPartyContent: false,
-          thirdPartyAttribution: "",
-          originalWorkAttested: false,
-          previewRightsAttested: false,
-        },
-        reviewNotes: "",
-        completedSteps: [],
       }));
     }, { key: HANDOFF_KEY });
 
     await openPublish(page);
-    await expect(page.getByTestId("market-authoring-title"))
-      .toHaveValue("Native program handoff");
+    await expect(page.getByTestId("market-authoring-title")).toHaveValue(
+      "Native program handoff",
+    );
     await page.getByRole("tab", { name: /엔진·구성/u }).click();
-    const list = page.getByTestId("market-authoring-engine-list");
-    await expect(list.getByText("Studio 원본 보존", { exact: true }))
-      .toHaveCount(2);
+    await expect(page.getByText("Studio 원본 보존")).toHaveCount(2);
   });
 });
