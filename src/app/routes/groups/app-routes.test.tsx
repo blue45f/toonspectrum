@@ -19,6 +19,15 @@ describe("application route registry", () => {
     });
   });
 
+  it("keeps Character Shaper in the creator route registry", () => {
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({
+        id: "creator-character-shaper",
+        path: "/shaper",
+      }),
+    );
+  });
+
   it("keeps Studio behind one canonical wildcard entry", () => {
     expect(
       appRoutes.filter((route) => route.path.startsWith("/studio")),
