@@ -282,24 +282,30 @@ function sameSource(source: El, candidate: El): boolean {
   }
 }
 
-function matchesCriterion(
+type StudioElementMatcher = (candidate: El) => boolean;
+
+/** Precompute the source key once; large pages should scale with candidates, not source key size. */
+function createCriterionMatcher(
   source: El,
-  candidate: El,
   criterion: StudioSelectMatchingCriterion,
-): boolean {
+): StudioElementMatcher {
   switch (criterion) {
     case "type":
-      return source.type === candidate.type;
+      return (candidate) => source.type === candidate.type;
     case "paint": {
       const sourceKey = paintKey(source);
-      return sourceKey !== null && sourceKey === paintKey(candidate);
+      return sourceKey === null
+        ? () => false
+        : (candidate) => sourceKey === paintKey(candidate);
     }
     case "typography": {
       const sourceKey = typographyKey(source);
-      return sourceKey !== null && sourceKey === typographyKey(candidate);
+      return sourceKey === null
+        ? () => false
+        : (candidate) => sourceKey === typographyKey(candidate);
     }
     case "source":
-      return sameSource(source, candidate);
+      return (candidate) => sameSource(source, candidate);
   }
 }
 
@@ -355,9 +361,8 @@ export function resolveStudioSelectMatchingOptions(
   const source = elements.find((element) => element.id === sourceId);
   if (!source) return [];
   return availableCriteria(source).flatMap((criterion) => {
-    const count = elements.filter((candidate) =>
-      matchesCriterion(source, candidate, criterion),
-    ).length;
+    const matches = createCriterionMatcher(source, criterion);
+    const count = elements.filter(matches).length;
     if (count < 2) return [];
     return [{ criterion, count, ...criterionLabel(source, criterion) }];
   });
@@ -371,7 +376,6 @@ export function selectStudioMatchingElementIds(
 ): string[] {
   const source = elements.find((element) => element.id === sourceId);
   if (!source) return [];
-  return elements
-    .filter((candidate) => matchesCriterion(source, candidate, criterion))
-    .map((candidate) => candidate.id);
+  const matches = createCriterionMatcher(source, criterion);
+  return elements.filter(matches).map((candidate) => candidate.id);
 }
