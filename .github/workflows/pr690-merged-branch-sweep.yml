@@ -1,0 +1,119 @@
+name: Safe merged branch sweep after PR 690
+
+on:
+  push:
+    branches:
+      - ops/pr690-post-merge-cleanup-20260904
+    paths:
+      - .github/workflows/pr690-merged-branch-sweep.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: pr690-safe-merged-branch-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLEANUP_BRANCH: ops/pr690-post-merge-cleanup-20260904
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Discover protected and merged PR heads
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[].head.ref' | sort -u > /tmp/open-pr-heads.txt
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null) | [.head.ref, .head.sha] | @tsv' \
+            | sort -u > /tmp/merged-pr-heads.tsv
+          echo "open PR heads: $(wc -l < /tmp/open-pr-heads.txt | tr -d ' ')"
+          echo "merged PR heads: $(wc -l < /tmp/merged-pr-heads.tsv | tr -d ' ')"
+
+      - name: Delete only proven merged or content-contained branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+          rm -rf /tmp/toonspectrum-branch-sweep
+          git worktree add --detach /tmp/toonspectrum-branch-sweep origin/main
+
+          deleted=0
+          kept=0
+          while IFS= read -r branch; do
+            case "$branch" in
+              main|"$CLEANUP_BRANCH"|preserve/*)
+                echo "protected: $branch"
+                continue
+                ;;
+            esac
+
+            if grep -Fqx "$branch" /tmp/open-pr-heads.txt; then
+              echo "open PR head, keep: $branch"
+              kept=$((kept + 1))
+              continue
+            fi
+
+            remote_sha="$(git rev-parse "refs/remotes/origin/${branch}")"
+            merged_record="$(printf '%s\t%s' "$branch" "$remote_sha")"
+            delete_reason=""
+
+            if grep -Fqx "$merged_record" /tmp/merged-pr-heads.tsv; then
+              delete_reason="exact head of a merged PR"
+            else
+              git -C /tmp/toonspectrum-branch-sweep merge --abort >/dev/null 2>&1 || true
+              git -C /tmp/toonspectrum-branch-sweep reset --hard origin/main >/dev/null
+              git -C /tmp/toonspectrum-branch-sweep clean -fdx >/dev/null
+
+              if git -C /tmp/toonspectrum-branch-sweep merge --no-commit --no-ff "refs/remotes/origin/${branch}" >/tmp/branch-merge.log 2>&1; then
+                if git -C /tmp/toonspectrum-branch-sweep diff --quiet \
+                  && git -C /tmp/toonspectrum-branch-sweep diff --cached --quiet; then
+                  delete_reason="trial merge produces no tree change"
+                fi
+              fi
+              git -C /tmp/toonspectrum-branch-sweep merge --abort >/dev/null 2>&1 || true
+              git -C /tmp/toonspectrum-branch-sweep reset --hard origin/main >/dev/null
+              git -C /tmp/toonspectrum-branch-sweep clean -fdx >/dev/null
+            fi
+
+            if [ -n "$delete_reason" ]; then
+              echo "delete: $branch ($delete_reason)"
+              git push origin --delete "$branch"
+              deleted=$((deleted + 1))
+            else
+              echo "unproven or still unique, keep: $branch"
+              kept=$((kept + 1))
+            fi
+          done < <(
+            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
+              | grep -v '^HEAD$' \
+              | sort -u
+          )
+
+          echo "BRANCH_SWEEP_DELETED=$deleted"
+          echo "BRANCH_SWEEP_KEPT=$kept"
+          git worktree remove --force /tmp/toonspectrum-branch-sweep
+
+      - name: Remove one-off sweep workflow from cleanup branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/pr690-merged-branch-sweep.yml
+          git commit -m "chore(ci): remove completed merged-branch sweep"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
