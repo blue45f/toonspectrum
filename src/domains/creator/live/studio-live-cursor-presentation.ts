@@ -15,6 +15,7 @@ export interface StudioLiveCursorPresentationOptions {
   peers: readonly StudioLivePeer[];
   pageId: string;
   followingSessionId?: string | null;
+  pinnedSessionIds?: ReadonlySet<string>;
   preferences: Readonly<StudioLiveCollaborationPreferences>;
   networkHints?: StudioLiveNetworkHints;
 }
@@ -22,8 +23,10 @@ export interface StudioLiveCursorPresentationOptions {
 function activityScore(
   cursor: StudioLivePeerCursor,
   peer: StudioLivePeer | undefined,
-  followingSessionId: string | null
+  followingSessionId: string | null,
+  pinnedSessionIds: ReadonlySet<string>
 ): number {
+  if (pinnedSessionIds.has(cursor.participant.sessionId)) return 5;
   if (cursor.participant.sessionId === followingSessionId) return 4;
   if (cursor.cursor.drawing) return 3;
   if (peer?.visibility === "active") return 2;
@@ -31,15 +34,16 @@ function activityScore(
 }
 
 /**
- * Figma-style cursor admission: the followed collaborator, active strokes and active editors win
- * before idle pointers. The local visibility preference is presentation-only and never affects
- * CRDT, locks, presence or another participant's cursor.
+ * Figma-style cursor admission: cursor-chat authors, the followed collaborator, active strokes and
+ * active editors win before idle pointers. The local visibility preference is presentation-only
+ * and never affects CRDT, locks, presence or another participant's cursor.
  */
 export function selectStudioLivePresentedCursors({
   cursors,
   peers,
   pageId,
   followingSessionId = null,
+  pinnedSessionIds = new Set<string>(),
   preferences,
   networkHints,
 }: StudioLiveCursorPresentationOptions): StudioLivePeerCursor[] {
@@ -47,19 +51,32 @@ export function selectStudioLivePresentedCursors({
   const peerBySession = new Map(peers.map((peer) => [peer.sessionId, peer] as const));
   const eligible = cursors.filter((entry) => {
     if (isStudioLiveCursorCleared(entry.cursor) || entry.cursor.pageId !== pageId) return false;
-    const following = entry.participant.sessionId === followingSessionId;
-    if (following) return true;
+    const sessionId = entry.participant.sessionId;
+    if (pinnedSessionIds.has(sessionId) || sessionId === followingSessionId) return true;
     if (preferences.cursorVisibility === "drawing") return entry.cursor.drawing === true;
     if (preferences.cursorVisibility === "active") {
-      return entry.cursor.drawing === true || peerBySession.get(entry.participant.sessionId)?.visibility === "active";
+      return (
+        entry.cursor.drawing === true ||
+        peerBySession.get(sessionId)?.visibility === "active"
+      );
     }
     return true;
   });
 
   eligible.sort((left, right) => {
     const scoreDelta =
-      activityScore(right, peerBySession.get(right.participant.sessionId), followingSessionId) -
-      activityScore(left, peerBySession.get(left.participant.sessionId), followingSessionId);
+      activityScore(
+        right,
+        peerBySession.get(right.participant.sessionId),
+        followingSessionId,
+        pinnedSessionIds
+      ) -
+      activityScore(
+        left,
+        peerBySession.get(left.participant.sessionId),
+        followingSessionId,
+        pinnedSessionIds
+      );
     if (scoreDelta !== 0) return scoreDelta;
     if (left.updatedAt !== right.updatedAt) return right.updatedAt - left.updatedAt;
     return left.participant.sessionId.localeCompare(right.participant.sessionId);
