@@ -1,0 +1,167 @@
+name: Temporary 3D runtime integration
+
+on:
+  push:
+    branches:
+      - feat/3d-shot-deck-ai-reference-20260904
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: ${{ !contains(github.event.head_commit.message, '[3d-runtime-integrated]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wire the 3D pro suite to the production scene
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          pro_path = Path("src/domains/creator/bg3d/StudioBg3dProSuitePanel.tsx")
+          pro = pro_path.read_text(encoding="utf-8")
+          pro = replace_once(
+              pro,
+              'import type { TimeOfDayPreset } from "../scene-3d/studio-3d-scene-auto-culling";\n',
+              'import type { TimeOfDayPreset } from "../scene-3d/studio-3d-scene-auto-culling";\nimport type {\n  StudioBg3dCameraSettings,\n  StudioBg3dShot,\n} from "./studio-bg3d-scene-document";\n',
+              "pro-suite scene types",
+          )
+          pro = replace_once(
+              pro,
+              '''export interface StudioBg3dProSuitePanelProps {
+            readonly disabled?: boolean;
+          }
+
+          export function StudioBg3dProSuitePanel({ disabled = false }: StudioBg3dProSuitePanelProps) {''',
+              '''export interface StudioBg3dProSuitePanelProps {
+            readonly disabled?: boolean | undefined;
+            readonly baseCamera?: StudioBg3dCameraSettings | undefined;
+            readonly productionShots?: readonly StudioBg3dShot[] | undefined;
+            readonly onCaptureCurrentShot?: (() => void) | undefined;
+            readonly onApplyProductionShot?: ((shotId: string) => void) | undefined;
+            readonly onMoveProductionShot?: ((shotId: string, targetIndex: number) => void) | undefined;
+            readonly onRemoveProductionShot?: ((shotId: string) => void) | undefined;
+            readonly onUseCurrentFrameAsAiReference?: (() => void) | undefined;
+            readonly aiReferenceBusy?: boolean | undefined;
+            readonly aiReferenceDisabled?: boolean | undefined;
+          }
+
+          export function StudioBg3dProSuitePanel({
+            disabled = false,
+            baseCamera,
+            productionShots,
+            onCaptureCurrentShot,
+            onApplyProductionShot,
+            onMoveProductionShot,
+            onRemoveProductionShot,
+            onUseCurrentFrameAsAiReference,
+            aiReferenceBusy = false,
+            aiReferenceDisabled = false,
+          }: StudioBg3dProSuitePanelProps) {''',
+              "pro-suite runtime props",
+          )
+          pro = replace_once(
+              pro,
+              '      {activeTab === "director" && <StudioBg3dCinematicDirectorPanel />}\n',
+              '''      {activeTab === "director" && (
+                <StudioBg3dCinematicDirectorPanel
+                  disabled={disabled}
+                  baseCamera={baseCamera}
+                  productionShots={productionShots}
+                  onCaptureCurrentShot={onCaptureCurrentShot}
+                  onApplyProductionShot={onApplyProductionShot}
+                  onMoveProductionShot={onMoveProductionShot}
+                  onRemoveProductionShot={onRemoveProductionShot}
+                  onUseCurrentFrameAsAiReference={onUseCurrentFrameAsAiReference}
+                  aiReferenceBusy={aiReferenceBusy}
+                  aiReferenceDisabled={aiReferenceDisabled}
+                />
+              )}\n''',
+              "director runtime bridge",
+          )
+          pro = replace_once(
+              pro,
+              '      {activeTab === "multipass" && <StudioBg3dMultiPassExporterPanel />}\n',
+              '      {activeTab === "multipass" && <StudioBg3dMultiPassExporterPanel disabled={disabled} />}\n',
+              "multipass disabled bridge",
+          )
+          pro_path.write_text(pro, encoding="utf-8")
+
+          director_path = Path("src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.tsx")
+          director = director_path.read_text(encoding="utf-8")
+          optional_type_replacements = {
+              "  readonly disabled?: boolean;": "  readonly disabled?: boolean | undefined;",
+              "  readonly baseCamera?: StudioBg3dCameraSettings;": "  readonly baseCamera?: StudioBg3dCameraSettings | undefined;",
+              "  readonly productionShots?: readonly StudioBg3dShot[];": "  readonly productionShots?: readonly StudioBg3dShot[] | undefined;",
+              "  readonly onCaptureCurrentShot?: () => void;": "  readonly onCaptureCurrentShot?: (() => void) | undefined;",
+              "  readonly onApplyProductionShot?: (shotId: string) => void;": "  readonly onApplyProductionShot?: ((shotId: string) => void) | undefined;",
+              "  readonly onMoveProductionShot?: (shotId: string, targetIndex: number) => void;": "  readonly onMoveProductionShot?: ((shotId: string, targetIndex: number) => void) | undefined;",
+              "  readonly onRemoveProductionShot?: (shotId: string) => void;": "  readonly onRemoveProductionShot?: ((shotId: string) => void) | undefined;",
+              "  readonly onApplyShotBookmark?: (bookmark: WebtoonShotBookmark) => void;": "  readonly onApplyShotBookmark?: ((bookmark: WebtoonShotBookmark) => void) | undefined;",
+              "  readonly onTriggerShake?: (config: CameraShakeConfig) => void;": "  readonly onTriggerShake?: ((config: CameraShakeConfig) => void) | undefined;",
+              "  readonly onUseCurrentFrameAsAiReference?: () => void;": "  readonly onUseCurrentFrameAsAiReference?: (() => void) | undefined;",
+              "  readonly aiReferenceBusy?: boolean;": "  readonly aiReferenceBusy?: boolean | undefined;\n  readonly aiReferenceDisabled?: boolean | undefined;",
+          }
+          for old, new in optional_type_replacements.items():
+              director = replace_once(director, old, new, f"director optional prop {old}")
+          director = replace_once(
+              director,
+              "  aiReferenceBusy = false,\n}: StudioBg3dCinematicDirectorPanelProps)",
+              "  aiReferenceBusy = false,\n  aiReferenceDisabled = false,\n}: StudioBg3dCinematicDirectorPanelProps)",
+              "director AI disabled destructure",
+          )
+          director = replace_once(
+              director,
+              "          disabled={disabled || aiReferenceBusy}\n",
+              "          disabled={disabled || aiReferenceDisabled || aiReferenceBusy}\n",
+              "director AI disabled state",
+          )
+          director_path.write_text(director, encoding="utf-8")
+
+          view_path = Path("src/domains/creator/bg3d/StudioBg3dViewPanel.tsx")
+          view = view_path.read_text(encoding="utf-8")
+          view = replace_once(
+              view,
+              "                  <StudioBg3dProSuitePanel disabled={isCapturing || isRestoringScene} />",
+              '''                  <StudioBg3dProSuitePanel
+                    disabled={isCapturing || isRestoringScene}
+                    baseCamera={sceneBaseDocument.camera}
+                    productionShots={savedShots}
+                    onCaptureCurrentShot={captureCurrentShot}
+                    onApplyProductionShot={applySavedShot}
+                    onMoveProductionShot={moveSavedShot}
+                    onRemoveProductionShot={removeSavedShot}
+                    onUseCurrentFrameAsAiReference={onUseCurrentFrameAsAiReference}
+                    aiReferenceBusy={aiReferenceBusy}
+                    aiReferenceDisabled={aiReferenceActionDisabled}
+                  />''',
+              "view-panel production bridge",
+          )
+          view_path.write_text(view, encoding="utf-8")
+
+      - name: Verify patch shape
+        run: |
+          git diff --check
+          grep -q 'productionShots={savedShots}' src/domains/creator/bg3d/StudioBg3dViewPanel.tsx
+          grep -q 'aiReferenceDisabled={aiReferenceDisabled}' src/domains/creator/bg3d/StudioBg3dProSuitePanel.tsx
+          grep -q 'StudioBg3dMultiPassExporterPanel disabled={disabled}' src/domains/creator/bg3d/StudioBg3dProSuitePanel.tsx
+
+      - name: Commit runtime integration
+        run: |
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/domains/creator/bg3d/StudioBg3dProSuitePanel.tsx \
+                  src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.tsx \
+                  src/domains/creator/bg3d/StudioBg3dViewPanel.tsx
+          git commit -m "feat(3d): wire the shot director into the production scene [3d-runtime-integrated]"
+          git push origin HEAD
