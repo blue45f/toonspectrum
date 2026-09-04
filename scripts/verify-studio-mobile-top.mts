@@ -52,6 +52,7 @@ const MAX_HEIGHT_RATIO = 1.6;
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/analytics/traffic/",
 ] as const;
 
 function isExpectedStaticPreviewError(message: string, studioUrl: string): boolean {

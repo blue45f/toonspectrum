@@ -60,6 +60,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/analytics/traffic/",
 ] as const;
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const SOURCE_REVISION_PATTERN = /^hokusai-source-v1:[a-f0-9]{16}$/u;
