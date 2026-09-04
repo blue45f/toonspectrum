@@ -1,0 +1,50 @@
+name: Cleanup merged PR branches
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Delete only branches proven to be fully integrated
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: cleanup-merged-pr-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Remove only refs proven to be contained in the default branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--all)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            args=(--pr "${{ github.event.pull_request.number }}" --apply)
+          elif [[ "${{ inputs.apply }}" == "true" ]]; then
+            args+=(--apply)
+          fi
+          node scripts/cleanup-merged-branches.mjs "${args[@]}"
