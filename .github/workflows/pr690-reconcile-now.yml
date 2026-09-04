@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   reconcile:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -25,7 +25,19 @@ jobs:
 
       - name: Reconcile architecture branch with current main
         shell: bash
-        run: python3 scripts/pr690-reconcile-v2.py
+        run: python3 scripts/pr690-reconcile.py
+
+      - name: Remove superseded reconciliation adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm --ignore-unmatch scripts/pr690-reconcile-v2.py
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(architecture): remove reconciliation transport"
+            git push origin HEAD:refactor/layered-architecture-20260904
+          fi
 
       - name: Confirm one-off reconciliation files were removed
         shell: bash
