@@ -65,76 +65,167 @@ function catalogue(
 }
 
 describe("createStudioMainMenuPresentation", () => {
-  it("presents the twelve-title menubar with Help last (UX 감사 2026-09-02 §3.4)", () => {
+  it("presents the nine workflow titles with Help last", () => {
     const presentation = createStudioMainMenuPresentation(catalogue());
 
-    expect(presentation.presentedGroupIds).toEqual([...STUDIO_MAIN_MENU_PRESENTATION_ORDER]);
-    expect(presentation.presentedGroupIds).toHaveLength(12);
+    expect(presentation.presentedGroupIds).toEqual([
+      ...STUDIO_MAIN_MENU_PRESENTATION_ORDER,
+    ]);
+    expect(presentation.presentedGroupIds).toHaveLength(9);
     expect(presentation.presentedGroupIds.at(-1)).toBe("help");
+    expect(
+      presentation.groups.find((group) => group.id === "filter")?.label,
+    ).toBe("효과");
     expect(presentation.specialistBoundaryGroupId).toBeNull();
   });
 
-  it("folds the thin specialist groups into 삽입 and 도구 without dropping a row", () => {
+  it("regroups every catalogue command by artist workflow without dropping a row", () => {
     const groups = catalogue(3);
     const presentation = createStudioMainMenuPresentation(groups);
 
-    const insert = presentation.groups.find((group) => group.id === "insert");
-    const tools = presentation.groups.find((group) => group.id === "tools");
-    expect(insert?.label).toBe("삽입");
-    expect(tools?.label).toBe("도구");
     expect(presentation.compositeSources).toEqual({
-      insert: [...STUDIO_MAIN_MENU_COMPOSITE_GROUPS.insert],
-      tools: [...STUDIO_MAIN_MENU_COMPOSITE_GROUPS.tools],
+      file: ["file", "collaboration"],
+      edit: ["edit", "select", "transform"],
+      view: ["view", "canvas", "window"],
+      insert: ["text", "vector", "3d"],
+      comic: ["comic", "animation"],
+      filter: ["filter", "ai"],
     });
 
-    // Every absorbed row is still there, in source order, with its id intact.
-    const absorbed = [...STUDIO_MAIN_MENU_COMPOSITE_GROUPS.insert, ...STUDIO_MAIN_MENU_COMPOSITE_GROUPS.tools];
-    const expectedRowIds = absorbed.flatMap((id) =>
-      groups.find((group) => group.id === id)!.items.map((item) => item.id),
-    );
-    const presentedRowIds = [...(insert?.items ?? []), ...(tools?.items ?? [])].map((item) => item.id);
-    expect(presentedRowIds).toEqual(expectedRowIds);
+    for (const [title, sourceIds] of Object.entries(
+      STUDIO_MAIN_MENU_COMPOSITE_GROUPS,
+    )) {
+      const presented = presentation.groups.find(
+        (group) => group.id === title,
+      );
+      const expectedIds = sourceIds.flatMap((sourceId) =>
+        groups
+          .find((group) => group.id === sourceId)!
+          .items.map((item) => item.id),
+      );
+      expect(presented?.items.map((item) => item.id), title).toEqual(
+        expectedIds,
+      );
+    }
 
-    // No absorbed group survives as a title of its own.
-    for (const id of absorbed) {
+    const secondarySources = [
+      "collaboration",
+      "select",
+      "transform",
+      "canvas",
+      "window",
+      "text",
+      "vector",
+      "3d",
+      "animation",
+      "ai",
+    ];
+    for (const id of secondarySources) {
       expect(presentation.presentedGroupIds).not.toContain(id);
     }
   });
 
-  it("captions every section inside a composite and rules between them, not after the last", () => {
+  it("captions every workflow section and draws rules only between sources", () => {
     const presentation = createStudioMainMenuPresentation(catalogue(2));
-    const tools = presentation.groups.find((group) => group.id === "tools")!;
 
-    const captions = tools.items
-      .map((item) => item.sectionLabel)
-      .filter((label): label is string => label !== undefined);
-    expect(captions).toEqual(["캔버스", "변형", "애니메이션", "3D", "협업", "AI"]);
+    const expectedCaptions: Readonly<Record<string, readonly string[]>> = {
+      file: ["파일", "협업"],
+      edit: ["편집", "선택", "변형"],
+      view: ["보기", "캔버스", "창"],
+      insert: ["텍스트", "벡터", "3D"],
+      comic: ["만화", "애니메이션"],
+      filter: ["필터", "AI"],
+    };
 
-    const rules = tools.items.map((item) => Boolean(item.separatorAfter));
-    // 6 sections × 2 rows: a rule closes each section except the last one.
-    expect(rules).toEqual([false, true, false, true, false, true, false, true, false, true, false, false]);
+    for (const [title, captions] of Object.entries(expectedCaptions)) {
+      const group = presentation.groups.find((entry) => entry.id === title)!;
+      expect(
+        group.items
+          .map((item) => item.sectionLabel)
+          .filter((label): label is string => label !== undefined),
+        title,
+      ).toEqual(captions);
+
+      const sourceCount = captions.length;
+      const rules = group.items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item.separatorAfter)
+        .map(({ index }) => index);
+      expect(rules, title).toEqual(
+        Array.from(
+          { length: Math.max(0, sourceCount - 1) },
+          (_, index) => index * 2 + 1,
+        ),
+      );
+    }
   });
 
-  it("falls back to English composite titles for a non-Korean catalogue and honours overrides", () => {
+  it("uses English workflow titles and honours localized overrides", () => {
+    const englishLabels: Record<string, string> = {
+      file: "File",
+      edit: "Edit",
+      view: "View",
+      filter: "Filter",
+      comic: "Comic",
+      help: "Help",
+    };
     const english = createStudioMainMenuPresentation(
-      catalogue(1, { file: "File", help: "Help" }),
+      catalogue(1, englishLabels),
     );
-    expect(english.groups.find((group) => group.id === "insert")?.label).toBe("Insert");
-    expect(english.groups.find((group) => group.id === "tools")?.label).toBe("Tools");
+    expect(english.groups.map((group) => group.label)).toEqual([
+      "File",
+      "Edit",
+      "View",
+      "Insert",
+      "레이어",
+      "그리기",
+      "Comic",
+      "Effects",
+      "Help",
+    ]);
 
     const overridden = createStudioMainMenuPresentation(catalogue(1), {
-      labels: { insert: "挿入" },
+      labels: { insert: "挿入", filter: "エフェクト" },
     });
-    expect(overridden.groups.find((group) => group.id === "insert")?.label).toBe("挿入");
-    expect(overridden.groups.find((group) => group.id === "tools")?.label).toBe("도구");
+    expect(
+      overridden.groups.find((group) => group.id === "insert")?.label,
+    ).toBe("挿入");
+    expect(
+      overridden.groups.find((group) => group.id === "filter")?.label,
+    ).toBe("エフェクト");
+    const japaneseLabels: Record<string, string> = {
+      file: "ファイル",
+      edit: "編集",
+      view: "表示",
+      filter: "フィルター",
+      comic: "マンガ",
+      layer: "レイヤー",
+      brush: "描画",
+      help: "ヘルプ",
+    };
+    const japanese = createStudioMainMenuPresentation(
+      catalogue(1, japaneseLabels),
+    );
+    expect(japanese.groups.map((group) => group.label)).toEqual([
+      "ファイル",
+      "編集",
+      "表示",
+      "Insert",
+      "レイヤー",
+      "描画",
+      "マンガ",
+      // Until a locale pack ships an explicit Effects label, retain the
+      // localized Filter wording rather than leaking Korean or English.
+      "フィルター",
+      "ヘルプ",
+    ]);
   });
 
-  it("keeps unknown/future groups, slotted before 창 in source order", () => {
+  it("keeps unknown/future groups before Help in source order", () => {
     const groups: StudioMainMenuPresentableGroup[] = [
       { id: "file", label: "파일", items: [{ id: "save" }] },
       { id: "future-a", label: "A", items: [{ id: "a" }] },
       { id: "brush", label: "그리기", items: [{ id: "pen" }] },
-      { id: "window", label: "창", items: [{ id: "w" }] },
       { id: "future-b", label: "B", items: [{ id: "b" }] },
       { id: "help", label: "도움말", items: [{ id: "h" }] },
     ];
@@ -146,35 +237,44 @@ describe("createStudioMainMenuPresentation", () => {
       "brush",
       "future-a",
       "future-b",
-      "window",
       "help",
     ]);
   });
 
-  it("passes non-composite groups and their command arrays through by reference", () => {
+  it("passes standalone groups and their command arrays through by reference", () => {
     const groups = catalogue(2);
     const presentation = createStudioMainMenuPresentation(groups);
 
-    for (const group of groups) {
-      if (studioMainMenuPresentedTitleFor(group.id) !== group.id) continue;
-      const presented = presentation.groups.find((candidate) => candidate.id === group.id);
-      expect(presented).toBe(group);
-      expect(presented?.items).toBe(group.items);
+    for (const id of ["layer", "brush", "help"]) {
+      const source = groups.find((group) => group.id === id)!;
+      const presented = presentation.groups.find(
+        (candidate) => candidate.id === id,
+      );
+      expect(presented).toBe(source);
+      expect(presented?.items).toBe(source.items);
     }
   });
 
-  it("omits a composite title whose sources are all absent", () => {
+  it("omits workflow composites whose sources are all absent", () => {
     const presentation = createStudioMainMenuPresentation([
-      { id: "file", label: "파일", items: [{ id: "save" }] },
+      { id: "layer", label: "레이어", items: [{ id: "image" }] },
       { id: "help", label: "도움말", items: [{ id: "h" }] },
     ]);
-    expect(presentation.presentedGroupIds).toEqual(["file", "help"]);
+    expect(presentation.presentedGroupIds).toEqual(["layer", "help"]);
     expect(presentation.compositeSources).toEqual({});
   });
 
-  it("maps an absorbed catalogue group to the title that now presents it", () => {
-    expect(studioMainMenuPresentedTitleFor("canvas")).toBe("tools");
+  it("maps every absorbed catalogue group to its visible workflow title", () => {
+    expect(studioMainMenuPresentedTitleFor("collaboration")).toBe("file");
+    expect(studioMainMenuPresentedTitleFor("select")).toBe("edit");
+    expect(studioMainMenuPresentedTitleFor("transform")).toBe("edit");
+    expect(studioMainMenuPresentedTitleFor("canvas")).toBe("view");
+    expect(studioMainMenuPresentedTitleFor("window")).toBe("view");
     expect(studioMainMenuPresentedTitleFor("text")).toBe("insert");
-    expect(studioMainMenuPresentedTitleFor("filter")).toBe("filter");
+    expect(studioMainMenuPresentedTitleFor("vector")).toBe("insert");
+    expect(studioMainMenuPresentedTitleFor("3d")).toBe("insert");
+    expect(studioMainMenuPresentedTitleFor("animation")).toBe("comic");
+    expect(studioMainMenuPresentedTitleFor("ai")).toBe("filter");
+    expect(studioMainMenuPresentedTitleFor("layer")).toBe("layer");
   });
 });
