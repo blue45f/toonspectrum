@@ -1,4 +1,4 @@
-import { ListFilter, MousePointerSquareDashed } from "lucide-react";
+import { ListFilter, MousePointer2 } from "lucide-react";
 import { useId, useState } from "react";
 
 import type {
@@ -93,7 +93,7 @@ export function StudioSelectionMatchingPanel({
             className: "min-h-11 gap-1.5 whitespace-nowrap px-2.5 lg:min-h-9 pointer-coarse:min-h-11",
           })}
         >
-          <MousePointerSquareDashed size={14} aria-hidden />
+          <MousePointer2 size={14} aria-hidden />
           전체 선택
         </button>
       </div>
