@@ -123,7 +123,7 @@ export function MarketCommentsSection({
   const [commentInput, setCommentInput] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyInput, setReplyInput] = useState("");
-  const comments = data?.comments ?? [];
+  const comments = useMemo(() => data?.comments ?? [], [data?.comments]);
   const roots = useMemo(() => buildCommentTree(comments), [comments]);
 
   useEffect(() => {
