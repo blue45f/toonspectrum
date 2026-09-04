@@ -1,6 +1,7 @@
 import { ImagePlus, Lock, MessageSquare } from "lucide-react";
 import { Fragment, Suspense, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
+import { StudioLiveCollaborationQuickControls } from "../live/StudioLiveCollaborationQuickControls";
 import { StudioLivePresenceDockConnected } from "../studio-page-lazy-ui";
 import { adoptMissingPage } from "../studio-pages";
 import { stepStudioViewZoom, type StudioViewRotation } from "../studio-view-controls";
@@ -91,6 +92,16 @@ export function renderStudioCanvasStickyBanners({
   workId,
   zoom,
 }: StudioCanvasStickyBannersContext): ReactNode {
+  const openTeam = () => {
+    dismissQuickStart();
+    setTeamPanelOpen(true);
+  };
+  const toggleFollow = (sessionId: string) => {
+    setFollowingStudioSessionId((current) =>
+      current === sessionId ? null : sessionId
+    );
+  };
+
   return (
     <Fragment>
     <div
@@ -116,20 +127,18 @@ export function renderStudioCanvasStickyBanners({
         </span>
       </div>
     </div>
-    <div className="pointer-events-none sticky top-2 z-[56] flex h-0 items-start justify-end pr-2">
+    <div className="pointer-events-none sticky top-2 z-[56] flex h-0 items-start justify-end gap-1.5 pr-2">
+      <StudioLiveCollaborationQuickControls
+        followingSessionId={followingStudioSessionId}
+        onOpenTeam={openTeam}
+        onToggleFollow={toggleFollow}
+      />
       <Suspense fallback={null}>
         <StudioLivePresenceDockConnected
           operationSyncReady={studioCrdtOperationSyncReady}
           followingSessionId={followingStudioSessionId}
-          onOpenTeam={() => {
-            dismissQuickStart();
-            setTeamPanelOpen(true);
-          }}
-          onToggleFollow={(sessionId) =>
-            setFollowingStudioSessionId((current) =>
-              current === sessionId ? null : sessionId
-            )
-          }
+          onOpenTeam={openTeam}
+          onToggleFollow={toggleFollow}
           onFollowPage={(pageId) => {
             if (pageId === activePage.id) return;
             if (!pages.some((page) => page.id === pageId)) {

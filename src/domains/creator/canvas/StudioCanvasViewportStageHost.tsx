@@ -91,6 +91,7 @@ export function StudioCanvasViewportStageHost({
     editing,
     effScale,
     elementById,
+    followingStudioSessionId,
     elements,
     gridSize,
     groups,
@@ -746,6 +747,7 @@ export function StudioCanvasViewportStageHost({
             <Suspense fallback={null}>
               <StudioRemoteCursorOverlay
                 pageId={activePage.id}
+                followingSessionId={followingStudioSessionId}
                 canvasWidth={CANVAS_W}
                 canvasHeight={canvasH}
                 trailSuppressedSessionIds={studioLiveGesturePreviewTrailSuppressedSessionIds}
