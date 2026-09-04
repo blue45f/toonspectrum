@@ -449,8 +449,11 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     && !isEffectivelyLocked(canvasSelectionEls[0]!, groups);
   // The proxy's rotation handle is offered only where the commit could honour it: a sole stroke
   // follows the single-stroke planner's drop rule, a selection the group planner's all-or-nothing
-  // verdict. That verdict scans calligraphy strokes for effective stylus orientation, so it is
-  // derived here with the other per-selection facts rather than in the per-render decoration pass.
+  // verdict, which scans calligraphy strokes for effective stylus orientation. It is derived here
+  // beside the other facts that gate the same proxy -- singleDrawFreeScale, multiSelectionBounds,
+  // groupResizeEnabled -- so one selection cannot produce a handle and a commit that disagree.
+  // Placement is not a cost argument: the decoration pass is a plain factory whose caller owns
+  // every piece of state it reads, and it imports no planner to ask.
   const soleSelectionEl = canvasSelectionEls[0];
   const selectionRotatable = singleDrawFreeScale
     ? soleSelectionEl?.type === "draw" && !studioDrawObjectRotationIsDropped(soleSelectionEl)
@@ -483,6 +486,15 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     multiSelectionVisibleBounds.length > 0
       ? unionBounds(multiSelectionVisibleBounds)
       : null;
+  // A hidden member is dropped from the box above but NOT from the selection the commit
+  // transforms, so the frame would be derived from what is visible and then applied to artwork
+  // outside it -- a 90-degree turn about a box that excludes it flings a hidden stroke hundreds of
+  // pixels away, discovered only when it is shown again. Refuse the whole gesture exactly as a
+  // locked member does, rather than silently transforming the visible subset; the sole-stroke lane
+  // already requires `!isEffectivelyHidden` for the same reason.
+  const selectionHasHiddenMember = canvasSelectionEls.some((element) =>
+    isEffectivelyHidden(element, groups)
+  );
   const selectionLockState: "locked" | "mixed" | "unlocked" =
     selectionLockedCount === 0
       ? "unlocked"
@@ -500,6 +512,7 @@ export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportPr
     (marqueeIds.length > 1 || singleDrawFreeScale) &&
     canvasSelectionEls.length === (marqueeIds.length > 1 ? marqueeIds.length : 1) &&
     selectionLockState === "unlocked" &&
+    !selectionHasHiddenMember &&
     multiSelectionBounds !== null &&
     multiSelectionBounds.w > 0 &&
     multiSelectionBounds.h > 0;

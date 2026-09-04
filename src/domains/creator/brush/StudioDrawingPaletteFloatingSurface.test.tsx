@@ -5,18 +5,20 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetStudioFloatingSurfaceStackForTest } from "../studio-floating-surface-stack";
+
+import {
+  studioDrawingPaletteFloatingLayoutKey,
+} from "./studio-drawing-palette-floating-layout";
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
   type StudioDrawingPaletteLayout,
 } from "./studio-drawing-palettes";
-import {
-  studioDrawingPaletteFloatingLayoutKey,
-} from "./studio-drawing-palette-floating-layout";
 import { StudioDrawingPaletteStack } from "./StudioDrawingPaletteStack";
 
 function Harness() {
@@ -51,6 +53,12 @@ afterEach(() => {
   resetStudioFloatingSurfaceStackForTest();
 });
 
+// `PointerEventInit.isPrimary` defaults to **false** (UI Events spec), so a synthetic pointerdown
+// looks like a secondary pointer of a multi-touch gesture unless the test says otherwise. A real
+// mouse press always reports `isPrimary: true`, and StudioFloatingSurface.beginPointerSession
+// rightly refuses non-primary pointers — so omitting the flag here silently started no drag session
+// at all and every assertion below read the untouched layout.
+
 describe("Studio drawing palette floating windows", () => {
   it("moves, persists, closes, and restores a detached palette in the same tab", () => {
     render(<Harness />);
@@ -83,7 +91,10 @@ describe("Studio drawing palette floating windows", () => {
     expect(parsed.xRatio).toBeGreaterThan(0);
     const movedLeft = dialog.style.left;
 
-    fireEvent.click(screen.getByRole("button", {
+    // Two affordances answer to "서브 도구 팝업 닫기" once the window is open: the icon rail
+    // trigger (whose label flips 열기/닫기) and the window chrome's own close button. Scope to the
+    // dialog so this asserts the floating window closes itself, not that the rail toggled it.
+    fireEvent.click(within(dialog).getByRole("button", {
       name: "서브 도구 팝업 닫기",
     }));
     expect(screen.queryByRole("dialog", { name: "서브 도구 팝업" }))
@@ -107,6 +118,7 @@ describe("Studio drawing palette floating windows", () => {
     fireEvent.pointerDown(east, {
       pointerId: 91,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 332,
       clientY: 300,
@@ -146,6 +158,7 @@ describe("Studio drawing palette floating windows", () => {
     fireEvent.pointerDown(move, {
       pointerId: 92,
       pointerType: "mouse",
+      isPrimary: true,
       button: 0,
       clientX: 100,
       clientY: 100,

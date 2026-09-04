@@ -115,10 +115,16 @@ describe("database integration runner CI policy", () => {
       },
     });
     expect(parityJob?.services).toBeUndefined();
+    // The trailing upload-artifact is the failure evidence path, not a runner dependency: it runs
+    // only `if: failure()` and touches nothing before the proof. This job had failed seven times in
+    // a row leaving no page state behind, which is why the sibling studio-3d-visual job already
+    // carries the same step. Keeping it in this pinned list means a *new* action still trips the
+    // contract, which is what "fresh hard-gated runner" is guarding.
     expect(paritySteps.map((step) => step.uses).filter(Boolean)).toEqual([
       "actions/checkout@v6",
       "pnpm/action-setup@v6",
       "actions/setup-node@v6",
+      "actions/upload-artifact@v4",
     ]);
 
     const coreResultGate = paritySteps.find(

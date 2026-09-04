@@ -1737,7 +1737,7 @@ async function walkDesktop(
         .waitFor({ state: "hidden", timeout: 5_000 })
         .then(() => true)
         .catch(() => false));
-    const edgeRail = page.locator('button[title="속성 패널 펼치기"]');
+    const edgeRail = page.locator('button[title="작업 패널 펼치기"]');
     const railVisible = await edgeRail.isVisible().catch(() => false);
     let restored = false;
     if (railVisible && (await clickControl(edgeRail))) {
@@ -1749,7 +1749,7 @@ async function walkDesktop(
     record(rows, {
       control: "인스펙터 접기 → 엣지 레일 → 펼치기 (왕복)",
       state: "데스크톱",
-      path: "인스펙터 상단 '접기' → 우측 엣지 레일 '속성' 클릭",
+      path: "인스펙터 상단 '접기' → 우측 엣지 레일 '작업 패널' 클릭",
       verdict: collapsedAway && restored ? "reachable" : "blocked",
       effect: `'접기' 클릭됨=${collapseClicked}, 접힘=${collapsedAway}, 복구 레일 노출=${railVisible}, 복원=${restored} — 캔버스가 패널 폭 전체를 회수한다`,
       defect: !collapseClicked

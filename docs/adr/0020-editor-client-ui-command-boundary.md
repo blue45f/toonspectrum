@@ -47,12 +47,18 @@ Wave A(2026-08-08)는 `CommandRegistry`와 155개 명령 카탈로그를 만들�
    `RenderRuntime`, `DurabilityRuntime`, `CollaborationRuntime`, `ExportRuntime`으로 상태 소유자를 나누고,
    호스트는 런타임 조합과 shell mount만 남긴다(목표 500–1,000행). `ViewSessionCore/Rest`는 feature별
    selector/command로 대체된 뒤 삭제한다.
+7. **안정적 클라이언트 런타임**(2026-09-04 착수): UI 어댑터는 React 렌더마다 새 `EditorClient`를 만들지
+   않는다. `EditorClientRuntime`이 하나의 client identity, 구독 집합, 명령 coalescing, request sequence,
+   revision 수명을 소유하고, 부모 commit 뒤 최신 immutable snapshot과 command context만 교체한다.
+   툴 레일은 이 런타임을 최초 적용 대상으로 삼는다. 동일 snapshot 참조에서는 UI 구독을 깨우지 않되
+   action port는 반드시 최신 closure로 교체한다.
 
 ## 결과
 
 - 긍정: setter 전달·closure bag·린트 예외가 더 늘지 못한다. 명령 경로가 하나라 메뉴·단축키·레일·HUD·AI가
   같은 부수효과를 갖는다. 이후 Worker 세션(검토 §5)으로 옮길 때 UI는 `EditorClient` 구현만 바꾸면 된다.
+  툴 레일 client가 부모 렌더마다 초기화되지 않아 구독과 명령 수명이 실제 workspace session과 일치한다.
 - 부정: 전환 기간 동안 핸들러(구)와 명령(신)이 공존한다. ratchet 상한은 리팩터가 진행될 때마다 수동으로
   내려야 한다(자동 상향은 없다).
 - 미결: `CommandReceipt.dirtyRegions`·`durableState`를 실제 문서 런타임과 OPFS 저널이 채우는 것은 P1·P3에서
-  연결한다. 지금은 계약과 훅, 테스트만 있다.
+  연결한다. `EditorClientRuntime`을 문서·viewport·내구성·협업 owner로 확대하는 작업도 P1 잔여다.

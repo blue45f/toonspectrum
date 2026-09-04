@@ -741,13 +741,7 @@ function transformElement(
 }
 
 /**
- * Plan one atomic positive uniform resize.
- *
- * The output always preserves document order. A successful plan replaces every selected element
- * with a transformed immutable copy; every failure returns only the original element references.
- */
-/**
- * The transformed SELECTION only, in `selectedIds` order, or `null` where the plan is refused.
+ * The transformed SELECTION only, in document order, or `null` where the plan is refused.
  *
  * Split out of `planStudioGroupUniformResize` so a per-frame live preview can show what the commit
  * will produce without allocating a whole-document array sixty times a second. The full planner is
@@ -821,6 +815,14 @@ export function planStudioGroupUniformResizeSelection(
   return transformed;
 }
 
+/**
+ * Plan one atomic positive uniform resize, optionally with a rigid rotation, over the document.
+ *
+ * The output always preserves document order. A successful plan replaces every selected element
+ * with a transformed immutable copy and keeps the original reference for every unselected one;
+ * every refusal -- including a member that cannot carry the requested angle -- returns a fresh
+ * array holding only original element references.
+ */
 export function planStudioGroupUniformResize(
   input: StudioGroupUniformResizeInput
 ): El[] {

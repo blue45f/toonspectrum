@@ -111,6 +111,14 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expect(occurrences(proxySource, "<Transformer")).toBe(1);
     expectSourceToken(proxySource, "transformer.nodes([proxy])", "group Transformer");
     expectSourceToken(selectionDecorationsSource, "ref={trRef}", "single-object Transformer");
+    // A panel frame stores no angle, and its transformend commits only {x, y, width, height} --
+    // an offered turn would land as a displacement. The handle is withheld instead, matching the
+    // verdict `studioGroupUniformResizeMemberCanRotate` reaches for a frame inside a selection.
+    expectSourceToken(
+      selectionDecorationsSource,
+      'rotateEnabled={selected?.type !== "frame"}',
+      "single-object Transformer frame rotation gate",
+    );
     expectSourceToken(
       viewportSource,
       "unionBounds(multiSelectionVisibleBounds)",
@@ -252,6 +260,15 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(source, "masterEditModeRef.current", "resize master snapshot");
     expectSourceToken(source, "captureStudioMutationTicket()", "resize document snapshot");
     expectSourceToken(source, "isEffectivelyLocked", "resize begin");
+    // The source frame comes from the VISIBLE box, so a hidden member would be transformed by an
+    // affine that never accounted for it -- a turn about a box it sits outside throws it off-page
+    // with nothing on screen to show it. Refused at the gate, like a locked member.
+    expectSourceToken(source, "isEffectivelyHidden", "resize hidden-member guard");
+    expectSourceToken(
+      viewportSource,
+      "!selectionHasHiddenMember",
+      "group resize hidden-member gate",
+    );
     expectSourceToken(
       source,
       "finitePositiveGroupResizeBounds(sourceBounds)",

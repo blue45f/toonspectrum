@@ -5,6 +5,7 @@ import { defaultStudioAppSettings } from "../studio-app-settings";
 import {
   STUDIO_LEFT_TOOL_RAIL_COMMANDS,
   createStudioLeftToolRailClient,
+  createStudioLeftToolRailRuntime,
   type StudioLeftToolRailClientInput,
 } from "./studio-left-tool-rail-client";
 
@@ -129,5 +130,50 @@ describe("Studio left tool rail EditorClient adapter", () => {
     });
 
     expect(receipt.status).toBe("unavailable");
+  });
+
+  it("keeps one client, publishes changed view state and replaces host action ports", async () => {
+    const initial = createInput();
+    const runtime = createStudioLeftToolRailRuntime(initial);
+    const client = runtime.client;
+    const listener = vi.fn();
+    client.subscribe(listener);
+
+    const replacementSetDrawShape = vi.fn();
+    const changed: StudioLeftToolRailClientInput = {
+      ...initial,
+      drawShape: "ellipse",
+      setDrawShape: replacementSetDrawShape,
+    };
+    expect(runtime.update(changed)).toBe(true);
+    expect(runtime.client).toBe(client);
+    expect(client.getSnapshot().drawShape).toBe("ellipse");
+    expect(listener).toHaveBeenCalledOnce();
+
+    await client.dispatch({
+      id: STUDIO_LEFT_TOOL_RAIL_COMMANDS.setDrawShape,
+      payload: ["line"],
+      source: "test",
+    });
+    expect(initial.setDrawShape).not.toHaveBeenCalled();
+    expect(replacementSetDrawShape).toHaveBeenCalledExactlyOnceWith("line");
+
+    const openHybridDcc = vi.fn();
+    const contextOnly: StudioLeftToolRailClientInput = {
+      ...changed,
+      setHybridDccOpen: openHybridDcc,
+    };
+    expect(runtime.update(contextOnly)).toBe(false);
+    expect(listener).toHaveBeenCalledOnce();
+    expect(
+      client.availability(STUDIO_LEFT_TOOL_RAIL_COMMANDS.setHybridDccOpen).state,
+    ).toBe("enabled");
+
+    await client.dispatch({
+      id: STUDIO_LEFT_TOOL_RAIL_COMMANDS.setHybridDccOpen,
+      payload: [true],
+      source: "test",
+    });
+    expect(openHybridDcc).toHaveBeenCalledExactlyOnceWith(true);
   });
 });

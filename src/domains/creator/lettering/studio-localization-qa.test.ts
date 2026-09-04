@@ -255,3 +255,135 @@ describe("runStudioLocalizationQa — 입력 불변", () => {
     expect(JSON.stringify(pages)).toBe(before);
   });
 });
+
+describe("runStudioLocalizationQa — §2.5 용어집 충돌", () => {
+  const rules = [{ sourceTerm: "마왕", targetTerm: "Demon Lord" }];
+
+  it("원문을 모르면 한 큐도 대 보지 않는다 — 0 건을 '통과'로 읽으면 안 된다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ text: "The dark one rises." })])],
+      measurer,
+      { targetLocale: "en", sourceLocale: "ko", glossaryRules: rules },
+    );
+
+    expect(report.glossaryCheckedCueCount).toBe(0);
+    expect(report.score.errors.filter((e) => e.dimension === "terminology")).toHaveLength(0);
+  });
+
+  it("규칙이 지정한 대역어가 번역문에 없으면 Terminology 오류를 싣는다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ text: "The dark one rises." })])],
+      measurer,
+      {
+        targetLocale: "en",
+        sourceLocale: "ko",
+        glossaryRules: rules,
+        sourceTextFor: (id) => (id === "b1" ? "마왕이 깨어난다." : undefined),
+      },
+    );
+
+    expect(report.glossaryCheckedCueCount).toBe(1);
+    const terminology = report.score.errors.filter((e) => e.dimension === "terminology");
+    expect(terminology).toHaveLength(1);
+    // 서브타입 카탈로그가 미완이라 이름을 지어내지 않는다 — 차원만 싣는다.
+    expect(terminology[0].subtype).toBeNull();
+    expect(terminology[0].severity).toBe("major");
+    expect(terminology[0].cueId).toBe("b1");
+    expect(terminology[0].page).toBe(1);
+  });
+
+  it("대역어가 번역문에 있으면 오류가 없다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ text: "The Demon Lord rises." })])],
+      measurer,
+      {
+        targetLocale: "en",
+        sourceLocale: "ko",
+        glossaryRules: rules,
+        sourceTextFor: () => "마왕이 깨어난다.",
+      },
+    );
+
+    expect(report.glossaryCheckedCueCount).toBe(1);
+    expect(report.score.errors.filter((e) => e.dimension === "terminology")).toHaveLength(0);
+  });
+
+  it("심각도는 정책값이라 호출부가 갈아 끼울 수 있다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ text: "The dark one rises." })])],
+      measurer,
+      {
+        targetLocale: "en",
+        sourceLocale: "ko",
+        glossaryRules: rules,
+        sourceTextFor: () => "마왕이 깨어난다.",
+        glossarySeverity: { missingTarget: "critical" },
+      },
+    );
+
+    expect(report.score.errors.find((e) => e.dimension === "terminology")?.severity).toBe(
+      "critical",
+    );
+  });
+});
+
+describe("runStudioLocalizationQa — 말풍선 명도 대비", () => {
+  it("흰 바탕에 연회색 대사를 실패로 짚는다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ fill: "#ffffff", textFill: "#cccccc" })])],
+      measurer,
+      { targetLocale: "en" },
+    );
+
+    expect(report.cues[0].legibility?.verdict).toBe("fail");
+    expect(report.legibilityCheckedCueCount).toBe(1);
+    expect(report.legibilityFailCueCount).toBe(1);
+    // 대비는 번역 품질이 아니다 — MQM 점수에는 들어가지 않는다.
+    expect(report.score.errors).toHaveLength(0);
+  });
+
+  it("검은 대사와 흰 말풍선은 통과한다", () => {
+    const report = runStudioLocalizationQa(
+      [page("p1", [bubble({ fill: "#ffffff", textFill: "#000000" })])],
+      measurer,
+      { targetLocale: "en" },
+    );
+
+    expect(report.cues[0].legibility?.verdict).toBe("pass");
+    expect(report.legibilityFailCueCount).toBe(0);
+  });
+
+  it("그라데이션 말풍선은 판정하지 않는다 — fill 은 화면에 없는 색이다", () => {
+    const report = runStudioLocalizationQa(
+      [
+        page("p1", [
+          bubble({ fill: "#ffffff", textFill: "#cccccc", gradient: { stops: [] } }),
+        ]),
+      ],
+      measurer,
+      { targetLocale: "en" },
+    );
+
+    expect(report.cues[0].legibility?.verdict).toBe("indeterminate");
+    // "안 쟀다"가 아니라 "재려 했지만 판정 불가" — 검사한 큐 수에 들어가지 않는다.
+    expect(report.legibilityCheckedCueCount).toBe(0);
+    expect(report.legibilityFailCueCount).toBe(0);
+  });
+
+  it("AAA 를 요구하면 AA 만 넘긴 조합이 실패가 된다", () => {
+    // 말풍선 기본 글자 크기는 24px = WCAG 큰 글자이므로 임계값은 AA 3.0 / AAA 4.5 다.
+    // #898989 대 흰색은 3.5:1 — 그 사이에 정확히 놓인다.
+    const pages = [page("p1", [bubble({ fill: "#ffffff", textFill: "#898989" })])];
+
+    const aa = runStudioLocalizationQa(pages, measurer, { targetLocale: "en" });
+    expect(aa.cues[0].legibility?.ratio).toBe(3.5);
+    expect(aa.cues[0].legibility?.threshold).toBe(3);
+    expect(aa.cues[0].legibility?.verdict).toBe("pass");
+    expect(
+      runStudioLocalizationQa(pages, measurer, {
+        targetLocale: "en",
+        legibilityLevel: "AAA",
+      }).cues[0].legibility?.verdict,
+    ).toBe("fail");
+  });
+});

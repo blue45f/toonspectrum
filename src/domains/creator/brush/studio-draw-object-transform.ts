@@ -79,8 +79,10 @@ export function studioDrawSymmetryIsMirrored(symmetry: DrawEl["symmetry"]): bool
 /**
  * The single-stroke planner's own drop rule: a stroke whose `points` cannot absorb a turn keeps
  * its move and resize and stays upright (`studioDrawShapeIsBoundsDerived`,
- * `studioDrawSymmetryIsMirrored`). Exported so the editor withholds the rotation handle from the
- * same rule instead of offering a turn the commit would drop.
+ * `studioDrawSymmetryIsMirrored`). Exported so the rest of the rotate lane reads the same verdict
+ * BEFORE an angle reaches this planner: the editor withholds the rotation handle, the group
+ * planner refuses such a member, and `planStudioSelectionTransformCommit` refuses a sole stroke's
+ * angle outright rather than committing the drop below as a silent resize.
  */
 export function studioDrawObjectRotationIsDropped(el: DrawEl): boolean {
   return studioDrawShapeIsBoundsDerived(el.kind) || studioDrawSymmetryIsMirrored(el.symmetry);

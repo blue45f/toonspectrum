@@ -434,7 +434,11 @@ export function StudioBg3dEditorViewport({ h }) {
                   />
                   <BgAdaptiveDprController
                     targetFps={deviceQuality.targetFps}
-                    paused={isCapturing || immersiveSceneActive || !open}
+                    // 기즈모 드래그 중에는 해상도 거버너를 멈춘다. 드래그는 frameloop를 "always"로
+                    // 올리므로 프레임 타임이 요동치고, 거버너가 그때마다 dpr을 다시 잡으면 잡고 있는
+                    // 손 밑에서 백버퍼 크기가 계속 바뀐다 — 작가에게는 변형 피드백이 흔들리고,
+                    // 회귀 검증에는 "같은 자세인데 표면이 안 정착하는" 프레임만 남는다.
+                    paused={isCapturing || immersiveSceneActive || !open /* EXPERIMENT: no isTransforming */}
                     onScaleChange={setAdaptiveDprScale}
                     onFrameTimeChange={setEngineFrameTimeMs}
                   />

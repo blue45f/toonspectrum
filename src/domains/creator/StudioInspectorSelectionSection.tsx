@@ -165,7 +165,7 @@ export function StudioInspectorSelectionSection({
                 className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55 disabled:[&_select]:cursor-not-allowed disabled:[&_select]:opacity-55 disabled:[&_textarea]:cursor-not-allowed disabled:[&_textarea]:opacity-55"
               >
                 <legend className="sr-only">선택 요소 편집 설정</legend>
-                <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
+                <Suspense fallback={<StudioPanelLoading label="작업 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
 
               {selected.type === "draw" && (

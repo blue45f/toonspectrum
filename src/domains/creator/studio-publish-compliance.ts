@@ -6,6 +6,11 @@
  * change independently of ToonSpectrum.
  */
 
+import {
+  planStudioAiGenerationLabel,
+  type StudioAiGenerationLabelPlan,
+} from "./studio-ai-generation-label";
+
 export const STUDIO_PUBLISH_COMPLIANCE_VERSION = 1 as const;
 
 export const STUDIO_PUBLISH_COMPLIANCE_DESTINATIONS = ["generic", "webtoon", "tapas"] as const;
@@ -54,6 +59,8 @@ export type StudioPublishComplianceIssueCode =
   | "THIRD_PARTY_ATTRIBUTION_MISSING"
   | "THIRD_PARTY_DECLARATION_INCONSISTENT"
   | "AI_DISCLOSURE_UNCONFIRMED"
+  | "AI_RESULT_LABEL_REQUIRED"
+  | "AI_RESULT_LABEL_ADVISED"
   | "POLICY_REVIEW_UNCONFIRMED"
   | "DESTINATION_MATURE_REVIEW_REQUIRED"
   | "DESTINATION_CONTENT_REVIEW_REQUIRED"
@@ -70,6 +77,11 @@ export interface StudioPublishComplianceIssue {
 export interface StudioPublishComplianceValidationOptions {
   aiUsage?: StudioPublishComplianceAiUsage;
   /**
+   * 배포 대상 로케일(BCP-47). AI 표기 의무는 관할마다 다르므로 studio-ai-generation-label 로
+   * 그대로 넘긴다. 생략하면 그 모듈의 기본 로케일이 쓰인다.
+   */
+  locale?: string;
+  /**
    * Opt in only when the caller is not already running studio-publish-preflight. That preflight
    * owns the same current Tapas AI-generation rule, so the default avoids duplicate issues.
    */
@@ -81,6 +93,11 @@ export interface StudioPublishComplianceResult {
   checklist: StudioPublishComplianceChecklist;
   /** Means the self-check has no blocking omissions; it is not a legal or platform certification. */
   readyForDestinationReview: boolean;
+  /**
+   * 생성형 AI 표기 판정. 표기 문구·근거 조문·워터마크 사양이 여기 들어 있으므로, 패널은 경고
+   * 문구를 다시 조립하지 말고 이 값을 그대로 읽는다.
+   */
+  aiLabel: StudioAiGenerationLabelPlan;
   errors: readonly StudioPublishComplianceIssue[];
   warnings: readonly StudioPublishComplianceIssue[];
   issues: readonly StudioPublishComplianceIssue[];
@@ -266,6 +283,10 @@ function normalizeAiUsage(value: unknown): StudioPublishComplianceAiUsage {
  * Destination-specific warnings deliberately ask for a current manual policy review instead of
  * encoding mutable rating thresholds. The only opt-in hard policy is Tapas's current generated-AI
  * prohibition, which is disabled by default because studio-publish-preflight already reports it.
+ *
+ * The AI result-label warnings come from studio-ai-generation-label and stay warnings on purpose:
+ * only the creator can place text on the artwork, so blocking on a condition this repo cannot
+ * resolve would produce a gate nobody can clear.
  */
 export function validateStudioPublishCompliance(
   value: unknown,
@@ -390,6 +411,33 @@ export function validateStudioPublishCompliance(
     );
   }
 
+  /*
+   * 위 오류는 "고지했는가"만 묻는다. 아래 경고는 "어디에 고지했는가"를 묻는다 — 내보내기는 고지
+   * 문구를 패키지 안 별도 JSON에만 남기므로, 이미지 한 장만 전달받은 독자는 표기를 보지 못한다.
+   * 체크박스를 하나 더 만들지 않고 경고로 두는 이유는, 이 저장소가 픽셀을 대신 바꿔 줄 수 없어
+   * 창작자만 해소할 수 있는 항목이기 때문이다. 해소할 수 없는 조건으로 게시를 막지는 않는다.
+   */
+  const aiLabel = planStudioAiGenerationLabel({ usage: aiUsage, locale: options.locale });
+  if (aiLabel.obligation === "required-on-result") {
+    issues.push(
+      makeIssue(
+        "warning",
+        "AI_RESULT_LABEL_REQUIRED",
+        `${aiLabel.rationale} 내보내기는 이 문구를 패키지 안 별도 JSON에만 기록하므로, 작품 이미지에 「${aiLabel.labelText}」를 직접 넣어 주세요.`,
+        "aiDisclosureConfirmed"
+      )
+    );
+  } else if (aiLabel.obligation === "advisory") {
+    issues.push(
+      makeIssue(
+        "warning",
+        "AI_RESULT_LABEL_ADVISED",
+        `${aiLabel.rationale} 표기하려면 작품 이미지에 「${aiLabel.labelText}」를 직접 넣어 주세요.`,
+        "aiDisclosureConfirmed"
+      )
+    );
+  }
+
   if (!checklist.policyReviewConfirmed) {
     issues.push(
       makeIssue(
@@ -448,6 +496,7 @@ export function validateStudioPublishCompliance(
     destination: normalizedDestination,
     checklist,
     readyForDestinationReview: errors.length === 0,
+    aiLabel,
     errors,
     warnings,
     issues,

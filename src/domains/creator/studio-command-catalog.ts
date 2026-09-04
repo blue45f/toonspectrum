@@ -1203,8 +1203,17 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     }),
     defineCommand({
       id: "window.right-panel",
-      labels: [ko("속성 패널 표시 전환"), en("Toggle properties panel")],
-      aliases: [ps("Properties Panel"), krita("Tool Options Docker")],
+      // 이 행이 여닫는 패널은 스스로를 "작업 패널"이라고 부른다
+      // (`StudioInspectorNavigator` COPY.panelTitle, `StudioInspectorAsideShell`
+      // aria-label). 검색 색인의 canonical 이름은 화면에 보이는 이름이어야 하므로
+      // 라벨이 그쪽을 따라가고, 예전 이름 "속성 패널"은 손버릇이 끊기지 않게
+      // 우리 레거시 별칭으로 남긴다.
+      labels: [ko("작업 패널 표시 전환"), en("Toggle work panel")],
+      aliases: [
+        ours("속성 패널"),
+        ps("Properties Panel"),
+        krita("Tool Options Docker"),
+      ],
       origins: [menu("window/right-panel")],
     }),
     defineCommand({

@@ -80,7 +80,9 @@ export function buildStudioWindowMenuItems({
       id: "right-panel",
       commandId: "window.right-panel",
       legacyPath: "view/right-panel",
-      label: state.rightPanelOpen ? "속성 패널 숨기기" : "속성 패널 보이기",
+      // 패널이 스스로를 "작업 패널"이라 부르므로(아래 wide 행의 문구와 동일)
+      // 이 행도 같은 이름을 쓴다. 예전 이름 "속성 패널"은 카탈로그의 검색 별칭으로 남아 있다.
+      label: state.rightPanelOpen ? "작업 패널 숨기기" : "작업 패널 보이기",
       icon: SlidersHorizontal,
       onSelect: () => {
         ui.toggleRightPanel();
