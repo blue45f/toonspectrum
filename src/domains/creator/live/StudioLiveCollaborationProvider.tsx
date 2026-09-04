@@ -394,8 +394,12 @@ export function StudioLiveCollaborationProvider({
     let disposeSession: (() => void) | null = null;
     void (async () => {
       let roomModule: typeof import("./studio-live-collaboration-room");
+      let adaptiveCursorModule: typeof import("./studio-live-adaptive-cursor-transport");
       try {
-        roomModule = await import("./studio-live-collaboration-room");
+        [roomModule, adaptiveCursorModule] = await Promise.all([
+          import("./studio-live-collaboration-room"),
+          import("./studio-live-adaptive-cursor-transport"),
+        ]);
       } catch (cause) {
         if (cancelled) return;
         setAvailability("error");
@@ -405,6 +409,7 @@ export function StudioLiveCollaborationProvider({
       }
       if (cancelled) return;
 
+      let observedPeerCount = 0;
       let nextRoom: StudioLiveRoom;
       try {
         nextRoom = new roomModule.StudioLiveRoom({
@@ -417,9 +422,15 @@ export function StudioLiveCollaborationProvider({
             }),
             role: participantRole,
           },
-          ...(transportPreference === "server" && transportFactory
-            ? { dependencies: { transportFactory } }
-            : {}),
+          dependencies: {
+            transportFactory: adaptiveCursorModule.createStudioAdaptiveCursorTransportFactory({
+              ...(transportPreference === "server" && transportFactory
+                ? { baseFactory: transportFactory }
+                : {}),
+              getPeerCount: () => observedPeerCount,
+            }),
+            cursorIntervalMs: adaptiveCursorModule.STUDIO_LIVE_CURSOR_CAPTURE_INTERVAL_MS,
+          },
         });
       } catch (cause) {
         setAvailability("error");
@@ -457,6 +468,7 @@ export function StudioLiveCollaborationProvider({
       const unsubscribe = nextRoom.subscribe((event) => {
         if (cancelled) return;
         if (event.type === "presence") {
+          observedPeerCount = event.peers.length;
           setPeers(event.peers);
           if (nextRoom.ready) exposeReadyRoom();
           return;
@@ -679,7 +691,9 @@ export function StudioLiveCollaborationProvider({
           );
           setOperationSyncReady(true);
           setMode(nextRoom.mode);
-          setPeers(nextRoom.getPeers());
+          const readyPeers = nextRoom.getPeers();
+          observedPeerCount = readyPeers.length;
+          setPeers(readyPeers);
           setLocks(nextRoom.getLocks());
           exposeReadyRoom(null);
         } catch (cause: unknown) {

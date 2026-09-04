@@ -2,6 +2,8 @@ import {
   Check,
   CloudOff,
   ExternalLink,
+  Eye,
+  EyeOff,
   LoaderCircle,
   MessageCircle,
   MousePointer2,
@@ -36,6 +38,10 @@ import {
 } from "../studio-commercial-residuals";
 
 import {
+  presentStudioLiveCursorQuality,
+  type StudioLiveCursorQualitySnapshot,
+} from "./studio-live-cursor-quality";
+import {
   planStudioCommentPinPreviewPosition,
   studioLiveCursorActivityLabel,
   studioLiveCursorToolLabel,
@@ -46,6 +52,13 @@ import { useStudioLiveCollaboration } from "./studio-live-collaboration-context"
 import { openStudioLiveCompanionTab } from "./studio-live-jam-session";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import { useStudioRemoteCursors } from "./studio-live-remote-cursor-store";
+import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
+import {
+  isStudioLiveCursorVisibilityShortcut,
+  isStudioLiveShortcutTextTarget,
+  toggleStudioLiveRemoteCursors,
+  useStudioLiveViewPreferences,
+} from "./studio-live-view-preferences";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   formatStudioLiveLastAck,
@@ -123,6 +136,9 @@ export interface StudioLivePresenceDockProps {
   onOpenTeam: () => void;
   onOpenCompanionTab?: () => void;
   onToggleFollow: (sessionId: string) => void;
+  remoteCursorsVisible?: boolean;
+  onToggleRemoteCursors?: () => void;
+  cursorQuality?: StudioLiveCursorQualitySnapshot | null;
   syncSnapshot?: StudioLiveSyncSnapshot;
   voiceControls?: ReactNode;
 }
@@ -1131,9 +1147,10 @@ export function StudioRemoteCursorOverlay({
   rotation = 0,
 }: StudioRemoteCursorOverlayProps) {
   const { room } = useStudioLiveCollaboration();
+  const { remoteCursorsVisible } = useStudioLiveViewPreferences();
   const cursors = useStudioRemoteCursors(room);
 
-  if (hidden) return null;
+  if (hidden || !remoteCursorsVisible) return null;
   return (
     <StudioLiveCanvasOverlay
       canvasWidth={canvasWidth}
@@ -1172,6 +1189,9 @@ export function StudioLivePresenceDock({
   onOpenTeam,
   onOpenCompanionTab,
   onToggleFollow,
+  remoteCursorsVisible = true,
+  onToggleRemoteCursors,
+  cursorQuality = null,
   syncSnapshot,
   voiceControls,
 }: StudioLivePresenceDockProps) {
@@ -1208,6 +1228,9 @@ export function StudioLivePresenceDock({
   const syncAnnouncement = `${syncPresentation.shortLabel}. ${syncPresentation.detail}`;
   const collaborationLabel = `${syncAnnouncement} ${lastAckLabel}.`;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
+  const cursorQualityPresentation = cursorQuality
+    ? presentStudioLiveCursorQuality(cursorQuality)
+    : null;
 
   return (
     <div
@@ -1246,6 +1269,27 @@ export function StudioLivePresenceDock({
       >
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
       </button>
+      {onToggleRemoteCursors ? (
+        <button
+          type="button"
+          aria-label={remoteCursorsVisible ? "팀원 커서 숨기기" : "팀원 커서 표시하기"}
+          aria-pressed={remoteCursorsVisible}
+          title={
+            remoteCursorsVisible
+              ? "팀원 커서 숨기기 · Ctrl/⌘+Alt+\\"
+              : "팀원 커서 표시하기 · Ctrl/⌘+Alt+\\"
+          }
+          data-studio-remote-cursor-visibility={remoteCursorsVisible ? "visible" : "hidden"}
+          className="hidden size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none sm:grid"
+          onClick={onToggleRemoteCursors}
+        >
+          {remoteCursorsVisible ? (
+            <Eye size={16} strokeWidth={1.75} aria-hidden />
+          ) : (
+            <EyeOff size={16} strokeWidth={1.75} aria-hidden />
+          )}
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label={`${collaborationLabel} 팀 작업 공간 열기`}
@@ -1267,6 +1311,25 @@ export function StudioLivePresenceDock({
           {syncPresentation.shortLabel}
         </span>
       </button>
+
+      {cursorQuality && cursorQualityPresentation && cursorQuality.tier !== "live" ? (
+        <button
+          type="button"
+          aria-label={`${cursorQualityPresentation.detail} 팀 작업 공간 열기`}
+          title={cursorQualityPresentation.detail}
+          data-studio-cursor-quality={cursorQuality.tier}
+          className={cn(
+            "hidden min-h-11 max-w-44 items-center gap-1.5 rounded-full border px-2.5 text-[0.66rem] font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent xl:inline-flex",
+            syncToneClass(cursorQualityPresentation.tone)
+          )}
+          onClick={onOpenTeam}
+        >
+          <Radio size={13} className="shrink-0" aria-hidden />
+          <span className="truncate">
+            {cursorQualityPresentation.shortLabel} · {cursorQuality.cadenceMs}ms
+          </span>
+        </button>
+      ) : null}
 
       {voiceControls}
 
@@ -1368,6 +1431,8 @@ export function StudioLivePresenceDockConnected({
 }: StudioLivePresenceDockConnectedProps) {
   const live = useStudioLiveCollaboration();
   const { availability, peers, locks, sync, room } = live;
+  const { remoteCursorsVisible } = useStudioLiveViewPreferences();
+  const cursorQuality = useStudioLiveCursorQuality(room?.workId ?? null);
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
   // Room lock snapshots are lease-pruned; omit `now` so the pure summary counts the snapshot
@@ -1384,6 +1449,22 @@ export function StudioLivePresenceDockConnected({
   useEffect(() => {
     if (followingSessionId && !followedPeer) onToggleFollow(followingSessionId);
   }, [followedPeer, followingSessionId, onToggleFollow]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented
+        || event.repeat
+        || !isStudioLiveCursorVisibilityShortcut(event)
+        || isStudioLiveShortcutTextTarget(event.target)
+      ) return;
+      event.preventDefault();
+      toggleStudioLiveRemoteCursors();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (!alwaysOn) return null;
 
@@ -1408,6 +1489,9 @@ export function StudioLivePresenceDockConnected({
       followingSessionId={followingSessionId}
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}
+      remoteCursorsVisible={remoteCursorsVisible}
+      onToggleRemoteCursors={toggleStudioLiveRemoteCursors}
+      cursorQuality={cursorQuality}
       syncSnapshot={sync}
     />
   );
