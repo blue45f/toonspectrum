@@ -96,8 +96,6 @@ export interface StudioInkwashFluidPreviewPlannerOptions {
   readonly wetnessLoad: number;
   readonly spectralAbsorption?: Readonly<{ r: number; g: number; b: number }>;
   readonly inkColor?: Readonly<{ r: number; g: number; b: number }>;
-  readonly radiusScale?: number;
-  readonly pigmentScale?: number;
 }
 
 export interface StudioInkwashFluidPreviewPlannerState {
@@ -107,8 +105,6 @@ export interface StudioInkwashFluidPreviewPlannerState {
   readonly pigmentLoad: number;
   readonly wetnessLoad: number;
   readonly absorption: readonly [number, number, number];
-  readonly radiusScale: number;
-  readonly pigmentScale: number;
   started: boolean;
   previousX: number;
   previousY: number;
@@ -279,12 +275,6 @@ function spectralColor(
   ];
 }
 
-function positiveFiniteOr(value: number | undefined, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : fallback;
-}
-
 export function createStudioInkwashFluidPreviewPlanner(
   options: StudioInkwashFluidPreviewPlannerOptions,
 ): StudioInkwashFluidPreviewPlannerState {
@@ -310,8 +300,6 @@ export function createStudioInkwashFluidPreviewPlanner(
     pigmentLoad: Math.max(0, options.pigmentLoad),
     wetnessLoad: clamp01(options.wetnessLoad),
     absorption,
-    radiusScale: positiveFiniteOr(options.radiusScale, 1),
-    pigmentScale: positiveFiniteOr(options.pigmentScale, 1),
     started: false,
     previousX: 0,
     previousY: 0,
@@ -353,14 +341,12 @@ export function planStudioInkwashFluidPreviewStamps(
     const normalizedPressure = clamp01(pressure);
     const speedShrink = 1 / (1 + speed * (isWater ? 0.35 : 0.85));
     const pressureGrow = 0.35 + 0.65 * normalizedPressure;
-    const radius =
-      state.baseRadius
-      * pressureGrow
-      * speedShrink
-      * state.radiusScale;
+    // The committed deposit computes radius and density from exactly these terms. Any
+    // preview-only factor here is a promise the commit does not keep — the live/commit fidelity
+    // gate measures that difference directly.
+    const radius = state.baseRadius * pressureGrow * speedShrink;
     const densityScale =
       state.pigmentLoad
-      * state.pigmentScale
       * (0.4 + 0.6 * normalizedPressure)
       * speedShrink;
     const impulse = isWater

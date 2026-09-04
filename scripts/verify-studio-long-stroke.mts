@@ -356,6 +356,21 @@ async function selectBrush(
     name,
     { timeout: 15_000 },
   );
+  // 데스크톱 카탈로그는 이제 상주형 플로팅 패널이라(closeOnSelection={false}) 선택만으로 닫히지
+  // 않는다. 열린 채로 두면 캔버스를 덮어 제스처가 패널 위에서 시작하고, 획이 한 픽셀도 남지
+  // 않는다(실측: ink-committed changedPixels=0). 명시적으로 닫고, 안 닫히면 조용히 넘어가지 않는다.
+  if (await catalog.count() > 0) {
+    await page.getByRole("button", { name: /(?:라이브러리|선택) 닫기$/u })
+      .first()
+      .click({ timeout: 3_000 })
+      .catch(() => undefined);
+    await catalog.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+  }
+  if (await catalog.count() > 0) {
+    throw new Error(
+      `brush catalogue stayed open after selecting ${name}; the gesture would land on the panel`,
+    );
+  }
 }
 
 /** 브러시 결정: env → dev 서버 전체 카탈로그 → preview env fallback. */

@@ -1153,17 +1153,6 @@ export class StudioLiveWetInkOverlayRenderer {
         wetnessLoad: recipe.material.wetnessLoad,
         spectralAbsorption: recipe.material.spectralAbsorption,
         inkColor: recipe.inkColor,
-        // Measured live→commit gap for the deep pen was +16.45% width and +29.53% density.
-        // These bounded preview-only factors estimate the missing diffusion/edge darkening while
-        // leaving the committed 4× physical field and every stored brush value unchanged.
-        radiusScale:
-          1
-          + recipe.material.bleed * 0.45
-          + recipe.material.granulation * 0.1,
-        pigmentScale:
-          1
-          + recipe.material.bleed * 0.55
-          + recipe.material.edgeDarkening * 0.12,
       }),
       previewTiles: new Map(),
     };
