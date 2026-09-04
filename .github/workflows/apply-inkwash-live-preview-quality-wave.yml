@@ -33,12 +33,21 @@ jobs:
 
           path = Path("scripts/apply-inkwash-live-preview-quality-wave.mjs")
           source = path.read_text(encoding="utf-8")
-          old = (
-              "  const baseRadius = Math.max(0.75, options.radius);\n"
-              "  const absorption = spectralColor({ ...options, samples: [] });\n"
-              "  return {"
-          )
-          new = '''  const baseRadius = Math.max(0.75, options.radius);
+
+          def replace_one(before: str, after: str, label: str) -> None:
+              global source
+              count = source.count(before)
+              if count != 1:
+                  raise SystemExit(f"{label} target count={count}")
+              source = source.replace(before, after, 1)
+
+          replace_one(
+              (
+                  "  const baseRadius = Math.max(0.75, options.radius);\n"
+                  "  const absorption = spectralColor({ ...options, samples: [] });\n"
+                  "  return {"
+              ),
+              '''  const baseRadius = Math.max(0.75, options.radius);
           const absorption = spectralColor({
             tool: options.tool,
             samples: [],
@@ -50,58 +59,69 @@ jobs:
               : {}),
             ...(options.inkColor ? { inkColor: options.inkColor } : {}),
           });
-          return {'''
-          if source.count(old) != 1:
-              raise SystemExit(f"preview construction target count={source.count(old)}")
-          source = source.replace(old, new, 1)
-          source = source.replace(
+          return {''',
+              "preview construction",
+          )
+          replace_one(
               "const INKWASH_PREVIEW_TILE_SIZE = 128;",
               "const INKWASH_PREVIEW_TILE_SIZE = 64;",
-              1,
+              "preview tile size",
           )
-          source = source.replace("                coarseBase: 32,", "                coarseBase: 16,", 1)
-          pressure_old = '''        state.previousPressure
-                  + (currentPressure - state.previousPressure) * amount,
-          '''
-          if source.count(pressure_old) != 1:
-              raise SystemExit(f"pressure semantics target count={source.count(pressure_old)}")
-          source = source.replace(pressure_old, "        currentPressure,\n", 1)
+          replace_one(
+              "                coarseBase: 32,",
+              "                coarseBase: 16,",
+              "preview coarse grid",
+          )
+          replace_one(
+              (
+                  "        state.previousPressure\n"
+                  "          + (currentPressure - state.previousPressure) * amount,\n"
+              ),
+              "        currentPressure,\n",
+              "commit pressure semantics",
+          )
+          replace_one(
+              (
+                  "  push:\n"
+                  "    branches:\n"
+                  "      - fix/inkwash-live-preview-quality-20260904\n"
+              ),
+              (
+                  "  push:\n"
+                  "    branches:\n"
+                  "      - main\n"
+                  "      - fix/inkwash-live-preview-quality-20260904\n"
+              ),
+              "permanent workflow branch coverage",
+          )
 
-          source = source.replace(
-              '''  push:
-              branches:
-                - fix/inkwash-live-preview-quality-20260904
-          ''',
-              '''  push:
-              branches:
-                - main
-                - fix/inkwash-live-preview-quality-20260904
-          ''',
-              1,
-          )
           expression_open = "$" + "{{"
-          verify_env = (
-              "      TOONSPECTRUM_VERIFY_DIR: "
-              + expression_open
-              + " runner.temp }}/studio-inkwash-live-preview-quality\n"
+          replace_one(
+              (
+                  "      TOONSPECTRUM_VERIFY_DIR: "
+                  + expression_open
+                  + " runner.temp }}/studio-inkwash-live-preview-quality\n"
+              ),
+              "",
+              "runner-temp job environment",
           )
-          source = source.replace(verify_env, "", 1)
-          source = source.replace(
-              '''      - uses: actions/checkout@v6
-                - uses: pnpm/action-setup@v4
-          ''',
-              '''      - uses: actions/checkout@v6
-                - name: Resolve verification directory after runner allocation
-                  run: echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/studio-inkwash-live-preview-quality" >> "$GITHUB_ENV"
-                - uses: pnpm/action-setup@v4
-          ''',
-              1,
+          replace_one(
+              (
+                  "      - uses: actions/checkout@v6\n"
+                  "      - uses: pnpm/action-setup@v4\n"
+              ),
+              (
+                  "      - uses: actions/checkout@v6\n"
+                  "      - name: Resolve verification directory after runner allocation\n"
+                  "        run: echo \"TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/studio-inkwash-live-preview-quality\" >> \"$GITHUB_ENV\"\n"
+                  "      - uses: pnpm/action-setup@v4\n"
+              ),
+              "runner-temp setup step",
           )
 
           source = source.replace("${name}", "\\${name}")
           source = source.replace('${label ?? "unknown"}', '\\${label ?? "unknown"}')
-          escaped_open = "\\$" + "{{"
-          source = source.replace(expression_open, escaped_open)
+          source = source.replace(expression_open, "\\$" + "{{")
           path.write_text(source, encoding="utf-8")
       - name: Apply quality-first preview patch
         run: |
