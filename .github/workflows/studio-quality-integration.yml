@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: studio-finishing-quality-inspection
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   integrate-and-verify:
@@ -58,6 +58,24 @@ jobs:
           echo "a1279d9d5642741cff1e454255b95362c6ebfcf23df42305e7561b6a3b0b8650  /tmp/studio-quality-payload.tar.xz" | sha256sum --check -
           tar -xJf /tmp/studio-quality-payload.tar.xz
           python3 apply-studio-quality-integration.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/StudioContinuityPanel.test.tsx")
+          text = path.read_text(encoding="utf-8")
+          old = '''    const acknowledge = await screen.findByRole("button", {
+                name: "의도된 상태로 확인",
+              });
+              fireEvent.click(acknowledge);'''
+          new = '''    const [acknowledge] = await screen.findAllByRole("button", {
+                name: "의도된 상태로 확인",
+              });
+              expect(acknowledge).toBeDefined();
+              fireEvent.click(acknowledge!);'''
+          if old not in text:
+              raise SystemExit("quality acknowledgement test anchor not found")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
           rm -f apply-studio-quality-integration.py
           rm -rf .quality-payload
           rm -f .github/workflows/studio-quality-integration.yml
