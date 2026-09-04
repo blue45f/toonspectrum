@@ -197,43 +197,39 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     ))).toBe(false);
   });
 
-  it("redraws the whole InkWash live polyline per frame instead of stacking round caps", () => {
+  it("renders InkWash pigment through bounded optical tile uploads", () => {
     const { activeCanvas, renderer } = attachedRenderer();
-    const start = wetStroke([20, 40], { brush: "inkwash-pen", id: "inkwash-pen-live-redraw" });
+    const start = wetStroke([20, 40], {
+      brush: "inkwash-pen",
+      id: "inkwash-pen-live-preview",
+    });
     expect(renderer.begin(start, { pageEpoch: 5 }).status).toBe("started");
-    // pointer-down: one dot path (moveTo + the 0.01 px lineTo that gives a round cap its area).
-    expect(activeCanvas.paths).toEqual([1]);
-    const fullClears = () => activeCanvas.clears.filter(
-      (args) => args[0] === 0
-        && args[1] === 0
-        && args[2] === activeCanvas.width
-        && args[3] === activeCanvas.height,
-    ).length;
-    const clearsAfterBegin = fullClears();
+    expect(activeCanvas.paths).toEqual([]);
+    expect(activeCanvas.draws.length).toBeGreaterThan(0);
+    const drawsAfterBegin = activeCanvas.draws.length;
 
     const grown = wetStroke([20, 40, 60, 42, 100, 47], {
       brush: "inkwash-pen",
-      id: "inkwash-pen-live-redraw",
+      id: "inkwash-pen-live-preview",
     });
     expect(renderer.appendFrom(grown, { pageEpoch: 5 })).toMatchObject({
       status: "appended",
       consumedSourcePoints: 3,
     });
-    // The frame cleared the previous polyline and stroked every point again as ONE path, so the
-    // start cap and the previous frame's end cap are never painted twice at partial alpha.
-    expect(fullClears()).toBe(clearsAfterBegin + 1);
-    expect(activeCanvas.paths).toEqual([1, 2]);
+    expect(activeCanvas.paths).toEqual([]);
+    expect(activeCanvas.draws.length).toBeGreaterThan(drawsAfterBegin);
+    const drawsAfterGrowth = activeCanvas.draws.length;
 
     const longer = wetStroke([20, 40, 60, 42, 100, 47, 140, 50], {
       brush: "inkwash-pen",
-      id: "inkwash-pen-live-redraw",
+      id: "inkwash-pen-live-preview",
     });
     expect(renderer.appendFrom(longer, { pageEpoch: 5 })).toMatchObject({
       status: "appended",
       consumedSourcePoints: 4,
     });
-    expect(fullClears()).toBe(clearsAfterBegin + 2);
-    expect(activeCanvas.paths).toEqual([1, 2, 3]);
+    expect(activeCanvas.paths).toEqual([]);
+    expect(activeCanvas.draws.length).toBeGreaterThan(drawsAfterGrowth);
   });
 
   it("keeps InkWash pen and water on one live wash field", () => {

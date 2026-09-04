@@ -316,6 +316,16 @@ export const PALETTE_STUDIO_TOOLS: PaletteStudioTool[] = [
     ],
   },
   {
+    id: "tool-character-shaper",
+    name: "캐릭터 셰이퍼",
+    shortcutKey: "",
+    category: "panel",
+    icon: Sparkles,
+    actionPath: "/studio/character",
+    tip: "프리셋 카드로 3D 캐릭터를 만들고 포즈를 잡아 투명 PNG·레이어 PSD로 내보냅니다.",
+    keywords: ["셰이퍼", "shaper", "캐릭터", "프리셋", "3d", "vrm", "포즈", "의상", "character"],
+  },
+  {
     id: "tool-layers",
     name: "레이어 패널",
     shortcutKey: "L",
@@ -419,6 +429,15 @@ export const PALETTE_PAGES: PalettePage[] = [
     shortcut: ["G", "S"],
     category: "creator",
     keywords: ["스튜디오", "그리기", "캔버스", "제작", "창작", "studio", "creator"],
+  },
+  {
+    id: "page-shaper",
+    href: "/shaper",
+    title: "캐릭터 셰이퍼 소개",
+    subtitle: "프리셋·AI 추천·표면 드로잉·PSD 내보내기 사용 안내",
+    icon: Sparkles,
+    category: "creator",
+    keywords: ["셰이퍼", "shaper", "캐릭터", "프리셋", "3d", "가이드", "character"],
   },
   {
     id: "page-market",

@@ -13,6 +13,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     activeCommentAnchor,
     activePage,
     admittedBg3dOpen,
+    admittedCharacterShaperOpen,
     admittedMannequinPoserOpen,
     admittedPoserVrmOpen,
     aiProvenance,
@@ -128,6 +129,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     setFxPanelOpen,
     setFollowingStudioSessionId,
     setLoadedWork,
+    setCharacterShaperOpen,
     setMannequinPoserOpen,
     setPageReviewOpen,
     setPoserInitialDataUrl,
@@ -261,6 +263,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           poserInitialElementId={poserInitialElementId}
           poserSeedPropId={poserSeedPropId}
           poserVrmOpen={admittedPoserVrmOpen}
+          characterShaperOpen={admittedCharacterShaperOpen}
           productionInsightsOpen={productionInsightsOpen}
           productionInsightsResult={productionInsightsResult}
           publicationAnalytics={publicationAnalytics}
@@ -330,6 +333,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           setMannequinPoserOpen={setMannequinPoserOpen}
           setPoserInitialElementId={setPoserInitialElementId}
           setPoserVrmOpen={setPoserVrmOpen}
+          setCharacterShaperOpen={setCharacterShaperOpen}
           setProductionInsightsOpen={setProductionInsightsOpen}
           setPublicationOperationsOpen={setPublicationOperationsOpen}
           setPublishPackageOpen={setPublishPackageOpen}

@@ -13,6 +13,7 @@ import {
   StudioStoryboardGridPanel,
   StudioTimelapsePanel,
   StudioVrmPoser,
+  StudioCharacterShaper,
 } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
 import {
@@ -103,6 +104,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "poserInitialElementId"
   | "poserSeedPropId"
   | "poserVrmOpen"
+  | "characterShaperOpen"
   | "quickActionsAnchor"
   | "quickActionsDisabledActions"
   | "quickActionsOpen"
@@ -116,6 +118,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "setPoserInitialDataUrl"
   | "setPoserInitialElementId"
   | "setPoserVrmOpen"
+  | "setCharacterShaperOpen"
   | "setQuickActionsOpen"
   | "setQuickActionsPreferences"
   | "setStoryboardGridOpen"
@@ -265,6 +268,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   poserInitialElementId,
   poserSeedPropId = null,
   poserVrmOpen,
+  characterShaperOpen,
   quickActionsAnchor,
   quickActionsDisabledActions,
   quickActionsOpen,
@@ -278,6 +282,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   setPoserInitialDataUrl,
   setPoserInitialElementId,
   setPoserVrmOpen,
+  setCharacterShaperOpen,
   setQuickActionsOpen,
   setQuickActionsPreferences,
   setStoryboardGridOpen,
@@ -474,6 +479,29 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
             onClose={() => {
               setPoserVrmOpen(false);
+              setPoserInitialDataUrl(undefined);
+              setPoserInitialElementId(undefined);
+              if (typeof onSeedObjectInsertConsumed === "function") {
+                onSeedObjectInsertConsumed();
+              }
+            }}
+            onInsert={insertVrmResult}
+          />
+        ) : null}
+      </Suspense>
+
+      {/* 캐릭터 셰이퍼 — 같은 VRM 런타임·같은 삽입 경로. 컨트롤러와 대화상자가 한 커밋에
+          마운트되도록 Suspense 경계는 이 바깥에만 둔다. */}
+      <Suspense fallback={<PoserLoadingOverlay />}>
+        {characterShaperOpen ? (
+          <StudioCharacterShaper
+            open
+            initialDataUrl={poserInitialDataUrl}
+            initialScene={poserInitialScene}
+            seedPropId={poserSeedPropId}
+            onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
+            onClose={() => {
+              setCharacterShaperOpen(false);
               setPoserInitialDataUrl(undefined);
               setPoserInitialElementId(undefined);
               if (typeof onSeedObjectInsertConsumed === "function") {

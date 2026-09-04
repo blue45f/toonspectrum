@@ -88,6 +88,12 @@ const CreateChallengesPage = lazyRetry(
   () => import("@/src/domains/creator/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage })),
   "CreateChallengesPage"
 );
+const CharacterShaperLandingPage = lazyRetry(
+  () => import("@/src/domains/creator/CharacterShaperLandingPage").then((m) => ({
+    default: m.CharacterShaperLandingPage,
+  })),
+  "CharacterShaperLandingPage"
+);
 const StudioRouter = lazyRetry(
   async () => {
     const [module] = await Promise.all([
@@ -248,6 +254,7 @@ export function AppRouter() {
             <Route path="/create/challenges" element={<CreateChallengesPage />} />
             <Route path="/create/series/:id" element={<CreateSeriesPage />} />
             <Route path="/create/:id" element={<CreateWorkPage />} />
+            <Route path="/shaper" element={<CharacterShaperLandingPage />} />
             <Route path="/studio/*" element={<StudioRouter />} />
 
             {/* Market Routes */}

@@ -203,6 +203,27 @@ const ENGLISH_TUTORIAL_COPY: Readonly<Record<string, TutorialCopy>> = {
       },
     ],
   },
+  "character-shaper": {
+    title: "Character Shaper",
+    summary: "Pick face, hair and clothing from preset cards, then export a transparent PNG or a layered PSD.",
+    tryLabel: "Open Shaper",
+    steps: [
+      {
+        title: "Pick a model, then pick cards",
+        body: "Load a VRM, then walk the slot rail and click cards for face shape, eyes, hair and tops. One click applies immediately and becomes one undo step.",
+        tip: "Entries the model cannot honour stay visible with the reason written on the card.",
+      },
+      {
+        title: "Pose from a photo or the webcam",
+        body: "Drop a reference image for recipe suggestions, or use a photo or the webcam to move the pose onto the model. You choose which body regions to keep.",
+      },
+      {
+        title: "Paint, then export",
+        body: "Turn on surface drawing to paint on the model, then add a transparent PNG to the page or export a PSD whose layers are already separated.",
+        tip: "The PSD carries flat, shadow, highlight and line groups. Layers that could not be produced are listed with their reason.",
+      },
+    ],
+  },
 };
 
 export function studioTutorialSourceCopy(

@@ -38,6 +38,7 @@ function createInput(): StudioLeftToolRailClientInput {
     referencePanelOpen: false,
     mannequinPoserOpen: false,
     poserVrmOpen: false,
+    characterShaperOpen: false,
     bg3dOpen: false,
     hybridDccOpen: false,
     selected: null,

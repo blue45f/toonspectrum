@@ -56,7 +56,7 @@ describe("Studio BG3D control-field ownership boundary", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
     const panelSource = [
       moduleSource("./StudioBg3dShapesPanel.tsx"),
-      moduleSource("./StudioBg3dViewPanel.tsx"),
+      moduleSource("./StudioBg3dViewPanelContent.tsx"),
       moduleSource("./StudioBg3dLtPanel.tsx"),
     ].join("\n");
     const controlSource = moduleSource("./studio-bg3d-control-fields.tsx");

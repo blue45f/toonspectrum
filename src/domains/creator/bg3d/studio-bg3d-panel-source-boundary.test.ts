@@ -7,6 +7,7 @@ const PANEL_FILES = [
   "./StudioBg3dImmersivePanel.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
+  "./StudioBg3dViewPanelContent.tsx",
   "./StudioBg3dLtPanel.tsx",
 ] as const;
 
@@ -87,15 +88,15 @@ describe("Studio BG3D panel source boundary", () => {
       moduleSource("./StudioBg3dEditorSidebarExtras.tsx"),
     ].join("\n");
     const expectations = [
-      ["StudioBg3dShapesPanel", "shapes"],
-      ["StudioBg3dViewPanel", "view"],
-      ["StudioBg3dLtPanel", "lt"],
+      ["StudioBg3dShapesPanel", "shapes", "./StudioBg3dShapesPanel.tsx"],
+      ["StudioBg3dViewPanel", "view", "./StudioBg3dViewPanelContent.tsx"],
+      ["StudioBg3dLtPanel", "lt", "./StudioBg3dLtPanel.tsx"],
     ] as const;
 
-    for (const [componentName, tab] of expectations) {
+    for (const [componentName, tab, sourceFile] of expectations) {
       expect(editorSource).toContain(`<${componentName}`);
       expect(editorSource).toContain(`hidden={hideOnTab("${tab}")}`);
-      expect(moduleSource(`./${componentName}.tsx`)).toContain("<section hidden={hidden}>");
+      expect(moduleSource(sourceFile)).toContain("<section hidden={hidden}>");
     }
   });
 });

@@ -227,6 +227,7 @@ describe("머리 소품의 face/bone socket 의미 계약", () => {
     "flowerCrown",
     "choker",
     "catEars",
+    "elfEars",
     "horns",
     "halo",
     "beanie",

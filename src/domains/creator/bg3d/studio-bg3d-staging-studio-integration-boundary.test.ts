@@ -6,7 +6,7 @@ import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 
 const background3dSource = readStudioBg3dEditorSource();
 const viewPanelSource = readFileSync(
-  new URL("./StudioBg3dViewPanel.tsx", import.meta.url),
+  new URL("./StudioBg3dViewPanelContent.tsx", import.meta.url),
   "utf8",
 );
 
