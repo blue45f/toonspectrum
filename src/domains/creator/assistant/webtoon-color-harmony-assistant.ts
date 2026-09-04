@@ -177,6 +177,8 @@ export class WebtoonColorHarmonyAssistant {
    *   not equivalent to "cooler": for red/orange it moves toward yellow and makes the result warmer.
    * - Near-neutral colors receive a small cool saturation floor so gray/white bases do not become
    *   muddy black overlays.
+   * - Saturation is deliberately bounded. Very light skin bases often report HSL saturation near
+   *   100%; carrying that value into darker shadows produces neon red, not a usable cel-shading ramp.
    * - Lightness ordering is deterministic: highlight >= base > shadow1 > shadow2, modulo 8-bit rounding.
    */
   public generateHueShiftShadow(baseHex: string): {
@@ -190,12 +192,12 @@ export class WebtoonColorHarmonyAssistant {
 
     // Hue is undefined for a true neutral. Anchor it near blue before applying the cool target.
     const meaningfulBaseHue = hsl.s < 0.02 ? 245 : hsl.h;
-    const h1 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 25);
-    const h2 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 40);
-    const s1 = clamp(Math.max(hsl.s * 1.15, hsl.s + 0.08, 0.14), 0, 1);
-    const s2 = clamp(Math.max(hsl.s * 1.25, hsl.s + 0.14, 0.22), 0, 1);
-    const l1 = clamp(hsl.l * 0.72, 0.08, 0.82);
-    const l2 = clamp(Math.min(l1 - 0.08, hsl.l * 0.5), 0.04, 0.7);
+    const h1 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 45);
+    const h2 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 65);
+    const s1 = clamp(0.12 + hsl.s * 0.38, 0.14, 0.5);
+    const s2 = clamp(0.18 + hsl.s * 0.32, 0.2, 0.52);
+    const l1 = clamp(hsl.l * 0.86, 0.08, 0.88);
+    const l2 = clamp(hsl.l * 0.68, 0.04, 0.72);
 
     const highlightBaseHue = hsl.s < 0.02 ? WARM_HIGHLIGHT_TARGET_HUE : hsl.h;
     const hh = shiftHueToward(highlightBaseHue, WARM_HIGHLIGHT_TARGET_HUE, 12);
