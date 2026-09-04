@@ -52,6 +52,7 @@ export interface StudioLeftToolRailSnapshot {
   readonly referencePanelOpen: boolean;
   readonly mannequinPoserOpen: boolean;
   readonly poserVrmOpen: boolean;
+  readonly characterShaperOpen: boolean;
   readonly bg3dOpen: boolean;
   readonly hybridDccOpen: boolean;
   readonly selected: El | null;
@@ -125,6 +126,7 @@ export interface StudioLeftToolRailActions
   readonly setReferencePanelOpen: (value: boolean) => void;
   readonly setMannequinPoserOpen?: (value: boolean) => void;
   readonly setPoserVrmOpen?: (value: boolean) => void;
+  readonly setCharacterShaperOpen?: (value: boolean) => void;
   readonly setHybridDccOpen?: (value: boolean) => void;
   readonly setViewTool: (value: "zoom" | "rotate" | null) => void;
 }
@@ -183,6 +185,7 @@ export const STUDIO_LEFT_TOOL_RAIL_COMMANDS = {
   setReferencePanelOpen: "rail.reference.set-open",
   setMannequinPoserOpen: "rail.mannequin.set-open",
   setPoserVrmOpen: "rail.vrm.set-open",
+  setCharacterShaperOpen: "rail.character-shaper.set-open",
   setHybridDccOpen: "rail.hybrid-dcc.set-open",
   setViewTool: "rail.view.set-tool",
 } as const satisfies Record<StudioLeftToolRailActionName, CommandId>;
@@ -268,6 +271,7 @@ function snapshotFromInput(
     referencePanelOpen: input.referencePanelOpen,
     mannequinPoserOpen: input.mannequinPoserOpen,
     poserVrmOpen: input.poserVrmOpen,
+    characterShaperOpen: input.characterShaperOpen,
     bg3dOpen: input.bg3dOpen,
     hybridDccOpen: input.hybridDccOpen,
     selected: input.selected,

@@ -37,6 +37,7 @@ export type StudioTutorialTryAction =
   | "template"
   | "layers"
   | "character"
+  | "character-shaper"
   | "bg3d"
   | "ai-assist"
   | "dialogue"
@@ -630,6 +631,31 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
       {
         title: "의상·소품",
         body: "워드로브와 소품 목록으로 분위기를 더해요. 어색하면 위치를 조금만 미세 조정해 보세요.",
+      },
+    ],
+  },
+  {
+    id: "character-shaper",
+    category: "threed",
+    title: "캐릭터 셰이퍼",
+    summary: "프리셋 카드로 얼굴·헤어·의상을 고르고 투명 PNG나 레이어 PSD로 내보내요.",
+    badge: "셰",
+    tryAction: "character-shaper",
+    tryLabel: "셰이퍼 열기",
+    steps: [
+      {
+        title: "모델 고르고 카드 고르기",
+        body: "VRM을 불러온 뒤 왼쪽 슬롯 레일에서 얼굴형·눈·헤어·상의를 카드로 고릅니다. 한 번 누르면 바로 적용되고 되돌리기 한 단계로 남아요.",
+        tip: "모델이 지원하지 않는 항목은 이유를 적어 두고 흐리게 보여 줍니다.",
+      },
+      {
+        title: "사진·웹캠으로 포즈 잡기",
+        body: "참고 이미지로 추천을 받고, 사진이나 웹캠으로 포즈를 옮깁니다. 어떤 부위를 가져올지 고를 수 있어요.",
+      },
+      {
+        title: "칠하고 내보내기",
+        body: "표면 드로잉으로 모델 위에 직접 칠한 뒤 투명 배경 PNG로 캔버스에 추가하거나, 레이어가 나뉜 PSD로 내보냅니다.",
+        tip: "PSD는 밑색·음영·하이라이트·주선 그룹으로 나옵니다. 만들지 못한 레이어는 이유를 함께 적어 줍니다.",
       },
     ],
   },

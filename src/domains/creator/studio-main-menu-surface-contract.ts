@@ -125,6 +125,8 @@ export interface StudioMainMenuSurfaceActions {
   startEphemeralWhiteboard: () => unknown;
   /** 3D ▸ 캐릭터 — VRM poser 표면. URL `surface=poser`. */
   openVrmPoser: () => unknown;
+  /** 3D ▸ 캐릭터 셰이퍼 — 프리셋 우선 캐릭터 작업실. URL `surface=character`. */
+  openCharacterShaper: () => unknown;
   /** 3D ▸ 배경 — 3D 배경 표면. URL `surface=bg3d`. */
   openBackground3d: () => unknown;
   /** 웹툰 창작 보조 센터 — 규격 검사, 자동 슬라이서, 스크롤 페이싱, 효과음 사전, 컬러 조화, 포커스 타이머. */

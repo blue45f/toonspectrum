@@ -13,6 +13,7 @@ import {
   sanitizeAvatarForgeState,
   type AvatarForgeFaceAccent,
   type AvatarForgeHairPart,
+  type AvatarForgeHairParams,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
@@ -95,6 +96,18 @@ function detectReplaceableHairMeshes(vrm: VRM | null): THREE.Mesh[] {
 // eslint-disable-next-line react-refresh/only-export-components
 export function countDetectedVrmHairMeshes(vrm: VRM | null): number {
   return detectReplaceableHairMeshes(vrm).length;
+}
+
+/**
+ * `replaceOriginal` 은 "모델이 가진 헤어를 감춘다"는 작가의 명시적 의사다. 스타일과 무관하게
+ * 그대로 지킨다 — `style: "none"` 과의 조합이 바로 민머리를 만드는 방법이고(모자 착용, 표면에
+ * 직접 그릴 헤어), 원본을 되돌리는 조작은 스타일 선택이 아니라 이 토글을 끄는 것이다. 예전에는
+ * "none" 을 예외로 두어 헤어를 감추지 않았는데, 그러면 "원본 헤어를 숨깁니다" 라고 적힌 카드가
+ * 적용된 것처럼 보이면서 화면은 그대로인 상태가 된다.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function shouldHideAuthoredVrmHair(hair: Pick<AvatarForgeHairParams, "replaceOriginal">): boolean {
+  return hair.replaceOriginal === true;
 }
 
 /**
@@ -461,10 +474,11 @@ export function StudioVrmAvatarForge({
     [safeState.semanticFaceMorphs, vrm],
   );
 
+  const hideAuthoredHair = shouldHideAuthoredVrmHair(safeState.hair);
   useEffect(() => {
-    if (!safeState.hair.replaceOriginal || safeState.hair.style === "none") return;
+    if (!hideAuthoredHair) return;
     return acquireHiddenHair(detectReplaceableHairMeshes(vrm));
-  }, [safeState.hair.replaceOriginal, safeState.hair.style, vrm]);
+  }, [hideAuthoredHair, vrm]);
 
   if (!normalizedHead || !object) return null;
   return createPortal(<primitive object={object} />, normalizedHead);

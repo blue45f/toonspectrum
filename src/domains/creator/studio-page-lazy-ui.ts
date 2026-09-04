@@ -361,6 +361,10 @@ const StudioVrmPoser = lazyRetry(
   () => import( "./vrm/StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
   "StudioVrmPoser"
 );
+const StudioCharacterShaper = lazyRetry(
+  () => import("./character-shaper/StudioCharacterShaper").then((mod) => ({ default: mod.StudioCharacterShaper })),
+  "StudioCharacterShaper"
+);
 const StudioMannequinPoserPanel = lazyRetry(
   () => import("./scene-3d/StudioMannequinPoserPanel").then((mod) => ({ default: mod.StudioMannequinPoserPanel })),
   "StudioMannequinPoserPanel"
@@ -952,6 +956,7 @@ export {
   StudioUnifiedBrushPicker,
   StudioUploadPublish,
   StudioVrmPoser,
+  StudioCharacterShaper,
   StudioMannequinPoserPanel,
   StudioCanonicalVNextDryMediaCanvas,
   StudioWebGpuCanvas,
