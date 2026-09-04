@@ -7,7 +7,7 @@ import { withCsrfProtection } from "@/lib/csrf";
 
 const VISITOR_STORAGE_KEY = "toonspectrum-traffic-visitor-v1";
 const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";
-const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_INTERVAL_MS = 60_000;
 const MIN_HEARTBEAT_SECONDS = 5;
 
 type NavigatorWithPrivacyAndConnection = Navigator & {
