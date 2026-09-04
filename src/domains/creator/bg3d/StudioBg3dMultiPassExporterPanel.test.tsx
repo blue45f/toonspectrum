@@ -45,6 +45,17 @@ describe("StudioBg3dMultiPassExporterPanel", () => {
     expect(config.includeMaterialIdMask).toBe(true);
   });
 
+  it("marks manual pass changes as custom instead of falsely selecting the complete preset", () => {
+    render(<StudioBg3dMultiPassExporterPanel />);
+    const completePreset = screen.getByRole("button", { name: "전체 패스" });
+
+    fireEvent.click(screen.getByRole("button", { name: /08_법선 벡터/ }));
+
+    expect(screen.getByText("사용자 설정")).toBeDefined();
+    expect(completePreset.className).not.toContain("bg-accent text-accent-fg");
+    expect(screen.getByRole("button", { name: /08_법선 벡터/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("disables every export action when the parent scene is locked", () => {
     render(<StudioBg3dMultiPassExporterPanel disabled />);
     expect(screen.getByText("레이어별 패스 렌더링 & 다운로드 시작").closest("button")?.disabled).toBe(true);
