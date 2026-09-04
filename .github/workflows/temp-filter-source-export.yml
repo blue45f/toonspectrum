@@ -1,9 +1,9 @@
 name: Temporary filter source export
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/studio-filter-exhaustive-20260905
+      - main
 
 permissions:
   contents: read
