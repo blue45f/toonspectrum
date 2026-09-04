@@ -10,7 +10,7 @@ import {
   type StudioBg3dAiReferenceActionProps,
   type StudioBg3dBabylonDiagnosticState,
 } from "./StudioBg3dViewPanel";
-import viewPanelSource from "./StudioBg3dViewPanel.tsx?raw";
+import viewPanelSource from "./StudioBg3dViewPanelContent.tsx?raw";
 
 afterEach(cleanup);
 

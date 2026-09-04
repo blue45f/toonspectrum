@@ -1,179 +1,238 @@
-import { Camera, Clapperboard, Activity, BookmarkPlus, Play } from "lucide-react";
-import React, { useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+
+import { evaluateWebtoonShotEasing } from "../scene-3d/studio-3d-camera-cinematic-director";
 
 import {
-  WEBTOON_SHOT_ANGLE_PRESETS,
-  createShotBookmark,
-  type WebtoonShotAngleKind,
-  type CameraShakePreset,
-  type CameraShakeConfig,
-  type WebtoonShotBookmark,
-} from "../scene-3d/studio-3d-camera-cinematic-director";
+  createStudioBg3dCameraUpForDutchRoll,
+  readStudioBg3dCameraDutchRollDegrees,
+} from "./studio-bg3d-camera-orientation";
+import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+import { StudioBg3dCinematicDirectorPanel as StudioBg3dCinematicDirectorPanelContent } from "./StudioBg3dCinematicDirectorPanelContent";
 
-export interface StudioBg3dCinematicDirectorPanelProps {
-  readonly onApplyShotBookmark?: (bookmark: WebtoonShotBookmark) => void;
-  readonly onTriggerShake?: (config: CameraShakeConfig) => void;
+import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
+import type { StudioBg3dCinematicDirectorPanelProps } from "./StudioBg3dCinematicDirectorPanelContent";
+import type { WebtoonShotBookmark } from "../scene-3d/studio-3d-camera-cinematic-director";
+
+export type { StudioBg3dCinematicDirectorPanelProps } from "./StudioBg3dCinematicDirectorPanelContent";
+
+const CAMERA_PREVIEW_FRAME_INTERVAL_MS = 1_000 / 30;
+
+function normalizeDegrees(value: number): number {
+  let normalized = value % 360;
+  if (normalized > 180) normalized -= 360;
+  if (normalized < -180) normalized += 360;
+  return normalized;
 }
 
-let cinematicBookmarkCounter = 100;
+function lerp(from: number, to: number, progress: number): number {
+  return from + (to - from) * progress;
+}
 
-export function StudioBg3dCinematicDirectorPanel({
-  onApplyShotBookmark,
-  onTriggerShake,
-}: StudioBg3dCinematicDirectorPanelProps): React.JSX.Element {
-  const [selectedAngle, setSelectedAngle] = useState<WebtoonShotAngleKind>("eye-level-dialogue");
-  const [selectedShake, setSelectedShake] = useState<CameraShakePreset>("none");
-  const [shakeIntensity, setShakeIntensity] = useState(1.0);
-  const [bookmarks, setBookmarks] = useState<readonly WebtoonShotBookmark[]>([
-    createShotBookmark("cut-1", "01화 오프닝 - 전경", 1, "wide-establishing"),
-    createShotBookmark("cut-2", "01화 주인공 등장", 2, "low-angle-heroic"),
-    createShotBookmark("cut-3", "01화 결투 대치", 3, "dutch-tilt-tension"),
+function cameraFromBookmark(
+  baseCamera: StudioBg3dCameraSettings,
+  bookmark: WebtoonShotBookmark,
+): StudioBg3dCameraSettings {
+  const target = [
+    baseCamera.target[0],
+    baseCamera.target[1],
+    baseCamera.target[2],
+  ] as const;
+  const position = [
+    target[0] + bookmark.position[0] - bookmark.target[0],
+    target[1] + bookmark.position[1] - bookmark.target[1],
+    target[2] + bookmark.position[2] - bookmark.target[2],
+  ] as const;
+  const up = createStudioBg3dCameraUpForDutchRoll(
+    { position, target },
+    bookmark.dutchRollDegrees,
+  ) ?? [0, 1, 0] as const;
+
+  return {
+    ...baseCamera,
+    position,
+    target,
+    fovDegrees: bookmark.fov,
+    projection: "perspective",
+    zoom: 1,
+    lensShift: [0, 0],
+    up,
+  };
+}
+
+function interpolateCamera(
+  from: StudioBg3dCameraSettings,
+  to: StudioBg3dCameraSettings,
+  bookmark: WebtoonShotBookmark,
+  rawProgress: number,
+): StudioBg3dCameraSettings {
+  const progress = evaluateWebtoonShotEasing(bookmark.easing, rawProgress);
+  const position = [
+    lerp(from.position[0], to.position[0], progress),
+    lerp(from.position[1], to.position[1], progress),
+    lerp(from.position[2], to.position[2], progress),
+  ] as const;
+  const target = [
+    lerp(from.target[0], to.target[0], progress),
+    lerp(from.target[1], to.target[1], progress),
+    lerp(from.target[2], to.target[2], progress),
+  ] as const;
+  const fromRoll = readStudioBg3dCameraDutchRollDegrees(from);
+  const rollDelta = normalizeDegrees(bookmark.dutchRollDegrees - fromRoll);
+  const roll = normalizeDegrees(fromRoll + rollDelta * progress);
+  const up = createStudioBg3dCameraUpForDutchRoll({ position, target }, roll) ?? to.up;
+  const fromLensShift = from.lensShift ?? [0, 0];
+  const toLensShift = to.lensShift ?? [0, 0];
+
+  return {
+    ...from,
+    position,
+    target,
+    fovDegrees: lerp(from.fovDegrees, to.fovDegrees, progress),
+    projection: "perspective",
+    zoom: lerp(from.zoom ?? 1, to.zoom ?? 1, progress),
+    lensShift: [
+      lerp(fromLensShift[0], toLensShift[0], progress),
+      lerp(fromLensShift[1], toLensShift[1], progress),
+    ],
+    ...(up ? { up } : {}),
+  };
+}
+
+function prefersReducedCameraMotion(): boolean {
+  return typeof globalThis.matchMedia === "function" &&
+    globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Resolves production scene commands from the nearest 3D editor shell while preserving direct prop
+ * injection for tests and standalone rehearsals. Explicit props always win over context values.
+ */
+export function StudioBg3dCinematicDirectorPanel(
+  props: StudioBg3dCinematicDirectorPanelProps,
+) {
+  const runtime = useStudioBg3dProSuiteRuntime();
+  const animationFrameRef = useRef<number | null>(null);
+  const transitionActiveRef = useRef(false);
+  const finishCameraPreviewRef = useRef<(() => void) | undefined>(undefined);
+  const {
+    disabled,
+    baseCamera,
+    productionShots,
+    onCaptureCurrentShot,
+    onApplyProductionShot,
+    onMoveProductionShot,
+    onRemoveProductionShot,
+    onApplyShotBookmark,
+    onUseCurrentFrameAsAiReference,
+    aiReferenceBusy,
+    ...rest
+  } = props;
+  const resolvedDisabled = disabled ?? runtime?.disabled ?? false;
+  const resolvedBaseCamera = baseCamera ?? runtime?.baseCamera;
+  const resolvedShots = productionShots ?? runtime?.productionShots;
+  const resolvedCapture = onCaptureCurrentShot ?? runtime?.onCaptureCurrentShot;
+  const resolvedApply = onApplyProductionShot ?? runtime?.onApplyProductionShot;
+  const resolvedMove = onMoveProductionShot ?? runtime?.onMoveProductionShot;
+  const resolvedRemove = onRemoveProductionShot ?? runtime?.onRemoveProductionShot;
+  const runtimeApplyCameraView = runtime?.onApplyCameraView;
+  const runtimePreviewCameraView = runtime?.onPreviewCameraView;
+  const runtimeFinishCameraPreview = runtime?.onFinishCameraViewPreview;
+  finishCameraPreviewRef.current = runtimeFinishCameraPreview;
+
+  const cancelPreviewAnimation = useCallback((finish: boolean) => {
+    if (
+      animationFrameRef.current !== null &&
+      typeof globalThis.cancelAnimationFrame === "function"
+    ) {
+      globalThis.cancelAnimationFrame(animationFrameRef.current);
+    }
+    animationFrameRef.current = null;
+    if (finish && transitionActiveRef.current) finishCameraPreviewRef.current?.();
+    transitionActiveRef.current = false;
+  }, []);
+
+  useEffect(() => () => cancelPreviewAnimation(false), [cancelPreviewAnimation]);
+
+  useEffect(() => {
+    if (resolvedDisabled) cancelPreviewAnimation(true);
+  }, [cancelPreviewAnimation, resolvedDisabled]);
+
+  const applyRuntimeBookmark = useCallback((bookmark: WebtoonShotBookmark) => {
+    if (!runtimeApplyCameraView || !resolvedBaseCamera) return;
+    const targetCamera = cameraFromBookmark(resolvedBaseCamera, bookmark);
+    const durationMs = Math.max(0, Math.min(8_000, bookmark.transitionSeconds * 1_000));
+    const canAnimate =
+      durationMs >= CAMERA_PREVIEW_FRAME_INTERVAL_MS &&
+      resolvedBaseCamera.projection !== "orthographic" &&
+      !prefersReducedCameraMotion() &&
+      typeof globalThis.requestAnimationFrame === "function" &&
+      runtimePreviewCameraView !== undefined &&
+      runtimeFinishCameraPreview !== undefined;
+
+    cancelPreviewAnimation(true);
+    if (!canAnimate) {
+      runtimeApplyCameraView(targetCamera);
+      return;
+    }
+
+    const fromCamera = resolvedBaseCamera;
+    let startedAt: number | null = null;
+    let lastPreviewAt = Number.NEGATIVE_INFINITY;
+    transitionActiveRef.current = true;
+
+    const animate = (timestamp: number) => {
+      startedAt ??= timestamp;
+      const rawProgress = Math.max(0, Math.min(1, (timestamp - startedAt) / durationMs));
+      const shouldPreview =
+        rawProgress >= 1 || timestamp - lastPreviewAt >= CAMERA_PREVIEW_FRAME_INTERVAL_MS;
+      if (shouldPreview) {
+        runtimePreviewCameraView(
+          rawProgress >= 1
+            ? targetCamera
+            : interpolateCamera(fromCamera, targetCamera, bookmark, rawProgress),
+        );
+        lastPreviewAt = timestamp;
+      }
+      if (rawProgress >= 1) {
+        animationFrameRef.current = null;
+        transitionActiveRef.current = false;
+        finishCameraPreviewRef.current?.();
+        return;
+      }
+      animationFrameRef.current = globalThis.requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = globalThis.requestAnimationFrame(animate);
+  }, [
+    cancelPreviewAnimation,
+    resolvedBaseCamera,
+    runtimeApplyCameraView,
+    runtimeFinishCameraPreview,
+    runtimePreviewCameraView,
   ]);
-
-  const handleAddBookmark = () => {
-    cinematicBookmarkCounter += 1;
-    const nextCutIndex = bookmarks.length + 1;
-    const newBm = createShotBookmark(
-      `cut-${cinematicBookmarkCounter}`,
-      `0${nextCutIndex}화 컷 ${nextCutIndex}`,
-      nextCutIndex,
-      selectedAngle,
-    );
-    setBookmarks([...bookmarks, newBm]);
-    onApplyShotBookmark?.(newBm);
-  };
-
-  const handleTriggerShake = (preset: CameraShakePreset) => {
-    setSelectedShake(preset);
-    onTriggerShake?.({
-      preset,
-      intensity: shakeIntensity,
-      frequency: 15,
-      decayRate: 1.5,
-    });
-  };
+  const resolvedBookmark = onApplyShotBookmark ?? (
+    runtimeApplyCameraView && resolvedBaseCamera ? applyRuntimeBookmark : undefined
+  );
+  const aiReferenceBlocked = runtime?.aiReferenceDisabled ?? false;
+  const resolvedAiReference = aiReferenceBlocked
+    ? undefined
+    : onUseCurrentFrameAsAiReference ?? runtime?.onUseCurrentFrameAsAiReference;
 
   return (
-    <div className="flex flex-col gap-3 p-3 text-xs text-fg">
-      <div className="flex items-center justify-between border-b border-line pb-2">
-        <div className="flex items-center gap-1.5 font-bold text-fg">
-          <Clapperboard className="size-4 text-accent" />
-          <span>시네마틱 카메라 & 컷 디렉터</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleAddBookmark}
-          className="flex items-center gap-1 rounded bg-accent/15 px-2 py-1 text-[0.68rem] font-bold text-accent transition-all hover:bg-accent/25"
-        >
-          <BookmarkPlus className="size-3" />
-          <span>현재 뷰 북마크 저장</span>
-        </button>
-      </div>
-
-      {/* Webtoon Angle Presets */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[0.68rem] font-medium text-fg-3">웹툰 연출 앵글 프리셋</span>
-        <div className="grid grid-cols-2 gap-1.5">
-          {WEBTOON_SHOT_ANGLE_PRESETS.map((preset) => (
-            <button
-              key={preset.kind}
-              type="button"
-              onClick={() => {
-                setSelectedAngle(preset.kind);
-                cinematicBookmarkCounter += 1;
-                const bm = createShotBookmark(`preview-${cinematicBookmarkCounter}`, preset.label, 1, preset.kind);
-                onApplyShotBookmark?.(bm);
-              }}
-              className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
-                selectedAngle === preset.kind
-                  ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-              }`}
-            >
-              <div className="flex items-center gap-1">
-                <Camera className="size-3 text-accent" />
-                <span className="text-[0.72rem] leading-tight">{preset.label}</span>
-              </div>
-              <span className="mt-0.5 text-[0.62rem] text-fg-3 line-clamp-1">{preset.description}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Camera Shake VFX */}
-      <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 font-bold text-fg">
-            <Activity className="size-3.5 text-accent" />
-            <span className="text-[0.7rem]">카메라 셰이크 연출 (Camera Shake)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[0.65rem] text-fg-3">강도:</span>
-            <input
-              type="range"
-              min="0.2"
-              max="2.0"
-              step="0.1"
-              value={shakeIntensity}
-              onChange={(e) => setShakeIntensity(parseFloat(e.target.value))}
-              className="h-1.5 w-16 cursor-pointer accent-accent"
-            />
-            <span className="w-6 text-right font-mono text-[0.68rem] text-fg">{shakeIntensity}x</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-1">
-          {[
-            { id: "handheld-subtle" as const, label: "일상 핸드헬드" },
-            { id: "earthquake-rumble" as const, label: "지진/붕괴 진동" },
-            { id: "explosive-shockwave" as const, label: "폭발 충격파" },
-            { id: "heartbeat-throb" as const, label: "심박수 긴장 펄스" },
-            { id: "running-footstep" as const, label: "질주 발걸음 바운스" },
-            { id: "none" as const, label: "셰이크 멈춤" },
-          ].map((shake) => (
-            <button
-              key={shake.id}
-              type="button"
-              onClick={() => handleTriggerShake(shake.id)}
-              className={`rounded border px-1.5 py-1 text-[0.68rem] font-medium transition-all ${
-                selectedShake === shake.id
-                  ? "border-accent bg-accent text-accent-fg"
-                  : "border-line bg-raised text-fg-2 hover:text-fg"
-              }`}
-            >
-              {shake.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Saved Cut Bookmarks */}
-      <div className="flex flex-col gap-1">
-        <span className="text-[0.68rem] font-medium text-fg-3">저장된 웹툰 에피소드 컷 목록</span>
-        <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
-          {bookmarks.map((bm) => (
-            <div
-              key={bm.id}
-              className="flex items-center justify-between rounded border border-line bg-card px-2 py-1.5 text-xs"
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="rounded bg-raised px-1 py-0.5 font-mono text-[0.62rem] font-bold text-fg-2">
-                  #{bm.episodePanelIndex}
-                </span>
-                <span className="font-medium text-fg">{bm.name}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onApplyShotBookmark?.(bm)}
-                className="flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-[0.65rem] text-accent hover:bg-accent hover:text-accent-fg"
-              >
-                <Play className="size-2.5" />
-                <span>카메라 이동</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <StudioBg3dCinematicDirectorPanelContent
+      {...rest}
+      disabled={resolvedDisabled}
+      aiReferenceBusy={aiReferenceBusy ?? runtime?.aiReferenceBusy ?? false}
+      {...(resolvedBaseCamera ? { baseCamera: resolvedBaseCamera } : {})}
+      {...(resolvedShots ? { productionShots: resolvedShots } : {})}
+      {...(resolvedCapture ? { onCaptureCurrentShot: resolvedCapture } : {})}
+      {...(resolvedApply ? { onApplyProductionShot: resolvedApply } : {})}
+      {...(resolvedMove ? { onMoveProductionShot: resolvedMove } : {})}
+      {...(resolvedRemove ? { onRemoveProductionShot: resolvedRemove } : {})}
+      {...(resolvedBookmark ? { onApplyShotBookmark: resolvedBookmark } : {})}
+      {...(resolvedAiReference
+        ? { onUseCurrentFrameAsAiReference: resolvedAiReference }
+        : {})}
+    />
   );
 }
