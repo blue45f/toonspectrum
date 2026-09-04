@@ -2,6 +2,10 @@ import {
   resolveStudioBg3dProductionBatchPreset,
   type StudioBg3dProductionBatchPreset,
 } from "./studio-bg3d-production-multipass";
+import {
+  resolveStudioBg3dProductionBatchPresetForLook,
+  type StudioBg3dProductionLookState,
+} from "./studio-bg3d-production-pass-readiness";
 
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 
@@ -41,7 +45,7 @@ export const STUDIO_BG3D_PRODUCTION_INTENTS: readonly StudioBg3dProductionIntent
     Object.freeze({
       id: "manuscript",
       label: "웹툰 원고",
-      description: "LT·컬러·톤·질감선·주선과 컷별 PSD, 콘택트 시트를 함께 준비합니다.",
+      description: "현재 LT 형식에 맞는 컬러 또는 톤·질감선·주선과 PSD, 콘택트 시트를 준비합니다.",
       batchPreset: "manuscript",
       includeLayeredPsd: true,
       includeContactSheet: true,
@@ -51,7 +55,7 @@ export const STUDIO_BG3D_PRODUCTION_INTENTS: readonly StudioBg3dProductionIntent
     Object.freeze({
       id: "composite",
       label: "2D 합성",
-      description: "원고 패스와 레이어 PSD를 유지하면서 배경 알파를 투명하게 맞춥니다.",
+      description: "현재 LT 형식에 맞는 원고 패스와 PSD를 유지하면서 배경 알파를 투명하게 맞춥니다.",
       batchPreset: "manuscript",
       includeLayeredPsd: true,
       includeContactSheet: false,
@@ -61,7 +65,7 @@ export const STUDIO_BG3D_PRODUCTION_INTENTS: readonly StudioBg3dProductionIntent
     Object.freeze({
       id: "ai-reference",
       label: "AI 참조",
-      description: "원본·주선·깊이 패스로 구도와 포즈 확인용 입력을 준비합니다.",
+      description: "원본·사용 가능한 주선·깊이 패스로 구도와 포즈 확인용 입력을 준비합니다.",
       batchPreset: "ai-reference",
       includeLayeredPsd: false,
       includeContactSheet: false,
@@ -73,6 +77,7 @@ export const STUDIO_BG3D_PRODUCTION_INTENTS: readonly StudioBg3dProductionIntent
 export interface StudioBg3dProductionIntentState {
   readonly availablePasses: readonly StudioBg3dShotBatchPass[];
   readonly selectedPasses: readonly StudioBg3dShotBatchPass[];
+  readonly look?: StudioBg3dProductionLookState;
   readonly includeLayeredPsd: boolean;
   readonly includeContactSheet: boolean;
   readonly lineArtPreview: boolean;
@@ -95,17 +100,29 @@ function samePassSet(
   return leftSet.size === rightSet.size && [...leftSet].every((pass) => rightSet.has(pass));
 }
 
+function resolveIntentPasses(
+  availablePasses: readonly StudioBg3dShotBatchPass[],
+  preset: StudioBg3dProductionBatchPreset,
+  look?: StudioBg3dProductionLookState,
+): readonly StudioBg3dShotBatchPass[] {
+  return look
+    ? resolveStudioBg3dProductionBatchPresetForLook(availablePasses, preset, look)
+    : resolveStudioBg3dProductionBatchPreset(availablePasses, preset);
+}
+
 export function planStudioBg3dProductionIntent(
   availablePasses: readonly StudioBg3dShotBatchPass[],
   intentId: StudioBg3dProductionIntentId,
+  look?: StudioBg3dProductionLookState,
 ): StudioBg3dProductionIntentPlan {
   const definition = STUDIO_BG3D_PRODUCTION_INTENTS.find((intent) => intent.id === intentId) ??
     STUDIO_BG3D_PRODUCTION_INTENTS[0]!;
   return Object.freeze({
     definition,
-    selectedPasses: resolveStudioBg3dProductionBatchPreset(
+    selectedPasses: resolveIntentPasses(
       availablePasses,
       definition.batchPreset,
+      look,
     ),
   });
 }
@@ -114,9 +131,10 @@ export function detectStudioBg3dProductionIntent(
   state: StudioBg3dProductionIntentState,
 ): StudioBg3dProductionIntentId | null {
   for (const definition of STUDIO_BG3D_PRODUCTION_INTENTS) {
-    const selectedPasses = resolveStudioBg3dProductionBatchPreset(
+    const selectedPasses = resolveIntentPasses(
       state.availablePasses,
       definition.batchPreset,
+      state.look,
     );
     if (
       samePassSet(state.selectedPasses, selectedPasses) &&
