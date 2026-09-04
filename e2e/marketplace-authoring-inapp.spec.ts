@@ -73,6 +73,22 @@ test("marketplace authoring remains operable in Chromium in-app profiles", async
       );
       const clippedButtons: string[] = [];
       const undersizedButtons: string[] = [];
+
+      const isInsideIntentionalHorizontalScroller = (element: HTMLElement) => {
+        let ancestor: HTMLElement | null = element.parentElement;
+        while (ancestor && root.contains(ancestor)) {
+          const ancestorStyle = getComputedStyle(ancestor);
+          if (
+            (ancestorStyle.overflowX === "auto" || ancestorStyle.overflowX === "scroll")
+            && ancestor.scrollWidth > ancestor.clientWidth + 1
+          ) {
+            return true;
+          }
+          ancestor = ancestor.parentElement;
+        }
+        return false;
+      };
+
       for (const button of root.querySelectorAll("button")) {
         const element = button as HTMLElement;
         const rect = element.getBoundingClientRect();
@@ -84,8 +100,11 @@ test("marketplace authoring remains operable in Chromium in-app profiles", async
           || rect.height === 0
         ) continue;
         if (
-          rect.right > document.documentElement.clientWidth + 1
-          || rect.left < -1
+          (
+            rect.right > document.documentElement.clientWidth + 1
+            || rect.left < -1
+          )
+          && !isInsideIntentionalHorizontalScroller(element)
         ) {
           clippedButtons.push(
             element.getAttribute("aria-label")
