@@ -49,6 +49,8 @@ export function useStudioPreferencesRuntime({
   const [railMoreOpen, setRailMoreOpen] = useState(false);
   const appSettingsRef = useRef(appSettings);
   const appSettingsUserRevisionRef = useRef(0);
+  const applyMirroredSettingsRef = useRef(applyMirroredSettings);
+  const closeRightPanelForFocusModeRef = useRef(closeRightPanelForFocusMode);
   const uiBooleanPreferenceRevisionsRef = useRef<
     Record<StudioUiBooleanPreferenceKey, number>
   >({
@@ -58,6 +60,8 @@ export function useStudioPreferencesRuntime({
     "comment-pins-hidden": 0,
   });
   appSettingsRef.current = appSettings;
+  applyMirroredSettingsRef.current = applyMirroredSettings;
+  closeRightPanelForFocusModeRef.current = closeRightPanelForFocusMode;
 
   const [effectFavoriteState, setEffectFavoriteState] = useState<StudioEffectFavoriteState>(() =>
     normalizeStudioEffectFavoriteState(undefined),
@@ -86,8 +90,10 @@ export function useStudioPreferencesRuntime({
             appSettingsRef.current = hydrated;
             setAppSettings(hydrated);
             setUiDensityMode(hydrated.general.densityMode);
-            if (hydrated.general.densityMode === "focus") closeRightPanelForFocusMode();
-            applyMirroredSettings(hydrated);
+            if (hydrated.general.densityMode === "focus") {
+              closeRightPanelForFocusModeRef.current();
+            }
+            applyMirroredSettingsRef.current(hydrated);
           } else {
             try {
               await repository.saveAppSettings(appSettingsRef.current);
@@ -137,7 +143,7 @@ export function useStudioPreferencesRuntime({
     return () => {
       cancelled = true;
     };
-  }, [applyMirroredSettings, closeRightPanelForFocusMode]);
+  }, []);
 
   const persistAppSettings = useCallback((next: StudioAppSettings): void => {
     const revision = ++appSettingsUserRevisionRef.current;
@@ -167,7 +173,7 @@ export function useStudioPreferencesRuntime({
   }, []);
 
   const setStudioUiDensity = useCallback((mode: StudioUiDensityMode): void => {
-    if (mode === "focus") closeRightPanelForFocusMode();
+    if (mode === "focus") closeRightPanelForFocusModeRef.current();
     setUiDensityMode(mode);
     const current = appSettingsRef.current;
     const next = current.general.densityMode === mode
@@ -175,18 +181,18 @@ export function useStudioPreferencesRuntime({
       : { ...current, general: { ...current.general, densityMode: mode } };
     if (next !== current) setAppSettings(next);
     persistAppSettings(next);
-  }, [closeRightPanelForFocusMode, persistAppSettings]);
+  }, [persistAppSettings]);
 
   const commitAppSettings = useCallback((next: StudioAppSettings): void => {
     appSettingsRef.current = next;
     setAppSettings(next);
     persistAppSettings(next);
     setUiDensityMode(next.general.densityMode);
-    applyMirroredSettings(next);
-  }, [applyMirroredSettings, persistAppSettings]);
+    applyMirroredSettingsRef.current(next);
+  }, [persistAppSettings]);
 
-  // Effect Events must stay inside the effect that consumes them. This command is part of the
-  // hook's public API, so expose the stable callback that already reads current settings via refs.
+  // Effect Events cannot cross a custom-hook boundary. The public command remains stable while the
+  // callback refs above keep its host-owned side effects current without restarting hydration.
   const setStudioUiDensityFromCompanion = setStudioUiDensity;
   const isRailToolVisible = useCallback(
     (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
