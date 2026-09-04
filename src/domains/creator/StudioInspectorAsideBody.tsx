@@ -4,6 +4,7 @@ import {
   resolveStudioFigmaSelectionLayoutMetrics,
   selectStudioFigmaDesignTargets,
 } from "./studio-figma-selection-ux";
+import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
@@ -40,6 +41,13 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   } = model;
   const hasMultiSelection =
     inspectorContentMode === "selection" && marqueeIds.length > 1;
+  const figmaDesignTargets = inspectorContentMode === "selection"
+    ? selectStudioFigmaDesignTargets(elements, marqueeIds, selected)
+    : [];
+  const figmaSelectionMetrics = resolveStudioFigmaSelectionLayoutMetrics(figmaDesignTargets);
+  const multiRotationSupported =
+    figmaDesignTargets.length < 2
+    || figmaDesignTargets.every(studioGroupUniformResizeMemberCanRotate);
 
   return (
     <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
@@ -88,10 +96,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           {inspectorContentMode === "selection" && (
             <div>
               <StudioFigmaDesignPanel
-                metrics={resolveStudioFigmaSelectionLayoutMetrics(
-                  selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
-                )}
+                metrics={figmaSelectionMetrics}
                 disabled={inspectorInteractionPolicy.selection.disabled}
+                multiRotationSupported={multiRotationSupported}
                 onChange={applyFigmaSelectionLayoutPatch}
                 onZoomToSelection={zoomToSelection}
                 onFlipHorizontal={() => flipSelected("horizontal")}
