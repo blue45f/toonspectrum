@@ -1,0 +1,162 @@
+name: Architecture PR 690 main synchronization
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/architecture-main-sync-pr690.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: architecture-main-sync-pr690
+  cancel-in-progress: false
+
+jobs:
+  synchronize-and-verify:
+    name: synchronize and verify exact merge tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PR_NUMBER: "690"
+      BRANCH_NAME: refactor/layered-architecture-20260904
+      WORKFLOW_PATH: .github/workflows/architecture-main-sync-pr690.yml
+    steps:
+      - name: Check out architecture branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/layered-architecture-20260904
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Configure repository identity
+        run: |
+          git config user.name "toonstudio-architecture-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Remove the one-off workflow from the candidate tree
+        run: |
+          git rm "$WORKFLOW_PATH"
+          git commit -m "chore(architecture): remove one-off main synchronization workflow"
+
+      - name: Merge the current main branch
+        id: merge
+        run: |
+          git fetch origin main
+          BASE_BEFORE="$(git merge-base HEAD origin/main)"
+          echo "base_before=$BASE_BEFORE" >> "$GITHUB_OUTPUT"
+          git merge --no-edit --no-ff -X ours origin/main
+          git diff --check origin/main...HEAD
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "candidate_tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+
+      - name: Guard current-main additions from accidental deletion
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          deleted = subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=D", "origin/main...HEAD"],
+              text=True,
+          ).splitlines()
+          allowed = {
+              ".github/qa/studio-soak-run-20260902-03kST.md",
+          }
+          unexpected = [path for path in deleted if path not in allowed]
+          if unexpected:
+              raise SystemExit(
+                  "architecture merge unexpectedly deletes current-main files:\n"
+                  + "\n".join(f" - {path}" for path in unexpected)
+              )
+          print("current-main deletion guard passed")
+          PY
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify exact synchronized tree
+        run: |
+          pnpm run validate:architecture
+          pnpm run ci
+          git diff --check
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "verification mutated tracked files" >&2
+            git status --short
+            git diff --stat
+            exit 1
+          fi
+
+      - name: Push synchronized branch
+        id: push
+        run: |
+          git push origin "HEAD:$BRANCH_NAME"
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish required core success for the verified exact tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.head_sha }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/statuses/$VERIFIED_SHA" \
+            -f state=success \
+            -f context=core \
+            -f description="Exact synchronized tree passed the complete pnpm CI gate" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Squash merge PR 690
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.head_sha }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            RESULT="$(gh api \
+              --method PUT \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${{ github.repository }}/pulls/$PR_NUMBER/merge" \
+              -f merge_method=squash \
+              -f sha="$VERIFIED_SHA" \
+              -f commit_title="refactor(architecture): layer routes and extract studio runtimes (#690)" \
+              -f commit_message="Adopt layered route ownership, extract Studio runtimes, and enforce architecture ratchets." \
+              2>&1)" && {
+                echo "$RESULT"
+                exit 0
+              }
+            echo "$RESULT"
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Remove one-off workflow after a failed verification
+        if: failure() && steps.push.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin "$BRANCH_NAME"
+          git reset --hard "origin/$BRANCH_NAME"
+          if [ -f "$WORKFLOW_PATH" ]; then
+            git rm "$WORKFLOW_PATH"
+            git commit -m "chore(architecture): remove failed one-off synchronization workflow"
+            git push origin "HEAD:$BRANCH_NAME"
+          fi
