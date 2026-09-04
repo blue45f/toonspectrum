@@ -36,14 +36,15 @@ const RESOURCE_ID = "20000000-0000-4000-8000-000000000001";
 describe("MarketSocialProofBar", () => {
   it("links aggregate ratings and comments to their detail sections", () => {
     mocks.useMarketSocial.mockReturnValue({
-      snapshot: {
+      status: "ready",
+      data: {
         resourceId: RESOURCE_ID,
+        publisherId: "30000000-0000-4000-8000-000000000001",
+        packageId: "brush.ink.production",
+        resourceVersion: "2.1.0",
         comments: [],
-        commentCount: 7,
-        commentsTruncated: false,
         reviews: [],
-        reviewsTruncated: false,
-        reviewStats: {
+        stats: {
           average: 4.7,
           totalCount: 12,
           recommendPercentage: 92,
@@ -51,17 +52,29 @@ describe("MarketSocialProofBar", () => {
         },
         viewer: {
           authenticated: true,
-          isPublisher: false,
-          isLibraryMember: true,
-          isStudioVerified: true,
+          libraryMembership: "active",
+          studioVerificationSupported: true,
+          studioInstallVerified: true,
+          canComment: true,
           canReview: true,
-          reviewId: null,
+          reviewQualification: "studio",
+          reviewRequirement: "none",
+          myReviewId: null,
         },
+        totalCommentCount: 7,
+        generatedAt: "2026-09-04T00:00:00.000Z",
+        truncated: { comments: false, reviews: false },
       },
-      loading: false,
-      refreshing: false,
       error: null,
-      reload: vi.fn(),
+      pendingAction: null,
+      refresh: vi.fn(),
+      createComment: vi.fn(),
+      deleteComment: vi.fn(),
+      toggleCommentLike: vi.fn(),
+      saveReview: vi.fn(),
+      deleteReview: vi.fn(),
+      toggleReviewHelpful: vi.fn(),
+      isPending: vi.fn(),
     });
 
     render(<MarketSocialProofBar resourceId={RESOURCE_ID} />);
