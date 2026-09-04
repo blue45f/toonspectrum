@@ -1,0 +1,187 @@
+name: Apply quality-first brush policy patch
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/workflows/patch-brush-quality-policy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/all-brush-long-stroke-quality-election-20260904
+      - name: Apply quality-first policy changes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, before: str, after: str, label: str) -> None:
+              source = path.read_text()
+              count = source.count(before)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              path.write_text(source.replace(before, after, 1))
+
+          election = Path("src/domains/creator/brush/studio-brush-gpu-quality-election.ts")
+          replace_once(
+              election,
+              '''  const heapRegression = input.gpu.performance.heapGrowthBytes !== null
+            && input.baseline.performance.heapGrowthBytes !== null
+            && input.gpu.performance.heapGrowthBytes
+              > input.baseline.performance.heapGrowthBytes + 4 * 1024 * 1024;
+          const performanceNonInferior = ratios.draw <= 1.02
+            && ratios.frameP50 <= 1.02
+            && ratios.frameP95 <= 1.02
+            && ratios.frameP99 <= 1.05
+            && input.gpu.performance.longTaskCount <= input.baseline.performance.longTaskCount + 1
+            && input.gpu.performance.longTaskTotalMilliseconds
+              <= input.baseline.performance.longTaskTotalMilliseconds + 50
+            && !heapRegression;''',
+              '''  // Quality equivalence is the hard product gate. Once every visual, texture,
+          // continuity, input-delivery and physical-adapter assertion is satisfied, GPU may win
+          // with a small bounded overhead. Material regressions remain disqualifying.
+          const heapRegression = input.gpu.performance.heapGrowthBytes !== null
+            && input.baseline.performance.heapGrowthBytes !== null
+            && input.gpu.performance.heapGrowthBytes
+              > input.baseline.performance.heapGrowthBytes + 8 * 1024 * 1024;
+          const performanceNonInferior = ratios.draw <= 1.1
+            && ratios.frameP50 <= 1.1
+            && ratios.frameP95 <= 1.08
+            && ratios.frameP99 <= 1.15
+            && input.gpu.performance.longTaskCount <= input.baseline.performance.longTaskCount + 2
+            && input.gpu.performance.longTaskTotalMilliseconds
+              <= input.baseline.performance.longTaskTotalMilliseconds + 100
+            && !heapRegression;''',
+              "GPU bounded-overhead policy",
+          )
+
+          election_test = Path("src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts")
+          replace_once(
+              election_test,
+              '''  it("rejects a small p95 regression even when pixels are equivalent", () => {
+            const result = electStudioBrushGpuQuality(candidate({
+              gpu: {
+                quality: quality(),
+                performance: performance({ frameP95Milliseconds: 20.6 }),
+              },
+            }));
+            expect(result.selected).toBe("incumbent");
+            expect(result.qualityEquivalent).toBe(true);
+            expect(result.performanceNonInferior).toBe(false);
+            expect(result.reasons).toContain("performance-regression");
+          });''',
+              '''  it("prefers GPU when quality is equivalent and p95 overhead remains modest", () => {
+            const result = electStudioBrushGpuQuality(candidate({
+              gpu: {
+                quality: quality(),
+                performance: performance({
+                  drawMilliseconds: 1_075,
+                  frameP50Milliseconds: 17.8,
+                  frameP95Milliseconds: 21.5,
+                  frameP99Milliseconds: 31.5,
+                  longTaskCount: 3,
+                  longTaskTotalMilliseconds: 150,
+                  heapGrowthBytes: 9 * 1024 * 1024,
+                }),
+              },
+            }));
+            expect(result.selected).toBe("gpu");
+            expect(result.qualityEquivalent).toBe(true);
+            expect(result.performanceNonInferior).toBe(true);
+            expect(result.reasons).toEqual([]);
+          });
+
+          it("keeps the incumbent when equivalent pixels require a material p95 regression", () => {
+            const result = electStudioBrushGpuQuality(candidate({
+              gpu: {
+                quality: quality(),
+                performance: performance({ frameP95Milliseconds: 22 }),
+              },
+            }));
+            expect(result.selected).toBe("incumbent");
+            expect(result.qualityEquivalent).toBe(true);
+            expect(result.performanceNonInferior).toBe(false);
+            expect(result.reasons).toContain("performance-regression");
+          });''',
+              "GPU bounded-overhead tests",
+          )
+
+          curation = Path("src/domains/creator/brush/studio-brush-quality-curation.ts")
+          replace_once(
+              curation,
+              '''function representativeComparator(
+            left: StudioBrushCurationCandidate,
+            right: StudioBrushCurationCandidate,
+          ): number {
+            if (left.protectedFromCulling !== right.protectedFromCulling) {
+              return left.protectedFromCulling ? -1 : 1;
+            }
+            const leftScore = candidateQualityScore(left);
+            const rightScore = candidateQualityScore(right);
+            const qualityDelta = leftScore - rightScore;
+            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+            // GPU is only a tie-breaker after quality is effectively equal.
+            if (left.gpuApproved !== right.gpuApproved) return left.gpuApproved ? -1 : 1;''',
+              '''function representativeComparator(
+            left: StudioBrushCurationCandidate,
+            right: StudioBrushCurationCandidate,
+          ): number {
+            if (left.qualityPassed !== right.qualityPassed) return left.qualityPassed ? -1 : 1;
+            const leftScore = candidateQualityScore(left);
+            const rightScore = candidateQualityScore(right);
+            const qualityDelta = leftScore - rightScore;
+            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
+            // Preserve a canonical starter only after its measured quality is tied with the winner.
+            if (left.protectedFromCulling !== right.protectedFromCulling) {
+              return left.protectedFromCulling ? -1 : 1;
+            }
+            // GPU is only a tie-breaker after quality is effectively equal.
+            if (left.gpuApproved !== right.gpuApproved) return left.gpuApproved ? -1 : 1;''',
+              "curation representative order",
+          )
+
+          curation_test = Path("src/domains/creator/brush/studio-brush-quality-curation.test.ts")
+          anchor = '''  it("never suggests removing more than one protected canonical brush automatically", () => {'''
+          insertion = '''  it("never lets a protected but failing brush beat a passing representative", () => {
+            const clusters = curateStudioBrushCandidates([
+              candidate("protected-failing", {
+                protectedFromCulling: true,
+                qualityPassed: false,
+                listedOrder: 0,
+              }),
+              candidate("passing", {
+                protectedFromCulling: false,
+                qualityPassed: true,
+                listedOrder: 1,
+              }),
+            ]);
+            expect(clusters[0]?.representativeId).toBe("passing");
+          });
+
+          ''' + anchor
+          replace_once(curation_test, anchor, insertion, "curation failing protected test")
+          PY
+          git diff --check
+      - name: Commit source changes only
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          git diff --cached --check
+          git commit -m "feat(brush): prefer quality-tied GPU representatives"
+          git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
