@@ -1,0 +1,286 @@
+name: Rebuild and merge architecture PR 690
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/architecture-rebuild-and-merge-pr690.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: architecture-clean-rebuild-pr690
+  cancel-in-progress: true
+
+jobs:
+  rebuild-verify-merge:
+    name: clean rebuild, complete CI, and squash merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      PR_NUMBER: "690"
+      BRANCH_NAME: refactor/layered-architecture-20260904
+      ORIGINAL_BASE: 0a1ecebec53dd9ec7f91d33dc9b8bb69d0e9e9e3
+      VERIFIED_REFACTOR_HEAD: f53139cdbe8c3d56cf15a65190cc64356bc537f4
+    steps:
+      - name: Check out full repository history
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/layered-architecture-20260904
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Configure repository identity
+        run: |
+          git config user.name "toonstudio-architecture-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Cancel obsolete synchronization runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          current = int(os.environ["GITHUB_RUN_ID"])
+          branch = os.environ["BRANCH_NAME"]
+          payload = subprocess.check_output(
+              [
+                  "gh", "api",
+                  f"repos/{repo}/actions/runs?branch={branch}&per_page=100",
+              ],
+              text=True,
+          )
+          runs = json.loads(payload).get("workflow_runs", [])
+          obsolete = {
+              ".github/workflows/architecture-main-sync-pr690.yml",
+              ".github/workflows/architecture-finalize-pr690.yml",
+          }
+          for run in runs:
+              run_id = int(run.get("id", 0))
+              if run_id == current or run.get("path") not in obsolete:
+                  continue
+              if run.get("status") not in {"queued", "in_progress", "waiting", "requested", "pending"}:
+                  continue
+              subprocess.run(
+                  ["gh", "api", "--method", "POST", f"repos/{repo}/actions/runs/{run_id}/cancel"],
+                  check=False,
+              )
+              print(f"cancel requested for obsolete run {run_id}")
+          PY
+
+      - name: Capture immutable refactor commit sequence
+        id: commits
+        run: |
+          git fetch origin main "$BRANCH_NAME"
+          git cat-file -e "$ORIGINAL_BASE^{commit}"
+          git cat-file -e "$VERIFIED_REFACTOR_HEAD^{commit}"
+          git rev-list --reverse --no-merges "$ORIGINAL_BASE..$VERIFIED_REFACTOR_HEAD" > /tmp/architecture-commits.txt
+          test -s /tmp/architecture-commits.txt
+          echo "count=$(wc -l < /tmp/architecture-commits.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          cat /tmp/architecture-commits.txt
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies once
+        run: pnpm install --frozen-lockfile
+
+      - name: Rebuild on a stable latest main and run the complete gate
+        id: rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          verified=0
+          for round in 1 2 3; do
+            echo "=== clean rebuild round $round ==="
+            git cherry-pick --abort >/dev/null 2>&1 || true
+            git fetch origin main "$BRANCH_NAME"
+            START_MAIN="$(git rev-parse origin/main)"
+            echo "start main: $START_MAIN"
+            git checkout -B architecture-rebuilt "$START_MAIN"
+
+            while IFS= read -r commit; do
+              echo "applying architecture commit $commit"
+              if git cherry-pick -X ours "$commit"; then
+                continue
+              fi
+              if git diff --quiet && git diff --cached --quiet; then
+                git cherry-pick --skip
+                continue
+              fi
+              echo "unresolved cherry-pick state for $commit" >&2
+              git status --short
+              exit 1
+            done < /tmp/architecture-commits.txt
+
+            # None of the transport/synchronization helpers may enter the final tree.
+            for path in \
+              .github/workflows/architecture-rebuild-and-merge-pr690.yml \
+              .github/workflows/architecture-finalize-pr690.yml \
+              .github/workflows/architecture-main-sync-pr690.yml \
+              .github/workflows/architecture-source-snapshot.yml \
+              .github/workflows/architecture-snapshot.yml; do
+              if [ -f "$path" ]; then
+                git rm "$path"
+              fi
+            done
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(architecture): remove one-off synchronization helpers"
+            fi
+
+            python3 - <<'PY'
+          from pathlib import Path
+
+          required = {
+              "src/app/routes/AppRouter.tsx": 160,
+              "src/domains/creator/studio-router/StudioRouter.tsx": 150,
+              "src/domains/creator/StudioCuttoonEditorHost.tsx": 29_700,
+              "src/domains/creator/studio-host-architecture-ratchet.test.ts": 2_000,
+              "scripts/validate-architecture.mjs": 2_000,
+          }
+          errors = []
+          for name, ceiling in required.items():
+              path = Path(name)
+              if not path.exists():
+                  errors.append(f"missing architecture boundary: {name}")
+                  continue
+              lines = len(path.read_text(encoding="utf-8").splitlines())
+              if lines > ceiling:
+                  errors.append(f"architecture line ceiling exceeded: {name}: {lines} > {ceiling}")
+          forbidden = [
+              Path(".github/workflows/architecture-rebuild-and-merge-pr690.yml"),
+              Path(".github/workflows/architecture-finalize-pr690.yml"),
+              Path(".github/workflows/architecture-main-sync-pr690.yml"),
+              Path(".github/workflows/architecture-source-snapshot.yml"),
+              Path(".github/workflows/architecture-snapshot.yml"),
+          ]
+          errors.extend(f"one-off workflow leaked: {path}" for path in forbidden if path.exists())
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print("static architecture ceilings and cleanup guards passed")
+          PY
+
+            git diff --check "$START_MAIN...HEAD"
+            pnpm run validate:architecture
+            pnpm run ci
+            git diff --check
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              echo "complete CI mutated tracked source" >&2
+              git status --short
+              git diff --stat
+              exit 1
+            fi
+
+            git fetch origin main
+            END_MAIN="$(git rev-parse origin/main)"
+            if [ "$END_MAIN" = "$START_MAIN" ]; then
+              VERIFIED_SHA="$(git rev-parse HEAD)"
+              VERIFIED_TREE="$(git rev-parse HEAD^{tree})"
+              echo "main_sha=$START_MAIN" >> "$GITHUB_OUTPUT"
+              echo "sha=$VERIFIED_SHA" >> "$GITHUB_OUTPUT"
+              echo "tree=$VERIFIED_TREE" >> "$GITHUB_OUTPUT"
+              echo "round=$round" >> "$GITHUB_OUTPUT"
+              verified=1
+              break
+            fi
+            echo "main advanced during verification ($START_MAIN -> $END_MAIN); rebuilding again"
+          done
+
+          if [ "$verified" -ne 1 ]; then
+            echo "main did not remain stable across three complete validation rounds" >&2
+            exit 1
+          fi
+
+      - name: Replace PR branch with exact clean verified history
+        id: push
+        env:
+          VERIFIED_SHA: ${{ steps.rebuild.outputs.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+          git fetch origin "$BRANCH_NAME"
+          REMOTE_SHA="$(git rev-parse "origin/$BRANCH_NAME")"
+          git push \
+            --force-with-lease="refs/heads/$BRANCH_NAME:$REMOTE_SHA" \
+            origin "HEAD:refs/heads/$BRANCH_NAME"
+          echo "sha=$VERIFIED_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Publish required core success for the exact fully tested SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.sha }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/statuses/$VERIFIED_SHA" \
+            -f state=success \
+            -f context=core \
+            -f description="Clean latest-main rebuild passed complete pnpm CI" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Verify PR points at exact tested SHA and is mergeable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.sha }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            PR_SHA="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.head.sha')"
+            MERGEABLE="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.mergeable')"
+            STATE="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.mergeable_state')"
+            echo "head=$PR_SHA mergeable=$MERGEABLE state=$STATE"
+            if [ "$PR_SHA" = "$VERIFIED_SHA" ] && [ "$MERGEABLE" = "true" ]; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Squash merge exact verified architecture tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_SHA: ${{ steps.push.outputs.sha }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if gh api \
+              --method PUT \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${{ github.repository }}/pulls/$PR_NUMBER/merge" \
+              -f merge_method=squash \
+              -f sha="$VERIFIED_SHA" \
+              -f commit_title="refactor(architecture): layer routes and extract studio runtimes (#690)" \
+              -f commit_message="Rebuild the refactor on the latest main, preserve current product changes, extract Studio runtimes, and enforce architecture ratchets."; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Verify main contains the merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MERGED="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.merged')"
+          MERGED_AT="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.merged_at')"
+          MERGE_SHA="$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq '.merge_commit_sha')"
+          test "$MERGED" = "true"
+          echo "PR #$PR_NUMBER merged at $MERGED_AT as $MERGE_SHA"
