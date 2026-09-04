@@ -14,15 +14,15 @@ function cameraFromBookmark(
   baseCamera: StudioBg3dCameraSettings,
   bookmark: WebtoonShotBookmark,
 ): StudioBg3dCameraSettings {
-  const position = [
-    bookmark.position[0],
-    bookmark.position[1],
-    bookmark.position[2],
-  ] as const;
   const target = [
-    bookmark.target[0],
-    bookmark.target[1],
-    bookmark.target[2],
+    baseCamera.target[0],
+    baseCamera.target[1],
+    baseCamera.target[2],
+  ] as const;
+  const position = [
+    target[0] + bookmark.position[0] - bookmark.target[0],
+    target[1] + bookmark.position[1] - bookmark.target[1],
+    target[2] + bookmark.position[2] - bookmark.target[2],
   ] as const;
   const up = createStudioBg3dCameraUpForDutchRoll(
     { position, target },
