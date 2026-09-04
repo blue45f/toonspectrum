@@ -137,6 +137,16 @@ interface SurfaceEvidence {
   readonly gpuSurfaceKinds: readonly string[];
   readonly refusedStrokeNotices: number;
 }
+interface GpuAdapterEvidence {
+  readonly available: boolean;
+  readonly adapterClass: "hardware" | "software" | "unknown" | "unavailable";
+  readonly isFallbackAdapter: boolean | null;
+  readonly adapterFingerprint: string | null;
+  readonly vendor: string;
+  readonly architecture: string;
+  readonly device: string;
+  readonly description: string;
+}
 type GateGlobals = typeof globalThis & {
   __longStrokeGate?: { moves: number; coalesced: number; rejections: number };
   __longStrokeFrames?: number[];
@@ -145,6 +155,76 @@ type GateGlobals = typeof globalThis & {
   __longStrokeStop?: () => void;
   gc?: () => void;
 };
+
+async function inspectGpuAdapter(page: Page): Promise<GpuAdapterEvidence> {
+  const unavailable: GpuAdapterEvidence = Object.freeze({
+    available: false,
+    adapterClass: "unavailable",
+    isFallbackAdapter: null,
+    adapterFingerprint: null,
+    vendor: "",
+    architecture: "",
+    device: "",
+    description: "",
+  });
+  if (!WEBGPU) return unavailable;
+  return page.evaluate(async () => {
+    type AdapterInfoLike = Readonly<{
+      vendor?: unknown;
+      architecture?: unknown;
+      device?: unknown;
+      description?: unknown;
+    }>;
+    type AdapterLike = Readonly<{
+      info?: AdapterInfoLike;
+      isFallbackAdapter?: unknown;
+    }>;
+    type NavigatorWithGpu = Navigator & Readonly<{
+      gpu?: Readonly<{
+        requestAdapter(options?: Readonly<{ powerPreference?: "high-performance" }>):
+          Promise<AdapterLike | null>;
+      }>;
+    }>;
+    const gpu = (navigator as NavigatorWithGpu).gpu;
+    if (!gpu) return null;
+    const adapter = await gpu.requestAdapter({
+      powerPreference: "high-performance",
+    }) as AdapterLike | null;
+    if (!adapter) return null;
+    const info = adapter.info ?? {};
+    const text = (value: unknown): string =>
+      typeof value === "string" ? value.trim() : "";
+    const vendor = text(info.vendor);
+    const architecture = text(info.architecture);
+    const device = text(info.device);
+    const description = text(info.description);
+    const fallbackValue = adapter.isFallbackAdapter;
+    const isFallbackAdapter = typeof fallbackValue === "boolean"
+      ? fallbackValue
+      : null;
+    const adapterFingerprint = [vendor, architecture, device, description]
+      .filter((value) => value.length > 0)
+      .join(":") || null;
+    const identity = adapterFingerprint?.toLowerCase() ?? "";
+    const software = /swiftshader|llvmpipe|lavapipe|software|warp|basic render/u
+      .test(identity);
+    const adapterClass = isFallbackAdapter === true || software
+      ? "software" as const
+      : adapterFingerprint
+        ? "hardware" as const
+        : "unknown" as const;
+    return {
+      available: true,
+      adapterClass,
+      isFallbackAdapter,
+      adapterFingerprint,
+      vendor,
+      architecture,
+      device,
+      description,
+    };
+  }).then((result) => result ?? unavailable).catch(() => unavailable);
+}
 
 function log(message: string): void {
   console.log(`[verify-studio-long-stroke] ${message}`);
@@ -742,6 +822,9 @@ async function main(): Promise<void> {
     await page.addInitScript("globalThis.__name ??= (target) => target;");
     await installGateGlobals(page);
     await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    const gpuAdapter = await inspectGpuAdapter(page);
+    report.gpuAdapter = gpuAdapter;
+    log(`gpu adapter: ${gpuAdapter.adapterClass} · ${gpuAdapter.adapterFingerprint ?? "unidentified"}`);
     await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 60_000 })
       .catch(() => undefined);
     await dismissChrome(page);
