@@ -16,11 +16,9 @@ import {
 
 import { isAllowedCsrfOrigin, isSameRequestOrigin } from "../../csrf-middleware";
 
-import {
-  TrafficAnalyticsService,
-  type TrafficRequestContext,
-} from "./traffic-analytics.service";
+import { TrafficAnalyticsService } from "./traffic-analytics.service";
 
+import type { TrafficRequestContext } from "./traffic-analytics-model";
 import type { Request } from "express";
 
 function singleHeader(value: string | string[] | undefined): string | undefined {
