@@ -19,7 +19,7 @@ concurrency:
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[inkwash-live-preview-applied]') }}
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
