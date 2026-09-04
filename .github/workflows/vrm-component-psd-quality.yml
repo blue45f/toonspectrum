@@ -1,0 +1,55 @@
+name: VRM component PSD quality
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/vrm-component-psd-quality.yml"
+      - "docs/studio/vrm-component-psd-linked-render.md"
+      - "src/domains/creator/vrm/studio-vrm-component-pass-plan*"
+      - "src/domains/creator/vrm/studio-vrm-component-psd*"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/vrm-component-psd-quality.yml"
+      - "docs/studio/vrm-component-psd-linked-render.md"
+      - "src/domains/creator/vrm/studio-vrm-component-pass-plan*"
+      - "src/domains/creator/vrm/studio-vrm-component-psd*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vrm-component-psd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  component-psd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify semantic component capture and real PSD output
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.ts \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec vitest run \
+            src/domains/creator/vrm/studio-vrm-component-pass-plan.test.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
