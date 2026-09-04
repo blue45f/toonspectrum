@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { auditStudioInspectorDensity } from "./studio-inspector-dom-density";
 import { StudioInspectorBatchRenameSection } from "./StudioInspectorBatchRenameSection";
 
-import type { ImageEl } from "./studio-element-model";
+import type { El, ImageEl } from "./studio-element-model";
 
 function image(id: string, name: string, y: number, locked = false): ImageEl {
   return {
@@ -48,7 +48,7 @@ describe("StudioInspectorBatchRenameSection", () => {
   });
 
   it("previews layer order and commits the complete rename exactly once", () => {
-    const commit = vi.fn(() => true);
+    const commit = vi.fn((_next: El[]) => true);
     const announce = vi.fn();
     render(
       <StudioInspectorBatchRenameSection
