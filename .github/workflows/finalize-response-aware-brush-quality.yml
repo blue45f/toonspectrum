@@ -1,0 +1,81 @@
+name: Finalize response-aware brush quality sources
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/workflows/finalize-response-aware-brush-quality.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-response-aware-brush-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/all-brush-long-stroke-quality-election-20260904
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Restore exact locally validated sources
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import gzip
+          import hashlib
+
+          files = (
+              (
+                  ".github/brush-quality-payloads/curation.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.ts",
+                  "3904f19aeb0ebc9dd951cd4722d195307dce2840b62c210c0bc6ec47f9ab8748",
+              ),
+              (
+                  ".github/brush-quality-payloads/curation.test.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.test.ts",
+                  "6a37d4d3753e5eee800064ed858e10af3e1b794fe72e8fe5c2c661b13d9cc7bb",
+              ),
+              (
+                  ".github/brush-quality-payloads/analyze.mts.gz.b64",
+                  "scripts/analyze-studio-brush-similarity.mts",
+                  "9b10f1a811bf8f22ea0fcfbcf1e2fbe439126f74ae0f2b55ec9bc3856bfbf479",
+              ),
+          )
+          for payload_path, target_path, expected_sha256 in files:
+              encoded = Path(payload_path).read_text(encoding="utf-8").strip()
+              restored = gzip.decompress(base64.b64decode(encoded))
+              actual_sha256 = hashlib.sha256(restored).hexdigest()
+              if actual_sha256 != expected_sha256:
+                  raise SystemExit(
+                      f"{target_path}: sha256 mismatch {actual_sha256} != {expected_sha256}"
+                  )
+              target = Path(target_path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(restored)
+              print(f"restored {target_path} ({len(restored)} bytes)")
+          PY
+          git diff --check
+
+      - name: Commit source-only result
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            src/domains/creator/brush/studio-brush-quality-curation.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            scripts/analyze-studio-brush-similarity.mts
+          git diff --cached --check
+          git commit -m "feat(brush): preserve live texture and hand-feel distinctions"
+          git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
