@@ -1,0 +1,67 @@
+name: Sync all-brush quality benchmark with main
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/trigger/all-brush-quality-sync-main.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-all-brush-quality-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Merge current main without discarding benchmark work
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git fetch origin main
+          git merge --no-edit origin/main
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify merged benchmark source
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.test.ts \
+            src/domains/creator/render/studio-webgpu-dab-tile-binning.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            scripts/run-studio-all-brush-long-stroke-shard.mts \
+            scripts/aggregate-studio-all-brush-long-stroke.mts \
+            scripts/verify-studio-long-stroke.mts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts \
+            src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts \
+            src/domains/creator/live/studio-live-ink-lane-admission.ts
+          NODE_OPTIONS='--max-old-space-size=8192' pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Remove one-shot sync workflow and push
+        run: |
+          set -euo pipefail
+          rm -f .github/trigger/all-brush-quality-sync-main.txt
+          rm -f .github/workflows/studio-all-brush-quality-sync-main.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'ci(brush): sync exhaustive quality benchmark with main'
+          fi
+          git push origin HEAD:${GITHUB_REF_NAME}
