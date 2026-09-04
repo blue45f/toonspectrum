@@ -1,35 +1,47 @@
 import {
   CheckCircle2,
+  Cloud,
+  LoaderCircle,
+  Palette,
   PenTool,
+  RefreshCw,
+  ShieldCheck,
   Star,
   ThumbsUp,
   Trash2,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
-
 import {
-  addMarketReview,
-  deleteMarketReview,
-  getMarketReviews,
-  toggleMarketReviewHelpful,
-  MARKET_SOCIAL_EVENT,
-} from "../models/market-social-store";
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+
+import { useMarketSocial } from "../hooks/use-market-social";
+
+import type {
+  CreatorMarketplaceSocialAuthorBadge,
+  CreatorMarketplaceSocialReview,
+} from "@/lib/creator-marketplace-social-contract";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
+import Link from "@/src/compat/router-link";
 
 interface MarketReviewsSectionProps {
   resourceId: string;
 }
 
+type ReviewSort = "helpful" | "newest" | "rating";
+
 const RATING_DESCRIPTIONS: Record<number, string> = {
-  5: "최고예요! 상업 연재 작업에 큰 도움이 됩니다.",
-  4: "좋아요! 실무 컷 작업에 유용하게 씁니다.",
+  5: "최고예요! 실제 연재 작업에 큰 도움이 됩니다.",
+  4: "좋아요! 실무 컷 작업에 유용합니다.",
   3: "보통이에요. 무난하게 쓸 만합니다.",
-  2: "아쉬워요. 설정 조절이 조금 필요해요.",
-  1: "별로예요. 개선이 필요해 보여요.",
+  2: "아쉬워요. 설정 조절이 필요합니다.",
+  1: "개선이 필요해 보여요.",
 };
 
 const SUGGESTED_ROLE_TAGS = [
@@ -38,164 +50,278 @@ const SUGGESTED_ROLE_TAGS = [
   "콘티/데생 작가",
   "일러스트레이터",
   "웹툰 지망생",
-];
+] as const;
 
 const SUGGESTED_REVIEW_TAGS = [
   "선화 최적",
   "작업 속도 단축",
   "필압 우수",
-  "3D 구도 잡기 편함",
+  "3D 구도 편리",
   "색감 통일성",
   "레이어 분리 깔끔",
-];
+] as const;
 
-export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) {
+function formatDate(value: string): string {
+  try {
+    return new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return value.slice(0, 10);
+  }
+}
+
+function ReviewAuthorBadge({
+  badge,
+}: {
+  badge: CreatorMarketplaceSocialAuthorBadge;
+}) {
+  if (badge === "studio-verified") {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-semibold text-good">
+        <ShieldCheck className="size-2.5" aria-hidden="true" />
+        Studio 사용 인증
+      </span>
+    );
+  }
+  if (badge === "library-member") {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded bg-cool/15 px-1.5 py-0.5 text-[0.62rem] font-medium text-cool">
+        <Cloud className="size-2.5" aria-hidden="true" />
+        보관함 회원
+      </span>
+    );
+  }
+  if (badge === "publisher") {
+    return (
+      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[0.62rem] font-semibold text-accent">
+        배급자
+      </span>
+    );
+  }
+  return null;
+}
+
+function sortedReviews(
+  reviews: readonly CreatorMarketplaceSocialReview[],
+  sort: ReviewSort,
+): CreatorMarketplaceSocialReview[] {
+  return [...reviews].sort((left, right) => {
+    if (sort === "helpful") {
+      return right.helpfulCount - left.helpfulCount
+        || right.createdAt.localeCompare(left.createdAt);
+    }
+    if (sort === "rating") {
+      return right.rating - left.rating
+        || right.helpfulCount - left.helpfulCount;
+    }
+    return right.createdAt.localeCompare(left.createdAt);
+  });
+}
+
+// A fresh `[]` each render hands every memo below a new dependency identity, so they
+// recompute every render and memoise nothing. One frozen empty keeps it stable while
+// `data` is still loading.
+const NO_REVIEWS: readonly CreatorMarketplaceSocialReview[] = Object.freeze([]);
+
+export function MarketReviewsSection({
+  resourceId,
+}: MarketReviewsSectionProps) {
   const session = useSession();
-  const loggedInUserName =
-    session.status === "authenticated"
-      ? (session.data as { name?: string; nickname?: string })?.nickname
-        || (session.data as { name?: string; nickname?: string })?.name
-      : undefined;
-
-  const [{ reviews, stats }, setSocialData] = useState(() =>
-    getMarketReviews(resourceId),
-  );
-
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [rating, setRating] = useState<number>(5);
-  const [hoverRating, setHoverRating] = useState<number>(0);
+  const viewerKey = session.status === "authenticated"
+    ? session.data.user.id
+    : "guest";
+  const {
+    status,
+    data,
+    error,
+    pendingAction,
+    refresh,
+    saveReview,
+    deleteReview,
+    toggleReviewHelpful,
+  } = useMarketSocial(resourceId, viewerKey);
+  const [sort, setSort] = useState<ReviewSort>("helpful");
+  const [formOpen, setFormOpen] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [titleInput, setTitleInput] = useState("");
   const [contentInput, setContentInput] = useState("");
-  const [authorNameInput, setAuthorNameInput] = useState(loggedInUserName ?? "");
-  const [selectedRoleTag, setSelectedRoleTag] = useState("현역 웹툰 작가");
-  const [selectedTags, setSelectedTags] = useState<string[]>([
-    "선화 최적",
-    "작업 속도 단축",
-  ]);
+  const [roleTag, setRoleTag] = useState<string>(SUGGESTED_ROLE_TAGS[0]);
+  const [tags, setTags] = useState<string[]>([]);
 
-  useEffect(() => {
-    const refresh = () => setSocialData(getMarketReviews(resourceId));
-    window.addEventListener(MARKET_SOCIAL_EVENT, refresh);
-    return () => window.removeEventListener(MARKET_SOCIAL_EVENT, refresh);
-  }, [resourceId]);
-
-  useEffect(() => {
-    if (loggedInUserName && !authorNameInput) {
-      setAuthorNameInput(loggedInUserName);
-    }
-  }, [loggedInUserName, authorNameInput]);
-
-  const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter((t) => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
+  const reviews = data?.reviews ?? NO_REVIEWS;
+  const displayReviews = useMemo(
+    () => sortedReviews(reviews, sort),
+    [reviews, sort],
+  );
+  const mine = data?.viewer.myReviewId
+    ? reviews.find((review) => review.id === data.viewer.myReviewId) ?? null
+    : null;
+  const stats = data?.stats ?? {
+    average: 0,
+    totalCount: 0,
+    recommendPercentage: 0,
+    distribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
   };
 
-  const handleReviewSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!titleInput.trim() || !contentInput.trim()) return;
-
-    addMarketReview(resourceId, {
-      rating,
-      title: titleInput,
-      content: contentInput,
-      authorName: authorNameInput || "웹툰 창작자",
-      roleTag: selectedRoleTag,
-      tags: selectedTags.length > 0 ? selectedTags : undefined,
-    });
-
+  useEffect(() => {
+    setFormOpen(false);
+    setRating(5);
+    setHoverRating(0);
     setTitleInput("");
     setContentInput("");
-    setIsFormOpen(false);
-    setSocialData(getMarketReviews(resourceId));
-  };
+    setRoleTag(SUGGESTED_ROLE_TAGS[0]);
+    setTags([]);
+  }, [resourceId]);
 
-  const effectiveRating = hoverRating > 0 ? hoverRating : rating;
+  function openEditor(): void {
+    if (!data?.viewer.canReview) return;
+    if (mine) {
+      setRating(mine.rating);
+      setTitleInput(mine.title);
+      setContentInput(mine.content);
+      setRoleTag(mine.roleTag || SUGGESTED_ROLE_TAGS[0]);
+      setTags([...mine.tags]);
+    } else {
+      setRating(5);
+      setTitleInput("");
+      setContentInput("");
+      setRoleTag(SUGGESTED_ROLE_TAGS[0]);
+      setTags([]);
+    }
+    setFormOpen(true);
+  }
+
+  function toggleTag(tag: string): void {
+    setTags((current) => current.includes(tag)
+      ? current.filter((candidate) => candidate !== tag)
+      : current.length >= 5
+        ? current
+        : [...current, tag]);
+  }
+
+  async function submitReview(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!titleInput.trim() || !contentInput.trim() || !data?.viewer.canReview) {
+      return;
+    }
+    try {
+      await saveReview({
+        rating,
+        title: titleInput.trim(),
+        content: contentInput.trim(),
+        roleTag,
+        tags,
+      });
+      setFormOpen(false);
+    } catch {
+      // Shared store exposes the server message in the inline error status.
+    }
+  }
+
+  const effectiveRating = hoverRating || rating;
+  const reviewRequirement = data?.viewer.reviewRequirement ?? "login";
+  const loadingInitial = status === "loading" && !data;
 
   return (
     <section
       aria-labelledby="market-reviews-heading"
       className="rounded-xl border border-line bg-card p-5 sm:p-6"
     >
-      {/* Reviews Summary Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-4">
         <div>
           <h2
             id="market-reviews-heading"
             className="flex items-center gap-2 text-base font-bold text-fg sm:text-lg"
           >
             <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden="true" />
-            <span>작가 평점 & 활용 리뷰</span>
+            <span>Studio 검증 평점 & 활용 리뷰</span>
           </h2>
-          <p className="mt-0.5 text-xs text-fg-3">
-            실제 스튜디오에서 소재를 활용한 웹툰 작가들의 실측 피드백
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
+            계정 라이브러리에 추가하고 Studio 설치·적용까지 완료한 사용자만 평가할 수 있어 썸네일 인상보다 실제 작업 경험을 반영합니다.
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setIsFormOpen((prev) => !prev)}
-          className={buttonClass({
-            variant: isFormOpen ? "outline" : "solid",
-            size: "sm",
-            className: "gap-1.5",
-          })}
-        >
-          <PenTool className="size-3.5" aria-hidden="true" />
-          <span>{isFormOpen ? "작성 취소" : "리뷰 작성하기"}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={status === "loading"}
+            aria-label="리뷰 새로고침"
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+          >
+            <RefreshCw
+              className={cn("size-3.5", status === "loading" && "animate-spin")}
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => formOpen ? setFormOpen(false) : openEditor()}
+            disabled={!data?.viewer.canReview || Boolean(pendingAction)}
+            title={!data?.viewer.canReview
+              ? "계정 라이브러리 추가와 Studio 적용을 완료해야 합니다."
+              : undefined}
+            className={buttonClass({
+              variant: formOpen ? "outline" : "solid",
+              size: "sm",
+              className: "gap-1.5 disabled:cursor-not-allowed disabled:opacity-45",
+            })}
+          >
+            <PenTool className="size-3.5" aria-hidden="true" />
+            {formOpen ? "작성 취소" : mine ? "내 리뷰 수정" : "리뷰 작성"}
+          </button>
+        </div>
       </div>
 
-      {/* Aggregate Score & Distribution Bar Chart */}
-      <div className="mt-4 grid gap-6 rounded-xl border border-line/60 bg-panel/30 p-4 sm:grid-cols-[160px_minmax(0,1fr)]">
-        {/* Score Column */}
-        <div className="flex flex-col items-center justify-center border-b border-line/50 pb-4 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-4 text-center">
-          <div className="text-4xl font-extrabold text-fg numeral tnum">
+      <div className="mt-4 grid gap-6 rounded-xl border border-line/60 bg-panel/30 p-4 sm:grid-cols-[170px_minmax(0,1fr)]">
+        <div className="flex flex-col items-center justify-center border-b border-line/50 pb-4 text-center sm:border-b-0 sm:border-r sm:pb-0 sm:pr-4">
+          <div className="numeral tnum text-4xl font-extrabold text-fg">
             {stats.average.toFixed(1)}
           </div>
-          <div className="mt-1 flex text-amber-400">
-            {Array.from({ length: 5 }, (_, i) => (
+          <div className="mt-1 flex" aria-label={`평균 ${stats.average.toFixed(1)}점`}>
+            {Array.from({ length: 5 }, (_, index) => (
               <Star
-                key={i}
+                key={index}
                 className={cn(
                   "size-4",
-                  i < Math.round(stats.average)
+                  index < Math.round(stats.average)
                     ? "fill-amber-400 text-amber-400"
                     : "text-line-strong",
                 )}
+                aria-hidden="true"
               />
             ))}
           </div>
           <p className="mt-1.5 text-xs font-medium text-fg-2">
-            총 <span className="numeral tnum font-bold">{stats.totalCount}</span>개의 평가
+            총 <span className="numeral tnum font-bold">{stats.totalCount}</span>개의 검증 평가
           </p>
           <div className="mt-1 inline-flex items-center gap-1 rounded bg-good/15 px-2 py-0.5 text-[0.68rem] font-semibold text-good">
-            <UserCheck className="size-3" />
-            <span>{stats.recommendPercentage}% 작가 추천</span>
+            <UserCheck className="size-3" aria-hidden="true" />
+            {stats.recommendPercentage}% 추천
           </div>
         </div>
 
-        {/* 5-star to 1-star Breakdown Bars */}
         <div className="flex flex-col justify-center gap-1.5 text-xs">
           {([5, 4, 3, 2, 1] as const).map((star) => {
-            const count = stats.distribution[star];
-            const percentage =
-              stats.totalCount > 0 ? Math.round((count / stats.totalCount) * 100) : 0;
+            const count = stats.distribution[String(star) as "1" | "2" | "3" | "4" | "5"];
+            const percentage = stats.totalCount > 0
+              ? Math.round((count / stats.totalCount) * 100)
+              : 0;
             return (
               <div key={star} className="flex items-center gap-2">
-                <span className="w-8 shrink-0 font-medium text-fg-3 flex items-center gap-0.5">
-                  <span>{star}</span>
-                  <Star className="size-3 fill-amber-400 text-amber-400" />
+                <span className="flex w-8 shrink-0 items-center gap-0.5 font-medium text-fg-3">
+                  {star}<Star className="size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
                 </span>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-raised">
                   <div
-                    className="h-full rounded-full bg-amber-400 transition-all duration-300"
+                    className="h-full rounded-full bg-amber-400 transition-[width] duration-300"
                     style={{ width: `${percentage}%` }}
                   />
                 </div>
-                <span className="w-10 text-right text-[0.68rem] numeral tnum text-fg-3">
+                <span className="numeral tnum w-10 text-right text-[0.68rem] text-fg-3">
                   {count}개
                 </span>
               </div>
@@ -204,26 +330,60 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
         </div>
       </div>
 
-      {/* Review Submission Form (Expandable) */}
-      {isFormOpen ? (
+      {data ? (
+        <div className={cn(
+          "mt-4 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2.5 text-xs",
+          data.viewer.canReview
+            ? "border-good/35 bg-good/10 text-good"
+            : "border-line bg-panel text-fg-2",
+        )}>
+          {data.viewer.canReview ? (
+            <>
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+              <span className="font-semibold">Studio 사용 인증 완료 · 리뷰 작성 가능</span>
+            </>
+          ) : reviewRequirement === "login" ? (
+            <span>로그인 후 보관함·Studio 적용 이력을 확인합니다.</span>
+          ) : reviewRequirement === "publisher-cannot-review" ? (
+            <span>배급자는 자신의 리소스에 평점을 남길 수 없습니다.</span>
+          ) : reviewRequirement === "add-to-library" ? (
+            <>
+              <Cloud className="size-4 text-cool" aria-hidden="true" />
+              <span>먼저 상세 페이지의 계정 라이브러리 버튼으로 이 리소스를 소장해 주세요.</span>
+            </>
+          ) : (
+            <>
+              <Palette className="size-4 text-accent" aria-hidden="true" />
+              <span>Studio에서 실제 설치·적용을 완료하면 리뷰가 열립니다.</span>
+              <Link
+                href={`/studio?installMarketResource=${resourceId}&assetMarket=community`}
+                className="ml-auto font-semibold text-accent hover:underline"
+              >
+                Studio에서 적용
+              </Link>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {formOpen && data?.viewer.canReview ? (
         <form
-          onSubmit={handleReviewSubmit}
-          className="mt-5 rounded-xl border border-accent/40 bg-panel/70 p-4 sm:p-5 shadow-sm space-y-4"
+          onSubmit={(event) => void submitReview(event)}
+          className="mt-5 space-y-4 rounded-xl border border-accent/40 bg-panel/70 p-4 shadow-sm sm:p-5"
         >
-          <div className="flex items-center justify-between border-b border-line/60 pb-2.5">
-            <h3 className="text-sm font-bold text-fg flex items-center gap-1.5">
-              <PenTool className="size-4 text-accent" />
-              <span>에셋 활용 리뷰 남기기</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-2.5">
+            <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+              <PenTool className="size-4 text-accent" aria-hidden="true" />
+              {mine ? "내 Studio 활용 리뷰 수정" : "Studio 활용 리뷰 남기기"}
             </h3>
             <span className="text-[0.68rem] text-fg-3">
-              작성된 리뷰는 에셋 마켓 상세 페이지에 즉시 반영됩니다.
+              계정 이름과 Studio 인증 상태가 함께 표시됩니다.
             </span>
           </div>
 
-          {/* Star Rating Picker */}
-          <div>
-            <span className="block text-xs font-semibold text-fg">별점 선택</span>
-            <div className="mt-1.5 flex items-center gap-3">
+          <fieldset>
+            <legend className="text-xs font-semibold text-fg">별점 선택</legend>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -232,8 +392,9 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-0.5 transition-transform hover:scale-110 focus:outline-none"
+                    className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     aria-label={`${star}점`}
+                    aria-pressed={rating === star}
                   >
                     <Star
                       className={cn(
@@ -242,91 +403,82 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
                           ? "fill-amber-400 text-amber-400"
                           : "text-line-strong",
                       )}
+                      aria-hidden="true"
                     />
                   </button>
                 ))}
               </div>
               <span className="text-xs font-medium text-fg-2">
-                {RATING_DESCRIPTIONS[effectiveRating] ?? ""}
+                {RATING_DESCRIPTIONS[effectiveRating]}
               </span>
             </div>
-          </div>
+          </fieldset>
 
-          {/* Role & Name */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="review-author-name" className="block text-xs font-semibold text-fg">창작자 닉네임</label>
-              <input
-                id="review-author-name"
-                type="text"
-                value={authorNameInput}
-                onChange={(e) => setAuthorNameInput(e.target.value)}
-                placeholder="예: 웹툰 작가 민우"
-                maxLength={20}
-                className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
-              />
-            </div>
-            <div>
-              <label htmlFor="review-role-tag" className="block text-xs font-semibold text-fg">작가 역할 태그</label>
-              <select
-                id="review-role-tag"
-                value={selectedRoleTag}
-                onChange={(e) => setSelectedRoleTag(e.target.value)}
-                className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg focus:border-accent focus:outline-none"
-              >
-                {SUGGESTED_ROLE_TAGS.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Title & Body */}
           <div>
-            <label htmlFor="review-title" className="block text-xs font-semibold text-fg">리뷰 제목</label>
+            <label htmlFor="review-role-tag" className="block text-xs font-semibold text-fg">
+              작업 역할
+            </label>
+            <select
+              id="review-role-tag"
+              value={roleTag}
+              onChange={(event) => setRoleTag(event.target.value)}
+              className="mt-1 h-9 w-full rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus:border-accent focus:outline-none sm:max-w-xs"
+            >
+              {SUGGESTED_ROLE_TAGS.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="review-title" className="block text-xs font-semibold text-fg">
+              리뷰 제목
+            </label>
             <input
               id="review-title"
-              type="text"
               value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-              placeholder="예: 선화 추출과 투시 구도 잡을 때 필수입니다"
+              onChange={(event) => setTitleInput(event.target.value)}
               maxLength={80}
               required
-              className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
+              placeholder="예: 선화 작업 시간이 확실히 줄었습니다"
+              className="mt-1 h-9 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg focus:border-accent focus:outline-none"
             />
           </div>
 
           <div>
-            <label htmlFor="review-content" className="block text-xs font-semibold text-fg">상세 리뷰 내용</label>
+            <label htmlFor="review-content" className="block text-xs font-semibold text-fg">
+              실제 적용 경험
+            </label>
             <textarea
               id="review-content"
               rows={4}
               value={contentInput}
-              onChange={(e) => setContentInput(e.target.value)}
-              placeholder="스튜디오에서 어떻게 활용하셨는지, 선화·채색·연출 작업에 어떤 점이 좋았는지 자세한 팁을 나눠주세요."
-              maxLength={1000}
+              onChange={(event) => setContentInput(event.target.value)}
+              maxLength={1_000}
               required
+              placeholder="어떤 컷과 설정에서 사용했는지, 품질·성능·호환성의 장단점을 구체적으로 남겨 주세요."
               className="mt-1 w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
             />
+            <p className="mt-1 text-right text-[0.65rem] text-fg-3">
+              {contentInput.length} / 1,000자
+            </p>
           </div>
 
-          {/* Quick Tags Selection */}
-          <div>
-            <span className="block text-xs font-semibold text-fg">핵심 장점 키워드</span>
+          <fieldset>
+            <legend className="text-xs font-semibold text-fg">핵심 키워드</legend>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {SUGGESTED_REVIEW_TAGS.map((tag) => {
-                const active = selectedTags.includes(tag);
+                const active = tags.includes(tag);
                 return (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
+                    aria-pressed={active}
                     className={cn(
                       "rounded-md border px-2 py-1 text-[0.68rem] font-medium transition-colors",
                       active
-                        ? "border-accent bg-accent/15 text-accent font-bold"
+                        ? "border-accent bg-accent/15 text-accent"
                         : "border-line bg-card text-fg-3 hover:text-fg",
                     )}
                   >
@@ -335,141 +487,168 @@ export function MarketReviewsSection({ resourceId }: MarketReviewsSectionProps) 
                 );
               })}
             </div>
-          </div>
+          </fieldset>
 
-          {/* Form Actions */}
           <div className="flex items-center justify-end gap-2 border-t border-line/60 pt-3">
             <button
               type="button"
-              onClick={() => setIsFormOpen(false)}
+              onClick={() => setFormOpen(false)}
               className={buttonClass({ variant: "ghost", size: "sm" })}
             >
               취소
             </button>
             <button
               type="submit"
-              disabled={!titleInput.trim() || !contentInput.trim()}
+              disabled={!titleInput.trim() || !contentInput.trim() || Boolean(pendingAction)}
               className={buttonClass({
                 variant: "solid",
                 size: "sm",
-                className: "disabled:opacity-40",
+                className: "gap-1.5 disabled:opacity-40",
               })}
             >
-              리뷰 등록하기
+              {pendingAction === "review:save" ? (
+                <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+              ) : null}
+              {mine ? "리뷰 수정" : "리뷰 등록"}
             </button>
           </div>
         </form>
       ) : null}
 
-      {/* Reviews List */}
-      <div className="mt-5 space-y-3.5">
-        {reviews.length === 0 ? (
+      {error ? (
+        <div role="alert" className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="ml-auto font-semibold text-accent hover:underline"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-fg-2">검증된 사용자 리뷰</p>
+        <label className="flex items-center gap-2 text-[0.68rem] text-fg-3">
+          정렬
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value as ReviewSort)}
+            className="h-8 rounded-lg border border-line bg-panel px-2 text-xs text-fg focus:border-accent focus:outline-none"
+          >
+            <option value="helpful">도움순</option>
+            <option value="newest">최신순</option>
+            <option value="rating">평점 높은순</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-3 space-y-3.5">
+        {loadingInitial ? (
+          <div role="status" className="space-y-3" aria-label="리뷰 불러오는 중">
+            {Array.from({ length: 2 }, (_, index) => (
+              <div key={index} className="rounded-xl border border-line/60 bg-panel/30 p-4">
+                <div className="skeleton h-4 w-40" />
+                <div className="skeleton mt-3 h-3 w-full" />
+                <div className="skeleton mt-2 h-3 w-4/5" />
+              </div>
+            ))}
+          </div>
+        ) : displayReviews.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-panel/50 py-8 text-center">
             <p className="text-xs font-medium text-fg-2">
-              아직 등록된 작가 리뷰가 없습니다. 첫 번째 리뷰를 남겨보세요!
+              아직 검증된 활용 리뷰가 없습니다.
             </p>
           </div>
         ) : (
-          reviews.map((rev) => (
-            <article
-              key={rev.id}
-              className="rounded-xl border border-line/60 bg-panel/40 p-4 transition-colors hover:border-line-strong"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-fg">
-                      {rev.author.name}
-                    </span>
-                    {rev.author.roleTag ? (
-                      <span className="rounded bg-raised px-1.5 py-0.5 text-[0.62rem] font-medium text-fg-2">
-                        {rev.author.roleTag}
-                      </span>
-                    ) : null}
-                    {rev.author.isVerifiedBuyer ? (
-                      <span className="inline-flex items-center gap-0.5 text-[0.62rem] font-medium text-good">
-                        <CheckCircle2 className="size-2.5" /> 구매 인증
-                      </span>
+          displayReviews.map((review) => (
+            <article key={review.id} className="rounded-xl border border-line/60 bg-panel/30 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-bold text-fg">{review.author.name}</span>
+                    <ReviewAuthorBadge badge={review.author.badge} />
+                    {review.roleTag ? (
+                      <span className="text-[0.65rem] text-fg-3">· {review.roleTag}</span>
                     ) : null}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
-                    <div className="flex text-amber-400">
-                      {Array.from({ length: 5 }, (_, i) => (
+                    <span className="flex" aria-label={`${review.rating}점`}>
+                      {Array.from({ length: 5 }, (_, index) => (
                         <Star
-                          key={i}
+                          key={index}
                           className={cn(
-                            "size-3",
-                            i < Math.round(rev.rating)
+                            "size-3.5",
+                            index < review.rating
                               ? "fill-amber-400 text-amber-400"
                               : "text-line-strong",
                           )}
+                          aria-hidden="true"
                         />
                       ))}
-                    </div>
-                    <time
-                      dateTime={rev.createdAt}
-                      className="text-[0.65rem] text-fg-3"
-                    >
-                      {rev.createdAt.slice(0, 10)}
+                    </span>
+                    <time dateTime={review.createdAt} className="text-[0.65rem] text-fg-3">
+                      {formatDate(review.createdAt)}
                     </time>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      toggleMarketReviewHelpful(resourceId, rev.id);
-                      setSocialData(getMarketReviews(resourceId));
-                    }}
+                    onClick={() => void toggleReviewHelpful(review.id).catch(() => undefined)}
+                    disabled={session.status !== "authenticated" || Boolean(pendingAction)}
+                    aria-pressed={review.helpfulByViewer}
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.68rem] font-medium transition-colors",
-                      rev.helpfulByMe
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[0.68rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      review.helpfulByViewer
                         ? "border-accent bg-accent/15 text-accent"
                         : "border-line bg-card text-fg-3 hover:text-fg",
                     )}
                   >
                     <ThumbsUp className="size-3" aria-hidden="true" />
-                    <span>도움이 돼요 {rev.helpfulCount > 0 ? rev.helpfulCount : ""}</span>
+                    도움 {review.helpfulCount > 0 ? review.helpfulCount : ""}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      deleteMarketReview(resourceId, rev.id);
-                      setSocialData(getMarketReviews(resourceId));
-                    }}
-                    title="리뷰 삭제"
-                    className="p-1 text-fg-3 opacity-50 hover:text-warn hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                    <span className="sr-only">삭제</span>
-                  </button>
+                  {review.isMine ? (
+                    <button
+                      type="button"
+                      onClick={() => void deleteReview().catch(() => undefined)}
+                      disabled={Boolean(pendingAction)}
+                      aria-label="내 리뷰 삭제"
+                      className="rounded p-1.5 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn disabled:opacity-40"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
-              <h4 className="mt-2 text-xs font-bold text-fg leading-snug">
-                {rev.title}
-              </h4>
-              <p className="mt-1 text-xs leading-relaxed text-fg-2 whitespace-pre-wrap">
-                {rev.content}
+              <h3 className="mt-3 text-sm font-bold leading-snug text-fg">
+                {review.title}
+              </h3>
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-fg-2">
+                {review.content}
               </p>
 
-              {rev.tags && rev.tags.length > 0 ? (
-                <div className="mt-2.5 flex flex-wrap gap-1">
-                  {rev.tags.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded bg-raised/80 px-1.5 py-0.5 text-[0.62rem] text-fg-3"
-                    >
-                      #{t}
-                    </span>
+              {review.tags.length > 0 ? (
+                <ul className="mt-2.5 flex flex-wrap gap-1">
+                  {review.tags.map((tag) => (
+                    <li key={tag} className="rounded bg-raised/80 px-1.5 py-0.5 text-[0.62rem] text-fg-3">
+                      #{tag}
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : null}
             </article>
           ))
         )}
       </div>
+
+      {data?.truncated.reviews ? (
+        <p className="mt-4 text-center text-[0.68rem] text-fg-3">
+          리뷰가 많아 최신 100개를 표시하고 있습니다.
+        </p>
+      ) : null}
     </section>
   );
 }

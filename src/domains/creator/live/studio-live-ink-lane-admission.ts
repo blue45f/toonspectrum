@@ -1,3 +1,5 @@
+import { studioBrushGpuQualityEvidenceAllows } from "../brush/studio-brush-gpu-quality-evidence";
+
 import type { DrawEl } from "../studio-element-model";
 
 /**
@@ -40,8 +42,10 @@ export interface StudioLiveInkLaneSelectionInput {
 export function studioLiveInkLaneSelectsGpu(input: StudioLiveInkLaneSelectionInput): boolean {
   if (input.explicitBackend === "canvas2d") return false;
   if (!studioLiveInkLaneAdmitsStyle(input.element)) return false;
-  return input.explicitBackend === "webgpu"
-    || (input.rolloutPrefersGpu && input.hardwareReady);
+  if (input.explicitBackend === "webgpu") return true;
+  return input.rolloutPrefersGpu
+    && input.hardwareReady
+    && studioBrushGpuQualityEvidenceAllows(input.element.brushCatalogId);
 }
 
 /**
