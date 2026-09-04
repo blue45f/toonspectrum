@@ -416,7 +416,9 @@ function buildHairEntries(): CharacterSlotEntry[] {
       volume: seed.hair.volume ?? HAIR_DEFAULTS.volume,
     },
     apply: { kind: "forge-hair", hair: seed.hair },
-    requires: MODEL_LOADED,
+    // 「헤어 없음」은 모델이 가진 헤어를 감추는 것이 전부다. 헤어가 얼굴·몸 메시에 합쳐진
+    // 모델에서는 감출 대상이 없으므로, 적용된 척하지 않고 이유를 밝힌다.
+    requires: seed.hair.style === "none" ? [{ kind: "hair-original" as const }] : MODEL_LOADED,
     exportLayer: "hair-front",
   }));
   return [original, ...styles];

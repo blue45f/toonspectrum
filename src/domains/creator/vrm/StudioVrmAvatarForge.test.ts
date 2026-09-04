@@ -8,6 +8,7 @@ import {
 import {
   countDetectedVrmHairMeshes,
   createAvatarForgeHairGeometry,
+  shouldHideAuthoredVrmHair,
 } from "./StudioVrmAvatarForge";
 
 import type { AvatarForgeHairPart, AvatarForgeHairStyle } from "./studio-vrm-avatar-forge";
@@ -175,5 +176,29 @@ describe("Avatar Forge toon-clump geometry quality", () => {
     const tipWidth = spread(18, 0);
     expect(rootDepth).toBeLessThan(rootWidth * 0.5);
     expect(tipWidth).toBeLessThan(rootWidth * 0.08);
+  });
+});
+
+describe("shouldHideAuthoredVrmHair", () => {
+  it("hides the model's own hair whenever the creator asked for it", () => {
+    expect(shouldHideAuthoredVrmHair({ replaceOriginal: true })).toBe(true);
+    expect(shouldHideAuthoredVrmHair({ replaceOriginal: false })).toBe(false);
+  });
+
+  it("keeps hiding it for the 'none' style, which is how a bald head is authored", () => {
+    // The Character Shaper's 「헤어 없음」 card is exactly this combination, and its copy promises
+    // the authored hair disappears. Excluding "none" here made that card apply with no visible
+    // change — the dishonest state the slot catalog exists to prevent.
+    const bald = createAvatarForgeState();
+    bald.hair.style = "none";
+    bald.hair.replaceOriginal = true;
+    expect(shouldHideAuthoredVrmHair(bald.hair)).toBe(true);
+  });
+
+  it("restores the authored hair through the toggle rather than through a style", () => {
+    const restored = createAvatarForgeState();
+    restored.hair.style = "bob";
+    restored.hair.replaceOriginal = false;
+    expect(shouldHideAuthoredVrmHair(restored.hair)).toBe(false);
   });
 });

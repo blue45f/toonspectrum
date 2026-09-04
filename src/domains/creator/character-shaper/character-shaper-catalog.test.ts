@@ -421,3 +421,19 @@ describe("character shaper catalog — search", () => {
     expect(searchCharacterSlotEntries("hair", "보브 romance", "romance").map((item) => item.id)).toEqual(["hair:bob"]);
   });
 });
+
+describe("hair:none", () => {
+  it("asks for a separable authored hair mesh, because hiding one is all it does", () => {
+    const noHair = findCharacterSlotEntry("hair:none");
+    expect(noHair).not.toBeNull();
+    expect(noHair?.requires).toEqual([{ kind: "hair-original" }]);
+  });
+
+  it("still turns procedural hair off and asks the runtime to hide the model's hair", () => {
+    const noHair = findCharacterSlotEntry("hair:none");
+    expect(noHair?.apply).toMatchObject({
+      kind: "forge-hair",
+      hair: { style: "none", replaceOriginal: true },
+    });
+  });
+});

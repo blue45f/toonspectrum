@@ -110,21 +110,43 @@ pnpm exec eslint --max-warnings=0 <변경 파일 전부>   # → 0 problems
 세션 백(`StudioCuttoonEditorViewSessionCore/Rest`)의 `any` 개수는 래칫이라 새 필드는 `any` 가
 아니라 실제 타입(`boolean`, setter 시그니처)으로 넣었다.
 
-## 5. Browser evidence — TODO (스크린샷 단계)
+## 5. Browser evidence (2026-09-04, 개발 서버 + Playwright/SwiftShader)
 
-아래는 개발 서버 + Playwright(SwiftShader) 검증 단계에서 채운다. 이 세션에서는 서버를 켜지 않았고,
-따라서 **실제 GPU 경로는 아직 확인되지 않았다.**
+`pnpm verify:studio-character-shaper` 로 재현한다. 실행 결과는
+`docs/screenshots/character-shaper/character-shaper-evidence.json`, 캡처는 같은 디렉터리에 있다.
+검증 스크립트는 이미지에 들어 있는 Chromium 을 직접 가리키고, WebGL 캔버스가
+`preserveDrawingBuffer: false` 이므로 합성된 스크린샷을 페이지 안에서 다시 디코딩해 통계를 낸다
+(`e2e/studio-3d-visual-verification.spec.ts` 와 같은 기법).
 
-- [ ] `/studio/character` 데스크톱 1440×900 — 번들 샘플 VRM 로드, 슬롯 레일·선반·인스펙터·독이 한 화면에
-- [ ] `/studio/character` 모바일 390×844 — 뷰포트 상단 + 가로 레일 + 바텀 시트 두 스냅
-- [ ] 헤어 카드 커밋 전/후 픽셀 diff (뷰포트가 실제로 바뀌는지)
-- [ ] 워드로브 카드 커밋 전/후 픽셀 diff
-- [ ] 투명 배경 PNG 캡처가 비어 있지 않은지(알파 커버리지 > 0)
-- [ ] PSD 내보내기 영수증에 레이어 ≥ 8개, `skipped` 목록의 이유가 사람 문장인지
-- [ ] 표면 드로잉 켜기 → 획 → PSD 「표면 드로잉」 그룹 생성 확인
-- [ ] 참고 이미지 탭을 표면 드로잉 중에 열었다가 닫으면 드로잉이 돌아오는지
-- [ ] Esc 순서(서랍 → 시트 → 드로잉 → 대화상자)와 포커스 복귀
-- [ ] 스크린샷 저장 위치: `docs/screenshots/character-shaper/`
+| 항목 | 결과 |
+| --- | --- |
+| `/studio/character` 데스크톱 1440×900 | `character-desktop.png` — 레일·선반·뷰포트·인스펙터·독이 한 화면 |
+| `/studio/character` 모바일 390×844 | `character-mobile.png` — 가로 overflow 없음(스크립트가 단언) |
+| 헤어 카드 커밋 전/후 | 타일 휘도 최대 변화 **32.3** |
+| 워드로브 카드 커밋 전/후 | 타일 휘도 최대 변화 **85.2** |
+| PSD 내보내기 영수증 | 레이어 **10개** — 주선·윤곽선 / 음영·어두운 면 / 밑색(얼굴·상의·하의·피부) / 미리보기 |
+| 대화상자 안 접근 가능한 이름 누락 | **0건** |
+| 페이지 오류 | **0건** |
+
+아직 자동 검증에 들어 있지 않은 항목: 투명 PNG 알파 커버리지, 표면 드로잉 획 → PSD 「표면 드로잉」
+그룹 생성, 참고 서랍을 드로잉 중에 여닫는 왕복, Esc 순서와 포커스 복귀. 수동으로 확인했고
+스크립트에 넣는 것은 후속 작업이다.
+
+### 이 검증이 실제로 잡아낸 결함
+
+첫 실행에서 헤어 카드의 타일 변화가 **0** 이었다. 「헤어 없음」 카드는 "원본 헤어를 숨깁니다" 라고
+적혀 있는데 화면이 그대로였다 — 카탈로그가 막으려던 바로 그 상태다. 원인은 셰이퍼가 아니라
+`StudioVrmAvatarForge` 의 헤어 감춤 조건이었다: `replaceOriginal` 이 켜져 있어도 스타일이 `none`
+이면 건너뛰었다. `replaceOriginal` 하나만으로 판단하도록 고쳤고(민머리를 만드는 조합이 바로 이것이다),
+`shouldHideAuthoredVrmHair` 로 의도를 문서화해 회귀 테스트를 붙였다. 고친 뒤 같은 검증에서 32.3 이
+나왔고, 헤어가 사라졌으므로 PSD 의 머리 마스크가 비어 정직하게 빠져 레이어가 11 → 10 으로 줄었다.
+
+### 셰이퍼가 만들지 않은, 그러나 눈에 띄는 문제
+
+절차적 워드로브 상의(티셔츠)가 몸에 맞지 않고 조각난 판으로 보인다(`character-desktop-top.png`).
+같은 모델·같은 옷을 기존 `3D 캐릭터` 빌더에서 입혀도 결과가 동일하므로 이번 변경의 회귀가 아니라
+`buildGarmentParts` 의 기존 품질 한계다. 셰이퍼는 그 경로를 한 번의 클릭 거리로 당겨 놓았을 뿐이며,
+의상 메시 품질 자체는 별도 작업으로 남는다.
 
 ## 6. 남은 한계 (정직한 목록)
 

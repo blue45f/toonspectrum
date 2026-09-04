@@ -1,0 +1,27 @@
+{
+  "origin": "http://127.0.0.1:5173",
+  "capturedAt": "2026-09-04T05:15:28.673Z",
+  "beforeStats": {
+    "width": 662,
+    "height": 760,
+    "distinctColors": 363,
+    "dominantShare": 0.3168489583333333,
+    "meanLuma": 49.31918402778559
+  },
+  "hairPeakTileDelta": 32.30499999999975,
+  "topPeakTileDelta": 85.21583333333345,
+  "accessibleNameGaps": [],
+  "psdLayers": [
+    "주선",
+    "윤곽선",
+    "음영",
+    "어두운 면",
+    "밑색",
+    "얼굴",
+    "상의",
+    "하의",
+    "피부",
+    "미리보기 (Beauty)"
+  ],
+  "consoleErrors": []
+}
