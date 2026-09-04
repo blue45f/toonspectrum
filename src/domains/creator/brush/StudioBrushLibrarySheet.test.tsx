@@ -239,12 +239,14 @@ describe("StudioBrushLibrarySheet", () => {
     expect(sheetSource).toContain("triggerElement");
   });
 
-  it("keeps outside-pointer focus on the newly chosen control and fits short viewports", () => {
+  it("keeps mobile outside-pointer dismissal while desktop becomes a persistent comparison window", () => {
     expect(sheetSource).toContain('onClose("outside-pointer")');
     expect(sheetSource).toContain('onClose("escape")');
-    expect(sheetSource).toContain('onClose("selection")');
-    expect(sheetSource).toContain("spaceAbove >= spaceBelow");
-    expect(sheetSource).not.toContain("Math.max(224, viewportHeight - bottom - 8)");
+    expect(sheetSource).toContain('if (closeOnSelection) onClose("selection")');
+    expect(sheetSource).toContain("dismissOnOutsidePointer={!desktop}");
+    expect(sheetSource).toContain("closeOnSelection={!desktop}");
+    expect(sheetSource).toContain("StudioFloatingSurface");
+    expect(sheetSource).toContain("useStudioFloatingSurfaceLayout");
   });
 
   it("keeps catalog search, tabs, close, and favorites at 44px touch density", () => {

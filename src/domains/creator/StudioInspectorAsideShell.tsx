@@ -1,8 +1,10 @@
 import {
   ChevronRight,
   Loader2,
+  Move,
+  PanelRight,
 } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { StudioLayerCompsPanel } from "./layer/StudioLayerCompsPanel";
@@ -23,10 +25,16 @@ import { executeStudioInspectorRouteTransition } from "./studio-inspector-tool-t
 import { isEffectivelyHidden } from "./studio-layers";
 import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
 import { resolveStudioTemplateGutterCapability } from "./studio-template-gutter-layout";
+import {
+  DEFAULT_STUDIO_INSPECTOR_FLOATING_LAYOUT,
+  loadStudioDetachablePanelState,
+  saveStudioDetachablePanelState,
+} from "./studio-detachable-panels";
 import { StudioLayerNavigator } from "./studio-page-lazy-ui";
 import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
 import { STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH } from "./studio-workspace-layout-metrics";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
+import { StudioDetachablePanelSlot } from "./StudioDetachablePanelSlot";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import {
@@ -178,12 +186,34 @@ export function StudioInspectorAsideShell({
     && inspectorLayout.primary === "properties"
     && rightResize.width >= STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH;
   const layersPaneMounted = inspectorLayout.primary === "layers" || layersSplitWithProperties;
+  const [detached, setDetached] = useState(() =>
+    loadStudioDetachablePanelState("inspector")
+  );
+  const desktopDetached = !isMobile && detached;
+  const setInspectorDetached = (next: boolean): void => {
+    setDetached(next);
+    saveStudioDetachablePanelState("inspector", next);
+    if (next) setRightPanelOpen(true);
+  };
   return (
+    <StudioDetachablePanelSlot
+      detached={desktopDetached && visibleRightPanelOpen}
+      surfaceId="inspector"
+      label="작업 패널"
+      defaultLayout={DEFAULT_STUDIO_INSPECTOR_FLOATING_LAYOUT}
+      minWidth={360}
+      minHeight={480}
+      maxWidth={920}
+      maxHeight={1_100}
+      allowedDockEdges={["left", "right"]}
+      onClose={() => setRightPanelOpen(false)}
+    >
         <aside
           ref={propsSheetRef}
           role={isMobile ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-sheet-id="props"
+          data-studio-panel-detached={desktopDetached ? "true" : undefined}
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
@@ -195,6 +225,7 @@ export function StudioInspectorAsideShell({
             "fixed inset-x-0 bottom-0 z-[60] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
+            desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:self-auto lg:border-0 lg:bg-transparent lg:p-0",
             !visibleRightPanelOpen && "lg:hidden",
             inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden",
             inspectorDrawing &&
@@ -210,7 +241,9 @@ export function StudioInspectorAsideShell({
                     safeMobileKeyboardInset,
                   ),
                 }
-              : { width: rightResize.width, minWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum }
+              : desktopDetached
+                ? { width: "100%", minWidth: 0 }
+                : { width: rightResize.width, minWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum }
           }
         >
           <StudioCommandSearchHost
@@ -227,15 +260,30 @@ export function StudioInspectorAsideShell({
             }}
             trailing={
               isMobile ? null : (
-                <button
-                  type="button"
-                  onClick={() => setRightPanelOpen(false)}
-                  aria-label="작업 패널 접기"
-                  className="mr-1 hidden min-h-9 shrink-0 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
-                  title="작업 패널 접기"
-                >
-                  접기 <ChevronRight size={12} aria-hidden />
-                </button>
+                <div className="mr-1 hidden shrink-0 items-center gap-1 lg:flex">
+                  <button
+                    type="button"
+                    onClick={() => setInspectorDetached(!detached)}
+                    aria-label={detached
+                      ? "작업 패널을 오른쪽 패널에 붙이기"
+                      : "작업 패널을 창으로 분리"}
+                    aria-pressed={desktopDetached}
+                    className="inline-flex min-h-9 items-center gap-1 rounded px-2 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    title={detached ? "오른쪽 패널에 붙이기" : "자유 배치 창으로 분리"}
+                  >
+                    {detached ? <PanelRight size={12} aria-hidden /> : <Move size={12} aria-hidden />}
+                    {detached ? "붙이기" : "분리"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelOpen(false)}
+                    aria-label="작업 패널 접기"
+                    className="inline-flex min-h-9 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    title="작업 패널 접기"
+                  >
+                    접기 <ChevronRight size={12} aria-hidden />
+                  </button>
+                </div>
               )
             }
             onNavigateInspector={(route, focusTarget) => {
@@ -671,5 +719,6 @@ export function StudioInspectorAsideShell({
             }}
           />
         </aside>
+    </StudioDetachablePanelSlot>
   );
 }
