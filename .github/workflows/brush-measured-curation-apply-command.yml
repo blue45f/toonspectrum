@@ -1,0 +1,216 @@
+name: One-shot apply measured brush curation
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: apply-measured-brush-curation
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: >-
+      github.event.issue.pull_request
+      && github.event.issue.number == 679
+      && github.event.comment.body == '/apply-latest-measured-brush-curation-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_BRANCH: feat/all-brush-long-stroke-quality-election-20260904
+      CANDIDATE_WORKFLOW: brush-measured-curation-patch-candidate.yml
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Wait for latest successful measured patch candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=""
+          artifact_id=""
+          for _ in $(seq 1 240); do
+            run_id="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/${CANDIDATE_WORKFLOW}/runs?status=completed&per_page=30" \
+              --jq '.workflow_runs | map(select(.conclusion == "success")) | sort_by(.created_at) | reverse | .[0].id // empty')"
+            if [[ -n "$run_id" ]]; then
+              artifact_id="$(gh api \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+                --jq '.artifacts
+                  | map(select(.expired == false and (.name | startswith("measured-brush-curation-patch-"))))
+                  | sort_by(.created_at) | reverse | .[0].id // empty')"
+            fi
+            [[ -n "$artifact_id" ]] && break
+            sleep 30
+          done
+          if [[ -z "$run_id" || -z "$artifact_id" ]]; then
+            echo "No successful measured curation patch artifact became available." >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Download measured patch candidate
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.candidate.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate
+          gh api -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > candidate.zip
+          unzip -q candidate.zip -d candidate
+          test -f candidate/measured-brush-curation.patch
+          test -f candidate/measured-brush-curation-summary.json
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+          path: source
+
+      - name: Verify exact benchmark HEAD and patch scope
+        id: scope
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ../candidate/measured-brush-curation.patch .
+          cp ../candidate/measured-brush-curation-summary.json .
+          benchmark_head="$(python3 -c 'import json; print(json.load(open("measured-brush-curation-summary.json"))["benchmarkHeadSha"])')"
+          quarantine_count="$(python3 -c 'import json; print(len(json.load(open("measured-brush-curation-summary.json"))["quarantineIds"]))')"
+          current_head="$(git rev-parse HEAD)"
+          if [[ "$current_head" != "$benchmark_head" ]]; then
+            echo "current feature HEAD $current_head differs from benchmark HEAD $benchmark_head" >&2
+            exit 1
+          fi
+
+          mapfile -t changed < <(git apply --numstat measured-brush-curation.patch | awk '{print $3}' | sort -u)
+          allowed=(
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          )
+          for path in "${changed[@]}"; do
+            permitted=false
+            for candidate_path in "${allowed[@]}"; do
+              [[ "$path" == "$candidate_path" ]] && permitted=true
+            done
+            if [[ "$permitted" != true ]]; then
+              echo "Patch changes forbidden path: $path" >&2
+              exit 1
+            fi
+          done
+          git apply --check measured-brush-curation.patch
+          git apply measured-brush-curation.patch
+          rm measured-brush-curation.patch measured-brush-curation-summary.json
+          git diff --check
+          echo "benchmark_head=$benchmark_head" >> "$GITHUB_OUTPUT"
+          echo "quarantine_count=$quarantine_count" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: source
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate UI-only curation and replay compatibility boundary
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+          )
+          [[ -f src/domains/creator/brush/studio-brush-quarantine.test.ts ]] \
+            && tests+=(src/domains/creator/brush/studio-brush-quarantine.test.ts)
+          pnpm exec vitest run "${tests[@]}"
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+          mapfile -t changed < <(git diff --name-only)
+          for path in "${changed[@]}"; do
+            case "$path" in
+              src/domains/creator/brush/studio-brush-quality-curation.generated.ts|\
+              src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts|\
+              src/domains/creator/brush/studio-brush-quarantine.ts) ;;
+              *) echo "Unexpected changed path after validation: $path" >&2; exit 1 ;;
+            esac
+          done
+
+      - name: Publish evidence-bound curation
+        id: publish
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.ts \
+            src/domains/creator/brush/studio-brush-quality-curation.generated.test.ts \
+            src/domains/creator/brush/studio-brush-quarantine.ts
+          if git diff --cached --quiet; then
+            echo "No curation change to publish."
+            echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "feat(brush): apply measured quality-equivalent catalogue curation"
+          git push origin HEAD:${TARGET_BRANCH}
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Post success receipt
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: [
+                '✅ **측정 기반 브러시 노출 축소 적용 완료**',
+                '',
+                `- benchmark HEAD: \`${{ steps.scope.outputs.benchmark_head }}\``,
+                `- resulting HEAD: \`${{ steps.publish.outputs.head_sha }}\``,
+                `- UI 노출 격리: **${{ steps.scope.outputs.quarantine_count }}개**`,
+                '- runtime brush IDs 삭제 없음',
+                '- 기존 저장 문서 직접 조회·재생 경로 유지',
+                '- 패치 범위: generated evidence + quarantine integration + focused test only',
+                `- candidate validation: ${{ steps.candidate.outputs.run_url }}`,
+              ].join('\n'),
+            });
+
+      - name: Post failure receipt
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body: `❌ 측정 기반 브러시 축소 적용이 중단됐습니다. 품질 증거·HEAD 일치·패치 범위·타입 검사 중 하나를 통과하지 못했으므로 제품 브랜치를 변경하지 않았습니다: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
