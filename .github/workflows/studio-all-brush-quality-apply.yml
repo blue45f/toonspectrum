@@ -52,11 +52,23 @@ jobs:
           from pathlib import Path
           path = Path("scripts/aggregate-studio-all-brush-long-stroke.mts")
           source = path.read_text()
-          old = "let report: LongStrokeReport | null = null;\n      try {"
-          new = "let report: LongStrokeReport | null;\n      try {"
-          if source.count(old) != 1:
-              raise SystemExit(f"expected one report initialization, found {source.count(old)}")
-          path.write_text(source.replace(old, new))
+          replacements = [
+              (
+                  "let report: LongStrokeReport | null = null;\n      try {",
+                  "let report: LongStrokeReport | null;\n      try {",
+                  "report initialization",
+              ),
+              (
+                  "data: image.data as Uint8Array,",
+                  "data: image.getRawImage().data as Uint8Array,",
+                  "public image-js pixel accessor",
+              ),
+          ]
+          for old, new, label in replacements:
+              if source.count(old) != 1:
+                  raise SystemExit(f"expected one {label}, found {source.count(old)}")
+              source = source.replace(old, new)
+          path.write_text(source)
           PY
           pnpm exec eslint --fix \
             scripts/run-studio-all-brush-long-stroke-shard.mts \
