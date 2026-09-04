@@ -4,8 +4,9 @@ import {
   classifyTrafficDevice,
   classifyTrafficSource,
   isExcludedTrafficPath,
+  normalizeTrafficCampaignToken,
   normalizeTrafficPath,
-} from "./traffic-analytics.service";
+} from "./traffic-analytics-model";
 
 describe("traffic analytics privacy boundaries", () => {
   it("keeps only the pathname and removes query or hash data", () => {
@@ -41,6 +42,13 @@ describe("traffic analytics privacy boundaries", () => {
         "Mozilla/5.0 compatible Googlebot/2.1; +https://www.google.com/bot.html",
       ).isBot,
     ).toBe(true);
+  });
+
+  it("normalizes campaign labels without retaining free-form personal data", () => {
+    expect(normalizeTrafficCampaignToken(" launch user@example.com ")).toBe(
+      "launch-user-example.com",
+    );
+    expect(normalizeTrafficCampaignToken("한글 캠페인")).toBeNull();
   });
 
   it("prioritizes explicit campaign attribution over referrer inference", () => {
