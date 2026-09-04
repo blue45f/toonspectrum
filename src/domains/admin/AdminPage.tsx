@@ -17,6 +17,7 @@ import { AdminReports } from "./components/AdminReports";
 import { AdminRevenue } from "./components/AdminRevenue";
 import { AdminSecurity } from "./components/AdminSecurity";
 import { AdminToastProvider } from "./components/AdminToast";
+import { AdminTraffic } from "./components/AdminTraffic";
 
 import { Container } from "@/components/section";
 import { useI18n, useT } from "@/lib/i18n";
@@ -25,6 +26,7 @@ import Link from "@/src/compat/router-link";
 
 type TabKey =
   | "dashboard"
+  | "traffic"
   | "plans"
   | "revenue"
   | "promos"
@@ -47,6 +49,7 @@ export function AdminPage() {
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "dashboard", label: t("admin.tabs.dashboard") },
+    { key: "traffic", label: t("admin.tabs.traffic") },
     { key: "plans", label: t("admin.tabs.plans") },
     { key: "revenue", label: t("admin.tabs.revenue") },
     { key: "promos", label: t("admin.tabs.promos") },
@@ -71,14 +74,19 @@ export function AdminPage() {
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <ShieldCheck size={13} /> {t("admin.console")}
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("admin.title")}</h1>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              {t("admin.title")}
+            </h1>
             <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-3">
               {t("admin.desc")}
             </p>
           </div>
 
           {gate.kind === "admin" && uid && (
-            <AdminQuickPalette userId={uid} onSelectTab={(k) => setTab(k as TabKey)} />
+            <AdminQuickPalette
+              userId={uid}
+              onSelectTab={(key) => setTab(key as TabKey)}
+            />
           )}
         </header>
 
@@ -86,25 +94,32 @@ export function AdminPage() {
 
         {gate.kind === "admin" && uid && (
           <div className="flex flex-col gap-6">
-            {/* Live Analytics Pulse Bar */}
             <AdminHeaderStats userId={uid} />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-fg-3">
-                {gate.me.name ?? gate.me.email} · {t("admin.role")} <span className="text-accent font-semibold">{gate.me.role}</span>
+                {gate.me.name ?? gate.me.email} · {t("admin.role")}{" "}
+                <span className="font-semibold text-accent">
+                  {gate.me.role}
+                </span>
               </div>
-              <nav className="inline-flex flex-wrap rounded-xl border border-line bg-card p-1 shadow-sm" aria-label="관리 영역">
-                {tabs.map((tItem) => (
+              <nav
+                className="inline-flex flex-wrap rounded-xl border border-line bg-card p-1 shadow-sm"
+                aria-label="관리 영역"
+              >
+                {tabs.map((tabItem) => (
                   <button
-                    key={tItem.key}
-                    onClick={() => setTab(tItem.key)}
-                    aria-pressed={tab === tItem.key}
+                    key={tabItem.key}
+                    onClick={() => setTab(tabItem.key)}
+                    aria-pressed={tab === tabItem.key}
                     className={cn(
                       "rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
-                      tab === tItem.key ? "bg-accent text-on-accent shadow-md shadow-accent/20 font-semibold" : "text-fg-2 hover:text-fg hover:bg-slate-800/40"
+                      tab === tabItem.key
+                        ? "bg-accent text-on-accent shadow-md shadow-accent/20 font-semibold"
+                        : "text-fg-2 hover:text-fg hover:bg-slate-800/40",
                     )}
                   >
-                    {tItem.label}
+                    {tabItem.label}
                   </button>
                 ))}
                 <span className="mx-1 my-1 w-px bg-line" aria-hidden />
@@ -122,10 +137,13 @@ export function AdminPage() {
 
             <main className="min-h-[500px]">
               {tab === "dashboard" && <AdminDashboard uid={uid} />}
+              {tab === "traffic" && <AdminTraffic uid={uid} />}
               {tab === "plans" && <AdminPlans uid={uid} />}
               {tab === "revenue" && <AdminRevenue uid={uid} />}
               {tab === "promos" && <AdminPromos userId={uid} />}
-              {tab === "announcements" && <AdminAnnouncements userId={uid} />}
+              {tab === "announcements" && (
+                <AdminAnnouncements userId={uid} />
+              )}
               {tab === "reports" && <AdminReports userId={uid} />}
               {tab === "security" && <AdminSecurity userId={uid} />}
               {tab === "audit" && <AdminAuditLogs userId={uid} />}
