@@ -78,6 +78,16 @@ function navigationLoadTimeMs(): number | null {
   return Math.max(0, Math.round(entry.duration)) || null;
 }
 
+function coarseScreenClass(): string {
+  const longest = Math.max(window.screen.width, window.screen.height);
+  const shortest = Math.min(window.screen.width, window.screen.height);
+  if (shortest <= 0 || longest <= 0) return "unknown";
+  if (shortest < 600) return "small";
+  if (shortest < 900) return "medium";
+  if (longest >= 1_920) return "large";
+  return "desktop";
+}
+
 function campaign(search: string): {
   utmSource: string | null;
   utmMedium: string | null;
@@ -190,8 +200,7 @@ export function TrafficAnalyticsBridge() {
         ...identifiers,
         path: location.pathname,
         referrer: document.referrer || null,
-        screenWidth: window.screen.width,
-        screenHeight: window.screen.height,
+        screenClass: coarseScreenClass(),
         loadTimeMs: navigationLoadTimeMs(),
         ...campaign(location.search),
       });
