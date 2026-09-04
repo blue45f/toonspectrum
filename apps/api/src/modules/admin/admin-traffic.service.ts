@@ -6,6 +6,7 @@ import { requireAdminUser } from "./admin-types";
 
 const PAGE_VIEW_PREFIX = "traffic:pv:";
 const SESSION_PREFIX = "traffic:ss:";
+const SESSION_UPPER_BOUND = "traffic:st:";
 const SUPPORTED_RANGES = [1, 7, 30, 90] as const;
 
 function sortableTimestamp(date: Date): string {
@@ -116,7 +117,8 @@ export class AdminTrafficService {
             COALESCE(NULLIF(value->>'isBot', '')::boolean, false) AS is_bot,
             "updatedAt" AS updated_at
           FROM app_setting
-          WHERE key LIKE $7
+          WHERE key >= $7
+            AND key < $10
             AND "updatedAt" >= $1
         ),
         sessions AS (
@@ -254,12 +256,12 @@ export class AdminTrafficService {
         )
         SELECT jsonb_build_object(
           'generatedAt', $5,
-          'rangeDays', $8,
-          'bucketSeconds', $4,
+          'rangeDays', $8::integer,
+          'bucketSeconds', $4::integer,
           'status',
             CASE WHEN (SELECT page_views FROM totals) > 0 THEN 'live' ELSE 'empty' END,
           'storageMode', 'first-party-kv-v1',
-          'retentionDays', $9,
+          'retentionDays', $9::integer,
           'privacy', jsonb_build_object(
             'storesRawIp', false,
             'storesQueryString', false,
@@ -432,9 +434,10 @@ export class AdminTrafficService {
         seconds,
         now,
         SESSION_PREFIX,
-        `${SESSION_PREFIX}%`,
+        SESSION_PREFIX,
         days,
         retentionDays(),
+        SESSION_UPPER_BOUND,
       ],
     );
 
@@ -459,16 +462,17 @@ export class AdminTrafficService {
           SELECT
             value->>'visitorHash' AS visitor_hash
           FROM app_setting
-          WHERE key LIKE $1
-            AND "updatedAt" >= $2
+          WHERE key >= $1
+            AND key < $2
+            AND "updatedAt" >= $3
             AND NOT COALESCE(NULLIF(value->>'isBot', '')::boolean, false)
         ),
         recent_page_views AS (
           SELECT
             NULLIF(value->>'occurredAt', '')::timestamptz AS occurred_at
           FROM app_setting
-          WHERE key >= $3
-            AND key < $4
+          WHERE key >= $4
+            AND key < $5
             AND NOT COALESCE(NULLIF(value->>'isBot', '')::boolean, false)
         )
         SELECT
@@ -478,7 +482,7 @@ export class AdminTrafficService {
             AS "activeSessions",
           (
             SELECT count(*) FROM recent_page_views
-            WHERE occurred_at >= $2
+            WHERE occurred_at >= $3
           ) AS "pageViews5m",
           (SELECT count(*) FROM recent_page_views)
             AS "pageViews30m",
@@ -486,7 +490,8 @@ export class AdminTrafficService {
             AS "latestAt"
       `,
       [
-        `${SESSION_PREFIX}%`,
+        SESSION_PREFIX,
+        SESSION_UPPER_BOUND,
         fiveMinutesAgo,
         pageViewRangeKey(thirtyMinutesAgo),
         pageViewRangeKey(new Date(now.getTime() + 1_000)),
