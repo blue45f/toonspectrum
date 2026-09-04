@@ -54,8 +54,8 @@ describe("studioLiveInkLaneSelectsGpu", () => {
     rolloutPrefersGpu: true,
   };
 
-  it("selects the lane only when the rollout prefers it and the hardware is ready", () => {
-    expect(studioLiveInkLaneSelectsGpu(base)).toBe(true);
+  it("keeps automatic rollout on the incumbent until brush-specific evidence exists", () => {
+    expect(studioLiveInkLaneSelectsGpu(base)).toBe(false);
     expect(studioLiveInkLaneSelectsGpu({ ...base, hardwareReady: false })).toBe(false);
     expect(studioLiveInkLaneSelectsGpu({ ...base, rolloutPrefersGpu: false })).toBe(false);
   });
