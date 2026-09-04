@@ -1,0 +1,50 @@
+name: Fix brush portfolio final merge
+
+on:
+  push:
+    branches:
+      - fix/brush-portfolio-exhaustive-contract-20260904
+    paths:
+      - ".github/workflows/fix-brush-portfolio-final.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-brush-portfolio-final-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/brush-portfolio-exhaustive-contract-20260904
+          fetch-depth: 0
+
+      - name: Repair exhaustive-tab regression and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx")
+          source = path.read_text(encoding="utf-8")
+          old = 'fireEvent.click(screen.getByRole("tab", { name: TEXTURE_TAB_LABEL }));'
+          new = 'fireEvent.click(screen.getByRole("tab", { name: EXHAUSTIVE_TAB_LABEL }));'
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(f"expected one stale TEXTURE_TAB_LABEL reference, found {count}")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+          rm -f .github/workflows/fix-brush-portfolio-final.yml
+          git diff --check
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit --no-verify -m "fix(brush): restore exhaustive library fallback test"
+          git push --no-verify origin HEAD:fix/brush-portfolio-exhaustive-contract-20260904
