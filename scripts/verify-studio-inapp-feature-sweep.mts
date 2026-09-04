@@ -18,6 +18,7 @@
  * Env:
  *   TOONSPECTRUM_SWEEP_PROFILES=kakaotalk-android-360,...   기본: 전체
  *   TOONSPECTRUM_SWEEP_STEPS=tool-pen,menu-file,...          기본: 전체
+ *   TOONSPECTRUM_SWEEP_BASE_URL=https://…                    프리뷰 대신 이 오리진을 검사
  *   TOONSPECTRUM_VERIFY_DIR                                  산출물 루트
  */
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -656,7 +657,11 @@ async function sweepProfile(
   page.setDefaultTimeout(15_000);
   const collector = await collectStudioInAppRuntimeErrors(page);
   await installStudioInAppFirstRunState(page);
-  await installStudioInAppGuestBoundary(page);
+  // 로컬 프리뷰에는 Nest API 가 없어 게스트 경계를 세워 준다. 실제 배포본에는 API 가 있으므로
+  // 가로채면 오히려 제품과 다른 경로를 재게 된다.
+  if (!process.env.TOONSPECTRUM_SWEEP_BASE_URL) {
+    await installStudioInAppGuestBoundary(page);
+  }
 
   const outcomes: StudioInAppStepOutcome[] = [];
   await page.goto(`${baseUrl}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -703,9 +708,13 @@ async function main(): Promise<void> {
   if (profiles.length === 0) throw new Error("no matching in-app profile");
   if (steps.length === 0) throw new Error("no matching step");
 
-  const port = await findFreePort();
-  const preview = spawnVitePreview({ port, runner: "pnpm-exec" });
-  const baseUrl = `http://127.0.0.1:${port}`;
+  // 운영 반영 뒤 같은 스윕을 실제 배포본에 그대로 겨눌 수 있어야 한다. BASE_URL 이 있으면
+  // 프리뷰를 띄우지 않고 그 오리진을 그대로 쓴다.
+  const externalBase = process.env.TOONSPECTRUM_SWEEP_BASE_URL?.trim();
+  const port = externalBase ? 0 : await findFreePort();
+  const preview = externalBase ? null : spawnVitePreview({ port, runner: "pnpm-exec" });
+  const baseUrl = externalBase ?? `http://127.0.0.1:${port}`;
+  log(`target ${baseUrl}${externalBase ? " (external)" : " (local preview)"}`);
   const browser = await launchStudioInAppBrowser();
   const reports: ProfileReport[] = [];
   try {
@@ -715,7 +724,7 @@ async function main(): Promise<void> {
     }
   } finally {
     await browser.close().catch(() => undefined);
-    await stopChildProcess(preview);
+    if (preview) await stopChildProcess(preview);
   }
 
   const allErrors = reports.flatMap((report) =>
