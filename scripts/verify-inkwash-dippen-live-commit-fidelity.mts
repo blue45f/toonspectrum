@@ -33,6 +33,8 @@ import { pathToFileURL } from "node:url";
 interface FidelityCaseDefinition {
   readonly id: "inkwash-pen" | "glass-pen";
   readonly brushName: string;
+  readonly searchTerm: string;
+  readonly brushWidth: number;
   readonly contract: string;
 }
 
@@ -67,11 +69,15 @@ const FIDELITY_CASES = Object.freeze([
   {
     id: "inkwash-pen",
     brushName: "잉크워시 딥펜(유체 잉크)",
+    searchTerm: "잉크워시 딥펜",
+    brushWidth: 8,
     contract: "fluid wet-ink live overlay → committed document pixels",
   },
   {
     id: "glass-pen",
     brushName: "유리펜(잉크 흐름)",
+    searchTerm: "유리펜",
+    brushWidth: 3.1,
     contract: "thin-line causal filtering → committed document geometry",
   },
 ] as const satisfies readonly FidelityCaseDefinition[]);
@@ -125,6 +131,8 @@ async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult> 
       ...process.env,
       TOONSPECTRUM_VERIFY_DIR: caseRoot,
       TOONSPECTRUM_LONG_STROKE_BRUSH: definition.brushName,
+      TOONSPECTRUM_LONG_STROKE_BRUSH_SEARCH: definition.searchTerm,
+      TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH: String(definition.brushWidth),
       TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW: SPAWN_PREVIEW ? "1" : "0",
       // The required gate measures the deterministic shipped compatibility path. Hardware/WebGPU
       // device-loss coverage is kept in its dedicated fault-injection suites, not silently mixed

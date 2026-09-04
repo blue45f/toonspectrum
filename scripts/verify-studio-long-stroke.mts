@@ -30,6 +30,8 @@
  * 환경변수
  *   STUDIO_URL                               기본 http://localhost:5173/studio
  *   TOONSPECTRUM_LONG_STROKE_BRUSH           브러시 이름(기본: 카탈로그 첫 paint 브러시; preview 에선 활성 펜)
+ *   TOONSPECTRUM_LONG_STROKE_BRUSH_SEARCH    카탈로그 검색어(전체 이름보다 짧은 고유어 권장)
+ *   TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH     브러시 기본 폭; preview에서 /src 조회를 생략
  *   TOONSPECTRUM_LONG_STROKE_DPR             deviceScaleFactor(기본 1)
  *   TOONSPECTRUM_LONG_STROKE_WEBGPU=1        --enable-unsafe-webgpu 를 켠다(기본 꺼짐 = Konva/CPU 경로). 헤드리스
  *                                            SwiftShader WebGPU 는 텍스처 생성이 실패해 선택 provider 가 획을 확정하지
@@ -59,6 +61,12 @@ import {
 } from "./lib/studio-verify-preview-harness.mjs";
 
 const BRUSH_NAME_ENV = process.env.TOONSPECTRUM_LONG_STROKE_BRUSH?.trim() || null;
+const BRUSH_SEARCH_ENV =
+  process.env.TOONSPECTRUM_LONG_STROKE_BRUSH_SEARCH?.trim() || null;
+const parsedBrushWidth = Number(process.env.TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH);
+const BRUSH_WIDTH_ENV = Number.isFinite(parsedBrushWidth) && parsedBrushWidth > 0
+  ? parsedBrushWidth
+  : null;
 const DEVICE_SCALE_FACTOR = Number(process.env.TOONSPECTRUM_LONG_STROKE_DPR ?? "1") || 1;
 const WEBGPU = process.env.TOONSPECTRUM_LONG_STROKE_WEBGPU === "1";
 const SPAWN_PREVIEW = process.env.TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW === "1";
@@ -116,7 +124,12 @@ interface CommittedStroke {
   readonly drawCount: number; readonly points: number[];
   readonly sampleSpacing: number | null; readonly pendingStrokeDurability: unknown;
 }
-interface BrushChoice { readonly name: string | null; readonly width: number; readonly source: string }
+interface BrushChoice {
+  readonly name: string | null;
+  readonly searchTerm: string | null;
+  readonly width: number;
+  readonly source: string;
+}
 type GateGlobals = typeof globalThis & {
   __longStrokeGate?: { moves: number; coalesced: number; rejections: number };
   __longStrokeFrames?: number[];
@@ -205,7 +218,11 @@ async function activatePen(page: Page): Promise<void> {
 }
 
 /** probe-studio-brush-sweep selectBrush 포트(데스크톱 카탈로그 searchbox → `${name} 선택`). */
-async function selectBrush(page: Page, name: string): Promise<void> {
+async function selectBrush(
+  page: Page,
+  name: string,
+  searchTerm: string = name,
+): Promise<void> {
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (await pill.count() === 0) {
@@ -217,8 +234,10 @@ async function selectBrush(page: Page, name: string): Promise<void> {
   const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
   await catalog.waitFor({ state: "visible", timeout: 15_000 });
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox").fill(name);
-  const option = catalog.getByRole("button", { name: `${name} 선택`, exact: true });
+  await catalog.getByRole("searchbox").fill(searchTerm);
+  const option = catalog
+    .getByRole("button", { name: `${name} 선택`, exact: true })
+    .first();
   await option.waitFor({ state: "visible", timeout: 15_000 });
   await option.scrollIntoViewIfNeeded();
   await option.click({ force: true });
@@ -233,6 +252,14 @@ async function selectBrush(page: Page, name: string): Promise<void> {
 
 /** 브러시 결정: env → dev 서버 카탈로그 모듈(첫 paint) → preview 폴백(활성 펜 그대로, 폭 12 가정). */
 async function resolveBrush(page: Page): Promise<BrushChoice> {
+  if (BRUSH_NAME_ENV && BRUSH_WIDTH_ENV !== null) {
+    return {
+      name: BRUSH_NAME_ENV,
+      searchTerm: BRUSH_SEARCH_ENV ?? BRUSH_NAME_ENV,
+      width: BRUSH_WIDTH_ENV,
+      source: "env-pinned",
+    };
+  }
   const catalog = await page.evaluate(async ({ wanted, modulePath }) => {
     try {
       const module = await import(/* @vite-ignore */ modulePath) as
@@ -244,11 +271,29 @@ async function resolveBrush(page: Page): Promise<BrushChoice> {
       return null;
     }
   }, { wanted: BRUSH_NAME_ENV, modulePath: DEV_MODULES.catalog });
-  if (catalog) return { ...catalog, source: BRUSH_NAME_ENV ? "env+catalog" : "catalog-first-paint" };
-  if (BRUSH_NAME_ENV) return { name: BRUSH_NAME_ENV, width: 12, source: "env" };
+  if (catalog) {
+    return {
+      ...catalog,
+      searchTerm: BRUSH_SEARCH_ENV ?? catalog.name,
+      source: BRUSH_NAME_ENV ? "env+catalog" : "catalog-first-paint",
+    };
+  }
+  if (BRUSH_NAME_ENV) {
+    return {
+      name: BRUSH_NAME_ENV,
+      searchTerm: BRUSH_SEARCH_ENV ?? BRUSH_NAME_ENV,
+      width: 12,
+      source: "env-unpinned-width",
+    };
+  }
   const label = await page.locator('[data-studio-brush-active-pill="true"]').first()
     .getAttribute("aria-label").catch(() => null);
-  return { name: null, width: 12, source: `active-pill:${label ?? "unknown"}` };
+  return {
+    name: null,
+    searchTerm: null,
+    width: 12,
+    source: `active-pill:${label ?? "unknown"}`,
+  };
 }
 
 /** pointermove(캡처)·unhandledrejection 카운터 — 제스처 전에 document 시작 시점에 심는다. */
@@ -459,6 +504,9 @@ async function diffShots(page: Page, a: string, b: string, regions: Record<strin
  * dist 매니페스트 대신 /src 모듈을 페이지 안에서 import). preview 빌드(/src 없음)에서는 null.
  */
 async function readCommittedStroke(page: Page): Promise<CommittedStroke | null> {
+  // Production preview has no /src modules. Do not manufacture three console 404s before taking
+  // the documented input-delivery fallback; dev-server runs keep the richer SQLite proof.
+  if (SPAWN_PREVIEW) return null;
   const deadline = Date.now() + COMMIT_READ_TIMEOUT_MS;
   let latest: CommittedStroke | null = null;
   while (Date.now() < deadline) {
@@ -602,7 +650,9 @@ async function main(): Promise<void> {
     await dismissChrome(page);
     await activatePen(page);
     const brush = await resolveBrush(page);
-    if (brush.name) await selectBrush(page, brush.name);
+    if (brush.name) {
+      await selectBrush(page, brush.name, brush.searchTerm ?? brush.name);
+    }
     log(`brush: ${brush.name ?? "(active pen)"} width ${brush.width} (${brush.source}) · webgpu flag ${WEBGPU}`);
     report.brush = brush;
     report.frameGraphDocument = await page.locator("[data-studio-frame-graph-document]").first()
