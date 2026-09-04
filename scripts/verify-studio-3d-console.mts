@@ -850,7 +850,7 @@ async function dismissHydratedQuickStart(page: Page): Promise<void> {
 }
 
 /** Composite menubar title that absorbed the 3D group (studio-main-menu-presentation.ts). */
-const STUDIO_TOOLS_MENU_TITLE = "도구";
+const STUDIO_INSERT_MENU_TITLE = "삽입";
 
 /**
  * Opens the dropdown that now carries the 3D rows.
@@ -863,8 +863,8 @@ const STUDIO_TOOLS_MENU_TITLE = "도구";
 async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("menuitem", { name: STUDIO_TOOLS_MENU_TITLE, exact: true }).click();
-  const menu = page.locator(`[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]`);
+  await mainMenu.getByRole("menuitem", { name: STUDIO_INSERT_MENU_TITLE, exact: true }).click();
+  const menu = page.locator(`[role="menu"][aria-label="${STUDIO_INSERT_MENU_TITLE}"]`);
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }

@@ -217,14 +217,14 @@ async function main() {
   });
   await page.waitForTimeout(600);
 
-  await page.getByRole("menuitem", { name: "필터" }).click().catch(() => {});
+  await page.getByRole("menuitem", { name: "효과" }).click().catch(() => {});
   await page.waitForTimeout(120);
   const filterNames = ["가우시안 블러", "색조 / 채도 / 밝기", "모자이크 / 픽셀화"];
   for (const name of filterNames) {
     const item = page.getByRole("menuitem", { name: new RegExp(name) }).first();
     const visible = await item.isVisible().catch(() => false);
     if (!visible) {
-      await page.getByRole("menuitem", { name: "필터" }).click().catch(() => {});
+      await page.getByRole("menuitem", { name: "효과" }).click().catch(() => {});
       await page.waitForTimeout(80);
     }
     const t0 = Date.now();

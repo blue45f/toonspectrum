@@ -1114,13 +1114,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   // Composite titles take a shipped translation when the pack has one and fall back to
   // the catalogue's own language otherwise (same escape hatch the Help group uses).
   const menuT = useT();
-  const compositeMenuLabel = (id: "insert" | "tools"): string | undefined => {
+  const compositeMenuLabel = (id: "insert"): string | undefined => {
     const key = `studio.mainMenu.group.${id}.label`;
     const translated = menuT(key);
     return translated === key ? undefined : translated;
   };
   const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups, {
-    labels: { insert: compositeMenuLabel("insert"), tools: compositeMenuLabel("tools") },
+    labels: { insert: compositeMenuLabel("insert") },
   });
   const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
 

@@ -1,23 +1,16 @@
 /**
- * StudioMainMenu — the desktop application menubar for ToonStudio.
- * `createStudioMainMenuPresentation` hands it twelve titles in one row —
- * 파일 · 편집 · 보기 · 삽입 · 레이어 · 선택 · 그리기 · 만화 · 필터 · 도구 · 창 · 도움말 —
- * of which 삽입 (텍스트 · 벡터) and 도구 (캔버스 · 변형 · 애니메이션 · 3D · 협업 · AI) are
- * composites: each concatenates several catalogue groups into a single dropdown.
- * A composite dropdown renders every absorbed group as a `role="group"` section
- * wrapper named by its own visible caption through `aria-labelledby`, so a screen
- * reader hears 협업 before 팀 · 공유 권한 rather than ~15 undifferentiated rows. The
- * rows stay flat `menuitem`s under one roving tabindex, so arrows walk straight
- * across a section boundary; a non-composite title (파일 · 편집 …) carries no
- * section caption and therefore emits no wrapper at all.
- * Menus portal to document.body with fixed coords so they never lose to options-strip
- * stacking or menubar overflow clipping.
- * When one menu is open, hovering another group switches (desktop app menubar UX), and
- * clicking a neighbouring title commits to that menu instead of toggling it back shut.
- * The bar is a WAI-ARIA `menubar` with a roving tab stop: one Tab press skips it, arrows
- * move between groups, and Tab from inside a panel dismisses it back to its own title.
- * `specialistBoundaryGroupId` is the last remnant of the retired two-tier bar: the
- * presentation hard-codes it to `null`, so the separator below never renders in the app.
+ * StudioMainMenu — ToonStudio's desktop application menubar.
+ *
+ * The workflow presentation supplies nine titles in one row:
+ * 파일 · 편집 · 보기 · 삽입 · 레이어 · 그리기 · 만화 · 효과 · 도움말.
+ * File, Edit, View, Insert, Comic and Effects are composite dropdowns whose source
+ * catalogue groups remain visible as named role="group" sections. Rows keep a flat
+ * menuitem order so arrow-key navigation crosses section boundaries naturally.
+ *
+ * Menus portal to document.body with fixed coordinates, switch on neighbouring-title
+ * hover/click like a desktop editor, and implement a WAI-ARIA menubar with one roving
+ * tab stop. Help remains last; unknown future catalogue groups are placed immediately
+ * before it by the presentation layer instead of being dropped.
  */
 import { Check, ChevronDown } from "lucide-react";
 import {
