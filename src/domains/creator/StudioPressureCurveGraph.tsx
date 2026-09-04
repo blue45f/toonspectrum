@@ -68,6 +68,16 @@ function safeCoalescedPointerEvents(event: PointerEvent): readonly PointerEvent[
   }
 }
 
+function normalizedReportedPressure(event: PointerEvent): number {
+  const reportedPressure = Number.isFinite(event.pressure) ? event.pressure : 0;
+  if (reportedPressure > 0) return clamp(reportedPressure, 0, 1);
+  // Mouse PointerEvents commonly expose a fixed 0.5 while pressed. Keeping that value makes the
+  // scratch pad usable but the calibration recommendation rejects its near-zero dynamic range.
+  if (event.pointerType === "mouse" || event.pointerType === "touch") return 0.5;
+  // A zero pen sample stays zero so release/contact sentinels cannot bias the recommendation.
+  return 0;
+}
+
 function normalizedTestPoint(
   event: PointerEvent,
   rect: DOMRect
@@ -75,16 +85,7 @@ function normalizedTestPoint(
   if (!(rect.width > 0) || !(rect.height > 0)) return null;
   const x = clamp(((event.clientX - rect.left) / rect.width) * TEST_W, 0, TEST_W);
   const y = clamp(((event.clientY - rect.top) / rect.height) * TEST_H, 0, TEST_H);
-  const reportedPressure = Number.isFinite(event.pressure) ? event.pressure : 0;
-  // Mouse PointerEvents commonly expose a fixed 0.5 while pressed. Keeping that value makes the
-  // scratch pad usable but the calibration recommendation rejects its near-zero dynamic range.
-  // A zero pen sample stays zero so release/contact sentinels cannot bias the recommendation.
-  const rawPressure = reportedPressure > 0
-    ? clamp(reportedPressure, 0, 1)
-    : event.pointerType === "mouse" || event.pointerType === "touch"
-      ? 0.5
-      : 0;
-  return { x, y, rawPressure };
+  return { x, y, rawPressure: normalizedReportedPressure(event) };
 }
 
 export interface StudioPressureCurveGraphProps {
@@ -106,6 +107,8 @@ export function StudioPressureCurveGraph({
   const pathD = studioPressureCurvePathD(pressureCurve, CHART_W, CHART_H, 28);
   const slider = studioPressureCurveSliderMeta(pressureCurve);
   const handle = studioPressureCurveHandlePoint(pressureCurve);
+  const handleOutputMinimum = studioPressureCurveMap(handle.x, slider.max);
+  const handleOutputMaximum = studioPressureCurveMap(handle.x, slider.min);
   const touch = density === "touch";
   const curvePointerIdRef = useRef<number | null>(null);
   const testPointerIdRef = useRef<number | null>(null);
@@ -168,19 +171,21 @@ export function StudioPressureCurveGraph({
   };
 
   const onCurveKeyDown = (event: KeyboardEvent<SVGCircleElement>): void => {
-    let next: number | null = null;
+    let nextExponent: number | null = null;
+    // The direct handle represents output, not gamma: Up/Right increases visible output and
+    // therefore lowers the exponent. Home/End retain standard slider min/max semantics.
     if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
-      next = slider.value - slider.step;
+      nextExponent = slider.value + slider.step;
     } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
-      next = slider.value + slider.step;
+      nextExponent = slider.value - slider.step;
     } else if (event.key === "Home") {
-      next = slider.min;
+      nextExponent = slider.max;
     } else if (event.key === "End") {
-      next = slider.max;
+      nextExponent = slider.min;
     }
-    if (next === null) return;
+    if (nextExponent === null) return;
     event.preventDefault();
-    onPressureCurveChange(clamp(next, slider.min, slider.max));
+    onPressureCurveChange(clamp(nextExponent, slider.min, slider.max));
   };
 
   const appendTestPoints = (
@@ -303,13 +308,13 @@ export function StudioPressureCurveGraph({
           tabIndex={0}
           aria-label="필압 곡선 제어점"
           aria-orientation="vertical"
-          aria-valuemin={slider.min}
-          aria-valuemax={slider.max}
-          aria-valuenow={slider.value}
-          aria-valuetext={`감마 ${slider.value.toFixed(2)}`}
+          aria-valuemin={Math.round(handleOutputMinimum * 100)}
+          aria-valuemax={Math.round(handleOutputMaximum * 100)}
+          aria-valuenow={Math.round(handle.y * 100)}
+          aria-valuetext={`중간 필압 출력 ${pressurePercent(handle.y)} · 감마 ${slider.value.toFixed(2)}`}
           aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
           data-studio-pressure-curve-handle="true"
-          className="cursor-ns-resize outline-none focus-visible:stroke-accent focus-visible:stroke-[2]"
+          className="cursor-ns-resize outline-none focus-visible:stroke-2 focus-visible:stroke-accent"
           onPointerDown={onCurvePointerDown}
           onPointerMove={onCurvePointerMove}
           onPointerUp={finishCurvePointer}
@@ -328,7 +333,7 @@ export function StudioPressureCurveGraph({
         />
       </svg>
       <p className="mb-2 text-[0.58rem] leading-relaxed text-fg-3">
-        주황 제어점을 위아래로 드래그하거나 키보드 방향키로 반응을 직접 조절합니다.
+        위로 올리면 약한 압력에 더 민감해지고, 아래로 내리면 더 단단해집니다. 방향키로도 조절할 수 있습니다.
       </p>
 
       <div
@@ -527,7 +532,7 @@ export function StudioPressureCurveGraph({
               aria-live="polite"
             >
               {stats
-                ? `입력 샘플 ${stats.sampleCount}개 · 범위 ${pressurePercent(stats.minimum)}–${pressurePercent(stats.maximum)} · 중앙 ${pressurePercent(stats.median)}`
+                ? `입력 샘플 ${stats.sampleCount}개 · 범위 ${pressurePercent(stats.minimum)}–${pressurePercent(stats.maximum)} · 중앙 ${pressurePercent(stats.median)} · P90 ${pressurePercent(stats.p90)}`
                 : "입력 샘플 없음 · 다양한 압력으로 한 번에 그리면 자동 보정할 수 있습니다."}
             </p>
             <div className="flex shrink-0 gap-1">
