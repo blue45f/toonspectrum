@@ -6,7 +6,7 @@
 
 ## 1. 이번 반영
 
-### 숫자 기반 Multi-edit
+### 1.1 숫자 기반 Multi-edit
 
 복수 선택의 인스펙터 변형을 다음까지 확장했다.
 
@@ -31,12 +31,37 @@ Figma의 공식 Bulk edit는 여러 프레임·그룹·섹션의 레이어를 �
 
 이번 단계는 Studio에서 즉시 효율이 크고 기존 권위를 안전하게 재사용할 수 있는 **공통 기하 변형**부터 닫았다.
 
+### 1.2 같은 속성 선택 / Matching selection
+
+단일 요소를 고르면 현재 페이지의 표시 레이어에서 실제로 두 개 이상 존재하는 기준만 제안한다.
+
+- 같은 유형: 이미지·텍스트·말풍선·선화·프레임 등 같은 모델 종류
+- 같은 외형: 채우기·선·선 굵기·그라데이션·그림자·말풍선 Variant 등 렌더 속성
+- 같은 글꼴·조판: 글꼴·크기·행간·방향·정렬·텍스트 경로
+- 같은 원본: 번들 에셋, 분리 3D LT 묶음, 브러시 카탈로그, 스티키 노트 프리셋
+- 표시 범위: 공유 숨김과 ‘나만 숨기기’ 레이어는 후보에서 제외
+- 선택 권위: 결과는 레이어 내비게이터와 캔버스가 함께 사용하는 `selectLayersFromNavigator` 어댑터로만 반영
+- 읽기 전용 지원: 선택은 문서 mutation이 아니므로 리뷰 잠금이나 협업 편집 잠금 상태에서도 사용 가능
+
+비교 키는 문서 객체 전체가 아니라 요소 종류별 렌더 의미 allow-list로 만든다. 좌표, 텍스트 내용, 잠금, AI provenance, 래스터 원본 영수증, 런타임 캐시는 비교에서 제외해 오선택·대용량 직렬화·스키마 확장 회귀를 막는다.
+
+관련 구현:
+
+- `src/domains/creator/studio-select-matching.ts`
+- `src/domains/creator/StudioSelectionMatchingPanel.tsx`
+- `src/domains/creator/StudioInspectorAsideBody.tsx`
+
+Figma는 같은 Properties, Fill, Stroke, Effect, Text properties, Font, Instance를 가진 레이어를 일괄 선택하는 흐름을 제공한다.
+
+- https://help.figma.com/hc/en-us/articles/360040449873-Select-layers-and-objects
+
 ## 2. 현재 Studio에 이미 있는 대응 기능
 
 | Figma 계열 기능 | Studio 상태 | 판단 |
 | --- | --- | --- |
 | 다중 선택·Marquee | 구현됨 | 현재 선택 모델 유지 |
 | 숫자 X/Y/W/H/회전/불투명도 | 단일 선택 구현 + 이번에 복수 선택 확장 | 이번 완료 |
+| 같은 속성 선택 | 유형·외형·조판·원본 기준 구현 | 이번 완료 |
 | Zoom to selection | 구현됨 | 유지 |
 | 선택 중심 Flip | 구현됨 | 유지 |
 | 정렬·가로/세로 균등 분배 | 구현됨 | 중복 구현 금지 |
@@ -50,23 +75,6 @@ Figma의 공식 Bulk edit는 여러 프레임·그룹·섹션의 레이어를 �
 협업 세부 현황과 서버 선행조건은 `docs/studio-figma-collaboration-benchmark-2026-07-13.md`를 따른다.
 
 ## 3. 추가 가치가 큰 기능 검토
-
-### P0 — 같은 속성 선택 / Matching selection
-
-Figma는 같은 Properties, Fill, Stroke, Effect, Text properties, Font, Instance를 가진 레이어를 일괄 선택할 수 있다.
-
-- https://help.figma.com/hc/en-us/articles/360040449873-Select-layers-and-objects
-
-Studio 적용안:
-
-1. 같은 요소 종류
-2. 같은 브러시·선 색·선 굵기
-3. 같은 채우기·톤·필터 프리셋
-4. 같은 글꼴·크기·화자·말풍선 스타일
-5. 같은 에셋/캐릭터/3D 장면 원본
-6. 현재 패널 또는 현재 컷 범위 선택
-
-선행 작업은 속성별 정규화 키와 숨김·잠금·그룹 경계를 명시하는 것이다. 단순 JSON 전체 비교는 AI provenance·캐시·런타임 receipt까지 묶어 오선택을 만들 수 있으므로 사용하지 않는다.
 
 ### P1 — 웹툰 스타일 변수와 Mode
 
@@ -122,14 +130,14 @@ Studio 적용안:
 | 순위 | 기능 | 효과 | 위험 | 결정 |
 | --- | --- | --- | --- | --- |
 | P0 | 숫자 Multi-edit | 반복 배치·크기 통일·회전 작업 즉시 단축 | 낮음: 기존 변형 권위 재사용 | 이번 완료 |
-| P0 | 같은 속성 선택 | 대규모 회차 일괄 수정의 핵심 진입점 | 중간: 의미 비교 키 필요 | 다음 안전 단계 |
+| P0 | 같은 속성 선택 | 대규모 회차 일괄 수정의 핵심 진입점 | 중간: 의미 비교 키 필요 | 이번 완료 |
 | P1 | 스타일 변수/Mode | 작품 전역 룩·식자 일관성 | 중상: 문서 스키마/공유 권한 | 토큰 권위 설계 후 |
 | P1 | Component/Variant/Instance | 반복 요소 재사용과 원본 갱신 | 높음: override/분리/병합 | 독립 문서 모델로 |
 | P2 | Branch/Review/Merge | 편집부 협업과 대안 관리 | 매우 높음: 서버 revision 필수 | 영속 버전 이후 |
 
 ## 5. 완료 조건
 
-이번 Multi-edit는 다음을 모두 만족할 때 완료로 본다.
+### Multi-edit
 
 - 단일 요소 인스펙터 동작에 회귀가 없다.
 - 복수 선택 W 또는 H 입력이 한 비율로만 변형된다.
@@ -138,4 +146,15 @@ Studio 적용안:
 - 프레임이 포함된 혼합 선택의 불투명도는 비활성/거부된다.
 - 선택 밖 요소는 객체 참조까지 유지하여 불필요한 CRDT diff를 만들지 않는다.
 - 한 입력이 한 Undo 단계와 한 접근성 안내로 기록된다.
-- 순수 계획기 테스트와 Inspector DOM 테스트가 통과한다.
+
+### Matching selection
+
+- 현재 선택을 포함해 같은 기준이 둘 이상일 때만 메뉴가 보인다.
+- 결과 ID는 문서 z-order를 유지한다.
+- 색상 표기 대소문자와 기본값 차이는 의미가 같으면 같은 외형으로 본다.
+- 좌표와 텍스트 내용은 외형·조판 비교에 영향을 주지 않는다.
+- 안정 에셋 ID가 있으면 데이터 URL보다 우선한다.
+- 공유 숨김 및 로컬 숨김 요소는 선택 후보에서 제외한다.
+- 결과는 기존 캔버스/레이어 선택 어댑터로만 반영한다.
+
+순수 계획기, Inspector DOM, 선택 경계 테스트와 전체 CI가 통과해야 완료한다.
