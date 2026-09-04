@@ -106,8 +106,8 @@ jobs:
 
       - name: Commit and push verified source-only changes
         run: |
-          # GitHub's default Actions token cannot modify workflow files. Keep the permanent workflow
-          # change for a follow-up Contents API commit, and push only the verified TypeScript/source.
+          # The Actions token cannot author workflow files. Keep workflow edits out of this commit;
+          # they are cleaned separately through the authenticated Contents API after verification.
           git restore .github/workflows/studio-all-brush-long-stroke-quality.yml
           rm -f scripts/patch-all-brush-hardware-evidence.py
           rm -f scripts/patch-all-brush-hardware-evidence-v2.py
