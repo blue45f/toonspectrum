@@ -275,7 +275,7 @@ function authorFromRow(
 ): CreatorMarketplaceSocialAuthor {
   if (deleted) {
     return {
-      id: row.userId,
+      id: "deleted",
       name: "삭제됨",
       avatar: null,
       badge: "member",
@@ -383,6 +383,7 @@ export class CreatorMarketplaceSocialService {
     const resource = await this.visibleResource(resourceId);
     const key = socialKey(resource);
     const rootLimit = CREATOR_MARKETPLACE_SOCIAL_COMMENT_PAGE_SIZE;
+    const replyLimit = rootLimit * 5;
     const reviewLimit = CREATOR_MARKETPLACE_SOCIAL_REVIEW_PAGE_SIZE;
 
     const commentSelect = {
@@ -481,9 +482,9 @@ export class CreatorMarketplaceSocialService {
             inArray(reviewReplies.parentId, rootIds),
           ))
           .orderBy(asc(reviewReplies.createdAt), asc(reviewReplies.id))
-          .limit(rootLimit + 1)
+          .limit(replyLimit + 1)
       : [];
-    const replyPage = replyRows.slice(0, rootLimit);
+    const replyPage = replyRows.slice(0, replyLimit);
     const commentRows = [...rootPage, ...replyPage];
     const reviewRows = reviewRowsWithSentinel.slice(0, reviewLimit);
     const myReviewRow = myReviewRows[0];
@@ -639,7 +640,7 @@ export class CreatorMarketplaceSocialService {
       generatedAt: new Date().toISOString(),
       truncated: {
         comments: rootRows.length > rootLimit
-          || replyRows.length > rootLimit
+          || replyRows.length > replyLimit
           || totalCommentCount > commentRows.length,
         reviews: reviewRowsWithSentinel.length > reviewLimit,
       },
@@ -817,7 +818,6 @@ export class CreatorMarketplaceSocialService {
           tags: input.tags,
           spoiler: false,
           hidden: false,
-          createdAt: new Date(),
         },
       });
     return this.page(resourceId, userId);
