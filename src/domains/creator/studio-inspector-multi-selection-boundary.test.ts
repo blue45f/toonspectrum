@@ -49,6 +49,18 @@ describe("Studio inspector multi-selection scope", () => {
     );
   });
 
+  it("mounts atomic batch rename inside the same mutation gate with canonical document inputs", () => {
+    expect(multiSelectionSource).toContain("<StudioInspectorBatchRenameSection");
+    expect(multiSelectionSource).toContain("elements={elements}");
+    expect(multiSelectionSource).toContain("selectedIds={marqueeIds}");
+    expect(multiSelectionSource).toContain("groups={groups}");
+    expect(multiSelectionSource).toContain("commit={(next) => commit(next)}");
+    expect(multiSelectionSource).toContain("announce={announceDrawingShortcut}");
+    expect(multiSelectionSource.indexOf("<StudioInspectorBatchRenameSection")).toBeGreaterThan(
+      multiSelectionSource.indexOf("<fieldset"),
+    );
+  });
+
   it("hides single-image tool tabs while multiple elements are selected", () => {
     expect(shellSource).toContain(
       "marqueeIds.length <= 1 &&\n              (selectedSupportsImageInspectorTabs || unselectedImageToolsVisible)",
