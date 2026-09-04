@@ -101,10 +101,10 @@ describe("Studio inspector module boundary", () => {
   });
 
   it("warms the always-visible desktop inspector beside the editor without taxing mobile startup", () => {
-    const router = moduleShape("./studio-router/StudioRouter.tsx");
+    const router = moduleShape("./studio-router/routes/StudioEditorRoute.tsx");
 
-    expect(router.dynamicImports).toContain("../studio-inspector-aside-loader");
-    expect(router.valueImports).not.toContain("../studio-inspector-aside-loader");
+    expect(router.dynamicImports).toContain("../../studio-inspector-aside-loader");
+    expect(router.valueImports).not.toContain("../../studio-inspector-aside-loader");
     expect(router.source).toContain('typeof window.matchMedia !== "function"');
     expect(router.source).toContain('window.matchMedia("(max-width: 1023px)").matches');
     expect(router.source).toContain("preloadStudioInspectorAside())");

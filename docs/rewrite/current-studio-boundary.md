@@ -1,5 +1,9 @@
 # 현재 Studio 경계 감사 (V12)
 
+> 2026-09-04 갱신: 앱 URL 선언은 `src/app/routes/groups/creator.routes.tsx`, Studio 내부
+> canonicalization과 surface dispatch는 `src/domains/creator/studio-router/StudioRouter.tsx`가 소유한다.
+> 아래의 과거 `AppRouter -> StudioPage` 직결 설명은 이 경계로 교정했다.
+>
 > 2026-09-02 갱신: 엔진 역할(primary/provider/reference/lab)과 권위 소유자는 이제
 > [`docs/engines/renderer-roles.md`](../engines/renderer-roles.md)(원장 생성본)가 단일 진실이다. 이 문서의
 > §1·§3 중 "Vello는 selection-overlay island 한정" 서술은 stale이다 — `studio-vello-hub-document-hybrid-v13`이
@@ -20,7 +24,7 @@
 
 | 경계 | 현재 판정 | 직접 근거 | 확대 해석 금지 |
 | --- | --- | --- | --- |
-| 앱/URL | **기존 `/studio`에서 in-place** | [`index.html`](../../index.html) → [`src/app/main.tsx`](../../src/app/main.tsx) → [`src/app/routes/AppRouter.tsx`](../../src/app/routes/AppRouter.tsx) → [`src/domains/creator/StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) | 별도 `/studio-v11`, `/studio-v12`, `/studio/v12` 제품 route가 있다는 뜻이 아니다. |
+| 앱/URL | **기존 `/studio`에서 in-place** | [`index.html`](../../index.html) → [`src/app/main.tsx`](../../src/app/main.tsx) → [`src/app/routes/AppRouter.tsx`](../../src/app/routes/AppRouter.tsx) → [`src/app/routes/groups/creator.routes.tsx`](../../src/app/routes/groups/creator.routes.tsx) → [`src/domains/creator/studio-router/StudioRouter.tsx`](../../src/domains/creator/studio-router/StudioRouter.tsx) → [`src/domains/creator/StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) | 별도 `/studio-v11`, `/studio-v12`, `/studio/v12` 제품 route가 있다는 뜻이 아니다. |
 | 문서·입력 권위 | **Konva Stage 유지** | [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)의 `<Stage>`와 pointer handlers | Vello가 전체 문서, pointer, brush pixel 또는 whole-canvas 권위를 얻었다고 말할 수 없다. |
 | Vello 제품 배선 | **selection-overlay island에 제한해 기본 활성** | [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts), [`studio-vello-hub-surface.tsx`](../../src/domains/creator/studio-vello-hub-surface.tsx), [`studio-vello-hub.ts`](../../src/domains/creator/studio-vello-hub.ts) | scene-local candidate이며 `productWidePromoted=false`, `persistentWinnerStorage=false`다. |
 | 렌더/브러시 tournament | **실제 제품 호출부에 배선** | [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx)의 pointer-down admission, [`StudioKonvaImageNode.tsx`](../../src/domains/creator/StudioKonvaImageNode.tsx)의 filter-island plan | winner cache가 모든 장면·장치의 기본 renderer 승격을 의미하지 않는다. |
@@ -40,7 +44,9 @@ index.html
   -> src/app/main.tsx
   -> src/app/AppShell.tsx
   -> src/app/routes/AppRouter.tsx
-  -> /studio
+  -> src/app/routes/groups/creator.routes.tsx (`/studio/*`)
+  -> src/domains/creator/studio-router/StudioRouter.tsx
+  -> routes/StudioEditorRoute.tsx
   -> src/domains/creator/StudioPage.tsx
   -> src/domains/creator/StudioCanvasViewport.tsx
        |- Konva Stage: 문서 표시와 pointer 입력 권위
@@ -48,9 +54,11 @@ index.html
        `- Pixi: Vello disabled/fallback 때 같은 island의 명시적 fallback
 ```
 
-- [`AppRouter.tsx`](../../src/app/routes/AppRouter.tsx)는 `StudioPage`를 lazy import하고 정확히
-  `path="/studio"`에 마운트한다. 동반 도구는 `path="/studio/tools-companion"`이며 별도 V12 앱이
-  아니다.
+- [`AppRouter.tsx`](../../src/app/routes/AppRouter.tsx)는 전역 fallback·error·isolation 경계만
+  조립한다. [`creator.routes.tsx`](../../src/app/routes/groups/creator.routes.tsx)가 정확히 하나의
+  `path="/studio/*"` 엔트리에서 `StudioRouter`를 lazy import한다. 편집기·게시·2D→3D·동반 도구는
+  [`StudioRouter.tsx`](../../src/domains/creator/studio-router/StudioRouter.tsx)가 canonical URL로
+  dispatch하며 경쟁하는 flat Studio route나 별도 V12 앱을 만들지 않는다.
 - 같은 router는 [`StudioCrossOriginIsolationGate.tsx`](../../src/app/StudioCrossOriginIsolationGate.tsx)로
   Studio 문서 전환을 감싼다. [`vercel.json`](../../vercel.json)은 `/studio`와 `/studio/(.*)`에
   COOP `same-origin`, COEP `credentialless`를 설정하고, 전체 응답에 HTTP
@@ -215,7 +223,8 @@ pnpm exec tsx tests/benchmarks/harness/csp-blind-lab-cli.ts analyze \
 cd /Users/hjunkim/WebstormProjects/toonspectrum
 
 rg -n '<script[^>]+type="module"|createRoot|<AppRouter|Route path="/studio"' \
-  index.html src/app/main.tsx src/app/AppShell.tsx src/app/routes/AppRouter.tsx
+  index.html src/app/main.tsx src/app/AppShell.tsx src/app/routes/AppRouter.tsx \
+  src/app/routes/groups/creator.routes.tsx src/domains/creator/studio-router/StudioRouter.tsx
 
 rg -n -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' \
   '@toonspectrum/studio-(brush-platform|command-registry|engine-registry|engine-vello|project-model)' \

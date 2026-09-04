@@ -3,7 +3,20 @@
  * still starts at that path; this file owns remaining editor session logic.
  */
 import { Command } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ChangeEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -39,16 +52,8 @@ import {
   finalizeStudioAiGeneratedAssetProvenance,
 } from "./ai/studio-ai-generated-asset-model";
 import { resolveStudioAiImageReferences } from "./ai/studio-ai-image-reference-resolution";
-import {
-  createEmptyStudioAiImageReferenceDocument,
-  hydrateStudioAiImageReferenceDocument,
-  type StudioAiImageReferenceDocument,
-} from "./ai/studio-ai-image-reference-roles";
-import {
-  createEmptyStudioAiProvenanceDocument,
-  normalizeStudioAiProvenanceDocument,
-  type StudioAiProvenanceDocument,
-} from "./ai/studio-ai-provenance";
+import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
+import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import {
   parseStudioAiRequestedSize,
   recordPendingStudioAiOperation,
@@ -60,9 +65,7 @@ import {
   type StudioAiObservableResult,
   type StudioAiPendingOperationInput,
 } from "./ai/studio-ai-provenance-recorder";
-import {
-  createStudioScenarioImageGenerationExecutors,
-} from "./ai/studio-scenario-image-generation";
+import { createStudioScenarioImageGenerationExecutors } from "./ai/studio-scenario-image-generation";
 import {
   planStudioBg3dLtDetachComposite,
   planStudioBg3dLtDrawingAssist,
@@ -73,19 +76,10 @@ import {
   resolveStudioBg3dLinkedRenderState,
   resolveStudioBg3dLtLinkedScene,
 } from "./bg3d/studio-bg3d-lt-apply";
-import {
-  planStudioBg3dLtLayers,
-} from "./bg3d/studio-bg3d-lt-layer-plan";
-import {
-  attachStudioBg3dMagicFilterMaskToLtPlan,
-} from "./bg3d/studio-bg3d-magic-layer-attach";
-import {
-  StudioBg3dRecoveryAccessGate,
-} from "./bg3d/studio-bg3d-recovery-access-lease";
-import {
-  isStudioBrushAliasId,
-  isStudioBrushEraserAliasId,
-} from "./brush/studio-brush-alias-profile";
+import { planStudioBg3dLtLayers } from "./bg3d/studio-bg3d-lt-layer-plan";
+import { attachStudioBg3dMagicFilterMaskToLtPlan } from "./bg3d/studio-bg3d-magic-layer-attach";
+import { StudioBg3dRecoveryAccessGate } from "./bg3d/studio-bg3d-recovery-access-lease";
+import { isStudioBrushAliasId, isStudioBrushEraserAliasId } from "./brush/studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
@@ -98,16 +92,10 @@ import type {
   StudioBrushSnapshot,
   StudioSavedBrush,
 } from "./brush/studio-brush-library";
-import {
-  planStudioDrawModeChange,
-  planStudioStrokeWidthChange,
-} from "./brush/studio-brush-mode-width";
-import {
-  studioBrushPackFormatOf,
-} from "./brush/studio-brush-pack-format";
+import { planStudioDrawModeChange, planStudioStrokeWidthChange } from "./brush/studio-brush-mode-width";
+import { studioBrushPackFormatOf } from "./brush/studio-brush-pack-format";
 import { isStudioBrushPackCatalogId } from "./brush/studio-brush-pack-id";
 import {
-  StudioBrushR8GrainHydrator,
   collectStudioBrushR8GrainSources,
   projectStudioBrushR8GrainRenderElements,
 } from "./brush/studio-brush-r8-grain-hydrator";
@@ -118,18 +106,13 @@ import {
 } from "./brush/studio-brush-selection";
 import {
   assignStudioBrushSlot,
-  emptyStudioBrushSlots,
   rememberStudioBrushSlot,
-  STUDIO_BRUSH_SLOT_COUNT,
   studioBrushSlotAt,
   type StudioBrushSlot,
-  type StudioBrushSlotsState,
 } from "./brush/studio-brush-slots";
-import {
-  resolveStudioStampBrushKind,
-  resolveStudioStampBrushStyle,
-} from "./brush/studio-brush-stamp-engine";
+import { resolveStudioStampBrushKind, resolveStudioStampBrushStyle } from "./brush/studio-brush-stamp-engine";
 import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
+import { useStudioBrushQuickSlots } from "./brush/useStudioBrushQuickSlots";
 import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
@@ -139,19 +122,50 @@ import {
   studioLiveBrushPressure,
   studioLiveBrushPressureSamples,
 } from "./brush/studio-draw-rendering";
-import {
-  isStudioCanvasInteractionBlocked,
-} from "./canvas/studio-canvas-cursor";
-import { buildStudioLiveShareHref, studioCreationLinkParams } from "./creator-studio-links";
+import { isStudioCanvasInteractionBlocked } from "./canvas/studio-canvas-cursor";
+import { studioCreationLinkParams } from "./creator-studio-links";
+import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
-import { createStudioDeferredStrokeCommitEngine } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
+import {
+  createStudioDeferredStrokeCommitEngine,
+} from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";
+import { useStudioCrdtRuntime } from "./studio-cuttoon-editor/runtime/useStudioCrdtRuntime";
+import { useStudioHydrationRuntime } from "./studio-cuttoon-editor/runtime/useStudioHydrationRuntime";
+import { useStudioLiveSessionRuntime } from "./studio-cuttoon-editor/runtime/useStudioLiveSessionRuntime";
+import {
+  useStudioRasterPublicationRuntime,
+} from "./studio-cuttoon-editor/runtime/useStudioRasterPublicationRuntime";
+import {
+  useStudioTournamentPersistenceBoot,
+} from "./studio-cuttoon-editor/runtime/useStudioTournamentPersistenceBoot";
+import {
+  useStudioDocumentAccessRuntime,
+} from "./studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime";
+import {
+  useStudioCommentDocumentsRuntime,
+} from "./studio-cuttoon-editor/runtime/useStudioCommentDocumentsRuntime";
+import {
+  useStudioDocumentSidecarsRuntime,
+} from "./studio-cuttoon-editor/runtime/useStudioDocumentSidecarsRuntime";
+import { useStudioHistoryDurability } from "./studio-cuttoon-editor/runtime/useStudioHistoryDurability";
+import { useStudioHistoryRetention } from "./studio-cuttoon-editor/runtime/useStudioHistoryRetention";
+import { useStudioPageHistorySnapshots } from "./studio-cuttoon-editor/runtime/useStudioPageHistorySnapshots";
+import {
+  useStudioUnifiedHistoryJournal,
+} from "./studio-cuttoon-editor/runtime/useStudioUnifiedHistoryJournal";
+import { useStudioPreferencesRuntime } from "./studio-cuttoon-editor/runtime/useStudioPreferencesRuntime";
+import {
+  useStudioVectorOperationRuntime,
+} from "./studio-cuttoon-editor/runtime/useStudioVectorOperationRuntime";
+import {
+  useStudioSharedDocumentRevalidation,
+} from "./studio-cuttoon-editor/runtime/useStudioSharedDocumentRevalidation";
 import { remapStudioBg3dLtCopiedBundles } from "./bg3d/studio-bg3d-lt-copy-remap";
 import { useStudioPageClipboard } from "./studio-page-clipboard-controller";
 import { useStudioPageViewControls } from "./canvas/studio-page-view-controller";
 import { useStudioPageManagement } from "./page/studio-page-management-controller";
-import { useStudioSidecarDocuments } from "./history/studio-page-sidecars-controller";
 import {
   useStudioVectorNodeBubbleEdit,
   type BubbleShapePointerCaptureTarget,
@@ -182,15 +196,9 @@ import {
   DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
   type StudioAdvancedFillSettings,
 } from "./studio-advanced-fill-settings";
-import type {
-  StudioAdvancedFillTapGesture,
-} from "./studio-advanced-fill-tap";
-import type {
-  StudioAdvancedRuler,
-} from "./studio-advanced-ruler-document";
-import type {
-  StudioAdvancedRulerSnapState,
-} from "./studio-advanced-ruler-snap";
+import type { StudioAdvancedFillTapGesture } from "./studio-advanced-fill-tap";
+import type { StudioAdvancedRuler } from "./studio-advanced-ruler-document";
+import type { StudioAdvancedRulerSnapState } from "./studio-advanced-ruler-snap";
 import { shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
@@ -200,12 +208,6 @@ import {
   setKeyframe,
 } from "./studio-anim-tracks";
 import {
-  defaultStudioAppSettings,
-  type StudioAppSettings,
-  type StudioAppSettingsTab,
-  type StudioRailToolId,
-} from "./studio-app-settings";
-import {
   createStudioAssetFavoriteId,
   normalizeStudioAssetFavoriteState,
   removeStudioAssetFavorite,
@@ -213,10 +215,7 @@ import {
   type StudioAssetFavoriteId,
   type StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
-import {
-  studioTransferCanInsert,
-  studioTransferHasFiles,
-} from "./studio-asset-transfer";
+import { studioTransferCanInsert, studioTransferHasFiles } from "./studio-asset-transfer";
 import {
   CANVAS_W,
   EFFECT_EMOJIS,
@@ -228,7 +227,6 @@ import {
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
-  studioAutosaveKey,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
   type StudioAutosavePayload,
@@ -255,10 +253,7 @@ import {
   insertBubbleShapePointAtClosestSegment,
   removeBubbleShapePoint,
 } from "./lettering/studio-bubble-custom-shape";
-import {
-  bubbleMergeUnavailableReason,
-  mergeStudioBubbles,
-} from "./lettering/studio-bubble-merge";
+import { bubbleMergeUnavailableReason, mergeStudioBubbles } from "./lettering/studio-bubble-merge";
 import {
   bubbleLetterSpacing,
   bubbleTextBoxWidth,
@@ -270,13 +265,9 @@ import {
   resolveBubbleLineHeight,
 } from "./lettering/studio-bubble-text-fit";
 import { resolveStudioCanvasGestureDisposition } from "./canvas/studio-canvas-gesture-arbitration";
-import {
-  recordStudioHotPathRender,
-} from "./canvas/studio-canvas-shared-runtime";
+import { recordStudioHotPathRender } from "./canvas/studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./canvas/studio-canvas-size";
-import {
-  selectStudioCausalInkSamples,
-} from "./studio-causal-ink";
+import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
   appendStudioCausalPostCorrection,
   createStudioCausalPostCorrectionState,
@@ -291,12 +282,7 @@ import {
   type StudioCharacterBible,
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
-import { studioCheckpointKey } from "./studio-checkpoint-loader";
-import {
-  STUDIO_ICON_SIZE,
-  STUDIO_ICON_STROKE,
-  studioChromeIconClass,
-} from "./studio-chrome-ui";
+import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
@@ -340,19 +326,13 @@ import {
   type StudioCommittedInkSurfaceHandoff,
   type StudioCommittedInkVisibleDrawReceipt,
 } from "./studio-committed-ink-handoff-coordinator";
-import type {
-  StudioCommittedInkRetainedRetryState,
-} from "./studio-committed-ink-release-retry";
+import type { StudioCommittedInkRetainedRetryState } from "./studio-committed-ink-release-retry";
 import {
   createStudioCommunityAssetCredit,
   formatStudioCommunityAssetCredit,
 } from "./studio-community-asset-license";
 import { executeStudioCompanionToolCommand } from "./studio-companion-tool-command-executor";
-import {
-  lintStudioContinuity,
-  type StudioContinuityIssue,
-  type StudioStoryBeat,
-} from "./studio-continuity";
+import { lintStudioContinuity, type StudioContinuityIssue, type StudioStoryBeat } from "./studio-continuity";
 import {
   commitPendingStrokeBatchForAdmission,
   studioLiveInkLaneSelectsGpu,
@@ -362,11 +342,7 @@ import { studioDrawElementToCrdtStroke } from "./live/studio-crdt-draw-bridge";
 import { StudioCrdtLiveStrokePublisher } from "./live/studio-crdt-live-stroke-publisher";
 import { STUDIO_CRDT_ORIGIN_LOCAL } from "./live/studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
-import {
-  initialCropRect,
-  isCropRectNoop,
-  planCropApply,
-} from "./studio-crop";
+import { initialCropRect, isCropRectNoop, planCropApply } from "./studio-crop";
 import { resolveStudioDccRouteAccess } from "./hybrid-dcc/studio-dcc-route-access";
 import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
@@ -403,9 +379,7 @@ import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
 } from "./export/studio-document-export-loaders";
-import {
-  createStudioInterchangeImportOrchestration,
-} from "./export/studio-interchange-import";
+import { createStudioInterchangeImportOrchestration } from "./export/studio-interchange-import";
 import {
   DODGE_BURN_EXPOSURE_DEFAULT,
   DODGE_BURN_HARDNESS_DEFAULT,
@@ -436,35 +410,17 @@ import {
   requireStudioDrawingPointerTransport,
 } from "./brush/studio-drawing-pointer-transport";
 import { createStudioDrawingShortcutNoticeStore } from "./brush/studio-drawing-shortcut-notice-store";
-import {
-  adjustStudioBrushWidth,
-} from "./brush/studio-drawing-shortcuts";
-import { disposeStudioDynamicCoverageCommittedCache } from "./studio-dynamic-brush-coverage-renderer";
-import {
-  isStudioPasteScopeCurrent,
-  resolveStudioEditAvailability,
-} from "./studio-edit-controls";
+import { adjustStudioBrushWidth } from "./brush/studio-drawing-shortcuts";
+import { isStudioPasteScopeCurrent, resolveStudioEditAvailability } from "./studio-edit-controls";
 import {
   isStudioCuttoonSourceFormat,
   isStudioEditorAsyncScopeCurrent,
-  isStudioEditorCollaborationLocked,
-  isStudioEditorMutationContinuationAllowed,
-  isStudioSourceHydrationPending,
   type StudioEditorMutationTicket,
 } from "./studio-editor-scope";
-import {
-  normalizeStudioEffectFavoriteState,
-  rememberStudioEffectRecent,
-  toggleStudioEffectFavorite,
-  type StudioEffectFavoriteState,
-  type StudioEffectId,
-} from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
 import { planStudioEmeresUnderlayElement } from "./studio-emeres-underlay-placement";
-import type {
-  ExportFormat,
-} from "./export/studio-export";
+import type { ExportFormat } from "./export/studio-export";
 import {
   buildStudioPublishPreflightInput,
   collectStudioPublishPreflightProvenance,
@@ -479,11 +435,7 @@ import {
   type StudioFillPageReference,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
-import {
-  canFilterMask,
-  type FilterMaskPaintMode,
-} from "./filter/studio-filter-mask";
-import { StudioFilterMaskSurfaceHydrator } from "./filter/studio-filter-mask-surface-hydrator";
+import { canFilterMask, type FilterMaskPaintMode } from "./filter/studio-filter-mask";
 import { useStudioRetouchMaskTools } from "./filter/studio-retouch-mask-tools-controller";
 import {
   applyStudioInlineFilterMaskMutation,
@@ -492,9 +444,7 @@ import {
   type StudioInlineFilterMaskMutationPatch,
 } from "./filter/studio-filter-mask-surface-projection";
 import { hexToRgb } from "./studio-filters";
-import type {
-  FixedRateStrokeFilterState,
-} from "./studio-fixed-rate-stroke-filter";
+import type { FixedRateStrokeFilterState } from "./studio-fixed-rate-stroke-filter";
 import {
   createFixedRateStrokeFrameClock,
   createFixedRateStrokeFramePump,
@@ -525,9 +475,7 @@ import {
 } from "./studio-group-selection";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
-import {
-  planHealCloneDabs,
-} from "./studio-heal-clone";
+import { planHealCloneDabs } from "./studio-heal-clone";
 import {
   bakeHistoryBrushStrokeToCanvas,
   planHistoryBrushDabs,
@@ -537,27 +485,14 @@ import {
   createStudioHistoryJournal,
   readStudioHistoryJournalRedoEntry,
   readStudioHistoryJournalUndoEntry,
-  recordStudioHistoryJournalPagesSteps,
   seekStudioHistoryJournalToPagesDepth,
   stepStudioHistoryJournal,
   studioHistoryJournalSidecarLabel,
 } from "./studio-history-journal";
-import {
-  createStudioHistoryRetentionUiState,
-  observeStudioHistoryRetentionAppend,
-} from "./studio-history-retention-ui";
-import {
-  initialGpuLiveSourceJournalMatchesPlan,
-} from "./canvas/studio-hokusai-gpu-plan-matchers";
-import {
-  StudioHokusaiLiveOverlayRenderer,
-} from "./render/studio-hokusai-live-brush-overlay";
-import {
-  StudioHokusaiLiveBrushProvider,
-} from "./render/studio-hokusai-live-brush-runtime";
-import {
-  planStudioHokusaiNaturalMediaReplacement,
-} from "./render/studio-hokusai-natural-media-replacement";
+import { initialGpuLiveSourceJournalMatchesPlan } from "./canvas/studio-hokusai-gpu-plan-matchers";
+import { StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
+import { StudioHokusaiLiveBrushProvider } from "./render/studio-hokusai-live-brush-runtime";
+import { planStudioHokusaiNaturalMediaReplacement } from "./render/studio-hokusai-natural-media-replacement";
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
@@ -589,27 +524,9 @@ import {
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
 import { resolveStudioInteractiveThreeDSurfaceAdmission } from "./studio-interactive-3d-surface";
-import {
-  clampIsometricCellSize,
-  type IsometricAxisRay,
-} from "./studio-isometric-grid";
-import type {
-  ImageFilterFields,
-} from "./render/studio-konva-filter-fields";
+import { clampIsometricCellSize, type IsometricAxisRay } from "./studio-isometric-grid";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import { studioKonvaRuntime as KonvaRuntime } from "./render/studio-konva-runtime";
-import { StudioLayerLiftComposeWorkerClient } from "./layer/studio-layer-lift-compose-worker-client";
-import {
-  createStudioLayerLiftLocalForegroundProvider,
-} from "./layer/studio-layer-lift-local-provider";
-import {
-  loadStudioLayerLiftMediaPipeInference,
-} from "./layer/studio-layer-lift-mediapipe-inference";
-import {
-  StudioLayerLiftOperationRegistry,
-} from "./layer/studio-layer-lift-operation-context";
-import type {
-  StudioLayerLiftReviewPreviewResource,
-} from "./layer/studio-layer-lift-review-preview";
 import {
   createStudioLayerLiftSession,
   resolveStudioLayerLiftDisabledReason,
@@ -621,10 +538,7 @@ import {
   invertLayerMaskAlpha,
   type LayerMaskPaintMode,
 } from "./layer/studio-layer-mask";
-import {
-  normalizeStudioLayerColor,
-  normalizeStudioLayerRole,
-} from "./layer/studio-layer-navigator";
+import { normalizeStudioLayerColor, normalizeStudioLayerRole } from "./layer/studio-layer-navigator";
 import { createStudioLayerOperations } from "./layer/studio-layer-operations";
 import {
   EMPTY_STUDIO_LAYER_SOLO_STATE,
@@ -671,25 +585,14 @@ import {
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
 import type { StudioLiquifyMode } from "./studio-liquify-contract";
-import {
-  mapLiquifyRoiToDocumentFrame,
-  planStudioLiquifyLivePreview,
-} from "./studio-liquify-live-preview";
+import { mapLiquifyRoiToDocumentFrame, planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
 import {
   endStudioLiquifyPointerSession,
   isStudioLiquifyPointerOwner,
   type StudioLiquifyPointerSession,
 } from "./studio-liquify-pointer";
-import {
-  thinStudioLiquifyPointsForApply,
-} from "./studio-liquify-stroke-sampling";
-import {
-  gateStudioCanvasMutation,
-  type StudioCanvasMutationIntent,
-} from "./live/studio-live-canvas-mutation-gate";
-import {
-  projectStudioCanvasCommentPins,
-} from "./live/studio-live-canvas-overlay-model";
+import { thinStudioLiquifyPointsForApply } from "./studio-liquify-stroke-sampling";
+import { projectStudioCanvasCommentPins } from "./live/studio-live-canvas-overlay-model";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
@@ -698,33 +601,15 @@ import {
   StudioLiveRetainedMediaOverlayRenderer,
   studioLiveRetainedMediaOverlaySupportsElement,
 } from "./live/studio-live-retained-media-overlay";
+import { createStudioLiveResourceLeaseController } from "./live/createStudioLiveResourceLeaseController";
 import { StudioLiveGesturePreviewPublisher } from "./live/studio-live-gesture-preview-publisher";
-import { StudioLiveGesturePreviewRoomAdapter } from "./live/studio-live-gesture-preview-room-adapter";
-import {
-  decideStudioLiveInkBackend,
-} from "./live/studio-live-ink-backend";
+import { decideStudioLiveInkBackend } from "./live/studio-live-ink-backend";
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
   studioLiveInkFastOverlaySupportsStyle,
   type StudioLiveInkStrokeStyle,
 } from "./live/studio-live-ink-overlay";
-import {
-  resolveStudioLiveSessionWorkId,
-  shouldExpectStudioSharedDocument,
-  shouldRequireStudioLiveServer,
-  shouldSeedStudioLiveSharedBootstrapPage,
-  studioLiveSharedBootstrapPageId,
-} from "./live/studio-live-jam-session";
-import {
-  planStudioLiveHeldResourceReplace,
-  selfHoldsStudioLiveLock,
-  studioLiveMutationResources,
-} from "./live/studio-live-mutation-guard";
-import {
-  releaseStudioLiveMutationLocks,
-  replaceStudioLiveMutationLocks,
-} from "./live/studio-live-mutation-lock-coordinator";
 import { StudioLiveStampOverlayRenderer } from "./live/studio-live-stamp-overlay";
 import {
   StudioLiveWetInkOverlayRenderer,
@@ -772,7 +657,6 @@ import {
 } from "./studio-living-ink-studio-coordinator";
 import {
   isStudioLocalDatabaseOwnershipBusyError,
-  STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
   STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
 } from "./studio-local-database-ownership";
 import {
@@ -798,9 +682,7 @@ import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindi
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
 import {
-  composeMasterRenderElements,
   composeThumbPage,
-  createEmptyDocumentMaster,
   normalizeDocumentMaster,
   withMasterElements,
   type DocumentMaster,
@@ -877,12 +759,10 @@ import {
 } from "./studio-page-editor-runtime-contracts";
 import {
   loadStudioBrushLibrarySqliteRepository,
-  loadStudioBrushQuickSlotsSqliteRepository,
   loadStudioLiquifyBrowserRuntime,
   loadStudioPixelEditBrushRuntime,
   readAllProductBrushes,
   type ProductBrushLibraryRepository,
-  type StudioBrushQuickSlotsSnapshot,
 } from "./studio-page-editor-runtime-loaders";
 import {
   EMPTY_STUDIO_GPU_STROKES,
@@ -894,7 +774,6 @@ import {
   type StudioLivingInkCanonicalHandoff,
   type StudioLivingInkOverlaySurfaceState,
   type StudioLivingInkPinnedStroke,
-  type StudioPageHistoryJournal,
   type StudioQuickAccessIntegrationModule,
 } from "./studio-page-editor-types";
 import {
@@ -932,29 +811,19 @@ import {
   preloadStudioTextEditOverlay,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
-import {
-  PAGE_NAME_MAX,
-  PAGE_NOTE_MAX,
-  pageDisplayName,
-} from "./studio-page-meta";
-import {
-  isPageReviewLocked,
-  patchPageReviewState,
-  type PageReviewState,
-} from "./studio-page-review";
+import { pageDisplayName } from "./studio-page-meta";
+import { isPageReviewLocked, patchPageReviewState, type PageReviewState } from "./studio-page-review";
 import { runStudioPageSavePipeline } from "./studio-page-save-pipeline";
 import { clearStudioWorkMetadataValidationError } from "./studio-work-metadata";
 import {
   clampZoom,
   closedStudioLayerLiftUiState,
-  createStudioPageHistoryCommandJournalClient,
   type StudioLayerLiftUiState,
   isStudioAiReferenceCompatibleAsset,
   isStudioViewToolsHudEventTarget,
   publishPackageCreditsFromPack,
   publishPackageSettingsFromPack,
   STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY,
-  studioBrushQuickSlotsDeviceProfile,
   studioLinked3dCloudSaveRecoveryNotice,
   studioTimelineClockMs,
   STUDIO_LAYER_LIFT_DEFAULT_REVIEW_OPTIONS,
@@ -976,11 +845,6 @@ import {
   useStudioUiBooleanPreferenceHydration,
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
-import {
-  STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS,
-  type StudioPagesHistoryCommandJournalDurabilityStatus,
-  type StudioHistoryJournalTransitionInput,
-} from "./studio-pages-history-command-journal-client";
 import { createPalette } from "./studio-palette-library";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
@@ -991,28 +855,20 @@ import {
   getStudioPaperSurfaceCatalogEntry,
   planStudioPaperSurfaceApply,
 } from "./brush/studio-paper-surface-catalog";
-import {
-  studioPaperVectorDocumentIneligibilityReason,
-} from "./brush/studio-paper-vector-document-adapter";
+import { studioPaperVectorDocumentIneligibilityReason } from "./brush/studio-paper-vector-document-adapter";
 import { insertBlankPageAt } from "./studio-pages";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
-  type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
-import type {
-  PerspectiveRay,
-  VanishingPoint,
-} from "./studio-perspective-guide";
+import type { PerspectiveRay, VanishingPoint } from "./studio-perspective-guide";
 import {
   admitStudioPixelArtStrokeColor,
   createStudioPixelArtMode,
   enableStudioPixelArtMode,
   type StudioPixelArtModeState,
 } from "./studio-pixel-art-mode";
-import {
-  isStudioPixelPencilRenderMode,
-} from "./studio-pixel-pencil";
+import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import {
   bindPixelSelectionHistory,
   commitPixelSelectionHistory,
@@ -1021,9 +877,7 @@ import {
   undoPixelSelectionHistory,
   type PixelSelectionHistoryOperation,
 } from "./studio-pixel-selection-session-history";
-import {
-  canUseStudioPointerPredictionForSession,
-} from "./canvas/studio-pointer-prediction-capability";
+import { canUseStudioPointerPredictionForSession } from "./canvas/studio-pointer-prediction-capability";
 import {
   appendStudioAuthoritativeInk,
   createStudioPredictedInkTailState,
@@ -1046,10 +900,7 @@ import {
 } from "./studio-pro-draw-prefs";
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
-import {
-  resetStudioAiProvenanceForRemix,
-  type StudioProjectFile,
-} from "./studio-project-file";
+import { resetStudioAiProvenanceForRemix, type StudioProjectFile } from "./studio-project-file";
 import {
   buildStudioProjectFileSnapshot,
   resolveStudioDurableProjectPages,
@@ -1073,15 +924,12 @@ import {
   type StudioPublishPackagePlan,
   type StudioPublishPackageSettings,
 } from "./studio-publish-package";
-import { normalizeStudioPublishPackSettings, validateStudioPublishPreflight } from "./studio-publish-preflight";
 import {
-  bakePuppetWarpToCanvas,
-  isPuppetWarpNoop,
-} from "./studio-puppet-warp";
-import type {
-  StudioQuickActionId,
-  StudioQuickActionsPreferences,
-} from "./studio-quick-actions";
+  normalizeStudioPublishPackSettings,
+  validateStudioPublishPreflight,
+} from "./studio-publish-preflight";
+import { bakePuppetWarpToCanvas, isPuppetWarpNoop } from "./studio-puppet-warp";
+import type { StudioQuickActionId, StudioQuickActionsPreferences } from "./studio-quick-actions";
 import {
   buildQuickMaskTintPixels,
   invertMask,
@@ -1117,9 +965,7 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./render/studio-raster-publication-projection";
-import {
-  thinStudioRasterRetouchPointsForApply,
-} from "./render/studio-raster-retouch-stroke-sampling";
+import { thinStudioRasterRetouchPointsForApply } from "./render/studio-raster-retouch-stroke-sampling";
 import { resolveStudioRasterToolResumePlan } from "./render/studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./render/studio-raster-visible-rect";
 import {
@@ -1130,10 +976,8 @@ import {
   type StudioRawPenInkPreviewState,
 } from "./studio-raw-pen-ink-preview";
 import {
-  areStudioReferenceBoardDocumentsEqual,
   createDefaultStudioReferenceBoardDocument,
   normalizeStudioReferenceBoardDocument,
-  type StudioReferenceBoardDocument,
 } from "./studio-reference-board";
 import {
   createEmptyStudioReleaseScheduleSnapshot,
@@ -1164,11 +1008,7 @@ import {
   type StudioScrollViewport,
   type StudioScrollViewportStore,
 } from "./studio-scroll-viewport-store";
-import {
-  clampCanvasPlacementCenter,
-  unionBounds,
-  viewportSpawnCenter,
-} from "./studio-selection";
+import { clampCanvasPlacementCenter, unionBounds, viewportSpawnCenter } from "./studio-selection";
 import {
   applySelectionAdjustToCanvas,
   applySelectionContentTransformToCanvas,
@@ -1221,17 +1061,13 @@ import {
   type StudioServerAiProviderPreference,
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
-import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
 import { studioShared3dStageEntryAsDocument } from "./studio-shared-3d-stage-collection";
 import {
   resolveStudioShared3dStageBundleIdForElement,
   type StudioShared3dStageDccSource,
 } from "./studio-shared-3d-stage-document";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
-import {
-  DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
-  type StudioSilkGenerativeSpec,
-} from "./studio-silk-generative";
+import { DEFAULT_STUDIO_SILK_GENERATIVE_SPEC, type StudioSilkGenerativeSpec } from "./studio-silk-generative";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
@@ -1259,13 +1095,9 @@ import {
   reportStudioAutosaveFailure,
   reportStudioSaveAuthorityDegraded,
 } from "./studio-storage-recovery-runtime";
-import type {
-  StudioStrokeObjectSnapCache,
-} from "./brush/studio-stroke-object-snap-cache";
+import type { StudioStrokeObjectSnapCache } from "./brush/studio-stroke-object-snap-cache";
 import { StudioStrokePostprocessWorkerClient } from "./brush/studio-stroke-postprocess-worker-client";
-import {
-  DEFAULT_SHAPE_PARAMS,
-} from "./brush/studio-stroke-shapes";
+import { DEFAULT_SHAPE_PARAMS } from "./brush/studio-stroke-shapes";
 import type {
   StudioPointerVelocityState,
   StudioStabilizerMode,
@@ -1278,17 +1110,9 @@ import {
   studioStrokeSurfaceRouteSuppressesDraft,
   type StudioStrokeSurfaceRoute,
 } from "./brush/studio-stroke-surface-route";
-import {
-  mergeStudioTeamCommentMutationReceipt,
-} from "./studio-team-comment-frontier";
-import { StudioTeamCommentOperationScopeRegistry } from "./studio-team-comment-operation-scope";
-import {
-  createStudioTeamCommentRefreshSession,
-  type StudioTeamCommentRefreshSession,
-} from "./studio-team-comment-refresh-session";
-import {
-  createStudioThinLineInkInputState,
-} from "./studio-thin-line-ink-input-v1";
+import { mergeStudioTeamCommentMutationReceipt } from "./studio-team-comment-frontier";
+import { createStudioTeamCommentRefreshSession } from "./studio-team-comment-refresh-session";
+import { createStudioThinLineInkInputState } from "./studio-thin-line-ink-input-v1";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
   areStudioToolOperationSnapshotsEqual,
@@ -1298,8 +1122,6 @@ import {
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
-import { bootStudioTournamentPersistence } from "./studio-tournament-persistence-bootstrap";
-import type { StudioUiDensityMode } from "./studio-ui-density";
 import {
   hasStudioUnloadPromptWork,
   installStudioUnloadGuard,
@@ -1331,10 +1153,7 @@ import {
   type StudioViewRotation,
   type StudioViewSnapshot,
 } from "./studio-view-controls";
-import {
-  DEFAULT_WATERMARK,
-  type WatermarkSettings,
-} from "./studio-watermark";
+import { DEFAULT_WATERMARK, type WatermarkSettings } from "./studio-watermark";
 import {
   isStudioWebGpuAuthorityCurrent,
   snapshotStudioWebGpuAuthority,
@@ -1366,22 +1185,18 @@ import {
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
 import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
-import { StudioWorkAssetAdmissionCoordinator } from "./studio-work-asset-admission";
 import {
   studioWorkAssetDestructiveEditReason,
   studioWorkAssetDocumentSourceTransitionReason,
   studioWorkAssetSourceReplacementReason,
 } from "./studio-work-asset-edit-guard";
-import { StudioWorkAssetHydrator } from "./studio-work-asset-hydrator";
 import {
   areStudioWorkAssetSceneReferencesEqual,
   collectStudioWorkAssetSceneReferences,
   projectStudioWorkAssetPageForReadOnlyPreview,
   projectStudioWorkAssetPageForRender,
   resolveStudioWorkAssetReadableImageSource,
-  resolveStudioWorkAssetHydrationScope,
   type StudioWorkAssetRenderPlaceholder,
-  type StudioWorkAssetSceneReference,
 } from "./studio-work-asset-render-projection";
 import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canvas-dock";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
@@ -1424,31 +1239,21 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { buildStudioWriterRoomCanvasPages } from "./writer-room/buildStudioWriterRoomCanvasPages";
 import { shouldSuppressStudioQuickStartAutoOpen } from "./studio-quick-start-auto-open";
 import type {
   StudioCanvasViewportHandlers,
   StudioHokusaiLiveOverlaySurfaceBinding,
   StudioLivingInkOverlaySurfaceBinding,
 } from "./canvas/StudioCanvasViewport";
-import type {
-  CvdMode,
-} from "./StudioColorBlindPreview";
-import type {
-  StudioLazyPanelStackHandlers,
-  StudioLazyPanelStackProps,
-} from "./StudioLazyPanelStack";
-import type {
-  StudioCrdtAuthoritativeSaveBarrier,
-  StudioCrdtSceneGraphRuntime,
-} from "./live/StudioLiveCollaborationProvider";
+import type { CvdMode } from "./StudioColorBlindPreview";
+import type { StudioLazyPanelStackHandlers, StudioLazyPanelStackProps } from "./StudioLazyPanelStack";
 import type {
   StudioOptionsBarsDrawModel,
   StudioOptionsBarsHandlers,
   StudioOptionsBarsSelectionModel,
 } from "./StudioOptionsBars";
-import type {
-  StudioSelectionAlignMode,
-} from "./StudioSelectionContextBar";
+import type { StudioSelectionAlignMode } from "./StudioSelectionContextBar";
 import type {
   FxPickerSection,
   StudioBgScene,
@@ -1462,9 +1267,7 @@ import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
 import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";
 import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";
-import {
-  requestStudioVrmProjectArchiveUseContext,
-} from "./vrm/StudioVrmProjectArchiveAttestationHost";
+import { requestStudioVrmProjectArchiveUseContext } from "./vrm/StudioVrmProjectArchiveAttestationHost";
 import { useStudioLiveTransportAuth } from "./live/use-studio-live-transport-auth";
 import { useStudioBrushBaselineController } from "./brush/useStudioBrushBaselineController";
 
@@ -1478,17 +1281,9 @@ import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-pr
 import type { StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { SvgExportEl, SvgExportResult } from "./export/studio-svg-export";
-import type {
-  StudioFilterDraft,
-  StudioFilterKind,
-  StudioFilterPreview,
-} from "./filter/studio-filter-menu";
-import type {
-  StudioLayerNavigatorItem,
-} from "./layer/studio-layer-navigator";
-import type {
-  StudioLayerLiftReviewOptions,
-} from "./layer/StudioLayerLiftDialog";
+import type { StudioFilterDraft, StudioFilterKind, StudioFilterPreview } from "./filter/studio-filter-menu";
+import type { StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
+import type { StudioLayerLiftReviewOptions } from "./layer/StudioLayerLiftDialog";
 import type {
   StudioDialogueImportApplyResult,
   StudioDialogueImportMatchMode,
@@ -1496,35 +1291,22 @@ import type {
 } from "./lettering/studio-dialogue-interchange";
 import type { StudioCrdtDocument } from "./live/studio-crdt-document";
 import type { StudioRasterOverlaySourceElement } from "./live/studio-crdt-raster-ui-bridge";
-import type { StudioLiveRoom } from "./live/studio-live-collaboration-room";
-import type {
-  StudioCommentPinClickPayload,
-  StudioCommentPinReanchorPayload,
-} from "./live/StudioLiveCanvasOverlay";
+import type { StudioCommentPinClickPayload } from "./live/StudioLiveCanvasOverlay";
 import type { StudioLivePressureStore } from "./live/StudioLiveInkHosts";
-import type {
-  StudioEditableRasterCopyPlan,
-} from "./render/studio-raster-edit-preparation";
+import type { StudioEditableRasterCopyPlan } from "./render/studio-raster-edit-preparation";
 import type { StudioRasterServerAuthoritySnapshot } from "./render/studio-raster-server-authority";
 import type { StudioRasterToolId } from "./render/studio-raster-tool-availability";
-import type {
-  StudioGpuBackend,
-  StudioGpuFrameReceipt,
-} from "./render/studio-webgpu-frame-contract";
+import type { StudioGpuBackend, StudioGpuFrameReceipt } from "./render/studio-webgpu-frame-contract";
 import type {
   StudioGpuLiveStrokePlan,
   StudioGpuLiveStrokePlanner,
 } from "./render/studio-webgpu-live-stroke-plan";
 import type { StudioGpuStroke } from "./render/studio-webgpu-stroke";
 import type { StudioBg3dAiMethodReferenceCapture } from "./scene-3d/studio-3d-ai-reference-handoff";
-import type {
-  StudioBackground3DInsertResult,
-} from "./scene-3d/studio-3d-insert-contract";
+import type { StudioBackground3DInsertResult } from "./scene-3d/studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
-import type {
-  StudioAsset,
-} from "./studio-asset-library";
+import type { StudioAsset } from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
   StudioAutoActionPlan,
@@ -1541,10 +1323,6 @@ import type {
   PendingStudioInterchangeImport,
   StudioInterchangeImportChoice,
 } from "./studio-document-interchange-commit";
-import type {
-  StudioDraftCollaborationProvisionGate,
-  StudioDraftCollaborationReadiness,
-} from "./studio-draft-collaboration";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -1563,9 +1341,7 @@ import type { StudioExtendedBlendModeId } from "./studio-extended-blend";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
-import type {
-  StudioLivingInkExecutionConfig,
-} from "./studio-living-ink-execution-protocol";
+import type { StudioLivingInkExecutionConfig } from "./studio-living-ink-execution-protocol";
 import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
 import type { StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
 import type {
@@ -1578,7 +1354,6 @@ import type { StudioBg3dRecoveryAccessSnapshot } from "./studio-page-editor-runt
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
-import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { PsdExportEl, PsdExportResult } from "./export/studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type {
@@ -1587,25 +1362,16 @@ import type {
   StudioPublishPreflightInput,
   StudioPublishProfile,
 } from "./studio-publish-preflight";
-import type { StudioQualityWorkerClient } from "./studio-quality-worker-client";
-import type {
-  StudioQuickAccessCommandMeta,
-  StudioQuickAccessState,
-} from "./studio-quick-access";
-import type {
-  StudioQuickAccessCommandAvailability,
-} from "./studio-quick-access-integration";
+import type { StudioQuickAccessCommandMeta, StudioQuickAccessState } from "./studio-quick-access";
+import type { StudioQuickAccessCommandAvailability } from "./studio-quick-access-integration";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
-import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
-import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
-import type { StudioUiBooleanPreferenceKey } from "./studio-ui-preferences-sqlite";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
 import type {
   StudioWatermarkPreferenceRuntime,
@@ -1613,14 +1379,8 @@ import type {
 } from "./studio-watermark-preferences-sqlite";
 import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
-import type {
-  StudioWorkspacePersistenceRuntime,
-} from "./studio-workspace-sqlite-runtime";
-import type {
-  StudioAssetShareOptions,
-  StudioAssetSortOrder,
-  StudioAssetTab,
-} from "./StudioAssetMenuPanel";
+import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
+import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } from "./StudioAssetMenuPanel";
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
 import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
@@ -1676,6 +1436,8 @@ export function StudioCuttoonEditor({
     workId,
   );
   const linked3dCloudSaveRecoveryNoticeRef = useRef(linked3dCloudSaveRecoveryNotice);
+  const [error, setError] = useState<string | null>(linked3dCloudSaveRecoveryNotice);
+  const announceDrawingShortcutRef = useRef<(message: string) => void>(() => undefined);
   const creationLinks = studioCreationLinkParams({
     workId,
     titleId: params.get("titleId"),
@@ -1691,130 +1453,87 @@ export function StudioCuttoonEditor({
     authReady: studioAuthReady,
     userId: studioAuthUserId,
   });
-  // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
-  // to live cursor state. The always-mounted provider owns and rotates the actual room.
-  const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
-  const [studioLiveGesturePreviewAdapter] = useState(
-    () => new StudioLiveGesturePreviewRoomAdapter(),
-  );
-  const studioLiveGesturePreviewLifecycleGenerationRef = useRef({ generation: 0 });
-  const cancelStudioLiveGesturePreviewRef = useRef<() => void>(() => undefined);
-  const studioLiveCommentEventHandlerRef = useRef<(
-    change: StudioTeamCommentLiveEvent
-  ) => void>(() => undefined);
-  const studioLiveCommentRoomUnsubscribeRef = useRef<(() => void) | null>(null);
-  const studioCrdtAuthoritativeSaveBarrierRef =
-    useRef<StudioCrdtAuthoritativeSaveBarrier | null>(null);
-  const [studioCrdtAuthoritativeBarrierGeneration, setStudioCrdtAuthoritativeBarrierGeneration] =
-    useState(0);
-  const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
-  const studioCrdtSceneRuntimeRef = useRef<StudioCrdtSceneGraphRuntime | null>(null);
-  const publishStudioCrdtSceneTransitionRef = useRef<(
-    previousPages: readonly PageState[],
-    nextPages: readonly PageState[],
-    registerNewDraws?: boolean
-  ) => boolean>(() => false);
-  // Completed raster publications are serialized per editor actor. This keeps Lamport allocation
-  // strictly increasing even when a fast artist finishes another stroke while the previous PNG
-  // tiles are still uploading. Each controller is also an account/work teardown boundary.
-  const studioRasterPublicationTailRef = useRef<Promise<void>>(Promise.resolve());
-  const studioRasterPublicationControllersRef = useRef(new Set<AbortController>());
-  const studioFilterMaskPublicationClockRef = useRef(0);
-  const studioFilterMaskPublicationGenerationRef = useRef(new Map<string, number>());
-  const [studioCrdtDocument, setStudioCrdtDocument] = useState<StudioCrdtDocument | null>(null);
-  const [studioCrdtReconciledDocument, setStudioCrdtReconciledDocument] =
-    useState<StudioCrdtDocument | null>(null);
-  // StudioPage's outer editor key rotates on both auth and work scope. This per-instance owner is
-  // therefore incapable of carrying private Blob URLs or in-flight responses across identities.
-  const [studioBrushR8GrainHydrator] = useState(
-    () => new StudioBrushR8GrainHydrator()
-  );
-  const studioBrushR8GrainHydrationRevision = useSyncExternalStore(
-    studioBrushR8GrainHydrator.subscribe,
-    studioBrushR8GrainHydrator.getVersion,
-    studioBrushR8GrainHydrator.getVersion
-  );
-  const [studioWorkAssetHydrator] = useState(
-    () => new StudioWorkAssetHydrator(null)
-  );
-  const [studioFilterMaskSurfaceHydrator] = useState(
-    () => new StudioFilterMaskSurfaceHydrator()
-  );
-  const [studioWorkAssetAdmissionCoordinator] = useState(
-    () => new StudioWorkAssetAdmissionCoordinator()
-  );
-  const studioWorkAssetHydrationRevision = useSyncExternalStore(
-    studioWorkAssetHydrator.subscribe,
-    studioWorkAssetHydrator.getVersion,
-    studioWorkAssetHydrator.getVersion
-  );
-  const studioFilterMaskHydrationRevision = useSyncExternalStore(
-    studioFilterMaskSurfaceHydrator.subscribe,
-    studioFilterMaskSurfaceHydrator.getVersion,
-    studioFilterMaskSurfaceHydrator.getVersion
-  );
-  const [studioWorkAssetReferences, setStudioWorkAssetReferences] =
-    useState<StudioWorkAssetSceneReference[]>([]);
-  const [studioWorkAssetLimitExceeded, setStudioWorkAssetLimitExceeded] = useState(false);
-  useLayoutEffect(() => () => {
-    studioFilterMaskPublicationClockRef.current += 1;
-    studioFilterMaskPublicationGenerationRef.current.clear();
-    for (const controller of studioRasterPublicationControllersRef.current) {
-      controller.abort(new DOMException("래스터 편집 세션이 종료되었습니다.", "AbortError"));
-    }
-    studioRasterPublicationControllersRef.current.clear();
-    disposeStudioDynamicCoverageCommittedCache();
-    studioBrushR8GrainHydrator.dispose();
-    studioFilterMaskSurfaceHydrator.dispose();
-    studioWorkAssetAdmissionCoordinator.dispose();
-    studioWorkAssetHydrator.dispose();
-  }, [
+  const {
+    cancelStudioLiveGesturePreviewRef,
+    studioLiveCommentEventHandlerRef,
+    studioLiveCommentRoomUnsubscribeRef,
+    studioLiveGesturePreviewAdapter,
+    studioLiveGesturePreviewLifecycleGenerationRef,
+    studioLiveHeldResourcesRef,
+    studioLiveMutationGenerationRef,
+    studioLivePendingMutationRef,
+    studioLiveRoomRef,
+  } = useStudioLiveSessionRuntime();
+  const {
+    publishStudioCrdtSceneTransitionRef,
+    setStudioCrdtAuthoritativeBarrierGeneration,
+    setStudioCrdtDocument,
+    setStudioCrdtReconciledDocument,
+    studioCrdtAuthoritativeBarrierGeneration,
+    studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtDocument,
+    studioCrdtDocumentRef,
+    studioCrdtReconciledDocument,
+    studioCrdtSceneRuntimeRef,
+  } = useStudioCrdtRuntime();
+  const {
+    studioFilterMaskPublicationClockRef,
+    studioFilterMaskPublicationGenerationRef,
+    studioRasterPublicationControllersRef,
+    studioRasterPublicationTailRef,
+  } = useStudioRasterPublicationRuntime();
+  const {
+    setStudioWorkAssetLimitExceeded,
+    setStudioWorkAssetReferences,
+    studioBrushR8GrainHydrationRevision,
     studioBrushR8GrainHydrator,
+    studioFilterMaskHydrationRevision,
     studioFilterMaskSurfaceHydrator,
     studioWorkAssetAdmissionCoordinator,
+    studioWorkAssetHydrationRevision,
     studioWorkAssetHydrator,
-  ]);
-  useEffect(() => {
-    // Persistence is a boot concern, never a pen-down dependency. The dynamic
-    // boundary keeps SQLite/OPFS out of the static Studio route while the
-    // synchronous stroke ladder remains pristine until hydration completes.
-    void bootStudioTournamentPersistence();
+    studioWorkAssetLimitExceeded,
+    studioWorkAssetReferences,
+  } = useStudioHydrationRuntime();
+  useStudioTournamentPersistenceBoot();
+  const applyMirroredStudioSettings = useCallback((next: StudioAppSettings): void => {
+    setShowGrid(next.grids.showPixelGrid);
+    setShowRulers(next.grids.showCanvasRulers);
+    setGridSize(next.grids.pixelGridSize);
+    setShowAlignmentGuides(next.grids.showAlignmentGuides);
+    setPressureCurve(next.other.pressureCurve);
+    setSnapEnabled(next.grids.snapToPixelGrid);
   }, []);
-  const studioLiveHeldResourcesRef = useRef<string[]>([]);
-  const studioLiveMutationGenerationRef = useRef(0);
-  const studioLivePendingMutationRef = useRef<{
-    room: StudioLiveRoom;
-    key: string;
-    promise: Promise<boolean>;
-  } | null>(null);
-  const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(
-    () => defaultStudioAppSettings().general.densityMode,
-  );
-  // 앱 설정 — toolbar / shortcuts / mouse / touch / grids / other.
-  const [appSettings, setAppSettings] = useState<StudioAppSettings>(defaultStudioAppSettings);
-  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
-  const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<StudioAppSettingsTab>("general");
-  const [appSettingsPersistenceState, setAppSettingsPersistenceState] = useState<
-    "loading" | "saved" | "session-only"
-  >("loading");
-  const [railMoreOpen, setRailMoreOpen] = useState(false);
-  const appSettingsRef = useRef(appSettings);
-  const appSettingsUserRevisionRef = useRef(0);
-  const uiBooleanPreferenceRevisionsRef = useRef<
-    Record<StudioUiBooleanPreferenceKey, number>
-  >({
-    "ai-notice-acknowledged": 0,
-    "quick-start-dismissed": 0,
-    "mobile-hint-dismissed": 0,
-    "comment-pins-hidden": 0,
+  const closeStudioRightPanelForFocusMode = useCallback((): void => {
+    setForceRightPanelOpen(false);
+  }, []);
+  const {
+    appSettings,
+    appSettingsInitialTab,
+    appSettingsOpen,
+    appSettingsPersistenceState,
+    appSettingsRef,
+    commitAppSettings,
+    effectFavoriteState,
+    isRailToolVisible,
+    persistAppSettings,
+    persistStudioUiBooleanPreference,
+    railMoreOpen,
+    rememberEffectRecent,
+    setAppSettings,
+    setAppSettingsInitialTab,
+    setAppSettingsOpen,
+    setAppSettingsPersistenceState,
+    setRailMoreOpen,
+    setStudioUiDensity,
+    setStudioUiDensityFromCompanion,
+    toggleEffectFavorite,
+    uiBooleanPreferenceRevisionsRef,
+    uiDensityMode,
+  } = useStudioPreferencesRuntime({
+    applyMirroredSettings: applyMirroredStudioSettings,
+    closeRightPanelForFocusMode: closeStudioRightPanelForFocusMode,
   });
-  appSettingsRef.current = appSettings;
-  const [effectFavoriteState, setEffectFavoriteState] = useState<StudioEffectFavoriteState>(() =>
-    normalizeStudioEffectFavoriteState(undefined)
-  );
-  const effectFavoriteStateRef = useRef(effectFavoriteState);
-  const effectFavoriteUserRevisionRef = useRef(0);
-  effectFavoriteStateRef.current = effectFavoriteState;
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
   /**
@@ -1835,219 +1554,6 @@ export function StudioCuttoonEditor({
   // 엔진은 lazy 청크에 남기려고 기본값을 리터럴로 초기화한다(type-only import).
   const [extendedBlendMode, setExtendedBlendMode] = useState<StudioExtendedBlendModeId>("linear-dodge");
   const [extendedBlendOpacity, setExtendedBlendOpacity] = useState(1);
-  // 벡터 패스 불리언(도형 결합) — 마퀴 2도형 선택 시 합치기/빼기/교차/제외.
-  const [pathBooleanBusy, setPathBooleanBusy] = useState(false);
-  const pathBooleanRunIdRef = useRef(0);
-  const pathBooleanActiveRef = useRef(false);
-  const pathBooleanAbortRef = useRef<AbortController | null>(null);
-  const pathBooleanClientRef = useRef<StudioQualityWorkerClient | null>(null);
-  // Paper.js 경로 정리는 Worker 안의 settled suggestion만 만들며, Studio 문서 권위는 이
-  // 컴포넌트가 보유한다. 페이지/Undo/선택이 바뀌면 run/epoch를 함께 전진시켜 늦은 결과를 폐기한다.
-  const [paperVectorRefinementBusy, setPaperVectorRefinementBusy] = useState(false);
-  const paperVectorRefinementRunIdRef = useRef(0);
-  const paperVectorRefinementActiveRef = useRef(false);
-  const paperVectorRefinementAbortRef = useRef<AbortController | null>(null);
-  const paperVectorRefinementRequestSequenceRef = useRef(0);
-  const paperVectorRefinementEngineEpochRef = useRef(1);
-  const paperVectorRefinementClientRef = useRef<{
-    advanceEngineEpoch(): number;
-    dispose(): void;
-  } | null>(null);
-  function persistAppSettings(next: StudioAppSettings): void {
-    const revision = ++appSettingsUserRevisionRef.current;
-    setAppSettingsPersistenceState("loading");
-    void acquireProductStudioUiPreferencesRepository()
-      .then((repository) => repository.saveAppSettings(next))
-      .then(() => {
-        if (appSettingsUserRevisionRef.current === revision) {
-          setAppSettingsPersistenceState("saved");
-        }
-      })
-      .catch(() => {
-        if (appSettingsUserRevisionRef.current === revision) {
-          setAppSettingsPersistenceState("session-only");
-        }
-      });
-  }
-  function persistStudioUiBooleanPreference(
-    key: StudioUiBooleanPreferenceKey,
-    value: boolean,
-  ): void {
-    uiBooleanPreferenceRevisionsRef.current[key] += 1;
-    void acquireProductStudioUiPreferencesRepository()
-      .then((repository) => repository.saveBooleanPreference(key, value))
-      .catch(() => setAppSettingsPersistenceState("session-only"));
-  }
-  function setStudioUiDensity(mode: StudioUiDensityMode) {
-    if (mode === "focus") setForceRightPanelOpen(false);
-    setUiDensityMode(mode);
-    const current = appSettingsRef.current;
-    const next = current.general.densityMode === mode
-      ? current
-      : { ...current, general: { ...current.general, densityMode: mode } };
-    if (next !== current) setAppSettings(next);
-    persistAppSettings(next);
-  }
-  function commitAppSettings(next: StudioAppSettings) {
-    setAppSettings(next);
-    persistAppSettings(next);
-    // Mirror high-impact prefs into existing live state (avoid recursive setStudioUiDensity).
-    setUiDensityMode(next.general.densityMode);
-    setShowGrid(next.grids.showPixelGrid);
-    setShowRulers(next.grids.showCanvasRulers);
-    setGridSize(next.grids.pixelGridSize);
-    setShowAlignmentGuides(next.grids.showAlignmentGuides);
-    setPressureCurve(next.other.pressureCurve);
-    setSnapEnabled(next.grids.snapToPixelGrid);
-  }
-  const setStudioUiDensityFromCompanion = useEffectEvent(setStudioUiDensity);
-  // useCallback: 좌측 레일 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
-  const isRailToolVisible = useCallback(
-    (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
-    [appSettings.toolbar.visibleIds]
-  );
-  function persistEffectFavoriteState(next: StudioEffectFavoriteState) {
-    const revision = ++effectFavoriteUserRevisionRef.current;
-    effectFavoriteStateRef.current = next;
-    setEffectFavoriteState(next);
-    void acquireProductStudioUiPreferencesRepository()
-      .then((repository) => repository.saveEffectFavorites(next))
-      .catch(() => {
-        if (effectFavoriteUserRevisionRef.current === revision) {
-          setAppSettingsPersistenceState("session-only");
-        }
-      });
-  }
-  function toggleEffectFavorite(effectId: StudioEffectId) {
-    persistEffectFavoriteState(toggleStudioEffectFavorite(effectFavoriteState, effectId));
-  }
-  function rememberEffectRecent(effectId: StudioEffectId) {
-    persistEffectFavoriteState(rememberStudioEffectRecent(effectFavoriteState, effectId));
-  }
-  function liveMutationResources(elementIds?: readonly string[] | null): string[] {
-    return studioLiveMutationResources({
-      pageId: activePage.id,
-      elementIds,
-    });
-  }
-  function liveMutationPreflight(
-    room: StudioLiveRoom,
-    elementIds?: readonly string[] | null,
-    intent: StudioCanvasMutationIntent = "transform"
-  ): boolean {
-    const decision = gateStudioCanvasMutation({
-      locks: room.getLocks(),
-      pageId: activePage.id,
-      elementIds,
-      selfSessionId: room.participant.sessionId,
-      intent,
-      allowSelectWithoutLease: false,
-    });
-    if (decision.ok) return true;
-    setError(decision.reason);
-    return false;
-  }
-  async function beginLiveResourceEditAsync(
-    elementIds?: readonly string[] | null,
-    intent: StudioCanvasMutationIntent = "transform"
-  ): Promise<boolean> {
-    const room = studioLiveRoomRef.current;
-    if (!room) return true;
-    if (!liveMutationPreflight(room, elementIds, intent)) return false;
-    const resources = liveMutationResources(elementIds);
-    const key = JSON.stringify(resources);
-    const pending = studioLivePendingMutationRef.current;
-    if (pending) {
-      if (pending.room === room && pending.key === key) return pending.promise;
-      setError("다른 편집 잠금을 확인하고 있어요. 확인이 끝난 뒤 다시 시도해 주세요.");
-      return false;
-    }
-
-    const generation = ++studioLiveMutationGenerationRef.current;
-    const operation = replaceStudioLiveMutationLocks({
-      room,
-      previouslyHeld: studioLiveHeldResourcesRef.current,
-      nextResources: resources,
-    }).then((result) => {
-      if (generation !== studioLiveMutationGenerationRef.current) {
-        if (result.ok) releaseStudioLiveMutationLocks(room, result.held);
-        return false;
-      }
-      studioLiveHeldResourcesRef.current = [...result.held];
-      if (!result.ok) {
-        setError(result.failure.message);
-        return false;
-      }
-      setError(null);
-      return true;
-    });
-    const entry = { room, key, promise: operation };
-    studioLivePendingMutationRef.current = entry;
-    void operation.finally(() => {
-      if (studioLivePendingMutationRef.current === entry) {
-        studioLivePendingMutationRef.current = null;
-      }
-    });
-    return operation;
-  }
-  function beginLiveResourceEdit(
-    elementIds?: readonly string[] | null,
-    intent: StudioCanvasMutationIntent = "drag"
-  ): boolean {
-    const room = studioLiveRoomRef.current;
-    if (!room) return true;
-    if (!liveMutationPreflight(room, elementIds, intent)) return false;
-    const resources = liveMutationResources(elementIds);
-
-    // Local-tab preview has a synchronous deterministic arbiter. Authenticated server rooms must
-    // already expose every desired authoritative lease before Konva may begin a drag/transform.
-    if (room.mode !== "server") {
-      const plan = planStudioLiveHeldResourceReplace(
-        studioLiveHeldResourcesRef.current,
-        resources
-      );
-      for (const resource of plan.toRelease) room.releaseLock(resource);
-      for (const resource of plan.toClaim) {
-        if (!room.claimLock(resource)) {
-          releaseStudioLiveMutationLocks(room, plan.held);
-          studioLiveHeldResourcesRef.current = [];
-          return false;
-        }
-      }
-      studioLiveHeldResourcesRef.current = [...plan.held];
-      return true;
-    }
-
-    const locks = room.getLocks();
-    if (
-      resources.every((resource) =>
-        selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)
-      )
-    ) {
-      const plan = planStudioLiveHeldResourceReplace(
-        studioLiveHeldResourcesRef.current,
-        resources
-      );
-      for (const resource of plan.toRelease) room.releaseLock(resource);
-      studioLiveHeldResourcesRef.current = [...plan.held];
-      return true;
-    }
-
-    const key = JSON.stringify(resources);
-    const pending = studioLivePendingMutationRef.current;
-    if (!pending || pending.room !== room || pending.key !== key) {
-      void beginLiveResourceEditAsync(elementIds);
-    }
-    return true;
-  }
-  function endLiveResourceEdit() {
-    const room = studioLiveRoomRef.current;
-    ++studioLiveMutationGenerationRef.current;
-    studioLiveHeldResourcesRef.current = [
-      ...releaseStudioLiveMutationLocks(room, studioLiveHeldResourcesRef.current),
-    ];
-  }
-
   // 텍스트류 요소의 Konva 변형 종료 커밋 — 스케일을 폰트 크기(옵션: 너비)로 환산해 patch 하고,
   // 예외와 무관하게 라이브 편집락을 해제한다. 캔버스 memo 자식은 React Compiler가 finally 구문을
   // 지원하지 않아 이 로직을 에디터 핸들러로 승격했다.
@@ -2180,629 +1686,139 @@ export function StudioCuttoonEditor({
       );
     }
   }
-  // Live-room 회전/CRDT 문서 페어링 콜백, 오토세이브 문서 런타임, work-asset admission 배선은
-  // live/studio-collaboration-wiring 의 useStudioCollaborationWiring 으로 추출됐다. pages 히스토리와
-  // 협업 잠금 계산이 끝난 지점(아래 호출부)에서 주입 컨텍스트로 연결된다.
-  const [studioLiveEditsDurablyProtected, setStudioLiveEditsDurablyProtected] = useState(false);
-  const workAuthScopeKey = workId ? studioAuthUserId : null;
-  const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
-  const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
-  const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
-    useState<StudioAiImageReferenceDocument>(
-      createEmptyStudioAiImageReferenceDocument,
-    );
-  const loggedIn = Boolean(studioAuthUserId);
-  const [draftCollaboration, setDraftCollaboration] =
-    useState<StudioDraftCollaborationReadiness | null>(null);
-  const draftCollaborationProvisionGateRef =
-    useRef<StudioDraftCollaborationProvisionGate | null>(null);
-  const draftCollaborationProvisionAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => {
-    draftCollaborationProvisionAbortRef.current?.abort();
-    draftCollaborationProvisionAbortRef.current = null;
-    draftCollaborationProvisionGateRef.current = null;
-    if (workId || liveRoomQueryParam || !studioAuthUserId) {
-      setDraftCollaboration(null);
-      return;
-    }
-    let current = true;
-    void import("./studio-draft-collaboration")
-      .then(async ({ loadOrCreateStudioDraftCollaborationIdentity }) => {
-        if (!current) return;
-        const identity = await loadOrCreateStudioDraftCollaborationIdentity({
-          documentScopeKey: autosaveKey,
-          ownerScopeKey: studioAuthUserId,
-        });
-        if (current) setDraftCollaboration({ status: "local", identity });
-      })
-      .catch((error: unknown) => {
-        if (!current) return;
-        console.error("Failed to prepare the unsaved Studio collaboration identity:", error);
-        setDraftCollaboration(null);
-      });
-    return () => {
-      current = false;
-      draftCollaborationProvisionAbortRef.current?.abort();
-      draftCollaborationProvisionAbortRef.current = null;
-    };
-  }, [autosaveKey, liveRoomQueryParam, studioAuthUserId, workId]);
-  async function copyStudioDraftCollaborationShareLink(
-    provisionalWorkId: string
-  ): Promise<void> {
-    await navigator.clipboard.writeText(
-      buildStudioLiveShareHref(provisionalWorkId, window.location.origin, provisionalWorkId)
-    );
-    announceDrawingShortcut("팀 초대 링크를 복사했습니다 · 팀원 권한을 추가한 뒤 전달하세요");
-  }
-  async function requestStudioDraftCollaborationShare(): Promise<void> {
-    const readiness = draftCollaboration;
-    const actorAuthScopeKey = studioAuthUserId;
-    if (!readiness || !actorAuthScopeKey || readiness.status === "provisioning") return;
-    if (readiness.status === "ready") {
-      try {
-        await copyStudioDraftCollaborationShareLink(readiness.room.provisionalWorkId);
-      } catch {
-        setError("초대 링크를 복사하지 못했어요. 브라우저 클립보드 권한을 확인해 주세요.");
-      }
-      return;
-    }
-
-    const identity = readiness.identity;
-    const controller = new AbortController();
-    draftCollaborationProvisionAbortRef.current?.abort();
-    draftCollaborationProvisionAbortRef.current = controller;
-    try {
-      const [
-        {
-          consumeStudioDraftCollaborationProvisionAttempt,
-          createStudioDraftCollaborationProvisionRequest,
-        },
-        { provisionCreatorDraftCollaborationRoom },
-      ] = await Promise.all([
-        import("./studio-draft-collaboration"),
-        import("./creator-draft-collaboration-client"),
-      ]);
-      if (controller.signal.aborted) return;
-      const gate = consumeStudioDraftCollaborationProvisionAttempt(
-        draftCollaborationProvisionGateRef.current,
-        { identity }
-      );
-      draftCollaborationProvisionGateRef.current = gate.next;
-      if (!gate.allowed) {
-        const retrySeconds = Math.max(1, Math.ceil(gate.retryAfterMs / 1_000));
-        setDraftCollaboration({
-          status: "error",
-          identity,
-          message: `공유 작업실 요청이 너무 잦아요. ${retrySeconds}초 뒤 다시 시도해 주세요.`,
-        });
-        return;
-      }
-      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
-      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
-      if (controller.signal.aborted) return;
-      const snapshotJson = JSON.stringify(currentStudioProjectSnapshot());
-      const request = createStudioDraftCollaborationProvisionRequest({
-        identity,
-        actorAuthScopeKey,
-        intent: "share-link",
-        initialSnapshotByteLength: new TextEncoder().encode(snapshotJson).byteLength,
-      });
-      const room = await provisionCreatorDraftCollaborationRoom(request, {
-        signal: controller.signal,
-      });
-      if (
-        controller.signal.aborted
-        || draftCollaborationProvisionAbortRef.current !== controller
-      ) return;
-      setDraftCollaboration({ status: "ready", identity, room });
-      try {
-        await copyStudioDraftCollaborationShareLink(room.provisionalWorkId);
-      } catch {
-        announceDrawingShortcut("임시 팀 작업실이 준비됐습니다 · 팀 패널에서 멤버를 추가하세요");
-      }
-    } catch (cause) {
-      if (
-        controller.signal.aborted
-        || draftCollaborationProvisionAbortRef.current !== controller
-      ) return;
-      setDraftCollaboration({
-        status: "error",
-        identity,
-        message: cause instanceof Error
-          ? cause.message
-          : "임시 협업 작업실을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
-      });
-    } finally {
-      if (draftCollaborationProvisionAbortRef.current === controller) {
-        draftCollaborationProvisionAbortRef.current = null;
-      }
-    }
-  }
-  const expectsSharedDocument = shouldExpectStudioSharedDocument({
-    workAuthScopeKey,
-    workId,
-    remixId,
-  });
-  const [workHydrated, setWorkHydrated] = useState(!(workId || remixId));
-  const [workHydrationFailed, setWorkHydrationFailed] = useState(false);
-  const [workHydrationUnsupportedFormat, setWorkHydrationUnsupportedFormat] = useState(false);
-  const [documentReloadRequired, setDocumentReloadRequired] = useState(false);
-  const [sharedDocumentScope, setSharedDocumentScope] = useState<{
-    authScopeKey: string;
-    workId: string;
-    value: StudioSharedDocument;
-  } | null>(null);
-  const sharedDocument =
-    studioAuthUserId &&
-    workId &&
-    sharedDocumentScope?.authScopeKey === studioAuthUserId &&
-    sharedDocumentScope.workId === workId
-      ? sharedDocumentScope.value
-      : null;
-  const sharedDocumentRef = useRef(sharedDocument);
-  sharedDocumentRef.current = sharedDocument;
-  const draftCollaborationWorkId = draftCollaboration?.status === "ready"
-    ? draftCollaboration.room.provisionalWorkId
-    : draftCollaboration?.identity.draftDocumentId;
-  // `?room=` publication for a brand-new jam lives in StudioDocumentLayout; only the local draft
-  // identity — which the layout deliberately does not know about — is resolved here.
-  const effectiveWorkId = resolveStudioLiveSessionWorkId({
-    workId,
-    roomId: liveRoomQueryParam,
-    draftWorkId: draftCollaborationWorkId,
-    instantWorkId,
-  });
-  const studioLiveParticipant = useMemo(() => {
-    if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
-      return {
-        displayName: session?.user?.name ?? "내 작업",
-        role: sharedDocument.role,
-      };
-    }
-    // Magma 스타일 무료/즉시 실시간 동시 편집 룸 지원 — URL room 쿼리 또는 로컬 라이브 모드
-    if (liveRoomQueryParam || expectsSharedDocument || !workId) {
-      return {
-        displayName: session?.user?.name ?? (studioAuthUserId ? "게스트 작가" : "익명 게스트"),
-        role: "editor" as const,
-      };
-    }
-    return null;
-  }, [expectsSharedDocument, workId, studioAuthUserId, sharedDocument, session?.user?.name, liveRoomQueryParam]);
-  // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
-  // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
-  const authorizedWorkAssetScopeId = resolveStudioWorkAssetHydrationScope({
-    workId,
-    authUserId: studioAuthUserId,
-    remixId,
-    documentStatus: expectsSharedDocument ? sharedDocument?.status : null,
-    canView: Boolean(sharedDocument?.capabilities.view),
-  });
-  useLayoutEffect(() => {
-    studioWorkAssetHydrator.setWorkId(authorizedWorkAssetScopeId);
-    if (authorizedWorkAssetScopeId) return;
-    studioWorkAssetHydrator.observe([]);
-    setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
-    setStudioWorkAssetLimitExceeded(false);
-  }, [authorizedWorkAssetScopeId, studioWorkAssetHydrator]);
-  const collaborationDocumentUnavailable =
-    expectsSharedDocument &&
-    !sharedDocument &&
-    draftCollaboration?.status !== "provisioning";
-  const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
-  const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
-  const studioCrdtDocumentReady = Boolean(
-    studioCrdtDocument &&
-    studioCrdtDocumentRef.current === studioCrdtDocument &&
-    studioCrdtSceneRuntimeRef.current &&
-    studioCrdtReconciledDocument === studioCrdtDocument
-  );
-  const studioLiveJam = Boolean(liveRoomQueryParam || !workId);
-  const requiresStudioLiveServer = shouldRequireStudioLiveServer({
+  const {
+    advanceStudioRevisionProjectGeneration,
+    authorizedWorkAssetScopeId,
+    autosaveKey,
+    canApplyStudioMutation,
+    captureStudioMutationTicket,
+    checkpointKey,
+    collaborationAccessRef,
+    collaborationDocumentLocked,
+    collaborationDocumentUnavailable,
+    collaborationOperationSyncPending,
+    collaborationOperationSyncRequired,
+    collaborationReadOnly,
+    currentStudioDocumentScopeRef,
+    documentReloadRequired,
+    documentRevalidateAbortRef,
+    draftCollaborationProvisionAbortRef,
+    documentSaveInFlightRef,
+    draftCollaboration,
+    editorMountedRef,
+    effectiveWorkId,
     expectsSharedDocument,
-    draftCollaborationReady: draftCollaboration?.status === "ready",
-    liveJam: studioLiveJam,
-  });
-  const isRealtimeTeamSession = requiresStudioLiveServer;
-  const collaborationOperationSyncRequired = Boolean(
-    expectsSharedDocument && isRealtimeTeamSession && studioLiveParticipant && !collaborationReadOnly
-  );
-  // A reconciled Y.Doc alone is insufficient: collaborative editing is exposed only while the
-  // authoritative server or the browser-durable outbox can retain the next operation.
-  const studioCrdtOperationSyncReady = studioCrdtDocumentReady && (
-    !collaborationOperationSyncRequired || studioLiveEditsDurablyProtected
-  );
-  const collaborationOperationSyncPending =
-    collaborationOperationSyncRequired && !studioCrdtOperationSyncReady;
-  const collaborationDocumentLocked = expectsSharedDocument && isStudioEditorCollaborationLocked({
-    documentAccessLocked:
-      documentReloadRequired ||
-      sourceHydrationPending ||
-      collaborationDocumentUnavailable ||
-      collaborationReadOnly,
-    operationSyncRequired: collaborationOperationSyncRequired,
-    operationSyncReady: studioCrdtOperationSyncReady,
-  });
-  const collaborationAccessRef = useRef({
-    authScopeKey: studioAuthUserId,
-    workId,
-    locked: collaborationDocumentLocked,
-    accessGeneration: 0,
-    documentGeneration: 0,
-  });
-  const previousCollaborationAccess = collaborationAccessRef.current;
-  if (
-    previousCollaborationAccess.authScopeKey !== studioAuthUserId ||
-    previousCollaborationAccess.workId !== workId ||
-    previousCollaborationAccess.locked !== collaborationDocumentLocked
-  ) {
-    collaborationAccessRef.current = {
-      authScopeKey: studioAuthUserId,
-      workId,
-      locked: collaborationDocumentLocked,
-      accessGeneration: previousCollaborationAccess.accessGeneration + 1,
-      documentGeneration: previousCollaborationAccess.documentGeneration,
-    };
-  }
-  const currentStudioDocumentScopeRef = useRef({
-    authScopeKey: studioAuthUserId,
-    workId,
-  });
-  currentStudioDocumentScopeRef.current = { authScopeKey: studioAuthUserId, workId };
-  const editorMountedRef = useRef(true);
-  const studioLayerLiftRegistryRef = useRef<StudioLayerLiftOperationRegistry | null>(
-    null
-  );
-  studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
-  const studioLayerLiftProviderRef = useRef<ReturnType<
-    typeof createStudioLayerLiftLocalForegroundProvider
-  > | null>(null);
-  studioLayerLiftProviderRef.current ??=
-    createStudioLayerLiftLocalForegroundProvider({
-      loadInference: loadStudioLayerLiftMediaPipeInference,
-    });
-  const studioLayerLiftCompositorRef =
-    useRef<StudioLayerLiftComposeWorkerClient | null>(null);
-  studioLayerLiftCompositorRef.current ??=
-    new StudioLayerLiftComposeWorkerClient();
-  const studioLayerLiftAbortRef = useRef<AbortController | null>(null);
-  const studioLayerLiftRunIdRef = useRef(0);
-  const studioLayerLiftPreviewResourceRef =
-    useRef<StudioLayerLiftReviewPreviewResource | null>(null);
-  const documentSaveInFlightRef = useRef(false);
-  // Monotonic snapshot token dedicated to revision review. Unlike async mutation tickets, this
-  // also advances for provenance bookkeeping that changes persisted project data.
-  const studioRevisionProjectGenerationRef = useRef(0);
-  const studioProjectDocumentSessionRef =
-    useRef<StudioProjectDocumentSessionProvenance | null>(null);
-  const studioProjectDocumentSessionScopeKey = JSON.stringify([
-    studioAuthUserId,
-    workId,
+    isRealtimeTeamSession,
+    lockStudioMutationsNow,
+    loggedIn,
+    markStudioDocumentChanged,
+    ownerDetailAbortRef,
+    previousMutationScopeRef,
+    requestStudioDraftCollaborationShare,
+    requiresStudioLiveServer,
+    scenarioImageReferenceDocument,
+    serverRevisionAbortRef,
+    setDocumentReloadRequired,
+    setDraftCollaboration,
+    setScenarioImageReferenceDocument,
+    setSharedDocumentScope,
+    setStudioLiveEditsDurablyProtected,
+    setWorkHydrated,
+    setWorkHydrationFailed,
+    setWorkHydrationUnsupportedFormat,
+    sharedDocument,
+    sharedDocumentRef,
+    sharedDocumentRestoreAbortRef,
+    sharedDocumentSaveAbortRef,
+    sourceHydrationPending,
+    studioCrdtDocumentReady,
+    studioCrdtOperationSyncReady,
+    studioLayerLiftAbortRef,
+    studioLayerLiftCompositorRef,
+    studioLayerLiftPreviewResourceRef,
+    studioLayerLiftProviderRef,
+    studioLayerLiftRegistryRef,
+    studioLayerLiftRunIdRef,
+    studioLiveJam,
+    studioLiveParticipant,
+    studioProjectDocumentSessionRef,
+    studioProjectDocumentSessionScopeKey,
+    studioProjectDocumentSessionScopeRef,
+    studioRevisionProjectGenerationRef,
+    tryMarkStudioDocumentChangedQuietly,
+    workAuthScopeKey,
+    workHydrated,
+    workHydrationFailed,
+    workHydrationUnsupportedFormat,
+  } = useStudioDocumentAccessRuntime({
+    announce: (message) => announceDrawingShortcut(message),
+    getProjectSnapshot: () => currentStudioProjectSnapshot(),
+    instantWorkId,
+    liveRoomQueryParam,
     remixId,
-  ]);
-  const studioProjectDocumentSessionScopeRef = useRef(
-    studioProjectDocumentSessionScopeKey
-  );
-  const sharedDocumentSaveAbortRef = useRef<AbortController | null>(null);
-  const sharedDocumentRestoreAbortRef = useRef<AbortController | null>(null);
-  const ownerDetailAbortRef = useRef<AbortController | null>(null);
-  const documentRevalidateAbortRef = useRef<AbortController | null>(null);
-  const serverRevisionAbortRef = useRef<AbortController | null>(null);
-  const previousMutationScopeRef = useRef(JSON.stringify([studioAuthUserId, workId]));
-  function captureStudioMutationTicket(): StudioEditorMutationTicket {
-    const current = collaborationAccessRef.current;
-    return {
-      authScopeKey: current.authScopeKey,
-      workId: current.workId,
-      accessGeneration: current.accessGeneration,
-      documentGeneration: current.documentGeneration,
-    };
-  }
-  function canApplyStudioMutation(
-    ticket: StudioEditorMutationTicket,
-    options: { allowDuringSave?: boolean } = {}
-  ): boolean {
-    const current = collaborationAccessRef.current;
-    const allowed =
-      (options.allowDuringSave === true || !documentSaveInFlightRef.current) &&
-      isStudioEditorMutationContinuationAllowed(ticket, {
-        ...current,
-        mounted: editorMountedRef.current,
-        aborted: false,
-      });
-    if (
-      !allowed &&
-      editorMountedRef.current &&
-      !current.locked &&
-      ticket.authScopeKey === current.authScopeKey &&
-      ticket.workId === current.workId &&
-      ticket.accessGeneration === current.accessGeneration &&
-      ticket.documentGeneration !== current.documentGeneration
-    ) {
-      setError("작업 중 원고가 변경되어 오래된 비동기 결과를 적용하지 않았어요. 다시 실행해 주세요.");
-    }
-    return allowed;
-  }
-  function lockStudioMutationsNow() {
-    const current = collaborationAccessRef.current;
-    if (current.locked) return;
-    collaborationAccessRef.current = {
-      ...current,
-      locked: true,
-      accessGeneration: current.accessGeneration + 1,
-    };
-  }
-  // 무음 더티 마크 — 슬라이더처럼 연속 입력되는 컨트롤용 변형. 저장 중이면 범프를
-  // 건너뛰고 false를 돌려주지만 오류 배너는 띄우지 않는다(입력 도중 차단 방지).
-  function tryMarkStudioDocumentChangedQuietly(): boolean {
-    if (documentSaveInFlightRef.current) return false;
-    studioRevisionProjectGenerationRef.current += 1;
-    const current = collaborationAccessRef.current;
-    collaborationAccessRef.current = {
-      ...current,
-      documentGeneration: current.documentGeneration + 1,
-    };
-    return true;
-  }
-  function markStudioDocumentChanged(): boolean {
-    if (!tryMarkStudioDocumentChangedQuietly()) {
-      if (editorMountedRef.current) {
-        setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
-      }
-      return false;
-    }
-    return true;
-  }
-  useLayoutEffect(() => {
-    editorMountedRef.current = true;
-    return () => {
-      // key 기반 account/work remount의 commit 단계에서 즉시 내려, 이전 인스턴스의 비동기 캡처가
-      // 새 계정 토큰으로 PATCH를 시작할 수 있는 passive-effect 공백을 없앤다.
-      editorMountedRef.current = false;
-      documentSaveInFlightRef.current = false;
-      lockStudioMutationsNow();
-      sharedDocumentSaveAbortRef.current?.abort();
-      sharedDocumentSaveAbortRef.current = null;
-      sharedDocumentRestoreAbortRef.current?.abort();
-      sharedDocumentRestoreAbortRef.current = null;
-      ownerDetailAbortRef.current?.abort();
-      ownerDetailAbortRef.current = null;
-      documentRevalidateAbortRef.current?.abort();
-      documentRevalidateAbortRef.current = null;
-      serverRevisionAbortRef.current?.abort();
-      serverRevisionAbortRef.current = null;
-    };
-  }, []);
-  useEffect(() => {
-    studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
-    studioLayerLiftProviderRef.current ??=
-      createStudioLayerLiftLocalForegroundProvider({
-        loadInference: loadStudioLayerLiftMediaPipeInference,
-      });
-    studioLayerLiftCompositorRef.current ??=
-      new StudioLayerLiftComposeWorkerClient();
-    return () => {
-      studioLayerLiftRunIdRef.current += 1;
-      studioLayerLiftAbortRef.current?.abort();
-      studioLayerLiftAbortRef.current = null;
-      studioLayerLiftRegistryRef.current?.invalidate();
-      studioLayerLiftRegistryRef.current = null;
-      studioLayerLiftCompositorRef.current?.dispose();
-      studioLayerLiftCompositorRef.current = null;
-      studioLayerLiftProviderRef.current = null;
-      studioLayerLiftPreviewResourceRef.current?.revoke();
-      studioLayerLiftPreviewResourceRef.current = null;
-    };
-  }, []);
+    reportError: (message) => setError(message),
+    sessionDisplayName: session?.user?.name ?? null,
+    setStudioWorkAssetLimitExceeded,
+    setStudioWorkAssetReferences,
+    studioAuthUserId,
+    studioCrdtDocument,
+    studioCrdtDocumentRef,
+    studioCrdtReconciledDocument,
+    studioCrdtSceneRuntimeRef,
+    studioWorkAssetHydrator,
+    workId,
+  });
 
-  // 편집 문서 상태(페이지 리스트를 히스토리로 관리하여 페이지 생성/삭제/이동도 undo/redo 지원)
-  const [pagesHistory, setPagesHistoryState] = useState<PageState[][]>([
-    [
-      {
-        id: shouldSeedStudioLiveSharedBootstrapPage(workId)
-          ? studioLiveSharedBootstrapPageId(effectiveWorkId)
-          : uid(),
-        elements: [],
-        bg: "#ffffff",
-        bgGrad: null,
-        canvasH: 1080,
-      },
-    ],
-  ]);
-  const setPagesHistory = (next: Parameters<typeof setPagesHistoryState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setPagesHistoryState(next);
-  };
-  const [pagesHi, setPagesHiState] = useState(0);
-  const setPagesHi = (next: Parameters<typeof setPagesHiState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setPagesHiState(next);
-  };
-  const pagesHiRef = useRef(pagesHi);
-  pagesHiRef.current = pagesHi;
-  const pagesHistoryRef = useRef(pagesHistory);
-  pagesHistoryRef.current = pagesHistory;
-  /**
-   * 통합 실행취소 저널 — 캔버스 스냅샷 단계와 히스토리 밖 사이드카 편집을 **한 시간 순서**로 묶는다.
-   *
-   * 스냅샷 히스토리를 대체하지 않는다. `{kind:"pages"}` 항목은 페이로드 없이 "여기서 `pagesHi`
-   * 기계 장치가 한 칸 움직인다"만 표시하므로, 획별 undo 입도·CRDT 전이 발행·저장 중 게이트·
-   * 살아있는 잉크/호쿠사이 중단·합치기 계약이 전부 손대지 않은 채로 남는다.
-   *
-   * `undo()` 가 `pagesHistoryRef`/`pagesHiRef` 를 읽는 이유(대기 획 flush 가 ref 만 동기 전진시킨다)
-   * 가 저널에도 그대로 적용되므로, 기록 지점마다 ref 를 먼저 옮기고 React 상태를 뒤따르게 한다.
-   */
-  const [historyJournal, setHistoryJournalState] = useState<StudioPageHistoryJournal>(() =>
-    createStudioHistoryJournal()
-  );
-  const historyJournalRef = useRef(historyJournal);
-  historyJournalRef.current = historyJournal;
-  function commitStudioHistoryJournal(next: StudioPageHistoryJournal): void {
-    historyJournalRef.current = next;
-    setHistoryJournalState(next);
-  }
-  /**
-   * 되돌리기 유지 경계의 진단 상태. 계량값은 매 append마다 갱신하지만, 사용자 안내 문장은 실제
-   * 바이트 예산 퇴출 때만 새로 만들어 `role="status"`가 평범한 붓질마다 반복되지 않게 한다.
-   */
-  const [studioHistoryRetention, setStudioHistoryRetention] = useState(
-    createStudioHistoryRetentionUiState
-  );
-  const studioHistoryRetentionRef = useRef(studioHistoryRetention);
-  studioHistoryRetentionRef.current = studioHistoryRetention;
-  function commitStudioHistoryRetention(next: typeof studioHistoryRetention): void {
-    studioHistoryRetentionRef.current = next;
-    setStudioHistoryRetention(next);
-  }
-  function noteStudioHistoryRetention(
-    appended: StudioPagesHistoryAppendResult<PageState>
-  ): void {
-    commitStudioHistoryRetention(
-      observeStudioHistoryRetentionAppend(
-        studioHistoryRetentionRef.current,
-        appended,
-        { collaborating: Boolean(studioCrdtDocumentRef.current) }
-      )
-    );
-  }
-  function resetStudioHistoryRetention(): void {
-    commitStudioHistoryRetention(createStudioHistoryRetentionUiState());
-  }
-  /**
-   * 스냅샷 히스토리가 새 단계를 만들었을 때 저널에 같은 수의 `pages` 항목을 넣는다.
-   *
-   * `nextUndoDepth` 는 전이 뒤의 실제 `pagesHi` 다. 상한(200)에 밀려 스냅샷이 앞에서 잘려 나가면
-   * 이 값이 기대치보다 작고, 저널도 같은 수만큼 앞을 버려 둘이 어긋나지 않는다.
-   */
-  function recordStudioHistoryJournalPages(addedSteps: number, nextUndoDepth: number): void {
-    if (addedSteps <= 0) return;
-    commitStudioHistoryJournal(
-      recordStudioHistoryJournalPagesSteps(historyJournalRef.current, { addedSteps, nextUndoDepth })
-    );
-  }
-  /** 문서 전체 수화(프로젝트 로드·임시저장 복구)는 저널도 처음부터 다시 시작한다. */
-  function resetStudioHistoryJournal(): void {
-    commitStudioHistoryJournal(createStudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>());
-  }
-  // ⌘Z/⇧⌘Z 가능 여부 — 스냅샷 단계가 없어도 되돌릴 사이드카 편집이 남아 있을 수 있다.
-  // 저널이 비었거나 어긋난 경우(원격 CRDT 재조정 등)에도 `pagesHi` 만으로 예전 답을 낸다.
-  const studioHistorySidecarUndoAvailable =
-    readStudioHistoryJournalUndoEntry(historyJournal)?.kind === "sidecar";
-  const studioHistorySidecarRedoAvailable =
-    readStudioHistoryJournalRedoEntry(historyJournal)?.kind === "sidecar";
+  const {
+    pages,
+    pagesHi,
+    pagesHiRef,
+    pagesHistory,
+    pagesHistoryRef,
+    setPagesHi,
+    setPagesHiState,
+    setPagesHistory,
+    setPagesHistoryState,
+  } = useStudioPageHistorySnapshots({
+    effectiveWorkId,
+    markStudioDocumentChanged,
+    workId,
+  });
+  const {
+    commitStudioHistoryJournal,
+    historyJournalRef,
+    recordStudioHistoryJournalPages,
+    resetStudioHistoryJournal,
+    studioHistorySidecarRedoAvailable,
+    studioHistorySidecarUndoAvailable,
+  } = useStudioUnifiedHistoryJournal();
+  const {
+    noteStudioHistoryRetention,
+    resetStudioHistoryRetention,
+    studioHistoryRetention,
+  } = useStudioHistoryRetention(studioCrdtDocumentRef);
   const [hasPendingOverlayCommit, setHasPendingOverlayCommit] = useState(false);
   const [hasUndonePendingOverlay, setHasUndonePendingOverlay] = useState(false);
   const studioHistoryCanUndo = pagesHi > 0
     || studioHistorySidecarUndoAvailable
     || hasPendingOverlayCommit;
-  const studioHistoryCanRedo =
-    pagesHi < pagesHistory.length - 1
+  const studioHistoryCanRedo = pagesHi < pagesHistory.length - 1
     || studioHistorySidecarRedoAvailable
     || hasUndonePendingOverlay;
-  const [pagesHistoryDurabilityStatus, setPagesHistoryDurabilityStatus] =
-    useState<StudioPagesHistoryCommandJournalDurabilityStatus>(
-      STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS
-    );
-  const pagesHistoryCommandJournalRef = useRef<ReturnType<
-    typeof createStudioPageHistoryCommandJournalClient
-  > | null>(null);
-  useEffect(() => {
-    // React Strict Mode replays effect setup/cleanup without a render between them. Recreate a
-    // client during setup if the simulated cleanup disposed the render-created instance.
-    pagesHistoryCommandJournalRef.current ??=
-      createStudioPageHistoryCommandJournalClient();
-    const client = pagesHistoryCommandJournalRef.current;
-    const stopObservingDurability = client?.observeDurabilityStatus(
-      setPagesHistoryDurabilityStatus
-    );
-    return () => {
-      stopObservingDurability?.();
-      client?.dispose();
-      if (pagesHistoryCommandJournalRef.current === client) {
-        pagesHistoryCommandJournalRef.current = null;
-      }
-    };
-  }, []);
-  function retryStudioHistoryDurability(): void {
-    void pagesHistoryCommandJournalRef.current?.retryDurability().catch((cause: unknown) => {
-      setPagesHistoryDurabilityStatus({
-        state: "memory-only",
-        durable: false,
-        persistenceKind: "memory-only",
-        retryable: true,
-        cause,
-      });
-    });
-  }
-  function rebaseStudioHistoryJournal(
-    resultingPages: StudioHistoryJournalTransitionInput["nextPages"],
-    resultingHistoryIndex: number,
-    reason: string
-  ): void {
-    try {
-      pagesHistoryCommandJournalRef.current?.rebase({
-        pages: resultingPages,
-        historyIndex: resultingHistoryIndex,
-      });
-    } catch (cause) {
-      // The snapshot history is the mutation authority. A diagnostic journal failure must never
-      // interrupt an accepted local/remote edit or escape a CRDT subscription callback.
-      if (import.meta.env.DEV) {
-        console.warn(`Studio command journal rebase failed (${reason}).`, cause);
-      }
-    }
-  }
-  function recordStudioHistoryTransition(
-    input: StudioHistoryJournalTransitionInput
-  ): void {
-    try {
-      pagesHistoryCommandJournalRef.current?.recordTransition(input);
-    } catch (cause) {
-      // The existing bounded snapshot history remains authoritative during this staged migration.
-      // A journal invariant failure retires only the audit/replay horizon and never drops the
-      // creator's accepted mutation.
-      rebaseStudioHistoryJournal(
-        input.nextPages,
-        input.nextHistoryIndex,
-        "transition recovery"
-      );
-      if (import.meta.env.DEV) {
-        console.warn("Studio command journal transition was reset.", cause);
-      }
-    }
-  }
-  function recordStudioHistoryUndoRedo(
-    action: "undo" | "redo",
-    resultingPages: PageState[],
-    resultingHistoryIndex: number
-  ): void {
-    const target = {
-      pages: resultingPages,
-      historyIndex: resultingHistoryIndex,
-    };
-    try {
-      if (action === "undo") {
-        pagesHistoryCommandJournalRef.current?.recordUndo(target);
-      } else {
-        pagesHistoryCommandJournalRef.current?.recordRedo(target);
-      }
-    } catch (cause) {
-      rebaseStudioHistoryJournal(
-        resultingPages,
-        resultingHistoryIndex,
-        `${action} recovery`
-      );
-      if (import.meta.env.DEV) {
-        console.warn(`Studio command journal ${action} was reset.`, cause);
-      }
-    }
-  }
+  const {
+    pagesHistoryCommandJournalRef,
+    pagesHistoryDurabilityStatus,
+    rebaseStudioHistoryJournal,
+    recordStudioHistoryTransition,
+    recordStudioHistoryUndoRedo,
+    retryStudioHistoryDurability,
+  } = useStudioHistoryDurability();
   const comipoActionBusyRef = useRef(false);
-  const pages = pagesHistory[pagesHi];
 
   const [currentPageId, setCurrentPageIdState] = useState<string>(pages[0]?.id || "");
   const currentPageIdRef = useRef(currentPageId);
   currentPageIdRef.current = currentPageId;
-  function setCurrentPageId(next: Parameters<typeof setCurrentPageIdState>[0]): boolean {
+  const setCurrentPageId = useCallback((next: Parameters<typeof setCurrentPageIdState>[0]): boolean => {
     const currentPage = currentPageIdRef.current;
     const nextPageId = typeof next === "function" ? next(currentPage) : next;
     if (nextPageId !== currentPage) {
@@ -2825,153 +1841,80 @@ export function StudioCuttoonEditor({
     currentPageIdRef.current = nextPageId;
     setCurrentPageIdState(nextPageId);
     return true;
-  }
+  }, []);
 
-  // ── 문서 마스터(공통 요소 레이어) — 모든 페이지에 깔리는 로고/워터마크/코너 장식(studio-master-page) ──
-  // pagesHistory 와 분리된 문서 레벨 상태 — 마스터 편집은 페이지 실행취소 히스토리에 포함되지 않는다(패널 고지).
-  const [master, setMasterState] = useState<DocumentMaster<El>>(() => createEmptyDocumentMaster<El>());
-  const setMaster = (next: Parameters<typeof setMasterState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setMasterState(next);
-  };
-  // ── 히스토리 밖 사이드카(캐릭터 바이블·Writer Room) ──
   const {
+    aiProvenance,
     characterBible,
-    writerRoom,
-    setCharacterBible,
-    setWriterRoom,
-    restoreStudioSidecarDocument,
     hydrateStudioSidecarDocuments,
-  } = useStudioSidecarDocuments({
-    markStudioDocumentChanged,
-    onBeforeRecordSidecar: () => {
+    master,
+    masterEditMode,
+    masterEditModeRef,
+    masterPanelOpen,
+    masterRenderEls,
+    masterRenderElsRef,
+    publicationAnalytics,
+    referenceBoard,
+    referenceBoardCommittedSnapshotRef,
+    referenceBoardLatestRequestedRef,
+    releaseSchedule,
+    restoreStudioSidecarDocument,
+    setAiProvenance,
+    setAiProvenanceOperationState,
+    setAiProvenanceState,
+    setCharacterBible,
+    setMaster,
+    setMasterEditMode,
+    setMasterPanelOpen,
+    setMasterState,
+    setPublicationAnalytics,
+    setPublicationAnalyticsState,
+    setReferenceBoard,
+    setReferenceBoardState,
+    setReleaseSchedule,
+    setReleaseScheduleState,
+    setWriterRoom,
+    writerRoom,
+  } = useStudioDocumentSidecarsRuntime({
+    advanceStudioRevisionProjectGeneration,
+    beforeRecordSidecar: () => {
       if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
     },
-    historyJournalRef,
     commitStudioHistoryJournal,
+    historyJournalRef,
+    markStudioDocumentChanged,
   });
-  const [aiProvenance, setAiProvenanceState] = useState<StudioAiProvenanceDocument>(() =>
-    createEmptyStudioAiProvenanceDocument()
-  );
-  const setAiProvenance = (next: Parameters<typeof setAiProvenanceState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setAiProvenanceState(next);
-  };
-  // pending/settled provenance bookkeeping is produced by the very async operation being guarded.
-  // It is saved in the document, but must not invalidate its own source-generation ticket.
-  // 저장 진행 중이라고 조용히 버리면 안 된다 — 임시저장은 수 초 주기로 겹치므로 대부분의 AI 작업
-  // 기록이 유실됐다(실측: 성공한 dialogue 작업도 이력 패널에 0건). revision generation을 올리면
-  // 진행 중인 저장 이후에 후속 저장이 잡혀 기록이 반영된다(grouping 커밋의 dirty 마킹과 동일 패턴).
-  const setAiProvenanceOperationState = (next: Parameters<typeof setAiProvenanceState>[0]) => {
-    studioRevisionProjectGenerationRef.current += 1;
-    setAiProvenanceState(next);
-  };
-  const [studioComments, setStudioCommentsState] = useState<StudioCommentsDocument>(() =>
-    createEmptyStudioCommentsDocument()
-  );
-  const [studioTeamComments, setStudioTeamCommentsState] = useState<StudioCommentsDocument>(() =>
-    createEmptyStudioCommentsDocument()
-  );
-  const [studioTeamCommentCapabilities, setStudioTeamCommentCapabilities] =
-    useState<StudioTeamCommentCapabilities | null>(null);
-  const [studioCommentSyncError, setStudioCommentSyncError] = useState<string | null>(null);
-  const [studioCommentInteractionNotice, setStudioCommentInteractionNotice] = useState<string | null>(
-    null
-  );
-  const [studioTeamCommentsSyncing, setStudioTeamCommentsSyncing] = useState(false);
-  const [studioTeamUnreadCommentIds, setStudioTeamUnreadCommentIds] = useState<string[]>([]);
-  const studioTeamCommentCapabilitiesRef = useRef(studioTeamCommentCapabilities);
-  studioTeamCommentCapabilitiesRef.current = studioTeamCommentCapabilities;
-  const studioTeamUnreadCommentIdsRef = useRef(studioTeamUnreadCommentIds);
-  studioTeamUnreadCommentIdsRef.current = studioTeamUnreadCommentIds;
-  const studioTeamCommentsLoadGenerationRef = useRef(0);
-  const studioTeamCommentRefreshSessionRef = useRef<StudioTeamCommentRefreshSession | null>(null);
-  const studioTeamCommentsScopeRef = useRef<string | null>(null);
-  const studioTeamCommentActivitySequenceRef = useRef<Map<string, bigint>>(new Map());
-  const studioTeamCommentReadSequenceRef = useRef<Map<string, bigint>>(new Map());
-  const studioTeamCommentOperationScopeRegistryRef = useRef(
-    new StudioTeamCommentOperationScopeRegistry()
-  );
-  const studioTeamCommentMutationFlightRef = useRef(new Map<
-    string,
-    { signature: string; promise: Promise<boolean> }
-  >());
-  const studioTeamCommentReadFlightRef = useRef(new Map<string, Promise<boolean>>());
-  const studioTeamCommentReanchorFlightRef = useRef(new Map<string, Promise<boolean>>());
-  const studioTeamCommentReanchorQueueRef = useRef(
-    new Map<string, StudioCommentPinReanchorPayload>()
-  );
-  const studioTeamCommentLiveTargetSequenceRef = useRef(new Map<string, bigint>());
-  const studioTeamCommentLiveRefreshFlightRef = useRef(new Map<string, Promise<void>>());
-  useEffect(() => () => {
-    studioTeamCommentOperationScopeRegistryRef.current.abortAll();
-    studioTeamCommentMutationFlightRef.current.clear();
-    studioTeamCommentReadFlightRef.current.clear();
-    studioTeamCommentReanchorFlightRef.current.clear();
-    studioTeamCommentReanchorQueueRef.current.clear();
-    studioTeamCommentLiveTargetSequenceRef.current.clear();
-    studioTeamCommentLiveRefreshFlightRef.current.clear();
-  }, []);
-  const setStudioComments = (next: Parameters<typeof setStudioCommentsState>[0]): boolean => {
-    if (!markStudioDocumentChanged()) return false;
-    setStudioCommentsState(next);
-    return true;
-  };
-  const [releaseSchedule, setReleaseScheduleState] = useState<StudioReleaseSchedule>(() =>
-    createEmptyStudioReleaseScheduleSnapshot()
-  );
-  const setReleaseSchedule = (next: Parameters<typeof setReleaseScheduleState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setReleaseScheduleState(next);
-  };
-  const [publicationAnalytics, setPublicationAnalyticsState] = useState<StudioPublicationAnalyticsDocument>(() =>
-    createEmptyStudioPublicationAnalyticsSnapshot()
-  );
-  const setPublicationAnalytics = (next: Parameters<typeof setPublicationAnalyticsState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    setPublicationAnalyticsState(next);
-  };
-  const [referenceBoard, setReferenceBoardState] = useState<StudioReferenceBoardDocument>(() =>
-    createDefaultStudioReferenceBoardDocument()
-  );
-  const referenceBoardCommittedSnapshotRef = useRef<Readonly<{
-    document: StudioReferenceBoardDocument;
-    revision: number;
-  }>>(Object.freeze({ document: referenceBoard, revision: 1 }));
-  // Tracks the latest accepted React write, including multiple writes batched into one task.
-  // The committed snapshot remains the only document exposed outside React.
-  const referenceBoardLatestRequestedRef = useRef(referenceBoard);
-  useLayoutEffect(() => {
-    referenceBoardLatestRequestedRef.current = referenceBoard;
-    const previous = referenceBoardCommittedSnapshotRef.current;
-    if (previous.document === referenceBoard) return;
-    referenceBoardCommittedSnapshotRef.current = Object.freeze({
-      document: referenceBoard,
-      revision: previous.revision >= Number.MAX_SAFE_INTEGER ? 1 : previous.revision + 1,
-    });
-  }, [referenceBoard]);
-  const setReferenceBoard = (next: StudioReferenceBoardDocument): boolean => {
-    const normalized = normalizeStudioReferenceBoardDocument(next);
-    if (
-      areStudioReferenceBoardDocumentsEqual(
-        referenceBoardLatestRequestedRef.current,
-        normalized
-      )
-    ) return true;
-    if (!markStudioDocumentChanged()) return false;
-    referenceBoardLatestRequestedRef.current = normalized;
-    setReferenceBoardState(normalized);
-    return true;
-  };
-  const [masterEditMode, setMasterEditMode] = useState(false);
-  const masterEditModeRef = useRef(masterEditMode);
-  masterEditModeRef.current = masterEditMode;
-  const [masterPanelOpen, setMasterPanelOpen] = useState(false);
-  // 페이지 캔버스/썸네일에 깔 마스터 합성 목록(숨김 제외 · 잠금/노클립 강제 · 비상호작용).
-  // useMemo: 캔버스 memo 자식 prop 안정성 — master 변경 시에만 재합성.
-  const masterRenderEls = useMemo(() => composeMasterRenderElements(master), [master]);
-  const masterRenderElsRef = useRef(masterRenderEls);
-  masterRenderElsRef.current = masterRenderEls;
+  const {
+    setStudioCommentInteractionNotice,
+    setStudioComments,
+    setStudioCommentsState,
+    setStudioCommentSyncError,
+    setStudioTeamCommentCapabilities,
+    setStudioTeamCommentsState,
+    setStudioTeamCommentsSyncing,
+    setStudioTeamUnreadCommentIds,
+    studioCommentInteractionNotice,
+    studioComments,
+    studioCommentSyncError,
+    studioTeamCommentActivitySequenceRef,
+    studioTeamCommentCapabilities,
+    studioTeamCommentCapabilitiesRef,
+    studioTeamCommentLiveRefreshFlightRef,
+    studioTeamCommentLiveTargetSequenceRef,
+    studioTeamCommentMutationFlightRef,
+    studioTeamCommentOperationScopeRegistryRef,
+    studioTeamCommentReadFlightRef,
+    studioTeamCommentReadSequenceRef,
+    studioTeamCommentReanchorFlightRef,
+    studioTeamCommentReanchorQueueRef,
+    studioTeamCommentRefreshSessionRef,
+    studioTeamComments,
+    studioTeamCommentsLoadGenerationRef,
+    studioTeamCommentsScopeRef,
+    studioTeamCommentsSyncing,
+    studioTeamUnreadCommentIds,
+    studioTeamUnreadCommentIdsRef,
+  } = useStudioCommentDocumentsRuntime({ markStudioDocumentChanged });
   const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
   // useMemo: 폴백 리터럴이 렌더마다 새 객체가 되지 않도록(memo 자식 prop 안정성).
   const activePage = useMemo(
@@ -2986,48 +1929,40 @@ export function StudioCuttoonEditor({
       },
     [pages, activePageIndex, currentPageId]
   );
-  useEffect(() => {
-    if (pathBooleanActiveRef.current) {
-      pathBooleanRunIdRef.current += 1;
-      pathBooleanActiveRef.current = false;
-      pathBooleanAbortRef.current?.abort();
-      pathBooleanAbortRef.current = null;
-      setPathBooleanBusy(false);
-    }
-    if (paperVectorRefinementActiveRef.current) {
-      paperVectorRefinementRunIdRef.current += 1;
-      paperVectorRefinementActiveRef.current = false;
-      paperVectorRefinementAbortRef.current?.abort();
-      paperVectorRefinementAbortRef.current = null;
-      const client = paperVectorRefinementClientRef.current;
-      if (client) {
-        paperVectorRefinementEngineEpochRef.current = client.advanceEngineEpoch();
-      } else {
-        paperVectorRefinementEngineEpochRef.current += 1;
-      }
-      setPaperVectorRefinementBusy(false);
-    }
-  // A history-array identity change is not itself an authority change. Autosave,
-  // reconciliation, and collaboration admission may replace that outer array
-  // while the active page/index/source objects are still authoritative. Treating
-  // it as a cancellation signal recycled the dedicated Worker during startup in
-  // production. Page/mode/index changes still cancel eagerly; same-index document
-  // edits are rejected after await by the mutation ticket and exact source identity.
-  }, [activePage.id, masterEditMode, pagesHi]);
-  useEffect(() => () => {
-    pathBooleanRunIdRef.current += 1;
-    pathBooleanActiveRef.current = false;
-    pathBooleanAbortRef.current?.abort();
-    pathBooleanAbortRef.current = null;
-    pathBooleanClientRef.current?.dispose();
-    pathBooleanClientRef.current = null;
-    paperVectorRefinementRunIdRef.current += 1;
-    paperVectorRefinementActiveRef.current = false;
-    paperVectorRefinementAbortRef.current?.abort();
-    paperVectorRefinementAbortRef.current = null;
-    paperVectorRefinementClientRef.current?.dispose();
-    paperVectorRefinementClientRef.current = null;
-  }, []);
+  const {
+    cancelPaperVectorRefinement,
+    paperVectorRefinementAbortRef,
+    paperVectorRefinementActiveRef,
+    paperVectorRefinementBusy,
+    paperVectorRefinementClientRef,
+    paperVectorRefinementEngineEpochRef,
+    paperVectorRefinementRequestSequenceRef,
+    paperVectorRefinementRunIdRef,
+    pathBooleanAbortRef,
+    pathBooleanActiveRef,
+    pathBooleanBusy,
+    pathBooleanClientRef,
+    pathBooleanRunIdRef,
+    setPaperVectorRefinementBusy,
+    setPathBooleanBusy,
+  } = useStudioVectorOperationRuntime({
+    activePageId: activePage.id,
+    announceRef: announceDrawingShortcutRef,
+    masterEditMode,
+    pagesHistoryIndex: pagesHi,
+  });
+  const {
+    begin: beginLiveResourceEdit,
+    beginAsync: beginLiveResourceEditAsync,
+    end: endLiveResourceEdit,
+  } = createStudioLiveResourceLeaseController({
+    heldResourcesRef: studioLiveHeldResourcesRef,
+    mutationGenerationRef: studioLiveMutationGenerationRef,
+    pageId: activePage.id,
+    pendingMutationRef: studioLivePendingMutationRef,
+    reportError: setError,
+    roomRef: studioLiveRoomRef,
+  });
   const {
     autosaveDocumentLeadership,
     autosaveDocumentLeaseRef,
@@ -3051,8 +1986,7 @@ export function StudioCuttoonEditor({
     pagesHistoryRef,
     publishStudioCrdtSceneTransitionRef,
     rebaseStudioHistoryJournal,
-    // setError 는 이 지점보다 뒤에 선언되는 상태 setter 다. 값으로 넘기면 TDZ 라 지연 클로저로 넘긴다.
-    setError: (message) => setError(message),
+    setError,
     setPagesHistoryState,
     setStudioCrdtAuthoritativeBarrierGeneration,
     setStudioCrdtDocument,
@@ -3135,7 +2069,14 @@ export function StudioCuttoonEditor({
         snapshotFields: ["sceneElements"] as const,
       }
     );
-  }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
+  }, [
+    activePage.id,
+    authorizedWorkAssetScopeId,
+    setStudioWorkAssetLimitExceeded,
+    setStudioWorkAssetReferences,
+    studioCrdtDocument,
+    studioWorkAssetHydrator,
+  ]);
 
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
@@ -3227,7 +2168,20 @@ export function StudioCuttoonEditor({
         snapshotFields: ["strokes", "sceneElements", "pages", "layerGroups"] as const,
       }
     );
-  }, [sourceHydrationPending, studioCrdtDocument, studioWorkAssetHydrator]);
+  }, [
+    collaborationAccessRef,
+    editorMountedRef,
+    pagesHiRef,
+    pagesHistoryRef,
+    rebaseStudioHistoryJournal,
+    setPagesHistoryState,
+    setStudioCrdtReconciledDocument,
+    sourceHydrationPending,
+    studioCrdtDocument,
+    studioCrdtSceneRuntimeRef,
+    studioRevisionProjectGenerationRef,
+    studioWorkAssetHydrator,
+  ]);
 
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
@@ -3277,8 +2231,13 @@ export function StudioCuttoonEditor({
     );
     setPagesHistoryState(reconciled.history);
   }, [
+    pagesHiRef,
+    pagesHistoryRef,
+    rebaseStudioHistoryJournal,
+    setPagesHistoryState,
     sourceHydrationPending,
     studioCrdtDocument,
+    studioCrdtSceneRuntimeRef,
     studioWorkAssetHydrator,
     studioWorkAssetHydrationRevision,
     studioWorkAssetReferences,
@@ -4097,12 +3056,31 @@ export function StudioCuttoonEditor({
       }
       refreshSession.dispose();
     };
-  }, [studioTeamCommentsWorkId]);
+  }, [
+    setStudioCommentSyncError,
+    setStudioTeamCommentCapabilities,
+    setStudioTeamCommentsState,
+    setStudioTeamCommentsSyncing,
+    setStudioTeamUnreadCommentIds,
+    studioTeamCommentActivitySequenceRef,
+    studioTeamCommentLiveRefreshFlightRef,
+    studioTeamCommentLiveTargetSequenceRef,
+    studioTeamCommentMutationFlightRef,
+    studioTeamCommentOperationScopeRegistryRef,
+    studioTeamCommentReadFlightRef,
+    studioTeamCommentReadSequenceRef,
+    studioTeamCommentReanchorFlightRef,
+    studioTeamCommentReanchorQueueRef,
+    studioTeamCommentRefreshSessionRef,
+    studioTeamCommentsLoadGenerationRef,
+    studioTeamCommentsScopeRef,
+    studioTeamCommentsWorkId,
+  ]);
   useEffect(() => {
     if (commentsOpen) {
       studioTeamCommentRefreshSessionRef.current?.request("panel-open");
     }
-  }, [commentsOpen]);
+  }, [commentsOpen, studioTeamCommentRefreshSessionRef]);
   // 의도된 변경(2026-08, B-06): 라이브 새로고침 큐 본문(refresh/queue)은
   // studio-page-comments-runtime.ts 로 추출 — 시퀀스 프론티어·세대 가드 계약은 그대로다.
   const {
@@ -4137,7 +3115,7 @@ export function StudioCuttoonEditor({
     setPublishPackageOpen(false);
     setDialogueBatchOpen(false);
     setDialogueTranslateOpen(false);
-  }, [collaborationDocumentLocked]);
+  }, [collaborationDocumentLocked, setMasterEditMode, setMasterPanelOpen]);
   useEffect(() => {
     const availableIds = new Set(pages.map((page) => page.id));
     const fallbackId = availableIds.has(currentPageId) ? currentPageId : pages[0]?.id;
@@ -5691,7 +4669,6 @@ export function StudioCuttoonEditor({
     }, 1_400);
     drawingShortcutNoticeTimerRef.current = timer;
   }
-  const announceDrawingShortcutRef = useRef(announceDrawingShortcut);
   announceDrawingShortcutRef.current = announceDrawingShortcut;
   useEffect(() => () => {
     if (drawingShortcutNoticeTimerRef.current) {
@@ -5886,7 +4863,7 @@ export function StudioCuttoonEditor({
       }
       clipsLoadRef.current = null;
     };
-  }, [menu]);
+  }, [editorMountedRef, menu]);
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -6030,234 +5007,12 @@ export function StudioCuttoonEditor({
   const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(
     initialToolOperationMemory.paint.stampTuning,
   );
-  const brushSlotsOwnerScope = studioAuthUserId ?? "guest";
-  const [brushSlotsDeviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);
-  const brushSlotsScope = {
-    ownerScope: brushSlotsOwnerScope,
-    deviceProfile: brushSlotsDeviceProfile,
-  };
-  const brushSlotsScopeKey = JSON.stringify([
-    brushSlotsScope.ownerScope,
-    brushSlotsScope.deviceProfile,
-  ]);
-  const brushSlotsScopeRef = useRef({ key: brushSlotsScopeKey, scope: brushSlotsScope });
-  brushSlotsScopeRef.current = { key: brushSlotsScopeKey, scope: brushSlotsScope };
-  const [brushSlotsProjection, setBrushSlotsProjection] = useState(() => ({
-    scopeKey: brushSlotsScopeKey,
-    state: emptyStudioBrushSlots(),
-  }));
-  const brushSlotsState = brushSlotsProjection.scopeKey === brushSlotsScopeKey
-    ? brushSlotsProjection.state
-    : emptyStudioBrushSlots();
-  const brushSlotsProjectionRef = useRef(brushSlotsProjection);
-  brushSlotsProjectionRef.current = brushSlotsProjection;
-  const brushSlotsDurableSnapshotRef = useRef<{
-    scopeKey: string;
-    snapshot: StudioBrushQuickSlotsSnapshot;
-  } | null>(null);
-  const brushSlotsHydrationGenerationRef = useRef(0);
-  const brushSlotsMutationGenerationRef = useRef(0);
-  const brushSlotsMutationTailRef = useRef<Promise<void>>(Promise.resolve());
-  const brushSlotsDirtyGenerationsByScopeRef = useRef(new Map<string, number[]>());
-  /** Multi-tab OPFS ownership: announce once per mount, never dump Worker lock text to setError. */
-  const brushSlotsOwnershipBusyAnnouncedRef = useRef(false);
-
-  useEffect(() => {
-    let active = true;
-    const generation = brushSlotsHydrationGenerationRef.current + 1;
-    brushSlotsHydrationGenerationRef.current = generation;
-    const mutationGeneration = brushSlotsMutationGenerationRef.current;
-    const request = brushSlotsScopeRef.current;
-    if (brushSlotsProjectionRef.current.scopeKey !== request.key) {
-      const emptyProjection = { scopeKey: request.key, state: emptyStudioBrushSlots() };
-      brushSlotsProjectionRef.current = emptyProjection;
-      setBrushSlotsProjection(emptyProjection);
-    }
-    if (brushSlotsDurableSnapshotRef.current?.scopeKey !== request.key) {
-      brushSlotsDurableSnapshotRef.current = null;
-    }
-
-    void loadStudioBrushQuickSlotsSqliteRepository()
-      .then(({ getProductStudioBrushQuickSlotsSqliteRepository }) =>
-        getProductStudioBrushQuickSlotsSqliteRepository().load(request.scope))
-      .then((snapshot) => {
-        if (
-          !active
-          || !editorMountedRef.current
-          || brushSlotsHydrationGenerationRef.current !== generation
-          || brushSlotsMutationGenerationRef.current !== mutationGeneration
-          || brushSlotsScopeRef.current.key !== request.key
-        ) {
-          return;
-        }
-        brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot };
-        const projection = { scopeKey: request.key, state: { slots: snapshot.slots } };
-        brushSlotsProjectionRef.current = projection;
-        setBrushSlotsProjection(projection);
-      })
-      .catch((cause) => {
-        if (
-          !active
-          || !editorMountedRef.current
-          || brushSlotsHydrationGenerationRef.current !== generation
-          || brushSlotsMutationGenerationRef.current !== mutationGeneration
-          || brushSlotsScopeRef.current.key !== request.key
-        ) {
-          return;
-        }
-        // Two Studio tabs share one origin OPFS SAH lock. Secondary tab keeps empty/session slots.
-        if (isStudioLocalDatabaseOwnershipBusyError(cause)) {
-          if (!brushSlotsOwnershipBusyAnnouncedRef.current) {
-            brushSlotsOwnershipBusyAnnouncedRef.current = true;
-            announceDrawingShortcutRef.current(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT);
-          }
-          return;
-        }
-        setError(
-          cause instanceof Error
-            ? `브러시 퀵 슬롯을 불러오지 못했어요: ${cause.message}`
-            : "브러시 퀵 슬롯을 불러오지 못했어요. SQLite 저장소를 확인해주세요.",
-        );
-      });
-    return () => {
-      active = false;
-    };
-  }, [brushSlotsScopeKey]);
-
-  function commitStudioBrushSlotsMutation(
-    update: (state: StudioBrushSlotsState) => StudioBrushSlotsState,
-    options: {
-      readonly successMessage?: string;
-      readonly failureMessage: string;
-    },
-  ): void {
-    const request = brushSlotsScopeRef.current;
-    const currentProjection = brushSlotsProjectionRef.current;
-    const currentState = currentProjection.scopeKey === request.key
-      ? currentProjection.state
-      : emptyStudioBrushSlots();
-    const desiredState = update(currentState);
-    const generation = brushSlotsMutationGenerationRef.current + 1;
-    brushSlotsMutationGenerationRef.current = generation;
-    const dirtyGenerations = brushSlotsDirtyGenerationsByScopeRef.current.get(request.key)
-      ?? Array.from({ length: STUDIO_BRUSH_SLOT_COUNT }, () => 0);
-    brushSlotsDirtyGenerationsByScopeRef.current.set(request.key, dirtyGenerations);
-    for (let index = 0; index < STUDIO_BRUSH_SLOT_COUNT; index += 1) {
-      if (
-        JSON.stringify(currentState.slots[index] ?? null)
-        !== JSON.stringify(desiredState.slots[index] ?? null)
-      ) {
-        dirtyGenerations[index] = generation;
-      }
-    }
-    const optimisticProjection = { scopeKey: request.key, state: desiredState };
-    brushSlotsProjectionRef.current = optimisticProjection;
-    setBrushSlotsProjection(optimisticProjection);
-
-    const persist = async (): Promise<void> => {
-      const activeDirtySlots = dirtyGenerations.flatMap((marker, slotIndex) =>
-        marker > 0 && marker <= generation ? [{ marker, slotIndex }] : []);
-      if (activeDirtySlots.length === 0) {
-        if (
-          editorMountedRef.current
-          && brushSlotsScopeRef.current.key === request.key
-          && brushSlotsMutationGenerationRef.current === generation
-          && options.successMessage
-        ) {
-          announceDrawingShortcut(options.successMessage);
-        }
-        return;
-      }
-      const repositoryModule = await loadStudioBrushQuickSlotsSqliteRepository();
-      const repository = repositoryModule.getProductStudioBrushQuickSlotsSqliteRepository();
-      const durable = brushSlotsDurableSnapshotRef.current?.scopeKey === request.key
-        ? brushSlotsDurableSnapshotRef.current.snapshot
-        : await repository.load(request.scope);
-      const applyDirtySlots = (
-        base: StudioBrushQuickSlotsSnapshot,
-        entries: readonly { marker: number; slotIndex: number }[],
-      ): StudioBrushSlotsState => {
-        const slots = [...base.slots];
-        for (const { slotIndex } of entries) {
-          slots[slotIndex] = desiredState.slots[slotIndex] ?? null;
-        }
-        return { slots };
-      };
-
-      let saved: StudioBrushQuickSlotsSnapshot;
-      let conflictResolved = false;
-      try {
-        saved = await repository.save(
-          request.scope,
-          applyDirtySlots(durable, activeDirtySlots),
-          durable.revision,
-        );
-      } catch (cause) {
-        if (
-          !cause
-          || typeof cause !== "object"
-          || !("code" in cause)
-          || cause.code !== "conflict"
-        ) {
-          throw cause;
-        }
-        const latest = await repository.load(request.scope);
-        const retryDirtySlots = activeDirtySlots.filter(
-          ({ marker, slotIndex }) => dirtyGenerations[slotIndex] === marker,
-        );
-        if (retryDirtySlots.length === 0) return;
-        saved = await repository.save(
-          request.scope,
-          applyDirtySlots(latest, retryDirtySlots),
-          latest.revision,
-        );
-        conflictResolved = true;
-      }
-
-      for (const { marker, slotIndex } of activeDirtySlots) {
-        if (dirtyGenerations[slotIndex] === marker) dirtyGenerations[slotIndex] = 0;
-      }
-      if (dirtyGenerations.every((marker) => marker === 0)) {
-        brushSlotsDirtyGenerationsByScopeRef.current.delete(request.key);
-      }
-      if (brushSlotsScopeRef.current.key !== request.key) return;
-      brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot: saved };
-      if (!editorMountedRef.current) return;
-      if (conflictResolved) {
-        announceDrawingShortcut("다른 탭의 브러시 슬롯 변경을 다시 불러와 안전하게 병합했어요.");
-      }
-      if (brushSlotsMutationGenerationRef.current === generation) {
-        const projection = { scopeKey: request.key, state: { slots: saved.slots } };
-        brushSlotsProjectionRef.current = projection;
-        setBrushSlotsProjection(projection);
-        if (!conflictResolved && options.successMessage) {
-          announceDrawingShortcut(options.successMessage);
-        }
-      }
-    };
-    const operation = brushSlotsMutationTailRef.current.then(persist, persist);
-    brushSlotsMutationTailRef.current = operation.then(
-      () => undefined,
-      () => undefined,
-    );
-    void operation.catch((cause) => {
-      if (!editorMountedRef.current || brushSlotsScopeRef.current.key !== request.key) return;
-      if (isStudioLocalDatabaseOwnershipBusyError(cause)) {
-        // Optimistic UI already updated; secondary tab cannot write OPFS — no red banner.
-        if (!brushSlotsOwnershipBusyAnnouncedRef.current) {
-          brushSlotsOwnershipBusyAnnouncedRef.current = true;
-          announceDrawingShortcut(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT);
-        }
-        return;
-      }
-      const message = cause && typeof cause === "object" && "code" in cause
-        && cause.code === "conflict"
-        ? "다른 탭에서 브러시 슬롯이 다시 변경되어 현재 슬롯은 안전하게 유지했지만 저장하지 못했어요. 다시 시도해주세요."
-        : `${options.failureMessage} 현재 슬롯은 이 화면에만 유지되며 저장 완료로 처리하지 않았어요.`;
-      setError(message);
-      announceDrawingShortcut(message);
-    });
-  }
+  const { brushSlotsState, commitStudioBrushSlotsMutation } = useStudioBrushQuickSlots({
+    announceRef: announceDrawingShortcutRef,
+    editorMountedRef,
+    ownerScope: studioAuthUserId,
+    reportError: setError,
+  });
   /** Procreate size/opacity lock + Ibis recent/favorites for built-in brushes. */
   const {
     proDrawPrefs,
@@ -7538,21 +6293,21 @@ export function StudioCuttoonEditor({
           fresh.revision === expectedRevision;
       },
     });
-  }, []);
+  }, [documentSaveInFlightRef, editorMountedRef, studioRevisionProjectGenerationRef]);
   const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationPageIdRef = useRef<string | null>(null);
   useEffect(() => {
     poserMutationTicketRef.current = poserVrmOpen ? captureStudioMutationTicket() : null;
-  }, [poserVrmOpen]);
+  }, [captureStudioMutationTicket, poserVrmOpen]);
   const mannequinMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   useEffect(() => {
     mannequinMutationTicketRef.current = mannequinPoserOpen ? captureStudioMutationTicket() : null;
-  }, [mannequinPoserOpen]);
+  }, [captureStudioMutationTicket, mannequinPoserOpen]);
   useEffect(() => {
     bg3dMutationTicketRef.current = bg3dOpen ? captureStudioMutationTicket() : null;
     bg3dMutationPageIdRef.current = bg3dOpen ? currentPageIdRef.current : null;
-  }, [bg3dOpen]);
+  }, [bg3dOpen, captureStudioMutationTicket]);
 
   // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 SQLite/OPFS 행으로 분리하고,
   // 로그인 사용자가 바뀌는 한 렌더 동안 이전 계정의 별표가 보이거나 새 키에 기록되지 않게 owner와
@@ -7588,7 +6343,7 @@ export function StudioCuttoonEditor({
         );
       })
       .catch(() => setAppSettingsPersistenceState("session-only"));
-  }, [studioAuthUserId]);
+  }, [setAppSettingsPersistenceState, studioAuthUserId]);
 
   function commitAssetFavoriteState(state: StudioAssetFavoriteState): void {
     const next = { userId: studioAuthUserId, state };
@@ -7953,7 +6708,6 @@ export function StudioCuttoonEditor({
     setPublishComplianceState(next);
   };
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(linked3dCloudSaveRecoveryNotice);
   function clearWorkMetadataValidationError() {
     setError(clearStudioWorkMetadataValidationError);
   }
@@ -7977,83 +6731,6 @@ export function StudioCuttoonEditor({
     location.state,
     navigate,
   ]);
-  useEffect(() => {
-    let cancelled = false;
-    const settingsRevisionAtStart = appSettingsUserRevisionRef.current;
-    const favoritesRevisionAtStart = effectFavoriteUserRevisionRef.current;
-
-    void acquireProductStudioUiPreferencesRepository()
-      .then(async (repository) => {
-        const [settingsResult, favoritesResult] = await Promise.allSettled([
-          repository.loadAppSettings(),
-          repository.loadEffectFavorites(),
-        ]);
-        if (cancelled) return;
-
-        let degraded = false;
-        if (settingsResult.status === "fulfilled") {
-          if (appSettingsUserRevisionRef.current === settingsRevisionAtStart) {
-            const hydrated = settingsResult.value;
-            appSettingsRef.current = hydrated;
-            setAppSettings(hydrated);
-            setUiDensityMode(hydrated.general.densityMode);
-            if (hydrated.general.densityMode === "focus") setForceRightPanelOpen(false);
-            setShowGrid(hydrated.grids.showPixelGrid);
-            setShowRulers(hydrated.grids.showCanvasRulers);
-            setGridSize(hydrated.grids.pixelGridSize);
-            setShowAlignmentGuides(hydrated.grids.showAlignmentGuides);
-            setSnapEnabled(hydrated.grids.snapToPixelGrid);
-            setPressureCurve(hydrated.other.pressureCurve);
-          } else {
-            try {
-              await repository.saveAppSettings(appSettingsRef.current);
-            } catch {
-              degraded = true;
-            }
-          }
-        } else if (appSettingsUserRevisionRef.current !== settingsRevisionAtStart) {
-          try {
-            await repository.saveAppSettings(appSettingsRef.current);
-          } catch {
-            degraded = true;
-          }
-        } else {
-          degraded = true;
-        }
-
-        if (favoritesResult.status === "fulfilled") {
-          if (effectFavoriteUserRevisionRef.current === favoritesRevisionAtStart) {
-            effectFavoriteStateRef.current = favoritesResult.value;
-            setEffectFavoriteState(favoritesResult.value);
-          } else {
-            try {
-              await repository.saveEffectFavorites(effectFavoriteStateRef.current);
-            } catch {
-              degraded = true;
-            }
-          }
-        } else if (effectFavoriteUserRevisionRef.current !== favoritesRevisionAtStart) {
-          try {
-            await repository.saveEffectFavorites(effectFavoriteStateRef.current);
-          } catch {
-            degraded = true;
-          }
-        } else {
-          degraded = true;
-        }
-
-        if (!cancelled) {
-          setAppSettingsPersistenceState(degraded ? "session-only" : "saved");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAppSettingsPersistenceState("session-only");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   useEffect(() => {
     if (
       masterEditMode
@@ -8242,92 +6919,19 @@ export function StudioCuttoonEditor({
     import("./studio-saved-clip-sqlite-repository").StudioSavedClipSqliteRepository
   > | null>(null);
 
-  useEffect(() => {
-    if (!workHydrated || !workId || !studioAuthUserId || !sharedDocument) return;
-    const requestScope = { authScopeKey: studioAuthUserId, workId };
-    const revalidate = async () => {
-      documentRevalidateAbortRef.current?.abort();
-      const controller = new AbortController();
-      documentRevalidateAbortRef.current = controller;
-      const requestIsCurrent = () =>
-        isStudioEditorAsyncScopeCurrent(requestScope, {
-          ...currentStudioDocumentScopeRef.current,
-          mounted: editorMountedRef.current,
-          aborted: controller.signal.aborted,
-        });
-      try {
-        const { getStudioSharedDocumentMeta } = await import("./studio-shared-document-client");
-        if (!requestIsCurrent()) return;
-        const fresh = await getStudioSharedDocumentMeta(workId, controller.signal);
-        if (!requestIsCurrent()) return;
-        const revisionChanged = fresh.revision !== sharedDocument.revision;
-        if (fresh.access !== "edit") lockStudioMutationsNow();
-        setSharedDocumentScope((current) =>
-          current &&
-          current.authScopeKey === requestScope.authScopeKey &&
-          current.workId === requestScope.workId
-            ? {
-                ...current,
-                value: {
-                  ...current.value,
-                  role: fresh.role,
-                  status: fresh.status,
-                  capabilities: fresh.capabilities,
-                  access: fresh.access,
-                  // 원격 revision이 달라져도 로컬 base를 몰래 전진시키지 않는다. 다음 저장은 409로
-                  // 보호되고 사용자가 로컬 원고를 내보낸 뒤 명시적으로 다시 열 수 있다.
-                  ...(revisionChanged ? {} : { updatedAt: fresh.updatedAt }),
-                },
-              }
-            : current
-        );
-        if (fresh.access !== "edit") {
-          setError(
-            fresh.role === "commenter"
-              ? studioTeamCommentCapabilities?.comment === true
-                ? "검토 전용 권한으로 변경되었습니다. 원고 편집은 잠기지만 댓글 핀과 답글로 피드백을 계속 남길 수 있어요."
-                : "검토 전용 권한으로 변경되었습니다. 원고와 댓글 작성은 읽기 전용이며 기존 피드백만 확인할 수 있어요."
-              : "팀 편집 권한이 회수되었습니다. 로컬 변경은 JSON·이미지로 내보낼 수 있지만 서버에는 저장할 수 없어요."
-          );
-        } else if (revisionChanged) {
-          setError("다른 팀원이 새 revision을 저장했습니다. 로컬 원고를 내보낸 뒤 공동 문서를 다시 열어 병합해 주세요.");
-        }
-      } catch {
-        if (!requestIsCurrent()) return;
-        lockStudioMutationsNow();
-        setSharedDocumentScope((current) =>
-          current &&
-          current.authScopeKey === requestScope.authScopeKey &&
-          current.workId === requestScope.workId
-            ? {
-                ...current,
-                value: {
-                  ...current.value,
-                  capabilities: { ...current.value.capabilities, edit: false },
-                  access: "view",
-                },
-              }
-            : current
-        );
-        setError("팀 권한을 다시 확인하지 못해 안전하게 읽기 전용으로 전환했습니다. 로컬 변경은 내보낸 뒤 다시 접속해 주세요.");
-      } finally {
-        if (documentRevalidateAbortRef.current === controller) {
-          documentRevalidateAbortRef.current = null;
-        }
-      }
-    };
-    const onFocus = () => void revalidate();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") void revalidate();
-    };
-    globalThis.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      globalThis.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      documentRevalidateAbortRef.current?.abort();
-    };
-  }, [sharedDocument, studioAuthUserId, studioTeamCommentCapabilities?.comment, workHydrated, workId]);
+  useStudioSharedDocumentRevalidation({
+    currentDocumentScopeRef: currentStudioDocumentScopeRef,
+    documentRevalidateAbortRef,
+    editorMountedRef,
+    lockMutations: lockStudioMutationsNow,
+    reportError: setError,
+    setSharedDocumentScope,
+    sharedDocument,
+    studioAuthUserId,
+    studioTeamCanComment: studioTeamCommentCapabilities?.comment === true,
+    workHydrated,
+    workId,
+  });
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -8598,7 +7202,13 @@ export function StudioCuttoonEditor({
     studioLifecycleBaselineScopeRef.current = scope;
     studioLifecycleDurableGenerationRef.current = studioRevisionProjectGenerationRef.current;
     studioLifecycleDurablePendingFingerprintRef.current = "";
-  }, [remixId, studioAuthUserId, workHydrated, workId]);
+  }, [
+    remixId,
+    studioAuthUserId,
+    studioRevisionProjectGenerationRef,
+    workHydrated,
+    workId,
+  ]);
 
   const { buildCurrentStudioProjectFileSnapshot } = useStudioStableHandlers<{
     buildCurrentStudioProjectFileSnapshot: (
@@ -8863,6 +7473,9 @@ export function StudioCuttoonEditor({
     workId,
     remixId,
     sharedDocument,
+    pagesHiRef,
+    pagesHistoryRef,
+    studioRevisionProjectGenerationRef,
   ]);
 
   // 서버 자동저장 — 위 로컬 임시저장(브라우저 저장소)과 별개로, 손을 놓은 지 45초가 지나면
@@ -8908,6 +7521,7 @@ export function StudioCuttoonEditor({
     collaborationDocumentLocked,
     workHydrated,
     title,
+    documentSaveInFlightRef,
   ]);
 
   // An unresolved recovery remains authoritative until the artist restores or clears it. New edits
@@ -11473,6 +10087,9 @@ export function StudioCuttoonEditor({
     studioCrdtAuthoritativeBarrierGeneration,
     studioCrdtDocument,
     studioCrdtOperationSyncReady,
+    collaborationAccessRef,
+    studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtDocumentRef,
   ]);
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
@@ -12937,7 +11554,7 @@ export function StudioCuttoonEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAppSettingsPersistenceState]);
   // 고급 채우기 무효화/정리 effect — studio-page-advanced-fill 훅으로 추출.
   // 상태·setter·ref 는 위에서 페이지가 소유하고(핫패스 제스처 소유권 검사와 명령 경로가 안정
   // 참조를 요구한다), 훅은 그 안정 참조로 동일한 effect 계약만 수행한다.
@@ -13736,7 +12353,7 @@ export function StudioCuttoonEditor({
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
-  }, [canvasPointerGestureIsOwned]);
+  }, [appSettingsRef, canvasPointerGestureIsOwned]);
 
   // 모바일 핀치 줌 — 두 손가락 거리 변화를 zoom에 반영(한 손가락 스크롤=네이티브 패닝은 그대로).
   useEffect(() => {
@@ -13904,7 +12521,7 @@ export function StudioCuttoonEditor({
       node.removeEventListener("touchend", onTouchEnd);
       node.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [canvasEditingGestureIsOwned, canvasPointerGestureIsOwned]);
+  }, [appSettingsRef, canvasEditingGestureIsOwned, canvasPointerGestureIsOwned]);
 
   // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
   useEffect(() => {
@@ -13966,7 +12583,11 @@ export function StudioCuttoonEditor({
     studioProjectDocumentSessionScopeRef.current =
       studioProjectDocumentSessionScopeKey;
     studioProjectDocumentSessionRef.current = null;
-  }, [studioProjectDocumentSessionScopeKey]);
+  }, [
+    studioProjectDocumentSessionRef,
+    studioProjectDocumentSessionScopeKey,
+    studioProjectDocumentSessionScopeRef,
+  ]);
   const mutationScopeKey = JSON.stringify([studioAuthUserId, workId]);
   useLayoutEffect(() => {
     if (previousMutationScopeRef.current === mutationScopeKey) return;
@@ -13984,7 +12605,16 @@ export function StudioCuttoonEditor({
     setIsExporting(false);
     setServerRevisionLoading(false);
     setFxPanelLoading(false);
-  }, [mutationScopeKey]);
+  }, [
+    documentRevalidateAbortRef,
+    documentSaveInFlightRef,
+    mutationScopeKey,
+    ownerDetailAbortRef,
+    previousMutationScopeRef,
+    serverRevisionAbortRef,
+    sharedDocumentRestoreAbortRef,
+    sharedDocumentSaveAbortRef,
+  ]);
   // Export loops switch pages asynchronously. This marker is updated only after React has committed
   // the requested page and capture mode, so a slow phone cannot accidentally snapshot the previous
   // page merely because an arbitrary 120/180ms sleep elapsed.
@@ -14451,7 +13081,13 @@ export function StudioCuttoonEditor({
       companionCommandHandlerRef.current = () => undefined;
     };
     // 훅 반환 ref 는 안정 객체 — deps 에 넣어도 재구독을 일으키지 않는다.
-  }, [companionCommandHandlerRef, companionPendingTextTimerRef, companionUiRef, setLeftPanelOpenWithOverride]);
+  }, [
+    companionCommandHandlerRef,
+    companionPendingTextTimerRef,
+    companionUiRef,
+    setLeftPanelOpenWithOverride,
+    setStudioUiDensityFromCompanion,
+  ]);
 
   // 컴패니언에 현재 UI 상태 미러 (채널·미러 판정은 useStudioCompanionRuntime 이 소유).
   useEffect(() => {
@@ -15858,7 +14494,7 @@ const puppetWarpArmed =
   // "페이지 요소 + 마스터 합성"이어야 하고, 마스터 편집 화면(고스트 포함)이 찍히면 안 된다.
   useEffect(() => {
     if (isExporting) setMasterEditMode(false);
-  }, [isExporting]);
+  }, [isExporting, setMasterEditMode]);
 
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
@@ -16036,11 +14672,8 @@ const puppetWarpArmed =
           StudioCharacterBible,
           StudioWriterRoomDocument
         >();
-        historyJournalRef.current = freshJournal;
-        setHistoryJournalState(freshJournal);
-        const freshHistoryRetention = createStudioHistoryRetentionUiState();
-        studioHistoryRetentionRef.current = freshHistoryRetention;
-        setStudioHistoryRetention(freshHistoryRetention);
+        commitStudioHistoryJournal(freshJournal);
+        resetStudioHistoryRetention();
         setPagesHistoryState([hydratedPages]);
         setPagesHiState(0);
         setCurrentPageId(
@@ -16106,7 +14739,38 @@ const puppetWarpArmed =
       alive = false;
       controller.abort();
     };
-  }, [hydrateStudioSidecarDocuments, remixId, workAuthScopeKey, workId]);
+  }, [
+    advancedFillAbortRef,
+    advancedFillRunIdRef,
+    advancedFillTapGestureRef,
+    advancedFillTapPayloadRef,
+    advancedFillTouchPanRef,
+    collaborationAccessRef,
+    commitStudioHistoryJournal,
+    hydrateStudioSidecarDocuments,
+    pagesHistoryCommandJournalRef,
+    referenceBoardLatestRequestedRef,
+    remixId,
+    resetStudioHistoryRetention,
+    setAiProvenanceState,
+    setCurrentPageId,
+    setDocumentReloadRequired,
+    setMasterState,
+    setPagesHiState,
+    setPagesHistoryState,
+    setPublicationAnalyticsState,
+    setReferenceBoardState,
+    setReleaseScheduleState,
+    setSharedDocumentScope,
+    setStudioCommentsState,
+    setWorkHydrated,
+    setWorkHydrationFailed,
+    setWorkHydrationUnsupportedFormat,
+    studioProjectDocumentSessionRef,
+    studioRevisionProjectGenerationRef,
+    workAuthScopeKey,
+    workId,
+  ]);
 
   // 시리즈·챌린지 딥링크로 들어온 경우 게시 맥락 배너를 채운다.
   useEffect(() => {
@@ -16423,7 +15087,7 @@ const puppetWarpArmed =
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAppSettingsPersistenceState]);
   useEffect(() => {
     const controller = new AbortController();
     void getStudioServerAiStatus(controller.signal)
@@ -16602,9 +15266,7 @@ const puppetWarpArmed =
   function cancelWriterRoomAi() {
     writerRoomAiAbortRef.current?.abort();
   }
-  // Writer Room의 검토된 컷 플랜을 여러 새 페이지로 투영한다. 기존 페이지는 건드리지 않고,
-  // 전체 생성 페이지를 commitPages 한 번에 넣어 실행 취소도 한 단계로 유지한다. 프로젝션 코어가
-  // 누락 참조나 잘릴 콘텐츠를 발견하면 canApply=false가 되어 이 함수는 아무것도 변경하지 않는다.
+  // Writer Room projection is pure application logic; this command owns only editor insertion.
   function applyWriterRoomCanvasPlan() {
     const plan = writerRoomCanvasPlan;
     if (!plan || !plan.applyReadiness.canApply || plan.pageGrouping.pages.length === 0) {
@@ -16613,113 +15275,7 @@ const puppetWarpArmed =
     }
 
     try {
-      const projectedPanelById = new Map(plan.panels.map((panel) => [panel.id, panel]));
-      const episodeTitle = writerRoom.stages["episode-outline"].title.trim() || "Writer Room";
-      const createdPages: PageState[] = plan.pageGrouping.pages.map((group, pageIndex) => {
-        const layout = layoutScenarioPanels([], CANVAS_W, 1080, group.scenarioScenes);
-        if (layout.panels.length !== group.scenarioScenes.length) {
-          throw new Error("WRITER_ROOM_LAYOUT_MISMATCH");
-        }
-
-        const pageElements: El[] = [];
-        layout.panels.forEach((item, panelIndex) => {
-          const scenarioInput = group.scenarioScenes[panelIndex];
-          const projectedPanel = scenarioInput
-            ? projectedPanelById.get(scenarioInput.writerRoomPanelId)
-            : undefined;
-          if (!scenarioInput || !projectedPanel) {
-            throw new Error("WRITER_ROOM_PANEL_CORRELATION_MISSING");
-          }
-
-          pageElements.push({
-            id: uid(),
-            type: "frame",
-            x: item.frame.x,
-            y: item.frame.y,
-            width: item.frame.width,
-            height: item.frame.height,
-            storyBeat: {
-              type: item.beatType,
-              summary: item.summary,
-              ...(item.continuity ? { continuity: item.continuity } : {}),
-            },
-            name: `${panelIndex + 1}컷 · ${projectedPanel.shot || projectedPanel.action || "장면"}`.slice(0, 120),
-          });
-          item.bubbles.forEach((bubble) => {
-            pageElements.push({ id: uid(), ...bubble });
-          });
-
-          const visibleSfx = projectedPanel.sfxLabels.filter((label) => label.text.trim().length > 0);
-          const columnCount = Math.max(1, Math.min(3, visibleSfx.length));
-          const rowCount = Math.max(1, Math.ceil(visibleSfx.length / columnCount));
-          const cellWidth = Math.max(96, (item.frame.width - 48) / columnCount);
-          const rowStride = Math.max(58, Math.min(92, (item.frame.height - 48) / rowCount));
-
-          visibleSfx.forEach((label, sfxIndex) => {
-            const preset = label.presetId
-              ? SFX_LIBRARY.find((candidate) => candidate.id === label.presetId)
-              : undefined;
-            const base = preset
-              ? createSfxTextConfig(preset, 0, 0)
-              : {
-                  text: label.text,
-                  x: 0,
-                  y: 0,
-                  width: 220,
-                  fontSize: 64,
-                  fill: "#ffb24a",
-                  stroke: "#2a1208",
-                  strokeWidth: 6,
-                  rotation: 0,
-                  font: "Black Han Sans",
-                  fontStyle: "bold" as const,
-                  shadowColor: "#160a04",
-                  shadowBlur: 7,
-                  shadowOpacity: 0.32,
-                };
-            const scale = label.style.scale === "small" ? 0.72 : label.style.scale === "large" ? 1.28 : 1;
-            const emphasisScale = label.style.emphasis === "strong" ? 1.1 : 1;
-            const fontSize = Math.round(Math.max(30, Math.min(92, base.fontSize * scale * emphasisScale)));
-            const width = Math.round(Math.max(88, Math.min(cellWidth - 12, base.width * scale)));
-            const column = sfxIndex % columnCount;
-            const row = Math.floor(sfxIndex / columnCount);
-            const x = Math.round(item.frame.x + 24 + column * cellWidth + (cellWidth - width) / 2);
-            const unclampedY = item.frame.y + item.frame.height - 24 - (rowCount - row) * rowStride;
-            const y = Math.round(
-              Math.max(item.frame.y + 18, Math.min(item.frame.y + item.frame.height - fontSize - 18, unclampedY))
-            );
-            pageElements.push({
-              id: uid(),
-              type: "text",
-              ...base,
-              text: label.text,
-              x,
-              y,
-              width,
-              fontSize,
-              name: `SFX · ${label.text}`.slice(0, 120),
-              ...(label.style.emphasis === "quiet" ? { opacity: 0.62 } : {}),
-              ...(label.style.emphasis === "strong"
-                ? {
-                    fontStyle: "bold" as const,
-                    strokeWidth: Math.max(6, (base.strokeWidth ?? 0) + 2),
-                  }
-                : {}),
-            });
-          });
-        });
-
-        return {
-          id: uid(),
-          elements: pageElements,
-          bg: "#ffffff",
-          bgGrad: null,
-          canvasH: Math.max(1080, layout.nextCanvasH, group.estimatedCanvasHeight),
-          name: `${episodeTitle} · 콘티 ${pageIndex + 1}`.slice(0, PAGE_NAME_MAX),
-          note: "Writer Room 컷 플랜에서 생성한 편집 가능한 콘티 초안".slice(0, PAGE_NOTE_MAX),
-        };
-      });
-
+      const createdPages = buildStudioWriterRoomCanvasPages({ plan, writerRoom });
       const currentIndex = Math.max(0, pages.findIndex((page) => page.id === activePage.id));
       const nextPages = [
         ...pages.slice(0, currentIndex + 1),
@@ -18591,22 +17147,6 @@ const puppetWarpArmed =
     if (!changed) return;
     if (options?.coalesceKey) commitCoalesced(next, options.coalesceKey);
     else commit(next);
-  }
-
-  function cancelPaperVectorRefinement() {
-    const wasActive = paperVectorRefinementActiveRef.current;
-    paperVectorRefinementRunIdRef.current += 1;
-    paperVectorRefinementActiveRef.current = false;
-    paperVectorRefinementAbortRef.current?.abort();
-    paperVectorRefinementAbortRef.current = null;
-    const client = paperVectorRefinementClientRef.current;
-    if (client) {
-      paperVectorRefinementEngineEpochRef.current = client.advanceEngineEpoch();
-    } else {
-      paperVectorRefinementEngineEpochRef.current += 1;
-    }
-    setPaperVectorRefinementBusy(false);
-    if (wasActive) announceDrawingShortcut("경로 정리를 취소했어요.");
   }
 
   /**
@@ -27368,6 +25908,8 @@ function clearSelectionForEdit() {
       viewTransformSuppressed,
       studioMainMenuSurfaceActions,
       studioMainMenuSurfaceState,
+      setAppSettingsInitialTab,
+      setAppSettingsOpen,
       setLeftPanelOpenWithOverride,
       setRightPanelOpenWithOverride,
       toggleCanvasWideMode,
@@ -28091,7 +26633,17 @@ function clearSelectionForEdit() {
     return () => {
       controller.abort();
     };
-  }, [checkpointKey, checkpointPanelOpen, loggedIn, serverCurrentRevision, sharedDocument?.role, studioAuthUserId, workId]);
+  }, [
+    checkpointKey,
+    checkpointPanelOpen,
+    currentStudioDocumentScopeRef,
+    editorMountedRef,
+    loggedIn,
+    serverCurrentRevision,
+    sharedDocument?.role,
+    studioAuthUserId,
+    workId,
+  ]);
 
   async function openOwnerFxPanel() {
     if (loadedWork && !sharedDocument) {
