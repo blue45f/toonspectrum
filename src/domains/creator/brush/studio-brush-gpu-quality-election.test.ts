@@ -148,11 +148,32 @@ describe("studio brush GPU quality election", () => {
     }
   });
 
-  it("rejects a small p95 regression even when pixels are equivalent", () => {
+  it("prefers GPU when quality is equivalent and p95 overhead remains modest", () => {
     const result = electStudioBrushGpuQuality(candidate({
       gpu: {
         quality: quality(),
-        performance: performance({ frameP95Milliseconds: 20.6 }),
+        performance: performance({
+          drawMilliseconds: 1_075,
+          frameP50Milliseconds: 17.8,
+          frameP95Milliseconds: 21.5,
+          frameP99Milliseconds: 31.5,
+          longTaskCount: 3,
+          longTaskTotalMilliseconds: 150,
+          heapGrowthBytes: 9 * 1024 * 1024,
+        }),
+      },
+    }));
+    expect(result.selected).toBe("gpu");
+    expect(result.qualityEquivalent).toBe(true);
+    expect(result.performanceNonInferior).toBe(true);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("keeps the incumbent when equivalent pixels require a material p95 regression", () => {
+    const result = electStudioBrushGpuQuality(candidate({
+      gpu: {
+        quality: quality(),
+        performance: performance({ frameP95Milliseconds: 22 }),
       },
     }));
     expect(result.selected).toBe("incumbent");
