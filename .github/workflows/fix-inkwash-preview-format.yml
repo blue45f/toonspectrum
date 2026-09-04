@@ -1,0 +1,80 @@
+name: Normalize InkWash preview planner formatting
+
+on:
+  push:
+    branches:
+      - fix/inkwash-causal-preview-clean-port-20260904
+    paths:
+      - .github/workflows/fix-inkwash-preview-format.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: normalize-inkwash-preview-planner-formatting
+  cancel-in-progress: true
+
+jobs:
+  normalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: fix/inkwash-causal-preview-clean-port-20260904
+          fetch-depth: 0
+
+      - name: Normalize planner block indentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/domains/creator/brush/studio-inkwash-fluid.ts")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          start = lines.index("const absorption = spectralColor({")
+          end = lines.index("return {", start)
+          if lines[end - 1] != "});":
+              raise SystemExit(f"unexpected planner block terminator: {lines[end - 1]!r}")
+          for index in range(start, end + 1):
+              lines[index] = "  " + lines[index]
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify style and focused planner contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/brush/studio-inkwash-fluid.ts
+          pnpm exec vitest run \
+            src/domains/creator/brush/studio-inkwash-fluid-deposit.test.ts \
+            src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts
+
+      - name: Commit normalized product source without the one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/fix-inkwash-preview-format.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "style(brush): normalize InkWash preview planner formatting"
+          git push --no-verify origin HEAD:fix/inkwash-causal-preview-clean-port-20260904
