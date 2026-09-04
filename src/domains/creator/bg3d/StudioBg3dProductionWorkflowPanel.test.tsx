@@ -33,6 +33,15 @@ function createBatch(
       "main-line": "주선",
       depth: "깊이",
     },
+    look: {
+      lineEnabled: true,
+      lineStrength: 0.8,
+      textureLineEnabled: true,
+      textureLineStrength: 0.5,
+      toneMode: "flat",
+      toneType: "color",
+      toneOpacity: 1,
+    },
     exportHeight: "per-shot",
     exportHeightOptions: [640, 1080, 1440, 2160, 4096],
     includeLayeredPsd: true,
@@ -127,7 +136,7 @@ describe("StudioBg3dProductionWorkflowPanel", () => {
     expect(batch.selectAllShots).toHaveBeenCalledTimes(1);
   });
 
-  it("applies only production-proven manuscript passes", () => {
+  it("applies only production-proven and LT-configured manuscript passes", () => {
     const batch = createBatch({
       selectedShotIds: ["shot-a", "shot-b"],
     });
@@ -137,7 +146,6 @@ describe("StudioBg3dProductionWorkflowPanel", () => {
     expect(batch.setSelectedPasses).toHaveBeenCalledWith([
       "lt-composite",
       "color",
-      "tone",
       "texture-line",
       "main-line",
     ]);
@@ -146,11 +154,11 @@ describe("StudioBg3dProductionWorkflowPanel", () => {
   it("starts the recoverable production export when every gate is ready", async () => {
     const batch = createBatch({
       selectedShotIds: ["shot-a", "shot-b"],
-      selectedPasses: ["lt-composite", "color", "tone", "texture-line", "main-line"],
+      selectedPasses: ["lt-composite", "color", "texture-line", "main-line"],
     });
     renderWorkflow(createRuntime(batch));
 
-    fireEvent.click(screen.getByRole("button", { name: "2컷 · 5패스 출력 시작" }));
+    fireEvent.click(screen.getByRole("button", { name: "2컷 · 4패스 출력 시작" }));
     await waitFor(() => expect(batch.startExport).toHaveBeenCalledTimes(1));
   });
 
