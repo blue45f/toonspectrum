@@ -32,6 +32,18 @@ jobs:
           node-version: 24.16.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Repair staged applicator template escaping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/apply-all-brush-long-stroke-quality.mjs")
+          source = path.read_text()
+          old = "${operation} tool never activated"
+          new = r"\${operation} tool never activated"
+          if source.count(old) != 1:
+              raise SystemExit(f"expected one applicator interpolation, found {source.count(old)}")
+          path.write_text(source.replace(old, new))
+          PY
       - name: Apply benchmark and quality-gated rollout patch
         run: node scripts/apply-all-brush-long-stroke-quality.mjs
       - name: Focused tests
