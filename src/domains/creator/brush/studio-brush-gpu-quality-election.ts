@@ -1,4 +1,5 @@
-export const STUDIO_BRUSH_GPU_QUALITY_ELECTION_VERSION = 1 as const;
+export const STUDIO_BRUSH_GPU_QUALITY_ELECTION_VERSION = 2 as const;
+export const STUDIO_BRUSH_GPU_QUALITY_RENDER_CONTRACT_VERSION = 1 as const;
 
 export type StudioBrushGpuQualityPolicyKind =
   | "strict-continuous"
@@ -6,6 +7,18 @@ export type StudioBrushGpuQualityPolicyKind =
   | "record-only-discrete"
   | "record-only-transparent"
   | "eraser";
+
+export type StudioBrushGpuAdapterClass =
+  | "hardware"
+  | "software"
+  | "unknown"
+  | "unavailable";
+
+export interface StudioBrushGpuExecutionEvidence {
+  readonly adapterClass: StudioBrushGpuAdapterClass;
+  readonly isFallbackAdapter: boolean | null;
+  readonly adapterFingerprint: string | null;
+}
 
 export interface StudioBrushLongStrokePerformanceEvidence {
   readonly drawMilliseconds: number;
@@ -58,6 +71,7 @@ export interface StudioBrushGpuQualityElectionInput {
     quality: StudioBrushLongStrokeQualityEvidence;
     performance: StudioBrushLongStrokePerformanceEvidence;
   }>;
+  readonly gpuExecution: StudioBrushGpuExecutionEvidence;
   readonly crossEngine: StudioBrushCrossEngineQualityEvidence;
 }
 
@@ -85,6 +99,7 @@ export interface StudioBrushGpuQualityElectionResult {
   readonly selected: "gpu" | "incumbent";
   readonly qualityEquivalent: boolean;
   readonly performanceNonInferior: boolean;
+  readonly hardwareEligible: boolean;
   readonly reasons: readonly string[];
   readonly ratios: Readonly<{
     draw: number;
@@ -95,89 +110,96 @@ export interface StudioBrushGpuQualityElectionResult {
   readonly thresholds: StudioBrushGpuQualityElectionThresholds;
 }
 
-const THRESHOLDS: Readonly<Record<StudioBrushGpuQualityPolicyKind, StudioBrushGpuQualityElectionThresholds>> =
-  Object.freeze({
-    "strict-continuous": Object.freeze({
-      maximumChangedInkRatio: 0.12,
-      minimumSilhouetteIntersectionOverUnion: 0.96,
-      minimumInkEnergyRatio: 0.95,
-      maximumInkEnergyRatio: 1.05,
-      minimumEdgeDensityRatio: 0.92,
-      maximumEdgeDensityRatio: 1.10,
-      minimumGradientEnergyRatio: 0.90,
-      maximumGradientEnergyRatio: 1.12,
-      minimumHistogramIntersection: 0.96,
-      minimumProfileCorrelation: 0.97,
-      maximumNormalizedBoundsDrift: 0.015,
-      maximumNormalizedCentroidDrift: 0.015,
-      maximumLiveCommitRegression: 0.005,
-      maximumCommittedSettleRatio: 0.001,
-    }),
-    "soft-wet-continuous": Object.freeze({
-      maximumChangedInkRatio: 0.35,
-      minimumSilhouetteIntersectionOverUnion: 0.82,
-      minimumInkEnergyRatio: 0.85,
-      maximumInkEnergyRatio: 1.18,
-      minimumEdgeDensityRatio: 0.78,
-      maximumEdgeDensityRatio: 1.28,
-      minimumGradientEnergyRatio: 0.75,
-      maximumGradientEnergyRatio: 1.30,
-      minimumHistogramIntersection: 0.84,
-      minimumProfileCorrelation: 0.82,
-      maximumNormalizedBoundsDrift: 0.045,
-      maximumNormalizedCentroidDrift: 0.04,
-      maximumLiveCommitRegression: 0.03,
-      maximumCommittedSettleRatio: 0.01,
-    }),
-    "record-only-discrete": Object.freeze({
-      maximumChangedInkRatio: 0.45,
-      minimumSilhouetteIntersectionOverUnion: 0.75,
-      minimumInkEnergyRatio: 0.82,
-      maximumInkEnergyRatio: 1.22,
-      minimumEdgeDensityRatio: 0.72,
-      maximumEdgeDensityRatio: 1.35,
-      minimumGradientEnergyRatio: 0.72,
-      maximumGradientEnergyRatio: 1.35,
-      minimumHistogramIntersection: 0.80,
-      minimumProfileCorrelation: 0.72,
-      maximumNormalizedBoundsDrift: 0.06,
-      maximumNormalizedCentroidDrift: 0.05,
-      maximumLiveCommitRegression: 0.04,
-      maximumCommittedSettleRatio: 0.005,
-    }),
-    "record-only-transparent": Object.freeze({
-      maximumChangedInkRatio: 0,
-      minimumSilhouetteIntersectionOverUnion: 1,
-      minimumInkEnergyRatio: 1,
-      maximumInkEnergyRatio: 1,
-      minimumEdgeDensityRatio: 1,
-      maximumEdgeDensityRatio: 1,
-      minimumGradientEnergyRatio: 1,
-      maximumGradientEnergyRatio: 1,
-      minimumHistogramIntersection: 1,
-      minimumProfileCorrelation: 1,
-      maximumNormalizedBoundsDrift: 0,
-      maximumNormalizedCentroidDrift: 0,
-      maximumLiveCommitRegression: 0,
-      maximumCommittedSettleRatio: 0,
-    }),
-    eraser: Object.freeze({
-      maximumChangedInkRatio: 0,
-      minimumSilhouetteIntersectionOverUnion: 1,
-      minimumInkEnergyRatio: 1,
-      maximumInkEnergyRatio: 1,
-      minimumEdgeDensityRatio: 1,
-      maximumEdgeDensityRatio: 1,
-      minimumGradientEnergyRatio: 1,
-      maximumGradientEnergyRatio: 1,
-      minimumHistogramIntersection: 1,
-      minimumProfileCorrelation: 1,
-      maximumNormalizedBoundsDrift: 0,
-      maximumNormalizedCentroidDrift: 0,
-      maximumLiveCommitRegression: 0,
-      maximumCommittedSettleRatio: 0,
-    }),
-  });
+/**
+ * These are equivalence tolerances, not aesthetic acceptance thresholds. The candidate must first
+ * pass its own media-specific live/commit quality gate. Cross-engine tolerances then permit only
+ * small antialiasing and browser-compositor variation; a faster but visibly different path stays on
+ * the incumbent.
+ */
+const THRESHOLDS: Readonly<
+  Record<StudioBrushGpuQualityPolicyKind, StudioBrushGpuQualityElectionThresholds>
+> = Object.freeze({
+  "strict-continuous": Object.freeze({
+    maximumChangedInkRatio: 0.02,
+    minimumSilhouetteIntersectionOverUnion: 0.99,
+    minimumInkEnergyRatio: 0.985,
+    maximumInkEnergyRatio: 1.015,
+    minimumEdgeDensityRatio: 0.96,
+    maximumEdgeDensityRatio: 1.04,
+    minimumGradientEnergyRatio: 0.95,
+    maximumGradientEnergyRatio: 1.05,
+    minimumHistogramIntersection: 0.985,
+    minimumProfileCorrelation: 0.99,
+    maximumNormalizedBoundsDrift: 0.005,
+    maximumNormalizedCentroidDrift: 0.005,
+    maximumLiveCommitRegression: 0.002,
+    maximumCommittedSettleRatio: 0.001,
+  }),
+  "soft-wet-continuous": Object.freeze({
+    maximumChangedInkRatio: 0.08,
+    minimumSilhouetteIntersectionOverUnion: 0.95,
+    minimumInkEnergyRatio: 0.95,
+    maximumInkEnergyRatio: 1.05,
+    minimumEdgeDensityRatio: 0.9,
+    maximumEdgeDensityRatio: 1.1,
+    minimumGradientEnergyRatio: 0.88,
+    maximumGradientEnergyRatio: 1.12,
+    minimumHistogramIntersection: 0.95,
+    minimumProfileCorrelation: 0.94,
+    maximumNormalizedBoundsDrift: 0.015,
+    maximumNormalizedCentroidDrift: 0.012,
+    maximumLiveCommitRegression: 0.005,
+    maximumCommittedSettleRatio: 0.003,
+  }),
+  "record-only-discrete": Object.freeze({
+    maximumChangedInkRatio: 0.12,
+    minimumSilhouetteIntersectionOverUnion: 0.9,
+    minimumInkEnergyRatio: 0.92,
+    maximumInkEnergyRatio: 1.08,
+    minimumEdgeDensityRatio: 0.88,
+    maximumEdgeDensityRatio: 1.12,
+    minimumGradientEnergyRatio: 0.86,
+    maximumGradientEnergyRatio: 1.14,
+    minimumHistogramIntersection: 0.93,
+    minimumProfileCorrelation: 0.9,
+    maximumNormalizedBoundsDrift: 0.02,
+    maximumNormalizedCentroidDrift: 0.018,
+    maximumLiveCommitRegression: 0.01,
+    maximumCommittedSettleRatio: 0.003,
+  }),
+  "record-only-transparent": Object.freeze({
+    maximumChangedInkRatio: 0,
+    minimumSilhouetteIntersectionOverUnion: 1,
+    minimumInkEnergyRatio: 1,
+    maximumInkEnergyRatio: 1,
+    minimumEdgeDensityRatio: 1,
+    maximumEdgeDensityRatio: 1,
+    minimumGradientEnergyRatio: 1,
+    maximumGradientEnergyRatio: 1,
+    minimumHistogramIntersection: 1,
+    minimumProfileCorrelation: 1,
+    maximumNormalizedBoundsDrift: 0,
+    maximumNormalizedCentroidDrift: 0,
+    maximumLiveCommitRegression: 0,
+    maximumCommittedSettleRatio: 0,
+  }),
+  eraser: Object.freeze({
+    maximumChangedInkRatio: 0,
+    minimumSilhouetteIntersectionOverUnion: 1,
+    minimumInkEnergyRatio: 1,
+    maximumInkEnergyRatio: 1,
+    minimumEdgeDensityRatio: 1,
+    maximumEdgeDensityRatio: 1,
+    minimumGradientEnergyRatio: 1,
+    maximumGradientEnergyRatio: 1,
+    minimumHistogramIntersection: 1,
+    minimumProfileCorrelation: 1,
+    maximumNormalizedBoundsDrift: 0,
+    maximumNormalizedCentroidDrift: 0,
+    maximumLiveCommitRegression: 0,
+    maximumCommittedSettleRatio: 0,
+  }),
+});
 
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -194,9 +216,9 @@ function inRange(value: number, minimum: number, maximum: number): boolean {
 }
 
 /**
- * Quality is a hard prerequisite. Performance is a non-inferiority gate only: once the pictures
- * are equivalent, a statistically tied GPU path wins so the product can accumulate GPU evidence
- * without lowering texture, hand feel, or live/commit continuity.
+ * Quality is a hard prerequisite. A statistically tied physical-GPU path wins only after the
+ * pictures are equivalent; software/fallback adapters remain diagnostic evidence and can never
+ * author the product allowlist.
  */
 export function electStudioBrushGpuQuality(
   input: StudioBrushGpuQualityElectionInput,
@@ -206,10 +228,15 @@ export function electStudioBrushGpuQuality(
   const baselineQuality = input.baseline.quality;
   const gpuQuality = input.gpu.quality;
   const cross = input.crossEngine;
+  const execution = input.gpuExecution;
 
-  if (typeof input.brushId !== "string" || input.brushId.length === 0) reasons.push("invalid-brush-id");
+  if (typeof input.brushId !== "string" || input.brushId.length === 0) {
+    reasons.push("invalid-brush-id");
+  }
   if (input.policy === "eraser") reasons.push("eraser-transparent-overlay-ineligible");
-  if (input.policy === "record-only-transparent") reasons.push("transparent-tool-has-no-pixel-election");
+  if (input.policy === "record-only-transparent") {
+    reasons.push("transparent-tool-has-no-pixel-election");
+  }
   if (!baselineQuality.measured || !gpuQuality.measured) reasons.push("measurement-incomplete");
   if (!baselineQuality.ownQualityPassed) reasons.push("incumbent-quality-failed");
   if (!gpuQuality.ownQualityPassed) reasons.push("gpu-quality-failed");
@@ -220,26 +247,42 @@ export function electStudioBrushGpuQuality(
     reasons.push("stroke-refused");
   }
   if (!gpuQuality.gpuSurfaceObserved) reasons.push("gpu-surface-not-observed");
-  if (baselineQuality.visiblePixels <= 0 || gpuQuality.visiblePixels <= 0) reasons.push("missing-visible-ink");
-  if (input.baseline.performance.inputDeliveryRatio < 0.98 || input.gpu.performance.inputDeliveryRatio < 0.98) {
-    reasons.push("input-delivery");
+  if (baselineQuality.visiblePixels <= 0 || gpuQuality.visiblePixels <= 0) {
+    reasons.push("missing-visible-ink");
   }
+  if (
+    input.baseline.performance.inputDeliveryRatio < 0.98
+    || input.gpu.performance.inputDeliveryRatio < 0.98
+  ) reasons.push("input-delivery");
   if (cross.comparedPixels <= 0) reasons.push("cross-engine-images-missing");
-  if (cross.changedInkRatio > thresholds.maximumChangedInkRatio) reasons.push("changed-ink-ratio");
-  if (cross.silhouetteIntersectionOverUnion < thresholds.minimumSilhouetteIntersectionOverUnion) {
-    reasons.push("silhouette-iou");
+  if (cross.changedInkRatio > thresholds.maximumChangedInkRatio) {
+    reasons.push("changed-ink-ratio");
   }
-  if (!inRange(cross.inkEnergyRatio, thresholds.minimumInkEnergyRatio, thresholds.maximumInkEnergyRatio)) {
-    reasons.push("ink-energy");
-  }
-  if (!inRange(cross.edgeDensityRatio, thresholds.minimumEdgeDensityRatio, thresholds.maximumEdgeDensityRatio)) {
-    reasons.push("edge-density");
-  }
-  if (!inRange(
-    cross.gradientEnergyRatio,
-    thresholds.minimumGradientEnergyRatio,
-    thresholds.maximumGradientEnergyRatio,
-  )) reasons.push("gradient-energy");
+  if (
+    cross.silhouetteIntersectionOverUnion
+      < thresholds.minimumSilhouetteIntersectionOverUnion
+  ) reasons.push("silhouette-iou");
+  if (
+    !inRange(
+      cross.inkEnergyRatio,
+      thresholds.minimumInkEnergyRatio,
+      thresholds.maximumInkEnergyRatio,
+    )
+  ) reasons.push("ink-energy");
+  if (
+    !inRange(
+      cross.edgeDensityRatio,
+      thresholds.minimumEdgeDensityRatio,
+      thresholds.maximumEdgeDensityRatio,
+    )
+  ) reasons.push("edge-density");
+  if (
+    !inRange(
+      cross.gradientEnergyRatio,
+      thresholds.minimumGradientEnergyRatio,
+      thresholds.maximumGradientEnergyRatio,
+    )
+  ) reasons.push("gradient-energy");
   if (cross.luminanceHistogramIntersection < thresholds.minimumHistogramIntersection) {
     reasons.push("luminance-histogram");
   }
@@ -260,9 +303,22 @@ export function electStudioBrushGpuQuality(
   if (gpuQuality.committedToSettledChangedRatio > thresholds.maximumCommittedSettleRatio) {
     reasons.push("post-commit-instability");
   }
-  if (gpuQuality.centerlineCoverage + 0.01 < baselineQuality.centerlineCoverage) {
+  if (gpuQuality.centerlineCoverage + 0.005 < baselineQuality.centerlineCoverage) {
     reasons.push("centerline-coverage-regression");
   }
+
+  if (execution.adapterClass === "software") reasons.push("software-gpu-evidence-only");
+  if (execution.adapterClass === "unknown") reasons.push("gpu-hardware-unverified");
+  if (execution.adapterClass === "unavailable") reasons.push("gpu-adapter-unavailable");
+  if (execution.isFallbackAdapter === true) reasons.push("fallback-gpu-evidence-only");
+  if (
+    typeof execution.adapterFingerprint !== "string"
+    || execution.adapterFingerprint.length === 0
+  ) reasons.push("gpu-adapter-fingerprint-missing");
+  const hardwareEligible = execution.adapterClass === "hardware"
+    && execution.isFallbackAdapter !== true
+    && typeof execution.adapterFingerprint === "string"
+    && execution.adapterFingerprint.length > 0;
 
   const ratios = Object.freeze({
     draw: ratio(input.gpu.performance.drawMilliseconds, input.baseline.performance.drawMilliseconds),
@@ -282,14 +338,14 @@ export function electStudioBrushGpuQuality(
   const heapRegression = input.gpu.performance.heapGrowthBytes !== null
     && input.baseline.performance.heapGrowthBytes !== null
     && input.gpu.performance.heapGrowthBytes
-      > input.baseline.performance.heapGrowthBytes + 8 * 1024 * 1024;
-  const performanceNonInferior = ratios.draw <= 1.05
-    && ratios.frameP50 <= 1.05
-    && ratios.frameP95 <= 1.05
-    && ratios.frameP99 <= 1.10
+      > input.baseline.performance.heapGrowthBytes + 4 * 1024 * 1024;
+  const performanceNonInferior = ratios.draw <= 1.02
+    && ratios.frameP50 <= 1.02
+    && ratios.frameP95 <= 1.02
+    && ratios.frameP99 <= 1.05
     && input.gpu.performance.longTaskCount <= input.baseline.performance.longTaskCount + 1
     && input.gpu.performance.longTaskTotalMilliseconds
-      <= input.baseline.performance.longTaskTotalMilliseconds + 100
+      <= input.baseline.performance.longTaskTotalMilliseconds + 50
     && !heapRegression;
   if (!performanceNonInferior) reasons.push("performance-regression");
 
@@ -320,7 +376,9 @@ export function electStudioBrushGpuQuality(
     "centerline-coverage-regression",
   ]);
   const qualityEquivalent = reasons.every((reason) => !qualityReasons.has(reason));
-  const selected = qualityEquivalent && performanceNonInferior ? "gpu" : "incumbent";
+  const selected = qualityEquivalent && performanceNonInferior && hardwareEligible
+    ? "gpu"
+    : "incumbent";
   return Object.freeze({
     kind: "studio-brush-gpu-quality-election",
     version: STUDIO_BRUSH_GPU_QUALITY_ELECTION_VERSION,
@@ -328,6 +386,7 @@ export function electStudioBrushGpuQuality(
     selected,
     qualityEquivalent,
     performanceNonInferior,
+    hardwareEligible,
     reasons: Object.freeze(reasons),
     ratios,
     thresholds,
