@@ -28,9 +28,9 @@ function quality(overrides: Partial<StudioBrushLongStrokeQualityEvidence> = {}) 
     browserErrorCount: 0,
     refusedStrokeCount: 0,
     gpuSurfaceObserved: true,
-    liveToCommittedChangedRatio: 0.005,
+    liveToCommittedChangedRatio: 0.003,
     committedToSettledChangedRatio: 0,
-    centerlineCoverage: 0.995,
+    centerlineCoverage: 0.998,
     visiblePixels: 12_000,
     inkEnergy: 500_000,
     edgeDensity: 0.2,
@@ -46,16 +46,21 @@ function candidate(
     policy: "strict-continuous",
     baseline: { quality: quality({ gpuSurfaceObserved: false }), performance: performance() },
     gpu: { quality: quality(), performance: performance() },
+    gpuExecution: {
+      adapterClass: "hardware",
+      isFallbackAdapter: false,
+      adapterFingerprint: "vendor:device:architecture",
+    },
     crossEngine: {
       comparedPixels: 1_000_000,
-      changedInkRatio: 0.02,
-      silhouetteIntersectionOverUnion: 0.985,
+      changedInkRatio: 0.005,
+      silhouetteIntersectionOverUnion: 0.997,
       inkEnergyRatio: 1,
       edgeDensityRatio: 1,
       gradientEnergyRatio: 1,
-      luminanceHistogramIntersection: 0.99,
-      horizontalProfileCorrelation: 0.99,
-      verticalProfileCorrelation: 0.99,
+      luminanceHistogramIntersection: 0.995,
+      horizontalProfileCorrelation: 0.997,
+      verticalProfileCorrelation: 0.997,
       normalizedBoundsDrift: 0,
       normalizedCentroidDrift: 0,
     },
@@ -64,12 +69,13 @@ function candidate(
 }
 
 describe("studio brush GPU quality election", () => {
-  it("prefers a tied GPU path only after every quality gate passes", () => {
+  it("prefers a tied physical-GPU path only after every quality gate passes", () => {
     const result = electStudioBrushGpuQuality(candidate());
     expect(result).toMatchObject({
       selected: "gpu",
       qualityEquivalent: true,
       performanceNonInferior: true,
+      hardwareEligible: true,
       reasons: [],
     });
   });
@@ -77,13 +83,16 @@ describe("studio brush GPU quality election", () => {
   it("keeps the incumbent when texture energy is reduced even if GPU is much faster", () => {
     const input = candidate();
     const result = electStudioBrushGpuQuality(candidate({
-      gpu: { quality: quality(), performance: performance({
-        drawMilliseconds: 300,
-        frameP50Milliseconds: 8,
-        frameP95Milliseconds: 10,
-        frameP99Milliseconds: 12,
-      }) },
-      crossEngine: { ...input.crossEngine, gradientEnergyRatio: 0.7 },
+      gpu: {
+        quality: quality(),
+        performance: performance({
+          drawMilliseconds: 300,
+          frameP50Milliseconds: 8,
+          frameP95Milliseconds: 10,
+          frameP99Milliseconds: 12,
+        }),
+      },
+      crossEngine: { ...input.crossEngine, gradientEnergyRatio: 0.94 },
     }));
     expect(result.selected).toBe("incumbent");
     expect(result.reasons).toContain("gradient-energy");
@@ -91,7 +100,10 @@ describe("studio brush GPU quality election", () => {
 
   it("keeps the incumbent when live and committed texture continuity regresses", () => {
     const result = electStudioBrushGpuQuality(candidate({
-      gpu: { quality: quality({ liveToCommittedChangedRatio: 0.03 }), performance: performance() },
+      gpu: {
+        quality: quality({ liveToCommittedChangedRatio: 0.008 }),
+        performance: performance(),
+      },
     }));
     expect(result.selected).toBe("incumbent");
     expect(result.reasons).toContain("live-commit-regression");
@@ -99,10 +111,33 @@ describe("studio brush GPU quality election", () => {
 
   it("does not elect a path that was not observed on a GPU surface", () => {
     const result = electStudioBrushGpuQuality(candidate({
-      gpu: { quality: quality({ gpuSurfaceObserved: false }), performance: performance() },
+      gpu: {
+        quality: quality({ gpuSurfaceObserved: false }),
+        performance: performance(),
+      },
     }));
     expect(result.selected).toBe("incumbent");
     expect(result.reasons).toContain("gpu-surface-not-observed");
+  });
+
+  it("records software and fallback adapters as diagnostics but never promotes them", () => {
+    for (const gpuExecution of [
+      {
+        adapterClass: "software" as const,
+        isFallbackAdapter: true,
+        adapterFingerprint: "google:swiftshader",
+      },
+      {
+        adapterClass: "unknown" as const,
+        isFallbackAdapter: null,
+        adapterFingerprint: null,
+      },
+    ]) {
+      const result = electStudioBrushGpuQuality(candidate({ gpuExecution }));
+      expect(result.selected).toBe("incumbent");
+      expect(result.qualityEquivalent).toBe(true);
+      expect(result.hardwareEligible).toBe(false);
+    }
   });
 
   it("treats erasers and transparent water-only tools as measured but not generic GPU candidates", () => {
@@ -113,9 +148,12 @@ describe("studio brush GPU quality election", () => {
     }
   });
 
-  it("rejects a material p95 regression even when pixels are equivalent", () => {
+  it("rejects a small p95 regression even when pixels are equivalent", () => {
     const result = electStudioBrushGpuQuality(candidate({
-      gpu: { quality: quality(), performance: performance({ frameP95Milliseconds: 24 }) },
+      gpu: {
+        quality: quality(),
+        performance: performance({ frameP95Milliseconds: 20.6 }),
+      },
     }));
     expect(result.selected).toBe("incumbent");
     expect(result.qualityEquivalent).toBe(true);
