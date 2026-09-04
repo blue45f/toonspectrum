@@ -1,0 +1,52 @@
+name: PR 690 reconcile with main
+
+on:
+  push:
+    branches:
+      - refactor/layered-architecture-20260904
+    paths:
+      - .github/workflows/pr690-reconcile-main.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr690-reconcile-main
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Merge current main into the architecture branch
+        shell: bash
+        run: |
+          set -uo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch --no-tags origin main
+
+          if git merge --no-ff --no-edit origin/main; then
+            echo "PR690_RECONCILE_RESULT=merged"
+            git push origin HEAD:refactor/layered-architecture-20260904
+            exit 0
+          fi
+
+          echo "PR690_RECONCILE_RESULT=conflicts"
+          echo "PR690_CONFLICT_FILES_BEGIN"
+          git diff --name-only --diff-filter=U
+          echo "PR690_CONFLICT_FILES_END"
+
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            echo "PR690_CONFLICT_DETAIL_BEGIN $file"
+            git diff --cc -- "$file" | sed -n '1,260p'
+            echo "PR690_CONFLICT_DETAIL_END $file"
+          done < <(git diff --name-only --diff-filter=U)
+
+          exit 1
