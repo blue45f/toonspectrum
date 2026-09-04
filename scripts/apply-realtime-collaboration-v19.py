@@ -323,7 +323,9 @@ replace_once(
   pageId: string;
   followingSessionId?: string | null;
   canvasWidth: number;''',
-    guard="  followingSessionId?: string | null;",
+    guard='''export interface StudioRemoteCursorOverlayProps {
+  pageId: string;
+  followingSessionId?: string | null;''',
 )
 
 replace_once(
