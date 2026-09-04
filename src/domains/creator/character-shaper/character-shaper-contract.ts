@@ -194,7 +194,8 @@ export type CharacterSlotPreviewSpec =
     }
   | { readonly kind: "prop"; readonly propId: string; readonly category: "hand" | "head" | "body"; readonly color: string }
   | { readonly kind: "expression"; readonly emoji: string; readonly weights: Readonly<Record<string, number>> }
-  | { readonly kind: "pose"; readonly figure: CharacterPoseGlyphFigure; readonly tone: string }
+  /** The renderer resolves `presetId` through `buildCharacterPoseGlyph` so the catalog stays data-only. */
+  | { readonly kind: "pose"; readonly presetId: string; readonly tone: string }
   | { readonly kind: "hand-pose"; readonly poseType: CharacterHandPoseType }
   | { readonly kind: "glyph"; readonly icon: string; readonly caption: string };
 

@@ -168,8 +168,9 @@ reason "엘프 귀 소품이 아직 없습니다" — do not fake it.
 inline `<svg>` (viewBox 0 0 80 100) using only `currentColor`, `var(--color-*)` tokens and the
 spec's own colors. Deterministic, no randomness, no external images. Hair previews may compose
 `StudioVrmAvatarForgePreview` for silhouettes but must render inside the same 4:5 frame. Pose
-previews use `character-shaper-pose-glyph.ts`: project the preset's bone directions/rotations to
-a `CharacterPoseGlyphFigure` (unit tests pin a running pose vs. standing pose to differ). Hand
+previews receive `{ kind: "pose", presetId }` and resolve the preset (`NATURAL_IDLE_POSES` +
+`EXTRA_POSE_PRESETS` by id) through `character-shaper-pose-glyph.ts`: project the preset's bone
+directions/rotations to a `CharacterPoseGlyphFigure` (unit tests pin a running pose vs. standing pose to differ). Hand
 poses use per-type finger curl tables. Expressions draw a face with brows/eyes/mouth driven by
 weights (happy → smile arc, angry → brows down, surprised → round mouth), emoji only as `<title>`.
 
