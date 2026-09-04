@@ -165,7 +165,7 @@ describe("WebGPU dab tile binning compute candidate", () => {
       "scratch[right] += scratch[left]",
     );
     expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scan).toContain(
-      "tile_offsets[meta.tile_count] = meta.reference_count",
+      "tile_offsets[config.tile_count] = config.reference_count",
     );
     expect(STUDIO_WEBGPU_DAB_TILE_BINNING_COMPUTE_WGSL.scatter).toContain(
       "output_cursor + local_offset",
