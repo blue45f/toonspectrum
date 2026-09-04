@@ -44,22 +44,24 @@ jobs:
 
           path = Path("scripts/apply-inkwash-live-preview-quality-wave.mjs")
           source = path.read_text(encoding="utf-8")
-          old = '''  const baseRadius = Math.max(0.75, options.radius);
-            const absorption = spectralColor({ ...options, samples: [] });
-            return {'''
+          old = (
+              "  const baseRadius = Math.max(0.75, options.radius);\n"
+              "  const absorption = spectralColor({ ...options, samples: [] });\n"
+              "  return {"
+          )
           new = '''  const baseRadius = Math.max(0.75, options.radius);
-            const absorption = spectralColor({
-              tool: options.tool,
-              samples: [],
-              radius: options.radius,
-              pigmentLoad: options.pigmentLoad,
-              wetnessLoad: options.wetnessLoad,
-              ...(options.spectralAbsorption
-                ? { spectralAbsorption: options.spectralAbsorption }
-                : {}),
-              ...(options.inkColor ? { inkColor: options.inkColor } : {}),
-            });
-            return {'''
+          const absorption = spectralColor({
+            tool: options.tool,
+            samples: [],
+            radius: options.radius,
+            pigmentLoad: options.pigmentLoad,
+            wetnessLoad: options.wetnessLoad,
+            ...(options.spectralAbsorption
+              ? { spectralAbsorption: options.spectralAbsorption }
+              : {}),
+            ...(options.inkColor ? { inkColor: options.inkColor } : {}),
+          });
+          return {'''
           if source.count(old) != 1:
               raise SystemExit(f"preview construction target count={source.count(old)}")
           source = source.replace(old, new, 1)
