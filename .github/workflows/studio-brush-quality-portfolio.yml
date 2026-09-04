@@ -1,3 +1,4 @@
+# Quality-first merge gate: catalogue integrity and exhaustive reachability are mandatory.
 name: Studio brush quality portfolio
 
 on:
