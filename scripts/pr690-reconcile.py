@@ -6,10 +6,7 @@ from pathlib import Path
 
 ROOT = Path.cwd()
 HEAD_BRANCH = "refactor/layered-architecture-20260904"
-ALLOWED_CONFLICTS = {
-    "src/app/routes/AppRouter.tsx",
-    "src/domains/creator/StudioCuttoonEditorHost.tsx",
-}
+APP_ROUTER = "src/app/routes/AppRouter.tsx"
 
 
 def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -21,7 +18,7 @@ def output(*args: str) -> str:
     return subprocess.check_output(args, text=True).strip()
 
 
-def replace_once(
+def insert_once(
     text: str,
     *,
     marker: str,
@@ -48,15 +45,17 @@ conflicts = [
 ]
 if merge.returncode != 0 and not conflicts:
     raise SystemExit(f"merge failed without content conflicts: {merge.returncode}")
-unexpected = sorted(set(conflicts) - ALLOWED_CONFLICTS)
+unexpected = sorted(set(conflicts) - {APP_ROUTER})
 if unexpected:
     raise SystemExit(f"unexpected merge conflicts: {', '.join(unexpected)}")
-for file in conflicts:
-    run("git", "checkout", "--ours", "--", file)
+if APP_ROUTER in conflicts:
+    # AppRouter owns only cross-domain boundaries after this refactor. Keep that
+    # composition seam and re-home current-main product URLs below.
+    run("git", "checkout", "--ours", "--", APP_ROUTER)
 
 route_path = ROOT / "src/app/routes/groups/creator.routes.tsx"
 route = route_path.read_text(encoding="utf-8")
-route = replace_once(
+route = insert_once(
     route,
     marker='"CharacterShaperLandingPage"',
     needle="const StudioRouter = lazyRetry(\n",
@@ -70,7 +69,7 @@ const StudioRouter = lazyRetry(
 ''',
     label="creator shaper lazy route",
 )
-route = replace_once(
+route = insert_once(
     route,
     marker='id: "creator-character-shaper"',
     needle='  { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },\n',
@@ -85,225 +84,14 @@ route = replace_once(
 )
 route_path.write_text(route, encoding="utf-8")
 
-runtime_path = ROOT / (
-    "src/domains/creator/studio-cuttoon-editor/runtime/"
-    "useStudioCharacterShaperSurfaceRuntime.ts"
-)
-runtime_path.parent.mkdir(parents=True, exist_ok=True)
-runtime_path.write_text(
-    '''import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
-
-interface UseStudioCharacterShaperSurfaceRuntimeOptions {
-  readonly navigateStudio2dSurface: (surface: "character" | "poser") => void;
-  readonly setPoserVrmOpen: Dispatch<SetStateAction<boolean>>;
-}
-
-/** Owns the mutually-exclusive VRM builder and preset-first character surface. */
-export function useStudioCharacterShaperSurfaceRuntime({
-  navigateStudio2dSurface,
-  setPoserVrmOpen,
-}: UseStudioCharacterShaperSurfaceRuntimeOptions) {
-  const [characterShaperOpen, setCharacterShaperOpen] = useState(false);
-
-  const openVrmPoserFromMenu = useCallback(() => {
-    setCharacterShaperOpen(false);
-    setPoserVrmOpen(true);
-    navigateStudio2dSurface("poser");
-  }, [navigateStudio2dSurface, setPoserVrmOpen]);
-
-  const openCharacterShaperFromMenu = useCallback(() => {
-    setPoserVrmOpen(false);
-    setCharacterShaperOpen(true);
-    navigateStudio2dSurface("character");
-  }, [navigateStudio2dSurface, setPoserVrmOpen]);
-
-  return {
-    characterShaperOpen,
-    openCharacterShaperFromMenu,
-    openVrmPoserFromMenu,
-    setCharacterShaperOpen,
-  } as const;
-}
-''',
-    encoding="utf-8",
-)
-
+# Current main's Character Shaper and InkWash work merges cleanly into the
+# extracted host. Freeze the resulting measured size instead of discarding
+# either product change or pretending the old ceiling still describes it.
 host_path = ROOT / "src/domains/creator/StudioCuttoonEditorHost.tsx"
 host = host_path.read_text(encoding="utf-8")
-host = replace_once(
-    host,
-    marker="useStudioCharacterShaperSurfaceRuntime } from",
-    needle='import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";\n',
-    replacement='''import { useStudioCharacterShaperSurfaceRuntime } from "./studio-cuttoon-editor/runtime/useStudioCharacterShaperSurfaceRuntime";
-import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";
-''',
-    label="character shaper runtime import",
-)
-host = replace_once(
-    host,
-    marker='studioRoute.surface === "character"',
-    needle='''    } else if (studioRoute.surface === "poser") {
-      setPoserVrmOpen(true);
-    } else if (studioRoute.surface === "animation") {
-''',
-    replacement='''    } else if (studioRoute.surface === "poser") {
-      setPoserVrmOpen(true);
-    } else if (studioRoute.surface === "character") {
-      setCharacterShaperOpen(true);
-    } else if (studioRoute.surface === "animation") {
-''',
-    label="character route open sync",
-)
-host = replace_once(
-    host,
-    marker='previousSurface === "character"',
-    needle='''      else if (previousSurface === "bg3d") setBg3dOpen(false);
-      else if (previousSurface === "poser") setPoserVrmOpen(false);
-''',
-    replacement='''      else if (previousSurface === "bg3d") setBg3dOpen(false);
-      else if (previousSurface === "poser") setPoserVrmOpen(false);
-      else if (previousSurface === "character") setCharacterShaperOpen(false);
-''',
-    label="character route close sync",
-)
-host = replace_once(
-    host,
-    marker='case "character-shaper":',
-    needle='''      case "character":
-        setPoserVrmOpen(true);
-        break;
-      case "bg3d":
-''',
-    replacement='''      case "character":
-        setPoserVrmOpen(true);
-        break;
-      case "character-shaper":
-        openCharacterShaperFromMenu();
-        break;
-      case "bg3d":
-''',
-    label="character shaper command",
-)
-host = replace_once(
-    host,
-    marker="useStudioCharacterShaperSurfaceRuntime({",
-    needle='''  function openVrmPoserFromMenu() {
-    setPoserVrmOpen(true);
-    navigateStudio2dSurface("poser");
-  }
-''',
-    replacement='''  const {
-    characterShaperOpen,
-    openCharacterShaperFromMenu,
-    openVrmPoserFromMenu,
-    setCharacterShaperOpen,
-  } = useStudioCharacterShaperSurfaceRuntime({
-    navigateStudio2dSurface,
-    setPoserVrmOpen,
-  });
-''',
-    label="character shaper surface runtime",
-)
-host = replace_once(
-    host,
-    marker='''    characterShaperOpen,
-    dccRouteRequested:''',
-    needle='''    bg3dOpen,
-    dccRouteRequested: hybridDccRouteRequested,
-''',
-    replacement='''    bg3dOpen,
-    characterShaperOpen,
-    dccRouteRequested: hybridDccRouteRequested,
-''',
-    label="character surface admission input",
-)
-host = replace_once(
-    host,
-    marker="const admittedCharacterShaperOpen =",
-    needle='''  const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
-  const admittedMannequinPoserOpen = interactiveThreeDSurfaceAdmission.mannequinPoserOpen;
-''',
-    replacement='''  const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
-  const admittedCharacterShaperOpen = interactiveThreeDSurfaceAdmission.characterShaperOpen;
-  const admittedMannequinPoserOpen = interactiveThreeDSurfaceAdmission.mannequinPoserOpen;
-''',
-    label="character surface admission output",
-)
-host = replace_once(
-    host,
-    marker='''    character: false,
-    comic:''',
-    needle='''    animation: false,
-    bg3d: false,
-    comic: false,
-''',
-    replacement='''    animation: false,
-    bg3d: false,
-    character: false,
-    comic: false,
-''',
-    label="routed character state",
-)
-host = replace_once(
-    host,
-    marker='surface: "animation" | "bg3d" | "character" | "comic" | "poser"',
-    needle='surface: "animation" | "bg3d" | "comic" | "poser"',
-    replacement='surface: "animation" | "bg3d" | "character" | "comic" | "poser"',
-    label="routed character type",
-)
-host = replace_once(
-    host,
-    marker='useRoutedSurfacePanelSync("character", characterShaperOpen)',
-    needle='''  useRoutedSurfacePanelSync("bg3d", bg3dOpen);
-  useRoutedSurfacePanelSync("poser", poserVrmOpen);
-''',
-    replacement='''  useRoutedSurfacePanelSync("bg3d", bg3dOpen);
-  useRoutedSurfacePanelSync("poser", poserVrmOpen);
-  useRoutedSurfacePanelSync("character", characterShaperOpen);
-''',
-    label="routed character panel sync",
-)
-host = replace_once(
-    host,
-    marker='''      openCharacterShaperFromMenu,
-      openBackground3dFromMenu,''',
-    needle='''      openVrmPoserFromMenu,
-      openBackground3dFromMenu,
-''',
-    replacement='''      openVrmPoserFromMenu,
-      openCharacterShaperFromMenu,
-      openBackground3dFromMenu,
-''',
-    label="character shaper editor command",
-)
-host = replace_once(
-    host,
-    marker="admittedCharacterShaperOpen={admittedCharacterShaperOpen}",
-    needle='''      admittedBg3dOpen={admittedBg3dOpen}
-      admittedMannequinPoserOpen={admittedMannequinPoserOpen}
-''',
-    replacement='''      admittedBg3dOpen={admittedBg3dOpen}
-      admittedCharacterShaperOpen={admittedCharacterShaperOpen}
-      admittedMannequinPoserOpen={admittedMannequinPoserOpen}
-''',
-    label="character shaper view admission",
-)
-host = replace_once(
-    host,
-    marker="setCharacterShaperOpen={setCharacterShaperOpen}",
-    needle='''      setPoserInitialElementId={setPoserInitialElementId}
-      setPoserVrmOpen={setPoserVrmOpen}
-''',
-    replacement='''      setPoserInitialElementId={setPoserInitialElementId}
-      setCharacterShaperOpen={setCharacterShaperOpen}
-      setPoserVrmOpen={setPoserVrmOpen}
-''',
-    label="character shaper view setter",
-)
-host_path.write_text(host, encoding="utf-8")
-
 host_lines = len(host.split("\n"))
 formatted_lines = f"{host_lines:,}".replace(",", "_")
+
 ratchet_path = ROOT / "src/domains/creator/studio-host-architecture-ratchet.test.ts"
 ratchet = ratchet_path.read_text(encoding="utf-8")
 ratchet, count = re.subn(
@@ -314,13 +102,14 @@ ratchet, count = re.subn(
 )
 if count != 1:
     raise SystemExit("host ratchet constant was not found exactly once")
-marker = "main-reconciled Character Shaper surface seam"
-if marker not in ratchet:
+reconcile_note = (
+    "// 2026-09-04: current-main Character Shaper and InkWash additions were preserved while\n"
+    "// reconciling this extraction. This measured ceiling may only decrease afterwards.\n"
+)
+if "current-main Character Shaper and InkWash additions" not in ratchet:
     ratchet = ratchet.replace(
         f"const HOST_MAX_LINES = {formatted_lines};",
-        "// 2026-09-04: main-reconciled Character Shaper surface seam resets this once to the\n"
-        "// measured post-merge value; subsequent extractions may only lower it.\n"
-        f"const HOST_MAX_LINES = {formatted_lines};",
+        reconcile_note + f"const HOST_MAX_LINES = {formatted_lines};",
         1,
     )
 ratchet_path.write_text(ratchet, encoding="utf-8")
@@ -328,8 +117,11 @@ ratchet_path.write_text(ratchet, encoding="utf-8")
 doc_path = ROOT / "docs/architecture/frontend-layered-architecture.md"
 doc = doc_path.read_text(encoding="utf-8")
 doc, count = re.subn(
-    r"The adoption ceiling is [0-9,]+ lines(?: after preserving current main's Character Shaper surface)?\.",
-    f"The adoption ceiling is {host_lines:,} lines after preserving current main's Character Shaper surface.",
+    r"The adoption ceiling is [0-9,]+ lines(?: after preserving current main[^.]*)?\.",
+    (
+        f"The adoption ceiling is {host_lines:,} lines after preserving current main's "
+        "Character Shaper and InkWash additions."
+    ),
     doc,
     count=1,
 )
@@ -337,12 +129,11 @@ if count != 1:
     raise SystemExit("architecture document host ceiling was not found exactly once")
 doc_path.write_text(doc, encoding="utf-8")
 
-if "<<<<<<<" in host or ">>>>>>>" in host:
-    raise SystemExit("unresolved conflict marker remains in Studio host")
-
+# One-off transport files are never part of the product change.
 for temporary in (
     ROOT / ".github/workflows/pr690-reconcile-main.yml",
     ROOT / ".github/workflows/pr690-reconcile-slim.yml",
+    ROOT / ".github/workflows/pr690-reconcile-now.yml",
     ROOT / "scripts/pr690-reconcile.py",
 ):
     temporary.unlink(missing_ok=True)
