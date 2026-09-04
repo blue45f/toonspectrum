@@ -1,0 +1,56 @@
+name: Merged branch cleanup quality
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cleanup-merged-pr-branches.yml"
+      - ".github/workflows/cleanup-merged-branch-backlog.yml"
+      - ".github/workflows/merged-branch-cleanup-quality.yml"
+      - "scripts/cleanup-merged-branches.mjs"
+      - "scripts/cleanup-merged-branches.d.mts"
+      - "scripts/cleanup-merged-branches.test.ts"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cleanup-merged-pr-branches.yml"
+      - ".github/workflows/cleanup-merged-branch-backlog.yml"
+      - ".github/workflows/merged-branch-cleanup-quality.yml"
+      - "scripts/cleanup-merged-branches.mjs"
+      - "scripts/cleanup-merged-branches.d.mts"
+      - "scripts/cleanup-merged-branches.test.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merged-branch-cleanup-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify branch deletion safety contracts
+        run: |
+          node --check scripts/cleanup-merged-branches.mjs
+          pnpm exec eslint --max-warnings=0 \
+            scripts/cleanup-merged-branches.mjs \
+            scripts/cleanup-merged-branches.test.ts
+          pnpm exec vitest run scripts/cleanup-merged-branches.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
