@@ -157,10 +157,14 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(async () => ({ width: 400, height: 500, close: vi.fn() })),
   });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+  const context2d = {
     drawImage: vi.fn(),
     getImageData: () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 }),
-  } as unknown as CanvasRenderingContext2D);
+  } as unknown as CanvasRenderingContext2D;
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    ((contextId: string) => contextId === "2d" ? context2d : null) as
+      typeof HTMLCanvasElement.prototype.getContext
+  ));
 });
 
 afterEach(() => {
