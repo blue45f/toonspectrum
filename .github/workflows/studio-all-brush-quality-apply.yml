@@ -1,0 +1,73 @@
+name: Apply all-brush screen-fill quality benchmark
+
+on:
+  push:
+    branches:
+      - feat/all-brush-long-stroke-quality-election-20260904
+    paths:
+      - .github/trigger/all-brush-quality-apply.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-all-brush-quality-apply-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply benchmark and quality-gated rollout patch
+        run: node scripts/apply-all-brush-long-stroke-quality.mjs
+      - name: Focused tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+          src/domains/creator/brush/studio-stroke-surface-route-wiring-boundary.test.ts
+          src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
+      - name: Focused lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          scripts/run-studio-all-brush-long-stroke-shard.mts
+          scripts/aggregate-studio-all-brush-long-stroke.mts
+          scripts/verify-studio-long-stroke.mts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-election.test.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.ts
+          src/domains/creator/brush/studio-brush-gpu-quality-evidence.generated.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.ts
+          src/domains/creator/live/studio-live-ink-lane-admission.test.ts
+      - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Commit applied source and trigger exhaustive benchmark
+        run: |
+          set -euo pipefail
+          mkdir -p .github/trigger
+          printf 'all-brush screen-fill quality benchmark\n' > .github/trigger/all-brush-quality-benchmark.txt
+          rm -f .github/trigger/all-brush-quality-apply.txt
+          rm -f .github/workflows/studio-all-brush-quality-apply.yml
+          rm -f scripts/apply-all-brush-long-stroke-quality.mjs
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'test(brush): benchmark every brush with screen-filling strokes'
+          git push origin HEAD:${GITHUB_REF_NAME}
