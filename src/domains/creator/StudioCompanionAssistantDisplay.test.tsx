@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioCompanionAssistantDisplay } from "./StudioCompanionAssistantDisplay";
 
-afterEach(cleanup);
-
 const TAB_PREFIX = "companion-assistant";
+
+afterEach(cleanup);
 
 function openTab(label: string) {
   fireEvent.click(screen.getByRole("tab", { name: label }));
@@ -20,7 +20,7 @@ function openSfxTab() {
 }
 
 describe("StudioCompanionAssistantDisplay", () => {
-  it("renders companion assistant toolkit surface with all 6 quick tabs", () => {
+  it("renders the six webtoon production helpers", () => {
     const markup = renderToStaticMarkup(<StudioCompanionAssistantDisplay />);
 
     expect(markup).toContain("웹툰 보조 툴킷");
@@ -32,20 +32,58 @@ describe("StudioCompanionAssistantDisplay", () => {
     expect(markup).toContain("크로키 가이드");
     expect(markup).toContain("네이버웹툰 (도전/베도/정식)");
   });
+
+  it("does not present sample dimensions or invented gutters as live document facts", () => {
+    render(<StudioCompanionAssistantDisplay />);
+
+    expect(screen.getAllByText("예시 데이터").length).toBeGreaterThan(0);
+    expect(screen.getByText(/업로드 차단 판단에 쓰지 않습니다/)).toBeTruthy();
+    expect(screen.getByText("포맷 미검사")).toBeTruthy();
+    expect(screen.getByText("컷 간 여백 미검사")).toBeTruthy();
+    expect((screen.getByLabelText("내보내기 포맷") as HTMLSelectElement).value).toBe("");
+  });
+
+  it("labels connected canvas facts and preserves supplied audit fields", () => {
+    render(
+      <StudioCompanionAssistantDisplay
+        canvasWidth={800}
+        canvasHeight={1280}
+        imageFormat="png"
+        panelGuttersPx={[220, 640]}
+      />,
+    );
+
+    expect(screen.getAllByText("현재 원고").length).toBeGreaterThan(0);
+    expect((screen.getByLabelText("원고 폭(px)") as HTMLInputElement).value).toBe("800");
+    expect((screen.getByLabelText("원고 높이(px)") as HTMLInputElement).value).toBe("1280");
+    expect((screen.getByLabelText("내보내기 포맷") as HTMLSelectElement).value).toBe("png");
+    expect(screen.getByText("2개 여백 검사 중")).toBeTruthy();
+  });
+
+  it("switches to an explicit manual source as soon as the author edits an audit field", () => {
+    render(<StudioCompanionAssistantDisplay />);
+
+    fireEvent.change(screen.getByLabelText("원고 폭(px)"), { target: { value: "940" } });
+
+    expect(screen.getAllByText("직접 입력").length).toBeGreaterThan(0);
+    expect((screen.getByLabelText("원고 폭(px)") as HTMLInputElement).value).toBe("940");
+  });
 });
 
 describe("StudioCompanionAssistantDisplay — 디자인 토큰", () => {
   it("creator UI 에서 테마 전환되지 않는 원시 팔레트 색을 쓰지 않는다", () => {
-    // 감사 콜아웃(emerald/amber/rose)·완독 수치(emerald)·복사 체크(emerald) 회귀 방지.
     const markup = renderToStaticMarkup(<StudioCompanionAssistantDisplay />);
     expect(markup).not.toMatch(/\b(?:text|bg|border)-(?:emerald|amber|rose|slate|zinc|gray)-\d/);
     expect(markup).not.toContain("dark:text-");
   });
 
-  it("규격 감사 콜아웃을 good/warn/bad 시맨틱 토큰으로 칠한다", () => {
+  it("규격 감사와 페이싱 결과를 good/warn/bad 시맨틱 토큰으로 칠한다", () => {
     const { container } = render(<StudioCompanionAssistantDisplay />);
     expect(container.innerHTML).toMatch(/border-(?:good|warn|bad)\/35/);
     expect(container.innerHTML).toMatch(/bg-(?:good|warn|bad)\/10/);
+
+    openTab("스크롤 페이싱");
+    expect(container.innerHTML).toMatch(/border-(?:good|warn)\/35/);
   });
 });
 
@@ -53,9 +91,7 @@ describe("StudioCompanionAssistantDisplay — 탭 시맨틱", () => {
   it("6개 탭을 이름 붙은 tablist 로 노출하고 활성 탭만 selected 로 표시한다", () => {
     render(<StudioCompanionAssistantDisplay />);
 
-    const list = screen.getByRole("tablist", { name: "웹툰 보조 툴킷 탭" });
-    expect(list).toBeTruthy();
-
+    expect(screen.getByRole("tablist", { name: "웹툰 보조 툴킷 탭" })).toBeTruthy();
     const tabs = screen.getAllByRole("tab");
     expect(tabs).toHaveLength(6);
     expect(tabs.filter((tab) => tab.getAttribute("aria-selected") === "true")).toHaveLength(1);
@@ -79,7 +115,7 @@ describe("StudioCompanionAssistantDisplay — 탭 시맨틱", () => {
     expect(panel.getAttribute("aria-labelledby")).toBe(`${TAB_PREFIX}-tab-spec-slicer`);
   });
 
-  it("방향키로 탭을 순환 선택한다(roving tabIndex 유지)", () => {
+  it("방향키로 탭을 순환 선택한다", () => {
     render(<StudioCompanionAssistantDisplay />);
 
     const first = screen.getByRole("tab", { name: "플랫폼 규격" });
@@ -97,15 +133,49 @@ describe("StudioCompanionAssistantDisplay — 탭 시맨틱", () => {
   });
 });
 
+describe("StudioCompanionAssistantDisplay — 스크롤 페이싱", () => {
+  it("labels the default run as an example estimate and withholds viewport density judgement", () => {
+    render(<StudioCompanionAssistantDisplay />);
+    openTab("스크롤 페이싱");
+
+    expect(screen.getByText("예시 데이터")).toBeTruthy();
+    expect(screen.getByText(/컷 높이 600px 가정/)).toBeTruthy();
+    expect(screen.getByText("화면당 컷수 미검사")).toBeTruthy();
+  });
+
+  it("uses an entered viewport only after the author supplies one", () => {
+    render(<StudioCompanionAssistantDisplay />);
+    openTab("스크롤 페이싱");
+
+    fireEvent.change(screen.getByLabelText("독자 화면 높이(px)"), {
+      target: { value: "844" },
+    });
+
+    expect(screen.getByText(/화면당 최대 \d+컷/)).toBeTruthy();
+  });
+
+  it("uses connected panel spans when supplied", () => {
+    render(
+      <StudioCompanionAssistantDisplay
+        panels={[
+          { id: "p1", topY: 0, bottomY: 600, heightPx: 600, dialogueCount: 1 },
+          { id: "p2", topY: 850, bottomY: 1450, heightPx: 600, dialogueCount: 2 },
+        ]}
+      />,
+    );
+    openTab("스크롤 페이싱");
+
+    expect(screen.getByText("현재 원고")).toBeTruthy();
+    expect(screen.getByText("2컷 분석")).toBeTruthy();
+  });
+});
+
 describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
   it("잘라낸 결과를 숨기지 않고 개수와 더 보기 어포던스를 함께 보여준다", () => {
     openSfxTab();
 
-    // 사전 전체는 20개. 처음엔 6개만 그리되 그 사실을 화면에 적는다.
     expect(screen.getByText("총 20개 중 6개 표시")).toBeTruthy();
-
-    const more = screen.getByRole("button", { name: "더 보기 (+14)" });
-    fireEvent.click(more);
+    fireEvent.click(screen.getByRole("button", { name: "더 보기 (+14)" }));
 
     expect(screen.getByText("총 20개 중 12개 표시")).toBeTruthy();
     expect(screen.getByRole("button", { name: "더 보기 (+8)" })).toBeTruthy();
@@ -114,7 +184,6 @@ describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
   it("검색어가 바뀌면 펼쳐둔 개수를 처음으로 되돌린다", () => {
     openSfxTab();
     fireEvent.click(screen.getByRole("button", { name: "더 보기 (+14)" }));
-    expect(screen.getByText("총 20개 중 12개 표시")).toBeTruthy();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "의성어·의태어 검색" }), {
       target: { value: "쿵" },
@@ -125,8 +194,9 @@ describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
   it("결과가 없으면 빈 공간 대신 StudioEmptyState 와 초기화 경로를 준다", () => {
     openSfxTab();
 
-    const search = screen.getByRole("searchbox", { name: "의성어·의태어 검색" });
-    fireEvent.change(search, { target: { value: "존재하지않는효과음" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "의성어·의태어 검색" }), {
+      target: { value: "존재하지않는효과음" },
+    });
 
     expect(document.querySelector('[data-studio-empty-state="true"]')).toBeTruthy();
     expect(screen.getByText("검색 결과가 없습니다")).toBeTruthy();
@@ -139,15 +209,21 @@ describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
   it("흰색 글리프가 라이트 테마에서 사라지지 않도록 외곽선을 함께 입힌다", () => {
     openSfxTab();
 
-    // `퍽` 은 #ffffff 본문 + #dc2626 외곽선을 전제로 만들어진 레터링 데이터다.
     const glyph = screen.getByText("퍽");
     expect(glyph.getAttribute("style")).toContain("text-shadow");
     expect(glyph.getAttribute("style")).toContain("#dc2626");
   });
 
-  it("복사 버튼이 아이콘 모양이 아니라 이름으로 상태를 알린다", () => {
-    openSfxTab();
+  it("복사와 캔버스 삽입을 모호한 카드 클릭 대신 이름 붙은 별도 액션으로 제공한다", () => {
+    const onInsertSfxText = vi.fn();
+    render(<StudioCompanionAssistantDisplay onInsertSfxText={onInsertSfxText} />);
+    openTab("효과음 사전");
+
     expect(screen.getByRole("button", { name: "쿵 복사" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "쿵 캔버스에 삽입" }));
+
+    expect(onInsertSfxText).toHaveBeenCalledWith("쿵");
+    expect(screen.getByRole("status").textContent).toContain("캔버스에 삽입했습니다");
   });
 });
 
@@ -185,7 +261,6 @@ describe("StudioCompanionAssistantDisplay — 클립보드", () => {
 
   it("클립보드가 막히면 거짓 성공 대신 실패를 알린다", async () => {
     stubClipboard(() => Promise.reject(new Error("blocked")));
-    // 폴백(execCommand)도 실패시켜 두 경로가 모두 막힌 상황을 만든다.
     Object.defineProperty(document, "execCommand", {
       value: () => false,
       configurable: true,
@@ -220,8 +295,8 @@ describe("StudioCompanionAssistantDisplay — 클립보드", () => {
   });
 });
 
-describe("StudioCompanionAssistantDisplay — 피부톤 팔레트", () => {
-  it("모달과 같은 5개 표준 톤을 모두 노출한다(유일한 어두운 톤 포함)", () => {
+describe("StudioCompanionAssistantDisplay — 컬러 조화", () => {
+  it("모달과 같은 5개 표준 톤을 모두 노출한다", () => {
     render(<StudioCompanionAssistantDisplay />);
     openTab("컬러 조화");
 
@@ -243,25 +318,86 @@ describe("StudioCompanionAssistantDisplay — 피부톤 팔레트", () => {
     const swatch = screen.getByRole("img", {
       name: "딥 브라운 / 다크 엘프 (판타지) 밑색·1차 음영·2차 음영",
     });
+    expect(Array.from(swatch.children).map((band) => band.getAttribute("title"))).toEqual([
+      "밑색",
+      "1차 음영",
+      "2차 음영",
+    ]);
+  });
+
+  it("임의 밑색을 검증하고 4단계 음영 결과를 즉시 만든다", () => {
+    render(<StudioCompanionAssistantDisplay />);
+    openTab("컬러 조화");
+
+    const input = screen.getByLabelText("밑색 HEX");
+    fireEvent.change(input, { target: { value: "not-a-color" } });
+    expect(screen.getByRole("alert").textContent).toContain("#RRGGBB");
+
+    fireEvent.change(input, { target: { value: "#336699" } });
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(
-      Array.from(swatch.children).map((band) => band.getAttribute("title")),
-    ).toEqual(["밑색", "1차 음영", "2차 음영"]);
+      screen.getByRole("img", { name: "계산된 하이라이트·밑색·1차 음영·2차 음영" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("StudioCompanionAssistantDisplay — 타이머와 크로키", () => {
+  it("포커스 타이머에서 공정·집중 모드·초기화를 한 화면에서 제어한다", () => {
+    render(<StudioCompanionAssistantDisplay />);
+    openTab("포커스 타이머");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "집중 모드" }), {
+      target: { value: "deep-flow-50" },
+    });
+    expect(screen.getByText("50:00")).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "제작 공정" }), {
+      target: { value: "lineart" },
+    });
+    expect((screen.getByRole("combobox", { name: "제작 공정" }) as HTMLSelectElement).value).toBe(
+      "lineart",
+    );
+    expect(screen.getByRole("button", { name: "세션 초기화" })).toBeTruthy();
+  });
+
+  it("크로키 간격과 투시 프리셋을 함께 제어한다", () => {
+    render(<StudioCompanionAssistantDisplay />);
+    openTab("크로키 가이드");
+
+    fireEvent.click(screen.getByRole("button", { name: "180초" }));
+    expect(screen.getByText("03:00")).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "투시 프리셋" }), {
+      target: { value: "dutch-tilt" },
+    });
+    expect(screen.getByText(/더치 앵글/)).toBeTruthy();
+    expect(screen.getByText(/소실점 2개/)).toBeTruthy();
   });
 });
 
 describe("StudioCompanionAssistantDisplay — 터치 타깃 · 포커스 링", () => {
-  it("탭 본문의 모든 버튼이 공용 포커스 링과 44px 터치 타깃을 갖는다", () => {
+  it("각 탭 본문의 모든 버튼이 공용 포커스 링과 44px 터치 타깃을 갖는다", () => {
     const { container } = render(<StudioCompanionAssistantDisplay />);
 
-    for (const label of ["효과음 사전", "컬러 조화", "포커스 타이머", "크로키 가이드"]) {
+    for (const label of [
+      "플랫폼 규격",
+      "스크롤 페이싱",
+      "효과음 사전",
+      "컬러 조화",
+      "포커스 타이머",
+      "크로키 가이드",
+    ]) {
       openTab(label);
-      const buttons = Array.from(container.querySelectorAll("button"));
+      const panel = screen.getByRole("tabpanel");
+      const buttons = Array.from(panel.querySelectorAll("button"));
       expect(buttons.length).toBeGreaterThan(0);
       for (const button of buttons) {
         expect(button.className).toContain("focus-visible:outline-accent");
         expect(button.className).toContain("min-h-11");
       }
     }
+
+    expect(container).toBeTruthy();
   });
 
   it("장식용 lucide 아이콘은 접근성 트리에서 감춘다", () => {
