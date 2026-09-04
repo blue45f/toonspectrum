@@ -1,26 +1,23 @@
 import {
   CornerDownRight,
   Heart,
-  LoaderCircle,
   MessageSquare,
-  RefreshCw,
   Send,
-  ShieldCheck,
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+
 import {
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
-
-import { useMarketSocial } from "../hooks/use-market-social";
-
-import type {
-  CreatorMarketplaceSocialComment,
-} from "@/lib/creator-marketplace-social-contract";
+  addMarketComment,
+  addMarketCommentReply,
+  deleteMarketComment,
+  deleteMarketCommentReply,
+  getMarketComments,
+  toggleMarketCommentLike,
+  MARKET_SOCIAL_EVENT,
+  type MarketComment,
+} from "../models/market-social-store";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -31,145 +28,96 @@ interface MarketCommentsSectionProps {
   publisherId?: string;
 }
 
-interface CommentNode extends CreatorMarketplaceSocialComment {
-  replies: CommentNode[];
-}
-
 function formatRelativeTime(dateString: string): string {
-  const timestamp = new Date(dateString).getTime();
-  if (!Number.isFinite(timestamp)) return "방금 전";
-  const diff = Math.max(0, Date.now() - timestamp);
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "방금 전";
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}일 전`;
-  return dateString.slice(0, 10);
+  try {
+    const timestamp = new Date(dateString).getTime();
+    if (Number.isNaN(timestamp)) return "방금 전";
+    const diff = Math.max(0, Date.now() - timestamp);
+    const minutes = Math.floor(diff / (60 * 1000));
+    if (minutes < 1) return "방금 전";
+    if (minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}일 전`;
+    return dateString.slice(0, 10);
+  } catch {
+    return "방금 전";
+  }
 }
-
-function buildCommentTree(
-  comments: readonly CreatorMarketplaceSocialComment[],
-): CommentNode[] {
-  const nodes = new Map<string, CommentNode>(comments.map((comment) => [
-    comment.id,
-    { ...comment, replies: [] },
-  ]));
-  const roots: CommentNode[] = [];
-  for (const comment of comments) {
-    const node = nodes.get(comment.id);
-    if (!node) continue;
-    const parent = comment.parentId ? nodes.get(comment.parentId) : null;
-    if (parent) parent.replies.push(node);
-    else roots.push(node);
-  }
-  roots.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  for (const root of roots) {
-    root.replies.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  }
-  return roots;
-}
-
-function AuthorBadge({
-  badge,
-}: {
-  badge: CreatorMarketplaceSocialComment["author"]["badge"];
-}) {
-  if (badge === "publisher") {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded bg-accent/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
-        <Sparkles className="size-2.5" aria-hidden="true" />
-        배급자
-      </span>
-    );
-  }
-  if (badge === "studio-verified") {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-semibold text-good">
-        <ShieldCheck className="size-2.5" aria-hidden="true" />
-        Studio 사용 인증
-      </span>
-    );
-  }
-  if (badge === "library-member") {
-    return (
-      <span className="rounded bg-cool/15 px-1.5 py-0.5 text-[0.62rem] font-medium text-cool">
-        보관함 회원
-      </span>
-    );
-  }
-  return null;
-}
-
-// A fresh `[]` each render hands every memo below a new dependency identity, so they
-// recompute every render and memoise nothing. One frozen empty keeps it stable while
-// `data` is still loading.
-const NO_COMMENTS: readonly CreatorMarketplaceSocialComment[] = Object.freeze([]);
 
 export function MarketCommentsSection({
   resourceId,
+  publisherId,
 }: MarketCommentsSectionProps) {
   const session = useSession();
-  const viewerKey = session.status === "authenticated"
-    ? session.data.user.id
-    : "guest";
-  const authenticated = session.status === "authenticated";
-  const {
-    status,
-    data,
-    error,
-    pendingAction,
-    refresh,
-    createComment,
-    deleteComment,
-    toggleCommentLike,
-  } = useMarketSocial(resourceId, viewerKey);
+  const loggedInUserName =
+    session.status === "authenticated"
+      ? (session.data as { name?: string; nickname?: string })?.nickname
+        || (session.data as { name?: string; nickname?: string })?.name
+      : undefined;
+
+  const [comments, setComments] = useState<MarketComment[]>(() =>
+    getMarketComments(resourceId),
+  );
   const [commentInput, setCommentInput] = useState("");
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [authorNameInput, setAuthorNameInput] = useState(loggedInUserName ?? "");
+  const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
   const [replyInput, setReplyInput] = useState("");
-  const comments = data?.comments ?? NO_COMMENTS;
-  const roots = useMemo(() => buildCommentTree(comments), [comments]);
+  const [replyAuthorName, setReplyAuthorName] = useState(loggedInUserName ?? "");
 
   useEffect(() => {
-    setCommentInput("");
-    setReplyingTo(null);
-    setReplyInput("");
+    const refresh = () => setComments(getMarketComments(resourceId));
+    window.addEventListener(MARKET_SOCIAL_EVENT, refresh);
+    return () => window.removeEventListener(MARKET_SOCIAL_EVENT, refresh);
   }, [resourceId]);
 
-  async function submitComment(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    const content = commentInput.trim();
-    if (!content || !authenticated) return;
-    try {
-      await createComment({ content, parentId: null });
-      setCommentInput("");
-    } catch {
-      // Shared store exposes the server message in the inline error status.
+  useEffect(() => {
+    if (loggedInUserName && !authorNameInput) {
+      setAuthorNameInput(loggedInUserName);
     }
-  }
+  }, [loggedInUserName, authorNameInput]);
 
-  async function submitReply(parentId: string): Promise<void> {
-    const content = replyInput.trim();
-    if (!content || !authenticated) return;
-    try {
-      await createComment({ content, parentId });
-      setReplyInput("");
-      setReplyingTo(null);
-    } catch {
-      // Shared store exposes the server message in the inline error status.
-    }
-  }
+  const handleCreateComment = (e: FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim()) return;
 
-  const loadingInitial = status === "loading" && !data;
-  const totalCount = data?.totalCommentCount ?? comments.length;
+    addMarketComment(resourceId, {
+      content: commentInput,
+      authorName: authorNameInput || "웹툰 창작자",
+      authorBadge: "verified_buyer",
+    });
+
+    setCommentInput("");
+    setComments(getMarketComments(resourceId));
+  };
+
+  const handleCreateReply = (commentId: string, replyToName: string) => {
+    if (!replyInput.trim()) return;
+
+    addMarketCommentReply(resourceId, commentId, {
+      content: replyInput,
+      authorName: replyAuthorName || authorNameInput || "웹툰 창작자",
+      replyToAuthorName: replyToName,
+      authorBadge: "user",
+    });
+
+    setReplyInput("");
+    setReplyingCommentId(null);
+    setComments(getMarketComments(resourceId));
+  };
+
+  const totalCommentsAndReplies = comments.reduce(
+    (total, c) => total + 1 + c.replies.length,
+    0,
+  );
 
   return (
     <section
       aria-labelledby="market-comments-heading"
       className="rounded-xl border border-line bg-card p-5 sm:p-6"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div>
           <h2
             id="market-comments-heading"
@@ -177,158 +125,143 @@ export function MarketCommentsSection({
           >
             <MessageSquare className="size-4 text-accent" aria-hidden="true" />
             <span>Q&A 및 커뮤니티 피드백</span>
-            <span className="numeral tnum rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-accent">
-              {totalCount}
+            <span className="numeral tnum ml-1 rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-accent">
+              {totalCommentsAndReplies}
             </span>
           </h2>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-            모든 글은 계정에 귀속되어 다른 기기와 사용자에게 동기화됩니다. 실제 Studio 적용 이력이 있으면 사용 인증 배지가 표시됩니다.
+          <p className="mt-0.5 text-xs text-fg-3">
+            에셋 활용법, 웹툰 연재 적용 문의, 작가 피드백을 자유롭게 남겨보세요.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={status === "loading"}
-          className={buttonClass({
-            variant: "ghost",
-            size: "sm",
-            className: "gap-1.5",
-          })}
-        >
-          <RefreshCw
-            className={cn("size-3.5", status === "loading" && "animate-spin")}
-            aria-hidden="true"
-          />
-          새로고침
-        </button>
       </div>
 
-      {authenticated ? (
-        <form onSubmit={(event) => void submitComment(event)} className="mt-4">
-          <label htmlFor="market-comment-input" className="sr-only">
-            에셋 질문 또는 피드백
-          </label>
+      {/* New Root Comment Form */}
+      <form onSubmit={handleCreateComment} className="mt-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            placeholder="닉네임 (미입력 시 '웹툰 창작자')"
+            value={authorNameInput}
+            onChange={(e) => setAuthorNameInput(e.target.value)}
+            maxLength={20}
+            className="h-8 w-44 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <span className="text-[0.68rem] text-fg-3">
+            네티켓을 지키며 유익한 창작 커뮤니티를 만들어주세요.
+          </span>
+        </div>
+        <div className="relative">
           <textarea
-            id="market-comment-input"
             rows={3}
             value={commentInput}
-            onChange={(event) => setCommentInput(event.target.value)}
-            placeholder="호환성, 적용 방법, 라이선스 또는 작업 팁을 질문해 보세요."
-            maxLength={700}
+            onChange={(e) => setCommentInput(e.target.value)}
+            placeholder="에셋에 대한 궁금한 점이나 피드백을 작성해 주세요..."
+            maxLength={500}
             className="w-full rounded-xl border border-line bg-panel p-3 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <div className="mt-1.5 flex items-center justify-between gap-3 px-1">
-            <span className="text-[0.68rem] text-fg-3">
-              {commentInput.length} / 700자 · 작성자 이름은 로그인 계정을 사용합니다.
+          <div className="mt-1 flex items-center justify-between px-1">
+            <span className="text-[0.65rem] text-fg-3">
+              {commentInput.length} / 500자
             </span>
             <button
               type="submit"
-              disabled={!commentInput.trim() || Boolean(pendingAction)}
+              disabled={!commentInput.trim()}
               className={buttonClass({
                 variant: "solid",
                 size: "sm",
-                className: "gap-1.5 disabled:opacity-40",
+                className: "gap-1 disabled:opacity-40",
               })}
             >
-              {pendingAction === "comment:create" ? (
-                <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
-              ) : (
-                <Send className="size-3.5" aria-hidden="true" />
-              )}
-              댓글 등록
+              <Send className="size-3" aria-hidden="true" />
+              <span>댓글 등록</span>
             </button>
           </div>
-        </form>
-      ) : (
-        <div className="mt-4 rounded-xl border border-dashed border-line bg-panel/50 px-4 py-3 text-xs leading-relaxed text-fg-2">
-          댓글과 답글은 공개로 읽을 수 있으며, 작성·좋아요는 로그인 후 사용할 수 있습니다.
         </div>
-      )}
+      </form>
 
-      {error ? (
-        <div role="alert" className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2">
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="ml-auto font-semibold text-accent hover:underline"
-          >
-            다시 시도
-          </button>
-        </div>
-      ) : null}
-
+      {/* Comments List */}
       <div className="mt-6 space-y-4">
-        {loadingInitial ? (
-          <div role="status" className="space-y-3" aria-label="댓글 불러오는 중">
-            {Array.from({ length: 2 }, (_, index) => (
-              <div key={index} className="rounded-xl border border-line/60 bg-panel/30 p-4">
-                <div className="skeleton h-4 w-36" />
-                <div className="skeleton mt-3 h-3 w-full" />
-                <div className="skeleton mt-2 h-3 w-4/5" />
-              </div>
-            ))}
-          </div>
-        ) : roots.length === 0 ? (
+        {comments.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-panel/50 py-8 text-center">
             <p className="text-xs font-medium text-fg-2">
-              아직 등록된 질문이 없습니다. 첫 번째 활용 질문을 남겨보세요.
+              아직 등록된 댓글이 없어요. 첫 번째 질문이나 소감을 남겨보세요!
             </p>
           </div>
         ) : (
-          roots.map((comment) => (
-            <article
-              key={comment.id}
-              className="rounded-xl border border-line/60 bg-panel/30 p-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent">
-                    {comment.deleted ? "–" : (comment.author.name[0] ?? "U")}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-xs font-bold text-fg">
-                        {comment.author.name}
-                      </span>
-                      <AuthorBadge badge={comment.author.badge} />
+          comments.map((comment) => {
+            const isCreator =
+              comment.author.badge === "creator"
+              || (publisherId && comment.author.id === publisherId);
+
+            return (
+              <div
+                key={comment.id}
+                className="rounded-xl border border-line/60 bg-panel/30 p-4 transition-colors"
+              >
+                {/* Comment Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-7 items-center justify-center rounded-full bg-accent/20 text-accent font-bold text-xs">
+                      {comment.author.name[0] ?? "U"}
                     </div>
-                    <time dateTime={comment.createdAt} className="text-[0.65rem] text-fg-3">
-                      {formatRelativeTime(comment.createdAt)}
-                    </time>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-fg">
+                          {comment.author.name}
+                        </span>
+                        {isCreator ? (
+                          <span className="inline-flex items-center gap-0.5 rounded bg-accent/20 px-1.5 py-0.2 text-[0.62rem] font-bold text-accent">
+                            <Sparkles className="size-2.5" /> 배급자
+                          </span>
+                        ) : comment.author.badge === "verified_buyer" ? (
+                          <span className="rounded bg-good/15 px-1.5 py-0.2 text-[0.62rem] font-medium text-good">
+                            구매 인증
+                          </span>
+                        ) : comment.author.badge === "pro_artist" ? (
+                          <span className="rounded bg-cool/15 px-1.5 py-0.2 text-[0.62rem] font-medium text-cool">
+                            프로 작가
+                          </span>
+                        ) : null}
+                      </div>
+                      <time
+                        dateTime={comment.createdAt}
+                        className="text-[0.65rem] text-fg-3"
+                      >
+                        {formatRelativeTime(comment.createdAt)}
+                      </time>
+                    </div>
                   </div>
-                </div>
-                {comment.canDelete ? (
+
                   <button
                     type="button"
-                    onClick={() => void deleteComment(comment.id).catch(() => undefined)}
-                    disabled={Boolean(pendingAction)}
-                    aria-label="댓글 삭제"
-                    className="rounded p-1 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn disabled:opacity-40"
+                    onClick={() => {
+                      deleteMarketComment(resourceId, comment.id);
+                      setComments(getMarketComments(resourceId));
+                    }}
+                    title="댓글 삭제"
+                    className="p-1 text-fg-3 opacity-60 hover:text-warn hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">삭제</span>
                   </button>
-                ) : null}
-              </div>
+                </div>
 
-              <p className={cn(
-                "mt-2 whitespace-pre-wrap text-xs leading-relaxed",
-                comment.deleted ? "italic text-fg-3" : "text-fg-2",
-              )}>
-                {comment.deleted ? "삭제된 댓글입니다." : comment.content}
-              </p>
+                {/* Comment Body */}
+                <p className="mt-2 text-xs leading-relaxed text-fg-2 whitespace-pre-wrap">
+                  {comment.content}
+                </p>
 
-              {!comment.deleted ? (
-                <div className="mt-3 flex items-center gap-3 border-t border-line/40 pt-2">
+                {/* Comment Actions */}
+                <div className="mt-3 flex items-center gap-3 border-t border-line/40 pt-2 text-xs">
                   <button
                     type="button"
-                    onClick={() => void toggleCommentLike(comment.id).catch(() => undefined)}
-                    disabled={!authenticated || Boolean(pendingAction)}
-                    aria-pressed={comment.likedByViewer}
-                    title={authenticated ? undefined : "로그인 후 좋아요를 누를 수 있습니다."}
+                    onClick={() => {
+                      toggleMarketCommentLike(resourceId, comment.id);
+                      setComments(getMarketComments(resourceId));
+                    }}
                     className={cn(
-                      "inline-flex items-center gap-1 text-[0.7rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                      comment.likedByViewer
+                      "inline-flex items-center gap-1 text-[0.7rem] font-medium transition-colors",
+                      comment.likedByMe
                         ? "text-warn"
                         : "text-fg-3 hover:text-warn",
                     )}
@@ -336,133 +269,184 @@ export function MarketCommentsSection({
                     <Heart
                       className={cn(
                         "size-3.5",
-                        comment.likedByViewer && "fill-warn text-warn",
+                        comment.likedByMe && "fill-warn text-warn",
                       )}
                       aria-hidden="true"
                     />
-                    좋아요 {comment.likeCount > 0 ? comment.likeCount : ""}
+                    <span>좋아요 {comment.likes > 0 ? comment.likes : ""}</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
-                      setReplyingTo(replyingTo === comment.id ? null : comment.id);
+                      setReplyingCommentId(
+                        replyingCommentId === comment.id ? null : comment.id,
+                      );
                       setReplyInput("");
                     }}
-                    disabled={!authenticated || Boolean(pendingAction)}
-                    className="text-[0.7rem] font-medium text-fg-3 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    className="text-[0.7rem] font-medium text-fg-3 hover:text-accent transition-colors"
                   >
                     답글 달기
                   </button>
                 </div>
-              ) : null}
 
-              {comment.replies.length > 0 ? (
-                <div className="mt-3 space-y-2.5 border-l-2 border-accent/25 pl-3 sm:pl-4">
-                  {comment.replies.map((reply) => (
-                    <article key={reply.id} className="rounded-lg border border-line/40 bg-card/60 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <CornerDownRight className="size-3 shrink-0 text-fg-3" aria-hidden="true" />
-                          <span className="truncate text-xs font-bold text-fg">
-                            {reply.author.name}
-                          </span>
-                          <AuthorBadge badge={reply.author.badge} />
-                          <time dateTime={reply.createdAt} className="shrink-0 text-[0.62rem] text-fg-3">
-                            {formatRelativeTime(reply.createdAt)}
-                          </time>
-                        </div>
-                        {reply.canDelete ? (
-                          <button
-                            type="button"
-                            onClick={() => void deleteComment(reply.id).catch(() => undefined)}
-                            disabled={Boolean(pendingAction)}
-                            aria-label="답글 삭제"
-                            className="rounded p-1 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn disabled:opacity-40"
-                          >
-                            <Trash2 className="size-3" aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className={cn(
-                        "mt-1.5 pl-4 whitespace-pre-wrap text-xs leading-relaxed",
-                        reply.deleted ? "italic text-fg-3" : "text-fg-2",
-                      )}>
-                        {reply.deleted ? "삭제된 답글입니다." : reply.content}
-                      </p>
-                      {!reply.deleted ? (
-                        <button
-                          type="button"
-                          onClick={() => void toggleCommentLike(reply.id).catch(() => undefined)}
-                          disabled={!authenticated || Boolean(pendingAction)}
-                          aria-pressed={reply.likedByViewer}
-                          className={cn(
-                            "mt-2 ml-4 inline-flex items-center gap-1 text-[0.65rem] font-medium transition-colors disabled:opacity-50",
-                            reply.likedByViewer ? "text-warn" : "text-fg-3 hover:text-warn",
-                          )}
+                {/* Nested Replies (대댓글) */}
+                {comment.replies.length > 0 ? (
+                  <div className="mt-3 space-y-2.5 border-l-2 border-accent/30 pl-3 sm:pl-4">
+                    {comment.replies.map((reply) => {
+                      const replyIsCreator =
+                        reply.author.badge === "creator"
+                        || (publisherId && reply.author.id === publisherId);
+
+                      return (
+                        <div
+                          key={reply.id}
+                          className="rounded-lg bg-card/60 p-3 border border-line/40"
                         >
-                          <Heart
-                            className={cn(
-                              "size-3",
-                              reply.likedByViewer && "fill-warn text-warn",
-                            )}
-                            aria-hidden="true"
-                          />
-                          좋아요 {reply.likeCount > 0 ? reply.likeCount : ""}
-                        </button>
-                      ) : null}
-                    </article>
-                  ))}
-                </div>
-              ) : null}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <CornerDownRight
+                                className="size-3 text-fg-3 shrink-0"
+                                aria-hidden="true"
+                              />
+                              <span className="text-xs font-bold text-fg">
+                                {reply.author.name}
+                              </span>
+                              {replyIsCreator ? (
+                                <span className="inline-flex items-center gap-0.5 rounded bg-accent/20 px-1 py-0.2 text-[0.6rem] font-bold text-accent">
+                                  <Sparkles className="size-2" /> 배급자
+                                </span>
+                              ) : null}
+                              {reply.replyToAuthorName ? (
+                                <span className="text-[0.65rem] text-accent font-medium">
+                                  @{reply.replyToAuthorName}
+                                </span>
+                              ) : null}
+                              <time
+                                dateTime={reply.createdAt}
+                                className="text-[0.62rem] text-fg-3"
+                              >
+                                {formatRelativeTime(reply.createdAt)}
+                              </time>
+                            </div>
 
-              {replyingTo === comment.id ? (
-                <div className="mt-3 rounded-lg border border-accent/35 bg-card p-3">
-                  <label htmlFor={`market-reply-${comment.id}`} className="text-xs font-semibold text-accent">
-                    @{comment.author.name} 님에게 답글
-                  </label>
-                  <textarea
-                    id={`market-reply-${comment.id}`}
-                    rows={2}
-                    value={replyInput}
-                    onChange={(event) => setReplyInput(event.target.value)}
-                    maxLength={700}
-                    className="mt-2 w-full rounded-lg border border-line bg-panel p-2.5 text-xs leading-relaxed text-fg focus:border-accent focus:outline-none"
-                    placeholder="답글 내용을 입력하세요."
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setReplyingTo(null)}
-                      className={buttonClass({ variant: "ghost", size: "sm" })}
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void submitReply(comment.id)}
-                      disabled={!replyInput.trim() || Boolean(pendingAction)}
-                      className={buttonClass({
-                        variant: "solid",
-                        size: "sm",
-                        className: "gap-1.5 disabled:opacity-40",
-                      })}
-                    >
-                      <Send className="size-3" aria-hidden="true" />
-                      답글 등록
-                    </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteMarketCommentReply(
+                                  resourceId,
+                                  comment.id,
+                                  reply.id,
+                                );
+                                setComments(getMarketComments(resourceId));
+                              }}
+                              title="답글 삭제"
+                              className="text-fg-3 opacity-60 hover:text-warn hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="size-3" aria-hidden="true" />
+                              <span className="sr-only">삭제</span>
+                            </button>
+                          </div>
+
+                          <p className="mt-1.5 pl-4 text-xs leading-relaxed text-fg-2 whitespace-pre-wrap">
+                            {reply.content}
+                          </p>
+
+                          <div className="mt-2 pl-4 flex items-center gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleMarketCommentLike(
+                                  resourceId,
+                                  comment.id,
+                                  reply.id,
+                                );
+                                setComments(getMarketComments(resourceId));
+                              }}
+                              className={cn(
+                                "inline-flex items-center gap-1 text-[0.65rem] font-medium transition-colors",
+                                reply.likedByMe
+                                  ? "text-warn"
+                                  : "text-fg-3 hover:text-warn",
+                              )}
+                            >
+                              <Heart
+                                className={cn(
+                                  "size-3",
+                                  reply.likedByMe && "fill-warn text-warn",
+                                )}
+                                aria-hidden="true"
+                              />
+                              <span>
+                                좋아요 {reply.likes > 0 ? reply.likes : ""}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              ) : null}
-            </article>
-          ))
+                ) : null}
+
+                {/* Inline Reply Input Box */}
+                {replyingCommentId === comment.id ? (
+                  <div className="mt-3 rounded-lg border border-accent/40 bg-card p-3">
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-accent flex items-center gap-1">
+                        <CornerDownRight className="size-3" />
+                        <span>@{comment.author.name} 님에게 답글 작성</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyingCommentId(null)}
+                        className="text-fg-3 hover:text-fg text-[0.7rem]"
+                      >
+                        취소
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="답글 작성자 닉네임"
+                        value={replyAuthorName}
+                        onChange={(e) => setReplyAuthorName(e.target.value)}
+                        className="h-8 w-36 rounded-md border border-line bg-panel px-2 text-xs text-fg focus:border-accent focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="답글 내용을 입력하세요..."
+                        value={replyInput}
+                        onChange={(e) => setReplyInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleCreateReply(comment.id, comment.author.name);
+                          }
+                        }}
+                        className="h-8 flex-1 rounded-md border border-line bg-panel px-2.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCreateReply(comment.id, comment.author.name)
+                        }
+                        disabled={!replyInput.trim()}
+                        className={buttonClass({
+                          variant: "solid",
+                          size: "sm",
+                          className: "disabled:opacity-40",
+                        })}
+                      >
+                        답글
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
-
-      {data?.truncated.comments ? (
-        <p className="mt-4 text-center text-[0.68rem] text-fg-3">
-          대화가 많아 최신 댓글 일부만 표시하고 있습니다.
-        </p>
-      ) : null}
     </section>
   );
 }
