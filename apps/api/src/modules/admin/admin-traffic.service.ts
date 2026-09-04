@@ -2,12 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { dbPool } from "../../db";
 
-import {
-  TRAFFIC_DEFAULT_RETENTION_DAYS,
-  TRAFFIC_SESSION_PREFIX,
-  TRAFFIC_SESSION_UPPER_BOUND,
-  trafficPageViewRangeKey,
-} from "../traffic-analytics/traffic-analytics-model";
+import { TRAFFIC_DEFAULT_RETENTION_DAYS } from "../traffic-analytics/traffic-analytics-model";
 import {
   ADMIN_TRAFFIC_OVERVIEW_QUERY,
   ADMIN_TRAFFIC_PULSE_QUERY,
@@ -60,21 +55,9 @@ export class AdminTrafficService {
     const days = normalizeRangeDays(daysValue);
     const now = new Date();
     const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1_000);
-    const end = new Date(now.getTime() + 1_000);
     const result = await dbPool.query<AnalyticsRow>(
       ADMIN_TRAFFIC_OVERVIEW_QUERY,
-      [
-        start,
-        trafficPageViewRangeKey(start),
-        trafficPageViewRangeKey(end),
-        bucketSeconds(days),
-        now,
-        TRAFFIC_SESSION_PREFIX,
-        TRAFFIC_SESSION_PREFIX,
-        days,
-        retentionDays(),
-        TRAFFIC_SESSION_UPPER_BOUND,
-      ],
+      [start, bucketSeconds(days), now, days, retentionDays()],
     );
 
     return (
@@ -108,11 +91,8 @@ export class AdminTrafficService {
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1_000);
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1_000);
     const result = await dbPool.query<PulseRow>(ADMIN_TRAFFIC_PULSE_QUERY, [
-      TRAFFIC_SESSION_PREFIX,
-      TRAFFIC_SESSION_UPPER_BOUND,
       fiveMinutesAgo,
-      trafficPageViewRangeKey(thirtyMinutesAgo),
-      trafficPageViewRangeKey(new Date(now.getTime() + 1_000)),
+      thirtyMinutesAgo,
       now,
     ]);
     return (
