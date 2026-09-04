@@ -1,4 +1,4 @@
-name: Apply quality-only brush representative ranking
+name: Publish response-aware brush curation sources
 
 on:
   push:
@@ -11,99 +11,71 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-response-aware-brush-curation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  patch:
+  publish:
     runs-on: ubuntu-slim
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           ref: feat/all-brush-long-stroke-quality-election-20260904
-      - name: Keep performance outside the representative quality score
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Restore locally validated quality sources
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import base64
+          import gzip
+          import hashlib
 
-          def replace_once(path: Path, before: str, after: str, label: str) -> None:
-              source = path.read_text()
-              count = source.count(before)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected one match, found {count}")
-              path.write_text(source.replace(before, after, 1))
-
-          curation = Path("src/domains/creator/brush/studio-brush-quality-curation.ts")
-          replace_once(
-              curation,
-              '''function candidateQualityScore(candidate: StudioBrushCurationCandidate): number {
-            if (!candidate.qualityPassed) return -1;
-            const errorPenalty = Math.min(1, candidate.browserErrorCount * 0.25)
-              + Math.min(1, candidate.refusedStrokeCount * 0.25);
-            const responsiveness = Number.isFinite(candidate.frameP95Milliseconds)
-              ? clamp01(1 - Math.max(0, candidate.frameP95Milliseconds - 16.667) / 83.333)
-              : 0;
-            return 0.28 * clamp01(candidate.centerlineCoverage)
-              + 0.22 * clamp01(candidate.liveCommitFidelity)
-              + 0.18 * clamp01(candidate.settledStability)
-              + 0.17 * clamp01(candidate.inputDeliveryRatio)
-              + 0.1 * clamp01(candidate.textureQuality)
-              + 0.05 * responsiveness
-              - 0.2 * errorPenalty;
-          }''',
-              '''function candidateQualityScore(candidate: StudioBrushCurationCandidate): number {
-            if (!candidate.qualityPassed) return -1;
-            const errorPenalty = Math.min(1, candidate.browserErrorCount * 0.25)
-              + Math.min(1, candidate.refusedStrokeCount * 0.25);
-            // This score deliberately excludes frame time. The representative is chosen by mark
-            // quality and interaction fidelity; GPU/backend performance is considered only after
-            // the measured quality score is tied.
-            return 0.25 * clamp01(candidate.textureQuality)
-              + 0.25 * clamp01(candidate.liveCommitFidelity)
-              + 0.2 * clamp01(candidate.centerlineCoverage)
-              + 0.15 * clamp01(candidate.settledStability)
-              + 0.15 * clamp01(candidate.inputDeliveryRatio)
-              - 0.2 * errorPenalty;
-          }''',
-              "quality-only representative score",
+          files = (
+              (
+                  ".github/brush-quality-payloads/curation.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.ts",
+                  "3904f19aeb0ebc9dd951cd4722d195307dce2840b62c210c0bc6ec47f9ab8748",
+              ),
+              (
+                  ".github/brush-quality-payloads/curation.test.ts.gz.b64",
+                  "src/domains/creator/brush/studio-brush-quality-curation.test.ts",
+                  "6a37d4d3753e5eee800064ed858e10af3e1b794fe72e8fe5c2c661b13d9cc7bb",
+              ),
+              (
+                  ".github/brush-quality-payloads/analyze.mts.gz.b64",
+                  "scripts/analyze-studio-brush-similarity.mts",
+                  "9b10f1a811bf8f22ea0fcfbcf1e2fbe439126f74ae0f2b55ec9bc3856bfbf479",
+              ),
           )
-          replace_once(
-              curation,
-              '''  if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;''',
-              '''  if (Math.abs(qualityDelta) > 0.005) return qualityDelta > 0 ? -1 : 1;''',
-              "strict quality tie threshold",
-          )
-
-          test = Path("src/domains/creator/brush/studio-brush-quality-curation.test.ts")
-          anchor = '''  it("never lets a protected but failing brush beat a passing representative", () => {'''
-          insertion = '''  it("does not let frame speed compensate for lower measured mark quality", () => {
-            const clusters = curateStudioBrushCandidates([
-              candidate("slower-quality", {
-                frameP95Milliseconds: 180,
-                textureQuality: 0.9,
-                listedOrder: 0,
-              }),
-              candidate("fast-gpu-lower-quality", {
-                gpuApproved: true,
-                frameP95Milliseconds: 5,
-                textureQuality: 0.84,
-                listedOrder: 1,
-              }),
-            ]);
-            expect(clusters[0]?.representativeId).toBe("slower-quality");
-          });
-
-          ''' + anchor
-          replace_once(test, anchor, insertion, "performance cannot buy quality test")
+          for payload_path, target_path, expected_sha256 in files:
+              encoded = Path(payload_path).read_text(encoding="utf-8").strip()
+              restored = gzip.decompress(base64.b64decode(encoded))
+              actual_sha256 = hashlib.sha256(restored).hexdigest()
+              if actual_sha256 != expected_sha256:
+                  raise SystemExit(
+                      f"{target_path}: sha256 mismatch {actual_sha256} != {expected_sha256}"
+                  )
+              target = Path(target_path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(restored)
+              print(f"restored {target_path} ({len(restored)} bytes)")
           PY
           git diff --check
-      - name: Commit source changes only
+
+      - name: Commit exact response-aware source files
         run: |
           set -euo pipefail
           git config user.name toonstudio-bot
           git config user.email actions@users.noreply.github.com
           git add \
             src/domains/creator/brush/studio-brush-quality-curation.ts \
-            src/domains/creator/brush/studio-brush-quality-curation.test.ts
+            src/domains/creator/brush/studio-brush-quality-curation.test.ts \
+            scripts/analyze-studio-brush-similarity.mts
           git diff --cached --check
-          git commit -m "feat(brush): rank representatives by quality before speed"
+          git commit -m "feat(brush): preserve live texture and hand-feel distinctions"
           git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
