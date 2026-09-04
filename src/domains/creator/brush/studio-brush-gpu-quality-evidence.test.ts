@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE,
   STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MAX_AGE_MS,
+  STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT,
   studioBrushGpuQualityEvidenceAllows,
   studioBrushGpuQualityEvidenceRecordAllows,
   type StudioBrushGpuQualityEvidenceRecord,
@@ -24,7 +25,7 @@ function evidence(
       .toISOString(),
     sourceCommit: "a".repeat(40),
     benchmarkDigest: `sha256:${"b".repeat(64)}`,
-    measurementRunCount: 1,
+    measurementRunCount: STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT,
     measuredBrushCount: 192,
     hardwareClass: "hardware",
     hardwareAdapterFingerprints: ["apple:m2-max:metal"],
@@ -35,7 +36,7 @@ function evidence(
 }
 
 describe("Studio brush GPU quality evidence", () => {
-  it("allows only a fresh physical-GPU record for the requested brush", () => {
+  it("allows only a fresh repeated physical-GPU record for the requested brush", () => {
     expect(studioBrushGpuQualityEvidenceRecordAllows(evidence(), "gpen", NOW)).toBe(true);
     expect(studioBrushGpuQualityEvidenceRecordAllows(evidence(), "watercolor", NOW)).toBe(false);
   });
@@ -55,12 +56,12 @@ describe("Studio brush GPU quality evidence", () => {
     }), "gpen", NOW)).toBe(false);
   });
 
-  it("rejects software, unrepeatable, and unidentified adapter evidence", () => {
+  it("rejects software, insufficient repetitions, and unidentified adapter evidence", () => {
     expect(studioBrushGpuQualityEvidenceRecordAllows(evidence({
       hardwareClass: null,
     }), "gpen", NOW)).toBe(false);
     expect(studioBrushGpuQualityEvidenceRecordAllows(evidence({
-      measurementRunCount: 0,
+      measurementRunCount: STUDIO_BRUSH_GPU_QUALITY_EVIDENCE_MINIMUM_RUN_COUNT - 1,
     }), "gpen", NOW)).toBe(false);
     expect(studioBrushGpuQualityEvidenceRecordAllows(evidence({
       hardwareAdapterFingerprints: [],
