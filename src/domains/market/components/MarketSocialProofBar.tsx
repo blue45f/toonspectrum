@@ -1,0 +1,90 @@
+import {
+  LoaderCircle,
+  MessageSquare,
+  ShieldCheck,
+  Star,
+  ThumbsUp,
+} from "lucide-react";
+
+import { useMarketSocial } from "../hooks/use-market-social";
+
+import { cn } from "@/lib/utils";
+import { useSession } from "@/src/compat/auth-session-store";
+
+export function MarketSocialProofBar({
+  resourceId,
+}: {
+  readonly resourceId: string;
+}) {
+  const session = useSession();
+  const viewerKey = session.ready && session.status === "authenticated"
+    ? session.data.user.id
+    : "anonymous";
+  const { snapshot, loading } = useMarketSocial(resourceId, viewerKey);
+
+  if (loading && !snapshot) {
+    return (
+      <div
+        role="status"
+        aria-label="평점과 댓글 요약 불러오는 중"
+        className="mt-4 inline-flex min-h-9 items-center gap-2 rounded-lg border border-line/70 bg-card/70 px-3 text-xs text-fg-3"
+      >
+        <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+        활용 평가와 질문 동기화 중
+      </div>
+    );
+  }
+
+  if (!snapshot) return null;
+
+  const hasReviews = snapshot.reviewStats.totalCount > 0;
+  return (
+    <nav
+      aria-label="이 리소스의 평가와 질문 요약"
+      className="mt-4 flex flex-wrap items-center gap-1.5"
+    >
+      <a
+        href="#market-reviews-heading"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+      >
+        <Star
+          className={cn(
+            "size-3.5",
+            hasReviews
+              ? "fill-amber-400 text-amber-400"
+              : "text-fg-3",
+          )}
+          aria-hidden="true"
+        />
+        <span className="numeral tnum">
+          {hasReviews ? snapshot.reviewStats.average.toFixed(1) : "평가 전"}
+        </span>
+        <span className="font-normal text-fg-3">
+          {snapshot.reviewStats.totalCount}개
+        </span>
+      </a>
+      <a
+        href="#market-reviews-heading"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+      >
+        <ThumbsUp className="size-3.5 text-good" aria-hidden="true" />
+        <span className="numeral tnum">{snapshot.reviewStats.recommendPercentage}%</span>
+        <span className="font-normal text-fg-3">추천</span>
+      </a>
+      <a
+        href="#market-comments-heading"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+      >
+        <MessageSquare className="size-3.5 text-accent" aria-hidden="true" />
+        <span className="numeral tnum">{snapshot.commentCount}</span>
+        <span className="font-normal text-fg-3">질문·답글</span>
+      </a>
+      {snapshot.viewer.isStudioVerified ? (
+        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-good/30 bg-good/10 px-3 text-xs font-semibold text-good">
+          <ShieldCheck className="size-3.5" aria-hidden="true" />
+          내 계정 Studio 사용 인증
+        </span>
+      ) : null}
+    </nav>
+  );
+}
