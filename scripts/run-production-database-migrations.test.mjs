@@ -25,12 +25,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(35);
+  expect(manifest).toHaveLength(36);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0035_creator_marketplace_3d_asset_kind",
+    "0036_traffic_analytics_relations",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(35);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(36);
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
