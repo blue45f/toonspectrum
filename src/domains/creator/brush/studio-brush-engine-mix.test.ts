@@ -6,10 +6,14 @@ import {
   studioDryMediaKernelDabProgramPin,
 } from "./studio-brush-dynamics";
 import {
+  analyzeStudioBrushMixQuality,
+  applyStudioBrushMixRecipe,
   describeStudioBrushEngineStack,
   isStudioBrushMixTraitSectionId,
   mergeStudioBrushMixTraitSection,
+  STUDIO_BRUSH_MIX_RECIPES,
   STUDIO_BRUSH_MIX_TRAIT_SECTIONS,
+  stabilizeStudioBrushMixQuality,
   suggestStudioBrushMixName,
 } from "./studio-brush-engine-mix";
 import {
@@ -20,9 +24,10 @@ import {
 const dryMediaBase = studioBrushDynamicsSettingsForBrushId("dry-media");
 const crayon = studioBrushDynamicsSettingsForBrushId("crayon");
 const airbrush = studioBrushDynamicsSettingsForBrushId("airbrush");
+const inkParticle = studioBrushDynamicsSettingsForBrushId("ink-particle");
+const hardAirbrush = studioBrushDynamicsSettingsForBrushId("hard-airbrush");
+const mirrorPen = studioBrushDynamicsSettingsForBrushId("sketchpad-mirror");
 
-// 선택 변주 시임(selection variant seam)은 카탈로그 선택 시점에 커널 핀을 민팅하므로,
-// 순수 로직 테스트에서는 동일 핀을 직접 부착한 정규 설정을 베이스로 쓴다.
 const dryMedia = dryMediaBase
   ? normalizeStudioBrushDynamicsSettings({
       ...dryMediaBase,
@@ -31,15 +36,30 @@ const dryMedia = dryMediaBase
   : null;
 
 describe("studio brush engine mix trait sections", () => {
-  it("exposes the four mixable sections", () => {
+  it("exposes granular portable modules plus legacy-compatible bundles", () => {
     expect(STUDIO_BRUSH_MIX_TRAIT_SECTIONS.map((section) => section.id)).toEqual([
       "tip",
       "dual-tip",
+      "surface",
+      "pigment",
+      "size-opacity",
+      "flow-spacing",
+      "scatter-orientation",
+      "taper",
       "grain",
       "response",
+      "material",
+      "expression",
     ]);
-    expect(isStudioBrushMixTraitSectionId("tip")).toBe(true);
+    expect(isStudioBrushMixTraitSectionId("surface")).toBe(true);
+    expect(isStudioBrushMixTraitSectionId("expression")).toBe(true);
     expect(isStudioBrushMixTraitSectionId("carrier")).toBe(false);
+  });
+
+  it("ships distinct multi-source recipes", () => {
+    expect(STUDIO_BRUSH_MIX_RECIPES).toHaveLength(8);
+    expect(new Set(STUDIO_BRUSH_MIX_RECIPES.map((recipe) => recipe.id)).size).toBe(8);
+    expect(STUDIO_BRUSH_MIX_RECIPES.every((recipe) => recipe.steps.length >= 3)).toBe(true);
   });
 });
 
@@ -52,7 +72,6 @@ describe("mergeStudioBrushMixTraitSection", () => {
     expect(merged.seed).toBe(dryMedia!.seed);
     expect(merged.depositPipeline).toBe(dryMedia!.depositPipeline);
     expect(merged.presetId).toBe(dryMedia!.presetId);
-    // 캐리어 핀은 소스에서 복사하지 않는다 — 에어브러시의 폴오프 핀이 드라이 미디어에 얹히면 안 된다.
     expect(merged.softFalloffLinearProgram).toBeUndefined();
   });
 
@@ -67,30 +86,188 @@ describe("mergeStudioBrushMixTraitSection", () => {
     expect(merged.tip).toEqual(dryMedia!.tip);
   });
 
-  it("replaces response channels wholesale while leaving the tip untouched", () => {
-    const merged = mergeStudioBrushMixTraitSection("response", dryMedia!, airbrush!);
-    expect(merged.width).toEqual(airbrush!.width);
-    expect(merged.flow).toEqual(airbrush!.flow);
-    expect(merged.taper).toEqual(airbrush!.taper);
-    expect(merged.tip).toEqual(dryMedia!.tip);
+  it("separates surface grain from pigment dynamics", () => {
+    const source = normalizeStudioBrushDynamicsSettings({
+      ...airbrush!,
+      grain: { space: "stroke-fixed", amount: 0.71, scale: 3.5, contrast: 0.8, seed: 55 },
+      colorDynamics: {
+        backgroundColor: "#223344",
+        foregroundBackgroundMix: 0.4,
+        hueJitter: 28,
+      },
+    });
+    const surface = mergeStudioBrushMixTraitSection("surface", dryMedia!, source);
+    expect(surface.grain).toEqual(source.grain);
+    expect(surface.colorDynamics).toEqual(dryMedia!.colorDynamics);
+
+    const pigment = mergeStudioBrushMixTraitSection("pigment", dryMedia!, source);
+    expect(pigment.colorDynamics).toEqual(source.colorDynamics);
+    expect(pigment.grain).toEqual(dryMedia!.grain);
   });
 
-  it("keeps grain and color dynamics together in the grain section", () => {
-    const merged = mergeStudioBrushMixTraitSection("grain", airbrush!, dryMedia!);
-    expect(merged.grain).toEqual(dryMedia!.grain);
-    expect(merged.colorDynamics).toEqual(dryMedia!.colorDynamics);
-    expect(merged.width).toEqual(airbrush!.width);
+  it("copies each dynamics family without replacing unrelated properties", () => {
+    const sizeOpacity = mergeStudioBrushMixTraitSection("size-opacity", dryMedia!, airbrush!);
+    expect(sizeOpacity.width).toEqual(airbrush!.width);
+    expect(sizeOpacity.opacity).toEqual(airbrush!.opacity);
+    expect(sizeOpacity.roundness).toEqual(airbrush!.roundness);
+    expect(sizeOpacity.flow).toEqual(dryMedia!.flow);
+
+    const flowSpacing = mergeStudioBrushMixTraitSection("flow-spacing", dryMedia!, airbrush!);
+    expect(flowSpacing.flow).toEqual(airbrush!.flow);
+    expect(flowSpacing.spacing).toEqual(airbrush!.spacing);
+    expect(flowSpacing.spacingRatio).toBe(airbrush!.spacingRatio);
+    expect(flowSpacing.width).toEqual(dryMedia!.width);
+
+    const scatter = mergeStudioBrushMixTraitSection("scatter-orientation", dryMedia!, airbrush!);
+    expect(scatter.scatter).toEqual(airbrush!.scatter);
+    expect(scatter.angle).toEqual(airbrush!.angle);
+    expect(scatter.scatterRatio).toBe(airbrush!.scatterRatio);
+
+    const taper = mergeStudioBrushMixTraitSection("taper", dryMedia!, airbrush!);
+    expect(taper.taper).toEqual(airbrush!.taper);
+    expect(taper.width).toEqual(dryMedia!.width);
+  });
+
+  it("keeps the legacy response and grain bundles compatible", () => {
+    const response = mergeStudioBrushMixTraitSection("response", dryMedia!, airbrush!);
+    expect(response.width).toEqual(airbrush!.width);
+    expect(response.flow).toEqual(airbrush!.flow);
+    expect(response.taper).toEqual(airbrush!.taper);
+    expect(response.tip).toEqual(dryMedia!.tip);
+
+    const grain = mergeStudioBrushMixTraitSection("grain", airbrush!, dryMedia!);
+    expect(grain.grain).toEqual(dryMedia!.grain);
+    expect(grain.colorDynamics).toEqual(dryMedia!.colorDynamics);
+    expect(grain.width).toEqual(airbrush!.width);
+  });
+
+  it("copies complete portable material and expression bundles", () => {
+    const material = mergeStudioBrushMixTraitSection("material", airbrush!, dryMedia!);
+    expect(material.tip).toEqual(dryMedia!.tip);
+    expect(material.tipLayers).toEqual(dryMedia!.tipLayers);
+    expect(material.grain).toEqual(dryMedia!.grain);
+    expect(material.width).toEqual(airbrush!.width);
+
+    const expression = mergeStudioBrushMixTraitSection("expression", airbrush!, dryMedia!);
+    expect(expression.width).toEqual(dryMedia!.width);
+    expect(expression.flow).toEqual(dryMedia!.flow);
+    expect(expression.tip).toEqual(airbrush!.tip);
+  });
+});
+
+describe("applyStudioBrushMixRecipe", () => {
+  it("applies a multi-source recipe in order while retaining the base carrier contract", () => {
+    expect(dryMedia && hardAirbrush && inkParticle && mirrorPen).toBeTruthy();
+    const result = applyStudioBrushMixRecipe("webtoon-clean-line", dryMedia!, {
+      "hard-airbrush": hardAirbrush,
+      "ink-particle": inkParticle,
+      "sketchpad-mirror": mirrorPen,
+    });
+    expect(result.appliedStepCount).toBe(3);
+    expect(result.missingSourceBrushIds).toEqual([]);
+    expect(result.settings.tip).toEqual(hardAirbrush!.tip);
+    expect(result.settings.width).toEqual(inkParticle!.width);
+    expect(result.settings.flow).toEqual(mirrorPen!.flow);
+    expect(result.settings.depositPipeline).toBe(dryMedia!.depositPipeline);
+    expect(result.settings.seed).toBe(dryMedia!.seed);
+    expect(result.settings.dryMediaKernelProgram).toEqual(dryMedia!.dryMediaKernelProgram);
+  });
+
+  it("skips unavailable sources without mutating the original settings", () => {
+    const result = applyStudioBrushMixRecipe("webtoon-clean-line", dryMedia!, {
+      "hard-airbrush": hardAirbrush,
+    });
+    expect(result.appliedStepCount).toBe(1);
+    expect(result.missingSourceBrushIds).toEqual(["ink-particle", "sketchpad-mirror"]);
+    expect(result.settings.tip).toEqual(hardAirbrush!.tip);
+    expect(result.settings.width).toEqual(dryMedia!.width);
+    expect(dryMedia!.tip).toEqual(dryMediaBase!.tip);
+  });
+});
+
+describe("analyzeStudioBrushMixQuality", () => {
+  it("reports deterministic quality risks for wide spacing and scatter", () => {
+    const risky = normalizeStudioBrushDynamicsSettings({
+      ...dryMedia!,
+      spacingRatio: 0.62,
+      scatterRatio: 0.88,
+      tipLayers: [],
+    });
+    const first = analyzeStudioBrushMixQuality("dry-media", risky, null);
+    const second = analyzeStudioBrushMixQuality("dry-media", risky, null);
+    expect(first).toEqual(second);
+    expect(first.issues.map((issue) => issue.id)).toEqual(
+      expect.arrayContaining(["carrier-gaps", "scatter-holes"]),
+    );
+    expect(first.qualityScore).toBeLessThan(100);
+    expect(first.activeModuleCount).toBeGreaterThan(0);
+    expect(first.estimatedMarksPerDab).toBeGreaterThanOrEqual(1);
+  });
+
+  it("stabilizes reported carrier, grain and color risks without changing identity", () => {
+    const risky = normalizeStudioBrushDynamicsSettings({
+      ...dryMedia!,
+      spacingRatio: 0.62,
+      scatterRatio: 0.88,
+      grain: { amount: 0.96, scale: 0.5, contrast: 0.9, seed: 12 },
+      colorDynamics: {
+        backgroundColor: "#ffffff",
+        foregroundBackgroundJitter: 0.9,
+        hueJitter: 160,
+        saturationJitter: 0.9,
+        valueJitter: 0.9,
+      },
+    });
+    const fixed = stabilizeStudioBrushMixQuality(risky);
+    expect(fixed.spacingRatio).toBe(0.22);
+    expect(fixed.scatterRatio).toBe(0.22);
+    expect(fixed.grain.amount).toBe(0.72);
+    expect(fixed.grain.scale).toBe(2);
+    expect(fixed.colorDynamics.hueJitter).toBe(32);
+    expect(fixed.colorDynamics.valueJitter).toBe(0.25);
+    expect(fixed.depositPipeline).toBe(risky.depositPipeline);
+    expect(fixed.seed).toBe(risky.seed);
+    expect(fixed.dryMediaKernelProgram).toEqual(risky.dryMediaKernelProgram);
+    expect(analyzeStudioBrushMixQuality("dry-media", fixed, null).issues.length)
+      .toBeLessThan(analyzeStudioBrushMixQuality("dry-media", risky, null).issues.length);
+  });
+
+  it("includes active oil programs in complexity", () => {
+    const none = analyzeStudioBrushMixQuality(
+      "oil--filbert-ribbon",
+      dryMedia!,
+      studioBrushEngineProgramSetFromOil({
+        bristlePhysics: false,
+        bristleLoadDynamics: false,
+        impastoRelief: false,
+      }),
+    );
+    const all = analyzeStudioBrushMixQuality(
+      "oil--filbert-ribbon",
+      dryMedia!,
+      studioBrushEngineProgramSetFromOil({
+        bristlePhysics: true,
+        bristleLoadDynamics: true,
+        impastoRelief: true,
+      }),
+    );
+    expect(all.complexityScore).toBeGreaterThan(none.complexityScore);
+    expect(all.activeModuleCount).toBeGreaterThan(none.activeModuleCount);
   });
 });
 
 describe("describeStudioBrushEngineStack", () => {
-  it("always names the carrier first", () => {
+  it("always names the carrier first and exposes material modules", () => {
     const stack = describeStudioBrushEngineStack("pen", dryMedia!, null);
     expect(stack[0]).toMatchObject({ id: "carrier", active: true });
+    expect(stack.some((entry) => entry.id === "runtime-semantics")).toBe(true);
+    expect(stack.some((entry) => entry.id === "primary-tip")).toBe(true);
+    expect(stack.some((entry) => entry.id === "grain")).toBe(true);
+    expect(stack.some((entry) => entry.id === "mix-complexity")).toBe(true);
     expect(stack.some((entry) => entry.id.startsWith("oil-"))).toBe(false);
   });
 
-  it("lists oil programs with engine program overrides winning over the baseline", () => {
+  it("lists oil programs with overrides winning over the baseline", () => {
     const baseline = studioOilProgramSetForBrush("oil--filbert-ribbon");
     expect(baseline.bristlePhysics).toBe(true);
     const stack = describeStudioBrushEngineStack(
@@ -107,7 +284,7 @@ describe("describeStudioBrushEngineStack", () => {
     expect(byId.get("oil-impastoRelief")?.active).toBe(true);
   });
 
-  it("surfaces carrier program pins recorded on the settings", () => {
+  it("surfaces carrier program pins recorded on settings", () => {
     const stack = describeStudioBrushEngineStack("dry-media", dryMedia!, null);
     expect(stack.some((entry) => entry.id === "dry-media-kernel" && entry.active)).toBe(true);
   });
