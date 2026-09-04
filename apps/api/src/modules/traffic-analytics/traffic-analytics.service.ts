@@ -6,8 +6,6 @@ import {
   TooManyRequestsException,
 } from "@nestjs/common";
 
-import { dbPool } from "../../db";
-
 import {
   boundedTrafficInteger,
   classifyTrafficDevice,
@@ -20,15 +18,18 @@ import {
   requireTrafficIdentifier,
   TRAFFIC_DEFAULT_RETENTION_DAYS,
   TRAFFIC_MAX_ENGAGED_SECONDS,
-  TRAFFIC_PAGE_VIEW_PREFIX,
   trafficPageViewRangeKey,
   TRAFFIC_SESSION_PREFIX,
-  TRAFFIC_SESSION_UPPER_BOUND,
   trafficScreenClass,
   type TrafficHeartbeatPayload,
   type TrafficPageViewPayload,
   type TrafficRequestContext,
 } from "./traffic-analytics-model";
+import {
+  cleanupExpiredTrafficData,
+  persistTrafficHeartbeat,
+  persistTrafficPageView,
+} from "./traffic-analytics-store";
 
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RATE_WINDOW_MS = 60_000;
@@ -70,10 +71,6 @@ function hashIdentifier(kind: "visitor" | "session", value: string): string {
   return createHmac("sha256", analyticsSecret())
     .update(`${kind}:${value}`)
     .digest("hex");
-}
-
-function json(value: unknown): string {
-  return JSON.stringify(value);
 }
 
 @Injectable()
@@ -176,12 +173,10 @@ export class TrafficAnalyticsService {
       0,
       20_000,
     );
+    const screenClass = trafficScreenClass(screenWidth, screenHeight);
+    const countryCode = normalizeTrafficCountryCode(context.countryCode);
     const loadTimeMs =
       boundedTrafficInteger(payload.loadTimeMs, 0, 0, 120_000) || null;
-    const countryCode = normalizeTrafficCountryCode(context.countryCode);
-    const eventKey = `${trafficPageViewRangeKey(occurredAt)}:${randomUUID()}`;
-    const sessionKey = `${TRAFFIC_SESSION_PREFIX}${sessionHash}`;
-    const screenClass = trafficScreenClass(screenWidth, screenHeight);
 
     const eventValue = {
       version: 1,
@@ -222,51 +217,13 @@ export class TrafficAnalyticsService {
       isBot: false,
     };
 
-    await dbPool.query(
-      `
-        WITH inserted_event AS (
-          INSERT INTO app_setting (key, value, "updatedAt")
-          VALUES ($1, $2::jsonb, $3)
-          RETURNING 1
-        )
-        INSERT INTO app_setting (key, value, "updatedAt")
-        SELECT $4, $5::jsonb, $3
-        FROM inserted_event
-        ON CONFLICT (key) DO UPDATE SET
-          value =
-            app_setting.value
-            || jsonb_strip_nulls(EXCLUDED.value)
-            || jsonb_build_object(
-              'firstSeenAt',
-                COALESCE(app_setting.value->'firstSeenAt', EXCLUDED.value->'firstSeenAt'),
-              'entryPath',
-                COALESCE(app_setting.value->'entryPath', EXCLUDED.value->'entryPath'),
-              'referrerHost',
-                COALESCE(app_setting.value->'referrerHost', EXCLUDED.value->'referrerHost'),
-              'source',
-                COALESCE(app_setting.value->'source', EXCLUDED.value->'source'),
-              'medium',
-                COALESCE(app_setting.value->'medium', EXCLUDED.value->'medium'),
-              'campaign',
-                COALESCE(app_setting.value->'campaign', EXCLUDED.value->'campaign'),
-              'pageViews',
-                COALESCE((app_setting.value->>'pageViews')::integer, 0) + 1,
-              'engagedSeconds',
-                GREATEST(
-                  COALESCE((app_setting.value->>'engagedSeconds')::integer, 0),
-                  COALESCE((EXCLUDED.value->>'engagedSeconds')::integer, 0)
-                )
-            ),
-          "updatedAt" = GREATEST(app_setting."updatedAt", EXCLUDED."updatedAt")
-      `,
-      [
-        eventKey,
-        json(eventValue),
-        occurredAt,
-        sessionKey,
-        json(sessionValue),
-      ],
-    );
+    await persistTrafficPageView({
+      eventKey: `${trafficPageViewRangeKey(occurredAt)}:${randomUUID()}`,
+      eventValue,
+      sessionKey: `${TRAFFIC_SESSION_PREFIX}${sessionHash}`,
+      sessionValue,
+      occurredAt,
+    });
 
     this.scheduleCleanup();
     return { accepted: true };
@@ -302,48 +259,26 @@ export class TrafficAnalyticsService {
       0,
       TRAFFIC_MAX_ENGAGED_SECONDS,
     );
-    const sessionKey = `${TRAFFIC_SESSION_PREFIX}${sessionHash}`;
-    const sessionValue = {
-      version: 1,
-      visitorHash,
-      firstSeenAt: occurredAt.toISOString(),
-      lastSeenAt: occurredAt.toISOString(),
-      entryPath: path,
-      lastPath: path,
-      countryCode: normalizeTrafficCountryCode(context.countryCode),
-      deviceType: device.deviceType,
-      browser: device.browser,
-      os: device.os,
-      pageViews: 0,
-      engagedSeconds,
-      isBot: false,
-    };
 
-    await dbPool.query(
-      `
-        INSERT INTO app_setting (key, value, "updatedAt")
-        VALUES ($1, $2::jsonb, $3)
-        ON CONFLICT (key) DO UPDATE SET
-          value =
-            app_setting.value
-            || jsonb_strip_nulls(EXCLUDED.value)
-            || jsonb_build_object(
-              'firstSeenAt',
-                COALESCE(app_setting.value->'firstSeenAt', EXCLUDED.value->'firstSeenAt'),
-              'entryPath',
-                COALESCE(app_setting.value->'entryPath', EXCLUDED.value->'entryPath'),
-              'pageViews',
-                COALESCE((app_setting.value->>'pageViews')::integer, 0),
-              'engagedSeconds',
-                GREATEST(
-                  COALESCE((app_setting.value->>'engagedSeconds')::integer, 0),
-                  COALESCE((EXCLUDED.value->>'engagedSeconds')::integer, 0)
-                )
-            ),
-          "updatedAt" = GREATEST(app_setting."updatedAt", EXCLUDED."updatedAt")
-      `,
-      [sessionKey, json(sessionValue), occurredAt],
-    );
+    await persistTrafficHeartbeat({
+      sessionKey: `${TRAFFIC_SESSION_PREFIX}${sessionHash}`,
+      sessionValue: {
+        version: 1,
+        visitorHash,
+        firstSeenAt: occurredAt.toISOString(),
+        lastSeenAt: occurredAt.toISOString(),
+        entryPath: path,
+        lastPath: path,
+        countryCode: normalizeTrafficCountryCode(context.countryCode),
+        deviceType: device.deviceType,
+        browser: device.browser,
+        os: device.os,
+        pageViews: 0,
+        engagedSeconds,
+        isBot: false,
+      },
+      occurredAt,
+    });
 
     this.scheduleCleanup();
     return { accepted: true };
@@ -355,36 +290,12 @@ export class TrafficAnalyticsService {
       return;
     }
     this.lastCleanupAt = now;
-    this.cleanupPromise = this.cleanup()
+    this.cleanupPromise = cleanupExpiredTrafficData(retentionDays())
       .catch(() => {
         // Retention is best-effort and must never fail a user request.
       })
       .finally(() => {
         this.cleanupPromise = null;
       });
-  }
-
-  private async cleanup(): Promise<void> {
-    const cutoff = new Date(Date.now() - retentionDays() * 24 * 60 * 60 * 1_000);
-    await dbPool.query(
-      `
-        DELETE FROM app_setting
-        WHERE (
-          key >= $1
-          AND key < $2
-        ) OR (
-          key >= $3
-          AND key < $4
-          AND "updatedAt" < $5
-        )
-      `,
-      [
-        TRAFFIC_PAGE_VIEW_PREFIX,
-        trafficPageViewRangeKey(cutoff),
-        TRAFFIC_SESSION_PREFIX,
-        TRAFFIC_SESSION_UPPER_BOUND,
-        cutoff,
-      ],
-    );
   }
 }
