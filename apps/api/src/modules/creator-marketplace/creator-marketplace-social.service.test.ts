@@ -39,10 +39,25 @@ describe("CreatorMarketplaceSocialService policy boundary", () => {
     expect(serviceSource).toContain("reviews");
   });
 
-  it("keeps deletion permission-aware and anonymizes deleted comments", () => {
+  it("keeps deletion permission-aware and removes deleted author identity", () => {
+    expect(serviceSource).toContain('id: "deleted"');
     expect(serviceSource).toContain('name: "삭제됨"');
     expect(serviceSource).toContain("isAdminUser");
     expect(serviceSource).toContain("canDelete:");
     expect(serviceSource).toContain("deletedAt");
+  });
+
+  it("uses a bounded reply budget larger than the root page", () => {
+    expect(serviceSource).toContain("const replyLimit = rootLimit * 5");
+    expect(serviceSource).toContain(".limit(replyLimit + 1)");
+    expect(serviceSource).toContain("replyRows.length > replyLimit");
+  });
+
+  it("preserves original review chronology when a reviewer edits their review", () => {
+    const conflictUpdate = serviceSource.slice(
+      serviceSource.indexOf(".onConflictDoUpdate({"),
+      serviceSource.indexOf("return this.page(resourceId, userId);", serviceSource.indexOf(".onConflictDoUpdate({")),
+    );
+    expect(conflictUpdate).not.toContain("createdAt: new Date()");
   });
 });
