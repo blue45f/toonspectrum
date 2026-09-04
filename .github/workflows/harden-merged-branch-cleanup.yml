@@ -1,0 +1,64 @@
+name: Harden merged branch cleanup
+
+on:
+  push:
+    branches:
+      - ci/automatic-merged-branch-cleanup-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: harden-merged-branch-cleanup-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: ${{ !contains(github.event.head_commit.message, '[merged-branch-cleanup-hardened]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/automatic-merged-branch-cleanup-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply race-condition hardening
+        run: python3 scripts/harden-merged-branch-cleanup.py
+
+      - name: Validate diff and syntax
+        run: |
+          node --check scripts/cleanup-merged-branches.mjs
+          git diff --check
+          git status --short
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run cleanup contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            scripts/cleanup-merged-branches.mjs \
+            scripts/cleanup-merged-branches.test.ts
+          pnpm exec vitest run scripts/cleanup-merged-branches.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Commit hardened cleanup
+        run: |
+          rm -f scripts/harden-merged-branch-cleanup.py
+          rm -f .github/workflows/harden-merged-branch-cleanup.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "fix(ci): recheck branch heads before merged-ref cleanup [merged-branch-cleanup-hardened]"
+          git push --no-verify origin HEAD:ci/automatic-merged-branch-cleanup-20260904
