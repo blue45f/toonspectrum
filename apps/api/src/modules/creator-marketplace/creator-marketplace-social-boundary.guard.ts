@@ -90,6 +90,15 @@ function genericReplyRouteValues(
   ].filter((value): value is string => typeof value === "string");
 }
 
+function genericTitleReviewValue(
+  path: string,
+  params: BoundaryRequest["params"],
+): string | undefined {
+  const match = /\/titles\/([^/]+)\/reviews\/?$/u.exec(path);
+  if (!match) return undefined;
+  return typeof params?.id === "string" ? params.id : decoded(match[1]);
+}
+
 export function directCreatorMarketplaceSocialBoundaryViolation(
   request: BoundaryRequest,
 ): string | null {
@@ -129,6 +138,12 @@ export function directCreatorMarketplaceSocialBoundaryViolation(
 
   if (genericReplyRouteValues(path, request.params).some(
     isCreatorMarketplaceSocialNamespaceValue,
+  )) {
+    return MARKET_BOUNDARY_MESSAGE;
+  }
+
+  if (isCreatorMarketplaceSocialThreadId(
+    genericTitleReviewValue(path, request.params),
   )) {
     return MARKET_BOUNDARY_MESSAGE;
   }

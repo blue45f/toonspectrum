@@ -23,9 +23,14 @@ describe("CreatorMarketplaceSocialBoundaryGuard", () => {
     })).toMatch(/마켓 전용 API/u);
   });
 
-  it("blocks the ordinary review-reply route from reading a market thread", () => {
+  it("blocks generic reply and title-review reads from exposing a market thread", () => {
     expect(directCreatorMarketplaceSocialBoundaryViolation({
       originalUrl: `/api/reviews/${encodeURIComponent(THREAD)}/replies`,
+      params: { id: THREAD },
+    })).toMatch(/마켓 전용 API/u);
+
+    expect(directCreatorMarketplaceSocialBoundaryViolation({
+      originalUrl: `/api/titles/${encodeURIComponent(THREAD)}/reviews`,
       params: { id: THREAD },
     })).toMatch(/마켓 전용 API/u);
   });
