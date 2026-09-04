@@ -47,6 +47,7 @@ export function StudioBg3dProductionIntentPanel() {
     return detectStudioBg3dProductionIntent({
       availablePasses: batch.availablePasses,
       selectedPasses: batch.selectedPasses,
+      look: batch.look,
       includeLayeredPsd: batch.includeLayeredPsd,
       includeContactSheet: batch.includeContactSheet,
       lineArtPreview: scene.lineArtPreview,
@@ -59,6 +60,7 @@ export function StudioBg3dProductionIntentPanel() {
   const snapshotCurrentState = (): PreviousProductionIntentState => Object.freeze({
     availablePasses: [...batch.availablePasses],
     selectedPasses: [...batch.selectedPasses],
+    look: batch.look,
     selectedShotIds: [...batch.selectedShotIds],
     includeLayeredPsd: batch.includeLayeredPsd,
     includeContactSheet: batch.includeContactSheet,
@@ -68,7 +70,11 @@ export function StudioBg3dProductionIntentPanel() {
 
   const applyIntent = (intentId: StudioBg3dProductionIntentId) => {
     if (runtime.disabled || batch.isRendering) return;
-    const plan = planStudioBg3dProductionIntent(batch.availablePasses, intentId);
+    const plan = planStudioBg3dProductionIntent(
+      batch.availablePasses,
+      intentId,
+      batch.look,
+    );
     setPreviousState(snapshotCurrentState());
 
     if (runtime.productionShots.length > 0) batch.selectAllShots();
@@ -112,7 +118,7 @@ export function StudioBg3dProductionIntentPanel() {
             전체 제작 프리셋
           </h3>
           <p className="mt-1 text-[0.57rem] leading-relaxed text-fg-3">
-            컷 선택·패스·PSD·콘택트 시트·선화·배경 알파를 작업 목적에 맞춰 함께 설정합니다.
+            컷 선택·현재 LT에 맞는 패스·PSD·콘택트 시트·선화·배경 알파를 작업 목적에 맞춰 함께 설정합니다.
           </p>
         </div>
         <span className="rounded-full border border-good/40 bg-good/10 px-2 py-1 text-[0.52rem] font-bold text-good">
