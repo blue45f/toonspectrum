@@ -71,6 +71,11 @@ replace_once(
     '''          {followedPeer\n            ? `${followedPeer.displayName} 따라가기 중지`\n            : activePeer\n              ? `${activePeer.displayName} 바로 따라가기`\n              : "따라갈 활성 탭 없음"}''',
     '''          {followedPeer\n            ? `집중 모드 종료 · ${followedPeer.displayName}`\n            : activePeer\n              ? `집중 모드 시작 · ${activePeer.displayName}`\n              : "집중할 활성 탭 없음"}''',
 )
+replace_once(
+    command_center,
+    'peer.visibility === "active" ? "활성 탭" : "백그라운드 탭"',
+    'peer.visibility === "active" ? "활성 탭" : "유휴 탭"',
+)
 
 command_center_test = "src/domains/creator/live/StudioLiveCollaborationCommandCenter.test.tsx"
 replace_once(
@@ -82,4 +87,14 @@ replace_once(
     command_center_test,
     '    expect(html).toContain("민호 따라가기 중지");',
     '    expect(html).toContain("집중 모드 종료 · 민호");',
+)
+replace_once(
+    command_center_test,
+    '  peer("viewer-id", "지우", { role: "viewer", visibility: "background" }),',
+    '  peer("viewer-id", "지우", { role: "viewer", visibility: "idle" }),',
+)
+replace_once(
+    command_center_test,
+    '  peer("followed-id", "민호", { role: "editor", visibility: "background" }),',
+    '  peer("followed-id", "민호", { role: "editor", visibility: "idle" }),',
 )
