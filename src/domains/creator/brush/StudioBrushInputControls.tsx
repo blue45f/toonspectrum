@@ -72,10 +72,10 @@ export function StudioBrushInputControls({
         </label>
       ) : null}
 
-      {/* CSP/Procreate-class response graph (implementable deferred slice) */}
       <StudioPressureCurveGraph
         pressureCurve={pressureCurve}
         onPressureCurveChange={onPressureCurveChange}
+        pressureMinSize={pressureMinSize}
         density={density}
       />
 
