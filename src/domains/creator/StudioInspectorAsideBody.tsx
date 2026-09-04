@@ -3,7 +3,7 @@ import { Suspense, useId } from "react";
 import {
   resolveStudioFigmaSelectionLayoutMetrics,
   selectStudioFigmaDesignTargets,
-} from "./studio-figma-selection-ux";
+} from "./studio-selection-transform-advanced";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
@@ -92,6 +92,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
                   selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
                 )}
                 disabled={inspectorInteractionPolicy.selection.disabled}
+                disabledReason={inspectorInteractionPolicy.selection.reason}
                 onChange={applyFigmaSelectionLayoutPatch}
                 onZoomToSelection={zoomToSelection}
                 onFlipHorizontal={() => flipSelected("horizontal")}
