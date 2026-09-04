@@ -1,0 +1,254 @@
+name: Brush quality benchmark completion receipt
+
+on:
+  workflow_run:
+    workflows:
+      - Studio all-brush screen-fill quality election
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: brush-quality-benchmark-receipt-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  failed-run-receipt:
+    if: >-
+      github.event.workflow_run.head_branch == 'feat/all-brush-long-stroke-quality-election-20260904'
+      && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const body = [
+              '❌ **전체 브러시 화면 채움 장획 벤치마크 실패**',
+              '',
+              `- 결론: **${run.conclusion ?? 'unknown'}**`,
+              `- HEAD: \`${run.head_sha}\``,
+              `- 실행: ${run.html_url}`,
+              '',
+              '품질 증거가 완성되지 않았으므로 GPU 선거와 브러시 축소 결과를 제품에 적용하지 않습니다.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body,
+            });
+
+  successful-run-receipt:
+    if: >-
+      github.event.workflow_run.head_branch == 'feat/all-brush-long-stroke-quality-election-20260904'
+      && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Download aggregate quality and curation evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: all-brush-quality-election-and-curation-*
+          path: receipt-input
+          merge-multiple: true
+
+      - name: Validate and summarize catalogue evidence
+        id: validate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import math
+          import os
+          from pathlib import Path
+          from statistics import median
+
+          root = Path('receipt-input')
+          quality_paths = sorted(root.rglob('all-brush-gpu-quality-report.json'))
+          curation_paths = sorted(root.rglob('brush-curation-report.json'))
+          if len(quality_paths) != 1:
+              raise SystemExit(f'expected one quality report, found {len(quality_paths)}')
+          if len(curation_paths) != 1:
+              raise SystemExit(f'expected one curation report, found {len(curation_paths)}')
+
+          quality = json.loads(quality_paths[0].read_text(encoding='utf-8'))
+          curation = json.loads(curation_paths[0].read_text(encoding='utf-8'))
+          cases = quality.get('cases')
+          if not isinstance(cases, list) or not cases:
+              raise SystemExit('quality report contains no brush cases')
+
+          def number(value, fallback=0.0):
+              return float(value) if isinstance(value, (int, float)) and math.isfinite(value) else fallback
+
+          baseline_failed = []
+          selected_gpu = []
+          selected_incumbent = []
+          invalid_gpu_elections = []
+          browser_errors = 0
+          refused_strokes = 0
+          baseline_p95 = []
+          gpu_p95 = []
+
+          for entry in cases:
+              brush_id = str(entry.get('id') or '<unknown>')
+              baseline = entry.get('baseline') or {}
+              gpu = entry.get('gpu') or {}
+              baseline_quality = baseline.get('quality') or {}
+              gpu_quality = gpu.get('quality') or {}
+              baseline_perf = baseline.get('performance') or {}
+              gpu_perf = gpu.get('performance') or {}
+              election = entry.get('election') or {}
+
+              if baseline_quality.get('ownQualityPassed') is not True:
+                  baseline_failed.append(brush_id)
+              browser_errors += int(number(baseline_quality.get('browserErrorCount')))
+              browser_errors += int(number(gpu_quality.get('browserErrorCount')))
+              refused_strokes += int(number(baseline_quality.get('refusedStrokeCount')))
+              refused_strokes += int(number(gpu_quality.get('refusedStrokeCount')))
+
+              baseline_delivery = number(baseline_perf.get('inputDeliveryRatio'))
+              if baseline_delivery < 0.98:
+                  baseline_failed.append(f'{brush_id}:input-delivery={baseline_delivery:.4f}')
+
+              p95 = number(baseline_perf.get('frameP95Milliseconds'), float('nan'))
+              if math.isfinite(p95):
+                  baseline_p95.append(p95)
+              gpu_value = number(gpu_perf.get('frameP95Milliseconds'), float('nan'))
+              if math.isfinite(gpu_value):
+                  gpu_p95.append(gpu_value)
+
+              selected = election.get('selected')
+              if selected == 'gpu':
+                  selected_gpu.append(brush_id)
+                  if not (
+                      election.get('qualityEquivalent') is True
+                      and election.get('performanceNonInferior') is True
+                      and election.get('hardwareEligible') is True
+                  ):
+                      invalid_gpu_elections.append(brush_id)
+              else:
+                  selected_incumbent.append(brush_id)
+
+          quarantine_ids = curation.get('suggestedQuarantineIds') or []
+          clusters = curation.get('clusters') or []
+          if not isinstance(quarantine_ids, list) or not isinstance(clusters, list):
+              raise SystemExit('invalid curation report shape')
+
+          failures = []
+          if baseline_failed:
+              failures.append(f'baseline-quality={len(baseline_failed)}')
+          if browser_errors:
+              failures.append(f'browser-errors={browser_errors}')
+          if refused_strokes:
+              failures.append(f'refused-strokes={refused_strokes}')
+          if invalid_gpu_elections:
+              failures.append(f'invalid-gpu-elections={len(invalid_gpu_elections)}')
+
+          summary = {
+              'kind': 'toonspectrum-all-brush-benchmark-receipt-v1',
+              'workflowRunId': int(os.environ['WORKFLOW_RUN_ID']),
+              'headSha': os.environ['WORKFLOW_HEAD_SHA'],
+              'benchmarkDigest': quality.get('benchmarkDigest'),
+              'caseCount': len(cases),
+              'baselinePassedCount': len(cases) - len({item.split(':', 1)[0] for item in baseline_failed}),
+              'baselineFailureCount': len(baseline_failed),
+              'browserErrorCount': browser_errors,
+              'refusedStrokeCount': refused_strokes,
+              'gpuSelectedCount': len(selected_gpu),
+              'incumbentSelectedCount': len(selected_incumbent),
+              'invalidGpuElectionCount': len(invalid_gpu_elections),
+              'duplicateClusterCount': len(clusters),
+              'suggestedQuarantineCount': len(quarantine_ids),
+              'suggestedQuarantineIds': quarantine_ids,
+              'baselineFrameP95MedianMs': median(baseline_p95) if baseline_p95 else None,
+              'gpuFrameP95MedianMs': median(gpu_p95) if gpu_p95 else None,
+              'passed': not failures,
+              'failures': failures,
+              'baselineFailed': baseline_failed[:40],
+              'invalidGpuElections': invalid_gpu_elections[:40],
+          }
+          Path('brush-quality-receipt.json').write_text(
+              json.dumps(summary, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as stream:
+              stream.write(f"passed={'true' if summary['passed'] else 'false'}\n")
+              stream.write(f"case_count={summary['caseCount']}\n")
+              stream.write(f"gpu_count={summary['gpuSelectedCount']}\n")
+              stream.write(f"incumbent_count={summary['incumbentSelectedCount']}\n")
+              stream.write(f"cluster_count={summary['duplicateClusterCount']}\n")
+              stream.write(f"quarantine_count={summary['suggestedQuarantineCount']}\n")
+              stream.write(f"browser_errors={summary['browserErrorCount']}\n")
+              stream.write(f"refused_strokes={summary['refusedStrokeCount']}\n")
+              stream.write(f"baseline_failures={summary['baselineFailureCount']}\n")
+              stream.write(f"invalid_gpu={summary['invalidGpuElectionCount']}\n")
+              stream.write(f"baseline_p95={summary['baselineFrameP95MedianMs']}\n")
+              stream.write(f"gpu_p95={summary['gpuFrameP95MedianMs']}\n")
+
+          if failures:
+              raise SystemExit('; '.join(failures))
+          PY
+        env:
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Upload compact receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brush-quality-completion-receipt-${{ github.event.workflow_run.id }}
+          path: brush-quality-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Post measured receipt to PR
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const passed = '${{ steps.validate.outputs.passed }}' === 'true';
+            const body = [
+              `${passed ? '✅' : '❌'} **전체 브러시 화면 채움 장획 품질 영수증**`,
+              '',
+              `- HEAD: \`${context.payload.workflow_run.head_sha}\``,
+              `- 브러시 사례: **${{ steps.validate.outputs.case_count || 'unknown' }}**`,
+              `- GPU 선정: **${{ steps.validate.outputs.gpu_count || '0' }}**`,
+              `- 기존 엔진 유지: **${{ steps.validate.outputs.incumbent_count || '0' }}**`,
+              `- 유사 브러시 완전연결 군집: **${{ steps.validate.outputs.cluster_count || '0' }}**`,
+              `- 노출 격리 제안: **${{ steps.validate.outputs.quarantine_count || '0' }}**`,
+              `- baseline 품질 실패: **${{ steps.validate.outputs.baseline_failures || 'unknown' }}**`,
+              `- 잘못된 GPU 선거: **${{ steps.validate.outputs.invalid_gpu || 'unknown' }}**`,
+              `- 브라우저 오류: **${{ steps.validate.outputs.browser_errors || 'unknown' }}**`,
+              `- 거부된 획: **${{ steps.validate.outputs.refused_strokes || 'unknown' }}**`,
+              `- baseline frame p95 중앙값: **${{ steps.validate.outputs.baseline_p95 || 'n/a' }} ms**`,
+              `- GPU frame p95 중앙값: **${{ steps.validate.outputs.gpu_p95 || 'n/a' }} ms**`,
+              `- 전체 벤치마크: ${context.payload.workflow_run.html_url}`,
+              '',
+              passed
+                ? '품질·입력·물리 GPU 선거 조건을 통과했습니다. 이 결과만 다음 노출 축소/엔진 적용의 근거로 사용합니다.'
+                : '증거 검증을 통과하지 못했습니다. GPU 선거와 브러시 노출 축소를 제품에 적용하지 않습니다.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 679,
+              body,
+            });
+
+      - name: Enforce receipt verdict
+        if: steps.validate.outcome != 'success'
+        run: exit 1
