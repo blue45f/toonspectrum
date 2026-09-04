@@ -1,0 +1,88 @@
+name: Apply Studio detachable panels wave 2
+
+on:
+  push:
+    branches:
+      - feat/studio-detachable-panels-wave2-20260904
+
+concurrency:
+  group: studio-detachable-panels-wave2
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Apply detachable panel expansion
+        run: |
+          python3 scripts/apply-studio-detachable-panels-wave2.py
+          python3 scripts/patch-studio-detachable-tests-wave2.py
+          git diff --check
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format touched modules
+        run: |
+          pnpm exec eslint --fix \
+            src/domains/creator/studio-detachable-panels.ts \
+            src/domains/creator/studio-detachable-panels.test.ts \
+            src/domains/creator/studio-detachable-panels-boundary.test.ts \
+            src/domains/creator/StudioDetachablePanelSlot.tsx \
+            src/domains/creator/StudioPageListPane.tsx \
+            src/domains/creator/StudioInspectorAsideShell.tsx \
+            src/domains/creator/brush/StudioBrushLibrarySheet.tsx \
+            src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+      - name: Lint touched modules
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-detachable-panels.ts \
+            src/domains/creator/studio-detachable-panels.test.ts \
+            src/domains/creator/studio-detachable-panels-boundary.test.ts \
+            src/domains/creator/StudioDetachablePanelSlot.tsx \
+            src/domains/creator/StudioPageListPane.tsx \
+            src/domains/creator/StudioInspectorAsideShell.tsx \
+            src/domains/creator/brush/StudioBrushLibrarySheet.tsx \
+            src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+      - name: Run focused panel tests
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/studio-detachable-panels.test.ts \
+            src/domains/creator/studio-detachable-panels-boundary.test.ts \
+            src/domains/creator/StudioPageListPane.test.tsx \
+            src/domains/creator/studio-page-list-pane-boundary.test.ts \
+            src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx \
+            src/domains/creator/StudioFloatingSurface.test.tsx \
+            src/domains/creator/studio-floating-surface.test.ts
+      - name: Validate architecture and types
+        run: |
+          pnpm run validate:architecture
+          pnpm run typecheck
+      - name: Verify production build and Studio bundle
+        run: |
+          pnpm run build
+          pnpm run check:studio-bundle
+      - name: Commit verified product changes
+        run: |
+          rm -f scripts/apply-studio-detachable-panels-wave2.py
+          rm -f scripts/patch-studio-detachable-tests-wave2.py
+          rm -f .github/workflows/apply-studio-detachable-panels-wave2.yml
+          git add -A
+          git diff --cached --check
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "feat(studio): expand detachable workspace panels"
+          git push origin HEAD:feat/studio-detachable-panels-wave2-20260904
