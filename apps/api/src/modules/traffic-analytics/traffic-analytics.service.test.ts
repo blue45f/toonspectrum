@@ -6,6 +6,7 @@ import {
   isExcludedTrafficPath,
   normalizeTrafficCampaignToken,
   normalizeTrafficPath,
+  normalizeTrafficScreenClass,
 } from "./traffic-analytics-model";
 
 describe("traffic analytics privacy boundaries", () => {
@@ -53,6 +54,13 @@ describe("traffic analytics privacy boundaries", () => {
         "Mozilla/5.0 compatible Googlebot/2.1; +https://www.google.com/bot.html",
       ).isBot,
     ).toBe(true);
+  });
+
+  it("accepts only a coarse display class", () => {
+    expect(normalizeTrafficScreenClass("small")).toBe("small");
+    expect(normalizeTrafficScreenClass("LARGE")).toBe("large");
+    expect(normalizeTrafficScreenClass("2560x1440")).toBe("unknown");
+    expect(normalizeTrafficScreenClass(undefined)).toBe("unknown");
   });
 
   it("rejects PII-like campaign labels and normalizes safe labels", () => {
