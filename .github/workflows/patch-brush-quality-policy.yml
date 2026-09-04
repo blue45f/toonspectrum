@@ -1,4 +1,4 @@
-name: Apply remaining quality-first curation patch
+name: Apply quality-only brush representative ranking
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: feat/all-brush-long-stroke-quality-election-20260904
-      - name: Apply remaining quality-first curation changes
+      - name: Keep performance outside the representative quality score
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -35,58 +35,65 @@ jobs:
           curation = Path("src/domains/creator/brush/studio-brush-quality-curation.ts")
           replace_once(
               curation,
-              '''function representativeComparator(
-            left: StudioBrushCurationCandidate,
-            right: StudioBrushCurationCandidate,
-          ): number {
-            if (left.protectedFromCulling !== right.protectedFromCulling) {
-              return left.protectedFromCulling ? -1 : 1;
-            }
-            const leftScore = candidateQualityScore(left);
-            const rightScore = candidateQualityScore(right);
-            const qualityDelta = leftScore - rightScore;
-            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
-            // GPU is only a tie-breaker after quality is effectively equal.
-            if (left.gpuApproved !== right.gpuApproved) return left.gpuApproved ? -1 : 1;''',
-              '''function representativeComparator(
-            left: StudioBrushCurationCandidate,
-            right: StudioBrushCurationCandidate,
-          ): number {
-            // An exposed canonical is never more important than a mark that actually passed the
-            // measured quality contract. Protection only resolves a genuine quality tie.
-            if (left.qualityPassed !== right.qualityPassed) return left.qualityPassed ? -1 : 1;
-            const leftScore = candidateQualityScore(left);
-            const rightScore = candidateQualityScore(right);
-            const qualityDelta = leftScore - rightScore;
-            if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;
-            if (left.protectedFromCulling !== right.protectedFromCulling) {
-              return left.protectedFromCulling ? -1 : 1;
-            }
-            // GPU is only a tie-breaker after quality is effectively equal.
-            if (left.gpuApproved !== right.gpuApproved) return left.gpuApproved ? -1 : 1;''',
-              "curation representative order",
+              '''function candidateQualityScore(candidate: StudioBrushCurationCandidate): number {
+            if (!candidate.qualityPassed) return -1;
+            const errorPenalty = Math.min(1, candidate.browserErrorCount * 0.25)
+              + Math.min(1, candidate.refusedStrokeCount * 0.25);
+            const responsiveness = Number.isFinite(candidate.frameP95Milliseconds)
+              ? clamp01(1 - Math.max(0, candidate.frameP95Milliseconds - 16.667) / 83.333)
+              : 0;
+            return 0.28 * clamp01(candidate.centerlineCoverage)
+              + 0.22 * clamp01(candidate.liveCommitFidelity)
+              + 0.18 * clamp01(candidate.settledStability)
+              + 0.17 * clamp01(candidate.inputDeliveryRatio)
+              + 0.1 * clamp01(candidate.textureQuality)
+              + 0.05 * responsiveness
+              - 0.2 * errorPenalty;
+          }''',
+              '''function candidateQualityScore(candidate: StudioBrushCurationCandidate): number {
+            if (!candidate.qualityPassed) return -1;
+            const errorPenalty = Math.min(1, candidate.browserErrorCount * 0.25)
+              + Math.min(1, candidate.refusedStrokeCount * 0.25);
+            // This score deliberately excludes frame time. The representative is chosen by mark
+            // quality and interaction fidelity; GPU/backend performance is considered only after
+            // the measured quality score is tied.
+            return 0.25 * clamp01(candidate.textureQuality)
+              + 0.25 * clamp01(candidate.liveCommitFidelity)
+              + 0.2 * clamp01(candidate.centerlineCoverage)
+              + 0.15 * clamp01(candidate.settledStability)
+              + 0.15 * clamp01(candidate.inputDeliveryRatio)
+              - 0.2 * errorPenalty;
+          }''',
+              "quality-only representative score",
+          )
+          replace_once(
+              curation,
+              '''  if (Math.abs(qualityDelta) > 0.01) return qualityDelta > 0 ? -1 : 1;''',
+              '''  if (Math.abs(qualityDelta) > 0.005) return qualityDelta > 0 ? -1 : 1;''',
+              "strict quality tie threshold",
           )
 
-          curation_test = Path("src/domains/creator/brush/studio-brush-quality-curation.test.ts")
-          anchor = '''  it("never suggests removing more than one protected canonical brush automatically", () => {'''
-          insertion = '''  it("never lets a protected but failing brush beat a passing representative", () => {
+          test = Path("src/domains/creator/brush/studio-brush-quality-curation.test.ts")
+          anchor = '''  it("never lets a protected but failing brush beat a passing representative", () => {'''
+          insertion = '''  it("does not let frame speed compensate for lower measured mark quality", () => {
             const clusters = curateStudioBrushCandidates([
-              candidate("protected-failing", {
-                protectedFromCulling: true,
-                qualityPassed: false,
+              candidate("slower-quality", {
+                frameP95Milliseconds: 180,
+                textureQuality: 0.9,
                 listedOrder: 0,
               }),
-              candidate("passing", {
-                protectedFromCulling: false,
-                qualityPassed: true,
+              candidate("fast-gpu-lower-quality", {
+                gpuApproved: true,
+                frameP95Milliseconds: 5,
+                textureQuality: 0.84,
                 listedOrder: 1,
               }),
             ]);
-            expect(clusters[0]?.representativeId).toBe("passing");
+            expect(clusters[0]?.representativeId).toBe("slower-quality");
           });
 
           ''' + anchor
-          replace_once(curation_test, anchor, insertion, "curation failing protected test")
+          replace_once(test, anchor, insertion, "performance cannot buy quality test")
           PY
           git diff --check
       - name: Commit source changes only
@@ -98,5 +105,5 @@ jobs:
             src/domains/creator/brush/studio-brush-quality-curation.ts \
             src/domains/creator/brush/studio-brush-quality-curation.test.ts
           git diff --cached --check
-          git commit -m "feat(brush): keep quality ahead of curation protection"
+          git commit -m "feat(brush): rank representatives by quality before speed"
           git push origin HEAD:feat/all-brush-long-stroke-quality-election-20260904
