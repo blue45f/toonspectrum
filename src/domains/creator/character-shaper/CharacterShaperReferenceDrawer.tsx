@@ -11,7 +11,7 @@
  * the runtime gates the catalogue load and the preview/apply calls on that surface being active —
  * and restores the previous tab when the drawer closes.
  */
-import { ImagePlus, Info, LoaderCircle, Pipette, Snowflake, TriangleAlert, Video, VideoOff, X } from "lucide-react";
+import { ImagePlus, Info, LoaderCircle, PersonStanding, Pipette, Snowflake, TriangleAlert, Video, VideoOff, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
@@ -28,7 +28,7 @@ import { extractCharacterReferencePalette } from "./character-shaper-palette-ext
 import type { CharacterReferencePalette } from "./character-shaper-palette-extract";
 import type { CharacterShaperReferenceDrawerProps } from "./character-shaper-ui-contract";
 import type { TrackingOptions } from "../vrm/studio-vrm-webcam-tracking";
-import type { StudioVrmPhotoPoseApplyPayload } from "../vrm/StudioVrmPhotoPoseScanner";
+import type { StudioVrmPhotoPoseApplyPayload, StudioVrmPhotoPoseHandoff } from "../vrm/StudioVrmPhotoPoseScanner";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { cn } from "@/lib/utils";
@@ -145,7 +145,12 @@ export function CharacterShaperReferenceDrawer({
   const tabRefs = useRef(new Map<DrawerMode, HTMLButtonElement | null>());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
+  const handoffTokenRef = useRef(0);
   const [palette, setPalette] = useState<PaletteState>(IDLE_PALETTE);
+  // 참고 탭에서 이미 받은 이미지. 같은 사진으로 포즈까지 읽고 싶은 사람이 파일을 두 번 고르지
+  // 않도록 들고 있다가 사진 탭으로 넘긴다. 토큰이 스캐너의 재실행 트리거다.
+  const [pickedImage, setPickedImage] = useState<File | null>(null);
+  const [photoHandoff, setPhotoHandoff] = useState<StudioVrmPhotoPoseHandoff | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -188,15 +193,18 @@ export function CharacterShaperReferenceDrawer({
 
   const readFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
+      setPickedImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "이미지 파일만 읽을 수 있습니다." });
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
+      setPickedImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "24MB 이하 이미지를 올려 주세요." });
       return;
     }
     const request = requestRef.current + 1;
     requestRef.current = request;
+    setPickedImage(file);
     setPalette({ status: "reading", palette: null, fileName: file.name, message: null });
     void (async () => {
       try {
@@ -350,6 +358,20 @@ export function CharacterShaperReferenceDrawer({
             {palette.message}
           </p>
         ) : null}
+        {pickedImage ? (
+          <button
+            type="button"
+            className={cn(BUTTON, "mt-2 w-full")}
+            onClick={() => {
+              handoffTokenRef.current += 1;
+              setPhotoHandoff({ file: pickedImage, token: handoffTokenRef.current });
+              onModeChange("photo");
+            }}
+          >
+            <PersonStanding size={14} aria-hidden />
+            이 사진에서 포즈도 읽기
+          </button>
+        ) : null}
       </div>
 
       {palette.status === "ready" && palette.palette ? (
@@ -456,6 +478,7 @@ export function CharacterShaperReferenceDrawer({
   const photoPanel = (
     <StudioVrmPhotoPoseScanner
       disabled={!h.vrm || binding.busyReason !== null}
+      handoff={photoHandoff}
       onApply={(payload: StudioVrmPhotoPoseApplyPayload) => Boolean(h.handlePhotoPoseApply?.(payload))}
     />
   );

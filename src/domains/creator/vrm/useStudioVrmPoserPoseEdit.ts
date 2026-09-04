@@ -71,6 +71,10 @@ import {
   findPoseById,
 } from "./studio-vrm-poser-helpers";
 import {
+  STUDIO_VRM_FINGER_BONE_PREFIX,
+  type StudioVrmFingerName,
+} from "./studio-vrm-finger-curl";
+import {
   applyExpressionWeightsToVrm,
   d,
   getPoseBoneRotation,
@@ -705,23 +709,34 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     setCustomYOffset(value);
   }
 
-  // Quick finger curl updater for the 고도화 section (affects multiple segments for natural look)
-  function updateFingerCurl(side: 'left' | 'right', curlDeg: number) {
+  /**
+   * 손가락 굽힘. `finger`를 주면 그 손가락만 움직이고 나머지 편집은 그대로 둔다 — 검지만 펴는
+   * 손짓처럼 한 손가락이 다른 각도를 가져야 하는 포즈는 손 단위 값으로는 만들 수 없다.
+   * 생략하면 지금까지처럼 다섯 손가락을 함께 굽힌다.
+   */
+  function updateFingerCurl(side: 'left' | 'right', curlDeg: number, finger?: StudioVrmFingerName) {
     const rad = d(curlDeg);
     const sign = side === 'left' ? -1 : 1;
-    const fingers = ['Index', 'Middle', 'Ring', 'Little'] as const;
     const segments = ['Proximal', 'Intermediate', 'Distal'] as const;
+    // 엄지는 다른 축으로, 덜 굽는다 — 네 손가락과 같은 각도를 주면 손바닥을 뚫는다.
+    const bendThumb = (next: FingerRotationMap) => {
+      next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * rad * 0.6, sign * rad * 0.5];
+      next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, sign * rad * 0.4, 0];
+    };
+    const bendFinger = (next: FingerRotationMap, name: 'Index' | 'Middle' | 'Ring' | 'Little') => {
+      segments.forEach((seg) => {
+        next[`${side}${name}${seg}` as VRMHumanBoneName] = [0, 0, sign * rad];
+      });
+    };
     setFingerEdits((prev: FingerRotationMap) => {
       const next = { ...prev };
-      fingers.forEach((f) => {
-        segments.forEach((seg) => {
-          const k = `${side}${f}${seg}` as VRMHumanBoneName;
-          next[k] = [0, 0, sign * rad];
-        });
-        // thumb a bit less
-        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * rad * 0.6, sign * rad * 0.5];
-        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, sign * rad * 0.4, 0];
-      });
+      if (!finger) {
+        (['Index', 'Middle', 'Ring', 'Little'] as const).forEach((name) => bendFinger(next, name));
+        bendThumb(next);
+        return next;
+      }
+      if (finger === 'thumb') bendThumb(next);
+      else bendFinger(next, STUDIO_VRM_FINGER_BONE_PREFIX[finger]);
       return next;
     });
   }

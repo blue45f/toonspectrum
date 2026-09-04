@@ -167,7 +167,7 @@ export const CHARACTER_PSD_PREVIEW_LAYER_NAME = "미리보기 (Beauty)";
 
 const MASK_NOT_FOUND_REASONS: Readonly<Record<CharacterSemanticMaskId, string>> = Object.freeze({
   "mask-face": "얼굴 메시를 찾지 못했습니다.",
-  "mask-eyes": "눈 메시를 따로 찾지 못했습니다. 눈이 얼굴 메시에 합쳐진 모델은 분리할 수 없습니다.",
+  "mask-eyes": "눈으로 읽히는 메시도 재질도 없습니다. 눈이 얼굴과 한 재질로 합쳐진 모델은 분리할 수 없습니다.",
   "mask-hair": "머리카락 메시를 찾지 못했습니다.",
   "mask-skin": "피부 메시를 찾지 못했습니다.",
   "mask-top": "상의로 분류된 메시가 없습니다.",
@@ -316,10 +316,41 @@ function maskFromNames(mesh: THREE.Mesh): CharacterSemanticMaskId | null {
   return PROTECTED_MASK[only];
 }
 
+/**
+ * VRoid 계열은 눈·눈썹·속눈썹·얼굴을 한 메시(대개 이름에 Head가 들어간다)에 재질로만 나눠 담는다.
+ * 메시 단위로만 분류하면 그 모델에서는 「눈」 레이어를 영영 만들 수 없으므로, 재질이 서로 다른
+ * 부위를 가리키는 메시는 슬롯 단위로 쪼갠다. 재질 이름이 더 구체적이라 메시 이름을 이긴다.
+ * 아무 말도 하지 않는 슬롯만 메시 이름의 분류로 되돌린다 — 얼굴을 눈이라 부르느니 그 슬롯을
+ * 얼굴에 두는 쪽이 정직하다.
+ */
+function maskSlotsFromMaterials(mesh: THREE.Mesh): Map<number, CharacterSemanticMaskId> | null {
+  if (!Array.isArray(mesh.material) || mesh.material.length < 2) return null;
+  const own = classifyMeshName(mesh.name).protected;
+  const fallback = own ? PROTECTED_MASK[own] : null;
+  const slots = new Map<number, CharacterSemanticMaskId>();
+  const seen = new Set<CharacterSemanticMaskId>();
+  mesh.material.forEach((material, slot) => {
+    if (!material) return;
+    const category = classifyMeshName(material.name).protected;
+    const mask = category ? PROTECTED_MASK[category] : fallback;
+    if (!mask) return;
+    slots.set(slot, mask);
+    seen.add(mask);
+  });
+  // 슬롯이 전부 같은 마스크를 가리키면 쪼갤 이유가 없다 — 메시 단위 분류가 그대로 맞다.
+  return seen.size > 1 ? slots : null;
+}
+
+/** 마스크 하나가 붙잡는 대상. `slots`가 있으면 그 메시의 해당 재질 슬롯만 이 마스크의 것이다. */
+interface CharacterMaskTarget {
+  readonly mesh: THREE.Mesh;
+  readonly slots: ReadonlySet<number> | null;
+}
+
 interface CharacterMeshIndex {
   /** Every mesh the capture may toggle, in traversal order. */
   readonly meshes: readonly THREE.Mesh[];
-  readonly groups: ReadonlyMap<CharacterSemanticMaskId, ReadonlySet<THREE.Mesh>>;
+  readonly groups: ReadonlyMap<CharacterSemanticMaskId, readonly CharacterMaskTarget[]>;
 }
 
 function indexCharacterMeshes(
@@ -352,17 +383,35 @@ function indexCharacterMeshes(
     if (mask) assigned.set(entry.mesh, mask);
   }
 
+  const slotAssigned = new Map<THREE.Mesh, Map<number, CharacterSemanticMaskId>>();
   for (const mesh of meshes) {
     if (assigned.has(mesh)) continue;
+    // 슬롯 분해가 먼저다. 메시 이름은 합쳐진 머리를 통째로 「얼굴」이라 부르므로, 그 판단을
+    // 먼저 받아들이면 눈은 영원히 얼굴 안에 갇힌다.
+    const slots = maskSlotsFromMaterials(mesh);
+    if (slots) {
+      slotAssigned.set(mesh, slots);
+      continue;
+    }
     const mask = maskFromNames(mesh);
     if (mask) assigned.set(mesh, mask);
   }
 
-  const groups = new Map<CharacterSemanticMaskId, Set<THREE.Mesh>>();
-  for (const [mesh, mask] of assigned) {
-    const bucket = groups.get(mask) ?? new Set<THREE.Mesh>();
-    bucket.add(mesh);
+  const groups = new Map<CharacterSemanticMaskId, CharacterMaskTarget[]>();
+  const push = (mask: CharacterSemanticMaskId, target: CharacterMaskTarget) => {
+    const bucket = groups.get(mask) ?? [];
+    bucket.push(target);
     groups.set(mask, bucket);
+  };
+  for (const [mesh, mask] of assigned) push(mask, { mesh, slots: null });
+  for (const [mesh, slots] of slotAssigned) {
+    const byMask = new Map<CharacterSemanticMaskId, Set<number>>();
+    for (const [slot, mask] of slots) {
+      const bucket = byMask.get(mask) ?? new Set<number>();
+      bucket.add(slot);
+      byMask.set(mask, bucket);
+    }
+    for (const [mask, slotSet] of byMask) push(mask, { mesh, slots: slotSet });
   }
   return { meshes, groups };
 }
@@ -437,19 +486,55 @@ function withRestore<T>(restore: () => void, run: () => T): T {
   }
 }
 
-/** Hide everything outside `keep`; the returned closure puts every flag back as it was. */
+/**
+ * Hide everything outside `targets`; the returned closure puts every flag back as it was.
+ *
+ * 슬롯만 남기는 대상은 메시를 켜 둔 채 나머지 재질의 색 기록만 끈다 — 재질을 갈아 끼우면
+ * 셰이더가 다시 컴파일되고 복원이 어긋날 수 있는데, `colorWrite`는 둘 다 일으키지 않는다.
+ */
 function isolateVisibility(
   meshes: readonly THREE.Mesh[],
-  keep: ReadonlySet<THREE.Mesh>,
+  targets: readonly CharacterMaskTarget[],
 ): () => void {
-  const previous = meshes.map((mesh) => mesh.visible);
-  for (const mesh of meshes) {
-    if (!keep.has(mesh)) mesh.visible = false;
+  const kept = new Map<THREE.Mesh, ReadonlySet<number> | null>();
+  for (const target of targets) {
+    // 같은 메시를 통째로 요구한 대상이 하나라도 있으면 그쪽이 이긴다.
+    if (kept.get(target.mesh) === null) continue;
+    if (target.slots === null) {
+      kept.set(target.mesh, null);
+      continue;
+    }
+    const merged = new Set(kept.get(target.mesh) ?? []);
+    for (const slot of target.slots) merged.add(slot);
+    kept.set(target.mesh, merged);
   }
+
+  const previousVisible = meshes.map((mesh) => mesh.visible);
+  const muted: { material: THREE.Material; colorWrite: boolean; depthWrite: boolean }[] = [];
+  for (const mesh of meshes) {
+    if (!kept.has(mesh)) {
+      mesh.visible = false;
+      continue;
+    }
+    const slots = kept.get(mesh) ?? null;
+    if (slots === null || !Array.isArray(mesh.material)) continue;
+    mesh.material.forEach((material, slot) => {
+      if (!material || slots.has(slot)) return;
+      muted.push({ material, colorWrite: material.colorWrite, depthWrite: material.depthWrite });
+      material.colorWrite = false;
+      // 깊이까지 꺼야 숨긴 슬롯이 남긴 슬롯을 가리지 않는다 — 메시 통째로 끌 때와 같은 결과다.
+      material.depthWrite = false;
+    });
+  }
+
   return () => {
     meshes.forEach((mesh, index) => {
-      mesh.visible = previous[index];
+      mesh.visible = previousVisible[index];
     });
+    for (const entry of muted) {
+      entry.material.colorWrite = entry.colorWrite;
+      entry.material.depthWrite = entry.depthWrite;
+    }
   };
 }
 
@@ -597,7 +682,7 @@ export async function captureCharacterSemanticPasses(
 
   for (const mask of CHARACTER_SEMANTIC_MASK_ORDER) {
     const keep = index.groups.get(mask);
-    if (!keep || keep.size === 0) {
+    if (!keep || keep.length === 0) {
       skipped.push({ pass: mask, reason: MASK_NOT_FOUND_REASONS[mask] });
       continue;
     }

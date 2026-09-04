@@ -208,6 +208,61 @@ async function main(): Promise<void> {
 
     evidence.accessibleNameGaps = await accessibleNameGaps(page);
 
+    // 투명 배경 PNG — 배경이 정말 비어 있는지는 알파로만 확인할 수 있다. "투명"이라 적어 놓고
+    // 캔버스 색을 함께 구워 내보내는 것이 이 기능의 대표적인 실패 방식이다.
+    const transparentSwitch = page.getByRole("switch", { name: /투명 배경/ }).first();
+    if ((await transparentSwitch.getAttribute("aria-checked")) !== "true") {
+      await transparentSwitch.click();
+      await page.waitForTimeout(500);
+    }
+    const pngButton = page.getByRole("button", { name: "PNG 저장" }).first();
+    const pngDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
+    await pngButton.click();
+    const pngDownload: Download = await pngDownloadPromise;
+    const pngPath = join(OUT_DIR, "character-export.png");
+    await pngDownload.saveAs(pngPath);
+    const { readFileSync: readPngFile } = await import("node:fs");
+    const pngAlpha = await page.evaluate(async (encodedPng) => {
+      const response = await fetch(`data:image/png;base64,${encodedPng}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("2D context unavailable");
+      context.drawImage(bitmap, 0, 0);
+      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      let transparent = 0;
+      let opaque = 0;
+      for (let offset = 3; offset < data.length; offset += 4) {
+        if (data[offset] === 0) transparent += 1;
+        else if (data[offset] > 250) opaque += 1;
+      }
+      const total = data.length / 4;
+      // 모서리는 캐릭터가 절대 닿지 않는 곳이다 — 여기가 불투명하면 배경이 함께 구워진 것이다.
+      const corner = (x: number, y: number) => data[(y * bitmap.width + x) * 4 + 3];
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        transparentShare: transparent / total,
+        opaqueShare: opaque / total,
+        corners: [
+          corner(0, 0),
+          corner(bitmap.width - 1, 0),
+          corner(0, bitmap.height - 1),
+          corner(bitmap.width - 1, bitmap.height - 1),
+        ],
+      };
+    }, readPngFile(pngPath).toString("base64"));
+    evidence.transparentPng = pngAlpha;
+    invariant(
+      pngAlpha.corners.every((alpha) => alpha === 0),
+      `transparent PNG has an opaque corner: ${pngAlpha.corners.join(", ")}`,
+    );
+    invariant(
+      pngAlpha.transparentShare > 0.1 && pngAlpha.opaqueShare > 0.01,
+      `transparent PNG holds no character over a transparent ground `
+        + `(transparent ${pngAlpha.transparentShare.toFixed(3)}, opaque ${pngAlpha.opaqueShare.toFixed(3)})`,
+    );
+
     // PSD export
     const psdButton = page.getByRole("button", { name: /PSD/ }).first();
     const downloadPromise = page.waitForEvent("download", { timeout: 120_000 });
@@ -222,6 +277,21 @@ async function main(): Promise<void> {
     walk(psd.children);
     evidence.psdLayers = layerNames;
     invariant(layerNames.length >= 8, `PSD has too few layers: ${layerNames.join(", ")}`);
+
+    // Esc 순서 — 서랍이 열려 있으면 Esc는 서랍만 닫는다. 첫 Esc에 작업 전체가 닫히면
+    // 참고 이미지를 보다가 실수로 편집 화면을 잃는다.
+    const drawerOpener = page.getByRole("button", { name: "참고 이미지 AI 추천" }).first();
+    await drawerOpener.click();
+    await page.waitForSelector('[data-character-shaper-drawer]', { timeout: 30_000 });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+    const escOrder = {
+      drawerClosed: (await page.locator('[data-character-shaper-drawer]').count()) === 0,
+      dialogStillOpen: (await page.locator(DIALOG).count()) > 0,
+    };
+    evidence.escOrder = escOrder;
+    invariant(escOrder.drawerClosed, "Esc did not close the reference drawer");
+    invariant(escOrder.dialogStillOpen, "Esc closed the whole workspace while the drawer was open");
 
     // Mobile
     const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "ko-KR", isMobile: true, hasTouch: true });

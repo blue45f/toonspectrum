@@ -198,6 +198,30 @@ function reasonFor(skipped: readonly CharacterSemanticSkip[], pass: CharacterSem
   return skipped.find((entry) => entry.pass === pass)?.reason ?? "";
 }
 
+/**
+ * VRoid 계열 머리 — 얼굴·눈이 한 메시 안에 재질 슬롯으로만 나뉜다. 메시 이름은 어느 쪽도
+ * 가리키지 않으므로 슬롯 단위로 쪼개지 않으면 「눈」 레이어를 만들 수 없다.
+ */
+function buildMergedHeadScene() {
+  const faceMaterial = mtoon("F00_000_00_FaceMouth_00_FACE", "#f0c8a8", "#c89878");
+  const eyeMaterial = mtoon("F00_000_00_EyeIris_00_EYE", "#3a6ea8", "#24486a");
+  const head = new THREE.Mesh(new THREE.BoxGeometry(), [faceMaterial, eyeMaterial]);
+  head.name = "N00_000_00_HeadMesh";
+
+  const root = new THREE.Group();
+  root.name = "VRMRoot";
+  root.add(head);
+  const scene = new THREE.Scene();
+  scene.add(root);
+  return {
+    head,
+    faceMaterial,
+    eyeMaterial,
+    vrm: { scene: root } as unknown as VRM,
+    capture: { gl: {} as THREE.WebGLRenderer, scene, camera: new THREE.PerspectiveCamera() },
+  };
+}
+
 function pass(id: CharacterSemanticPassId, rgba: Uint8ClampedArray): CharacterSemanticPass {
   return { id, width: WIDTH, height: HEIGHT, rgba };
 }
@@ -227,6 +251,62 @@ describe("character shaper semantic capture — passes", () => {
     expect(flat.shading).toContain("Tops:#4a6ea8:1:1");
     // The outline draw is deliberately left alone so the line pass can still find it.
     expect(flat.shading).toContain("FaceBase (Outline):#1b1714:-0.25:0.9");
+  });
+
+  it("separates eyes from a merged head by muting the other material slots", async () => {
+    const scene = buildMergedHeadScene();
+    const renderer = fakeRenderer();
+
+    const result = await captureCharacterSemanticPasses(
+      { capture: scene.capture, vrm: scene.vrm, width: WIDTH, height: HEIGHT },
+      renderer.dependencies,
+    );
+
+    // 눈과 얼굴 둘 다 레이어가 나와야 한다 — 한 메시 안에 있다는 이유로 포기하지 않는다.
+    const ids = result.passes.map((pass) => pass.id);
+    expect(ids).toContain("mask-eyes");
+    expect(ids).toContain("mask-face");
+    expect(reasonFor(result.skipped, "mask-eyes")).toBe("");
+
+    // 눈 패스에서는 얼굴 재질만 꺼진다. 메시 자체는 계속 그려져야 눈이 남는다.
+    const eyePass = renderer.observations.find((observation) =>
+      observation.muted.length === 1 && observation.muted[0] === scene.faceMaterial.name);
+    expect(eyePass).toBeTruthy();
+    expect(eyePass?.visible).toContain("N00_000_00_HeadMesh");
+
+    const facePass = renderer.observations.find((observation) =>
+      observation.muted.length === 1 && observation.muted[0] === scene.eyeMaterial.name);
+    expect(facePass).toBeTruthy();
+
+    // 캡처가 끝나면 두 재질의 colorWrite가 원래대로 돌아온다.
+    expect(scene.faceMaterial.colorWrite).toBe(true);
+    expect(scene.eyeMaterial.colorWrite).toBe(true);
+  });
+
+  it("leaves a single-purpose multi-material mesh classified as one whole mesh", async () => {
+    // 슬롯이 전부 같은 부위를 가리키면 쪼갤 이유가 없다 — 메시 단위 분류가 그대로 맞다.
+    const outer = mtoon("Tops_Outer", "#4a6ea8", "#2c4468");
+    const inner = mtoon("Tops_Inner", "#3a5e98", "#1c3458");
+    const shirt = new THREE.Mesh(new THREE.BoxGeometry(), [outer, inner]);
+    shirt.name = "Cloth_01";
+    const root = new THREE.Group();
+    root.name = "VRMRoot";
+    root.add(shirt);
+    const scene = new THREE.Scene();
+    scene.add(root);
+    const renderer = fakeRenderer();
+
+    await captureCharacterSemanticPasses(
+      {
+        capture: { gl: {} as THREE.WebGLRenderer, scene, camera: new THREE.PerspectiveCamera() },
+        vrm: { scene: root } as unknown as VRM,
+        width: WIDTH,
+        height: HEIGHT,
+      },
+      renderer.dependencies,
+    );
+
+    expect(renderer.observations.every((observation) => observation.muted.length === 0)).toBe(true);
   });
 
   it("restores every material factor after the flat pass", async () => {
@@ -317,7 +397,7 @@ describe("character shaper semantic capture — passes", () => {
     );
 
     expect(passes.map((entry) => entry.id)).not.toContain("mask-eyes");
-    expect(reasonFor(skipped, "mask-eyes")).toContain("얼굴 메시에 합쳐진");
+    expect(reasonFor(skipped, "mask-eyes")).toContain("얼굴과 한 재질로 합쳐진");
     expect(passes.map((entry) => entry.id)).not.toContain("mask-shoes");
     expect(reasonFor(skipped, "mask-shoes")).toContain("신발");
     expect(reasonFor(skipped, "surface-paint")).toContain("표면 드로잉");
