@@ -104,7 +104,7 @@ Pure transformations live next to their domain, for example Writer Room page pro
 
 - Application and Studio router seams: at most 100 lines.
 - New Studio runtime modules: at most 300 lines and zero explicit `any`.
-- The legacy Studio host line ceiling is a ratchet and may only decrease.
+- The legacy Studio host line ceiling is a ratchet and may only decrease. The adoption ceiling is 29,459 lines.
 - UI components do not receive new raw React setter bags. Prefer intent-level commands or a typed client.
 - Runtime modules do not import `StudioCuttoonEditorHost`.
 - Route IDs and paths are unique and the catch-all is last.
@@ -123,6 +123,18 @@ Architecture is the first performance boundary:
 5. Validate the production chunk graph with the existing Studio bundle gate before adding manual chunk rules.
 
 React Router framework-mode route modules were reviewed, but ToonSpectrum currently uses a declarative `BrowserRouter` boundary that is also part of the security review. Migrating router modes would combine architecture, security, and data-loading changes. This refactor instead obtains the route-ownership and code-splitting benefits with the current reviewed runtime and Vite dynamic imports.
+
+## Adoption verification
+
+The final adoption candidate was normalized and verified as one coherent change set on 2026-09-04:
+
+- changed-file ESLint auto-fix followed by a zero-warning changed-file lint gate
+- the repository architecture validator
+- full frontend and API TypeScript checks
+- route registry, Studio host ratchet, i18n loading, inspector boundary, Studio router boundary, and Writer Room projection tests
+- Git whitespace and patch-integrity checks
+
+The focused suite passed 6 test files and 29 tests. The verification commit also proved that every newly extracted runtime stays within the size, explicit-`any`, reverse-import, and dependency-cycle guardrails described above.
 
 ## Repository hygiene
 
