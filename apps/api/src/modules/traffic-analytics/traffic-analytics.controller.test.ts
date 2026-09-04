@@ -15,6 +15,7 @@ describe("TrafficAnalyticsController", () => {
   const request = {
     headers: {
       host: "www.toonstudio.cloud",
+      origin: "https://www.toonstudio.cloud",
       "user-agent": "Test Browser",
       "x-vercel-ip-country": "KR",
     },
@@ -26,9 +27,27 @@ describe("TrafficAnalyticsController", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it("forwards normalized request context to the collector", async () => {
+  it("rejects a foreign browser origin even when the public proof is copied", async () => {
+    const foreignRequest = {
+      headers: {
+        ...request.headers,
+        origin: "https://attacker.example",
+      },
+    } as unknown as Request;
     await expect(
-      controller.recordPageView(request, "1", {
+      controller.recordPageView(foreignRequest, "1", {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("forwards normalized request context and server-side privacy signals", async () => {
+    const privacyRequest = {
+      headers: {
+        ...request.headers,
+        dnt: "1",
+      },
+    } as unknown as Request;
+    await expect(
+      controller.recordPageView(privacyRequest, "1", {
         visitorId: "visitor_1234567890",
         sessionId: "session_1234567890",
         path: "/studio",
@@ -39,7 +58,16 @@ describe("TrafficAnalyticsController", () => {
       expect.objectContaining({
         host: "www.toonstudio.cloud",
         countryCode: "KR",
+        privacyOptOut: true,
       }),
+    );
+  });
+
+  it("normalizes non-object bodies before they reach the service", async () => {
+    await controller.recordHeartbeat(request, "1", null);
+    expect(service.recordHeartbeat).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ host: "www.toonstudio.cloud" }),
     );
   });
 });
