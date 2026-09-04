@@ -1,0 +1,87 @@
+name: Studio InkWash live preview quality
+
+on:
+  push:
+    branches:
+      - main
+      - fix/inkwash-live-preview-quality-20260904
+    paths:
+      - "src/domains/creator/brush/studio-inkwash-fluid.ts"
+      - "src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts"
+      - "src/domains/creator/live/studio-live-wet-ink-overlay.ts"
+      - "src/domains/creator/live/studio-live-wet-ink-integration.test.ts"
+      - "scripts/verify-studio-long-stroke.mts"
+      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - ".github/workflows/studio-inkwash-live-preview-quality.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/brush/studio-inkwash-fluid.ts"
+      - "src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts"
+      - "src/domains/creator/live/studio-live-wet-ink-overlay.ts"
+      - "src/domains/creator/live/studio-live-wet-ink-integration.test.ts"
+      - "scripts/verify-studio-long-stroke.mts"
+      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - ".github/workflows/studio-inkwash-live-preview-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-inkwash-live-preview-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve verification directory after runner allocation
+        run: echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/studio-inkwash-live-preview-quality" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Focused quality contracts
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/brush/studio-inkwash-fluid-deposit.test.ts
+          src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts
+          src/domains/creator/live/studio-live-wet-ink-overlay.test.ts
+          src/domains/creator/live/studio-live-wet-ink-integration.test.ts
+      - name: Lint quality surface
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/brush/studio-inkwash-fluid.ts
+          src/domains/creator/brush/studio-inkwash-fluid-live-preview.test.ts
+          src/domains/creator/live/studio-live-wet-ink-overlay.ts
+          src/domains/creator/live/studio-live-wet-ink-integration.test.ts
+          scripts/verify-studio-long-stroke.mts
+          scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Production build
+        run: pnpm run build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Live/commit visual and long-stroke gate
+        env:
+          TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
+        run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+      - name: Upload visual evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-inkwash-live-preview-quality
+          path: ${{ env.TOONSPECTRUM_VERIFY_DIR }}
+          if-no-files-found: warn
+          retention-days: 14
