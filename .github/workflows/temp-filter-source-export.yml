@@ -19,13 +19,12 @@ jobs:
         run: |
           tar -czf filter-source.tar.gz \
             src/domains/creator/filter \
-            src/domains/creator/studio-filter-menu.ts \
-            src/domains/creator/studio-filter-pack.ts \
-            src/domains/creator/studio-filter-union-wave.ts \
-            src/domains/creator/render/studio-konva-filter-fields.ts \
-            src/domains/creator/studio-effect-favorites.ts \
-            src/domains/creator/studio-ui-preferences-sqlite.ts \
+            src/domains/creator/render \
+            src/domains/creator/studio-*.ts \
+            src/domains/creator/brush/studio-ink-wash.ts \
+            src/domains/creator/layer/studio-layer-border-effect.ts \
             scripts/verify-studio-filter-dialog.mts \
+            scripts/verify-studio-gpu-filters.mts \
             package.json \
             pnpm-lock.yaml \
             tsconfig.json \
