@@ -1,0 +1,75 @@
+name: Harden component-aware VRM PSD
+
+on:
+  push:
+    branches:
+      - feat/vrm-component-psd-linked-render-20260904
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-vrm-component-psd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: ${{ !contains(github.event.head_commit.message, '[vrm-component-psd-hardened]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-component-psd-linked-render-20260904
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Wait for the base finalizer when it is still materializing tests
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            git fetch origin feat/vrm-component-psd-linked-render-20260904
+            git reset --hard origin/feat/vrm-component-psd-linked-render-20260904
+            if [[ -f src/domains/creator/vrm/studio-vrm-component-psd.test.ts ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test -f src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+
+      - name: Apply semantic hardening
+        run: python3 scripts/harden-vrm-component-psd.py
+
+      - name: Inspect hardened diff
+        run: git diff --check && git status --short
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify hardened component PSD
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/vrm/studio-vrm-component-psd.ts \
+            src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec vitest run src/domains/creator/vrm/studio-vrm-component-psd.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm run build
+
+      - name: Commit hardened implementation
+        run: |
+          rm -f scripts/harden-vrm-component-psd.py
+          rm -f .github/workflows/harden-vrm-component-psd.yml
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit --no-verify -m "fix(studio): harden VRM component PSD semantics [vrm-component-psd-hardened]"
+          git push --no-verify origin HEAD:feat/vrm-component-psd-linked-render-20260904
