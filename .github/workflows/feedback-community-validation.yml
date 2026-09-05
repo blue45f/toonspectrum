@@ -60,8 +60,11 @@ jobs:
           e2e/feedback-community-harness.tsx
           e2e/feedback-community.spec.ts
           e2e/feedback-community-contract.spec.ts
+          e2e/feedback-community-resilience.spec.ts
           packages/core/src/feedback.test.ts
           packages/core/src/feedback.ts
+          packages/core/src/feedback-response.ts
+          packages/core/src/feedback-response.test.ts
           packages/core/src/index.ts
           packages/core/src/types.ts
           playwright.feedback.config.ts
@@ -97,10 +100,10 @@ jobs:
         id: types
         continue-on-error: true
         run: pnpm run typecheck 2>&1 | tee artifacts/feedback/typecheck.log
-      - name: Shared input contract tests
+      - name: Shared input and response contract tests
         id: unit
         continue-on-error: true
-        run: pnpm exec vitest run packages/core/src/feedback.test.ts 2>&1 | tee artifacts/feedback/unit.log
+        run: pnpm exec vitest run packages/core/src/feedback.test.ts packages/core/src/feedback-response.test.ts 2>&1 | tee artifacts/feedback/unit.log
       - name: Isolated PostgreSQL regression tests
         id: database
         continue-on-error: true
