@@ -135,7 +135,7 @@ const UNION_NUMERIC_CONTROLS: Readonly<
   "polar-coordinates": [AMOUNT, CENTER_X, CENTER_Y],
 });
 
-export function isStudioSmartFilterUnionEngine(
+function isStudioSmartFilterUnionEngine(
   value: string,
 ): value is StudioFilterUnionWaveKind {
   return UNION_ENGINE_SET.has(value);

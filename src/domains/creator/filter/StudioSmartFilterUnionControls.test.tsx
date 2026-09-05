@@ -2,17 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./studio-filter-pack-registry";
-import {
-  StudioSmartFilterUnionControls,
-  isStudioSmartFilterUnionEngine,
-} from "./StudioSmartFilterUnionControls";
+import { StudioSmartFilterUnionControls } from "./StudioSmartFilterUnionControls";
 
 describe("StudioSmartFilterUnionControls", () => {
-  it("recognizes the complete Filter Gallery union set", () => {
-    for (const engine of STUDIO_FILTER_UNION_WAVE_KINDS) {
-      expect(isStudioSmartFilterUnionEngine(engine)).toBe(true);
-    }
-    expect(isStudioSmartFilterUnionEngine("gaussian-blur")).toBe(false);
+  it.each(STUDIO_FILTER_UNION_WAVE_KINDS)("renders editable controls for %s", (engine) => {
+    const html = renderToStaticMarkup(
+      <StudioSmartFilterUnionControls engine={engine} params={{}} onChange={vi.fn()} />,
+    );
+    expect(html).toContain('type="range"');
+    expect(html).toContain("세기");
   });
 
   it("renders reversible geometry controls with interpolation", () => {
@@ -29,7 +27,7 @@ describe("StudioSmartFilterUnionControls", () => {
     expect(html).toContain("중심 Y");
     expect(html).toContain("부드러운 보간");
     expect(html).toContain("최근접 · 픽셀 보존");
-    expect(html.match(/type=\"range\"/g)?.length).toBe(5);
+    expect(html.match(/type="range"/g)?.length).toBe(5);
   });
 
   it("exposes both polar directions and deterministic material controls", () => {
@@ -54,16 +52,19 @@ describe("StudioSmartFilterUnionControls", () => {
     expect(material).toContain("셀 크기");
     expect(material).toContain("납선 농도");
     expect(material).toContain("시드");
-    expect(material.match(/type=\"range\"/g)?.length).toBe(4);
+    expect(material.match(/type="range"/g)?.length).toBe(4);
   });
 
-  it("renders nothing for an engine already handled by the base panel", () => {
-    expect(renderToStaticMarkup(
-      <StudioSmartFilterUnionControls
-        engine="levels"
-        params={{}}
-        onChange={vi.fn()}
-      />,
-    )).toBe("");
-  });
+  it.each(["levels", "gaussian-blur", "not-a-filter"])(
+    "renders nothing for non-union engine %s",
+    (engine) => {
+      expect(renderToStaticMarkup(
+        <StudioSmartFilterUnionControls
+          engine={engine}
+          params={{}}
+          onChange={vi.fn()}
+        />,
+      )).toBe("");
+    },
+  );
 });
