@@ -202,7 +202,14 @@ function channel(): BroadcastChannel | null {
     broadcastChannel = null;
     return null;
   }
-  broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
+  // 존재는 생성 가능성이 아니다. 스토리지가 분할된 인앱 WebView 는 생성자를 노출한 채 `new` 에서
+  // SecurityError 를 던지고, 그 throw 가 channel() 밖으로 새어 소셜 구독 경로를 통째로 깬다.
+  try {
+    broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
+  } catch {
+    broadcastChannel = null;
+    return null;
+  }
   broadcastChannel.addEventListener("message", (event) => {
     if (!isBroadcastMessage(event.data)) return;
     for (const store of stores.values()) {

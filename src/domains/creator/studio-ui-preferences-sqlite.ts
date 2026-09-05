@@ -82,7 +82,8 @@ export interface StudioUiPreferencesRepository {
   saveBooleanPreference(key: StudioUiBooleanPreferenceKey, value: boolean): Promise<void>;
   loadBackgroundRecent(): Promise<StudioBackgroundRecentState>;
   saveBackgroundRecent(state: StudioBackgroundRecentState): Promise<void>;
-  /** Which 3D engine the artist last chose for the background editor: auto, WebGPU, or WebGL2. */
+  /** Which 3D engine the artist explicitly chose for the background editor: WebGPU or WebGL2.
+   *  There is no auto lane — a stored legacy "auto" normalizes to WebGPU (ADR 0018). */
   loadBg3dEnginePreference(): Promise<StudioBg3dEnginePreference>;
   saveBg3dEnginePreference(preference: StudioBg3dEnginePreference): Promise<void>;
   loadEffectFavorites(): Promise<StudioEffectFavoriteState>;

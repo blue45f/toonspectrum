@@ -6,7 +6,7 @@ import {
 import { StudioBg3dMultiPassExporterPanel as StudioBg3dMultiPassExporterPanelContent } from "./StudioBg3dMultiPassExporterPanelContent";
 import { StudioBg3dProductionMultiPassExporterPanel } from "./StudioBg3dProductionMultiPassExporterPanel";
 import { StudioBg3dProductionPassPreflightPanel } from "./StudioBg3dProductionPassPreflightPanel";
-import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowPanel";
+import { StudioBg3dProductionWorkflowPanel } from "./StudioBg3dProductionWorkflowBoundary";
 
 import type { StudioBg3dMultiPassExporterPanelProps } from "./StudioBg3dMultiPassExporterPanelContent";
 
