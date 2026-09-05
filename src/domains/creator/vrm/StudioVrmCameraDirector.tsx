@@ -2,8 +2,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-import { findCameraPreset } from "./studio-vrm-poser-helpers";
 import { resolveStudioVrmPortraitBounds, type StudioVrmPortraitLandmarks } from "./studio-vrm-portrait-framing";
+import { findCameraPreset } from "./studio-vrm-poser-helpers";
 import { fitStudioVrmPreviewCamera } from "./studio-vrm-preview-framing";
 import { applyCameraPreset, type OrbitLike } from "./StudioVrmPoserTypes";
 
@@ -72,14 +72,16 @@ export function CameraDirector({ presetId, resetNonce, vrm, interactionLocked = 
 
   // Measure after base pose (-3), prop IK (-2), grip refinement (-1.5) and raw
   // commit (-1). Resizing a panel or editing a finger is not a framing command.
-  useFrame(({ size }) => {
+  // Read mutable Three objects from the current frame, not a useThree snapshot.
+  useFrame(({ camera: frameCamera, controls: frameControls, size }) => {
     if (!pendingRef.current || presetId === "custom" || interactionLocked || size.width <= 0 || size.height <= 0) return;
     pendingRef.current = false;
+    const orbit = frameControls as OrbitLike;
     let effectivePreset = preset;
     let fitDistance: number | null = null;
     let boundsRadius = 0;
     if (vrm?.scene) {
-      const box = visibleCharacterBounds(vrm.scene, camera);
+      const box = visibleCharacterBounds(vrm.scene, frameCamera);
       const bodyBounds = { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] };
       const portrait = resolveStudioVrmPortraitBounds(presetId, bodyBounds, portraitLandmarks(vrm));
       // Keep the actual portrait lens/direction, fitting only its landmark region.
@@ -106,22 +108,22 @@ export function CameraDirector({ presetId, resetNonce, vrm, interactionLocked = 
       }
     }
     const vertical = Math.hypot(effectivePreset.position[0] - effectivePreset.target[0], effectivePreset.position[2] - effectivePreset.target[2]) < 1e-8;
-    camera.up.set(0, vertical ? 0 : 1, vertical ? 1 : 0);
-    if (camera instanceof THREE.PerspectiveCamera) camera.zoom = 1;
+    frameCamera.up.set(0, vertical ? 0 : 1, vertical ? 1 : 0);
+    if (frameCamera instanceof THREE.PerspectiveCamera) frameCamera.zoom = 1;
     if (fitDistance !== null) {
-      if (controls) {
-        controls.minDistance = Math.min(controls.minDistance ?? 1.3, fitDistance * 0.25);
-        controls.maxDistance = Math.max(controls.maxDistance ?? 5.2, fitDistance * 3);
+      if (orbit) {
+        orbit.minDistance = Math.min(orbit.minDistance ?? 1.3, fitDistance * 0.25);
+        orbit.maxDistance = Math.max(orbit.maxDistance ?? 5.2, fitDistance * 3);
       }
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.near = Math.min(camera.near, Math.max(0.001, fitDistance * 0.005));
-        camera.far = Math.max(camera.far, fitDistance + boundsRadius * 3);
+      if (frameCamera instanceof THREE.PerspectiveCamera) {
+        frameCamera.near = Math.min(frameCamera.near, Math.max(0.001, fitDistance * 0.005));
+        frameCamera.far = Math.max(frameCamera.far, fitDistance + boundsRadius * 3);
       }
     }
-    applyCameraPreset(camera, effectivePreset, invalidate);
-    if (controls?.target) {
-      controls.target.set(...effectivePreset.target);
-      controls.update?.();
+    applyCameraPreset(frameCamera, effectivePreset, invalidate);
+    if (orbit?.target) {
+      orbit.target.set(...effectivePreset.target);
+      orbit.update?.();
     }
   });
   return null;
