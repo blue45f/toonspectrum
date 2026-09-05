@@ -6,6 +6,7 @@ import { MusicTrackCard } from "./MusicTrackCard";
 import { generateMusic, getMusicStatus } from "./studio-music-client";
 import { deleteMusicTrack, loadMusicTracks, saveMusicTrack } from "./studio-music-library";
 import { createMusicRecovery } from "./studio-music-recovery";
+import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
@@ -17,8 +18,7 @@ const inputClass = "w-full rounded-xl border border-line bg-canvas px-3 py-2.5 t
 const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
   const [params] = useSearchParams();
-  const requestedWorkId = params.get("workId") ?? "";
-  const workId = /^[a-zA-Z0-9_-]{1,80}$/.test(requestedWorkId) ? requestedWorkId : "";
+  const workId = readMusicWorkId(params.get("workId"));
   const [brief, setBrief] = useState<MusicBrief>(() => ({ ...defaultMusicBrief(), workId }));
   const [status, setStatus] = useState<MusicStatus | null>(null);
   const [statusError, setStatusError] = useState("");
@@ -45,6 +45,11 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
     return () => controller.abort();
   }, [statusAttempt]);
   useEffect(() => { if (ownerId) void recovery.load().catch(() => undefined); }, [ownerId, recovery]);
+  useEffect(() => {
+    // Route changes must not remount the account library or discard its unsaved paid output.
+    setBrief((previous) => previous.workId === workId ? previous : scopeMusicBrief(previous, workId));
+    setOnlyWork(!!workId);
+  }, [workId]);
   useEffect(() => () => { pending.current?.abort(); pending.current = null; }, []);
   useEffect(() => {
     if (!needsLeaveWarning) return;
@@ -60,10 +65,10 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const currentLibrary = recovery.getSnapshot();
-    if (pending.current || currentLibrary.loading || !currentLibrary.loaded || currentLibrary.loadError || currentLibrary.pendingIds.length || !ownerId || !status?.enabled) return;
+    if (pending.current || currentLibrary.loading || !currentLibrary.loaded || currentLibrary.loadError || currentLibrary.pendingIds.length || brief.workId !== workId || !ownerId || !status?.enabled) return;
     setError(""); setNotice("");
     let parsed: MusicBrief;
-    try { parsed = parseMusicBrief(brief); } catch (reason) { setError(reason instanceof Error ? reason.message : "입력을 확인해 주세요."); return; }
+    try { parsed = parseMusicBrief({ ...brief, workId }); } catch (reason) { setError(reason instanceof Error ? reason.message : "입력을 확인해 주세요."); return; }
     if (currentLibrary.tracks.length >= 20) { setError("보관함의 기존 곡을 다운로드한 뒤 삭제해 공간을 확보해 주세요. 최대 20곡입니다."); return; }
     const controller = new AbortController();
     pending.current = controller; setBusy(true);
@@ -79,6 +84,7 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
         if (!controller.signal.aborted) setNotice(`음원은 생성됐지만 저장 완료를 확인하지 못했습니다. MP3를 먼저 다운로드하거나 같은 음원을 기기에 다시 저장해 주세요. ${reason instanceof Error ? reason.message : ""}`);
       }
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = await getApiErrorMessage(reason, "음악 생성에 실패했습니다. 자동 재시도하지 않습니다.");
       if (!controller.signal.aborted) setError(message);
     } finally {
@@ -118,7 +124,7 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
       </section>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <form ref={formRef} onSubmit={(event) => void submit(event)} className="min-w-0 space-y-5 rounded-2xl border border-line bg-card p-5 sm:p-6" aria-label="AI 음악 만들기">
-          <div><h2 className="flex items-center gap-2 text-xl font-semibold"><Sparkles size={20} aria-hidden />AI 음악 만들기</h2><p className="mt-1 text-sm text-fg-3">장면을 설명하고 원하는 음악의 결을 골라 주세요.</p></div>
+          <div><h2 className="flex items-center gap-2 text-xl font-semibold"><Sparkles size={20} aria-hidden />AI 음악 만들기</h2><p className="mt-1 text-sm text-fg-3">장면을 설명하고 원하는 음악의 결을 골라 주세요.</p><p className="mt-2 break-all text-xs text-fg-3" aria-live="polite">{workId ? `새 음악 연결 작품: ${workId}` : "새 음악은 특정 작품에 연결하지 않습니다."}</p></div>
           <fieldset disabled={busy} className="space-y-5 disabled:opacity-70">
             <label className="block space-y-2 text-sm font-medium">음악 제목<input className={inputClass} required maxLength={80} value={brief.title} onChange={(event) => patch({ title: event.target.value })} /></label>
             <fieldset><legend className="mb-2 text-sm font-medium">어떤 장면인가요?</legend><div className="grid grid-cols-2 gap-2">{MUSIC_MOODS.map((mood) => <button key={mood.id} type="button" aria-pressed={brief.mood === mood.id} onClick={() => patch({ mood: mood.id, bpm: mood.bpm })} className={`min-h-16 rounded-xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-accent ${brief.mood === mood.id ? "border-accent bg-accent/10" : "border-line hover:bg-panel"}`}><span className="block text-sm font-semibold">{mood.label}</span><span className="mt-1 block text-xs text-fg-3">{mood.hint}</span></button>)}</div></fieldset>
@@ -134,7 +140,7 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
             <details className="rounded-xl border border-line p-3"><summary className="cursor-pointer text-sm font-medium">생성 프롬프트 확인</summary><pre className="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-fg-2">{preview}</pre></details>
             <label className="flex items-start gap-3 rounded-xl border border-line bg-panel/40 p-3 text-xs leading-relaxed"><input type="checkbox" className="mt-1" required checked={brief.rightsConfirmed} onChange={(event) => patch({ rightsConfirmed: event.target.checked })} /><span>입력한 장면·가사를 사용할 권한이 있으며, 음악 생성을 위해 외부 공급자 ElevenLabs로 전송됨에 동의합니다. 유료 생성과 이용 조건을 확인했습니다.</span></label>
           </fieldset>
-          <div className="flex gap-2"><button type="submit" className={`${buttonClass} flex-1 border-accent bg-accent font-semibold text-on-accent hover:bg-accent/90`} disabled={busy || libraryLoading || !!library.loadError || pendingIds.length > 0 || !ownerId || !status?.enabled || !brief.rightsConfirmed}><Music4 size={18} aria-hidden />{savingTrack ? "음원 저장 중…" : busy ? "음악 생성 중…" : "AI 음악 생성"}</button>{busy && !savingTrack && <button type="button" className={buttonClass} onClick={cancel}><Square size={14} aria-hidden />취소</button>}</div>
+          <div className="flex gap-2"><button type="submit" className={`${buttonClass} flex-1 border-accent bg-accent font-semibold text-on-accent hover:bg-accent/90`} disabled={busy || libraryLoading || !!library.loadError || pendingIds.length > 0 || brief.workId !== workId || !ownerId || !status?.enabled || !brief.rightsConfirmed}><Music4 size={18} aria-hidden />{savingTrack ? "음원 저장 중…" : busy ? "음악 생성 중…" : "AI 음악 생성"}</button>{busy && !savingTrack && <button type="button" className={buttonClass} onClick={cancel}><Square size={14} aria-hidden />취소</button>}</div>
           <p className="text-xs leading-relaxed text-fg-3">중복 클릭은 한 번만 접수합니다. 취소·시간 초과 후에도 공급자 처리분은 과금될 수 있습니다. 생성 요청을 자동 재시도하지 않습니다.</p>
         </form>
         <section className="min-w-0 space-y-4" aria-labelledby="music-library-heading">
@@ -147,7 +153,7 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
           <div aria-live="polite" aria-atomic="true">{busy && <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-4 text-sm">{savingTrack ? "음원 생성이 완료되어 기기 저장 결과를 확인하고 있습니다. MP3 다운로드는 지금도 가능합니다." : "장면에 맞는 음악을 생성하고 있습니다. 이 화면에서 결과를 받은 뒤 기기 보관함에 저장합니다."}</p>}{notice && <p className="mt-3 rounded-xl border border-line bg-panel/40 p-4 text-sm leading-relaxed">{notice}</p>}</div>
           {error && <p role="alert" className="rounded-xl border border-bad/30 bg-bad/5 p-4 text-sm text-bad">{error}</p>}
           {libraryLoading && <p role="status" className="p-5 text-sm text-fg-3">기기 보관함을 여는 중…</p>}
-          {visibleTracks.map((track) => <MusicTrackCard key={track.metadata.id} track={track} saved={savedIds.includes(track.metadata.id)} busy={busy} pending={pendingIds.includes(track.metadata.id)} onSave={() => saveAgain(track)} onDelete={() => remove(track)} onReuse={() => { lyricsDraft.current = track.metadata.brief.lyrics; setBrief({ ...track.metadata.brief, instruments: [...track.metadata.brief.instruments], workId: workId || track.metadata.brief.workId, rightsConfirmed: false }); setNotice("이전 설정을 불러왔습니다. 내용을 수정한 뒤 생성하면 새로운 유료 요청이 접수됩니다."); formRef.current?.scrollIntoView({ block: "start" }); }} />)}
+          {visibleTracks.map((track) => <MusicTrackCard key={track.metadata.id} track={track} saved={savedIds.includes(track.metadata.id)} busy={busy || libraryLoading} pending={pendingIds.includes(track.metadata.id)} onSave={() => saveAgain(track)} onDelete={() => remove(track)} onReuse={() => { lyricsDraft.current = track.metadata.brief.lyrics; setBrief(scopeMusicBrief(track.metadata.brief, workId)); setNotice("이전 설정을 불러왔습니다. 내용을 수정한 뒤 생성하면 새로운 유료 요청이 접수됩니다."); formRef.current?.scrollIntoView({ block: "start" }); }} />)}
           {!libraryLoading && !library.loadError && visibleTracks.length === 0 && <div className="rounded-2xl border border-dashed border-line p-10 text-center"><Headphones size={32} className="mx-auto mb-4 text-fg-3" aria-hidden /><h3 className="font-semibold">{tracks.length ? "검색 조건에 맞는 음악이 없어요" : "아직 만들어진 음악이 없어요"}</h3><p className="mt-2 text-sm leading-relaxed text-fg-3">분위기를 고르고 장면을 설명해 주세요.<br />실제로 생성된 음원만 이곳에 표시됩니다.</p></div>}
           <aside className="rounded-2xl border border-line bg-card p-5 text-sm leading-relaxed"><h3 className="font-semibold">작품에 사용할 때</h3><p className="mt-2 text-fg-2">음악을 만든 후 MP3와 제작 정보를 내려받아 영상 편집에 사용하세요. 작품 ID 연결은 보관함 분류용이며, 독자용 BGM을 자동 게시하지 않습니다. 효과툰의 오디오 URL에는 직접 호스팅한 지속적인 HTTPS 음원 주소가 필요합니다.</p><a href={MUSIC_TERMS_URL} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block min-h-9 text-accent underline underline-offset-4">음원 이용 조건 확인</a><p className="text-xs text-fg-3">상용 이용 범위는 공급자 요금제·용도에 따라 달라집니다. 모든 배포·재판매에 대한 권리를 보장하지 않습니다.</p></aside>
         </section>
