@@ -1,0 +1,143 @@
+name: Storyworld shard forwarding repair
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-shard-forwarding-repair.yml]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PRODUCT_BRANCH: feat/storyworld-causality-lab-20260905
+      EXPECTED_HEAD: 8cdac2359526a33a71811d3de80f1eee73be0911
+      MERGED_BASE: 369469299c24b6b9d23114d716a3818945bb874b
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 369469299c24b6b9d23114d716a3818945bb874b
+          persist-credentials: false
+          show-progress: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Correct only the pnpm option terminator and add a regression contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          path = Path('.github/workflows/ci.yml')
+          data = path.read_bytes()
+          assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == '9f5f2e955f3bc3227489b52d0014d25e575f6273'
+          text = data.decode()
+          old = 'run: pnpm run test:root -- --shard='
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, 'run: pnpm run test:root --shard=', 1))
+          test = Path('scripts/ci-shard-forwarding.test.mjs')
+          assert not test.exists()
+          test.write_text('''import { execFileSync } from "node:child_process";
+          import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+          import { tmpdir } from "node:os";
+          import { join } from "node:path";
+
+          import { describe, expect, it } from "vitest";
+          import { parse } from "yaml";
+
+          const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+          const testJob = workflow.jobs.test;
+          const step = testJob.steps.find((entry) => entry.name === "Run this shard of the root Vitest suite with per-file progress");
+
+          describe("CI root shard forwarding", () => {
+            it("passes the shard option to Vitest instead of terminating option parsing", () => {
+              expect(step.run).toBe("pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}");
+              expect(testJob.strategy.matrix.shard).toEqual([1, 2, 3]);
+              expect(testJob.strategy["fail-fast"]).toBe(false);
+              expect(step["timeout-minutes"]).toBe(20);
+              expect(workflow.jobs.core.needs).toEqual(expect.arrayContaining(["lint", "typecheck", "build", "test", "test-serial"]));
+            });
+
+            it("round trips the exact workflow arguments through the installed pnpm", () => {
+              const directory = mkdtempSync(join(tmpdir(), "toonspectrum-ci-argv-"));
+              try {
+                const { packageManager } = JSON.parse(readFileSync("package.json", "utf8"));
+                writeFileSync(join(directory, "package.json"), JSON.stringify({ private: true, packageManager, scripts: { "test:root": "node probe.cjs" } }));
+                writeFileSync(join(directory, "probe.cjs"), 'console.log("FORWARDED=" + JSON.stringify(process.argv.slice(2)));');
+                for (const shard of testJob.strategy.matrix.shard) {
+                  const command = step.run.replace("${{ matrix.shard }}", String(shard)).replace("${{ strategy.job-total }}", String(testJob.strategy.matrix.shard.length));
+                  const [executable, ...args] = command.split(" ");
+                  expect(executable).toBe("pnpm");
+                  const output = execFileSync(executable, ["--dir", directory, ...args], { encoding: "utf8", timeout: 15000 });
+                  const line = output.split("\\n").find((value) => value.startsWith("FORWARDED="));
+                  expect(line).toBeDefined();
+                  expect(JSON.parse(line.slice("FORWARDED=".length))).toEqual([`--shard=${shard}/3`]);
+                }
+              } finally {
+                rmSync(directory, { recursive: true, force: true });
+              }
+            }, 60000);
+          });
+          ''')
+          print('Only the root shard option separator was removed; gates, timeouts, test set and assertions are unchanged.')
+          PY
+      - name: Install the exact repository dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify the actual pnpm forwarding contract and architecture
+        run: |
+          pnpm exec eslint --max-warnings=0 scripts/ci-shard-forwarding.test.mjs
+          pnpm exec vitest run scripts/ci-shard-forwarding.test.mjs
+          pnpm run validate:architecture
+      - name: Prove all three real Vitest shards are disjoint and cover the full root suite
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def files(shard=None):
+              command = ['pnpm', 'exec', 'vitest', 'list', '--filesOnly', '--no-color']
+              if shard is not None:
+                  command.append(f'--shard={shard}/3')
+              result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+              found = []
+              for raw in result.stdout.splitlines():
+                  value = raw.strip()
+                  if value and pathlib.Path(value).is_file():
+                      found.append(str(pathlib.Path(value).resolve()))
+              assert found and len(found) == len(set(found)), f'Invalid or duplicate file listing: {result.stdout[:3000]}'
+              return set(found)
+          whole = files()
+          shards = [files(index) for index in range(1, 4)]
+          assert set.union(*shards) == whole, 'Root suite has missing or unexpected shard files'
+          assert sum(map(len, shards)) == len(whole), 'The shard lists overlap'
+          assert all(0 < len(shard) < len(whole) for shard in shards), 'A shard incorrectly runs the whole suite'
+          report = {'mergedBase': os.environ['MERGED_BASE'], 'completeFileCount': len(whole), 'shardFileCounts': list(map(len, shards)), 'completeCoverage': True, 'overlapCount': 0, 'fileListSha256': hashlib.sha256('\n'.join(sorted(whole)).encode()).hexdigest()}
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'storyworld-shard-coverage.json').write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Preserve coverage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-shard-coverage
+          path: ${{ runner.temp }}/storyworld-shard-coverage.json
+          retention-days: 7
+      - name: Publish the verified minimal repair to the feature branch
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MERGED_BASE"
+          test "$(git ls-remote origin "refs/heads/$PRODUCT_BRANCH" | cut -f1)" = "$EXPECTED_HEAD"
+          git switch -c "$PRODUCT_BRANCH"
+          git add -- .github/workflows/ci.yml scripts/ci-shard-forwarding.test.mjs
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(ci): forward the root shard option to Vitest without an argument terminator'
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$PRODUCT_BRANCH"
+          printf 'Verified forwarding repair: %s\nAll required core checks remain mandatory.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
