@@ -68,6 +68,9 @@ describe("MarketResourceCard", () => {
     expect(html).toContain("bg-canvas");
     expect(html).toContain("bg-accent");
     expect(html).toContain("text-on-accent");
+    expect(html).toContain("비교 목록에 추가");
+    expect(html).not.toContain(">4.9<");
+    expect(html).not.toContain("공식 인증 배급자");
     expect(html).not.toContain("text-white");
     expect(html).not.toContain("text-black");
 

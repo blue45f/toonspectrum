@@ -34,3 +34,4 @@ apps/api/src/db/migrations/0033_creator_marketplace_cloud_library.sql
 apps/api/src/db/migrations/0034_creator_marketplace_package_moderation.sql
 apps/api/src/db/migrations/0035_creator_marketplace_3d_asset_kind.sql
 apps/api/src/db/migrations/0036_traffic_analytics_relations.sql
+apps/api/src/db/migrations/0037_creator_marketplace_3d_asset_parity.sql
