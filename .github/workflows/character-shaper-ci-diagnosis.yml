@@ -1,0 +1,43 @@
+name: Character Shaper PR754 failure diagnosis
+on:
+  push:
+    branches: [ai/shaper-pr754-ci-diagnosis-20260905]
+    paths: [.github/workflows/character-shaper-ci-diagnosis.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  summarize-existing-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download existing failed core log
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$REPOSITORY/actions/jobs/101289896708/logs" \
+            --output "$RUNNER_TEMP/shaper-core.log"
+      - name: Print bounded failing-test report (not a test result)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          raw = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'shaper-core.log').read_text(errors='replace')
+          raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+          raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+          lines = raw.splitlines()
+          pattern = re.compile(r'\bFAIL\b|AssertionError:|Unhandled (?:Error|Rejection)|Test Files\s|\bTests\s+\d+|FATAL ERROR|heap out of memory|Process completed with exit code')
+          hits = [i for i, line in enumerate(lines) if pattern.search(line)]
+          print(f'Existing core job 101289896708: {len(lines)} lines, {len(hits)} failure markers')
+          selected = set(range(max(0, len(lines)-50), len(lines)))
+          for i in hits[-30:]:
+              selected.update(range(max(0, i-1), min(len(lines), i+10)))
+          text = '\n'.join(f'{i+1}: {lines[i][:750]}' for i in sorted(selected))
+          print(text[-18000:])
+          PY
