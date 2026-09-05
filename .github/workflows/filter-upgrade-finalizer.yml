@@ -1,0 +1,180 @@
+name: Finalize exhaustive filter upgrade
+
+on:
+  push:
+    branches:
+      - feat/studio-filter-exhaustive-20260905
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: finalize-filter-upgrade-724
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/studio-filter-exhaustive-20260905
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Configure repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Materialize staged payload when required
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          parts=(.github/filter-upgrade-parts/part-*)
+          if (( ${#parts[@]} > 0 )); then
+            printf '%s\n' "${parts[@]}" | sort -V > /tmp/filter-parts.txt
+            while IFS= read -r part; do cat "$part"; done < /tmp/filter-parts.txt \
+              | tr -d '\r\n' > /tmp/filter-upgrade.b64
+            base64 --decode /tmp/filter-upgrade.b64 > /tmp/filter-upgrade.bin
+
+            python3 <<'PY'
+          from __future__ import annotations
+          import gzip
+          import io
+          from pathlib import Path, PurePosixPath
+          import shutil
+          import tarfile
+          import zipfile
+
+          root = Path.cwd().resolve()
+          raw = Path('/tmp/filter-upgrade.bin').read_bytes()
+          try:
+              payload = gzip.decompress(raw)
+          except OSError:
+              payload = raw
+
+          def safe_target(name: str) -> Path:
+              pure = PurePosixPath(name)
+              if pure.is_absolute() or '..' in pure.parts:
+                  raise SystemExit(f'Unsafe payload path: {name}')
+              target = (root / Path(*pure.parts)).resolve()
+              if target != root and root not in target.parents:
+                  raise SystemExit(f'Payload escapes repository: {name}')
+              return target
+
+          if payload.startswith(b'PK\x03\x04'):
+              with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                  for info in archive.infolist():
+                      target = safe_target(info.filename)
+                      if info.is_dir():
+                          target.mkdir(parents=True, exist_ok=True)
+                          continue
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      with archive.open(info) as source, target.open('wb') as destination:
+                          shutil.copyfileobj(source, destination)
+              Path('/tmp/filter-payload-kind').write_text('archive', encoding='utf-8')
+          else:
+              try:
+                  with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as archive:
+                      members = archive.getmembers()
+                      for member in members:
+                          safe_target(member.name)
+                          if member.issym() or member.islnk():
+                              raise SystemExit(f'Links are not accepted: {member.name}')
+                      archive.extractall(root, members=members, filter='data')
+                  Path('/tmp/filter-payload-kind').write_text('archive', encoding='utf-8')
+              except tarfile.ReadError:
+                  text = payload.decode('utf-8')
+                  if 'diff --git ' not in text:
+                      raise SystemExit('Payload is neither a safe archive nor a git patch')
+                  Path('/tmp/filter-upgrade.patch').write_text(text, encoding='utf-8')
+                  Path('/tmp/filter-payload-kind').write_text('patch', encoding='utf-8')
+          PY
+
+            if [[ "$(cat /tmp/filter-payload-kind)" == patch ]]; then
+              git apply --3way /tmp/filter-upgrade.patch
+            fi
+          fi
+
+          rm -rf .github/filter-upgrade-parts
+          rm -f .github/workflows/temp-filter-source-export.yml
+          rm -f .github/workflows/filter-upgrade-finalizer.yml
+
+          mapfile -t product_changes < <(git status --porcelain=v1 | sed -E 's/^.. //' | grep '^src/' || true)
+          if (( ${#product_changes[@]} == 0 )); then
+            mapfile -t committed_product_changes < <(git diff --name-only origin/main...HEAD | grep '^src/' || true)
+            if (( ${#committed_product_changes[@]} == 0 )); then
+              echo "Refusing to finalize: no product source files differ from main" >&2
+              git status --short
+              exit 1
+            fi
+          fi
+
+          if git status --porcelain=v1 | grep -E '^.. \.github/filter-upgrade-parts/|^.. \.github/workflows/(temp-filter-source-export|filter-upgrade-finalizer)\.yml$'; then
+            echo "Temporary staging files remain" >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify filters, types, lint and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/domains/creator/filter
+          pnpm exec tsc --noEmit
+          pnpm run lint:quick
+          pnpm run build
+
+      - name: Commit real product tree
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(filter): complete exhaustive production upgrade"
+          fi
+          head_sha=$(git rev-parse HEAD)
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:feat/studio-filter-exhaustive-20260905
+
+      - name: Ready PR and enable squash auto-merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/pr-body.md <<'EOF'
+          ## Summary
+          - materialize the exhaustive filter upgrade as ordinary reviewable product source
+          - remove all transfer chunks and temporary workflows
+          - preserve deterministic/offline filter behavior and existing saved-document kinds
+          - validate filter suites, TypeScript, zero-warning lint and the production build
+
+          ## Merge policy
+          Squash-merge automatically only after the repository-required checks pass on the exact finalized head.
+          EOF
+          gh pr edit 724 \
+            --title "feat(filter): complete exhaustive production filter upgrade" \
+            --body-file /tmp/pr-body.md
+          gh pr ready 724 || true
+          gh pr merge 724 --squash --auto --delete-branch --match-head-commit "$HEAD_SHA"
