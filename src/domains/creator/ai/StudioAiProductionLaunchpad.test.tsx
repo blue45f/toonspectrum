@@ -43,8 +43,12 @@ describe("StudioAiProductionLaunchpad", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /스토리 → 편집 가능한 컷/u })).toBeDisabled();
-    expect(screen.getByText("마스터 편집 중에는 사용할 수 없어요.")).toBeInTheDocument();
+    const scenarioButton = screen.getByRole("button", {
+      name: /스토리 → 편집 가능한 컷/u,
+    }) as HTMLButtonElement;
+
+    expect(scenarioButton.disabled).toBe(true);
+    expect(screen.queryByText("마스터 편집 중에는 사용할 수 없어요.")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /화풍·연출 레시피 만들기/u }));
     expect(onOpenSuperSuite).toHaveBeenCalledTimes(1);
