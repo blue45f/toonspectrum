@@ -1,0 +1,95 @@
+name: Studio PBR asset review
+on:
+  push:
+    branches: [feat/studio-assets-visual-curation-20260906]
+    paths:
+      - .github/workflows/studio-pbr-asset-review.yml
+      - scripts/acquire_studio_pbr_assets.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  pbr-review:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-visual-curation-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      HUSKY: "0"
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked tooling
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Obtain explicit 2K PBR originals with provenance and checksum verification
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/studio-pbr-delivery"
+      - name: Render new models in neutral lighting and keep all three angle previews
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/render_studio_asset_delivery.mjs')
+          s=p.read_text()
+          changes={
+              'renderer.toneMappingExposure = 1.15;':'renderer.toneMappingExposure = 0.95;',
+              'new THREE.HemisphereLight(0xffffff,0x646479,2.6)':'new THREE.HemisphereLight(0xffffff,0x646479,1.1)',
+              'new THREE.DirectionalLight(0xffffff,3.2)':'new THREE.DirectionalLight(0xffffff,2.0)',
+              'new THREE.DirectionalLight(0xffffff,1.1)':'new THREE.DirectionalLight(0xffffff,0.6)',
+              'const views=[];let preview;':'const views=[];let preview;const anglePreviews=[];',
+              "if(i===0)preview=renderer.domElement.toDataURL('image/png');":"anglePreviews.push(renderer.domElement.toDataURL('image/png')); if(i===0)preview=anglePreviews[0];",
+              'return {sourceBounds,fitScale,views,preview,renderer:':'return {sourceBounds,fitScale,views,preview,anglePreviews,renderer:',
+              'const {preview, ...metrics} = result;':'const {preview, anglePreviews, ...metrics} = result;',
+              "Object.assign(asset, {previewPath, browserRenderVerified:true,":"for (const [angle, data] of anglePreviews.entries()) await writeFile(path.join(output, `previews/${asset.id}-angle-${angle}.png`), Buffer.from(data.split(',')[1], 'base64'));\n      Object.assign(asset, {previewPath, browserRenderVerified:true,",
+          }
+          for before,after in changes.items():
+              if s.count(before)!=1: raise ValueError('Renderer source anchor moved: '+before)
+              s=s.replace(before,after,1)
+          p.write_text(s)
+          PY
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/studio-pbr-delivery" "$GITHUB_WORKSPACE"
+          cp scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/studio-pbr-delivery/review-renderer.mjs"
+      - name: Compose readable visual sheets without declaring artistic approval
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,shutil
+          from PIL import Image,ImageDraw
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-pbr-delivery'
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          cells=[]
+          for a in assets:
+              views=range(3) if a['kind']=='model' else [0]
+              for angle in views:
+                  p=f"previews/{a['id']}-angle-{angle}.png" if a['kind']=='model' else a['path']
+                  cells.append({'id':a['id'],'path':p,'angle':angle,'kind':a['kind'],'name':a['name']})
+          for number,start in enumerate(range(0,len(cells),12),1):
+              sheet=Image.new('RGB',(1600,1200),'#bfc4ca');draw=ImageDraw.Draw(sheet)
+              for i,c in enumerate(cells[start:start+12]):
+                  x,y=i%4*400,i//4*400
+                  with Image.open(root/c['path']) as src:
+                      im=src.convert('RGBA');im.thumbnail((384,340));sheet.paste(im,(x+(400-im.width)//2,y+8),im)
+                  draw.text((x+8,y+355),c['name'][:48],fill='#101820')
+                  draw.text((x+8,y+374),f"{c['id']} / angle {c['angle']}",fill='#101820')
+                  c['sheet']=number;c['cell']=i+1
+              sheet.save(root/f'pbr-review-{number:02d}.jpg',quality=95)
+          (root/'review-index.json').write_text(json.dumps({'assets':len(assets),'cells':cells,'artisticApproval':False},indent=2))
+          print('PBR VISUAL REVIEW',len(assets),'originals',len(cells),'view cells')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-pbr-delivery/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
