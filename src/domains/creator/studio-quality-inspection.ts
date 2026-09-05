@@ -242,7 +242,7 @@ function positive(value: unknown): value is number {
 }
 
 function displayPageName(page: PageState, pageIndex: number): string {
-  const name = page.name?.trim();
+  const name = typeof page.name === "string" ? page.name.trim() : "";
   return name || `${pageIndex + 1}페이지`;
 }
 
@@ -654,7 +654,7 @@ function inspectTextCharacters(
   add: (issue: MutableIssue) => void
 ): void {
   const text = el.text ?? "";
-  if (/[\u0000\uFFFD]/u.test(text)) {
+  if (text.includes("\u0000") || text.includes("\uFFFD")) {
     add({
       code: "INVALID_DIALOGUE_CHARACTER",
       category: "lettering",
@@ -960,17 +960,6 @@ function updateRevisionHashWithText(hash: number, text: string): number {
   return next >>> 0;
 }
 
-function boundedRevisionString(value: string): string {
-  if (value.length <= 4_096) return value;
-  const sampleLength = 96;
-  const samples = [0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => {
-    const maxStart = Math.max(0, value.length - sampleLength);
-    const start = Math.round(maxStart * ratio);
-    return value.slice(start, start + sampleLength);
-  });
-  return `${value.length}:${samples.join("|")}`;
-}
-
 function updateRevisionHash(
   hash: number,
   value: unknown,
@@ -990,7 +979,11 @@ function updateRevisionHash(
     case "bigint":
       return updateRevisionHashWithText(hash, `${value.toString()}n;`);
     case "string":
-      return updateRevisionHashWithText(hash, `"${boundedRevisionString(value)}";`);
+      // Hash every code unit without constructing a second full data-URL string.
+      return updateRevisionHashWithText(
+        updateRevisionHashWithText(updateRevisionHashWithText(hash, '"'), value),
+        '";'
+      );
     case "symbol":
       return updateRevisionHashWithText(hash, `symbol:${String(value.description)};`);
     case "function":
@@ -1064,7 +1057,7 @@ export function inspectStudioQuality(
     ? options.largeScrollGapPx
     : DEFAULT_LARGE_SCROLL_GAP_PX;
   const maxIssues = positive(options.maxIssues)
-    ? Math.floor(options.maxIssues)
+    ? Math.max(1, Math.floor(options.maxIssues))
     : DEFAULT_MAX_ISSUES;
   const measurer = options.textMeasurer ?? createCanvasBubbleTextMeasurer();
 
@@ -1219,7 +1212,27 @@ export function inspectStudioQuality(
     let hiddenMeaningfulCount = 0;
 
     for (let elementIndex = 0; elementIndex < page.elements.length; elementIndex += 1) {
-      const el = page.elements[elementIndex]!;
+      const sourceElement = page.elements[elementIndex]!;
+      const invalidText =
+        (sourceElement.type === "text" || sourceElement.type === "bubble" || sourceElement.type === "sticker") &&
+        typeof sourceElement.text !== "string";
+      // Restored fields are untrusted. Normalize once before every geometry/lettering read,
+      // keep the stored object untouched, and never turn malformed content into a pass.
+      const el: El = invalidText ? { ...sourceElement, text: "" } as El : sourceElement;
+      if (invalidText) {
+        add({
+          code: "INVALID_DIALOGUE_CHARACTER",
+          category: "lettering",
+          severity: "blocking",
+          title: "텍스트 데이터 형식 손상",
+          message: `${pageName}의 ${sourceElement.type} 요소에 문자열이 아닌 텍스트가 저장되어 있습니다.`,
+          remediation: "원문을 복구하거나 해당 요소를 다시 생성하세요.",
+          pageId: page.id,
+          pageIndex,
+          elementId: typeof sourceElement.id === "string" ? sourceElement.id : undefined,
+          idSuffix: `invalid-text:${elementIndex}`,
+        });
+      }
       checkedElementCount += 1;
       const elementId = typeof el.id === "string" ? el.id.trim() : "";
       if (!elementId) {

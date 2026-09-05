@@ -11,6 +11,8 @@ import {
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
 
+import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
+
 import type { ReactElement } from "react";
 
 const commentsSessionHarness = vi.hoisted(() => ({ nextInstanceId: 0 }));
@@ -61,7 +63,16 @@ vi.mock("./studio-page-lazy-ui", async () => {
     StudioCheckpointPanel: panel("checkpoint"),
     StudioColorWheelOverlay: panel("color-wheel"),
     StudioCommentsPanelSession: MockStudioCommentsPanelSession,
-    StudioContinuityPanel: panel("continuity"),
+    StudioContinuityPanel: ({ documentKey, onSelectTarget, onSelectScene }: {
+      documentKey?: string;
+      onSelectTarget: (target: { pageId: string; elementId: string }) => void;
+      onSelectScene: (sceneId: string) => void;
+    }) => (
+      <div data-optional-panel="continuity" data-document-key={documentKey ?? "none"}>
+        <button type="button" onClick={() => onSelectTarget({ pageId: "quality-page", elementId: "quality-frame" })}>품질 문제 이동</button>
+        <button type="button" onClick={() => onSelectScene("quality-scene")}>연속성 문제 이동</button>
+      </div>
+    ),
     StudioPageReviewPanel: panel("page-review"),
     StudioProductionInsightsPanel: panel("production-insights"),
     StudioPublicationOperationsPanel: panel("publication-operations"),
@@ -289,5 +300,43 @@ describe("StudioLazyPanelStack", () => {
     expect(setBg3dInitialDataUrl).toHaveBeenCalledWith(undefined);
     expect(setBg3dInitialScene).toHaveBeenCalledWith(undefined);
     expect(setBg3dInitialElementId).toHaveBeenCalledWith(undefined);
+  });
+});
+
+
+describe("quality inspection host navigation admission", () => {
+  it.each([false, true])("preserves target ownership when page switch admission=%s", (admitted) => {
+    const setCurrentPageId = vi.fn(() => admitted);
+    const setTool = vi.fn();
+    const setSelectedId = vi.fn();
+    const setContinuityOpen = vi.fn();
+    const props = createProps({
+      continuityOpen: true,
+      continuityIssues: [],
+      continuityScenes: [{ id: "quality-scene", pageId: "quality-page", frameId: "quality-frame",
+        label: "품질 장면", beat: { sceneId: "quality-scene" } }],
+      studioComments: { version: 1, threads: [] },
+      workId: null,
+      title: "",
+      setTool,
+      setSelectedId,
+      setContinuityOpen,
+      stableHandlers: { ...createHandlers(), setCurrentPageId },
+    });
+    render(withRetainedBg3dHost(
+      <StudioDocumentRuntimeContext.Provider value={{ documentKey: "auth:draft:unique", instanceId: "runtime" }}>
+        <StudioLazyPanelStack {...props} />
+      </StudioDocumentRuntimeContext.Provider>
+    ));
+    expect(screen.getByRole("button", { name: "품질 문제 이동" }).parentElement?.getAttribute("data-document-key"))
+      .toBe("auth:draft:unique");
+    fireEvent.click(screen.getByRole("button", { name: "품질 문제 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "연속성 문제 이동" }));
+    expect(setCurrentPageId).toHaveBeenCalledTimes(2);
+    expect(setCurrentPageId).toHaveBeenCalledWith("quality-page");
+    expect(setTool).toHaveBeenCalledTimes(admitted ? 2 : 0);
+    expect(setSelectedId).toHaveBeenCalledTimes(admitted ? 2 : 0);
+    expect(setContinuityOpen).toHaveBeenCalledTimes(admitted ? 2 : 0);
+    if (admitted) expect(setSelectedId).toHaveBeenCalledWith("quality-frame");
   });
 });

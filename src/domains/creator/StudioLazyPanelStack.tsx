@@ -2,12 +2,14 @@ import { X } from "lucide-react";
 import {
   Suspense,
   memo,
+  useContext,
   type Dispatch,
   type RefObject,
   type SetStateAction,
 } from "react";
 
 import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
+import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 import { selectWheelColors } from "./studio-color-wheel";
 import {
   StudioAiProvenancePanel,
@@ -651,6 +653,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     requestWriterRoomAiDraft,
     restoreServerRevision,
   } = stableHandlers;
+  const documentRuntime = useContext(StudioDocumentRuntimeContext);
   const teamWorkId = workId ?? (
     draftCollaboration?.status === "ready"
       ? draftCollaboration.room.provisionalWorkId
@@ -769,7 +772,9 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             pages={pages}
             currentPageId={currentPageId}
             openCommentCount={studioComments.threads.filter((thread) => !thread.resolved).length}
-            documentKey={workId ?? `draft:${title}`}
+            documentKey={documentRuntime?.documentKey ?? (
+              workId ? JSON.stringify(["work", studioAuthUserId ?? "guest", workId]) : undefined
+            )}
             scenes={continuityScenes.map((scene) => ({
               id: scene.id,
               label: scene.label,
@@ -777,13 +782,13 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             onSelectScene={(sceneId) => {
               const scene = continuityScenes.find((candidate) => candidate.id === sceneId);
               if (!scene) return;
-              setCurrentPageId(scene.pageId);
+              if (!setCurrentPageId(scene.pageId)) return;
               setTool("select");
               setSelectedId(scene.frameId);
               setContinuityOpen(false);
             }}
             onSelectTarget={(target) => {
-              if (target.pageId) setCurrentPageId(target.pageId);
+              if (target.pageId && !setCurrentPageId(target.pageId)) return;
               setTool("select");
               setSelectedId(target.elementId ?? null);
               setContinuityOpen(false);

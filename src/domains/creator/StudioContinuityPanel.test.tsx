@@ -57,12 +57,9 @@ describe("StudioContinuityPanel quality center", () => {
       />
     );
 
-    expect(screen.getByRole("dialog")).toHaveAttribute(
-      "data-studio-quality-inspection",
-      "true"
-    );
-    expect(screen.getByText("마감·품질 검사 센터")).toBeInTheDocument();
-    expect(screen.getByText("최종 수동 확인")).toBeInTheDocument();
+    expect(screen.getByRole("dialog").getAttribute("data-studio-quality-inspection")).toBe("true");
+    expect(screen.getByText("마감·품질 검사 센터")).not.toBeNull();
+    expect(screen.getByText("최종 수동 확인")).not.toBeNull();
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
@@ -89,9 +86,8 @@ describe("StudioContinuityPanel quality center", () => {
     });
     expect(acknowledge).toBeDefined();
     fireEvent.click(acknowledge!);
-    expect(
-      screen.getByRole("button", { name: "확인 취소" })
-    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("checkbox", { name: /확인됨/u }));
+    expect(screen.getByRole("button", { name: "확인 취소" }).getAttribute("aria-pressed")).toBe("true");
     draftView.unmount();
 
     render(
@@ -156,7 +152,9 @@ describe("StudioContinuityPanel quality center", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "위치로 이동" }));
+    const missingSource = (await screen.findByText("이미지 원본 누락")).closest("li");
+    expect(missingSource).not.toBeNull();
+    fireEvent.click(within(missingSource!).getByRole("button", { name: "위치로 이동" }));
     expect(onSelectTarget).toHaveBeenCalledWith({
       pageId: "page-1",
       elementId: "image-1",

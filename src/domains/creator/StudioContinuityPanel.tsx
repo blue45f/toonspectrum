@@ -177,16 +177,30 @@ function resolveSceneLabel(
   return listed || sceneId;
 }
 
-function safeStorageKey(documentKey: string | undefined): string {
-  const normalized = documentKey?.trim() || "local-draft";
-  return `toonstudio:quality-inspection:v1:${normalized.slice(0, 180)}`;
+function safeStorageKey(documentKey: string | undefined): string | null {
+  const normalized = documentKey?.trim();
+  // Never let anonymous drafts or truncated keys share a review receipt. v2 intentionally
+  // does not import v1 decisions, whose document/revision ownership was not guaranteed.
+  return normalized ? `toonstudio:quality-inspection:v2:${encodeURIComponent(normalized)}` : null;
 }
 
-function readPersistedState(storageKey: string): PersistedQualityState {
-  if (typeof localStorage === "undefined") return {};
+function readPersistedState(storageKey: string | null): PersistedQualityState {
+  if (storageKey === null) return {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey) ?? "{}") as PersistedQualityState;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (typeof localStorage === "undefined") return {};
+    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const record = parsed as Record<string, unknown>;
+    return {
+      acknowledgedIssueIds: Array.isArray(record.acknowledgedIssueIds)
+        ? record.acknowledgedIssueIds.filter((id): id is string => typeof id === "string")
+        : [],
+      manualCheckIds: Array.isArray(record.manualCheckIds)
+        ? record.manualCheckIds.filter((id): id is ManualCheckId =>
+            MANUAL_CHECKS.some((check) => check.id === id))
+        : [],
+      manualRevisionKey: typeof record.manualRevisionKey === "string" ? record.manualRevisionKey : undefined,
+    };
   } catch {
     return {};
   }
@@ -268,11 +282,13 @@ function IssueIcon({ severity }: { severity: StudioQualitySeverity }) {
   return <Eye size={16} aria-hidden />;
 }
 
+const EMPTY_PAGES: readonly PageState[] = [];
+
 export function StudioContinuityPanel({
   open,
   onClose,
   issues,
-  pages = [],
+  pages = EMPTY_PAGES,
   currentPageId,
   openCommentCount = 0,
   documentKey,
@@ -295,26 +311,39 @@ export function StudioContinuityPanel({
   const [categoryFilter, setCategoryFilter] = useState<"all" | StudioQualityCategory>("all");
   const [query, setQuery] = useState("");
   const [showAcknowledged, setShowAcknowledged] = useState(false);
-  const [acknowledgedIssueIds, setAcknowledgedIssueIds] = useState<Set<string>>(
+  const [storedAcknowledgedIssueIds, setAcknowledgedIssueIds] = useState<Set<string>>(
     () => new Set()
   );
-  const [completedManualChecks, setCompletedManualChecks] = useState<Set<ManualCheckId>>(
+  const [storedCompletedManualChecks, setCompletedManualChecks] = useState<Set<ManualCheckId>>(
     () => new Set()
   );
   const storageKey = useMemo(() => safeStorageKey(documentKey), [documentKey]);
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
+  // A rescan is a new measurement request even when the immutable pages did not change.
+  const scanInput = useMemo(() => ({ pages, epoch: scanEpoch }), [pages, scanEpoch]);
   const report = useMemo(
     () =>
       inspectStudioQuality({
-        pages,
+        pages: scanInput.pages,
         continuityIssues: issues,
         openCommentCount,
         supplementalIssues:
           rasterInspection?.status === "complete" ? rasterInspection.issues : [],
       }),
-    // scanEpoch intentionally retries browser font measurement after fonts/resources settle.
-    [issues, openCommentCount, pages, rasterInspection, scanEpoch]
+    [issues, openCommentCount, scanInput, rasterInspection]
+  );
+  const currentReviewKey = `${storageKey}:${report.revisionKey}`;
+  const acknowledgedIssueIds = useMemo(() => new Set(
+    loadedStorageKey === currentReviewKey
+      ? report.issues.filter((issue) =>
+          (issue.severity === "warning" || issue.severity === "review") &&
+          storedAcknowledgedIssueIds.has(issue.id)).map((issue) => issue.id)
+      : []
+  ), [currentReviewKey, loadedStorageKey, report.issues, storedAcknowledgedIssueIds]);
+  const completedManualChecks = useMemo(() =>
+    loadedStorageKey === currentReviewKey ? storedCompletedManualChecks : new Set<ManualCheckId>(),
+    [currentReviewKey, loadedStorageKey, storedCompletedManualChecks]
   );
 
   useEffect(() => {
@@ -323,12 +352,14 @@ export function StudioContinuityPanel({
     setRasterBusy(true);
     setRasterInspection(null);
     setRasterProgress({ completed: 0, total: 0 });
-    void inspectStudioRasterAssets(pages, {
+    void inspectStudioRasterAssets(scanInput.pages, {
       signal: controller.signal,
-      onProgress: setRasterProgress,
+      onProgress: (progress) => {
+        if (!controller.signal.aborted) setRasterProgress(progress);
+      },
     })
       .then((result) => {
-        if (result.status !== "aborted") setRasterInspection(result);
+        if (!controller.signal.aborted && result.status !== "aborted") setRasterInspection(result);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -345,7 +376,7 @@ export function StudioContinuityPanel({
         if (!controller.signal.aborted) setRasterBusy(false);
       });
     return () => controller.abort();
-  }, [open, pages, scanEpoch]);
+  }, [open, scanInput]);
 
   useEffect(() => {
     if (!open) return;
@@ -359,7 +390,9 @@ export function StudioContinuityPanel({
   useEffect(() => {
     if (!open) return;
     const persisted = readPersistedState(storageKey);
-    setAcknowledgedIssueIds(new Set(persisted.acknowledgedIssueIds ?? []));
+    setAcknowledgedIssueIds(new Set(
+      persisted.manualRevisionKey === report.revisionKey ? persisted.acknowledgedIssueIds ?? [] : []
+    ));
     setCompletedManualChecks(
       persisted.manualRevisionKey === report.revisionKey
         ? new Set(
@@ -374,8 +407,8 @@ export function StudioContinuityPanel({
 
   useEffect(() => {
     if (
-      loadedStorageKey !== `${storageKey}:${report.revisionKey}` ||
-      typeof localStorage === "undefined"
+      storageKey === null ||
+      loadedStorageKey !== `${storageKey}:${report.revisionKey}`
     ) {
       return;
     }
@@ -385,7 +418,7 @@ export function StudioContinuityPanel({
       manualRevisionKey: report.revisionKey,
     };
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload));
+      globalThis.localStorage?.setItem(storageKey, JSON.stringify(payload));
     } catch {
       // Storage can be unavailable in private/embedded contexts. The current session still works.
     }
@@ -486,7 +519,10 @@ export function StudioContinuityPanel({
         )
     )
   );
-  const rasterPending = hasRasterReferences && (rasterBusy || rasterInspection === null);
+  // Missing capability, failed probes and incomplete coverage are not a successful scan.
+  const rasterPending = hasRasterReferences && (
+    rasterBusy || rasterInspection?.status !== "complete" || rasterInspection.skippedSourceCount > 0
+  );
   const automaticReady = blockingReady && reviewOutstanding === 0 && !rasterPending;
   const manualReady = manualCompletedCount === MANUAL_CHECKS.length;
   const ready = automaticReady && manualReady;
