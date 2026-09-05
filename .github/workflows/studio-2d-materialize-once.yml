@@ -3,7 +3,7 @@ on:
   push:
     branches: [feat/studio-2d-assets-quality-20260906]
     paths:
-      - 'scripts/.studio-2d-transfer/finalize.py'
+      - 'scripts/.studio-2d-transfer/**'
       - '.github/workflows/studio-2d-materialize-once.yml'
 permissions:
   contents: write
@@ -12,7 +12,7 @@ defaults:
     shell: bash
 concurrency:
   group: prepare-studio-2d-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   prepare:
     if: github.ref == 'refs/heads/feat/studio-2d-assets-quality-20260906'
@@ -24,7 +24,9 @@ jobs:
       - uses: actions/checkout@v6
       - name: Apply exact source fixes on the isolated feature branch
         id: materialize
-        run: python3 scripts/.studio-2d-transfer/finalize.py
+        run: |
+          python3 scripts/.studio-2d-transfer/finalize.py
+          python3 scripts/.studio-2d-transfer/placement.py
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -42,10 +44,10 @@ jobs:
         id: lint
         continue-on-error: true
         run: pnpm exec eslint --fix src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/StudioToolBeltContent.tsx src/domains/creator/StudioCuttoonEditorHost.tsx scripts/studio-2d-*.mjs 2>&1 | tee artifacts/studio-2d/lint.txt
-      - name: Execute scene, component and placement regression tests
+      - name: Execute scene, component, placement and architecture regression tests
         id: tests
         continue-on-error: true
-        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/studio-2d-source-size.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts 2>&1 | tee artifacts/studio-2d/component-tests.txt
+        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/studio-2d-source-size.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts src/domains/creator/studio-host-architecture-ratchet.test.ts 2>&1 | tee artifacts/studio-2d/component-tests.txt
       - name: Full project typecheck
         id: types
         continue-on-error: true
