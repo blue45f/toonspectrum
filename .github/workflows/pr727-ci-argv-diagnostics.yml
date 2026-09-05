@@ -1,0 +1,89 @@
+name: PR727 CI argv diagnostics
+
+on:
+  push:
+    branches: [codex/pr727-ci-argv-diagnostics]
+    paths: [.github/workflows/pr727-ci-argv-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install the exact locked toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile > "$RUNNER_TEMP/install.log" 2>&1 || {
+            tail -n 80 "$RUNNER_TEMP/install.log"
+            exit 1
+          }
+          pnpm --version
+          pnpm exec vitest --version
+      - name: Observe script argv and Vitest parsing without running tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="$(mktemp -d)"
+          printf '%s\n' '{"name":"argv-probe","private":true,"scripts":{"args":"node argv.cjs"}}' > "$probe/package.json"
+          printf '%s\n' 'console.log("RECEIVED_ARGV=" + JSON.stringify(process.argv.slice(2)))' > "$probe/argv.cjs"
+          pnpm --dir "$probe" run args -- --shard=2/3
+          pnpm --dir "$probe" run args --shard=2/3
+          node --input-type=module <<'JS'
+          import { parseCLI } from 'vitest/node';
+          for (const tokens of [
+            ['vitest', 'run', '--', '--shard=2/3'],
+            ['vitest', 'run', '--shard=2/3'],
+          ]) {
+            const label = tokens.join(' ');
+            const parsed = parseCLI([...tokens]);
+            console.log(JSON.stringify({ command: label, filter: parsed.filter, options: parsed.options }));
+          }
+          JS
+          rm -rf -- "$probe"
+      - name: Summarize any completed root shard logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for job in 101290248441 101290248448 101290248534; do
+            state="$(gh api "repos/$REPOSITORY/actions/jobs/$job" --jq .status)"
+            echo "Job $job: $state"
+            if [[ "$state" != completed ]]; then continue; fi
+            curl --fail --silent --show-error --location \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/actions/jobs/$job/logs" \
+              --output "$RUNNER_TEMP/shard-$job.log"
+          done
+          python3 - <<'PY'
+          import os, pathlib, re
+          for path in sorted(pathlib.Path(os.environ['RUNNER_TEMP']).glob('shard-*.log')):
+              raw = path.read_text(errors='replace')
+              raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+              raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
+              lines = raw.splitlines()
+              pattern = re.compile(r'vitest run|\bFAIL\b|AssertionError:|Test Files\s|\bTests\s+\d+|Duration\s|\[error\]|timed out|operation was canceled', re.I)
+              hits = [i for i, line in enumerate(lines) if pattern.search(line)]
+              selected = set(range(max(0, len(lines)-20), len(lines)))
+              for i in hits[:3] + hits[-15:]:
+                  selected.update(range(max(0, i-1), min(len(lines), i+9)))
+              print(f'=== {path.name}: {len(lines)} lines ===')
+              for i in sorted(selected)[-160:]:
+                  print(f'{i+1}: {lines[i][:1200]}')
+          PY
