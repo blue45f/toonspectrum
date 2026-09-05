@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 6
     env:
       GH_TOKEN: ${{ github.token }}
-      EXPECTED_HEAD: d8ec56a3c7d942f5090926dbd390a254174722c9
+      EXPECTED_HEAD: 39a8cef2c6295ed52b946c6f74318bcd76bdf481
     steps:
       # No checkout or repository code is executed with the workflow token.
       - name: Validate the exact product-only pull request
