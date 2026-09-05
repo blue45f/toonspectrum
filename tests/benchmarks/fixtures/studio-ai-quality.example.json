@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "runId": "example-2026-09-05",
+  "createdAt": "2026-09-05T00:00:00.000Z",
+  "candidateLabel": "provider-model-build",
+  "provider": "replace-with-provider",
+  "model": "replace-with-model",
+  "cases": [
+    {
+      "id": "romance-two-character-dialogue",
+      "title": "로맨스 2인 대화 4컷",
+      "genre": "romance",
+      "completed": true,
+      "latencyMs": 18000,
+      "scores": {
+        "characterIdentity": 90,
+        "styleConsistency": 88,
+        "anatomyAndFaces": 85,
+        "compositionReadability": 90,
+        "letteringAccuracy": 82,
+        "backgroundContinuity": 86,
+        "editability": 84,
+        "workflowEfficiency": 85,
+        "rightsAndProvenance": 95,
+        "reliability": 90
+      },
+      "hardFailures": [],
+      "notes": "Replace example scores with a blinded evaluation."
+    },
+    {
+      "id": "action-motion-continuity",
+      "title": "액션 추격 장면 6컷",
+      "genre": "action",
+      "completed": true,
+      "latencyMs": 24000,
+      "scores": {
+        "characterIdentity": 88,
+        "styleConsistency": 86,
+        "anatomyAndFaces": 83,
+        "compositionReadability": 89,
+        "letteringAccuracy": 86,
+        "backgroundContinuity": 84,
+        "editability": 82,
+        "workflowEfficiency": 83,
+        "rightsAndProvenance": 95,
+        "reliability": 88
+      },
+      "hardFailures": []
+    }
+  ]
+}

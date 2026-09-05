@@ -731,20 +731,32 @@ describe("StudioReferencePanel controlled reference board", () => {
     );
     const dropzone = screen.getByTestId("reference-board-dropzone");
     const dropped = new File(["png"], "드롭.png", { type: "image/png" });
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [dropped], types: ["Files"], dropEffect: "none" },
+    // The callback precedes the controlled owner's render. Complete that render and its
+    // document-scope effects before starting a second, independent import transaction.
+    await act(async () => {
+      fireEvent.drop(dropzone, {
+        dataTransfer: { files: [dropped], types: ["Files"], dropEffect: "none" },
+      });
     });
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("button", { name: "드롭 이동 및 선택" })).toBeTruthy();
+    expect(screen.getByText("1/32")).toBeTruthy();
 
     const pasted = new File(["GIF89a"], "붙여넣기.gif", { type: "image/gif" });
-    fireEvent.paste(window, {
-      clipboardData: { files: [pasted], items: [] },
+    await act(async () => {
+      fireEvent.paste(window, {
+        clipboardData: { files: [pasted], items: [] },
+      });
     });
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(2));
 
     const imported = onCommit.mock.calls[1]?.[0] as StudioReferenceBoardDocument;
     expect(imported.items.map((item) => item.asset.name)).toEqual(["드롭", "붙여넣기"]);
     expect(assetLibraryMock.saveAsset).toHaveBeenCalledTimes(2);
+    expect(canvasImageIoMock.loadImageFileForCanvas.mock.calls.map(([file]) => file.name))
+      .toEqual(["드롭.png", "붙여넣기.gif"]);
+    expect(await screen.findByRole("button", { name: "붙여넣기 이동 및 선택" })).toBeTruthy();
+    expect(screen.getByText("2/32")).toBeTruthy();
   });
 
   it("resolves bytes by content hash before the legacy assetId hint", async () => {

@@ -24,6 +24,12 @@ CI에서는 전용 잡 `studio-3d-visual`이 이 스위트를 돌린다. 릴리�
 헤드리스로 돈다. 러너에는 `playwright install chromium`이 놓는 번들 Chromium만 있으므로 잡이
 `PLAYWRIGHT_CHANNEL: ""`로 채널 조회를 끈다(설정 기본값은 `chrome` 채널이다).
 
+2026-09-05부터 이 잡은 두 레인으로 돈다. "3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다"
+한 케이스가 SwiftShader 위에서 7.5분(스위트 17분의 절반 가까이)을 쓰므로 그 케이스에 `@slow`
+태그를 붙여 `--grep @slow` 레인에 홀로 두고, 나머지 케이스는 `--grep-invert @slow` 레인이 맡는다.
+두 레인이 각각 8~10분에 끝나 CI 임계 경로에서 17분짜리 단일 잡이 사라진다. 로컬
+`pnpm run verify:studio-3d-visual`은 태그와 무관하게 전부 돈다.
+
 ## 결함 1 — 3D 배경을 캔버스에 붙일 수 없었다
 
 `/studio`는 저장된 작품 id가 없는 모든 세션에 `?room=work-instant-…` 잼 룸을 발행한다

@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 1,
+  "runId": "replace-with-run-id",
+  "createdAt": "replace-with-iso-timestamp",
+  "candidateLabel": "replace-with-provider-model-build",
+  "provider": "replace-with-provider",
+  "model": "replace-with-model",
+  "cases": [
+    {
+      "id": "romance-two-character-dialogue",
+      "title": "로맨스 2인 대화 4컷",
+      "genre": "romance",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "action-three-character-occlusion",
+      "title": "액션 3인 교전·가림·극단 원근 6컷",
+      "genre": "action",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "fantasy-outfit-lock",
+      "title": "판타지 주연 의상·문장·무기 고정 8컷",
+      "genre": "fantasy",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "classroom-angle-continuity",
+      "title": "교실 동일 장소 4방향 카메라 연속성",
+      "genre": "slice-of-life",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "thriller-night-lighting",
+      "title": "야간 스릴러 저조도·역광 얼굴 보존",
+      "genre": "thriller",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "historical-costume-prop",
+      "title": "시대극 복식·소품·문양 연속성",
+      "genre": "historical",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "expression-pack",
+      "title": "동일 캐릭터 8종 표정 팩",
+      "genre": "character",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "turnaround-front-side-back",
+      "title": "정면·측면·후면 턴어라운드",
+      "genre": "character",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "extreme-pose-hands",
+      "title": "달리기·낙법·손 클로즈업 해부",
+      "genre": "anatomy",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "korean-lettering-sfx",
+      "title": "한글 대사·세로 효과음·말풍선 꼬리",
+      "genre": "lettering",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "background-time-shift",
+      "title": "동일 장소 낮→석양→밤 상태 변화",
+      "genre": "background",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "multi-character-identity-separation",
+      "title": "다인 장면 얼굴·의상 특징 분리",
+      "genre": "character",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "mask-repair-preservation",
+      "title": "얼굴·손 마스크 보정과 주변 픽셀 보존",
+      "genre": "editing",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "layer-decomposition",
+      "title": "평면 결과의 인물·배경·텍스트 레이어화",
+      "genre": "editing",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "episode-style-drift",
+      "title": "20컷 장면에서 선질·채색·팔레트 드리프트",
+      "genre": "style",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "cancel-resume-partial-results",
+      "title": "취소·재개·부분 결과 보존",
+      "genre": "reliability",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "provider-fallback-cost-safety",
+      "title": "공급자 실패 전환·중복 과금 방지",
+      "genre": "reliability",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    },
+    {
+      "id": "provenance-export-roundtrip",
+      "title": "내보내기·재불러오기 출처 이력 보존",
+      "genre": "provenance",
+      "completed": false,
+      "scores": {
+        "characterIdentity": 0,
+        "styleConsistency": 0,
+        "anatomyAndFaces": 0,
+        "compositionReadability": 0,
+        "letteringAccuracy": 0,
+        "backgroundContinuity": 0,
+        "editability": 0,
+        "workflowEfficiency": 0,
+        "rightsAndProvenance": 0,
+        "reliability": 0
+      },
+      "hardFailures": [],
+      "notes": "3개 이상 시드의 블라인드 중앙값과 수정 시간을 기록하세요."
+    }
+  ]
+}
