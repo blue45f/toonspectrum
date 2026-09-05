@@ -1,0 +1,83 @@
+name: Cancel superseded PR 724 runs
+
+on:
+  push:
+    branches: [ops/pr724-stale-ci-cleanup-20260905]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - name: Preserve current filter head and cancel only its superseded runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = 'blue45f/toonspectrum'
+          branch = 'feat/studio-filter-exhaustive-20260905'
+          expected_head = 'afe3c09c712aeb874360466cb6c9e32ccb4a68b5'
+          root = 'https://api.github.com/repos/' + repo
+
+          def api(path, method='GET'):
+              request = urllib.request.Request(
+                  root + path,
+                  data=b'' if method == 'POST' else None,
+                  method=method,
+                  headers={
+                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                      'Accept': 'application/vnd.github+json',
+                      'User-Agent': 'pr724-stale-run-cleanup',
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  payload = response.read()
+                  return json.loads(payload) if payload else None
+
+          pr = api('/pulls/724')
+          if pr['state'] != 'open' or pr['head']['ref'] != branch or pr['head']['repo']['full_name'] != repo:
+              raise SystemExit('PR identity/state changed; no cancellation performed')
+          if pr['head']['sha'] != expected_head:
+              raise SystemExit('PR head changed; no cancellation performed')
+
+          candidates = []
+          query = urllib.parse.urlencode({'branch': branch, 'per_page': 100})
+          for page in range(1, 7):
+              rows = api('/actions/runs?' + query + '&page=' + str(page))['workflow_runs']
+              candidates.extend(row for row in rows if row['head_branch'] == branch and row['head_sha'] != expected_head and row['status'] != 'completed')
+              if len(rows) < 100:
+                  break
+          cancelled = []
+          for candidate in candidates:
+              if api('/pulls/724')['head']['sha'] != expected_head:
+                  raise SystemExit('PR head changed; stopped cancellation')
+              run = api('/actions/runs/' + str(candidate['id']))
+              if run['head_branch'] != branch or run['head_sha'] == expected_head or run['status'] == 'completed':
+                  continue
+              try:
+                  api('/actions/runs/' + str(run['id']) + '/cancel', 'POST')
+              except urllib.error.HTTPError as error:
+                  if error.code == 409:
+                      print('Already finished or cancelling:', run['id'])
+                      continue
+                  raise
+              cancelled.append(run['id'])
+              print('Cancellation requested:', run['id'], run['name'], run['head_sha'])
+          receipt = {'pr': 724, 'preserved_head': expected_head, 'cancel_requested_run_ids': cancelled, 'count': len(cancelled)}
+          print(json.dumps(receipt, indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## PR 724 stale-run cleanup\n\n```json\n' + json.dumps(receipt, indent=2) + '\n```\n')
+          PY
