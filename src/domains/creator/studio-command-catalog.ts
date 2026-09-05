@@ -23,7 +23,7 @@
  *
  * 후속 메뉴 진입점 확장으로 카탈로그가 166개까지 늘어난 뒤, 툴벨트 전용이던
  * 검수·미리보기 3종은 View 중복이 제거되어 Animation/Comic 메뉴의 단일 행과
- * "프로젝트 작업" 시트가 소유한다(메뉴당 한 문 원칙).
+ * "프로젝트 센터" 시트가 소유한다(메뉴당 한 문 원칙).
  *
  * Measured 2026-08-09 against:
  * - `studio-main-menu-items-*.ts`     17 rendered groups / 169 items
@@ -296,7 +296,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "file/copy-image",
   "file/export-json",
   "file/export-archive",
-  // file, Wave E (5) — studio-main-menu-items-project.ts. The 프로젝트 작업
+  // file, Wave E (5) — studio-main-menu-items-project.ts. The 프로젝트 센터
   // sheet was the only door to these, and it is `max-sm:hidden`.
   "file/quick-start",
   "file/checkpoints",
@@ -605,7 +605,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     }),
     defineCommand({
       id: "file.project-tools",
-      labels: [ko("프로젝트 도구…"), en("Project tools…")],
+      labels: [ko("프로젝트 센터…"), en("Project center…")],
       aliases: [csp("작품 관리"), ps("Bridge")],
       origins: [menu("file/project")],
     }),
@@ -2187,7 +2187,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     /* ------------------------------------------- shipped-but-doorless (E) */
     /*
      * Wave E. Every entry below names a surface the product already ships and
-     * the menubar could not reach: the 프로젝트 작업 sheet's five panels, the
+     * the menubar could not reach: the 프로젝트 센터 sheet's five panels, the
      * animation timeline, the team/review flow and the story room. None of them
      * is a new feature; each is a new door, so the origin list is `menu` only.
      */
@@ -2313,8 +2313,13 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     }),
     defineCommand({
       id: "comic.continuity",
-      labels: [ko("이야기 연속성 검사"), en("Continuity check")],
-      aliases: [ours("연속성 검사")],
+      labels: [ko("마감·품질 검사"), en("Finishing quality inspection")],
+      aliases: [
+        ours("연속성 검사"),
+        ours("이야기 연속성 검사"),
+        ours("마감 검사"),
+        ours("품질 검사"),
+      ],
       origins: [menu("comic/continuity")],
     }),
     defineCommand({

@@ -199,7 +199,7 @@ const REVIEW_ACTIONS = [
   { id: "timelapse", name: "타임랩스 녹화" },
   { id: "storyboard-grid", name: "스토리보드 그리드 보기" },
   { id: "scroll-preview", name: "세로 스크롤 미리보기" },
-  { id: "continuity", name: "이야기 연속성 검사" },
+  { id: "continuity", name: "마감·품질 검사" },
   { id: "comments", name: "문서 댓글" },
   { id: "page-review", name: "페이지 검토와 편집 잠금" },
 ] as const;
@@ -247,8 +247,8 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
     it("7종 모두 가시 진입점을 가진다", () => {
       renderMenubarAt(width);
 
-      // 시트의 트리거("프로젝트 작업")가 보이지 않으면 시트 안의 버튼은 열 수 없다.
-      const sheetTrigger = screen.getByRole("button", { name: "프로젝트 작업" });
+      // 시트의 트리거("프로젝트 센터")가 보이지 않으면 시트 안의 버튼은 열 수 없다.
+      const sheetTrigger = screen.getByRole("button", { name: "프로젝트 센터" });
       const sheetReachable = isReachableAt(sheetTrigger, width);
 
       const unreachable = REVIEW_ACTIONS.filter((action) => {
@@ -275,8 +275,8 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
           document.querySelector('[data-studio-main-menu-host="true"]'),
           width,
         ),
-        "프로젝트 작업 시트": isReachableAt(
-          screen.getByRole("button", { name: "프로젝트 작업" }),
+        "프로젝트 센터 시트": isReachableAt(
+          screen.getByRole("button", { name: "프로젝트 센터" }),
           width,
         ),
         "내보내기 옵션": screen
@@ -296,17 +296,17 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
         "1600": {
           "내보내기 옵션": true,
           "앱 메뉴바(보기 메뉴)": true,
-          "프로젝트 작업 시트": true,
+          "프로젝트 센터 시트": true,
         },
         "430": {
           "내보내기 옵션": true,
           "앱 메뉴바(보기 메뉴)": false,
-          "프로젝트 작업 시트": true,
+          "프로젝트 센터 시트": true,
         },
         "900": {
           "내보내기 옵션": true,
           "앱 메뉴바(보기 메뉴)": false,
-          "프로젝트 작업 시트": true,
+          "프로젝트 센터 시트": true,
         },
       }
     `);
@@ -315,7 +315,7 @@ describe("검수·미리보기 진입점 — 뷰포트별 도달성", () => {
   it("몰입 모드를 끈 폰 폭에서도 도달성이 유지된다", () => {
     renderMenubarAt(430, { isMobile: true, mobileImmersive: false });
 
-    const sheetTrigger = screen.getByRole("button", { name: "프로젝트 작업" });
+    const sheetTrigger = screen.getByRole("button", { name: "프로젝트 센터" });
     expect(isReachableAt(sheetTrigger, 430)).toBe(true);
   });
 

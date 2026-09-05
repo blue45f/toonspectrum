@@ -2,6 +2,11 @@ import {
   StudioBg3dProSuiteRuntimeContext,
   type StudioBg3dProSuiteRuntimeValue,
 } from "./studio-bg3d-pro-suite-runtime-context";
+import {
+  evaluateStudioBg3dProductionPassReadiness,
+  summarizeStudioBg3dProductionLook,
+} from "./studio-bg3d-production-pass-readiness";
+import { summarizeStudioBg3dProductionScene } from "./studio-bg3d-production-workflow";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
@@ -42,21 +47,40 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     context.isBatchRenderingShots ||
     context.isRestoringScene ||
     context.physicsInteractionLocked;
+  const sceneSummary = summarizeStudioBg3dProductionScene({
+    document: context.sceneBaseDocument,
+    selectedNodeCount: context.selectedIds.size,
+    lineArtPreview: context.lineArtPreview,
+    transparentBackground: context.transparentInsert,
+  });
+  const productionLook = summarizeStudioBg3dProductionLook(
+    context.sceneBaseDocument.output,
+  );
+  const passReadiness = evaluateStudioBg3dProductionPassReadiness(
+    context.selectedShotBatchPasses,
+    productionLook,
+  );
+  const productionBlockedReason =
+    context.shotBatchBlockedReason ?? passReadiness.blockingReason;
   const runtime: StudioBg3dProSuiteRuntimeValue = {
     disabled,
     baseCamera: context.sceneBaseDocument.camera,
     productionShots: context.savedShots,
+    sceneSummary,
+    onSetLineArtPreview: context.setLineArtPreview,
+    onSetTransparentBackground: context.updateBackgroundTransparency,
     productionBatch: {
       selectedShotIds: context.shotBatchSelectedIds,
       availablePasses: context.STUDIO_BG3D_SHOT_BATCH_PASSES,
       selectedPasses: context.selectedShotBatchPasses,
       passLabels: context.STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+      look: productionLook,
       exportHeight: context.shotBatchExportHeight,
       exportHeightOptions: context.LT_EXPORT_HEIGHTS,
       includeLayeredPsd: context.shotBatchIncludeLayeredPsd,
       includeContactSheet: context.shotBatchIncludeContactSheet,
       recoveryReady: context.recoveryScope !== null,
-      blockedReason: context.shotBatchBlockedReason,
+      blockedReason: productionBlockedReason,
       isRendering: context.isBatchRenderingShots,
       progress: context.shotBatchProgress,
       recoverySummary: context.shotBatchRecoverySummary,
