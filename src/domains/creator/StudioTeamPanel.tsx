@@ -77,7 +77,7 @@ const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> 
   owner: { label: "소유자", description: "원고·게시 상태·작품 연결·팀 권한을 모두 관리합니다." },
   admin: { label: "관리자", description: "원고를 공동 저장하고 팀원을 초대·관리합니다. 게시는 소유자 권한입니다." },
   editor: { label: "편집자", description: "원고를 읽고 공동 저장합니다. 게시 상태와 팀원은 변경할 수 없습니다." },
-  commenter: { label: "검토자", description: "원고를 읽습니다. 서버 앵커 댓글은 다음 단계에서 연결됩니다." },
+  commenter: { label: "검토자", description: "원고를 읽고 서버 앵커 댓글로 검토 의견을 남깁니다." },
   viewer: { label: "열람자", description: "공유 원고를 읽기 전용으로 확인합니다." },
 };
 
