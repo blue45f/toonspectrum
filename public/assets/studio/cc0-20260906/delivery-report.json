@@ -1,20 +1,20 @@
 {
   "schema": "toonspectrum.asset-delivery.v1",
   "sourceRevision": "90ab3c778d1e66cd0cbc1b5446b343b4507fd5f2",
-  "deliveredOriginals": 1097,
+  "deliveredOriginals": 1144,
   "byKind": {
-    "model": 999,
-    "effect-mask": 96,
-    "surface-texture": 2
+    "model": 1016,
+    "surface-texture": 32,
+    "effect-mask": 96
   },
   "byCategory": {
-    "furniture": 140,
+    "furniture": 153,
+    "nature": 296,
+    "outdoor-prop": 128,
+    "surface-material": 32,
     "food": 200,
     "effect-mask": 96,
-    "surface-material": 2,
-    "nature": 294,
-    "architecture": 239,
-    "outdoor-prop": 126
+    "architecture": 239
   },
   "deduplicatedVariants": 35,
   "excludedCandidates": 16,
@@ -157,10 +157,18 @@
   ],
   "errors": [],
   "notice": "Actual delivered files passed the listed technical checks. These are not claims of visual approval, complete 3D validation, Studio runtime verification, or production publication.",
-  "browserRenderedModels": 999,
+  "browserRenderedModels": 1016,
   "browserRejectedModels": 0,
-  "repositoryBundledOriginals": 1097,
+  "repositoryBundledOriginals": 1144,
   "retiredStarterBackgrounds": 8,
   "retirementMethod": "hidden-from-new-selection; legacy-id-and-package-resolution-preserved",
-  "verifiedDeliveryFiles": 1097
+  "verifiedDeliveryFiles": 1144,
+  "pbrExpansion": {
+    "originals": 47,
+    "byKind": {
+      "model": 17,
+      "surface-texture": 30
+    },
+    "artisticReviewCompleted": false
+  }
 }

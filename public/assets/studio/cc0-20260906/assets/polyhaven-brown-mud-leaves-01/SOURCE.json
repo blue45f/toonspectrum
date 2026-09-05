@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brown_mud_leaves_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1529359200,
+    "name": "Brown Mud Leaves 01",
+    "categories": [
+      "terrain",
+      "natural",
+      "outdoor"
+    ],
+    "type": 1,
+    "tags": [
+      "grass",
+      "mud",
+      "moss",
+      "stones",
+      "orange",
+      "forest"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1299.9998331069946,
+      1299.9998331069946
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "7b74cea31de3b88001ff3bd7b8c01b88a7a58cf0",
+    "description": "Free 8K texture of brown muddy ground with scattered leaves, moss patches, small pebbles and a damp, rough surface with fine organic detail.",
+    "category_id": "b9a51c27-1499-5f4d-b28f-0d96ef8e0319",
+    "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+    "sponsors": [
+      "540619",
+      "172914019"
+    ],
+    "attributes": {
+      "surface_use": "ground",
+      "condition": [
+        "mossy",
+        "weathered"
+      ],
+      "origin": "natural",
+      "setting": "outdoor"
+    },
+    "download_count": 516763,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brown_mud_leaves_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_diff_2k.jpg",
+      "bytes": 4539452,
+      "sha256": "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
+      "sourceMd5": "e8b45aee8e00a253eb3a2b08cea89776"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_rough_2k.jpg",
+      "bytes": 2421908,
+      "sha256": "9556215f5fef905c37cdf19c77aef7822f124890f8fb7dcce65d57c5eafc0ca5",
+      "sourceMd5": "3e7209ff00204174c5bd013df3945b22"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_nor_gl_2k.jpg",
+      "bytes": 5688696,
+      "sha256": "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
+      "sourceMd5": "eb2c704d2889e1e5a53148dc6a2ebdf4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_ao_2k.jpg",
+      "bytes": 3813568,
+      "sha256": "76c342dc7b5ee7dc5f2246e24147f16afcaa2c0b31599da4c385404416e16eb8",
+      "sourceMd5": "63089afd1c1bdbe5506d6d2b3f3942e0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_disp_2k.jpg",
+      "bytes": 1788400,
+      "sha256": "3688c1acc705f604ffdaf956064c898658bcd2d8b0258e437e671390c896abb8",
+      "sourceMd5": "cbf64ab799b5d9fa5ef27da55692e563"
+    }
+  ]
+}
