@@ -9,9 +9,13 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: pr724-stale-ci-cleanup
+  cancel-in-progress: true
+
 jobs:
   cleanup:
-    runs-on: macos-15
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
       - name: Preserve current filter head and cancel only its superseded runs
