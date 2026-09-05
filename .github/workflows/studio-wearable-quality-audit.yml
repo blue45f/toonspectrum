@@ -1,0 +1,64 @@
+name: Studio wearable quality audit
+
+on:
+  push:
+    branches: [fix/studio-wearable-quality-audit-20260906]
+    paths:
+      - '.github/workflows/studio-wearable-quality-audit.yml'
+      - 'src/domains/creator/vrm/**'
+      - 'src/domains/creator/character-shaper/**'
+      - 'scripts/*wearable*'
+      - 'public/assets/3d/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wearable-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package the exact review source without credentials
+        run: |
+          mkdir -p wearable-review
+          git rev-parse HEAD > wearable-review/commit.txt
+          tar -czf wearable-review/source.tar.gz src/domains/creator/vrm src/domains/creator/character-shaper scripts e2e .github/workflows package.json pnpm-lock.yaml tsconfig.json playwright.config.ts public/assets/3d
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wearable-review-source-${{ github.sha }}
+          path: wearable-review/
+          retention-days: 3
+          if-no-files-found: error
+  visual-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Existing in-app 3D regression and screenshots
+        run: pnpm run verify:studio-3d-visual
+      - name: Preserve evidence even when a check fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wearable-visual-evidence-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report/
+            artifacts/
+            .artifacts/
+          retention-days: 7
+          if-no-files-found: warn
