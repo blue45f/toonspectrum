@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { CREATOR_DESTINATIONS, CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-content";
+import { CREATOR_HOME_SECTIONS } from "./creator-home-navigation";
 
 describe("creator-first home contracts", () => {
   it("keeps the creator entry and legacy discovery destinations reachable", () => {
@@ -32,9 +33,19 @@ describe("creator-first home contracts", () => {
   });
   it("does not import the studio engine or Remotion into the homepage", () => {
     const source = readFileSync("src/domains/marketing/CreatorHomePage.tsx", "utf8");
+    const picker = readFileSync("src/domains/marketing/CreatorWorkflowPicker.tsx", "utf8");
     expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/);
     expect(source).toContain('mode === "playing"');
     expect(source).toContain('kind="captions"');
-    expect(source).toContain('aria-pressed={stage === index}');
+    expect(picker).toContain('aria-pressed={stage === index}');
+    expect(source.match(/<CreatorWorkflowPicker\b/g)).toHaveLength(2);
+    expect(source).toContain('placement="process"');
+  });
+  it("gives every public jump destination a unique keyboard-focusable heading", () => {
+    const source = readFileSync("src/domains/marketing/CreatorHomePage.tsx", "utf8");
+    for (const section of CREATOR_HOME_SECTIONS) {
+      expect(source.split(`id="${section.id}"`)).toHaveLength(2);
+      expect(source).toContain(`<h2 id="${section.headingId}" tabIndex={-1}>`);
+    }
   });
 });
