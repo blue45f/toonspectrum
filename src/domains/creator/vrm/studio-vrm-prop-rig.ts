@@ -910,8 +910,6 @@ export function resolveSecondaryPropTarget(
   };
 }
 
-const STUDIO_VRM_SECONDARY_HAND_SCALE_MIN = 0.55;
-const STUDIO_VRM_SECONDARY_HAND_SCALE_MAX = 2.2;
 const STUDIO_VRM_SECONDARY_PALM_OFFSET_MAX = 0.95;
 
 /**
@@ -962,13 +960,11 @@ export function resolveSecondaryHandConstraint(
     .multiplyScalar(propScale)
     .applyQuaternion(groupWorldQuaternion)
     .add(new THREE.Vector3(...groupWorldPosition));
-  const stableHandScale = clamp(
-    Math.cbrt(Math.abs(handWorldScale[0] * handWorldScale[1] * handWorldScale[2])),
-    STUDIO_VRM_SECONDARY_HAND_SCALE_MIN,
-    STUDIO_VRM_SECONDARY_HAND_SCALE_MAX,
-  );
+  // T * R * S: preserve each signed scale axis before rotating the palm offset.
+  // A geometric mean moves the contact point on wide/tall hands and reflected rigs.
+  // The existing world-distance guard below still bounds malformed imported sockets.
   const palmWorldOffset = new THREE.Vector3(...socketPosition)
-    .multiplyScalar(stableHandScale)
+    .multiply(new THREE.Vector3(...handWorldScale))
     .applyQuaternion(targetHandWorldQuaternion);
   const maxPalmOffset = Math.min(
     STUDIO_VRM_SECONDARY_PALM_OFFSET_MAX,
