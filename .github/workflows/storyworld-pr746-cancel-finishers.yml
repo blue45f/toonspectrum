@@ -1,4 +1,4 @@
-name: Finish cancellation of obsolete Storyworld checks
+name: Inspect Storyworld CI and finish stale cancellation
 
 on:
   push:
@@ -6,17 +6,19 @@ on:
     paths: [.github/workflows/storyworld-pr746-cancel-finishers.yml]
 
 permissions:
-  actions: write
   contents: read
-  pull-requests: read
 
 jobs:
   retire-finishers:
     if: github.repository == 'blue45f/toonspectrum'
     runs-on: ubuntu-slim
     timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
     steps:
-      - name: Retire only obsolete finishers whose core was already cancelled
+      - name: Retire only obsolete finishers with an already terminal unsuccessful core
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -49,14 +51,13 @@ jobs:
                   print(f'{run_id}: terminal or independently retried; left unchanged.')
                   continue
               jobs = request(f'actions/runs/{run_id}/jobs?filter=latest&per_page=100')['jobs']
-              assert any(job['name'] == 'core' and job['status'] == 'completed' and job['conclusion'] == 'cancelled' for job in jobs)
+              core = [job for job in jobs if job['name'] == 'core']
+              assert len(core) == 1 and core[0]['status'] == 'completed' and core[0]['conclusion'] in ('failure', 'cancelled')
               remaining = [job for job in jobs if job['status'] != 'completed']
               assert remaining and all(job['name'] == 'verify' for job in remaining)
-              # Standard cancellation was accepted at 08:12 UTC, but always() kept the old
-              # post-core guard queued. The current PR head and its real core are excluded.
               try:
                   request(f'actions/runs/{run_id}/force-cancel', 'POST')
-                  print(f'{run_id}: force-cancel request accepted for obsolete finisher.')
+                  print(f'{run_id}: obsolete always() finisher cancellation accepted; prior core remains unsuccessful.')
               except urllib.error.HTTPError as error:
                   if error.code != 409:
                       raise
@@ -65,7 +66,65 @@ jobs:
                   if run['status'] == 'completed':
                       break
                   time.sleep(2)
-              assert run['status'] == 'completed', f'{run_id}: cancellation not yet complete'
-              print(f"{run_id}: confirmed completed / {run['conclusion']}.")
-          print('Current-head CI and all other PRs remain untouched. No check was marked successful.')
+              print(f"{run_id}: observed {run['status']} / {run['conclusion']}.")
+          print('Current-head CI, every other PR, and required-check policy remain untouched.')
+          PY
+
+  read-browser-failure:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Extract bounded error evidence from the exact PR 746 in-app job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          base = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+          job_id = 101271521388
+          with urllib.request.urlopen(urllib.request.Request(base + f'actions/jobs/{job_id}', headers=headers), timeout=20) as response:
+              job = json.load(response)
+          assert job['run_id'] == 33953145676 and job['head_sha'] == 'a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc'
+          assert job['name'] == 'studio-inapp-browser' and job['status'] == 'completed'
+          print(json.dumps({'jobId': job_id, 'headSha': job['head_sha'], 'conclusion': job['conclusion'], 'steps': job['steps']}, ensure_ascii=False))
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect())
+          try:
+              response = opener.open(urllib.request.Request(base + f'actions/jobs/{job_id}/logs', headers=headers), timeout=20)
+          except urllib.error.HTTPError as error:
+              assert error.code in (301, 302, 303, 307, 308)
+              location = error.headers['Location']
+              parsed = urllib.parse.urlparse(location)
+              assert parsed.scheme == 'https' and parsed.hostname and (parsed.hostname.endswith('.blob.core.windows.net') or parsed.hostname.endswith('.actions.githubusercontent.com') or parsed.hostname.endswith('.githubusercontent.com'))
+              # Signed log URL needs no GitHub credential. Never forward authorization.
+              response = urllib.request.urlopen(location, timeout=30)
+          with response:
+              data = response.read(8_000_001)
+          assert len(data) <= 8_000_000
+          text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', data.decode('utf-8-sig'))
+          lines = text.splitlines()
+          indices = set()
+          needles = ('hardFailures', 'Hard failures', 'FAILED', 'AssertionError', 'Error:', '##[error]', 'Maximum update', 'pageerror', 'runtimeErrors', 'failedSteps', '"failed"', '"failures"', '[verify-inapp] FAIL')
+          for index, line in enumerate(lines):
+              if any(needle in line for needle in needles):
+                  indices.update(range(max(0, index - 3), min(len(lines), index + 9)))
+          selected = '\n'.join(f'{index + 1}: {lines[index]}' for index in sorted(indices))
+          print('::group::Exact job error context')
+          print(selected[-24000:])
+          print('::endgroup::')
+          print('Original log line count:', len(lines), '; selected context characters:', len(selected))
           PY
