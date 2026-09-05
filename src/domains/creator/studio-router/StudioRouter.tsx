@@ -6,30 +6,14 @@ import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 import { StudioEditorRoute } from "./routes/StudioEditorRoute";
 import { StudioPublishRoute } from "./routes/StudioPublishRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
+import {
+  StudioLift3dPage,
+  StudioToolsCompanionPage,
+  StudioStoryworldLabPage,
+} from "./studio-router-lazy-pages";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
 import { lazyRetry } from "@/lib/lazy-retry";
-
-const StudioLift3dPage = lazyRetry(
-  () => import("../lift3d/StudioLift3dPage").then((module) => ({
-    default: module.StudioLift3dPage,
-  })),
-  "StudioLift3dPage",
-);
-
-const StudioToolsCompanionPage = lazyRetry(
-  () => import("../StudioToolsCompanionPage").then((module) => ({
-    default: module.StudioToolsCompanionPage,
-  })),
-  "StudioToolsCompanionPage",
-);
-
-const StudioStoryworldLabPage = lazyRetry(
-  () => import("../storyworld/StudioStoryworldLabPage").then((module) => ({
-    default: module.StudioStoryworldLabPage,
-  })),
-  "StudioStoryworldLabPage",
-);
 
 const StudioProductionHubPage = lazyRetry(
   () => import("../studio-production/StudioProductionHubPage").then((module) => ({
@@ -37,6 +21,7 @@ const StudioProductionHubPage = lazyRetry(
   })),
   "StudioProductionHubPage",
 );
+
 
 export function StudioRouter() {
   const location = useLocation();

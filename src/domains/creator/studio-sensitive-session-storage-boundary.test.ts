@@ -41,7 +41,8 @@ describe("sensitive Studio browser state stays session-scoped", () => {
       "loadStudioAiRecentPrompts(globalThis.localStorage)",
     );
     expect(toolPopover.match(/pushStudioAiRecentPrompt\(globalThis\.sessionStorage/gu))
-      .toHaveLength(4);
+      // 6: the four original sites plus applyEpisodeBatchPrompt and applySuperSuitePrompt.
+      .toHaveLength(6);
     expect(toolPopover).not.toContain(
       "pushStudioAiRecentPrompt(globalThis.localStorage",
     );
