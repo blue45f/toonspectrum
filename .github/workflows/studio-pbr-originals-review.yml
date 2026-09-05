@@ -1,0 +1,123 @@
+name: Studio PBR originals review
+on:
+  push:
+    branches: [feat/studio-pbr-verified-expansion-20260906]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  acquire-and-render:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-pbr-verified-expansion-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install pinned source inspection tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire bounded official CC0 originals
+        run: python3 scripts/acquire_studio_pbr_originals.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Validate actual GLB specification before browser loading
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import validator from 'gltf-validator';
+          const root=path.join(process.env.RUNNER_TEMP,'pbr-review');
+          const manifest=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));
+          const evidence=[]; const rejected=new Set();
+          for(const a of manifest.assets.filter(a=>a.kind==='model')) {
+            const bytes=await fs.readFile(path.join(root,a.path));
+            const r=await validator.validateBytes(new Uint8Array(bytes),{uri:a.path,maxIssues:100,externalResourceFunction:()=>Promise.reject(new Error('external resource forbidden'))});
+            evidence.push({id:a.id,errors:r.issues.numErrors,warnings:r.issues.numWarnings,messages:r.issues.messages});
+            if(r.issues.numErrors) rejected.add(a.id);
+            else a.technicalChecks.push('Khronos-glTF-validator-no-errors');
+          }
+          manifest.assets=manifest.assets.filter(a=>!rejected.has(a.id));
+          await fs.writeFile(path.join(root,'manifest.json'),JSON.stringify(manifest,null,2));
+          await fs.writeFile(path.join(root,'gltf-validation.json'),JSON.stringify(evidence,null,2));
+          console.log('GLTF SPECIFICATION',JSON.stringify(evidence.map(({id,errors,warnings})=>({id,errors,warnings}))));
+          JS
+      - name: Render each model from three views under PBR lighting
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('scripts/render_studio_asset_delivery.mjs').read_text()
+          src=src.replace("import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';\nimport { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';")
+          src=src.replace('const scene = new THREE.Scene();','const scene = new THREE.Scene();\nconst pmrem = new THREE.PMREMGenerator(renderer); const room = new RoomEnvironment(); const env = pmrem.fromScene(room,0.04); scene.environment=env.texture; room.dispose(); pmrem.dispose();')
+          src=src.replace("if(i===0)preview=renderer.domElement.toDataURL('image/png');", "views[views.length-1].png=renderer.domElement.toDataURL('image/png'); if(i===0)preview=views[views.length-1].png;")
+          src=src.replace('const {preview, ...metrics} = result;', "const {preview, ...metrics} = result;\n      for (const v of metrics.views) { await writeFile(path.join(output,`previews/${asset.id}-view-${v.view}.png`),Buffer.from(v.png.split(',')[1],'base64')); delete v.png; }")
+          src=src.replace('384','512')
+          Path('scripts/.pbr-review-renderer.mjs').write_text(src)
+          PY
+          node scripts/.pbr-review-renderer.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Package actual originals and review images without activating unreviewed picks
+        run: |
+          python3 - <<'PY'
+          import os,json,shutil,hashlib
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          root=Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          manifest=json.loads((root/'manifest.json').read_text()); assets=manifest['assets']
+          from collections import Counter
+          for a in assets:
+              raw=(root/a['path']).read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==a['sha256'] and len(raw)==a['bytes']
+          for n,start in enumerate(range(0,len(assets),12),1):
+              sheet=Image.new('RGB',(1600,1300),'#ededf0');draw=ImageDraw.Draw(sheet)
+              for i,a in enumerate(assets[start:start+12]):
+                  x,y=(i%4)*400,(i//4)*430
+                  with Image.open(root/a.get('previewPath',a['path'])) as im:
+                      im=im.convert('RGBA');im.thumbnail((380,365));sheet.paste(im,(x+(400-im.width)//2,y+8),im)
+                  draw.text((x+10,y+382),a['id'][:48],fill='#111111')
+                  draw.text((x+10,y+402),a['kind']+' | 2K | Poly Haven CC0',fill='#333333')
+              sheet.save(root/f'pbr-review-{n:02d}.jpg',quality=95)
+          report=json.loads((root/'delivery-report.json').read_text());report.update(deliveredOriginals=len(assets),byKind=dict(Counter(a['kind'] for a in assets)),activeStudioAdditions=0,visuallyApproved=0,sourceCredit='Poly Haven',reviewStatus='awaiting-direct-pixel-review')
+          (root/'delivery-report.json').write_text(json.dumps(report,indent=2))
+          dest=Path('data/studio-assets/pbr-review-20260906');dest.mkdir(parents=True,exist_ok=True)
+          for a in assets:
+              p=root/a['path'];q=dest/a['path'];q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+              source=p.parent/'SOURCE.json'
+              if source.exists():shutil.copy2(source,q.parent/source.name)
+              for m in a.get('pbrMaps',[]):
+                  q=dest/m['path'];q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/m['path'],q)
+          shutil.copytree(root/'previews',dest/'previews',dirs_exist_ok=True)
+          for p in root.glob('*.json'):shutil.copy2(p,dest/p.name)
+          for p in root.glob('*.jpg'):shutil.copy2(p,dest/p.name)
+          print('ACTUAL PBR DELIVERY',json.dumps(report))
+          print('STORED ORIGINAL BYTES',sum(p.stat().st_size for p in dest.rglob('*') if p.is_file()))
+          PY
+      - name: Retain files on the review branch only
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-pbr-verified-expansion-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -f -- data/studio-assets/pbr-review-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m 'feat(studio): retain native 2K CC0 PBR originals and real multi-angle previews for review'
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_REVIEW_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-actual-originals-${{ github.run_id }}
+          path: |
+            data/studio-assets/pbr-review-20260906/
+            ${{ runner.temp }}/pbr-review/delivery-report.json
+          retention-days: 14
+          if-no-files-found: warn
+          compression-level: 1
