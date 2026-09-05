@@ -10,7 +10,7 @@ describe("StudioSmartFiltersPanel", () => {
     );
     expect(html).toContain('type="search"');
     expect(html).toContain("필터 이름·효과 검색");
-    expect(html).toContain("사용 가능한 필터 60개");
+    expect(html).toContain("사용 가능한 필터 77개");
     expect(html).toContain("섀도우/하이라이트");
     expect(html).toContain("노출 / 감마 / 오프셋");
     expect(html).toContain("언샤프 마스크");
@@ -41,6 +41,10 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("먼지와 스크래치 제거");
     expect(html).toContain("가우시안 차분 선화");
     expect(html).toContain("색상 투명화");
+    expect(html).toContain("사인 웨이브");
+    expect(html).toContain("스테인드글라스");
+    expect(html).toContain("볼류메트릭 광선");
+    expect(html).toContain("극좌표 변환");
   });
 
   it("keeps the catalog available after more than 100 stack entries", () => {
@@ -60,7 +64,7 @@ describe("StudioSmartFiltersPanel", () => {
     );
     expect(html).toContain("101개");
     expect(html).not.toContain("스택이 가득 찼습니다");
-    expect(html).toContain("사용 가능한 필터 60개");
+    expect(html).toContain("사용 가능한 필터 77개");
   });
 
   it("renders bounded controls for all advanced blur engines", () => {
