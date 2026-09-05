@@ -65,11 +65,12 @@ jobs:
           retention-days: 3
       - run: pnpm exec playwright install chromium
       - run: pnpm run build:bundle
-      - name: Recheck actual live and committed pixels in this new build
+      - name: Recheck both selectable pencils with unchanged pixel quality thresholds
         env:
           TOONSPECTRUM_BRUSH_VERIFY_STAGE: long
           TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
-          TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade,soft-pencil,pencil-6b
+          # Other supported pencil aliases remain in the unit matrix, not re-enabled in the UI.
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade
         run: pnpm run verify:studio-brushes
       - name: Publish only after new-build pixel checks, retaining existing commit and push hooks
         if: hashFiles('scripts/apply-studio-live-tip.mjs') != ''
