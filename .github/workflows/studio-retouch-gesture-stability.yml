@@ -1,0 +1,71 @@
+name: Studio retouch gesture stability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-retouch-raster-gesture*.ts'
+      - 'src/domains/creator/studio-selection-tools.ts'
+      - 'src/domains/creator/studio-liquify-contract.ts'
+      - '.github/workflows/studio-retouch-gesture-stability.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-retouch-raster-gesture*.ts'
+      - 'src/domains/creator/studio-selection-tools.ts'
+      - 'src/domains/creator/studio-liquify-contract.ts'
+      - '.github/workflows/studio-retouch-gesture-stability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-retouch-gesture-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  retouch-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Record the exact tested revision
+        run: |
+          mkdir -p /tmp/studio-retouch-evidence
+          git rev-parse HEAD > /tmp/studio-retouch-evidence/commit.txt
+      - name: Existing retouch behavior and terminal-state regressions
+        run: |
+          set -o pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-retouch-raster-gesture.test.ts \
+            src/domains/creator/studio-retouch-raster-gesture-stability.test.ts \
+            2>&1 | tee /tmp/studio-retouch-evidence/tests.log
+      - name: Strict lint for the changed product and tests
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-retouch-raster-gesture.ts \
+            src/domains/creator/studio-retouch-raster-gesture-stability.test.ts \
+            2>&1 | tee /tmp/studio-retouch-evidence/lint.log
+      - name: Complete frontend TypeScript check
+        run: |
+          set -o pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit \
+            2>&1 | tee /tmp/studio-retouch-evidence/types.log
+      - name: Preserve pass or failure evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-retouch-gesture-evidence
+          path: /tmp/studio-retouch-evidence
+          retention-days: 7
+          if-no-files-found: warn
