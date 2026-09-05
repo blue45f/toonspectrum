@@ -17,11 +17,19 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, re, urllib.request
+          import hashlib, json, os, re, urllib.request, urllib.parse
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  next_request = super().redirect_request(req, fp, code, msg, headers, newurl)
+                  if urllib.parse.urlsplit(req.full_url).netloc != urllib.parse.urlsplit(newurl).netloc:
+                      next_request.remove_header('Authorization')
+                      next_request.remove_header('Accept')
+                  return next_request
+          opener = urllib.request.build_opener(SafeRedirect())
           base = 'https://api.github.com/repos/blue45f/toonspectrum/'
           headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
           def get(path):
-              with urllib.request.urlopen(urllib.request.Request(base + path, headers=headers), timeout=30) as response:
+              with opener.open(urllib.request.Request(base + path, headers=headers), timeout=30) as response:
                   return response.read()
           run = json.loads(get('actions/runs/33953145676'))
           assert run['head_sha'] == 'a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc'
@@ -30,10 +38,9 @@ jobs:
           raw = get('actions/jobs/101271521448/logs')
           text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw.decode('utf-8-sig'))
           lines = text.splitlines()
-          selected = set()
-          for i, line in enumerate(lines):
-              if re.search(r'\bFAIL\s|Failed (Tests|Suites)|Test Files|\bTests\s+\d+ failed|##\[error\]', line):
-                  selected.update(range(max(0, i-1), min(len(lines), i+22)))
-          excerpts = '\n'.join(lines[i] for i in sorted(selected))
-          print(json.dumps({'run':run['id'], 'job':job['id'], 'productSha':run['head_sha'], 'logSha256':hashlib.sha256(raw).hexdigest(), 'excerpts':excerpts[-90000:]}, ensure_ascii=False, indent=2))
+          failed = [line for line in lines if re.search(r'\bFAIL\s|Test Files|\bTests\s+\d+ failed', line)]
+          start = next((i for i,line in enumerate(lines) if 'Failed Tests' in line or 'Failed Suites' in line), len(lines)-150)
+          print('PRODUCT_SHA=' + run['head_sha'] + '\nLOG_SHA256=' + hashlib.sha256(raw).hexdigest())
+          print('FAILURE_HEADERS\n' + '\n'.join(failed))
+          print('FAILURE_DETAILS\n' + '\n'.join(lines[start:])[:30000])
           PY
