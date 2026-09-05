@@ -19,43 +19,21 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/evidence"
           for job in 101340478581 101340478582 101340478181; do
-            gh api "repos/blue45f/toonspectrum/actions/jobs/$job/logs" > "$RUNNER_TEMP/evidence/$job.log"
-            tail -n 180 "$RUNNER_TEMP/evidence/$job.log" > "$RUNNER_TEMP/evidence/$job.tail.log"
+            gh api --allow-escape-sequences "repos/blue45f/toonspectrum/actions/jobs/$job/logs" > "$RUNNER_TEMP/evidence/$job.log"
           done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: studio-767-ci-errors
-          path: ${{ runner.temp }}/evidence
-          retention-days: 3
-          if-no-files-found: error
-  bundle:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: 606709812a1cb3411b4e2f73c671c278185fc710
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Reproduce exact production graph
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bundle"
-          git rev-parse HEAD > "$RUNNER_TEMP/bundle/revision.txt"
-          pnpm run build:bundle > "$RUNNER_TEMP/bundle/build.log" 2>&1
-          cp dist/.vite/manifest.json "$RUNNER_TEMP/bundle/manifest.json"
-          git archive --format=tar HEAD vite.config.ts scripts src/domains/creator/studio-router src/domains/creator/studio-production src/domains/creator/studio-main-menu-viewport.ts src/domains/creator/StudioMainMenu.viewport.test.tsx > "$RUNNER_TEMP/bundle/source.tar"
+          python3 - <<'PY'
+          import os, pathlib, re
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'evidence'
+          for path in root.glob('*.log'):
+              text = path.read_text(encoding='utf-8-sig')
+              clean = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+              path.write_text(clean)
+              path.with_suffix('.tail.txt').write_text('\n'.join(clean.splitlines()[-220:]))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: studio-767-bundle-evidence
-          path: ${{ runner.temp }}/bundle
+          name: studio-767-ci-errors
+          path: ${{ runner.temp }}/evidence
           retention-days: 3
           if-no-files-found: error
