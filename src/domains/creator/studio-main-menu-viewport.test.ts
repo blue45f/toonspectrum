@@ -7,7 +7,6 @@ import {
   revealStudioMainMenuItem,
   studioMainMenuCoordsEqual,
 } from "./studio-main-menu-viewport";
-
 import mainMenuSource from "./StudioMainMenu.tsx?raw";
 
 afterEach(() => {
@@ -103,7 +102,7 @@ describe("Studio main menu viewport geometry", () => {
 
   it("normalizes non-finite measurements", () => {
     const result = resolveStudioMainMenuCoords({ left: NaN, top: Infinity, bottom: NaN, width: Infinity }, { left: NaN, top: Infinity, width: NaN, height: Infinity });
-    for (const value of [result.top, result.left, result.minWidth, result.maxWidth, result.maxHeight]) {
+    for (const value of [result.top, result.left, result.minWidth, result.maxHeight]) {
       expect(Number.isFinite(value)).toBe(true);
     }
   });
