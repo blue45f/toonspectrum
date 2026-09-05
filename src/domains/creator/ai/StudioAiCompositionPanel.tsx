@@ -54,7 +54,7 @@ export function StudioAiCompositionPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   // 팔레트·대사 패널과 동일 — 결과·에러가 팝오버 fold 아래에 생기지 않게 도착 시 nearest 스크롤.
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const hasFeedback = Boolean(suggestion || error);
@@ -64,10 +64,10 @@ export function StudioAiCompositionPanel({
 
   const run = async () => {
     const prompt = sceneTextValue.trim();
-    if (busy || !prompt) return;
+    if (busy || !configured || !prompt) return;
     setBusy(true);
     setError(null);
-    setCopied(false);
+    setCopyState("idle");
     const operationId = onOperationStart?.(prompt);
     const operationTransport = operationId && transport
       ? studioTextAiTransportForOperation(transport, operationId)
@@ -92,9 +92,9 @@ export function StudioAiCompositionPanel({
     if (!suggestion) return;
     try {
       await navigator.clipboard.writeText(suggestion);
-      setCopied(true);
+      setCopyState("copied");
     } catch {
-      // 클립보드 접근 불가(권한 등) — 조용히 무시, 사용자는 텍스트를 직접 선택해 복사할 수 있다.
+      setCopyState("failed");
     }
   };
 
@@ -107,8 +107,8 @@ export function StudioAiCompositionPanel({
 
       {!configured && (
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          로그인해 서버 AI를 사용하거나 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>
-          에서 내 API 키를 등록하면 쓸 수 있어요.
+          장면 초안은 먼저 작성할 수 있어요. 실행하려면 로그인해 서버 AI를 사용하거나{" "}
+          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 내 API 키를 등록하세요.
         </p>
       )}
 
@@ -116,11 +116,11 @@ export function StudioAiCompositionPanel({
         value={sceneTextValue}
         onChange={(e) => setSceneTextValue(e.target.value.slice(0, 800))}
         onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && configured) void run();
         }}
         placeholder="예: 주인공이 교실 문을 벌컥 열고 들어와 반 아이들과 눈이 마주친다. &quot;나 전학왔어.&quot;"
         rows={3}
-        disabled={!configured || busy}
+        disabled={busy}
         className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
       />
 
@@ -144,15 +144,27 @@ export function StudioAiCompositionPanel({
               <button
                 type="button"
                 onClick={() => void copySuggestion()}
-                className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
               >
-                <Copy size={11} /> {copied ? "복사됨" : "복사"}
+                <Copy size={11} />{" "}
+                {copyState === "copied"
+                  ? "복사됨"
+                  : copyState === "failed"
+                    ? "복사 실패"
+                    : "복사"}
               </button>
+              <span className="sr-only" role="status" aria-live="polite">
+                {copyState === "copied"
+                  ? "클립보드에 복사했어요."
+                  : copyState === "failed"
+                    ? "복사하지 못했어요. 텍스트를 직접 선택해 주세요."
+                    : ""}
+              </span>
               {onInsertAsNote && (
                 <button
                   type="button"
                   onClick={() => onInsertAsNote(suggestion)}
-                  className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                 >
                   <StickyNote size={11} /> 캔버스에 메모로 추가
                 </button>

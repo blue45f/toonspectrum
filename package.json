@@ -115,6 +115,7 @@
     "verify:studio-living-ink-execution": "node scripts/verify-studio-living-ink-execution.mjs",
     "verify:studio-living-ink-integration": "tsx scripts/verify-studio-living-ink-integration.mts",
     "verify:studio-native-raster-tools": "tsx scripts/verify-studio-native-raster-tools.mts",
+    "verify:studio-ai-quality": "tsx scripts/verify-studio-ai-quality.mts",
     "verify:studio-ux-task-benchmark": "tsx scripts/verify-studio-ux-task-benchmark.mts",
     "verify:studio-hybrid-dcc-integration": "tsx scripts/verify-studio-hybrid-dcc-integration.mts",
     "verify:studio-glb-export": "tsx scripts/verify-studio-glb-export.mjs",
