@@ -24,6 +24,7 @@ export type StudioCompanionRouteSurface =
   (typeof STUDIO_COMPANION_SURFACES)[number];
 
 export type StudioRouteKind =
+  | "brush-lab"
   | "companion"
   | "editor"
   | "invalid"
@@ -46,6 +47,12 @@ export interface StudioRouteManifestEntry {
  * coupled to a second, competing route table.
  */
 export const STUDIO_ROUTE_MANIFEST = Object.freeze([
+  {
+    id: "studio-brush-lab",
+    kind: "brush-lab",
+    ownsDocumentTitle: true,
+    pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/brush-lab",
+  },
   {
     id: "studio-editor",
     kind: "editor",
@@ -126,6 +133,11 @@ interface StudioResolvedRouteBase {
   readonly ownsDocumentTitle: boolean;
 }
 
+export interface StudioBrushLabRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "brush-lab";
+  readonly editorHref: string;
+}
+
 export interface StudioEditorRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "editor";
   readonly workspaceRoute: StudioWorkspaceRoute;
@@ -186,6 +198,7 @@ export interface StudioInvalidRouteResolution
 }
 
 export type StudioRouteResolution =
+  | StudioBrushLabRouteResolution
   | StudioCompanionRouteResolution
   | StudioEditorRouteResolution
   | StudioInvalidRouteResolution
@@ -554,10 +567,51 @@ function resolveWorkScopedPlaceholder(
   });
 }
 
+/** Independent authoring with the existing identity parser, never an arbitrary return URL. */
+function resolveBrushLab(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioBrushLabRouteResolution | StudioInvalidRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null) return null;
+  let probePathname: string;
+  if (segments.length === 2 && segments[1] === "brush-lab") {
+    probePathname = "/studio/canvas";
+  } else if (
+    segments.length === 4
+    && (segments[1] === "work" || segments[1] === "remix")
+    && segments[3] === "brush-lab"
+  ) {
+    probePathname = `/studio/${segments[1]}/${segments[2]}/canvas`;
+  } else {
+    return null;
+  }
+  const workspace = parseStudioWorkspaceRoute({ pathname: probePathname, search });
+  if (!workspace.valid) return invalidResolution(pathname, search, workspace);
+  if (workspace.presentation !== "editor") return invalidResolution(pathname, search, "invalid-mode");
+  const canonicalPathname = workspace.workId !== null
+    ? `/studio/work/${encodeURIComponent(workspace.workId)}/brush-lab`
+    : workspace.remixSourceWorkId !== null
+      ? `/studio/remix/${encodeURIComponent(workspace.remixSourceWorkId)}/brush-lab`
+      : "/studio/brush-lab";
+  const params = cleanIdentityQuery(search);
+  params.delete("returnTo");
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, params),
+    canonicalPathname,
+    kind: "brush-lab",
+    lifecycleKey: `/studio/${studioWorkspaceDocumentIdentity(workspace)}/brush-lab`,
+    ownsDocumentTitle: true,
+    editorHref: studioWorkspaceCanonicalHref(workspace, params),
+  });
+}
+
 export function resolveStudioRoute({
   pathname,
   search,
 }: StudioRouteLocationInput): StudioRouteResolution {
+  const brushLab = resolveBrushLab(pathname, search);
+  if (brushLab !== null) return brushLab;
   const publish = resolveCanonicalPublish(pathname, search);
   if (publish !== null) return publish;
   const companion = resolveCompanion(pathname, search);
