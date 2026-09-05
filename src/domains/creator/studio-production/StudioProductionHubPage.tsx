@@ -30,7 +30,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 
-export const STUDIO_PRODUCTION_SURFACES = [
+const STUDIO_PRODUCTION_SURFACES = [
   "projects",
   "review",
   "versions",
