@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply the narrowly reviewed contact and measurement patch
         run: |
+          mkdir -p wearable-final-integration
+          git rev-parse HEAD > wearable-final-integration/input-commit.txt
           git apply --check scripts/studio-wearable-fit.patch
           git apply scripts/studio-wearable-fit.patch
       - name: Integrate selection policy and explicit hair-clearance guidance
@@ -75,26 +77,51 @@ jobs:
           change(p,marker,test+marker)
           PY
       - name: Regenerate the exact original GLB pack
-        run: pnpm exec tsx scripts/generate-studio-wearable-v5.mts
+        run: pnpm exec tsx scripts/generate-studio-wearable-v5.mts > wearable-final-integration/generation.json
       - name: Lint the changed production code and tests
-        run: pnpm exec eslint --fix --max-warnings=0 src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts
+        run: |
+          set -o pipefail
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts 2>&1 | tee wearable-final-integration/lint.log
       - name: Real fixtures, complete VRM regression suite and legacy prop pack
-        run: pnpm exec vitest run src/domains/creator/vrm src/domains/creator/studio-everyday-props-pack-v4.test.ts --reporter=default
-      - name: Commit only reviewed source and generated output
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/vrm src/domains/creator/studio-everyday-props-pack-v4.test.ts --reporter=default 2>&1 | tee wearable-final-integration/tests.log
+      - name: Commit the reviewed source and complete matching GLB manifest
         run: |
           test "$GITHUB_REF_NAME" = 'fix/studio-wearable-quality-audit-20260906'
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-          git add -- src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts scripts/generate-studio-wearable-v5.mts public/assets/3d/atelier_ribbon.glb public/assets/3d/wearable-v5-manifest.json
+          git add -- src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts scripts/generate-studio-wearable-v5.mts
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          const manifestPath='public/assets/3d/wearable-v5-manifest.json';
+          const assets=JSON.parse(fs.readFileSync(manifestPath,'utf8')).assets;
+          if(assets.length!==12||assets.some(a=>!/^[-a-z0-9_]+\.glb$/.test(a.file)))throw new Error('Unexpected generated asset set');
+          execFileSync('git',['add','--',manifestPath,...assets.map(a=>'public/assets/3d/'+a.file)],{stdio:'inherit'});
+          for(const a of assets){
+            const staged=execFileSync('git',['show',':public/assets/3d/'+a.file],{maxBuffer:16*1024*1024});
+            if(createHash('sha256').update(staged).digest('hex')!==a.sha256)throw new Error('Staged asset mismatch: '+a.id);
+          }
+          console.log('All 12 staged GLBs match the staged manifest');
+          EOF
           git rm -- scripts/studio-wearable-fit.patch
-          mkdir -p wearable-final-integration
           git diff --cached --binary > wearable-final-integration/source.patch
-          git -c user.name='ToonStudio quality integration' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(studio): fit wearables to head surfaces and quarantine unsafe new selections'
-          git push origin "HEAD:$GITHUB_REF_NAME"
+          set -o pipefail
+          git -c user.name='ToonStudio quality integration' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(studio): fit wearables to head surfaces and quarantine unsafe new selections' 2>&1 | tee wearable-final-integration/commit.log
       - name: Install the real browser
         run: pnpm exec playwright install --with-deps chromium
       - name: Render standalone, worn and posed production components
-        run: GITHUB_SHA=$(git rev-parse HEAD) pnpm exec tsx scripts/verify-studio-wearable-v5.mts
+        run: |
+          set -o pipefail
+          GITHUB_SHA=$(git rev-parse HEAD) pnpm exec tsx scripts/verify-studio-wearable-v5.mts 2>&1 | tee wearable-final-integration/browser.log
+      - name: Push verified review-branch output with normal pre-push checks
+        run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          set -o pipefail
+          git push origin "HEAD:$GITHUB_REF_NAME" 2>&1 | tee wearable-final-integration/push.log
       - name: Keep exact sources, binaries and test evidence
         if: always()
         run: |
