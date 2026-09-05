@@ -88,7 +88,7 @@ export interface StudioBg3dEngineSelectionPlan {
   /** Whether the selected backend may currently own the interactive canvas. */
   readonly status: StudioBg3dEngineStatus;
   readonly reason: StudioBg3dEngineSelectionReason;
-  /** Korean, user-facing, single sentence for the engine status surface. */
+  /** Korean, user-facing explanation for the engine status surface. */
   readonly notice: string;
   /** Secondary observations worth surfacing in diagnostics; never another renderer candidate. */
   readonly diagnostics: readonly StudioBg3dEngineSelectionReason[];
@@ -109,7 +109,7 @@ export const STUDIO_BG3D_ENGINE_SELECTION_NOTICES:
   "webgpu-runtime-failed":
     "WebGPU 엔진을 시작하지 못했습니다. 다시 선택하거나 WebGL2를 직접 선택해 주세요.",
   "webgpu-probe-unsupported":
-    "이 브라우저는 WebGPU를 지원하지 않습니다. WebGL2를 직접 선택해 주세요.",
+    "WebGPU 지원 여부를 확인하지 못했습니다. 편집기를 다시 열거나 WebGL2를 직접 선택해 주세요.",
   "webgpu-compute-unavailable":
     "필요한 WebGPU 기능을 사용할 수 없습니다. WebGL2를 직접 선택해 주세요.",
   "inapp-browser-blocked":
@@ -124,6 +124,26 @@ export const STUDIO_BG3D_ENGINE_SELECTION_NOTICES:
   "webgl-only-vrm-character":
     "3D 캐릭터 색을 유지하려면 WebGL2 엔진을 직접 선택해 주세요.",
 });
+
+/** A timed-out/cancelled probe is not proof that this browser does not implement WebGPU. */
+function describeProbeFailure(probe: StudioBg3dWebGpuProbeResult | undefined): string {
+  switch (probe?.reason) {
+    case "insecure-context":
+      return "WebGPU는 보안 연결(HTTPS)에서만 사용할 수 있습니다. 보안 연결로 다시 열어 주세요.";
+    case "api-unavailable":
+      return "이 브라우저에서 WebGPU API를 사용할 수 없습니다. WebGL2를 직접 선택해 주세요.";
+    case "adapter-unavailable":
+      return "사용 가능한 WebGPU 어댑터를 찾지 못했습니다. 브라우저의 그래픽 가속 설정을 확인해 주세요.";
+    case "insufficient-limits":
+      return "WebGPU 어댑터의 메모리 한도가 부족합니다. WebGL2를 직접 선택해 주세요.";
+    case "timeout":
+      return "WebGPU 응답 확인이 지연됐습니다. 미지원으로 확정된 것은 아니며, 편집기를 다시 열어 확인해 주세요.";
+    case "aborted":
+      return "WebGPU 지원 확인이 중단됐습니다. 편집기를 다시 열어 확인해 주세요.";
+    default:
+      return STUDIO_BG3D_ENGINE_SELECTION_NOTICES["webgpu-probe-unsupported"];
+  }
+}
 
 export const STUDIO_BG3D_ENGINE_PREFERENCES: readonly StudioBg3dEnginePreference[] = Object.freeze([
   "webgpu",
@@ -149,13 +169,14 @@ function plan(
   reason: StudioBg3dEngineSelectionReason,
   status: StudioBg3dEngineStatus,
   diagnostics: readonly StudioBg3dEngineSelectionReason[],
+  notice = STUDIO_BG3D_ENGINE_SELECTION_NOTICES[reason],
 ): StudioBg3dEngineSelectionPlan {
   return Object.freeze({
     backend,
     runtimeId: BACKEND_RUNTIME_IDS[backend],
     status,
     reason,
-    notice: STUDIO_BG3D_ENGINE_SELECTION_NOTICES[reason],
+    notice,
     diagnostics: Object.freeze([...new Set(diagnostics)]),
   });
 }
@@ -219,6 +240,7 @@ export function selectStudioBg3dEngine(
       reason,
       hardBlocks.includes("webgpu-runtime-failed") ? "failed" : "unavailable",
       [...hardBlocks, ...advisories],
+      reason === "webgpu-probe-unsupported" ? describeProbeFailure(request.probe) : undefined,
     );
   }
   return plan("webgpu", "user-webgpu-override", "available", advisories);

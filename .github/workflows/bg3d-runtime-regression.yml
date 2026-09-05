@@ -34,8 +34,7 @@ concurrency:
 
 jobs:
   bg3d-production-runtime:
-    # This job intentionally has no dependency on temporary core-gate bypasses. A successful
-    # skipped core job must not be mistaken for a successful GPU execution.
+    # Execute independently of temporary core-gate bypasses. Never mistake skipped work for proof.
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -54,10 +53,24 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check changed verification code
-        run: pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts
-      - name: Test real-execution and failure-evidence contracts
-        run: pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts --reporter=verbose
+      - name: Check changed verification and capability notice code
+        run: |
+          pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
+            scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts
+      - name: Typecheck browser verification interfaces
+        run: |
+          pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 \
+            --module ESNext --moduleResolution bundler --types node \
+            playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
+            scripts/studio-bg3d-runtime-setup.mts
+      - name: Test real execution, capability policy and failure explanations
+        run: |
+          pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts --reporter=verbose
       - name: Install Chromium and its runtime dependencies
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the production app to be verified
