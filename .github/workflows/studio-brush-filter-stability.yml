@@ -30,7 +30,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Worker recovery, texture loading and current-UI verifier regressions
+      - name: Worker recovery, exact median pixels, texture loading and verifier regressions
         run: |
           set -o pipefail
           mkdir -p /tmp/studio-stability-unit-evidence
@@ -41,6 +41,8 @@ jobs:
             src/domains/creator/brush/studio-brush-r8-grain-hydrator.test.ts \
             src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts \
             src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts \
+            src/domains/creator/studio-detail.test.ts \
+            src/domains/creator/studio-detail-median-stability.test.ts \
             2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
       - name: Preserve focused regression results
         if: always()
@@ -51,11 +53,24 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
       - run: pnpm run build:bundle
+      - name: Require the production manifest used by SQLite durability checks
+        run: test -s dist/.vite/manifest.json
       - uses: actions/upload-artifact@v6
         with:
           name: studio-stability-dist
           path: dist
+          include-hidden-files: true
           retention-days: 3
+      - name: Preserve the tested filter Worker separately for reproducible CPU soak tests
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-filter-worker
+          path: |
+            dist/assets/studio-image-filter.worker-*.js
+            dist/.vite/manifest.json
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
 
   browser:
     needs: build
@@ -81,6 +96,8 @@ jobs:
         with:
           name: studio-stability-dist
           path: dist
+      - name: Verify hidden manifest survived artifact transport
+        run: test -s dist/.vite/manifest.json
       - name: Every dialog filter repeated in the same browser session
         if: matrix.suite == 'filters'
         env:
