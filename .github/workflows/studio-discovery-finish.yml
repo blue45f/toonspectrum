@@ -13,22 +13,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  integrate:
+  integrate-and-verify:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/studio-brush-filter-discovery-20260906'
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: write
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-    outputs:
-      source_ref: ${{ steps.publish.outputs.source_ref }}
+      STUDIO_DISCOVERY_QA_DIR: /tmp/studio-discovery-evidence
+      TOONSPECTRUM_BRUSH_VERIFY_DIR: /tmp/studio-discovery-evidence
+      TOONSPECTRUM_VERIFY_DIR: /tmp/studio-discovery-evidence
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: fix/studio-brush-filter-discovery-20260906
+          ref: ${{ github.sha }}
           fetch-depth: 100
-      - name: Apply reviewed filter integration and refresh from main
+      - name: Apply reviewed filter integration against original Git blobs
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -68,83 +69,65 @@ jobs:
           fi
           git fetch origin main --depth=100
           git -c core.hooksPath=/dev/null merge --no-edit origin/main
+      - name: Normalize only the reported duplicate top-level closing brace
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          p = Path('src/domains/creator/brush/StudioSubToolPalette.tsx')
+          original = p.read_text()
+          corrected, changes = re.subn(r'\n}\s*}\s*$', '\n}\n', original, count=1)
+          print('Exact source before correction:', subprocess.check_output(['git', 'hash-object', str(p)], text=True).strip())
+          print('Original trailing lines:', repr(original.splitlines()[-6:]))
+          if changes:
+              p.write_text(corrected)
+          print('Duplicate closing brace corrections:', changes)
+          print('Final trailing lines:', repr(p.read_text().splitlines()[-6:]))
+          PY
+          git diff --check
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Enforce strict lint and subsystem boundaries
+      - name: Enforce strict lint on reviewed source
         run: |
           pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts src/domains/creator/brush/StudioSubToolPalette.tsx src/domains/creator/brush/studio-shortcut-brush-search.ts src/domains/creator/brush/studio-shortcut-brush-search.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
-          node scripts/check-architecture-boundaries.mjs
           git diff --check
-      - name: Verify exact source and focused discovery contracts
-        run: |
-          git rev-parse HEAD
-          git hash-object src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx src/domains/creator/brush/StudioSubToolPalette.tsx
-          pnpm exec vitest run src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/filter/studio-filter-discovery.test.ts src/domains/creator/brush/studio-brush-catalog-names.test.ts src/domains/creator/brush/studio-brush-discovery.test.ts src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx src/domains/creator/brush/studio-shortcut-brush-search.test.ts
-      - name: Publish isolated changes with normal pre-push validation
-        id: publish
+      - name: Repository architecture rules
+        run: node scripts/check-architecture-boundaries.mjs
+      - name: All brush and filter regression tests and menu integration
+        run: pnpm exec vitest run src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search.test.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.test.ts
+      - name: Frontend typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Strict complete brush and filter lint
+        run: pnpm exec eslint src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search* src/domains/creator/studio-brush.ts src/domains/creator/studio-creative-ux.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts --max-warnings=0
+      - name: Production build
+        run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Responsive keyboard and production menu integration
+        run: pnpm exec tsx scripts/verify-studio-discovery-ux.mts
+      - name: Draw all eighteen shortcuts and verify pixels and undo
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
+          TOONSPECTRUM_BRUSH_SURVEY: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_SETTLED_DUMP: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: gpen,pen,fountain-pen,pencil,pencil--side-shade,charcoal--compressed-edge,watercolor,marker,gouache--matte-body,oil--filbert-ribbon,airbrush,spray,splatter,standard-eraser,kneaded-eraser,screentone,web-cross-hatch-pen,web-radial-burst
+        run: pnpm exec tsx scripts/verify-studio-brushes.mts
+      - name: Publish verified integration without force or main writes
         run: |
           git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts src/domains/creator/brush/StudioSubToolPalette.tsx src/domains/creator/brush/studio-shortcut-brush-search.ts src/domains/creator/brush/studio-shortcut-brush-search.test.ts scripts/verify-studio-discovery-ux.mts
           if ! git diff --cached --quiet; then
-            git -c core.hooksPath=/dev/null commit -m 'style(studio): normalize reviewed discovery imports'
+            git -c core.hooksPath=/dev/null commit -m 'fix(studio): finalize verified brush and filter discovery'
           fi
           git push origin HEAD:refs/heads/fix/studio-brush-filter-discovery-20260906
-          echo "source_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-  verify:
-    needs: integrate
-    uses: ./.github/workflows/studio-discovery-ux.yml
-    with:
-      source_ref: ${{ needs.integrate.outputs.source_ref }}
-
-  evidence:
-    needs: [integrate, verify]
-    if: always() && needs.integrate.result == 'success'
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v6
+          echo "Verified source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve screenshots and failure receipts
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
-          pattern: studio-discovery-*
-          path: /tmp/discovery-review
-      - name: Preserve synthetic screenshots outside the product branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REVIEW_SOURCE_SHA: ${{ needs.integrate.outputs.source_ref }}
-          VERIFICATION_RESULT: ${{ needs.verify.result }}
-        run: |
-          python3 - <<'PY'
-          import base64, json, os, urllib.request
-          from pathlib import Path
-          repo = 'blue45f/toonspectrum'
-          assert os.environ['GITHUB_REPOSITORY'] == repo
-          endpoint = 'https://api.github.com/repos/' + repo
-          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}
-          def post(path, body):
-              request = urllib.request.Request(endpoint + path, data=json.dumps(body).encode(), headers=headers, method='POST')
-              with urllib.request.urlopen(request, timeout=60) as response:
-                  return json.load(response)
-          root = Path('/tmp/discovery-review')
-          files = sorted(p for p in root.rglob('*.png') if 'studio-discovery-dist' not in p.parts and p.stat().st_size <= 4_000_000)[:100]
-          tree, names = [], []
-          for path in files:
-              name = path.relative_to(root).as_posix()
-              sha = post('/git/blobs', {'encoding': 'base64', 'content': base64.b64encode(path.read_bytes()).decode()})['sha']
-              tree.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': sha})
-              names.append(name)
-          summary = {'source': os.environ['REVIEW_SOURCE_SHA'], 'workflow_run': os.environ['GITHUB_RUN_ID'], 'verification': os.environ['VERIFICATION_RESULT'], 'screenshots': names, 'manual_visual_review': 'not yet recorded'}
-          tree.append({'path': 'summary.json', 'mode': '100644', 'type': 'blob', 'content': json.dumps(summary, ensure_ascii=False, indent=2) + '\n'})
-          readme = '# Synthetic discovery visual evidence\n\nSource: `' + summary['source'] + '`\n\nVerification: ' + summary['verification'] + '\n\nNot yet manually approved. No product branch is changed.\n\n' + '\n'.join('![' + name + '](' + name + ')' for name in names) + '\n'
-          tree.append({'path': 'README.md', 'mode': '100644', 'type': 'blob', 'content': readme})
-          tree_sha = post('/git/trees', {'tree': tree})['sha']
-          commit = post('/git/commits', {'message': 'test(studio): preserve synthetic discovery screenshots', 'tree': tree_sha, 'parents': []})['sha']
-          branch = 'qa/studio-discovery-771-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
-          post('/git/refs', {'ref': 'refs/heads/' + branch, 'sha': commit})
-          print(json.dumps({'evidence_commit': commit, 'evidence_branch': branch, **summary}, ensure_ascii=False, indent=2))
-          PY
+          name: studio-discovery-final-evidence
+          path: /tmp/studio-discovery-evidence
+          retention-days: 7
+          if-no-files-found: warn
