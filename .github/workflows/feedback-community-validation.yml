@@ -15,6 +15,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# A failed test piped through tee must fail its step, not just appear in a log.
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: feedback-community-${{ github.ref }}
   cancel-in-progress: true
@@ -22,7 +26,7 @@ jobs:
   feedback-community:
     name: Feedback community regression gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16
@@ -41,13 +45,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
       - name: Prepare evidence directory
         run: |
           mkdir -p artifacts/feedback
@@ -77,6 +74,20 @@ jobs:
           src/domains/legal/feedback/use-feedback-feed.ts
           vite.feedback-review.config.ts
           EOF
+          tar -czf artifacts/feedback/reviewed-source.tar.gz -T /tmp/feedback-lint-files .github/workflows/feedback-community-validation.yml
+      - name: Upload exact source for independent review
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-review-source-${{ github.sha }}
+          path: artifacts/feedback/reviewed-source.tar.gz
+          retention-days: 3
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Lint changed feature surfaces
         id: lint
         continue-on-error: true
@@ -107,6 +118,10 @@ jobs:
         id: build
         continue-on-error: true
         run: pnpm exec vite build --config vite.feedback-review.config.ts 2>&1 | tee artifacts/feedback/build.log
+      - name: Build complete production application
+        id: production
+        continue-on-error: true
+        run: pnpm run build 2>&1 | tee artifacts/feedback/production-build.log
       - name: Collect optional lint fix suggestions without changing tested commit
         if: always() && steps.lint.outcome == 'failure'
         run: |
@@ -132,10 +147,11 @@ jobs:
           BROWSER_INSTALL: ${{ steps.browser_install.outcome }}
           BROWSER: ${{ steps.browser.outcome }}
           BUILD: ${{ steps.build.outcome }}
+          PRODUCTION: ${{ steps.production.outcome }}
         run: |
           python3 - <<'PY'
           import os
-          keys = ['LINT', 'TYPES', 'UNIT', 'DATABASE', 'BROWSER_INSTALL', 'BROWSER', 'BUILD']
+          keys = ['LINT', 'TYPES', 'UNIT', 'DATABASE', 'BROWSER_INSTALL', 'BROWSER', 'BUILD', 'PRODUCTION']
           for key in keys:
               print(f'{key}: {os.environ.get(key, "missing")}')
           failed = [key for key in keys if os.environ.get(key) != 'success']
