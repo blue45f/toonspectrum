@@ -1,0 +1,251 @@
+name: Land and merge Studio finish quality inspection
+
+on:
+  push:
+    branches:
+      - feat/studio-quality-inspection-20260905
+    paths:
+      - ".github/workflows/studio-finish-quality-land-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: studio-finish-quality-landing-v2
+  cancel-in-progress: false
+
+jobs:
+  land-and-merge:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'chore(studio): trigger finish quality landing v2')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      FEATURE_BRANCH: feat/studio-quality-inspection-20260905
+      REPOSITORY: blue45f/toonspectrum
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout complete feature history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: feat/studio-quality-inspection-20260905
+
+      - name: Synchronize latest feature and main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-quality-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$FEATURE_BRANCH" main
+          git reset --hard "origin/$FEATURE_BRANCH"
+          git rev-parse HEAD > /tmp/studio-quality-v2-remote-head.txt
+          git merge --no-edit origin/main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply or verify product integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify-or-apply-studio-finish-quality.py
+          rm -f \
+            scripts/apply-studio-finish-quality-integration.py \
+            scripts/verify-or-apply-studio-finish-quality.py \
+            .github/workflows/studio-finish-quality-land.yml \
+            .github/workflows/studio-finish-quality-land-v2.yml
+          git diff --check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize changed product files
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix \
+            src/domains/creator/studio-finish-quality.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.tsx \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.tsx \
+            src/domains/creator/StudioLazyPanelStack.tsx \
+            src/domains/creator/StudioProjectReviewActions.tsx
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-finish-quality.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.tsx \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.tsx \
+            src/domains/creator/StudioLazyPanelStack.tsx \
+            src/domains/creator/StudioProjectReviewActions.tsx
+
+      - name: Run focused finish-quality regressions
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-finish-quality.test.ts
+          src/domains/creator/StudioFinishQualityView.test.tsx
+          src/domains/creator/studio-finish-quality-integration.test.ts
+          --reporter=verbose
+
+      - name: Run complete repository core gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run lint:strict
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm exec vitest run
+          pnpm exec vitest run --config vitest.perf.config.ts
+          pnpm run build
+          pnpm run check:studio-bundle
+
+      - name: Prepare certified product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --worktree -- public/data 2>/dev/null || true
+          rm -rf dist coverage test-results playwright-report .vite
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No product changes were produced" >&2
+            exit 1
+          fi
+          git status --short
+
+      - name: Commit and push exact validated tree
+        id: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_before="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          expected_remote="$(cat /tmp/studio-quality-v2-remote-head.txt)"
+          if [[ "$remote_before" != "$expected_remote" ]]; then
+            echo "Feature branch advanced during verification: expected ${expected_remote}, found ${remote_before}" >&2
+            exit 1
+          fi
+          git commit -m "feat(studio): add deterministic finish quality inspection"
+          git push origin HEAD:"$FEATURE_BRANCH"
+          product_sha="$(git rev-parse HEAD)"
+          echo "sha=${product_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the validated core status
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            --method POST \
+            "repos/${REPOSITORY}/statuses/${{ steps.product.outputs.sha }}" \
+            -f state=success \
+            -f context=core \
+            -f description='Architecture, lint, TypeScript, full Vitest, perf, build and bundle gates passed' \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      - name: Create or refresh the pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="$(gh pr list \
+            --repo "$REPOSITORY" \
+            --head "$FEATURE_BRANCH" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -z "$pr_number" ]]; then
+            gh pr create \
+              --repo "$REPOSITORY" \
+              --head "$FEATURE_BRANCH" \
+              --base main \
+              --title 'feat(studio): add deterministic finish quality inspection' \
+              --body-file - <<'BODY'
+          ## Summary
+          - deterministic final-manuscript inspection for document/page identity, geometry, review state, layer topology, dialogue, speech-bubble overflow and contrast, raster sources, animation frames, retained stroke integrity, and unresolved review comments
+          - integrated quality score, severity/category/search filters, JSON report export, and direct page/element navigation into the existing lazy review surface
+          - preserved story-continuity review and kept mutable destination limits in Publish Pack preflight
+
+          ## Safety
+          - inspection is side-effect free and never mutates artwork
+          - structural corruption alone blocks export; context-dependent findings remain human-review warnings
+          - automatic repair remains under the editor transaction and Undo authority
+
+          ## Exact-head verification
+          - architecture validation
+          - zero-warning strict ESLint
+          - strict TypeScript
+          - complete Vitest suite
+          - performance Vitest suite
+          - production build
+          - Studio bundle boundary
+          BODY
+            pr_number="$(gh pr list \
+              --repo "$REPOSITORY" \
+              --head "$FEATURE_BRANCH" \
+              --base main \
+              --state open \
+              --json number \
+              --jq '.[0].number')"
+          else
+            gh pr edit "$pr_number" \
+              --repo "$REPOSITORY" \
+              --title 'feat(studio): add deterministic finish quality inspection'
+          fi
+          echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Squash merge the validated pull request
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="${{ steps.pr.outputs.number }}"
+          if ! gh pr merge "$pr_number" \
+            --repo "$REPOSITORY" \
+            --squash \
+            --delete-branch \
+            --subject 'feat(studio): add deterministic finish quality inspection'; then
+            gh pr merge "$pr_number" \
+              --repo "$REPOSITORY" \
+              --auto \
+              --squash \
+              --delete-branch \
+              --subject 'feat(studio): add deterministic finish quality inspection'
+          fi
+
+      - name: Wait for main integration and verify product file
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="${{ steps.pr.outputs.number }}"
+          for attempt in $(seq 1 180); do
+            state="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json state --jq '.state')"
+            if [[ "$state" == "MERGED" ]]; then
+              gh api "repos/${REPOSITORY}/contents/src/domains/creator/studio-finish-quality.ts?ref=main" >/dev/null
+              echo "PR #${pr_number} merged and finish-quality core verified on main"
+              exit 0
+            fi
+            if [[ "$state" == "CLOSED" ]]; then
+              echo "PR #${pr_number} closed without merge" >&2
+              exit 1
+            fi
+            sleep 20
+          done
+          echo "Timed out waiting for PR #${pr_number} to merge" >&2
+          exit 1
