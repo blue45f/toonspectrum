@@ -14,6 +14,7 @@
  * Pure data + presentation helpers; no document state.
  */
 
+import { STUDIO_BRUSH_DISCOVERY } from "./brush/studio-brush-discovery";
 import {
   isStudioBrushMaterialGroup,
   studioBrushCoreMaterialGroup,
@@ -378,7 +379,7 @@ export function studioBrushTrayItem(preset: BrushPreset): StudioBrushTrayItem {
     id: preset.id,
     name: preset.name,
     shortName: SHORT_NAMES[preset.id] ?? preset.name.slice(0, 4),
-    hint: HINTS[preset.id] ?? preset.name,
+    hint: STUDIO_BRUSH_DISCOVERY[preset.id]?.hint ?? HINTS[preset.id] ?? preset.name,
     ...(preset.searchAliases ? { searchAliases: preset.searchAliases } : {}),
     defaultWidth: preset.defaultWidth,
     defaultOpacity: preset.defaultOpacity,
