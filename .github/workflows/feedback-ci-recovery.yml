@@ -4,7 +4,11 @@ on:
     branches: [chore/feedback-ci-recovery-20260906]
     paths: [.github/workflows/feedback-ci-recovery.yml]
 permissions:
+  contents: read
   actions: write
+concurrency:
+  group: feedback-ci-recovery-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   recover:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/chore/feedback-ci-recovery-20260906'
@@ -44,8 +48,8 @@ jobs:
             await new Promise(resolve => setTimeout(resolve, 15000));
             const afterCancel = await read();
             if (afterCancel.status !== 'completed') {
-              // GitHub documents force-cancel for jobs whose always() prevents normal cancellation.
-              // This is only an obsolete run. No status is marked successful and no protection is changed.
+              // Force-cancel only the obsolete run whose always() prevents normal cancellation.
+              // No status is marked successful and no protection is changed.
               await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel', { owner, repo, run_id });
             }
             const final = await read();
