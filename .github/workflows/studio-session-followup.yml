@@ -2,7 +2,7 @@ name: Studio session followup
 on:
   push:
     branches: [fix/studio-session-followup-20260906]
-    paths: ['scripts/.studio-pencil-pass.patch', '.github/workflows/studio-session-followup.yml', 'src/domains/creator/live/**']
+    paths: ['scripts/.studio-pencil-pass.patch', 'scripts/apply-studio-live-tip.mjs', '.github/workflows/studio-session-followup.yml', 'src/domains/creator/live/**']
   workflow_dispatch:
 permissions:
   contents: write
@@ -12,12 +12,16 @@ concurrency:
 jobs:
   verify:
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_VERIFY_DIR: /tmp/studio-session-evidence
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 100
+      - name: Fetch main ancestry for the existing changed-file push checks
+        run: git fetch --no-tags --depth=100 origin main:refs/remotes/origin/main
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -35,22 +39,30 @@ jobs:
           node -e 'const r=require("/tmp/studio-session-evidence/before.json"); if(r.numFailedTests===0 || r.numTotalTests!==18) process.exit(1)'
           git apply --check scripts/.studio-pencil-pass.patch
           git apply --index scripts/.studio-pencil-pass.patch
-      - name: Test the full retained renderer and pigment contracts
+      - name: Integrate the reversible moving tip with exact source anchors
+        if: hashFiles('scripts/apply-studio-live-tip.mjs') != ''
+        run: |
+          node scripts/apply-studio-live-tip.mjs
+          git add src/domains/creator/live/studio-live-retained-media-overlay.ts
+      - name: Test the full retained renderer, pigment contracts and tip lifetime
         run: |
           mkdir -p /tmp/studio-session-evidence
-          pnpm exec vitest run src/domains/creator/live/studio-live-retained-media-overlay.test.ts src/domains/creator/live/studio-live-retained-media-stability.test.ts src/domains/creator/live/studio-live-pencil-pass-compositing.test.ts src/domains/creator/brush/studio-pencil-alias-passes.test.ts --reporter=json --outputFile=/tmp/studio-session-evidence/after.json
-      - name: Publish tested implementation on feature branch only
-        if: hashFiles('scripts/.studio-pencil-pass.patch') != ''
+          pnpm exec vitest run src/domains/creator/live/studio-live-retained-media-overlay.test.ts src/domains/creator/live/studio-live-retained-media-stability.test.ts src/domains/creator/live/studio-live-pencil-pass-compositing.test.ts src/domains/creator/live/studio-live-transient-tip.test.ts src/domains/creator/brush/studio-pencil-alias-passes.test.ts --reporter=json --outputFile=/tmp/studio-session-evidence/after.json
+      - name: Preserve exact tested source before any later gate can fail
         run: |
-          git rm scripts/.studio-pencil-pass.patch
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(studio): preserve pencil pigment layers and alpha quantization'
-          git push origin HEAD:refs/heads/fix/studio-session-followup-20260906
-      - name: Preserve exact tested source
-        run: |
-          git rev-parse HEAD > /tmp/studio-session-evidence/tested-head.txt
-          git archive --format=tar.gz HEAD src packages lib scripts package.json tsconfig.json vitest.config.ts vite.config.ts > /tmp/studio-session-evidence/source.tar.gz
+          git rev-parse HEAD > /tmp/studio-session-evidence/base-head.txt
+          git write-tree > /tmp/studio-session-evidence/tested-tree.txt
+          git diff --cached > /tmp/studio-session-evidence/tested-source.patch
+          git archive --format=tar.gz "$(git write-tree)" src packages lib scripts package.json tsconfig.json vitest.config.ts vite.config.ts > /tmp/studio-session-evidence/source.tar.gz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-session-source
+          path: |
+            /tmp/studio-session-evidence/source.tar.gz
+            /tmp/studio-session-evidence/tested-tree.txt
+            /tmp/studio-session-evidence/tested-source.patch
+            /tmp/studio-session-evidence/after.json
+          retention-days: 3
       - run: pnpm exec playwright install chromium
       - run: pnpm run build:bundle
       - name: Recheck actual live and committed pixels in this new build
@@ -59,6 +71,15 @@ jobs:
           TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
           TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade,soft-pencil,pencil-6b
         run: pnpm run verify:studio-brushes
+      - name: Publish only after new-build pixel checks, retaining existing commit and push hooks
+        if: hashFiles('scripts/apply-studio-live-tip.mjs') != ''
+        run: |
+          git rm --ignore-unmatch scripts/.studio-pencil-pass.patch scripts/apply-studio-live-tip.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio): preserve pencil pigment layers and reversible live tips'
+          git push origin HEAD:refs/heads/fix/studio-session-followup-20260906
+          git rev-parse HEAD > /tmp/studio-session-evidence/tested-head.txt
       - if: always()
         uses: actions/upload-artifact@v6
         with:
