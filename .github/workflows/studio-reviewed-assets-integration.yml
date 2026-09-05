@@ -27,38 +27,47 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24.16.0
-      - name: Preserve current main and prepare reproducible sources
+      - name: Preserve current main and reconcile the reviewed baseline
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/studio-curation-results"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
-          git -c core.hooksPath=/dev/null merge --no-edit origin/main
+          if ! git -c core.hooksPath=/dev/null merge --no-edit origin/main; then
+            python3 - <<'PY'
+          import subprocess
+          p='src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
+          conflicts=subprocess.check_output(['git','diff','--name-only','--diff-filter=U'],text=True).splitlines()
+          assert conflicts == [p], 'Unexpected concurrent conflict: '+repr(conflicts)
+          expected=subprocess.check_output(['git','rev-parse','b5746b0f20a749319e35ccc6150d90f839d1289e:'+p],text=True).strip()
+          actual=subprocess.check_output(['git','rev-parse',':3:'+p],text=True).strip()
+          assert actual==expected, 'Main contains unreviewed UI changes; stop rather than overwrite'
+          subprocess.run(['git','checkout','--ours','--',p],check=True)
+          subprocess.run(['git','add','--',p],check=True)
+          subprocess.run(['git','-c','core.hooksPath=/dev/null','commit','--no-edit'],check=True)
+          print('Resolved only the reviewed add/add conflict caused by PR770 squash merge.')
+          PY
+          fi
           gh api repos/blue45f/toonspectrum/git/blobs/ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb --jq .content | python3 -c 'import sys,base64;sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > scripts/acquire_studio_pbr_assets.py
           test "$(git hash-object scripts/acquire_studio_pbr_assets.py)" = ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/apply_studio_visual_curation.py')
-          s=p.read_text()
-          before="save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':additions})"
-          after="save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':[a for a in retained if a['id'].startswith('polyhaven-')]})"
-          assert s.count(before)==1
-          s=s.replace(before,after)
-          before="'activeCatalogCuration':'curation-summary.json','productionPublished':0})"
-          after="'activeCatalogCuration':'curation-summary.json','repositoryBundledOriginals':len(retained),'verifiedDeliveryFiles':len(retained),'productionPublished':0})"
-          assert s.count(before)==1
-          p.write_text(s.replace(before,after))
-          p=Path('scripts/verify-studio-cc0-curated-ui.mjs')
-          s=p.read_text().replace("const prefix = '/assets/studio/cc0-20260906/';\n",'')
+          p=Path('scripts/apply_studio_visual_curation.py');s=p.read_text()
+          pairs=[("save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':additions})","save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':[a for a in retained if a['id'].startswith('polyhaven-')]})"),("'activeCatalogCuration':'curation-summary.json','productionPublished':0})","'activeCatalogCuration':'curation-summary.json','repositoryBundledOriginals':len(retained),'verifiedDeliveryFiles':len(retained),'productionPublished':0})")]
+          for before,after in pairs:
+              assert s.count(before)==1
+              s=s.replace(before,after)
           p.write_text(s)
+          p=Path('scripts/verify-studio-cc0-curated-ui.mjs')
+          p.write_text(p.read_text().replace("const prefix = '/assets/studio/cc0-20260906/';\n",''))
           PY
           python3 -m venv "$RUNNER_TEMP/asset-venv"
           "$RUNNER_TEMP/asset-venv/bin/pip" install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
           pnpm install --frozen-lockfile --ignore-scripts
-          mkdir -p "$RUNNER_TEMP/studio-curation-results"
       - name: Restore exactly the 47 visually reviewed originals
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,8 +76,7 @@ jobs:
           gh api repos/blue45f/toonspectrum/actions/artifacts/9975051972/zip > "$RUNNER_TEMP/pbr-reviewed.zip"
           python3 - <<'PY'
           import hashlib,os,pathlib,stat,zipfile
-          root=pathlib.Path(os.environ['RUNNER_TEMP'])
-          archive=root/'pbr-reviewed.zip'
+          root=pathlib.Path(os.environ['RUNNER_TEMP']);archive=root/'pbr-reviewed.zip'
           assert hashlib.sha256(archive.read_bytes()).hexdigest()=='5594bf15ecfdabd5266bb75206b59d14c7ac5523bea4208d1c4404c2d32c4e15','Artifact digest mismatch'
           out=root/'studio-pbr-candidates';out.mkdir()
           with zipfile.ZipFile(archive) as z:
@@ -90,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec vitest run src/domains/creator/studio-cc0-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts src/domains/creator/vrm/studio-vrm-outfit-static-asset-audit.test.ts 2>&1 | tee "$RUNNER_TEMP/studio-curation-results/unit-tests.log"
-          pnpm exec tsx -e 'import fs from "node:fs";import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts";import {curateStudioCc0Selection} from "./src/domains/creator/studio-cc0-curation.ts";const m=JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"));const a=parseStudioCc0Catalog(m);console.log("VERIFIED_CATALOG",JSON.stringify({all:a.length,defaultSelection:curateStudioCc0Selection(a).length,detailed:curateStudioCc0Selection(a,{style:"detailed",includeComponents:true}).length}));'
+          pnpm exec tsx -e 'import fs from "node:fs";import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts";import {curateStudioCc0Selection} from "./src/domains/creator/studio-cc0-curation.ts";const a=parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8")));console.log("VERIFIED_CATALOG",JSON.stringify({all:a.length,defaultSelection:curateStudioCc0Selection(a).length,detailed:curateStudioCc0Selection(a,{style:"detailed",includeComponents:true}).length}));'
       - name: Normalize and check changed frontend code without warnings
         run: |
           set -euo pipefail
