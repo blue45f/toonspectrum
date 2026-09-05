@@ -1,0 +1,107 @@
+name: PR 730 stale CI queue maintenance
+
+on:
+  push:
+    branches: [maintenance/pr730-stale-ci-20260905]
+    paths: [.github/workflows/pr730-stale-ci-maintenance.yml]
+
+permissions: {}
+
+concurrency:
+  group: pr730-stale-ci-maintenance
+  cancel-in-progress: false
+
+jobs:
+  cancel-obsolete-pr730-runs:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      # No checkout, repository code execution, secrets access, branch writes, or check overrides.
+      # This helper branch is deliberately not proposed for merge into main.
+      - name: Preserve current PR checks and cancel only superseded PR 730 verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          REPO = 'blue45f/toonspectrum'
+          BRANCH = 'feat/inspector-multi-selection-pro-20260905'
+          PR = 730
+          WORKFLOWS = {287571038, 349534064, 295120617}
+          ACTIVE = {'queued', 'in_progress', 'pending', 'waiting', 'requested'}
+          if os.environ.get('GITHUB_REPOSITORY') != REPO:
+              raise SystemExit('Unexpected repository; no mutations performed.')
+
+          def api(path, method='GET'):
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/' + REPO + path,
+                  data=b'{}' if method == 'POST' else None,
+                  method=method,
+                  headers={
+                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                      'Content-Type': 'application/json',
+                      'User-Agent': 'pr730-scoped-ci-maintenance',
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  body = response.read()
+                  return json.loads(body) if body else {}
+
+          def current_pr():
+              pr = api('/pulls/' + str(PR))
+              if (pr['state'] != 'open'
+                  or pr['base']['ref'] != 'main'
+                  or pr['head']['ref'] != BRANCH
+                  or pr['head']['repo']['full_name'] != REPO):
+                  raise SystemExit('PR no longer matches the maintenance scope; stopping.')
+              return pr
+
+          head = current_pr()['head']['sha']
+          print('Preserving all checks on current PR head:', head)
+          obsolete = []
+          for page in range(1, 11):
+              query = urllib.parse.urlencode({'branch': BRANCH, 'per_page': 100, 'page': page})
+              runs = api('/actions/runs?' + query)['workflow_runs']
+              for run in runs:
+                  if (run['head_branch'] == BRANCH
+                      and run['event'] == 'pull_request'
+                      and run['workflow_id'] in WORKFLOWS
+                      and run['status'] in ACTIVE
+                      and run['head_sha'] != head):
+                      obsolete.append(run)
+              if len(runs) < 100:
+                  break
+          else:
+              raise SystemExit('Pagination limit reached; no cancellations performed.')
+
+          requested = 0
+          for run in obsolete:
+              if current_pr()['head']['sha'] != head:
+                  raise SystemExit('PR head changed; stopping to preserve the newest checks.')
+              run_id = int(run['id'])
+              try:
+                  api('/actions/runs/' + str(run_id) + '/cancel', method='POST')
+                  requested += 1
+                  print('Cancellation requested:', run_id, run['name'], run['head_sha'])
+              except urllib.error.HTTPError as error:
+                  if error.code == 409:
+                      print('Run already finished or is no longer cancellable:', run_id)
+                  else:
+                      print('Cancellation failed with HTTP status:', error.code)
+                      raise
+          print('Obsolete run cancellations requested:', requested)
+          print('Current-head checks, main, source files, and branch protections were untouched.')
+          PY
