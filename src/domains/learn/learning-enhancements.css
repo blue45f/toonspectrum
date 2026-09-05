@@ -1,0 +1,56 @@
+/* Feature-scoped additions; no global reset or Studio canvas selectors. */
+.learn-record-shortcut {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 12px 24px 0;
+  text-align: right;
+  font-size: 14px;
+  color: var(--color-fg-2, #526273);
+}
+.learn-record-shortcut a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.learn-record-shortcut a:focus-visible { outline: 3px solid #087f73; outline-offset: 4px; }
+.learn-page .learn-record-tools {
+  padding: 28px;
+  border: 1px solid var(--learn-line);
+  border-radius: 14px;
+  background: var(--learn-bg);
+}
+.learn-page .learn-backup-details { margin-top: 28px; border-top: 1px solid var(--learn-line); padding-top: 18px; }
+.learn-page .learn-backup-details summary { min-height: 44px; cursor: pointer; font-weight: 700; padding: 8px 0; }
+.learn-page .learn-file-label { display: block; margin: 14px 0 10px; font-weight: 650; font-size: 14px; }
+.learn-page .learn-backup-details input[type=file] { width: 100%; min-width: 0; min-height: 44px; }
+.learn-page .learn-backup-details input[type=file]::file-selector-button {
+  background: var(--learn-bg);
+  color: var(--learn-fg);
+  border: 1px solid var(--learn-line);
+  padding: 10px 12px;
+  border-radius: 6px;
+  min-height: 44px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+.learn-page .learn-backup-preview { margin: 20px 0; padding: 20px; border: 1px solid var(--learn-line); border-radius: 10px; }
+.learn-page .learn-backup-preview dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.learn-page .learn-backup-preview dt { font-size: 13px; color: var(--learn-muted); }
+.learn-page .learn-backup-preview dd { margin: 0; font-size: 22px; font-weight: 700; }
+.learn-page .learn-comparison-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.learn-page .learn-comparison-controls button { flex: 1; min-width: 80px; font-size: 14px; }
+.learn-page .learn-diagram[data-view=reference],
+.learn-page .learn-diagram[data-view=comparison] { min-width: 0; max-width: 100%; width: 100%; max-height: 560px; }
+.learn-page .learn-share { padding: 18px 0; border-top: 1px solid var(--learn-line); }
+.learn-page .learn-share label { display: block; font-size: 14px; margin: 12px 0 8px; }
+.learn-page .learn-share input[type=text] { width: 100%; min-width: 0; min-height: 48px; padding: 10px 12px; background: var(--learn-bg); border: 1px solid var(--learn-line); border-radius: 6px; font-size: 16px; }
+.learn-page .learn-record-tools .learn-caption { margin-top: 22px; }
+@media (max-width: 640px) {
+  .learn-record-shortcut { padding: 8px 16px 0; font-size: 13px; }
+  .learn-page .learn-record-tools { padding: 18px; }
+  .learn-page .learn-backup-preview { padding: 16px; }
+  .learn-page .learn-backup-preview dl { grid-template-columns: 1fr; }
+  .learn-page .learn-comparison-controls { gap: 6px; }
+}
