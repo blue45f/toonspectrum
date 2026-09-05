@@ -1,0 +1,116 @@
+name: Complete studio discovery integration
+
+on:
+  push:
+    branches: [fix/studio-brush-filter-discovery-20260906]
+    paths: ['.github/workflows/studio-discovery-finish.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  integrate:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/studio-brush-filter-discovery-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      source_ref: ${{ steps.publish.outputs.source_ref }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-brush-filter-discovery-20260906
+      - name: Apply narrowly scoped integration edits against verified original blobs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          pinned = {
+            'src/domains/creator/filter/StudioFilterDialog.tsx': 'e230db0738f1c4102a3183a5d29074eebc5a1a55',
+            'src/domains/creator/studio-main-menu-items-filter.ts': '427dc35a0f7a712ab6a6e88c9a9a0f497c1979b3',
+            'src/domains/creator/studio-main-menu-items-filter.test.ts': '5a99a6e7a1a1d0d6bb9623c02954b4d4e51fee6e',
+          }
+          for path, sha in pinned.items():
+              actual = subprocess.check_output(['git', 'hash-object', path], text=True).strip()
+              assert actual == sha, f'Concurrent source change: {path}'
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              assert text.count(old) == count, f'Unexpected source shape: {path}: {old[:80]!r}'
+              p.write_text(text.replace(old, new))
+          dialog = 'src/domains/creator/filter/StudioFilterDialog.tsx'
+          replace(dialog, '  STUDIO_FILTER_GROUP_ORDER,\n', '')
+          replace(dialog, 'import {\n  STUDIO_FILTER_LABELS,', 'import { STUDIO_FILTER_DIALOG_GROUP_ORDER } from "./studio-filter-menu-groups";\nimport {\n  STUDIO_FILTER_LABELS,')
+          replace(dialog, '...STUDIO_FILTER_GROUP_ORDER.map', '...STUDIO_FILTER_DIALOG_GROUP_ORDER.map')
+          menu = 'src/domains/creator/studio-main-menu-items-filter.ts'
+          replace(menu, 'import {\n  STUDIO_FILTER_PACK_KINDS,', 'import { orderStudioFilterMenuItems } from "./filter/studio-filter-menu-groups";\nimport {\n  STUDIO_FILTER_PACK_KINDS,')
+          replace(menu, '  return [\n', '  const items: StudioMainMenuItem[] = [\n')
+          replace(menu, '  ];\n}\n', '  ];\n  return orderStudioFilterMenuItems(items);\n}\n')
+          tests = 'src/domains/creator/studio-main-menu-items-filter.test.ts'
+          replace(tests, 'import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG }', 'import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG, studioFilterGroupLabel }')
+          replace(tests, 'import { STUDIO_FILTER_PACK_DEFS }', 'import { STUDIO_FILTER_DIALOG_GROUP_ORDER } from "./filter/studio-filter-menu-groups";\nimport { STUDIO_FILTER_PACK_DEFS }')
+          replace(tests, 'const NON_FILTER_ROW_IDS = new Set(["last-filter", "levels", "tone-curve"]);', 'const NON_FILTER_ROW_IDS = new Set(["last-filter", "levels", "tone-curve"]);\nconst PURPOSE_ORDERED_KINDS = STUDIO_FILTER_DIALOG_GROUP_ORDER.flatMap((group) =>\n  STUDIO_FILTER_DIALOG_CATALOG.filter((entry) => entry.group === group).map((entry) => entry.kind),\n);')
+          replace(tests, 'in registration order', 'in shared purpose-group order')
+          replace(tests, 'toEqual([...STUDIO_FILTER_MENU_KINDS]);', 'toEqual(PURPOSE_ORDERED_KINDS);', 2)
+          old = '''    ).toEqual([
+                ["gaussian-blur", "기본 필터"],
+                ["levels", "레이어 보정"],
+                ["mosaic", "픽셀화"],
+                ["radial-blur", "블러"],
+                ["chromatic-aberration", "렌즈·화면 효과"],
+                ["emboss", "스타일화"],
+                ["line-cleanup", "선화·복원"],
+                ["noise-add", "노이즈"],
+                ["wave-warp", "왜곡"],
+                ["film-grain-pro", "질감·변환"],
+              ]);'''
+          # Match the checked-in indentation, not the YAML indentation of this script.
+          old = old.replace('\n      ', '\n')
+          new = '''    ).toEqual([
+                ...STUDIO_FILTER_DIALOG_GROUP_ORDER.map((group) => [
+                  STUDIO_FILTER_DIALOG_CATALOG.find((entry) => entry.group === group)!.kind,
+                  studioFilterGroupLabel(group),
+                ]),
+                ["levels", "레이어 보정"],
+              ]);'''.replace('\n      ', '\n')
+          # Delimiters are unique inside this exact pinned test, so preserve the surrounding tests.
+          text = Path(tests).read_text()
+          start = text.index('    ).toEqual([\n      ["gaussian-blur", "기본 필터"],')
+          end = text.index('    ]);', start) + len('    ]);')
+          Path(tests).write_text(text[:start] + new + text[end:])
+          script = 'scripts/verify-studio-discovery-ux.mts'
+          replace(script, 'const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[] }', 'const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string }')
+          replace(script, 'await nav.getByRole("menuitem", { name: "필터", exact: true }).click();', 'await nav.locator(\'[data-studio-main-menu-trigger="filter"]\').click();')
+          replace(script, 'await page.locator(\'[role="menu"][aria-label="필터"]\').getByRole("menuitem", { name: "가우시안 블러", exact: true }).click();', 'await page.locator(\'[data-studio-main-menu-panel="true"] [data-studio-menu-item-id="gaussian-blur"]\').click();')
+          replace(script, '} finally {\n  writeFileSync', '} catch (error) {\n  receipt.failure = error instanceof Error ? error.stack ?? error.message : String(error);\n  for (const [index, page] of browser.contexts().flatMap((context) => context.pages()).entries()) {\n    await screenshot(page, `failure-${index}.png`).catch(() => undefined);\n    writeFileSync(join(output, `failure-${index}.html`), await page.content().catch(() => ""));\n  }\n  throw error;\n} finally {\n  writeFileSync')
+          workflow = '.github/workflows/studio-discovery-ux.yml'
+          replace(workflow, 'src/domains/creator/StudioUnifiedBrushPicker.test.tsx', 'src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.test.ts', 2)
+          replace(workflow, 'scripts/verify-studio-discovery-ux.mts --max-warnings=0', 'src/domains/creator/studio-main-menu-items-filter.ts scripts/verify-studio-discovery-ux.mts --max-warnings=0')
+          PY
+          git diff --check
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Normalize only the modified TypeScript imports
+        run: pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
+      - name: Publish isolated integration changes without force or main writes
+        id: publish
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts .github/workflows/studio-discovery-ux.yml
+          git diff --cached --stat
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): align filter discovery groups and browser entry points'
+          git push origin HEAD:refs/heads/fix/studio-brush-filter-discovery-20260906
+          echo "source_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: integrate
+    uses: ./.github/workflows/studio-discovery-ux.yml
+    with:
+      source_ref: ${{ needs.integrate.outputs.source_ref }}
