@@ -16,15 +16,20 @@
 // studio-oil-ribbon-carrier.impasto-relief then failed main at 8.582x against an 8.55x budget,
 // on three retries, with nothing in the timed code changed.
 //
+// The catalogue matrix also delegates its clock to a helper. Its soak measures elapsed time
+// across consecutive planner runs, so it belongs in this same quiet pass. Its budgets, digest
+// checks, catalogue coverage, sample counts and degradation detector remain unchanged.
+//
 // A calibrated budget divides work by a reference kernel measured on the same machine, so it
 // already survives a uniformly slow runner. What it cannot divide out is *contention*: four
 // workers over ~3,000 files perturb the work and the reference by different amounts, and the
 // ratio drifts. Sequencing is what fixes that, not a looser threshold.
 //
-// Do not add tests that assert on counts, geometry or output bytes — those are deterministic and
-// belong in the main run. vitest.perf-budget-partition.test.ts pins that every entry exists and
-// really times something.
+// Do not add tests that assert only on counts, geometry or output bytes — those are deterministic
+// and belong in the main run. tests/vitest-perf-budget-partition.test.ts pins that every entry
+// exists and really times something.
 export const PERF_BUDGET_TEST_FILES = Object.freeze([
+  "scripts/studio-brush-catalogue-perf-matrix.test.ts",
   "src/domains/creator/brush/studio-brush-stamp-engine.test.ts",
   "src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts",
   "src/domains/creator/brush/studio-long-stroke-per-move-cost.test.ts",

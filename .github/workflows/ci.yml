@@ -286,9 +286,11 @@ jobs:
               --allow-loopback
       # `test:root` 는 루트 Vitest 스위트만 돈다(`pnpm test` 의 앞 절반). shard 분모는 matrix 크기에서
       # 자동으로 따라오므로 shard 를 늘리거나 줄일 때 여기를 손댈 필요가 없다.
+      # pnpm run 은 구분자 `--`도 전달한다. 이를 넣으면 Vitest가 뒤의 --shard를 옵션으로 읽지
+      # 않아 각 러너가 전체 스위트를 중복 실행한다. shard 옵션을 스크립트에 직접 전달한다.
       - name: Run this shard of the root Vitest suite with per-file progress
         timeout-minutes: 20
-        run: pnpm run test:root -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   test-serial:
     # 조용한 러너 한 대가 필요한 검사들. 벽시계 예산 테스트는 4 worker 와 경쟁하면 코드가 아니라
@@ -494,7 +496,7 @@ jobs:
 
   studio-inapp-browser:
     # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 라우트 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
-    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
+    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 바닥의 라우트 — 는 유닛 테스트가
     # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
     #
     # 기능 스윕(`studio-inapp-feature-sweep`)과 잡을 나눴다. 네 스윕을 한 잡에 직렬로 두면 17분인데,
