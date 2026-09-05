@@ -77,12 +77,11 @@ export function studioDialogFocusAnchor(ownerDocument: Document): HTMLElement | 
   return null;
 }
 
-/** Return true only when the browser actually accepted a focus destination. */
-export function returnStudioDialogFocus(opener: Element | null, ownerDocument: Document): boolean {
-  const candidates: (Element | null)[] = [
-    opener,
-    ...ownerDocument.querySelectorAll<HTMLElement>(FALLBACK_ANCHOR_SELECTOR),
-  ];
+/** Try only the supplied scope; callers own whether background fallbacks are allowed. */
+function focusStudioDialogCandidates(
+  candidates: readonly (Element | null)[],
+  ownerDocument: Document,
+): boolean {
   const attempted = new Set<Element>();
   for (const target of candidates) {
     if (!canReturnStudioDialogFocus(target, ownerDocument) || attempted.has(target)) continue;
@@ -99,6 +98,20 @@ export function returnStudioDialogFocus(opener: Element | null, ownerDocument: D
   return false;
 }
 
+/** Return true only when the browser actually accepted a focus destination. */
+export function returnStudioDialogFocus(opener: Element | null, ownerDocument: Document): boolean {
+  return focusStudioDialogCandidates([
+    opener,
+    ...ownerDocument.querySelectorAll<HTMLElement>(FALLBACK_ANCHOR_SELECTOR),
+  ], ownerDocument);
+}
+
+interface StudioModalFocusEntry {
+  readonly modal: Element;
+  // Retain the ancestor chain even if multiple portals close in one DOM batch.
+  readonly openers: readonly (Element | null)[];
+}
+
 // Each owner document has its own lifecycle (preview windows / iframe hosts).
 const installations = new WeakMap<Document, () => void>();
 
@@ -113,7 +126,8 @@ export function installStudioDialogFocusReturn(
   const body = ownerDocument.body;
   if (!body || !Observer || !view) return () => undefined;
 
-  const openers = new Map<Element, HTMLElement | null>();
+  const openers = new Map<Element, StudioModalFocusEntry>();
+  const modalFocus = new WeakMap<Element, Element>();
   let lastOutsideFocus: Element | null = resolveStudioDialogOpener(ownerDocument, null);
   let settleTimer: number | null = null;
   let settleFrame: number | null = null;
@@ -125,52 +139,95 @@ export function installStudioDialogFocusReturn(
     settleTimer = null;
     settleFrame = null;
   };
-  const restoreIfDropped = (opener: Element | null) => {
-    if (!disposed && studioDialogFocusWasDropped(ownerDocument)) {
-      returnStudioDialogFocus(opener, ownerDocument);
+  const activeModalEntry = (): StudioModalFocusEntry | null => {
+    let latest: StudioModalFocusEntry | null = null;
+    for (const [portal, entry] of openers) {
+      if (portal.isConnected && entry.modal.getAttribute("aria-modal") === "true") latest = entry;
     }
+    return latest;
+  };
+  const restoreIfDropped = (candidates: readonly (Element | null)[]) => {
+    if (disposed || !studioDialogFocusWasDropped(ownerDocument)) return;
+    const entry = activeModalEntry();
+    if (entry) {
+      // A surviving parent/child modal owns the return path. Never use the
+      // background menubar just because its opener is inert or was removed.
+      const scope = entry.modal;
+      focusStudioDialogCandidates([
+        ...candidates.filter((candidate) => candidate !== null && scope.contains(candidate)),
+        modalFocus.get(scope) ?? null,
+        scope.querySelector("[autofocus]"),
+        scope,
+        ...scope.querySelectorAll("button, a[href], input, select, textarea, [tabindex], [contenteditable='true']"),
+      ], ownerDocument);
+      return;
+    }
+    focusStudioDialogCandidates([
+      ...candidates,
+      ...ownerDocument.querySelectorAll<HTMLElement>(FALLBACK_ANCHOR_SELECTOR),
+    ], ownerDocument);
   };
   // Backdrop mousedown can drop focus after the first restoration. Passive
   // cleanup may also release inert later. Recheck, never unconditionally focus.
-  const restoreWhenSettled = (opener: Element | null) => {
+  const restoreWhenSettled = (candidates: readonly (Element | null)[]) => {
     cancelSettle();
-    restoreIfDropped(opener);
+    restoreIfDropped(candidates);
     settleTimer = view.setTimeout(() => {
       settleTimer = null;
-      restoreIfDropped(opener);
+      restoreIfDropped(candidates);
     }, 0);
     settleFrame = view.requestAnimationFrame(() => {
       settleFrame = null;
-      restoreIfDropped(opener);
+      restoreIfDropped(candidates);
     });
   };
   const onFocusIn = (event: Event) => {
     const target = asElement(event.target as Node | null);
-    if (!target || insideModal(target) || target === body) return;
-    lastOutsideFocus = target;
+    if (!target || target === body) return;
+    const modal = target.closest(MODAL_SELECTOR);
+    if (modal) modalFocus.set(modal, target);
+    else lastOutsideFocus = target;
   };
+  const rememberPortal = (element: Element) => {
+    if (openers.has(element)) return;
+    const modal = modalWithin(element);
+    if (!modal) return;
+    const parent = activeModalEntry();
+    const active = ownerDocument.activeElement;
+    const current = active && !element.contains(active) && active !== body
+      && (!parent || parent.modal.contains(active)) ? active : null;
+    // Capture before testing eligibility: a child's layout effect can already
+    // have made its parent inert. Eligibility is rechecked on each return tick.
+    const candidates = parent
+      ? [current, modalFocus.get(parent.modal) ?? null, parent.modal, ...parent.openers]
+      : [current, lastOutsideFocus];
+    openers.set(element, { modal, openers: candidates });
+  };
+  // A host may install after another modal has already mounted.
+  for (const element of body.children) rememberPortal(element);
   const observer = new Observer((records) => {
     for (const record of records) {
       for (const node of record.addedNodes) {
         const element = asElement(node);
-        if (element && modalWithin(element)) {
-          openers.set(element, resolveStudioDialogOpener(ownerDocument, lastOutsideFocus));
-        }
+        if (element) rememberPortal(element);
       }
     }
-    let pendingOpener: Element | null = null;
+    const pendingCandidates: (Element | null)[] = [];
     let pendingRestore = false;
     for (const record of records) {
       for (const node of record.removedNodes) {
         const element = asElement(node);
-        if (!element || !openers.has(element)) continue;
-        // Preserve the established last-removed portal ownership contract.
-        pendingOpener = openers.get(element) ?? null;
+        if (!element || element.isConnected) continue;
+        const entry = openers.get(element);
+        if (!entry) continue;
+        // The latest removed portal's opener chain is tried first, followed by
+        // earlier chains if their controls were removed in the same batch.
+        pendingCandidates.unshift(...entry.openers);
         pendingRestore = true;
         openers.delete(element);
       }
     }
-    if (pendingRestore) restoreWhenSettled(pendingOpener);
+    if (pendingRestore) restoreWhenSettled(pendingCandidates);
   });
   ownerDocument.addEventListener("focusin", onFocusIn, true);
   observer.observe(body, { childList: true });

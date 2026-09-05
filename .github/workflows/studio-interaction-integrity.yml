@@ -34,6 +34,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Check focus-return source and regression tests
-        run: pnpm exec eslint --max-warnings=0 src/domains/creator/studio-dialog-focus-return.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/studio-dialog-focus-return.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts src/domains/creator/studio-dialog-focus-return-nested.test.ts
       - name: Run existing and extended focus-return contracts
-        run: pnpm exec vitest run src/domains/creator/studio-dialog-focus-return.test.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts
+        run: pnpm exec vitest run src/domains/creator/studio-dialog-focus-return.test.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts src/domains/creator/studio-dialog-focus-return-nested.test.ts
