@@ -21,8 +21,8 @@ jobs:
           script: |
             const owner = 'blue45f';
             const repo = 'toonspectrum';
-            const run_id = 33987130875;
-            const oldSha = '8bf621375045482bdf68a0a1707fab21f272bfcb';
+            const run_id = 33988931897;
+            const oldSha = '21f2061caa3a85f6d6d5a677aa769a877e23ceb0';
             const branch = 'feat/feedback-community-20260906';
             const read = async () => (await github.rest.actions.getWorkflowRun({ owner, repo, run_id })).data;
             const run = await read();
