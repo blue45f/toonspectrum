@@ -43801,6 +43801,1908 @@
         0.08999999612569809
       ],
       "previewFitScale": 3.883495253502612
+    },
+    {
+      "id": "polyhaven-plywood",
+      "name": "목재 · Plywood",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-plywood/base-color.webp",
+      "previewPath": "previews/polyhaven-plywood.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5274804,
+      "sha256": "e609e0628ceb0ec3e9007355e15c5f7b719774a95d7a2d5e9bb62910c8d444e9",
+      "sourceSha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/plywood",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-plywood/normal-opengl.webp",
+          "sha256": "d76b787e4eb5c3e559a197d84478ef9a0c3f78a835557ad692be7e4d8b84299a",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_nor_gl_2k.jpg",
+            "bytes": 2836023,
+            "sourceMd5": "ed5dbe559ec897ff2c744fca23f98152",
+            "sha256": "2391dbe49aaecd6584d12731d4470bf91ba33b5c7f05c78ec5900fcae28f0310",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-laminate-floor-02",
+      "name": "목재 · Laminate Floor 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-laminate-floor-02/base-color.webp",
+      "previewPath": "previews/polyhaven-laminate-floor-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4456428,
+      "sha256": "d39c2d394b0b38738f030fb67ef5e3261dded52b13bb13647bbe6550eb63fe97",
+      "sourceSha256": "2a1e6519309b369f749f06aaf241ac67ea762c686b6a848c1a79331b18a30521",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/laminate_floor_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-laminate-floor-02/normal-opengl.webp",
+          "sha256": "91e8060ac18dffc68dd5d7872e463747041aeea1fcb3e5ea028b23c343ee172f",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_nor_gl_2k.jpg",
+            "bytes": 2420220,
+            "sourceMd5": "ef2dc661cf7a24fa1c2577fd10754014",
+            "sha256": "49aa58c34c6770d209e63f9bdb4d16326f5dab24474cfeb18433e63fc54456de",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-wood-table-001",
+      "name": "목재 · Wood Table 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-wood-table-001/base-color.webp",
+      "previewPath": "previews/polyhaven-wood-table-001.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 3918612,
+      "sha256": "dc480c8edab5c9d980624b8d0c657a0c463e4a38f51afa0825ad8b79104b37aa",
+      "sourceSha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-wood-table-001/normal-opengl.webp",
+          "sha256": "ebebb636d1da8c7ee89059e07cc9665dc37989fb7d7f43279a3d1e1af2e7fcf5",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_nor_gl_2k.jpg",
+            "bytes": 385020,
+            "sourceMd5": "50dbc9fe086df00f6bce819eae6091d1",
+            "sha256": "d56f02c911391267ddc6adc92e8a5bc29b9803196e8d57ad5b9702e6c842dc28",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-denmin-fabric-02",
+      "name": "직물 · Denim Fabric 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-denmin-fabric-02/base-color.webp",
+      "previewPath": "previews/polyhaven-denmin-fabric-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6238338,
+      "sha256": "dca57014fadf7e6a0b5676db9b007380ac785e1f75edc83cfee5e0254b8f1ceb",
+      "sourceSha256": "735c5845b8618ee88ca1b5b2aa9e859cead29a657c3f8c7c4498a2b9919587dc",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-denmin-fabric-02/normal-opengl.webp",
+          "sha256": "4fff6d51c970011243fd54e9f3f1d0685e5ad5c152bbb43503d4b7e6372d92f2",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_nor_gl_2k.jpg",
+            "bytes": 3799091,
+            "sourceMd5": "f8ceaea5a21900e1d77657b49fae11f7",
+            "sha256": "b97267814817ece4b4b16571f710e84f862630ab107dde9e95c4d52978f21c52",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-red-brick",
+      "name": "벽돌 · Red Brick",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-red-brick/base-color.webp",
+      "previewPath": "previews/polyhaven-red-brick.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5102364,
+      "sha256": "0dcfcd52df01d2dc5856d88855487cddf75dc4e2ba0609315ed60be32dd5b950",
+      "sourceSha256": "a1ae5ba7e63026971ceaf68ebbcf8982d9c2dadde1c99996c49b8ac1160af995",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/red_brick",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-red-brick/normal-opengl.webp",
+          "sha256": "ee3cf72f51cca6bf4708df22ed282b0df637dfe52f24ef88312ca4910535e75b",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick/red_brick_nor_gl_2k.jpg",
+            "bytes": 4327452,
+            "sourceMd5": "f10a21aa51b3a0950d1ca0f1fbb8e707",
+            "sha256": "dd2ce5b5c42f04f02fce555d53eae42503733a0a42e76ae9a18bfb9d0680da5b",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-red-brick-03",
+      "name": "벽돌 · Red Brick 03",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-red-brick-03/base-color.webp",
+      "previewPath": "previews/polyhaven-red-brick-03.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6771666,
+      "sha256": "6ef5415fc57984590c1c1ac4b8488a38ba70118de435d1b922adf85f8ae46cfd",
+      "sourceSha256": "c37ef11bb94a533d1c758c5c7d7199264e90f19b23946766c7c59aa189c11ff6",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/red_brick_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-red-brick-03/normal-opengl.webp",
+          "sha256": "01650de77fa8cfe292a7c46cca860e4c4c8013b928759f77e5aff826c7903a1b",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_nor_gl_2k.jpg",
+            "bytes": 3684630,
+            "sourceMd5": "fd2d01b5e0f4de51ca4d7c2b4bcbc22c",
+            "sha256": "3bcb8714c450369915a9608a9e5318433a5e5df932184519bdbfd993dec16a9f",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-medieval-blocks-03",
+      "name": "벽돌 · Medieval Blocks 03",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-medieval-blocks-03/base-color.webp",
+      "previewPath": "previews/polyhaven-medieval-blocks-03.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5405144,
+      "sha256": "acf9e238beeb4ef4944f522c34d7c14def94bd301f642b7e5a18f507f9e56e4f",
+      "sourceSha256": "63cc2220ed9e72c8dda620474c10fc26657552c5309c77c114b5ac725edfb902",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-medieval-blocks-03/normal-opengl.webp",
+          "sha256": "2aaf74d2da293e16c1255da7a11f4d0276ad87fd656ef3182cfbb3284a1075df",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_nor_gl_2k.jpg",
+            "bytes": 5073770,
+            "sourceMd5": "582bb92fd15482dd965051f2c9f45a6b",
+            "sha256": "16c8a4e4828752992725a57b2b69d32021f15dbc3548bced3f786a03e40cf5fe",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-metal-plate",
+      "name": "금속 · Metal Plate",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-metal-plate/base-color.webp",
+      "previewPath": "previews/polyhaven-metal-plate.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4353492,
+      "sha256": "70a44fb9428bec9bb1ea9f8a8ddd43e5053e74f952d1818c626c9b757a86c970",
+      "sourceSha256": "864c9a653acd1f5034c9bbe7f955b18cc9687a81bbdfa805e7a2319939676910",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/metal_plate",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-metal-plate/normal-opengl.webp",
+          "sha256": "35a1724452ead8f4b88e0ed134beef6bdcf99c934abd57bc22fafcdbb93f1f9f",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_nor_gl_2k.jpg",
+            "bytes": 2516654,
+            "sourceMd5": "797c3f3de91da0c03f44f493576e158e",
+            "sha256": "146f8c00874a584bcc4a184643e72f160da2a7568d469198e02b26c9ff93cf43",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-green-metal-rust",
+      "name": "금속 · Green Metal Rust",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-green-metal-rust/base-color.webp",
+      "previewPath": "previews/polyhaven-green-metal-rust.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 1904274,
+      "sha256": "913c4de676cd6a821b030fde8a8efe643db61ed7470fe472ea80e08f19899c6a",
+      "sourceSha256": "727515554ffb6410be82d3625a2837fe46612cb186ec391f77c50bd52c4d7ab2",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/green_metal_rust",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-green-metal-rust/normal-opengl.webp",
+          "sha256": "1866b598fcf546ba6665b709581cca975066965ff0c54a6514eb49f21e420d8f",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_nor_gl_2k.jpg",
+            "bytes": 357436,
+            "sourceMd5": "379dfb43f495a44569674717e974b920",
+            "sha256": "45ec5d256c91ccf4a87dd4c4a90f6c58b460f3862287f014bfde432055ece239",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-rust-coarse-01",
+      "name": "금속 · Rust Coarse 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-rust-coarse-01/base-color.webp",
+      "previewPath": "previews/polyhaven-rust-coarse-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5238916,
+      "sha256": "a9fa9443d353308cc76c95f242d8a44238f2e4510f2cdc5f1583de4e75d8f233",
+      "sourceSha256": "5b8801674fa53ff1b6f7853300f50aa7a1b31e69278554803bd957fe9fa7e392",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rust_coarse_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-rust-coarse-01/normal-opengl.webp",
+          "sha256": "1c82e494386340b90c3e98a6ae8d86aab1b53c989df250b32fa2cae406e28f74",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_nor_gl_2k.jpg",
+            "bytes": 3685688,
+            "sourceMd5": "70e8ba5a8244cffb052b9ba194610867",
+            "sha256": "495d3c87da059827ffaf49dae59f967cb3e0b187f4426ab0a47088c3fa83e50b",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-beige-wall-001",
+      "name": "회벽 · Beige Wall 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-beige-wall-001/base-color.webp",
+      "previewPath": "previews/polyhaven-beige-wall-001.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 1013954,
+      "sha256": "4f5e9468147829498c942f3509bcaf46429f10943203400fd331c45863056c7c",
+      "sourceSha256": "222d4d2e7d5c425c97e5a66790852388cec7706714d773f769fba6bfe08cea4e",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/beige_wall_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-beige-wall-001/normal-opengl.webp",
+          "sha256": "8648aaca61318a2925df611341a585bd1931716f33b657e7bd320b4e6c87b3cf",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_nor_gl_2k.jpg",
+            "bytes": 815507,
+            "sourceMd5": "127b2f5f2f8c2e57b1f08b263c0690bd",
+            "sha256": "7f5cbecd6766f44034f3b78b4addb1559e12bdd5a77501bd418a736609e7cedc",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-painted-plaster-wall",
+      "name": "회벽 · Painted Plaster Wall",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-painted-plaster-wall/base-color.webp",
+      "previewPath": "previews/polyhaven-painted-plaster-wall.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 3981608,
+      "sha256": "c53f95807470627531735a11af8d493212289ec4837936a9a5424c32437551c4",
+      "sourceSha256": "6fd812ed8dd5be1873c29aeef38ce9bf1fb30a22c6d4b3a12db725e98c26a1be",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_plaster_wall",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-painted-plaster-wall/normal-opengl.webp",
+          "sha256": "e33bdcccab39f03f8467a93cd6077b12eef783f8cf6d81ee142fda557b6e3282",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_nor_gl_2k.jpg",
+            "bytes": 4048392,
+            "sourceMd5": "18faf9f7949aefdb3ae7cef7195cba04",
+            "sha256": "2d601a46ed5ce2af866741c53cafa3cba472620c272e633b6484d4de16a80eb1",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-white-plaster-02",
+      "name": "회벽 · White Plaster 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-white-plaster-02/base-color.webp",
+      "previewPath": "previews/polyhaven-white-plaster-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5051242,
+      "sha256": "7bec2ca28b78dc3c40229d54c998634f4e07a0c5759b2cd48af26bd8a829b662",
+      "sourceSha256": "0ca5245ba70777d3e41ff4566c9f8d363855461891802c55cb7dc0f6f85f084e",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-white-plaster-02/normal-opengl.webp",
+          "sha256": "51e10d14debaa273d8584bfb92e2ca44b90fb0faa7e050f0a2853d59dc3246c6",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+            "bytes": 3379814,
+            "sourceMd5": "a9fa643c4a200686ad89598b545b2adc",
+            "sha256": "083579b03a8f31ec1886512e5972f3b893610bf26a2098f97910e0f46745cdc9",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-asphalt-02",
+      "name": "아스팔트 · Asphalt 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-asphalt-02/base-color.webp",
+      "previewPath": "previews/polyhaven-asphalt-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6008206,
+      "sha256": "8b850a0b505ffe62ed5c9751e3584a3ecbc90eba2dff634ff166813a296a2133",
+      "sourceSha256": "28f5ba8690553f192c0e5e1a5ff40f34765b4b93f4cc7059b1a3e9c795b6c28c",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/asphalt_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-asphalt-02/normal-opengl.webp",
+          "sha256": "718e55f26d750f761fd578058f6b6610e68a02bf473083c874f38bcb04c3a4e2",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_nor_gl_2k.jpg",
+            "bytes": 4943950,
+            "sourceMd5": "77ebd1cc0b020ccaa1c6b58f103d1f75",
+            "sha256": "ffe49db71a0fd34c1e259625df66a302a237597d6ef655307987ec4e45bc6f21",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-aerial-asphalt-01",
+      "name": "아스팔트 · Aerial Asphalt 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-aerial-asphalt-01/base-color.webp",
+      "previewPath": "previews/polyhaven-aerial-asphalt-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5336476,
+      "sha256": "1d92b0f74b0742662671589fafd990e869cd01bec949f0b1d56f5186b78678f3",
+      "sourceSha256": "a85ce28b8e6ed90acb0234832969b27f5b73fe055a0d5b94f34fc2943d319fb5",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_asphalt_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-aerial-asphalt-01/normal-opengl.webp",
+          "sha256": "c58c88cdf5450e5483e3795bc32814afe995667bb6e67ad14fd804cbafcf89f3",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_nor_gl_2k.jpg",
+            "bytes": 2751902,
+            "sourceMd5": "2b2d543f7c6567030f11a6070f586e05",
+            "sha256": "cb7e5b75ff47ad672ab820f71b77566419b612e52e7791c5ed90a7fa27b71807",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-asphalt-01",
+      "name": "아스팔트 · Asphalt 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-asphalt-01/base-color.webp",
+      "previewPath": "previews/polyhaven-asphalt-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4580328,
+      "sha256": "6601e0afb4e4065b2c226e814c783702203ae9b4097b03b329fc065af9dd4e62",
+      "sourceSha256": "10fe1dafe34fec51397dbe9011f798c68c4e3fc16abfd4d7aea0123122db8993",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-asphalt-01/normal-opengl.webp",
+          "sha256": "bd9f5efce233b0f436350a51d6cc92be2d697748c44eaaa3cee8ca4c357702b9",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_nor_gl_2k.jpg",
+            "bytes": 4845665,
+            "sourceMd5": "8b513a75b434f95ca268436265742638",
+            "sha256": "60fd6af2aae30bb3fd2231227ecbe52d0ced2c761d53a64f50dea59d173307cd",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-concrete-floor-worn-001",
+      "name": "콘크리트 · Concrete Floor Worn 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-concrete-floor-worn-001/base-color.webp",
+      "previewPath": "previews/polyhaven-concrete-floor-worn-001.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 1833164,
+      "sha256": "d2b97936631b054d209bc1e09d068eef9a71d9260ca28b40dafa5167d0cbecb0",
+      "sourceSha256": "e29b45cdcd6d02fae3c087c456196ffa750779a9b62e7071aa3831dc322a0cc4",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_floor_worn_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-concrete-floor-worn-001/normal-opengl.webp",
+          "sha256": "b4b9c5a56418600cab89ba9e67173b0faddbab444dede591ed23b01fde2f9837",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_2k.jpg",
+            "bytes": 870609,
+            "sourceMd5": "210fbc9fe40492177e79fdb4afda268e",
+            "sha256": "3b782137e34d63fd59b2e92b4e27b2ee4d082caf9dd23f00dc7ab4da5513daef",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-concrete-floor-02",
+      "name": "콘크리트 · Concrete Floor 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-concrete-floor-02/base-color.webp",
+      "previewPath": "previews/polyhaven-concrete-floor-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 7040798,
+      "sha256": "baad1fa5d96dd3dd18b83fdbee6200cc51998ef9cc74a1f63d6c87a61bf6f032",
+      "sourceSha256": "b08a20dcb306d08ee7f4a05ec216b19b7fd37e95745998ec5f81ecedaac1f0e9",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-concrete-floor-02/normal-opengl.webp",
+          "sha256": "6ecd6534b55b2cc5010f6636b5b79b51887a6a3a51e2be0742c4747d71c66dcc",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_nor_gl_2k.jpg",
+            "bytes": 935810,
+            "sourceMd5": "3cc9918473a0c3d5ecb10f0ddc7e218d",
+            "sha256": "ce12d18f283f884f4be6f6c110f81582376049caada1e226958659d3d5fbaae1",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-concrete-layers-02",
+      "name": "콘크리트 · Concrete Layers 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-concrete-layers-02/base-color.webp",
+      "previewPath": "previews/polyhaven-concrete-layers-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 3371196,
+      "sha256": "2c8083860e90d9848443c2fb1534c18f94ab456183a90f0e30b5a845e0e3ca26",
+      "sourceSha256": "f70070187573ad05457c65c3efe7fb25fe1e071a5490c760e5b90f845aab9b91",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_layers_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-concrete-layers-02/normal-opengl.webp",
+          "sha256": "a09e887bedce02d8c08dbb4b8366f125e3a094192e8809ac19ea3126a7140fc3",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_nor_gl_2k.jpg",
+            "bytes": 3389363,
+            "sourceMd5": "8421eb5b33a8afbf845565676abc7f44",
+            "sha256": "6985e0782adb226423d81cdd080b0e06012fdfb20eb3952d2459218fdd3977e9",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-coast-sand-rocks-02",
+      "name": "석재 · Coast Sand Rocks 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-coast-sand-rocks-02/base-color.webp",
+      "previewPath": "previews/polyhaven-coast-sand-rocks-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4522780,
+      "sha256": "db9e11bf6c45d8086c592ec89ec46141b9e4300149ba540797a35a45462ea31a",
+      "sourceSha256": "98a8850f24cba18e4c99e46c56f5675f910809ee7f75df3e8587ec9e27088ed6",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/coast_sand_rocks_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-coast-sand-rocks-02/normal-opengl.webp",
+          "sha256": "d1b0e553016222eceffe07cb2977cf9b54a03fd27ef25d1f61214dbe8f04a3cb",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_nor_gl_2k.jpg",
+            "bytes": 4810192,
+            "sourceMd5": "20c06634ac6d350c7baa0f18a24fb272",
+            "sha256": "e75cd105d218aae5bf669630635e6753a78f6325bc799be3d0ee8b974853a84d",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-aerial-rocks-02",
+      "name": "석재 · Aerial Rocks 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-aerial-rocks-02/base-color.webp",
+      "previewPath": "previews/polyhaven-aerial-rocks-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6559940,
+      "sha256": "7bc38edf446158d3324fa52341eb41ad12df250a64e5ad732691f93aeebd2ff6",
+      "sourceSha256": "f759d2471cb6a4b3b37d0a5a249adbad1d4d48d67825f37622a603dac8d9bb22",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_rocks_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-aerial-rocks-02/normal-opengl.webp",
+          "sha256": "362924f87664cbd5ef3447d1aacc644d156924e866688d104aabc876a11d77ae",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_rocks_02/aerial_rocks_02_nor_gl_2k.jpg",
+            "bytes": 4300188,
+            "sourceMd5": "7c405cfd3308a2672c99b44e102c328e",
+            "sha256": "e7ad2a65b446ef70c3eb8b32267bee74d91d9759ed52c349c38e34cfd62d079e",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-aerial-grass-rock",
+      "name": "석재 · Aerial Grass Rock",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-aerial-grass-rock/base-color.webp",
+      "previewPath": "previews/polyhaven-aerial-grass-rock.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6187830,
+      "sha256": "6bc2ba03a63c7e2267d7fb85bd483119fefd5f38cbd94668da74f89f824ab784",
+      "sourceSha256": "1a2ddfa4652adbe00447b940c40019d46f4b88245bc1b341cdf622c2110b7bc5",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_grass_rock",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-aerial-grass-rock/normal-opengl.webp",
+          "sha256": "abb4d6725c2b872d3cddf53f5e9417ee9b0b82e35300365b360ed4e89075c6ba",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_grass_rock/aerial_grass_rock_nor_gl_2k.jpg",
+            "bytes": 3799025,
+            "sourceMd5": "0c5423ce365169df7c242933b5137696",
+            "sha256": "c6aa14b042ce243f93a6ca807f46a085711c23ad316b104578e92df7770ee285",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-brown-leather",
+      "name": "가죽 · Brown Leather",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-brown-leather/base-color.webp",
+      "previewPath": "previews/polyhaven-brown-leather.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5264982,
+      "sha256": "d8758e19161a0d132660b16707d47c1c6ddfb811757b5720c653fc13709179e9",
+      "sourceSha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brown_leather",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-brown-leather/normal-opengl.webp",
+          "sha256": "26647d0d2ab3b6aaa54ae313f2dd441bbe62e84114dddc6cce178a05f441eae6",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_nor_gl_2k.jpg",
+            "bytes": 3030702,
+            "sourceMd5": "6e86bbaf5e995c4154b76a1e4b0f4f1c",
+            "sha256": "3386277290af50b4d464dc9a9f195bbf8dd6f137b9ae0274552397d2f0135c98",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-marble-01",
+      "name": "타일 · Marble 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-marble-01/base-color.webp",
+      "previewPath": "previews/polyhaven-marble-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 3009958,
+      "sha256": "40503ddddd2c38e976f42b2f0c1038643e92a96cfcd3d8c03a6e1acb0e3cd4d9",
+      "sourceSha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/marble_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-marble-01/normal-opengl.webp",
+          "sha256": "eb6cc281e9cddae463d4e2b6405aa7f9a413763ca3b9111269f62b43ee7328c7",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_nor_gl_2k.jpg",
+            "bytes": 409581,
+            "sourceMd5": "f25efb0b61ec7ac183b3b0f4d032ed17",
+            "sha256": "d5e17ccb2913adbf28fcb781fddf0aa711259ddea6c1c918442f9a3589aa4660",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-leather-white",
+      "name": "타일 · Leather White",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-leather-white/base-color.webp",
+      "previewPath": "previews/polyhaven-leather-white.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4381350,
+      "sha256": "345a20c70891248f7224d698ace6c1de8af917dbfec71438b265074026b812ec",
+      "sourceSha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/leather_white",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-leather-white/normal-opengl.webp",
+          "sha256": "67a4b2e222ef92a3c9845d3ec3c1a1925ba734b3bf26d1d759ba8d8a78a8a647",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_nor_gl_2k.jpg",
+            "bytes": 3176928,
+            "sourceMd5": "c45c0fac221ee5ffc2aa7eabde7bb79b",
+            "sha256": "f06e81389faf7c4bef47b8ed5a5c433b6e3b7d0ac77e4090f65ed9d964a589f6",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-floor-tiles-06",
+      "name": "타일 · Floor Tiles 06",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-floor-tiles-06/base-color.webp",
+      "previewPath": "previews/polyhaven-floor-tiles-06.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 3536838,
+      "sha256": "e9cb50590c64dec02976cab6f56a1a34730a6540c3a04285bac3afb837f3d25b",
+      "sourceSha256": "fe326c219d096e8f5d31c9be6da5a617f34c58b3042d0733f7d4450a38906b37",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/floor_tiles_06",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-floor-tiles-06/normal-opengl.webp",
+          "sha256": "cbf0e6d7a9e1de7da9e1e9f184677c912e6308e590cfd5846a04dedb3ebe0a78",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_nor_gl_2k.jpg",
+            "bytes": 1010594,
+            "sourceMd5": "07aded52ddd8758b4703cbd831c5b17d",
+            "sha256": "930ee26e4018f0d44d8f011b364b141c7ccf02bd3e47b85e591cbbaeb9f47046",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-decrepit-wallpaper",
+      "name": "종이 · Decrepit Wallpaper",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-decrepit-wallpaper/base-color.webp",
+      "previewPath": "previews/polyhaven-decrepit-wallpaper.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 4874912,
+      "sha256": "192310e3a987e0c7cdb77d2b74cfc315441921f36da2470b75d4236ece4cdc10",
+      "sourceSha256": "6a16d2c30016b98cce1176e85c64075fe48255d0302e7d7b9f71198fbe818cf1",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/decrepit_wallpaper",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-decrepit-wallpaper/normal-opengl.webp",
+          "sha256": "a2f5b3468145e67f116800b26f4fc7c95fd4625aee01a154e8a659ff679c082f",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_nor_gl_2k.jpg",
+            "bytes": 2906832,
+            "sourceMd5": "8ae2cd9b5d40327c6a0193fa9fd97058",
+            "sha256": "95507032d5039128729d132c0a5ce76e3fa0e43c8db077b480498ab6cbb42ed9",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-brown-mud-leaves-01",
+      "name": "지면 · Brown Mud Leaves 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-brown-mud-leaves-01/base-color.webp",
+      "previewPath": "previews/polyhaven-brown-mud-leaves-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 6544490,
+      "sha256": "0d63a2dd14676031199ddbae925335b6c75ab2d88ed876e71a00e069aa226c9e",
+      "sourceSha256": "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brown_mud_leaves_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-brown-mud-leaves-01/normal-opengl.webp",
+          "sha256": "23b8b32d3b91fab39c19c6b05e6a9a9a094b86d34f48ab618ac4a82b9cab415c",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_nor_gl_2k.jpg",
+            "bytes": 5688696,
+            "sourceMd5": "eb2c704d2889e1e5a53148dc6a2ebdf4",
+            "sha256": "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-forrest-ground-01",
+      "name": "지면 · Forest Ground 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-forrest-ground-01/base-color.webp",
+      "previewPath": "previews/polyhaven-forrest-ground-01.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 7326570,
+      "sha256": "08a582989d60925ce2101b47964f296f31f3783048fc456335f89478700d3f10",
+      "sourceSha256": "e4d557ff61a0b42712a58e8a2e91c6010738977d4e172b7af47abd7d406ae735",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/forrest_ground_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-forrest-ground-01/normal-opengl.webp",
+          "sha256": "43a3d4a42876b574008a4abaa5849018976793290eea76ad25443a5cf6a2ff12",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_nor_gl_2k.jpg",
+            "bytes": 5551101,
+            "sourceMd5": "7bb5186bd63bef99f6d21316718896f2",
+            "sha256": "aa23fa930c6303490f842f7c016c19d838263e8e4538d42508a9332e3fd76b69",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-rocky-terrain-02",
+      "name": "지면 · Rocky Terrain 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-rocky-terrain-02/base-color.webp",
+      "previewPath": "previews/polyhaven-rocky-terrain-02.webp",
+      "width": 2048,
+      "height": 2048,
+      "bytes": 5253894,
+      "sha256": "edad5bc9d201fe7babccc4f970ba25a7e212226cca7f0b2b846ad967772abd9c",
+      "sourceSha256": "9b042fe0618ffbc3650592456d7d8d265ba9a1cb5ce802f5f1d86b7ee79508a1",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rocky_terrain_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "companionMaps": [
+        {
+          "role": "normal-opengl",
+          "path": "assets/polyhaven-rocky-terrain-02/normal-opengl.webp",
+          "sha256": "3fd237b19b33c5add80392e04462980840d56c8f0a1b9c8ce90eba44d82cf83f",
+          "source": {
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_nor_gl_2k.jpg",
+            "bytes": 4149208,
+            "sourceMd5": "672bfdf5e7835fa369da6a5d1209026a",
+            "sha256": "556ed903180a9431b253fc1c334c769dc4615c5c0f4ef1cedf20533ae8409ce8",
+            "sourceDigestMatched": true
+          }
+        }
+      ],
+      "technicalChecks": [
+        "native-2K",
+        "decoded",
+        "lossless-pixel-roundtrip",
+        "source-size-and-digest",
+        "pixel-deduplicated"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false
+    },
+    {
+      "id": "polyhaven-modern-arm-chair-01",
+      "name": "패브릭 암체어 · Modern Arm Chair 01",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-modern-arm-chair-01/model.glb",
+      "bytes": 9219832,
+      "sha256": "2c02cde1c1a10f14bd4730f8ef8500cd2a7f23ef41f6f3c06cd42044ee2d6a58",
+      "geometrySha256": "7ec5456f39f019ece119bce6db03ec7974ca446a7e87155bf8a60d53e70e2069",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-modern-arm-chair-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.8203444182872772,
+        1.0228520567470696,
+        0.9865616858005524
+      ],
+      "previewFitScale": 1.9553169852935626
+    },
+    {
+      "id": "polyhaven-greenchair-01",
+      "name": "그린 체어 · Green Chair 01",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-greenchair-01/model.glb",
+      "bytes": 1983952,
+      "sha256": "3cc81bb53f98a627b9e3767547cef1d89dbd686aea098d9e91beb1c5a16b114d",
+      "geometrySha256": "94afc105fb368e8e07ceee0a8d532c6d4099c090f824a2b957c1fc933f334b4f",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/GreenChair_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-greenchair-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.6730944514274597,
+        1.0585118184098974,
+        0.6643873751163483
+      ],
+      "previewFitScale": 1.8894451296768813
+    },
+    {
+      "id": "polyhaven-wooden-table-02",
+      "name": "원목 테이블 · Wooden Table 02",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-wooden-table-02/model.glb",
+      "bytes": 1946960,
+      "sha256": "9b55915c1f9eba2c1e40dbb3c1026b62a7a85a998585bf71652c643e5ba5de35",
+      "geometrySha256": "3cf3fb11c31cef9381954747d3188d96c47a06f5d4fd9ba7b9860e878b80a1a7",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-wooden-table-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.13441663980484,
+        0.7995428870490286,
+        0.7060248255729675
+      ],
+      "previewFitScale": 1.7630206837798774
+    },
+    {
+      "id": "polyhaven-tea-set-01",
+      "name": "찻잔과 티포트 · Tea Set 01",
+      "kind": "model",
+      "category": "food",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-tea-set-01/model.glb",
+      "bytes": 5174804,
+      "sha256": "a0bc6ae3874e769928246e9229b3b2ec062368fa2feccfeaa3371f01472bbde3",
+      "geometrySha256": "ec01b793e68a8d07d1893330243d3c3a4ebe9fc0eca85280a9461dfed9f56583",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/tea_set_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-tea-set-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.9184822738170624,
+        0.1649930527782999,
+        0.483876571059227
+      ],
+      "previewFitScale": 2.1775052791038925
+    },
+    {
+      "id": "polyhaven-potted-plant-04",
+      "name": "실내 화분 · Potted Plant 04",
+      "kind": "model",
+      "category": "nature",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-potted-plant-04/model.glb",
+      "bytes": 6254684,
+      "sha256": "90181984aba61bdc820f540b7cd1bfde544d6f6e89ce4b4a421f620351888022",
+      "geometrySha256": "8abe2383fd6cbcab7d761f6d2f58f672037f782dce1f2491fe6ae260969e68cd",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-potted-plant-04.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.16788632422685623,
+        0.2674576655845158,
+        0.18475142866373062
+      ],
+      "previewFitScale": 7.477818949885384
+    },
+    {
+      "id": "polyhaven-desk-lamp-arm-01",
+      "name": "관절 데스크 램프 · Desk Lamp Arm 01",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-desk-lamp-arm-01/model.glb",
+      "bytes": 8471304,
+      "sha256": "86afc750a271afee4e2c69fa624c408446affdf14790dc68643e5fa2a496be98",
+      "geometrySha256": "cdd827cfd08b36c13e44809bd92a0a8cbb2799d59947d816db9d01be2940cfa6",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/desk_lamp_arm_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-desk-lamp-arm-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.20172932744026184,
+        0.8926106989383698,
+        0.6138725876808167
+      ],
+      "previewFitScale": 2.2406184492060293
+    },
+    {
+      "id": "polyhaven-sofa-02",
+      "name": "패브릭 소파 · Sofa 02",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-sofa-02/model.glb",
+      "bytes": 1265800,
+      "sha256": "259d5fb630a548fbc2c83c4fb96be5002da90780441c0725aea13b0c118324b2",
+      "geometrySha256": "ed80813ce96dccc49409f33e8e723b5011898abbdc0a92cf6d8759c263504cce",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/sofa_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-sofa-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.8071673512458801,
+        0.7094889283180237,
+        0.8177513778209686
+      ],
+      "previewFitScale": 1.1067043672635957
+    },
+    {
+      "id": "polyhaven-wooden-bowl-02",
+      "name": "원목 그릇 · Wooden Bowl 02",
+      "kind": "model",
+      "category": "food",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-wooden-bowl-02/model.glb",
+      "bytes": 8461024,
+      "sha256": "9071dd4dc81d9ed04b6616bb7a40ae188fe0ba795a5423561df76cf2040fa6df",
+      "geometrySha256": "89b3261cb186277c1263cb90edbcc712545b6a80370a307fb70ac1f41dcdff09",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_bowl_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-wooden-bowl-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.13071347028017044,
+        0.07309794479806442,
+        0.12453967705368996
+      ],
+      "previewFitScale": 15.300641897986583
+    },
+    {
+      "id": "polyhaven-brass-pan-01",
+      "name": "황동 팬 · Brass Pan 01",
+      "kind": "model",
+      "category": "food",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-brass-pan-01/model.glb",
+      "bytes": 5315360,
+      "sha256": "9c039140277051a1699e12b790fced03b841c75f57ebdd9ca0980e61c1a42f97",
+      "geometrySha256": "296c3701b9d5c3a9c4a6dd6ae9711293ea7dd29181297b57e7bba161c42876e3",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_pan_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-brass-pan-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.1912703588604927,
+        0.052509385510347784,
+        0.4496646225452423
+      ],
+      "previewFitScale": 4.44775928486296
+    },
+    {
+      "id": "polyhaven-planter-pot-clay",
+      "name": "테라코타 화분 · Planter Pot Clay",
+      "kind": "model",
+      "category": "nature",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-planter-pot-clay/model.glb",
+      "bytes": 5957560,
+      "sha256": "a868c5fb2bb841cff49c345b292dfac96fa222877c8f7af3e7e1741e0b24142e",
+      "geometrySha256": "fcc92d41dd956855e4c6e138c1f0975a0d6359aa25731ca2d2dfd69c9dbf0843",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/planter_pot_clay",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-planter-pot-clay.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.2659967243671417,
+        0.22187034250237048,
+        0.2634630501270294
+      ],
+      "previewFitScale": 7.518889583164573
+    },
+    {
+      "id": "polyhaven-painted-wooden-bench",
+      "name": "원목 벤치 · Painted Wooden Bench",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-painted-wooden-bench/model.glb",
+      "bytes": 7993728,
+      "sha256": "ca5300364ec1ab9150743588335657aeff1f5ec425a7a67291e9a5332a381421",
+      "geometrySha256": "b605246533c33448eed93459e7e0d6cb7baf0dc15214afcc8596adf7bbebff7c",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_wooden_bench",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-painted-wooden-bench.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.1649435758590698,
+        0.8892914750613272,
+        0.4965430945158005
+      ],
+      "previewFitScale": 1.7168213477851324
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet",
+      "name": "원목 수납장 · Painted Wooden Cabinet",
+      "kind": "model",
+      "category": "furniture",
+      "style": "realistic-pbr",
+      "path": "assets/polyhaven-painted-wooden-cabinet/model.glb",
+      "bytes": 6815356,
+      "sha256": "183e5af50fc4a42424c89505e96754f88e0b52e2a8ac586af911c4e967982054",
+      "geometrySha256": "6ab8b0f670431fd2fd4ee69fbccc4c650455f99ad2f8daef3ebab286ba8bb82b",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06",
+        "licenseEvidenceUrl": "https://polyhaven.com/license"
+      },
+      "technicalChecks": [
+        "GLB-2.0",
+        "self-contained-textures",
+        "source-size-and-digest",
+        "finite-positions",
+        "accessor-bounds",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "previewPath": "previews/polyhaven-painted-wooden-cabinet.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.194674551486969,
+        1.1818697528215125,
+        0.6166356205940247
+      ],
+      "previewFitScale": 1.674096093794474
     }
   ]
 }

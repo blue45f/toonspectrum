@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rocky_terrain_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_diff_2k.jpg",
+    "bytes": 3232826,
+    "sourceMd5": "68f9c94575ff3c3512be9b010eb03f0e",
+    "sha256": "9b042fe0618ffbc3650592456d7d8d265ba9a1cb5ce802f5f1d86b7ee79508a1",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-rocky-terrain-02/normal-opengl.webp",
+      "sha256": "3fd237b19b33c5add80392e04462980840d56c8f0a1b9c8ce90eba44d82cf83f",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_nor_gl_2k.jpg",
+        "bytes": 4149208,
+        "sourceMd5": "672bfdf5e7835fa369da6a5d1209026a",
+        "sha256": "556ed903180a9431b253fc1c334c769dc4615c5c0f4ef1cedf20533ae8409ce8",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

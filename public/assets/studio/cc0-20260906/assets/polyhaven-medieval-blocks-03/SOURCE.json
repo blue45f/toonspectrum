@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_diff_2k.jpg",
+    "bytes": 3839924,
+    "sourceMd5": "1154ad6a83952dc50e14d27e236caa86",
+    "sha256": "63cc2220ed9e72c8dda620474c10fc26657552c5309c77c114b5ac725edfb902",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-medieval-blocks-03/normal-opengl.webp",
+      "sha256": "2aaf74d2da293e16c1255da7a11f4d0276ad87fd656ef3182cfbb3284a1075df",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_nor_gl_2k.jpg",
+        "bytes": 5073770,
+        "sourceMd5": "582bb92fd15482dd965051f2c9f45a6b",
+        "sha256": "16c8a4e4828752992725a57b2b69d32021f15dbc3548bced3f786a03e40cf5fe",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

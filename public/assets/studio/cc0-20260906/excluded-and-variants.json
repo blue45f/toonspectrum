@@ -63,6 +63,22 @@
     {
       "source": "kenney-city-commercial/Models/GLB format/low-detail-building-wide-b.glb",
       "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "id": "fabric_pattern_07",
+      "reason": "No native 2K base-color file"
+    },
+    {
+      "id": "fabric_pattern_05",
+      "reason": "No native 2K base-color file"
+    },
+    {
+      "id": "leather_red_02",
+      "reason": "No native 2K base-color file"
+    },
+    {
+      "id": "book_pattern",
+      "reason": "No native 2K base-color file"
     }
   ],
   "variants": [

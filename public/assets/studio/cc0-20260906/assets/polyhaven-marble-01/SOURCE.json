@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/marble_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_diff_2k.jpg",
+    "bytes": 1269188,
+    "sourceMd5": "4eeefea16242cecb3b429ac0c8f88740",
+    "sha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-marble-01/normal-opengl.webp",
+      "sha256": "eb6cc281e9cddae463d4e2b6405aa7f9a413763ca3b9111269f62b43ee7328c7",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_nor_gl_2k.jpg",
+        "bytes": 409581,
+        "sourceMd5": "f25efb0b61ec7ac183b3b0f4d032ed17",
+        "sha256": "d5e17ccb2913adbf28fcb781fddf0aa711259ddea6c1c918442f9a3589aa4660",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

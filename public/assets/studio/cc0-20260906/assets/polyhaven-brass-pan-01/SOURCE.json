@@ -1,0 +1,53 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_pan_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "model": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_pan_01/brass_pan_01_2k.gltf",
+    "bytes": 2676,
+    "sourceMd5": "901766290d5fbbfc9ed8e1ffd0cea38b",
+    "sha256": "d29a08d054481a9ba388c7103b78165d46e692b9cb24bc3ac858b2c4b3784a33",
+    "sourceDigestMatched": true
+  },
+  "dependencies": [
+    {
+      "path": "brass_pan_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/brass_pan_01/brass_pan_01.bin",
+      "bytes": 109336,
+      "sourceMd5": "3099c59ef46a50380487ad9b92d4dfbd",
+      "sha256": "8ece55dcbde3a1f81b9221b4fb0344a802117fa89c39b4ec9718bb1d9cba253f",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/brass_pan_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_nor_gl_2k.jpg",
+      "bytes": 1178554,
+      "sourceMd5": "cc86291331c23e69796a565256117199",
+      "sha256": "61e4985caebebdc6dcb2bf79bcd036307c78bd2fd046afe18991d79822622ed7",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/brass_pan_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_diff_2k.jpg",
+      "bytes": 2020753,
+      "sourceMd5": "b669282b745cce90cbb3b464ed30bbc3",
+      "sha256": "6c8366d521d76ee94ee785135561462a6996e5e41bfc533e5cf5821bbf347cd3",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/brass_pan_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_arm_2k.jpg",
+      "bytes": 2004998,
+      "sourceMd5": "1fe973f670ac0ef36c3d8c9bf32d43ab",
+      "sha256": "83da410def20681a91314e39f8787c46f0515e30c477d3cc84df78a36ab7831c",
+      "sourceDigestMatched": true
+    }
+  ]
+}

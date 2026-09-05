@@ -1,0 +1,14 @@
+{
+  "acquisitionBoundaryTests": "passed",
+  "catalogAndLegacyTests": "58-passed",
+  "allManifestEntries": "passed",
+  "newModelThreeAngleRendering": "passed",
+  "frontendLint": "passed-zero-warnings",
+  "frontendTypes": "passed",
+  "productionBundle": "passed",
+  "studioBundleBoundaries": "passed",
+  "artisticInspection": "not-claimed",
+  "studioSaveRestoreRoundTrip": "not-run",
+  "mainMerge": "not-performed",
+  "productionDeployment": "not-performed"
+}

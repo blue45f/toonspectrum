@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/aerial_grass_rock",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_grass_rock/aerial_grass_rock_diff_2k.jpg",
+    "bytes": 2624635,
+    "sourceMd5": "024018554c0002620127749d1f585f3d",
+    "sha256": "1a2ddfa4652adbe00447b940c40019d46f4b88245bc1b341cdf622c2110b7bc5",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-aerial-grass-rock/normal-opengl.webp",
+      "sha256": "abb4d6725c2b872d3cddf53f5e9417ee9b0b82e35300365b360ed4e89075c6ba",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_grass_rock/aerial_grass_rock_nor_gl_2k.jpg",
+        "bytes": 3799025,
+        "sourceMd5": "0c5423ce365169df7c242933b5137696",
+        "sha256": "c6aa14b042ce243f93a6ca807f46a085711c23ad316b104578e92df7770ee285",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

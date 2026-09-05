@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_diff_2k.jpg",
+    "bytes": 3310792,
+    "sourceMd5": "769c7bf30050cc57be848a67d5c20270",
+    "sha256": "b08a20dcb306d08ee7f4a05ec216b19b7fd37e95745998ec5f81ecedaac1f0e9",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-concrete-floor-02/normal-opengl.webp",
+      "sha256": "6ecd6534b55b2cc5010f6636b5b79b51887a6a3a51e2be0742c4747d71c66dcc",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_nor_gl_2k.jpg",
+        "bytes": 935810,
+        "sourceMd5": "3cc9918473a0c3d5ecb10f0ddc7e218d",
+        "sha256": "ce12d18f283f884f4be6f6c110f81582376049caada1e226958659d3d5fbaae1",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

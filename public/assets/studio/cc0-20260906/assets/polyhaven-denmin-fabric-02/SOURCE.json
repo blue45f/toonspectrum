@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_diff_2k.jpg",
+    "bytes": 4732095,
+    "sourceMd5": "31c2f1bba041ea5609524c25ff30820e",
+    "sha256": "735c5845b8618ee88ca1b5b2aa9e859cead29a657c3f8c7c4498a2b9919587dc",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-denmin-fabric-02/normal-opengl.webp",
+      "sha256": "4fff6d51c970011243fd54e9f3f1d0685e5ad5c152bbb43503d4b7e6372d92f2",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_nor_gl_2k.jpg",
+        "bytes": 3799091,
+        "sourceMd5": "f8ceaea5a21900e1d77657b49fae11f7",
+        "sha256": "b97267814817ece4b4b16571f710e84f862630ab107dde9e95c4d52978f21c52",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/planter_pot_clay",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "model": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/planter_pot_clay/planter_pot_clay_2k.gltf",
+    "bytes": 2813,
+    "sourceMd5": "aada56568f8bff1b61f9a0fdc69a6082",
+    "sha256": "04d36b78db26de0771456fb88dd5f07db2e2b5b1ab15b81056159bac6ef89299",
+    "sourceDigestMatched": true
+  },
+  "dependencies": [
+    {
+      "path": "textures/planter_pot_clay_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/planter_pot_clay/planter_pot_clay_arm_2k.jpg",
+      "bytes": 2311213,
+      "sourceMd5": "389e1c9bdd359ccd2bd9e8ea0245a0a3",
+      "sha256": "0f315973c8126a62261660b28b45d7727628a9b3e912c9fd435f99dfd309a25b",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "planter_pot_clay.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/planter_pot_clay/planter_pot_clay.bin",
+      "bytes": 78096,
+      "sourceMd5": "93aa55f6378a47c3e2d03eb5b98da8b0",
+      "sha256": "effd0a038a75a054e55e2f5f71a84c57c1c6efc4e453ae3e62d4ce5167a2913c",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/planter_pot_clay_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/planter_pot_clay/planter_pot_clay_diff_2k.jpg",
+      "bytes": 2097198,
+      "sourceMd5": "24c6aee9f07cee0df6a665cba541bb45",
+      "sha256": "df68fcd5f8be67b2e61f82619a60de71b21176df1e4d19afc2635bc9fc1c70d3",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/planter_pot_clay_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/planter_pot_clay/planter_pot_clay_nor_gl_2k.jpg",
+      "bytes": 1469255,
+      "sourceMd5": "875b7e438c4426f9ad05620cd81da2b4",
+      "sha256": "db5ec3351dc70c1148ec11c62abc9613ffb87534e3da4475df391b6589dc41fb",
+      "sourceDigestMatched": true
+    }
+  ]
+}

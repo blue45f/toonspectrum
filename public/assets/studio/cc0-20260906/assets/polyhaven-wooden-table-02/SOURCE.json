@@ -1,0 +1,53 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "model": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_table_02/wooden_table_02_2k.gltf",
+    "bytes": 2687,
+    "sourceMd5": "5bf0f5462b03210cb352d81c074b9a5f",
+    "sha256": "5c7551f78030d5c78a525ebd488e1c1db249a4f627591add1f741aa0c43742ac",
+    "sourceDigestMatched": true
+  },
+  "dependencies": [
+    {
+      "path": "wooden_table_02.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/wooden_table_02/wooden_table_02.bin",
+      "bytes": 7576,
+      "sourceMd5": "a17c24e5366a0f7ad5522b88a4a9ea85",
+      "sha256": "52ed7cc67b3aa403375cf9bd18050e8cc21bcced6532a0183c1a733f0965df6d",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/wooden_table_02_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_table_02/wooden_table_02_nor_gl_2k.jpg",
+      "bytes": 543822,
+      "sourceMd5": "f3bbfc11f954c5799f24b6b8f23cc3db",
+      "sha256": "be892284bce8dca4e9a1135e59e801d0db446efdf4fb9ec8db2b63a4b64dbb91",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/wooden_table_02_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_table_02/wooden_table_02_diff_2k.jpg",
+      "bytes": 711929,
+      "sourceMd5": "2a346503ce15e4df59c0fd4ed1891047",
+      "sha256": "cb0a767c4671866a3ae6b85d0d163f814bf95398137e3c4a9d9af5b8e011f191",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/wooden_table_02_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_table_02/wooden_table_02_arm_2k.jpg",
+      "bytes": 681917,
+      "sourceMd5": "740c00078718bdcf8660e17851e62c8e",
+      "sha256": "39f046a0f452a92f9a0640a2c0436d26e93e77736670e05123a7744782fa68a6",
+      "sourceDigestMatched": true
+    }
+  ]
+}

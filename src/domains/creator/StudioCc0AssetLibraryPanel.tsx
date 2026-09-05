@@ -75,7 +75,7 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
         CC0 원본 에셋 라이브러리 {catalog ? `· ${catalog.length}종` : ""}
       </summary>
       {open && <div className="mt-2 space-y-3">
-        <p className="text-xs leading-relaxed text-fg-3">가구·음식·자연물·건축 소품과 효과·재질을 검색합니다. 3D는 로우폴리 스타일이며, GLB 파일을 받은 뒤 3D 도구의 모델 가져오기를 사용하세요. 효과와 재질은 바로 캔버스에 삽입할 수 있습니다.</p>
+        <p className="text-xs leading-relaxed text-fg-3">가구·음식·자연물·건축 소품과 효과·재질을 검색합니다. 3D는 로우폴리와 정밀 PBR 소품을 함께 제공하며, GLB 파일을 받은 뒤 3D 도구의 모델 가져오기를 사용하세요. 효과와 재질은 바로 캔버스에 삽입할 수 있습니다.</p>
         <label htmlFor={searchId} className="block text-xs font-semibold text-fg-2">에셋 검색</label>
         <input id={searchId} type="search" value={query} placeholder="가구, 음식, 나무, chair, tree…" className={`${CONTROL} w-full`} onChange={event => {setQuery(event.target.value); setPage(0);}} />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="에셋 종류">

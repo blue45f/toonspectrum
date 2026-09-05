@@ -1,0 +1,53 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/GreenChair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "model": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/GreenChair_01/GreenChair_01_2k.gltf",
+    "bytes": 2695,
+    "sourceMd5": "7aaf6e9d83220f3b07e0248455b5ad7d",
+    "sha256": "ee4a04d41aa2ac7faf33b1a77c908983e6c7899a6ad6a36d4732fb3871f80f7a",
+    "sourceDigestMatched": true
+  },
+  "dependencies": [
+    {
+      "path": "GreenChair_01.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/GreenChair_01/GreenChair_01.bin",
+      "bytes": 119168,
+      "sourceMd5": "9c84856d32c4d61b87fb5eba1f8339a3",
+      "sha256": "9070a41bcf38005997fe71a49e50b942b427ec05938413c9dc204df0b781e410",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/GreenChair_01_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GreenChair_01/GreenChair_01_nor_gl_2k.jpg",
+      "bytes": 895278,
+      "sourceMd5": "7512e07b1414e4e78a32335d60750629",
+      "sha256": "fe96fa21a863291bf8b1e5699e2f09013df8b75cd04fe9b8b28ec12a6a01b3ec",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/GreenChair_01_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GreenChair_01/GreenChair_01_arm_2k.jpg",
+      "bytes": 455369,
+      "sourceMd5": "02cec28a60bf52262a01339bb7434a1d",
+      "sha256": "1ff03d6731f1ebacc13c1797163d283de8ba99f059f774ea7eeeed3838385d6d",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/GreenChair_01_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GreenChair_01/GreenChair_01_diff_2k.jpg",
+      "bytes": 512406,
+      "sourceMd5": "25e63a758adb82eb13930925e364ca1e",
+      "sha256": "5b4cc60aa7fe00f2ba3062aa5dc451cd06349c00be0c179894fd549e9ef13c13",
+      "sourceDigestMatched": true
+    }
+  ]
+}

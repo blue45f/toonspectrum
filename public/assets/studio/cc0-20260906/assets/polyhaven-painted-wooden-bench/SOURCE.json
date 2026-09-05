@@ -1,0 +1,53 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_bench",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "model": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/painted_wooden_bench/painted_wooden_bench_2k.gltf",
+    "bytes": 2835,
+    "sourceMd5": "2977ba5644963b449ad3372c3e5e7dc5",
+    "sha256": "0321bf315d23f82d925353728632e32dad4d7fee8b75f58c3cc3a249635e96a3",
+    "sourceDigestMatched": true
+  },
+  "dependencies": [
+    {
+      "path": "textures/painted_wooden_bench_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_bench/painted_wooden_bench_arm_2k.jpg",
+      "bytes": 2232819,
+      "sourceMd5": "85abb03024e970c08fcc2163a38b564c",
+      "sha256": "fb51834034b251cba6b37387ca962fbf4181a0d63a5c747a3aa7460903582ed8",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/painted_wooden_bench_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_bench/painted_wooden_bench_nor_gl_2k.jpg",
+      "bytes": 3522953,
+      "sourceMd5": "02fe51467ced6a748de37c8563d3d543",
+      "sha256": "bb1992b136c436feb585fca9731d9e8f26e7397ed45a7e93efd1e5f6f68e3d36",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "textures/painted_wooden_bench_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_bench/painted_wooden_bench_diff_2k.jpg",
+      "bytes": 2210706,
+      "sourceMd5": "2b497deb0d615cae13454400672b724f",
+      "sha256": "1a0d4439212e01daad3437511defd9551db16f4d076129a73d5d6b2028b9cc57",
+      "sourceDigestMatched": true
+    },
+    {
+      "path": "painted_wooden_bench.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/painted_wooden_bench/painted_wooden_bench.bin",
+      "bytes": 25444,
+      "sourceMd5": "ed331b50f955852f007313c1a75c2e2d",
+      "sha256": "5799bcb20924105cccd6424de8cdb8e67eb57fddc19c395befeac634a7b2e013",
+      "sourceDigestMatched": true
+    }
+  ]
+}

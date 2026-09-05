@@ -1,0 +1,33 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/decrepit_wallpaper",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06",
+    "licenseEvidenceUrl": "https://polyhaven.com/license"
+  },
+  "download": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_diff_2k.jpg",
+    "bytes": 3325490,
+    "sourceMd5": "6d8cef16eecb7b4c84d77008ffc375b5",
+    "sha256": "6a16d2c30016b98cce1176e85c64075fe48255d0302e7d7b9f71198fbe818cf1",
+    "sourceDigestMatched": true
+  },
+  "companionMaps": [
+    {
+      "role": "normal-opengl",
+      "path": "assets/polyhaven-decrepit-wallpaper/normal-opengl.webp",
+      "sha256": "a2f5b3468145e67f116800b26f4fc7c95fd4625aee01a154e8a659ff679c082f",
+      "source": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_nor_gl_2k.jpg",
+        "bytes": 2906832,
+        "sourceMd5": "8ae2cd9b5d40327c6a0193fa9fd97058",
+        "sha256": "95507032d5039128729d132c0a5ce76e3fa0e43c8db077b480498ab6cbb42ed9",
+        "sourceDigestMatched": true
+      }
+    }
+  ]
+}

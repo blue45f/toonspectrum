@@ -1,0 +1,24 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "sourceRevision": "f69fe19f940348a150b15e4b672b653b0a923072",
+  "deliveredOriginals": 42,
+  "byKind": {
+    "surface-texture": 30,
+    "model": 12
+  },
+  "byCategory": {
+    "surface-material": 30,
+    "furniture": 7,
+    "food": 3,
+    "nature": 2
+  },
+  "downloadedBytes": 248503207,
+  "deduplicatedVariants": 0,
+  "excludedCandidates": 4,
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "packs": [],
+  "notice": "Real 2K files and self-contained PBR models. Technical acceptance is not full artistic approval.",
+  "browserRenderedModels": 12,
+  "browserRejectedModels": 0
+}
