@@ -1,0 +1,46 @@
+name: Render ToonStudio brand films
+on:
+  workflow_dispatch:
+    inputs:
+      format:
+        description: Reviewable rendition to render (no automatic publishing)
+        required: true
+        default: all
+        type: choice
+        options: [all, landscape, portrait, square]
+permissions:
+  contents: read
+concurrency:
+  group: creator-brand-film-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: media/brand-film/package-lock.json
+      - run: npm --prefix media/brand-film ci
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+      - run: npm --prefix media/brand-film run typecheck
+      - name: Render validated composition selection
+        env:
+          FILM_FORMAT: ${{ inputs.format }}
+        run: npm --prefix media/brand-film run render -- "$FILM_FORMAT"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: toonstudio-brand-film-${{ inputs.format }}-${{ github.sha }}
+          path: |
+            public/brand/toonstudio-*.mp4
+            public/brand/toonstudio-film-poster.jpg
+            public/brand/toonstudio-og.png
+            public/brand/film-manifest.json
+            public/brand/toonstudio-intro.*.vtt
+          retention-days: 30
+          if-no-files-found: error

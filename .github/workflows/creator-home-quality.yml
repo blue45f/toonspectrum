@@ -1,0 +1,55 @@
+name: Creator homepage quality
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/marketing/**'
+      - 'components/site-header*'
+      - 'src/app/AppShell.tsx'
+      - 'src/app/routes/**'
+      - 'public/brand/**'
+      - 'public/i18n/app/**'
+      - 'media/brand-film/**'
+      - 'automation/n8n/**'
+      - 'scripts/verify-creator-home.mjs'
+      - 'scripts/creator-film-automation.test.mjs'
+      - '.github/workflows/creator-home-quality.yml'
+permissions:
+  contents: read
+concurrency:
+  group: creator-home-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  creator-home:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          pnpm exec vitest run src/domains/marketing/creator-home-content.test.ts
+          node --test scripts/creator-film-automation.test.mjs
+          pnpm run build:bundle
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pnpm exec playwright install --with-deps chromium
+      - name: Verify production homepage and real rendered films
+        run: |
+          pnpm exec vite preview --host 127.0.0.1 --port 4173 > /tmp/creator-home-preview.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          node scripts/verify-creator-home.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: creator-home-${{ github.sha }}
+          path: artifacts/creator-home/
+          if-no-files-found: ignore
