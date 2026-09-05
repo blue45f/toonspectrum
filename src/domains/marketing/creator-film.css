@@ -1,0 +1,82 @@
+.creator-home .ch-film-section :is(a, button, summary, video):focus-visible {
+  outline: 3px solid #d1f28a;
+  outline-offset: 4px;
+}
+.creator-home .ch-film-frame > video:focus-visible {
+  outline-offset: -5px;
+}
+.creator-home .ch-film-chapters > button[aria-current="step"] {
+  border-top-color: #d1f28a;
+  border-top-width: 3px;
+  padding-top: 10px;
+  color: #d1f28a;
+}
+.creator-home .ch-film-loading {
+  margin-top: 12px;
+  color: #d0ddc7;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.creator-home .ch-film-downloads {
+  margin-top: 20px;
+  border-top: 1px solid #52654d;
+  padding-top: 8px;
+}
+.creator-home .ch-film-downloads > summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #e4eddc;
+}
+.creator-home .ch-film-download-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 7px 0;
+}
+.creator-home .ch-film-download-grid > a {
+  min-width: 0;
+  min-height: 64px;
+  border: 1px solid #637958;
+  border-radius: 8px;
+  padding: 13px 14px;
+  color: #f3f4e9;
+}
+.creator-home .ch-film-download-grid > a:hover {
+  background: #314b35;
+  border-color: #d1f28a;
+}
+.creator-home .ch-film-download-grid > a > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.creator-home .ch-film-download-grid > a svg { flex-shrink: 0; }
+.creator-home .ch-film-download-grid small {
+  display: block;
+  margin-top: 7px;
+  color: #c5d1c3;
+  font-size: 11px;
+}
+.creator-home .ch-film-downloads > p {
+  margin-top: 9px;
+  color: #c5d1c3;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.creator-home .ch-hero-copy { min-width: 0; }
+.creator-home[lang="en"] h1 > span {
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 767px) {
+  .creator-home[lang="en"] h1 { font-size: clamp(36px, 8vw, 60px); }
+  .creator-home .ch-film-chapters > button[aria-current="step"] { padding-top: 8px; }
+}
+@media (max-width: 540px) {
+  .creator-home .ch-film-download-grid { grid-template-columns: 1fr; gap: 8px; }
+}
