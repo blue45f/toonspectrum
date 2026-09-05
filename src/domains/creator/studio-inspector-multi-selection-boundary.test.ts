@@ -54,7 +54,10 @@ describe("Studio inspector multi-selection scope", () => {
     expect(multiSelectionSource).toContain("elements={elements}");
     expect(multiSelectionSource).toContain("selectedIds={marqueeIds}");
     expect(multiSelectionSource).toContain("groups={groups}");
-    expect(multiSelectionSource).toContain("commit={(next) => commit(next)}");
+    // The rename commit honours the same selection gate as every other multi-selection action.
+    expect(multiSelectionSource).toContain(
+      "commit={(next) => !inspectorInteractionPolicy.selection.disabled && commit(next)}",
+    );
     expect(multiSelectionSource).toContain("announce={announceDrawingShortcut}");
     expect(multiSelectionSource.indexOf("<StudioInspectorBatchRenameSection")).toBeGreaterThan(
       multiSelectionSource.indexOf("<fieldset"),
