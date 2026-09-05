@@ -1,0 +1,163 @@
+name: Studio curation finish evidence
+on:
+  push:
+    branches: [feat/studio-high-detail-curation-20260906]
+    paths: [.github/workflows/studio-curation-finish-evidence.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: studio-curation-finish-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  finish:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-high-detail-curation-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare reviewed catalog changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/prepare_studio_pbr_finish.py')
+          s=p.read_text().replace('pkg.id === "original-atmosphere-fx"','pkg.id === "original-atmosphere-overlays"')
+          p.write_text(s)
+          PY
+          python3 scripts/prepare_studio_pbr_finish.py
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+      - name: Restore exact visually inspected PBR model originals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9975071111/zip > "$RUNNER_TEMP/pbr-models.zip"
+          python3 - <<'PY'
+          import pathlib,os,zipfile,hashlib,stat
+          root=pathlib.Path(os.environ['RUNNER_TEMP']);archive=root/'pbr-models.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()=='618961469e112b0223416e7d7a6a04b9d413f88b2c4a6dc07de17a131a29a9a9'
+          out=root/'pbr-models';out.mkdir()
+          with zipfile.ZipFile(archive) as z:
+              assert len(z.infolist())<1000 and sum(i.file_size for i in z.infolist())<300*1024*1024
+              for i in z.infolist():
+                  assert (out/i.filename).resolve().is_relative_to(out.resolve()) and not stat.S_ISLNK(i.external_attr>>16)
+              z.extractall(out)
+          PY
+      - name: Acquire native 2K material maps with case-normalized upstream keys
+        run: |
+          python3 scripts/acquire_studio_pbr_assets.py --kind textures --output "$RUNNER_TEMP/pbr-materials"
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_curated_assets.mjs "$RUNNER_TEMP/pbr-materials" "$GITHUB_WORKSPACE"
+      - name: Re-render existing models under neutral lighting
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil,os
+          out=Path(os.environ['RUNNER_TEMP'])/'neutral-originals'
+          shutil.copytree('public/assets/studio/cc0-20260906',out)
+          p=Path('scripts/render_studio_asset_delivery.mjs');s=p.read_text()
+          for old,new in [('toneMappingExposure = 1.15','toneMappingExposure = 0.85'),('0x646479,2.6','0x646479,0.8'),('0xffffff,3.2','0xffffff,2.0'),('0xffffff,1.1','0xffffff,0.35')]:
+              assert old in s,old
+              s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/neutral-originals" "$GITHUB_WORKSPACE"
+      - name: Assemble candidate catalog and inspectable evidence
+        run: |
+          python3 - <<'PY'
+          import os,json,shutil,hashlib
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          root=Path(os.environ['RUNNER_TEMP']); public=Path('public/assets/studio/cc0-20260906')
+          neutral=root/'neutral-originals';models=root/'pbr-models';materials=root/'pbr-materials'
+          old=json.loads((public/'manifest.json').read_text());base=json.loads((neutral/'manifest.json').read_text())
+          assert {a['id']:a['sha256'] for a in old['assets']}=={a['id']:a['sha256'] for a in base['assets']},'Preview refresh must not delete or change any original'
+          shutil.copytree(neutral/'previews',public/'previews',dirs_exist_ok=True)
+          assets=base['assets']; reviews=[]
+          for source,reviewed in [(models,True),(materials,False)]:
+              entries=json.loads((source/'manifest.json').read_text())['assets']
+              for asset in entries:
+                  file=source/asset['path'];raw=file.read_bytes()
+                  assert hashlib.sha256(raw).hexdigest()==asset['sha256'] and len(raw)==asset['bytes']
+                  asset['visualReviewed']=reviewed
+                  asset['visualReviewLevel']='three-view-contact-sheet' if reviewed else 'pending-manual-material-review'
+                  asset['studioRuntimeVerified']=False
+                  assets.append(asset)
+                  reviews.append({'id':asset['id'],'visuallyReviewed':reviewed,'reviewLevel':asset['visualReviewLevel'],'views':asset.get('reviewPaths',[]),'sha256':asset['sha256']})
+              shutil.copytree(source/'assets',public/'assets',dirs_exist_ok=True)
+              shutil.copytree(source/'previews',public/'previews',dirs_exist_ok=True)
+          assert len({a['id'] for a in assets})==len(assets)
+          (public/'manifest.json').write_text(json.dumps({'schema':'toonspectrum.asset-delivery.v1','assets':assets},ensure_ascii=False,indent=2)+'\n')
+          evidence=Path('docs/reports/asset-visual-review-20260906')
+          (evidence/'pbr-decisions.json').write_text(json.dumps(reviews,ensure_ascii=False,indent=2)+'\n')
+          out=root/'curation-finish';out.mkdir()
+          shutil.copytree(materials,out/'materials')
+          shutil.copytree(neutral/'previews',out/'neutral-previews')
+          shutil.copyfile(public/'manifest.json',out/'combined-manifest.json')
+          for name in ['visual-decisions.json','pbr-decisions.json']:
+              shutil.copyfile(evidence/name,out/name)
+          def sheets(items,base_path,prefix,per_sheet,columns,w,h):
+              for start in range(0,len(items),per_sheet):
+                  sheet=Image.new('RGB',(w,h),'#bfc5cf');draw=ImageDraw.Draw(sheet)
+                  cellw=w//columns;cellh=h//(per_sheet//columns)
+                  for i,a in enumerate(items[start:start+per_sheet]):
+                      x=i%columns*cellw;y=i//columns*cellh
+                      paths=a.get('reviewPaths',[a.get('previewPath',a['path'])])
+                      for j,rel in enumerate(paths):
+                          with Image.open(base_path/rel) as im:
+                              im=im.convert('RGBA');im.thumbnail((cellw//len(paths)-8,cellh-42))
+                          sheet.paste(im,(x+j*cellw//len(paths)+(cellw//len(paths)-im.width)//2,y+4),im)
+                      draw.text((x+8,y+cellh-34),a.get('originalName',a['name'])[:45],fill='#11161d')
+                      draw.text((x+8,y+cellh-18),a['id'][:55],fill='#27323e')
+                  sheet.save(out/f'{prefix}-{start//per_sheet+1:02d}.jpg',quality=94)
+          sheets(json.loads((materials/'manifest.json').read_text())['assets'],materials,'materials',8,2,1920,1440)
+          sheets(base['assets'],neutral,'neutral',48,8,1600,1200)
+          report={'catalogOriginals':len(assets),'newPbrModels':len(json.loads((models/'manifest.json').read_text())['assets']),'newPbrMaterials':len(json.loads((materials/'manifest.json').read_text())['assets']),'retiredNewOverlayIds':['original-soft-snow-overlay','original-night-bokeh','original-golden-dust'],'staticContactSheetItemsReviewed':1351,'pbrModelsThreeViewReviewed':35,'pbrMaterialsManualReview':'pending','productionPublished':False}
+          for folder in [out,evidence]: (folder/'curation-summary.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+          print('CURATION SUMMARY',json.dumps(report))
+          PY
+      - name: Require focused tests lint and full frontend typecheck
+        run: |
+          set -o pipefail
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+          pnpm exec tsx -e 'import fs from "node:fs";import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts";console.log("ADMITTED",parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"))).length);'
+          pnpm exec tsc -p tsconfig.json --pretty false 2>&1 | tee "$RUNNER_TEMP/curation-finish/frontend-types.log"
+      - name: Keep validated candidate on feature branch only
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-high-detail-curation-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/cc0-20260906 docs/reports/asset-visual-review-20260906 src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx scripts/acquire_studio_pbr_assets.py scripts/render_studio_asset_delivery.mjs scripts/prepare_studio_pbr_finish.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m 'feat(studio): stage inspected PBR props and neutral previews with safe quality retirement'
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='CURATION_COMMIT %H'
+      - name: Capture source diff and audit evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/curation-finish"
+          git diff > "$RUNNER_TEMP/curation-finish/worktree.patch"
+          git diff --cached > "$RUNNER_TEMP/curation-finish/staged.patch"
+          cp -R src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.ts "$RUNNER_TEMP/curation-finish/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-curation-finish-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/curation-finish/
+            ${{ runner.temp }}/pbr-materials/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
