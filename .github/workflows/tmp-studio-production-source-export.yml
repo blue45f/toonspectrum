@@ -1,4 +1,4 @@
-name: Temporary Studio production archive recovery
+name: Temporary Studio production command center integration
 
 on:
   push:
@@ -9,33 +9,138 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export:
-    runs-on: windows-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        shell: bash
+  integrate:
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
         with:
           ref: feat/studio-production-command-center-20260905
-          fetch-depth: 1
-      - name: Package staged archive and focused source
+          fetch-depth: 0
+
+      - name: Configure integration identity
+        shell: bash
         run: |
           set -euo pipefail
-          tar -czf studio-production-recovery.tgz \
-            .github/tmp \
-            .github/workflows/tmp-studio-production-source-export.yml \
-            src/app/routes/app-route-title-ownership.ts \
-            src/app/routes/app-route-title-ownership.test.ts \
-            src/domains/creator/studio-router \
-            src/domains/creator/studio-workspace-route.ts
-      - uses: actions/upload-artifact@v4
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Repair and verify staged product archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/tmp/studio-production-patch.part07')
+          value = path.read_text(encoding='utf-8')
+          assert len(value) == 6000, len(value)
+          assert value[3920] == 'a', value[3912:3929]
+          path.write_text(value[:3920] + 'i' + value[3921:], encoding='utf-8')
+          PY
+          mapfile -t parts < <(find .github/tmp -maxdepth 1 -type f -name 'studio-production-patch.part??' | sort)
+          test "${#parts[@]}" -eq 11
+          cat "${parts[@]}" > /tmp/studio-production-patch.b64
+          base64 --decode /tmp/studio-production-patch.b64 > /tmp/studio-production-patch.tar.xz
+          echo '73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504  /tmp/studio-production-patch.tar.xz' | shasum -a 256 -c -
+          xz -t /tmp/studio-production-patch.tar.xz
+          tar -tJf /tmp/studio-production-patch.tar.xz | sort > /tmp/studio-production-patch.files
+          test "$(wc -l < /tmp/studio-production-patch.files | tr -d ' ')" -eq 21
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' /tmp/studio-production-patch.files; then
+            echo 'unsafe path found in patch archive' >&2
+            exit 1
+          fi
+          grep -Fx 'src/domains/creator/studio-production/StudioProductionHubPage.tsx' /tmp/studio-production-patch.files
+          grep -Fx 'src/domains/creator/studio-production/studio-production-sqlite-persistence.ts' /tmp/studio-production-patch.files
+          grep -Fx 'src/domains/creator/studio-router/studio-route-manifest.ts' /tmp/studio-production-patch.files
+          grep -Fx 'src/app/routes/app-route-title-ownership.test.ts' /tmp/studio-production-patch.files
+
+      - name: Commit product payload on its original base
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xJf /tmp/studio-production-patch.tar.xz
+          while IFS= read -r path; do
+            git add -- "$path"
+          done < /tmp/studio-production-patch.files
+          git diff --cached --check
+          git commit -m 'feat(studio): add production command center'
+
+      - name: Merge current main with three-way conflict detection
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
-          name: studio-production-recovery
-          path: studio-production-recovery.tgz
-          if-no-files-found: error
-          retention-days: 1
+          version: 11.4.0
+          run_install: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint production command center changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-production \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Run focused production command center tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-production/studio-production-model.test.ts \
+            src/domains/creator/studio-production/studio-production-sqlite-persistence.test.ts \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Validate architecture, types, and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run typecheck
+          pnpm run build
+
+      - name: Remove one-shot integration assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/tmp/studio-production-patch.part??
+          rmdir .github/tmp 2>/dev/null || true
+          rm -f .github/workflows/tmp-studio-production-source-export.yml
+          git add -A
+          git diff --cached --check
+          git commit -m 'chore(studio): remove production command center bootstrap'
+
+      - name: Push verified integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:feat/studio-production-command-center-20260905
