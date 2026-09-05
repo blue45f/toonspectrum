@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "files": [
+    "playwright.bg3d-runtime.config.ts",
+    "scripts/studio-bg3d-runtime-reporter.ts",
+    "scripts/studio-bg3d-runtime-setup.mts"
+  ]
+}

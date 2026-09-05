@@ -8,6 +8,7 @@ on:
       - "e2e/studio-3d-visual-verification.spec.ts"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
+      - "tsconfig.bg3d-runtime.json"
       - "scripts/studio-bg3d-runtime-*"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -19,6 +20,7 @@ on:
       - "e2e/studio-3d-visual-verification.spec.ts"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
+      - "tsconfig.bg3d-runtime.json"
       - "scripts/studio-bg3d-runtime-*"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -55,16 +57,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check changed verification and capability notice code
         run: |
-          pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
+          pnpm exec eslint --no-ignore --max-warnings 0 \
+            playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
             scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts
       - name: Typecheck browser verification interfaces
-        run: |
-          pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 \
-            --module ESNext --moduleResolution bundler --types node \
-            playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
-            scripts/studio-bg3d-runtime-setup.mts
+        run: pnpm exec tsc --project tsconfig.bg3d-runtime.json
       - name: Test real execution, capability policy and failure explanations
         run: |
           pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
