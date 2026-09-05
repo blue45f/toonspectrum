@@ -1,0 +1,77 @@
+name: Studio PBR visual review
+on:
+  push:
+    branches: [feat/studio-pbr-visual-quality-20260906]
+    paths: [scripts/acquire_studio_pbr_originals.py, .github/workflows/studio-pbr-visual-review.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  acquire-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare pinned tools
+        run: |
+          python3 -m pip install Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire actual 2K CC0 models and material originals
+        run: python3 scripts/acquire_studio_pbr_originals.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Render actual models at review resolution
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          text=Path('scripts/render_studio_asset_delivery.mjs').read_text()
+          text=text.replace('384','768').replace('0x646479,2.6','0x646479,1.2').replace('0xffffff,3.2','0xffffff,2.0').replace('0xffffff,1.1','0xffffff,0.4').replace('renderer.toneMappingExposure = 1.15','renderer.toneMappingExposure = 1.0')
+          (Path(os.environ['RUNNER_TEMP'])/'pbr-render.mjs').write_text(text)
+          PY
+          node "$RUNNER_TEMP/pbr-render.mjs" "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Prepare identity-linked review sheets without asserting approval
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          import json,os,shutil
+          root=Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          if not (root/'manifest.json').exists(): raise SystemExit(0)
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          for number,start in enumerate(range(0,len(assets),12),1):
+              sheet=Image.new('RGB',(1600,1300),'#dedee2');draw=ImageDraw.Draw(sheet)
+              for i,a in enumerate(assets[start:start+12]):
+                  x=(i%4)*400;y=(i//4)*430
+                  src=root/a.get('previewPath',a['path'])
+                  if src.suffix=='.glb' or not src.exists():continue
+                  with Image.open(src) as original:
+                      image=original.convert('RGBA');image.thumbnail((384,370))
+                      sheet.paste(image,(x+(400-image.width)//2,y+4),image)
+                  draw.text((x+8,y+378),str(start+i+1)+' '+a['id'][:45],fill='#111118')
+                  draw.text((x+8,y+398),a['kind']+' | native 2K | Poly Haven CC0',fill='#313139')
+              sheet.save(root/f'pbr-review-{number:02d}.jpg',quality=95)
+          # Source bytes are represented by SHA256 receipts; no need to duplicate them in the delivery ZIP.
+          shutil.rmtree(root/'_source',ignore_errors=True)
+          print('PBR REVIEW FILES',len(assets))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-review/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1
