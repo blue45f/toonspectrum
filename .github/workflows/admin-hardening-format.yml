@@ -1,0 +1,49 @@
+name: Format complete admin regression sources
+
+on:
+  push:
+    branches: ['fix/admin-verification-hardening-20260905']
+    paths: ['.github/workflows/admin-hardening-format.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-hardening-format
+  cancel-in-progress: false
+
+jobs:
+  format:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/admin-verification-hardening-20260905'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/admin-verification-hardening-20260905
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format and strictly validate the complete admin scope
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix --max-warnings=0 \
+            src/domains/admin apps/api/src/modules/admin \
+            scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
+          git diff --check
+          git diff --stat
+      - name: Commit verified formatting on the feature branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src/domains/admin apps/api/src/modules/admin \
+            scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
+          git rm .github/workflows/admin-hardening-format.yml
+          git diff --cached --check
+          git commit -m 'style(admin): normalize all admin test import groups'
+          git push origin HEAD:refs/heads/fix/admin-verification-hardening-20260905
+          echo "Verified feature head: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
