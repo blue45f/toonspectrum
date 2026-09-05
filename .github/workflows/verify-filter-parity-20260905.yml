@@ -1,0 +1,56 @@
+name: Independent Smart Filter parity verification
+
+on:
+  push:
+    branches:
+      - verify/filter-parity-20260905
+
+permissions:
+  contents: read
+
+jobs:
+  filter-parity:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-14, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-filter-exhaustive-20260905
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Focused Smart Filter tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-adjustment-stack.test.ts
+          src/domains/creator/StudioSmartFiltersPanel.test.tsx
+          src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx
+          src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts
+          src/domains/creator/filter/studio-filter-catalog.test.ts
+      - name: TypeScript and architecture
+        run: |
+          pnpm run validate:architecture
+          pnpm run typecheck
+      - name: Zero-warning changed-file lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/creator/studio-adjustment-stack.ts
+          src/domains/creator/studio-adjustment-stack.test.ts
+          src/domains/creator/StudioSmartFiltersPanel.tsx
+          src/domains/creator/StudioSmartFiltersPanel.test.tsx
+          src/domains/creator/filter/StudioSmartFilterUnionControls.tsx
+          src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx
+          src/domains/creator/filter/studio-filter-catalog.test.ts
+          src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts
+      - name: Production build
+        run: pnpm run build
