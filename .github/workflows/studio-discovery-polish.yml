@@ -1,0 +1,27 @@
+name: Studio discovery polish
+on:
+  push:
+    branches: [feat/studio-discovery-polish-20260906]
+permissions:
+  contents: read
+concurrency:
+  group: studio-discovery-polish-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Export exact tracked source for isolated local validation
+        run: |
+          mkdir -p /tmp/studio-discovery-polish-source
+          git archive --format=tar.gz HEAD > /tmp/studio-discovery-polish-source/source.tar.gz
+          git rev-parse HEAD > /tmp/studio-discovery-polish-source/commit.txt
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-discovery-polish-source
+          path: /tmp/studio-discovery-polish-source
+          retention-days: 1
