@@ -6,6 +6,10 @@ const bodySource = readFileSync(
   new URL("./StudioInspectorAsideBody.tsx", import.meta.url),
   "utf8",
 );
+const multiSelectionSource = readFileSync(
+  new URL("./StudioInspectorMultiSelectionSection.tsx", import.meta.url),
+  "utf8",
+);
 const shellSource = readFileSync(
   new URL("./StudioInspectorAsideShell.tsx", import.meta.url),
   "utf8",
@@ -29,12 +33,31 @@ function functionBody(name: string, nextName: string): string {
 }
 
 describe("Studio inspector multi-selection scope", () => {
-  it("does not render representative-only detail controls below the shared geometry panel", () => {
+  it("keeps representative-only details out while mounting the dedicated group surface", () => {
     expect(bodySource).toContain(
       'inspectorContentMode === "selection" && marqueeIds.length > 1',
     );
     expect(bodySource).toContain(
       "!hasMultiSelection ? (\n            <StudioInspectorSelectionSection",
+    );
+    expect(bodySource).toContain(
+      "<StudioInspectorMultiSelectionSection model={model} />",
+    );
+    expect(multiSelectionSource).toContain("<StudioInspectorSelectionActions");
+    expect(multiSelectionSource).toContain(
+      'data-testid="studio-inspector-context-multi-selection"',
+    );
+  });
+
+  it("mounts atomic batch rename inside the same mutation gate with canonical document inputs", () => {
+    expect(multiSelectionSource).toContain("<StudioInspectorBatchRenameSection");
+    expect(multiSelectionSource).toContain("elements={elements}");
+    expect(multiSelectionSource).toContain("selectedIds={marqueeIds}");
+    expect(multiSelectionSource).toContain("groups={groups}");
+    expect(multiSelectionSource).toContain("commit={(next) => commit(next)}");
+    expect(multiSelectionSource).toContain("announce={announceDrawingShortcut}");
+    expect(multiSelectionSource.indexOf("<StudioInspectorBatchRenameSection")).toBeGreaterThan(
+      multiSelectionSource.indexOf("<fieldset"),
     );
   });
 
@@ -57,5 +80,18 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).toContain("const target = targets[0]");
     expect(applyPatchSource).toContain("patchEl(target.id, next)");
     expect(applyPatchSource).not.toContain("if (!selected) return");
+  });
+
+  it("routes multi numeric edits through one atomic planner and one commit", () => {
+    const applyPatchSource = functionBody(
+      "applyFigmaSelectionLayoutPatch",
+      "reorder",
+    );
+
+    expect(applyPatchSource).toContain("planStudioFigmaMultiEdit({");
+    expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
+    expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
+    expect(applyPatchSource).toContain("if (!commit(plan.next)) return");
+    expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
   });
 });
