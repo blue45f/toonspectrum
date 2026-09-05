@@ -6,6 +6,18 @@
 
 const EXP_MIN = 0.35;
 const EXP_MAX = 2.5;
+const PRESSURE_EPSILON = 0.001;
+
+export const STUDIO_PRESSURE_CURVE_HANDLE_INPUT = 0.5;
+export const STUDIO_PRESSURE_CALIBRATION_MIN_SAMPLES = 8;
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function clamp01(value: number): number {
+  return clamp(value, 0, 1);
+}
 
 export function clampStudioPressureCurveExponent(value: unknown): number {
   const n = typeof value === "number" && Number.isFinite(value) ? value : 1;
@@ -75,4 +87,94 @@ export function studioPressureCurveSliderMeta(exponent: number): {
   };
 }
 
+/** One direct-manipulation handle keeps the legacy scalar exponent fully compatible. */
+export function studioPressureCurveHandlePoint(
+  exponent: number,
+  input01 = STUDIO_PRESSURE_CURVE_HANDLE_INPUT
+): StudioPressureCurvePoint {
+  const x = clamp(input01, 0.1, 0.9);
+  return { x, y: studioPressureCurveMap(x, exponent) };
+}
 
+/** Convert a graph point back to the scalar exponent used by existing brush documents. */
+export function studioPressureCurveExponentForPoint(
+  input01: number,
+  output01: number
+): number {
+  const x = clamp(input01, 0.1, 0.9);
+  const y = clamp(output01, PRESSURE_EPSILON, 1 - PRESSURE_EPSILON);
+  return clampStudioPressureCurveExponent(Math.log(y) / Math.log(x));
+}
+
+export interface StudioPressureCalibrationStats {
+  readonly sampleCount: number;
+  readonly minimum: number;
+  readonly maximum: number;
+  readonly median: number;
+  readonly p90: number;
+  readonly dynamicRange: number;
+}
+
+function percentile(sorted: readonly number[], ratio: number): number {
+  if (sorted.length === 0) return 0;
+  const position = clamp01(ratio) * (sorted.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  const weight = position - lower;
+  const a = sorted[lower] ?? 0;
+  const b = sorted[upper] ?? a;
+  return a + (b - a) * weight;
+}
+
+/** Zero/release sentinels are excluded so they cannot bias a physical-contact calibration. */
+export function studioPressureCalibrationStats(
+  samples: readonly number[]
+): StudioPressureCalibrationStats | null {
+  const normalized = samples
+    .filter((sample) => Number.isFinite(sample) && sample > PRESSURE_EPSILON)
+    .map(clamp01)
+    .sort((a, b) => a - b);
+  if (normalized.length === 0) return null;
+  const minimum = normalized[0] ?? 0;
+  const maximum = normalized.at(-1) ?? minimum;
+  return Object.freeze({
+    sampleCount: normalized.length,
+    minimum,
+    maximum,
+    median: percentile(normalized, 0.5),
+    p90: percentile(normalized, 0.9),
+    dynamicRange: maximum - minimum,
+  });
+}
+
+/**
+ * Recommend an exponent that maps the observed median contact to a balanced 50% output.
+ * Constant-pressure mouse streams are deliberately rejected rather than pretending to calibrate.
+ */
+export function recommendStudioPressureCurveExponent(
+  samples: readonly number[],
+  targetMedianOutput = 0.5
+): number | null {
+  const stats = studioPressureCalibrationStats(samples);
+  if (
+    !stats
+    || stats.sampleCount < STUDIO_PRESSURE_CALIBRATION_MIN_SAMPLES
+    || stats.dynamicRange < 0.08
+  ) {
+    return null;
+  }
+  return studioPressureCurveExponentForPoint(stats.median, targetMedianOutput);
+}
+
+/** Diameter used only by the pressure test pad; production ink keeps its existing authority. */
+export function studioPressurePreviewDiameter(
+  rawPressure: number,
+  exponent: number,
+  minimumSizeRatio = 0,
+  maximumDiameter = 18
+): number {
+  const floor = clamp01(minimumSizeRatio);
+  const mapped = studioPressureCurveMap(rawPressure, exponent);
+  const diameter = Math.max(1, maximumDiameter);
+  return diameter * (floor + (1 - floor) * mapped);
+}
