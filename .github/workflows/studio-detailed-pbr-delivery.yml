@@ -1,0 +1,150 @@
+name: Studio detailed PBR delivery
+on:
+  push:
+    branches: [feat/studio-assets-pbr-expansion-20260906]
+    paths:
+      - scripts/acquire_studio_pbr_expansion.py
+      - .github/workflows/studio-detailed-pbr-delivery.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-detailed-pbr-delivery-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  detailed-assets:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-pbr-expansion-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked verification tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 -m py_compile scripts/acquire_studio_pbr_expansion.py
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Acquire detailed models and native 2K material sets
+        run: python3 scripts/acquire_studio_pbr_expansion.py --output "$RUNNER_TEMP/pbr-delivery"
+      - name: Validate complete GLB structure
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import validator from 'gltf-validator';
+          const root=path.join(process.env.RUNNER_TEMP,'pbr-delivery');
+          const manifest=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));
+          const evidence=[]; const rejected=[];
+          for(const asset of manifest.assets.filter(a=>a.kind==='model')){
+            const bytes=new Uint8Array(await fs.readFile(path.join(root,asset.path)));
+            const result=await validator.validateBytes(bytes,{uri:asset.path,maxIssues:100});
+            const row={id:asset.id,errors:result.issues.numErrors,warnings:result.issues.numWarnings,messages:result.issues.messages};
+            evidence.push(row);
+            if(result.issues.numErrors>0)rejected.push(asset.id);
+            else asset.technicalChecks.push('Khronos-glTF-validator-no-errors');
+          }
+          manifest.assets=manifest.assets.filter(a=>!rejected.includes(a.id));
+          await fs.writeFile(path.join(root,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+          await fs.writeFile(path.join(root,'gltf-validation.json'),JSON.stringify({evidence,rejected},null,2)+'\n');
+          console.log('GLTF VALIDATION',JSON.stringify({checked:evidence.length,rejected:rejected.length}));
+          if(!manifest.assets.some(a=>a.kind==='model'))throw new Error('No detailed model passed full glTF validation');
+          JS
+      - name: Render each model from three angles and retain actual previews
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-delivery" "$GITHUB_WORKSPACE"
+      - name: Verify bytes and stage only admitted files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from collections import Counter
+          import hashlib,json,os,shutil
+          from PIL import Image,ImageDraw
+          root=Path(os.environ['RUNNER_TEMP'])/'pbr-delivery'
+          public=Path('public/assets/studio/cc0-20260906')
+          base=json.loads((public/'manifest.json').read_text())
+          extra=json.loads((root/'manifest.json').read_text())
+          old_ids={a['id'] for a in base['assets']}
+          old_hashes={a['sha256'] for a in base['assets']}
+          accepted=[]
+          for a in extra['assets']:
+              if a['id'] in old_ids or a['sha256'] in old_hashes: continue
+              file=(root/a['path']).resolve()
+              assert file.is_relative_to(root.resolve())
+              raw=file.read_bytes()
+              assert len(raw)==a['bytes'] and hashlib.sha256(raw).hexdigest()==a['sha256']
+              assert a['license']['id']=='CC0-1.0'
+              if a['kind']=='model':
+                  assert a.get('browserRenderVerified') is True
+                  assert 'Khronos-glTF-validator-no-errors' in a['technicalChecks']
+                  a['category']='nature' if a['selectionTerm']=='potted' else 'outdoor-prop' if a['selectionTerm']=='barrel' else 'furniture'
+              else:
+                  with Image.open(file) as image:
+                      image.load()
+                      assert list(image.size)==[a['width'],a['height']]
+              folder=Path(a['path']).parent
+              shutil.copytree(root/folder,public/folder,dirs_exist_ok=True)
+              if a.get('previewPath'):
+                  dest=public/a['previewPath'];dest.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copyfile(root/a['previewPath'],dest)
+              accepted.append(a);old_ids.add(a['id']);old_hashes.add(a['sha256'])
+          assert accepted
+          base['assets']=accepted+base['assets']
+          (public/'manifest.json').write_text(json.dumps(base,ensure_ascii=False,indent=2)+'\n')
+          for number,start in enumerate(range(0,len(accepted),24),1):
+              image=Image.new('RGB',(1200,1800),'#d8dbe2');draw=ImageDraw.Draw(image)
+              for i,a in enumerate(accepted[start:start+24]):
+                  x=(i%4)*300;y=(i//4)*300
+                  with Image.open(root/a.get('previewPath',a['path'])) as preview:
+                      preview=preview.convert('RGBA');preview.thumbnail((286,250))
+                      image.paste(preview,(x+(300-preview.width)//2,y+5),preview)
+                  draw.text((x+6,y+260),a['name'][:36],fill='#17171c')
+                  draw.text((x+6,y+279),a['kind']+' / native 2K source',fill='#33333c')
+              image.save(root/f'pbr-review-{number:02d}.jpg',quality=95)
+          report=json.loads((root/'delivery-report.json').read_text())
+          report.update({'catalogAddedOriginals':len(accepted),'combinedCatalogOriginals':len(base['assets']),'byKind':dict(Counter(a['kind'] for a in accepted)),'artisticReviewCompleted':False,'productionMerged':False})
+          (root/'delivery-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+          original_report=json.loads((public/'delivery-report.json').read_text())
+          original_report.update({'deliveredOriginals':len(base['assets']),'repositoryBundledOriginals':len(base['assets']),'verifiedDeliveryFiles':len(base['assets']),'byKind':dict(Counter(a['kind'] for a in base['assets'])),'byCategory':dict(Counter(a['category'] for a in base['assets'])),'browserRenderedModels':sum(a.get('browserRenderVerified') is True for a in base['assets'])})
+          original_report['pbrExpansion']={'originals':len(accepted),'byKind':report['byKind'],'artisticReviewCompleted':False}
+          (public/'delivery-report.json').write_text(json.dumps(original_report,ensure_ascii=False,indent=2)+'\n')
+          audit=Path('data/studio-assets/pbr-expansion-20260906');audit.mkdir(parents=True,exist_ok=True)
+          for name in ['delivery-report.json','gltf-validation.json','browser-render-evidence.json','source-receipts.json']:
+              shutil.copyfile(root/name,audit/name)
+          shutil.rmtree(root/'_source',ignore_errors=True)
+          for folder in (root/'assets').iterdir():
+              if folder.is_dir() and folder.name not in {a['id'] for a in accepted}: shutil.rmtree(folder)
+          print('PBR CATALOG DELIVERY',json.dumps(report,ensure_ascii=False))
+          PY
+      - name: Recheck native catalog contracts
+        run: |
+          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+          pnpm exec tsx -e 'import fs from "node:fs";import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts";const data=JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"));console.log("ADMITTED ORIGINALS",parseStudioCc0Catalog(data).length);'
+      - name: Commit actual assets on the acquisition branch only
+        run: |
+          test "$GITHUB_REF" = 'refs/heads/feat/studio-assets-pbr-expansion-20260906'
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/cc0-20260906
+          git add -f -- data/studio-assets/pbr-expansion-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'feat(studio): bundle technically validated detailed PBR originals'
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_DELIVERY_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-delivery-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-delivery/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
