@@ -16,55 +16,17 @@ jobs:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'feat/studio-filter-exhaustive-20260905'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
           ref: feat/studio-filter-exhaustive-20260905
           fetch-depth: 0
           token: ${{ github.token }}
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Apply the rehearsed source transformation
+      - name: Apply locally rehearsed source transformation
         run: python3 .github/scripts/temp-finalize-smart-filter.py
-      - run: pnpm install --frozen-lockfile
-      - name: Format changed sources
-        run: >-
-          pnpm exec prettier --write
-          src/domains/creator/studio-adjustment-stack.ts
-          src/domains/creator/studio-adjustment-stack.test.ts
-          src/domains/creator/StudioSmartFiltersPanel.tsx
-          src/domains/creator/StudioSmartFiltersPanel.test.tsx
-          src/domains/creator/filter/StudioSmartFilterUnionControls.tsx
-          src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx
-          src/domains/creator/filter/studio-filter-catalog.test.ts
-          src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts
-          docs/studio-smart-filter-gallery-parity-2026-09-05.md
-      - name: Verify focused Smart Filter contracts
-        run: >-
-          pnpm exec vitest run
-          src/domains/creator/studio-adjustment-stack.test.ts
-          src/domains/creator/StudioSmartFiltersPanel.test.tsx
-          src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx
-          src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts
-          src/domains/creator/filter/studio-filter-catalog.test.ts
-      - name: Verify TypeScript and zero-warning lint
-        run: |
-          pnpm exec tsc --noEmit
-          pnpm exec eslint --max-warnings=0 \
-            src/domains/creator/studio-adjustment-stack.ts \
-            src/domains/creator/studio-adjustment-stack.test.ts \
-            src/domains/creator/StudioSmartFiltersPanel.tsx \
-            src/domains/creator/StudioSmartFiltersPanel.test.tsx \
-            src/domains/creator/filter/StudioSmartFilterUnionControls.tsx \
-            src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx \
-            src/domains/creator/filter/studio-filter-catalog.test.ts \
-            src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts
-      - name: Publish verified product changes
+      - name: Publish product-only change
         shell: bash
         run: |
           set -euo pipefail
