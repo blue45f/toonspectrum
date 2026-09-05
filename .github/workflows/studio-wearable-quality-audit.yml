@@ -21,30 +21,17 @@ jobs:
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Generate original metre-scale assets
-        run: pnpm exec tsx scripts/generate-studio-wearable-v5.mts
-      - name: Preview stable IDs with upgraded GLB sources
+      - name: Validate committed GLB bytes and catalogue sources
         run: |
           node --input-type=module <<'EOF'
           import fs from 'node:fs';
-          const path='src/domains/creator/vrm/studio-vrm-props.ts';
-          let text=fs.readFileSync(path,'utf8');
-          const assets=JSON.parse(fs.readFileSync('public/assets/3d/wearable-v5-manifest.json','utf8')).assets;
-          const start='export const BLENDER_PROP_GLTF_URLS = Object.freeze({';
-          if(!text.includes(start))throw new Error('Catalogue source anchor changed');
-          const additions=assets.filter(({id})=>!new RegExp('\\n  '+id+': "/assets/3d/').test(text));
-          text=text.replace(start,start+'\n'+additions.map(({id,file})=>'  '+id+': "/assets/3d/'+file+'",').join('\n'));
-          fs.writeFileSync(path,text);
-          EOF
-      - name: Validate embedded GLB format
-        run: |
-          node --input-type=module <<'EOF'
-          import fs from 'node:fs';
+          import {createHash} from 'node:crypto';
           import validator from 'gltf-validator';
           const assets=JSON.parse(fs.readFileSync('public/assets/3d/wearable-v5-manifest.json','utf8')).assets;
           const reports=[];
           for(const asset of assets){
             const bytes=fs.readFileSync('public/assets/3d/'+asset.file);
+            if(createHash('sha256').update(bytes).digest('hex')!==asset.sha256)throw new Error('Committed asset hash mismatch: '+asset.id);
             const result=await validator.validateBytes(new Uint8Array(bytes),{uri:asset.file,maxIssues:30});
             reports.push({id:asset.id,issues:result.issues,info:result.info});
           }
@@ -52,29 +39,9 @@ jobs:
           fs.writeFileSync('.artifacts/wearable-glb-validation.json',JSON.stringify(reports,null,2));
           if(reports.some(report=>report.issues.numErrors))throw new Error('GLB validation errors');
           EOF
+          pnpm exec vitest run src/domains/creator/vrm/studio-vrm-wearable-v5.test.ts src/domains/creator/vrm/studio-vrm-props.test.ts src/domains/creator/studio-everyday-props-pack-v4.test.ts
       - name: Inspect standalone and worn production renderers
         run: pnpm exec tsx scripts/verify-studio-wearable-v5.mts
-      - name: Keep source and generated assets small and explicit
-        if: always()
-        run: |
-          mkdir -p wearable-generated
-          node --input-type=module <<'EOF'
-          import fs from 'node:fs';
-          const manifest='public/assets/3d/wearable-v5-manifest.json';
-          if(fs.existsSync(manifest)){
-            for(const {file} of JSON.parse(fs.readFileSync(manifest,'utf8')).assets)fs.copyFileSync('public/assets/3d/'+file,'wearable-generated/'+file);
-            fs.copyFileSync(manifest,'wearable-generated/wearable-v5-manifest.json');
-          }
-          EOF
-          cp scripts/*wearable* wearable-generated/
-          cp src/domains/creator/vrm/studio-vrm-props.ts wearable-generated/
-          git rev-parse HEAD > wearable-generated/commit.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: wearable-v5-generated-${{ github.sha }}
-          path: wearable-generated/
-          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -90,5 +57,15 @@ jobs:
         with:
           name: wearable-v5-closeups-${{ github.sha }}
           path: .artifacts/studio-wearable-v5/screenshots/*.png
+          retention-days: 7
+          include-hidden-files: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wearable-v5-runtime-${{ github.sha }}
+          path: |
+            .artifacts/studio-wearable-v5/runtime/
+            .artifacts/studio-wearable-v5/page.mjs
+            .artifacts/studio-wearable-v5/index.html
           retention-days: 7
           include-hidden-files: true
