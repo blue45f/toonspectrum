@@ -180,3 +180,10 @@ pnpm run build
 - 브라우저 실기기 E2E와 운영 배포
 
 이 구분은 기능 성숙도를 숨기지 않고, 엔진 결과를 기반으로 후속 어댑터를 독립적으로 출시·회귀 검증할 수 있게 한다.
+
+
+## SQLite/OPFS authority integration
+
+Storyworld drafts use the app-lifetime shared SQLite/OPFS handle in the isolated `studio-storyworld-drafts-v1` namespace. There are no localStorage or IndexedDB writes, automatic legacy imports, new database files, or hidden persistence fallbacks. The browser-KV boundary test is unchanged.
+
+The editor mounts only after a valid document-scoped read completes. Unavailable or corrupt rows fail closed with retry/return actions and are never replaced by example content. Complete edits queue immediately in invocation order, remount reads wait for pending writes, and stale acknowledgements cannot mark a different edit saved. Failed writes retain editable tab state with an explicit JSON backup message. This remains local planning, not canonical canvas/server/CRDT storage.

@@ -32,6 +32,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { storyworldDraftStore } from "./draft-store";
 import {
   STORYWORLD_CAPABILITIES,
   STORYWORLD_CAPABILITY_GROUPS,
@@ -74,11 +75,6 @@ type StoryworldTab =
 
 type SaveState = "idle" | "saved" | "error";
 
-type StoredStoryworldEnvelope = {
-  readonly version: 1;
-  readonly savedAtIso: string;
-  readonly project: StoryworldProject;
-};
 
 const TAB_ITEMS: readonly {
   readonly id: StoryworldTab;
@@ -295,19 +291,6 @@ function parseStoryworldProject(text: string): StoryworldProject {
   }
   assertOptionalFiniteNumber(value, "productionCapacityMinutes", "project");
   return value as unknown as StoryworldProject;
-}
-
-function safeReadStoredProject(storageKey: string): StoryworldProject | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const envelope = JSON.parse(raw) as Partial<StoredStoryworldEnvelope>;
-    if (envelope.version !== 1 || !envelope.project) return null;
-    return parseStoryworldProject(JSON.stringify(envelope.project));
-  } catch {
-    return null;
-  }
 }
 
 function projectStorageKey(workId: string | null, remixSourceWorkId: string | null): string {
@@ -835,13 +818,45 @@ function JsonTab({ project, onApply }: {
   );
 }
 
-export function StudioStoryworldLabPage({
+export function StudioStoryworldLabPage(props: StudioStoryworldLabPageProps) {
+  useDocumentTitle("스토리월드 인과관계 랩 · Studio");
+  const key = projectStorageKey(props.workId, props.remixSourceWorkId);
+  const [loaded, setLoaded] = useState<{ key: string; project: StoryworldProject } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLoaded(null);
+    setError(null);
+    void storyworldDraftStore.load(key, parseStoryworldProject).then((project) => {
+      if (active) setLoaded({ key, project: project ?? cloneDemoProject() });
+    }).catch((caught: unknown) => {
+      if (active) setError(caught instanceof Error ? caught.message : "저장소를 열 수 없습니다.");
+    });
+    return () => { active = false; };
+  }, [key, attempt]);
+  if (loaded === null || loaded.key !== key) {
+    return (
+      <main className="storyworld-main" aria-busy={error === null}>
+        <h1>스토리월드 인과관계 랩</h1>
+        <p role={error === null ? "status" : "alert"}>
+          {error === null ? "SQLite/OPFS에서 스토리월드 초안을 복원하는 중입니다." : `복원 실패: ${error} 저장된 원본은 변경하지 않았습니다.`}
+        </p>
+        {error !== null ? <button className="storyworld-button" type="button" onClick={() => setAttempt((value) => value + 1)}>저장소 다시 열기</button> : null}
+        <Link className="storyworld-button" href={editorHref(props.workId, props.remixSourceWorkId)}>Studio 편집기로 돌아가기</Link>
+      </main>
+    );
+  }
+  return <StudioStoryworldLabEditor key={key} {...props} initialProject={loaded.project} />;
+}
+
+function StudioStoryworldLabEditor({
   workId,
   remixSourceWorkId,
-}: StudioStoryworldLabPageProps) {
-  useDocumentTitle("스토리월드 인과관계 랩 · Studio");
+  initialProject,
+}: StudioStoryworldLabPageProps & { readonly initialProject: StoryworldProject }) {
   const storageKey = useMemo(() => projectStorageKey(workId, remixSourceWorkId), [workId, remixSourceWorkId]);
-  const [project, setProject] = useState<StoryworldProject>(() => safeReadStoredProject(storageKey) ?? cloneDemoProject());
+  const [project, setProject] = useState<StoryworldProject>(initialProject);
   const [activeTab, setActiveTab] = useState<StoryworldTab>("overview");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [statusText, setStatusText] = useState("결정적 로컬 분석 준비됨");
@@ -857,22 +872,19 @@ export function StudioStoryworldLabPage({
   }, [project.title]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const envelope: StoredStoryworldEnvelope = {
-          version: 1,
-          savedAtIso: new Date().toISOString(),
-          project,
-        };
-        window.localStorage.setItem(storageKey, JSON.stringify(envelope));
-        setSaveState("saved");
-        setStatusText("이 브라우저에 스토리월드 초안을 저장했습니다.");
-      } catch {
-        setSaveState("error");
-        setStatusText("브라우저 저장 공간에 쓰지 못했습니다. JSON으로 내보내 보관하세요.");
-      }
-    }, 250);
-    return () => window.clearTimeout(timer);
+    let active = true;
+    setSaveState("idle");
+    // Complete JSON edits queue immediately; only obsolete UI receipts are cancelled.
+    void storyworldDraftStore.save(storageKey, project).then(() => {
+      if (!active) return;
+      setSaveState("saved");
+      setStatusText("SQLite/OPFS에 스토리월드 초안을 저장했습니다.");
+    }).catch(() => {
+      if (!active) return;
+      setSaveState("error");
+      setStatusText("SQLite/OPFS에 저장하지 못했습니다. 현재 편집은 이 탭에만 남아 있습니다. JSON으로 내보내 보관하세요.");
+    });
+    return () => { active = false; };
   }, [project, storageKey]);
 
   const reset = () => {
