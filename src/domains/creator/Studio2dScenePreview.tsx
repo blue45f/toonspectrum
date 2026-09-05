@@ -9,6 +9,7 @@ import {
   studio2dResolutionLabel,
 } from "./studio-2d-asset-quality";
 import { studio2dImageSource } from "./studio-2d-image-source";
+import { useStudio2dImageReadiness } from "./useStudio2dImageReadiness";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { Studio2dScene } from "./studio-2d-asset-quality";
@@ -23,15 +24,15 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
   const dialogRef = useRef<HTMLElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLElement | null>(typeof document === "undefined" ? null : document.body);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [attempt, setAttempt] = useState(0);
-  const [actualSize, setActualSize] = useState("");
-  const [actualPixels, setActualPixels] = useState<{ width: number; height: number } | null>(null);
   const [pixelView, setPixelView] = useState(false);
   const metadata = getStudio2dAssetMetadata(scene);
   const title = studio2dDisplayName(scene);
-  const mismatch = !!metadata && !!actualPixels
-    && (metadata.width !== actualPixels.width || metadata.height !== actualPixels.height);
+  const { imageRef, imageKey, state, retry } = useStudio2dImageReadiness(studio2dImageSource(scene), metadata);
+  const status = state.status;
+  const actualPixels = state.pixels;
+  const actualSize = actualPixels ? `${actualPixels.width} × ${actualPixels.height}px` : "";
+  const mismatch = status === "mismatch";
+  const retryImage = () => { setPixelView(false); retry(); };
 
   useStudioModalSheet({ activeKey: scene.id, dialogRef, rootRef, onDismiss: onClose });
   if (typeof document === "undefined") return null;
@@ -59,24 +60,18 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
           </div>
           <div ref={viewportRef} role="region" className="max-h-[55dvh] overflow-auto rounded-lg bg-neutral-950" tabIndex={-1}
             aria-label="배경 원본 이미지 영역">
-            <img key={attempt} src={studio2dImageSource(scene)} alt={title} decoding="async"
+            <img key={imageKey} ref={imageRef} src={studio2dImageSource(scene)} alt={title} decoding="async"
               className={pixelView ? "block max-w-none" : "mx-auto block max-h-[55dvh] max-w-full object-contain"}
               style={pixelView && actualPixels ? { width: actualPixels.width, height: actualPixels.height } : undefined}
-              onLoad={(event) => {
-                const { naturalWidth, naturalHeight } = event.currentTarget;
-                if (!naturalWidth || !naturalHeight) { setStatus("error"); return; }
-                setActualPixels({ width: naturalWidth, height: naturalHeight });
-                setActualSize(`${naturalWidth} × ${naturalHeight}px`);
-                setStatus("ready");
-              }} onError={() => setStatus("error")} />
+              />
           </div>
           <div className="mt-3 space-y-2 text-xs leading-relaxed">
             {status === "loading" && <p role="status">원본 이미지를 불러오는 중…</p>}
             {status === "error" && <div role="alert" className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-bad">
-              원본을 불러오지 못해 삽입할 수 없습니다.
-              <button type="button" className="ml-2 underline" onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}>다시 불러오기</button>
+              {state.reason === "timeout" ? "연결 또는 이미지 처리 시간이 초과되어 삽입할 수 없습니다." : "원본을 불러오지 못해 삽입할 수 없습니다."}
+              <button type="button" className="ml-2 underline" onClick={retryImage}>다시 불러오기</button>
             </div>}
-            {mismatch && <p role="alert" className="text-bad">실제 이미지 크기({actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다.</p>}
+            {mismatch && <p role="alert" className="text-bad">실제 이미지 크기({actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다. <button type="button" className="ml-2 underline" onClick={retryImage}>다시 불러오기</button></p>}
             {metadata && <p className="text-fg-3">{metadata.environment} · {metadata.timeOfDay} · {metadata.containsPeople ? "인물 포함" : "인물 없는 배경"} · {isLargeStudio2dAsset(metadata) ? "큰 원본" : "소형 컷용 원본"}</p>}
             {metadata?.review.notes.map((note) => <p key={note} className="rounded-lg border border-line bg-raised p-2">{note}</p>)}
             {scene.imgSrc && <p className="rounded-lg border border-line p-2 text-fg-3">기존 카탈로그 소재 · 이용 권리 기록 미확인. 상업 이용·소재 재배포 전 출처와 이용 조건을 확인하세요. 추천 표시는 라이선스 승인이 아닙니다.</p>}
