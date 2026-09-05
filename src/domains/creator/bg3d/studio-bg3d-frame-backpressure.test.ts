@@ -1,11 +1,10 @@
+import { Camera, Object3D } from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   installStudioBg3dFrameBackpressure,
   type StudioBg3dFrameQueueRenderer,
 } from "./studio-bg3d-frame-backpressure";
-
-import type { Camera, Object3D } from "three";
 
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
 function fixture(webgpu = true) {
@@ -24,8 +23,9 @@ function fixture(webgpu = true) {
     clear,
     render,
   };
-  const scene = { userData: { pose: 0 } } as Object3D;
-  const camera = {} as Camera;
+  const scene = new Object3D();
+  scene.userData.pose = 0;
+  const camera = new Camera();
   const requestFrame = vi.fn();
   const release = installStudioBg3dFrameBackpressure(renderer, requestFrame);
   const draw = () => { renderer.clear(true, true, true); renderer.render(scene, camera); };
