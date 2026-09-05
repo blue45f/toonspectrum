@@ -30,13 +30,26 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Worker recovery and textured-brush regressions
-        run: >-
-          pnpm exec vitest run
-          src/domains/creator/studio-image-filter-worker-client.test.ts
-          src/domains/creator/studio-image-filter-worker-stability.test.ts
-          src/domains/creator/brush/studio-brush-r8-grain-hydrator.test.ts
-          src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts
+      - name: Worker recovery, texture loading and current-UI verifier regressions
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/studio-stability-unit-evidence
+          git rev-parse HEAD > /tmp/studio-stability-unit-evidence/commit.txt
+          pnpm exec vitest run \
+            src/domains/creator/studio-image-filter-worker-client.test.ts \
+            src/domains/creator/studio-image-filter-worker-stability.test.ts \
+            src/domains/creator/brush/studio-brush-r8-grain-hydrator.test.ts \
+            src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts \
+            src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts \
+            2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
+      - name: Preserve focused regression results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-unit-results
+          path: /tmp/studio-stability-unit-evidence
+          retention-days: 7
+          if-no-files-found: warn
       - run: pnpm run build:bundle
       - uses: actions/upload-artifact@v6
         with:
