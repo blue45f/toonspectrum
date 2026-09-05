@@ -29,6 +29,7 @@ jobs:
       - name: Prepare reviewed integration and safeguards
         run: |
           python3 scripts/finalize_studio_asset_delivery.py --prepare
+          python3 scripts/prepare_studio_asset_delivery_regressions.py
           python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
           python3 -m py_compile scripts/studio_asset_delivery.py scripts/finalize_studio_asset_delivery.py
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
@@ -42,15 +43,14 @@ jobs:
           python3 scripts/finalize_studio_asset_delivery.py --stage "$RUNNER_TEMP/studio-asset-delivery"
       - name: Verify catalog paths integrity and compatibility
         run: |
-          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts
+          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
           pnpm exec tsx -e 'import fs from "node:fs"; import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts"; const items=parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"))); console.log("ADMITTED SELF-HOSTED ORIGINALS",items.length);'
-          git ls-files '*original*asset*test*' '*AssetMarketplace*test*' '*AssetMenuPanel*test*'
       - name: Check touched frontend lint
         id: lint
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm exec eslint --fix src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx 2>&1 | tee "$RUNNER_TEMP/studio-asset-delivery/frontend-lint.log"
+          pnpm exec eslint --fix src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts 2>&1 | tee "$RUNNER_TEMP/studio-asset-delivery/frontend-lint.log"
       - name: Check full frontend types
         id: types
         continue-on-error: true
@@ -64,7 +64,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import os,json,pathlib
-          result={'catalogUnitTests':'passed','manifestAdmission':'passed','threeAngleModelRendering':'completed','frontendLint':os.environ['LINT_OUTCOME'],'frontendTypes':os.environ['TYPES_OUTCOME'],'fullProductionBuild':'not-run','studioSaveRestoreRoundTrip':'not-run','artisticApproval':'not-claimed','productionDeployment':'not-performed'}
+          result={'catalogAndLegacyUnitTests':'passed','manifestAdmission':'passed','threeAngleModelRendering':'completed','frontendLint':os.environ['LINT_OUTCOME'],'frontendTypes':os.environ['TYPES_OUTCOME'],'fullProductionBuild':'not-run','studioSaveRestoreRoundTrip':'not-run','artisticApproval':'not-claimed','productionDeployment':'not-performed'}
           for folder in [pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-asset-delivery',pathlib.Path('data/studio-assets/delivery-20260906')]:
               folder.mkdir(parents=True,exist_ok=True)
               (folder/'verification.json').write_text(json.dumps(result,indent=2)+'\n')
@@ -76,7 +76,7 @@ jobs:
           test "$GITHUB_REPOSITORY" = "blue45f/toonspectrum"
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
-          git add -- public/assets/studio/cc0-20260906 data/studio-assets/delivery-20260906 scripts/studio_asset_delivery.py scripts/render_studio_asset_delivery.mjs src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx
+          git add -- public/assets/studio/cc0-20260906 data/studio-assets/delivery-20260906 scripts/studio_asset_delivery.py scripts/render_studio_asset_delivery.mjs src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m "feat(studio): bundle rendered CC0 originals and retire blockout-only picks"
             git push origin "HEAD:$GITHUB_REF"
