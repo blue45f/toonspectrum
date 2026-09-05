@@ -10,6 +10,8 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+import { verifyCc0InsertionCancellation } from './studio-cc0-lifecycle-checks.mjs';
+
 const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? '/tmp/studio-cc0-ui');
 await mkdir(output, {recursive:true});
@@ -31,7 +33,8 @@ import {createRoot} from 'react-dom/client';
 import {StudioCc0AssetLibraryPanel} from './src/domains/creator/StudioCc0AssetLibraryPanel';
 window.__cc0Accept=true;
 window.__cc0Used=null;
-createRoot(document.getElementById('root')!).render(<main style={{maxWidth:720,margin:'24px auto',padding:12}}><h1>에셋 라이브러리 실제 컴포넌트 검증</h1><StudioCc0AssetLibraryPanel onUseAsset={asset=>{window.__cc0Used=asset;return window.__cc0Accept;}}/></main>);
+window.__cc0UseCount=0;
+createRoot(document.getElementById('root')!).render(<main style={{maxWidth:720,margin:'24px auto',padding:12}}><h1>에셋 라이브러리 실제 컴포넌트 검증</h1><StudioCc0AssetLibraryPanel onUseAsset={asset=>{window.__cc0UseCount+=1;window.__cc0Used=asset;return window.__cc0Accept;}}/></main>);
 `);
 let server, browser;
 const errors=[], steps=[];
@@ -78,6 +81,8 @@ try {
   await page.getByRole('dialog').getByRole('button',{name:'캔버스에 삽입',exact:true}).click();
   await page.waitForFunction(()=>window.__cc0Used!==null);
   assert.equal(await page.getByRole('dialog').count(),1,'failed canvas callback must retain preview');
+  await page.getByRole('dialog').getByRole('status').filter({hasText:'캔버스에 삽입하지 못했습니다.'}).waitFor();
+  steps.push('failed insertion feedback is visible inside the active modal');
   await page.evaluate(()=>{window.__cc0Accept=true;window.__cc0Used=null;});
   await page.getByRole('dialog').getByRole('button',{name:'캔버스에 삽입',exact:true}).click();
   await page.getByRole('dialog').waitFor({state:'hidden'});
@@ -91,6 +96,7 @@ try {
   assert.ok(inserted.width>=1024&&inserted.height>=1024);
   assert.equal(inserted.license,'CC0-1.0');
   steps.push('real WebP hash/decode/dimensions/rights insertion; success-only dismissal');
+  await verifyCc0InsertionCancellation(page, panel, manifest, steps);
   await page.getByLabel('에셋 검색',{exact:true}).fill('존재하지않는검수문자열');
   assert.equal(await panel.locator('article').count(),0);
   await page.getByLabel('에셋 검색',{exact:true}).fill('목재');
