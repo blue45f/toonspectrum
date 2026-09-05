@@ -25,9 +25,14 @@ describe("AI super-suite production integration boundary", () => {
       "src/domains/creator/ai/StudioAiSuperSuiteModal.tsx"
     );
 
-    expect(popover).toContain("consumeStudioAiSuperSuiteOpenRequest");
-    expect(popover).toContain("subscribeStudioAiSuperSuiteOpenRequest");
-    expect(popover).toContain("compileStudioAiSuitePromptHandoff");
+    const gateway = source("src/domains/creator/ai/StudioAiSuperSuiteGateway.tsx");
+    expect(popover).toContain("requestStudioAiSuperSuiteOpen");
+    expect(popover).toContain("<StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt}");
+    expect(popover).not.toContain("useState(");
+    expect(popover).not.toContain("import(");
+    expect(gateway).toContain("subscribeStudioAiSuperSuiteOpenRequest");
+    expect(gateway).toContain("compileStudioAiSuitePromptHandoff");
+    expect(gateway).toContain('import("./StudioAiSuperSuiteModal")');
     expect(popover).toContain('setMenu("aiAssist")');
     expect(modal).toContain("onApplyPromptRecipe");
   });
