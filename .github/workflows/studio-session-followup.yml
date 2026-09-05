@@ -1,0 +1,38 @@
+name: Studio session followup
+on:
+  push:
+    branches: [fix/studio-session-followup-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: studio-session-followup-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-stability-dist
+          run-id: 33982650924
+          github-token: ${{ github.token }}
+          path: dist
+      - run: pnpm exec tsx scripts/diagnose-studio-session.mts
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-session-diagnosis
+          path: /tmp/studio-session-evidence
+          retention-days: 7
+          if-no-files-found: error
