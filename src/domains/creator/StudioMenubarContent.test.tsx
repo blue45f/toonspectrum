@@ -692,9 +692,15 @@ describe("StudioMenubarContent", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
-    // 600px 레인의 오른쪽 경계(600)를 걸치는 트리거를 만든다.
-    const { triggers } = stubMenubarGeometry(container, { triggerPitch: 50, triggerWidth: 90 });
-    const straddling = triggers[11]!; // left 550, right 640 → 오른쪽 경계에 걸친다
+    // 마지막 트리거가 레인의 오른쪽 경계를 걸치도록 레인 폭을 트리거 수에서 잡는다 — 제시되는
+    // 메뉴 제목 수가 바뀌어도(IA 개편) 이 테스트가 고정 인덱스 때문에 깨지지 않게.
+    const triggerCount = container.querySelectorAll("[data-studio-main-menu-trigger]").length;
+    const { triggers } = stubMenubarGeometry(container, {
+      laneWidth: (triggerCount - 1) * 50 + 45,
+      triggerPitch: 50,
+      triggerWidth: 90,
+    });
+    const straddling = triggers[triggerCount - 1]!; // left (n-1)*50, right +90 → 경계(+45)에 걸친다
     fireEvent.focusIn(straddling);
     expect(straddling.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",
