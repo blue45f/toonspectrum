@@ -1,0 +1,122 @@
+name: Studio brush and filter stability
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-brush-filter-stability-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Worker recovery, exact median pixels, texture loading and verifier regressions
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/studio-stability-unit-evidence
+          git rev-parse HEAD > /tmp/studio-stability-unit-evidence/commit.txt
+          pnpm exec vitest run \
+            src/domains/creator/studio-image-filter-worker-client.test.ts \
+            src/domains/creator/studio-image-filter-worker-stability.test.ts \
+            src/domains/creator/brush/studio-brush-r8-grain-hydrator.test.ts \
+            src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts \
+            src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts \
+            src/domains/creator/studio-detail.test.ts \
+            src/domains/creator/studio-detail-median-stability.test.ts \
+            2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
+      - name: Preserve focused regression results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-unit-results
+          path: /tmp/studio-stability-unit-evidence
+          retention-days: 7
+          if-no-files-found: warn
+      - run: pnpm run build:bundle
+      - name: Require the production manifest used by SQLite durability checks
+        run: test -s dist/.vite/manifest.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-dist
+          path: dist
+          include-hidden-files: true
+          retention-days: 3
+      - name: Preserve the tested filter Worker separately for reproducible CPU soak tests
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-filter-worker
+          path: |
+            dist/assets/studio-image-filter.worker-*.js
+            dist/.vite/manifest.json
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
+
+  browser:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [filters, desktop, long, shapes, mobile, durability]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_DIR: /tmp/studio-stability-evidence
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-stability-dist
+          path: dist
+      - name: Verify hidden manifest survived artifact transport
+        run: test -s dist/.vite/manifest.json
+      - name: Every dialog filter repeated in the same browser session
+        if: matrix.suite == 'filters'
+        env:
+          TOONSPECTRUM_FILTER_DIALOG_SURVEY: '1'
+          TOONSPECTRUM_FILTER_DIALOG_ROUNDS: '3'
+        run: pnpm run verify:studio-filter-dialog
+      - name: Brush catalogue, long strokes, geometry, touch targets and save recovery
+        if: matrix.suite != 'filters'
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: ${{ matrix.suite }}
+          TOONSPECTRUM_BRUSH_STABILITY_ROUNDS: '2'
+          TOONSPECTRUM_BRUSH_SURVEY: '1'
+          TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
+        run: pnpm run verify:studio-brushes
+      - name: Preserve evidence even when a product check fails
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-${{ matrix.suite }}
+          path: /tmp/studio-stability-evidence
+          retention-days: 7
+          if-no-files-found: warn
