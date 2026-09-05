@@ -63,19 +63,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Preserve exact private review source and installed test environment
-        run: |
-          mkdir -p /tmp/studio-discovery-review
-          git rev-parse HEAD > /tmp/studio-discovery-review/commit.txt
-          git ls-files -z | tar --null --exclude='public/*' --exclude='*.woff*' --exclude='*.ttf' --exclude='*.otf' -T - -czf /tmp/studio-discovery-review/source.tar.gz
-          tar --exclude='*/.cache/*' --exclude='*.woff*' --exclude='*.ttf' --exclude='*.otf' -czf /tmp/studio-discovery-review/dependencies.tar.gz node_modules
-          cp "$(command -v node)" /tmp/studio-discovery-review/runtime-node
-      - uses: actions/upload-artifact@v6
-        with:
-          name: studio-discovery-review
-          path: /tmp/studio-discovery-review
-          retention-days: 1
-          compression-level: 1
       - run: pnpm run build:bundle
       - uses: actions/upload-artifact@v6
         with:
@@ -123,7 +110,7 @@ jobs:
           TOONSPECTRUM_BRUSH_VERIFY_SETTLED_DUMP: '1'
           TOONSPECTRUM_BRUSH_VERIFY_IDS: gpen,pen,fountain-pen,pencil,pencil--side-shade,charcoal--compressed-edge,watercolor,marker,gouache--matte-body,oil--filbert-ribbon,airbrush,spray,splatter,standard-eraser,kneaded-eraser,screentone,web-cross-hatch-pen,web-radial-burst
         run: pnpm exec tsx scripts/verify-studio-brushes.mts
-      - name: Preserve screenshots and honest receipts on success or failure
+      - name: Preserve screenshots and receipts on success or failure
         if: always()
         uses: actions/upload-artifact@v6
         with:

@@ -3,17 +3,15 @@
  * Pure, no React.
  */
 
-import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
-
-import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
-
 import { BRUSH_PRESETS, type BrushPreset } from "../studio-brush";
 import {
   listStudioBrushTrayItems,
   type StudioBrushTrayCategory,
   type StudioBrushTrayItem,
 } from "../studio-creative-ux";
+import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
 
+import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
 export const STUDIO_BRUSH_OPACITY_RANGE = { min: 0.05, max: 1 } as const;
