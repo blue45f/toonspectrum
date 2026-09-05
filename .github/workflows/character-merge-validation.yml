@@ -49,7 +49,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Check camera compiler and import rules
-        run: pnpm exec eslint --max-warnings=0 src/domains/creator/vrm/StudioVrmCameraDirector.tsx src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/vrm/StudioVrmCameraDirector.tsx src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx
       - name: Verify contact naturalness against production math
         run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
       - name: Run character, hand, contact, framing and route regressions
@@ -65,6 +65,7 @@ jobs:
             src/domains/creator/vrm/studio-vrm-prop-rig.test.ts \
             src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts \
             src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
             src/domains/creator/studio-router/studio-route-manifest.test.ts
       - name: Typecheck the application and API
         run: pnpm run typecheck
