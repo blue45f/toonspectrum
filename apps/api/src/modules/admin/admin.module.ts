@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AdminAnnouncementsService } from "./admin-announcements.service";
 import { AdminCampaignsService } from "./admin-campaigns.service";
 import { AdminMembersService } from "./admin-members.service";
 import { AdminMetricsService } from "./admin-metrics.service";
@@ -14,6 +15,7 @@ import { AdminService } from "./admin.service";
   controllers: [AdminController, AdminTrafficController],
   providers: [
     AdminService,
+    AdminAnnouncementsService,
     AdminCampaignsService,
     AdminMembersService,
     AdminMetricsService,
