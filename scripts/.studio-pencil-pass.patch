@@ -19,7 +19,7 @@
            });
          }
          buckets.clear();
-@@ -940,9 +939,11 @@
+@@ -940,7 +939,9 @@
              collectMark(cap.points, cap.opacityScale, cap.flowScale, pass.opacityScale);
            }
          }
