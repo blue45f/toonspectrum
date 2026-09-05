@@ -4,12 +4,13 @@ import { drawPromoFrame, loadPromoImages } from "./promo-canvas";
 import { PROMO_FPS, promoAudioGain, promoFrameCount, promoSize } from "./promo-model";
 
 import type { PromoImages } from "./promo-canvas";
-import type { PromoProject } from "./promo-model";
+import type { PromoPanel, PromoProject } from "./promo-model";
 
 export function PromoPreview({ project, disabled }: { project: PromoProject; disabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const startFrame = useRef(0);
+  const imageCache = useRef<{ sources: Pick<PromoPanel, "id" | "src">[]; images: PromoImages } | null>(null);
   const [images, setImages] = useState<PromoImages>(new Map());
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -18,12 +19,17 @@ export function PromoPreview({ project, disabled }: { project: PromoProject; dis
   const total = promoFrameCount(project);
   const size = promoSize(project.ratio, 480);
   useEffect(() => {
+    const cached = imageCache.current;
+    if (cached && cached.sources.length === project.panels.length && project.panels.every((panel, index) => panel.id === cached.sources[index]?.id && panel.src === cached.sources[index]?.src)) {
+      setImages(cached.images); setLoading(false); setError("");
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
     setError("");
     setImages(new Map());
     loadPromoImages(project, controller.signal).then((loaded) => {
-      if (!controller.signal.aborted) { setImages(loaded); setLoading(false); }
+      if (!controller.signal.aborted) { imageCache.current = { sources: project.panels.map(({ id, src }) => ({ id, src })), images: loaded }; setImages(loaded); setLoading(false); }
     }).catch(() => {
       if (!controller.signal.aborted) { setError("미리보기 이미지를 읽지 못했어요."); setLoading(false); }
     });
@@ -70,7 +76,7 @@ export function PromoPreview({ project, disabled }: { project: PromoProject; dis
     <section className="promo-preview" aria-label="홍보영상 미리보기">
       <div className="promo-preview-top"><span>미리보기</span><span>{project.ratio} · {project.seconds}초 · 30fps</span></div>
       <div className="promo-canvas-wrap"><canvas ref={canvasRef} width={size.width} height={size.height} aria-label={`${project.title} 홍보영상. 아래 컷 편집 영역에서 장면별 자막을 확인할 수 있어요.`} /></div>
-      {project.audio ? <audio ref={audioRef} src={project.audio.src} loop preload="metadata" aria-label="미리보기 배경음악" /> : null}
+      {project.audio ? <audio ref={audioRef} src={project.audio.src} loop preload="metadata" aria-label="미리보기 배경음악"><track kind="captions" srcLang="ko" label="배경음악 안내" src={`data:text/vtt;charset=utf-8,${encodeURIComponent("WEBVTT\n\n00:00:00.000 --> 00:01:00.000\n[사용자가 추가한 배경음악]\n")}`} default /></audio> : null}
       <div className="promo-playback">
         <button type="button" onClick={play} disabled={disabled || loading || images.size !== project.panels.length || !project.panels.length}>{playing ? "일시정지" : "재생"}</button>
         <label className="promo-sr-only" htmlFor="promo-seek">영상 탐색</label>
