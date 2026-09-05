@@ -228,7 +228,8 @@ test("WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는�
   try {
     await openReadyWebGpu(page, testInfo, "continuous");
     const continuous = await dragRing(page, testInfo, "continuous", 24);
-    await page.getByRole("button", { name: "3D 배경 편집기 닫기" }).click();
+    // Scope the accessible close action to the editor; the surrounding Studio has other dialogs.
+    await page.locator(DIALOG).getByRole("button", { name: "닫기", exact: true }).click();
     await expect(page.locator(DIALOG)).toHaveCount(0);
     await openReadyWebGpu(page, testInfo, "direct");
     const direct = await dragRing(page, testInfo, "direct", 1);
