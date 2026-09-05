@@ -1,0 +1,74 @@
+name: Studio curation verification
+on:
+  push:
+    branches: [feat/studio-assets-visual-curation-20260906]
+    paths: [.github/workflows/studio-curation-verify.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-curation-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  curation:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-visual-curation-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HUSKY: "0"
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Apply reviewed compositing and selection repairs
+        run: |
+          mkdir -p "$RUNNER_TEMP/curation-review"
+          python3 scripts/apply_studio_visual_curation.py
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify original identity and curated picker contracts
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts 2>&1 | tee "$RUNNER_TEMP/curation-review/tests.log"
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx
+          pnpm exec tsc -p tsconfig.json --pretty false
+      - name: Render every starter with the real browser SVG decoder
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec tsx -e 'import fs from "node:fs"; import {STUDIO_ORIGINAL_FREE_ASSETS,STUDIO_RETIRED_ORIGINAL_FREE_ASSETS} from "./src/domains/creator/studio-original-free-asset-packs.ts"; fs.writeFileSync(process.env.RUNNER_TEMP+"/curation-review/starters.json",JSON.stringify([...STUDIO_ORIGINAL_FREE_ASSETS,...STUDIO_RETIRED_ORIGINAL_FREE_ASSETS]));'
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';import path from 'node:path';import {chromium} from 'playwright';
+          const out=path.join(process.env.RUNNER_TEMP,'curation-review');const assets=JSON.parse(await fs.readFile(path.join(out,'starters.json'),'utf8'));
+          const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1200,height:1200},deviceScaleFactor:1});
+          try{
+            for(let offset=0;offset<assets.length;offset+=9){
+              await page.setContent('<style>body{margin:0;font:14px system-ui;background:#bbc0c8}main{display:grid;grid-template-columns:repeat(3,400px)}article{height:400px}img{width:384px;height:345px;object-fit:contain;background:conic-gradient(#d6d9df 25%,#a1a8b3 0 50%,#d6d9df 0 75%,#a1a8b3 0);background-size:24px 24px}p{margin:4px 10px}</style><main></main>');
+              await page.evaluate(items=>{const root=document.querySelector('main');for(const asset of items){const item=document.createElement('article');const image=document.createElement('img');image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(asset.svg);image.alt=asset.id;item.appendChild(image);const text=document.createElement('p');text.textContent=asset.id;item.appendChild(text);root.appendChild(item);}},assets.slice(offset,offset+9));
+              await page.evaluate(()=>Promise.all([...document.images].map(image=>image.decode())));
+              await page.screenshot({path:path.join(out,`repaired-starters-${1+offset/9}.png`)});
+            }
+          }finally{await browser.close();}
+          console.log('ACTUAL SVG DECODED',assets.length);
+          JS
+      - name: Keep tested code on review branch without merging or deployment
+        run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx
+          git diff --cached --stat
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "fix(studio): apply screened asset curation and transparent starter upgrades"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='CURATION_SOURCE_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-curation-repaired-starters
+          path: ${{ runner.temp }}/curation-review/
+          if-no-files-found: warn
+          retention-days: 14
