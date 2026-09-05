@@ -25,6 +25,7 @@ export type StudioRouteKind =
   | "invalid"
   | "lift3d"
   | "placeholder"
+  | "production"
   | "publish";
 
 export interface StudioRouteManifestEntry {
@@ -65,22 +66,40 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     pattern: "/studio/companion/:surface",
   },
   {
+    id: "studio-production",
+    kind: "production",
+    ownsDocumentTitle: true,
+    pattern: "/studio/(join|present|projects|review|share|versions)",
+  },
+  {
+    id: "studio-work-production",
+    kind: "production",
+    ownsDocumentTitle: true,
+    pattern: "/studio/work/:workId/:surface(present|review|versions)",
+  },
+  {
+    id: "studio-remix-production",
+    kind: "production",
+    ownsDocumentTitle: true,
+    pattern: "/studio/remix/:sourceWorkId/:surface(present|review|versions)",
+  },
+  {
     id: "studio-placeholder",
     kind: "placeholder",
     ownsDocumentTitle: false,
-    pattern: "/studio/(assets|join|present|projects|review|share|versions)",
+    pattern: "/studio/assets",
   },
   {
     id: "studio-work-placeholder",
     kind: "placeholder",
     ownsDocumentTitle: false,
-    pattern: "/studio/work/:workId/:surface",
+    pattern: "/studio/work/:workId/assets",
   },
   {
     id: "studio-remix-placeholder",
     kind: "placeholder",
     ownsDocumentTitle: false,
-    pattern: "/studio/remix/:sourceWorkId/:surface",
+    pattern: "/studio/remix/:sourceWorkId/assets",
   },
 ] as const satisfies readonly StudioRouteManifestEntry[]);
 
@@ -117,14 +136,24 @@ export interface StudioLift3dRouteResolution extends StudioResolvedRouteBase {
   readonly subject: string | null;
 }
 
-export type StudioPlaceholderRouteId =
-  | "assets"
-  | "review"
-  | "join"
-  | "versions"
-  | "present"
-  | "projects"
-  | "share";
+export const STUDIO_PRODUCTION_ROUTE_IDS = [
+  "join",
+  "present",
+  "projects",
+  "review",
+  "share",
+  "versions",
+] as const;
+
+export type StudioProductionRouteId =
+  (typeof STUDIO_PRODUCTION_ROUTE_IDS)[number];
+
+export type StudioPlaceholderRouteId = "assets";
+
+export interface StudioProductionRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "production";
+  readonly surface: StudioProductionRouteId;
+}
 
 export interface StudioPlaceholderRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "placeholder";
@@ -144,20 +173,13 @@ export type StudioRouteResolution =
   | StudioInvalidRouteResolution
   | StudioLift3dRouteResolution
   | StudioPlaceholderRouteResolution
+  | StudioProductionRouteResolution
   | StudioPublishRouteResolution;
 
-const PLACEHOLDER_IDS = new Set<StudioPlaceholderRouteId>([
-  "assets",
-  "review",
-  "join",
-  "versions",
-  "present",
-  "projects",
-  "share",
-]);
-
-const WORK_SCOPE_PLACEHOLDER_SURFACES = new Set<Omit<StudioPlaceholderRouteId, "join" | "projects" | "share">>([
-  "assets",
+const PRODUCTION_ROUTE_IDS = new Set<StudioProductionRouteId>(
+  STUDIO_PRODUCTION_ROUTE_IDS,
+);
+const WORK_SCOPE_PRODUCTION_SURFACES = new Set<StudioProductionRouteId>([
   "present",
   "review",
   "versions",
@@ -345,27 +367,109 @@ function resolveLift3d(
   });
 }
 
+function resolveProduction(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioProductionRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (
+    segments === null
+    || segments.length !== 2
+    || !PRODUCTION_ROUTE_IDS.has(segments[1] as StudioProductionRouteId)
+  ) {
+    return null;
+  }
+  const surface = segments[1] as StudioProductionRouteId;
+  const canonicalPathname = `/studio/${surface}`;
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, queryParams(search)),
+    canonicalPathname,
+    kind: "production",
+    lifecycleKey: canonicalPathname,
+    ownsDocumentTitle: true,
+    surface,
+  });
+}
+
 function resolvePlaceholder(
   pathname: string,
   search: string | URLSearchParams | undefined,
 ): StudioPlaceholderRouteResolution | null {
   const segments = normalizedSegments(pathname);
-  if (
-    segments === null
-    || segments.length !== 2
-    || !PLACEHOLDER_IDS.has(segments[1] as StudioPlaceholderRouteId)
-  ) {
+  if (segments === null || segments.length !== 2 || segments[1] !== "assets") {
     return null;
   }
-  const placeholderId = segments[1] as StudioPlaceholderRouteId;
-  const canonicalPathname = `/studio/${placeholderId}`;
+  const canonicalPathname = "/studio/assets";
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "placeholder",
     lifecycleKey: canonicalPathname,
     ownsDocumentTitle: false,
-    placeholderId,
+    placeholderId: "assets",
+  });
+}
+
+function resolveWorkScopedSurface(
+  pathname: string,
+): {
+  readonly scope: "work" | "remix";
+  readonly parsed: StudioWorkspaceRoute;
+  readonly candidateSurface: string;
+} | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null || segments.length !== 4) return null;
+  const [, scope, encodedIdentity, candidateSurface] = segments;
+  if (scope !== "work" && scope !== "remix") return null;
+  const parsed = parseStudioWorkspaceRoute({
+    pathname: `/studio/${scope}/${encodedIdentity}/canvas`,
+  });
+  if (!parsed.valid) return null;
+  return { scope, parsed, candidateSurface };
+}
+
+function scopedCanonicalPathname(
+  scope: "work" | "remix",
+  parsed: StudioWorkspaceRoute,
+  surface: string,
+): string {
+  return scope === "work"
+    ? `/studio/work/${encodeURIComponent(parsed.workId ?? "")}/${surface}`
+    : `/studio/remix/${encodeURIComponent(parsed.remixSourceWorkId ?? "")}/${surface}`;
+}
+
+function scopedLifecycleKey(
+  scope: "work" | "remix",
+  parsed: StudioWorkspaceRoute,
+  surface: string,
+): string {
+  return `/studio/${scope === "work"
+    ? `work:${encodeURIComponent(parsed.workId ?? "")}`
+    : `remix:${encodeURIComponent(parsed.remixSourceWorkId ?? "")}`}/${surface}`;
+}
+
+function resolveWorkScopedProduction(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioProductionRouteResolution | null {
+  const scoped = resolveWorkScopedSurface(pathname);
+  if (
+    scoped === null
+    || !WORK_SCOPE_PRODUCTION_SURFACES.has(
+      scoped.candidateSurface as StudioProductionRouteId,
+    )
+  ) {
+    return null;
+  }
+  const surface = scoped.candidateSurface as StudioProductionRouteId;
+  const canonicalPathname = scopedCanonicalPathname(scoped.scope, scoped.parsed, surface);
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, queryParams(search)),
+    canonicalPathname,
+    kind: "production",
+    lifecycleKey: scopedLifecycleKey(scoped.scope, scoped.parsed, surface),
+    ownsDocumentTitle: true,
+    surface,
   });
 }
 
@@ -373,32 +477,16 @@ function resolveWorkScopedPlaceholder(
   pathname: string,
   search: string | URLSearchParams | undefined,
 ): StudioPlaceholderRouteResolution | null {
-  const segments = normalizedSegments(pathname);
-  if (segments === null || segments.length !== 4) return null;
-  const [_, scope, encodedIdentity, candidateSurface] = segments;
-  if (scope !== "work" && scope !== "remix") return null;
-  if (!WORK_SCOPE_PLACEHOLDER_SURFACES.has(candidateSurface as StudioPlaceholderRouteId)) return null;
-
-  const probePathname = `/studio/${scope}/${encodedIdentity}/canvas`;
-  const parsed = parseStudioWorkspaceRoute({ pathname: probePathname });
-  if (!parsed.valid) return null;
-  const surface = candidateSurface as Exclude<
-    StudioPlaceholderRouteId,
-    "projects" | "join" | "share"
-  >;
-  const canonicalPathname = scope === "work"
-    ? `/studio/work/${encodeURIComponent(parsed.workId ?? "")}/${surface}`
-    : `/studio/remix/${encodeURIComponent(parsed.remixSourceWorkId ?? "")}/${surface}`;
-
+  const scoped = resolveWorkScopedSurface(pathname);
+  if (scoped === null || scoped.candidateSurface !== "assets") return null;
+  const canonicalPathname = scopedCanonicalPathname(scoped.scope, scoped.parsed, "assets");
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "placeholder",
-    lifecycleKey: `/studio/${scope === "work"
-      ? `work:${encodeURIComponent(parsed.workId ?? "")}`
-      : `remix:${encodeURIComponent(parsed.remixSourceWorkId ?? "")}`}/${surface}`,
+    lifecycleKey: scopedLifecycleKey(scoped.scope, scoped.parsed, "assets"),
     ownsDocumentTitle: false,
-    placeholderId: surface,
+    placeholderId: "assets",
   });
 }
 
@@ -412,6 +500,10 @@ export function resolveStudioRoute({
   if (companion !== null) return companion;
   const lift3d = resolveLift3d(pathname, search);
   if (lift3d !== null) return lift3d;
+  const production = resolveProduction(pathname, search);
+  if (production !== null) return production;
+  const workScopedProduction = resolveWorkScopedProduction(pathname, search);
+  if (workScopedProduction !== null) return workScopedProduction;
   const placeholder = resolvePlaceholder(pathname, search);
   if (placeholder !== null) return placeholder;
   const workScopedPlaceholder = resolveWorkScopedPlaceholder(pathname, search);

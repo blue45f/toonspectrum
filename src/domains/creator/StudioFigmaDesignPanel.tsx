@@ -210,7 +210,7 @@ export function StudioFigmaDesignPanel({
           </p>
           <p className="truncate text-[0.6875rem] font-medium text-fg-3">
             {multi
-              ? "위치와 불투명도는 묶음 전체에 함께 적용됩니다"
+              ? "이동·균일 크기·회전·불투명도를 묶음 전체에 적용"
               : "위치·크기는 캔버스 핸들 또는 아래 변형에서"}
           </p>
         </div>
@@ -291,11 +291,11 @@ export function StudioFigmaDesignPanel({
               />
               <Field
                 key={`w:${metrics.selectionKey}`}
-                label="너비 W"
+                label={multi ? "전체 너비 W" : "너비 W"}
                 controlId="selection.width"
                 priority="advanced"
                 value={metrics.width}
-                disabled={disabled || multi || !metrics.supportsWidth}
+                disabled={disabled || !metrics.supportsWidth}
                 disabledReason={metrics.widthDisabledReason}
                 min={1}
                 suffix="px"
@@ -303,11 +303,11 @@ export function StudioFigmaDesignPanel({
               />
               <Field
                 key={`h:${metrics.selectionKey}`}
-                label="높이 H"
+                label={multi ? "전체 높이 H" : "높이 H"}
                 controlId="selection.height"
                 priority="advanced"
                 value={metrics.height}
-                disabled={disabled || multi || !metrics.supportsHeight}
+                disabled={disabled || !metrics.supportsHeight}
                 disabledReason={metrics.heightDisabledReason}
                 min={1}
                 suffix="px"
@@ -315,14 +315,13 @@ export function StudioFigmaDesignPanel({
               />
               <Field
                 key={`rotation:${metrics.selectionKey}`}
-                // A stroke has no stored angle, so the box is an "and now turn it this much" input
-                // rather than a readout. Labelling it plain 회전 would promise a state that the
-                // document does not carry.
+                // A stroke or a multi-selection has no single stored angle, so the box is an
+                // "and now turn it this much" input rather than an absolute readout.
                 label={metrics.rotationIsRelative ? "회전(상대)" : "회전"}
                 controlId="selection.rotation"
                 priority="advanced"
                 value={metrics.rotation}
-                disabled={disabled || multi || !metrics.supportsRotation}
+                disabled={disabled || !metrics.supportsRotation}
                 disabledReason={metrics.rotationDisabledReason}
                 step={1}
                 suffix="°"
@@ -389,8 +388,9 @@ export function StudioFigmaDesignPanel({
             {multi ? (
               <div className="mt-2 space-y-1.5 rounded-lg bg-canvas/45 px-2 py-2 text-[0.6875rem] leading-relaxed text-fg-3">
                 <p>
-                  가로·세로 위치는 선택 묶음 전체를 이동하고, 불투명도는 한 번에 적용합니다.
-                  크기와 회전은 캔버스 핸들에서 조절해 주세요.
+                  가로·세로 위치는 선택 묶음 전체를 이동합니다. 전체 너비나 높이 하나를
+                  입력하면 현재 비율을 유지해 모두 함께 크기를 조절하고, 불투명도도 한 번에
+                  적용합니다.
                 </p>
                 <p className="font-medium text-fg-2">
                   색상·글자·클리핑처럼 대상마다 다른 속성은 한 개만 선택하면 표시됩니다.
@@ -402,13 +402,22 @@ export function StudioFigmaDesignPanel({
                 {metrics.widthDisabledReason ?? metrics.heightDisabledReason}
               </p>
             ) : null}
-            {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
+            {metrics.rotationIsRelative && metrics.supportsRotation ? (
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
-                선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
-                더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+                {multi ? (
+                  <>
+                    여러 요소의 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도 더&rdquo;예요.
+                    15를 넣으면 선택 중심을 기준으로 모두 15° 돌아가고 칸은 0으로 돌아옵니다.
+                  </>
+                ) : (
+                  <>
+                    선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
+                    더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+                  </>
+                )}
               </p>
             ) : null}
-            {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
+            {metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
                 {metrics.rotationDisabledReason}
               </p>

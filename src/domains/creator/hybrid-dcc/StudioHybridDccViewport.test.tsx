@@ -70,7 +70,7 @@ vi.mock("@react-three/drei/core/PerspectiveCamera.js", () => ({ PerspectiveCamer
 vi.mock("@react-three/drei/core/TransformControls.js", () => ({ TransformControls: () => null }));
 
 const VIEWPORT_SOURCE = readFileSync(
-  resolve(import.meta.dirname, "./StudioHybridDccViewport.tsx"),
+  resolve(import.meta.dirname, "./StudioHybridDccViewportCore.tsx"),
   "utf8",
 );
 

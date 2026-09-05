@@ -25,6 +25,8 @@ import {
   Wallpaper,
 } from "lucide-react";
 
+import { requestStudioAiSuperSuiteOpen } from "./ai/studio-ai-super-suite-intent";
+
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
@@ -73,7 +75,7 @@ export function buildStudioProductionMenuItems({
     {
       id: "continuity",
       commandId: "comic.continuity",
-      label: "이야기 연속성 검사…",
+      label: "마감·품질 검사…",
       icon: ScanEye,
       onSelect: () => {
         ui.openContinuityCheck();
@@ -112,7 +114,12 @@ export function buildStudioProductionMenuItems({
       label: "AI 웹툰 생성 슈퍼 스위트…",
       icon: Sparkles,
       onSelect: () => {
-        ui.openAiSuperSuite?.();
+        if (ui.openAiSuperSuite) {
+          ui.openAiSuperSuite();
+          return;
+        }
+        ui.openStudioMenu("aiAssist");
+        requestStudioAiSuperSuiteOpen();
       },
     },
   ];

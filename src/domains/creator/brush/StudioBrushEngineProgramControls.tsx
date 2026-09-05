@@ -1,17 +1,12 @@
 /**
- * 엔진 조합 편집기 — 획을 "칠해지는 순서대로 쌓인 패스"로 보여준다.
+ * Oil/acrylic engine-program composer.
  *
- * 클립스튜디오의 보조 도구 상세는 수십 개의 수치 슬라이더를 한 목록에 늘어놓는다. 강력하지만,
- * 각 항목이 붓자국의 무엇을 바꾸는지는 이름만 봐서는 알 수 없다. 여기서는 세 가지를 다르게 한다.
- *
- * 1. 파라미터 이름이 아니라 물리 현상으로 쓴다. `bristlePhysics` 가 아니라 "붓털이 눌리며 벌어짐".
- * 2. 칠해지는 순서를 그대로 보여준다 — 붓자국이 어떻게 조립되는지가 곧 그 브러시가 무엇인지다.
- * 3. 프리셋과 무엇이 다른지 항상 표시한다. 되돌릴 지점을 모르면 실험을 못 한다.
- *
- * 그리고 정직하게 적는다: 조합이 출하된 프리셋 중 어느 것과도 같지 않으면 "커스텀 조합"이라고
- * 말한다. 이름 없는 조합에 이름이 있는 척하지 않는다.
+ * The carrier always paints the base body. Three independently switchable physical passes then
+ * create the complete 2^3 matrix: bristle motion, paint depletion and impasto relief. The editor
+ * exposes both the literal paint order and every valid combination so artists can move from a
+ * known recipe to detailed per-pass editing without losing preset byte identity.
  */
-import { Layers, RotateCcw } from "lucide-react";
+import { Gauge, Layers, RotateCcw, Sparkles } from "lucide-react";
 
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 
@@ -28,37 +23,37 @@ import { studioBrushPresetById } from "./studio-draw-ux";
 
 import { cn } from "@/lib/utils";
 
-/**
- * 페인트 순서대로 나열한다. 이 순서는 장식이 아니라 캐리어가 실제로 칠하는 순서다 — 강모 시뮬은
- * 레인의 경로를 정하므로 침착보다 먼저 오고, 릴리프는 이미 놓인 능선 위에 얹히므로 마지막이다.
- */
+/** Paint order is the carrier's actual execution order. */
 const OIL_PROGRAM_ROWS: readonly {
   key: StudioBrushOilProgramKey;
   label: string;
+  shortLabel: string;
   physical: string;
+  cost: "낮음" | "중간";
 }[] = [
   {
     key: "bristlePhysics",
     label: "붓털 물리",
-    physical: "필압에 눌린 붓털이 벌어지고 뭉치면서 결의 경로 자체가 달라집니다.",
+    shortLabel: "강모",
+    physical: "필압에 눌린 붓털이 벌어지고 다시 뭉치며 결의 경로 자체를 만듭니다.",
+    cost: "중간",
   },
   {
     key: "bristleLoadDynamics",
     label: "물감 소모",
-    physical: "그을수록 물감이 마르며 획 뒤쪽이 갈필로 끊깁니다.",
+    shortLabel: "소모",
+    physical: "획을 이어 갈수록 적재된 물감이 줄어 자연스러운 갈필과 재충전 리듬을 만듭니다.",
+    cost: "낮음",
   },
   {
     key: "impastoRelief",
     label: "임파스토 릴리프",
-    physical: "쌓인 물감 능선에 빛과 그림자를 얹어 두께가 보이게 합니다.",
+    shortLabel: "두께",
+    physical: "이미 쌓인 능선 위에 하이라이트와 그림자를 합성해 실제 물감 두께를 드러냅니다.",
+    cost: "중간",
   },
 ];
 
-/**
- * 물리 현상으로 부르는 이 편집기의 어조에 맞춘 손글 프리셋 이름. 여기 없는 매트릭스 id 는 카탈로그
- * 이름으로 부른다(유화 붓, 아크릴 물감). 카탈로그에 없는 id 는 출하 프리셋이 아니므로 이름을 얻지
- * 못하고 비교에서 빠진다.
- */
 const OIL_PRESET_NAME_OVERRIDES: Readonly<Record<string, string>> = {
   "brush--bristle-physics": "유화 · 물리 강모 갈필",
   "brush--bristle-depletion": "갈필",
@@ -68,39 +63,138 @@ const OIL_PRESET_NAME_OVERRIDES: Readonly<Record<string, string>> = {
   "brush--oil-lanes": "유화 · 기본 레인",
 };
 
-/**
- * 비교 후보는 매트릭스가 데이터로 내보내는 id 전부와 매트릭스 밖의 기본 레인이다. 이 파일이 사설
- * 사본을 들고 있던 동안 2026-08-20 에 세 프로그램을 모두 켜고 출하된 유화 붓·아크릴 물감이 빠져,
- * 편집기가 출하된 조합을 "이 조합과 같은 프리셋은 없습니다"라고 말했다.
- */
 const OIL_PRESET_CANDIDATE_IDS: readonly string[] = [
   ...STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
   "brush--oil-lanes",
 ];
 
+interface OilCombinationRecipe {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly programs: StudioBrushOilProgramSet;
+}
+
+/** Every meaningful combination of the three independent oil programs. */
+const OIL_COMBINATION_RECIPES: readonly OilCombinationRecipe[] = Object.freeze([
+  {
+    id: "body-only",
+    name: "기본 본체",
+    description: "매끈하고 빠른 평면 도포",
+    programs: Object.freeze({
+      bristlePhysics: false,
+      bristleLoadDynamics: false,
+      impastoRelief: false,
+    }),
+  },
+  {
+    id: "bristle-only",
+    name: "부드러운 강모",
+    description: "결이 벌어지는 깨끗한 리본",
+    programs: Object.freeze({
+      bristlePhysics: true,
+      bristleLoadDynamics: false,
+      impastoRelief: false,
+    }),
+  },
+  {
+    id: "depletion-only",
+    name: "마른 획",
+    description: "진행할수록 끊기는 갈필",
+    programs: Object.freeze({
+      bristlePhysics: false,
+      bristleLoadDynamics: true,
+      impastoRelief: false,
+    }),
+  },
+  {
+    id: "relief-only",
+    name: "두꺼운 능선",
+    description: "평면 경로 위의 입체 표면",
+    programs: Object.freeze({
+      bristlePhysics: false,
+      bristleLoadDynamics: false,
+      impastoRelief: true,
+    }),
+  },
+  {
+    id: "natural-bristle",
+    name: "자연 강모",
+    description: "벌어짐과 소모가 함께 변화",
+    programs: Object.freeze({
+      bristlePhysics: true,
+      bristleLoadDynamics: true,
+      impastoRelief: false,
+    }),
+  },
+  {
+    id: "bristle-relief",
+    name: "강모 임파스토",
+    description: "움직이는 결 위에 두께 표현",
+    programs: Object.freeze({
+      bristlePhysics: true,
+      bristleLoadDynamics: false,
+      impastoRelief: true,
+    }),
+  },
+  {
+    id: "dry-relief",
+    name: "건조 임파스토",
+    description: "갈필과 능선의 강한 대비",
+    programs: Object.freeze({
+      bristlePhysics: false,
+      bristleLoadDynamics: true,
+      impastoRelief: true,
+    }),
+  },
+  {
+    id: "full-physics",
+    name: "풀 피직스",
+    description: "강모·소모·두께를 모두 사용",
+    programs: Object.freeze({
+      bristlePhysics: true,
+      bristleLoadDynamics: true,
+      impastoRelief: true,
+    }),
+  },
+]);
+
 function oilPresetName(id: string): string | null {
   return OIL_PRESET_NAME_OVERRIDES[id] ?? studioBrushPresetById(id)?.name ?? null;
 }
 
-/**
- * 편집 중인 조합이 어떤 출하 프리셋과 같은지 — 편집 중인 브러시 자신을 먼저 보고, 그다음 매트릭스
- * 순서다(세 프로그램을 모두 켠 조합은 유화 붓으로 부른다). 같은 게 없으면 null.
- */
+function oilProgramsEqual(
+  left: StudioBrushOilProgramSet,
+  right: StudioBrushOilProgramSet,
+): boolean {
+  return STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => left[key] === right[key]);
+}
+
 function matchingPresetName(programs: StudioBrushOilProgramSet, brushId: string): string | null {
   for (const id of [brushId, ...OIL_PRESET_CANDIDATE_IDS]) {
     const name = oilPresetName(id);
     if (!name) continue;
-    const baseline = studioOilProgramSetForBrush(id);
-    if (STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => baseline[key] === programs[key])) {
-      return name;
-    }
+    if (oilProgramsEqual(studioOilProgramSetForBrush(id), programs)) return name;
   }
   return null;
 }
 
+function combinationComplexity(activeCount: number): {
+  label: "경량" | "균형" | "고품질";
+  description: string;
+} {
+  if (activeCount <= 0) {
+    return { label: "경량", description: "본체 패스만 실행" };
+  }
+  if (activeCount <= 2) {
+    return { label: "균형", description: `${activeCount + 1}개 패스를 순차 실행` };
+  }
+  return { label: "고품질", description: "4개 패스를 모두 실행" };
+}
+
 export interface StudioBrushEngineProgramControlsProps {
   brushId: string;
-  /** 스트로크/저장 브러시가 실은 조합. 없으면 브러시 id 에서 유도한 기본 조합을 편집한다. */
+  /** Stroke/custom-brush override. Absence means the id-derived baseline. */
   programSet: StudioBrushEngineProgramSet | null | undefined;
   onChange: (next: StudioBrushEngineProgramSet | null) => void;
 }
@@ -119,9 +213,9 @@ export function StudioBrushEngineProgramControls({
         aria-live="polite"
       >
         <p className="font-semibold text-fg">이 브러시는 아직 조합할 엔진이 없습니다</p>
-        <p className="mt-1 text-fg-3 text-pretty">
-          지금은 유화·아크릴 캐리어만 프로그램을 조합할 수 있습니다. 유화 계열 브러시를 고르면
-          붓털 물리·물감 소모·임파스토를 원하는 대로 켜고 끌 수 있습니다.
+        <p className="mt-1 text-pretty text-fg-3">
+          이 패널의 물리 패스 매트릭스는 유화·아크릴 캐리어에서 동작합니다. 다른 계열은 위의
+          재질·동적 특성 믹서와 해당 매체 프로그램 카드로 조합할 수 있습니다.
         </p>
       </div>
     );
@@ -129,18 +223,22 @@ export function StudioBrushEngineProgramControls({
 
   const baseline = studioOilProgramSetForBrush(brushId);
   const current = programSet?.oil ?? baseline;
-  const changed = STUDIO_BRUSH_OIL_PROGRAM_KEYS.some((key) => current[key] !== baseline[key]);
+  const changed = !oilProgramsEqual(current, baseline);
   const presetName = matchingPresetName(current, brushId);
   const activeCount = STUDIO_BRUSH_OIL_PROGRAM_KEYS.filter((key) => current[key]).length;
+  const complexity = combinationComplexity(activeCount);
 
-  const toggle = (key: StudioBrushOilProgramKey) => {
-    const next = { ...current, [key]: !current[key] } satisfies StudioBrushOilProgramSet;
-    const matchesBaseline = STUDIO_BRUSH_OIL_PROGRAM_KEYS
-      .every((entry) => next[entry] === baseline[entry]);
-    // 기본값으로 되돌아오면 세트를 실어 보내지 않는다. 프리셋과 같은 획은 프리셋과 바이트 단위로
-    // 같은 플랜이어야 하고, 그 계약은 '세트 없음' 경로에 쓰여 있다.
-    onChange(matchesBaseline ? null : studioBrushEngineProgramSetFromOil(next));
-  };
+  function emit(next: StudioBrushOilProgramSet) {
+    onChange(
+      oilProgramsEqual(next, baseline)
+        ? null
+        : studioBrushEngineProgramSetFromOil(next),
+    );
+  }
+
+  function toggle(key: StudioBrushOilProgramKey) {
+    emit({ ...current, [key]: !current[key] });
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -150,7 +248,7 @@ export function StudioBrushEngineProgramControls({
           <p className="font-semibold text-fg">
             {presetName ? `${presetName}와 같은 조합` : "커스텀 조합"}
           </p>
-          <p className="mt-0.5 text-fg-3 text-pretty">
+          <p className="mt-0.5 text-pretty text-fg-3">
             아래 순서대로 칠해집니다. 켠 패스 {activeCount}개
             {presetName ? "" : " — 이 조합과 같은 프리셋은 없습니다"}
           </p>
@@ -165,6 +263,78 @@ export function StudioBrushEngineProgramControls({
             프리셋으로
           </button>
         ) : null}
+      </div>
+
+      <section className="rounded-xl border border-line bg-card/45 p-3" aria-labelledby="oil-matrix-heading">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="oil-matrix-heading" className="flex items-center gap-1.5 text-xs font-bold text-fg">
+              <Sparkles aria-hidden className="size-3.5 text-accent" />
+              8가지 물리 조합
+            </h3>
+            <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
+              세 프로그램의 모든 조합을 한 번에 비교하고 시작점으로 적용합니다.
+            </p>
+          </div>
+          <span className="rounded-lg border border-line bg-raised px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
+            2³ 조합
+          </span>
+        </div>
+        <div className="mt-2.5 grid grid-cols-2 gap-2">
+          {OIL_COMBINATION_RECIPES.map((recipe) => {
+            const selected = oilProgramsEqual(current, recipe.programs);
+            return (
+              <button
+                key={recipe.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => emit(recipe.programs)}
+                className={cn(
+                  "min-h-20 rounded-xl border px-2.5 py-2 text-left transition-colors",
+                  selected
+                    ? "border-accent/55 bg-accent-soft/35"
+                    : "border-line bg-card hover:border-line-strong hover:bg-raised",
+                )}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[0.7rem] font-bold text-fg">{recipe.name}</span>
+                  <span className="text-[0.6rem] tabular-nums text-fg-3">
+                    {STUDIO_BRUSH_OIL_PROGRAM_KEYS.filter((key) => recipe.programs[key]).length}/3
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-[0.61rem] leading-relaxed text-fg-3">
+                  {recipe.description}
+                </span>
+                <span className="mt-1.5 flex flex-wrap gap-1" aria-hidden>
+                  {OIL_PROGRAM_ROWS.map((row) => (
+                    <span
+                      key={row.key}
+                      className={cn(
+                        "rounded px-1 py-px text-[0.56rem] font-semibold",
+                        recipe.programs[row.key]
+                          ? "bg-accent-soft text-accent"
+                          : "bg-bg-2 text-fg-4",
+                      )}
+                    >
+                      {row.shortLabel}
+                    </span>
+                  ))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card/45 px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
+          <Gauge aria-hidden className="size-3.5 text-accent" />
+          실행 복잡도
+        </span>
+        <span className="text-right">
+          <span className="block text-[0.68rem] font-bold text-fg">{complexity.label}</span>
+          <span className="block text-[0.6rem] text-fg-3">{complexity.description}</span>
+        </span>
       </div>
 
       <ol className="flex flex-col gap-2">
@@ -200,8 +370,11 @@ export function StudioBrushEngineProgramControls({
                         변경됨
                       </span>
                     ) : null}
+                    <span className="rounded bg-bg-2 px-1 py-px text-[10px] font-medium text-fg-4">
+                      비용 {row.cost}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-[11px] leading-relaxed text-fg-3 text-pretty">
+                  <span className="mt-0.5 block text-pretty text-[11px] leading-relaxed text-fg-3">
                     {row.physical}
                   </span>
                 </span>

@@ -47,12 +47,12 @@ export function StudioAiCharacterConsistencyPanel({
 
       {!configured && (
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          위 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 API 키를 등록하면 이
-          기능을 쓸 수 있어요.
+          기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 실행하려면 위{" "}
+          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 이미지 API를 연결하세요.
         </p>
       )}
 
-      {configured && !hasReference && (
+      {!hasReference && (
         <div
           className="rounded-md border border-line bg-card/70 p-2 text-[0.63rem] leading-relaxed text-fg-3"
           role="status"
@@ -90,7 +90,7 @@ export function StudioAiCharacterConsistencyPanel({
         }}
         placeholder="예: 이 캐릭터가 비 오는 골목에서 우산을 쓰고 서 있는 모습"
         rows={2}
-        disabled={!configured || !hasReference || busy}
+        disabled={busy}
         className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
       />
 
@@ -98,7 +98,7 @@ export function StudioAiCharacterConsistencyPanel({
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <UserRoundCheck size={14} />}
         {busy ? "생성하는 중…" : "같은 캐릭터로 생성"}

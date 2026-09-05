@@ -171,7 +171,7 @@ export const creatorMarketplaceResourceReports = pgTable(
         and (${table.resourceId} is null or ${table.evidence}->>'resourceId' = ${table.resourceId})
         and ${table.evidence}->>'manifestHash' ~ '^[0-9a-f]{64}$'
         and (${table.evidence}->>'manifestByteSize')::integer between 1 and ${CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES_SQL}
-        and ${table.evidence}->>'kind' in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')
+        and ${table.evidence}->>'kind' in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset', '3d-asset')
         and ${table.evidence}->>'license' in ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')
         and (
           (

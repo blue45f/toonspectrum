@@ -2313,8 +2313,13 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     }),
     defineCommand({
       id: "comic.continuity",
-      labels: [ko("이야기 연속성 검사"), en("Continuity check")],
-      aliases: [ours("연속성 검사")],
+      labels: [ko("마감·품질 검사"), en("Finishing quality inspection")],
+      aliases: [
+        ours("연속성 검사"),
+        ours("이야기 연속성 검사"),
+        ours("마감 검사"),
+        ours("품질 검사"),
+      ],
       origins: [menu("comic/continuity")],
     }),
     defineCommand({

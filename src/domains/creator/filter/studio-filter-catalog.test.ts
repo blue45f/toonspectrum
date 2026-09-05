@@ -11,16 +11,13 @@ import {
   studioFilterDialogPreviewStyle,
 } from "./studio-filter-catalog";
 import { STUDIO_FILTER_MENU_KINDS } from "./studio-filter-menu";
-import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./studio-filter-union-wave";
 
 describe("studio filter catalog", () => {
-  it("covers every smart-filter engine and the deterministic union wave exactly once", () => {
+  it("covers every smart-filter engine exactly once", () => {
     const catalogIds = STUDIO_FILTER_CATALOG.map((entry) => entry.engine);
     expect(new Set(catalogIds).size).toBe(catalogIds.length);
     expect(catalogIds.length).toBeGreaterThanOrEqual(77);
-    expect([...catalogIds].sort()).toEqual(
-      [...STUDIO_ADJUSTMENT_ENGINE_IDS, ...STUDIO_FILTER_UNION_WAVE_KINDS].sort(),
-    );
+    expect([...catalogIds].sort()).toEqual([...STUDIO_ADJUSTMENT_ENGINE_IDS].sort());
     for (const entry of STUDIO_FILTER_CATALOG) {
       expect(entry.title.trim().length).toBeGreaterThan(0);
       expect(entry.description.trim().length).toBeGreaterThan(10);
