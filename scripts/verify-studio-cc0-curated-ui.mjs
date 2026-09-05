@@ -14,7 +14,6 @@ const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? '/tmp/studio-cc0-ui');
 await mkdir(output, {recursive:true});
 const manifest = JSON.parse(await readFile(path.join(root,'public/assets/studio/cc0-20260906/manifest.json'),'utf8'));
-const prefix = '/assets/studio/cc0-20260906/';
 const htmlName = 'cc0-curation-private-test.html';
 const entryName = 'cc0-curation-private-test.tsx';
 for (const file of [htmlName,entryName]) if (existsSync(path.join(root,file))) throw new Error('Test fixture path already exists');

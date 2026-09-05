@@ -1,0 +1,102 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/street_lamp_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Street Lamp 01",
+    "type": 2,
+    "authors": {
+      "Josh Dean": "All"
+    },
+    "info": null,
+    "date_published": 1697760000,
+    "categories": [
+      "lighting",
+      "industrial",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "street",
+      "road",
+      "light",
+      "lamppost",
+      "outdoor",
+      "pole",
+      "sidewalk",
+      "night",
+      " urban",
+      "city"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 30610,
+    "texel_density": 3976.4525897344943,
+    "dimensions": [
+      704.3362259864807,
+      386.49316132068634,
+      3870.5554008483887
+    ],
+    "sponsors": [
+      "7934315"
+    ],
+    "files_hash": "002d697fa195d73f627e82804612208853212519",
+    "description": "Free 8K model: ornate cast-iron street lamp with glass panes, exposed bulb, weathered black finish and detailed base, finial and mounting hardware.",
+    "category_id": "ca8e62db-af7b-55a5-b668-48f0f26a1c16",
+    "category": "Lighting/Street & Outdoor/Street Lamps",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "metal",
+        "glass"
+      ]
+    },
+    "download_count": 31207,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/street_lamp_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/street_lamp_01/street_lamp_01_2k.gltf",
+      "bytes": 6419,
+      "sha256": "d4f1c69cc433a5ee4b51035d6df3a0f1aaa2584ca6305bd2c02c93505e707f3e",
+      "sourceMd5": "c3f9bdf69e98a0dc325aef79f9aca17c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_lamp_01/street_lamp_01_nor_gl_2k.jpg",
+      "bytes": 1827395,
+      "sha256": "b63b40563939f3f1b2bb2bd45525f184c9d71d124020414d2f6dd0e8671e7611",
+      "sourceMd5": "b847bb892a00d30f516176fcfef54cb6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_lamp_01/street_lamp_01_diff_2k.jpg",
+      "bytes": 993834,
+      "sha256": "c50a25bb68902c9e5909160924f615b4c58f31600e175c6aa976cc7b623ce41c",
+      "sourceMd5": "7487f2ca1deee8f1fcaaaaadaa6dade0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_lamp_01/street_lamp_01_arm_2k.jpg",
+      "bytes": 2332682,
+      "sha256": "dadbbf2c75473587e6023d3555f81ea4fcb899976405c61aada539c6078e24e2",
+      "sourceMd5": "f13fca31be6fda9b1444e36a866c0860"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/street_lamp_01/street_lamp_01.bin",
+      "bytes": 748908,
+      "sha256": "c283db9b6d95835d9e8fc1692829acadcb21a0623b2daaa7231cec1440488401",
+      "sourceMd5": "324bc6295e3962322514ddcfc7037b23"
+    }
+  ]
+}

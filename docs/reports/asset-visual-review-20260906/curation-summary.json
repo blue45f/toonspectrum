@@ -1,0 +1,48 @@
+{
+  "schema": "toonspectrum.visual-curation.v1",
+  "reviewedOn": "2026-09-06",
+  "baselineVisualItemsReviewed": 1351,
+  "baselineContactPagesViewed": 57,
+  "newOriginalsVisuallyReviewed": 47,
+  "newContactPagesViewed": 4,
+  "newModels": 17,
+  "newSurfaceMaterials": 30,
+  "quarantinedNewSelectionIds": [
+    "kenney-food-glass-wine"
+  ],
+  "exactRotationDuplicatesRetired": 0,
+  "preservedLegacyNonWearableReferences": 18,
+  "activeOriginals": 1143,
+  "byKind": {
+    "model": 1015,
+    "effect-mask": 96,
+    "surface-texture": 32
+  },
+  "byCategory": {
+    "furniture": 140,
+    "food": 199,
+    "effect-mask": 96,
+    "surface-material": 32,
+    "nature": 294,
+    "architecture": 239,
+    "outdoor-prop": 126,
+    "pbr-detailed-prop": 17
+  },
+  "assemblyComponents": 288,
+  "defaultFinishedSelection": 855,
+  "sourceFilesDeleted": 0,
+  "userDataChanged": false,
+  "studioSaveRestoreRoundTrip": "not-claimed",
+  "remainingScope": [
+    "all-angle artistic inspection",
+    "enlarged topology/texture inspection for every model",
+    "dynamic brush/pose/clothing variants",
+    "Studio save/restore across every asset"
+  ],
+  "evidence": {
+    "baselineRevision": "0c99edac76dc728f8ba3a58b887a3ce35bcfab7b",
+    "pbrArtifact": 9975051972,
+    "pbrReviewPdf": 9975049171
+  },
+  "notice": "All listed contact-sheet images were viewed. Technical rendering, contact-sheet triage, full artistic approval and production deployment are different claims."
+}

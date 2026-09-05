@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/leather_white",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1592532089,
+    "name": "Leather White",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "sponsors": [
+      "9910225"
+    ],
+    "dimensions": [
+      300.00001192092896,
+      300.00001192092896
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "categories": [
+      "fabric",
+      "leather"
+    ],
+    "files_hash": "f772dd6a44080e64a320989faeb12bae236109cf",
+    "tags": [
+      "leather",
+      "white",
+      "smooth",
+      "new",
+      "even",
+      "textile ",
+      "upholstery",
+      "fashion",
+      "animal-hide"
+    ],
+    "description": "Free 8K leather texture: smooth, even white animal-hide upholstery material with fine grain, subtle matte sheen and clean, new finish.",
+    "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+    "category": "Textiles & Leather/Leather/Upholstery Leather",
+    "attributes": {
+      "surface_use": "object",
+      "origin": "man_made",
+      "condition": [
+        "clean"
+      ]
+    },
+    "download_count": 203069,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/leather_white.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_diff_2k.jpg",
+      "bytes": 3460639,
+      "sha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+      "sourceMd5": "1292cc2c6b26508dc242a4a12220d4a9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leather_white/leather_white_rough_2k.png",
+      "bytes": 3008509,
+      "sha256": "e42877acb3c598f53b0a1fecf50ace66a29b56bf19b25cbc5252cd1593bc6d34",
+      "sourceMd5": "8f994477455266e6689e1f9ce533cae0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_nor_gl_2k.jpg",
+      "bytes": 3176928,
+      "sha256": "f06e81389faf7c4bef47b8ed5a5c433b6e3b7d0ac77e4090f65ed9d964a589f6",
+      "sourceMd5": "c45c0fac221ee5ffc2aa7eabde7bb79b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/leather_white/leather_white_ao_2k.png",
+      "bytes": 3253395,
+      "sha256": "68c32c01a8db17f636b7c1a006a1ad279f1a0195c5132ebb46230c3539ec2892",
+      "sourceMd5": "355b70dec9c41db69bb673299d9c1afa"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_disp_2k.jpg",
+      "bytes": 2785869,
+      "sha256": "16133711439f9c5bb8fe1c97f9fd0937eab8048d43a8707f7d1fd688d5537fc1",
+      "sourceMd5": "e29a2e1b84cd387a3ed731fc49f56c01"
+    }
+  ]
+}

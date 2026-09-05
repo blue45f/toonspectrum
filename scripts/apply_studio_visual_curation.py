@@ -190,7 +190,7 @@ def apply(candidates: Path, output: Path) -> dict:
     output.mkdir(parents=True,exist_ok=True)
     for directory in (output, REVIEW):
         save(directory/'curation-summary.json',report)
-        save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':additions})
+        save(directory/'visual-decisions.json',{'items':decisions,'newOriginals':[a for a in retained if a['id'].startswith('polyhaven-')]})
         save(directory/'retired-rotation-variants.json',{'variants':variants})
     save(PUBLIC/'manifest.json',{'schema':'toonspectrum.asset-delivery.v1','assets':retained})
     save(PUBLIC/'curation-summary.json',report)
@@ -201,7 +201,7 @@ def apply(candidates: Path, output: Path) -> dict:
     old_report=json.loads((PUBLIC/'delivery-report.json').read_text())
     old_report['initialDeliveryOriginals']=old_report['deliveredOriginals']
     old_report.update({'deliveredOriginals':len(retained),'byKind':report['byKind'],'byCategory':report['byCategory'],
-      'activeCatalogCuration':'curation-summary.json','productionPublished':0})
+      'activeCatalogCuration':'curation-summary.json','repositoryBundledOriginals':len(retained),'verifiedDeliveryFiles':len(retained),'productionPublished':0})
     save(PUBLIC/'delivery-report.json',old_report)
     # Replace the stale standalone gallery so it cannot continue offering retired IDs.
     cards=[]
