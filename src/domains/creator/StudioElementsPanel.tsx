@@ -10,7 +10,6 @@ import { queryStudioCatalog, type StudioCatalogOrientation, type StudioCatalogSo
 import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL, STUDIO_CATALOG_PRIMARY_CONTROL } from "./catalog/StudioCatalogControls";
 import { StudioCatalogPreviewDialog } from "./catalog/StudioCatalogPreviewDialog";
 import { useStudioCatalogPreferences } from "./catalog/use-studio-catalog-preferences";
-
 import "./catalog/studio-catalog-browser.css";
 
 import { svgToDataUrl } from "./studio-characters";
@@ -147,7 +146,6 @@ function ElementTile({
     </article>
   );
 }
-
 export function StudioElementsPanel({
   onAdd,
   onOpenBubbles,
