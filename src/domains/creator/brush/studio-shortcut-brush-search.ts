@@ -11,11 +11,14 @@ export interface SearchableStudioShortcutBrush {
 }
 
 /**
- * A curated former name identifies a particular shortcut, not every brush whose
- * inherited description happens to mention that name. General purpose/material
- * queries still use literal AND matching, including all inherited old labels.
- * This changes discovery only: order, stable IDs and selected tools are untouched.
+ * Only ambiguous former product names have an explicit redirect. Discovery aliases
+ * also contain broad purposes such as "선화" and "잉크워시": those must NEVER
+ * suppress other matching tools. Keep this map separate from ordinary search tags.
  */
+const FORMER_SHORTCUT_NAME_TARGETS: ReadonlyMap<string, string> = new Map([
+  ["스크린톤", "screentone"],
+]);
+
 export function searchStudioShortcutBrushes<T extends SearchableStudioShortcutBrush>(
   tools: readonly T[],
   query: string,
@@ -23,13 +26,17 @@ export function searchStudioShortcutBrushes<T extends SearchableStudioShortcutBr
   const normalized = normalizeStudioToolSearch(query);
   const terms = studioToolSearchTerms(query);
   if (!terms.length) return [...tools];
-  const formerNameMatches = tools.filter((tool) =>
-    STUDIO_BRUSH_DISCOVERY[tool.id]?.aliases.some((alias) =>
-      normalizeStudioToolSearch(alias) === normalized,
-    ),
-  );
-  if (formerNameMatches.length) return formerNameMatches;
+  const formerNameTarget = FORMER_SHORTCUT_NAME_TARGETS.get(normalized);
+  if (formerNameTarget) {
+    const exact = tools.filter((tool) => tool.id === formerNameTarget);
+    if (exact.length) return exact;
+  }
   return tools.filter((tool) => matchesStudioToolSearch(terms, [
-    tool.name, tool.id, tool.hint, tool.categoryLabel, ...(tool.searchAliases ?? []),
+    tool.name,
+    tool.id,
+    tool.hint,
+    tool.categoryLabel,
+    ...(tool.searchAliases ?? []),
+    ...(STUDIO_BRUSH_DISCOVERY[tool.id]?.aliases ?? []),
   ]));
 }
