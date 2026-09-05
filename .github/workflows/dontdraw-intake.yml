@@ -5,13 +5,17 @@ on:
     branches: [main]
     paths:
       - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
       - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
       - ".github/workflows/dontdraw-intake.yml"
   push:
     branches: [main]
     paths:
       - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
       - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
       - ".github/workflows/dontdraw-intake.yml"
 
 permissions:
@@ -35,6 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           for source in scripts/dontdraw/*.mjs; do node --check "$source"; done
+          node --check scripts/upload-toonstudio-3d-assets.mts
           node --test scripts/dontdraw/*.test.mjs | tee dontdraw-intake-tests.tap
       - name: Retain actual test output
         if: always()
