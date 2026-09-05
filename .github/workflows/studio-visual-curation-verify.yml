@@ -1,0 +1,118 @@
+name: Studio visual curation verification
+on:
+  push:
+    branches: [feat/studio-assets-pbr-expansion-20260906]
+    paths:
+      - .github/workflows/studio-visual-curation-verify.yml
+      - scripts/apply_studio_visual_curation.py
+      - scripts/record_studio_asset_visual_review.py
+      - scripts/verify-studio-asset-curation.mjs
+      - src/domains/creator/studio-asset-visual-curation.ts
+      - src/domains/creator/studio-asset-visual-curation.test.ts
+      - src/domains/creator/StudioCc0AssetLibraryPanel.tsx
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: studio-visual-curation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  curated-assets:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-pbr-expansion-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare exact reviewed selection edits
+        run: |
+          mkdir -p "$RUNNER_TEMP/curation-evidence"
+          python3 scripts/apply_studio_visual_curation.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/verify-studio-asset-curation.mjs')
+          text=p.read_text()
+          before='<output data-inserted-id='
+          after='<output className="mt-3 block break-all text-xs" data-inserted-id='
+          if after not in text:
+              assert text.count(before)==1
+              p.write_text(text.replace(before,after))
+          PY
+          python3 -m py_compile scripts/apply_studio_visual_curation.py scripts/record_studio_asset_visual_review.py
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check touched code with zero warnings
+        run: |
+          set -o pipefail
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx scripts/verify-studio-asset-curation.mjs 2>&1 | tee "$RUNNER_TEMP/curation-evidence/lint.log"
+      - name: Run selection safety and all legacy SVG regressions
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts 2>&1 | tee "$RUNNER_TEMP/curation-evidence/tests.log"
+      - name: Full frontend typecheck and production build
+        run: |
+          set -o pipefail
+          pnpm run build 2>&1 | tee "$RUNNER_TEMP/curation-evidence/build.log"
+          pnpm run check:studio-bundle 2>&1 | tee "$RUNNER_TEMP/curation-evidence/bundle.log"
+      - name: Exercise actual component and real source files in Chromium
+        run: |
+          set -o pipefail
+          pnpm exec playwright install --with-deps chromium
+          node scripts/verify-studio-asset-curation.mjs "$RUNNER_TEMP/curation-evidence" 2>&1 | tee "$RUNNER_TEMP/curation-evidence/browser.log"
+      - name: Record completed visual inspection only for matching source bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9974508464/zip > "$RUNNER_TEMP/legacy-visual.zip"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,zipfile
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          z=root/'legacy-visual.zip'
+          assert hashlib.sha256(z.read_bytes()).hexdigest()=='beaca1b82c92d2b80683d4483b91de601221f33db684d05443876f8ed4cea6f8'
+          with zipfile.ZipFile(z) as archive:
+              names=[n for n in archive.namelist() if n.endswith('/review-index.json')]
+              assert len(names)==1
+              raw=archive.read(names[0]);assert len(raw)<2*1024*1024
+              (root/'curation-evidence/review-index.json').write_bytes(raw)
+          PY
+          pnpm exec tsx -e 'import fs from "node:fs";import {STUDIO_ORIGINAL_FREE_ASSETS as active,STUDIO_RETIRED_ORIGINAL_FREE_ASSETS as retired} from "./src/domains/creator/studio-original-free-asset-packs.ts";fs.writeFileSync(process.env.RUNNER_TEMP+"/curation-evidence/original-svg-snapshot.json",JSON.stringify({assets:[...active,...retired],activeIds:active.map(a=>a.id),retiredIds:retired.map(a=>a.id)}));'
+          python3 scripts/record_studio_asset_visual_review.py --index "$RUNNER_TEMP/curation-evidence/review-index.json" --svg-snapshot "$RUNNER_TEMP/curation-evidence/original-svg-snapshot.json" --output data/studio-assets/visual-review-20260906
+          cp data/studio-assets/visual-review-20260906/* "$RUNNER_TEMP/curation-evidence/"
+          cp "$RUNNER_TEMP/curation-evidence/browser-verification.json" data/studio-assets/visual-review-20260906/browser-verification.json
+      - name: Commit verified curation only to the feature branch
+        run: |
+          test "$GITHUB_REF" = 'refs/heads/feat/studio-assets-pbr-expansion-20260906'
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx scripts/verify-studio-asset-curation.mjs
+          git add -f -- data/studio-assets/visual-review-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'feat(studio): apply inspected asset quarantine and verified library presentation'
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='CURATION_COMMIT %H'
+      - name: Recheck unchanged standard 3D runtime oracle without relaxing thresholds
+        run: |
+          set -o pipefail
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console 2>&1 | tee "$RUNNER_TEMP/curation-evidence/3d-runtime.log"
+      - name: Capture exact touched source for reproducible diagnosis
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/curation-evidence/source"
+          cp --parents src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx scripts/verify-studio-asset-curation.mjs "$RUNNER_TEMP/curation-evidence/source/"
+          git status --short > "$RUNNER_TEMP/curation-evidence/git-status.txt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-curation-verification-${{ github.run_id }}
+          path: ${{ runner.temp }}/curation-evidence/
+          if-no-files-found: error
+          retention-days: 14
