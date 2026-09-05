@@ -111,7 +111,7 @@ export function buildStudioFileMenuItems({
     {
       id: "project",
       commandId: "file.project-tools",
-      label: "프로젝트 도구…",
+      label: "프로젝트 센터…",
       icon: Folder,
       separatorAfter: true,
       onSelect: () => {
@@ -439,7 +439,7 @@ export function buildStudioViewMenuItems({
     },
     // 검수·미리보기 3종(타임라인·세로 스크롤·스토리보드)은 View에서 제거했다 —
     // 같은 핸들러의 문이 Animation ▸ 타임라인, Comic ▸ 스토리보드/세로 스크롤,
-    // 그리고 "프로젝트 작업" 시트(터치 경로)에 이미 있어 메뉴당 한 문 원칙을 따른다.
+    // 그리고 "프로젝트 센터" 시트(터치 경로)에 이미 있어 메뉴당 한 문 원칙을 따른다.
     {
       id: "production-insights",
       commandId: "view.production-insights",

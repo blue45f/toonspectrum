@@ -364,7 +364,7 @@ function compareText(left: string, right: string): number {
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+  if (signal?.aborted) fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
 }
 
 function isAbortError(error: unknown): boolean {
@@ -478,7 +478,7 @@ async function defaultDigestText(value: string, signal?: AbortSignal): Promise<s
     digest = await subtle.digest("SHA-256", bytes);
   } catch (cause) {
     if (isAbortError(cause) || signal?.aborted) {
-      fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+      fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
     }
     fail("CRYPTO_UNAVAILABLE", "VRM 표면 페인팅 장면 fingerprint 계산에 실패했습니다.", undefined, cause);
   }
@@ -794,7 +794,7 @@ async function resolveLibrarySource(
     return source;
   } catch (cause) {
     if (isAbortError(cause) || signal?.aborted) {
-      fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+      fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
     }
     fail("LIBRARY_READ_FAILED", "로컬 VRM 표면 페인팅 PNG를 읽지 못했습니다.", undefined, cause);
   }
@@ -812,7 +812,7 @@ async function verifyAgainstPlan(
     verified = await verifier(metadataForPlan(plan), source, { signal });
   } catch (cause) {
     if (isAbortError(cause) || signal?.aborted) {
-      fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+      fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
     }
     fail(
       "ARTIFACT_VERIFICATION_FAILED",
@@ -933,7 +933,7 @@ export async function auditStudioVrmTexturePaintProjectLibraryAvailability(
       throwIfAborted(input.signal);
     } catch (cause) {
       if (isAbortError(cause) || input.signal?.aborted) {
-        fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+        fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
       }
       return Object.freeze({
         status: "unavailable",
@@ -1137,7 +1137,7 @@ async function installVerifiedArtifact(
     disposition = await library.install(artifact, { signal });
   } catch (cause) {
     if (isAbortError(cause) || signal?.aborted) {
-      fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+      fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
     }
     fail("LIBRARY_INSTALL_FAILED", "검증된 VRM 표면 페인팅 PNG를 로컬 라이브러리에 저장하지 못했습니다.", undefined, cause);
   }
@@ -1344,7 +1344,7 @@ export async function installPreparedStudioVrmTexturePaintProjectArchiveImportAn
         result = await state.library.installWithCreationReceipt(artifact, { signal: state.signal });
       } catch (cause) {
         if (isAbortError(cause) || state.signal?.aborted) {
-          fail("ABORTED", "VRM 표면 페인팅 프로젝트 작업이 취소되었습니다.");
+          fail("ABORTED", "VRM 표면 페인팅 프로젝트 센터이 취소되었습니다.");
         }
         fail(
           "LIBRARY_INSTALL_FAILED",

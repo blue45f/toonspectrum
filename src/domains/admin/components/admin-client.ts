@@ -40,7 +40,12 @@ export interface Campaign {
   planCode: string | null;
 }
 
-export type RevenueStatus = "pending" | "approved" | "paid" | "rejected" | "revoked";
+export type RevenueStatus =
+  | "pending"
+  | "approved"
+  | "paid"
+  | "rejected"
+  | "revoked";
 
 export interface RevenueEvent {
   id: string;
@@ -73,7 +78,12 @@ export interface RevenueSummary {
 
 export interface RevenueResponse {
   summary: RevenueSummary;
-  plans: { planId: string | null; planName: string | null; events: number; amountCents: number }[];
+  plans: {
+    planId: string | null;
+    planName: string | null;
+    events: number;
+    amountCents: number;
+  }[];
   events: RevenueEvent[];
   generatedAt: string;
 }
@@ -112,47 +122,103 @@ export interface AdminBenchmarkResult {
 export class AdminApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
   ) {
     super(message);
+    this.name = "AdminApiError";
   }
 }
 
-export async function adminFetch<T>(path: string, _uid: string, init?: RequestInit): Promise<T> {
+function buildAdminHeaders(init?: RequestInit): Record<string, string> {
   const headers: Record<string, string> = {
     ...(init?.body ? { "Content-Type": "application/json" } : {}),
   };
   if (init?.headers) {
-    new Headers(init.headers).forEach((value, key) => (headers[key] = value));
+    new Headers(init.headers).forEach((value, key) => {
+      headers[key] = value;
+    });
   }
+  return headers;
+}
+
+function toAdminApiError(error: HTTPError): AdminApiError {
+  let message = `요청 실패 (${error.response.status})`;
+  const data = error.data;
+  if (data && typeof data === "object") {
+    const { error, message: responseMessage } = data as {
+      error?: unknown;
+      message?: unknown;
+    };
+    if (error || responseMessage) {
+      message = String(error ?? responseMessage);
+    }
+  }
+  return new AdminApiError(error.response.status, message);
+}
+
+async function adminRaw(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
   try {
-    const res = await api.raw(`/api/admin${path}`, {
+    return await api.raw(`/api/admin${path}`, {
       method: (init?.method ?? "GET") as never,
       cache: "no-store",
       body: init?.body as BodyInit | null | undefined,
-      headers,
+      headers: buildAdminHeaders(init),
     });
-    if (res.status === 204) return undefined as T;
-    const text = await res.text();
-    return (text ? JSON.parse(text) : undefined) as T;
-  } catch (err) {
-    if (err instanceof HTTPError) {
-      let message = `요청 실패 (${err.response.status})`;
-      const data = err.data;
-      if (data && typeof data === "object") {
-        const { error, message: msg } = data as { error?: unknown; message?: unknown };
-        if (error || msg) message = String(error ?? msg);
-      }
-      throw new AdminApiError(err.response.status, message);
-    }
-    throw err;
+  } catch (error) {
+    if (error instanceof HTTPError) throw toAdminApiError(error);
+    throw error;
   }
 }
 
+export async function adminFetch<T>(
+  path: string,
+  _uid: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await adminRaw(path, init);
+  if (response.status === 204) return undefined as T;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+export async function adminFetchText(
+  path: string,
+  _uid: string,
+  init?: RequestInit,
+): Promise<string> {
+  const response = await adminRaw(path, init);
+  if (response.status === 204) return "";
+  return response.text();
+}
+
+export function downloadAdminFile(
+  filename: string,
+  content: BlobPart,
+  type = "text/plain;charset=utf-8",
+): void {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 // 표시 보조 — cents ↔ 원
-export const centsToWon = (cents: number) => Math.round((Number(cents) || 0) / 100);
-export const wonToCents = (won: number) => Math.round((Number(won) || 0) * 100);
-export const formatWon = (cents: number) => `₩${centsToWon(cents).toLocaleString("ko-KR")}`;
-export const formatNum = (n: number) => (Number(n) || 0).toLocaleString("ko-KR");
+export const centsToWon = (cents: number) =>
+  Math.round((Number(cents) || 0) / 100);
+export const wonToCents = (won: number) =>
+  Math.round((Number(won) || 0) * 100);
+export const formatWon = (cents: number) =>
+  `₩${centsToWon(cents).toLocaleString("ko-KR")}`;
+export const formatNum = (n: number) =>
+  (Number(n) || 0).toLocaleString("ko-KR");
 export const formatDate = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleDateString("ko-KR") : "—";

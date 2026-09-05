@@ -472,7 +472,7 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     );
     expect(source).toContain("vite-production-preview-shipped-studio-ui");
     expect(source).toContain("const studioUrl = `${origin}studio`");
-    expect(source).toContain('name: "프로젝트 작업"');
+    expect(source).toContain('name: "프로젝트 센터"');
     expect(source).toContain("[data-studio-project-actions-menu=\"true\"]");
     expect(source).toContain("[data-studio-hybrid-dcc-open=\"true\"]");
     expect(source).toContain('name: /^큐브 추가/u');

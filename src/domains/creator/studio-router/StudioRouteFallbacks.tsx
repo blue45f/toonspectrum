@@ -29,7 +29,10 @@ const SECONDARY_EXIT_CLASS =
  * 편집기로 들어가거나, Studio 밖 창작 게시판으로 나가거나. `data-studio-route-exit` 는
  * `verify:studio-inapp-browser` 가 "모든 라우트에 출구가 있다"를 검사하는 표식이다.
  */
-function StudioRouteExits({ onOpenStudio, openLabel }: {
+function StudioRouteExits({
+  onOpenStudio,
+  openLabel,
+}: {
   readonly onOpenStudio: () => void;
   readonly openLabel: string;
 }) {
@@ -78,14 +81,23 @@ export function StudioRouteFailure({
   );
 }
 
-const PLACEHOLDER_LABELS: Readonly<Record<StudioPlaceholderRouteId, string>> = {
-  assets: "에셋",
-  review: "리뷰",
-  join: "공동 작업 참여",
-  present: "프레젠테이션",
-  versions: "버전",
-  projects: "프로젝트",
-  share: "공유",
+interface StudioPlaceholderGuide {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly description: string;
+  readonly steps: readonly string[];
+  readonly openLabel: string;
+}
+
+const PLACEHOLDER_GUIDES: Readonly<Record<StudioPlaceholderRouteId, StudioPlaceholderGuide>> = {
+  assets: {
+    eyebrow: "에셋 진입 안내",
+    title: "에셋은 편집기 안에서 원고 맥락과 함께 사용합니다",
+    description:
+      "독립 주소에서 문서를 다시 만들지 않고, 기본 Studio에서 현재 페이지·선택 레이어·사용 권한을 유지한 채 에셋을 삽입합니다.",
+    steps: ["Studio 편집기 열기", "에셋 패널에서 검색·미리보기", "현재 원고에 비파괴 삽입"],
+    openLabel: "에셋을 사용할 Studio 열기",
+  },
 };
 
 export function StudioRoutePlaceholder({
@@ -95,19 +107,44 @@ export function StudioRoutePlaceholder({
   readonly onOpenStudio: () => void;
   readonly placeholderId: StudioPlaceholderRouteId;
 }) {
+  const guide = PLACEHOLDER_GUIDES[placeholderId];
   return (
     <section
       aria-labelledby="studio-placeholder-title"
       className="grid min-h-dvh place-items-center bg-bg px-5 py-12 text-fg"
     >
-      <div className="max-w-lg text-center">
-        <h1 id="studio-placeholder-title" className="text-2xl font-bold tracking-tight">
-          {PLACEHOLDER_LABELS[placeholderId]} 작업공간을 준비하고 있습니다
+      <div className="w-full max-w-2xl text-center">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-accent">{guide.eyebrow}</p>
+        <h1
+          id="studio-placeholder-title"
+          className="mx-auto mt-2 max-w-[24ch] text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+        >
+          {guide.title}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-fg-2">
-          이 화면에서는 편집 문서 런타임이 종료됩니다. 저장을 마친 작업은 기본 편집기에서 다시 열 수 있습니다.
+        <p className="mx-auto mt-3 max-w-[64ch] text-sm leading-relaxed text-fg-2">
+          {guide.description}
         </p>
-        <StudioRouteExits onOpenStudio={onOpenStudio} openLabel="Studio 편집기 열기" />
+        <ol className="mt-6 grid gap-2 text-left sm:grid-cols-3" aria-label="권장 작업 순서">
+          {guide.steps.map((step, index) => (
+            <li
+              key={step}
+              className="flex min-h-24 items-start gap-3 rounded-2xl border border-line bg-card p-3.5"
+            >
+              <span
+                aria-hidden="true"
+                className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-black text-accent"
+              >
+                {index + 1}
+              </span>
+              <span className="pt-1 text-xs font-semibold leading-relaxed text-fg-2">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mx-auto mt-4 max-w-[64ch] text-xs leading-relaxed text-fg-3">
+          이 주소에서는 편집 문서 런타임을 중복 실행하지 않습니다. 아래 버튼으로 기본 Studio를 열면
+          같은 원고와 계정 권한을 유지한 채 해당 작업을 이어갈 수 있습니다.
+        </p>
+        <StudioRouteExits onOpenStudio={onOpenStudio} openLabel={guide.openLabel} />
       </div>
     </section>
   );

@@ -169,12 +169,14 @@ export function StudioToolbarCluster({
 export function StudioToolBelt({
   children,
   className,
+  id = "studio-tool-belt",
   inert,
   "aria-hidden": ariaHidden,
   "aria-label": ariaLabel = "스튜디오 도구",
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
   inert?: boolean;
   "aria-hidden"?: boolean;
   "aria-label"?: string;
@@ -183,7 +185,9 @@ export function StudioToolBelt({
   const t = useT();
   return (
     <div
+      id={id}
       role="toolbar"
+      tabIndex={-1}
       aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       aria-hidden={ariaHidden}
       inert={inert ? true : undefined}
@@ -242,15 +246,19 @@ export function StudioFloatingToolPopover({
 export function StudioAppMenubar({
   children,
   className,
+  id = "studio-menubar",
   "aria-label": ariaLabel = "문서 메뉴",
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
   "aria-label"?: string;
 }): ReactElement {
   return (
     <div
+      id={id}
       role="banner"
+      tabIndex={-1}
       aria-label={ariaLabel}
       data-testid="studio-menubar"
       data-studio-app-menubar="true"
@@ -700,18 +708,22 @@ export function StudioVerticalToolRail({
   children,
   className,
   footer,
+  id = "studio-tool-rail",
   "aria-label": ariaLabel = "그리기 도구",
 }: {
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
+  id?: string;
   "aria-label"?: string;
 }): ReactElement {
   const lang = useI18n((state) => state.lang);
   const t = useT();
   return (
     <div
+      id={id}
       role="toolbar"
+      tabIndex={-1}
       aria-orientation="vertical"
       aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       data-studio-tool-rail="true"
@@ -1074,19 +1086,23 @@ export function StudioQuickActionsBar({
 export function StudioStatusBar({
   children,
   className,
+  id = "studio-status-bar",
   style,
   "aria-label": ariaLabel = "캔버스 상태 및 보기",
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
   style?: CSSProperties;
   "aria-label"?: string;
 }): ReactElement {
   return (
     <div
+      id={id}
       role="group"
       aria-label={ariaLabel}
       data-studio-status-bar="true"
+      tabIndex={-1}
       style={style}
       className={cn(
         "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",

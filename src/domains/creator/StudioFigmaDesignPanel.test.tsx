@@ -141,9 +141,12 @@ describe("StudioFigmaDesignPanel", () => {
     expect(opacity.disabled).toBe(false);
     openGeometry();
     const x = screen.getByLabelText("가로 위치 X") as HTMLInputElement;
-    const width = screen.getByLabelText("너비 W") as HTMLInputElement;
+    const width = screen.getByLabelText("전체 너비 W") as HTMLInputElement;
+    const height = screen.getByLabelText("전체 높이 H") as HTMLInputElement;
     expect(x.disabled).toBe(false);
+    // Generic metrics stay conservative; the production bridge is tested separately.
     expect(width.disabled).toBe(true);
+    expect(height.disabled).toBe(true);
     expect(opacity.disabled).toBe(false);
     expect(opacity.placeholder).toBe("혼합");
     expect(screen.getByText("2개 선택 · 공통 속성")).toBeTruthy();

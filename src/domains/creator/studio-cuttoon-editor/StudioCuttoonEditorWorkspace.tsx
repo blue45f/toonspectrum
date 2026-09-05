@@ -166,6 +166,10 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
 
   return (
       <div
+        id="studio-workspace"
+        role="group"
+        aria-label="편집 작업공간"
+        tabIndex={-1}
         data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
         className={cn(
           // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this

@@ -67,7 +67,7 @@ export interface StudioCrdtBindingTelemetry {
     | "unavailable"
     | "not-applicable";
   transportReady: boolean;
-  /** Server mutation ACK only; local BroadcastChannel receipts never masquerade as server ACKs. */
+  /** Server mutation ACK only; BroadcastChannel and P2P receipts are never server ACKs. */
   lastAckAt: number | null;
   lastAckServerSequence: string | null;
 }
@@ -115,7 +115,7 @@ interface PendingUpdate {
   persistenceState: "pending" | "ready" | "failed";
   /** Resolves false on a surfaced durability failure; it never creates an unhandled rejection. */
   persisted: Promise<boolean>;
-  /** Local BroadcastChannel delivery happened, but no authoritative server ACK exists yet. */
+  /** Peer delivery happened, but no authoritative server ACK exists yet. */
   localBroadcasted?: boolean;
 }
 
@@ -151,7 +151,7 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 /**
- * Binds a Yjs document to the room's durable channel. Presence/WebRTC never enters this path.
+ * Binds a Yjs document to the room's document channel, separate from ephemeral presence traffic.
  * Local mutations are merged for 40ms, acknowledged with stable update ids and retried in order;
  * state-vector sync repairs missed updates after reconnect before new edits continue publishing.
  */
@@ -176,13 +176,14 @@ export class StudioCrdtRoomBinding {
   private backgroundSyncTimer: unknown = null;
   private drainPromise: Promise<void> | null = null;
   private syncPromise: Promise<void> | null = null;
+  private resyncRequested = false;
   private activeSyncRequestId: string | null = null;
   private clientSequence = 0;
   private localServerSequence = 0;
   /**
    * Highest contiguous durable sequence proven to be present in this document. This is only
-   * meaningful for the authenticated socket transport: BroadcastChannel peers each have their
-   * own local counters and therefore cannot provide a room-wide ordering fence.
+   * meaningful for the authenticated socket transport: BroadcastChannel/P2P peers each have
+   * their own local counters and therefore cannot provide a room-wide ordering fence.
    */
   private authoritativeServerSequence: bigint | null = null;
   private durabilityWarning: string | null = null;
@@ -217,8 +218,7 @@ export class StudioCrdtRoomBinding {
     if (this.started) return this.syncNow();
     if (!this.room.ready) throw new Error("실시간 작업실 연결이 준비되지 않았습니다.");
     this.started = true;
-    this.authoritativeSyncReady =
-      this.room.mode !== "server" || this.room.crdtFanout === "mesh";
+    this.authoritativeSyncReady = !this.hasAuthoritativeServer();
     if (this.canEdit && this.outboxScope) await this.restoreOutbox();
     if (this.closed) return;
     if (this.recoveryState) {
@@ -259,6 +259,12 @@ export class StudioCrdtRoomBinding {
       throw error;
     }).finally(() => {
       if (this.syncPromise === run) this.syncPromise = null;
+      // A peer may open after this request was sent. Schedule the next snapshot only after
+      // synchronize() finishes clearing its timers, so the ready notification cannot be lost.
+      if (this.resyncRequested) {
+        this.resyncRequested = false;
+        this.scheduleSyncRetry();
+      }
     });
     this.syncPromise = run;
     return run;
@@ -285,8 +291,8 @@ export class StudioCrdtRoomBinding {
       if (this.recoveryState) {
         throw new Error(this.recoveryState.message);
       }
-      if (this.room.mode !== "server") {
-        throw new Error("로컬 협업 모드에서는 서버 승인 전 원고를 저장할 수 없습니다.");
+      if (!this.hasAuthoritativeServer()) {
+        throw new Error("로컬·P2P 협업 모드에서는 서버 승인 전 원고를 저장할 수 없습니다.");
       }
       if (!this.room.ready) {
         throw new Error("팀 서버 연결이 끊겨 미승인 변경을 저장할 수 없습니다.");
@@ -355,7 +361,7 @@ export class StudioCrdtRoomBinding {
     await this.persistPendingBeforeClose(deadline);
     while (
       this.pending.size > 0 &&
-      this.room.mode === "server" &&
+      this.hasAuthoritativeServer() &&
       this.room.ready &&
       Date.now() < deadline
     ) {
@@ -386,6 +392,7 @@ export class StudioCrdtRoomBinding {
     this.batchSubscription?.unsubscribe();
     this.batchSubscription = null;
     this.closed = true;
+    this.resyncRequested = false;
     this.activeSyncRequestId = null;
     this.unsubscribeCrdt?.();
     this.unsubscribeCrdt = null;
@@ -418,7 +425,7 @@ export class StudioCrdtRoomBinding {
     if (response) {
       this.document.applySyncResponse(response);
       this.advanceAuthoritativeSequenceAfterSync(response.serverSequence);
-      if (this.room.mode === "server") {
+      if (this.hasAuthoritativeServer()) {
         // The authoritative response has been validated and applied. Only from this point may a
         // restored/local frontier publish; enqueueUpdate can start its drain synchronously.
         this.authoritativeSyncReady = true;
@@ -432,7 +439,7 @@ export class StudioCrdtRoomBinding {
         if (missingOnServer.byteLength > EMPTY_UPDATE_BYTE_LENGTH) this.enqueueUpdate(missingOnServer);
       }
     }
-    if (this.room.mode === "server" && !response && this.room.crdtFanout !== "mesh") {
+    if (this.hasAuthoritativeServer() && !response) {
       throw new Error("서버가 권위 CRDT 동기화 응답을 반환하지 않았습니다.");
     }
     if (this.syncRetryTimer !== null) this.cancelTimeout(this.syncRetryTimer);
@@ -635,7 +642,7 @@ export class StudioCrdtRoomBinding {
 
   private async runDrain(): Promise<void> {
     if (this.recoveryState) return;
-    if (this.room.mode === "server" && !this.authoritativeSyncReady) {
+    if (this.hasAuthoritativeServer() && !this.authoritativeSyncReady) {
       for (const pending of this.pending.values()) {
         if (this.closed) return;
         await this.ensurePendingPersistence(pending);
@@ -657,7 +664,7 @@ export class StudioCrdtRoomBinding {
     }
     for (const [updateId, pending] of this.pending) {
       if (this.closed) return;
-      if (this.room.mode === "local" && pending.localBroadcasted) continue;
+      if (!this.hasAuthoritativeServer() && pending.localBroadcasted) continue;
       const persisted = await this.ensurePendingPersistence(pending);
       if (this.closed) return;
       if (!persisted) {
@@ -671,10 +678,9 @@ export class StudioCrdtRoomBinding {
       try {
         const acknowledgement = await this.room.publishCrdtUpdate(pending.request);
         this.reconcileAuthoritativeAcknowledgement(acknowledgement);
-        if (this.room.mode === "local") {
-          // BroadcastChannel delivery is peer visibility, not durable authority. Keep the request
-          // in both this backlog and the browser outbox so the next server binding can publish the
-          // exact same update id. Mark it delivered only to avoid rebroadcasting on every drain.
+        if (!this.hasAuthoritativeServer()) {
+          // BroadcastChannel/P2P delivery is peer visibility, not durable authority. Keep the
+          // exact request in both this backlog and the browser outbox for a future server ACK.
           pending.localBroadcasted = true;
           continue;
         }
@@ -715,11 +721,11 @@ export class StudioCrdtRoomBinding {
       }
     }
     if (this.started && !this.closed) {
-      if (this.room.mode === "local" && this.pending.size > 0) {
+      if (!this.hasAuthoritativeServer() && this.pending.size > 0) {
         this.emitStatus({
           state: "retrying",
           message:
-            "로컬 탭에는 전달됐지만 팀 서버 승인은 아직 없습니다. 서버 재연결까지 이 기기의 복구 저장소에 보관합니다.",
+            "참여자에게 전달됐지만 팀 서버 승인은 아직 없습니다. 서버 재연결까지 이 기기의 복구 저장소에 보관합니다.",
         });
       } else {
         this.emitStatus({ state: "ready", message: "팀 원고가 실시간으로 동기화됩니다." });
@@ -808,13 +814,21 @@ export class StudioCrdtRoomBinding {
   private onRoomEvent(event: StudioLiveRoomEvent): void {
     if (event.type !== "transport-status" || this.closed || this.recoveryState) return;
     if (
-      this.room.mode === "server" &&
+      this.hasAuthoritativeServer() &&
       (event.status.state === "connecting" ||
         event.status.state === "disconnected")
     ) {
       this.authoritativeSyncReady = false;
     }
     if (event.status.state !== "ready") return;
+    if (!this.hasAuthoritativeServer()) {
+      // A newly opened peer could not receive earlier local-only broadcasts.
+      for (const pending of this.pending.values()) pending.localBroadcasted = false;
+    }
+    if (this.syncPromise) {
+      this.resyncRequested = true;
+      return;
+    }
     void this.syncNow().catch((error) => {
       this.emitStatus({
         state: "retrying",
@@ -860,10 +874,19 @@ export class StudioCrdtRoomBinding {
     }
   }
 
+  /** Signaling can be server-backed while the document itself is peer-to-peer. Peer counters
+   * are not a global ordering fence, and peer receipts do not prove durable server storage.
+   * Undefined fanout preserves the legacy authoritative transport contract. */
+  private hasAuthoritativeServer(): boolean {
+    return this.room.mode === "server"
+      && this.room.crdtFanout !== "mesh"
+      && this.room.crdtFanout !== "none";
+  }
+
   private classifyAuthoritativeSequence(
     sequence: string
   ): "untracked" | "stale" | "contiguous" | "gap" {
-    if (this.room.mode !== "server" || this.authoritativeServerSequence === null) {
+    if (!this.hasAuthoritativeServer() || this.authoritativeServerSequence === null) {
       return "untracked";
     }
     const candidate = BigInt(sequence);
@@ -874,7 +897,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private advanceAuthoritativeSequenceAfterSync(sequence: string): void {
-    if (this.room.mode !== "server") return;
+    if (!this.hasAuthoritativeServer()) return;
     const synchronized = BigInt(sequence);
     if (
       this.authoritativeServerSequence === null ||
@@ -887,7 +910,7 @@ export class StudioCrdtRoomBinding {
   private reconcileAuthoritativeAcknowledgement(
     acknowledgement: StudioCrdtUpdateAck
   ): void {
-    if (this.room.mode === "server") {
+    if (this.hasAuthoritativeServer()) {
       this.lastAckAt = Date.now();
       this.lastAckServerSequence = acknowledgement.serverSequence;
     }
@@ -909,7 +932,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private requestAuthoritativeRepair(message: string): void {
-    if (this.closed || this.recoveryState || this.room.mode !== "server") return;
+    if (this.closed || this.recoveryState || !this.hasAuthoritativeServer()) return;
     this.emitStatus({ state: "repairing", message });
     if (!this.room.ready || this.syncPromise) {
       this.scheduleSyncRetry();

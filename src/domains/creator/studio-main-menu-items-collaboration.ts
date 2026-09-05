@@ -8,7 +8,7 @@
  * with no live session there was **no way to open it at all** — a share surface
  * you cannot reach is a share surface you do not have.
  *
- * Comments and page review were reachable, but only through the 프로젝트 작업
+ * Comments and page review were reachable, but only through the 프로젝트 센터
  * sheet (File ▸ 프로젝트 도구 → button), i.e. 3 actions for a §15 rule-4 command.
  *
  * Rows §15.3 asks for that the product genuinely lacks — Proposal Branch,

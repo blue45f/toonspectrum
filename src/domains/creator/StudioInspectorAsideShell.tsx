@@ -209,16 +209,17 @@ export function StudioInspectorAsideShell({
       onClose={() => setRightPanelOpen(false)}
     >
         <aside
+          id="studio-inspector"
           ref={propsSheetRef}
-          role={isMobile ? "dialog" : undefined}
+          role={isMobile ? "dialog" : "region"}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-sheet-id="props"
           data-studio-panel-detached={desktopDetached ? "true" : undefined}
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
-          aria-label={isMobile ? "작업 패널" : undefined}
-          tabIndex={isMobile ? -1 : undefined}
+          aria-label="작업 패널"
+          tabIndex={-1}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",

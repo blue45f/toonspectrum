@@ -13,6 +13,12 @@ describe("AppRouter document title ownership", () => {
     ["/studio/publish", "?id=legacy-work"],
     ["/studio/work/work-1/publish", ""],
     ["/studio/remix/source-1/animation", ""],
+    ["/studio/projects", ""],
+    ["/studio/work/work-1/versions", ""],
+    ["/studio/review", ""],
+    ["/studio/remix/source-1/present", ""],
+    ["/studio/share", "?scope=work%3Awork-1"],
+    ["/studio/join", "?invite=ts-demo"],
   ])("leaves a valid Studio child in charge for %s%s", (pathname, search) => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname, search })).toBe(false);
   });
@@ -34,10 +40,7 @@ describe("AppRouter document title ownership", () => {
     ["/studio//3d/dcc/model", ""],
     ["/studio/work/work-1/canvas", "?id=work-2"],
     ["/studio/work/work-1/canvas", "?id=work-1&id=work-1"],
-    ["/studio/projects", ""],
-    ["/studio/work/work-1/versions", ""],
-    ["/studio/review", ""],
-    ["/studio/remix/source-1/present", ""],
+    ["/studio/assets", ""],
   ])("keeps generic ownership for non-child or invalid route %s%s", (pathname, search) => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname, search })).toBe(true);
   });

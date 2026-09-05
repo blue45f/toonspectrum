@@ -211,7 +211,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
           type="button"
           onClick={() => setContinuityOpen(true)}
           aria-pressed={continuityOpen}
-          aria-label="이야기 연속성 검사"
+          aria-label="마감·품질 검사"
           className={cn(toolBtn(continuityOpen), iconToolBtnTouch)}
         >
           <CheckCircle2

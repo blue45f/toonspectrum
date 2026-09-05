@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect } from "vitest";
 
-import { StudioBg3dProSuitePanel } from "./StudioBg3dProSuitePanel";
+import { StudioBg3dProSuitePanel } from "./StudioBg3dProSuitePanelContent";
 
-describe("StudioBg3dProSuitePanel", () => {
+describe("StudioBg3dProSuitePanel content", () => {
   it("renders all professional suite tabs: Grip, Dynamic, Lens, Director, Character, Cloner, Particle, Text, MatCap, Screentone, Deform, PostFX, MultiPass, Culling, Hair", () => {
     const markup = renderToStaticMarkup(<StudioBg3dProSuitePanel />);
 

@@ -368,7 +368,7 @@ describe("StudioMenubarContent", () => {
       ["timelapse", "타임랩스 녹화", stableHandlers.openTimelapse],
       ["storyboard-grid", "스토리보드 그리드 보기", stableHandlers.openStoryboardGrid],
       ["scroll-preview", "세로 스크롤 미리보기", stableHandlers.openScrollPreview],
-      ["continuity", "이야기 연속성 검사", stableHandlers.openContinuityCheck],
+      ["continuity", "마감·품질 검사", stableHandlers.openContinuityCheck],
       ["comments", "문서 댓글", stableHandlers.toggleDocumentComments],
       ["page-review", "페이지 검토와 편집 잠금", stableHandlers.openPageReview],
     ] as const;
@@ -523,7 +523,7 @@ describe("StudioMenubarContent", () => {
       expect(label?.className).toContain("max-[429px]:sr-only");
     }
 
-    expect(screen.getByRole("button", { name: "프로젝트 작업" }).className)
+    expect(screen.getByRole("button", { name: "프로젝트 센터" }).className)
       .toContain("min-w-11");
     // 페이지·다운로드는 하단 도크의 드로잉 행이 소유한다 — 메뉴바 사본은 모바일에서 숨긴다.
     for (const name of [/페이지 목록/u, /현재 페이지$/u]) {
@@ -903,7 +903,7 @@ describe("StudioMenubarContent", () => {
       "슬롯 5: 현재 페이지 다운로드",
       "슬롯 6: 템플릿·에셋",
       "슬롯 7: 말풍선",
-      "슬롯 8: 프로젝트 작업",
+      "슬롯 8: 프로젝트 센터",
     ]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
@@ -1031,7 +1031,7 @@ describe("StudioMenubarContent", () => {
       "말풍선",
       "다운로드 2× PNG · 현재 페이지",
       "내보내기 옵션",
-      "프로젝트 작업",
+      "프로젝트 센터",
       "초안 저장",
       "게시하기",
     ]) {

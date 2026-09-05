@@ -72,6 +72,15 @@ export default defineConfig(
     },
   },
 
+  // AdminAnnouncements 의 활성 토글은 가시 텍스트와 checkbox 를 감싸는 유효한 wrapping label 이다.
+  // 현재 jsx-a11y 판정이 이 동적 편집 폼의 중첩 연결을 놓치므로 해당 파일의 이 규칙만 제한적으로 끈다.
+  {
+    files: ['src/domains/admin/components/AdminAnnouncements.tsx'],
+    rules: {
+      'jsx-a11y/label-has-associated-control': 'off',
+    },
+  },
+
   // StudioPage 예외: StudioCuttoonEditor 는 구조적으로 React Compiler 를 탈락("use no memo"
   // 명시)하고, memo 자식들의 prop 안정성을 위한 수동 useMemo/useCallback 을 대량 유지한다.
   // v7 컴파일러 기반 진단 두 개는 탈락 컴포넌트의 수동 메모를 "보존 불가"로, 이벤트 핸들러의

@@ -1,11 +1,5 @@
 // @vitest-environment jsdom
 
-/**
- * 조합 편집기가 실제로 조합을 만들어 내보내는지 — 그리고 기본값으로 돌아오면 세트를 벗는지.
- *
- * 후자가 중요하다. 프리셋과 같은 조합의 획은 프리셋과 바이트 단위로 같은 플랜이어야 하고, 그
- * 계약은 '세트 없음' 경로에 쓰여 있다. 편집기가 기본값을 세트로 실어 보내면 계약이 우회된다.
- */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -19,14 +13,14 @@ import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramCont
 describe("StudioBrushEngineProgramControls", () => {
   afterEach(cleanup);
 
-  it("유화가 아닌 브러시에는 조합할 엔진이 없다고 정직하게 말한다", () => {
+  it("describes the family boundary honestly for non-oil brushes", () => {
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={vi.fn()} />,
     );
     expect(screen.getByText("이 브러시는 아직 조합할 엔진이 없습니다")).toBeTruthy();
   });
 
-  it("프리셋의 기본 조합을 그 프리셋 이름으로 보여준다", () => {
+  it("shows the preset baseline and literal paint-order toggles", () => {
     render(
       <StudioBrushEngineProgramControls
         brushId="oil--impasto-ribbon"
@@ -34,17 +28,58 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={vi.fn()}
       />,
     );
-    // oil--impasto-ribbon 은 붓털 물리 + 임파스토를 켠다.
     expect(screen.getByText("유화 · 임파스토(소모 없음)와 같은 조합")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /붓털 물리/ }).getAttribute("aria-pressed"))
+    expect(screen.getByRole("button", { name: /붓털 물리/u }).getAttribute("aria-pressed"))
       .toBe("true");
-    expect(screen.getByRole("button", { name: /임파스토 릴리프/ }).getAttribute("aria-pressed"))
+    expect(screen.getByRole("button", { name: /임파스토 릴리프/u }).getAttribute("aria-pressed"))
       .toBe("true");
-    expect(screen.getByRole("button", { name: /물감 소모/ }).getAttribute("aria-pressed"))
+    expect(screen.getByRole("button", { name: /물감 소모/u }).getAttribute("aria-pressed"))
       .toBe("false");
   });
 
-  it("패스를 켜면 세트를 실어 보내고, 다른 출하 프리셋과 같아지면 그 이름으로 부른다", () => {
+  it("exposes all eight combinations exactly once", () => {
+    render(
+      <StudioBrushEngineProgramControls
+        brushId="oil--filbert-ribbon"
+        programSet={null}
+        onChange={vi.fn()}
+      />,
+    );
+    for (const name of [
+      "기본 본체",
+      "부드러운 강모",
+      "마른 획",
+      "두꺼운 능선",
+      "자연 강모",
+      "강모 임파스토",
+      "건조 임파스토",
+      "풀 피직스",
+    ]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${name}`, "u") })).toBeTruthy();
+    }
+    expect(screen.getByText("2³ 조합")).toBeTruthy();
+  });
+
+  it("applies a matrix recipe as a durable engine program set", () => {
+    const onChange = vi.fn();
+    render(
+      <StudioBrushEngineProgramControls
+        brushId="oil--filbert-ribbon"
+        programSet={null}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^건조 임파스토/u }));
+    expect(onChange).toHaveBeenCalledWith(
+      studioBrushEngineProgramSetFromOil({
+        bristlePhysics: false,
+        bristleLoadDynamics: true,
+        impastoRelief: true,
+      }),
+    );
+  });
+
+  it("sends a set after a detailed toggle and names matching shipped presets", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -53,7 +88,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /물감 소모/ }));
+    fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0]![0];
     expect(next?.oil).toEqual({
@@ -69,14 +104,12 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    // 세 프로그램을 전부 켠 조합은 2026-08-20 부터 유화 붓·아크릴 물감이 출하하는 조합이다 —
-    // 커스텀이 아니라 그 프리셋 이름으로 불러야 한다(매트릭스 순서상 유화 붓).
     expect(screen.getByText("유화 붓와 같은 조합")).toBeTruthy();
-    expect(screen.queryByText(/이 조합과 같은 프리셋은 없습니다/)).toBeNull();
-    expect(screen.getAllByText("변경됨").length).toBe(1);
+    expect(screen.queryByText(/이 조합과 같은 프리셋은 없습니다/u)).toBeNull();
+    expect(screen.getAllByText("변경됨")).toHaveLength(1);
   });
 
-  it("출하 프리셋 어느 것과도 같지 않은 조합만 커스텀이라고 부른다", () => {
+  it("calls only combinations absent from the shipped matrix custom", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -85,8 +118,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    // 릴리프 + 물감 소모(붓털 물리 없음)는 여덟 조합 중 유일하게 출하 프리셋이 없는 조합이다.
-    fireEvent.click(screen.getByRole("button", { name: /물감 소모/ }));
+    fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
     const next = onChange.mock.calls[0]![0];
     expect(next?.oil).toEqual({
       bristlePhysics: false,
@@ -102,10 +134,10 @@ describe("StudioBrushEngineProgramControls", () => {
       />,
     );
     expect(screen.getByText("커스텀 조합")).toBeTruthy();
-    expect(screen.getByText(/이 조합과 같은 프리셋은 없습니다/)).toBeTruthy();
+    expect(screen.getByText(/이 조합과 같은 프리셋은 없습니다/u)).toBeTruthy();
   });
 
-  it("세 프로그램을 모두 켜고 출하된 유화 붓·아크릴 물감은 자기 이름으로 불린다", () => {
+  it("names fully enabled general-purpose paints by their own preset", () => {
     for (const [brushId, name] of [["oil", "유화 붓"], ["acrylic", "아크릴 물감"]] as const) {
       render(
         <StudioBrushEngineProgramControls brushId={brushId} programSet={null} onChange={vi.fn()} />,
@@ -116,8 +148,7 @@ describe("StudioBrushEngineProgramControls", () => {
     }
   });
 
-  it("카탈로그에 실린 매트릭스 id 는 기본 조합에서 결코 커스텀으로 표시되지 않는다", () => {
-    // 매트릭스에 행이 늘어도 편집기가 따라오도록 — 이름을 못 얻는 id(카탈로그에 없는 행)만 예외다.
+  it("never labels a catalogued matrix baseline as custom", () => {
     let checked = 0;
     for (const brushId of STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS) {
       if (!studioBrushPresetById(brushId)) continue;
@@ -131,9 +162,9 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(checked).toBeGreaterThanOrEqual(7);
   });
 
-  it("기본값으로 되돌아오면 세트가 아니라 null 을 내보낸다", () => {
+  it("emits null when a toggle or matrix recipe returns to the id baseline", () => {
     const onChange = vi.fn();
-    render(
+    const { rerender } = render(
       <StudioBrushEngineProgramControls
         brushId="oil--filbert-ribbon"
         programSet={studioBrushEngineProgramSetFromOil({
@@ -144,12 +175,26 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    // filbert 의 기본은 붓털 물리만 — 임파스토를 끄면 기본값과 같아진다.
-    fireEvent.click(screen.getByRole("button", { name: /임파스토 릴리프/ }));
+    fireEvent.click(screen.getByRole("button", { name: /임파스토 릴리프/u }));
+    expect(onChange).toHaveBeenLastCalledWith(null);
+
+    onChange.mockClear();
+    rerender(
+      <StudioBrushEngineProgramControls
+        brushId="oil--filbert-ribbon"
+        programSet={studioBrushEngineProgramSetFromOil({
+          bristlePhysics: false,
+          bristleLoadDynamics: true,
+          impastoRelief: true,
+        })}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^부드러운 강모/u }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("프리셋으로 되돌리기는 변경이 있을 때만 나타난다", () => {
+  it("shows preset restore only for changed combinations", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -158,7 +203,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    expect(screen.queryByRole("button", { name: /프리셋으로/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /프리셋으로/u })).toBeNull();
 
     rerender(
       <StudioBrushEngineProgramControls
@@ -171,7 +216,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /프리셋으로/ }));
+    fireEvent.click(screen.getByRole("button", { name: /프리셋으로/u }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 });

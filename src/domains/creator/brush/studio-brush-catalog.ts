@@ -42,6 +42,7 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
     STUDIO_BRUSH_PACK_DESCRIPTORS.map((descriptor) =>
       Object.freeze({
         id: descriptor.catalogId,
+        runtimeBrushId: descriptor.runtimeBrushId,
         name: descriptor.catalogName,
         shortName: descriptor.shortName,
         hint: descriptor.hint,

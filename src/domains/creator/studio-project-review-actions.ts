@@ -4,7 +4,7 @@
  * 아래 7종은 트리거가 툴벨트(`StudioToolBelt`)에만 있었는데, 벨트 호스트가 데스크톱
  * `lg:hidden` + 모바일 몰입 `max-lg:hidden`으로 1600 / 900 / 430 전 구간에서 `display:none`
  * 이라 어디서도 클릭할 수 없었다(`docs/perf/heavy-feature-findings.md` §4-1).
- * 지금은 상시 보이는 "프로젝트 작업" 시트가 정본 진입점을 소유한다.
+ * 지금은 상시 보이는 "프로젝트 센터" 시트가 정본 진입점을 소유한다.
  *
  * 렌더 계층(`StudioProjectReviewActions.tsx`)과 분리해 두면 도달성 계약 테스트가
  * jsdom 없이도 이 목록을 읽을 수 있다.

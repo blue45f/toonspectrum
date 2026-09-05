@@ -17,6 +17,7 @@ import {
   studioFilterCatalogEntry,
   studioFilterGroupLabel,
 } from "./filter/studio-filter-catalog";
+import { StudioSmartFilterUnionControls } from "./filter/StudioSmartFilterUnionControls";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
@@ -596,6 +597,11 @@ function StudioSmartFilterControls({
           />
         </label>
       ) : null}
+      <StudioSmartFilterUnionControls
+        engine={entry.engine}
+        params={entry.params}
+        onChange={onChange}
+      />
       {controls.map((spec) => (
         <NumericParameterControl
           key={spec.key}

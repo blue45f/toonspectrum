@@ -685,25 +685,41 @@ describe("자동 손 그립과 양손 보조 target", () => {
       rotationDeg: [0, 0, 0] as Vec3,
       source: "measured" as const,
     };
+    const handScale = new THREE.Vector3(1.1, 0.9, 1.1);
     const result = resolveSecondaryHandConstraint(
       secondaryAnchor,
       [0.5, 1.1, -0.2],
       [groupQuaternion.x, groupQuaternion.y, groupQuaternion.z, groupQuaternion.w],
       1.25,
       handSocket,
-      [1.1, 0.9, 1.1]
+      [handScale.x, handScale.y, handScale.z]
     )!;
 
+    // Reconstruct the actual rendered T * R * S transform, not the retired
+    // geometric-mean approximation that loses the hand's per-axis scale.
     const targetHandQuaternion = new THREE.Quaternion(...result.targetHandWorldQuaternion);
-    const reconstructedPalm = new THREE.Vector3(...result.wristWorldPosition).add(
-      new THREE.Vector3(...handSocket.position)
-        .multiplyScalar(Math.cbrt(1.1 * 0.9 * 1.1))
-        .applyQuaternion(targetHandQuaternion)
+    const handWorldMatrix = new THREE.Matrix4().compose(
+      new THREE.Vector3(...result.wristWorldPosition),
+      targetHandQuaternion,
+      handScale
+    );
+    const reconstructedPalm = new THREE.Vector3(...handSocket.position).applyMatrix4(handWorldMatrix);
+    const expectedAnchor = new THREE.Vector3(...secondaryAnchor.position).applyMatrix4(
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(0.5, 1.1, -0.2),
+        groupQuaternion,
+        new THREE.Vector3(1.25, 1.25, 1.25)
+      )
     );
 
     expectVecClose(
       [reconstructedPalm.x, reconstructedPalm.y, reconstructedPalm.z],
       result.anchorWorldPosition,
+      6
+    );
+    expectVecClose(
+      result.anchorWorldPosition,
+      [expectedAnchor.x, expectedAnchor.y, expectedAnchor.z],
       6
     );
     expect(

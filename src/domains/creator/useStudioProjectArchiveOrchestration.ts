@@ -46,7 +46,7 @@ export function createStudioProjectArchiveIntentController(
   ): Promise<void> => {
     const state = operationStateRef.current;
     if (state.busy || input.projectArchiveBusy) {
-      input.setError("다른 프로젝트 작업이 끝난 뒤 다시 시도해 주세요.");
+      input.setError("다른 프로젝트 센터이 끝난 뒤 다시 시도해 주세요.");
       return;
     }
     state.busy = true;
