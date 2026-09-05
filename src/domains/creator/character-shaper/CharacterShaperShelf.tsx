@@ -176,7 +176,7 @@ function CharacterShaperShelfContent({
         <button type="button" aria-pressed={onlyAvailable} onClick={() => setOnlyAvailable((current) => !current)}
           className={cn(studioSegmentChipClass(onlyAvailable), "mt-1 min-h-11 w-full justify-between gap-1")}
           title="부분 적용과 적용 불가 항목을 제외합니다. 모델이 바뀌면 다시 계산합니다.">
-          <span>완전 지원만</span><span className="text-[0.65rem] tabular-nums">{counts.available}개</span>
+          <span>완전 지원만</span><span className="text-[0.65rem] tabular-nums">지원 {counts.available}개</span>
         </button>
         <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3" data-character-capability-counts="true">
           완전 지원 {counts.available} · 일부 적용 {counts.partial} · 적용 불가 {counts.unavailable}

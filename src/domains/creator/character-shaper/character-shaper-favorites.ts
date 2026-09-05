@@ -24,7 +24,8 @@ type ParsedFavorites =
 
 function validId(id: unknown): id is string {
   return typeof id === "string" && id.length > 0 && id.length <= 160
-    && id === id.trim() && !/[\u0000-\u001f\u007f]/u.test(id);
+    && id === id.trim()
+    && Array.from(id).every((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
 }
 
 /** Fail closed on future schemas or damaged data; never silently overwrite them. */
