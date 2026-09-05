@@ -5,37 +5,77 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: studio-3d-fit-inspection-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  source:
+  integrate-reviewed-source:
+    if: github.ref == 'refs/heads/fix/studio-3d-fit-inspection-20260906'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      head: ${{ steps.integrate.outputs.head }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 1
-      - name: Package review source without credentials or generated assets
+      - name: Integrate byte-verified source edits on this feature branch only
+        id: integrate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HUSKY: '0'
         run: |
-          mkdir -p /tmp/3d-source
-          git rev-parse HEAD > /tmp/3d-source/head.txt
-          git ls-files -z | python3 -c 'import sys,pathlib; ps=sys.stdin.buffer.read().decode().split("\0"); keep=[p for p in ps if p and pathlib.Path(p).is_file() and not p.startswith(("public/","docs/screenshots/","artifacts/","qa-results/")) and pathlib.Path(p).stat().st_size < 20000000]; sys.stdout.buffer.write(("\0".join(keep)+"\0").encode())' > /tmp/source-files
-          tar --null -T /tmp/source-files -czf /tmp/3d-source/source.tgz
-      - uses: actions/upload-artifact@v6
-        with:
-          name: studio-3d-source-${{ github.sha }}
-          path: /tmp/3d-source
-          retention-days: 3
-  production-readonly:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'fix/studio-3d-fit-inspection-20260906'
+          if test ! -f src/domains/creator/vrm/studio-vrm-surface-vertex-sampler.ts; then
+            python3 - <<'PY'
+          import base64,hashlib,json,pathlib,subprocess
+          parts=[
+            ('2fcd70d95b72badddda1f3345044784c66acd7ea','cf316be30bf6f77056767cfc7eedbb05780327ffb516e328a5255a643b32448b'),
+            ('872364c34db9883abc1bdb4fc6ca1932ddd704d8','dfd155f1207e039a00f4df15e433eee552e5f356fa185de14994f6429b99656b'),
+            ('6159cdf52c4dc85bad19e8197c65752c7443195c','431758cd633e6445cb3881c13bda286d4ae0f8ad486722271699dde72c2aca1c'),
+          ]
+          patch=b''
+          for sha,digest in parts:
+              data=json.loads(subprocess.check_output(['gh','api',f'repos/blue45f/toonspectrum/git/blobs/{sha}']))
+              content=base64.b64decode(data['content'])
+              assert hashlib.sha256(content).hexdigest()==digest, 'Transport integrity failure'
+              patch+=content
+          pathlib.Path('/tmp/reviewed-3d.patch').write_bytes(patch)
+          for line in patch.decode().splitlines():
+              if line.startswith('+++ '):
+                  assert line.startswith(('+++ b/src/domains/creator/vrm/','+++ b/src/domains/creator/character-shaper/'))
+          PY
+            git apply --check /tmp/reviewed-3d.patch
+            git apply /tmp/reviewed-3d.patch
+            git add src/domains/creator/vrm src/domains/creator/character-shaper
+            test "$(git diff --cached --name-only | wc -l)" -eq 13
+            git diff --cached --check
+            test "$(gh api repos/blue45f/toonspectrum/git/ref/heads/$GITHUB_REF_NAME --jq .object.sha)" = "$GITHUB_SHA"
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix(studio): fit rendered body surfaces and add precise contact inspection'
+            gh auth setup-git
+            git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          fi
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  code-verification:
+    needs: integrate-reviewed-source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     env:
       HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.integrate-reviewed-source.outputs.head }}
           persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -43,36 +83,103 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Inspect actual production routes without account or document mutations
-        shell: bash
+      - name: Strict lint for every changed product file
         run: |
-          mkdir -p /tmp/3d-production
-          node --input-type=module <<'JS'
-          import { chromium } from 'playwright';
-          import { writeFileSync } from 'node:fs';
-          const browser = await chromium.launch({args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-          const page = await browser.newPage({viewport:{width:1600,height:1000},locale:'ko-KR'});
-          const results=[];
-          for (const route of ['studio','studio/character','studio/bg3d','studio/poser','studio/lift3d']) {
-            const errors=[]; const listener=e=>errors.push(e.message); page.on('pageerror',listener);
-            try {
-              const response=await page.goto('https://www.toonstudio.cloud/'+route,{waitUntil:'domcontentloaded',timeout:90000});
-              await page.waitForTimeout(12000);
-              const session=await page.context().newCDPSession(page);
-              const image=await session.send('Page.captureScreenshot',{format:'png',fromSurface:true});
-              writeFileSync('/tmp/3d-production/'+route.replaceAll('/','-')+'.png',Buffer.from(image.data,'base64'));
-              await session.detach();
-              results.push({route,status:response?.status(),url:page.url(),title:await page.title(),text:(await page.locator('body').innerText()).slice(0,20000),errors});
-            } catch(e) { results.push({route,error:String(e),errors}); }
-            page.off('pageerror',listener);
-            writeFileSync('/tmp/3d-production/results.json',JSON.stringify(results,null,2));
-          }
-          await browser.close();
-          JS
+          mkdir -p /tmp/3d-code-evidence
+          git rev-parse HEAD > /tmp/3d-code-evidence/head.txt
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/character-shaper/CharacterShaperViewportHud.tsx \
+            src/domains/creator/character-shaper/StudioCharacterShaperDialog.tsx \
+            src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx \
+            src/domains/creator/vrm/StudioVrmCameraDirector.tsx \
+            src/domains/creator/vrm/StudioVrmPoserViewport.tsx \
+            src/domains/creator/vrm/StudioVrmWardrobePropsProjection.tsx \
+            src/domains/creator/vrm/studio-vrm-poser-catalogs.ts \
+            src/domains/creator/vrm/studio-vrm-surface-vertex-sampler.ts \
+            src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts \
+            src/domains/creator/vrm/studio-vrm-inspection-framing.ts \
+            src/domains/creator/vrm/studio-vrm-inspection-framing.test.ts \
+            src/domains/creator/vrm/studio-vrm-garment-weave.ts \
+            src/domains/creator/vrm/studio-vrm-garment-weave.test.ts \
+            2>&1 | tee /tmp/3d-code-evidence/lint.log
+      - name: Full frontend typecheck
+        if: ${{ !cancelled() }}
+        run: pnpm exec tsc -p tsconfig.json 2>&1 | tee /tmp/3d-code-evidence/typecheck.log
+      - name: Existing and new VRM and Character Shaper regressions
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run src/domains/creator/vrm src/domains/creator/character-shaper 2>&1 | tee /tmp/3d-code-evidence/tests.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: studio-3d-production-${{ github.sha }}
-          path: /tmp/3d-production
+          name: studio-3d-code-${{ needs.integrate-reviewed-source.outputs.head }}
+          path: /tmp/3d-code-evidence
           retention-days: 7
+
+  composed-frame-review:
+    needs: integrate-reviewed-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - variant: baseline
+            group: wardrobe
+          - variant: revised
+            group: wardrobe
+          - variant: revised
+            group: accessories
+          - variant: revised
+            group: appearance
+          - variant: revised
+            group: background
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+      STUDIO_REVIEW_GROUP: ${{ matrix.group }}
+      STUDIO_REVIEW_VARIANT: ${{ matrix.variant }}
+      STUDIO_CLOSEUP_OUTPUT: /tmp/3d-visual-evidence
+      TOONSPECTRUM_VERIFY_ORIGIN: http://127.0.0.1:5173
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.integrate-reviewed-source.outputs.head }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Select an honest before or after source
+        run: |
+          cp scripts/verify-studio-3d-fit-review.mjs /tmp/3d-review-runner.mjs
+          if test "$STUDIO_REVIEW_VARIANT" = baseline; then
+            git fetch --depth=1 origin dbd5e75a207950b00360516a4353af872ff67e60
+            git checkout --detach dbd5e75a207950b00360516a4353af872ff67e60
+            cp /tmp/3d-review-runner.mjs scripts/verify-studio-3d-fit-review.mjs
+          fi
+          mkdir -p "$STUDIO_CLOSEUP_OUTPUT"
+          git rev-parse HEAD > "$STUDIO_CLOSEUP_OUTPUT/head.txt"
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Production bundle without development HMR remounts
+        run: pnpm run build:bundle 2>&1 | tee "$STUDIO_CLOSEUP_OUTPUT/build.log"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run this source in a local preview
+        run: |
+          pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort > "$STUDIO_CLOSEUP_OUTPUT/preview.log" 2>&1 &
+          for n in $(seq 1 60); do
+            if curl --silent --fail "$TOONSPECTRUM_VERIFY_ORIGIN/" >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Inspect every exposed entry in the selected review group
+        run: node scripts/verify-studio-3d-fit-review.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-3d-frames-${{ matrix.variant }}-${{ matrix.group }}-${{ needs.integrate-reviewed-source.outputs.head }}
+          path: /tmp/3d-visual-evidence
+          retention-days: 7
+          if-no-files-found: error
