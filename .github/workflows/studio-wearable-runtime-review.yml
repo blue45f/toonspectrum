@@ -40,11 +40,11 @@ jobs:
           EOF
           node --input-type=module <<'EOF'
           import {build} from 'vite';
-          await build({configFile:false,resolve:{alias:{'@':process.cwd()}},build:{outDir:'wearable-runtime-review/runtime',lib:{entry:'.wearable-review/entry.ts',formats:['es'],fileName:()=> 'runtime.mjs'},minify:false,sourcemap:false},define:{'process.env.NODE_ENV':JSON.stringify('production')}});
+          await build({configFile:false,publicDir:false,resolve:{alias:{'@':process.cwd()}},build:{outDir:'wearable-runtime-review/runtime',lib:{entry:'.wearable-review/entry.ts',formats:['es'],fileName:()=> 'runtime.mjs'},minify:false,sourcemap:false},define:{'process.env.NODE_ENV':JSON.stringify('production')}});
           EOF
-          mkdir -p wearable-runtime-review/vrm
+          mkdir -p wearable-runtime-review/vrm wearable-runtime-review/browser-harnesses
           cp public/vrm/sample.vrm public/vrm/AvatarSample_B.vrm public/vrm/LICENSES.md wearable-runtime-review/vrm/
-          cp -r tools/browser-harnesses wearable-runtime-review/
+          cp tools/browser-harnesses/props-compare-main.ts tools/browser-harnesses/props-compare.html wearable-runtime-review/browser-harnesses/
           git rev-parse HEAD > wearable-runtime-review/commit.txt
       - uses: actions/upload-artifact@v4
         with:
