@@ -26,5 +26,5 @@ function subscribe(listener: () => void): () => void {
 
 export function useCharacterShaperFavorites() {
   const snapshot = useSyncExternalStore(subscribe, store.getSnapshot, serverSnapshot);
-  return { ...snapshot, setFavorite: store.setFavorite };
+  return { ...snapshot, setFavorite: store.setFavorite, retrySave: store.retrySave };
 }

@@ -1,7 +1,10 @@
 /** Small, versioned local preference store. No scene, images, tokens or account data are stored. */
 export const CHARACTER_FAVORITES_KEY = "toonstudio.character-shaper.favorites.v1";
 export const CHARACTER_FAVORITES_LIMIT = 256;
-const MAX_STORAGE_LENGTH = 32768;
+const MAX_ID_LENGTH = 160;
+// JSON may expand one UTF-16 code unit to six characters (e.g. a lone surrogate).
+// Derive the read budget from the accepted id/count limits so our own writes always round-trip.
+const MAX_STORAGE_LENGTH = 32 + CHARACTER_FAVORITES_LIMIT * (MAX_ID_LENGTH * 6 + 3);
 
 export interface CharacterFavoritesStorage {
   getItem(key: string): string | null;
@@ -12,10 +15,11 @@ export interface CharacterFavoritesSnapshot {
   readonly ids: readonly string[];
   readonly persistence: "persistent" | "memory";
   readonly notice: string | null;
+  readonly hasPendingChanges: boolean;
 }
 
 export const EMPTY_CHARACTER_FAVORITES: CharacterFavoritesSnapshot = Object.freeze({
-  ids: Object.freeze([] as string[]), persistence: "memory", notice: null,
+  ids: Object.freeze([] as string[]), persistence: "memory", notice: null, hasPendingChanges: false,
 });
 
 type ParsedFavorites =
@@ -23,7 +27,7 @@ type ParsedFavorites =
   | { readonly ok: false; readonly reason: string };
 
 function validId(id: unknown): id is string {
-  return typeof id === "string" && id.length > 0 && id.length <= 160
+  return typeof id === "string" && id.length > 0 && id.length <= MAX_ID_LENGTH
     && id === id.trim()
     && Array.from(id).every((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
 }
@@ -53,6 +57,8 @@ export interface CharacterFavoriteStore {
   subscribe(listener: () => void): () => void;
   refresh(): void;
   setFavorite(id: string, favorite: boolean): void;
+  /** Retry only unsaved edits, merging the latest stored preferences first. */
+  retrySave(): void;
 }
 
 /**
@@ -69,13 +75,15 @@ export function createCharacterFavoriteStore(
 
   const publish = (ids: readonly string[], persistence: CharacterFavoritesSnapshot["persistence"], notice: string | null) => {
     const sorted = [...new Set(ids)].sort();
+    const hasPendingChanges = pending.size > 0;
     if (snapshot.persistence === persistence && snapshot.notice === notice
+      && snapshot.hasPendingChanges === hasPendingChanges
       && snapshot.ids.length === sorted.length && snapshot.ids.every((id, index) => id === sorted[index])) return;
-    snapshot = Object.freeze({ ids: Object.freeze(sorted), persistence, notice });
+    snapshot = Object.freeze({ ids: Object.freeze(sorted), persistence, notice, hasPendingChanges });
     for (const listener of listeners) listener();
   };
 
-  const read = () => {
+  const read = (): { storage: CharacterFavoritesStorage | null; parsed: ParsedFavorites } => {
     try {
       const storage = storageProvider();
       if (!storage) return { storage: null, parsed: { ok: false as const, reason: "이번 세션에서만 즐겨찾기를 보관합니다." } };
@@ -108,6 +116,46 @@ export function createCharacterFavoriteStore(
       pending.size ? "아직 저장하지 못한 변경이 있어 이번 세션에도 보관 중입니다." : null);
   };
 
+  const persist = (ids: readonly string[], loaded: ReturnType<typeof read>) => {
+    const { storage, parsed } = loaded;
+    if (parsed.ok && storage) {
+      const raw = JSON.stringify({ version: 1, ids: [...ids].sort() });
+      // Keep a final invariant guard even if future id or schema limits change independently.
+      if (!parseCharacterFavorites(raw).ok) {
+        publish(ids, "memory", "즐겨찾기 저장 형식을 확인할 수 없어 이번 세션에서만 보관합니다.");
+        return;
+      }
+      try {
+        storage.setItem(CHARACTER_FAVORITES_KEY, raw);
+        pending.clear();
+        publish(ids, "persistent", null);
+        return;
+      } catch {
+        publish(ids, "memory", "즐겨찾기를 저장하지 못해 이번 세션에서만 보관합니다.");
+        return;
+      }
+    }
+    publish(ids, "memory", parsed.ok ? "이번 세션에서만 보관합니다." : parsed.reason);
+  };
+
+  const retrySave = () => {
+    if (pending.size === 0) {
+      refresh();
+      return;
+    }
+    const loaded = read();
+    if (!loaded.parsed.ok) {
+      publish(snapshot.ids, "memory", loaded.parsed.reason);
+      return;
+    }
+    const merged = mergePending(loaded.parsed.ids);
+    if (merged.length > CHARACTER_FAVORITES_LIMIT) {
+      publish(snapshot.ids, "memory", "다른 탭의 변경과 합치면 즐겨찾기 한도를 넘습니다. 일부 항목을 해제해 주세요.");
+      return;
+    }
+    persist(merged, loaded);
+  };
+
   const setFavorite = (id: string, favorite: boolean) => {
     if (!validId(id)) return;
     const { storage, parsed } = read();
@@ -130,18 +178,7 @@ export function createCharacterFavoriteStore(
       return;
     }
     pending.set(id, favorite);
-    if (parsed.ok && storage) {
-      try {
-        storage.setItem(CHARACTER_FAVORITES_KEY, JSON.stringify({ version: 1, ids: [...next].sort() }));
-        pending.clear();
-        publish([...next], "persistent", null);
-        return;
-      } catch {
-        publish([...next], "memory", "즐겨찾기를 저장하지 못해 이번 세션에서만 보관합니다.");
-        return;
-      }
-    }
-    publish([...next], "memory", parsed.ok ? "이번 세션에서만 보관합니다." : parsed.reason);
+    persist([...next], { storage, parsed });
   };
 
   return {
@@ -149,5 +186,6 @@ export function createCharacterFavoriteStore(
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     refresh,
     setFavorite,
+    retrySave,
   };
 }

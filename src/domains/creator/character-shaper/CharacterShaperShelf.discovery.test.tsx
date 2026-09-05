@@ -131,4 +131,20 @@ describe("CharacterShaperShelf discovery integration", () => {
   it("does not nest favorite actions inside selectable card buttons", () => {
     render(<CharacterShaperShelf {...props()} />); expect(document.querySelectorAll("button button")).toHaveLength(0);
   });
+  it("offers an explicit save retry after quota failure without changing the scene", () => {
+    const p = props(); render(<CharacterShaperShelf {...p} />);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    try {
+      write.mockImplementationOnce(() => { throw new DOMException("quota", "QuotaExceededError"); });
+      fireEvent.click(screen.getByRole("button", { name: "모자 즐겨찾기 추가" }));
+      expect(screen.getByRole("button", { name: "즐겨찾기 저장 다시 시도" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "즐겨찾기 저장 다시 시도" }));
+      expect(screen.queryByRole("button", { name: "즐겨찾기 저장 다시 시도" })).toBeNull();
+      expect(JSON.parse(localStorage.getItem(CHARACTER_FAVORITES_KEY) ?? "null").ids).toContain("accessory:hat");
+      expect(p.onCommitEntry).not.toHaveBeenCalled(); expect(p.binding.commit).not.toHaveBeenCalled();
+    } finally {
+      write.mockRestore();
+    }
+  });
+
 });

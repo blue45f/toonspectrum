@@ -196,7 +196,18 @@ function CharacterShaperShelfContent({
         ) : null}
         </div>
         {lockReason ? <p role="status" className="m-3 rounded-lg border border-warn/45 bg-warn/10 p-2 text-[0.7rem] text-warn">{lockReason}</p> : null}
-        {favorites.notice ? <p role="status" className="mx-3 mt-2 text-[0.65rem] text-warn">{favorites.notice}</p> : null}
+        {favorites.notice ? (
+          <div className="mx-3 mt-2 space-y-1.5">
+            <p role="status" className="text-[0.65rem] text-warn">{favorites.notice}</p>
+            {favorites.hasPendingChanges ? (
+              <button type="button" onClick={favorites.retrySave}
+                aria-label="즐겨찾기 저장 다시 시도"
+                className={cn("min-h-11 w-full rounded-lg border border-line bg-card px-3 text-[0.72rem] font-semibold text-fg-2 hover:bg-raised", STUDIO_FOCUS_RING)}>
+                저장 다시 시도
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {multi && equipped.length > 0 ? (
           <section aria-label="장착 중" className="border-b border-line/70 px-3 py-2.5">
             <p className="mb-1.5 text-[0.66rem] font-semibold tracking-wide text-fg-3">장착 중 · {equipped.length}</p>
