@@ -1,0 +1,46 @@
+name: Bootstrap webtoon AI production director
+
+on:
+  push:
+    branches:
+      - feat/studio-webtoon-ai-production-director-20260905
+    paths:
+      - .github/aiwork-payload.part*
+      - .github/workflows/studio-ai-payload-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feat/studio-webtoon-ai-production-director-20260905
+
+      - name: Reassemble and verify payload
+        shell: bash
+        run: |
+          cat .github/aiwork-payload.part* > /tmp/aipayload.tar.gz
+          echo "2c25b05440c362fbd397f1afa2dfe0814bdb6f80c0b1ce3ee2901d6865b1216b  /tmp/aipayload.tar.gz" | sha256sum -c -
+
+      - name: Apply production-director files
+        shell: bash
+        run: |
+          tar -xzf /tmp/aipayload.tar.gz -C "$GITHUB_WORKSPACE"
+          rm -f .github/aiwork-payload.part*
+          git diff --check
+
+      - name: Commit generated source files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): add episode-level webtoon AI production director"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -137,7 +137,7 @@ describe("StudioCommentsPanel review rail contract", () => {
   });
 
   it("keeps keyboard close/send and focus restoration semantics", () => {
-    expect(source).toContain('event.key !== "Escape"');
+    expect(source).toContain('event.key === "Escape"');
     expect(source).toContain("event.nativeEvent.isComposing");
     expect(source.match(/nativeEvent\.isComposing/g)?.length).toBeGreaterThanOrEqual(5);
     expect(source).toContain("reviewRail?.contains(activeElement)");
@@ -376,6 +376,15 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("getAnchorLabel(left.anchor, anchorOptions).localeCompare");
   });
 
+  it("adds a personalized review filter, mention-aware search, and sequential keyboard review", () => {
+    expect(source).toContain('value: "mine"');
+    expect(source).toContain("studioCommentThreadCurrentActorRelation");
+    expect(source).toContain("thread.mentions.map");
+    expect(source).toContain('aria-keyshortcuts="J K /"');
+    expect(source).toContain("moveReviewFocus");
+    expect(source).toContain("댓글 검색 지우기");
+  });
+
   it("moves keyboard focus to the newest thread when a canvas pin selects an anchor", () => {
     expect(source).toContain("focusRequest");
     expect(source).toContain("focusRequest.threadId");
@@ -410,7 +419,7 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("onMarkThreadRead(threadId)");
     expect(source).toContain("onMarkAllRead()");
     expect(source).toContain("onTogglePinsHidden");
-    expect(source).toContain("작성자와 댓글 검색");
+    expect(source).toContain("댓글·작성자·멘션 검색");
     expect(source).not.toContain("thread.unread =");
   });
 
@@ -483,6 +492,140 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("sr-only sm:not-sr-only");
     expect(source).toContain('aria-label="댓글 정렬"');
     expect(source).not.toContain('className="basis-full"');
+  });
+});
+
+describe("StudioCommentsPanel personalized review workflow", () => {
+  it("collects authored, participated, assigned, and mentioned threads and searches mention names", async () => {
+    const selfAuthored = makeThread({
+      id: "thread-self-authored",
+      author: CURRENT_ACTOR,
+      body: "내가 남긴 피드백",
+    });
+    const participated = makeThread({
+      id: "thread-participated",
+      body: "답글로 참여한 피드백",
+      replies: [{
+        id: "reply-self",
+        author: CURRENT_ACTOR,
+        body: "제가 확인할게요.",
+        mentions: [],
+        createdAt: NOW,
+        updatedAt: NOW,
+      }],
+    });
+    const assigned = makeThread({
+      id: "thread-assigned",
+      body: "내 담당 피드백",
+      assignee: CURRENT_ACTOR,
+    });
+    const mentioned = makeThread({
+      id: "thread-mentioned",
+      body: "나를 부른 피드백",
+      mentions: [CURRENT_ACTOR],
+    });
+    const unrelated = makeThread({
+      id: "thread-unrelated",
+      body: "다른 팀 피드백",
+      mentions: [{ id: "actor-color-lead", displayName: "채색 리드" }],
+    });
+
+    render(
+      <StudioCommentsPanel
+        {...makePanelProps({
+          document: makeDocument([
+            selfAuthored,
+            participated,
+            assigned,
+            mentioned,
+            unrelated,
+          ]),
+        })}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /나와 관련\s*4/u }));
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(4);
+    expect(screen.getByText("내 댓글")).toBeTruthy();
+    expect(screen.getByText("내가 참여")).toBeTruthy();
+    expect(screen.getByText("내 담당")).toBeTruthy();
+    expect(screen.getByText("나를 멘션")).toBeTruthy();
+    expect(screen.queryByText("다른 팀 피드백")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /전체\s*5/u }));
+    const search = screen.getByRole<HTMLInputElement>("searchbox", { name: "댓글 검색" });
+    fireEvent.change(search, { target: { value: "채색 리드" } });
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(1);
+    expect(screen.getByText("다른 팀 피드백")).toBeTruthy();
+  });
+
+  it("moves through visible threads with J/K and clears search with Escape before closing", async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const onClose = vi.fn();
+    const threads = [
+      makeThread({
+        id: "thread-oldest",
+        body: "첫 번째 피드백",
+        createdAt: "2026-07-26T00:00:00.000Z",
+        updatedAt: "2026-07-26T00:00:00.000Z",
+      }),
+      makeThread({
+        id: "thread-middle",
+        body: "두 번째 피드백",
+        createdAt: "2026-07-26T01:00:00.000Z",
+        updatedAt: "2026-07-26T01:00:00.000Z",
+      }),
+      makeThread({
+        id: "thread-newest",
+        body: "세 번째 피드백",
+        createdAt: "2026-07-26T02:00:00.000Z",
+        updatedAt: "2026-07-26T02:00:00.000Z",
+      }),
+    ];
+
+    try {
+      render(
+        <StudioCommentsPanel
+          {...makePanelProps({ document: makeDocument(threads), onClose })}
+        />
+      );
+
+      const dialog = await screen.findByRole("dialog", { name: "검토 댓글" });
+      await screen.findByText("세 번째 피드백");
+      const newest = globalThis.document.querySelector<HTMLElement>(
+        '[data-studio-comment-thread-id="thread-newest"]'
+      );
+      const middle = globalThis.document.querySelector<HTMLElement>(
+        '[data-studio-comment-thread-id="thread-middle"]'
+      );
+      expect(newest?.tabIndex).toBe(0);
+
+      fireEvent.keyDown(dialog, { key: "j" });
+      await waitFor(() => expect(globalThis.document.activeElement).toBe(middle));
+      fireEvent.keyDown(middle as HTMLElement, { key: "k" });
+      await waitFor(() => expect(globalThis.document.activeElement).toBe(newest));
+
+      fireEvent.keyDown(dialog, { key: "/" });
+      const search = screen.getByRole<HTMLInputElement>("searchbox", { name: "댓글 검색" });
+      expect(globalThis.document.activeElement).toBe(search);
+      fireEvent.change(search, { target: { value: "두 번째" } });
+      fireEvent.keyDown(search, { key: "Escape" });
+      expect(search.value).toBe("");
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+      }
+    }
   });
 });
 

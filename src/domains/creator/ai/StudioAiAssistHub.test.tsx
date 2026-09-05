@@ -57,6 +57,45 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("StudioAiAssistHub production entry points", () => {
+  it("exposes the episode workflow and the advanced suite as real touch targets", () => {
+    const onOpenEpisodeProduction = vi.fn();
+    const onPreloadEpisodeProduction = vi.fn();
+    const onOpenSuperSuite = vi.fn();
+    const onPreloadSuperSuite = vi.fn();
+    const view = render(
+      <StudioAiAssistHub
+        {...createProps({
+          onOpenEpisodeProduction,
+          onPreloadEpisodeProduction,
+          onOpenSuperSuite,
+          onPreloadSuperSuite,
+        })}
+      />
+    );
+
+    const production = screen.getByRole("button", { name: /회차 AI 프로덕션/ });
+    const suite = screen.getByRole("button", { name: /AI 웹툰 생성 슈퍼 스위트/ });
+
+    expect(production.className).toContain("min-h-16");
+    expect(suite.className).toContain("min-h-11");
+    expect(
+      view.container.querySelector('[class*="motion-reduce:animate-none"]')
+    ).not.toBeNull();
+
+    fireEvent.mouseEnter(production);
+    fireEvent.pointerDown(production);
+    fireEvent.focus(suite);
+    fireEvent.click(production);
+    fireEvent.click(suite);
+
+    expect(onPreloadEpisodeProduction).toHaveBeenCalledTimes(2);
+    expect(onPreloadSuperSuite).toHaveBeenCalledTimes(1);
+    expect(onOpenEpisodeProduction).toHaveBeenCalledTimes(1);
+    expect(onOpenSuperSuite).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("StudioAiAssistHub prompt reveal", () => {
   it("applies a preset and scrolls its own tool panel after the next frame", () => {
     const props = createProps();

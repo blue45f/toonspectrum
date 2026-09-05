@@ -2,22 +2,16 @@
  * studio-ai-storyboard-director.ts
  *
  * Webtoon Scenario to Storyboard & Cut Director Engine.
- * Benchmarks Onoma AI (TooNat) and Naver Webtoon AI Rough Sketcher.
- *
- * - Parses raw screenplay, novel dialogue, or story text into sequential comic cuts.
- * - Automatically assigns cinematic shot scales (Close-up, Medium, Full, Bird's eye, Worm's eye).
- * - Suggests character emotional expressions, comic sound effects (SFX), and background prompts.
- * - Computes vertical panel height ratios to create dynamic webtoon scroll rhythm.
  */
 
 export type StoryboardShotScale =
-  | "extreme-close-up" // 눈, 입술, 쥐어쥔 주먹 등 극도의 긴장감
-  | "close-up" // 인물 얼굴 중심의 감정 전달
-  | "medium-shot" // 상반신 대화 및 제스처
-  | "full-shot" // 인물 전신과 즉각적인 행동
-  | "long-shot" // 전체 전황 및 배경 조망
-  | "birds-eye" // 하늘에서 내려다보는 부감
-  | "worms-eye"; // 바닥에서 올려다보는 극단적 로우앵글
+  | "extreme-close-up"
+  | "close-up"
+  | "medium-shot"
+  | "full-shot"
+  | "long-shot"
+  | "birds-eye"
+  | "worms-eye";
 
 export type StoryboardCameraAngle = "eye-level" | "low-angle" | "high-angle" | "dutch-tilt";
 
@@ -38,7 +32,7 @@ export interface StoryboardCutPlan {
   readonly emotion: CharacterEmotionalTone;
   readonly suggestedSfx?: string;
   readonly backgroundPrompt: string;
-  readonly panelHeightRatio: number; // 0.7 (compact) ~ 2.0 (massive climax cut)
+  readonly panelHeightRatio: number;
 }
 
 export interface StoryboardDirectingResult {
@@ -49,10 +43,20 @@ export interface StoryboardDirectingResult {
   readonly pacingScore: number;
 }
 
+const ACTION_PATTERN = /(?:결투|공격|타격|대검|장검|단검|마검|검(?=$|[\s,.:;!?)]|을|이|으로|과|도|만|날|집|자루|끝)|칼(?=$|[\s,.:;!?)]|을|이|로|과|도|만|날|자루|끝)|주먹|때리|폭발|쾅|쿵)/u;
+const QUOTED_DIALOGUE_PATTERN = /["“](.+?)["”]/u;
+const SPEAKER_DIALOGUE_PATTERN = /^\s*[^:：\n]{1,20}[:：]\s*(.+)$/u;
+
+function visualPromptSource(line: string): string {
+  const withoutDialogue = line
+    .replace(/["“][^"”]*["”]/gu, "")
+    .replace(/^\s*[^:：\n]{1,20}[:：]\s*/u, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return (withoutDialogue || "character reaction and visual acting").slice(0, 80);
+}
+
 export class StudioAiStoryboardDirector {
-  /**
-   * Directs and compiles text into a sequence of structured webtoon cuts.
-   */
   public direct(scriptText: string): StoryboardDirectingResult {
     const lines = scriptText
       .split(/\n+/)
@@ -70,23 +74,16 @@ export class StudioAiStoryboardDirector {
     }
 
     const cuts: StoryboardCutPlan[] = [];
-
     lines.forEach((line, index) => {
-      const cutNum = index + 1;
-      const parsed = this.analyzeLineDirectives(line, cutNum, lines.length);
-      cuts.push(parsed);
+      cuts.push(this.analyzeLineDirectives(line, index + 1, lines.length));
     });
-
-    // Estimate read time: ~6 seconds per cut average on mobile scroll
-    const estSec = cuts.length * 6;
-    const pacingScore = Math.min(100, Math.max(50, 95 - Math.abs(cuts.length - 8) * 3));
 
     return {
       rawText: scriptText,
       cuts,
       totalCuts: cuts.length,
-      estimatedEpisodeReadingSec: estSec,
-      pacingScore,
+      estimatedEpisodeReadingSec: cuts.length * 6,
+      pacingScore: Math.min(100, Math.max(50, 95 - Math.abs(cuts.length - 8) * 3)),
     };
   }
 
@@ -97,15 +94,12 @@ export class StudioAiStoryboardDirector {
     let suggestedSfx: string | undefined;
     let heightRatio = 1.0;
 
-    // Detect dialogue (lines with quotes or colon)
     let dialogue: string | undefined;
-    const quoteMatch = line.match(/["“](.+?)["”]/) || line.match(/:(.+)/);
-    if (quoteMatch) {
-      dialogue = quoteMatch[1]?.trim();
-    }
+    const quoteMatch = line.match(QUOTED_DIALOGUE_PATTERN);
+    const speakerMatch = line.match(SPEAKER_DIALOGUE_PATTERN);
+    dialogue = quoteMatch?.[1]?.trim() || speakerMatch?.[1]?.trim();
 
-    // Shot scale & emotion heuristics
-    if (/결투|공격|타격|검|주먹|때리|폭발|쾅|쿵/.test(line)) {
+    if (ACTION_PATTERN.test(line)) {
       shotScale = "full-shot";
       cameraAngle = "low-angle";
       emotion = "rage";
@@ -113,7 +107,6 @@ export class StudioAiStoryboardDirector {
       heightRatio = 1.5;
     } else if (/눈빛|숨결|동공|입술|바라보|경악|놀라|충격/.test(line)) {
       shotScale = "extreme-close-up";
-      cameraAngle = "eye-level";
       emotion = "shock";
       suggestedSfx = "두근";
       heightRatio = 0.9;
@@ -124,20 +117,14 @@ export class StudioAiStoryboardDirector {
       suggestedSfx = "주룩주룩";
       heightRatio = 1.2;
     } else if (/웃|미소|행복|기쁨|환호/.test(line)) {
-      shotScale = "medium-shot";
-      cameraAngle = "eye-level";
       emotion = "joy";
-      heightRatio = 1.0;
     } else if (cutNum === totalCuts) {
-      // Climax or cliffhanger at the end
       shotScale = "worms-eye";
       cameraAngle = "low-angle";
       emotion = "determination";
       suggestedSfx = "스윽";
       heightRatio = 1.8;
     }
-
-    const bgPrompt = `Webtoon background setting for ${line.slice(0, 30)}, cinematic lighting, clean manhwa cel aesthetic`;
 
     return {
       cutNumber: cutNum,
@@ -147,7 +134,7 @@ export class StudioAiStoryboardDirector {
       cameraAngle,
       emotion,
       suggestedSfx,
-      backgroundPrompt: bgPrompt,
+      backgroundPrompt: `Webtoon panel staging for ${visualPromptSource(line)}, cinematic lighting, clean manhwa cel aesthetic, no speech bubbles, no readable text`,
       panelHeightRatio: heightRatio,
     };
   }
