@@ -1,0 +1,76 @@
+name: Storyworld bounded CI failure evidence
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-ci-evidence-20260905.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    steps:
+      - name: Read only PR 746 diagnostic logs and pinned source files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, re, urllib.parse, urllib.request
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  target = super().redirect_request(req, fp, code, msg, headers, newurl)
+                  if urllib.parse.urlsplit(req.full_url).netloc != urllib.parse.urlsplit(newurl).netloc:
+                      target.remove_header('Authorization')
+                      target.remove_header('Accept')
+                  return target
+          opener = urllib.request.build_opener(SafeRedirect())
+          base = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          def get(path):
+              req = urllib.request.Request(base + path, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with opener.open(req, timeout=40) as response:
+                  return response.read()
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storyworld-evidence'
+          root.mkdir()
+          report = {'productSha': '99a6a6967a7fda099361b1f965491e3a028046dd', 'jobs': [], 'sources': []}
+          for job_id in [101324829790, 101324829781, 101324829786]:
+              job = json.loads(get(f'actions/jobs/{job_id}'))
+              assert job['run_id'] == 33973042310 and job['status'] == 'completed'
+              raw = get(f'actions/jobs/{job_id}/logs')
+              text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw.decode('utf-8-sig'))
+              lines = text.splitlines()
+              cleanup = next((i for i, line in enumerate(lines) if 'Post job cleanup.' in line), len(lines))
+              relevant = lines[:cleanup]
+              starts = [i for i, line in enumerate(relevant) if 'Failed Tests' in line or 'Failed Suites' in line]
+              start = starts[-1] if starts else max(0, len(relevant) - 140)
+              tail = '\n'.join(relevant[start:])[-25000:]
+              (root / f'job-{job_id}.txt').write_text(text)
+              report['jobs'].append({'id': job_id, 'name': job['name'], 'conclusion': job['conclusion'], 'sha256': hashlib.sha256(raw).hexdigest(), 'failureTail': tail})
+              print('::group::' + job['name'])
+              print(tail)
+              print('::endgroup::')
+          paths = [
+              'src/domains/creator/hybrid-dcc/StudioHybridDccViewport.test.tsx',
+              'src/domains/creator/hybrid-dcc/StudioHybridDccViewportInteraction.test.tsx',
+              'src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts',
+              'src/domains/creator/hybrid-dcc/viewport-preferences-store.ts',
+              'src/domains/creator/studio-router/StudioRouter.tsx',
+              '.github/workflows/ci.yml',
+          ]
+          for path in paths:
+              item = json.loads(get('contents/' + path + '?ref=' + report['productSha']))
+              raw = base64.b64decode(item['content'])
+              target = root / 'source' / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+              report['sources'].append({'path': path, 'blobSha': item['sha'], 'sha256': hashlib.sha256(raw).hexdigest()})
+          (root / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-ci-evidence-99a6a69
+          path: ${{ runner.temp }}/storyworld-evidence
+          retention-days: 3
+          include-hidden-files: true
