@@ -1,0 +1,73 @@
+name: Finalize wearable quality and capture evidence
+on:
+  push:
+    branches: [fix/studio-wearable-quality-merge-20260906]
+    paths: ['.github/workflows/studio-wearable-finalize.yml']
+permissions:
+  contents: read
+concurrency:
+  group: wearable-finalize-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  integrate-and-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply exact reviewed UI and insertion changes
+        run: node scripts/apply-studio-wearable-selection.mjs
+      - name: Lint changed production code and tests
+        run: pnpm exec eslint src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/studio-vrm-prop-selection.ts src/domains/creator/vrm/studio-vrm-prop-selection.test.ts src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx --fix --max-warnings=0
+      - name: Verify geometry, fitting, selection and legacy document contracts
+        run: pnpm exec vitest run src/domains/creator/vrm/studio-vrm-wearable-v5.test.ts src/domains/creator/vrm/studio-vrm-props.test.ts src/domains/creator/studio-everyday-props-pack-v4.test.ts src/domains/creator/vrm/StudioVrmPropPanel.test.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/studio-vrm-prop-selection.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.test.ts src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts
+      - name: Verify project architecture and types
+        run: |
+          node scripts/validate-architecture.mjs
+          pnpm run typecheck
+      - name: Promote only reviewed files on this exact branch
+        run: |
+          test "$GITHUB_REF_NAME" = 'fix/studio-wearable-quality-merge-20260906'
+          git add src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/studio-vrm-prop-selection.ts src/domains/creator/vrm/studio-vrm-prop-selection.test.ts src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx
+          mkdir -p .artifacts/wearable-finalize
+          git diff --cached --binary > .artifacts/wearable-finalize/selection.patch
+          git -c user.name='ToonStudio quality integration' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(studio): enforce wearable quality selection and preserve legacy scenes'
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Capture actual production components on both fitting rigs
+        run: |
+          export GITHUB_SHA="$(git rev-parse HEAD)"
+          pnpm exec tsx scripts/verify-studio-wearable-v5.mts
+      - name: Preserve exact source revision and review output
+        if: always()
+        run: |
+          mkdir -p .artifacts/wearable-finalize
+          git rev-parse HEAD > .artifacts/wearable-finalize/commit.txt
+          cp public/assets/3d/wearable-v5-manifest.json .artifacts/wearable-finalize/
+          tar -czf .artifacts/wearable-finalize/source.tar.gz src/domains/creator/vrm scripts/generate-studio-wearable-v5.mts scripts/studio-wearable-review-page.mjs scripts/verify-studio-wearable-v5.mts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wearable-finalize-${{ github.sha }}
+          path: |
+            .artifacts/wearable-finalize/
+            .artifacts/studio-wearable-v5/review.json
+            .artifacts/studio-wearable-v5/contact-sheet-*.jpg
+          include-hidden-files: true
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wearable-closeups-${{ github.sha }}
+          path: .artifacts/studio-wearable-v5/screenshots/*.png
+          include-hidden-files: true
+          retention-days: 7
