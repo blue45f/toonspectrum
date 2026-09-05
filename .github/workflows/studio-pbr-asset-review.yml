@@ -1,0 +1,92 @@
+name: Studio PBR asset review
+on:
+  push:
+    branches: [feat/studio-asset-pbr-review-20260906]
+    paths: [scripts/acquire_studio_pbr_assets.py, .github/workflows/studio-pbr-asset-review.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  acquire-render:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-asset-pbr-review-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare locked toolchain
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire official native 2K PBR originals with full dependencies
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Render real GLB files from three camera angles
+        run: node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Prepare original preview sheets and bounded source review
+        run: |
+          python3 - <<'PY'
+          import json,hashlib,os,pathlib,shutil
+          from PIL import Image,ImageDraw
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          manifest=json.loads((root/'manifest.json').read_text())
+          assets=manifest['assets']
+          valid=set()
+          for a in assets:
+              p=(root/a['path']).resolve()
+              assert p.is_relative_to(root.resolve())
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==a['sha256']
+              assert p.stat().st_size==a['bytes']
+              valid.add(p.parent)
+              if a['kind']=='model': assert a.get('browserRenderVerified') is True
+          for p in (root/'assets').iterdir():
+              if p.is_dir() and p.resolve() not in valid: shutil.rmtree(p)
+          shutil.rmtree(root/'_source',ignore_errors=True)
+          for page,start in enumerate(range(0,len(assets),12),1):
+              sheet=Image.new('RGB',(1600,1300),'#d9dde3'); draw=ImageDraw.Draw(sheet)
+              for i,a in enumerate(assets[start:start+12]):
+                  x=(i%4)*400;y=(i//4)*430
+                  with Image.open(root/a.get('previewPath',a['path'])) as original:
+                      image=original.convert('RGBA');image.thumbnail((380,370))
+                  sheet.paste(image,(x+(400-image.width)//2,y+(370-image.height)//2),image)
+                  draw.text((x+10,y+380),str(start+i+1)+' '+a['id'][:47],fill='#15191f')
+                  draw.text((x+10,y+402),a['kind']+' | native 2K | candidate',fill='#303843')
+              sheet.save(root/f'pbr-review-{page:02d}.jpg',quality=95)
+          out=pathlib.Path('docs/reports/pbr-asset-review-20260906');out.mkdir(parents=True,exist_ok=True)
+          for name in ['manifest.json','delivery-report.json','browser-render-evidence.json','source-receipts.json']:
+              shutil.copyfile(root/name,out/name)
+          for sheet in root.glob('pbr-review-*.jpg'):shutil.copyfile(sheet,out/sheet.name)
+          print('PBR ORIGINALS',len(assets),'MODEL RENDERS',sum(a['kind']=='model' for a in assets),flush=True)
+          print('ACQUISITION REPORT',json.dumps(json.loads((root/'delivery-report.json').read_text())),flush=True)
+          PY
+      - name: Retain candidates on the review branch, not the active catalog
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-asset-pbr-review-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          mkdir -p public/assets/studio/pbr-candidates-20260906
+          cp -a "$RUNNER_TEMP/pbr-review/assets" "$RUNNER_TEMP/pbr-review/previews" "$RUNNER_TEMP/pbr-review/manifest.json" public/assets/studio/pbr-candidates-20260906/
+          git add -- public/assets/studio/pbr-candidates-20260906 docs/reports/pbr-asset-review-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): retain native PBR candidates and actual render evidence"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_REVIEW_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-review/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
