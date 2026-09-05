@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { test } from "vitest";
 
+import { appRoutes } from "../../src/app/routes/route-manifest";
 import {
   mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes, previewReferenceImport,
   REFERENCE_STORAGE_KEY,
@@ -77,4 +80,16 @@ test("a queued save cannot silently adopt a newer conflict baseline", async () =
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.reason, "conflict");
   assert.equal(writes, 0);
+});
+
+
+test("reference discovery has one labeled route in the public manifest", () => {
+  assert.deepEqual(appRoutes.filter((route) => route.path === "/references"), [
+    { path: "/references", label: "route.references" },
+  ]);
+});
+
+test("reference discovery remains reachable from the public sitemap", () => {
+  const source = readFileSync(resolve(process.cwd(), "src/domains/legal/SitemapPage.tsx"), "utf8");
+  assert.equal(source.split('["/references",').length - 1, 1);
 });
