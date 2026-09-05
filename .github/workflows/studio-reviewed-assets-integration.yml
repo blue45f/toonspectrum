@@ -12,7 +12,7 @@ concurrency:
 jobs:
   reviewed-assets:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-reviewed-assets-final-20260906'
-    runs-on: ubuntu-latest
+    runs-on: macos-15-intel
     timeout-minutes: 30
     env:
       HUSKY: "0"
@@ -36,7 +36,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
           git -c core.hooksPath=/dev/null merge --no-edit origin/main
-          gh api repos/blue45f/toonspectrum/git/blobs/ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb --jq .content | base64 --decode > scripts/acquire_studio_pbr_assets.py
+          gh api repos/blue45f/toonspectrum/git/blobs/ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb --jq .content | python3 -c 'import sys,base64;sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > scripts/acquire_studio_pbr_assets.py
           test "$(git hash-object scripts/acquire_studio_pbr_assets.py)" = ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb
           python3 - <<'PY'
           from pathlib import Path
