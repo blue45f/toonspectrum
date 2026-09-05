@@ -23,7 +23,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
 
     expect(html).toContain('data-studio-original-marketplace="local-phase-1"');
     expect(html).toContain("독자 무료 스타터 마켓");
-    expect(html).toContain("32 FREE");
+    expect(html).toContain("24 FREE");
     expect(html).toContain("LOCAL PHASE 1");
     expect(html).toContain("결제·클라우드 동기화 없이");
     expect(html).toContain("결제 기능도 비활성");
@@ -36,7 +36,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
   it("shows package provenance, license, version, compatibility and update boundaries", () => {
     const html = renderPanel();
 
-    expect(html).toContain("일상 공간 블록아웃");
+    expect(html).not.toContain("일상 공간 블록아웃");
     expect(html).toContain("매일 쓰는 생활 소품");
     expect(html).toContain("날씨와 감정 오버레이");
     expect(html).toContain("판타지·SF 장르 소품");
@@ -48,11 +48,11 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("메타데이터 전용 로컬 명세 내보내기");
   });
 
-  it("renders all 32 accessible, draggable starter assets with real placement actions", () => {
+  it("renders all 24 selectable, draggable starter assets with real placement actions", () => {
     const html = renderPanel();
 
-    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(32);
-    expect(html).toContain('data-studio-original-asset="original-compact-studio-room"');
+    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(24);
+    expect(html).not.toContain('data-studio-original-asset="original-compact-studio-room"');
     expect(html).toContain('data-studio-original-asset="original-city-bicycle"');
     expect(html).toContain('data-studio-original-asset="original-night-bokeh"');
     expect(html).toContain('data-studio-original-asset="original-sci-fi-airlock"');
@@ -70,7 +70,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain('aria-controls="studio-original-marketplace-filters"');
     expect(html).toContain("카테고리 · 복수 선택");
     expect(html).toContain("<option");
-    expect(html).toContain("무료 (4)");
+    expect(html).toContain("무료 (3)");
     expect(html).toContain("유료 (0)");
     expect(html).toContain("구독 (0)");
     expect(html).toContain("내 라이브러리");
