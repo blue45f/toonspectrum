@@ -31,4 +31,5 @@ order and duplicate-engine isolation remain intact.
 
 Focused tests cover all 17 engine IDs, default projection, parameter clamping, polar mode,
 interpolation, deterministic controls, and the 77-item Smart Filter catalog count. Repository `core`
-remains the merge gate.
+remains the merge gate. The published pull-request diff contains only product source, tests, and this
+receipt; no temporary workflow, payload, or patch script remains.
