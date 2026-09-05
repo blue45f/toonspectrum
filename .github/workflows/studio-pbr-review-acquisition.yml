@@ -1,0 +1,86 @@
+name: Studio PBR review acquisition
+on:
+  push:
+    branches: [feat/studio-pbr-quality-extension-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  originals:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-pbr-quality-extension-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked review dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire actual PBR originals from the official API
+        run: python3 scripts/acquire_studio_pbr_extension.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Render actual models with neutral environment lighting
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/render_studio_asset_delivery.mjs');s=p.read_text()
+          s=s.replace("import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';\nimport { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';")
+          s=s.replace('renderer.setSize(384,384)', 'renderer.setSize(768,768)').replace('384*384*4','768*768*4').replace('gl.readPixels(0,0,384,384','gl.readPixels(0,0,768,768')
+          s=s.replace('renderer.toneMappingExposure = 1.15;', 'renderer.toneMappingExposure = 1;')
+          s=s.replace('const scene = new THREE.Scene();', 'const scene = new THREE.Scene();\nconst environment=new RoomEnvironment();\nconst pmrem=new THREE.PMREMGenerator(renderer);\nconst environmentTarget=pmrem.fromScene(environment,0.04);\nscene.environment=environmentTarget.texture;scene.environmentIntensity=0.7;environment.dispose();pmrem.dispose();')
+          s=s.replace('0x646479,2.6','0x646479,0.8').replace('0xffffff,3.2','0xffffff,1.6').replace('0xffffff,1.1','0xffffff,0.5')
+          p.write_text(s)
+          PY
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Prepare review sheets and verify PBR byte integrity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          import json,os,hashlib,shutil
+          root=Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          expected=set()
+          for a in assets:
+              p=root/a['path'];raw=p.read_bytes();assert len(raw)==a['bytes'] and hashlib.sha256(raw).hexdigest()==a['sha256'];expected.add(p.parent)
+              if a['kind']=='model':assert a.get('browserRenderVerified') is True
+          for p in (root/'assets').iterdir():
+              if p.is_dir() and p not in expected:shutil.rmtree(p)
+          for page,start in enumerate(range(0,len(assets),12),1):
+              sheet=Image.new('RGB',(1600,1300),'#e8e8ed');d=ImageDraw.Draw(sheet)
+              for i,a in enumerate(assets[start:start+12]):
+                  x=(i%4)*400;y=(i//4)*430
+                  with Image.open(root/a.get('previewPath',a['path'])) as src:
+                      im=src.convert('RGBA');im.thumbnail((384,370));sheet.paste(im,(x+(400-im.width)//2,y+10),im)
+                  d.text((x+8,y+387),a['id'][:47],fill='#101015');d.text((x+8,y+405),a['kind'],fill='#4e4e59')
+              sheet.save(root/f'pbr-review-{page:02d}.jpg',quality=95)
+          shutil.rmtree(root/'_source')
+          print('PBR ORIGINALS READY FOR PIXEL REVIEW',len(assets))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-candidates-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pbr-review/manifest.json
+            ${{ runner.temp }}/pbr-review/delivery-report.json
+            ${{ runner.temp }}/pbr-review/acquisition-plan.json
+            ${{ runner.temp }}/pbr-review/source-receipts.json
+            ${{ runner.temp }}/pbr-review/browser-render-evidence.json
+            ${{ runner.temp }}/pbr-review/assets/
+            ${{ runner.temp }}/pbr-review/previews/
+            ${{ runner.temp }}/pbr-review/pbr-review-*.jpg
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1
