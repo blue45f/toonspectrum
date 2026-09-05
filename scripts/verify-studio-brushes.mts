@@ -125,7 +125,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/home",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/analytics/traffic/",
+  "/api/analytics/traffic/page-view",
 ] as const;
 /**
  * Durability timing, both tied to the product's deferred-commit idle flush
@@ -645,6 +645,24 @@ function collectBrowserErrors(
   return collector;
 }
 
+async function captureBrushStageFailure(
+  page: Page,
+  stage: string,
+  error: unknown,
+  browserErrors: BrowserErrorCollector,
+): Promise<void> {
+  await page.screenshot({ path: join(SCRATCH, `studio-brush-${stage}-failure.png`) })
+    .catch(() => undefined);
+  writeFileSync(join(SCRATCH, `studio-brush-${stage}-failure.json`), JSON.stringify({
+    ok: false,
+    stage,
+    error: error instanceof Error ? error.stack ?? error.message : String(error),
+    browserErrors,
+    requestedRounds: STABILITY_ROUNDS,
+    uniquePresetCount: BRUSH_MATRIX_CATALOG_COUNT,
+  }, null, 2));
+}
+
 function reportBrowserErrors(collector: BrowserErrorCollector): void {
   for (const message of collector.messages.slice(0, 10)) log(`browser error: ${message}`);
   for (const message of collector.failedResponses.slice(0, 10)) log(`failed response: ${message}`);
@@ -885,10 +903,24 @@ async function openDesktopCatalog(page: Page): Promise<Locator> {
   await catalog.waitFor({ state: "visible" });
   invariant(await catalog.count() === 1, "desktop opened more than one built-in catalogue session");
   invariant(
-    await page.locator('[role="dialog"][data-studio-brush-catalog="built-in"]').count() === 1,
-    "desktop must expose exactly one built-in catalogue dialog",
+    await page.locator('[role="dialog"][data-studio-brush-floating]').count() === 1,
+    "desktop must expose exactly one floating built-in catalogue dialog",
+  );
+  invariant(
+    await catalog.getAttribute("role") === "region"
+      && await page.locator('[data-studio-brush-floating]')
+        .locator('[data-studio-brush-catalog-session="true"]').count() === 1,
+    "desktop catalogue region must belong to the unique floating dialog",
   );
   return catalog;
+}
+
+/** Desktop selection deliberately keeps its floating library open for repeated picking. */
+async function closeDesktopCatalog(page: Page, catalog: Locator): Promise<void> {
+  const dialog = page.locator('[role="dialog"][data-studio-brush-floating]');
+  await dialog.getByRole("button", { name: / 닫기$/u }).click();
+  await catalog.waitFor({ state: "detached" });
+  await dialog.waitFor({ state: "detached" });
 }
 
 async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
@@ -1024,8 +1056,13 @@ async function selectDesktopBrush(
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
-  await option.click({ force: true });
-  await catalog.waitFor({ state: "detached" }).catch(() => {});
+  await option.click();
+  await page.waitForFunction((id) => {
+    const button = document.querySelector<HTMLButtonElement>(
+      `[data-studio-brush-select="${id}"]`,
+    );
+    return Boolean(button && !button.disabled && button.getAttribute("aria-busy") !== "true");
+  }, preset.id);
   await page.waitForFunction(
     ({ drawMode }) => document
       .querySelector('[data-studio-draw-options="true"]')
@@ -1040,6 +1077,8 @@ async function selectDesktopBrush(
       ?.includes(expectedName) === true,
     { expectedName: preset.name },
   );
+  // Wait for the asynchronous profile selection BEFORE closing its host; closing early cancels it.
+  await closeDesktopCatalog(page, catalog);
   if (operation === "erase") {
     invariant(
       await page.locator(
@@ -1622,7 +1661,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       .locator('[data-studio-brush-catalog-session="true"]')
       .count();
     const catalogDialogCount = await page
-      .locator('[role="dialog"][data-studio-brush-catalog="built-in"]')
+      .locator('[role="dialog"][data-studio-brush-floating]')
       .count();
     // External-origin runs may target a build whose catalogue predates this tree; the strict
     // UI-vs-catalogue match only holds for the co-built local preview.
@@ -1639,14 +1678,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       log("desktop: UI/catalogue equality SKIPPED (external origin) — receipt records the skip");
     }
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
-    await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
-    await firstCatalog.waitFor({ state: "detached" });
+    await closeDesktopCatalog(page, firstCatalog);
 
     await activateDesktopEraser(page);
     const eraserCatalog = await openDesktopCatalog(page);
     await assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog);
-    await eraserCatalog.locator('[data-studio-brush-library-close="true"]').click();
-    await eraserCatalog.waitFor({ state: "detached" });
+    await closeDesktopCatalog(page, eraserCatalog);
     await activateDesktopPen(page);
 
     const stage = page.locator(".konvajs-content").first();
@@ -3635,6 +3672,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       toolsBelowFullCoverage: evidence.filter((entry) => entry.visibleSegments < 6).length,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
+  } catch (error) {
+    await captureBrushStageFailure(page, "long", error, errors);
+    throw error;
   } finally {
     await context.close();
   }
@@ -3752,6 +3792,11 @@ async function drawPenPathWithJitterHold(
 }
 
 async function enableSmartShape(page: Page): Promise<void> {
+  const railToggle = page.locator('button[data-studio-rail-tool-id="smart-shape"]');
+  if (await railToggle.isVisible()) {
+    if (await railToggle.getAttribute("aria-pressed") !== "true") await railToggle.click();
+    return;
+  }
   const buttons = page.getByRole("button", { name: "스마트 도형", exact: true });
   const count = await buttons.count();
   for (let index = 0; index < count; index += 1) {
@@ -3931,6 +3976,9 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
       screenshot,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
+  } catch (error) {
+    await captureBrushStageFailure(page, "shapes", error, errors);
+    throw error;
   } finally {
     await context.close();
   }
@@ -3953,7 +4001,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await dismissQuickStartOverlay(page, 4_000);
     await clickPastTransientOverlays(
       page,
-      dock.locator('button[aria-controls="studio-mobile-draw-settings"]'),
+      dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
     );
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
@@ -4009,7 +4057,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await eraserButton.click();
     await dock.locator('[data-studio-mobile-tool="eraser"][aria-pressed="true"]')
       .waitFor({ state: "visible" });
-    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])').click();
     await drawSheet.waitFor({ state: "visible" });
     const eraserQuickPicker = drawSheet.locator('[data-studio-eraser-quick-picker="true"]');
     await eraserQuickPicker.waitFor({ state: "visible" });
@@ -4046,6 +4094,9 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
       screenshot,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
+  } catch (error) {
+    await captureBrushStageFailure(page, "mobile", error, errors);
+    throw error;
   } finally {
     await context.close();
   }
@@ -4365,6 +4416,9 @@ async function runDeferredDurabilityAudit(
       screenshot,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
+  } catch (error) {
+    await captureBrushStageFailure(page, "durability", error, errors);
+    throw error;
   } finally {
     await context.close();
   }
@@ -4600,7 +4654,16 @@ async function main(): Promise<void> {
           : "ALL BRUSH AND SMART SHAPE BROWSER GATES OK",
     );
     writeBrowserEvidenceReceipt({ desktop, longBrushes, smartShapes, mobile, durability });
-    console.log(JSON.stringify({ scratch: SCRATCH, desktop, longBrushes, smartShapes, mobile, durability }, null, 2));
+    const stageReport = {
+      ok: true,
+      stage: requestedStage || "all",
+      finishedAt: new Date().toISOString(),
+      scratch: SCRATCH,
+      desktop, longBrushes, smartShapes, mobile, durability,
+    };
+    writeFileSync(join(SCRATCH, `studio-brush-${requestedStage || "all"}-report.json`),
+      JSON.stringify(stageReport, null, 2));
+    console.log(JSON.stringify(stageReport, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     if (server) await stopChildProcess(server).catch(() => undefined);
