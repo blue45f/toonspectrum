@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "vitest";
 import ts from "typescript";
+
+// The maintained workflow uses Node; the root suite uses Vitest. Keep both real registrations.
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const leaves = ["studio-page-review.ts", "studio-frame-animation-timing.ts"];
 for (const name of leaves) {

@@ -419,6 +419,15 @@ export default defineConfig(({ mode }) => ({
           // the BG3D editor (+28%) and even the admin/feedback routes then had to download. Merging
           // only pays when the merged modules carry nothing behind them.
           if (
+            id.endsWith("/src/domains/creator/bg3d/studio-bg3d-model-thumbnail-encode.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts")
+          ) {
+            // Every thumbnail encoder caller already loads the PNG Worker client. Keep this
+            // unconditional pair in one request rather than a separate 250-byte wrapper chunk.
+            // The Worker itself, capture controller and archive paths retain their boundaries.
+            return "studio-bg3d-png-client";
+          }
+          if (
             id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-workflow.ts")
             || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts")
             || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-multipass.ts")
