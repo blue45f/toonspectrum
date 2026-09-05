@@ -419,6 +419,18 @@ export default defineConfig(({ mode }) => ({
           // the BG3D editor (+28%) and even the admin/feedback routes then had to download. Merging
           // only pays when the merged modules carry nothing behind them.
           if (
+            id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-workflow.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-multipass.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx")
+          ) {
+            // The editor already needs these production UI contracts and its shared context.
+            // Co-locate the 200-byte context instead of issuing another request on activation.
+            // Its only runtime dependency is React, which keeps its existing react-runtime chunk.
+            // Never include panels, SceneDocument runtime, engines or archive/Worker clients here.
+            return "studio-bg3d-production-models";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-workspaces.ts")
             || id.endsWith("/src/domains/creator/brush/studio-drawing-palettes.ts")
           ) {
@@ -496,9 +508,11 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/live/studio-live-local-transport-support.ts")
             || id.endsWith("/src/domains/creator/studio-content-aware-fill-contract.ts")
             || id.endsWith("/src/domains/creator/studio-z-index.ts")
+            || id.endsWith("/src/domains/creator/studio-initial-primary-tool.ts")
           ) {
-            // These dependency-free leaves total less than 1 KiB, so co-locating their bounded
-            // capability constants removes three requests without capturing a feature runtime.
+            // These dependency-free leaves total less than 1 KiB. The initial-tool policy is
+            // already synchronous in workspace restoration; co-locate it instead of paying a
+            // separate startup request. Do not include the preferences repository or any UI.
             return "studio-tiny-capability-contracts";
           }
           if (
