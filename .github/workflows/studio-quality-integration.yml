@@ -90,7 +90,9 @@ jobs:
           mapfile -t files < <(git ls-files -m -o --exclude-standard | grep -E '\.(ts|tsx|mts)$')
           test "${#files[@]}" -gt 0
           pnpm exec prettier --write "${files[@]}"
-          pnpm exec eslint --fix "${files[@]}"
+          # Auto-fix is best-effort here. The later zero-warning lint step remains the
+          # authoritative gate and will fail on every unresolved lint finding.
+          pnpm exec eslint --fix "${files[@]}" || true
           git add -N "${files[@]}"
           git diff --check
 
