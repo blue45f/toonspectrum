@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { normalizeStudioCatalogText, queryStudioCatalog, studioCatalogOrientation, studioCatalogTerms } from "./studio-catalog-query";
 
 const source = Object.freeze([
