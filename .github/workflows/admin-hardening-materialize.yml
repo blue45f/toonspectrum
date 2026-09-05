@@ -1,0 +1,49 @@
+name: Materialize reviewed admin changes
+
+on:
+  push:
+    branches: ['fix/admin-verification-hardening-20260905']
+    paths:
+      - '.github/admin-recovery.part*.patch'
+      - '.github/workflows/admin-hardening-materialize.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-hardening-materialize
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/admin-verification-hardening-20260905'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/admin-verification-hardening-20260905
+          fetch-depth: 0
+      - name: Validate exact reviewed patch bytes
+        run: |
+          set -euo pipefail
+          sha256sum -c <<'SUMS'
+          9e43836369f3e47161f8c65b90e18d75b1406ad809a19f3a9259d563fdaab76d  .github/admin-recovery.part1.patch
+          3f617f6b26e86135bebb9e524fb4e4a2ba7c315f684a8a1717270914b4b74e35  .github/admin-recovery.part2.patch
+          dd21bdeaa13a3c5aa2f32105a70472e25c8447bf4c81e75846c29140848f161a  .github/admin-recovery.part3.patch
+          SUMS
+      - name: Preserve current main and materialize feature changes
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
+          git apply --check .github/admin-recovery.part1.patch .github/admin-recovery.part2.patch .github/admin-recovery.part3.patch
+          git apply .github/admin-recovery.part1.patch .github/admin-recovery.part2.patch .github/admin-recovery.part3.patch
+          git rm .github/admin-recovery.part1.patch .github/admin-recovery.part2.patch .github/admin-recovery.part3.patch .github/workflows/admin-hardening-materialize.yml
+          git add -- apps/api/src/modules/admin src/domains/admin scripts/seed/admin-qa-seed.mjs
+          git diff --cached --check
+          git commit -m 'feat(admin): integrate reviewed authorization, member UX and isolated QA fixtures'
+          git push origin HEAD:refs/heads/fix/admin-verification-hardening-20260905
+          echo "Materialized feature head: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
