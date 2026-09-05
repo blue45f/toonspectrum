@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_plaster_wall",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "name": "Painted Plaster Wall",
+    "categories": [
+      "wall",
+      "plaster-concrete",
+      "outdoor"
+    ],
+    "type": 1,
+    "tags": [
+      "rough",
+      "weathered",
+      "worn",
+      "wall",
+      "discolored",
+      "plaster",
+      "plastered",
+      "damaged",
+      "old",
+      "stained",
+      "dirty",
+      "exterior",
+      "timeworn"
+    ],
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1706140800,
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "77e9d68a3359a2815a60a62fd3f0eba0f2f41994",
+    "description": "Free 16K painted plaster texture showing  slightly discolored exterior plaster with worn patches, subtle stains, dirt and surface damage.",
+    "category_id": "9d3c7da3-4959-5d42-8abc-5c31017a2fd4",
+    "category": "Concrete/Plaster & Stucco/Painted Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "painted",
+        "weathered",
+        "worn",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 300717,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/painted_plaster_wall.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_diff_2k.jpg",
+      "bytes": 3132937,
+      "sha256": "6fd812ed8dd5be1873c29aeef38ce9bf1fb30a22c6d4b3a12db725e98c26a1be",
+      "sourceMd5": "32f4f4e5ded7d20e55e337004d0d9691"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_rough_2k.jpg",
+      "bytes": 1595466,
+      "sha256": "35aad595469533cc3b7cc209cc6c7e065d660211f02c867f4492d3b371b1fee1",
+      "sourceMd5": "7cdd5fbbe56f7becb757fc5b52d11d28"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_nor_gl_2k.jpg",
+      "bytes": 4048392,
+      "sha256": "2d601a46ed5ce2af866741c53cafa3cba472620c272e633b6484d4de16a80eb1",
+      "sourceMd5": "18faf9f7949aefdb3ae7cef7195cba04"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_ao_2k.jpg",
+      "bytes": 2176195,
+      "sha256": "3d89b5ea1f9d93d611ab0015d887b620ec9c6623e19effadba84ee9345c4c6fc",
+      "sourceMd5": "b911e43133db837371f58983f5270586"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/painted_plaster_wall/painted_plaster_wall_disp_2k.jpg",
+      "bytes": 1565195,
+      "sha256": "80859875e00fde2c883d37a4eb47728bece60f9eb7c8a907ce40b20d8faf5ed1",
+      "sourceMd5": "b7823671e9faf44796354ef65b1dbe76"
+    }
+  ]
+}

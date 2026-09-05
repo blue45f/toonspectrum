@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Modern Ceiling Lamp 01",
+    "categories": [
+      "lighting"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1623767623,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 5602,
+    "texel_density": 7075.021821808576,
+    "dimensions": [
+      431.6493272781372,
+      431.6607564687729,
+      951.5514969825745
+    ],
+    "files_hash": "d324ea2a3c480145e3cf8beca5ec9c408b257dbb",
+    "tags": [
+      "lighting",
+      "light",
+      "modern",
+      "glass",
+      "round",
+      "hanging",
+      "hanging lamp",
+      "ceiling lamp",
+      "decorative lighting",
+      "modern decor",
+      "interior design"
+    ],
+    "description": "Free 8K model of a modern hanging ceiling lamp - frosted glass globe with brushed metal fittings, clean round minimalist design perfect for modern interiors.",
+    "sponsors": [
+      "7899208",
+      "84390067"
+    ],
+    "category_id": "7dd2cb93-3ec2-5d14-853c-45c93d9ce1a3",
+    "category": "Lighting/Ceiling/Pendant Lights",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "glass",
+        "metal"
+      ]
+    },
+    "download_count": 29029,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_ceiling_lamp_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_2k.gltf",
+      "bytes": 6177,
+      "sha256": "d7417dd85e54626a51632d6eaf93712986ac2620ca3041dadc51a08b8ffa9bc9",
+      "sourceMd5": "f82da13a17c9132f29338a04faf4ab32"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_arm_2k.jpg",
+      "bytes": 412296,
+      "sha256": "53afe6f7b309782f937cd13893ad7cef92ae8d49669fc5b86ddd3bc82b30f14f",
+      "sourceMd5": "ab7c9670ac05907649ab63932ef88b2a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_nor_gl_2k.jpg",
+      "bytes": 267241,
+      "sha256": "80a790f97f096d05358231f9af1d5935a33deff6ce0cfe6ee9690f8130a5c4ef",
+      "sourceMd5": "242130eeac95d65dc878a20d271faf86"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_ceiling_lamp_01/modern_ceiling_lamp_01.bin",
+      "bytes": 146828,
+      "sha256": "ae5140a64e12e639554158901a5e92340bb37c706096ff255804e3220fb96367",
+      "sourceMd5": "48b86e7e6db78e6d3dfd85b765c3ab68"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_diff_2k.jpg",
+      "bytes": 240872,
+      "sha256": "b0341690dc56eeddd3efa8a91c179a26e163f330907e5483b6903626b600347e",
+      "sourceMd5": "55956852d44470d86da29fad4fd38099"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_bowl_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "name": "Wooden Bowl 02",
+    "categories": [
+      "props",
+      "decorative",
+      "dishes"
+    ],
+    "type": 2,
+    "tags": [
+      "antique",
+      "vintage",
+      "old",
+      "wooden",
+      "ornate",
+      "traditional",
+      "fruitbowl",
+      "rustic decor",
+      "home decor"
+    ],
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 4666,
+    "date_published": 1721952000,
+    "texel_density": 30356.62414607518,
+    "dimensions": [
+      130.71347028017044,
+      124.53967705368996,
+      73.09794479806442
+    ],
+    "files_hash": "203f860d0142d73da28bfd91a7a982532caf87ee",
+    "description": "Free 8K 3D model of a wooden bowl with warm honey-brown patina, irregular carved rim, rich burl grain and worn antique surface with rustic, ornate character.",
+    "category_id": "2e20c653-c7cf-5e53-bb6b-378fa9ad5722",
+    "category": "Food & Kitchen/Tableware/Bowls",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "download_count": 3781,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bowl_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_bowl_02/wooden_bowl_02_2k.gltf",
+      "bytes": 2800,
+      "sha256": "144404195bb47eccab110e50aeea4b38a164aca4a6c06d9748c3552390af4737",
+      "sourceMd5": "dd7fc5724ee8691e05edff0e73d11b72"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_nor_gl_2k.jpg",
+      "bytes": 2828507,
+      "sha256": "e3ab02649c3d8178c5d2c5c7e6a1a61746a72c0fcfc7bf3cfc33d07366346f9b",
+      "sourceMd5": "49edb4402571affbee105ee2f8707cdc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_arm_2k.jpg",
+      "bytes": 2660467,
+      "sha256": "be8b112b7fb6230a400d3114cd40472a049feed79501fcd66328c189d793f7ca",
+      "sourceMd5": "59a8910db4e34a013d2e2c6111325150"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_bowl_02/wooden_bowl_02.bin",
+      "bytes": 116156,
+      "sha256": "6e3e1fb30969e9a52db3519b01ace016628a361c2cd9e2817c5e50c1ffb8a1dd",
+      "sourceMd5": "92850bb8ba7e6dfd53f4b157276a8536"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_diff_2k.jpg",
+      "bytes": 2854102,
+      "sha256": "9f85b1f26c447d2aa0d6cdf355a24025bef2bee4db19aaf04e87b1ae5d06aa66",
+      "sourceMd5": "1723a07c9892ec9f16c0cc4479972d07"
+    }
+  ]
+}
