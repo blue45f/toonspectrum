@@ -1,54 +1,49 @@
 name: Studio 2D asset quality
 
 on:
-  push:
-    branches: [feat/studio-2d-assets-quality-20260906]
   pull_request:
+    branches: [main]
     paths:
       - 'src/domains/creator/studio-bg*'
-      - 'src/domains/creator/**/StudioBackground*'
       - 'src/domains/creator/studio-2d*'
+      - 'src/domains/creator/Studio2d*'
+      - 'src/domains/creator/StudioSceneToolPopoverBody.tsx'
       - 'scripts/studio-2d*'
       - 'public/assets/studio/backgrounds/**'
       - '.github/workflows/studio-2d-asset-quality.yml'
-
 permissions:
   contents: read
-
 concurrency:
   group: studio-2d-asset-quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
-  asset-evidence:
+  asset-quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Capture tracked development sources and original backgrounds
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit native source files and compatibility aliases
         run: |
           mkdir -p artifacts/studio-2d
-          python3 - <<'PY'
-          import pathlib, subprocess, tarfile
-          root = pathlib.Path('.')
-          names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
-          prefixes = ('src/', 'lib/', 'tests/', 'scripts/', 'public/assets/studio/backgrounds/', 'docs/studio-', '.github/workflows/')
-          with tarfile.open('artifacts/studio-2d/source-snapshot.tar.gz', 'w:gz') as archive:
-              for name in names:
-                  p = root / name
-                  if not name or not p.is_file() or p.is_symlink():
-                      continue
-                  if name.startswith(prefixes) or ('/' not in name and p.suffix in ('.json', '.yaml', '.yml', '.ts', '.js', '.mjs')):
-                      archive.add(p, arcname=name)
-          (root / 'artifacts/studio-2d/commit.txt').write_text(subprocess.check_output(['git','rev-parse','HEAD']).decode())
-          PY
-      - name: Validate asset manifests when available
-        run: |
-          if [ -f scripts/studio-2d-asset-quality.test.mjs ]; then
-            node --test scripts/studio-2d-asset-quality.test.mjs
-          fi
+          node scripts/studio-2d-asset-audit.mjs | tee artifacts/studio-2d/asset-audit.json
+          node --test scripts/studio-2d-asset-quality.test.mjs | tee artifacts/studio-2d/file-tests.txt
+      - name: Test scene filtering and accessible insertion
+        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts | tee artifacts/studio-2d/component-tests.txt
+      - name: Lint changed modules
+        run: pnpm exec eslint src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx scripts/studio-2d-*.mjs
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Validate actual component with original images in Chromium
+        run: node scripts/studio-2d-browser-smoke.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
