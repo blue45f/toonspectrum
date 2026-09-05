@@ -20,23 +20,67 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Pack exact tracked source and local model assets
+      - name: Pack bounded source and asset archives
         shell: bash
         run: |
           set -euo pipefail
           git rev-parse HEAD > /tmp/studio-3d-review-head.txt
-          git ls-files -z > /tmp/studio-3d-review-files.txt
-          tar --exclude='public/data/*' --exclude='artifacts/*' --exclude='qa-results/*' --exclude='test-results/*' --exclude='playwright-report/*' --null -T /tmp/studio-3d-review-files.txt -czf /tmp/studio-3d-review-source.tgz
-          du -sh /tmp/studio-3d-review-source.tgz public/assets/3d || true
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          paths = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          paths = [p for p in paths if p and pathlib.Path(p).is_file()]
+          text = {'.ts','.tsx','.js','.jsx','.mjs','.mts','.cts','.cjs','.json','.css','.scss','.html','.md','.yml','.yaml','.toml','.lock','.txt','.svg','.wgsl','.glsl','.rs','.py','.sh','.sql'}
+          source = [p for p in paths if not p.startswith('public/') and (pathlib.Path(p).suffix in text or '/' not in p) and pathlib.Path(p).stat().st_size < 20_000_000]
+          pathlib.Path('/tmp/studio-3d-code-files.txt').write_bytes(('\0'.join(source)+'\0').encode())
+          pathlib.Path('/tmp/studio-3d-file-manifest.json').write_text(json.dumps([{'path':p,'bytes':pathlib.Path(p).stat().st_size} for p in paths], ensure_ascii=False))
+          print('Tracked files:',len(paths),'code files:',len(source))
+          for p in sorted(paths,key=lambda p:pathlib.Path(p).stat().st_size,reverse=True)[:25]:
+              print(pathlib.Path(p).stat().st_size,p)
+          PY
+          tar --null -T /tmp/studio-3d-code-files.txt -czf /tmp/studio-3d-review-source.tgz
+          tar --exclude='public/data' -czf /tmp/studio-3d-review-assets.tgz public
+          split -b 80M -d /tmp/studio-3d-review-assets.tgz /tmp/studio-3d-assets.part-
+          du -sh /tmp/studio-3d-review-source.tgz /tmp/studio-3d-assets.part-*
       - uses: actions/upload-artifact@v6
         with:
-          name: studio-3d-review-source-${{ github.sha }}
+          name: studio-3d-review-code-${{ github.sha }}
           path: |
             /tmp/studio-3d-review-source.tgz
             /tmp/studio-3d-review-head.txt
+            /tmp/studio-3d-file-manifest.json
           retention-days: 2
           compression-level: 0
           if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-assets-00-${{ github.sha }}
+          path: /tmp/studio-3d-assets.part-00
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-assets-01-${{ github.sha }}
+          path: /tmp/studio-3d-assets.part-01
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-assets-02-${{ github.sha }}
+          path: /tmp/studio-3d-assets.part-02
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-assets-03-${{ github.sha }}
+          path: /tmp/studio-3d-assets.part-03
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-assets-04-${{ github.sha }}
+          path: /tmp/studio-3d-assets.part-04
+          retention-days: 2
+          compression-level: 0
 
   review-runtime:
     runs-on: ubuntu-latest
@@ -55,7 +99,7 @@ jobs:
           cache: pnpm
       - name: Install exact locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Pack offline review runtime without credentials
+      - name: Pack bounded offline runtime without credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -64,15 +108,51 @@ jobs:
           cp "$(command -v node)" /tmp/studio-3d-runtime/bin/node
           find . -type d -name node_modules -prune -print0 > /tmp/studio-3d-module-paths.txt
           tar --null -T /tmp/studio-3d-module-paths.txt -czf /tmp/studio-3d-review-modules.tgz
+          split -b 80M -d /tmp/studio-3d-review-modules.tgz /tmp/studio-3d-modules.part-
           tar -C /tmp/studio-3d-runtime -czf /tmp/studio-3d-review-node.tgz bin
-          du -sh node_modules /tmp/studio-3d-review-modules.tgz
+          du -sh /tmp/studio-3d-modules.part-* /tmp/studio-3d-review-node.tgz
       - uses: actions/upload-artifact@v6
         with:
-          name: studio-3d-review-runtime-${{ github.sha }}
+          name: studio-3d-review-node-${{ github.sha }}
           path: |
-            /tmp/studio-3d-review-modules.tgz
             /tmp/studio-3d-review-node.tgz
             /tmp/studio-3d-runtime-head.txt
           retention-days: 2
           compression-level: 0
           if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-00-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-00
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-01-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-01
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-02-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-02
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-03-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-03
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-04-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-04
+          retention-days: 2
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-modules-05-${{ github.sha }}
+          path: /tmp/studio-3d-modules.part-05
+          retention-days: 2
+          compression-level: 0
