@@ -56,11 +56,26 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
     });
     return () => controller.abort();
   }, [open, catalog, revision]);
-  useEffect(() => () => insertController.current?.abort(), []);
+  useEffect(() => () => {
+    insertController.current?.abort();
+    insertController.current = null;
+  }, []);
+
+  function dismissPreview(): void {
+    // Closing a retained panel does not unmount this component. Cancel its pending work explicitly
+    // so a late download cannot modify the canvas after the artist has left the preview/library.
+    const pending = insertController.current;
+    insertController.current = null;
+    pending?.abort();
+    setInserting(null);
+    if (pending) setNotice("에셋 삽입을 취소했습니다.");
+    setPreview(null);
+  }
+
   useStudioModalSheet({
     activeKey: preview ? `cc0-asset-preview:${preview.id}` : null,
     dialogRef: previewRef, rootRef,
-    onDismiss: () => setPreview(null),
+    onDismiss: dismissPreview,
     resolveInitialFocus: dialog => dialog.querySelector<HTMLElement>("[data-autofocus='true']"),
   });
   const filtered = useMemo(() => curateStudioCc0Selection(
@@ -78,13 +93,21 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
     setInserting(asset.id); setNotice("");
     try {
       const item = await createStudioCc0ImageRecord(asset, controller.signal);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || insertController.current !== controller) return;
       const added = onUseAsset(item);
       setNotice(added ? `${asset.name} 에셋을 삽입했습니다.` : "캔버스에 삽입하지 못했습니다. 편집 가능한 컷을 선택해 주세요.");
       if (added) setPreview(null);
     } catch (error: unknown) {
-      if (!controller.signal.aborted) setNotice(error instanceof Error ? error.message : "에셋 삽입에 실패했습니다.");
-    } finally { if (!controller.signal.aborted) setInserting(null); }
+      if (!controller.signal.aborted && insertController.current === controller) {
+        setNotice(error instanceof Error ? error.message : "에셋 삽입에 실패했습니다.");
+      }
+    } finally {
+      // A cancelled predecessor must not clear the loading state of a newer insertion.
+      if (insertController.current === controller) {
+        insertController.current = null;
+        setInserting(null);
+      }
+    }
   }
   function renderUseButton(asset: StudioCc0Asset) {
     return asset.kind === "model"
@@ -92,7 +115,7 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
       : <button className={`${CONTROL} mt-2 w-full`} type="button" disabled={inserting !== null} onClick={() => {void insert(asset);}}>{inserting === asset.id ? "검증·삽입 중…" : "캔버스에 삽입"}</button>;
   }
   return (
-    <details ref={rootRef} className="mb-3 rounded-xl border border-line bg-card/70 p-3" data-studio-cc0-library="true" onToggle={event => {setOpen(event.currentTarget.open); if (!event.currentTarget.open) setPreview(null);}}>
+    <details ref={rootRef} className="mb-3 rounded-xl border border-line bg-card/70 p-3" data-studio-cc0-library="true" onToggle={event => {setOpen(event.currentTarget.open); if (!event.currentTarget.open) dismissPreview();}}>
       <summary className="min-h-11 cursor-pointer rounded-md text-sm font-bold text-fg-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">CC0 원본 에셋 라이브러리 {catalog ? `· ${catalog.length}종` : ""}</summary>
       {open && <div className="mt-2 space-y-3">
         <p className="text-xs leading-relaxed text-fg-3">질감이 있는 PBR 원본과 스타일라이즈 소품을 구분해서 찾습니다. 3D는 GLB를 받은 뒤 모델 가져오기를 사용하세요. 효과·재질 이미지는 캔버스에 바로 삽입합니다.</p>
@@ -113,12 +136,13 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
             {pages > 1 && <nav className="flex items-center justify-between gap-2" aria-label="에셋 페이지"><button type="button" className={CONTROL} disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>이전</button><span className="text-xs text-fg-3">{currentPage + 1} / {pages}</span><button type="button" className={CONTROL} disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)}>다음</button></nav>}
           </>}
         <p role="status" aria-live="polite" className="text-xs leading-relaxed text-fg-2">{notice}</p>
-        <p className="text-[0.65rem] leading-relaxed text-fg-3">1차 시각 검수에서 문제가 확인된 항목과 픽셀로 확인한 회전 중복은 신규 목록에서 제외합니다. 원본·출처·파일 해시는 보존하며, 기존 작품은 삭제하지 않습니다. 효과는 원본 크기 이내 사용을 권장합니다.</p>
+        <p className="text-[0.65rem] leading-relaxed text-fg-3">1차 시각 검수에서 문제가 확인된 항목은 신규 목록에서 제외하고 조립부품은 별도로 표시합니다. 원본·출처·파일 해시는 보존하며, 기존 작품은 삭제하지 않습니다. 효과는 원본 크기 이내 사용을 권장합니다.</p>
       </div>}
       {preview && <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-3"><div ref={previewRef} role="dialog" aria-modal="true" aria-labelledby={previewTitleId} tabIndex={-1} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-xl border border-line bg-panel p-4 shadow-xl">
-        <div className="flex items-center justify-between gap-3"><h3 id={previewTitleId} className="text-sm font-bold text-fg-1">{preview.name}</h3><button type="button" data-autofocus="true" className={CONTROL} onClick={() => setPreview(null)}>닫기</button></div>
+        <div className="flex items-center justify-between gap-3"><h3 id={previewTitleId} className="text-sm font-bold text-fg-1">{preview.name}</h3><button type="button" data-autofocus="true" className={CONTROL} onClick={dismissPreview}>닫기</button></div>
         <img src={studioCc0AssetUrl(preview.previewPath ?? preview.path)} alt={`${preview.name} 실제 파일 미리보기`} className={`mt-3 max-h-[60dvh] w-full rounded-lg object-contain ${imageClass(preview)}`} />
         <p className="mt-2 text-xs leading-relaxed text-fg-2">{studioCc0StyleLabel(preview)} · {categoryLabel(preview)} · {preview.provider} · CC0<br />{preview.kind === "model" ? "이 이미지는 해당 GLB의 렌더입니다. 실제 모델은 회전·확대하여 사용할 수 있습니다." : `원본 ${preview.width}×${preview.height}px. 표시 크기는 화면에 맞춰 축소됩니다.`}</p>{renderUseButton(preview)}
+        <p role="status" aria-live="polite" className="mt-2 text-xs leading-relaxed text-fg-2">{notice}</p>
       </div></div>}
     </details>
   );
