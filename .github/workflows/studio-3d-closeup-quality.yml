@@ -1,0 +1,78 @@
+name: Studio 3D close-up quality
+
+on:
+  push:
+    branches: [fix/studio-3d-closeup-quality-20260906]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-3d-closeup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Pack exact tracked source and local model assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > /tmp/studio-3d-review-head.txt
+          git ls-files -z > /tmp/studio-3d-review-files.txt
+          tar --exclude='public/data/*' --exclude='artifacts/*' --exclude='qa-results/*' --exclude='test-results/*' --exclude='playwright-report/*' --null -T /tmp/studio-3d-review-files.txt -czf /tmp/studio-3d-review-source.tgz
+          du -sh /tmp/studio-3d-review-source.tgz public/assets/3d || true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-source-${{ github.sha }}
+          path: |
+            /tmp/studio-3d-review-source.tgz
+            /tmp/studio-3d-review-head.txt
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: error
+
+  review-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install exact locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Pack offline review runtime without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > /tmp/studio-3d-runtime-head.txt
+          mkdir -p /tmp/studio-3d-runtime/bin
+          cp "$(command -v node)" /tmp/studio-3d-runtime/bin/node
+          find . -type d -name node_modules -prune -print0 > /tmp/studio-3d-module-paths.txt
+          tar --null -T /tmp/studio-3d-module-paths.txt -czf /tmp/studio-3d-review-modules.tgz
+          tar -C /tmp/studio-3d-runtime -czf /tmp/studio-3d-review-node.tgz bin
+          du -sh node_modules /tmp/studio-3d-review-modules.tgz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-review-runtime-${{ github.sha }}
+          path: |
+            /tmp/studio-3d-review-modules.tgz
+            /tmp/studio-3d-review-node.tgz
+            /tmp/studio-3d-runtime-head.txt
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: error
