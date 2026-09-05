@@ -115,7 +115,8 @@ function paintKey(element: El): string | null {
         element.outlineStroke ?? null,
         element.materialPressureModel ?? null,
         element.materialMinimumDiameterRatio ?? null,
-        element.inkWash ?? null,
+        element.stampPipeline ?? null,
+        element.watercolorPipeline ?? null,
       ]);
     case "text":
       return stableValue([
