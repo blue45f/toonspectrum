@@ -48,7 +48,7 @@ describe("Studio collaboration route gateways", () => {
     await screen.findByText("SQLite/OPFS 저장됨");
     expect(database.kvGet).toHaveBeenCalledWith("studio-production-command-center-v1", scopeKey);
     expect(screen.getByRole("heading", { name: "리뷰 및 승인" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "리뷰", exact: true }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: /^리뷰$/u }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(editorHref);
     expect(screen.queryByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeNull();
     expect(database.kvSet).not.toHaveBeenCalled();
