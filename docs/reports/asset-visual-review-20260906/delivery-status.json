@@ -1,0 +1,70 @@
+{
+  "schema": "toonspectrum.asset-review-status.v1",
+  "recordedOn": "2026-09-06",
+  "mergedBase": {
+    "pullRequest": 770,
+    "mergeSha": "7707c5e2cc9a10fc09bf9822f9f81387f2e44e89",
+    "mergedAtUtc": "2026-09-05T19:30:55Z",
+    "storedCc0Originals": 1097,
+    "requiredCore": "success",
+    "requiredCoreJob": 101357442913,
+    "fullProductionBuild": "success-in-pr-ci",
+    "separateWebGpuReopenGate": "failed-before-frame-comparison",
+    "webGpuFollowupIssue": 785,
+    "deploymentVerified": false
+  },
+  "staticVisualScreening": {
+    "inventoryItems": 1351,
+    "method": "contact-sheet inspection with targeted closeup and SVG before/after comparisons",
+    "evidenceRevision": "0c99edac76dc728f8ba3a58b887a3ce35bcfab7b",
+    "newRenderingDefectsQuarantined": 1,
+    "rotationDerivativesRemovedFromNewSelection": 16,
+    "transparentStarterPropsRepaired": 16,
+    "particleOverlaysRepaired": 3,
+    "additionalRepair": "four box side faces closed; ten golden dust sparkles independently scattered",
+    "previouslyRetiredBlockouts": 8,
+    "previouslyExcludedOutfitReferenceMeshes": 18,
+    "allOriginalsFullResolutionApproved": false,
+    "allDynamicBrushPoseOutfitCombinationsInspected": false
+  },
+  "additionalDetailedPbr": {
+    "acquisitionRun": 33984917046,
+    "acquisitionJob": 101356553690,
+    "artifactId": 9975090308,
+    "artifactSha256": "83a7e541158f170b0f2c2fa139dd1db4fbfff9ec155211ad7fb06d9f234d9bbf",
+    "downloadedOriginals": 65,
+    "models": 35,
+    "materials": 30,
+    "nativeResolution": "2K",
+    "supplier": "Poly Haven",
+    "license": "CC0-1.0",
+    "modelThreeAngleBrowserRenderPasses": 35,
+    "modelBrowserRenderFailures": 0,
+    "rejectedCandidates": 5,
+    "rejectionReason": "native 2K glTF or required PBR base-color map not available through the selected descriptor",
+    "visualViewsPrepared": 135,
+    "visuallyApprovedForApp": 0,
+    "publishedToMain": 0
+  },
+  "standaloneScreenedDownload": {
+    "selectedExternalOriginals": 1080,
+    "activeOriginalSvg": 24,
+    "selectedTotal": 1104,
+    "includesAdditionalPbr": false,
+    "changedSvgOriginals": 19,
+    "notice": "This is a separately prepared download. It does not imply the follow-up application changes are merged."
+  },
+  "followUpApplication": {
+    "branch": "feat/studio-assets-visual-curation-20260906",
+    "sourceAndPreparationScriptsWritten": true,
+    "queuedVerificationWorkflow": ".github/workflows/studio-curation-verify.yml",
+    "includesBoxAndSparkleRepair": true,
+    "reviewTransportRun": 33986329093,
+    "verificationCompleted": false,
+    "merged": false,
+    "autoMergeAuthorized": false,
+    "pending": ["receive and inspect all 135 new PBR views", "record explicit PBR visual allowlist", "execute app curation regressions", "stage approved new originals", "required CI for follow-up PR", "merge follow-up", "verify deployment and Studio save/restore"]
+  },
+  "userData": "No OPFS, database records, saved works or user uploads were deleted. Legacy source files and identifiers remain available.",
+  "countsNotice": "Preview images and material companion maps are not extra original assets. Previously retired assets are not counted as new removals. 1351 is the static inspection inventory, not a claim of 1351 distinct original artworks."
+}
