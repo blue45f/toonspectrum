@@ -1,6 +1,8 @@
 import { ForbiddenException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AdminMembersService } from "./admin-members.service";
+
 const doubles = vi.hoisted(() => ({
   update: vi.fn(), lifecycle: vi.fn(), invalidate: vi.fn(), audit: vi.fn(),
 }));
@@ -18,8 +20,6 @@ vi.mock("./admin-types", () => ({
   normalizeRole:(role:string)=>role,parseMemberStatus:(status:string)=>status,
   parseString:(value:string)=>value,parsePositiveInt:vi.fn(),escapeLike:vi.fn(),toNumber:Number,
 }));
-
-import { AdminMembersService } from "./admin-members.service";
 
 describe("operator member-write integration within the service", () => {
   beforeEach(() => { vi.clearAllMocks(); });
