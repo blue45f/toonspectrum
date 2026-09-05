@@ -64,6 +64,7 @@ import {
 import type { StudioWorkbenchTab } from "../studio-workbench-tabs";
 import type { StudioCopyFeedbackStatus } from "../use-studio-copy-feedback";
 import type { ReactElement } from "react";
+import type { StudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 
 import { cn } from "@/lib/utils";
 
@@ -204,12 +205,14 @@ export interface StudioAiSuperSuiteModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly onApplyPrompt?: (prompt: string) => void;
+  readonly onApplyPromptRecipe?: (handoff: StudioAiSuitePromptHandoff) => void;
 }
 
 export function StudioAiSuperSuiteModal({
   open,
   onClose,
   onApplyPrompt,
+  onApplyPromptRecipe,
 }: StudioAiSuperSuiteModalProps) {
   const rawId = useId();
   const idPrefix = `ai-super-suite-${rawId.replace(/:/gu, "")}`;
@@ -581,11 +584,23 @@ export function StudioAiSuperSuiteModal({
                     </div>
                   </dl>
 
-                  {onApplyPrompt && (
+                  {(onApplyPromptRecipe || onApplyPrompt) && (
                     <>
                       <button
                         type="button"
-                        onClick={() => onApplyPrompt(compiledStylePrompt.positivePrompt)}
+                        onClick={() => {
+                          if (onApplyPromptRecipe) {
+                            onApplyPromptRecipe({
+                              version: 1,
+                              positivePrompt: compiledStylePrompt.positivePrompt,
+                              negativePrompt: compiledStylePrompt.negativePrompt,
+                              denoiseStrength: compiledStylePrompt.denoiseStrength,
+                              recommendedSettings: compiledStylePrompt.recommendedSettings,
+                            });
+                            return;
+                          }
+                          onApplyPrompt?.(compiledStylePrompt.positivePrompt);
+                        }}
                         className={cn(
                           "mt-2 flex items-center justify-center gap-1 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent shadow-sm",
                           STUDIO_EASE,
@@ -594,11 +609,16 @@ export function StudioAiSuperSuiteModal({
                         )}
                       >
                         <Sparkles className="size-3.5" aria-hidden />
-                        <span>포지티브 프롬프트만 배경/캐릭터 생성기로 전송</span>
+                        <span>
+                          {onApplyPromptRecipe
+                            ? "전체 화풍 레시피를 배경 생성기로 전송"
+                            : "포지티브 프롬프트만 배경/캐릭터 생성기로 전송"}
+                        </span>
                       </button>
                       <p className="text-[0.62rem] leading-relaxed text-fg-3">
-                        네거티브 프롬프트와 디노이즈·권장 설정은 함께 전송되지 않아요. 위 값을
-                        복사해 생성기에서 직접 지정해 주세요.
+                        {onApplyPromptRecipe
+                          ? "포지티브·네거티브·디노이즈·선 두께·대비·채도를 제공자 호환 프롬프트로 보존해 전달해요."
+                          : "현재 연결은 포지티브 프롬프트만 전달해요. 나머지 값은 위에서 복사해 주세요."}
                       </p>
                     </>
                   )}
