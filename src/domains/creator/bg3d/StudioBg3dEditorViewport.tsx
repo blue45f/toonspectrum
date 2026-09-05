@@ -7,6 +7,7 @@
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
+import { StudioBg3dEngineRecoveryActions } from "./StudioBg3dEngineRecoveryActions";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
 import { StudioBg3dTurntableController } from "./StudioBg3dTurntableController";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
@@ -374,6 +375,10 @@ export function StudioBg3dEditorViewport({ h }) {
                       자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
                       WebGPU 또는 WebGL2를 직접 선택해 주세요.
                     </p>
+                    <StudioBg3dEngineRecoveryActions
+                      preference={engineRuntime.preference}
+                      onPreferenceChange={engineRuntime.setPreference}
+                    />
                   </div>
                 ) : (
                   <Canvas

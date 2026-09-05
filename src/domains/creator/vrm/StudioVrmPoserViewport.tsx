@@ -83,7 +83,11 @@ import type {
   VRM,
 } from "@pixiv/three-vrm";
 
-export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
+export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
+  h: StudioVrmPoserHost;
+  /** Shaper supplies accessible chrome and uses the available panel instead of a nested portrait. */
+  presentation?: "poser" | "shaper";
+}) {
   const {
     viewportInstructionsId,
     status,
@@ -190,6 +194,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
     handleWardrobeSurfaceReceipt,
     handleWardrobeXpbdCaptureSyncChange,
   } = h;
+  const frameless = broadcastPreviewActive || presentation === "shaper";
   return (
           <section
             aria-hidden={broadcastPreviewActive || undefined}
@@ -203,7 +208,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
             <div
               className={cx(
                 "relative mx-auto flex h-full min-h-0 w-full items-center justify-center",
-                broadcastPreviewActive
+                frameless
                   ? "max-h-none max-w-none p-0 lg:min-h-0"
                   : "max-h-full max-w-[min(82vw,720px)] p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]",
               )}
@@ -212,7 +217,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                 ref={broadcastViewportHostRef}
                 className={cx(
                   "relative h-full min-h-0 overflow-hidden bg-transparent",
-                  broadcastPreviewActive
+                  frameless
                     ? "max-h-none w-full rounded-none border-0 shadow-none lg:min-h-0"
                     : "aspect-[9/13] max-h-full w-auto rounded-xl border border-line/80 shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]",
                 )}
@@ -490,7 +495,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                   />
                 </Canvas>
 
-                {vrm && !broadcastPreviewActive ? (
+                {vrm && !broadcastPreviewActive && presentation === "poser" ? (
                   <>
                     <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
                       <StudioToolHintTarget
@@ -619,7 +624,7 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                   </>
                 ) : null}
 
-                {status === "empty" ? (
+                {status === "empty" && presentation === "poser" ? (
                   <div className="absolute inset-0 grid place-items-center bg-card/50 p-6 text-center backdrop-blur-[1px]">
                     <div className="max-w-[22rem]">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">

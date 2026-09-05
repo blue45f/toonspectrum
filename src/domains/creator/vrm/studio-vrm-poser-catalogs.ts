@@ -349,6 +349,14 @@ export const CAMERA_PRESETS: CameraPreset[] = [
   { id: "dutch", label: "더치 앵글", position: [1.2, 1.35, 2.6], target: [0, 1.25, 0], fov: 33 },
   { id: "topDown", label: "탑 다운", position: [0.2, 3.4, 1.2], target: [0, 1.1, 0], fov: 36 },
   { id: "birdEyeIsometric", label: "조감도 쿼터뷰", position: [2.4, 3.1, 2.6], target: [0, 0.7, 0], fov: 24 },
+  { id: "back", label: "후면", position: [0, 1.25, -3.15], target: [0, 1.22, 0], fov: 30 },
+  { id: "profileReverse", label: "반대 측면", position: [-2.8, 1.4, 0.35], target: [0, 1.25, 0], fov: 30 },
+  { id: "inspectTorso", label: "상의·허리 확대", position: [0, 1.25, 2], target: [0, 1.2, 0], fov: 30 },
+  { id: "inspectTorsoBack", label: "등·착장 확대", position: [0, 1.25, -2], target: [0, 1.2, 0], fov: 30 },
+  { id: "inspectLowerBody", label: "하의 확대", position: [0.2, 0.8, 2], target: [0, 0.7, 0], fov: 30 },
+  { id: "inspectFeet", label: "신발·접지 확대", position: [0.4, 0.4, 1.4], target: [0, 0.1, 0], fov: 30 },
+  { id: "inspectLeftHand", label: "왼손·그립 확대", position: [0.25, 1.1, 1.5], target: [0, 1, 0], fov: 30 },
+  { id: "inspectRightHand", label: "오른손·그립 확대", position: [-0.25, 1.1, 1.5], target: [0, 1, 0], fov: 30 },
 ];
 
 export const BONE_LABELS: Record<string, string> = {
