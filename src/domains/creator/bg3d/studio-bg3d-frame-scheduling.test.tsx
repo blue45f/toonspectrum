@@ -72,7 +72,9 @@ describe("BG3D event-driven frame quality sampling", () => {
   });
 
   it("wires the viewport's transform lock and rejects the removed experiment", () => {
-    const source = readFileSync(new URL("./StudioBg3dEditorViewport.tsx", import.meta.url), "utf8");
+    // Resolve a source file through Node, not Vite's browser-asset new-URL transform.
+    const require = createRequire(import.meta.url);
+    const source = readFileSync(require.resolve("./StudioBg3dEditorViewport.tsx"), "utf8");
     expect(source).toContain("paused={isTransforming || isCapturing || immersiveSceneActive || !open}");
     expect(source).not.toContain("EXPERIMENT: no isTransforming");
   });

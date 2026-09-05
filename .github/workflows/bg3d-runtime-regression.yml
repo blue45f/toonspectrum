@@ -63,7 +63,7 @@ jobs:
             e2e/studio-bg3d-compositor-sampler.ts \
             playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
             scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-discovery.test.ts \
-            scripts/studio-bg3d-runtime-setup.mts \
+            scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/studio-bg3d-runtime-setup.mts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability.ts \
@@ -80,21 +80,14 @@ jobs:
         run: |
           pnpm exec tsc --project tsconfig.bg3d-runtime.json
           pnpm run typecheck
-      - name: Test capability, scheduling and single-canvas renderer ownership
+      - name: Test the entire BG3D domain and release verification contracts
         run: |
-          pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
+          mkdir -p test-results
+          pnpm exec vitest run src/domains/creator/bg3d \
+            scripts/studio-bg3d-runtime-reporter.test.ts \
             scripts/studio-bg3d-runtime-discovery.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-engine-selection.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
-            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx \
-            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
-            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-render-policy.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-frame-scheduling.test.tsx \
-            src/domains/creator/bg3d/studio-bg3d-frame-quality-governor.test.ts --reporter=verbose
+            scripts/studio-bg3d-runtime-release-wiring.test.ts \
+            --reporter=default --reporter=json --outputFile=test-results/bg3d-unit-results.json
       - name: Install Chromium and its runtime dependencies
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the production app to be verified
@@ -106,7 +99,7 @@ jobs:
           xvfb-run -a --server-args="-screen 0 1920x1200x24" \
             pnpm exec playwright test --config=playwright.bg3d-runtime.config.ts \
             2>&1 | tee "$RUNNER_TEMP/bg3d-runtime.log"
-      - name: Preserve runtime screenshots, metrics, trace and HTML report
+      - name: Preserve unit results, runtime screenshots, metrics, trace and HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
