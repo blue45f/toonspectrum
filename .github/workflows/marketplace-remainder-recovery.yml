@@ -1,0 +1,58 @@
+name: Marketplace reviewed remainder recovery
+
+on:
+  push:
+    branches: [fix/marketplace-remaining-integrity-20260905]
+    paths:
+      - .github/workflows/marketplace-remainder-recovery.yml
+      - scripts/marketplace/recover-reviewed-remainder.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-reviewed-remainder-recovery
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/marketplace-remaining-integrity-20260905
+      - name: Recover reviewed pending product changes
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin c69700728b7ed6f15bf73b06fbbdb5ef91ec66f7
+          python3 scripts/marketplace/recover-reviewed-remainder.py
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format and lint exactly the recovered TypeScript sources
+        run: |
+          set -euo pipefail
+          mapfile -t sources < <(git diff --name-only -- '*.ts' '*.tsx')
+          sources+=(apps/api/src/modules/creator-marketplace/creator-marketplace-3d-asset-parity.test.ts)
+          pnpm exec eslint --fix --max-warnings=0 "${sources[@]}"
+          git diff --check
+      - name: Run real marketplace and migration contract tests
+        run: |
+          pnpm exec vitest run src/domains/market apps/api/src/modules/creator-marketplace lib/creator-marketplace scripts/run-production-database-migrations.test.mjs scripts/bootstrap-empty-production-database.test.mjs --reporter=dot
+      - name: Commit only reviewed product sources
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/fix/marketplace-remaining-integrity-20260905 | cut -f1)" = "$GITHUB_SHA"
+          git add src/domains/market apps/api/src/db/creator-marketplace-library.schema.ts apps/api/src/db/creator-marketplace-report.schema.ts apps/api/src/db/migrations/0037_creator_marketplace_3d_asset_parity.sql apps/api/src/modules/creator-marketplace/creator-marketplace-3d-asset-parity.test.ts scripts/production-database-migrations.manifest scripts/run-production-database-migrations.test.mjs scripts/bootstrap-empty-production-database.mjs scripts/bootstrap-empty-production-database.test.mjs scripts/verify-creator-marketplace-db.mts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(market): recover deferred trust and 3d ownership parity'
+          git push origin HEAD:fix/marketplace-remaining-integrity-20260905
