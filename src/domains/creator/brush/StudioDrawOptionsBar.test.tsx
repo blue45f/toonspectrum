@@ -194,7 +194,7 @@ describe("StudioDrawOptionsBar", () => {
     expect(
       screen
         .getByRole("toolbar", {
-          name: "그리기 옵션 · 현재 마커(굵고 반투명)",
+          name: "그리기 옵션 · 현재 반투명 마커",
         })
         .getAttribute("data-studio-active-draw-mode")
     ).toBe("pen");
@@ -204,14 +204,14 @@ describe("StudioDrawOptionsBar", () => {
     expect(screen.getByText("펜", { selector: '[data-studio-active-mode-label="true"]' })).toBeTruthy();
 
     const activeTool = screen.getByRole("button", {
-      name: "현재 도구 마커(굵고 반투명), 9px, 불투명도 90%, 브러시 선택 열기",
+      name: "현재 도구 반투명 마커, 9px, 불투명도 90%, 브러시 선택 열기",
     });
     expect(activeTool.getAttribute("data-studio-active-tool-summary")).toBe("pen");
-    expect(activeTool.textContent).toContain("마커(굵고 반투명)");
+    expect(activeTool.textContent).toContain("반투명 마커");
     expect(activeTool.textContent).toContain("9px · 90%");
 
     const reset = screen.getByRole("button", {
-      name: "마커(굵고 반투명) 기본값으로 복원, 변경된 설정 1개",
+      name: "반투명 마커 기본값으로 복원, 변경된 설정 1개",
     });
     expect(reset.getAttribute("data-studio-brush-preset-modified")).toBe("true");
     fireEvent.click(reset);
@@ -384,7 +384,7 @@ describe("StudioDrawOptionsBar", () => {
       />
     );
 
-    expect(html).toContain('aria-label="마커(굵고 반투명) 기본값 다시 적용"');
+    expect(html).toContain('aria-label="반투명 마커 기본값 다시 적용"');
     expect(html).toContain('data-studio-brush-preset-modified="false"');
     expect(drawOptionsSource).toContain("잠금 상태를 유지합니다.");
   });

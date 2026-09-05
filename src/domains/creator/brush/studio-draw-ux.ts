@@ -3,6 +3,10 @@
  * Pure, no React.
  */
 
+import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
+
+import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
+
 import { BRUSH_PRESETS, type BrushPreset } from "../studio-brush";
 import {
   listStudioBrushTrayItems,
@@ -50,7 +54,7 @@ export function filterStudioBrushLibraryItems(options: {
   /** Optional extended catalogue supplied by the lazy library surface. */
   catalogItems?: readonly StudioBrushTrayItem[];
 }): StudioBrushTrayItem[] {
-  const query = (options.query ?? "").trim().toLowerCase();
+  const terms = studioToolSearchTerms(options.query ?? "");
   const favoriteIds = options.favoriteIds ?? [];
   const recentIds = options.recentIds ?? [];
   const category = options.category ?? "all";
@@ -61,9 +65,9 @@ export function filterStudioBrushLibraryItems(options: {
   const byId = new Map(allItems.map((item) => [item.id, item]));
   let items: StudioBrushTrayItem[];
   if (category === "favorites") {
-    items = favoriteIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
+    items = [...new Set(favoriteIds)].map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "recent") {
-    items = recentIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
+    items = [...new Set(recentIds)].map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "all" || category === "expressive") {
     items = category === "all"
       ? allItems
@@ -74,17 +78,17 @@ export function filterStudioBrushLibraryItems(options: {
     items = allItems.filter((item) => item.mediaGroup === category);
   }
 
-  if (!query) return items;
+  if (!terms.length) return items;
   return items.filter((item) => {
-    const hay = [
+    return matchesStudioToolSearch(terms, [
       item.name,
       item.shortName,
       item.hint,
       item.id,
       item.mediaGroup,
+      STUDIO_BRUSH_MATERIAL_GROUP_LABELS[item.mediaGroup],
       ...(item.searchAliases ?? []),
-    ].join(" ").toLowerCase();
-    return hay.includes(query);
+    ]);
   });
 }
 
@@ -107,17 +111,17 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   title: string;
 }[] = [
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
-  { id: "recent", label: "최근", title: "최근 사용한 브러시" },
-  { id: "beginner", label: "기본", title: "초보 키트" },
-  { id: "ink", label: "잉크", title: "펜·G펜·붓펜 — 균일한 잉크 선" },
-  { id: "pencil", label: "연필", title: "연필·흑연 — 종이결 그레인" },
-  { id: "marker", label: "마커", title: "마커·형광펜 — 반투명 균일 도포" },
-  { id: "watercolor", label: "수채", title: "수채·수묵·과슈 — 웻엣지 번짐" },
-  { id: "oil", label: "유화", title: "유화·아크릴·임파스토 — 강모결과 두께" },
-  { id: "airbrush", label: "에어브러시", title: "에어·스프레이·스플래터 — 소프트 입자" },
-  { id: "pastel", label: "파스텔", title: "파스텔·목탄·크레용·초크 — 마른 가루" },
-  { id: "texture", label: "질감", title: "천·암석·나뭇잎·털 — 재질 스탬프" },
-  { id: "tone", label: "톤", title: "스크린톤·망점·해칭" },
-  { id: "fx", label: "효과", title: "네온·글로우·글리터·비·눈·불꽃" },
+  { id: "recent", label: "최근 사용", title: "최근 사용한 브러시" },
+  { id: "beginner", label: "시작 도구", title: "자주 쓰는 기본 표현부터 선택" },
+  { id: "ink", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.ink, title: "펜·G펜·붓펜 — 균일 선부터 필압 테이퍼까지" },
+  { id: "pencil", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.pencil, title: "연필·흑연 — 종이결 그레인" },
+  { id: "marker", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.marker, title: "마커·형광펜 — 넓은 획과 겹칠 수 있는 채색" },
+  { id: "watercolor", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.watercolor, title: "수채·수묵·과슈 — 물 번짐과 물감 도포" },
+  { id: "oil", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.oil, title: "유화·아크릴·임파스토 — 강모결과 두께" },
+  { id: "airbrush", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.airbrush, title: "에어·스프레이·스플래터 — 소프트 입자" },
+  { id: "pastel", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.pastel, title: "파스텔·목탄·크레용·초크 — 마른 가루" },
+  { id: "texture", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.texture, title: "천·암석·나뭇잎·털 — 재질 스탬프" },
+  { id: "tone", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.tone, title: "스크린톤·망점·해칭" },
+  { id: "fx", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.fx, title: "네온·글로우·글리터·비·눈·불꽃" },
   { id: "all", label: "전체", title: "모든 브러시" },
 ];

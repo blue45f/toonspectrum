@@ -528,7 +528,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   "field-iris-blur": {
     kind: "field-iris-blur",
-    label: "필드 아이리스 블러",
+    label: "영역 초점 블러",
     params: [
       slider("focusCenterX", "초점 X", 0, 100, "%"),
       slider("focusCenterY", "초점 Y", 0, 100, "%"),
@@ -641,7 +641,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   "tileable-blur": {
     kind: "tileable-blur",
-    label: "타일러블 블러",
+    label: "이음매 없는 블러",
     params: [
       slider("radius", "랩 반경", 1, 20, "px"),
       slider("sigma", "가우시안 시그마", 0.1, 20, undefined, 0.1),
@@ -841,7 +841,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   threshold: {
     kind: "threshold",
-    label: "한계값 (흑백 2값)",
+    label: "흑백 이진화",
     params: [slider("level", "레벨", 1, 255)],
     defaults: { level: 128 },
     fromImage: (image) =>
@@ -942,7 +942,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   "jpeg-artifact-reduction": {
     kind: "jpeg-artifact-reduction",
-    label: "JPEG 아티팩트 감소",
+    label: "JPEG 압축 깨짐 제거",
     params: [
       slider("deblockStrength", "블록 제거", 0, 100, "%"),
       slider("deringStrength", "링잉 제거", 0, 100, "%"),
@@ -984,7 +984,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   "edge-aware-denoise": {
     kind: "edge-aware-denoise",
-    label: "엣지 보존 노이즈 감소",
+    label: "윤곽 보존 노이즈 제거",
     params: [
       slider("radius", "탐색 반경", 1, 3, "px"),
       slider("strength", "노이즈 제거", 0, 100, "%"),
@@ -1122,7 +1122,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   },
   "wave-warp": unionWaveDef(
     "wave-warp",
-    "사인 웨이브",
+    "물결 왜곡",
     [
       slider("amount", "진폭", 1, 100, "%"),
       slider("scale", "파장", 4, 120, "px"),
@@ -1132,7 +1132,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   "ripple-warp": unionWaveDef(
     "ripple-warp",
-    "원형 리플",
+    "동심원 물결",
     [
       slider("amount", "진폭", 1, 100, "%"),
       slider("scale", "파장", 4, 120, "px"),
@@ -1154,7 +1154,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   twirl: unionWaveDef(
     "twirl",
-    "트월 회전",
+    "소용돌이",
     [
       slider("amount", "회전", -100, 100, "%"),
       slider("centerX", "중심 X", 0, 100, "%"),
@@ -1164,7 +1164,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   "pinch-bloat": unionWaveDef(
     "pinch-bloat",
-    "핀치 / 블로트",
+    "오므리기 / 부풀리기",
     [
       slider("amount", "수축 / 팽창", -100, 100, "%"),
       slider("centerX", "중심 X", 0, 100, "%"),
@@ -1225,7 +1225,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   pointillize: unionWaveDef(
     "pointillize",
-    "포인틸리즘",
+    "점묘화",
     [
       slider("amount", "점 혼합", 1, 100, "%"),
       slider("scale", "점 간격", 3, 32, "px"),
@@ -1256,7 +1256,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   photocopy: unionWaveDef(
     "photocopy",
-    "고대비 포토카피",
+    "복사기 효과",
     [
       slider("amount", "복사 강도", 1, 100, "%"),
       slider("scale", "국소 반경", 1, 5, "px"),
@@ -1276,7 +1276,7 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
   ),
   "god-rays": unionWaveDef(
     "god-rays",
-    "볼류메트릭 광선",
+    "빛줄기",
     [
       slider("amount", "광선 강도", 1, 100, "%"),
       slider("scale", "샘플 수", 2, 10),

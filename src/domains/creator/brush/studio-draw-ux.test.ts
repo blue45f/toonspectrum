@@ -85,7 +85,6 @@ describe("studio-draw-ux", () => {
       "hair-fiber",
       "pen",
       "footstep-stamp",
-      "hair-fiber",
     ]);
 
     const searched = filterStudioBrushLibraryItems({

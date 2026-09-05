@@ -912,6 +912,7 @@ export function StudioBrushLibrarySheet({
   }, [dismissOnOutsidePointer, open, onClose, triggerElement]);
 
   const normalizedQuery = query.trim();
+  const personalSearch = tab === "favorites" || tab === "recent";
   const items = filterStudioBrushCatalogItems({
     operation,
     category: tab,
@@ -1209,14 +1210,16 @@ export function StudioBrushLibrarySheet({
               setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
               setFocusedBrushId(null);
             }}
-            placeholder={operation === "erase"
+            placeholder={personalSearch
+              ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"}에서 이름·용도로 검색`
+              : operation === "erase"
               ? `지우개 ${operationCatalogCount}종 검색`
               : `전체 ${operationCatalogCount}종 검색 (네온, 수채, G펜…)`}
             className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
-            aria-label={`전체 ${operationLabel} 검색`}
+            aria-label={`${personalSearch ? tab === "favorites" ? "즐겨찾기" : "최근 사용" : "전체"} ${operationLabel} 검색`}
             aria-controls={panelId}
             aria-describedby={`${titleId}-search-scope`}
-            data-studio-brush-search-scope="all"
+            data-studio-brush-search-scope={personalSearch ? tab : "all"}
           />
         </div>
         <p
@@ -1227,8 +1230,10 @@ export function StudioBrushLibrarySheet({
             "[@media(max-height:32rem)]:hidden"
           )}
         >
-          {normalizedQuery
-            ? `분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
+          {personalSearch
+            ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"} 안에서 검색합니다. 다른 브러시는 전체 탭에서 찾으세요.`
+            : normalizedQuery
+            ? `재질 분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
             : operation === "erase"
               ? "지우는 강도와 결과를 비교해 선택하세요."
               : "재질을 고르거나 이름·용도·종류로 전체 검색"}
