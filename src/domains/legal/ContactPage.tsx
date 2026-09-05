@@ -41,7 +41,7 @@ export function ContactPage() {
       <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">광고·제휴 문의</h1>
       <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-fg-2">
         툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 아래 폼으로 보내시면 운영팀
-        비공개 보드로 바로 접수돼요. 공개 논의가 필요한 버그·QA는 TermsDesk 지원 보드도 이용할 수 있습니다.
+        공개 문의 게시판으로 접수돼요. 제목과 내용은 다른 사용자도 볼 수 있으므로 개인정보와 비공개 제안서는 입력하지 마세요.
       </p>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -82,7 +82,7 @@ export function ContactPage() {
           <div className="sticky top-20 rounded-2xl border border-line bg-panel/40 p-5">
             <h2 className="mb-1 text-sm font-semibold text-fg">바로 문의하기</h2>
             <p className="mb-4 text-xs leading-relaxed text-fg-3">
-              로그인 없이 보낼 수 있어요. 답변이 필요하면 연락처를 함께 남겨주세요.
+              로그인 없이 공개 문의를 보낼 수 있어요. 개인정보는 본문에 남기지 마세요.
             </p>
             <InquiryForm defaultCategory="partnership" />
           </div>

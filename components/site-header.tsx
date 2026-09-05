@@ -27,6 +27,7 @@ const NAV = [
   { i18n: "nav.play", href: "/play" },
   { i18n: "nav.reviews", href: "/reviews" },
   { i18n: "nav.community", href: "/community" },
+  { i18n: "footer.link.feedback", href: "/feedback" },
   { i18n: "nav.create", href: "/create" },
   { i18n: "nav.market", href: "/market" },
   { i18n: "nav.insights", href: "/insights" },
