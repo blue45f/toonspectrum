@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
-
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 
 import { StudioEditorRoute } from "./routes/StudioEditorRoute";
@@ -23,6 +22,13 @@ const StudioToolsCompanionPage = lazyRetry(
     default: module.StudioToolsCompanionPage,
   })),
   "StudioToolsCompanionPage",
+);
+
+const StudioProductionHubPage = lazyRetry(
+  () => import("../studio-production/StudioProductionHubPage").then((module) => ({
+    default: module.StudioProductionHubPage,
+  })),
+  "StudioProductionHubPage",
 );
 
 export function StudioRouter() {
@@ -64,6 +70,15 @@ export function StudioRouter() {
       return (
         <Suspense fallback={<StudioRouteLoading label="Studio 보조 창을 여는 중..." />}>
           <StudioToolsCompanionPage />
+        </Suspense>
+      );
+    case "production":
+      return (
+        <Suspense fallback={<StudioRouteLoading label="제작 운영 허브를 여는 중..." />}>
+          <StudioProductionHubPage
+            surface={resolution.surface}
+            onOpenStudio={() => navigate("/studio")}
+          />
         </Suspense>
       );
     case "placeholder":

@@ -1,0 +1,39 @@
+name: Studio interaction integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-dialog-focus-return*.ts'
+      - '.github/workflows/studio-interaction-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-dialog-focus-return*.ts'
+      - '.github/workflows/studio-interaction-integrity.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-interaction-integrity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  focus-return:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check focus-return source and regression tests
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/studio-dialog-focus-return.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts src/domains/creator/studio-dialog-focus-return-nested.test.ts
+      - name: Run existing and extended focus-return contracts
+        run: pnpm exec vitest run src/domains/creator/studio-dialog-focus-return.test.ts src/domains/creator/studio-dialog-focus-return-integrity.test.ts src/domains/creator/studio-dialog-focus-return-nested.test.ts
