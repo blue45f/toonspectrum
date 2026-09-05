@@ -94,16 +94,20 @@ jobs:
       - name: Production build and CSP
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm run build
-      - name: Reject skipped or empty admin test runs
+      - name: Verify complete unit and real API evidence
         if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         run: |
           node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
           const report = JSON.parse(readFileSync('test-results/admin-hardening/vitest.json', 'utf8'));
-          if (!report.success || report.numFailedTests || report.numPendingTests || report.numTodoTests || report.numTotalTests < 70) {
-            throw new Error('Admin regression evidence must be passing, nonempty and unskipped.');
+          if (report.success !== true || report.numFailedTests !== 0 || report.numPendingTests !== 0 || report.numTodoTests !== 0 || !Number.isSafeInteger(report.numTotalTests) || report.numTotalTests < 132 || report.numPassedTests !== report.numTotalTests) {
+            throw new Error('Admin regression evidence must contain the complete passing, unskipped baseline.');
           }
-          const summary = { commit: process.env.GITHUB_SHA, passed: report.numPassedTests, failed: report.numFailedTests, skipped: report.numPendingTests };
+          const live = JSON.parse(readFileSync('test-results/admin-hardening/live-qa.json', 'utf8'));
+          if (live.success !== true || live.fixtureAccounts !== 13 || live.realSuccessfulLogins !== 5 || live.blockedLoginChecks !== 5 || !Array.isArray(live.checks) || live.checks.length < 127 || live.assertionCount !== live.checks.length || live.checks.some((check) => check.passed !== true)) {
+            throw new Error('Real QA database, account and API verification evidence is incomplete.');
+          }
+          const summary = { commit: process.env.GITHUB_SHA, passed: report.numPassedTests, failed: report.numFailedTests, skipped: report.numPendingTests, liveAssertions: live.assertionCount, fixtureAccounts: live.fixtureAccounts, successfulLogins: live.realSuccessfulLogins, blockedLogins: live.blockedLoginChecks };
           writeFileSync('test-results/admin-hardening/summary.json', JSON.stringify(summary, null, 2));
           console.log(JSON.stringify(summary));
           JS
