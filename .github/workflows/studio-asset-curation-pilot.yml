@@ -5,6 +5,8 @@ on:
     paths:
       - scripts/studio_asset_curation.py
       - scripts/acquire_studio_asset_pilot.py
+      - scripts/normalize_studio_asset_glb.py
+      - scripts/tests/test_studio_asset_glb.py
       - scripts/tests/test_studio_asset_curation.py
       - data/studio-assets/acquisition-plan.json
       - .github/workflows/studio-asset-curation-pilot.yml
@@ -23,12 +25,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Test evidence gates and safe extraction (synthetic fixtures)
-        run: python3 -m unittest discover -s scripts/tests -p test_studio_asset_curation.py -v
+        run: python3 -m unittest discover -s scripts/tests -p 'test_studio_asset_*.py' -v
       - name: Acquire only the five explicitly selected free CC0 packs
         run: >-
           python3 scripts/acquire_studio_asset_pilot.py
           data/studio-assets/acquisition-plan.json
           --output "$RUNNER_TEMP/studio-asset-quarantine"
+      - name: Embed texture dependencies without changing geometry
+        run: >-
+          python3 scripts/normalize_studio_asset_glb.py
+          "$RUNNER_TEMP/studio-asset-quarantine"
+          --output "$RUNNER_TEMP/studio-asset-normalized"
       - name: Report actual acquisition state, never approval
         if: always()
         shell: bash
@@ -51,7 +58,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: studio-asset-quarantine-${{ github.run_id }}
-          path: ${{ runner.temp }}/studio-asset-quarantine/
+          path: |
+            ${{ runner.temp }}/studio-asset-quarantine/
+            ${{ runner.temp }}/studio-asset-normalized/
           if-no-files-found: warn
           retention-days: 7
           compression-level: 0
