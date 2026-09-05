@@ -1,30 +1,62 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { StudioProductionHubPage } from "../studio-production/StudioProductionHubPage";
+
+import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
+const database = vi.hoisted(() => ({
+  kvGet: vi.fn(async () => null),
+  kvSet: vi.fn(async () => undefined),
+}));
+
+vi.mock("../studio-local-database-runtime", () => ({
+  acquireStudioLocalDatabase: async () => database,
+}));
+
+beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 function renderPlaceholder(placeholderId: Parameters<typeof StudioRoutePlaceholder>[0]["placeholderId"]) {
   render(
     <MemoryRouter>
       <StudioRoutePlaceholder placeholderId={placeholderId} onOpenStudio={() => undefined} />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
 describe("Studio collaboration route gateways", () => {
-  it("turns review dead ends into a three-step, permission-preserving entry guide", () => {
-    renderPlaceholder("review");
+  // Review is now an actual production surface, not an asset-guidance placeholder. Exercise the
+  // shipped surface and its scope-preserving editor exit instead of widening the placeholder API.
+  it.each([
+    ["/studio/review", "draft", "/studio"],
+    ["/studio/work/work-1/review", "work:work-1", "/studio/work/work-1/canvas"],
+    ["/studio/remix/source-1/review", "remix:source-1", "/studio/remix/source-1/canvas"],
+  ])("opens the review workspace rather than a dead end at %s", async (pathname, scopeKey, editorHref) => {
+    expect(resolveStudioRoute({ pathname })).toMatchObject({ kind: "production" });
+    const onOpenStudio = vi.fn();
+    render(
+      <MemoryRouter initialEntries={[pathname]}>
+        <StudioProductionHubPage surface="review" onOpenStudio={onOpenStudio} />
+      </MemoryRouter>,
+    );
 
-    expect(document.querySelector('[data-studio-collaboration-gateway="review"]')).not.toBeNull();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("리뷰");
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeTruthy();
-    expect(screen.getByText(/서버 앵커 댓글/u)).toBeTruthy();
+    await screen.findByText("SQLite/OPFS 저장됨");
+    expect(database.kvGet).toHaveBeenCalledWith("studio-production-command-center-v1", scopeKey);
+    expect(screen.getByRole("heading", { name: "리뷰 및 승인" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "리뷰", exact: true }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "원고 열기" }).getAttribute("href")).toBe(editorHref);
+    expect(screen.queryByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeNull();
+    expect(database.kvSet).not.toHaveBeenCalled();
+    expect(onOpenStudio).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Studio 편집기로 돌아가기" }));
+    expect(onOpenStudio).toHaveBeenCalledTimes(1);
+    expect(database.kvSet).not.toHaveBeenCalled();
   });
 
   it("keeps non-collaboration asset guidance outside the collaboration gateway contract", () => {

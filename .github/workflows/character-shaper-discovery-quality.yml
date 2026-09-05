@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/domains/creator/character-shaper/**"
+      - "src/domains/creator/studio-router/**"
+      - "src/domains/creator/studio-production/**"
       - ".github/workflows/character-shaper-discovery-quality.yml"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -58,10 +60,20 @@ jobs:
             src/domains/creator/character-shaper/CharacterShaperControls.precision.test.tsx \
             src/domains/creator/character-shaper/CharacterShaperControls.lifecycle.test.tsx \
             src/domains/creator/character-shaper/character-shaper-precision.ts \
-            src/domains/creator/character-shaper/character-shaper-precision.test.ts
+            src/domains/creator/character-shaper/character-shaper-precision.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
       - name: Run the existing Character Shaper Vitest suite
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm exec vitest run src/domains/creator/character-shaper
+      - name: Verify production review routing and asset guidance regressions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts
       - name: Typecheck the complete frontend
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm exec tsc -p tsconfig.json
