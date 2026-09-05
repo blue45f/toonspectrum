@@ -32,21 +32,33 @@ describe("WebtoonSfxLexiconEngine", () => {
     expect(engine.search("쿵")[0]?.text).toBe("쿵");
     expect(engine.search("암살").some((item) => item.text === "스윽")).toBe(true);
     expect(engine.search("천둥").some((item) => item.text === "콰르릉")).toBe(true);
-    expect(engine.search("특수").every((item) => item.category === "magic-scifi")).toBe(true);
+    const categoryMatches = engine.search("특수");
+    expect(categoryMatches).toHaveLength(6);
+    expect(categoryMatches.every((item) => item.category === "magic-scifi")).toBe(true);
     expect(engine.search("두 근")[0]?.text).toBe("두근");
   });
 
-  it("ranks exact text ahead of tag and meaning matches", () => {
+  it("ranks exact text ahead of a genuine tag substring match", () => {
+    // 탁 is an exact entry; 퍼엉 has the tag 둔탁. Both genuinely match this query.
+    const results = engine.search("탁");
+
+    expect(results[0]?.text).toBe("탁");
+    expect(results.findIndex((item) => item.text === "퍼엉")).toBeGreaterThan(0);
+  });
+
+  it("does not invent fuzzy matches absent from the text, tags, meaning, or category", () => {
     const results = engine.search("펑");
 
     expect(results[0]?.text).toBe("펑");
-    expect(results.some((item) => item.text === "퍼엉")).toBe(true);
+    expect(results.some((item) => item.text === "퍼엉")).toBe(false);
   });
 
   it("combines ranked search with category filtering", () => {
     const categories: readonly SfxCategory[] = ["impact", "destruction", "magic-scifi"];
     for (const category of categories) {
-      expect(engine.search("폭발", category).every((item) => item.category === category)).toBe(true);
+      const matches = engine.search("폭발", category);
+      expect(matches.length).toBeGreaterThan(0);
+      expect(matches.every((item) => item.category === category)).toBe(true);
     }
   });
 
