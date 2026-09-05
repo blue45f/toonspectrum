@@ -1,0 +1,101 @@
+name: Studio PBR asset review
+on:
+  push:
+    branches: [feat/studio-assets-pbr-curation-20260906]
+    paths: ['.github/workflows/studio-pbr-asset-review.yml']
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pbr-review:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-pbr-curation-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked runtime and prepare neutral preview lighting
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/render_studio_asset_delivery.mjs')
+          text=p.read_text()
+          text=text.replace("import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';\nimport { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';")
+          text=text.replace('renderer.toneMappingExposure = 1.15;', 'renderer.toneMappingExposure = 0.9;')
+          text=text.replace('const scene = new THREE.Scene();', 'const scene = new THREE.Scene();\nconst environmentRoom = new RoomEnvironment();\nconst pmrem = new THREE.PMREMGenerator(renderer);\nconst environmentTarget = pmrem.fromScene(environmentRoom, 0.04);\nscene.environment = environmentTarget.texture;\nscene.environmentIntensity = 0.65;\nenvironmentRoom.dispose();\npmrem.dispose();')
+          text=text.replace('0x646479,2.6','0x646479,0.65').replace('0xffffff,3.2','0xffffff,2.0').replace('0xffffff,1.1','0xffffff,0.45')
+          p.write_text(text)
+          PY
+          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
+      - name: Acquire official native PBR models and materials
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/pbr-delivery"
+      - name: Render every acquired model and regenerate existing low-poly previews
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-delivery" "$GITHUB_WORKSPACE"
+          node scripts/render_studio_asset_delivery.mjs "$GITHUB_WORKSPACE/public/assets/studio/cc0-20260906" "$GITHUB_WORKSPACE"
+      - name: Stage complete files and visual review sheets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          from collections import Counter
+          import json,os,shutil,hashlib
+          source=Path(os.environ['RUNNER_TEMP'])/'pbr-delivery'; target=Path('public/assets/studio/cc0-20260906')
+          new=json.loads((source/'manifest.json').read_text())['assets']
+          manifest=json.loads((target/'manifest.json').read_text())
+          old_ids={a['id'] for a in manifest['assets']}
+          assert not any(a['id'] in old_ids for a in new)
+          for a in new:
+              assert hashlib.sha256((source/a['path']).read_bytes()).hexdigest()==a['sha256']
+          for name in ('assets','previews'):
+              shutil.copytree(source/name,target/name,dirs_exist_ok=True)
+          manifest['assets']+=new
+          (target/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+          out=Path('docs/reports/asset-pbr-review-20260906');out.mkdir(parents=True,exist_ok=True)
+          shutil.copyfile(source/'delivery-report.json',out/'acquisition-report.json')
+          shutil.copyfile(source/'browser-render-evidence.json',out/'pbr-render-evidence.json')
+          report={'catalogOriginals':len(manifest['assets']),'addedPbrOriginals':len(new),'byKind':dict(Counter(a['kind'] for a in new)),'visualApproval':False,'productionPublished':False}
+          (out/'summary.json').write_text(json.dumps(report,indent=2)+'\n')
+          for start in range(0,len(new),12):
+              sheet=Image.new('RGB',(1600,1300),'#dddddf');draw=ImageDraw.Draw(sheet)
+              for i,a in enumerate(new[start:start+12]):
+                  x=i%4*400;y=i//4*430
+                  with Image.open(target/a.get('previewPath',a['path'])) as im:
+                      im=im.convert('RGBA');im.thumbnail((380,375));sheet.paste(im,(x+(400-im.width)//2,y+5),im)
+                  draw.text((x+8,y+386),a['id'][:52],fill='#181820')
+                  draw.text((x+8,y+405),a['kind'],fill='#181820')
+              sheet.save(out/f'pbr-review-{start//12+1:02d}.jpg',quality=94)
+          print('PBR STAGED',json.dumps(report))
+          PY
+          pnpm exec tsx -e 'import fs from "node:fs";import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts";console.log("CATALOG ADMITTED",parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"))).length);'
+      - name: Retain reviewed staging on feature branch
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-assets-pbr-curation-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/cc0-20260906 scripts/render_studio_asset_delivery.mjs docs/reports/asset-pbr-review-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): stage native PBR originals and neutral-light previews"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_STAGING_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pbr-delivery/
+            docs/reports/asset-pbr-review-20260906/
+          retention-days: 14
+          compression-level: 1
