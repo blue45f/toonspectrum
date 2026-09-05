@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioAiAssistHub } from "./StudioAiAssistHub";
 
@@ -25,7 +25,15 @@ function props(
   };
 }
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 describe("StudioAiAssistHub task-first and keyboard UX", () => {
   it("uses a roving tab stop and arrow-key selection", () => {
