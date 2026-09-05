@@ -1,0 +1,52 @@
+name: Studio promo implementation workspace
+on:
+  push:
+    branches: [feat/studio-promo-video-20260906]
+    paths: [.github/workflows/studio-promo-bootstrap.yml]
+permissions:
+  contents: write
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/studio-promo-video-20260906
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.16.0'
+      - run: npm install --global pnpm@11.4.0
+      - name: Add synchronized Remotion dependencies and lockfile
+        run: |
+          pnpm add --workspace-root --save-exact --lockfile-only --ignore-scripts remotion@4 @remotion/player@4 @remotion/web-renderer@4 @remotion/media@4
+          node -e "const p=require('./package.json');const v=p.dependencies.remotion;for(const k of ['@remotion/player','@remotion/web-renderer','@remotion/media'])if(p.dependencies[k]!==v)throw Error('Remotion version mismatch');console.log('Remotion',v)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json pnpm-lock.yaml
+          HUSKY=0 git -c core.hooksPath=/dev/null commit -m 'build(video): pin synchronized Remotion browser rendering dependencies'
+          git push origin HEAD:feat/studio-promo-video-20260906
+      - name: Export tracked source only, without credentials or Git metadata
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile
+          allowed={'.ts','.tsx','.js','.jsx','.mjs','.cjs','.json','.yaml','.yml','.md','.css','.html','.toml','.txt','.properties'}
+          with tarfile.open('/tmp/studio-promo-source.tar.gz','w:gz') as out:
+            for name in subprocess.check_output(['git','ls-files','-z']).decode().split('\0'):
+              p=pathlib.Path(name)
+              if p.is_file() and p.suffix in allowed and not p.name.startswith('.env') and p.stat().st_size<8_000_000:
+                out.add(p,arcname=name,recursive=False)
+          PY
+      - name: Prepare isolated local validation dependencies
+        run: |
+          VERSION=$(node -p "require('./package.json').dependencies.remotion")
+          mkdir -p /tmp/video-toolchain
+          npm install --prefix /tmp/video-toolchain --ignore-scripts --no-audit --no-fund --package-lock=false "remotion@$VERSION" "@remotion/player@$VERSION" "@remotion/web-renderer@$VERSION" "@remotion/media@$VERSION" typescript react@19 react-dom@19 @types/react@19 @types/react-dom@19 @types/node zod esbuild@0.25 @playwright/test vitest jsdom react-router-dom lucide-react @testing-library/react
+          tar -czf /tmp/studio-promo-toolchain.tar.gz -C /tmp/video-toolchain node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-promo-implementation-workspace
+          path: |
+            /tmp/studio-promo-source.tar.gz
+            /tmp/studio-promo-toolchain.tar.gz
+          retention-days: 1
