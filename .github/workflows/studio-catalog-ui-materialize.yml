@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: feat/studio-asset-browser-quality-20260906
-      - name: Verify exact source blobs and SHA-256 before applying approved patch
+      - name: Verify exact source blobs and SHA-256 before applying approved product patch
         run: |
           test "$GITHUB_REF" = refs/heads/feat/studio-asset-browser-quality-20260906
           python3 - <<'PY'
@@ -29,13 +29,13 @@ jobs:
           for p in paths:
             if p in expected or p=='.github/workflows/studio-asset-browser.yml' or p=='scripts/verify-studio-catalog-browser.mjs' or p.startswith('src/domains/creator/catalog/') or p.startswith('tests/browser-fixtures/studio-catalog/'): continue
             raise ValueError('unapproved patch path: '+p)
-          subprocess.run(['git','apply','--check'],input=patch,check=True)
-          subprocess.run(['git','apply','--index'],input=patch,check=True)
-          print('Verified and applied',len(paths),'files. No main branch or protection change.')
+          subprocess.run(['git','apply','--check','--exclude=.github/workflows/*'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','--exclude=.github/workflows/*'],input=patch,check=True)
+          print('Product files applied; workflows remain unchanged and require the authorized connector.')
           PY
-      - name: Remove temporary transport and inspection files, commit feature only
+      - name: Commit feature product code only
         run: |
-          git rm --ignore-unmatch .ci/studio-catalog-ui.part0 .ci/studio-catalog-ui.part1 .ci/studio-catalog-ui.part2 .github/workflows/studio-catalog-ui-materialize.yml .github/workflows/studio-asset-ui-source-snapshot.yml .github/workflows/studio-curated-intake-inspect.yml .github/workflows/studio-curated-standard-intake.yml
+          git rm .ci/studio-catalog-ui.part0 .ci/studio-catalog-ui.part1 .ci/studio-catalog-ui.part2
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git -c core.hooksPath=/dev/null commit -m 'feat(studio): ship preview-first asset browser, durable favorites and authored native scenes'
@@ -55,6 +55,7 @@ jobs:
       - name: Lint changed product files without bypass
         if: always()
         run: |
+          mkdir -p artifacts/studio-catalog-browser
           set -o pipefail
           pnpm exec eslint --max-warnings=0 src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.tsx src/domains/creator/StudioAssetToolPopoverBody.tsx src/domains/creator/studio-scene-templates.ts src/domains/creator/studio-scene-templates.test.ts 2>&1 | tee artifacts/studio-catalog-browser/lint.log
       - name: Check locked full frontend TypeScript
