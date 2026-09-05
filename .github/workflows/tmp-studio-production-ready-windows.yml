@@ -69,87 +69,97 @@ jobs:
               raise SystemExit('archive verification block not found')
           end = end_start + len(end_marker)
 
-          portable = '''          python3 - <<'ARCHIVEPY'
-          import base64
-          import hashlib
-          import io
-          import lzma
-          import tarfile
-          from pathlib import Path, PurePosixPath
-
-          expected_sha = "73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504"
-          parts = sorted(Path("/tmp/studio-production-parts").glob("part??"))
-          if len(parts) != 11:
-              raise SystemExit(f"expected 11 patch chunks, found {len(parts)}")
-          encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
-          archive = base64.b64decode(encoded, validate=True)
-          actual_sha = hashlib.sha256(archive).hexdigest()
-          if actual_sha != expected_sha:
-              raise SystemExit(f"archive sha mismatch: {actual_sha}")
-          payload = lzma.decompress(archive)
-          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as bundle:
-              members = bundle.getmembers()
-              names = sorted(member.name for member in members)
-              if len(names) != 21 or len(set(names)) != len(names):
-                  raise SystemExit(f"unexpected archive member count: {len(names)}")
-              required = {
-                  "src/domains/creator/studio-production/StudioProductionHubPage.tsx",
-                  "src/domains/creator/studio-production/studio-production-sqlite-persistence.ts",
-                  "src/domains/creator/studio-router/studio-route-manifest.ts",
-              }
-              missing = required.difference(names)
-              if missing:
-                  raise SystemExit(f"missing required archive members: {sorted(missing)}")
-              for member in members:
-                  relative = PurePosixPath(member.name)
-                  if relative.is_absolute() or ".." in relative.parts or not member.isfile():
-                      raise SystemExit(f"unsafe archive member: {member.name}")
-                  extracted = bundle.extractfile(member)
-                  if extracted is None:
-                      raise SystemExit(f"cannot read archive member: {member.name}")
-                  destination = Path(*relative.parts)
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-                  destination.write_bytes(extracted.read())
-              Path("/tmp/studio-production-patch.files").write_text(
-                  "\\n".join(names) + "\\n",
-                  encoding="utf-8",
-              )
-          print(f"verified product archive {actual_sha} with {len(names)} files")
-          ARCHIVEPY'''
+          portable = '\n'.join([
+              "          python3 - <<'ARCHIVEPY'",
+              '          import base64',
+              '          import hashlib',
+              '          import io',
+              '          import lzma',
+              '          import tarfile',
+              '          from pathlib import Path, PurePosixPath',
+              '',
+              '          expected_sha = "73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504"',
+              '          parts = sorted(Path("/tmp/studio-production-parts").glob("part??"))',
+              '          if len(parts) != 11:',
+              '              raise SystemExit(f"expected 11 patch chunks, found {len(parts)}")',
+              '          encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)',
+              '          archive = base64.b64decode(encoded, validate=True)',
+              '          actual_sha = hashlib.sha256(archive).hexdigest()',
+              '          if actual_sha != expected_sha:',
+              '              raise SystemExit(f"archive sha mismatch: {actual_sha}")',
+              '          payload = lzma.decompress(archive)',
+              '          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as bundle:',
+              '              members = bundle.getmembers()',
+              '              names = sorted(member.name for member in members)',
+              '              if len(names) != 21 or len(set(names)) != len(names):',
+              '                  raise SystemExit(f"unexpected archive member count: {len(names)}")',
+              '              required = {',
+              '                  "src/domains/creator/studio-production/StudioProductionHubPage.tsx",',
+              '                  "src/domains/creator/studio-production/studio-production-sqlite-persistence.ts",',
+              '                  "src/domains/creator/studio-router/studio-route-manifest.ts",',
+              '              }',
+              '              missing = required.difference(names)',
+              '              if missing:',
+              '                  raise SystemExit(f"missing required archive members: {sorted(missing)}")',
+              '              for member in members:',
+              '                  relative = PurePosixPath(member.name)',
+              '                  if relative.is_absolute() or ".." in relative.parts or not member.isfile():',
+              '                      raise SystemExit(f"unsafe archive member: {member.name}")',
+              '                  extracted = bundle.extractfile(member)',
+              '                  if extracted is None:',
+              '                      raise SystemExit(f"cannot read archive member: {member.name}")',
+              '                  destination = Path(*relative.parts)',
+              '                  destination.parent.mkdir(parents=True, exist_ok=True)',
+              '                  destination.write_bytes(extracted.read())',
+              '              Path("/tmp/studio-production-patch.files").write_text(',
+              '                  "\\n".join(names) + "\\n",',
+              '                  encoding="utf-8",',
+              '              )',
+              '          print(f"verified product archive {actual_sha} with {len(names)} files")',
+              '          ARCHIVEPY',
+          ])
           source = source[:start] + portable + source[end:]
 
-          validation_before = '''      - name: Validate architecture, types, and production build
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm run validate:architecture
-          pnpm run typecheck
-          pnpm run build'''
-          validation_after = '''      - name: Validate architecture, types, and production build
-        shell: bash
-        run: |
-          set -euo pipefail
-          export NODE_OPTIONS='--max-old-space-size=8192'
-          pnpm run validate:architecture
-          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
-          pnpm run prebuild
-          pnpm exec vite build
-          pnpm run postbuild'''
+          validation_before = '\n'.join([
+              '      - name: Validate architecture, types, and production build',
+              '        shell: bash',
+              '        run: |',
+              '          set -euo pipefail',
+              '          pnpm run validate:architecture',
+              '          pnpm run typecheck',
+              '          pnpm run build',
+          ])
+          validation_after = '\n'.join([
+              '      - name: Validate architecture, types, and production build',
+              '        shell: bash',
+              '        run: |',
+              '          set -euo pipefail',
+              "          export NODE_OPTIONS='--max-old-space-size=8192'",
+              '          pnpm run validate:architecture',
+              '          pnpm exec tsc -p tsconfig.json --noEmit --incremental false',
+              '          pnpm run prebuild',
+              '          pnpm exec vite build',
+              '          pnpm run postbuild',
+          ])
           if validation_before not in source:
               raise SystemExit('validation/build step not found')
           source = source.replace(validation_before, validation_after, 1)
 
-          cleanup_before = '''          rm -f .github/workflows/tmp-studio-production-ready.yml
-          git add -A'''
-          cleanup_after = '''          rm -f .github/workflows/tmp-studio-production-ready.yml
-          rm -f .github/workflows/tmp-studio-production-ready-call.yml
-          rm -f .github/workflows/tmp-studio-production-ready-arm.yml
-          rm -f .github/workflows/tmp-studio-production-ready-macos.yml
-          rm -f .github/workflows/tmp-studio-production-ready-slim.yml
-          rm -f .github/workflows/tmp-studio-production-ready-ubuntu2404.yml
-          rm -f .github/workflows/tmp-studio-production-ready-windows.yml
-          rm -rf .tmp
-          git add -A'''
+          cleanup_before = '\n'.join([
+              '          rm -f .github/workflows/tmp-studio-production-ready.yml',
+              '          git add -A',
+          ])
+          cleanup_after = '\n'.join([
+              '          rm -f .github/workflows/tmp-studio-production-ready.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-call.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-arm.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-macos.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-slim.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-ubuntu2404.yml',
+              '          rm -f .github/workflows/tmp-studio-production-ready-windows.yml',
+              '          rm -rf .tmp',
+              '          git add -A',
+          ])
           if cleanup_before not in source:
               raise SystemExit('final cleanup step not found')
           source = source.replace(cleanup_before, cleanup_after, 1)
