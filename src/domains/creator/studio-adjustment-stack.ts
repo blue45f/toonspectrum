@@ -5,12 +5,13 @@
  * Can live on image elements as `smartFilters` or on a dedicated adjustment layer record.
  */
 
-import type { InkWash } from "./brush/studio-ink-wash";
 import {
   STUDIO_FILTER_PACK_LABELS,
   STUDIO_FILTER_UNION_WAVE_KINDS,
   type StudioFilterUnionWaveKind,
 } from "./filter/studio-filter-pack-registry";
+
+import type { InkWash } from "./brush/studio-ink-wash";
 import type { StudioFilterUnionWave } from "./filter/studio-filter-union-wave";
 import type {
   StudioFieldIrisBlurOptions,

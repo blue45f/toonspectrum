@@ -504,8 +504,13 @@ export default defineConfig(({ mode }) => ({
           if (
             id.endsWith("/src/domains/creator/studio-layers.ts")
             || id.endsWith("/src/domains/creator/studio-work-metadata.ts")
+            || id.endsWith("/src/domains/creator/studio-page-review.ts")
+            || id.endsWith("/src/domains/creator/studio-frame-animation-timing.ts")
           ) {
-            // Work metadata is a dependency-free leaf whose owner set is contained by layers.
+            // These pure document models have no runtime dependencies. Review status and frame
+            // timing are already needed by the editor and reused by the lazy quality inspector;
+            // co-locating their sub-KiB bodies avoids separate startup requests without
+            // capturing a quality UI, decoder, rendering engine or browser runtime.
             return "studio-document-micro-models";
           }
           if (

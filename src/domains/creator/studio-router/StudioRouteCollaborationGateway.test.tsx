@@ -66,3 +66,33 @@ describe("Studio collaboration route gateways", () => {
     expect(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" })).toBeTruthy();
   });
 });
+
+// Preserve the complementary quality-branch checks when merging the independently migrated UI.
+describe("quality review route ownership", () => {
+  it.each([
+    "/studio/review",
+    "/studio/work/work-1/review",
+    "/studio/remix/source-1/review",
+  ])("retains exact production ownership for %s", (pathname) => {
+    const resolution = resolveStudioRoute({ pathname, search: "", hash: "" });
+    expect(resolution).toMatchObject({
+      kind: "production",
+      surface: "review",
+      canonicalHref: pathname,
+      ownsDocumentTitle: true,
+    });
+    expect(resolution).not.toHaveProperty("placeholderId");
+  });
+
+  it("delegates the asset guidance exit exactly once", () => {
+    const onOpenStudio = vi.fn();
+    render(
+      <MemoryRouter>
+        <StudioRoutePlaceholder placeholderId="assets" onOpenStudio={onOpenStudio} />
+      </MemoryRouter>
+    );
+    expect(document.querySelector("[data-studio-collaboration-gateway]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" }));
+    expect(onOpenStudio).toHaveBeenCalledTimes(1);
+  });
+});

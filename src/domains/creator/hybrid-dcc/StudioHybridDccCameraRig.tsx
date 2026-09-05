@@ -104,9 +104,8 @@ export function StudioHybridDccCameraRig({
   readonly sceneCenter: StudioHybridDccViewVec3;
   readonly sceneRadius: number;
 }) {
-  "use no memo";
-  // OrbitControls mutate camera/target without changing their identities. This imperative bridge
-  // must read those live values at every requested reconciliation, not a memoized render snapshot.
+  // OrbitControls mutate camera/target without changing their identities. The effect reads
+  // those live resources for each requested reconciliation; render does not snapshot them.
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as NavigationControls | null;
   const { width, height } = useThree((state) => state.size);

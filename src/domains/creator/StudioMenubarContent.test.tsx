@@ -368,7 +368,7 @@ describe("StudioMenubarContent", () => {
       ["timelapse", "타임랩스 녹화", stableHandlers.openTimelapse],
       ["storyboard-grid", "스토리보드 그리드 보기", stableHandlers.openStoryboardGrid],
       ["scroll-preview", "세로 스크롤 미리보기", stableHandlers.openScrollPreview],
-      ["continuity", "이야기 연속성 검사", stableHandlers.openContinuityCheck],
+      ["continuity", "마감·품질 검사", stableHandlers.openContinuityCheck],
       ["comments", "문서 댓글", stableHandlers.toggleDocumentComments],
       ["page-review", "페이지 검토와 편집 잠금", stableHandlers.openPageReview],
     ] as const;
