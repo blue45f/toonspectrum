@@ -7,23 +7,44 @@ permissions:
   contents: read
 concurrency:
   group: studio-asset-quality-delivery-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   asset-quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-      - name: Snapshot tracked source for reproducible review
+      - name: Inspect actual catalog seams
         run: |
-          git archive --format=tar.gz --output="$RUNNER_TEMP/studio-asset-source.tar.gz" HEAD
           python3 - <<'PY'
-          import json, pathlib, subprocess
-          files = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
-          selected = [p for p in files if p and (p.startswith('public/') or ('studio' in p and any(k in p.lower() for k in ['asset', 'sticker', 'background', 'template', 'brush', 'emere', 'font', 'sfx', 'material'])))]
-          print(json.dumps([{'path': p, 'bytes': pathlib.Path(p).stat().st_size} for p in selected], ensure_ascii=False, indent=2))
+          import pathlib, subprocess, re, json, os
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'studio-asset-delivery'
+          out.mkdir(exist_ok=True)
+          files = [pathlib.Path(p) for p in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0') if p]
+          public = [p for p in files if str(p).startswith('public/')]
+          (out / 'public-inventory.json').write_text(json.dumps([{'path':str(p),'bytes':p.stat().st_size} for p in public],indent=2))
+          print('STATIC ROOT COUNTS')
+          from collections import Counter
+          print(json.dumps(Counter('/'.join(p.parts[:3]) for p in public),indent=2))
+          print('CATALOG FILES')
+          for p in files:
+              s=str(p)
+              if p.suffix in {'.ts','.tsx','.mts','.py'} and any(k in s.lower() for k in ['asset','sticker','background','template','particle','emere','sfx']) and not any(k in s for k in ['.test.','/tests/','/api/']):
+                  if s.startswith(('src/lib/','lib/','scripts/')) or any(k in p.name for k in ['catalog','library','registry','qualified','load','pack']):
+                      print(s, p.stat().st_size)
+          for p in files:
+              if p.name == 'AGENTS.md' and len(p.parts)<4:
+                  print('\nREPO INSTRUCTIONS',p,'\n',p.read_text()[:10000])
+          host=pathlib.Path('src/domains/creator/StudioCuttoonEditorHost.tsx')
+          if host.exists():
+              text=host.read_text()
+              print('HOST ASSET IMPORTS')
+              for m in re.finditer(r'(?:import[\s\S]{0,600}?from\s*[\"\'][^\"\']+[\"\']|import\([\"\'][^\"\']+[\"\']\))', text):
+                  if any(k in m.group().lower() for k in ['asset','sticker','template','background','emere','sfx']): print(m.group())
+          pkg=pathlib.Path('package.json')
+          if pkg.exists(): print('PACKAGE SCRIPTS',json.dumps(json.loads(pkg.read_text()).get('scripts',{}),indent=2))
           PY
       - name: Run asset delivery checks when present
         run: |
@@ -35,9 +56,6 @@ jobs:
         if: always()
         with:
           name: studio-asset-quality-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/studio-asset-source.tar.gz
-            ${{ runner.temp }}/studio-asset-delivery/
+          path: ${{ runner.temp }}/studio-asset-delivery/
           if-no-files-found: error
           retention-days: 7
-          compression-level: 0
