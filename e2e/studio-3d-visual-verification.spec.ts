@@ -707,7 +707,12 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
    * `?room=work-instant-…` 잼을 발행하므로 `isRealtimeTeamSession`이 참이고, 그 분기가 실패로
    * 닫혀 있는 동안에는 3D 배경을 캔버스에 붙이는 경로가 어디에도 없었다.
    */
-  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }, testInfo) => {
+  //
+  // `@slow`: CI(.github/workflows/ci.yml `studio-3d-visual`)는 이 스위트를 두 레인으로 나눠 돌린다.
+  // 이 케이스 하나가 SwiftShader 위에서 7.5분(스위트 전체 17분의 절반 가까이)을 쓰므로 `--grep @slow`
+  // 레인에 홀로 두고, 나머지는 `--grep-invert @slow` 레인이 맡는다. 태그는 분배에만 쓰이고 로컬
+  // `pnpm run verify:studio-3d-visual` 은 여전히 전부 돈다.
+  test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", { tag: "@slow" }, async ({ page }, testInfo) => {
     // This case walks the whole round trip — insert, update, reopen, update again — while every
     // frame is rendered by SwiftShader. On the CI runner the other 3D cases in this file each
     // take 1.5–2.5 minutes, and this one does several times their work, so the 300s it inherited

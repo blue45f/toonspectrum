@@ -214,7 +214,10 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 
 Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). **2026-09-02부터
 `main`은 브랜치 보호로 PR 전용이며 CI의 `core` 체크(lint·typecheck·마이그레이션 채택·전체 Vitest·빌드 게이트)
-성공이 머지 조건**입니다. 적색 커밋은 PR 경로로는 main에 들어가지 못하므로 배포되지 않습니다 — "적색 main도
+성공이 머지 조건**입니다. 2026-09-05부터 `core`는 그 검사들을 직접 돌리는 잡이 아니라 병렬 잡
+`lint`·`typecheck`·`build`·`test (1/3..3/3)`·`test (serial lane)`의 결과를 합치는 게이트 잡입니다 — 검사 항목은
+같고 배치만 바뀌었으며, 필수 체크 이름 `core`는 그대로입니다. 릴리스 체크 `verify`도 같은 방식으로 `core`와
+`studio-3d-runtime`(3D 런타임 오라클)을 합칩니다. 적색 커밋은 PR 경로로는 main에 들어가지 못하므로 배포되지 않습니다 — "적색 main도
 배포되는 구조"를 배포 경로가 아니라 머지 경로에서 막은 것입니다(Vercel CLI 배포 시크릿이 저장소에 없어
 `workflow_run` 게이트는 쓸 수 없었습니다). 정책은 저장소 표준과 같습니다: 승인 0명, `strict=false`(base 최신화
 강제 없음), `enforce_admins=false`, 강제 push·삭제 금지. **예외는 하나 — 관리자(소유자)는 PR·`core` 요구를 우회해
