@@ -1,0 +1,144 @@
+name: Temporary Studio production Windows runner switch
+
+on:
+  push:
+    branches:
+      - feat/studio-production-command-center-ready-20260905
+    paths:
+      - .github/workflows/tmp-studio-production-ready-windows.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-production-ready-windows-switch
+  cancel-in-progress: true
+
+jobs:
+  switch-runner:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Checkout ready branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/studio-production-command-center-ready-20260905
+          fetch-depth: 0
+
+      - name: Make the delivery workflow portable to Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow = Path('.github/workflows/tmp-studio-production-ready.yml')
+          source = workflow.read_text(encoding='utf-8')
+
+          source, runner_count = re.subn(
+              r'(?m)^    runs-on: (?:ubuntu-latest|ubuntu-24\.04|ubuntu-24\.04-arm|macos-15|windows-2025)$',
+              '    runs-on: windows-2025',
+              source,
+              count=1,
+          )
+          if runner_count != 1 and '    runs-on: windows-2025' not in source:
+              raise SystemExit('unexpected delivery runner declaration')
+
+          source = source.replace(
+              '          for index in $(seq -w 0 10); do',
+              '          for index in {00..10}; do',
+              1,
+          )
+
+          start_marker = '          cat /tmp/studio-production-parts/part?? > /tmp/studio-production-patch.b64'
+          end_marker = '          tar -xJf /tmp/studio-production-patch.tar.xz'
+          start = source.find(start_marker)
+          end_start = source.find(end_marker, start)
+          if start >= 0 and end_start >= 0:
+              end = end_start + len(end_marker)
+              portable = '''          python3 - <<'ARCHIVEPY'
+          import base64
+          import hashlib
+          import io
+          import lzma
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          expected_sha = "73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504"
+          parts = sorted(Path("/tmp/studio-production-parts").glob("part??"))
+          if len(parts) != 11:
+              raise SystemExit(f"expected 11 patch chunks, found {len(parts)}")
+          encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
+          archive = base64.b64decode(encoded, validate=True)
+          actual_sha = hashlib.sha256(archive).hexdigest()
+          if actual_sha != expected_sha:
+              raise SystemExit(f"archive sha mismatch: {actual_sha}")
+          payload = lzma.decompress(archive)
+          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as bundle:
+              members = bundle.getmembers()
+              names = sorted(member.name for member in members)
+              if len(names) != 21 or len(set(names)) != len(names):
+                  raise SystemExit(f"unexpected archive member count: {len(names)}")
+              required = {
+                  "src/domains/creator/studio-production/StudioProductionHubPage.tsx",
+                  "src/domains/creator/studio-router/studio-route-manifest.ts",
+                  "src/app/routes/app-route-title-ownership.test.ts",
+              }
+              missing = required.difference(names)
+              if missing:
+                  raise SystemExit(f"missing required archive members: {sorted(missing)}")
+              for member in members:
+                  relative = PurePosixPath(member.name)
+                  if relative.is_absolute() or ".." in relative.parts or not member.isfile():
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+                  extracted = bundle.extractfile(member)
+                  if extracted is None:
+                      raise SystemExit(f"cannot read archive member: {member.name}")
+                  destination = Path(*relative.parts)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(extracted.read())
+              Path("/tmp/studio-production-patch.files").write_text(
+                  "\\n".join(names) + "\\n",
+                  encoding="utf-8",
+              )
+          print(f"verified product archive {actual_sha} with {len(names)} files")
+          ARCHIVEPY'''
+              source = source[:start] + portable + source[end:]
+          elif "python3 - <<'ARCHIVEPY'" not in source:
+              raise SystemExit('archive verification block not found')
+
+          build_pattern = re.compile(
+              r'(?m)^      - name: Build production application\n        run: pnpm run build$'
+          )
+          build_replacement = '''      - name: Build production application
+        shell: bash
+        run: |
+          set -euo pipefail
+          export NODE_OPTIONS='--max-old-space-size=8192'
+          pnpm run prebuild
+          pnpm exec tsc -p tsconfig.json
+          pnpm exec vite build
+          pnpm run postbuild'''
+          source, build_count = build_pattern.subn(build_replacement, source, count=1)
+          if build_count != 1 and 'pnpm exec vite build' not in source:
+              raise SystemExit('production build step not found')
+
+          workflow.write_text(source, encoding='utf-8')
+          PY
+
+      - name: Publish the portable one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/tmp-studio-production-ready-windows.yml
+          rm -f .github/workflows/tmp-studio-production-ready-ubuntu2404.yml
+          rm -f .github/workflows/tmp-studio-production-ready-arm.yml
+          rm -f .github/workflows/tmp-studio-production-ready-macos.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'ci(studio): run production delivery on Windows 2025'
+          git push origin HEAD:feat/studio-production-command-center-ready-20260905
