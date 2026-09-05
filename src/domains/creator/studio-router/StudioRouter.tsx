@@ -71,7 +71,7 @@ export function StudioRouter() {
       return (
         <StudioProductionRoute
           surface={resolution.surface}
-          onOpenStudio={() => navigate("/studio")}
+          onOpenStudio={() => navigate(resolution.editorHref)}
         />
       );
     case "storyworld":

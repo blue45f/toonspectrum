@@ -1,12 +1,12 @@
 import { resolveStudioBg3dProductionBatchPreset } from "./studio-bg3d-production-multipass";
 
 import type { StudioBg3dProductionBatchPreset } from "./studio-bg3d-production-multipass";
-import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 import type {
   StudioBg3dOutputSettings,
   StudioBg3dToneMode,
   StudioBg3dToneOutputType,
 } from "./studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 
 export interface StudioBg3dProductionLookState {
   readonly lineEnabled: boolean;

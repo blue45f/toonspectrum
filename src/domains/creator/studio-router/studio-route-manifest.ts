@@ -1,5 +1,9 @@
 import { STUDIO_LIFT3D_SUBJECTS } from "../lift3d/studio-lift3d-contract";
 import {
+  resolveStudioProductionScope,
+  studioProductionLifecycleKey,
+} from "../studio-production/studio-production-scope";
+import {
   parseStudioWorkspaceRoute,
   studioWorkspaceCanonicalHref,
   studioWorkspaceDocumentIdentity,
@@ -166,6 +170,7 @@ export type StudioPlaceholderRouteId = "assets";
 export interface StudioProductionRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "production";
   readonly surface: StudioProductionRouteId;
+  readonly editorHref: string;
 }
 
 export interface StudioPlaceholderRouteResolution extends StudioResolvedRouteBase {
@@ -384,7 +389,7 @@ function resolveLift3d(
 function resolveProduction(
   pathname: string,
   search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
   const segments = normalizedSegments(pathname);
   if (
     segments === null
@@ -393,13 +398,16 @@ function resolveProduction(
   ) {
     return null;
   }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
   const surface = segments[1] as StudioProductionRouteId;
   const canonicalPathname = `/studio/${surface}`;
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "production",
-    lifecycleKey: canonicalPathname,
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
     ownsDocumentTitle: true,
     surface,
   });
@@ -504,7 +512,7 @@ function scopedLifecycleKey(
 function resolveWorkScopedProduction(
   pathname: string,
   search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
   const scoped = resolveWorkScopedSurface(pathname);
   if (
     scoped === null
@@ -514,13 +522,16 @@ function resolveWorkScopedProduction(
   ) {
     return null;
   }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
   const surface = scoped.candidateSurface as StudioProductionRouteId;
   const canonicalPathname = scopedCanonicalPathname(scoped.scope, scoped.parsed, surface);
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "production",
-    lifecycleKey: scopedLifecycleKey(scoped.scope, scoped.parsed, surface),
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
     ownsDocumentTitle: true,
     surface,
   });

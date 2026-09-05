@@ -1,0 +1,69 @@
+name: Studio production integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-production/**'
+      - 'src/domains/creator/studio-router/**'
+      - 'src/domains/creator/StudioInspector*'
+      - 'src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-production/**'
+      - 'src/domains/creator/studio-router/**'
+      - 'src/domains/creator/StudioInspector*'
+      - 'src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-production-integrity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  production-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify real CI execution contract
+        run: node --test scripts/ci-executed-gates.test.mjs
+      - name: Verify actual production routes and Inspector integration
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/studio-production/studio-production-scope.test.ts \
+            src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
+            src/domains/creator/studio-batch-rename.test.ts \
+            src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
+            src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
+            src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Build and inspect actual production browser
+        run: |
+          pnpm run build
+          pnpm run check:studio-bundle
+          pnpm exec playwright install --with-deps chromium
+          pnpm run verify:studio-menus
