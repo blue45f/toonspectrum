@@ -1,0 +1,27 @@
+name: Studio stability source inspection
+
+on:
+  push:
+    branches: [diagnostics/studio-stability-778-20260906]
+    paths: [.github/workflows/studio-stability-source-inspect.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Capture tracked source only, with its exact revision
+        run: |
+          mkdir -p /tmp/studio-source-inspect
+          git rev-parse HEAD > /tmp/studio-source-inspect/commit.txt
+          git archive --format=tar.gz --output=/tmp/studio-source-inspect/studio-source.tar.gz HEAD src scripts .github package.json pnpm-lock.yaml
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-source-inspect-778
+          path: /tmp/studio-source-inspect
+          retention-days: 1
+          if-no-files-found: error
