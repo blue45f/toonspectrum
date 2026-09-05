@@ -1,17 +1,21 @@
 name: Studio session followup
 on:
+  push:
+    branches: [fix/studio-session-followup-20260906]
+    paths: ['scripts/.studio-pencil-pass.patch', '.github/workflows/studio-session-followup.yml', 'src/domains/creator/live/**']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: studio-session-followup-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  diagnose:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  verify:
+    runs-on: macos-latest
+    timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_DIR: /tmp/studio-session-evidence
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -20,13 +24,45 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Require a real regression on the unpatched painter
+        if: hashFiles('scripts/.studio-pencil-pass.patch') != ''
+        run: |
+          mkdir -p /tmp/studio-session-evidence
+          test "$(git hash-object src/domains/creator/live/studio-live-retained-media-overlay.ts)" = e3e81fce8834b941e5e06624135e22904c0005cc
+          if pnpm exec vitest run src/domains/creator/live/studio-live-pencil-pass-compositing.test.ts --reporter=json --outputFile=/tmp/studio-session-evidence/before.json; then
+            echo 'Expected the old compositing implementation to fail'; exit 1
+          fi
+          node -e 'const r=require("/tmp/studio-session-evidence/before.json"); if(r.numFailedTests===0 || r.numTotalTests!==18) process.exit(1)'
+          git apply --check scripts/.studio-pencil-pass.patch
+          git apply --index scripts/.studio-pencil-pass.patch
+      - name: Test the full retained renderer and pigment contracts
+        run: |
+          mkdir -p /tmp/studio-session-evidence
+          pnpm exec vitest run src/domains/creator/live/studio-live-retained-media-overlay.test.ts src/domains/creator/live/studio-live-retained-media-stability.test.ts src/domains/creator/live/studio-live-pencil-pass-compositing.test.ts src/domains/creator/brush/studio-pencil-alias-passes.test.ts --reporter=json --outputFile=/tmp/studio-session-evidence/after.json
+      - name: Publish tested implementation on feature branch only
+        if: hashFiles('scripts/.studio-pencil-pass.patch') != ''
+        run: |
+          git rm scripts/.studio-pencil-pass.patch
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio): preserve pencil pigment layers and alpha quantization'
+          git push origin HEAD:refs/heads/fix/studio-session-followup-20260906
+      - name: Preserve exact tested source
+        run: |
+          git rev-parse HEAD > /tmp/studio-session-evidence/tested-head.txt
+          git archive --format=tar.gz HEAD src packages lib scripts package.json tsconfig.json vitest.config.ts vite.config.ts > /tmp/studio-session-evidence/source.tar.gz
+      - run: pnpm exec playwright install chromium
       - run: pnpm run build:bundle
-      - run: pnpm exec tsx scripts/diagnose-studio-session.mts
+      - name: Recheck actual live and committed pixels in this new build
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: long
+          TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade,soft-pencil,pencil-6b
+        run: pnpm run verify:studio-brushes
       - if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: studio-session-diagnosis
+          name: studio-session-new-build-evidence
           path: /tmp/studio-session-evidence
           retention-days: 7
           if-no-files-found: error
