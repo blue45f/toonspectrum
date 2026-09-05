@@ -1,9 +1,12 @@
 {
-  "name": "툰스펙트럼",
-  "short_name": "툰스펙트럼",
-  "description": "웹툰·웹소설 통합 인덱스",
+  "name": "툰스튜디오 · ToonStudio",
+  "short_name": "툰스튜디오",
+  "description": "아이디어를 첫 장면으로. 드로잉·컷툰·3D 창작 공간.",
   "lang": "ko-KR",
-  "categories": ["entertainment", "books"],
+  "categories": [
+    "entertainment",
+    "books"
+  ],
   "id": "/",
   "start_url": "/",
   "scope": "/",
