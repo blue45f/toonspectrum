@@ -1,0 +1,57 @@
+name: Storyworld native failure evidence 99a6
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-native-99a6-evidence.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    steps:
+      - name: Read the completed native failures for the current product revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,urllib.request,urllib.parse
+          class Redirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl):
+                  target=super().redirect_request(req,fp,code,msg,headers,newurl)
+                  if urllib.parse.urlsplit(req.full_url).netloc != urllib.parse.urlsplit(newurl).netloc:
+                      target.remove_header('Authorization')
+                      target.remove_header('Accept')
+                  return target
+          opener=urllib.request.build_opener(Redirect())
+          base='https://api.github.com/repos/blue45f/toonspectrum/'
+          def get(path):
+              req=urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with opener.open(req,timeout=40) as response:return response.read()
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'native-evidence'
+          out.mkdir()
+          run=json.loads(get('actions/runs/33975198738'))
+          assert run['head_sha']=='99a6a6967a7fda099361b1f965491e3a028046dd'
+          report={'productSha':run['head_sha'],'jobs':[]}
+          for jid in [101330559343,101330559418,101330559300]:
+              job=json.loads(get(f'actions/jobs/{jid}'))
+              assert job['run_id']==run['id'] and job['status']=='completed'
+              raw=get(f'actions/jobs/{jid}/logs')
+              text=re.sub(r'\x1b\[[0-9;]*[A-Za-z]','',raw.decode('utf-8-sig'))
+              (out/f'job-{jid}.txt').write_text(text)
+              lines=text.splitlines()
+              indices=set()
+              for i,line in enumerate(lines):
+                  if re.search(r'\bFAIL\s|Failed Tests|Failed Suites|AssertionError|TimeoutError|##\[error\]',line):
+                      indices.update(range(i,min(i+7,len(lines))))
+              excerpt='\n'.join(lines[i] for i in sorted(indices))[-12000:]
+              report['jobs'].append({'id':jid,'name':job['name'],'conclusion':job['conclusion'],'sha256':hashlib.sha256(raw).hexdigest(),'failureSummary':excerpt})
+          (out/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-native-99a6-failures
+          path: ${{ runner.temp }}/native-evidence
+          retention-days: 3
