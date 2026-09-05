@@ -1,0 +1,2410 @@
+{
+  "rendered": [
+    {
+      "id": "legacy-0002-adaptive-power-wheelchair",
+      "sourceBounds": [
+        0.680000014603138,
+        1.0403093245622699,
+        1.0528720010247554
+      ],
+      "fitScale": 1.8995661372449921,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 27237,
+          "triangles": 15964
+        },
+        {
+          "view": 1,
+          "visiblePixels": 24009,
+          "triangles": 15964
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25828,
+          "triangles": 15964
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0003-ancient-rune-shield",
+      "sourceBounds": [
+        0.7799999713897705,
+        0.2025000024586916,
+        0.7700000405311584
+      ],
+      "fitScale": 2.5641026581532893,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 23639,
+          "triangles": 9344
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23068,
+          "triangles": 9344
+        },
+        {
+          "view": 2,
+          "visiblePixels": 23704,
+          "triangles": 9344
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0004-arcade-game-cabinet",
+      "sourceBounds": [
+        0.8199999928474426,
+        1.835000030696392,
+        0.850000012665987
+      ],
+      "fitScale": 1.0899182378983339,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25269,
+          "triangles": 7592
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20990,
+          "triangles": 7592
+        },
+        {
+          "view": 2,
+          "visiblePixels": 22428,
+          "triangles": 7592
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0005-bathtub",
+      "sourceBounds": [
+        0.8079927563667297,
+        0.6304575043085737,
+        0.4440557658672333
+      ],
+      "fitScale": 2.4752697152797802,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25928,
+          "triangles": 10500
+        },
+        {
+          "view": 1,
+          "visiblePixels": 28989,
+          "triangles": 10500
+        },
+        {
+          "view": 2,
+          "visiblePixels": 21869,
+          "triangles": 10500
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0006-blackboard",
+      "sourceBounds": [
+        1.9000000432133675,
+        2.059000110424808,
+        0.21300000604242086
+      ],
+      "fitScale": 0.9713452611653162,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 21995,
+          "triangles": 7740
+        },
+        {
+          "view": 1,
+          "visiblePixels": 26952,
+          "triangles": 7740
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10770,
+          "triangles": 7740
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0007-bonsai-tree",
+      "sourceBounds": [
+        0.23569526754598868,
+        0.2600397023764729,
+        0.12001046352088451
+      ],
+      "fitScale": 7.691133245124611,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 24275,
+          "triangles": 29532
+        },
+        {
+          "view": 1,
+          "visiblePixels": 24731,
+          "triangles": 29532
+        },
+        {
+          "view": 2,
+          "visiblePixels": 21291,
+          "triangles": 29532
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0008-bubble-tea",
+      "sourceBounds": [
+        0.07400000095367432,
+        0.2149791015234116,
+        0.07400000095367432
+      ],
+      "fitScale": 9.303229875961671,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 10060,
+          "triangles": 11604
+        },
+        {
+          "view": 1,
+          "visiblePixels": 10194,
+          "triangles": 11604
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10169,
+          "triangles": 11604
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0009-campfire",
+      "sourceBounds": [
+        0.7424211502075195,
+        0.4916371120063868,
+        0.7270579779725352
+      ],
+      "fitScale": 2.6938887711388144,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14397,
+          "triangles": 23272
+        },
+        {
+          "view": 1,
+          "visiblePixels": 16447,
+          "triangles": 23272
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17244,
+          "triangles": 23272
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0010-chair",
+      "sourceBounds": [
+        0.4180000126361847,
+        0.96523969516256,
+        0.420125169927162
+      ],
+      "fitScale": 2.072024192564078,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14344,
+          "triangles": 9464
+        },
+        {
+          "view": 1,
+          "visiblePixels": 13957,
+          "triangles": 9464
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12162,
+          "triangles": 9464
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0099-crystal-orb",
+      "sourceBounds": [
+        0.5532592460513115,
+        0.5550000071525574,
+        0.5560000017285347
+      ],
+      "fitScale": 3.5971222909752685,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 30014,
+          "triangles": 20272
+        },
+        {
+          "view": 1,
+          "visiblePixels": 30125,
+          "triangles": 20272
+        },
+        {
+          "view": 2,
+          "visiblePixels": 27782,
+          "triangles": 20272
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0100-cyber-glasses",
+      "sourceBounds": [
+        0.319824609802653,
+        0.1180000165696009,
+        0.20791701532138335
+      ],
+      "fitScale": 6.253427468368039,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 8229,
+          "triangles": 10976
+        },
+        {
+          "view": 1,
+          "visiblePixels": 8982,
+          "triangles": 10976
+        },
+        {
+          "view": 2,
+          "visiblePixels": 4811,
+          "triangles": 10976
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0101-cyber-helmet-visor",
+      "sourceBounds": [
+        0.37100002116619435,
+        0.3300000574514462,
+        0.2975000001024455
+      ],
+      "fitScale": 5.39083527195831,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 22008,
+          "triangles": 16560
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23339,
+          "triangles": 16560
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14633,
+          "triangles": 16560
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0102-cyber-katana",
+      "sourceBounds": [
+        0.32223695218551784,
+        0.2300000201736995,
+        1.7171385139226913
+      ],
+      "fitScale": 1.1647284035526813,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 2201,
+          "triangles": 6204
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2065,
+          "triangles": 6204
+        },
+        {
+          "view": 2,
+          "visiblePixels": 2302,
+          "triangles": 6204
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0103-cyber-sniper-rifle",
+      "sourceBounds": [
+        0.5044853151410941,
+        0.8054711035147213,
+        2.5150000180961323
+      ],
+      "fitScale": 0.7952286225087227,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 4749,
+          "triangles": 17496
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2557,
+          "triangles": 17496
+        },
+        {
+          "view": 2,
+          "visiblePixels": 5211,
+          "triangles": 17496
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0104-cyberpunk-hoverbike",
+      "sourceBounds": [
+        1.0600000384093917,
+        0.6992000063064286,
+        2.08699993789196
+      ],
+      "fitScale": 0.9583133969904009,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 12567,
+          "triangles": 15068
+        },
+        {
+          "view": 1,
+          "visiblePixels": 11656,
+          "triangles": 15068
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13991,
+          "triangles": 15068
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0105-cyberpunk-motorcycle",
+      "sourceBounds": [
+        0.6800000071525574,
+        0.9070000393850315,
+        2.090000033378601
+      ],
+      "fitScale": 0.95693778376017,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 11134,
+          "triangles": 14500
+        },
+        {
+          "view": 1,
+          "visiblePixels": 7787,
+          "triangles": 14500
+        },
+        {
+          "view": 2,
+          "visiblePixels": 12532,
+          "triangles": 14500
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0106-desk",
+      "sourceBounds": [
+        1.2000000476837158,
+        0.7536084442399442,
+        0.6000000238418579
+      ],
+      "fitScale": 1.6666666004392863,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25926,
+          "triangles": 6300
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29057,
+          "triangles": 6300
+        },
+        {
+          "view": 2,
+          "visiblePixels": 19585,
+          "triangles": 6300
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0107-classroom-art-studio",
+      "sourceBounds": [
+        10,
+        4,
+        8.000000067055225
+      ],
+      "fitScale": 0.2,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 42632,
+          "triangles": 134512
+        },
+        {
+          "view": 1,
+          "visiblePixels": 31297,
+          "triangles": 134512
+        },
+        {
+          "view": 2,
+          "visiblePixels": 39519,
+          "triangles": 134512
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0108-compact-apartment-interior",
+      "sourceBounds": [
+        7.000000134110451,
+        3.200000047683716,
+        6.000000067055225
+      ],
+      "fitScale": 0.28571428024038986,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 47799,
+          "triangles": 99468
+        },
+        {
+          "view": 1,
+          "visiblePixels": 33797,
+          "triangles": 99468
+        },
+        {
+          "view": 2,
+          "visiblePixels": 44461,
+          "triangles": 99468
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0109-fantasy-alchemist-workshop-library",
+      "sourceBounds": [
+        12.00000011920929,
+        5.807000041007996,
+        10.00000011920929
+      ],
+      "fitScale": 0.1666666650109821,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 47677,
+          "triangles": 161420
+        },
+        {
+          "view": 1,
+          "visiblePixels": 32259,
+          "triangles": 161420
+        },
+        {
+          "view": 2,
+          "visiblePixels": 35424,
+          "triangles": 161420
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0110-fantasy-ruin-courtyard",
+      "sourceBounds": [
+        11.399999618530273,
+        5.980400174856186,
+        11.399999618530273
+      ],
+      "fitScale": 0.17543860236179962,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28837,
+          "triangles": 149468
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29105,
+          "triangles": 149468
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28834,
+          "triangles": 149468
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0111-hanok-market-courtyard",
+      "sourceBounds": [
+        16.700660199862895,
+        3.8956008478895736,
+        13.450330004564016
+      ],
+      "fitScale": 0.11975574474693038,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 30359,
+          "triangles": 80716
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25146,
+          "triangles": 80716
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28674,
+          "triangles": 80716
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0112-hospital-emergency-nurse-station",
+      "sourceBounds": [
+        12.000000149011612,
+        4.221999835675466,
+        9.000000074505806
+      ],
+      "fitScale": 0.16666666459706098,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 38260,
+          "triangles": 122832
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29582,
+          "triangles": 122832
+        },
+        {
+          "view": 2,
+          "visiblePixels": 35385,
+          "triangles": 122832
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0113-korean-convenience-store-night",
+      "sourceBounds": [
+        10.800000190734863,
+        3.7600001096725464,
+        8.950000565499067
+      ],
+      "fitScale": 0.18518518191469718,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 37590,
+          "triangles": 150152
+        },
+        {
+          "view": 1,
+          "visiblePixels": 31923,
+          "triangles": 150152
+        },
+        {
+          "view": 2,
+          "visiblePixels": 35342,
+          "triangles": 150152
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0114-korean-school-rooftop",
+      "sourceBounds": [
+        15.000000268220901,
+        3.7450000047683716,
+        12.000000268220901
+      ],
+      "fitScale": 0.1333333309491476,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 29789,
+          "triangles": 106752
+        },
+        {
+          "view": 1,
+          "visiblePixels": 26715,
+          "triangles": 106752
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28195,
+          "triangles": 106752
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0115-scifi-command-corridor",
+      "sourceBounds": [
+        7.000000208616257,
+        4.5,
+        16
+      ],
+      "fitScale": 0.125,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 23636,
+          "triangles": 188296
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20354,
+          "triangles": 188296
+        },
+        {
+          "view": 2,
+          "visiblePixels": 24111,
+          "triangles": 188296
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0116-seoul-subway-platform",
+      "sourceBounds": [
+        13.425000071525574,
+        4.560000192373991,
+        20
+      ],
+      "fitScale": 0.1,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26083,
+          "triangles": 201688
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23671,
+          "triangles": 201688
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28306,
+          "triangles": 201688
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0117-stylized-cafe-interior",
+      "sourceBounds": [
+        9.025345385074615,
+        3.5999999046325684,
+        7.266007177288653
+      ],
+      "fitScale": 0.221598167678706,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 41232,
+          "triangles": 190444
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29146,
+          "triangles": 190444
+        },
+        {
+          "view": 2,
+          "visiblePixels": 38329,
+          "triangles": 190444
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0130-urban-neon-alley",
+      "sourceBounds": [
+        6.800000190734863,
+        7.058399975299835,
+        14
+      ],
+      "fitScale": 0.14285714285714285,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 32008,
+          "triangles": 146912
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23381,
+          "triangles": 146912
+        },
+        {
+          "view": 2,
+          "visiblePixels": 33879,
+          "triangles": 146912
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0131-everyday-backpack",
+      "sourceBounds": [
+        0.33320000022649765,
+        0.40302377939224243,
+        0.41928026964887977
+      ],
+      "fitScale": 4.770078977660626,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28494,
+          "triangles": 6640
+        },
+        {
+          "view": 1,
+          "visiblePixels": 27251,
+          "triangles": 6640
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25615,
+          "triangles": 6640
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0132-everyday-book",
+      "sourceBounds": [
+        0.16500000283122063,
+        0.23499999940395355,
+        0.047500000277068466
+      ],
+      "fitScale": 8.51063831945845,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26069,
+          "triangles": 4136
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29886,
+          "triangles": 4136
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16771,
+          "triangles": 4136
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0133-everyday-cap",
+      "sourceBounds": [
+        0.20999999344348907,
+        0.167950002476573,
+        0.2669999422505498
+      ],
+      "fitScale": 7.49063832427058,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 22835,
+          "triangles": 14680
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20149,
+          "triangles": 14680
+        },
+        {
+          "view": 2,
+          "visiblePixels": 22592,
+          "triangles": 14680
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0134-everyday-glasses",
+      "sourceBounds": [
+        0.15499986708164215,
+        0.06920001095464222,
+        0.16884041437879205
+      ],
+      "fitScale": 11.84550516153684,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 10937,
+          "triangles": 22376
+        },
+        {
+          "view": 1,
+          "visiblePixels": 11292,
+          "triangles": 22376
+        },
+        {
+          "view": 2,
+          "visiblePixels": 6356,
+          "triangles": 22376
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0135-everyday-mug",
+      "sourceBounds": [
+        0.1371999979019165,
+        0.08711976953782141,
+        0.08339999616146088
+      ],
+      "fitScale": 14.577259698136356,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 23481,
+          "triangles": 8460
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25788,
+          "triangles": 8460
+        },
+        {
+          "view": 2,
+          "visiblePixels": 24815,
+          "triangles": 8460
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0136-fantasy-magic-chest",
+      "sourceBounds": [
+        0.9399999976158142,
+        0.7049999833106995,
+        0.7490000054680194
+      ],
+      "fitScale": 2.1276595798646123,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 43983,
+          "triangles": 11264
+        },
+        {
+          "view": 1,
+          "visiblePixels": 44884,
+          "triangles": 11264
+        },
+        {
+          "view": 2,
+          "visiblePixels": 39127,
+          "triangles": 11264
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0137-fantasy-magic-wand-staff",
+      "sourceBounds": [
+        0.3959999978542328,
+        0.39600005106033964,
+        1.3240000195801258
+      ],
+      "fitScale": 1.5105739957875914,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 2555,
+          "triangles": 13080
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2938,
+          "triangles": 13080
+        },
+        {
+          "view": 2,
+          "visiblePixels": 2695,
+          "triangles": 13080
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0138-fireplace",
+      "sourceBounds": [
+        1.5,
+        1.3349999636411667,
+        0.6200000047683716
+      ],
+      "fitScale": 1.3333333333333333,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 39973,
+          "triangles": 12972
+        },
+        {
+          "view": 1,
+          "visiblePixels": 43385,
+          "triangles": 12972
+        },
+        {
+          "view": 2,
+          "visiblePixels": 29113,
+          "triangles": 12972
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0139-fox-mask",
+      "sourceBounds": [
+        0.20364926286738216,
+        0.29575405486062933,
+        0.13501987025271772
+      ],
+      "fitScale": 6.762375585830858,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 17793,
+          "triangles": 6728
+        },
+        {
+          "view": 1,
+          "visiblePixels": 21082,
+          "triangles": 6728
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13575,
+          "triangles": 6728
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0140-grandfather-clock",
+      "sourceBounds": [
+        0.47999998927116394,
+        1.9800000563263893,
+        0.45298370718955994
+      ],
+      "fitScale": 1.0101009813659894,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 10926,
+          "triangles": 18856
+        },
+        {
+          "view": 1,
+          "visiblePixels": 11104,
+          "triangles": 18856
+        },
+        {
+          "view": 2,
+          "visiblePixels": 8758,
+          "triangles": 18856
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0141-hanging-sign",
+      "sourceBounds": [
+        0.49500003902728024,
+        0.4689999932667866,
+        0.05000000074505806
+      ],
+      "fitScale": 4.040403721846529,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 18130,
+          "triangles": 13324
+        },
+        {
+          "view": 1,
+          "visiblePixels": 21967,
+          "triangles": 13324
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10647,
+          "triangles": 13324
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0142-hologram-tablet",
+      "sourceBounds": [
+        0.45499999821186066,
+        0.25999999046325684,
+        0.17241031427143932
+      ],
+      "fitScale": 4.395604412879018,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 17751,
+          "triangles": 12556
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23855,
+          "triangles": 12556
+        },
+        {
+          "view": 2,
+          "visiblePixels": 11670,
+          "triangles": 12556
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0143-ice-cream-cone",
+      "sourceBounds": [
+        0.06540000438690186,
+        0.24661184086008736,
+        0.06540000438690186
+      ],
+      "fitScale": 8.109910671867045,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 8017,
+          "triangles": 11956
+        },
+        {
+          "view": 1,
+          "visiblePixels": 8052,
+          "triangles": 11956
+        },
+        {
+          "view": 2,
+          "visiblePixels": 8003,
+          "triangles": 11956
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0144-kitchen-stove",
+      "sourceBounds": [
+        0.6200000047683716,
+        0.9705445854513957,
+        0.6520000156015158
+      ],
+      "fitScale": 2.0606987355143604,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 41708,
+          "triangles": 74416
+        },
+        {
+          "view": 1,
+          "visiblePixels": 38567,
+          "triangles": 74416
+        },
+        {
+          "view": 2,
+          "visiblePixels": 38568,
+          "triangles": 74416
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0145-magic-grimoire",
+      "sourceBounds": [
+        0.45500000193715096,
+        0.20025001024157246,
+        0.5400000214576721
+      ],
+      "fitScale": 3.7037035565317473,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 30901,
+          "triangles": 13272
+        },
+        {
+          "view": 1,
+          "visiblePixels": 30347,
+          "triangles": 13272
+        },
+        {
+          "view": 2,
+          "visiblePixels": 31859,
+          "triangles": 13272
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0146-magic-staff-crystal",
+      "sourceBounds": [
+        0.30107068086455263,
+        1.8566400408744812,
+        0.2788442251572693
+      ],
+      "fitScale": 1.077214729818062,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 2298,
+          "triangles": 18376
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2275,
+          "triangles": 18376
+        },
+        {
+          "view": 2,
+          "visiblePixels": 2251,
+          "triangles": 18376
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0147-mailbox",
+      "sourceBounds": [
+        0.33670634389077764,
+        1.03999999538064,
+        0.1874999962747097
+      ],
+      "fitScale": 1.9230769316186391,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 6794,
+          "triangles": 5612
+        },
+        {
+          "view": 1,
+          "visiblePixels": 6928,
+          "triangles": 5612
+        },
+        {
+          "view": 2,
+          "visiblePixels": 5692,
+          "triangles": 5612
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0148-mech-turret",
+      "sourceBounds": [
+        0.5600000023841858,
+        0.4732317827477369,
+        0.8757698692748694
+      ],
+      "fitScale": 2.2837049665296023,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14345,
+          "triangles": 19172
+        },
+        {
+          "view": 1,
+          "visiblePixels": 17236,
+          "triangles": 19172
+        },
+        {
+          "view": 2,
+          "visiblePixels": 15829,
+          "triangles": 19172
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0149-medical-stethoscope",
+      "sourceBounds": [
+        0.2147948294878006,
+        0.10650001490103864,
+        0.29700000287324635
+      ],
+      "fitScale": 6.734006668860403,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 5694,
+          "triangles": 9124
+        },
+        {
+          "view": 1,
+          "visiblePixels": 5475,
+          "triangles": 9124
+        },
+        {
+          "view": 2,
+          "visiblePixels": 4862,
+          "triangles": 9124
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0150-medieval-greatsword",
+      "sourceBounds": [
+        0.8200000364962979,
+        0.15400001985679876,
+        2.1268016919493675
+      ],
+      "fitScale": 0.9403791653780638,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 3057,
+          "triangles": 7248
+        },
+        {
+          "view": 1,
+          "visiblePixels": 2935,
+          "triangles": 7248
+        },
+        {
+          "view": 2,
+          "visiblePixels": 3192,
+          "triangles": 7248
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0151-medieval-shield",
+      "sourceBounds": [
+        0.7300000190734863,
+        1.0074001712112712,
+        0.24620002880692482
+      ],
+      "fitScale": 1.9853083780949263,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 19333,
+          "triangles": 8024
+        },
+        {
+          "view": 1,
+          "visiblePixels": 23436,
+          "triangles": 8024
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10228,
+          "triangles": 8024
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0152-modern-smartphone-prop",
+      "sourceBounds": [
+        0.07859999686479568,
+        0.15000000596046448,
+        0.01800000067212315
+      ],
+      "fitScale": 13.33333280351429,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16326,
+          "triangles": 8500
+        },
+        {
+          "view": 1,
+          "visiblePixels": 20288,
+          "triangles": 8500
+        },
+        {
+          "view": 2,
+          "visiblePixels": 8860,
+          "triangles": 8500
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0153-neom-bench-prop",
+      "sourceBounds": [
+        1.9199999570846558,
+        1.0140282736520716,
+        0.6575917413017676
+      ],
+      "fitScale": 1.0416666899497316,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 19279,
+          "triangles": 8168
+        },
+        {
+          "view": 1,
+          "visiblePixels": 16228,
+          "triangles": 8168
+        },
+        {
+          "view": 2,
+          "visiblePixels": 15031,
+          "triangles": 8168
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0155-outfit-cardigan",
+      "sourceBounds": [
+        0.45169779658317566,
+        0.6918925642967224,
+        0.45169778168201447
+      ],
+      "fitScale": 2.890622190791875,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 22522,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 22515,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 22513,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0156-outfit-cyber-suit-v2",
+      "sourceBounds": [
+        0.5081599950790405,
+        1.1051063537597656,
+        0.5081599950790405
+      ],
+      "fitScale": 1.809780563830485,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 15058,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15065,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 15066,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0157-outfit-cyberpunk-suit",
+      "sourceBounds": [
+        0.41405630111694336,
+        1.1531540155410767,
+        0.41405630111694336
+      ],
+      "fitScale": 1.73437370294511,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 11516,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 11515,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 11522,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0158-outfit-dress",
+      "sourceBounds": [
+        0.6612026691436768,
+        0.864865779876709,
+        0.6612026691436768
+      ],
+      "fitScale": 2.312497553418185,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25612,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25624,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25615,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0159-outfit-hanbok-modern",
+      "sourceBounds": [
+        0.5269808173179626,
+        1.0570552349090576,
+        0.5269808173179626
+      ],
+      "fitScale": 1.8920487160465815,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16485,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 16473,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16475,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0160-outfit-kimono-traditional",
+      "sourceBounds": [
+        0.5458014905452728,
+        1.0570552349090576,
+        0.5458014607429504
+      ],
+      "fitScale": 1.8920487160465815,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 17154,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 17142,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17139,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0161-outfit-pants",
+      "sourceBounds": [
+        0.408207431435585,
+        0.8168163299560547,
+        0.18820742517709732
+      ],
+      "fitScale": 2.4485308712028337,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 13954,
+          "triangles": 3072
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14618,
+          "triangles": 3072
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10501,
+          "triangles": 3072
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0162-outfit-punk-jacket",
+      "sourceBounds": [
+        0.470518559217453,
+        0.6726721525192261,
+        0.470518559217453
+      ],
+      "fitScale": 2.973216584795127,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 24481,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 24458,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 24461,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0163-outfit-sailor",
+      "sourceBounds": [
+        0.41405630111694336,
+        0.5285276174545288,
+        0.41405630111694336
+      ],
+      "fitScale": 3.784097432093163,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28192,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 28182,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28184,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0164-outfit-scrubpants",
+      "sourceBounds": [
+        0.44702814519405365,
+        0.8264268636703491,
+        0.20702815055847168
+      ],
+      "fitScale": 2.4200568591363867,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 15177,
+          "triangles": 3072
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15901,
+          "triangles": 3072
+        },
+        {
+          "view": 2,
+          "visiblePixels": 11482,
+          "triangles": 3072
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0165-outfit-scrubs",
+      "sourceBounds": [
+        0.4328770339488983,
+        0.5957958102226257,
+        0.4328770339488983
+      ],
+      "fitScale": 3.356854757425497,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25642,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25634,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25633,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0166-outfit-shorts",
+      "sourceBounds": [
+        0.44584889709949493,
+        0.33633607625961304,
+        0.22584889084100723
+      ],
+      "fitScale": 4.485824711042592,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 24580,
+          "triangles": 3072
+        },
+        {
+          "view": 1,
+          "visiblePixels": 26276,
+          "triangles": 3072
+        },
+        {
+          "view": 2,
+          "visiblePixels": 21199,
+          "triangles": 3072
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0167-outfit-space-suit",
+      "sourceBounds": [
+        0.5269808173179626,
+        1.1531540155410767,
+        0.5269808173179626
+      ],
+      "fitScale": 1.73437370294511,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14941,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14930,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14929,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0168-outfit-tactical-vest",
+      "sourceBounds": [
+        0.36938274302600327,
+        0.4617284249008442,
+        0.20987655222415924
+      ],
+      "fitScale": 4.331550522213352,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 22487,
+          "triangles": 192
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25956,
+          "triangles": 192
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17727,
+          "triangles": 192
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0169-outfit-tank",
+      "sourceBounds": [
+        0.37641486525535583,
+        0.5189191699028015,
+        0.37641485035419464
+      ],
+      "fitScale": 3.85416480253489,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25599,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25585,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25588,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0170-outfit-trenchcoat",
+      "sourceBounds": [
+        0.4893392026424408,
+        1.1051063537597656,
+        0.489339217543602
+      ],
+      "fitScale": 1.809780563830485,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14458,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14445,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14457,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0171-outfit-tshirt",
+      "sourceBounds": [
+        0.41405630111694336,
+        0.5765770077705383,
+        0.41405630111694336
+      ],
+      "fitScale": 3.46874740589022,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25292,
+          "triangles": 1536
+        },
+        {
+          "view": 1,
+          "visiblePixels": 25267,
+          "triangles": 1536
+        },
+        {
+          "view": 2,
+          "visiblePixels": 25270,
+          "triangles": 1536
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0172-outfit-wide",
+      "sourceBounds": [
+        0.6011318564414978,
+        0.8456454277038574,
+        0.30113184452056885
+      ],
+      "fitScale": 2.3650574277099907,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 20909,
+          "triangles": 3072
+        },
+        {
+          "view": 1,
+          "visiblePixels": 22788,
+          "triangles": 3072
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16477,
+          "triangles": 3072
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0173-paper-lantern",
+      "sourceBounds": [
+        0.10884689167141914,
+        0.20500000100582838,
+        0.10884690657258034
+      ],
+      "fitScale": 9.756097513107512,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 14997,
+          "triangles": 130788
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15000,
+          "triangles": 130788
+        },
+        {
+          "view": 2,
+          "visiblePixels": 14999,
+          "triangles": 130788
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0174-potted-monstera",
+      "sourceBounds": [
+        0.5239118964761172,
+        0.35596182526733355,
+        0.15600000321865082
+      ],
+      "fitScale": 3.8174357433992165,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 7726,
+          "triangles": 37274
+        },
+        {
+          "view": 1,
+          "visiblePixels": 6579,
+          "triangles": 37274
+        },
+        {
+          "view": 2,
+          "visiblePixels": 6021,
+          "triangles": 37274
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0175-ramen-bowl",
+      "sourceBounds": [
+        0.118000078946352,
+        0.12925649277671453,
+        0.11800011619925499
+      ],
+      "fitScale": 15.473110534222222,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 29177,
+          "triangles": 30732
+        },
+        {
+          "view": 1,
+          "visiblePixels": 31695,
+          "triangles": 30732
+        },
+        {
+          "view": 2,
+          "visiblePixels": 27651,
+          "triangles": 30732
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0176-robot-pet",
+      "sourceBounds": [
+        0.19600000232458115,
+        0.4419999858364463,
+        0.40399999637156725
+      ],
+      "fitScale": 4.5248870228246165,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16713,
+          "triangles": 12260
+        },
+        {
+          "view": 1,
+          "visiblePixels": 15717,
+          "triangles": 12260
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17959,
+          "triangles": 12260
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0177-round-table",
+      "sourceBounds": [
+        1.0324915647506714,
+        0.7512463182210922,
+        1.0324915647506714
+      ],
+      "fitScale": 1.937061830120583,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28792,
+          "triangles": 4680
+        },
+        {
+          "view": 1,
+          "visiblePixels": 28832,
+          "triangles": 4680
+        },
+        {
+          "view": 2,
+          "visiblePixels": 28637,
+          "triangles": 4680
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0178-royal-throne",
+      "sourceBounds": [
+        1.2299998626112938,
+        2.215000116252673,
+        0.9200000166893005
+      ],
+      "fitScale": 0.902934489856186,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 22799,
+          "triangles": 24108
+        },
+        {
+          "view": 1,
+          "visiblePixels": 22724,
+          "triangles": 24108
+        },
+        {
+          "view": 2,
+          "visiblePixels": 17306,
+          "triangles": 24108
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0179-school-desk",
+      "sourceBounds": [
+        1.100000023841858,
+        0.7600000165402889,
+        0.6499999901279807
+      ],
+      "fitScale": 1.8181817787737895,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 25755,
+          "triangles": 4316
+        },
+        {
+          "view": 1,
+          "visiblePixels": 27864,
+          "triangles": 4316
+        },
+        {
+          "view": 2,
+          "visiblePixels": 24828,
+          "triangles": 4316
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0180-scifi-drone-bot",
+      "sourceBounds": [
+        0.9120000004768372,
+        0.6269999835640192,
+        0.7919999957084656
+      ],
+      "fitScale": 2.192982454993755,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 18027,
+          "triangles": 30832
+        },
+        {
+          "view": 1,
+          "visiblePixels": 19027,
+          "triangles": 30832
+        },
+        {
+          "view": 2,
+          "visiblePixels": 18442,
+          "triangles": 30832
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0181-scifi-laser-gun",
+      "sourceBounds": [
+        0.3049999922513962,
+        0.6145495859549884,
+        1.78141268581957
+      ],
+      "fitScale": 1.1227044782606705,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 6779,
+          "triangles": 7792
+        },
+        {
+          "view": 1,
+          "visiblePixels": 4526,
+          "triangles": 7792
+        },
+        {
+          "view": 2,
+          "visiblePixels": 7482,
+          "triangles": 7792
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0182-sofa",
+      "sourceBounds": [
+        1.8520000167191029,
+        0.8995658159255981,
+        0.800000011920929
+      ],
+      "fitScale": 1.0799135971624263,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 26730,
+          "triangles": 26800
+        },
+        {
+          "view": 1,
+          "visiblePixels": 21790,
+          "triangles": 26800
+        },
+        {
+          "view": 2,
+          "visiblePixels": 21800,
+          "triangles": 26800
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0183-steampunk-airship",
+      "sourceBounds": [
+        0.988531703934331,
+        1.2700000256299973,
+        2.280999598667602
+      ],
+      "fitScale": 0.876808571631603,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 16300,
+          "triangles": 13912
+        },
+        {
+          "view": 1,
+          "visiblePixels": 12855,
+          "triangles": 13912
+        },
+        {
+          "view": 2,
+          "visiblePixels": 18491,
+          "triangles": 13912
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0184-street-food-cart",
+      "sourceBounds": [
+        1,
+        1.5997255365965601,
+        0.6602072496328205
+      ],
+      "fitScale": 1.2502144613225528,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 21989,
+          "triangles": 15168
+        },
+        {
+          "view": 1,
+          "visiblePixels": 19565,
+          "triangles": 15168
+        },
+        {
+          "view": 2,
+          "visiblePixels": 19180,
+          "triangles": 15168
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0185-street-lamp",
+      "sourceBounds": [
+        1.2799999713897705,
+        3.3400000482797623,
+        0.5799999833106995
+      ],
+      "fitScale": 0.5988023865538812,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 4119,
+          "triangles": 37820
+        },
+        {
+          "view": 1,
+          "visiblePixels": 4274,
+          "triangles": 37820
+        },
+        {
+          "view": 2,
+          "visiblePixels": 3526,
+          "triangles": 37820
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0186-tactical-helmet",
+      "sourceBounds": [
+        0.4450000077486038,
+        0.4259999953210354,
+        0.49470001133158803
+      ],
+      "fitScale": 4.042854162498569,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 32166,
+          "triangles": 24456
+        },
+        {
+          "view": 1,
+          "visiblePixels": 29248,
+          "triangles": 24456
+        },
+        {
+          "view": 2,
+          "visiblePixels": 33512,
+          "triangles": 24456
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0187-tea-set",
+      "sourceBounds": [
+        0.3698251325610036,
+        0.15374925453215837,
+        0.2199999988079071
+      ],
+      "fitScale": 5.407961287406812,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 19639,
+          "triangles": 41796
+        },
+        {
+          "view": 1,
+          "visiblePixels": 19388,
+          "triangles": 41796
+        },
+        {
+          "view": 2,
+          "visiblePixels": 16579,
+          "triangles": 41796
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0188-traffic-light",
+      "sourceBounds": [
+        0.6600000113248825,
+        2.759999930858612,
+        0.3467552887821003
+      ],
+      "fitScale": 0.7246376993124841,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 4037,
+          "triangles": 11324
+        },
+        {
+          "view": 1,
+          "visiblePixels": 4087,
+          "triangles": 11324
+        },
+        {
+          "view": 2,
+          "visiblePixels": 3552,
+          "triangles": 11324
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0189-vending-machine",
+      "sourceBounds": [
+        0.949999988079071,
+        1.8925000242888927,
+        0.7619999870657921
+      ],
+      "fitScale": 1.0568031568461937,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 28454,
+          "triangles": 24100
+        },
+        {
+          "view": 1,
+          "visiblePixels": 27373,
+          "triangles": 24100
+        },
+        {
+          "view": 2,
+          "visiblePixels": 23942,
+          "triangles": 24100
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0190-wishing-well",
+      "sourceBounds": [
+        1.202081676522123,
+        2.7350000143051147,
+        1.202081676522123
+      ],
+      "fitScale": 0.7312614221349987,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 13848,
+          "triangles": 19062
+        },
+        {
+          "view": 1,
+          "visiblePixels": 14174,
+          "triangles": 19062
+        },
+        {
+          "view": 2,
+          "visiblePixels": 13827,
+          "triangles": 19062
+        }
+      ],
+      "renderer": "Three.js 184"
+    },
+    {
+      "id": "legacy-0191-wizard-hat",
+      "sourceBounds": [
+        0.23760941624641418,
+        0.46545859077911894,
+        0.23760941624641418
+      ],
+      "fitScale": 4.296837655638179,
+      "views": [
+        {
+          "view": 0,
+          "visiblePixels": 10097,
+          "triangles": 29174
+        },
+        {
+          "view": 1,
+          "visiblePixels": 10854,
+          "triangles": 29174
+        },
+        {
+          "view": 2,
+          "visiblePixels": 10317,
+          "triangles": 29174
+        }
+      ],
+      "renderer": "Three.js 184"
+    }
+  ],
+  "failed": [],
+  "artisticApproval": false,
+  "studioRoundTripVerified": false
+}
