@@ -558,7 +558,7 @@ export function StudioOriginalAssetMarketplacePanel({
             <span className="flex flex-wrap items-center gap-1.5">
               <strong className="text-xs text-fg">독자 무료 스타터 마켓</strong>
               <span className="rounded-full border border-good/35 bg-good/10 px-2 py-0.5 text-[0.55rem] font-black text-good">
-                32 FREE
+                {`${STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.reduce((count, pkg) => count + pkg.includedItems.length, 0)} FREE`}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-[0.58rem] text-fg-3">
@@ -587,7 +587,7 @@ export function StudioOriginalAssetMarketplacePanel({
               </span>
             </div>
             <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-              32종 모두 외부 마켓 상품을 복제하지 않은 ToonSpectrum 원본 SVG입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.
+              선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonSpectrum 자체 에셋입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.
             </p>
           </div>
         </div>

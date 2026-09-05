@@ -33,6 +33,10 @@ EXTRA_PACKS = [
     ('kenney-nature', 'nature-kit', 'nature'),
     ('kenney-city-commercial', 'city-kit-commercial', 'architecture'),
     ('kenney-survival', 'survival-kit', 'outdoor-prop'),
+    ('kenney-building', 'building-kit', 'architecture'),
+    ('kenney-watercraft', 'watercraft-kit', 'outdoor-prop'),
+    ('kenney-suburban', 'city-kit-suburban', 'architecture'),
+    ('kenney-roads', 'city-kit-roads', 'architecture'),
 ]
 LIMIT_IMAGE_PIXELS = 32 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = LIMIT_IMAGE_PIXELS
@@ -262,6 +266,7 @@ def acquire_delivery(output: Path) -> dict:
                 candidates += [p for p in sorted(unpacked.rglob('*.gltf')) if p.stem not in glb_names]
                 added = 0
                 for source in candidates:
+                    target = None
                     try:
                         source_rel = source.relative_to(unpacked).as_posix()
                         if any(t in source.stem.lower() for t in ['lowdetail', 'low-detail']):
@@ -269,6 +274,10 @@ def acquire_delivery(output: Path) -> dict:
                             continue
                         identifier = pack_id + '-' + slug(source.stem)
                         target = folder / (slug(source.stem) + '.glb')
+                        if target.exists():
+                            suffix = digest(source_rel.encode('utf-8'))[:10]
+                            identifier += '-' + suffix
+                            target = folder / (slug(source.stem) + '-' + suffix + '.glb')
                         if source.suffix == '.glb': normalize(source, target)
                         else: gltf_to_glb(source, target)
                         raw = target.read_bytes()
@@ -291,7 +300,7 @@ def acquire_delivery(output: Path) -> dict:
                                        'visualReviewed': False, 'studioRuntimeVerified': False})
                         added += 1
                     except Exception as error:
-                        if 'target' in locals() and target.exists(): target.unlink()
+                        if target is not None and target.exists(): target.unlink()
                         rejected.append({'source': pack_id + '/' + str(source.relative_to(unpacked)), 'reason': str(error)})
                 image_candidates = []
                 if pack['category'] == 'effect-mask':
@@ -306,7 +315,9 @@ def acquire_delivery(output: Path) -> dict:
                             image = image.convert('RGBA')
                         w, h = image.size
                         minimum = 512 if pack['category'] == 'effect-mask' else 2048
-                        if min(w, h) < minimum: raise ValueError('below-intended-role-resolution')
+                        if ((pack['category'] == 'effect-mask' and min(w, h) < minimum)
+                            or (pack['category'] == 'surface-material' and (max(w, h) < 2048 or min(w, h) < 1024))):
+                            raise ValueError('below-intended-role-resolution')
                         if pack['category'] == 'effect-mask' and image.getchannel('A').getextrema()[0] == 255:
                             raise ValueError('opaque-effect-background')
                         if image.getchannel('A').getbbox() is None: raise ValueError('empty-alpha')

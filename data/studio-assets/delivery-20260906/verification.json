@@ -1,0 +1,11 @@
+{
+  "catalogAndLegacyUnitTests": "58-passed",
+  "manifestAdmission": "1097-passed",
+  "threeAngleModelRendering": "999-passed-in-run-33981429268",
+  "frontendLint": "success",
+  "frontendTypes": "success",
+  "fullProductionBuild": "not-run",
+  "studioSaveRestoreRoundTrip": "not-run",
+  "artisticApproval": "not-claimed",
+  "productionDeployment": "not-performed"
+}

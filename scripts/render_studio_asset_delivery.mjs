@@ -11,7 +11,7 @@ const tools = path.resolve(process.argv[3] ?? '');
 if (!process.argv[2] || !process.argv[3]) throw new Error('Usage: renderer OUTPUT ISOLATED_TOOLS_DIRECTORY');
 const requireTools = createRequire(path.join(tools, 'package.json'));
 const { chromium } = requireTools('playwright');
-const threeRoot = path.dirname(requireTools.resolve('three/package.json'));
+const threeRoot = path.dirname(path.dirname(requireTools.resolve('three')));
 const manifestPath = path.join(output, 'manifest.json');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const modelAssets = manifest.assets.filter(asset => asset.kind === 'model');
@@ -92,7 +92,7 @@ try {
   await context.route('**/*', route => route.request().url().startsWith(baseUrl + '/') ? route.continue() : route.abort());
   const page = await context.newPage();
   await page.goto(baseUrl);
-  await page.waitForFunction(() => window.rendererReady, {timeout:30000});
+  await page.waitForFunction(() => window.rendererReady, undefined, {timeout:30000});
   for (const [index, asset] of modelAssets.entries()) {
     try {
       const result = await page.evaluate(url => window.renderAsset(url), baseUrl + '/' + asset.path);
