@@ -20,7 +20,7 @@
 
 `status: open | answered`는 기존 답변 여부다. `progress: received | reviewing | planned | in_progress | completed | not_planned`는 실제 개선 진행 상황이다. 운영자 답변을 작성하는 것만으로 `completed`가 되지 않는다. 기존 answered 글의 progress도 received로 시작하며, 운영자가 검토 후 실제 진행 상태를 정한다.
 
-`feedback_post`에 progress와 허용 목록 기반 metadata를 추가한다. `feedback_vote`는 `(postId,userId)` 복합 기본 키로 중복 공감을 방지한다. 투표는 토글 요청이 아니라 원하는 boolean을 저장하므로 같은 요청을 반복해도 하나만 남는다. 기존 게시글·답글·작성자는 삭제하거나 재생성하지 않는다. 초기화는 advisory transaction lock을 사용한 additive runtime migration이며 실패 시 재시도한다.
+`feedback_post`에 progress와 허용 목록 기반 metadata를 추가한다. `feedback_vote`는 `(postId,userId)` 복합 기본 키로 중복 공감을 방지한다. 투표는 토글 요청이 아니라 원하는 boolean을 저장하므로 같은 요청을 반복해도 하나만 남는다. 기존 게시글·답글·작성자는 삭제하거나 재생성하지 않는다. 스키마 변경은 관리형 마이그레이션 `0038_feedback_community.sql`과 전용 마이그레이션 계정으로 수행한다. API는 읽기 전용 준비 상태만 확인하며 스키마·권한 미반영 시 503을 반환한다. 운영 계정에는 테이블 생성·수정 권한을 주지 않는다.
 
 모든 쓰기는 기존 sessionAuth와 CSRF 경계를 유지한다. 브라우저는 공용 API 클라이언트의 HttpOnly 쿠키·CSRF 처리를 사용하며 로컬 userId를 인증 헤더로 보내지 않는다. 운영자 권한은 데이터 계층에서도 다시 확인한다. 숨김 글은 ID를 알아도 상세 조회·댓글 조회/작성·투표·처리 상태 변경이 불가능하다. 개인화 목록은 private/no-store로 반환한다.
 
@@ -39,7 +39,7 @@ pnpm exec playwright test --config playwright.feedback.config.ts
 pnpm run typecheck
 ```
 
-DB 검증 스크립트는 정확히 loopback의 `feedback_community_test`만 허용한다. 해당 격리 DB에서만 기존 형식의 테이블을 생성해 마이그레이션, 페이지네이션, 권한, 중복 투표, 이력, 숨김 글과 답글 깊이를 검증한다. 운영 DB에는 테스트 글을 등록하지 않는다.
+DB 검증 스크립트는 정확히 loopback의 `feedback_community_test`만 허용한다. 해당 격리 DB에서만 기존 형식의 테이블을 생성해 마이그레이션, 페이지네이션, 권한, 중복 투표, 이력, 숨김 글과 답글 깊이를 검증한다. 추가로 DDL이 금지된 비소유 역할의 별도 프로세스에서 실제 읽기·제보·댓글·공감·운영자 상태 변경을 검증한다. 운영 DB에는 테스트 글을 등록하지 않는다.
 
 Playwright는 실제 React 화면을 테스트 전용 엔트리로 렌더하고 API 응답만 fixture로 교체한다. 게스트/로그인/운영자, 글 등록, 검색·페이지네이션, 공감·취소, 실패한 댓글의 재시도, 구버전 API 차단, 320/390/768/1440px 가로 넘침과 브라우저 예외를 검사한다. `e2e/feedback-community.html`과 해당 테스트 엔트리는 프로덕션 빌드에서 참조하지 않는다. 화면 증거에는 “UI 검증 · 테스트 데이터”를 명시한다.
 

@@ -21,45 +21,30 @@ const MAX_REPLY = 1500;
 const MAX_DEPTH = 4;
 let ensurePromise: Promise<void> | null = null;
 
-/** Additive, serialized runtime migration, also safe on databases created by the old Q&A page. */
+/** Read-only capability probe. Schema changes belong to the managed migration role. */
 export function ensureFeedbackTables(): Promise<void> {
-  ensurePromise ??= db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(82361742)`);
-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_post (
-      id TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      category TEXT NOT NULL DEFAULT 'question', title TEXT NOT NULL, text TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'open', "answeredAt" TIMESTAMPTZ,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )`);
-    await tx.execute(sql`ALTER TABLE feedback_post
-      ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false,
-      ADD COLUMN IF NOT EXISTS progress TEXT NOT NULL DEFAULT 'received',
-      ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb`);
-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_post_progress_created
-      ON feedback_post(progress, "createdAt", id)`);
-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_post_user_created
-      ON feedback_post("userId", "createdAt", id)`);
-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_reply (
-      id TEXT PRIMARY KEY, "postId" TEXT NOT NULL REFERENCES feedback_post(id) ON DELETE CASCADE,
-      "parentId" TEXT, "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      text TEXT NOT NULL, "isOfficial" BOOLEAN NOT NULL DEFAULT false,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )`);
-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_reply_post
-      ON feedback_reply("postId", "createdAt")`);
-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_vote (
-      "postId" TEXT NOT NULL REFERENCES feedback_post(id) ON DELETE CASCADE,
-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY ("postId", "userId")
-    )`);
-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_vote_user ON feedback_vote("userId")`);
-  }).catch((error: unknown) => { ensurePromise = null; throw error; });
+  ensurePromise ??= (async () => {
+    // LIMIT 0 validates relation/column access without reading user content.
+    await db.execute(sql`SELECT id, "userId", category, title, text, tags, hidden,
+      progress, metadata, status, "answeredAt", "createdAt" FROM public.feedback_post LIMIT 0`);
+    await db.execute(sql`SELECT id, "postId", "parentId", "userId", text,
+      "isOfficial", "createdAt" FROM public.feedback_reply LIMIT 0`);
+    await db.execute(sql`SELECT "postId", "userId", "createdAt" FROM public.feedback_vote LIMIT 0`);
+  })().catch((cause: unknown) => {
+    ensurePromise = null;
+    // Drizzle wraps PostgreSQL exceptions. Never expose SQL or role names to clients.
+    const wrapped = cause && typeof cause === "object" ? cause as { code?: unknown; cause?: { code?: unknown } } : null;
+    const code = wrapped?.cause?.code ?? wrapped?.code;
+    if (code === "42P01" || code === "42703" || code === "42501") {
+      throw new FeedbackError("제보 기능 업데이트를 준비하고 있어요. 잠시 후 다시 확인해 주세요.", 503);
+    }
+    throw cause;
+  });
   return ensurePromise;
 }
 
 export class FeedbackError extends Error {
-  constructor(message: string, readonly statusCode: 400 | 403 | 404 | 409 = 400) { super(message); this.name = "FeedbackError"; }
+  constructor(message: string, readonly statusCode: 400 | 403 | 404 | 409 | 503 = 400) { super(message); this.name = "FeedbackError"; }
 }
 export function parseFeedbackCategory(value: unknown): FeedbackKind { return isFeedbackKind(value) ? value : "question"; }
 export function parseFeedbackCategoryFilter(value: unknown): FeedbackCategoryFilter { return isFeedbackKind(value) ? value : "all"; }
