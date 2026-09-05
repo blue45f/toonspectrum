@@ -153,7 +153,7 @@ describe("Studio route manifest", () => {
       "?scope=work%3Awork-1",
       "production",
       "/studio/share?scope=work%3Awork-1",
-      "/studio/share",
+      "/studio/work:work-1/share",
     ],
     [
       "/studio/join",
