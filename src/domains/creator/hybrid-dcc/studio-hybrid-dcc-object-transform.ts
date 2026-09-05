@@ -37,7 +37,8 @@ export function createStudioHybridDccIdentityTransform(): StudioHybridDccObjectT
 function isVec3Tuple(value: unknown): value is StudioHybridDccVec3Tuple {
   return Array.isArray(value)
     && value.length === 3
-    && value.every((component) => typeof component === "number" && Number.isFinite(component));
+    && [0, 1, 2].every((index) => Object.hasOwn(value, index)
+      && typeof value[index] === "number" && Number.isFinite(value[index]));
 }
 
 /** Validates untrusted persisted/plugin transform data and returns a detached canonical value. */
@@ -145,5 +146,5 @@ export function hashStudioHybridDccObjectTransform(
     ...transform.position,
     ...transform.rotationEulerRad,
     ...transform.scale,
-  ].map((component) => Object.is(component, -0) ? "0" : component.toPrecision(17)).join(",");
+  ].map((component) => (Object.is(component, -0) ? 0 : component).toPrecision(17)).join(",");
 }

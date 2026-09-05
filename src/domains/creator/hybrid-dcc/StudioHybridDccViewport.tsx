@@ -1,5 +1,6 @@
 /** Keep the established viewport API and renderer intact while adding reversible precision tools. */
 import { StudioHybridDccPrecisionTools } from "./StudioHybridDccPrecisionTools";
+import { StudioHybridDccTransformUtilities } from "./StudioHybridDccTransformUtilities";
 import {
   StudioHybridDccViewport as StudioHybridDccViewportCore,
   type StudioHybridDccViewportProps,
@@ -13,6 +14,7 @@ export function StudioHybridDccViewport(props: StudioHybridDccViewportProps) {
     <>
       <StudioHybridDccViewportCore {...props} />
       <StudioHybridDccPrecisionTools {...props} />
+      <StudioHybridDccTransformUtilities {...props} />
     </>
   );
 }

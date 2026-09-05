@@ -11,7 +11,6 @@ import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera.js";
 import { PerformanceMonitor } from "@react-three/drei/core/PerformanceMonitor.js";
 import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera.js";
-import { TransformControls } from "@react-three/drei/core/TransformControls.js";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import {
   AlertTriangle,
@@ -28,6 +27,7 @@ import {
   Component,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -64,6 +64,15 @@ import {
 } from "./studio-hybrid-dcc-object-transform";
 import { validateStudioHybridDccFanPolygon } from "./studio-hybrid-dcc-polygon-validation";
 import { resolveStudioHybridDccScreenComponentCandidate } from "./studio-hybrid-dcc-screen-selection";
+import {
+  resolveStudioHybridDccViewportShortcut,
+  type StudioHybridDccStandardView,
+  type StudioHybridDccViewportPreferences,
+} from "./studio-hybrid-dcc-viewport-interaction";
+import { StudioHybridDccCameraRig } from "./StudioHybridDccCameraRig";
+import { StudioHybridDccTransformGizmo } from "./StudioHybridDccTransformGizmo";
+import { StudioHybridDccViewportInteractionBar } from "./StudioHybridDccViewportInteractionBar";
+import { useStudioHybridDccViewportPreferences } from "./useStudioHybridDccViewportPreferences";
 
 import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
 
@@ -71,7 +80,7 @@ export type StudioHybridDccViewportProjection = "perspective" | "orthographic";
 export type StudioHybridDccViewportOverlay = "material" | "material-wire" | "wireframe";
 export type StudioHybridDccTransformMode = "translate" | "rotate" | "scale";
 export type StudioHybridDccTransformSpace = "world" | "local";
-export type StudioHybridDccViewportView = "isometric" | "front" | "right" | "top";
+export type StudioHybridDccViewportView = StudioHybridDccStandardView;
 export type StudioHybridDccViewportRenderSource =
   | "authority-source"
   | "authority-edit-cage"
@@ -918,6 +927,9 @@ function StudioHybridDccAssetMesh({
   editingDisabled,
   transformMode,
   transformSpace,
+  preferences,
+  onDraggingChange,
+  onNotice,
   sculptStroke,
 }: {
   readonly asset: StudioHybridDccViewportAssetSnapshot;
@@ -940,6 +952,9 @@ function StudioHybridDccAssetMesh({
   readonly editingDisabled: boolean;
   readonly transformMode: StudioHybridDccTransformMode;
   readonly transformSpace: StudioHybridDccTransformSpace;
+  readonly preferences: StudioHybridDccViewportPreferences;
+  readonly onDraggingChange: (dragging: boolean) => void;
+  readonly onNotice: (message: string) => void;
   /** 활성화되면 포인터 드래그가 오브젝트 로컬 좌표로 조형 스트로크를 보낸다. */
   readonly sculptStroke?: (localPoint: { x: number; y: number; z: number }) => void;
 }) {
@@ -1095,123 +1110,30 @@ function StudioHybridDccAssetMesh({
       ) : null}
     </group>
   );
-  if (editingDisabled || !selected || !onCommitTransform || selectionMode !== "object") {
+  if (editingDisabled || sculptStroke || !selected || !onCommitTransform || selectionMode !== "object") {
     return object;
   }
   return (
-    <TransformControls
+    <StudioHybridDccTransformGizmo
+      objectRef={objectRef}
+      source={{
+        assetId: asset.assetId,
+        geometryStamp: `${asset.meshHash}:${asset.meshRevision}:${asset.renderHash}`,
+        transform: {
+          revision: STUDIO_HYBRID_DCC_OBJECT_TRANSFORM_REVISION,
+          position: asset.position, rotationEulerRad: asset.rotationEulerRad, scale: asset.scale,
+        },
+      }}
       mode={transformMode}
       space={transformSpace}
-      translationSnap={0.1}
-      rotationSnap={Math.PI / 12}
-      scaleSnap={0.1}
-      size={0.82}
-      onMouseUp={() => {
-        const group = objectRef.current;
-        if (!group) return;
-        onCommitTransform(asset.assetId, {
-          revision: STUDIO_HYBRID_DCC_OBJECT_TRANSFORM_REVISION,
-          position: [group.position.x, group.position.y, group.position.z],
-          rotationEulerRad: [group.rotation.x, group.rotation.y, group.rotation.z],
-          scale: [group.scale.x, group.scale.y, group.scale.z],
-        });
-      }}
+      preferences={preferences}
+      onCommit={onCommitTransform}
+      onDraggingChange={onDraggingChange}
+      onNotice={onNotice}
     >
       {object}
-    </TransformControls>
+    </StudioHybridDccTransformGizmo>
   );
-}
-
-function configureStudioHybridDccCamera(
-  camera: THREE.Camera,
-  controls: { readonly target?: THREE.Vector3; update?: () => void } | null,
-  viewportWidth: number,
-  viewportHeight: number,
-  centerTuple: readonly [number, number, number],
-  radius: number,
-  view: StudioHybridDccViewportView,
-): void {
-  const center = new THREE.Vector3(...centerTuple);
-  const direction = new THREE.Vector3(...(
-    view === "front"
-      ? [0, 0, 1] as const
-      : view === "right"
-        ? [1, 0, 0] as const
-        : view === "top"
-          ? [0, 1, 0] as const
-          : [1, 0.72, 1] as const
-  )).normalize();
-  if (view === "top") camera.up.set(0, 0, -1);
-  else camera.up.set(0, 1, 0);
-  camera.position.copy(center).addScaledVector(direction, radius * 2.8);
-  if (camera instanceof THREE.OrthographicCamera) {
-    camera.near = Math.max(0.001, radius / 1_000);
-    camera.far = Math.max(100, radius * 50);
-    camera.zoom = Math.max(0.01, Math.min(viewportWidth, viewportHeight) / (radius * 3.2));
-    camera.updateProjectionMatrix();
-  } else if (camera instanceof THREE.PerspectiveCamera) {
-    camera.near = Math.max(0.001, radius / 1_000);
-    camera.far = Math.max(100, radius * 50);
-    camera.fov = 42;
-    camera.zoom = 1;
-    camera.updateProjectionMatrix();
-  }
-  camera.lookAt(center);
-  if (controls?.target) controls.target.copy(center);
-  controls?.update?.();
-}
-
-function StudioHybridDccCameraRig({
-  center,
-  frameRevision,
-  radius,
-  signature,
-  snapshot,
-  view,
-}: {
-  readonly center: readonly [number, number, number];
-  readonly frameRevision: number;
-  readonly radius: number;
-  readonly signature: string;
-  readonly snapshot: StudioHybridDccViewportSnapshot;
-  readonly view: StudioHybridDccViewportView;
-}) {
-  const camera = useThree((state) => state.camera);
-  const controls = useThree((state) => state.controls) as {
-    readonly target?: THREE.Vector3;
-    update?: () => void;
-  } | null;
-  const size = useThree((state) => state.size);
-  const viewportHeight = size.height;
-  const viewportWidth = size.width;
-  const [centerX, centerY, centerZ] = center;
-
-  useEffect(() => {
-    configureStudioHybridDccCamera(
-      camera,
-      controls,
-      viewportWidth,
-      viewportHeight,
-      [centerX, centerY, centerZ],
-      radius,
-      view,
-    );
-  }, [
-    camera,
-    centerX,
-    centerY,
-    centerZ,
-    controls,
-    frameRevision,
-    radius,
-    signature,
-    snapshot.signature,
-    view,
-    viewportHeight,
-    viewportWidth,
-  ]);
-
-  return null;
 }
 
 function StudioHybridDccAdaptiveDpr() {
@@ -1450,14 +1372,29 @@ export function StudioHybridDccViewport({
   const [viewPreset, setViewPreset] = useState<StudioHybridDccViewportView>("isometric");
   const [frameTarget, setFrameTarget] = useState<"scene" | "selection">("scene");
   const [frameRevision, setFrameRevision] = useState(0);
+  const [orientationRevision, setOrientationRevision] = useState(0);
+  const [isolatedAssetId, setIsolatedAssetId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [interactionNotice, setInteractionNotice] = useState("");
+  const draggingRef = useRef(false);
+  const suppressSelectionUntilRef = useRef(0);
+  const { preferences, patchPreferences, setPreferences } = useStudioHybridDccViewportPreferences();
   const [detectedWebgl, setDetectedWebgl] = useState<boolean | null>(webglAvailable ?? null);
   const viewportRef = useRef<HTMLElement>(null);
   const descriptionId = useId();
   const effectiveProjection = projection ?? uncontrolledProjection;
   const effectiveOverlay = overlay ?? uncontrolledOverlay;
+  const effectiveTransformSpace = transformMode === "scale" ? "local" : transformSpace;
   const prefersReducedMotion = usePrefersReducedMotion(reducedMotion);
   const effectiveSelectionMode = componentSelection?.mode ?? "object";
-  const snapshot = deriveStudioHybridDccViewportSnapshot(workspace, effectiveSelectionMode);
+  const snapshot = useMemo(
+    () => deriveStudioHybridDccViewportSnapshot(workspace, effectiveSelectionMode),
+    [workspace, effectiveSelectionMode],
+  );
+  const isolationMatchesSelection = !workspace.activeAssetId || workspace.activeAssetId === isolatedAssetId;
+  const isolatedAsset = isolationMatchesSelection
+    ? snapshot.assets.find((asset) => asset.assetId === isolatedAssetId) ?? null : null;
+  const renderedAssets = isolatedAsset ? [isolatedAsset] : snapshot.assets;
   const selectedAssetId = snapshot.assets.some((asset) => asset.assetId === workspace.activeAssetId)
     ? workspace.activeAssetId
     : null;
@@ -1471,6 +1408,12 @@ export function StudioHybridDccViewport({
     && componentSelection.provenance.sourceHash === selectedAsset?.meshHash
       ? componentSelection.elementIds
       : [];
+  useEffect(() => {
+    if (isolatedAssetId && !isolatedAsset) {
+      setIsolatedAssetId(null);
+      setInteractionNotice("격리 대상이나 선택이 바뀌어 전체 보기로 돌아왔습니다.");
+    }
+  }, [isolatedAssetId, isolatedAsset]);
   const effectiveFrameTarget = frameTarget === "selection" && selectedAsset ? "selection" : "scene";
   const framedCenter: readonly [number, number, number] = effectiveFrameTarget === "selection"
     ? [
@@ -1486,9 +1429,6 @@ export function StudioHybridDccViewport({
         selectedAsset!.worldMax[2] - selectedAsset!.worldMin[2],
       ) / 2)
     : snapshot.radius;
-  const framingSignature = effectiveFrameTarget === "selection"
-    ? `${selectedAsset!.assetId}:${selectedAsset!.renderHash}:${selectedAsset!.worldMin.join(",")}:${selectedAsset!.worldMax.join(",")}`
-    : snapshot.signature;
   const renderSources = new Set(snapshot.assets.map((asset) => asset.renderSource));
   const viewportRenderSource = snapshot.assets.length === 0
     ? "empty"
@@ -1517,6 +1457,7 @@ export function StudioHybridDccViewport({
   };
   const changeView = (next: StudioHybridDccViewportView) => {
     setViewPreset(next);
+    setOrientationRevision((current) => current + 1);
     setFrameRevision((current) => current + 1);
     if (next !== "isometric") changeProjection("orthographic");
   };
@@ -1530,105 +1471,84 @@ export function StudioHybridDccViewport({
     setFrameRevision((current) => current + 1);
   };
 
+  const toggleIsolation = () => {
+    if (draggingRef.current) return;
+    if (isolatedAssetId) {
+      setIsolatedAssetId(null);
+      setFrameTarget("scene");
+      setInteractionNotice("전체 보기 · 문서의 숨김 상태는 변경하지 않았습니다.");
+    } else if (selectedAsset) {
+      setIsolatedAssetId(selectedAsset.assetId);
+      setFrameTarget("selection");
+      setInteractionNotice(`${selectedAsset.assetId}만 보기 · / 키로 전체 보기`);
+    } else return;
+    setFrameRevision((current) => current + 1);
+  };
+  const changeDragging = (active: boolean) => {
+    draggingRef.current = active;
+    setDragging(active);
+    if (!active) suppressSelectionUntilRef.current = performance.now() + 120;
+  };
+  const selectionAllowed = () => !editingDisabled && !draggingRef.current
+    && performance.now() >= suppressSelectionUntilRef.current;
+
   useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
     const handleViewportShortcut = (event: KeyboardEvent) => {
-      const viewport = viewportRef.current;
-      if (!viewport) return;
-      const eventTarget = event.target instanceof Node ? event.target : null;
-      const focused = typeof document === "undefined" ? null : document.activeElement;
-      if (!eventTarget || !viewport.contains(eventTarget)) {
-        if (!focused || !viewport.contains(focused)) return;
-      }
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.target instanceof HTMLInputElement
-        || event.target instanceof HTMLTextAreaElement
-        || event.target instanceof HTMLSelectElement) return;
-      const key = event.key.toLowerCase();
-      const componentMode = event.code === "Digit1"
-        ? "vertex"
-        : event.code === "Digit2"
-          ? "edge"
-          : event.code === "Digit3"
-            ? "face"
-            : event.code === "Digit4"
-              ? "object"
-              : null;
-      if (!editingDisabled && componentMode && onComponentSelectionModeChange
-        && (componentMode === "object" || selectedAsset)) {
-        event.preventDefault();
-        onComponentSelectionModeChange(componentMode);
-        return;
-      }
-      if (!editingDisabled && effectiveSelectionMode === "object"
-        && event.shiftKey && key === "d" && selectedAsset && onDuplicateSelected) {
-        event.preventDefault();
-        onDuplicateSelected();
-        return;
-      }
-      if (!editingDisabled && effectiveSelectionMode === "object"
-        && (event.key === "Delete" || event.key === "Backspace")
-        && selectedAsset && onDeleteSelected) {
-        event.preventDefault();
-        onDeleteSelected();
-        return;
-      }
-      const transform = !editingDisabled
-        && onCommitAssetTransform && effectiveSelectionMode === "object"
-        ? key === "g"
-          ? "translate"
-          : key === "r"
-            ? "rotate"
-            : key === "s"
-              ? "scale"
-              : null
-        : null;
-      if (transform) {
-        event.preventDefault();
-        setTransformMode(transform);
-        return;
-      }
-      if (event.key === "Home") {
-        event.preventDefault();
-        setFrameTarget("scene");
-        setFrameRevision((current) => current + 1);
-        return;
-      }
-      if (event.key === "." || event.code === "NumpadDecimal") {
-        if (!selectedAsset) return;
-        event.preventDefault();
-        setFrameTarget("selection");
-        setFrameRevision((current) => current + 1);
-        return;
-      }
-      const view = event.code === "Numpad1"
-        ? "front"
-        : event.code === "Numpad3"
-          ? "right"
-          : event.code === "Numpad7"
-            ? "top"
-            : null;
-      if (!view) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target || !viewport.contains(target)) return;
+      // Shift+Tab remains normal backwards focus navigation on toolbar controls.
+      if (event.shiftKey && event.key === "Tab" && !(target instanceof HTMLCanvasElement)
+        && !target.closest('[role="application"]')) return;
+      const action = resolveStudioHybridDccViewportShortcut(event, {
+        textEntry: Boolean(target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="spinbutton"]')),
+        selected: Boolean(selectedAsset), editingDisabled: editingDisabled || Boolean(onSculptStroke),
+        objectMode: effectiveSelectionMode === "object", canTransform: Boolean(onCommitAssetTransform),
+        canSelectComponents: Boolean(onComponentSelectionModeChange), canDuplicate: Boolean(onDuplicateSelected),
+        canDelete: Boolean(onDeleteSelected), dragging: draggingRef.current,
+      });
+      if (!action) return;
+      if (action.kind === "toggle-isolation" && !isolatedAssetId && !selectedAsset) return;
       event.preventDefault();
-      setViewPreset(view);
-      setFrameRevision((current) => current + 1);
-      if (projection === undefined) setUncontrolledProjection("orthographic");
-      onProjectionChange?.("orthographic");
+      switch (action.kind) {
+        case "view":
+          setViewPreset(action.view);
+          setOrientationRevision((current) => current + 1);
+          setFrameRevision((current) => current + 1);
+          if (projection === undefined) setUncontrolledProjection("orthographic");
+          onProjectionChange?.("orthographic");
+          break;
+        case "frame":
+          setFrameTarget(action.target);
+          setFrameRevision((current) => current + 1);
+          break;
+        case "toggle-projection": {
+          const next = effectiveProjection === "perspective" ? "orthographic" : "perspective";
+          if (projection === undefined) setUncontrolledProjection(next);
+          onProjectionChange?.(next);
+          break;
+        }
+        case "toggle-snap": setPreferences((current) => ({ ...current, snapping: !current.snapping })); break;
+        case "toggle-isolation":
+          setIsolatedAssetId(isolatedAssetId ? null : selectedAsset!.assetId);
+          setFrameTarget(isolatedAssetId ? "scene" : "selection");
+          setFrameRevision((current) => current + 1);
+          break;
+        case "transform": setTransformMode(action.mode); break;
+        case "selection": onComponentSelectionModeChange?.(action.mode); break;
+        case "duplicate": onDuplicateSelected?.(); break;
+        case "delete": onDeleteSelected?.(); break;
+      }
     };
-    window.addEventListener("keydown", handleViewportShortcut);
-    return () => window.removeEventListener("keydown", handleViewportShortcut);
-  }, [
-    onCommitAssetTransform,
-    onDeleteSelected,
-    onDuplicateSelected,
-    onComponentSelectionModeChange,
-    onProjectionChange,
-    projection,
-    selectedAsset,
-    editingDisabled,
-    effectiveSelectionMode,
-  ]);
+    viewport.addEventListener("keydown", handleViewportShortcut);
+    return () => viewport.removeEventListener("keydown", handleViewportShortcut);
+  }, [onCommitAssetTransform, onDeleteSelected, onDuplicateSelected,
+    onComponentSelectionModeChange, onProjectionChange, projection, effectiveProjection,
+    selectedAsset, editingDisabled, effectiveSelectionMode, onSculptStroke, isolatedAssetId, setPreferences]);
 
   return (
+    <>
     <section
       ref={viewportRef}
       aria-label="Hybrid DCC 3D 작업 뷰포트"
@@ -1643,7 +1563,7 @@ export function StudioHybridDccViewport({
       data-overlay={effectiveOverlay}
       data-context-lost={contextLost ? "true" : "false"}
       data-transform-mode={transformMode}
-      data-transform-space={transformSpace}
+      data-transform-space={effectiveTransformSpace}
       data-selection-mode={effectiveSelectionMode}
       data-selected-elements={selectedElementIds.length}
       data-editing-disabled={editingDisabled ? "true" : "false"}
@@ -1651,13 +1571,20 @@ export function StudioHybridDccViewport({
       data-frame-target={effectiveFrameTarget}
       data-render-source={viewportRenderSource}
       data-render-signature={snapshot.signature}
+      data-isolated-asset={isolatedAsset?.assetId ?? ""}
+      data-visible-assets={renderedAssets.length}
+      data-snapping={preferences.snapping ? "true" : "false"}
+      data-dragging={dragging ? "true" : "false"}
+      data-frame-revision={frameRevision}
     >
       <p id={descriptionId} className="sr-only">
         마우스 왼쪽 드래그로 회전하고, 오른쪽 드래그로 이동하며, 휠로 확대하거나 축소합니다.
         선택 오브젝트는 G 이동, R 회전, S 크기 조절 기즈모로 편집합니다.
         Shift와 D는 선택 오브젝트 복제, Delete는 되돌릴 수 있는 삭제입니다.
         숫자 1, 2, 3, 4는 꼭짓점, 모서리, 면, 오브젝트 선택 모드입니다.
-        숫자 키패드 1, 3, 7은 정면, 우측, 상단 보기이며 Home은 전체, 마침표는 선택 오브젝트를 화면에 맞춥니다.
+        숫자 키패드 1, 3, 7은 정면, 우측, 상단, Ctrl 조합은 반대편 보기입니다.
+        키패드 5는 투영 전환, /는 선택 격리, Home은 전체, F 또는 마침표는 선택 화면 맞춤입니다.
+        캔버스에서 Shift+Tab은 스냅 전환, Esc는 진행 중인 변형 취소입니다.
       </p>
 
       {snapshot.assets.length > 0 && detectedWebgl === true ? (
@@ -1685,7 +1612,7 @@ export function StudioHybridDccViewport({
               gl.domElement.tabIndex = 0;
             }}
             onPointerMissed={() => {
-              if (editingDisabled) return;
+              if (!selectionAllowed()) return;
               if (effectiveSelectionMode === "object") onSelectAsset(null);
               else onClearComponentSelection?.();
             }}
@@ -1709,11 +1636,10 @@ export function StudioHybridDccViewport({
             />
             <StudioHybridDccCameraRig
               center={framedCenter}
-              frameRevision={frameRevision}
               radius={framedRadius}
-              signature={framingSignature}
-              snapshot={snapshot}
-              view={viewPreset}
+              intent={{ revision: frameRevision, orientationRevision, view: viewPreset }}
+              sceneCenter={snapshot.center}
+              sceneRadius={snapshot.radius}
             />
             <StudioHybridDccAdaptiveDpr />
             <StudioHybridDccLocalEnvironment />
@@ -1721,7 +1647,7 @@ export function StudioHybridDccViewport({
             <StudioHybridDccLightRig radius={snapshot.radius} />
 
             <group>
-              <gridHelper
+              {preferences.showGrid ? <gridHelper
                 args={[
                   snapshot.gridSize,
                   Math.min(96, Math.max(12, snapshot.gridSize * 2)),
@@ -1729,39 +1655,44 @@ export function StudioHybridDccViewport({
                   VIEWPORT_COLORS.gridMinor,
                 ]}
                 position={[0, -0.002, 0]}
-              />
-              <axesHelper args={[Math.max(1.2, snapshot.radius * 0.22)]} position={[0, 0.012, 0]} />
-              <mesh
+              /> : null}
+              {preferences.showAxes ? <axesHelper args={[Math.max(1.2, snapshot.radius * 0.22)]} position={[0, 0.012, 0]} /> : null}
+              {preferences.showGround ? <mesh
                 receiveShadow
                 rotation-x={-Math.PI / 2}
                 position={[0, -0.006, 0]}
               >
                 <planeGeometry args={[snapshot.gridSize, snapshot.gridSize]} />
                 <shadowMaterial transparent opacity={0.2} depthWrite={false} />
-              </mesh>
+              </mesh> : null}
             </group>
 
-            {snapshot.assets.map((asset) => (
+            {renderedAssets.map((asset) => (
               <StudioHybridDccAssetMesh
                 key={`${asset.assetId}:${asset.renderHash}:${asset.renderSource}`}
                 asset={asset}
                 overlay={effectiveOverlay}
                 selected={asset.assetId === selectedAssetId}
-                onSelect={onSelectAsset}
-                onSelectComponent={onSelectComponent}
+                onSelect={(assetId) => { if (selectionAllowed()) onSelectAsset(assetId); }}
+                onSelectComponent={onSelectComponent
+                  ? (...args) => { if (selectionAllowed()) onSelectComponent(...args); }
+                  : undefined}
                 onSelectionError={onComponentSelectionError}
                 selectionElementIds={selectedElementIds}
                 selectionMode={effectiveSelectionMode}
                 editingDisabled={editingDisabled}
                 onCommitTransform={onCommitAssetTransform}
                 transformMode={transformMode}
-                transformSpace={transformSpace}
+                transformSpace={effectiveTransformSpace}
+                preferences={preferences}
+                onDraggingChange={changeDragging}
+                onNotice={setInteractionNotice}
                 sculptStroke={onSculptStroke && asset.assetId === selectedAssetId
                   ? (localPoint) => onSculptStroke(asset.assetId, localPoint)
                   : undefined}
               />
             ))}
-            <ContactShadows
+            {preferences.showGround ? <ContactShadows
               key={snapshot.signature}
               position={[snapshot.center[0], 0.004, snapshot.center[2]]}
               color={VIEWPORT_COLORS.background}
@@ -1772,7 +1703,7 @@ export function StudioHybridDccViewport({
               resolution={prefersReducedMotion ? 256 : 512}
               frames={1}
               depthWrite={false}
-            />
+            /> : null}
           </Canvas>
         </StudioHybridDccCanvasBoundary>
       ) : snapshot.assets.length > 0 && detectedWebgl === null ? (
@@ -1883,12 +1814,12 @@ export function StudioHybridDccViewport({
                   <Expand size={14} aria-hidden="true" /> 크기
                 </SegmentedButton>
                 <SegmentedButton
-                  active={transformSpace === "local"}
-                  disabled={editingDisabled}
-                  label={transformSpace === "local" ? "로컬 좌표계" : "월드 좌표계"}
+                  active={effectiveTransformSpace === "local"}
+                  disabled={editingDisabled || transformMode === "scale"}
+                  label={effectiveTransformSpace === "local" ? "로컬 좌표계" : "월드 좌표계"}
                   onClick={() => setTransformSpace((current) => current === "world" ? "local" : "world")}
                 >
-                  {transformSpace === "local" ? "Local" : "World"}
+                  {effectiveTransformSpace === "local" ? "Local" : "World"}
                 </SegmentedButton>
               </div>
               <span className="my-1 w-px shrink-0 bg-line" aria-hidden="true" />
@@ -1917,6 +1848,9 @@ export function StudioHybridDccViewport({
               { id: "front", label: "앞", accessible: "정면 보기 (숫자 키패드 1)" },
               { id: "right", label: "오른쪽", accessible: "우측 보기 (숫자 키패드 3)" },
               { id: "top", label: "위", accessible: "상단 보기 (숫자 키패드 7)" },
+              { id: "back", label: "뒤", accessible: "후면 보기 (Ctrl+숫자 키패드 1)" },
+              { id: "left", label: "왼쪽", accessible: "좌측 보기 (Ctrl+숫자 키패드 3)" },
+              { id: "bottom", label: "아래", accessible: "하단 보기 (Ctrl+숫자 키패드 7)" },
             ] as const).map((option) => (
               <SegmentedButton
                 key={option.id}
@@ -1969,7 +1903,7 @@ export function StudioHybridDccViewport({
       {snapshot.assets.length > 0 ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 p-2 sm:p-3">
           <div className="pointer-events-auto flex max-w-[min(72%,34rem)] gap-1 overflow-x-auto rounded-xl border border-line bg-panel/95 p-1 shadow-[0_8px_22px_oklch(0.08_0.008_70/0.28)]" aria-label="뷰포트 에셋">
-            {snapshot.assets.map((asset) => {
+            {renderedAssets.map((asset) => {
               const selected = asset.assetId === selectedAssetId;
               return (
                 <button
@@ -1980,7 +1914,7 @@ export function StudioHybridDccViewport({
                   data-render-hash={asset.renderHash}
                   data-render-source={asset.renderSource}
                   disabled={editingDisabled}
-                  onClick={() => onSelectAsset(asset.assetId)}
+                  onClick={() => { if (selectionAllowed()) onSelectAsset(asset.assetId); }}
                   className={classes(
                     "min-h-11 max-w-40 shrink-0 rounded-lg border px-2.5 text-left transition-colors motion-reduce:transition-none sm:min-h-9",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -2051,5 +1985,15 @@ export function StudioHybridDccViewport({
         </div>
       ) : null}
     </section>
+    <StudioHybridDccViewportInteractionBar
+      preferences={preferences}
+      onChange={patchPreferences}
+      isolatedAssetId={isolatedAsset?.assetId ?? null}
+      hasSelection={Boolean(selectedAsset)}
+      dragging={dragging}
+      onToggleIsolation={toggleIsolation}
+      notice={interactionNotice}
+    />
+    </>
   );
 }
