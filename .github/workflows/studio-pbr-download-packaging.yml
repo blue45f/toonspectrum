@@ -1,0 +1,122 @@
+name: Studio PBR download packaging
+on:
+  push:
+    branches: [chore/studio-pbr-download-packaging-20260906]
+    paths: [.github/workflows/studio-pbr-download-packaging.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: studio-pbr-download-packaging
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - name: Retrieve and verify exact completed acquisition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9975090308/zip > "$RUNNER_TEMP/source.zip"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,shutil,stat,zipfile
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          archive=root/'source.zip'
+          h=hashlib.sha256()
+          with archive.open('rb') as f:
+              for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
+          assert h.hexdigest()=='83a7e541158f170b0f2c2fa139dd1db4fbfff9ec155211ad7fb06d9f234d9bbf'
+          source=root/'source';source.mkdir()
+          with zipfile.ZipFile(archive) as z:
+              infos=z.infolist()
+              assert len(infos)<10000 and sum(i.file_size for i in infos)<2*1024**3
+              for i in infos:
+                  p=(source/i.filename).resolve()
+                  assert p.is_relative_to(source.resolve()) and not stat.S_ISLNK(i.external_attr>>16)
+              z.extractall(source)
+          manifest=json.loads((source/'manifest.json').read_text())
+          assets=manifest['assets']
+          assert len(assets)==65 and len({a['id'] for a in assets})==65
+          files=set();part=1;used=0;part_assets={1:[]};parts=root/'parts';parts.mkdir()
+          review=root/'visual-review';review.mkdir()
+          def copy_file(rel,destination):
+              p=(source/rel).resolve()
+              assert p.is_relative_to(source.resolve()) and p.is_file()
+              assert p.suffix.lower() not in {'.ttf','.otf','.woff','.woff2','.exe','.dll'}
+              dst=destination/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dst)
+          for a in assets:
+              rel=pathlib.Path(a['path']);p=(source/rel).resolve()
+              assert p.is_relative_to(source.resolve()) and str(rel).startswith('assets/')
+              raw=p.read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==a['sha256'] and len(raw)==a['bytes']
+              assert a['license']['id']=='CC0-1.0'
+              if a['kind']=='model': assert a.get('browserRenderVerified') is True
+              group=[q.relative_to(source) for q in p.parent.rglob('*') if q.is_file() and q.suffix.lower() in {'.glb','.webp','.png','.jpg','.jpeg','.json','.txt'}]
+              group=[q for q in group if q not in files]
+              previews=[q.relative_to(source) for q in (source/'previews').glob(a['id']+'*.png')]
+              group+=previews
+              size=sum((source/q).stat().st_size for q in group)
+              assert size<240*1024**2
+              if used+size>240*1024**2:
+                  part+=1;used=0;part_assets[part]=[]
+              destination=parts/f'part-{part:02d}'
+              for q in group: copy_file(q,destination)
+              files.update(group);used+=size;part_assets[part].append(a)
+          for n,items in part_assets.items():
+              dest=parts/f'part-{n:02d}'
+              (dest/'manifest.json').write_text(json.dumps({'schema':manifest['schema'],'assets':items},ensure_ascii=False,indent=2)+'\n')
+              for name in ('delivery-report.json','browser-render-evidence.json','source-receipts.json','acquisition-plan.json'):
+                  if (source/name).exists(): copy_file(pathlib.Path(name),dest)
+              (dest/'README.md').write_text('# ToonStudio native 2K PBR originals\n\nThis part contains '+str(len(items))+' original assets. Keep the assets/ and previews/ folders with the manifest. Source and CC0 license records are included. No upscaling was used. Browser rendering is technical evidence, not full artistic approval or production deployment.\n',encoding='utf-8')
+          for p in source.glob('pbr-review-*.jpg'): copy_file(p.relative_to(source),review)
+          for name in ('manifest.json','delivery-report.json','browser-render-evidence.json','review-index.json','source-receipts.json','acquisition-plan.json'):
+              if (source/name).exists(): copy_file(pathlib.Path(name),review)
+          report=json.loads((source/'delivery-report.json').read_text())
+          report['packaging']=[{'part':n,'originals':len(items),'bytes':sum(p.stat().st_size for p in (parts/f'part-{n:02d}').rglob('*') if p.is_file())} for n,items in part_assets.items()]
+          report['acquisitionRun']=33984917046
+          report['sourceArtifact']=9975090308
+          report['productionPublished']=0
+          report['approvedVisualOriginals']=0
+          out=pathlib.Path('docs/reports/asset-visual-review-20260906/pbr-delivery-report.json')
+          out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+          shutil.copyfile(out,review/'packaging-report.json')
+          print('PACKAGING SUMMARY',json.dumps(report,ensure_ascii=False))
+          assert len(part_assets)<=3
+          PY
+      - name: Record source receipts and exact acquisition results
+        run: |
+          git add -- docs/reports/asset-visual-review-20260906/pbr-delivery-report.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'docs(studio): record 65 real PBR originals and bounded delivery parts'
+          git push origin "HEAD:refs/heads/chore/studio-pbr-download-packaging-20260906"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-01
+          path: ${{ runner.temp }}/parts/part-01/
+          retention-days: 30
+          compression-level: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-02
+          path: ${{ runner.temp }}/parts/part-02/
+          retention-days: 30
+          compression-level: 1
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-03
+          path: ${{ runner.temp }}/parts/part-03/
+          retention-days: 30
+          compression-level: 1
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-visual-review-65
+          path: ${{ runner.temp }}/visual-review/
+          retention-days: 30
+          compression-level: 1
+          if-no-files-found: error
