@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CheckCheck,
   ChevronDown,
+  ChevronUp,
   CircleDot,
   ClipboardList,
   CornerDownRight,
@@ -47,6 +48,7 @@ import {
   studioCommentAnchorsEqual,
   type StudioCommentActor,
   type StudioCommentAnchor,
+  type StudioCommentThread,
   type StudioCommentsDocument,
 } from "./studio-comments";
 import {
@@ -124,8 +126,9 @@ export interface StudioCommentsPanelCapabilities {
   assign: boolean;
 }
 
-type CommentFilter = "current" | "all" | "unread" | "open" | "resolved";
+type CommentFilter = "current" | "all" | "mine" | "unread" | "open" | "resolved";
 type CommentSort = "recent" | "oldest" | "location";
+type CurrentActorRelation = "mentioned" | "assigned" | "authored" | "participated" | null;
 
 interface CommentMessageTarget {
   threadId: string;
@@ -135,6 +138,7 @@ interface CommentMessageTarget {
 const FILTERS: readonly { value: CommentFilter; label: string }[] = [
   { value: "current", label: "현재 위치" },
   { value: "all", label: "전체" },
+  { value: "mine", label: "나와 관련" },
   { value: "unread", label: "읽지 않음" },
   { value: "open", label: "열림" },
   { value: "resolved", label: "해결됨" },
@@ -195,6 +199,38 @@ function actorsRepresentSamePerson(
   if (left.id || right.id) return Boolean(left.id && right.id && left.id === right.id);
   return left.displayName.normalize("NFKC").toLocaleLowerCase()
     === right.displayName.normalize("NFKC").toLocaleLowerCase();
+}
+
+function studioCommentThreadCurrentActorRelation(
+  thread: StudioCommentThread,
+  currentActor: StudioCommentActor
+): CurrentActorRelation {
+  const mentioned = [...thread.mentions, ...thread.replies.flatMap((reply) => reply.mentions)]
+    .some((actor) => actorsRepresentSamePerson(actor, currentActor));
+  if (mentioned) return "mentioned";
+  if (thread.assignee && actorsRepresentSamePerson(thread.assignee, currentActor)) {
+    return "assigned";
+  }
+  if (actorsRepresentSamePerson(thread.author, currentActor)) return "authored";
+  if (thread.replies.some((reply) => actorsRepresentSamePerson(reply.author, currentActor))) {
+    return "participated";
+  }
+  return null;
+}
+
+function studioCommentCurrentActorRelationLabel(
+  relation: CurrentActorRelation
+): string | null {
+  if (relation === "mentioned") return "나를 멘션";
+  if (relation === "assigned") return "내 담당";
+  if (relation === "authored") return "내 댓글";
+  if (relation === "participated") return "내가 참여";
+  return null;
+}
+
+function isStudioCommentTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.matches("input, textarea, select") || target.isContentEditable);
 }
 
 function messageTargetsEqual(
@@ -268,6 +304,7 @@ export function StudioCommentsPanel({
   const descriptionId = useId();
   const newThreadDisabledReasonId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const replyEditorRef = useRef<HTMLTextAreaElement>(null);
   const assigneeEditorRef = useRef<HTMLInputElement>(null);
@@ -305,6 +342,7 @@ export function StudioCommentsPanel({
   const [editBody, setEditBody] = useState("");
   const [pendingDelete, setPendingDelete] = useState<CommentMessageTarget | null>(null);
   const [query, setQuery] = useState("");
+  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   const [readMutation, setReadMutation] = useState<string | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -485,6 +523,7 @@ export function StudioCommentsPanel({
       ).find((candidate) => candidate.dataset.studioCommentThreadId === threadId);
       if (!thread) return;
       pendingFocusThreadIdRef.current = null;
+      setFocusedThreadId(threadId);
       thread.focus({ preventScroll: true });
       thread.scrollIntoView({ block: "nearest", behavior: "auto" });
     });
@@ -504,6 +543,9 @@ export function StudioCommentsPanel({
   const openCount = document.threads.filter((thread) => !thread.resolved).length;
   const resolvedCount = document.threads.length - openCount;
   const unreadCount = document.threads.filter((thread) => unreadThreadIds.has(thread.id)).length;
+  const mineCount = document.threads.filter(
+    (thread) => studioCommentThreadCurrentActorRelation(thread, currentActor) !== null
+  ).length;
   const currentCount = activeAnchor
     ? document.threads.filter((thread) =>
         studioCommentAnchorsEqual(thread.anchor, activeAnchor)
@@ -512,6 +554,7 @@ export function StudioCommentsPanel({
   const filterCounts: Record<CommentFilter, number> = {
     current: currentCount,
     all: document.threads.length,
+    mine: mineCount,
     unread: unreadCount,
     open: openCount,
     resolved: resolvedCount,
@@ -524,6 +567,9 @@ export function StudioCommentsPanel({
           ? studioCommentAnchorsEqual(thread.anchor, activeAnchor)
           : false;
       }
+      if (filter === "mine") {
+        return studioCommentThreadCurrentActorRelation(thread, currentActor) !== null;
+      }
       if (filter === "unread") return unreadThreadIds.has(thread.id);
       if (filter === "open") return !thread.resolved;
       if (filter === "resolved") return thread.resolved;
@@ -535,7 +581,12 @@ export function StudioCommentsPanel({
         thread.author.displayName,
         thread.body,
         thread.assignee?.displayName ?? "",
-        ...thread.replies.flatMap((reply) => [reply.author.displayName, reply.body]),
+        ...thread.mentions.map((mention) => mention.displayName),
+        ...thread.replies.flatMap((reply) => [
+          reply.author.displayName,
+          reply.body,
+          ...reply.mentions.map((mention) => mention.displayName),
+        ]),
       ].some((value) => value.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery));
     })
     .slice()
@@ -553,6 +604,41 @@ export function StudioCommentsPanel({
       return Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
         || right.id.localeCompare(left.id);
     });
+  const activeReviewThreadId = visibleThreads.some((thread) => thread.id === focusedThreadId)
+    ? focusedThreadId
+    : visibleThreads[0]?.id ?? null;
+  const activeReviewThreadIndex = activeReviewThreadId
+    ? visibleThreads.findIndex((thread) => thread.id === activeReviewThreadId)
+    : -1;
+  const reviewNavigationBlocked = Boolean(
+    composerExpanded
+    || activeReplyThreadId
+    || assigningThreadId
+    || editingMessage
+    || pendingDelete
+    || saving
+    || sharedReply?.submitting
+  );
+  const focusVisibleThreadAt = (index: number): void => {
+    const nextThread = visibleThreads[index];
+    if (!nextThread) return;
+    setFocusedThreadId(nextThread.id);
+    globalThis.requestAnimationFrame(() => {
+      const thread = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>("[data-studio-comment-thread-id]") ?? []
+      ).find((candidate) => candidate.dataset.studioCommentThreadId === nextThread.id);
+      thread?.focus({ preventScroll: true });
+      thread?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    });
+  };
+  const moveReviewFocus = (direction: -1 | 1): void => {
+    if (reviewNavigationBlocked || visibleThreads.length === 0) return;
+    const currentIndex = Math.max(0, activeReviewThreadIndex);
+    focusVisibleThreadAt(Math.min(
+      visibleThreads.length - 1,
+      Math.max(0, currentIndex + direction)
+    ));
+  };
   const canAddThread =
     capabilities.create
     && !saving
@@ -844,6 +930,9 @@ export function StudioCommentsPanel({
   if (normalizedQuery) {
     emptyTitle = "검색 결과가 없어요";
     emptyDescription = "다른 작성자 이름이나 댓글 문구로 다시 검색해 보세요.";
+  } else if (filter === "mine") {
+    emptyTitle = "나와 관련된 댓글이 없어요";
+    emptyDescription = "내가 작성·답글·담당·멘션된 댓글을 한곳에 모아 보여 드립니다.";
   } else if (filter === "unread") {
     emptyTitle = "새 피드백을 모두 확인했어요";
     emptyDescription = "새 댓글이나 답글이 도착하면 여기에 모아 보여 드립니다.";
@@ -874,35 +963,59 @@ export function StudioCommentsPanel({
       aria-busy={saving || sharedReply?.submitting || readMutation !== null || syncing}
       tabIndex={-1}
       data-studio-comments-rail="true"
+      aria-keyshortcuts="J K /"
       onKeyDown={(event) => {
-        if (event.nativeEvent.isComposing || event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (pendingDelete) {
-          focusReviewRail();
-          setPendingDelete(null);
-        } else if (editingMessage) {
-          cancelEditing();
-        } else if (activeReplyThreadId) {
-          if (replySubmitInFlightRef.current || sharedReply?.submitting || saving) return;
-          focusReviewRail();
-          closeReplyEditor();
-        } else if (ownedReplyThreadId && ownedReplyBody.trim()) {
-          setError("보존 중인 답글을 등록하거나 취소한 뒤 검토함을 닫아 주세요.");
-          if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
-          globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
-        } else if (assigningThreadId) {
-          focusReviewRail();
-          setAssigningThreadId(null);
-        } else if (composerExpanded) {
-          focusReviewRail();
-          setComposerExpanded(false);
-          setNewComment("");
-          setComposerAnchor(null);
-          setComposerAnchorLabelSnapshot(null);
-          pendingNewCommentIdRef.current = null;
-        } else {
-          onClose();
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.target === searchInputRef.current && query) {
+            setQuery("");
+            globalThis.requestAnimationFrame(() => searchInputRef.current?.focus());
+          } else if (pendingDelete) {
+            focusReviewRail();
+            setPendingDelete(null);
+          } else if (editingMessage) {
+            cancelEditing();
+          } else if (activeReplyThreadId) {
+            if (replySubmitInFlightRef.current || sharedReply?.submitting || saving) return;
+            focusReviewRail();
+            closeReplyEditor();
+          } else if (ownedReplyThreadId && ownedReplyBody.trim()) {
+            setError("보존 중인 답글을 등록하거나 취소한 뒤 검토함을 닫아 주세요.");
+            if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
+            globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
+          } else if (assigningThreadId) {
+            focusReviewRail();
+            setAssigningThreadId(null);
+          } else if (composerExpanded) {
+            focusReviewRail();
+            setComposerExpanded(false);
+            setNewComment("");
+            setComposerAnchor(null);
+            setComposerAnchorLabelSnapshot(null);
+            pendingNewCommentIdRef.current = null;
+          } else {
+            onClose();
+          }
+          return;
+        }
+        if (
+          event.defaultPrevented
+          || event.metaKey
+          || event.ctrlKey
+          || event.altKey
+          || isStudioCommentTextEntryTarget(event.target)
+        ) return;
+        if (event.key === "/") {
+          event.preventDefault();
+          searchInputRef.current?.focus();
+          return;
+        }
+        const shortcut = event.key.toLocaleLowerCase();
+        if (shortcut === "j" || shortcut === "k") {
+          event.preventDefault();
+          moveReviewFocus(shortcut === "j" ? 1 : -1);
         }
       }}
       className={reviewRailClassName}
@@ -1174,17 +1287,35 @@ export function StudioCommentsPanel({
           <>
           <div className="sticky top-0 z-10 flex flex-col gap-1.5 border-b border-line bg-panel/95 px-4 py-2.5 backdrop-blur-sm sm:px-5">
             <div className="flex min-w-0 items-center gap-1.5">
-              <label className="relative min-w-0 flex-1">
-                <span className="sr-only">댓글 검색</span>
-                <Search size={13} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-                  placeholder="작성자와 댓글 검색"
-                  className="h-11 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-9"
-                />
-              </label>
+              <div className="relative min-w-0 flex-1">
+                <label className="block">
+                  <span className="sr-only">댓글 검색</span>
+                  <Search size={13} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    value={query}
+                    aria-keyshortcuts="/"
+                    onChange={(event) => setQuery(event.target.value.slice(0, 120))}
+                    placeholder="댓글·작성자·멘션 검색 (/)"
+                    className="h-11 w-full rounded-lg border border-line bg-card pl-8 pr-10 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-9 [&::-webkit-search-cancel-button]:appearance-none"
+                  />
+                </label>
+                {query ? (
+                  <button
+                    type="button"
+                    aria-label="댓글 검색 지우기"
+                    title="검색 지우기 (Esc)"
+                    onClick={() => {
+                      setQuery("");
+                      globalThis.requestAnimationFrame(() => searchInputRef.current?.focus());
+                    }}
+                    className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent sm:size-7"
+                  >
+                    <X size={13} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
               {onTogglePinsHidden ? (
                 <button
                   type="button"
@@ -1264,6 +1395,43 @@ export function StudioCommentsPanel({
                   : `메시지 ${totalMessages}/${STUDIO_COMMENTS_MAX_TOTAL_MESSAGES}`}
               </span>
             </div>
+            {visibleThreads.length > 1 ? (
+              <div className="flex min-w-0 items-center justify-between gap-2 border-t border-line/70 pt-1.5">
+                <p className="min-w-0 truncate text-[0.68rem] font-semibold text-fg-3">
+                  순차 검토
+                  <span className="ml-1 tabular-nums text-fg-2">
+                    {Math.max(1, activeReviewThreadIndex + 1).toLocaleString("ko-KR")}
+                    <span className="px-1 text-fg-3">/</span>
+                    {visibleThreads.length.toLocaleString("ko-KR")}
+                  </span>
+                  <span className="ml-2 hidden font-normal sm:inline">J/K로 이동</span>
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={reviewNavigationBlocked || activeReviewThreadIndex <= 0}
+                    aria-label="이전 댓글로 이동"
+                    title={reviewNavigationBlocked ? "작성 중인 작업을 먼저 마무리해 주세요." : "이전 댓글 (K)"}
+                    onClick={() => moveReviewFocus(-1)}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8"
+                  >
+                    <ChevronUp size={13} aria-hidden />
+                    이전
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reviewNavigationBlocked || activeReviewThreadIndex >= visibleThreads.length - 1}
+                    aria-label="다음 댓글로 이동"
+                    title={reviewNavigationBlocked ? "작성 중인 작업을 먼저 마무리해 주세요." : "다음 댓글 (J)"}
+                    onClick={() => moveReviewFocus(1)}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8"
+                  >
+                    다음
+                    <ChevronDown size={13} aria-hidden />
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {visibleThreads.length === 0 ? (
@@ -1302,6 +1470,13 @@ export function StudioCommentsPanel({
                 const canEditThread = !isReadOnlyArchive && capabilities.editOwn && ownsThread && !saving;
                 const isEditingThread = !isReadOnlyArchive && messageTargetsEqual(editingMessage, threadTarget);
                 const locationLabel = getAnchorLabel(thread.anchor, anchorOptions);
+                const currentActorRelation = studioCommentThreadCurrentActorRelation(
+                  thread,
+                  currentActor
+                );
+                const currentActorRelationLabel = studioCommentCurrentActorRelationLabel(
+                  currentActorRelation
+                );
                 const taskSuggestion = compileStudioReviewTask(thread, {
                   anchorLabel: locationLabel,
                 });
@@ -1332,7 +1507,8 @@ export function StudioCommentsPanel({
                     <article
                       id={`${titleId}-thread-${thread.id}`}
                       data-studio-comment-thread-id={thread.id}
-                      tabIndex={-1}
+                      tabIndex={activeReviewThreadId === thread.id ? 0 : -1}
+                      onFocusCapture={() => setFocusedThreadId(thread.id)}
                       className={`relative px-4 py-4 outline-none transition-colors focus-visible:bg-accent-soft/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent sm:px-5 ${unreadThreadIds.has(thread.id) ? "bg-accent-soft/15 before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r before:bg-accent" : ""}`}
                     >
                       <div className="flex min-w-0 items-start gap-3">
@@ -1355,6 +1531,11 @@ export function StudioCommentsPanel({
                                 : <CircleDot size={10} aria-hidden />}
                               {thread.resolved ? "해결됨" : "열림"}
                             </span>
+                            {filter === "mine" && currentActorRelationLabel ? (
+                              <span className="inline-flex items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[0.62rem] font-semibold text-accent">
+                                {currentActorRelationLabel}
+                              </span>
+                            ) : null}
                             {unreadThreadIds.has(thread.id) ? (
                               <span className="inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold text-on-accent">
                                 새 피드백
