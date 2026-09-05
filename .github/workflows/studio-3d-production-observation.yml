@@ -1,0 +1,77 @@
+name: Studio 3D production observation
+on:
+  push:
+    branches: [fix/studio-3d-closeup-quality-20260906]
+    paths: ['.github/workflows/studio-3d-production-observation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe-public-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Install isolated browser tooling
+        run: |
+          mkdir -p /tmp/studio-observe /tmp/studio-production-observation
+          npm install --prefix /tmp/studio-observe --no-audit --no-fund playwright@1.62.1
+          /tmp/studio-observe/node_modules/.bin/playwright install --with-deps chromium
+      - name: Observe public routes without modifying production accounts or documents
+        timeout-minutes: 14
+        shell: bash
+        run: |
+          cat > /tmp/studio-observe/observe.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import { writeFileSync } from 'node:fs';
+          const out='/tmp/studio-production-observation';
+          const results=[];
+          const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          async function shot(page,id) {
+            const session=await page.context().newCDPSession(page);
+            try {
+              const image=await session.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false});
+              writeFileSync(`${out}/${id}.png`,Buffer.from(image.data,'base64'));
+            } finally { await session.detach(); }
+          }
+          try {
+            for (const [id,path] of [['studio','/studio'],['character','/studio/character'],['background','/studio/bg3d'],['poser','/studio/poser'],['lift3d','/studio/lift3d']]) {
+              const context=await browser.newContext({viewport:{width:1440,height:900},locale:'ko-KR'});
+              const page=await context.newPage();
+              const row={id,path,errors:[],status:'not-started'};
+              results.push(row);
+              page.on('pageerror',error=>row.errors.push(error.message));
+              try {
+                row.status='loading';
+                await page.goto(`https://www.toonstudio.cloud${path}`,{waitUntil:'domcontentloaded',timeout:90000});
+                await page.waitForTimeout(15000);
+                if(id==='character') {
+                  await page.locator('[data-character-shaper-hud] button[aria-label="확대"]:not(:disabled)').waitFor({timeout:90000}).catch(error=>row.readinessError=String(error));
+                }
+                row.url=page.url();
+                row.title=await page.title();
+                row.canvases=await page.locator('canvas').evaluateAll(nodes=>nodes.map(n=>({width:n.width,height:n.height,cssWidth:n.clientWidth,cssHeight:n.clientHeight})));
+                await shot(page,id);
+                writeFileSync(`${out}/${id}.txt`,await page.locator('body').innerText());
+                row.status='captured-awaiting-visual-review';
+              } catch(error) {
+                row.status='failed'; row.error=String(error);
+                await shot(page,`${id}-failed`).catch(()=>{});
+              } finally {
+                writeFileSync(`${out}/evidence.json`,JSON.stringify({capturedAt:new Date().toISOString(),source:'https://www.toonstudio.cloud',mode:'read-only guest navigation; no production writes',renderer:'Chromium software WebGL',results},null,2));
+                console.log(JSON.stringify(row));
+                await context.close();
+              }
+            }
+          } finally { await browser.close(); }
+          JS
+          node /tmp/studio-observe/observe.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-production-observation-${{ github.run_id }}
+          path: /tmp/studio-production-observation
+          retention-days: 7
+          if-no-files-found: error

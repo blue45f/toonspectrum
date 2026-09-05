@@ -1,10 +1,14 @@
 /** Actual UI/compositor evidence. Images require visual review; no aesthetic auto-pass. */
+import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { chromium, type Page } from "playwright";
 
 const ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN ?? "http://127.0.0.1:5173";
 const OUTPUT = process.env.STUDIO_CLOSEUP_OUTPUT ?? "/tmp/studio-3d-closeup";
+const LANE = process.env.STUDIO_CLOSEUP_LANE ?? "all";
+const SOURCE = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const ROOT = '[data-character-shaper="true"]';
 const VIEWPORT = `${ROOT} [data-character-shaper-viewport]`;
 const records: Record<string, unknown>[] = [];
@@ -13,26 +17,24 @@ const errors: string[] = [];
 mkdirSync(OUTPUT, { recursive: true });
 const safeName = (value: string) => value.replace(/[^a-zA-Z0-9_-]+/g, "-");
 const persist = () => writeFileSync(join(OUTPUT, "evidence.json"), JSON.stringify({
-  source: process.env.GITHUB_SHA ?? "local", capturedAt: new Date().toISOString(),
+  source: SOURCE, lane: LANE, capturedAt: new Date().toISOString(),
   renderer: "Chromium SwiftShader WebGL2", externalFonts: "offline fallback",
   visualApproval: "pending-human-image-review", catalog, records, errors,
 }, null, 2));
 
-async function ready(page: Page) {
-  // Canvas mount is NOT model readiness. In dev, dependency optimization can also remount the dialog.
-  await page.locator(`${ROOT} button[aria-label="확대"]:not(:disabled)`).waitFor({ timeout: 300_000 });
+async function ready(page: Page, timeout = 45_000) {
+  // The legacy toolbar has another hidden zoom button; readiness belongs to the visible HUD.
+  await page.locator(`${ROOT} [data-character-shaper-hud] button[aria-label="확대"]:not(:disabled)`)
+    .waitFor({ timeout });
 }
 async function camera(page: Page, label: string) {
   await page.locator(ROOT).getByRole("group", { name: "카메라 프리셋", exact: true })
     .getByRole("button", { name: label, exact: true }).click();
   await page.waitForTimeout(1000);
 }
-async function inspection(page: Page, id: string, fallback: string) {
-  const select = page.getByRole("combobox", { name: "부위·방향 확대 검사", exact: true });
-  if (await select.count()) {
-    await select.selectOption(id);
-    await page.waitForTimeout(1000);
-  } else await camera(page, fallback);
+async function inspection(page: Page, id: string) {
+  await page.getByRole("combobox", { name: "부위·방향 확대 검사", exact: true }).selectOption(id);
+  await page.waitForTimeout(1000);
 }
 async function capture(page: Page, name: string, full = false) {
   const box = await (full ? page.locator(ROOT) : page.locator(`${VIEWPORT} canvas`).first()).boundingBox();
@@ -87,32 +89,30 @@ async function commit(page: Page, id: string): Promise<boolean> {
 }
 
 async function main() {
+  if (!["all", "top", "bottom", "shoes", "accessory"].includes(LANE)) throw new Error(`Unknown lane: ${LANE}`);
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: "ko-KR" });
   await context.route(/https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//, (route) => route.abort());
-  // This visual lane has no Nest server; authentication is an explicit guest boundary, not a visual assertion.
   await context.route("**/api/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ authenticated: false, user: null }) }));
   await context.addInitScript(() => {
     localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
     localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
   });
   const page = await context.newPage();
-  page.setDefaultTimeout(45_000);
+  page.setDefaultTimeout(30_000);
   page.on("pageerror", (error) => { errors.push(error.message); persist(); });
-  page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("Failed to load resource")) console.info(`[browser] ${message.text().slice(0, 400)}`); });
   try {
     await page.goto(`${ORIGIN}/studio/character`, { waitUntil: "domcontentloaded", timeout: 180_000 });
-    await ready(page);
+    await ready(page, 240_000);
     await page.waitForTimeout(2500);
-    console.info("[closeup] model controls ready");
     await capture(page, "00-original-ui", true);
     await camera(page, "전신");
     await capture(page, "01-original-full");
     await camera(page, "상반신");
     await capture(page, "02-original-bust");
     for (const kind of ["face-shape", "eyes", "irises", "nose", "mouth", "ears", "hair", "body", "top", "bottom", "shoes", "accessory", "expression", "pose", "hand-pose"]) await slot(page, kind);
-
     for (const kind of ["top", "bottom", "shoes"] as const) {
+      if (LANE !== "all" && LANE !== kind) continue;
       await slot(page, kind);
       const ids = [...new Set(catalog[kind].map((entry) => entry.id))].filter((id) => id !== `${kind}:original`);
       for (const id of ids) {
@@ -124,7 +124,7 @@ async function main() {
           await camera(page, "사선");
           await capture(page, `${id}-three-quarter`);
           if (await page.getByRole("combobox", { name: "부위·방향 확대 검사", exact: true }).count()) {
-            await inspection(page, kind === "top" ? "inspectTorsoBack" : kind === "bottom" ? "inspectLowerBody" : "inspectFeet", "전신");
+            await inspection(page, kind === "top" ? "inspectTorsoBack" : kind === "bottom" ? "inspectLowerBody" : "inspectFeet");
             await capture(page, `${id}-detail`);
           }
         } catch (error) { records.push({ id, status: "failed", error: String(error) }); persist(); }
@@ -132,7 +132,7 @@ async function main() {
       await commit(page, `${kind}:original`);
     }
     await slot(page, "accessory");
-    for (const { id } of catalog.accessory) {
+    for (const { id } of (LANE === "all" || LANE === "accessory" ? catalog.accessory : [])) {
       try {
         if (!await commit(page, id)) continue;
         await camera(page, "상반신");
