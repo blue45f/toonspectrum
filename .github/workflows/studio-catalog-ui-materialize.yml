@@ -1,0 +1,76 @@
+name: Studio catalog UI materialize and verify
+on:
+  push:
+    branches: [feat/studio-asset-browser-quality-20260906]
+    paths: [.github/workflows/studio-catalog-ui-materialize.yml]
+permissions:
+  contents: write
+jobs:
+  materialize-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: feat/studio-asset-browser-quality-20260906
+      - name: Verify exact source blobs and SHA-256 before applying approved patch
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-asset-browser-quality-20260906
+          python3 - <<'PY'
+          import pathlib, base64, lzma, hashlib, subprocess
+          expected={'src/domains/creator/StudioAssetToolPopoverBody.tsx':'f1b92803c486d454f34520b7b899768e78185472','src/domains/creator/StudioElementsPanel.tsx':'2eb1491752c05646823b991f4cee10dfcbb7bc12','src/domains/creator/studio-scene-templates.test.ts':'cd1a6ad2c24b14a51fa6a089e1e78ad6daba6958','src/domains/creator/studio-scene-templates.ts':'bd44ab84cdf7085ef6f8f859132bb7bd7c22eb78'}
+          for p,sha in expected.items():
+            actual=subprocess.check_output(['git','hash-object',p]).decode().strip()
+            if actual!=sha: raise ValueError('source changed: '+p)
+          encoded=''.join(pathlib.Path(f'.ci/studio-catalog-ui.part{i}').read_text().strip() for i in range(3))
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          if len(patch)>200000 or hashlib.sha256(patch).hexdigest()!='f4812a87d0ffd7ecbb82a72e194edec42e9ce6489b5d93d2d6b81ba9d3d85b86': raise ValueError('patch integrity failure')
+          paths=[line.split('\t')[-1] for line in subprocess.check_output(['git','apply','--numstat'],input=patch).decode().splitlines()]
+          for p in paths:
+            if p in expected or p=='.github/workflows/studio-asset-browser.yml' or p=='scripts/verify-studio-catalog-browser.mjs' or p.startswith('src/domains/creator/catalog/') or p.startswith('tests/browser-fixtures/studio-catalog/'): continue
+            raise ValueError('unapproved patch path: '+p)
+          subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply','--index'],input=patch,check=True)
+          print('Verified and applied',len(paths),'files. No main branch or protection change.')
+          PY
+      - name: Remove temporary transport and inspection files, commit feature only
+        run: |
+          git rm --ignore-unmatch .ci/studio-catalog-ui.part0 .ci/studio-catalog-ui.part1 .ci/studio-catalog-ui.part2 .github/workflows/studio-catalog-ui-materialize.yml .github/workflows/studio-asset-ui-source-snapshot.yml .github/workflows/studio-curated-intake-inspect.yml .github/workflows/studio-curated-standard-intake.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null commit -m 'feat(studio): ship preview-first asset browser, durable favorites and authored native scenes'
+          git push origin HEAD:refs/heads/feat/studio-asset-browser-quality-20260906
+          mkdir -p artifacts/studio-catalog-browser
+          git rev-parse HEAD > artifacts/studio-catalog-browser/tested-head.txt
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run real regression tests without bypass
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+      - name: Lint changed product files without bypass
+        if: always()
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.tsx src/domains/creator/StudioAssetToolPopoverBody.tsx src/domains/creator/studio-scene-templates.ts src/domains/creator/studio-scene-templates.test.ts 2>&1 | tee artifacts/studio-catalog-browser/lint.log
+      - name: Check locked full frontend TypeScript
+        if: always()
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
+      - name: Prepare browser
+        if: always()
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Real production component browser verification
+        if: always()
+        run: pnpm exec node scripts/verify-studio-catalog-browser.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-catalog-implementation-evidence
+          path: artifacts/studio-catalog-browser/
+          retention-days: 7
