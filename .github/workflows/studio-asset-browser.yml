@@ -6,6 +6,7 @@ on:
       - src/domains/creator/catalog/**
       - src/domains/creator/StudioElementsPanel*
       - src/domains/creator/StudioAssetToolPopoverBody.tsx
+      - src/domains/creator/studio-tool-belt-lazy-ui*
       - src/domains/creator/studio-scene-templates*
       - scripts/verify-studio-catalog-browser.mjs
       - scripts/pack_studio_curated_gltf.py
@@ -17,6 +18,7 @@ on:
       - src/domains/creator/catalog/**
       - src/domains/creator/StudioElementsPanel*
       - src/domains/creator/StudioAssetToolPopoverBody.tsx
+      - src/domains/creator/studio-tool-belt-lazy-ui*
       - src/domains/creator/studio-scene-templates*
       - scripts/verify-studio-catalog-browser.mjs
       - scripts/pack_studio_curated_gltf.py
@@ -52,7 +54,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
           set -o pipefail
-          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
       - name: Offline asset packaging and curation unit tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
