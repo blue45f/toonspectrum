@@ -1,0 +1,38 @@
+name: Studio 3D bounded failure evidence
+on:
+  push:
+    branches: [fix/studio-3d-closeup-quality-20260906]
+    paths: ['.github/workflows/studio-3d-failure-diagnostic.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Retrieve only the requested failed verification log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/studio-failure
+          gh api repos/blue45f/toonspectrum/actions/jobs/101353509233/logs > /tmp/studio-failure/job.log
+          python3 - <<'PY'
+          import pathlib,re
+          text=pathlib.Path('/tmp/studio-failure/job.log').read_text(encoding='utf-8-sig')
+          text=re.sub(r'\x1b\[[0-9;]*m','',text)
+          lines=text.splitlines()
+          chunks=[]
+          for i,line in enumerate(lines):
+              if ' FAIL ' in line or 'AssertionError:' in line or 'Test Files ' in line:
+                  chunks.append('\n'.join(lines[max(0,i-2):min(len(lines),i+35)]))
+          summary='\n\n'.join(chunks)
+          pathlib.Path('/tmp/studio-failure/failures.txt').write_text(summary)
+          print(summary[:40000])
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-failure-diagnostic
+          path: /tmp/studio-failure
+          retention-days: 2
+          if-no-files-found: error
