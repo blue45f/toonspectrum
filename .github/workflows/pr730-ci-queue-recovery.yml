@@ -13,7 +13,8 @@ permissions:
 jobs:
   recover-superseded-ci:
     if: github.repository == 'blue45f/toonspectrum'
-    runs-on: ubuntu-latest
+    # This API-only recovery is architecture independent; do not change the actual CI runners.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
       # No checkout or PR code execution. Only obsolete CI runs for this exact PR are cancelled.
