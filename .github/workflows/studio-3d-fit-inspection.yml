@@ -14,7 +14,7 @@ concurrency:
 jobs:
   integrate-reviewed-source:
     if: github.ref == 'refs/heads/fix/studio-3d-fit-inspection-20260906'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     permissions:
       contents: write
@@ -32,34 +32,42 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = 'fix/studio-3d-fit-inspection-20260906'
-          if test ! -f src/domains/creator/vrm/studio-vrm-surface-vertex-sampler.ts; then
-            python3 - <<'PY'
+          python3 - <<'PY'
           import base64,hashlib,json,pathlib,subprocess
-          parts=[
-            ('2fcd70d95b72badddda1f3345044784c66acd7ea','cf316be30bf6f77056767cfc7eedbb05780327ffb516e328a5255a643b32448b'),
-            ('872364c34db9883abc1bdb4fc6ca1932ddd704d8','dfd155f1207e039a00f4df15e433eee552e5f356fa185de14994f6429b99656b'),
-            ('6159cdf52c4dc85bad19e8197c65752c7443195c','431758cd633e6445cb3881c13bda286d4ae0f8ad486722271699dde72c2aca1c'),
+          groups=[
+            ('src/domains/creator/vrm/studio-vrm-surface-vertex-sampler.ts',[
+              ('2fcd70d95b72badddda1f3345044784c66acd7ea','cf316be30bf6f77056767cfc7eedbb05780327ffb516e328a5255a643b32448b'),
+              ('872364c34db9883abc1bdb4fc6ca1932ddd704d8','dfd155f1207e039a00f4df15e433eee552e5f356fa185de14994f6429b99656b'),
+              ('6159cdf52c4dc85bad19e8197c65752c7443195c','431758cd633e6445cb3881c13bda286d4ae0f8ad486722271699dde72c2aca1c'),
+            ]),
+            ('src/domains/creator/bg3d/StudioBg3dEngineRecoveryActions.tsx',[
+              ('1b4ec75f172889759077c93837e11ca048c031c0','c725949d9fca86622caa89cb4f3a37bc8f9c4871aac634480175069e9243f188'),
+            ]),
           ]
           patch=b''
-          for sha,digest in parts:
-              data=json.loads(subprocess.check_output(['gh','api',f'repos/blue45f/toonspectrum/git/blobs/{sha}']))
-              content=base64.b64decode(data['content'])
-              assert hashlib.sha256(content).hexdigest()==digest, 'Transport integrity failure'
-              patch+=content
-          pathlib.Path('/tmp/reviewed-3d.patch').write_bytes(patch)
-          for line in patch.decode().splitlines():
-              if line.startswith('+++ '):
-                  assert line.startswith(('+++ b/src/domains/creator/vrm/','+++ b/src/domains/creator/character-shaper/'))
+          for marker,parts in groups:
+              if pathlib.Path(marker).exists(): continue
+              for sha,digest in parts:
+                  data=json.loads(subprocess.check_output(['gh','api',f'repos/blue45f/toonspectrum/git/blobs/{sha}']))
+                  content=base64.b64decode(data['content'])
+                  assert hashlib.sha256(content).hexdigest()==digest, 'Transport integrity failure'
+                  patch+=content
+          if patch:
+              for line in patch.decode().splitlines():
+                  if line.startswith('+++ '):
+                      assert line.startswith(('+++ b/src/domains/creator/vrm/','+++ b/src/domains/creator/character-shaper/','+++ b/src/domains/creator/bg3d/'))
+              pathlib.Path('/tmp/reviewed-3d.patch').write_bytes(patch)
           PY
+          if test -f /tmp/reviewed-3d.patch; then
             git apply --check /tmp/reviewed-3d.patch
             git apply /tmp/reviewed-3d.patch
-            git add src/domains/creator/vrm src/domains/creator/character-shaper
-            test "$(git diff --cached --name-only | wc -l)" -eq 13
+            git add src/domains/creator/vrm src/domains/creator/character-shaper src/domains/creator/bg3d
+            test "$(git diff --cached --name-only | wc -l)" -le 16
             git diff --cached --check
             test "$(gh api repos/blue45f/toonspectrum/git/ref/heads/$GITHUB_REF_NAME --jq .object.sha)" = "$GITHUB_SHA"
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(studio): fit rendered body surfaces and add precise contact inspection'
+            git commit -m 'fix(studio): fit rendered body surfaces and provide direct inspection and recovery'
             gh auth setup-git
             git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
           fi
@@ -101,13 +109,16 @@ jobs:
             src/domains/creator/vrm/studio-vrm-inspection-framing.test.ts \
             src/domains/creator/vrm/studio-vrm-garment-weave.ts \
             src/domains/creator/vrm/studio-vrm-garment-weave.test.ts \
+            src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx \
+            src/domains/creator/bg3d/StudioBg3dEngineRecoveryActions.tsx \
+            src/domains/creator/bg3d/StudioBg3dEngineRecoveryActions.test.tsx \
             2>&1 | tee /tmp/3d-code-evidence/lint.log
       - name: Full frontend typecheck
         if: ${{ !cancelled() }}
         run: pnpm exec tsc -p tsconfig.json 2>&1 | tee /tmp/3d-code-evidence/typecheck.log
       - name: Existing and new VRM and Character Shaper regressions
         if: ${{ !cancelled() }}
-        run: pnpm exec vitest run src/domains/creator/vrm src/domains/creator/character-shaper 2>&1 | tee /tmp/3d-code-evidence/tests.log
+        run: pnpm exec vitest run src/domains/creator/vrm src/domains/creator/character-shaper src/domains/creator/bg3d/StudioBg3dEngineRecoveryActions.test.tsx src/domains/creator/bg3d/studio-bg3d-engine-no-fallback-wiring.test.ts src/domains/creator/bg3d/StudioBg3dEnginePanel.test.tsx src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx 2>&1 | tee /tmp/3d-code-evidence/tests.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -117,7 +128,7 @@ jobs:
 
   composed-frame-review:
     needs: integrate-reviewed-source
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     strategy:
       fail-fast: false
