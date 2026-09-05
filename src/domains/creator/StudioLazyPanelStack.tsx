@@ -766,14 +766,35 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             onClose={() => setContinuityOpen(false)}
             issues={continuityIssues}
-            scenes={continuityScenes.map((scene) => ({ id: scene.id, label: scene.label }))}
+            pages={pages}
+            currentPageId={currentPageId}
+            openCommentCount={studioComments.threads.filter((thread) => !thread.resolved).length}
+            documentKey={workId ?? `draft:${title}`}
+            scenes={continuityScenes.map((scene) => ({
+              id: scene.id,
+              label: scene.label,
+            }))}
             onSelectScene={(sceneId) => {
-              const scene = continuityScenes.find((item) => item.id === sceneId);
+              const scene = continuityScenes.find((candidate) => candidate.id === sceneId);
               if (!scene) return;
               setCurrentPageId(scene.pageId);
               setTool("select");
               setSelectedId(scene.frameId);
               setContinuityOpen(false);
+            }}
+            onSelectTarget={(target) => {
+              if (target.pageId) setCurrentPageId(target.pageId);
+              setTool("select");
+              setSelectedId(target.elementId ?? null);
+              setContinuityOpen(false);
+            }}
+            onOpenScrollPreview={() => {
+              setContinuityOpen(false);
+              setScrollPreviewOpen(true);
+            }}
+            onOpenPublishPreflight={() => {
+              setContinuityOpen(false);
+              setPublishPreflightOpen(true);
             }}
           />
         ) : null}

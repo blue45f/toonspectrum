@@ -223,8 +223,8 @@ const TOOL_BELT_HINTS = {
     "team-collaboration"
   ),
   continuity: studioToolHintFromLabel(
-    "이야기 연속성 검사",
-    "캐릭터 바이블과 장면 비트를 비교해 인물, 장소, 시간, 의상과 소품의 불일치를 찾습니다.",
+    "마감·품질 검사",
+    "문서 무결성, 이미지 해상도, 레이어, 식자, 컷 간격, 검토 상태와 이야기 연속성을 한 번에 검사합니다.",
     undefined,
     "continuity-check"
   ),
