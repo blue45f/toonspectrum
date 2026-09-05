@@ -17,14 +17,18 @@ interface Frame {
   readonly distinctColors: number;
   readonly dominantShare: number;
 }
-async function decodeFrame(page: Page, png: Buffer): Promise<Frame> {
-  return page.evaluate(async (base64) => {
+async function decodeFrame(page: Page, png: Buffer, readbackOptimized = true): Promise<Frame> {
+  return page.evaluate(async ({ base64, readbackOptimized }) => {
     const response = await fetch(`data:image/png;base64,${base64}`);
     const bitmap = await createImageBitmap(await response.blob());
     try {
       const width = Math.min(bitmap.width, 320);
       const height = Math.min(bitmap.height, 240);
-      const ctx = new OffscreenCanvas(width, height).getContext("2d");
+      // This is an analysis-only copy of a PNG, not the editor's canvas. Prefer CPU backing for
+      // readback so measuring the GPU does not enqueue another GPU upload/draw/download cycle.
+      const ctx = new OffscreenCanvas(width, height).getContext("2d", {
+        willReadFrequently: readbackOptimized,
+      });
       if (!ctx) throw new Error("Cannot decode composited WebGPU frame");
       ctx.drawImage(bitmap, 0, 0, width, height);
       const { data } = ctx.getImageData(0, 0, width, height);
@@ -52,7 +56,7 @@ async function decodeFrame(page: Page, png: Buffer): Promise<Frame> {
     } finally {
       bitmap.close();
     }
-  }, png.toString("base64"));
+  }, { base64: png.toString("base64"), readbackOptimized });
 }
 
 function peakDelta(left: Frame, right: Frame): number {
@@ -105,16 +109,19 @@ async function stableFrame(page: Page, info: TestInfo, label: string) {
     expect(current.frame.distinctColors, "A blank framebuffer cannot prove rotation fidelity")
       .toBeGreaterThan(4);
     expect(current.frame.dominantShare).toBeLessThan(0.99);
-    // Retain the original visible-frame oracle as an independent cross-check, while the pointer
-    // is still down. The sampling deadline above includes every observation and is not extended.
+    // Retain both parts of the original oracle: locator screenshot AND default-backed decoding.
+    // Only the convergence sampler uses readback optimization; final cross-gesture fidelity below
+    // is calculated from these original-oracle frames, while the pointer is still down.
     const referencePng = await page.locator(CANVAS).screenshot();
-    const reference = await decodeFrame(page, referencePng);
+    const reference = await decodeFrame(page, referencePng, false);
     const referenceDelta = peakDelta(current.frame, reference);
     await info.attach(`${label}-locator-reference.png`, { body: referencePng, contentType: "image/png" });
     expect([current.frame.width, current.frame.height]).toEqual([reference.width, reference.height]);
     expect(referenceDelta, "Direct compositor sampling must agree with the original screenshot")
       .toBeLessThan(2);
-    return { frame: current.frame, ...metrics, referenceDelta };
+    expect(reference.distinctColors).toBeGreaterThan(4);
+    expect(reference.dominantShare).toBeLessThan(0.99);
+    return { frame: reference, ...metrics, referenceDelta };
   } finally {
     await sampler.dispose();
   }
