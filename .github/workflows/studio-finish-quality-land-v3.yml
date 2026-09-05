@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/studio-finish-quality-land-v3.yml
       - scripts/apply-studio-finish-quality-integration.py
+      - scripts/repair-studio-quality-contracts.py
   workflow_dispatch:
 
 permissions:
@@ -19,7 +20,7 @@ jobs:
   prepare-product:
     if: github.ref == 'refs/heads/feat/studio-quality-inspection-20260905'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
     env:
@@ -42,12 +43,18 @@ jobs:
           git config user.name 'toonstudio-quality-bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
-          git merge --no-edit origin/main
-      - name: Apply current-panel integration and prove idempotency
+          if ! git merge --no-edit origin/main; then
+            git diff --name-only --diff-filter=U
+            git diff --cc
+            exit 1
+          fi
+      - name: Apply integration and type contracts, then prove idempotency
         run: |
           set -euo pipefail
           python3 scripts/apply-studio-finish-quality-integration.py
           python3 scripts/apply-studio-finish-quality-integration.py --check
+          python3 scripts/repair-studio-quality-contracts.py
+          python3 scripts/repair-studio-quality-contracts.py --check
           git diff --check
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -66,12 +73,32 @@ jobs:
             src/domains/creator/StudioContinuityPanel*.tsx \
             src/domains/creator/StudioFinishQualityView*.tsx \
             src/domains/creator/StudioLazyPanelStack*.tsx
-      - name: Remove legacy integration and substitute-status machinery
+      - name: Test quality, persistence and navigation before committing
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-737"
+          pnpm exec vitest run \
+            src/domains/creator/studio-quality-inspection.test.ts \
+            src/domains/creator/studio-quality-inspection-hardening.test.ts \
+            src/domains/creator/studio-quality-raster-inspection.test.ts \
+            src/domains/creator/studio-quality-finish-bridge.test.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.test.tsx \
+            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
+            src/domains/creator/StudioLazyPanelStack.test.tsx \
+            src/domains/creator/StudioMenubarContent.test.tsx \
+            src/domains/creator/studio-review-entry-point-viewports.test.tsx \
+            src/domains/creator/StudioToolBeltContent.hints.test.ts \
+            --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/quality-737/tests.log"
+      - name: Remove one-time integration machinery
         run: |
           rm .github/workflows/studio-finish-quality-land.yml \
             .github/workflows/studio-finish-quality-land-v2.yml \
             .github/workflows/studio-finish-quality-land-v3.yml \
             scripts/apply-studio-finish-quality-integration.py \
+            scripts/repair-studio-quality-contracts.py \
             scripts/verify-or-apply-studio-finish-quality.py
           git diff --check
       - name: Commit source on the feature branch, never on main
@@ -84,17 +111,18 @@ jobs:
           test "$current" = "$GITHUB_SHA"
           git add -A
           git diff --cached --check
-          git commit -m 'fix(quality): integrate finishing checks into canonical review center'
+          git commit -m 'fix(quality): integrate and validate finishing inspection contracts'
           auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
           echo "::add-mask::$auth"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:$FEATURE_BRANCH"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Retain exact product sources for independent inspection
+      - name: Retain exact sources and diagnostics for inspection
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/quality-737"
           git rev-parse HEAD > "$RUNNER_TEMP/quality-737/head.txt"
           git diff > "$RUNNER_TEMP/quality-737/uncommitted.patch"
+          git status --short > "$RUNNER_TEMP/quality-737/status.txt"
           git archive --format=zip -o "$RUNNER_TEMP/quality-737/source.zip" HEAD src components lib packages apps scripts tools docs .github package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json eslint.config.mjs eslint.legacy-exceptions.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -123,25 +151,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Feature and review-navigation regressions
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/quality-737"
-          pnpm exec vitest run \
-            src/domains/creator/studio-quality-inspection.test.ts \
-            src/domains/creator/studio-quality-inspection-hardening.test.ts \
-            src/domains/creator/studio-quality-raster-inspection.test.ts \
-            src/domains/creator/studio-quality-finish-bridge.test.ts \
-            src/domains/creator/studio-finish-quality.test.ts \
-            src/domains/creator/studio-finish-quality-integration.test.ts \
-            src/domains/creator/StudioFinishQualityView.test.tsx \
-            src/domains/creator/StudioContinuityPanel.test.tsx \
-            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
-            src/domains/creator/StudioLazyPanelStack.test.tsx \
-            src/domains/creator/StudioMenubarContent.test.tsx \
-            src/domains/creator/studio-review-entry-point-viewports.test.tsx \
-            src/domains/creator/StudioToolBeltContent.hints.test.ts \
-            --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/quality-737/tests.log"
       - name: Architecture and strict lint
         run: |
           set -euo pipefail
@@ -154,12 +163,6 @@ jobs:
           set -euo pipefail
           pnpm run build
           pnpm run check:studio-bundle
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: quality-737-verification-${{ github.run_id }}
-          path: ${{ runner.temp }}/quality-737
-          retention-days: 7
 
-# This workflow deliberately cannot write check/status success, approve or merge a PR.
-# The normal CI / core check on the current PR head remains the main-merge authority.
+# This workflow cannot forge status/check success, approve or merge a PR.
+# The normal CI / core check on the exact PR head remains the main-merge authority.
