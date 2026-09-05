@@ -43,7 +43,7 @@ function moduleImports(fileName: string) {
 
 describe("Studio BG3D asset-library ownership boundary", () => {
   it("keeps the leaf panel renderer-free and prevents a reverse editor import", () => {
-    const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
+    const imports = moduleImports("./StudioBg3dAssetLibraryPanelBase.tsx");
 
     expect(imports.valueImports).toEqual([
       "lucide-react",
@@ -57,6 +57,23 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);
   });
 
+  it("keeps the reference-rebuild wrapper renderer-free and delegates to the real file input", () => {
+    const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
+    expect(imports.valueImports).toEqual([
+      "react", "./StudioBg3dAssetLibraryPanelBase", "./StudioReferenceRebuildPresets",
+    ]);
+    expect(imports.dynamicImports).toEqual([]);
+    const wrapper = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
+    expect(wrapper).toContain("input.files = transfer.files");
+    expect(wrapper).toContain('input.dispatchEvent(new Event("change", { bubbles: true }))');
+    expect(wrapper).toContain("importButton.disabled");
+    expect(wrapper).not.toContain("saveVerifiedBg3dModel");
+    expect(wrapper).not.toContain("importVerifiedBg3dModelsAtomically");
+    const presets = moduleImports("./StudioReferenceRebuildPresets.tsx");
+    expect(presets.valueImports).toEqual(["react"]);
+    expect(presets.dynamicImports).toEqual([]);
+  });
+
   it("keeps persistence, validation, resource disposal, scene, history, and selection in the parent", () => {
     const editorSource = [
       moduleSource("./StudioBackground3D.tsx"),
@@ -64,7 +81,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
       moduleSource("./StudioBg3dEditorSidebarExtras.tsx"),
     ].join("\n");
     const editorImports = moduleImports("./StudioBackground3D.tsx");
-    const panelSource = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
+    const panelSource = moduleSource("./StudioBg3dAssetLibraryPanelBase.tsx");
     const editorOwnedSource = `${editorSource}\n${
       moduleSource("./studio-bg3d-editor-model-import-actions.ts")
     }\n${moduleSource("./useStudioBg3dEditor.ts")}\n${
