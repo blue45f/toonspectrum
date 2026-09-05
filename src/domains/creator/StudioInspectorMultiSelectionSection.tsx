@@ -44,7 +44,7 @@ export function StudioInspectorMultiSelectionSection({
         <div className="min-w-0">
           <p className="text-xs font-extrabold tracking-tight text-fg">선택 묶음 작업</p>
           <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-fg-3">
-            공통 수치·배치·순서·이름을 선택 묶음 전체에 한 번에 적용합니다.
+            공통 수치는 위 변형에서, 배치·순서·이름 작업은 여기에서 한 번에 적용합니다.
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[0.6875rem] font-bold tabular-nums text-accent">

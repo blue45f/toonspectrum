@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   GitCompareArrows,
   Layers,
   PackageSearch,
@@ -9,7 +11,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import {
@@ -46,6 +48,7 @@ export function MarketComparePage() {
     removeCompare,
     clearCompare,
   } = useMarketCompare();
+  const tableViewportRef = useRef<HTMLDivElement>(null);
   const rows = useMemo(
     () => createMarketComparisonRows(compareItems),
     [compareItems],
@@ -54,6 +57,15 @@ export function MarketComparePage() {
     () => summarizeMarketComparison(compareItems),
     [compareItems],
   );
+
+  function scrollComparison(direction: -1 | 1): void {
+    const viewport = tableViewportRef.current;
+    if (!viewport) return;
+    // Native buttons retain keyboard access without making a static table a tab stop.
+    // Direct scrolling also respects reduced-motion preferences on every browser.
+    const distance = Math.max(240, Math.floor(viewport.clientWidth * 0.8));
+    viewport.scrollLeft += direction * distance;
+  }
 
   return (
     <Container size="wide" className="py-7 sm:py-10">
@@ -69,7 +81,7 @@ export function MarketComparePage() {
             </span>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-            배급자가 게시한 manifest와 현재 공개 릴리스의 사실만 나란히 표시합니다. 평점·판매량·성능 등 검증되지 않은 수치는 비교에 넣지 않습니다.
+            비교 목록에 담은 공개 manifest의 사실만 나란히 표시합니다. 평점·판매량·성능 등 검증되지 않은 수치는 비교에 넣지 않습니다.
           </p>
         </div>
         {compareCount > 0 ? (
@@ -95,7 +107,7 @@ export function MarketComparePage() {
           </div>
           <h2 className="mt-3 text-sm font-bold text-fg">비교할 에셋을 담아 주세요</h2>
           <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-fg-3">
-            탐색 카드나 상세 화면의 비교 버튼으로 최대 {MARKET_COMPARE_MAX_ITEMS}개를 선택할 수 있습니다.
+            탐색 카드의 비교 버튼으로 최대 {MARKET_COMPARE_MAX_ITEMS}개를 선택할 수 있습니다.
           </p>
           <Link
             href="/market/browse"
@@ -221,14 +233,35 @@ export function MarketComparePage() {
           </section>
 
           <section className="mt-5 rounded-xl border border-line bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+              <p className="text-xs text-fg-3">표가 넓으면 이동 버튼으로 다른 열을 확인하세요.</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-controls="market-compare-table-scroll"
+                  onClick={() => scrollComparison(-1)}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 gap-1.5" })}
+                >
+                  <ChevronLeft className="size-3.5" aria-hidden="true" />
+                  이전 열 보기
+                </button>
+                <button
+                  type="button"
+                  aria-controls="market-compare-table-scroll"
+                  onClick={() => scrollComparison(1)}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 gap-1.5" })}
+                >
+                  다음 열 보기
+                  <ChevronRight className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
             <div
+              id="market-compare-table-scroll"
+              ref={tableViewportRef}
               role="region"
               aria-label="에셋 manifest 비교표"
-              // A horizontally scrollable region must be reachable by keyboard
-              // (WCAG 2.1.1); the labelled region role is the documented pattern.
-              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-              tabIndex={0}
-              className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+              className="overflow-x-auto"
             >
               <table
                 className="w-full border-collapse text-left text-xs"

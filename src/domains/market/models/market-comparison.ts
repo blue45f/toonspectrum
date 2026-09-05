@@ -7,7 +7,6 @@ import {
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
-
 const ENGINE_LABELS: Readonly<Record<string, string>> = {
   canvas2d: "Canvas 2D",
   webgl2: "WebGL 2",

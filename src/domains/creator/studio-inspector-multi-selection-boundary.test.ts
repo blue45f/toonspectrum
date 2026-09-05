@@ -82,17 +82,16 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).not.toContain("if (!selected) return");
   });
 
-  it("routes multi numeric edits through one atomic planner and one commit", () => {
+  it("routes multi numeric edits through the exact group transform bridge", () => {
     const applyPatchSource = functionBody(
       "applyFigmaSelectionLayoutPatch",
       "reorder",
     );
 
-    expect(applyPatchSource).toContain("planStudioFigmaMultiEdit({");
+    expect(applyPatchSource).toContain("planStudioInspectorMultiSelectionLayoutPatch(");
     expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
     expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
-    expect(applyPatchSource).toContain("if (!commit(plan.next)) return");
-    expect(applyPatchSource).toContain("setError(null)");
+    expect(applyPatchSource).toContain("commit(plan.next)");
     expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
   });
 });

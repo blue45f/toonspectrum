@@ -28,6 +28,7 @@ import {
   STUDIO_LIVE_INK_CAPABILITY,
   type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
+import { bindStudioLiveP2pChannelLifecycle } from "./studio-live-p2p-channel-lifecycle";
 
 import type {
   StudioLiveTransport,
@@ -48,7 +49,7 @@ export const STUDIO_LIVE_P2P_MAX_PEERS = 8;
 export const STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES = 256 * 1024;
 /** JSON control message announcing this peer's negotiated binary lanes (e.g. "ink-v2"). */
 export const STUDIO_LIVE_P2P_CAPS_WIRE = "studio-live-p2p-caps";
-/** Ink predictions are droppable, so a congested channel falls back instead of queueing deep. */
+/** Bounds queued ink so the publisher can retry or cancel instead of silently dropping actuals. */
 export const STUDIO_LIVE_P2P_INK_MAX_BUFFERED_BYTES = 256 * 1024;
 /** Per-peer inbound budget for mesh ink frames, mirroring the socket lane's windows. */
 export const STUDIO_LIVE_P2P_INK_INBOUND_WINDOW_MS = 3_000;
@@ -58,6 +59,7 @@ export const STUDIO_LIVE_P2P_INK_INBOUND_MAX_BYTES = 4 * 1024 * 1024;
 const STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES = 8;
 const STUDIO_LIVE_P2P_MAX_LANE_NAME_LENGTH = 64;
 const STUDIO_LIVE_P2P_NO_BINARY_LANES: readonly string[] = Object.freeze([]);
+const STUDIO_LIVE_P2P_RELIABLE_INK_LANES: readonly string[] = Object.freeze([STUDIO_LIVE_INK_CAPABILITY]);
 
 const STUDIO_LIVE_P2P_EPHEMERAL_KINDS = new Set<StudioLiveMessageKind>([
   "presence:heartbeat",
@@ -87,6 +89,9 @@ export interface StudioLiveP2pRtcDataChannel {
   readonly label: string;
   readonly readyState: string;
   readonly bufferedAmount: number;
+  readonly ordered?: boolean;
+  readonly maxRetransmits?: number | null;
+  readonly maxPacketLifeTime?: number | null;
   /** Real RTCDataChannels are switched to "arraybuffer" so mesh ink frames avoid Blob hops. */
   binaryType?: string;
   send(data: string | ArrayBuffer): void;
@@ -120,15 +125,20 @@ export interface StudioLiveP2pOverlayOptions {
   readonly maxPeers?: number;
 }
 
-async function firstNonNullCrdtSyncResponse(
+function firstNonNullCrdtSyncResponse(
   primary: Promise<StudioCrdtSyncResponse | null>,
   mesh: Promise<StudioCrdtSyncResponse | null>,
 ): Promise<StudioCrdtSyncResponse | null> {
-  const settled = await Promise.allSettled([primary, mesh]);
-  for (const result of settled) {
-    if (result.status === "fulfilled" && result.value) return result.value;
-  }
-  return null;
+  return new Promise((resolve) => {
+    let remaining = 2;
+    const settle = (response: StudioCrdtSyncResponse | null): void => {
+      if (response) resolve(response);
+      if (--remaining === 0) resolve(null);
+    };
+    // An absent same-profile BroadcastChannel must not delay an available remote peer.
+    void primary.then(settle, () => settle(null));
+    void mesh.then(settle, () => settle(null));
+  });
 }
 
 function defaultCreatePeerConnection(): StudioLiveP2pRtcPeerConnection | null {
@@ -248,13 +258,12 @@ function decodeStudioLiveP2pInkFrame(data: ArrayBuffer): Record<string, unknown>
 }
 
 /**
- * Opportunistic STUN-only data-channel mesh on top of an authoritative server transport.
+ * STUN-only data-channel mesh on top of the room's signaling transport.
  * Cursor, presence heartbeat, chat, and gesture previews hop peer-to-peer once every known peer
  * has an open channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
  * on the primary when it can persist updates; otherwise the mesh carries jam Yjs diffs.
- * Binary ink: actual samples always ride the reliable primary lane (V18 — actuals are never
- * lossy), while droppable predictions may hop the mesh to peers that announced ink-v2.
- * A missing WebRTC implementation or a failed ICE path falls back without shrinking features.
+ * Authoritative ink actuals retain their server lane. Signaling-only rooms negotiate an ordered,
+ * fully reliable RTC lane for exact actual samples; failure remains visible to the publisher.
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   readonly mode: StudioLiveTransport["mode"];
@@ -270,12 +279,16 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly peers = new Map<string, StudioLiveP2pPeerLink>();
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly inkListeners = new Set<(value: unknown) => void>();
+  private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
+  private readonly meshReadyChannels = new WeakSet<StudioLiveP2pRtcDataChannel>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
   private readonly pendingCrdtSync = new Map<string, {
     resolve: (response: StudioCrdtSyncResponse | null) => void;
     timeout: ReturnType<typeof setTimeout>;
   }>();
   private readonly seenCrdtUpdateIds = new Set<string>();
+  private readonly deliveredCrdtGeneration = new Map<string, number>();
+  private meshGeneration = 0;
   private unsubscribePrimary: (() => void) | null = null;
   private signalSequence = 1;
   private closed = false;
@@ -302,12 +315,16 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     return this.primary.ready;
   }
 
-  /**
-   * The mesh alone cannot negotiate a binary lane it can honor — actual samples require the
-   * reliable authority path — so the overlay advertises exactly what the primary negotiated.
-   */
+  /** Server-backed lanes retain their negotiated capabilities. Peer-only rooms negotiate
+   * exact ink independently, and only on ordered, fully reliable RTC data channels. */
   get binaryLaneCapabilities(): readonly string[] {
-    return this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
+    if (!this.usesPeerInkLane()) {
+      return this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
+    }
+    return this.ready && [...this.peers.values()].some((peer) =>
+      this.isReliableMeshLink(peer) && peer.announcedBinaryLanes
+      && peer.peerBinaryLanes.includes(STUDIO_LIVE_INK_CAPABILITY)
+    ) ? STUDIO_LIVE_P2P_RELIABLE_INK_LANES : STUDIO_LIVE_P2P_NO_BINARY_LANES;
   }
 
   async connect(): Promise<void> {
@@ -338,7 +355,13 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   subscribeControl(listener: (event: StudioLiveTransportControlEvent) => void): () => void {
-    return this.primary.subscribeControl?.(listener) ?? (() => undefined);
+    if (this.closed) return () => undefined;
+    this.controlListeners.add(listener);
+    const unsubscribe = this.primary.subscribeControl?.(listener);
+    return () => {
+      this.controlListeners.delete(listener);
+      unsubscribe?.();
+    };
   }
 
   acquireLock?(
@@ -372,6 +395,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
+    // A peer snapshot can repair a peer room, never certify a server save boundary.
+    if (this.primary.crdtFanout === "authoritative") {
+      return this.primary.requestCrdtSync?.(request) ?? Promise.resolve(null);
+    }
     const primary = this.primary.requestCrdtSync
       ? this.primary.requestCrdtSync(request)
       : null;
@@ -412,15 +439,18 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
-    // Same-origin tabs share BroadcastChannel on the signaling primary. A half-open
-    // WebRTC channel used to steal this path and then ACK even when the other tab
-    // never received the Yjs diff. Keep BC as the same-profile plane and still fan
-    // out on the mesh for a second browser that cannot see that channel.
+    // Retain BroadcastChannel for same-profile tabs, but never let its successful receipt hide
+    // a failed cross-browser mesh transmission in a room without document authority.
     if (this.primary.publishCrdtUpdate) {
+      const primary = this.primary.publishCrdtUpdate(request);
       if (this.openPeerChannelCount() > 0) {
-        void this.publishMeshCrdtUpdate(request).catch(() => undefined);
+        const mesh = this.publishMeshCrdtUpdate(request);
+        if (this.primary.crdtFanout !== "authoritative") {
+          return Promise.all([primary, mesh]).then(([acknowledgement]) => acknowledgement);
+        }
+        void mesh.catch(() => undefined);
       }
-      return this.primary.publishCrdtUpdate(request);
+      return primary;
     }
     return this.publishMeshCrdtUpdate(request);
   }
@@ -436,16 +466,21 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   /**
-   * V18 delivery contract: actual samples must never be lossy. The opportunistic mesh has no
-   * retransmit protocol, so a channel closing mid-stroke would tear an unrecoverable hole in the
-   * strictly-sequenced chunk stream. Actuals therefore always ride the reliable primary lane;
-   * only droppable predictions may hop the mesh, and only to peers that announced ink-v2.
+   * Actual samples on an authoritative connection keep their reliable primary lane. A
+   * signaling-only room uses separately negotiated, ordered RTC with unlimited retransmission.
+   * Every peer must be capable and writable; congestion/closure returns false to preserve the
+   * publisher's retry/cancel contract. Final CRDT strokes remain separate from transient ink.
    */
   sendInk(message: StudioLiveInkWireMessage): boolean {
     if (this.closed) return false;
+    if (this.usesPeerInkLane()) {
+      if (!this.ready || !this.binaryLaneCapabilities.includes(STUDIO_LIVE_INK_CAPABILITY)) return false;
+      if ([...this.peers.values()].some((peer) => !this.isReliableMeshLink(peer))) return false;
+      return this.sendMeshInkFrame(message);
+    }
     const sendPrimary = this.primary.sendInk;
     if (typeof sendPrimary !== "function" || !this.inkLaneNegotiated()) return false;
-    if (message.message.kind === "ink:prediction" && this.sendMeshInkPrediction(message)) {
+    if (message.message.kind === "ink:prediction" && this.sendMeshInkFrame(message)) {
       return true;
     }
     return sendPrimary.call(this.primary, message);
@@ -473,8 +508,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     }
     this.pendingCrdtSync.clear();
     this.seenCrdtUpdateIds.clear();
+    this.deliveredCrdtGeneration.clear();
     this.crdtListeners.clear();
     this.inkListeners.clear();
+    this.controlListeners.clear();
     for (const sessionId of [...this.peers.keys()]) this.teardownPeer(sessionId);
     this.knownPeerSessionIds.clear();
     this.listeners.clear();
@@ -522,23 +559,36 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     if (!parsed) {
       return Promise.reject(new Error("CRDT 업데이트가 올바르지 않습니다."));
     }
-    const duplicate = this.seenCrdtUpdateIds.has(parsed.updateId);
+    if (this.closed || this.peers.size === 0
+      || this.peers.size !== this.knownPeerSessionIds.size
+      || this.openPeerChannelCount() !== this.peers.size) {
+      return Promise.reject(new Error("P2P 원고 전송 채널이 준비되지 않았습니다."));
+    }
+    const duplicate = this.deliveredCrdtGeneration.get(parsed.updateId) === this.meshGeneration;
     if (!duplicate) {
-      this.rememberMeshCrdtUpdateId(parsed.updateId);
-      if (this.peers.size > 0) {
-        this.sendMeshCrdtWire({
+      const delivered = this.sendMeshCrdtWire({
+        workId: this.context.workId,
+        senderSessionId: this.context.participant.sessionId,
+        targetSessionId: null,
+        kind: "update",
+        payload: {
+          protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
           workId: this.context.workId,
-          senderSessionId: this.context.participant.sessionId,
-          targetSessionId: null,
-          kind: "update",
-          payload: {
-            protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
-            workId: this.context.workId,
-            updateId: parsed.updateId,
-            serverSequence: "0",
-            update: parsed.update,
-          },
-        });
+          updateId: parsed.updateId,
+          serverSequence: "0",
+          update: parsed.update,
+        },
+      });
+      if (!delivered) {
+        return Promise.reject(new Error("일부 P2P 참여자에게 원고를 전송하지 못해 다시 시도합니다."));
+      }
+      this.rememberMeshCrdtUpdateId(parsed.updateId);
+      // Receiving an ID or delivering it to a previous set of peers is not proof that a new
+      // channel received it. Only successful fanout in the current generation suppresses retry.
+      this.deliveredCrdtGeneration.set(parsed.updateId, this.meshGeneration);
+      if (this.deliveredCrdtGeneration.size > 2_048) {
+        const oldest = this.deliveredCrdtGeneration.keys().next().value;
+        if (typeof oldest === "string") this.deliveredCrdtGeneration.delete(oldest);
       }
     }
     return Promise.resolve({
@@ -558,11 +608,15 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     let delivered = 0;
     const serialized = JSON.stringify(createStudioCrdtLocalWireMessage(message));
     const target = message.targetSessionId;
+    if (message.kind === "update" && !target
+      && this.peers.size !== this.knownPeerSessionIds.size) return false;
+    let expected = 0;
     for (const peer of this.peers.values()) {
       if (target && peer.sessionId !== target) continue;
+      expected += 1;
       if (this.sendSerializedToPeer(peer, serialized)) delivered += 1;
     }
-    return delivered > 0;
+    return delivered > 0 && (message.kind !== "update" || delivered === expected);
   }
 
   private receiveMeshCrdt(value: unknown): boolean {
@@ -724,6 +778,16 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     }
   }
 
+  private usesPeerInkLane(): boolean {
+    return this.primary.crdtFanout === "mesh" || this.primary.crdtFanout === "none";
+  }
+
+  private isReliableMeshLink(peer: StudioLiveP2pPeerLink): boolean {
+    const channel = peer.channel;
+    return !peer.closed && channel?.readyState === "open" && channel.ordered === true
+      && channel.maxRetransmits === null && channel.maxPacketLifeTime === null;
+  }
+
   /** True only when the primary negotiated the ink-v2 binary lane for this connection. */
   private inkLaneNegotiated(): boolean {
     return (
@@ -733,12 +797,11 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   /**
-   * Droppable prediction fan-out. Mirrors the ephemeral all-or-fallback policy: the mesh is used
-   * only when every known peer has an open channel, announced ink-v2 and can absorb the frame.
-   * A mid-fanout failure falls back whole to the primary — receivers sequence-reject duplicate
-   * predictions, so parity beats a partial mesh delivery.
+   * Exact binary fanout, selected by the caller for reliable peer actuals or droppable predictions.
+   * Every known peer must have an open channel, announce ink-v2 and accept the complete frame.
+   * Partial failure is returned to the caller, never reported as successful room-wide delivery.
    */
-  private sendMeshInkPrediction(wire: StudioLiveInkWireMessage): boolean {
+  private sendMeshInkFrame(wire: StudioLiveInkWireMessage): boolean {
     if (
       this.knownPeerSessionIds.size === 0
       || this.peers.size !== this.knownPeerSessionIds.size
@@ -763,21 +826,27 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     return true;
   }
 
-  /** Announces our negotiated binary lanes so the peer can gate its mesh ink fan-out per-peer. */
+  /** Announces negotiated binary lanes so the peer can gate its mesh ink fanout per peer. */
   private announceMeshBinaryLanes(link: StudioLiveP2pPeerLink): void {
     if (link.closed || link.announcedBinaryLanes) return;
-    const lanes = this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
+    const lanes = this.usesPeerInkLane()
+      ? (this.isReliableMeshLink(link) ? STUDIO_LIVE_P2P_RELIABLE_INK_LANES : STUDIO_LIVE_P2P_NO_BINARY_LANES)
+      : this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
     if (lanes.length === 0) return;
-    link.announcedBinaryLanes = this.sendSerializedToPeer(
+    // Set before send: a synchronous adapter can answer during send, otherwise recursing forever.
+    link.announcedBinaryLanes = true;
+    if (!this.sendSerializedToPeer(
       link,
       JSON.stringify({ wire: STUDIO_LIVE_P2P_CAPS_WIRE, binaryLanes: [...lanes] }),
-    );
+    )) link.announcedBinaryLanes = false;
   }
 
   private receiveMeshInk(link: StudioLiveP2pPeerLink, data: ArrayBuffer): void {
-    // Fail closed: without a locally negotiated ink-v2 lane the mesh frame is dropped outright,
-    // never approximated and never re-routed to the JSON envelope listeners.
-    if (!this.inkLaneNegotiated()) return;
+    // Fail closed without a locally negotiated lane. Never approximate exact ink with JSON.
+    if (this.usesPeerInkLane()) {
+      if (!this.ready || !this.isReliableMeshLink(link) || !link.announcedBinaryLanes
+        || !link.peerBinaryLanes.includes(STUDIO_LIVE_INK_CAPABILITY)) return;
+    } else if (!this.inkLaneNegotiated()) return;
     if (!this.acceptMeshInkInbound(link, data.byteLength)) return;
     const candidate = decodeStudioLiveP2pInkFrame(data);
     // The frame must claim the sending link's verified presence identity — no mesh relaying.
@@ -900,7 +969,8 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       if (typeof offer.sdp !== "string" || offer.sdp.length === 0) return;
       this.sendMeshDescription(link.sessionId, "offer", offer.sdp);
     } catch {
-      this.teardownPeer(link.sessionId);
+      // A rejected offer from a retired connection must not close a newer link for the peer.
+      if (this.peers.get(link.sessionId) === link) this.teardownPeer(link.sessionId);
     }
   }
 
@@ -950,35 +1020,46 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     link: StudioLiveP2pPeerLink,
     channel: StudioLiveP2pRtcDataChannel,
   ): void {
-    if (link.closed) {
-      channel.close();
-      return;
-    }
-    if (link.channel && link.channel !== channel) {
-      try {
-        link.channel.close();
-      } catch {
-        // Replaced channel.
+    bindStudioLiveP2pChannelLifecycle({
+      link,
+      channel,
+      isActive: () => !this.closed && this.peers.get(link.sessionId) === link,
+      resetNegotiation: () => {
+        link.announcedBinaryLanes = false;
+        link.peerBinaryLanes = STUDIO_LIVE_P2P_NO_BINARY_LANES;
+        link.inkInboundWindow = null;
+      },
+      onOpen: () => {
+        this.announceMeshBinaryLanes(link);
+        this.notifyMeshReady(link, channel);
+      },
+      onMessage: (value) => this.handleChannelMessage(link, value),
+      onClosed: () => this.teardownPeer(link.sessionId),
+    });
+  }
+
+  private notifyMeshReady(link: StudioLiveP2pPeerLink, channel: StudioLiveP2pRtcDataChannel): void {
+    if (this.meshReadyChannels.has(channel)) return;
+    this.meshReadyChannels.add(channel);
+    this.meshGeneration += 1;
+    if (!this.usesPeerInkLane()) return;
+    queueMicrotask(() => {
+      if (this.closed || link.closed || link.channel !== channel || channel.readyState !== "open") return;
+      const event: StudioLiveTransportControlEvent = { type: "status", status: {
+        state: "ready", message: "P2P 데이터 채널이 연결되어 누락된 원고를 다시 맞춥니다.", recoverable: true,
+      } };
+      for (const listener of this.controlListeners) {
+        try {
+          listener(event);
+        } catch {
+          // An observer must not break peer delivery.
+        }
       }
-    }
-    link.channel = channel;
-    link.announcedBinaryLanes = false;
-    channel.binaryType = "arraybuffer";
-    channel.onopen = () => {
-      if (link.closed || link.channel !== channel) return;
-      this.announceMeshBinaryLanes(link);
-    };
-    channel.onmessage = (event) => {
-      this.handleChannelMessage(link, event.data);
-    };
-    channel.onclose = () => {
-      if (link.channel === channel) link.channel = null;
-    };
-    if (channel.readyState === "open") this.announceMeshBinaryLanes(link);
+    });
   }
 
   private handleChannelMessage(link: StudioLiveP2pPeerLink, data: unknown): void {
-    if (this.closed) return;
+    if (this.closed || link.closed || this.peers.get(link.sessionId) !== link) return;
     if (data instanceof ArrayBuffer) {
       this.receiveMeshInk(link, data);
       return;

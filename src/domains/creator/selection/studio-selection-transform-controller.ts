@@ -2,7 +2,6 @@ import {
   alignStudioSelection,
   type StudioAlignMode,
 } from "../studio-cuttoon-editor/studio-align-selected";
-import { planStudioFigmaMultiEdit } from "../studio-figma-multi-edit";
 import {
   planStudioSelectionFlip,
   planStudioSelectionLayoutPatch,
@@ -10,6 +9,7 @@ import {
   type StudioFigmaSelectionLayoutPatch,
 } from "../studio-figma-selection-ux";
 import { planAtomicSelectionTranslation } from "../studio-group-selection";
+import { planStudioInspectorMultiSelectionLayoutPatch } from "../studio-inspector-multi-selection";
 import { isEffectivelyLocked, reorderLayerItem, type LayerGroup } from "../studio-layers";
 
 import type { El } from "../studio-element-model";
@@ -116,18 +116,17 @@ export function useStudioSelectionTransform(options: StudioSelectionTransformOpt
   function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
     const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
     if (targets.length > 1) {
-      const plan = planStudioFigmaMultiEdit({
+      const plan = planStudioInspectorMultiSelectionLayoutPatch(
         elements,
-        selectedIds: targets.map((element) => element.id),
+        targets.map((element) => element.id),
         patch,
-        isLocked: (element) => isEffectivelyLocked(element, groups),
-      });
+        { isLocked: (element) => isEffectivelyLocked(element, groups) },
+      );
       if (plan.kind === "unchanged") {
-        if (plan.reason) setError(plan.reason);
+        if (plan.refusal) setError(plan.refusal);
         return;
       }
       if (!commit(plan.next)) return;
-      setError(null);
       announceDrawingShortcut(plan.announcement);
       return;
     }

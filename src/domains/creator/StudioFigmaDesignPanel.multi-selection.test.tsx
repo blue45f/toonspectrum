@@ -47,12 +47,14 @@ describe("StudioFigmaDesignPanel production multi-selection", () => {
     renderPanel([image("a", 10, 20), image("b", 90, 60)]);
     openGeometry();
 
-    const width = screen.getByLabelText("너비 W") as HTMLInputElement;
-    const height = screen.getByLabelText("높이 H") as HTMLInputElement;
+    const width = screen.getByLabelText("전체 너비 W") as HTMLInputElement;
+    const height = screen.getByLabelText("전체 높이 H") as HTMLInputElement;
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     expect(width.disabled).toBe(false);
     expect(height.disabled).toBe(false);
     expect(rotation.disabled).toBe(false);
+    // A marquee stores no shared angle, so the box is an increment that reads 0.
+    expect(rotation.value).toBe("0");
     expect(screen.getByText(/현재 비율을 유지/u)).toBeTruthy();
     expect(screen.getByText(/선택 중심을 기준/u)).toBeTruthy();
   });
@@ -61,7 +63,7 @@ describe("StudioFigmaDesignPanel production multi-selection", () => {
     const onChange = renderPanel([image("a", 10, 20), image("b", 90, 60)]);
     openGeometry();
 
-    const width = screen.getByLabelText("너비 W") as HTMLInputElement;
+    const width = screen.getByLabelText("전체 너비 W") as HTMLInputElement;
     fireEvent.change(width, { target: { value: "2" } });
     fireEvent.change(width, { target: { value: "20" } });
     fireEvent.change(width, { target: { value: "220" } });
@@ -69,6 +71,11 @@ describe("StudioFigmaDesignPanel production multi-selection", () => {
     fireEvent.keyDown(width, { key: "Enter" });
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith({ width: 220 });
+
+    const height = screen.getByLabelText("전체 높이 H") as HTMLInputElement;
+    fireEvent.change(height, { target: { value: "120" } });
+    fireEvent.keyDown(height, { key: "Enter" });
+    expect(onChange).toHaveBeenLastCalledWith({ height: 120 });
 
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     fireEvent.change(rotation, { target: { value: "15" } });
@@ -88,7 +95,7 @@ describe("StudioFigmaDesignPanel production multi-selection", () => {
     renderPanel([panel, image("image", 140, 0)]);
     openGeometry();
 
-    const width = screen.getByLabelText("너비 W") as HTMLInputElement;
+    const width = screen.getByLabelText("전체 너비 W") as HTMLInputElement;
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     expect(width.disabled).toBe(false);
     expect(rotation.disabled).toBe(true);

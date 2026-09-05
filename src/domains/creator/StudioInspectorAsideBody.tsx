@@ -1,7 +1,6 @@
 import { Suspense, useId, useMemo } from "react";
 
 import { selectStudioFigmaDesignTargets } from "./studio-figma-selection-ux";
-import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
 import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
 import { isEffectivelyHidden } from "./studio-layers";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
@@ -54,23 +53,16 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const figmaDesignTargets = inspectorContentMode === "selection"
     ? selectStudioFigmaDesignTargets(elements, marqueeIds, selected)
     : [];
-  // The Inspector bridge promotes group W/H and relative rotation on top of the conservative
-  // Figma-style resolver, so the numeric panel and the atomic group planner agree on capability.
   const figmaSelectionMetrics = resolveStudioInspectorSelectionLayoutMetrics(figmaDesignTargets);
-  const multiRotationSupported =
-    figmaDesignTargets.length < 2
-    || figmaDesignTargets.every(studioGroupUniformResizeMemberCanRotate);
   const matchingSourceId =
     figmaDesignTargets.length === 1 ? figmaDesignTargets[0]!.id : null;
   const visibleMatchingElements = useMemo(
-    () => matchingSourceId
-      ? elements.filter(
-          (element) =>
-            !localHiddenElementIds.has(element.id)
-            && !isEffectivelyHidden(element, groups),
-        )
-      : [],
-    [elements, groups, localHiddenElementIds, matchingSourceId],
+    () => elements.filter(
+      (element) =>
+        !localHiddenElementIds.has(element.id)
+        && !isEffectivelyHidden(element, groups),
+    ),
+    [elements, groups, localHiddenElementIds],
   );
   const matchingOptions = useMemo(
     () => matchingSourceId
@@ -148,7 +140,6 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
               <StudioFigmaDesignPanel
                 metrics={figmaSelectionMetrics}
                 disabled={inspectorInteractionPolicy.selection.disabled}
-                multiRotationSupported={multiRotationSupported}
                 onChange={applyFigmaSelectionLayoutPatch}
                 onZoomToSelection={zoomToSelection}
                 onFlipHorizontal={() => flipSelected("horizontal")}

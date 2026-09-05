@@ -35,6 +35,13 @@ import {
 import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
 import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
 import { preloadStudioMainMenuGroupRuntime } from "./studio-main-menu-intent-preload";
+import {
+  readStudioMainMenuViewport,
+  resolveStudioMainMenuCoords,
+  revealStudioMainMenuItem,
+  studioMainMenuCoordsEqual,
+  type StudioMainMenuCoords,
+} from "./studio-main-menu-viewport";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -65,8 +72,8 @@ function localizeText(
   return translated === key ? fallback : translated;
 }
 
-type MenuCoords = { top: number; left: number; minWidth: number; maxHeight: number };
-type MenuOpenFocusIntent = "first" | "preserve";
+type MenuCoords = StudioMainMenuCoords;
+type MenuOpenFocusIntent = "first" | "last" | "preserve";
 type MenuGroupNavigationDirection = "next" | "previous";
 export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
 
@@ -269,42 +276,12 @@ function splitStudioMainMenuSections(
   return sections;
 }
 
-/**
- * A menu is only as tall as the room under its title. The old flat 28rem ceiling was fine for the
- * short groups but left the long ones — 필터 ships 49 kinds — scrolling four screens inside a panel
- * that was using under half the viewport. Measuring the gap keeps every group as tall as it can be
- * without ever running off the bottom edge, and the floor keeps a menu opened from a title near the
- * bottom of a short window from collapsing to a sliver.
- */
-const STUDIO_MAIN_MENU_VIEWPORT_MARGIN = 12;
-const STUDIO_MAIN_MENU_MIN_HEIGHT = 240;
-const STUDIO_MAIN_MENU_FALLBACK_HEIGHT = 448;
-
+/** Fit the actual visible viewport, including pinch zoom and on-screen keyboards. */
 function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
-  if (!btn) {
-    return { top: 48, left: 8, minWidth: 248, maxHeight: STUDIO_MAIN_MENU_FALLBACK_HEIGHT };
-  }
-  const rect = btn.getBoundingClientRect();
-  const minWidth = Math.max(248, rect.width + 48);
-  let left = rect.left;
-  if (typeof window !== "undefined") {
-    left = Math.min(left, window.innerWidth - minWidth - 8);
-    left = Math.max(8, left);
-  }
-  const top = rect.bottom + 6;
-  const viewportHeight = typeof window === "undefined" ? 0 : window.innerHeight;
-  const maxHeight = viewportHeight > 0
-    ? Math.max(
-      STUDIO_MAIN_MENU_MIN_HEIGHT,
-      viewportHeight - top - STUDIO_MAIN_MENU_VIEWPORT_MARGIN,
-    )
-    : STUDIO_MAIN_MENU_FALLBACK_HEIGHT;
-  return {
-    top,
-    left,
-    minWidth,
-    maxHeight,
-  };
+  return resolveStudioMainMenuCoords(
+    btn?.getBoundingClientRect() ?? { left: 8, top: 10, bottom: 42, width: 0 },
+    readStudioMainMenuViewport(btn?.ownerDocument.defaultView),
+  );
 }
 
 function MenuDropdown({
@@ -353,7 +330,8 @@ function MenuDropdown({
   );
 
   const updateCoords = () => {
-    setCoords(measureTrigger(buttonRef.current));
+    const next = measureTrigger(buttonRef.current);
+    setCoords((current) => studioMainMenuCoordsEqual(current, next) ? current : next);
   };
 
   const closeMenu = (restoreFocus = true) => {
@@ -378,6 +356,7 @@ function MenuDropdown({
     if (nextIndex < 0) return;
     setActiveItemIndex(nextIndex);
     itemRefs.current[nextIndex]?.focus({ preventScroll: true });
+    revealStudioMainMenuItem(itemRefs.current[nextIndex] ?? null, menuRef.current);
   };
 
   useEffect(() => {
@@ -393,20 +372,32 @@ function MenuDropdown({
     if (openedRef.current) return;
     openedRef.current = true;
     updateCoords();
-    const firstEnabledIndex = resolveStudioMainMenuItemIndex(group.items, -1, "first");
-    setActiveItemIndex(firstEnabledIndex);
-    if (openFocusIntentRef.current === "first" && firstEnabledIndex >= 0) {
-      itemRefs.current[firstEnabledIndex]?.focus({ preventScroll: true });
-    } else if (openFocusIntentRef.current === "first") {
+    const initialIndex = resolveStudioMainMenuItemIndex(
+      group.items, -1, openFocusIntentRef.current === "last" ? "last" : "first",
+    );
+    setActiveItemIndex(initialIndex);
+    if (openFocusIntentRef.current !== "preserve" && initialIndex >= 0) {
+      itemRefs.current[initialIndex]?.focus({ preventScroll: true });
+    } else if (openFocusIntentRef.current !== "preserve") {
       menuRef.current?.focus({ preventScroll: true });
     }
     openFocusIntentRef.current = "first";
   }, [group.items, open]);
 
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const focused = menu?.ownerDocument.activeElement;
+    if (open && menu && focused instanceof HTMLElement && menu.contains(focused)) {
+      revealStudioMainMenuItem(focused, menu);
+    }
+  }, [coords, open]);
+
   useEffect(() => {
     if (!open) return;
     // Defer outside-dismiss so the opening click cannot immediately close the panel.
     let remove: (() => void) | undefined;
+    let repositionFrame: number | null = null;
+    const visualViewport = window.visualViewport;
     const attachTimer = window.setTimeout(() => {
       function onDoc(e: PointerEvent) {
         const t = e.target as Node | null;
@@ -419,31 +410,43 @@ function MenuDropdown({
         closeMenuRef.current(false);
       }
       function onKey(e: KeyboardEvent) {
-        if (e.key !== "Escape" || e.defaultPrevented) return;
+        if (e.key !== "Escape" || e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
         e.preventDefault();
         closeMenuRef.current();
       }
-      function onReposition() {
-        updateCoords();
+      function onReposition(event: Event) {
+        // Scrolling menu rows does not move the trigger. Coalesce external
+        // viewport changes instead of re-rendering once per scroll event.
+        if (event.target === menuRef.current || repositionFrame !== null) return;
+        repositionFrame = window.requestAnimationFrame(() => {
+          repositionFrame = null;
+          updateCoords();
+        });
       }
       document.addEventListener("pointerdown", onDoc, true);
       document.addEventListener("keydown", onKey);
       window.addEventListener("resize", onReposition);
       window.addEventListener("scroll", onReposition, true);
+      visualViewport?.addEventListener("resize", onReposition);
+      visualViewport?.addEventListener("scroll", onReposition);
       remove = () => {
         document.removeEventListener("pointerdown", onDoc, true);
         document.removeEventListener("keydown", onKey);
         window.removeEventListener("resize", onReposition);
         window.removeEventListener("scroll", onReposition, true);
+        visualViewport?.removeEventListener("resize", onReposition);
+        visualViewport?.removeEventListener("scroll", onReposition);
       };
     }, 0);
     return () => {
       window.clearTimeout(attachTimer);
+      if (repositionFrame !== null) window.cancelAnimationFrame(repositionFrame);
       remove?.();
     };
   }, [open]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     if (event.key === "Tab") {
       // The panel is portalled to <body>, so sequential focus from inside it has nowhere
       // to go: the browser drops focus on BODY and leaves the menu open. Dismiss the menu
@@ -531,7 +534,10 @@ function MenuDropdown({
             tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
             data-studio-main-menu-item-index={itemIndex}
             data-studio-menu-item-id={item.id}
-            onFocus={() => setActiveItemIndex(itemIndex)}
+            onFocus={() => {
+              setActiveItemIndex(itemIndex);
+              revealStudioMainMenuItem(itemRefs.current[itemIndex] ?? null, menuRef.current);
+            }}
             onClick={() => {
               if (item.disabled) return;
               try {
@@ -541,7 +547,7 @@ function MenuDropdown({
               }
             }}
             className={cn(
-              "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
+              "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium pointer-coarse:min-h-11",
               STUDIO_EASE,
               STUDIO_FOCUS_RING,
               item.danger && "text-bad",
@@ -602,6 +608,7 @@ function MenuDropdown({
             aria-label={group.label}
             tabIndex={-1}
             data-studio-main-menu-panel="true"
+            data-studio-main-menu-side={coords.side}
             data-studio-shortcut-boundary="true"
             onKeyDown={handleMenuKeyDown}
             className={cn(
@@ -612,6 +619,8 @@ function MenuDropdown({
               top: coords.top,
               left: coords.left,
               minWidth: coords.minWidth,
+              maxWidth: coords.maxWidth,
+              transform: coords.side === "top" ? "translateY(-100%)" : undefined,
               maxHeight: coords.maxHeight,
               // Body-level: beat studio shell / overflow chrome (options strip, absolute leftovers).
               zIndex: STUDIO_Z.workspace,
@@ -694,6 +703,7 @@ function MenuDropdown({
             if (!open) setCoords(measureTrigger(buttonRef.current));
           }}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
             if (event.key === "Escape" && open) {
               event.preventDefault();
               event.stopPropagation();
@@ -718,10 +728,11 @@ function MenuDropdown({
             if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
             event.preventDefault();
             event.stopPropagation();
+            const intent = event.key === "ArrowUp" ? "last" : "first";
             if (open) {
-              focusMenuItem("first", -1);
+              focusMenuItem(intent, -1);
             } else {
-              openMenu("first");
+              openMenu(intent);
             }
           }}
           onClick={() => {
