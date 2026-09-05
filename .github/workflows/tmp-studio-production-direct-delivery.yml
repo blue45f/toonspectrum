@@ -53,7 +53,7 @@ jobs:
 
       - name: Checkout integration base
         if: steps.elect.outputs.winner == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.BASE_SHA }}
           path: repo
@@ -61,7 +61,7 @@ jobs:
 
       - name: Checkout staged archive
         if: steps.elect.outputs.winner == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DIRTY_BRANCH }}
           path: staging
@@ -69,7 +69,7 @@ jobs:
 
       - name: Checkout reviewed delivery recipe
         if: steps.elect.outputs.winner == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.READY_BRANCH }}
           path: ready
@@ -135,10 +135,11 @@ jobs:
                   destination = destination_root.joinpath(*relative.parts)
                   destination.parent.mkdir(parents=True, exist_ok=True)
                   destination.write_bytes(source.read())
+              (root / "product-files.txt").write_text("\n".join(names) + "\n", encoding="utf-8")
           print(f"verified {actual} and extracted {len(names)} product files")
           PY
 
-      - name: Replay reviewed hardening and collaboration reconciliation
+      - name: Replay reviewed product hardening
         if: steps.elect.outputs.winner == 'true'
         shell: bash
         run: |
@@ -159,8 +160,6 @@ jobs:
           for match in pattern.finditer(recipe):
               body = textwrap.dedent(match.group("body"))
               lowered = body.lower()
-              # Transport/bootstrap/archive blocks are deliberately excluded. Product-only rewrite
-              # blocks mention the Studio production or route surfaces and operate inside the repo.
               if any(token in lowered for token in (
                   "studio-production-patch.part",
                   "studio-production-parts",
@@ -171,21 +170,21 @@ jobs:
                   "git push",
               )):
                   continue
+              if "StudioRouteFallbacks.tsx" in body or "PLACEHOLDER_GUIDES" in body:
+                  continue
               if not any(token in body for token in (
                   "StudioProduction",
                   "studio-production",
-                  "studio-route-manifest",
-                  "StudioRouter",
-                  "collaboration",
-                  "app-route-title-ownership",
               )):
                   continue
               subprocess.run(["python3", "-c", body], cwd=root / "repo", check=True)
               executed += 1
-          print(f"replayed {executed} reviewed product rewrite blocks")
+          if executed != 1:
+              raise SystemExit(f"expected one reviewed hardening block, executed {executed}")
+          print("replayed the reviewed product hardening block")
           PY
 
-      - name: Rebase product commit onto current main and publish a clean branch
+      - name: Commit reviewed product payload on its original base
         if: steps.elect.outputs.winner == 'true'
         shell: bash
         working-directory: repo
@@ -193,25 +192,84 @@ jobs:
           set -euo pipefail
           git config user.name 'toonstudio-bot'
           git config user.email 'actions@users.noreply.github.com'
-          rm -f .github/workflows/tmp-studio-production*.yml
-          rm -f .github/tmp/studio-production-patch.part??
-          rmdir .github/tmp 2>/dev/null || true
-          git add -A
+          while IFS= read -r path; do
+            git add -- "$path"
+          done < ../product-files.txt
           git diff --cached --check
           test -f src/domains/creator/studio-production/StudioProductionHubPage.tsx
           test -f src/domains/creator/studio-production/studio-production-model.ts
           test -f src/domains/creator/studio-production/studio-production-sqlite-persistence.ts
           git commit -m 'feat(studio): add production command center'
-          feature_commit=$(git rev-parse HEAD)
+
+      - name: Merge current main and retire superseded collaboration dead ends
+        if: steps.elect.outputs.winner == 'true'
+        shell: bash
+        working-directory: repo
+        run: |
+          set -euo pipefail
           git fetch origin main
-          git checkout -B "$FINAL_BRANCH" origin/main
-          git cherry-pick -X theirs "$feature_commit"
+          git show origin/main:src/domains/creator/studio-router/StudioRouteFallbacks.tsx > ../StudioRouteFallbacks.main.tsx
+          merge_status=0
+          git merge --no-commit --no-ff origin/main || merge_status=$?
+          conflicts="$(git diff --name-only --diff-filter=U)"
+          unexpected="$(printf '%s\n' "$conflicts" | grep -v '^src/domains/creator/studio-router/StudioRouteFallbacks.tsx$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo 'unexpected merge conflicts:' >&2
+            printf '%s\n' "$unexpected" >&2
+            exit 1
+          fi
+          cp ../StudioRouteFallbacks.main.tsx src/domains/creator/studio-router/StudioRouteFallbacks.tsx
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import textwrap
+          from pathlib import Path
+
+          root = Path.cwd().parent
+          recipe = (root / "ready" / ".github" / "workflows" / "tmp-studio-production-ready.yml").read_text(encoding="utf-8")
+          pattern = re.compile(
+              r"python3 - <<'(?P<tag>[A-Z][A-Z0-9_]*)'\n(?P<body>.*?)(?:\n\s*)(?P=tag)(?=\n|$)",
+              re.DOTALL,
+          )
+          candidates = []
+          for match in pattern.finditer(recipe):
+              body = textwrap.dedent(match.group("body"))
+              if "StudioRouteFallbacks.tsx" in body and "PLACEHOLDER_GUIDES" in body:
+                  candidates.append(body)
+          if len(candidates) != 1:
+              raise SystemExit(f"expected one route reconciliation block, found {len(candidates)}")
+          subprocess.run(["python3", "-c", candidates[0]], cwd=Path.cwd(), check=True)
+          print("replayed the reviewed route reconciliation block")
+          PY
+          rm -f .github/workflows/tmp-studio-production*.yml
+          rm -f .github/tmp/studio-production-patch.part??
+          rmdir .github/tmp 2>/dev/null || true
+          git add -A
+          git diff --cached --check
+          if [[ $merge_status -ne 0 && -n "$(git diff --name-only --diff-filter=U)" ]]; then
+            echo 'merge conflicts remain unresolved' >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+          git commit --no-edit
+
+      - name: Publish clean branch from the merged tree
+        if: steps.elect.outputs.winner == 'true'
+        shell: bash
+        working-directory: repo
+        run: |
+          set -euo pipefail
           test -z "$(git ls-files '.github/tmp/studio-production-patch.part*' '.github/workflows/tmp-studio-production*')"
           git diff origin/main...HEAD --check
-          git push --force-with-lease origin "HEAD:refs/heads/${FINAL_BRANCH}"
+          test -f src/domains/creator/studio-production/StudioProductionHubPage.tsx
+          test -f src/domains/creator/studio-production/studio-production-model.ts
+          test -f src/domains/creator/studio-production/studio-production-sqlite-persistence.ts
+          git branch -f "$FINAL_BRANCH" HEAD
+          git push --force-with-lease origin "${FINAL_BRANCH}:refs/heads/${FINAL_BRANCH}"
+          echo "published $(git rev-parse HEAD) to ${FINAL_BRANCH}"
 
-      - name: Release runner election lock
-        if: always() && steps.elect.outputs.winner == 'true'
+      - name: Release election lock after a failed attempt
+        if: failure() && steps.elect.outputs.winner == 'true'
         shell: bash
         run: |
           lock_ref='${{ steps.elect.outputs.lock_ref }}'
