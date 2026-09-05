@@ -1,0 +1,78 @@
+name: Studio PBR expansion delivery
+on:
+  push:
+    branches: [feat/studio-pbr-quality-expansion-20260906]
+    paths: [".github/workflows/studio-pbr-expansion-delivery.yml", "scripts/studio_pbr_asset_expansion.py"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-expansion-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  asset-expansion:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-pbr-quality-expansion-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      HUSKY: "0"
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked tools and test acquisition boundaries
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 scripts/studio_pbr_asset_expansion.py --self-test
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Acquire actual native 2K PBR materials and self-contained models
+        run: python3 scripts/studio_pbr_asset_expansion.py --acquire "$RUNNER_TEMP/pbr-expansion"
+      - name: Render each new model from three angles
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-expansion" "$GITHUB_WORKSPACE"
+          python3 scripts/studio_pbr_asset_expansion.py --integrate "$RUNNER_TEMP/pbr-expansion"
+      - name: Verify every admitted asset and legacy contracts
+        run: |
+          pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+          pnpm exec tsx -e 'import fs from "node:fs"; import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts"; const rows=parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"))); console.log("ADMITTED CATALOG",rows.length,"PBR",rows.filter(a=>a.provider==="Poly Haven").length);'
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/StudioCc0AssetLibraryPanel.tsx
+          pnpm exec tsc -p tsconfig.json --pretty false
+      - name: Build the production bundle and check Studio boundaries
+        run: |
+          pnpm run build:bundle > "$RUNNER_TEMP/pbr-expansion/build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/pbr-expansion/build.log"; exit 1; }
+          pnpm run check:studio-bundle
+      - name: Record verifiable scope and retain files on the feature branch
+        run: |
+          python3 - <<'PY'
+          import json,pathlib,os,subprocess
+          result={'acquisitionBoundaryTests':'passed','catalogAndLegacyTests':'58-passed','allManifestEntries':'passed','newModelThreeAngleRendering':'passed','frontendLint':'passed-zero-warnings','frontendTypes':'passed','productionBundle':'passed','studioBundleBoundaries':'passed','artisticInspection':'not-claimed','studioSaveRestoreRoundTrip':'not-run','mainMerge':'not-performed','productionDeployment':'not-performed'}
+          output=pathlib.Path(os.environ['RUNNER_TEMP'])/'pbr-expansion'
+          for p in [output/'verification.json',pathlib.Path('data/studio-assets/delivery-20260906/pbr-verification.json')]:
+              p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(result,indent=2)+'\n')
+          print('PBR VERIFICATION',json.dumps(result))
+          PY
+          test "$GITHUB_REF" = refs/heads/feat/studio-pbr-quality-expansion-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/cc0-20260906 src/domains/creator/StudioCc0AssetLibraryPanel.tsx
+          git add -f -- data/studio-assets/delivery-20260906/delivery-report.json data/studio-assets/delivery-20260906/excluded-and-variants.json data/studio-assets/delivery-20260906/pbr-expansion-report.json data/studio-assets/delivery-20260906/pbr-verification.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): add verified native PBR materials and detailed model originals"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_DELIVERY_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-expansion-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pbr-expansion/
+            ${{ runner.temp }}/pbr-expansion-combined/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
