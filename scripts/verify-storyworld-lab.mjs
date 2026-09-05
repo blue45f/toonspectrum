@@ -100,119 +100,51 @@ function validateCssCoverage() {
   return used.size;
 }
 
+// Use the compiler installed by the lockfile, never a global tsc or permissive mock declarations.
+function runTypeScript(args) {
+  execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), ...args], {
+    cwd: root,
+    stdio: "inherit",
+  });
+}
+
 function validateStrictSurfaceTypes() {
-  const typeRoot = mkdtempSync(join(tmpdir(), "toonspectrum-storyworld-types-"));
-  const targetDir = join(typeRoot, "src/domains/creator/storyworld");
-  mkdirSync(targetDir, { recursive: true });
-  for (const fileName of [
-    "StudioStoryworldLabPage.tsx",
-    "studio-storyworld-causality.ts",
-    "studio-storyworld-catalog.ts",
-    "studio-storyworld-causality.test.ts",
-  ]) {
-    writeFileSync(
-      join(targetDir, fileName),
-      readFileSync(join(sourceDir, fileName), "utf8"),
-    );
+  runTypeScript(["--project", join(root, "tsconfig.json"), "--noEmit", "--incremental", "false", "--pretty", "false"]);
+  checkOk(true, "real repository Storyworld UI/test typecheck");
+}
+
+function compileEngine() {
+  const inputDir = join(outDir, "src");
+  mkdirSync(inputDir, { recursive: true });
+  const files = ["studio-storyworld-causality.ts", "studio-storyworld-catalog.ts"];
+  for (const filename of files) {
+    writeFileSync(join(inputDir, filename), readFileSync(join(sourceDir, filename)));
   }
-  writeFileSync(join(typeRoot, "stubs.d.ts"), String.raw`
-declare namespace JSX {
-  type Element = any;
-  interface IntrinsicAttributes { key?: string | number; }
-  interface IntrinsicElements {
-    select: { onChange?: (event: import("react").ChangeEvent<HTMLSelectElement>) => void; [key: string]: any };
-    textarea: { onChange?: (event: import("react").ChangeEvent<HTMLTextAreaElement>) => void; [key: string]: any };
-    input: { onChange?: (event: import("react").ChangeEvent<HTMLInputElement>) => void; [key: string]: any };
-    [name: string]: any;
-  }
-}
-declare module "react" {
-  export type ReactNode = any;
-  export type SetStateAction<S> = S | ((previous: S) => S);
-  export type Dispatch<A> = (value: A) => void;
-  export interface MutableRefObject<T> { current: T; }
-  export interface ChangeEvent<T = Element> { target: T; currentTarget: T; }
-  export function useState<S>(initial: S | (() => S)): [S, Dispatch<SetStateAction<S>>];
-  export function useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void;
-  export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T;
-  export function useRef<T>(initial: T | null): MutableRefObject<T | null>;
-}
-declare module "react/jsx-runtime" {
-  export const Fragment: any;
-  export function jsx(type: any, props: any, key?: any): JSX.Element;
-  export function jsxs(type: any, props: any, key?: any): JSX.Element;
-}
-declare module "lucide-react" {
-  type Icon = (props: Record<string, unknown>) => JSX.Element;
-  export const AlertTriangle: Icon; export const ArrowLeft: Icon; export const BadgeCheck: Icon;
-  export const BookOpenCheck: Icon; export const BrainCircuit: Icon; export const CheckCircle2: Icon;
-  export const ChevronRight: Icon; export const CircleDot: Icon; export const Download: Icon;
-  export const FileJson: Icon; export const FlaskConical: Icon; export const GitBranch: Icon;
-  export const Import: Icon; export const Info: Icon; export const Network: Icon;
-  export const RefreshCcw: Icon; export const Save: Icon; export const ShieldCheck: Icon;
-  export const Sparkles: Icon; export const TimerReset: Icon; export const Users: Icon;
-  export const WandSparkles: Icon; export const XCircle: Icon;
-}
-declare module "vitest" {
-  type Matcher = {
-    toEqual(value: unknown): void; toContain(value: unknown): void; toHaveLength(value: number): void;
-    toBe(value: unknown): void; toBeLessThan(value: number): void; toBeGreaterThan(value: number): void;
-  };
-  type Expect = ((value: unknown) => Matcher) & {
-    arrayContaining(value: readonly unknown[]): unknown;
-    objectContaining(value: Record<string, unknown>): unknown;
-  };
-  export const expect: Expect;
-  export function describe(name: string, body: () => void): void;
-  export function it(name: string, body: () => void | Promise<void>): void;
-}
-declare module "*.css" { const value: string; export default value; }
-declare module "@/src/compat/router-link" {
-  const Link: (props: { href: string; children?: any; [key: string]: any }) => JSX.Element;
-  export default Link;
-}
-declare module "@/src/hooks/use-document-title" { export function useDocumentTitle(title: string): void; }
-`);
-  writeFileSync(join(typeRoot, "tsconfig.json"), JSON.stringify({
+  // A private CommonJS compilation boundary keeps require() independent of the repository's
+  // package type. An explicit project avoids TypeScript 6's implicit-config CLI ambiguity.
+  writeFileSync(join(outDir, "package.json"), JSON.stringify({ private: true, type: "commonjs" }));
+  const config = join(outDir, "tsconfig.json");
+  writeFileSync(config, JSON.stringify({
     compilerOptions: {
-      target: "ES2022",
-      lib: ["DOM", "DOM.Iterable", "ESNext"],
       strict: true,
-      noEmit: true,
-      module: "ESNext",
-      moduleResolution: "Bundler",
-      isolatedModules: true,
-      verbatimModuleSyntax: true,
-      jsx: "react-jsx",
-      baseUrl: ".",
-      paths: { "@/*": ["./*"] },
-      skipLibCheck: true,
+      noEmit: false,
+      target: "ES2022",
+      module: "NodeNext",
+      moduleResolution: "NodeNext",
+      lib: ["ES2023", "DOM"],
+      types: [],
+      rootDir: inputDir,
+      outDir: join(outDir, "compiled"),
     },
-    include: ["src/**/*.ts", "src/**/*.tsx", "stubs.d.ts"],
+    files: files.map((filename) => join(inputDir, filename)),
   }, null, 2));
-  try {
-    execFileSync("tsc", ["-p", join(typeRoot, "tsconfig.json")], { stdio: "inherit" });
-    checkOk(true, "strict Storyworld UI/test typecheck");
-  } finally {
-    rmSync(typeRoot, { recursive: true, force: true });
-  }
+  runTypeScript(["--project", config, "--pretty", "false"]);
 }
 
 try {
-  execFileSync("tsc", [
-    "--noEmit", "false",
-    "--strict",
-    "--target", "ES2022",
-    "--module", "NodeNext",
-    "--moduleResolution", "NodeNext",
-    "--lib", "ES2023,DOM",
-    "--outDir", outDir,
-    join(sourceDir, "studio-storyworld-causality.ts"),
-    join(sourceDir, "studio-storyworld-catalog.ts"),
-  ], { stdio: "inherit" });
-
-  const engine = require(join(outDir, "studio-storyworld-causality.js"));
-  const catalogue = require(join(outDir, "studio-storyworld-catalog.js"));
+  compileEngine();
+  const engine = require(join(outDir, "compiled/studio-storyworld-causality.js"));
+  const catalogue = require(join(outDir, "compiled/studio-storyworld-catalog.js"));
 
   const first = engine.analyzeStoryworldProject(engine.STORYWORLD_DEMO_PROJECT);
   const second = engine.analyzeStoryworldProject(engine.STORYWORLD_DEMO_PROJECT);
