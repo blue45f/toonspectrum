@@ -1,0 +1,43 @@
+name: Studio asset quality delivery
+on:
+  push:
+    branches: [feat/studio-assets-quality-delivery-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-asset-quality-delivery-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  asset-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Snapshot tracked source for reproducible review
+        run: |
+          git archive --format=tar.gz --output="$RUNNER_TEMP/studio-asset-source.tar.gz" HEAD
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          files = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          selected = [p for p in files if p and (p.startswith('public/') or ('studio' in p and any(k in p.lower() for k in ['asset', 'sticker', 'background', 'template', 'brush', 'emere', 'font', 'sfx', 'material'])))]
+          print(json.dumps([{'path': p, 'bytes': pathlib.Path(p).stat().st_size} for p in selected], ensure_ascii=False, indent=2))
+          PY
+      - name: Run asset delivery checks when present
+        run: |
+          if test -f scripts/studio_asset_delivery.py; then
+            python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+            python3 scripts/studio_asset_delivery.py --output "$RUNNER_TEMP/studio-asset-delivery"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-asset-quality-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/studio-asset-source.tar.gz
+            ${{ runner.temp }}/studio-asset-delivery/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
