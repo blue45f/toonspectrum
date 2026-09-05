@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-slim
+    runs-on: windows-2025
     timeout-minutes: 5
     steps:
-      - name: Preserve current filter head and cancel only its superseded runs
+      - name: Preserve current filter head and cancel only superseded executions
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,6 +34,10 @@ jobs:
           repo = 'blue45f/toonspectrum'
           branch = 'feat/studio-filter-exhaustive-20260905'
           expected_head = 'afe3c09c712aeb874360466cb6c9e32ccb4a68b5'
+          preserved = {
+              branch: expected_head,
+              'ops/pr724-stale-ci-cleanup-20260905': os.environ['GITHUB_SHA'],
+          }
           root = 'https://api.github.com/repos/' + repo
 
           def api(path, method='GET'):
@@ -58,18 +62,20 @@ jobs:
               raise SystemExit('PR head changed; no cancellation performed')
 
           candidates = []
-          query = urllib.parse.urlencode({'branch': branch, 'per_page': 100})
-          for page in range(1, 7):
-              rows = api('/actions/runs?' + query + '&page=' + str(page))['workflow_runs']
-              candidates.extend(row for row in rows if row['head_branch'] == branch and row['head_sha'] != expected_head and row['status'] != 'completed')
-              if len(rows) < 100:
-                  break
+          for target_branch, keep_sha in preserved.items():
+              query = urllib.parse.urlencode({'branch': target_branch, 'per_page': 100})
+              for page in range(1, 7):
+                  rows = api('/actions/runs?' + query + '&page=' + str(page))['workflow_runs']
+                  candidates.extend(row for row in rows if row['head_branch'] == target_branch and row['head_sha'] != keep_sha and row['status'] != 'completed')
+                  if len(rows) < 100:
+                      break
           cancelled = []
           for candidate in candidates:
               if api('/pulls/724')['head']['sha'] != expected_head:
                   raise SystemExit('PR head changed; stopped cancellation')
               run = api('/actions/runs/' + str(candidate['id']))
-              if run['head_branch'] != branch or run['head_sha'] == expected_head or run['status'] == 'completed':
+              keep_sha = preserved.get(run['head_branch'])
+              if keep_sha is None or run['head_sha'] == keep_sha or run['status'] == 'completed':
                   continue
               try:
                   api('/actions/runs/' + str(run['id']) + '/cancel', 'POST')
