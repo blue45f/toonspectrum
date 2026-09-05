@@ -1,0 +1,71 @@
+name: Verify P2P channel lifecycle repair
+
+on:
+  push:
+    branches: [fix/collaboration-cross-browser-sync-20260905]
+    paths:
+      - .github/workflows/repair-p2p-channel-755.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-p2p-channel-755
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/fix/collaboration-cross-browser-sync-20260905'
+    runs-on: macos-14
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Verify isolated lifecycle contract
+        run: node --experimental-strip-types --test scripts/verify-studio-p2p-channel-lifecycle.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Add real transport lifecycle regression cases
+        run: node scripts/maintenance/repair-p2p-channel-755.mjs tests
+      - name: Reproduce the two existing channel failures
+        shell: bash
+        run: |
+          set +e
+          pnpm exec vitest run src/domains/creator/live/studio-mesh-sync-regression.test.ts -t '\[channel-close-regression\]' --reporter=json --outputFile=channel-red.json
+          result=$?
+          set -e
+          test "$result" -ne 0
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('channel-red.json', 'utf8'));
+          const assertions = report.testResults.flatMap((file) => file.assertionResults);
+          const failed = assertions.filter((test) => test.status === 'failed' && test.fullName.includes('[channel-close-regression]'));
+          if (failed.length !== 2) throw new Error('Expected both lifecycle assertions to fail before the repair');
+          console.log(JSON.stringify({ phase: 'before-fix', failed: failed.map((test) => test.fullName) }));
+          JS
+      - name: Apply exact-source transport repair
+        run: node scripts/maintenance/repair-p2p-channel-755.mjs fix
+      - name: Normalize imports and lint changed production code
+        run: pnpm exec eslint --fix src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-live-p2p-channel-lifecycle.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
+      - name: Verify document, ink, channel, and server regressions
+        run: pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts src/domains/creator/live/studio-live-collaboration-room.ink.test.ts src/domains/creator/live/studio-live-socket-transport.test.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
+      - name: Verify repository types
+        run: pnpm run typecheck
+      - name: Commit only verified source and regressions to the requested branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm scripts/maintenance/repair-p2p-channel-755.mjs
+          git add src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-live-p2p-channel-lifecycle.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
+          git diff --cached --check
+          git commit -m 'fix(studio): recover closed peer channels and reject retired channel callbacks'
+          git push origin HEAD:fix/collaboration-cross-browser-sync-20260905
