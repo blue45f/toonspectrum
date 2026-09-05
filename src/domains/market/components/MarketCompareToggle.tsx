@@ -2,8 +2,8 @@ import { GitCompareArrows } from "lucide-react";
 
 import { useMarketCompare } from "../hooks/use-market-compare";
 
-import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { MouseEvent as ReactMouseEvent } from "react";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
