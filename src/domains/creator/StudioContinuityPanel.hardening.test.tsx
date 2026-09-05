@@ -45,7 +45,18 @@ beforeEach(() => {
   raster.inspect.mockResolvedValue({ status: "complete", issues: [], assetReferenceCount: 0,
     probedSourceCount: 0, skippedSourceCount: 0 });
 });
-afterEach(async () => { cleanup(); await loadStudioQualityReviewState("__test_flush__"); vi.restoreAllMocks(); });
+afterEach(async () => {
+  cleanup();
+  // A read started by a React effect is not part of the store's writeTail.
+  // Keep this file's module mocks alive until those lazy imports and their
+  // continuations finish; a sentinel read alone only drains queued writes.
+  await act(async () => {
+    await vi.dynamicImportSettled();
+    await loadStudioQualityReviewState("__test_flush__");
+    await vi.dynamicImportSettled();
+  });
+  vi.restoreAllMocks();
+});
 
 describe("quality center review ownership", () => {
   it("supports omitted pages without repeated raster effects and rescans explicitly", async () => {
@@ -76,6 +87,8 @@ describe("quality center review ownership", () => {
     view.rerender(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey="owner-B" />);
     expect(manualCheckbox().checked).toBe(false);
     expect(screen.queryByText("마감 준비 완료")).toBeNull();
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    expect(manualCheckbox().checked).toBe(false);
   });
 
   it("invalidates both acknowledgements and manual checks after edits", async () => {
@@ -96,6 +109,9 @@ describe("quality center review ownership", () => {
     render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey="malformed" />);
     expect(manualCheckbox().checked).toBe(false);
     expect(screen.queryByText("마감 준비 완료")).toBeNull();
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    expect(manualCheckbox().checked).toBe(false);
+    expect(screen.getByText(/현재 탭에만 보관됩니다/u)).toBeTruthy();
   });
 
   it("keeps long document keys distinct", async () => {
@@ -104,6 +120,24 @@ describe("quality center review ownership", () => {
     seed(`${prefix}A`, pages);
     render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey={`${prefix}B`} />);
     expect(manualCheckbox().checked).toBe(false);
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    expect(manualCheckbox().checked).toBe(false);
+  });
+
+  it("settles lazy reads after repeated unmounts without writing or opening a real Worker", async () => {
+    const pages = [page()];
+    for (let index = 0; index < 20; index += 1) {
+      const view = render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey={`unmounted-${index}`} />);
+      view.unmount();
+    }
+    await act(async () => { await vi.dynamicImportSettled(); });
+    expect(reviewDb.acquire).toHaveBeenCalledTimes(20);
+    expect(reviewDb.get).toHaveBeenCalledTimes(20);
+    for (let index = 0; index < 20; index += 1) {
+      expect(reviewDb.get).toHaveBeenCalledWith(`toonstudio:quality-inspection:v2:unmounted-${index}`);
+    }
+    expect(reviewDb.set).not.toHaveBeenCalled();
+    expect(reviewDb.rows.size).toBe(0);
   });
 
   it("does not promote an unavailable raster scan to ready", async () => {
