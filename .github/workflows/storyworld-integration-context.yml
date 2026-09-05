@@ -1,0 +1,52 @@
+name: Storyworld integration repair context
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-integration-context.yml]
+permissions:
+  contents: read
+jobs:
+  source-context:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    steps:
+      - name: Read scoped source context from the exact reviewed product head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, concurrent.futures, hashlib, json, os, pathlib, urllib.request
+          sha = '99a6a6967a7fda099361b1f965491e3a028046dd'
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storyworld-integration-context'
+          root.mkdir()
+          api = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          def get(path):
+              req = urllib.request.Request(api + path, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(req, timeout=40) as response:
+                  return json.load(response)
+          tree = get('git/trees/' + sha + '?recursive=1')
+          assert not tree.get('truncated'), 'Need a complete source tree'
+          exact = {'studio-quality-bundle-leaves.test.mjs', 'studio-quality-bundle-leaves.mjs', 'studio-tool-belt-lazy-ui-boundary.test.ts', 'studio-tool-belt-lazy-ui.tsx', 'studio-tool-belt-lazy-ui.ts', 'studio-page-lazy-ui.ts', 'studio-page-lazy-ui.tsx', 'studio-ui-preferences-sqlite.ts', 'studio-production-bible-sqlite-persistence.ts', 'StudioProductionHubPage.tsx', 'StudioProductionHubPage.test.tsx', 'StudioAiToolPopoverBody.tsx', 'StudioAiSuperSuiteModal.tsx'}
+          prefixes = ('StudioContinuityPanel', 'studio-continuity', 'studio-ai-super-suite', 'studio-ai-suite')
+          selected = [item for item in tree['tree'] if item['type'] == 'blob' and (pathlib.PurePosixPath(item['path']).name in exact or pathlib.PurePosixPath(item['path']).name.startswith(prefixes))]
+          assert 8 <= len(selected) <= 40
+          def fetch(item):
+              data = get('git/blobs/' + item['sha'])
+              raw = base64.b64decode(data['content'])
+              assert hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest() == item['sha']
+              target = root / 'source' / item['path']
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+              return {'path': item['path'], 'blobSha': item['sha'], 'sha256': hashlib.sha256(raw).hexdigest()}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              files = list(pool.map(fetch, selected))
+          (root / 'manifest.json').write_text(json.dumps({'productSha': sha, 'files': files}, indent=2))
+          print(json.dumps({'productSha': sha, 'files': files}, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-integration-context-99a6a69
+          path: ${{ runner.temp }}/storyworld-integration-context
+          retention-days: 3
