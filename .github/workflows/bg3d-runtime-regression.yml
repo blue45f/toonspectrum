@@ -71,12 +71,16 @@ jobs:
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.ts \
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
             src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.ts \
-            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-render-policy.ts \
+            src/domains/creator/bg3d/studio-bg3d-render-policy.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-frame-scheduling.test.tsx \
+            src/domains/creator/bg3d/StudioBg3dSceneNodes.tsx
       - name: Typecheck browser verification and application interfaces
         run: |
           pnpm exec tsc --project tsconfig.bg3d-runtime.json
           pnpm run typecheck
-      - name: Test capability, late response and single-canvas renderer ownership
+      - name: Test capability, scheduling and single-canvas renderer ownership
         run: |
           pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
             scripts/studio-bg3d-runtime-discovery.test.ts \
@@ -87,7 +91,10 @@ jobs:
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx \
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
             src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts --reporter=verbose
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-render-policy.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-frame-scheduling.test.tsx \
+            src/domains/creator/bg3d/studio-bg3d-frame-quality-governor.test.ts --reporter=verbose
       - name: Install Chromium and its runtime dependencies
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the production app to be verified
