@@ -66,6 +66,12 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
 export function SiteFooter() {
   const t = useT();
   const year = new Date().getFullYear();
+  const siteBrand = t("app.name");
+  // Older translations embed a product name in labels such as "About ToonSpectrum".
+  // Resolve only navigation labels against the canonical brand, preserving the rest
+  // of each translation. User content and the authoritative policy text are untouched.
+  const navigationLabel = (key: string) =>
+    t(key).replaceAll(/ToonSpectrum|툰스펙트럼/g, () => siteBrand);
 
   return (
     <footer
@@ -84,7 +90,7 @@ export function SiteFooter() {
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />
             <span className="font-display text-lg font-bold transition-colors group-hover:text-accent">
-              {t("footer.brand")}
+              {siteBrand}
             </span>
           </Link>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">{t("footer.description.primary")}</p>
@@ -98,7 +104,7 @@ export function SiteFooter() {
             key={col.titleKey}
             className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4"
           >
-            <h2 className="eyebrow text-fg-3">{t(col.titleKey)}</h2>
+            <h2 className="eyebrow text-fg-3">{navigationLabel(col.titleKey)}</h2>
             {col.links.map((l) => (
               <Link
                 key={l.href}
@@ -111,7 +117,7 @@ export function SiteFooter() {
                   className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
                 />
                 <span className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
-                  {t(l.key)}
+                  {navigationLabel(l.key)}
                 </span>
               </Link>
             ))}
