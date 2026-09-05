@@ -1,97 +1,76 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Header,
-  HttpException,
-  HttpStatus,
-  Headers,
-  Param,
-  Post,
-  Query,
-  Req,
-  UnauthorizedException,
+  Body, Controller, Get, Header, Headers, HttpException, HttpStatus, Param, Post, Query, UnauthorizedException,
 } from "@nestjs/common";
 
 import { FeedbackService } from "./feedback.service";
 
-import type { Request } from "express";
+import type { FeedbackListQuery } from "./feedback.service";
 
-interface ListQuery {
-  category?: string | null;
-  status?: string | null;
-  q?: string | null;
-  tag?: string | null;
-  sort?: string | null;
-  cursor?: string | null;
-  limit?: number | null;
-}
-
-const RateLimitStore: Record<string, number[]> = {};
-
-function parseIp(req: Request): string {
-  const xff = req.headers["x-forwarded-for"];
-  if (typeof xff === "string" && xff.trim()) return xff.split(",")[0].trim();
-  const real = req.headers["x-real-ip"];
-  if (typeof real === "string" && real.trim()) return real.trim();
-  return req.socket?.remoteAddress ?? "unknown";
-}
-
-function enforceUserOrError(userId: string | null | undefined) {
+// Per authenticated user, not spoofable proxy headers. This is a bounded per-instance guard;
+// global abuse controls remain the deployment gateway's responsibility.
+const rateLimitStore = new Map<string, number[]>();
+function enforceUserOrError(userId: string | undefined): string {
+  // sessionAuth has already verified the HttpOnly cookie/token and rewritten this internal header.
   if (!userId) throw new UnauthorizedException("로그인이 필요해요.");
   return userId;
 }
-
-function rateLimit(key: string, limit: number, windowMs: number) {
+function rateLimit(key: string, limit: number, windowMs = 10 * 60_000): void {
   const now = Date.now();
-  const recent = (RateLimitStore[key] ?? []).filter((ts) => now - ts < windowMs);
-  if (recent.length >= limit) {
-    RateLimitStore[key] = recent;
-    throw new HttpException(
-      { error: "요청이 너무 잦습니다.", status: HttpStatus.TOO_MANY_REQUESTS },
-      HttpStatus.TOO_MANY_REQUESTS
-    );
-  }
+  const recent = (rateLimitStore.get(key) ?? []).filter((time) => now - time < windowMs);
+  if (recent.length >= limit) throw new HttpException("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.TOO_MANY_REQUESTS);
   recent.push(now);
-  RateLimitStore[key] = recent;
-  if (Object.keys(RateLimitStore).length > 10000) {
-    const keys = Object.keys(RateLimitStore);
-    for (let i = 0; i < 100; i++) delete RateLimitStore[keys[i]];
+  rateLimitStore.delete(key);
+  rateLimitStore.set(key, recent);
+  if (rateLimitStore.size > 10_000) {
+    const oldest = rateLimitStore.keys().next().value;
+    if (oldest !== undefined) rateLimitStore.delete(oldest);
   }
 }
-
 @Controller()
 export class FeedbackController {
   private readonly feedbackService = new FeedbackService();
 
   @Get("/feedback/posts")
-  @Header("Cache-Control", "no-store, max-age=0")
-  async listPosts(@Query() query: ListQuery) {
-    return this.feedbackService.listPosts(query);
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async listPosts(@Query() query: FeedbackListQuery, @Headers("x-user-id") userId?: string) {
+    return this.feedbackService.listPosts(query, userId);
+  }
+
+  @Get("/feedback/posts/:id")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async getPost(@Param("id") postId: string, @Headers("x-user-id") userId?: string) {
+    return this.feedbackService.getPost(postId, userId);
   }
 
   @Post("/feedback/posts")
-  async createPost(@Body() body: unknown, @Headers("x-user-id") userId?: string, @Req() req?: Request) {
+  async createPost(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
-    rateLimit(`feedback-post:${uid}:${parseIp(req ?? ({} as Request))}`, 8, 10 * 60_000);
+    rateLimit(`post:${uid}`, 8);
     return this.feedbackService.createPost(uid, body);
   }
 
   @Get("/feedback/posts/:id/replies")
   @Header("Cache-Control", "no-store, max-age=0")
-  async listReplies(@Param("id") postId: string) {
-    return this.feedbackService.listReplies(postId);
-  }
+  async listReplies(@Param("id") postId: string) { return this.feedbackService.listReplies(postId); }
 
   @Post("/feedback/posts/:id/replies")
-  async createReply(
-    @Param("id") postId: string,
-    @Body() body: unknown,
-    @Headers("x-user-id") userId?: string,
-    @Req() req?: Request
-  ) {
+  async createReply(@Param("id") postId: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
-    rateLimit(`feedback-reply:${uid}:${parseIp(req ?? ({} as Request))}`, 30, 10 * 60_000);
+    rateLimit(`reply:${uid}`, 30);
     return this.feedbackService.createReply(postId, uid, body);
+  }
+
+  @Post("/feedback/posts/:id/vote")
+  async vote(@Param("id") postId: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    rateLimit(`vote:${uid}`, 100);
+    return this.feedbackService.vote(postId, uid, body);
+  }
+
+  @Post("/feedback/posts/:id/progress")
+  async changeProgress(@Param("id") postId: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    rateLimit(`progress:${uid}`, 60);
+    return this.feedbackService.changeProgress(postId, uid, body);
   }
 }
