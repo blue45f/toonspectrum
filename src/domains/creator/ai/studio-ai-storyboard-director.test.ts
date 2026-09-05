@@ -25,12 +25,29 @@ describe("StudioAiStoryboardDirector", () => {
     expect(res.cuts[0].emotion).toBe("rage");
     expect(res.cuts[0].shotScale).toBe("full-shot");
 
-    // Second cut (shock)
     expect(res.cuts[1].emotion).toBe("shock");
     expect(res.cuts[1].shotScale).toBe("extreme-close-up");
 
-    // Last cut (climax)
     expect(res.cuts[2].panelHeightRatio).toBeGreaterThan(1.5);
     expect(res.estimatedEpisodeReadingSec).toBeGreaterThan(10);
+  });
+
+  it("does not mistake the adjective 검은 for a sword action", () => {
+    const res = director.direct(
+      "검은 고양이가 창가에 조용히 앉아 있다.\n주인공이 문을 닫는다."
+    );
+
+    expect(res.cuts[0]?.emotion).toBe("calm");
+    expect(res.cuts[0]?.shotScale).toBe("medium-shot");
+  });
+
+  it("extracts speaker dialogue without leaking lettering into image prompts", () => {
+    const res = director.direct('민서: "오늘은 여기까지 하자."');
+    const cut = res.cuts[0];
+
+    expect(cut?.dialogue).toBe("오늘은 여기까지 하자.");
+    expect(cut?.backgroundPrompt).not.toContain("오늘은 여기까지 하자");
+    expect(cut?.backgroundPrompt).toContain("no speech bubbles");
+    expect(cut?.backgroundPrompt).toContain("no readable text");
   });
 });
