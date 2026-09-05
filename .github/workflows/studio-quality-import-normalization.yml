@@ -78,11 +78,8 @@ jobs:
           files.forEach((file, index) => assert.deepEqual(signature(file), before[index], file));
           fs.writeFileSync(process.env.RUNNER_TEMP + '/quality-imports/statement-preservation.json',
             JSON.stringify({ unchangedImportBindingsAndExecutableStatements: true, files }, null, 2) + '\n');
-          const workflow = '.github/workflows/studio-finishing-quality.yml';
-          const text = fs.readFileSync(workflow, 'utf8');
-          const old = 'branches: [main, feat/studio-quality-inspection-20260905]';
-          assert.equal(text.split(old).length - 1, 1);
-          fs.writeFileSync(workflow, text.replace(old, 'branches: [main]'));
+          // Workflow changes are committed separately through the authorized GitHub connector.
+          // The Actions job never creates or modifies a workflow using its contents-only token.
           JS
           git diff --check
           git diff > "$RUNNER_TEMP/quality-imports/imports.patch"
