@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: studio-discovery-integration-771
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   integrate-and-verify:
@@ -77,7 +77,7 @@ jobs:
           p = Path('src/domains/creator/brush/StudioSubToolPalette.tsx')
           original = p.read_text()
           corrected, changes = re.subn(r'\n}\s*}\s*$', '\n}\n', original, count=1)
-          print('Exact source before correction:', subprocess.check_output(['git', 'hash-object', str(p)], text=True).strip())
+          print('Source before correction:', subprocess.check_output(['git', 'hash-object', str(p)], text=True).strip())
           print('Original trailing lines:', repr(original.splitlines()[-6:]))
           if changes:
               p.write_text(corrected)
@@ -96,7 +96,7 @@ jobs:
           pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts src/domains/creator/brush/StudioSubToolPalette.tsx src/domains/creator/brush/studio-shortcut-brush-search.ts src/domains/creator/brush/studio-shortcut-brush-search.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
           git diff --check
       - name: Repository architecture rules
-        run: node scripts/check-architecture-boundaries.mjs
+        run: pnpm run validate:architecture
       - name: All brush and filter regression tests and menu integration
         run: pnpm exec vitest run src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search.test.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.test.ts
       - name: Frontend typecheck
