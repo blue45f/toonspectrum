@@ -73,7 +73,7 @@ export function buildStudioProductionMenuItems({
     {
       id: "continuity",
       commandId: "comic.continuity",
-      label: "이야기 연속성 검사…",
+      label: "마감·품질 검사…",
       icon: ScanEye,
       onSelect: () => {
         ui.openContinuityCheck();
