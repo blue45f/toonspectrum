@@ -33,7 +33,7 @@ function functionBody(name: string, nextName: string): string {
 }
 
 describe("Studio inspector multi-selection scope", () => {
-  it("keeps representative-only details out while mounting the dedicated group surface", () => {
+  it("keeps representative-only detail controls out while mounting the dedicated group surface", () => {
     expect(bodySource).toContain(
       'inspectorContentMode === "selection" && marqueeIds.length > 1',
     );
@@ -92,6 +92,7 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
     expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
     expect(applyPatchSource).toContain("if (!commit(plan.next)) return");
+    expect(applyPatchSource).toContain("setError(null)");
     expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
   });
 });

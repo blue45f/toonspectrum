@@ -1,10 +1,8 @@
 import { Suspense, useId, useMemo } from "react";
 
-import {
-  resolveStudioFigmaSelectionLayoutMetrics,
-  selectStudioFigmaDesignTargets,
-} from "./studio-figma-selection-ux";
+import { selectStudioFigmaDesignTargets } from "./studio-figma-selection-ux";
 import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
+import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
 import { isEffectivelyHidden } from "./studio-layers";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import {
@@ -56,7 +54,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const figmaDesignTargets = inspectorContentMode === "selection"
     ? selectStudioFigmaDesignTargets(elements, marqueeIds, selected)
     : [];
-  const figmaSelectionMetrics = resolveStudioFigmaSelectionLayoutMetrics(figmaDesignTargets);
+  // The Inspector bridge promotes group W/H and relative rotation on top of the conservative
+  // Figma-style resolver, so the numeric panel and the atomic group planner agree on capability.
+  const figmaSelectionMetrics = resolveStudioInspectorSelectionLayoutMetrics(figmaDesignTargets);
   const multiRotationSupported =
     figmaDesignTargets.length < 2
     || figmaDesignTargets.every(studioGroupUniformResizeMemberCanRotate);

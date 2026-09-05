@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   resolveStudioFigmaSelectionLayoutMetrics,
 } from "./studio-figma-selection-ux";
+import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
 import { resetStudioInspectorSectionStateCache } from "./studio-inspector-section-state";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 
@@ -35,10 +36,14 @@ function draw(partial: Partial<DrawEl> & Pick<DrawEl, "id" | "points">): DrawEl 
   } as DrawEl;
 }
 
+/**
+ * Mirrors the production wiring: the Inspector feeds the panel the promoted multi-selection
+ * metrics, which are identical to the conservative resolver for a single target.
+ */
 function renderPanel(elements: readonly El[], onChange = vi.fn()) {
   render(
     <StudioFigmaDesignPanel
-      metrics={resolveStudioFigmaSelectionLayoutMetrics(elements)}
+      metrics={resolveStudioInspectorSelectionLayoutMetrics(elements)}
       onChange={onChange}
     />,
   );

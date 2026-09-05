@@ -141,12 +141,12 @@ describe("studio select matching", () => {
     const source = image({
       id: "source",
       src: "data:image/png;base64,SAME",
-      builtinRasterAssetId: "asset-hero",
+      builtinRasterAssetId: "builtin-raster-hero",
     });
     const sameAsset = image({
       id: "same-asset",
       src: "data:image/png;base64,DIFFERENT-CACHE-COPY",
-      builtinRasterAssetId: "asset-hero",
+      builtinRasterAssetId: "builtin-raster-hero",
     });
     const sameBytesWithoutIdentity = image({
       id: "same-bytes",

@@ -320,7 +320,7 @@ export function StudioFigmaDesignPanel({
               />
               <Field
                 key={`rotation:${metrics.selectionKey}`}
-                // A stroke and a multi-selection store no shared angle, so this is an incremental
+                // A stroke or a multi-selection stores no shared angle, so this is an incremental
                 // turn rather than an absolute readout. The field returns to 0 after each commit.
                 label={multi || metrics.rotationIsRelative ? "회전(상대)" : "회전"}
                 controlId="selection.rotation"
@@ -328,11 +328,13 @@ export function StudioFigmaDesignPanel({
                 value={multi ? 0 : metrics.rotation}
                 disabled={
                   disabled
-                  || (multi ? !multiRotationSupported : !metrics.supportsRotation)
+                  || (multi
+                    ? !multiRotationSupported || !metrics.supportsRotation
+                    : !metrics.supportsRotation)
                 }
                 disabledReason={
-                  multi
-                    ? (multiRotationSupported ? null : multiRotationDisabledReason)
+                  multi && !multiRotationSupported
+                    ? multiRotationDisabledReason
                     : metrics.rotationDisabledReason
                 }
                 step={1}
@@ -400,8 +402,9 @@ export function StudioFigmaDesignPanel({
             {multi ? (
               <div className="mt-2 space-y-1.5 rounded-lg bg-canvas/45 px-2 py-2 text-[0.6875rem] leading-relaxed text-fg-3">
                 <p>
-                  W/H 중 한쪽 값을 입력하면 선택 비율을 유지한 채 전체 크기를 조절합니다.
-                  X/Y는 묶음 이동, 회전은 현재 상태에서 더하는 상대 각도예요.
+                  X/Y는 선택 묶음 전체를 이동합니다. 전체 너비나 높이 한쪽을 입력하면 현재
+                  비율을 유지해 모두 함께 크기를 조절하고, 회전은 현재 상태에서 더하는 상대
+                  각도이며, 불투명도도 한 번에 적용합니다.
                 </p>
                 <p className="font-medium text-fg-2">
                   모든 대상이 한 번에 바뀌며, 잠금 또는 호환되지 않는 요소가 있으면 전체를 그대로 유지합니다.
@@ -418,13 +421,22 @@ export function StudioFigmaDesignPanel({
                 {metrics.widthDisabledReason ?? metrics.heightDisabledReason}
               </p>
             ) : null}
-            {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
+            {metrics.rotationIsRelative && metrics.supportsRotation ? (
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
-                선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
-                더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+                {multi ? (
+                  <>
+                    여러 요소의 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도 더&rdquo;예요.
+                    15를 넣으면 선택 중심을 기준으로 모두 15° 돌아가고 칸은 0으로 돌아옵니다.
+                  </>
+                ) : (
+                  <>
+                    선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
+                    더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+                  </>
+                )}
               </p>
             ) : null}
-            {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
+            {metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
                 {metrics.rotationDisabledReason}
               </p>
