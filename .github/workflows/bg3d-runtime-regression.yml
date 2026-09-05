@@ -55,21 +55,30 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check changed verification and capability notice code
+      - name: Check changed verification and capability code
         run: |
           pnpm exec eslint --no-ignore --max-warnings 0 \
             playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
             scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
-            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts
-      - name: Typecheck browser verification interfaces
-        run: pnpm exec tsc --project tsconfig.bg3d-runtime.json
-      - name: Test real execution, capability policy and failure explanations
+            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.ts \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx
+      - name: Typecheck browser verification and application interfaces
+        run: |
+          pnpm exec tsc --project tsconfig.bg3d-runtime.json
+          pnpm run typecheck
+      - name: Test real execution, capability policy and late response ownership
         run: |
           pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.test.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
-            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts --reporter=verbose
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx --reporter=verbose
       - name: Install Chromium and its runtime dependencies
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the production app to be verified
