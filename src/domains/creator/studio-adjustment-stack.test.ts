@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./filter/studio-filter-pack-registry";
+
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
@@ -378,7 +380,53 @@ describe("studio adjustment stack", () => {
       "retro-film",
       "watercolor",
       "diffuse-glow",
+      ...STUDIO_FILTER_UNION_WAVE_KINDS,
     ]));
+    expect(STUDIO_ADJUSTMENT_ENGINE_IDS).toHaveLength(77);
+  });
+
+  it("projects every Filter Gallery union engine into an editable non-destructive operation", () => {
+    for (const engine of STUDIO_FILTER_UNION_WAVE_KINDS) {
+      const params = studioAdjustmentDefaultParams(engine);
+      const fields = studioAdjustmentOperationToFilterFields({
+        id: `union-${engine}`,
+        engine,
+        enabled: true,
+        params,
+      });
+      expect(fields.filterUnionWave).toMatchObject({
+        kind: engine,
+        amount: params.amount,
+      });
+      expect(fields.filterUnionWave?.amount).not.toBe(0);
+    }
+  });
+
+  it("clamps union-wave geometry and preserves polar mode and interpolation", () => {
+    expect(studioAdjustmentOperationToFilterFields({
+      id: "fisheye-clamped",
+      engine: "fisheye",
+      enabled: true,
+      params: { amount: 999, centerX: -20, centerY: 180, interpolation: "nearest" },
+    }).filterUnionWave).toMatchObject({
+      kind: "fisheye",
+      amount: 100,
+      centerX: 0,
+      centerY: 100,
+      interpolation: "nearest",
+    });
+
+    expect(studioAdjustmentOperationToFilterFields({
+      id: "polar-reverse",
+      engine: "polar-coordinates",
+      enabled: true,
+      params: { amount: 75, mode: "polar-to-rectangular", interpolation: "nearest" },
+    }).filterUnionWave).toMatchObject({
+      kind: "polar-coordinates",
+      amount: 75,
+      mode: "polar-to-rectangular",
+      interpolation: "nearest",
+    });
   });
 
   it("reports live local preview for every engine", () => {

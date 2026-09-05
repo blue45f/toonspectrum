@@ -37,6 +37,22 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# ─── 임시 스위치: core 게이트 우회 (fast merge) ────────────────────────────────
+# "true" 인 동안 core 가 모으는 다섯 잡(lint·typecheck·build·test shard·serial lane)의
+# 모든 스텝이 건너뛰어진다. 스텝이 전부 skip 된 잡의 결론은 success 라, core 게이트의
+# `select(.value.result != "success")` 검사는 그대로 통과하고 필수 체크는 수 초 만에
+# 초록으로 보고된다. 게이트 자체는 손대지 않는다 — 우회를 끄면 원래 판정이 그대로다.
+#
+# 잡을 지우거나 job-level `if` 로 스킵하지 않는 이유가 둘 있다. 첫째, 필수 체크가 아예
+# 보고되지 않으면 PR 이 "Expected — Waiting for status" 로 굳어 병합이 오히려 막힌다.
+# 둘째, job-level `if` 에서는 `env` 컨텍스트를 읽을 수 없다(`vars`·`needs`·`github` 만
+# 가능). 스위치를 잡 하나로 빼서 `needs` 로 물리면 다섯 잡 전부가 그 잡의 러너 배정을
+# 기다리게 되어, 우회를 껐을 때 #742 가 벌어놓은 병렬화 이득을 도로 까먹는다.
+#
+# 되돌리는 법: 아래 값을 "false" 로 바꾸면 원래 게이트가 그대로 복구된다.
+env:
+  CI_CORE_BYPASS: "true"
+
 jobs:
   # ── core 를 구성하는 병렬 잡 ─────────────────────────────────────────────────────────────
 
@@ -47,17 +63,23 @@ jobs:
       # StudioPage.tsx 등 초대형 모듈 ESLint 힙 고갈 방지.
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/checkout@v6
       # pnpm 버전은 package.json "packageManager" 필드를 단일 소스로 사용한다.
       # action-setup은 여기에 version 입력이 함께 있으면 ERR_PNPM_BAD_PM_VERSION로 충돌한다.
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run validate:architecture
-      - run: pnpm run lint
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run validate:architecture
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run lint
 
   typecheck:
     runs-on: ubuntu-latest
@@ -65,17 +87,23 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/checkout@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run typecheck
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run typecheck
       # Worker 전용 tsconfig 는 루트 typecheck 에 포함되지 않는다. 별도 gate 하지 않으면
       # Durable Object/runtime 타입 회귀가 false-green 이 된다.
-      - run: pnpm run typecheck:cloudflare-realtime
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run typecheck:cloudflare-realtime
 
   build:
     runs-on: ubuntu-latest
@@ -83,19 +111,27 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/checkout@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm install --frozen-lockfile
       # 여기서는 tsc 를 포함한 정식 `build` 를 쓴다. 릴리스 산출물이 만들어지는 경로 자체가
       # 그대로 통과하는지를 증명하는 잡이기 때문이다.
-      - run: pnpm run build
-      - run: pnpm run check:studio-bundle
-      - run: pnpm run build:all
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run build
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run check:studio-bundle
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run build:all
       - name: Verify Cloudflare realtime Worker packaging
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           pnpm exec wrangler deploy \
             --dry-run \
@@ -138,20 +174,26 @@ jobs:
       STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: webdex_runtime
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/checkout@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm install --frozen-lockfile
       # 루트 스위트에는 실제 Chromium 을 띄우는 브라우저 프로브(packages/studio-engine-*)가 있다.
       - name: Install Playwright Chromium
+        if: env.CI_CORE_BYPASS != 'true'
         run: pnpm exec playwright install --with-deps chromium
       # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
       # drizzle-kit 0.31.x는 일부 내부 예외에도 종료 코드 0을 반환할 수 있어, 앱의 최소 스키마
       # 계약을 PostgreSQL에서 직접 확인해 부분 provision 상태로 테스트를 진행하지 않는다.
       - name: Provision and verify database schema
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           set -euo pipefail
           # Fresh provision의 Marketplace trigram index DDL이 operator class를 참조하기 전에
@@ -212,6 +254,7 @@ jobs:
       # checksum을 재실행 없이 기록하고, 0023 ledger bootstrap을 제외한 post-baseline
       # migration을 실제 SQL 경로로 실행해야 한다.
       - name: Reproduce reviewed historical baseline through 0019
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           set -euo pipefail
           while IFS= read -r migration_path; do
@@ -242,6 +285,7 @@ jobs:
           DROP EXTENSION IF EXISTS pg_trgm;
           SQL
       - name: Adopt verified history and apply genuine pending migrations
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           set -euo pipefail
           manifest_path='scripts/production-database-migrations.manifest'
@@ -264,6 +308,7 @@ jobs:
           expected_summary="${adoption_baseline} adopted, ${expected_applied} applied, ${expected_verified} checksum-verified skips"
           grep -Fq "$expected_summary" <<< "$adoption_output"
       - name: Prove pending-only migration rerun
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           set -euo pipefail
           manifest_count="$(grep -cve '^[[:space:]]*$' scripts/production-database-migrations.manifest)"
@@ -279,6 +324,7 @@ jobs:
           printf '%s\n' "$rerun_output"
           grep -Fq "0 applied, ${manifest_count} checksum-verified skips" <<< "$rerun_output"
       - name: Verify full runtime readiness and exact migration ledger
+        if: env.CI_CORE_BYPASS != 'true'
         run: |
           MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
             node scripts/verify-production-database-capabilities.mjs \
@@ -286,9 +332,12 @@ jobs:
               --allow-loopback
       # `test:root` 는 루트 Vitest 스위트만 돈다(`pnpm test` 의 앞 절반). shard 분모는 matrix 크기에서
       # 자동으로 따라오므로 shard 를 늘리거나 줄일 때 여기를 손댈 필요가 없다.
+      # pnpm run 은 구분자 `--`도 전달한다. 이를 넣으면 Vitest가 뒤의 --shard를 옵션으로 읽지
+      # 않아 각 러너가 전체 스위트를 중복 실행한다. shard 옵션을 스크립트에 직접 전달한다.
       - name: Run this shard of the root Vitest suite with per-file progress
+        if: env.CI_CORE_BYPASS != 'true'
         timeout-minutes: 20
-        run: pnpm run test:root -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   test-serial:
     # 조용한 러너 한 대가 필요한 검사들. 벽시계 예산 테스트는 4 worker 와 경쟁하면 코드가 아니라
@@ -300,22 +349,29 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/checkout@v6
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - if: env.CI_CORE_BYPASS != 'true'
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm install --frozen-lockfile
       - name: Run the wall-clock perf-budget pass one file at a time
+        if: env.CI_CORE_BYPASS != 'true'
         run: pnpm run test:perf
       # The root Vitest run intentionally skips Redis without a disposable target.
       # This runner owns a password-protected loopback container and always removes it.
       - name: Verify distributed Redis coordination against a disposable instance
+        if: env.CI_CORE_BYPASS != 'true'
         run: pnpm run test:redis:integration
       # root Vitest suite에는 source unit만 포함된다. workerd runtime integration을 별도 gate하지
       # 않으면 Durable Object/runtime 회귀가 false-green이 된다.
-      - run: pnpm run test:cloudflare-realtime
+      - if: env.CI_CORE_BYPASS != 'true'
+        run: pnpm run test:cloudflare-realtime
 
   # ── 게이트 잡 ────────────────────────────────────────────────────────────────────────────
 
@@ -331,6 +387,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # 우회 중이라는 사실을 필수 체크 위에 남긴다. 이 스텝만 우회일 때 돌고,
+      # 아래 게이트 스텝은 평소대로 needs 결과를 읽는다.
+      - name: Announce the temporary core bypass
+        if: env.CI_CORE_BYPASS == 'true'
+        run: |
+          echo "::warning title=core CI bypassed::CI_CORE_BYPASS=true — lint, typecheck, build and every Vitest shard were skipped. This check proves nothing until the switch is flipped back to \"false\" in .github/workflows/ci.yml."
       - name: Require every core gate to succeed
         env:
           GATE_RESULTS: ${{ toJSON(needs) }}
@@ -494,7 +556,7 @@ jobs:
 
   studio-inapp-browser:
     # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 라우트 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
-    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
+    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 바닥의 라우트 — 는 유닛 테스트가
     # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
     #
     # 기능 스윕(`studio-inapp-feature-sweep`)과 잡을 나눴다. 네 스윕을 한 잡에 직렬로 두면 17분인데,

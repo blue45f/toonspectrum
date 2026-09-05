@@ -7,7 +7,6 @@ import {
   revealStudioMainMenuItem,
   studioMainMenuCoordsEqual,
 } from "./studio-main-menu-viewport";
-
 import mainMenuSource from "./StudioMainMenu.tsx?raw";
 
 afterEach(() => {
