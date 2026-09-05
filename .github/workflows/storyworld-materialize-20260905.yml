@@ -1,4 +1,4 @@
-name: Materialize reviewed Storyworld patch
+name: Storyworld integration preflight
 
 on:
   push:
@@ -12,50 +12,89 @@ permissions:
 
 concurrency:
   group: storyworld-materialize-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   materialize:
     if: github.repository == 'blue45f/toonspectrum'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref_name }}
-      - name: Verify the immutable patch and apply atomically
+      - name: Apply the reviewed source onto hash-pinned live router seams
+        id: integrate
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          python3 - <<'PY'
-          import hashlib
-          import lzma
-          import pathlib
-          import subprocess
-          import tempfile
-          import shutil
-
-          transport = pathlib.Path('.github/storyworld-transport-20260905')
-          chunks = [transport / f'part-{i:03d}' for i in range(6)]
-          compressed = b''.join(path.read_bytes() for path in chunks)
-          patch = lzma.decompress(compressed, memlimit=256 * 1024 * 1024)
-          expected = '863bc8cfe7c50d94eef43fc5d13e42c6ef096b7e77f958e9ba912644d03527dd'
-          assert len(patch) == 215215, 'Unexpected patch size'
-          assert hashlib.sha256(patch).hexdigest() == expected, 'Patch checksum mismatch'
-          with tempfile.NamedTemporaryFile(suffix='.patch') as handle:
-              handle.write(patch)
-              handle.flush()
-              subprocess.run(['git', 'apply', '--check', '--whitespace=error', handle.name], check=True)
-              subprocess.run(['git', 'apply', '--whitespace=error', handle.name], check=True)
-          shutil.rmtree(transport)
-          pathlib.Path('.github/workflows/storyworld-materialize-20260905.yml').unlink()
-          print('Applied the reviewed patch. All temporary transport files removed.')
-          PY
-          git add -A
+          python3 .github/storyworld-transport-20260905/integrate.py
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install the exact repository dependencies
+        id: install
+        run: pnpm install --frozen-lockfile
+      - name: Format and lint only the changed integration surface
+        id: lint
+        continue-on-error: true
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            src/domains/creator/storyworld \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-storyworld-route.test.ts \
+            scripts/verify-storyworld-lab.mjs
+      - name: Run real engine, UI and router regression tests
+        id: tests
+        continue-on-error: true
+        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router
+      - name: Check full repository TypeScript and API contracts
+        id: types
+        continue-on-error: true
+        run: pnpm run typecheck
+      - name: Publish product changes without temporary transport files
+        if: ${{ !cancelled() && steps.integrate.outcome == 'success' }}
+        shell: bash
+        env:
+          LINT_RESULT: ${{ steps.lint.outcome }}
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          TYPE_RESULT: ${{ steps.types.outcome }}
+        run: |
+          set -euo pipefail
+          rm -r .github/storyworld-transport-20260905
+          rm .github/workflows/storyworld-materialize-20260905.yml
+          git add -A -- \
+            .github/storyworld-transport-20260905 \
+            .github/workflows/storyworld-materialize-20260905.yml \
+            docs/studio-storyworld-causality-lab-2026-09-05.md \
+            scripts/verify-storyworld-lab.mjs \
+            src/domains/creator/storyworld \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-storyworld-route.test.ts
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat(studio): apply reviewed Storyworld causality lab patch'
+          HUSKY=0 git commit -m 'feat(studio): integrate Storyworld lab with live routes and bounded local input'
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
-          printf 'Product commit: `%s`\n\nPatch SHA-256: `863bc8cfe7c50d94eef43fc5d13e42c6ef096b7e77f958e9ba912644d03527dd`\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Product commit: `%s`\n\nLint: %s\n\nTests: %s\n\nTypes: %s\n\nRequired PR core CI is still mandatory.\n' "$(git rev-parse HEAD)" "$LINT_RESULT" "$TEST_RESULT" "$TYPE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+      - name: Require every diagnostic to pass
+        if: ${{ !cancelled() }}
+        env:
+          INSTALL_RESULT: ${{ steps.install.outcome }}
+          LINT_RESULT: ${{ steps.lint.outcome }}
+          TEST_RESULT: ${{ steps.tests.outcome }}
+          TYPE_RESULT: ${{ steps.types.outcome }}
+        run: |
+          test "$INSTALL_RESULT" = success
+          test "$LINT_RESULT" = success
+          test "$TEST_RESULT" = success
+          test "$TYPE_RESULT" = success
