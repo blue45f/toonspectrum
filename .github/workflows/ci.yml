@@ -1,5 +1,27 @@
 name: CI
 
+# ── 잡 배치 (2026-09-05 재편) ─────────────────────────────────────────────────────────────────
+#
+# 재편 전에는 `core` 한 잡이 lint(5~6분) → typecheck(2~3분) → 루트 Vitest 전체(15~21분) → build(2분)를
+# 직렬로 돌리고, 3D 런타임 오라클(`verify`, 8~9분)이 그 뒤에 줄을 서서 PR 하나가 초록이 되기까지
+# 약 35분(main 푸시는 43분)이 걸렸다. 같은 PR 에 커밋을 연달아 밀어도 이전 실행이 취소되지 않아
+# 실행마다 6개 잡이 공개 저장소 동시 실행 한도(20)를 나눠 먹었고, 실행 하나가 러너 배정만
+# 1시간 반을 기다린 기록도 있다(2026-09-04 run 2602: 19:46 생성, 첫 잡 21:10 시작).
+#
+# 지금은 검사를 하나도 빼지 않고 배치만 바꿨다.
+#   - `concurrency`: 같은 PR 의 진행 중 실행은 새 커밋이 오면 취소한다. main 푸시는 취소하지 않는다.
+#   - `core`: lint / typecheck / build / test(3 shard) / test-serial 이 병렬로 돌고, `core` 는 그 결과를
+#     합치는 게이트 잡이다. 브랜치 보호의 필수 체크 이름 `core` 는 그대로다(DEPLOY.md).
+#   - `verify`: `core` 와 `studio-3d-runtime` 을 합치는 릴리스 게이트. 3D 오라클은 core 뒤에 줄 서지
+#     않고 처음부터 병렬로 돈다. core 가 빨간불이면 verify 도 빨간불이다(hard gate 유지).
+#   - 루트 Vitest 스위트는 3 shard 로 나눈다(`--shard`: 파일 경로 해시로 분배하므로 모든 파일이
+#     정확히 한 shard 에서 한 번 돈다). 벽시계 예산 테스트(`test:perf`)는 조용한 러너가 필요하므로
+#     별도 잡(`test-serial`)에서 한 번만 돈다.
+#   - 브라우저 게이트는 프로덕션 dist 만 필요하므로 `build:bundle`(vite build 만)을 쓴다. tsc 는
+#     `typecheck` 잡이 한 번 증명한다. 같은 tsc 를 잡마다 2분씩 다시 지불할 이유가 없다.
+#
+# 임계 경로는 35분 → 약 11분이다(3D 시각 검증의 7.5분짜리 단일 케이스와 in-app 기능 스윕이 하한).
+
 on:
   push:
     branches: [main]
@@ -9,123 +31,91 @@ on:
 permissions:
   contents: read
 
+# PR 은 PR 번호로 묶어 새 커밋이 오면 진행 중 실행을 취소한다. main 푸시는 커밋 SHA 로 묶이므로
+# 서로 간섭하지 않는다 — 커밋마다 어느 커밋이 main 을 깨뜨렸는지 신호가 남아야 한다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  studio-p5-brush-real-runtime:
+  # ── core 를 구성하는 병렬 잡 ─────────────────────────────────────────────────────────────
+
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
+    env:
+      # StudioPage.tsx 등 초대형 모듈 ESLint 힙 고갈 방지.
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
+      # pnpm 버전은 package.json "packageManager" 필드를 단일 소스로 사용한다.
+      # action-setup은 여기에 version 입력이 함께 있으면 ERR_PNPM_BAD_PM_VERSION로 충돌한다.
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify real p5.brush Worker WebGL2 runtime
-        run: pnpm run verify:studio-p5-brush-real-runtime
+      - run: pnpm run validate:architecture
+      - run: pnpm run lint
 
-  studio-filter-dialog:
-    # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
-    # 실제로 몰아본다. 이 게이트가 없는 동안 페이지 합성·레이어 필터 전체가 브라우저에서
-    # 다이얼로그조차 못 여는 상태로 지나갔다 — createImageBitmap(svgBlob) 이 Chromium·WebKit
-    # 모두에서 InvalidStateError 라 선택된 offscreen 벡터 래스터가 항상 실패했는데, 유닛 테스트는
-    # 주입된 디코더를 쓰기 때문에 전부 초록이었다. 브라우저만이 그 사실을 말해준다.
-    #
-    # 잡 이름은 `core`/`verify` 와 겹치면 안 된다. 그 둘은 이미 각각 job id `verify:` 와
-    # `studio-3d-runtime:` 에 붙어 있고, main 브랜치 보호의 필수 체크가 `core` 하나다.
+  typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Build for vite preview
-        run: pnpm run build
-      - name: Verify the shipped filter dialog end to end
-        run: pnpm run verify:studio-filter-dialog
-
-  studio-inapp-browser:
-    # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
-    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
-    # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
-    #
-    # core 와 병렬로 돈다: 자체적으로 dist 를 만들므로 의존이 없고, 27분짜리 core 뒤에 줄 세우면
-    # 벽시계 시간만 두 배가 된다.
-    runs-on: ubuntu-latest
-    # 프로파일 3종 × 라우트 9개 + 세션 프로브 2개 = 29회 페이지 로드. 무거운 Studio 번들이라
-    # 스윕만 약 11분이고, 여기에 install 과 프로덕션 빌드가 더 붙는다.
-    timeout-minutes: 40
+    timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-        with:
-          # 빌드·브라우저 코드가 PR 에서 오므로 체크아웃 토큰을 물려주지 않는다.
-          persist-credentials: false
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      # 세 게이트 모두 vite preview 로 dist/ 를 서빙하므로 프로덕션 빌드가 먼저 있어야 한다.
-      # 빌드를 한 번만 치르려고 세 스윕이 이 잡을 공유한다 — 별도 잡으로 떼면 `tsc` 전체
-      # 타입체크까지 포함된 빌드를 통째로 다시 지불한다.
-      - name: Build production Studio assets
-        id: build
-        run: pnpm run build
-      - name: Sweep every Studio route under in-app browser conditions
-        run: pnpm run verify:studio-inapp-browser
-      - name: Drive the Studio's features inside those in-app browsers
-        # The route sweep above opens every route once and measures the chrome it finds. It never
-        # touches the app afterwards, so an error that only appears when somebody picks a tool,
-        # opens a sheet or draws a stroke has never been in front of a gate — which is how a
-        # React #185 render loop shipped, firing on the first stroke on every phone profile while
-        # both error boundaries stayed silent in production. This drives 45 interactions and
-        # attributes every error channel, boundary catches included, to the step in flight.
-        run: pnpm run verify:studio-inapp-feature-sweep
-      - name: Open the 3D editor inside those same in-app browsers
-        # The route sweep above proves every Studio route survives an embedded WebView; it never
-        # opens the 3D editor, which is where the engine-selection policy has to hold. This drives
-        # the routed bg3d surface at phone widths and reads the composited canvas back, failing on
-        # a blank viewport, an engine badge that is not WebGL2, a touch target under 44px,
-        # horizontal overflow, a viewport notice with no readable surface, or any page error.
-        #
-        # It belongs beside the route sweep rather than in the 3D runtime job: same browser matrix
-        # and build, and this job runs parallel to core instead of behind it, so the gate still
-        # reports when core is red.
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
-            pnpm run verify:studio-bg3d-inapp-editor
-      # 앞 스윕이 빨간불이어도 이건 돌아야 한다. 기본 `success()` 조건이면 한쪽이 깨질 때마다
-      # 다른 쪽 신호를 통째로 잃는다. 다만 빌드가 실패했다면 dist/ 가 없어 preview 가 뜨지
-      # 않으므로, 원인과 무관한 두 번째 빨간불을 만들지 않도록 빌드 성공을 함께 요구한다.
-      - name: Probe the /studio top chrome across mobile widths and both shells
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: pnpm run verify:studio-mobile-top
+      - run: pnpm run typecheck
+      # Worker 전용 tsconfig 는 루트 typecheck 에 포함되지 않는다. 별도 gate 하지 않으면
+      # Durable Object/runtime 타입 회귀가 false-green 이 된다.
+      - run: pnpm run typecheck:cloudflare-realtime
 
-  verify:
-    # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
-    # moves so the fresh 3D job can retain the stable "CI / verify" check context.
-    name: core
+  build:
     runs-on: ubuntu-latest
-    # The complete root suite contains broad Studio/browser and disposable-DB gates. On the
-    # GitHub runner, checkout/install/lint/typecheck consume about 9 minutes before Vitest starts,
-    # so the old 25-minute job limit cancelled Vitest mid-run and hid its final failure summary.
-    # Keep a bounded per-step budget for Vitest while leaving enough time for the post-test runtime
-    # and production-build gates. Raising this ceiling does not skip or weaken any check.
-    timeout-minutes: 75
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      # 여기서는 tsc 를 포함한 정식 `build` 를 쓴다. 릴리스 산출물이 만들어지는 경로 자체가
+      # 그대로 통과하는지를 증명하는 잡이기 때문이다.
+      - run: pnpm run build
+      - run: pnpm run check:studio-bundle
+      - run: pnpm run build:all
+      - name: Verify Cloudflare realtime Worker packaging
+        run: |
+          pnpm exec wrangler deploy \
+            --dry-run \
+            --config deploy/cloudflare-realtime/wrangler.jsonc \
+            --outdir /tmp/toonspectrum-cloudflare-realtime-dry-run
+
+  test:
+    name: test (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-latest
+    # 한 shard 는 루트 스위트의 1/3(약 5~7분)이다. 이전 단일 잡은 Vitest 앞에 install/lint/typecheck 로
+    # 9분을 쓰고도 25분 한도에 걸려 Vitest 가 중간에 잘려 최종 실패 요약이 사라진 적이 있다.
+    # 이 한도를 올리는 것은 검사를 건너뛰거나 약화하지 않는다.
+    timeout-minutes: 30
+    strategy:
+      # shard 하나가 깨져도 나머지 shard 의 신호는 그대로 받는다.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     # DB-backed 테스트(community 등)는 PostgreSQL을 사용한다(libSQL 파일 → Postgres 마이그레이션).
+    # shard 마다 자기 컨테이너를 가지므로 shard 간 상태가 섞이지 않는다.
     services:
       postgres:
         image: postgres:16-alpine
@@ -146,23 +136,18 @@ jobs:
       # 필수 실행한다. 이 값이 있으면 해당 테스트는 skip이 아니라 CI gate가 된다.
       STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex:webdex@localhost:5432/webdex
       STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: webdex_runtime
-      # StudioPage.tsx 등 초대형 모듈 ESLint/tsc 힙 고갈 방지 (GitHub-hosted ~7GB 한도 내).
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-      # pnpm 버전은 package.json "packageManager" 필드를 단일 소스로 사용한다.
-      # action-setup은 여기에 version 입력이 함께 있으면 ERR_PNPM_BAD_PM_VERSION로 충돌한다.
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      # 루트 스위트에는 실제 Chromium 을 띄우는 브라우저 프로브(packages/studio-engine-*)가 있다.
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run validate:architecture
-      - run: pnpm run lint
-      - run: pnpm run typecheck
       # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
       # drizzle-kit 0.31.x는 일부 내부 예외에도 종료 코드 0을 반환할 수 있어, 앱의 최소 스키마
       # 계약을 PostgreSQL에서 직접 확인해 부분 provision 상태로 테스트를 진행하지 않는다.
@@ -299,45 +284,21 @@ jobs:
             node scripts/verify-production-database-capabilities.mjs \
               --runtime-database-role webdex_runtime \
               --allow-loopback
-      - name: Run the complete root Vitest suite with per-file progress
-        timeout-minutes: 40
-        run: pnpm run test
-      # The root Vitest run intentionally skips Redis without a disposable target.
-      # This runner owns a password-protected loopback container and always removes it.
-      - name: Verify distributed Redis coordination against a disposable instance
-        run: pnpm run test:redis:integration
-      # root Vitest suite에는 source unit만 포함된다. workerd runtime integration과 Worker
-      # 전용 tsconfig를 별도 gate하지 않으면 Durable Object/runtime 회귀가 false-green이 된다.
-      - run: pnpm run test:cloudflare-realtime
-      - run: pnpm run typecheck:cloudflare-realtime
-      - name: Verify Cloudflare realtime Worker packaging
-        run: |
-          pnpm exec wrangler deploy \
-            --dry-run \
-            --config deploy/cloudflare-realtime/wrangler.jsonc \
-            --outdir /tmp/toonspectrum-cloudflare-realtime-dry-run
-      - run: pnpm run build
-      - run: pnpm run check:studio-bundle
-      - run: pnpm run build:all
+      # `test:root` 는 루트 Vitest 스위트만 돈다(`pnpm test` 의 앞 절반). shard 분모는 matrix 크기에서
+      # 자동으로 따라오므로 shard 를 늘리거나 줄일 때 여기를 손댈 필요가 없다.
+      - name: Run this shard of the root Vitest suite with per-file progress
+        timeout-minutes: 20
+        run: pnpm run test:root -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
-  studio-3d-visual:
-    # 렌더된 프레임을 근거로 하는 Studio 3D 표면 회귀.
-    #
-    # `studio-3d-runtime`은 WebGPU/WebGL2 캡처 동등성이라는 릴리스 오라클을 본다. 이 잡은 그
-    # 위에서 사용자가 실제로 밟는 경로를 본다 — 3D 배경·캐릭터·데생 인형이 캔버스에 붙는지.
-    # 그 경로 하나가 실사용 진입점 전부에서 막혀 있었는데도 기존 3D E2E는 다이얼로그가 열리는지만
-    # 보느라 초록이었다.
-    #
-    # 오라클 잡의 20분 예산을 잠식하지 않도록 분리한다. GPU 없는 러너에서도 실제 프레임이 나오게
-    # playwright.config.ts가 ANGLE/SwiftShader로 Chromium을 띄우므로 Xvfb는 필요 없다.
+  test-serial:
+    # 조용한 러너 한 대가 필요한 검사들. 벽시계 예산 테스트는 4 worker 와 경쟁하면 코드가 아니라
+    # 머신을 재게 되므로(vitest.perf-budget-files.mjs) 단일 worker 로, 다른 어떤 것과도 겹치지 않게
+    # 여기서 한 번만 돈다. 그 뒤에 붙는 두 통합 검사는 각각 몇 초짜리라 별도 러너를 받을 이유가 없다.
+    name: test (serial lane)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      # Empty selects Playwright's own bundled Chromium — the build `playwright install chromium`
-      # puts on the runner. The config otherwise defaults to the `chrome` channel, which needs
-      # Google Chrome and would not resolve here.
-      PLAYWRIGHT_CHANNEL: ""
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
@@ -346,50 +307,59 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify Studio 3D surfaces against rendered frames
-        run: pnpm run verify:studio-3d-visual
-      # A CI-only e2e failure is undiagnosable without the page state that produced it: the run
-      # log keeps the call log but not the DOM. Playwright writes an accessibility snapshot to
-      # `test-results/**/error-context.md` for every failed test, so publish that directory.
-      - name: Upload Playwright failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
-        with:
-          name: studio-3d-visual-failure
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+      - name: Run the wall-clock perf-budget pass one file at a time
+        run: pnpm run test:perf
+      # The root Vitest run intentionally skips Redis without a disposable target.
+      # This runner owns a password-protected loopback container and always removes it.
+      - name: Verify distributed Redis coordination against a disposable instance
+        run: pnpm run test:redis:integration
+      # root Vitest suite에는 source unit만 포함된다. workerd runtime integration을 별도 gate하지
+      # 않으면 Durable Object/runtime 회귀가 false-green이 된다.
+      - run: pnpm run test:cloudflare-realtime
+
+  # ── 게이트 잡 ────────────────────────────────────────────────────────────────────────────
+
+  core:
+    # main 브랜치 보호의 필수 체크. 위 다섯 잡이 전부 성공했을 때만 초록이다.
+    #
+    # `if: always()` 가 없으면 상류 잡 하나가 실패할 때 이 잡은 "skipped" 로 끝나고, GitHub 는
+    # skipped 필수 체크를 통과로 본다 — 빨간불이 머지 가능한 PR 이 된다. 그래서 언제나 실행하고
+    # 결과를 직접 읽어 판정한다.
+    name: core
+    needs: [lint, typecheck, build, test, test-serial]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every core gate to succeed
+        env:
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          failed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<< "$GATE_RESULTS")"
+          if [[ -n "$failed" ]]; then
+            echo "::error::Core CI gates did not all succeed."
+            printf '%s\n' "$failed"
+            exit 1
+          fi
+          echo "All core gates succeeded."
 
   studio-3d-runtime:
-    # Preserve the existing "CI / verify" check context while moving the GPU proof onto
-    # a clean GitHub-hosted VM so CPU/memory contention cannot affect the release oracle. The
-    # WebGPU shards use headed Chromium under Xvfb because both headless-shell and regular
-    # new-headless lost the SwiftShader device on the first Babylon readback.
-    name: verify
-    needs: verify
-    # Always materialize the release-facing check. A failed/cancelled core job must produce a failing
-    # 3D gate instead of a potentially merge-neutral skipped downstream check.
-    if: ${{ always() }}
+    # WebGPU/WebGL2 캡처 동등성이라는 릴리스 오라클. core 와 러너를 공유하지 않는 깨끗한 VM 에서
+    # 돌아 CPU/메모리 경합이 판정에 섞이지 않는다. WebGPU shard 는 헤드리스(shell·new-headless 모두)가
+    # 첫 Babylon readback 에서 SwiftShader 디바이스를 잃으므로 Xvfb 아래 헤디드 Chromium 을 쓴다.
+    #
+    # 예전에는 `needs: core` 로 core 뒤에 줄을 섰다. 릴리스 체크 `verify` 가 core 실패를 반영해야
+    # 한다는 요구는 지금 아래의 `verify` 게이트 잡이 맡으므로, 이 증명은 처음부터 병렬로 돈다.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Require successful core CI
-        env:
-          CORE_RESULT: ${{ needs.verify.result }}
-        run: |
-          if [[ "$CORE_RESULT" != "success" ]]; then
-            echo "::error::Core CI gate ended with result '$CORE_RESULT'."
-            exit 1
-          fi
       - uses: actions/checkout@v6
         with:
           # Dependency, build, and browser code from the PR must not inherit a checkout token.
           persist-credentials: false
-      # package.json "packageManager" remains the pnpm version authority.
       - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
       - uses: actions/setup-node@v6
         with:
@@ -399,7 +369,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build production Studio assets on the isolated runner
-        run: pnpm run build
+        run: pnpm run build:bundle
       - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
         # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
         # deterministic while the verifier still owns the exact viewport of every proof page.
@@ -437,3 +407,209 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  verify:
+    # 릴리스 체크 "CI / verify" = core 전체 + 3D 런타임 오라클. core 가 실패·취소되면 이 체크도
+    # 실패한다 — 병합 중립적인 "skipped" 로 끝나는 일이 없도록 언제나 실행해 결과를 직접 읽는다.
+    name: verify
+    needs: [core, studio-3d-runtime]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful core CI and the Studio 3D runtime proof
+        env:
+          CORE_RESULT: ${{ needs.core.result }}
+          PARITY_RESULT: ${{ needs.studio-3d-runtime.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$CORE_RESULT" != "success" ]]; then
+            echo "::error::Core CI gate ended with result '$CORE_RESULT'."
+            exit 1
+          fi
+          if [[ "$PARITY_RESULT" != "success" ]]; then
+            echo "::error::Studio 3D runtime proof ended with result '$PARITY_RESULT'."
+            exit 1
+          fi
+          echo "Core CI and the Studio 3D runtime proof both succeeded."
+
+  # ── core 와 병렬로 도는 브라우저 게이트 ──────────────────────────────────────────────────
+  # 아래 잡들은 자체적으로 dist 를 만들거나 vite dev 서버를 띄우므로 core 에 의존하지 않는다.
+  # 브랜치 보호 필수 체크는 아니다(러너 환경 의존이 크다 — DEPLOY.md).
+
+  studio-3d-visual:
+    # 렌더된 프레임을 근거로 하는 Studio 3D 표면 회귀.
+    #
+    # `studio-3d-runtime`은 WebGPU/WebGL2 캡처 동등성이라는 릴리스 오라클을 본다. 이 잡은 그
+    # 위에서 사용자가 실제로 밟는 경로를 본다 — 3D 배경·캐릭터·데생 인형이 캔버스에 붙는지.
+    # 그 경로 하나가 실사용 진입점 전부에서 막혀 있었는데도 기존 3D E2E는 다이얼로그가 열리는지만
+    # 보느라 초록이었다.
+    #
+    # 두 레인으로 나눈다. "3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다" 한 케이스가 SwiftShader
+    # 위에서 7.5분(스위트 17분의 절반 가까이)을 쓰므로 그 케이스만 `@slow` 태그로 따로 떼면 두 레인이
+    # 각각 8~10분에 끝난다. Playwright 의 `--shard` 는 케이스 개수로만 자르므로 여기서는 맞지 않는다.
+    #
+    # GPU 없는 러너에서도 실제 프레임이 나오게 playwright.config.ts가 ANGLE/SwiftShader로 Chromium을
+    # 띄우므로 Xvfb는 필요 없다.
+    name: studio-3d-visual (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: slow lane
+            filter: --grep @slow
+          - lane: fast lane
+            filter: --grep-invert @slow
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      # Empty selects Playwright's own bundled Chromium — the build `playwright install chromium`
+      # puts on the runner. The config otherwise defaults to the `chrome` channel, which needs
+      # Google Chrome and would not resolve here.
+      PLAYWRIGHT_CHANNEL: ""
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify Studio 3D surfaces against rendered frames
+        run: pnpm run verify:studio-3d-visual -- ${{ matrix.filter }}
+      # A CI-only e2e failure is undiagnosable without the page state that produced it: the run
+      # log keeps the call log but not the DOM. Playwright writes an accessibility snapshot to
+      # `test-results/**/error-context.md` for every failed test, so publish that directory.
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-3d-visual-failure-${{ strategy.job-index }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  studio-inapp-browser:
+    # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 라우트 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
+    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
+    # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
+    #
+    # 기능 스윕(`studio-inapp-feature-sweep`)과 잡을 나눴다. 네 스윕을 한 잡에 직렬로 두면 17분인데,
+    # 둘로 나누면 각각 10분 안팎이다. 예전에는 "빌드를 두 번 지불한다"는 이유로 한 잡에 묶었지만,
+    # 그 빌드에서 2분을 차지하던 tsc 는 이제 `typecheck` 잡이 한 번 증명하므로 `build:bundle` 은
+    # 2분 남짓이다.
+    runs-on: ubuntu-latest
+    # 프로파일 3종 × 라우트 9개 + 세션 프로브 2개 = 29회 페이지 로드. 무거운 Studio 번들이라
+    # 스윕만 약 5분이고, 여기에 install 과 프로덕션 빌드가 더 붙는다.
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # 빌드·브라우저 코드가 PR 에서 오므로 체크아웃 토큰을 물려주지 않는다.
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # 두 게이트 모두 vite preview 로 dist/ 를 서빙하므로 프로덕션 빌드가 먼저 있어야 한다.
+      - name: Build production Studio assets
+        id: build
+        run: pnpm run build:bundle
+      - name: Sweep every Studio route under in-app browser conditions
+        run: pnpm run verify:studio-inapp-browser
+      # 앞 스윕이 빨간불이어도 이건 돌아야 한다. 기본 `success()` 조건이면 한쪽이 깨질 때마다
+      # 다른 쪽 신호를 통째로 잃는다. 다만 빌드가 실패했다면 dist/ 가 없어 preview 가 뜨지
+      # 않으므로, 원인과 무관한 두 번째 빨간불을 만들지 않도록 빌드 성공을 함께 요구한다.
+      - name: Probe the /studio top chrome across mobile widths and both shells
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm run verify:studio-mobile-top
+
+  studio-inapp-feature-sweep:
+    # 라우트 스윕은 라우트를 한 번씩 열어 보고 크롬 모양을 잰 뒤 앱을 건드리지 않는다. 누군가 도구를
+    # 고르고 시트를 열고 스트로크를 그릴 때만 나타나는 오류는 게이트 앞에 선 적이 없었고, 그래서
+    # 첫 스트로크마다 터지는 React #185 렌더 루프가 모든 폰 프로파일에서 두 에러 바운더리가 조용한
+    # 채로 배포됐다. 이 잡은 45개 상호작용을 몰고, 바운더리 catch 를 포함한 모든 오류 채널을
+    # 진행 중인 단계에 귀속시킨다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production Studio assets
+        id: build
+        run: pnpm run build:bundle
+      - name: Drive the Studio's features inside those in-app browsers
+        run: pnpm run verify:studio-inapp-feature-sweep
+      - name: Open the 3D editor inside those same in-app browsers
+        # The route sweep proves every Studio route survives an embedded WebView; it never opens
+        # the 3D editor, which is where the engine-selection policy has to hold. This drives the
+        # routed bg3d surface at phone widths and reads the composited canvas back, failing on a
+        # blank viewport, an engine badge that is not WebGL2, a touch target under 44px,
+        # horizontal overflow, a viewport notice with no readable surface, or any page error.
+        #
+        # It belongs beside the feature sweep rather than in the 3D runtime job: same browser
+        # matrix and build, and this job runs parallel to core instead of behind it, so the gate
+        # still reports when core is red.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm run verify:studio-bg3d-inapp-editor
+
+  studio-filter-dialog:
+    # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
+    # 실제로 몰아본다. 이 게이트가 없는 동안 페이지 합성·레이어 필터 전체가 브라우저에서
+    # 다이얼로그조차 못 여는 상태로 지나갔다 — createImageBitmap(svgBlob) 이 Chromium·WebKit
+    # 모두에서 InvalidStateError 라 선택된 offscreen 벡터 래스터가 항상 실패했는데, 유닛 테스트는
+    # 주입된 디코더를 쓰기 때문에 전부 초록이었다. 브라우저만이 그 사실을 말해준다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build for vite preview
+        run: pnpm run build:bundle
+      - name: Verify the shipped filter dialog end to end
+        run: pnpm run verify:studio-filter-dialog
+
+  studio-p5-brush-real-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify real p5.brush Worker WebGL2 runtime
+        run: pnpm run verify:studio-p5-brush-real-runtime
