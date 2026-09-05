@@ -31,6 +31,8 @@ export function measureStudioVrmHeadSurface(vrm: VRM): StudioVrmHeadSurface | nu
   );
   const inverseFacing = facing.clone().invert();
   const inverseHead = head.matrixWorld.clone().invert();
+  const headDescendants = new Set<THREE.Object3D>();
+  rawHead.traverse((object) => { headDescendants.add(object); });
   const meshes: THREE.SkinnedMesh[] = [];
   let vertexCount = 0;
   vrm.scene.traverse((object) => {
@@ -39,7 +41,7 @@ export function measureStudioVrmHeadSurface(vrm: VRM): StudioVrmHeadSurface | nu
     const geometry = mesh.geometry;
     if (!geometry.getAttribute("position") || !geometry.getAttribute("skinIndex") || !geometry.getAttribute("skinWeight")) return;
     meshes.push(mesh);
-    vertexCount += geometry.getAttribute("position")?.count ?? 0;
+    vertexCount += geometry.getAttribute("position").count;
   });
   const stride = Math.max(1, Math.ceil(vertexCount / SAMPLE_BUDGET));
   const points: THREE.Vector3[] = [];
@@ -47,12 +49,7 @@ export function measureStudioVrmHeadSurface(vrm: VRM): StudioVrmHeadSurface | nu
   for (const mesh of meshes) {
     if (visited >= SAMPLE_BUDGET) break;
     mesh.skeleton.update();
-    const eligible = mesh.skeleton.bones.map((bone) => {
-      for (let ancestor: THREE.Object3D | null = bone; ancestor; ancestor = ancestor.parent) {
-        if (ancestor === rawHead) return true;
-      }
-      return false;
-    });
+    const eligible = mesh.skeleton.bones.map((bone) => headDescendants.has(bone));
     const geometry = mesh.geometry;
     const position = geometry.getAttribute("position");
     const indices = geometry.getAttribute("skinIndex");
