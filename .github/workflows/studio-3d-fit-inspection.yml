@@ -1,0 +1,78 @@
+name: Studio 3D fit and inspection
+on:
+  push:
+    branches: [fix/studio-3d-fit-inspection-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-3d-fit-inspection-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Package review source without credentials or generated assets
+        run: |
+          mkdir -p /tmp/3d-source
+          git rev-parse HEAD > /tmp/3d-source/head.txt
+          git ls-files -z | python3 -c 'import sys,pathlib; ps=sys.stdin.buffer.read().decode().split("\0"); keep=[p for p in ps if p and pathlib.Path(p).is_file() and not p.startswith(("public/","docs/screenshots/","artifacts/","qa-results/")) and pathlib.Path(p).stat().st_size < 20000000]; sys.stdout.buffer.write(("\0".join(keep)+"\0").encode())' > /tmp/source-files
+          tar --null -T /tmp/source-files -czf /tmp/3d-source/source.tgz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-source-${{ github.sha }}
+          path: /tmp/3d-source
+          retention-days: 3
+  production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Inspect actual production routes without account or document mutations
+        shell: bash
+        run: |
+          mkdir -p /tmp/3d-production
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          import { writeFileSync } from 'node:fs';
+          const browser = await chromium.launch({args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          const page = await browser.newPage({viewport:{width:1600,height:1000},locale:'ko-KR'});
+          const results=[];
+          for (const route of ['studio','studio/character','studio/bg3d','studio/poser','studio/lift3d']) {
+            const errors=[]; const listener=e=>errors.push(e.message); page.on('pageerror',listener);
+            try {
+              const response=await page.goto('https://www.toonstudio.cloud/'+route,{waitUntil:'domcontentloaded',timeout:90000});
+              await page.waitForTimeout(12000);
+              const session=await page.context().newCDPSession(page);
+              const image=await session.send('Page.captureScreenshot',{format:'png',fromSurface:true});
+              writeFileSync('/tmp/3d-production/'+route.replaceAll('/','-')+'.png',Buffer.from(image.data,'base64'));
+              await session.detach();
+              results.push({route,status:response?.status(),url:page.url(),title:await page.title(),text:(await page.locator('body').innerText()).slice(0,20000),errors});
+            } catch(e) { results.push({route,error:String(e),errors}); }
+            page.off('pageerror',listener);
+            writeFileSync('/tmp/3d-production/results.json',JSON.stringify(results,null,2));
+          }
+          await browser.close();
+          JS
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-3d-production-${{ github.sha }}
+          path: /tmp/3d-production
+          retention-days: 7
