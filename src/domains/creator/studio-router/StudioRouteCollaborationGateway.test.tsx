@@ -1,36 +1,43 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
 afterEach(cleanup);
 
-function renderPlaceholder(placeholderId: Parameters<typeof StudioRoutePlaceholder>[0]["placeholderId"]) {
-  render(
-    <MemoryRouter>
-      <StudioRoutePlaceholder placeholderId={placeholderId} onOpenStudio={() => undefined} />
-    </MemoryRouter>
-  );
-}
-
 describe("Studio collaboration route gateways", () => {
-  it("turns review dead ends into a three-step, permission-preserving entry guide", () => {
-    renderPlaceholder("review");
+  it.each([
+    "/studio/review",
+    "/studio/work/work-1/review",
+    "/studio/remix/source-1/review",
+  ])("routes %s to the working review hub instead of retired placeholder guidance", (pathname) => {
+    const resolution = resolveStudioRoute({ pathname, search: "", hash: "" });
 
-    expect(document.querySelector('[data-studio-collaboration-gateway="review"]')).not.toBeNull();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("리뷰");
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeTruthy();
-    expect(screen.getByText(/서버 앵커 댓글/u)).toBeTruthy();
+    expect(resolution).toMatchObject({
+      kind: "production",
+      surface: "review",
+      canonicalHref: pathname,
+      ownsDocumentTitle: true,
+    });
+    expect(resolution).not.toHaveProperty("placeholderId");
   });
 
-  it("keeps non-collaboration asset guidance outside the collaboration gateway contract", () => {
-    renderPlaceholder("assets");
+  it("keeps asset guidance outside the collaboration gateway and delegates its exit", () => {
+    const onOpenStudio = vi.fn();
+    render(
+      <MemoryRouter>
+        <StudioRoutePlaceholder placeholderId="assets" onOpenStudio={onOpenStudio} />
+      </MemoryRouter>
+    );
 
     expect(document.querySelector("[data-studio-collaboration-gateway]")).toBeNull();
-    expect(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" })).toBeTruthy();
+    const openStudio = screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" });
+    expect(openStudio).toBeTruthy();
+    fireEvent.click(openStudio);
+    expect(onOpenStudio).toHaveBeenCalledTimes(1);
   });
 });
