@@ -17,7 +17,7 @@ const CHECKLIST = [
   { id: "receipt", group: "제출 준비", title: "접수 후 제출 파일과 접수 확인을 보관했습니다.", detail: "접수 번호, 확인 메일과 최종 파일 버전을 남기세요." },
 ];
 export function PublishingPage() {
-  const { workspace, update, error } = useCreatorWorkspace();
+  const { workspace, update, error, ready, saving, writable } = useCreatorWorkspace();
   const completed = CHECKLIST.filter((item) => workspace.checks.includes(`publish-${item.id}`)).length;
   return <ResourceLayout title="연재·출판 준비실" intro="제출 전에 놓치기 쉬운 항목을 확인하세요. 이 체크리스트는 일반적인 준비 도구이며, 특정 플랫폼의 접수 기준이나 법률 자문이 아닙니다.">
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-6">
@@ -28,10 +28,10 @@ export function PublishingPage() {
     <div className="grid gap-4 md:grid-cols-2">{CHECKLIST.map((item) => {
       const id = `publish-${item.id}`;
       return <label htmlFor={id} key={id} className="flex cursor-pointer gap-4 rounded-2xl border border-line bg-panel p-5">
-        <input id={id} type="checkbox" className="mt-1 size-5 shrink-0" checked={workspace.checks.includes(id)} onChange={() => update((value) => ({ ...value, checks: value.checks.includes(id) ? value.checks.filter((key) => key !== id) : [...value.checks, id] }))} />
+        <input id={id} type="checkbox" className="mt-1 size-5 shrink-0" checked={workspace.checks.includes(id)} disabled={!ready || !writable || saving} onChange={(event) => { const checked = event.target.checked; void update((value) => ({ ...value, checks: checked ? [...new Set([...value.checks, id])] : value.checks.filter((key) => key !== id) })); }} />
         <span><span className="mb-2 block text-xs font-semibold text-accent">{item.group}</span><span className="block font-semibold leading-7">{item.title}</span><span className="mt-2 block text-sm leading-7 text-fg-2">{item.detail}</span></span>
       </label>;
     })}</div>
-    <LocalSaveNotice error={error} />
+    <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;
 }

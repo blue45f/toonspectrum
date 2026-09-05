@@ -16,7 +16,7 @@ const CONFIG = {
   kakao: { title: "만화·작법서 탐색", intro: "만화 단행본, 작법서와 참고 도서를 검색하세요. 작품과 판본의 관계는 원출처에서 확인하며 자동으로 동일 작품으로 합치지 않습니다.", hint: "예: 만화 작법, 웹툰, 스토리", url: "https://search.daum.net/search?w=book&q=%EB%A7%8C%ED%99%94", examples: ["만화 작법", "웹툰", "스토리"] },
   bizinfo: { title: "작가 기회센터", intro: "기업마당 최근 최대 100건에서 지원사업을 찾습니다. 모든 공모전을 포함하지 않으며, 개인 작가와 사업자의 신청 자격은 공고 원문을 확인해야 합니다.", hint: "예: 웹툰, 만화, 콘텐츠", url: "https://www.bizinfo.go.kr/", examples: ["웹툰", "만화", "콘텐츠"] },
 };
-function ResourceCard({ item, saved, onToggle }: { item: CreatorResource; saved: boolean; onToggle: () => void }) {
+function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !imageFailed && <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="h-52 w-full bg-raised object-contain p-3" />}
@@ -34,7 +34,7 @@ function ResourceCard({ item, saved, onToggle }: { item: CreatorResource; saved:
       </details>
       <div className="mt-auto flex flex-wrap gap-2 pt-2">
         <a href={item.sourceUrl} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">원문 확인 ↗</a>
-        <button className={RESOURCE_BUTTON} aria-pressed={saved} onClick={onToggle}>{saved ? "저장 해제" : "보드에 저장"}</button>
+        <button className={RESOURCE_BUTTON} aria-pressed={saved} disabled={disabled} onClick={onToggle}>{saved ? "저장 해제" : "보드에 저장"}</button>
         {item.provider === "bizinfo" && item.deadline && <button className={RESOURCE_BUTTON} onClick={() => downloadText("opportunity-deadline.ics", deadlineCalendar(item), "text/calendar;charset=utf-8")}>마감일 일정 파일</button>}
       </div>
     </div>
@@ -52,7 +52,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
   const [loading, setLoading] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [retry, setRetry] = useState(0);
-  const { workspace, update, error } = useCreatorWorkspace();
+  const { workspace, update, error, ready, saving, writable } = useCreatorWorkspace();
   useEffect(() => { setDraft(query); }, [query]);
   useEffect(() => {
     setResult(null); setRequestError("");
@@ -77,9 +77,13 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
   }, [provider, query, page, retry, savedOnly]);
   const savedItems = workspace.saved.filter((item) => item.provider === provider);
   const items = savedOnly ? savedItems : result?.items ?? [];
-  const toggle = (item: CreatorResource) => update((value) => ({ ...value,
-    saved: value.saved.some((saved) => saved.id === item.id) ? value.saved.filter((saved) => saved.id !== item.id) : [...value.saved, item],
-  }));
+  const toggle = (item: CreatorResource) => {
+    const remove = workspace.saved.some((saved) => saved.id === item.id);
+    void update((value) => ({ ...value,
+      saved: remove ? value.saved.filter((saved) => saved.id !== item.id)
+        : value.saved.some((saved) => saved.id === item.id) ? value.saved : [...value.saved, item],
+    }));
+  };
   const searchFor = (q: string) => { setSavedOnly(false); setParams({ q, page: "1" }); };
   return <ResourceLayout title={config.title} intro={config.intro}>
     <ProviderStatus provider={provider} />
@@ -105,13 +109,13 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
     </div>
     {!savedOnly && (requestError || result?.status === "unavailable" || result?.status === "partial") && <button className={RESOURCE_BUTTON} onClick={() => setRetry((value) => value + 1)}>다시 시도</button>}
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={!savedOnly && loading}>
-      {items.map((item) => <ResourceCard key={item.id} item={item} saved={workspace.saved.some((saved) => saved.id === item.id)} onToggle={() => toggle(item)} />)}
+      {items.map((item) => <ResourceCard key={item.id} item={item} saved={workspace.saved.some((saved) => saved.id === item.id)} disabled={!ready || !writable || saving} onToggle={() => toggle(item)} />)}
     </div>
     {!savedOnly && result && (result.status === "ready" || result.status === "partial") && <nav className="flex items-center justify-center gap-4" aria-label="검색 결과 페이지">
       <button className={RESOURCE_BUTTON} disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button><span>{page} 페이지</span>
       <button className={RESOURCE_BUTTON} disabled={!result.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
     </nav>}
-    <LocalSaveNotice error={error} />
+    <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;
 }
 export function ReferencesPage() { return <ResourceSearchPage provider="met" />; }

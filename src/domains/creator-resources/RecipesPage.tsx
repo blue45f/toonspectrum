@@ -27,7 +27,7 @@ function RecipePreview({ recipe, amount }: { recipe: Recipe; amount: number }) {
 }
 function RecipeLesson({ recipe }: { recipe: Recipe }) {
   const [amount, setAmount] = useState<number>(recipe.initial);
-  const { workspace, update, error } = useCreatorWorkspace();
+  const { workspace, update, error, ready, saving, writable } = useCreatorWorkspace();
   const completeCount = recipe.steps.filter((_, index) => workspace.checks.includes(`recipe-${recipe.id}-${index}`)).length;
   return <section className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-7">
     <header><p className="text-sm text-accent">{recipe.tag} · 약 {recipe.minutes}분 실습</p><h2 className="mt-2 text-2xl font-bold">{recipe.title}</h2><p className="mt-3 leading-7 text-fg-2">{recipe.intro}</p></header>
@@ -39,7 +39,7 @@ function RecipeLesson({ recipe }: { recipe: Recipe }) {
       {recipe.steps.map((step, index) => {
         const id = `recipe-${recipe.id}-${index}`;
         return <label key={id} htmlFor={id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 leading-7">
-          <input id={id} type="checkbox" className="mt-1.5 size-5 shrink-0" checked={workspace.checks.includes(id)} onChange={() => update((value) => ({ ...value, checks: value.checks.includes(id) ? value.checks.filter((key) => key !== id) : [...value.checks, id] }))} />
+          <input id={id} type="checkbox" className="mt-1.5 size-5 shrink-0" checked={workspace.checks.includes(id)} disabled={!ready || !writable || saving} onChange={(event) => { const checked = event.target.checked; void update((value) => ({ ...value, checks: checked ? [...new Set([...value.checks, id])] : value.checks.filter((key) => key !== id) })); }} />
           <span>{index + 1}. {step}</span>
         </label>;
       })}
@@ -47,7 +47,7 @@ function RecipeLesson({ recipe }: { recipe: Recipe }) {
       <button className={RESOURCE_BUTTON} onClick={() => downloadText(`${recipe.id}-exercise.svg`, exerciseSvg(recipe, amount), "image/svg+xml;charset=utf-8")}>편집 가능한 SVG 실습 시트</button>
       <p className="text-xs leading-6 text-fg-2">SVG는 빈 컷 프레임입니다. 여백·반응 컷 높이만 시트에 반영하며, 다른 슬라이더는 화면 실험용입니다. 스튜디오에 자동으로 프로젝트를 생성하지 않습니다.</p>
     </div></div>
-    <LocalSaveNotice error={error} />
+    <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </section>;
 }
 export function RecipesPage() {
