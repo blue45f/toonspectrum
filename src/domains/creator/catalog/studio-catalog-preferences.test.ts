@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { applyStudioCatalogPreference, createStudioCatalogPreferencesRepository, normalizeStudioCatalogPreferences } from "./studio-catalog-preferences";
 
 function harness() {

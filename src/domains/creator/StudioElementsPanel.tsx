@@ -11,7 +11,6 @@ import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTR
 import { StudioCatalogPreviewDialog } from "./catalog/StudioCatalogPreviewDialog";
 import { useStudioCatalogPreferences } from "./catalog/use-studio-catalog-preferences";
 import "./catalog/studio-catalog-browser.css";
-
 import { svgToDataUrl } from "./studio-characters";
 import {
   findStudioElement,
