@@ -538,9 +538,14 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       return retainedMediaOperationFailure(this.lastFailureReason);
     }
     if (!this.active) return retainedMediaOperationFailure("stroke-identity");
+    if (element.id !== this.active.id || retainedKind(element) !== this.active.kind) {
+      return this.failActive("stroke-identity");
+    }
     if (!this.isNativeSurfaceReady) return this.failActive("surface-unavailable");
     this.active.element = element;
-    if (this.active.kind === "highlighter") {
+    // Rebuild pencil once at release: transient taps and per-frame alpha unions must not
+    // become the durable surface. Replay uses this same finalized, whole-stroke program.
+    if (this.active.kind === "highlighter" || this.active.kind === "pencil") {
       this.clearCanvas(this.activeContext, this.activeCanvas);
       const fullActive: ActiveRetainedStroke = {
         id: element.id,
@@ -557,7 +562,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         oilPlanner: null,
         oilCarrierPlanner: null,
       };
-      if (!this.paintSuffix(fullActive, element, this.activeContext)) {
+      if (!this.paintSuffix(fullActive, element, this.activeContext, true)) {
         return this.failActive("surface-unavailable");
       }
     } else {
@@ -785,24 +790,38 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         : null;
       if (tap && active.paintedSourceSegments === 0 && active.paintedPencilMarks === 0) {
         const scale = this.surface?.documentScale ?? 1;
-        const radius = studioLiveVisibleTapDocumentRadius(
-          Math.max(0.35, width * tap.sizeScale / 2),
-          scale,
-        );
+        const liveDraft = target === this.activeContext && !finalize;
         context.globalCompositeOperation = "source-over";
         context.fillStyle = element.stroke;
-        context.globalAlpha = Math.min(
-          1,
-          (element.opacity ?? 1)
-          * Math.sqrt(tap.opacityScale * tap.flowScale),
-        );
-        context.beginPath();
-        context.arc(tap.x, tap.y, radius, 0, Math.PI * 2);
-        context.fill();
+        for (const pass of studioPencilAliasPasses(brush)) {
+          const documentRadius = Math.max(
+            0.35,
+            Math.max(0.5, width * pass.widthScale) * tap.sizeScale / 2,
+          );
+          const radius = liveDraft
+            ? studioLiveVisibleTapDocumentRadius(documentRadius, scale)
+            : documentRadius;
+          context.globalAlpha = Math.min(
+            1,
+            (element.opacity ?? 1) * pass.opacityScale
+            * Math.sqrt(tap.opacityScale * tap.flowScale),
+          );
+          context.beginPath();
+          context.arc(tap.x, tap.y, radius, 0, Math.PI * 2);
+          context.fill();
+        }
         active.paintedPencilMarks = 1;
         return true;
       }
       if (tap) return true;
+      if (target === this.activeContext
+        && active.paintedSourceSegments === 0 && active.paintedPencilMarks > 0) {
+        // Pointerdown's visibility hint is not pigment. Retire it once travel begins,
+        // otherwise it survives every append and disappears only on document replay.
+        this.clearCanvas(this.activeContext, this.activeCanvas);
+        active.paintedPencilMarks = 0;
+      }
+
       // 증분 곡선 빌더 + suffix 리본: 매 이동 전체 곡선·리본을 다시 세우던 O(n)/이동을 새 점
       // 수에만 비례하게 만든다. 리본은 이미 칠한 선분 경계부터의 suffix만 계획한다 — 아래
       // 셀 필터·start 캡 스킵과 같은 경계 규약이라 칠해지는 픽셀은 종전과 같다.
@@ -984,6 +1003,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         // 막으므로 이 값은 0으로 남겨야 정확하다.
         active.paintedPencilMarks = 1;
         return true;
+      }
+      if (target === this.activeContext
+        && active.paintedSourceSegments === 0 && active.paintedPencilMarks > 0) {
+        this.clearCanvas(this.activeContext, this.activeCanvas);
+        active.paintedPencilMarks = 0;
       }
       // 증분 빌더: 이동마다 전체 스트로크의 선분을 다시 세우던 O(n)/이동을 새 점 수에만
       // 비례하게 만든다. 필압·스타일러스는 나란한 인덱스별 접근자로 넘겨 배열 재구성
@@ -1211,7 +1235,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedSourceSegments: 0,
         oilPlanner: null,
         oilCarrierPlanner: null,
-      }, stroke, this.settledContext);
+      }, stroke, this.settledContext, true);
     }
   }
 
@@ -1236,7 +1260,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedSourceSegments: 0,
         oilPlanner: null,
         oilCarrierPlanner: null,
-      }, stroke, this.settledContext);
+      }, stroke, this.settledContext, true);
     }
     if (!this.active) return;
     const replayActive: ActiveRetainedStroke = {
