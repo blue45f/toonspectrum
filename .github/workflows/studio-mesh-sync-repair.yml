@@ -12,12 +12,12 @@ permissions:
 
 concurrency:
   group: studio-mesh-sync-repair
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   regression:
     if: github.ref == 'refs/heads/fix/collaboration-cross-browser-sync-20260905'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm scripts/maintenance/studio-mesh-sync-repair.mjs .github/workflows/studio-mesh-sync-repair.yml
+          git rm scripts/maintenance/studio-mesh-sync-repair.mjs
           git add src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts
           git diff --cached --check
           git commit -m 'fix(studio): separate mesh synchronization from authoritative server sequencing'
