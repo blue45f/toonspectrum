@@ -22,8 +22,15 @@ const CONVERSION = new Set([".skp", ".blend", ".fbx", ".obj", ".gltf", ".dae", "
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
+function hasAsciiControl(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
 function text(value, label, max = 300) {
-  requireThat(typeof value === "string" && value.trim().length > 0 && value.length <= max && !/[\u0000-\u001f\u007f]/u.test(value), `${label}: expected nonempty text (max ${max})`);
+  requireThat(typeof value === "string" && value.trim().length > 0 && value.length <= max && !hasAsciiControl(value), `${label}: expected nonempty text (max ${max})`);
   return value.trim();
 }
 function relativeFile(value) {
