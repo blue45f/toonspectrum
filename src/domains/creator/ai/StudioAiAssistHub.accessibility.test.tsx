@@ -34,14 +34,12 @@ describe("StudioAiAssistHub task-first and keyboard UX", () => {
 
     const background = screen.getByRole("tab", { name: /배경/u });
     const character = screen.getByRole("tab", { name: /캐릭터/u });
+    const panel = screen.getByRole("tabpanel");
 
-    expect(background).toHaveAttribute("tabindex", "0");
-    expect(character).toHaveAttribute("tabindex", "-1");
-    expect(background).toHaveAttribute("aria-controls");
-    expect(screen.getByRole("tabpanel")).toHaveAttribute(
-      "aria-labelledby",
-      background.id
-    );
+    expect(background.getAttribute("tabindex")).toBe("0");
+    expect(character.getAttribute("tabindex")).toBe("-1");
+    expect(background.hasAttribute("aria-controls")).toBe(true);
+    expect(panel.getAttribute("aria-labelledby")).toBe(background.id);
 
     fireEvent.keyDown(background, { key: "ArrowRight" });
     expect(input.onToolChange).toHaveBeenCalledWith("character");
