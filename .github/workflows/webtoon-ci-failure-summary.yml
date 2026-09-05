@@ -30,7 +30,11 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$FAILED_JOB_ID" =~ ^[0-9]+$ ]]
-          gh api "repos/$REPOSITORY/actions/jobs/$FAILED_JOB_ID/logs" > "$RUNNER_TEMP/failed-core.log"
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$REPOSITORY/actions/jobs/$FAILED_JOB_ID/logs" \
+            --output "$RUNNER_TEMP/failed-core.log"
       - name: Print bounded failure diagnostics
         shell: bash
         run: |
@@ -41,6 +45,8 @@ jobs:
 
           raw = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'failed-core.log').read_text(errors='replace')
           raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+          raw = re.sub(r'\x1b\][^\x07]*(?:\x07|\x1b\\)', '', raw)
+          raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
           lines = raw.splitlines()
           pattern = re.compile(r'\bFAIL\b|AssertionError:|Unhandled (?:Error|Rejection)|Test Files\s|\bTests\s+\d+|FATAL ERROR|heap out of memory|\[error\]|Process completed with exit code')
           hits = [index for index, line in enumerate(lines) if pattern.search(line)]
