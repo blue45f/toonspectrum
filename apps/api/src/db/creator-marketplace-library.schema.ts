@@ -114,7 +114,7 @@ export const creatorMarketplaceLibraryItems = pgTable(
     ),
     check(
       "creator_marketplace_library_kind_check",
-      sql`${table.kind} in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset', '3d-asset')`,
+      sql`${table.kind} in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')`,
     ),
     check(
       "creator_marketplace_library_name_check",
