@@ -1,0 +1,63 @@
+name: Studio visual curation v2
+on:
+  push:
+    branches: [feat/studio-visual-curation-v2-20260906]
+permissions:
+  contents: write
+concurrency:
+  group: studio-visual-curation-v2
+  cancel-in-progress: true
+jobs:
+  visual-proof:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-visual-curation-v2-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - run: python3 -m pip install --disable-pip-version-check Pillow==11.3.0
+      - name: Assemble exact published render sheets and static inventory
+        run: |
+          python3 - <<'PY'
+          import pathlib,json,subprocess,collections
+          from PIL import Image,ImageDraw
+          root=pathlib.Path('public/assets/studio/cc0-20260906')
+          sheets=sorted(root.glob('review-sheet-*.jpg'))
+          assert len(sheets)==23
+          images=[Image.open(p).convert('RGB') for p in sheets]
+          images[0].save(root/'visual-proof-1097.pdf',save_all=True,append_images=images[1:],resolution=96)
+          for image in images:image.close()
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          index=[{'sheet':i//48+1,'row':(i%48)//8+1,'column':i%8+1,'id':a['id'],'name':a['name'],'category':a['category'],'path':a['path']} for i,a in enumerate(assets)]
+          (root/'visual-proof-index.json').write_text(json.dumps(index,ensure_ascii=False,indent=2))
+          files=[pathlib.Path(p) for p in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if p]
+          print('ASSET SOURCE CATALOGS')
+          for p in files:
+              s=str(p)
+              if s.startswith('src/domains/creator/') and p.suffix in {'.ts','.tsx'} and not any(k in s for k in ['.test.','/tests/']) and any(k in p.name.lower() for k in ['catalog','asset-pack','sticker','template-library','material-library','sfx-library','brush-presets']):print(s,p.stat().st_size)
+          static=[p for p in files if str(p).startswith('public/') and p.suffix.lower() in {'.glb','.vrm','.png','.jpg','.webp','.svg','.mp3','.wav'} and 'cc0-20260906' not in str(p)]
+          print('OTHER STATIC GROUPS',json.dumps(collections.Counter('/'.join(p.parts[:4]) for p in static),ensure_ascii=False))
+          (root/'other-static-inventory.json').write_text(json.dumps([{'path':str(p),'bytes':p.stat().st_size} for p in static],indent=2))
+          previews=[p for p in static if p.suffix.lower() in {'.png','.jpg','.webp'} and ('/assets/studio/' in str(p) or '/assets/3d/' in str(p))]
+          proof=[]
+          for start in range(0,len(previews),24):
+              page=Image.new('RGB',(1600,1200),'#efeff1');draw=ImageDraw.Draw(page)
+              for i,p in enumerate(previews[start:start+24]):
+                  x,y=i%6*266,i//6*300
+                  with Image.open(p) as original:
+                      image=original.convert('RGBA');image.thumbnail((250,265));page.paste(image,(x+(266-image.width)//2,y),image)
+                  draw.text((x+5,y+270),str(p.stem)[:36],fill='#18181b')
+              proof.append(page)
+          if proof:proof[0].save(root/'visual-proof-existing-static.pdf',save_all=True,append_images=proof[1:],resolution=96)
+          print('PROOF_COUNTS',json.dumps({'cc0':len(assets),'cc0Sheets':len(sheets),'otherStaticFiles':len(static),'otherImagePreviews':len(previews)}))
+          PY
+      - name: Retain visual evidence only on curation branch
+        run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/cc0-20260906/visual-proof-1097.pdf public/assets/studio/cc0-20260906/visual-proof-index.json public/assets/studio/cc0-20260906/other-static-inventory.json
+          if test -f public/assets/studio/cc0-20260906/visual-proof-existing-static.pdf; then git add public/assets/studio/cc0-20260906/visual-proof-existing-static.pdf; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "test(studio): retain full-resolution curation proofs"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PROOF_COMMIT %H'
