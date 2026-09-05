@@ -48,14 +48,15 @@ export function StudioAiBackgroundPanel({
         </p>
       )}
 
-      <label className="grid gap-1">
-        <span className="flex items-center justify-between gap-2 text-[0.62rem] font-semibold text-fg-2">
+      <div className="grid gap-1">
+        <div className="flex items-center justify-between gap-2 text-[0.62rem] font-semibold text-fg-2">
           <span>무엇을 그릴까요?</span>
           <span className="font-mono font-normal tabular-nums text-fg-3">
             {prompt.length}/{BACKGROUND_PROMPT_MAX}
           </span>
-        </span>
+        </div>
         <textarea
+          aria-label="무엇을 그릴까요?"
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value.slice(0, BACKGROUND_PROMPT_MAX))}
           onKeyDown={(e) => {
@@ -66,7 +67,7 @@ export function StudioAiBackgroundPanel({
           disabled={busy}
           className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
         />
-      </label>
+      </div>
 
       <div>
         <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">크기</p>

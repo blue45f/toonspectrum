@@ -23,7 +23,6 @@ import { useId, useRef } from "react";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
-import { StudioAiProductionLaunchpad } from "./StudioAiProductionLaunchpad";
 import {
   presetsForAssistTool,
   recentPromptsForTool,
@@ -32,6 +31,7 @@ import {
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
 import { planStudioAiExecutionPreflight } from "./studio-ai-execution-preflight";
+import { StudioAiProductionLaunchpad } from "./StudioAiProductionLaunchpad";
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 
@@ -117,7 +117,7 @@ export function StudioAiAssistHub({
   ) => {
     const index = STUDIO_AI_ASSIST_TOOLS.findIndex((item) => item.id === tool);
     if (index < 0) return;
-    let nextIndex = index;
+    let nextIndex: number;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
       nextIndex = (index + 1) % STUDIO_AI_ASSIST_TOOLS.length;
     } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {

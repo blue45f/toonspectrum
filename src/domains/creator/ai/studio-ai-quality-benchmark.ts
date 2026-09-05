@@ -37,8 +37,10 @@ export const STUDIO_AI_QUALITY_WEIGHTS: Readonly<
   reliability: 0.06,
 });
 
-export interface StudioAiQualityScores
-  extends Record<StudioAiQualityDimension, number> {}
+export type StudioAiQualityScores = Record<
+  StudioAiQualityDimension,
+  number
+>;
 
 export interface StudioAiQualityCase {
   readonly id: string;
