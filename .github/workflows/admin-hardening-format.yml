@@ -1,0 +1,51 @@
+name: Format reviewed admin imports
+
+on:
+  push:
+    branches: ['fix/admin-verification-hardening-20260905']
+    paths: ['.github/workflows/admin-hardening-format.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-hardening-format
+  cancel-in-progress: false
+
+jobs:
+  format:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/admin-verification-hardening-20260905'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/admin-verification-hardening-20260905
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply and verify the repository's import rules
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix --max-warnings=0 \
+            src/domains/admin/AdminMembersPage.tsx \
+            src/domains/admin/components/admin-client.hardening.test.ts \
+            scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
+          git diff --check
+          git diff --stat
+      - name: Commit exact formatting changes and remove this temporary workflow
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src/domains/admin/AdminMembersPage.tsx \
+            src/domains/admin/components/admin-client.hardening.test.ts \
+            scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
+          git rm .github/workflows/admin-hardening-format.yml
+          git diff --cached --check
+          git commit -m 'style(admin): align import groups with repository ESLint rules'
+          git push origin HEAD:refs/heads/fix/admin-verification-hardening-20260905
+          echo "Formatted feature head: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
