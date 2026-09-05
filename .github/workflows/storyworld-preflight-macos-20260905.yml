@@ -1,4 +1,4 @@
-name: Storyworld independent macOS preflight
+name: Storyworld exact-head diagnostic report
 
 on:
   push:
@@ -13,89 +13,78 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  materialize-macos:
+  diagnostics:
     if: github.repository == 'blue45f/toonspectrum'
     runs-on: macos-15
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      TARGET_BRANCH: feat/storyworld-causality-lab-20260905
+      PRODUCT_SHA: 593b97c77d3428d327ee066875df2d5907b74b4b
+      REPORT_BRANCH: verify/storyworld-preflight-macos-20260905
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
-      - name: Refuse stale work and integrate on the exact live source
-        id: integrate
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = cd9c1987a4f980e610d991b05e87f3f325725a3c
-          python3 .github/storyworld-transport-20260905/integrate.py
+          ref: 593b97c77d3428d327ee066875df2d5907b74b4b
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
-      - name: Install the exact repository dependencies
-        id: install
-        run: pnpm install --frozen-lockfile
-      - name: Lint only the Storyworld integration surface
-        id: lint
-        continue-on-error: true
-        run: |
-          pnpm exec eslint --fix --max-warnings=0 \
-            src/domains/creator/storyworld \
-            src/domains/creator/studio-router/StudioRouter.tsx \
-            src/domains/creator/studio-router/studio-route-manifest.ts \
-            src/domains/creator/studio-router/studio-route-manifest.test.ts \
-            src/domains/creator/studio-router/studio-storyworld-route.test.ts \
-            scripts/verify-storyworld-lab.mjs
-      - name: Run actual engine, UI and router regression tests
-        id: tests
-        continue-on-error: true
-        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router
-      - name: Check repository and API TypeScript
-        id: types
-        continue-on-error: true
-        run: pnpm run typecheck
-      - name: Publish only a fast-forward product commit, removing all transport
-        if: ${{ !cancelled() && steps.integrate.outcome == 'success' }}
+      - name: Execute real checks and preserve bounded compiler/test output
         shell: bash
-        env:
-          LINT_RESULT: ${{ steps.lint.outcome }}
-          TEST_RESULT: ${{ steps.tests.outcome }}
-          TYPE_RESULT: ${{ steps.types.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import time
+
+          target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storyworld-diagnostic.json'
+          commands = [
+              ('install', ['pnpm', 'install', '--frozen-lockfile']),
+              ('lint', ['pnpm', 'exec', 'eslint', '--max-warnings=0', 'src/domains/creator/storyworld', 'src/domains/creator/studio-router/StudioRouter.tsx', 'src/domains/creator/studio-router/studio-route-manifest.ts', 'src/domains/creator/studio-router/studio-route-manifest.test.ts', 'src/domains/creator/studio-router/studio-storyworld-route.test.ts', 'scripts/verify-storyworld-lab.mjs']),
+              ('tests', ['pnpm', 'exec', 'vitest', 'run', 'src/domains/creator/storyworld', 'src/domains/creator/studio-router']),
+              ('types', ['pnpm', 'run', 'typecheck']),
+              ('architecture', ['pnpm', 'run', 'validate:architecture']),
+          ]
+          report = {'productSha': os.environ['PRODUCT_SHA'], 'runId': os.environ['GITHUB_RUN_ID'], 'checks': []}
+          for name, command in commands:
+              started = time.monotonic()
+              try:
+                  completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=600)
+                  entry = {'name': name, 'exitCode': completed.returncode, 'seconds': round(time.monotonic() - started, 2), 'outputTail': completed.stdout[-24000:]}
+              except Exception as error:
+                  entry = {'name': name, 'exitCode': -1, 'error': str(error)}
+              report['checks'].append(entry)
+              target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+              print(name, entry['exitCode'], flush=True)
+              if name == 'install' and entry['exitCode'] != 0:
+                  break
+          PY
+      - name: Publish diagnostic evidence to the verification branch only
+        if: ${{ !cancelled() }}
+        shell: bash
         run: |
           set -euo pipefail
-          rm -r .github/storyworld-transport-20260905
-          rm .github/workflows/storyworld-materialize-20260905.yml
-          rm .github/workflows/storyworld-preflight-macos-20260905.yml
-          git add -A -- \
-            .github/storyworld-transport-20260905 \
-            .github/workflows/storyworld-materialize-20260905.yml \
-            .github/workflows/storyworld-preflight-macos-20260905.yml \
-            docs/studio-storyworld-causality-lab-2026-09-05.md \
-            scripts/verify-storyworld-lab.mjs \
-            src/domains/creator/storyworld \
-            src/domains/creator/studio-router/StudioRouter.tsx \
-            src/domains/creator/studio-router/studio-route-manifest.ts \
-            src/domains/creator/studio-router/studio-route-manifest.test.ts \
-            src/domains/creator/studio-router/studio-storyworld-route.test.ts
-          git diff --cached --check
+          test -f "$RUNNER_TEMP/storyworld-diagnostic.json"
+          git fetch origin "$REPORT_BRANCH"
+          git switch --detach FETCH_HEAD
+          mkdir -p .github/storyworld-diagnostics
+          cp "$RUNNER_TEMP/storyworld-diagnostic.json" ".github/storyworld-diagnostics/$PRODUCT_SHA.json"
+          git add -- ".github/storyworld-diagnostics/$PRODUCT_SHA.json"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          HUSKY=0 git commit -m 'feat(studio): integrate verified Storyworld lab with document-scoped routes'
-          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
-          printf 'Product commit: `%s`\n\nLint: %s\n\nTests: %s\n\nTypes: %s\n\nThis preflight does not replace the mandatory PR core CI.\n' "$(git rev-parse HEAD)" "$LINT_RESULT" "$TEST_RESULT" "$TYPE_RESULT" >> "$GITHUB_STEP_SUMMARY"
-      - name: Require all diagnostic results
+          HUSKY=0 git commit -m "test(studio): record Storyworld diagnostic evidence for $PRODUCT_SHA"
+          git push origin "HEAD:refs/heads/$REPORT_BRANCH"
+      - name: Require real diagnostic success
         if: ${{ !cancelled() }}
-        env:
-          INSTALL_RESULT: ${{ steps.install.outcome }}
-          LINT_RESULT: ${{ steps.lint.outcome }}
-          TEST_RESULT: ${{ steps.tests.outcome }}
-          TYPE_RESULT: ${{ steps.types.outcome }}
+        shell: bash
         run: |
-          test "$INSTALL_RESULT" = success
-          test "$LINT_RESULT" = success
-          test "$TEST_RESULT" = success
-          test "$TYPE_RESULT" = success
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'storyworld-diagnostic.json').read_text())
+          assert len(result['checks']) == 5 and all(check['exitCode'] == 0 for check in result['checks']), 'Diagnostic checks failed; see the committed report. Required PR core CI is unchanged.'
+          PY
