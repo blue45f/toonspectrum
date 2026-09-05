@@ -28,6 +28,7 @@ import {
   STUDIO_LIVE_INK_CAPABILITY,
   type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
+import { bindStudioLiveP2pChannelLifecycle } from "./studio-live-p2p-channel-lifecycle";
 
 import type {
   StudioLiveTransport,
@@ -968,7 +969,8 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       if (typeof offer.sdp !== "string" || offer.sdp.length === 0) return;
       this.sendMeshDescription(link.sessionId, "offer", offer.sdp);
     } catch {
-      this.teardownPeer(link.sessionId);
+      // A rejected offer from a retired connection must not close a newer link for the peer.
+      if (this.peers.get(link.sessionId) === link) this.teardownPeer(link.sessionId);
     }
   }
 
@@ -1018,36 +1020,22 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     link: StudioLiveP2pPeerLink,
     channel: StudioLiveP2pRtcDataChannel,
   ): void {
-    if (link.closed) {
-      channel.close();
-      return;
-    }
-    if (link.channel && link.channel !== channel) {
-      try {
-        link.channel.close();
-      } catch {
-        // Replaced channel.
-      }
-    }
-    link.channel = channel;
-    link.announcedBinaryLanes = false;
-    link.peerBinaryLanes = STUDIO_LIVE_P2P_NO_BINARY_LANES;
-    channel.binaryType = "arraybuffer";
-    channel.onopen = () => {
-      if (link.closed || link.channel !== channel) return;
-      this.announceMeshBinaryLanes(link);
-      this.notifyMeshReady(link, channel);
-    };
-    channel.onmessage = (event) => {
-      this.handleChannelMessage(link, event.data);
-    };
-    channel.onclose = () => {
-      if (link.channel === channel) link.channel = null;
-    };
-    if (channel.readyState === "open") {
-      this.announceMeshBinaryLanes(link);
-      this.notifyMeshReady(link, channel);
-    }
+    bindStudioLiveP2pChannelLifecycle({
+      link,
+      channel,
+      isActive: () => !this.closed && this.peers.get(link.sessionId) === link,
+      resetNegotiation: () => {
+        link.announcedBinaryLanes = false;
+        link.peerBinaryLanes = STUDIO_LIVE_P2P_NO_BINARY_LANES;
+        link.inkInboundWindow = null;
+      },
+      onOpen: () => {
+        this.announceMeshBinaryLanes(link);
+        this.notifyMeshReady(link, channel);
+      },
+      onMessage: (value) => this.handleChannelMessage(link, value),
+      onClosed: () => this.teardownPeer(link.sessionId),
+    });
   }
 
   private notifyMeshReady(link: StudioLiveP2pPeerLink, channel: StudioLiveP2pRtcDataChannel): void {
@@ -1071,7 +1059,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   private handleChannelMessage(link: StudioLiveP2pPeerLink, data: unknown): void {
-    if (this.closed) return;
+    if (this.closed || link.closed || this.peers.get(link.sessionId) !== link) return;
     if (data instanceof ArrayBuffer) {
       this.receiveMeshInk(link, data);
       return;
