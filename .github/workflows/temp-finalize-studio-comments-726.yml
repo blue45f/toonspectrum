@@ -1,0 +1,246 @@
+name: Temporary finalize Studio comments 726
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.number == 726 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply the verified focused-inbox UX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          panel_path = Path('src/domains/creator/StudioCommentsPanel.tsx')
+          popover_path = Path('src/domains/creator/StudioCommentThreadPopover.tsx')
+          panel = panel_path.read_text()
+
+          helper_import = '''import {
+            studioCommentThreadAssignedToActor,
+            studioCommentThreadMentionsActor,
+          } from "./studio-comment-inbox-filter";
+          '''
+          import_anchor = 'import {\n  addStudioCommentReply,\n'
+          if helper_import not in panel:
+              if import_anchor not in panel:
+                  raise SystemExit('comment model import anchor missing')
+              panel = panel.replace(import_anchor, helper_import + import_anchor, 1)
+
+          old_type = 'type CommentFilter = "current" | "all" | "unread" | "open" | "resolved";'
+          new_type = '''type CommentFilter =
+            | "current"
+            | "all"
+            | "unread"
+            | "assigned"
+            | "mentioned"
+            | "open"
+            | "resolved";'''
+          if old_type in panel:
+              panel = panel.replace(old_type, new_type, 1)
+          elif new_type not in panel:
+              raise SystemExit('comment filter type anchor missing')
+
+          old_filters = '  { value: "unread", label: "읽지 않음" },\n  { value: "open", label: "열림" },'
+          new_filters = '  { value: "unread", label: "읽지 않음" },\n  { value: "assigned", label: "내 담당" },\n  { value: "mentioned", label: "나를 멘션" },\n  { value: "open", label: "열림" },'
+          if old_filters in panel:
+              panel = panel.replace(old_filters, new_filters, 1)
+          elif new_filters not in panel:
+              raise SystemExit('comment filters array anchor missing')
+
+          if 'filter === "assigned"' not in panel:
+              match = re.search(r'^(\s*)if \(filter === "open"', panel, re.MULTILINE)
+              if not match:
+                  raise SystemExit('open filter branch missing')
+              indent = match.group(1)
+              insertion = (
+                  f'{indent}if (\n'
+                  f'{indent}  filter === "assigned"\n'
+                  f'{indent}  && !studioCommentThreadAssignedToActor(thread, currentActor)\n'
+                  f'{indent}) return false;\n'
+                  f'{indent}if (\n'
+                  f'{indent}  filter === "mentioned"\n'
+                  f'{indent}  && !studioCommentThreadMentionsActor(thread, currentActor)\n'
+                  f'{indent}) return false;\n'
+              )
+              panel = panel[:match.start()] + insertion + panel[match.start():]
+
+          shortcut = '''                onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter"
+                              && (event.metaKey || event.ctrlKey)
+                              && !event.nativeEvent.isComposing
+                            ) {
+                              event.preventDefault();
+                              event.currentTarget.form?.requestSubmit();
+                            }
+                          }}
+                          aria-keyshortcuts="Control+Enter Meta+Enter"
+          '''
+          for value_expr in ('newComment', 'activeReplyBody'):
+              anchor = f'                value={{{value_expr}}}\n'
+              if anchor in panel:
+                  index = panel.index(anchor)
+                  nearby = panel[index:index + 900]
+                  if 'aria-keyshortcuts="Control+Enter Meta+Enter"' not in nearby:
+                      panel = panel[:index + len(anchor)] + shortcut + panel[index + len(anchor):]
+              elif f'value={{{value_expr}}}' not in panel:
+                  raise SystemExit(f'comment textarea missing: {value_expr}')
+          panel_path.write_text(panel)
+
+          popover = popover_path.read_text()
+          anchor = '                value={replyBody}\n'
+          shortcut = '''                onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter"
+                              && (event.metaKey || event.ctrlKey)
+                              && !event.nativeEvent.isComposing
+                            ) {
+                              event.preventDefault();
+                              event.currentTarget.form?.requestSubmit();
+                            }
+                          }}
+                          aria-keyshortcuts="Control+Enter Meta+Enter"
+          '''
+          if anchor in popover:
+              index = popover.index(anchor)
+              nearby = popover[index:index + 900]
+              if 'aria-keyshortcuts="Control+Enter Meta+Enter"' not in nearby:
+                  popover = popover[:index + len(anchor)] + shortcut + popover[index + len(anchor):]
+          elif 'value={replyBody}' not in popover:
+              raise SystemExit('pin quick-reply textarea missing')
+          popover_path.write_text(popover)
+
+          Path('src/domains/creator/studio-comment-inbox-filter.ts').write_text('''import type { StudioCommentActor, StudioCommentThread } from "./studio-comments";
+
+          function normalizedActorName(actor: StudioCommentActor): string {
+            return actor.displayName.trim().normalize("NFKC").toLocaleLowerCase();
+          }
+
+          /** Matches the same collaborator while keeping account IDs authoritative. */
+          export function studioCommentActorsRepresentSamePerson(
+            left: StudioCommentActor,
+            right: StudioCommentActor
+          ): boolean {
+            if (left.id || right.id) return Boolean(left.id && right.id && left.id === right.id);
+            return normalizedActorName(left) === normalizedActorName(right);
+          }
+
+          export function studioCommentThreadAssignedToActor(
+            thread: StudioCommentThread,
+            actor: StudioCommentActor
+          ): boolean {
+            return Boolean(
+              thread.assignee
+              && studioCommentActorsRepresentSamePerson(thread.assignee, actor)
+            );
+          }
+
+          /** The opening message and every reply participate in the mention inbox. */
+          export function studioCommentThreadMentionsActor(
+            thread: StudioCommentThread,
+            actor: StudioCommentActor
+          ): boolean {
+            return [thread, ...thread.replies].some((message) =>
+              message.mentions.some((mention) =>
+                studioCommentActorsRepresentSamePerson(mention, actor)
+              )
+            );
+          }
+          ''')
+
+          Path('src/domains/creator/studio-comment-inbox-filter.test.ts').write_text('''import { describe, expect, it } from "vitest";
+
+          import type { StudioCommentActor, StudioCommentThread } from "./studio-comments";
+          import {
+            studioCommentActorsRepresentSamePerson,
+            studioCommentThreadAssignedToActor,
+            studioCommentThreadMentionsActor,
+          } from "./studio-comment-inbox-filter";
+
+          const NOW = "2026-09-05T00:00:00.000Z";
+          const CURRENT: StudioCommentActor = { id: "actor-current", displayName: "희준" };
+
+          function thread(overrides: Partial<StudioCommentThread> = {}): StudioCommentThread {
+            return {
+              id: "thread-1",
+              author: { id: "reviewer", displayName: "검수자" },
+              body: "말풍선 위치를 확인해 주세요.",
+              mentions: [],
+              createdAt: NOW,
+              updatedAt: NOW,
+              anchor: { type: "page", pageId: "page-1" },
+              replies: [],
+              resolved: false,
+              ...overrides,
+            };
+          }
+
+          describe("Studio comment smart inbox", () => {
+            it("keeps account IDs authoritative", () => {
+              expect(studioCommentActorsRepresentSamePerson(
+                CURRENT,
+                { id: "actor-current", displayName: "변경된 이름" }
+              )).toBe(true);
+              expect(studioCommentActorsRepresentSamePerson(CURRENT, { displayName: "희준" })).toBe(false);
+            });
+
+            it("normalizes display-name-only legacy actors", () => {
+              expect(studioCommentActorsRepresentSamePerson(
+                { displayName: "  ＨＥＥＪＵＮ  " },
+                { displayName: "heejun" }
+              )).toBe(true);
+            });
+
+            it("matches assigned threads", () => {
+              expect(studioCommentThreadAssignedToActor(thread({ assignee: CURRENT }), CURRENT)).toBe(true);
+              expect(studioCommentThreadAssignedToActor(thread(), CURRENT)).toBe(false);
+            });
+
+            it("matches mentions in the opening message and replies", () => {
+              expect(studioCommentThreadMentionsActor(thread({ mentions: [CURRENT] }), CURRENT)).toBe(true);
+              expect(studioCommentThreadMentionsActor(thread({
+                replies: [{
+                  id: "reply-1",
+                  author: { id: "reviewer", displayName: "검수자" },
+                  body: "수정 확인 부탁드립니다.",
+                  mentions: [CURRENT],
+                  createdAt: NOW,
+                  updatedAt: NOW,
+                }],
+              }), CURRENT)).toBe(true);
+            });
+
+            it("rejects unrelated mentions", () => {
+              expect(studioCommentThreadMentionsActor(thread({
+                mentions: [{ id: "someone-else", displayName: "다른 사용자" }],
+              }), CURRENT)).toBe(false);
+            });
+          });
+          ''')
+          PY
+
+          rm -f \
+            .github/workflows/temp-studio-comments-source-export.yml \
+            .github/workflows/temp-apply-studio-comments-enhancement.yml \
+            .github/workflows/temp-finalize-studio-comments-726.yml
+          git config user.name toonstudio-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(studio): add focused comment inbox and fast reply shortcuts"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi

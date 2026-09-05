@@ -103,7 +103,7 @@ describe("StudioCommentThreadPopover", () => {
       .toBe("left");
   });
 
-  it("summarizes only the three most recent messages and safely wraps long Korean and English", () => {
+  it("summarizes recent messages, expands the full conversation inline, and safely wraps long text", () => {
     const longBody = `긴한글문자열${"가".repeat(80)} longEnglishToken${"x".repeat(120)}`;
     const replies = [
       reply(1),
@@ -117,13 +117,23 @@ describe("StudioCommentThreadPopover", () => {
       />
     );
 
-    expect(screen.getByText("이전 메시지 2개 · 전체 검토함에서 확인")).toBeTruthy();
+    const expand = screen.getByRole("button", { name: "이전 메시지 2개 보기" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("답글 1")).toBeNull();
     expect(screen.getByText("답글 2")).toBeTruthy();
     const longMessage = screen.getByText(longBody);
     expect(longMessage.className).toContain("break-words");
     expect(longMessage.className).toContain("[overflow-wrap:anywhere]");
     expect(longMessage.className).toContain("line-clamp-3");
+
+    fireEvent.click(expand);
+    expect(screen.getByText("답글 1")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "최근 메시지만 보기" }).getAttribute("aria-expanded"))
+      .toBe("true");
+    expect(screen.getByText(longBody).className).not.toContain("line-clamp-3");
+
+    fireEvent.click(screen.getByRole("button", { name: "최근 메시지만 보기" }));
+    expect(screen.queryByText("답글 1")).toBeNull();
   });
 
   it("submits a trimmed quick reply once, defers draft clearing to the parent, and supports Ctrl/Command+Enter", async () => {
