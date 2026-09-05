@@ -1,0 +1,96 @@
+name: Feedback ARM review
+on:
+  push:
+    branches: [chore/feedback-ci-recovery-20260906]
+    paths: [.github/workflows/feedback-arm-review.yml]
+permissions:
+  contents: read
+jobs:
+  review:
+    name: Independent ARM feedback review
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: feedback_community_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    defaults:
+      run:
+        shell: bash
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=6144
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/feedback_community_test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 21f2061caa3a85f6d6d5a677aa769a877e23ceb0
+          persist-credentials: false
+      - name: Record exact source, platform and review scope
+        run: |
+          test "$(git rev-parse HEAD)" = 21f2061caa3a85f6d6d5a677aa769a877e23ceb0
+          mkdir -p artifacts/feedback
+          git rev-parse HEAD > artifacts/feedback/source-commit.txt
+          uname -a > artifacts/feedback/platform.txt
+          printf '%s\n' 'Additional ARM verification only. Does not replace core/verify or the main PR workflow.' > artifacts/feedback/scope.txt
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate feature imports and code
+        run: |
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            apps/api/src/db/schema/community.schema.ts \
+            apps/api/src/modules/feedback/feedback.controller.ts \
+            apps/api/src/modules/feedback/feedback.service.ts \
+            apps/api/src/server/feedback.ts \
+            components/inquiry-form.tsx components/site-header.tsx components/site-header-mobile-nav.tsx \
+            packages/core/src/feedback.ts packages/core/src/feedback.test.ts \
+            packages/core/src/feedback-response.ts packages/core/src/feedback-response.test.ts \
+            packages/core/src/index.ts packages/core/src/types.ts \
+            src/domains/legal/FeedbackPage.tsx src/domains/legal/ContactPage.tsx src/domains/legal/SitemapPage.tsx \
+            src/domains/legal/feedback/*.tsx src/domains/legal/feedback/use-feedback-feed.ts \
+            e2e/feedback-community*.tsx e2e/feedback-community*.spec.ts \
+            scripts/verify-feedback-community-db.mts playwright.feedback.config.ts vite.feedback-review.config.ts \
+            2>&1 | tee artifacts/feedback/arm-lint.log
+      - name: Shared input and response contract tests
+        run: pnpm exec vitest run packages/core/src/feedback.test.ts packages/core/src/feedback-response.test.ts 2>&1 | tee artifacts/feedback/arm-unit.log
+      - name: Whole application typecheck
+        run: pnpm run typecheck 2>&1 | tee artifacts/feedback/arm-typecheck.log
+      - name: Isolated PostgreSQL integration
+        env:
+          TSX_TSCONFIG_PATH: apps/api/tsconfig.json
+        run: pnpm exec tsx scripts/verify-feedback-community-db.mts 2>&1 | tee artifacts/feedback/arm-database.log
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Real component browser regressions
+        run: pnpm exec playwright test --config playwright.feedback.config.ts 2>&1 | tee artifacts/feedback/arm-browser.log
+      - name: Compile reviewed interface
+        run: pnpm exec vite build --config vite.feedback-review.config.ts 2>&1 | tee artifacts/feedback/arm-ui-build.log
+      - name: Whole production build
+        run: pnpm run build 2>&1 | tee artifacts/feedback/arm-production-build.log
+      - name: Exact feature source for independent inspection
+        if: always()
+        run: |
+          tar -czf artifacts/feedback/reviewed-feature-source.tar.gz \
+            packages/core/src/feedback*.ts src/domains/legal/FeedbackPage.tsx \
+            src/domains/legal/feedback e2e/feedback-community* playwright.feedback.config.ts vite.feedback-review.config.ts \
+            .github/workflows/feedback-community-validation.yml
+      - name: Preserve results and fixture screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-arm-review-21f2061
+          retention-days: 7
+          path: |
+            artifacts/feedback
+            test-results
+            dist-feedback-review
