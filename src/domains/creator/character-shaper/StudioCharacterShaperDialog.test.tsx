@@ -331,7 +331,7 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect(h.setActiveCameraId).toHaveBeenCalledWith("inspectRightHand");
     expect(h.handleViewReset).not.toHaveBeenCalled();
     expect(h.onClose).not.toHaveBeenCalled();
-    expect(screen.getAllByRole("button", { name: "확대", exact: true })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^확대$/ })).toHaveLength(1);
   });
   it.each([
     { isCapturing: true }, { isThumbnailCapturing: true }, { isSharingPose: true },
