@@ -12,8 +12,8 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
     // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
     titleKey: "footer.section.create",
     links: [
-      { key: "footer.link.create", href: "/create" },
       { key: "footer.link.studio", href: "/studio" },
+      { key: "footer.link.create", href: "/create" },
       { key: "footer.link.shaper", href: "/shaper" },
       { key: "footer.link.market", href: "/market" },
     ],
@@ -43,7 +43,7 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
     ],
   },
   {
-    titleKey: "footer.section.brand",
+    titleKey: "app.name",
     links: [
       { key: "footer.link.news", href: "/news" },
       { key: "footer.link.about", href: "/about" },
@@ -72,7 +72,7 @@ export function SiteFooter() {
       data-site-chrome="footer"
       className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25 pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0"
     >
-      {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
+      {/* 공통 브랜드 구분선 — 기존 사이트의 컬러 시스템을 유지한다. */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-px"

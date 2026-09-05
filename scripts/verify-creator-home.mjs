@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 
 import { chromium } from "@playwright/test";
 
@@ -12,8 +12,7 @@ const results = [];
 const manifest = JSON.parse(readFileSync("public/brand/film-manifest.json", "utf8"));
 for (const [format, entry] of Object.entries(manifest.assets)) {
   const path = `public${entry.src}`;
-  const bytes = readFileSync(path);
-  assert.equal(createHash("sha256").update(bytes).digest("hex"), entry.sha256);
+  assert.equal(createHash("sha256").update(readFileSync(path)).digest("hex"), entry.sha256);
   const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], { encoding: "utf8" }));
   const video = probe.streams.find((stream) => stream.codec_type === "video");
   assert.equal(video.width, entry.width);
@@ -24,19 +23,36 @@ for (const [format, entry] of Object.entries(manifest.assets)) {
   results.push({ check: `render-${format}`, dimensions: [video.width, video.height], duration: probe.format.duration, sha256: entry.sha256 });
 }
 for (let attempt = 0; attempt < 60; attempt += 1) {
-  try { const response = await fetch(origin); if (response.ok) break; } catch { /* Preview server is starting. */ }
+  try {
+    const response = await fetch(origin);
+    if (response.ok) break;
+  } catch { /* Preview server is starting. */ }
   if (attempt === 59) throw new Error("Preview server did not become ready");
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
+const viewports = [
+  ["desktop", 1440, 1000, "ko", "light"],
+  ["tablet", 820, 1180, "ko", "light"],
+  ["mobile", 390, 844, "ko", "light"],
+  ["small-mobile", 320, 740, "ko", "light"],
+  ["dark", 1440, 1000, "ko", "dark"],
+  ["english-mobile", 390, 844, "en", "light"],
+  ["english-small-mobile", 320, 740, "en", "light"],
+];
 const browser = await chromium.launch({ headless: true });
+let currentPage;
+let currentName;
+let failure;
 try {
-  for (const [name, width, height, locale, theme] of [["desktop", 1440, 1000, "ko", "light"], ["tablet", 820, 1180, "ko", "light"], ["mobile", 390, 844, "ko", "light"], ["small-mobile", 320, 740, "ko", "light"], ["dark", 1440, 1000, "ko", "dark"], ["english-mobile", 390, 844, "en", "light"]]) {
+  for (const [name, width, height, locale, theme] of viewports) {
+    currentName = name;
     const context = await browser.newContext({ viewport: { width, height }, locale: locale === "ko" ? "ko-KR" : "en-US", reducedMotion: "reduce" });
     await context.addInitScript(({ locale, theme }) => {
       localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: locale }, version: 0 }));
       localStorage.setItem("toonspectrum-theme", JSON.stringify({ state: { theme }, version: 0 }));
     }, { locale, theme });
     const page = await context.newPage();
+    currentPage = page;
     const errors = [];
     const videoRequests = [];
     page.on("pageerror", (error) => errors.push(String(error)));
@@ -45,12 +61,15 @@ try {
     await page.locator('[data-creator-home="studio-first"]').waitFor({ timeout: 60000 });
     await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.locator("h1").count(), 1);
-    assert.equal(await page.locator("video").count(), 0, "Video must not mount or download before a user gesture");
-    assert.equal(videoRequests.length, 0);
-    assert(await page.title().then((title) => title.includes(locale === "ko" ? "툰스튜디오" : "ToonStudio")));
-    const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
-    assert.equal(hasOverflow, false, `Horizontal page overflow: ${name}`);
+    assert.equal(await page.locator("video").count(), 0, "Video must not mount before a user gesture");
+    assert.equal(videoRequests.length, 0, "Video must not download before a user gesture");
+    const brand = locale === "ko" ? "툰스튜디오" : "ToonStudio";
+    await page.waitForFunction((name) => document.title.includes(name), brand);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
+    const headlineBounds = await page.locator("#creator-home-title > span").boundingBox();
+    assert(headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1, `Clipped headline: ${name}`);
     assert(await page.locator('.ch-actions a[href="/studio"]').isVisible());
+
     const previewOptions = page.locator(".ch-preview-options button");
     await previewOptions.nth(1).click();
     assert.equal(await previewOptions.nth(1).getAttribute("aria-pressed"), "true");
@@ -63,8 +82,19 @@ try {
     await faq.click();
     assert.equal(await faq.locator("..").getAttribute("open"), "");
     await faq.click();
+
+    // The existing shell intentionally defers its footer. Exercise scroll, wait for its
+    // real lazy-loaded content, and only then capture the complete document.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const footer = page.locator('footer[data-site-chrome="footer"]');
+    await footer.waitFor({ state: "visible", timeout: 30000 });
+    assert.equal(await footer.getByRole("heading", { name: brand, exact: true }).count(), 1);
+    assert.equal(await footer.locator("nav").first().locator("a").first().getAttribute("href"), "/studio");
+    assert.equal(/툰스펙트럼|ToonSpectrum/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Footer overflow: ${name}`);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${output}/${name}.png`, fullPage: true, animations: "disabled" });
+
     if (name === "desktop") {
       await page.getByTestId("creator-film-play").click();
       const video = page.locator("video");
@@ -93,15 +123,22 @@ try {
       await page.route("**/brand/toonstudio-intro.mp4", (route) => route.abort());
       await page.getByTestId("creator-film-play").click();
       await page.locator(".ch-film-error").waitFor();
-      assert(await page.locator('.ch-actions a[href="/studio"]').count() === 1);
+      assert.equal(await page.locator('.ch-actions a[href="/studio"]').count(), 1);
       results.push({ check: "mobile-menu-focus-and-film-error", pass: true });
     }
     assert.deepEqual(errors, [], `Uncaught page errors: ${name}`);
-    results.push({ check: name, viewport: [width, height], locale, theme, noHorizontalOverflow: true, uncaughtErrors: errors });
+    results.push({ check: name, viewport: [width, height], locale, theme, noHorizontalOverflow: true, headlineWithinViewport: true, footerBrandVerified: true, uncaughtErrors: errors });
     await context.close();
+    currentPage = undefined;
   }
+} catch (error) {
+  failure = String(error);
+  if (currentPage && !currentPage.isClosed()) {
+    await currentPage.screenshot({ path: `${output}/failure-${currentName}.png`, fullPage: true, animations: "disabled" }).catch(() => {});
+  }
+  throw error;
 } finally {
   await browser.close();
-  writeFileSync(`${output}/report.json`, JSON.stringify({ sourceCommit: process.env.GITHUB_SHA || "local", origin, results }, null, 2) + "\n");
+  writeFileSync(`${output}/report.json`, JSON.stringify({ status: failure ? "failed" : "passed", failure, sourceCommit: process.env.GITHUB_SHA || "local", origin, results }, null, 2) + "\n");
 }
 console.log(JSON.stringify({ status: "passed", results }, null, 2));
