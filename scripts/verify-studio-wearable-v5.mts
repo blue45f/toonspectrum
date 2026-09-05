@@ -19,7 +19,7 @@ const source=[
   "export * as React from 'react';",
   "export {createRoot} from 'react-dom/client';",
   "export {Canvas,useFrame,useThree} from '@react-three/fiber';",
-  ...["studio-vrm-wardrobe","studio-vrm-props","studio-vrm-prop-rig","studio-vrm-poser-utils","studio-vrm-costume-runtime","StudioVrmWardrobePropsProjection"].map((name)=>`export * from ${JSON.stringify(join(domain,"vrm",name))};`),
+  ...["studio-vrm-wardrobe","studio-vrm-garment-fit","studio-vrm-props","studio-vrm-prop-rig","studio-vrm-poser-utils","studio-vrm-costume-runtime","StudioVrmWardrobePropsProjection"].map((name)=>`export * from ${JSON.stringify(join(domain,"vrm",name))};`),
   `export * from ${JSON.stringify(join(domain,"studio-pose-presets"))};`,
 ].join("\n");
 await writeFile(entry,source);

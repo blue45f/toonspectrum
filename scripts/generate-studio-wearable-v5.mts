@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 import * as T from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 type Point = readonly [number, number, number];
 type Material = T.MeshStandardMaterial;
@@ -62,6 +62,24 @@ class Asset {
   box(size: Point, position: Point, mat: Material, radius = 0.003, rotation: Point = [0, 0, 0]) {
     this.add(new RoundedBoxGeometry(...size, 4, Math.min(radius, ...size.map((x) => x * 0.45))), mat, position, rotation);
   }
+  plate(size: Point, position: Point, mat: Material, radius: number) {
+    const [width, height, depth] = size;
+    const r = Math.min(radius, width / 2, height / 2);
+    const x = -width / 2, y = -height / 2;
+    const shape = new T.Shape();
+    shape.moveTo(x + r, y);
+    shape.lineTo(x + width - r, y);
+    shape.quadraticCurveTo(x + width, y, x + width, y + r);
+    shape.lineTo(x + width, y + height - r);
+    shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    shape.lineTo(x + r, y + height);
+    shape.quadraticCurveTo(x, y + height, x, y + height - r);
+    shape.lineTo(x, y + r);
+    shape.quadraticCurveTo(x, y, x + r, y);
+    const geometry = new T.ExtrudeGeometry(shape, { depth, steps: 1, bevelEnabled: false, curveSegments: 12 });
+    geometry.translate(0, 0, -depth / 2);
+    this.add(geometry, mat, position);
+  }
   sphere(radius: number, position: Point, mat: Material, scale: Point = [1, 1, 1]) {
     this.add(new T.SphereGeometry(radius, 40, 24), mat, position, [0, 0, 0], scale);
   }
@@ -79,8 +97,11 @@ class Asset {
     const root = new T.Group(); root.name = `atelier:${this.id}:v5`;
     root.userData = { generator: "scripts/generate-studio-wearable-v5.mts", license: "CC0-1.0", units: "metres", up: "+Y", anchor: [...this.anchor], qualityReviewRequired: true };
     for (const [mat, parts] of this.parts) {
-      const geometry = mergeGeometries(parts, false);
+      let geometry = mergeGeometries(parts, false);
       if (!geometry) throw new Error(`Cannot assemble ${this.id}/${mat.name}`);
+      const unindexed = geometry;
+      geometry = mergeVertices(unindexed, 0.000001);
+      unindexed.dispose();
       const mesh = new T.Mesh(geometry, mat); mesh.name = `${this.id}:${mat.name}`;
       mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh);
       for (const part of parts) part.dispose();
@@ -186,7 +207,7 @@ function sunglasses() {
   for(const sign of [-1,1]) {
     const x=sign*.034;
     a.tube(roundedOutline(.055,.039,.013,0,x),.0025,acetate,true);
-    a.box([.052,.036,.002],[x,0,-.0007],lens,.012);
+    a.plate([.052,.036,.002],[x,0,-.0007],lens,.012);
     a.tube([[sign*.061,.01,0],[sign*.069,.01,-.012],[sign*.068,.007,-.069],[sign*.061,-.011,-.105]],.0023,acetate,false,40);
     a.box([.005,.004,.007],[sign*.062,.009,-.006],steel,.001);
     a.sphere(.0025,[sign*.010,-.006,-.007],rubber,[.6,1.7,.8]);
@@ -220,8 +241,9 @@ function ribbon() {
   const edge=material("RibbonV5_Selvedge","#8a3454",.75);
   for(const sign of [-1,1]) {
     const sample=(u:number,w:number):Point=>{
-      const angle=u*2*PI; const length=.013+.040*(.5-.5*Math.cos(angle)); const height=.024*Math.sin(angle);
-      return [sign*length,height*(.42+.58*Math.sin(PI*w)),.012*Math.sin(PI*w)*Math.sin(angle)+.009*(w-.5)];
+      const angle=u*2*PI; const length=.010+.045*(.5-.5*Math.cos(angle));
+      const width=.018+.034*Math.sin(PI*u);
+      return [sign*length,(w-.5)*width+.003*Math.sin(angle),.013*Math.sin(angle)*(.45+.55*Math.sin(PI*w))];
     };
     a.add(grid(48,14,sample),silk);
     for(const w of [.03,.97]) a.tube(Array.from({length:49},(_,i)=>sample(i/48,w)),.0004,edge,false,60);
@@ -268,10 +290,10 @@ function wizardHat() {
 function smartphone() {
   const a=new Asset("smartphone","modern_smartphone_prop.glb",[0,-.02,-.006]);
   const shell=material("PhoneV5_Aluminium","#364351",.34,.72,true);
-  a.box([.073,.149,.008],[0,0,0],shell,.007);
-  a.box([.070,.146,.001],[0,0,.0042],glass,.0065);
-  a.box([.069,.145,.001],[0,0,-.0042],rubber,.006);
-  a.box([.031,.033,.0028],[-.018,.051,-.006],shell,.007);
+  a.plate([.073,.149,.008],[0,0,0],shell,.007);
+  a.plate([.070,.146,.001],[0,0,.0042],glass,.0065);
+  a.plate([.069,.145,.001],[0,0,-.0042],rubber,.006);
+  a.plate([.031,.033,.0028],[-.018,.051,-.006],shell,.007);
   for(const [x,y] of [[-.025,.057],[-.012,.045]] as const) {
     a.add(new T.CylinderGeometry(.0073,.0073,.003,48),darkMetal,[x,y,-.008],[PI/2,0,0]);
     a.add(new T.CylinderGeometry(.0054,.0054,.0034,48),glass,[x,y,-.0082],[PI/2,0,0]);

@@ -50,7 +50,7 @@ api.select = async ({ type="wardrobe", id, model="sample", angle=30, crop="full"
   const idle=R.pickNaturalIdlePose(model==="sample"?"sample-vrm":"avatar-b");
   R.applyPoseToVrm(vrm,R.stripFingerBones(idle.bones),idle.yOffset??0,undefined,{skipPalmCorrect:true});
   const metrics=R.measureVrmPropRigMetrics(vrm);
-  let instance=null; let equip=null; let slot=null;
+  let instance=null; let equip=null; let slot=null; let effectiveFit=1;
   if(type==="prop") {
     const def=R.propDefById(id); if(!def)throw new Error(`Unknown prop ${id}`);
     instance=propInstance(def,color);
@@ -62,9 +62,10 @@ api.select = async ({ type="wardrobe", id, model="sample", angle=30, crop="full"
     if(color)equip={...equip,color};
     const state=R.mergeWardrobeCostumeVisibility({hidden:[],recolor:{}},{[slot]:equip},costume,true);
     R.applyStudioVrmCostumeState(costume,state);
+    effectiveFit=R.inspectStudioVrmGarmentFit({[slot]:equip},wardrobeMetrics).slots[slot]?.effectiveFit??equip.fit;
   }
   R.correctVrmHangingHandPalmTwist(vrm);vrm.humanoid.update();vrm.update(0);vrm.scene.updateMatrixWorld(true);
-  active={type,id,model,vrm,instance,equip,slot,metrics,wardrobeMetrics,angle,crop,token,idlePose:vrm.humanoid.getNormalizedPose()};
+  active={type,id,model,vrm,instance,equip,slot,metrics,wardrobeMetrics,effectiveFit,angle,crop,token,idlePose:vrm.humanoid.getNormalizedPose()};
   selectState(active);
 };
 api.view = (angle,crop=active?.crop??"full")=>{
@@ -121,8 +122,9 @@ function Subject({selection}) {
   const receipt=React.useCallback((slot,value)=>{if(generation===token)api.receipt=value;},[token]);
   React.useEffect(()=>{if(selection.type==="asset"||selection.type==="native")api.status="ready";},[selection]);
   const children=[h("primitive",{key:"model",object:selection.vrm?.scene??selection.object,dispose:null})];
-  if(selection.type==="wardrobe")children.push(h(R.StudioVrmWardrobeAttachment,{key:`garment-${token}`,vrm:selection.vrm,slot:selection.slot,equip:selection.equip,metrics:selection.wardrobeMetrics,effectiveFit:selection.equip.fit,onSurfaceReceipt:receipt,onAttachmentStatus:status}));
+  if(selection.type==="wardrobe")children.push(h(R.StudioVrmWardrobeAttachment,{key:`garment-${token}`,vrm:selection.vrm,slot:selection.slot,equip:selection.equip,metrics:selection.wardrobeMetrics,effectiveFit:selection.effectiveFit,onSurfaceReceipt:receipt,onAttachmentStatus:status}));
   if(selection.type==="prop")children.push(h(R.StudioVrmPropAttachment,{key:`prop-${token}`,vrm:selection.vrm,instance:selection.instance,metrics:selection.metrics,onAttachmentStatus:status}));
+  if(selection.instance)children.push(h(R.StudioVrmGripContactRefine,{key:`grip-${token}`,vrm:selection.vrm,items:[selection.instance],metrics:selection.metrics}));
   if(selection.vrm)children.push(h(R.StudioVrmRuntimeCommit,{key:"commit",vrm:selection.vrm,physicsPreview:false,webcamActive:false}));
   children.push(h(Camera,{key:"camera",selection}));
   return h(React.Fragment,null,...children);
