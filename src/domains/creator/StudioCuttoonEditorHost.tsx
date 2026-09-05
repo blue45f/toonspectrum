@@ -25584,7 +25584,7 @@ function clearSelectionForEdit() {
     pixelSelectionTool: pixelToolArmed ? pixelTool : null,
   });
   // §15.3 rows whose feature shipped behind a panel and whose only door was the
-  // 프로젝트 작업 sheet, the mobile-only tool belt or an inspector tab. Bundled
+  // 프로젝트 센터 sheet, the mobile-only tool belt or an inspector tab. Bundled
   // here so the composition below stays a projection: `bindStudioMainMenu
   // SurfaceActions` is a name-for-name map, so the menu can only reach a surface
   // this page already opens somewhere else.
