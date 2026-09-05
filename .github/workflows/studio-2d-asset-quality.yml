@@ -1,0 +1,58 @@
+name: Studio 2D asset quality
+
+on:
+  push:
+    branches: [feat/studio-2d-assets-quality-20260906]
+  pull_request:
+    paths:
+      - 'src/domains/creator/studio-bg*'
+      - 'src/domains/creator/**/StudioBackground*'
+      - 'src/domains/creator/studio-2d*'
+      - 'scripts/studio-2d*'
+      - 'public/assets/studio/backgrounds/**'
+      - '.github/workflows/studio-2d-asset-quality.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-2d-asset-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asset-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Capture tracked development sources and original backgrounds
+        run: |
+          mkdir -p artifacts/studio-2d
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile
+          root = pathlib.Path('.')
+          names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          prefixes = ('src/', 'lib/', 'tests/', 'scripts/', 'public/assets/studio/backgrounds/', 'docs/studio-', '.github/workflows/')
+          with tarfile.open('artifacts/studio-2d/source-snapshot.tar.gz', 'w:gz') as archive:
+              for name in names:
+                  p = root / name
+                  if not name or not p.is_file() or p.is_symlink():
+                      continue
+                  if name.startswith(prefixes) or ('/' not in name and p.suffix in ('.json', '.yaml', '.yml', '.ts', '.js', '.mjs')):
+                      archive.add(p, arcname=name)
+          (root / 'artifacts/studio-2d/commit.txt').write_text(subprocess.check_output(['git','rev-parse','HEAD']).decode())
+          PY
+      - name: Validate asset manifests when available
+        run: |
+          if [ -f scripts/studio-2d-asset-quality.test.mjs ]; then
+            node --test scripts/studio-2d-asset-quality.test.mjs
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-2d-asset-evidence
+          path: artifacts/studio-2d/
+          retention-days: 7
+          if-no-files-found: error
