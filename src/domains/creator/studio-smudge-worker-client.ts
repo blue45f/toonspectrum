@@ -372,11 +372,12 @@ function runSmudgeWithSharedModuleWorker(
   options: StudioSmudgeWorkerClientOptions,
 ): Promise<StudioSmudgeWorkerClientResult> {
   const disposeGeneration = sharedSmudgeDisposeGeneration;
-  clearSharedSmudgeIdleTimer();
   return sharedSmudgeQueue.run(request, async (queuedRequest) => {
-    clearSharedSmudgeIdleTimer();
     if (disposeGeneration !== sharedSmudgeDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    // Admission can be cancelled before this executor starts. Keep the warm Worker's idle
+    // deadline until live work actually takes ownership, including the queue handoff microtask.
+    clearSharedSmudgeIdleTimer();
     let creationError: unknown;
     if (!sharedSmudgeWorker) {
       try {

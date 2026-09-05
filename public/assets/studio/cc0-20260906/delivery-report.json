@@ -1,0 +1,166 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "sourceRevision": "90ab3c778d1e66cd0cbc1b5446b343b4507fd5f2",
+  "deliveredOriginals": 1097,
+  "byKind": {
+    "model": 999,
+    "effect-mask": 96,
+    "surface-texture": 2
+  },
+  "byCategory": {
+    "furniture": 140,
+    "food": 200,
+    "effect-mask": 96,
+    "surface-material": 2,
+    "nature": 294,
+    "architecture": 239,
+    "outdoor-prop": 126
+  },
+  "deduplicatedVariants": 35,
+  "excludedCandidates": 16,
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "downloadedBytes": 99380769,
+  "packs": [
+    {
+      "id": "kenney-furniture",
+      "rawFiles": 1263,
+      "deliveredOriginals": 140,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip",
+        "bytes": 5130729,
+        "sha256": "e67652d0932cee41683f74711c03d3e192a2af9979ef8e6b237711f5482d46b0"
+      }
+    },
+    {
+      "id": "kenney-food",
+      "rawFiles": 1005,
+      "deliveredOriginals": 200,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/food-kit/83086fa91c-1719418518/kenney_food-kit.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/food-kit/83086fa91c-1719418518/kenney_food-kit.zip",
+        "bytes": 4606270,
+        "sha256": "cdad90853682499b94c9fda2f87678b24bfd8f3264e0ed323f6b6a27fd7c6f6f"
+      }
+    },
+    {
+      "id": "kenney-particles",
+      "rawFiles": 194,
+      "deliveredOriginals": 96,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip",
+        "bytes": 15001764,
+        "sha256": "b631d4b07f7002549fdcf155f01141ad482f79f3440e4e301eed49ce5f1d8958"
+      }
+    },
+    {
+      "id": "ambientcg-wood095",
+      "rawFiles": 6,
+      "deliveredOriginals": 1,
+      "download": {
+        "url": "https://ambientcg.com/get?file=Wood095_2K-JPG.zip",
+        "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Wood095_nuMFLYaB/Wood095_2K-JPG.zip",
+        "bytes": 12931993,
+        "sha256": "89baf84c1c02dc5ca435896559ac2f53e6d6a2991f602aea43cafe83868dd1fc"
+      }
+    },
+    {
+      "id": "ambientcg-fabric066",
+      "rawFiles": 7,
+      "deliveredOriginals": 1,
+      "download": {
+        "url": "https://ambientcg.com/get?file=Fabric066_2K-JPG.zip",
+        "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Fabric066_RqLsIgGw/Fabric066_2K-JPG.zip",
+        "bytes": 35769326,
+        "sha256": "7af520fce64a91a7c0eeb89a6b4e02d0c57da8c886a44ec2b5d8624eb4688be6"
+      }
+    },
+    {
+      "id": "kenney-nature",
+      "rawFiles": 2957,
+      "deliveredOriginals": 294,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip",
+        "bytes": 10537521,
+        "sha256": "fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d"
+      }
+    },
+    {
+      "id": "kenney-city-commercial",
+      "rawFiles": 215,
+      "deliveredOriginals": 25,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip",
+        "bytes": 4096974,
+        "sha256": "f8b09b081c2bb88bcc126e2dec1cb40fd0dad7e7e591b6c26aaefe96fb35276b"
+      }
+    },
+    {
+      "id": "kenney-survival",
+      "rawFiles": 408,
+      "deliveredOriginals": 80,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/survival-kit/4065a8185b-1712149243/kenney_survival-kit.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/survival-kit/4065a8185b-1712149243/kenney_survival-kit.zip",
+        "bytes": 1948174,
+        "sha256": "c3586341b5932c87eb43d75d915434f47daed168b17ed36a03e8ca9977c7443e"
+      }
+    },
+    {
+      "id": "kenney-building",
+      "rawFiles": 403,
+      "deliveredOriginals": 79,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/building-kit/0de7aaa492-1743244741/kenney_building-kit.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/building-kit/0de7aaa492-1743244741/kenney_building-kit.zip",
+        "bytes": 1598905,
+        "sha256": "2740ef5772fb5fb3d7aab881db22d129f6b68afe711b1a79e6d5e9e19cf3eec6"
+      }
+    },
+    {
+      "id": "kenney-watercraft",
+      "rawFiles": 235,
+      "deliveredOriginals": 46,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/watercraft-kit/a335cfed49-1713519620/kenney_watercraft-pack.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/watercraft-kit/a335cfed49-1713519620/kenney_watercraft-pack.zip",
+        "bytes": 1870991,
+        "sha256": "cd1470c1cf441c7f46d0944ae6d0d897242365dc97677c5079b3238965d659f3"
+      }
+    },
+    {
+      "id": "kenney-suburban",
+      "rawFiles": 212,
+      "deliveredOriginals": 40,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/city-kit-suburban/2c871b7af2-1745479373/kenney_city-kit-suburban_20.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/city-kit-suburban/2c871b7af2-1745479373/kenney_city-kit-suburban_20.zip",
+        "bytes": 3038740,
+        "sha256": "5869c35cf30b1c87bdb2d197b6d325eebadd2ef08ea27f04797e8e08d77a9a39"
+      }
+    },
+    {
+      "id": "kenney-roads",
+      "rawFiles": 483,
+      "deliveredOriginals": 95,
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/city-kit-roads/74288c9459-1787042796/kenney_city-kit-roads.zip",
+        "resolvedUrl": "https://kenney.nl/media/pages/assets/city-kit-roads/74288c9459-1787042796/kenney_city-kit-roads.zip",
+        "bytes": 2849382,
+        "sha256": "22058af3d68173a7cf9bda9f0e243a8cef6bd68168c302ebc76327063849674e"
+      }
+    }
+  ],
+  "errors": [],
+  "notice": "Actual delivered files passed the listed technical checks. These are not claims of visual approval, complete 3D validation, Studio runtime verification, or production publication.",
+  "browserRenderedModels": 999,
+  "browserRejectedModels": 0,
+  "repositoryBundledOriginals": 1097,
+  "retiredStarterBackgrounds": 8,
+  "retirementMethod": "hidden-from-new-selection; legacy-id-and-package-resolution-preserved",
+  "verifiedDeliveryFiles": 1097
+}

@@ -349,11 +349,12 @@ function runRetouchWithSharedModuleWorker(
   options: StudioRetouchWorkerClientOptions,
 ): Promise<StudioRetouchWorkerClientResult> {
   const disposeGeneration = sharedRetouchDisposeGeneration;
-  clearSharedRetouchIdleTimer();
   return sharedRetouchQueue.run(request, async (queuedRequest) => {
-    clearSharedRetouchIdleTimer();
     if (disposeGeneration !== sharedRetouchDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    // Admission can be cancelled before this executor starts. Keep the warm Worker's idle
+    // deadline until live work actually takes ownership, including the queue handoff microtask.
+    clearSharedRetouchIdleTimer();
     let creationError: unknown;
     if (!sharedRetouchWorker) {
       try {
