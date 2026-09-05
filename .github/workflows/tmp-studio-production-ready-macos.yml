@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   switch-runner:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     steps:
       - name: Checkout ready branch
@@ -26,7 +26,7 @@ jobs:
           ref: feat/studio-production-command-center-ready-20260905
           fetch-depth: 0
 
-      - name: Make the delivery workflow portable to macOS
+      - name: Make the delivery workflow portable to hosted ARM
         shell: bash
         run: |
           set -euo pipefail
@@ -39,7 +39,7 @@ jobs:
           old_runner = '    runs-on: ubuntu-latest'
           if source.count(old_runner) != 1:
               raise SystemExit('unexpected delivery runner declaration')
-          source = source.replace(old_runner, '    runs-on: macos-15', 1)
+          source = source.replace(old_runner, '    runs-on: ubuntu-24.04-arm', 1)
 
           old_loop = '          for index in $(seq -w 0 10); do'
           if source.count(old_loop) != 1:
@@ -117,5 +117,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'ci(studio): run production delivery on macOS'
+          git commit -m 'ci(studio): run production delivery on hosted ARM'
           git push origin HEAD:feat/studio-production-command-center-ready-20260905
