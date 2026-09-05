@@ -8,7 +8,7 @@ import {
 
 describe("Studio route manifest", () => {
   it("declares one owner for each Studio route family", () => {
-    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(5);
+    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(6);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
       STUDIO_ROUTE_MANIFEST.length,
     );
@@ -128,6 +128,27 @@ describe("Studio route manifest", () => {
       "/studio/lift3d",
     ],
     [
+      "/studio/storyworld",
+      "",
+      "storyworld",
+      "/studio/storyworld",
+      "/studio/draft/storyworld",
+    ],
+    [
+      "/studio/storyworld",
+      "?id=work-1&room=team-a",
+      "storyworld",
+      "/studio/work/work-1/storyworld?room=team-a",
+      "/studio/work:work-1/storyworld",
+    ],
+    [
+      "/studio/remix/source-1/storyworld",
+      "?room=team-a",
+      "storyworld",
+      "/studio/remix/source-1/storyworld?room=team-a",
+      "/studio/remix:source-1/storyworld",
+    ],
+    [
       "/studio/projects",
       "",
       "placeholder",
@@ -190,6 +211,7 @@ describe("Studio route manifest", () => {
   it.each([
     ["/studio", "?mode=upload&mode=upload", "invalid-mode"],
     ["/studio/3d/dcc/model", "?mode=upload", "invalid-mode"],
+    ["/studio/storyworld", "?mode=upload", "invalid-mode"],
     ["/studio", "?id=work-1&remix=source-1", "identity-conflict"],
     ["/studio/remix/source-1/canvas", "?remix=source-2", "identity-conflict"],
     ["/studio/work/work-1/publish", "?id=work-2", "work-id-conflict"],
@@ -211,6 +233,7 @@ describe("Studio route manifest", () => {
       search: "?view=navigator",
     })).toBe(true);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/lift3d" })).toBe(true);
+    expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/storyworld" })).toBe(true);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/projects" })).toBe(false);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/avatar" })).toBe(false);
   });
