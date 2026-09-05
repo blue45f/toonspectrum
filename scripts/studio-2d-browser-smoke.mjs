@@ -46,7 +46,7 @@ try {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url);
     await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(48);
-    await expect(page.getByRole("status")).toHaveText("64개 장면");
+    await expect(page.getByRole("status").filter({ hasText: /^64개 장면$/u })).toHaveText("64개 장면");
     await page.getByRole("button", { name: "장면 더 보기 (16개 남음)", exact: true }).click();
     await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(64);
     await page.getByLabel("소재 구분", { exact: true }).selectOption("recommended");
