@@ -94,7 +94,7 @@ export function StudioHybridDccMeshSelectionTools(props: Props) {
     setError(""); setNotice("");
     try {
       const selectedSource = source();
-      if (mode === "object" || !componentSelection) return;
+      if (!componentSelection) return;
       const ids = runStudioHybridDccSelectionCommand(selectedSource.mesh, mode, componentSelection.elementIds, command);
       apply(selectedSource, ids);
     } catch (problem) { setError(problem instanceof Error ? problem.message : "선택 명령을 실행하지 못했습니다."); setOpen(true); }

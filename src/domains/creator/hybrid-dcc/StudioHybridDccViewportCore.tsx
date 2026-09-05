@@ -64,6 +64,7 @@ import {
 } from "./studio-hybrid-dcc-object-transform";
 import { validateStudioHybridDccFanPolygon } from "./studio-hybrid-dcc-polygon-validation";
 import { resolveStudioHybridDccScreenComponentCandidate } from "./studio-hybrid-dcc-screen-selection";
+import { createStudioHybridDccSelectionGate } from "./studio-hybrid-dcc-selection-gate";
 import {
   resolveStudioHybridDccViewportShortcut,
   type StudioHybridDccStandardView,
@@ -1377,7 +1378,12 @@ export function StudioHybridDccViewport({
   const [dragging, setDragging] = useState(false);
   const [interactionNotice, setInteractionNotice] = useState("");
   const draggingRef = useRef(false);
-  const suppressSelectionUntilRef = useRef(0);
+  const selectionGateRef = useRef<ReturnType<typeof createStudioHybridDccSelectionGate<ReturnType<typeof setTimeout>>> | null>(null);
+  useEffect(() => {
+    const gate = createStudioHybridDccSelectionGate(setTimeout, clearTimeout);
+    selectionGateRef.current = gate;
+    return () => { gate.dispose(); };
+  }, []);
   const { preferences, patchPreferences, setPreferences } = useStudioHybridDccViewportPreferences();
   const [detectedWebgl, setDetectedWebgl] = useState<boolean | null>(webglAvailable ?? null);
   const viewportRef = useRef<HTMLElement>(null);
@@ -1487,10 +1493,10 @@ export function StudioHybridDccViewport({
   const changeDragging = (active: boolean) => {
     draggingRef.current = active;
     setDragging(active);
-    if (!active) suppressSelectionUntilRef.current = performance.now() + 120;
+    if (!active) selectionGateRef.current?.suppress();
   };
   const selectionAllowed = () => !editingDisabled && !draggingRef.current
-    && performance.now() >= suppressSelectionUntilRef.current;
+    && (selectionGateRef.current?.allows() ?? true);
 
   useEffect(() => {
     const viewport = viewportRef.current;

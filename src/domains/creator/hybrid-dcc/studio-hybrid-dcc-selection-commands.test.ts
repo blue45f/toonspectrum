@@ -140,7 +140,7 @@ describe("bounded and validated topology", () => {
     assert.throws(() => run(strip, "vertex", new Array(3), "all"));
   });
   it("rejects wrong storage IDs, asymmetric twins and invalid face ownership", () => {
-    const corrupt = (patch: Record<string, number>) => ({ ...strip, halfEdges: strip.halfEdges.map((edge, i) => i === 0 ? { ...edge, ...patch } : edge) });
+    const corrupt = (patch: Partial<Mesh["halfEdges"][number]>) => ({ ...strip, halfEdges: strip.halfEdges.map((edge, i) => i === 0 ? { ...edge, ...patch } : edge) });
     for (const patch of [{ id: 12 }, { twin: 0 }, { twin: 100 }, { next: 2 }, { face: 999 }, { vertex: 999 }]) {
       assert.throws(() => run(corrupt(patch), "edge", [], "all"));
     }

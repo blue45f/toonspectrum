@@ -32,7 +32,7 @@ function value(result: ReturnType<typeof mutateStudioHybridDccComponentSelection
 }
 const create = () => workspaceAddUnitCube(createStudioHybridDccWorkspace("mesh-selection-tools"), "cube");
 function Harness({ workspace, editingDisabled = false, contextLost = false, mutation = vi.fn() }: {
-  workspace: StudioHybridDccWorkspace; editingDisabled?: boolean; contextLost?: boolean; mutation?: ReturnType<typeof vi.fn>;
+  workspace: StudioHybridDccWorkspace; editingDisabled?: boolean; contextLost?: boolean; mutation?: (operation: string, elementId?: number) => void;
 }) {
   const scopeRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState(() => value(mutateStudioHybridDccComponentSelection(
@@ -41,7 +41,7 @@ function Harness({ workspace, editingDisabled = false, contextLost = false, muta
   return (
     <div ref={scopeRef}>
       <div data-studio-hybrid-dcc-viewport="true" data-context-lost={contextLost ? "true" : "false"}>
-        <div role="application" tabIndex={0} aria-label="selection-test-canvas"><input aria-label="canvas text entry" /></div>
+        <div role="application" aria-label="selection-test-canvas"><input aria-label="canvas text entry" /></div>
       </div>
       <output aria-label="selected stable ids">{selection.elementIds.join(",")}</output>
       <StudioHybridDccMeshSelectionTools workspace={workspace} componentSelection={selection} scopeRef={scopeRef}

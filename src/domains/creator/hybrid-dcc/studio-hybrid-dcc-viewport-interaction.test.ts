@@ -224,6 +224,8 @@ describe("reusable authoring utilities", () => {
     const good = { min: [0, 0, 0] as const, max: [1, 1, 1] as const };
     assert.throws(() => align(identity(), { ...good, min: [2, 0, 0] }, good, 0, "min", "max"));
     assert.throws(() => align(identity(), good, good, 0, "min", "max", Infinity));
-    assert.throws(() => normalize({ ...identity(), position: [1, , 3] }));
+    const sparse = new Array<number>(3);
+    sparse[0] = 1; sparse[2] = 3;
+    assert.throws(() => normalize({ ...identity(), position: sparse }));
   });
 });

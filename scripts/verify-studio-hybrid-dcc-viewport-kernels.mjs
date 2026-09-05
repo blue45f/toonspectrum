@@ -12,7 +12,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = join(root, "src/domains/creator/hybrid-dcc");
 const temporary = mkdtempSync(join(tmpdir(), "studio-dcc-viewport-"));
 const kernels = ["studio-hybrid-dcc-object-transform", "studio-hybrid-dcc-transform-gesture",
-  "studio-hybrid-dcc-transform-utilities", "studio-hybrid-dcc-viewport-interaction"];
+  "studio-hybrid-dcc-transform-utilities", "studio-hybrid-dcc-viewport-interaction",
+  "studio-hybrid-dcc-transform-runtime", "studio-hybrid-dcc-selection-gate"];
 try {
   const config = join(temporary, "tsconfig.json");
   writeFileSync(config, JSON.stringify({
@@ -23,19 +24,22 @@ try {
   const compiled = spawnSync(process.execPath, [require.resolve("typescript/bin/tsc"), "-p", config],
     { stdio: "inherit", timeout: 60_000 });
   if (compiled.error || compiled.status !== 0) throw new Error("Strict kernel typecheck failed", { cause: compiled.error });
-  const test = readFileSync(join(source, "studio-hybrid-dcc-viewport-interaction.test.ts"), "utf8");
-  const output = ts.transpileModule(test, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
-    reportDiagnostics: true,
+  const testPaths = ["studio-hybrid-dcc-viewport-interaction", "studio-hybrid-dcc-transform-runtime"].map((name) => {
+    const test = readFileSync(join(source, `${name}.test.ts`), "utf8");
+    const output = ts.transpileModule(test, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+      reportDiagnostics: true,
+    });
+    if (output.diagnostics?.length) throw new Error("Kernel test syntax check failed");
+    const registrar = 'require("vitest")';
+    if (output.outputText.split(registrar).length !== 2) throw new Error("Unexpected test registrar shape");
+    // The same native assertions and compiled production kernels run under Node's test registrar.
+    const testPath = join(temporary, `${name}.node-test.cjs`);
+    writeFileSync(testPath, output.outputText.replace(registrar, 'require("node:test")'));
+    return testPath;
   });
-  if (output.diagnostics?.length) throw new Error("Kernel test syntax check failed");
-  const registrar = 'require("vitest")';
-  if (output.outputText.split(registrar).length !== 2) throw new Error("Unexpected test registrar shape");
-  // The same native assertions and compiled production kernels run under Node's test registrar.
-  const testPath = join(temporary, "viewport.node-test.cjs");
-  writeFileSync(testPath, output.outputText.replace(registrar, 'require("node:test")'));
   console.log("Renderer-free kernel checks only. React/Three/WebGL and full repository CI are separate.");
-  const tested = spawnSync(process.execPath, ["--test", testPath], { stdio: "inherit", timeout: 60_000 });
+  const tested = spawnSync(process.execPath, ["--test", ...testPaths], { stdio: "inherit", timeout: 60_000 });
   if (tested.error || tested.status !== 0) throw new Error("Kernel regression tests failed", { cause: tested.error });
 } finally {
   rmSync(temporary, { recursive: true, force: true });

@@ -8,7 +8,7 @@ import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
 import type { ReactNode } from "react";
 
 vi.mock("@react-three/fiber", () => ({
-  Canvas: (_props: { children?: ReactNode }) => <div role="application" tabIndex={0} aria-label="test-3d-canvas" />,
+  Canvas: (_props: { children?: ReactNode }) => <div role="application" aria-label="test-3d-canvas"><button type="button" aria-label="canvas keyboard target" /></div>,
   useThree: vi.fn(),
 }));
 vi.mock("@react-three/drei/core/ContactShadows.js", () => ({ ContactShadows: () => null }));
@@ -58,7 +58,7 @@ describe("viewport interaction integration", () => {
   });
   it("supports opposite views, projection toggle, isolation and focus-selected keys", () => {
     setup();
-    const canvas = screen.getByRole("application");
+    const canvas = screen.getByRole("button", { name: "canvas keyboard target" });
     fireEvent.keyDown(canvas, { key: "1", code: "Numpad1", ctrlKey: true });
     expect(root().getAttribute("data-view-preset")).toBe("back");
     fireEvent.keyDown(canvas, { key: "5", code: "Numpad5" });
@@ -70,7 +70,7 @@ describe("viewport interaction integration", () => {
   });
   it("never intercepts IME, repeated deletion, contenteditable or outside events", () => {
     const { props } = setup();
-    const canvas = screen.getByRole("application");
+    const canvas = screen.getByRole("button", { name: "canvas keyboard target" });
     canvas.focus();
     fireEvent.keyDown(canvas, { key: "Delete", repeat: true });
     fireEvent.keyDown(canvas, { key: "Delete", isComposing: true });
@@ -89,7 +89,7 @@ describe("viewport interaction integration", () => {
     const button = screen.getByRole("button", { name: "등각 보기" });
     expect(fireEvent.keyDown(button, { key: "Tab", shiftKey: true, cancelable: true })).toBe(true);
     expect(root().getAttribute("data-snapping")).toBe("true");
-    fireEvent.keyDown(screen.getByRole("application"), { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(screen.getByRole("button", { name: "canvas keyboard target" }), { key: "Tab", shiftKey: true });
     expect(root().getAttribute("data-snapping")).toBe("false");
   });
   it("validates snap inputs and remembers view preferences in browser storage", () => {
