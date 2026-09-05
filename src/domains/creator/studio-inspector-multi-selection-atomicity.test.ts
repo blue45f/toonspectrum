@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { planStudioInspectorMultiSelectionLayoutPatch } from "./studio-inspector-multi-selection";
 
-import type { El, ImageEl } from "./studio-element-model";
+import type { FrameEl, ImageEl } from "./studio-element-model";
 
 function image(
   partial: Partial<ImageEl> & Pick<ImageEl, "id" | "x" | "y" | "width" | "height">,
@@ -15,7 +15,7 @@ function image(
   } as ImageEl;
 }
 
-function frame(id = "frame"): El {
+function frame(id = "frame"): FrameEl {
   return {
     id,
     type: "frame",
@@ -23,7 +23,7 @@ function frame(id = "frame"): El {
     y: 0,
     width: 120,
     height: 80,
-  } as El;
+  };
 }
 
 describe("Inspector multi-selection atomic boundaries", () => {
