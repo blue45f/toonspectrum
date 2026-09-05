@@ -168,16 +168,20 @@ describe("listSceneTemplates", () => {
     expect(action.every((t) => t.category === "action")).toBe(true);
   });
 
-  it("신규 카테고리도 거른다: 학원 3종·판타지 3종", () => {
+  it("학원·판타지의 기존 구성과 새 상황별 구성을 모두 반환한다", () => {
     expect(listSceneTemplates("school").map((t) => t.id)).toEqual([
       "school-classroom",
       "school-hallway",
       "school-rooftop",
+      "school-exam-silence",
+      "school-locker-note",
     ]);
     expect(listSceneTemplates("fantasy").map((t) => t.id)).toEqual([
       "fantasy-throne",
       "fantasy-summon",
       "fantasy-dungeon",
+      "fantasy-royal-letter",
+      "fantasy-portal-choice",
     ]);
   });
 
