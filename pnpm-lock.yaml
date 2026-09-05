@@ -89,13 +89,13 @@ importers:
         specifier: 9.6.1
         version: 9.6.1(patch_hash=68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222)(@types/react@19.2.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.184.0)
       '@remotion/media':
-        specifier: ^4.0.521
+        specifier: 4.0.521
         version: 4.0.521(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@remotion/player':
-        specifier: ^4.0.521
+        specifier: 4.0.521
         version: 4.0.521(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@remotion/web-renderer':
-        specifier: ^4.0.521
+        specifier: 4.0.521
         version: 4.0.521(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@resvg/resvg-wasm':
         specifier: 2.6.2
@@ -239,7 +239,7 @@ importers:
         specifier: 7.18.2
         version: 7.18.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       remotion:
-        specifier: ^4.0.521
+        specifier: 4.0.521
         version: 4.0.521(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       rhino3dm:
         specifier: 8.32.1
@@ -10989,7 +10989,7 @@ snapshots:
       tar-stream: 3.1.7
       undici: 7.29.0
       xdg-app-paths: 5.1.0
-      zod: 4.4.3
+      zod: 4.5.4
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
@@ -13702,7 +13702,7 @@ snapshots:
       libtess: 1.2.2
       omggif: 1.0.10
       pako: 2.2.0
-      zod: 4.4.3
+      zod: 4.5.4
 
   pako@2.1.0: {}
 
