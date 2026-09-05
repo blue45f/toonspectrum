@@ -7,6 +7,7 @@ import { useApp } from "@/lib/store";
 import {
   FEEDBACK_AREAS, FEEDBACK_AREA_LABELS, FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, validateFeedbackInput,
 } from "@/packages/core/src/feedback";
+import { isFeedbackEntry } from "@/packages/core/src/feedback-response";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 interface Props {
@@ -49,9 +50,11 @@ export function FeedbackComposer({ kind, onKindChange, userId, hydrated, apiRead
     setSending(true);
     setError("");
     try {
-      // Also suppress the browser's ambient Referer URL, not just fields in the JSON body.
-      const entry = await api.post<FeedbackEntry>("/feedback/posts", parsed.value, { timeout: 30_000, referrerPolicy: "no-referrer" });
+      const entry = await api.post<unknown>("/feedback/posts", parsed.value, { timeout: 30_000, referrerPolicy: "no-referrer" });
       if (useApp.getState().userId !== userId) return;
+      if (!isFeedbackEntry(entry) || entry.category !== parsed.value.category) {
+        throw new Error("등록 결과를 확인하지 못했어요. 중복 제보를 피하려면 내 제보 목록을 먼저 확인해 주세요. 입력 내용은 유지됩니다.");
+      }
       setTitle(""); setText(""); setTags(""); setSteps(""); setExpected(""); setActual(""); setPublicConfirmed(false);
       onCreated(entry);
     } catch (cause) {
@@ -72,8 +75,8 @@ export function FeedbackComposer({ kind, onKindChange, userId, hydrated, apiRead
   return (
     <form className="fb-form" onSubmit={submit} aria-label="공개 제보 작성" noValidate aria-busy={sending}>
       <p className="fb-notice"><Globe2 size={16} aria-hidden="true" /> 제목·내용·재현 정보는 모두 공개됩니다.</p>
-      {!apiReady && <p className="fb-notice" role="status">제보 서버를 확인하고 있어요. 목록을 불러온 뒤 작성할 수 있습니다.</p>}
-      <fieldset disabled={sending || !apiReady}>
+      {!apiReady && <p className="fb-notice" role="status">입력 내용은 유지됩니다. 작성은 계속할 수 있고, 목록 연결이 확인되면 등록할 수 있어요.</p>}
+      <fieldset disabled={sending}>
         <div className="fb-form-pair">
           <div><label htmlFor={`${id}-kind`}>제보 유형</label><select id={`${id}-kind`} value={kind} onChange={(event) => onKindChange(event.target.value as FeedbackKind)}>{FEEDBACK_KINDS.map((key) => <option key={key} value={key}>{FEEDBACK_KIND_LABELS[key]}</option>)}</select></div>
           <div><label htmlFor={`${id}-area`}>관련 기능</label><select id={`${id}-area`} value={area} onChange={(event) => setArea(event.target.value)}>{FEEDBACK_AREAS.map((key) => <option key={key} value={key}>{FEEDBACK_AREA_LABELS[key]}</option>)}</select></div>
