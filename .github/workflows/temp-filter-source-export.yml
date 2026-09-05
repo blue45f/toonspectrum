@@ -9,14 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  export:
-    runs-on: ubuntu-latest
+  export-unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Inspect staged filter upgrade payload
+      - name: Recover staged payload
         shell: bash
         run: |
           set -u
@@ -30,19 +33,67 @@ jobs:
           gzip_status=$?
           tar -tzf filter-upgrade-export/payload.tar.gz > filter-upgrade-export/tar-list.txt 2>filter-upgrade-export/tar-error.txt
           tar_status=$?
+          mkdir -p filter-upgrade-export/recovered
+          tar -xzf filter-upgrade-export/payload.tar.gz -C filter-upgrade-export/recovered 2>filter-upgrade-export/extract-error.txt
+          extract_status=$?
           set -e
           {
+            echo "runner=${{ matrix.runner }}"
             echo "part_count=$(find .github/filter-upgrade-parts -maxdepth 1 -type f -name 'part-*' | wc -l)"
             echo "base64_bytes=$(wc -c < filter-upgrade-export/payload.b64)"
             echo "decoded_bytes=$(wc -c < filter-upgrade-export/payload.tar.gz)"
             echo "decode_status=$decode_status"
             echo "gzip_status=$gzip_status"
             echo "tar_status=$tar_status"
+            echo "extract_status=$extract_status"
           } > filter-upgrade-export/report.txt
-
       - uses: actions/upload-artifact@v4
         with:
-          name: filter-upgrade-staging
+          name: filter-upgrade-staging-${{ matrix.runner }}
+          path: filter-upgrade-export
+          if-no-files-found: error
+          retention-days: 1
+
+  export-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Recover staged payload
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force filter-upgrade-export | Out-Null
+          Copy-Item -Recurse .github/filter-upgrade-parts filter-upgrade-export/parts
+          $parts = Get-ChildItem .github/filter-upgrade-parts/part-* | Sort-Object Name
+          $payload = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
+          Set-Content -NoNewline -Encoding ascii filter-upgrade-export/payload.b64 $payload
+          $decodeStatus = 0
+          try {
+            [IO.File]::WriteAllBytes('filter-upgrade-export/payload.tar.gz', [Convert]::FromBase64String($payload))
+          } catch {
+            $decodeStatus = 1
+            $_ | Out-String | Set-Content filter-upgrade-export/base64-error.txt
+            New-Item -ItemType File -Force filter-upgrade-export/payload.tar.gz | Out-Null
+          }
+          $tarStatus = 0
+          tar -tzf filter-upgrade-export/payload.tar.gz *> filter-upgrade-export/tar-list.txt
+          if ($LASTEXITCODE -ne 0) { $tarStatus = $LASTEXITCODE }
+          New-Item -ItemType Directory -Force filter-upgrade-export/recovered | Out-Null
+          tar -xzf filter-upgrade-export/payload.tar.gz -C filter-upgrade-export/recovered 2> filter-upgrade-export/extract-error.txt
+          $extractStatus = $LASTEXITCODE
+          @(
+            'runner=windows-latest',
+            "part_count=$($parts.Count)",
+            "base64_bytes=$((Get-Item filter-upgrade-export/payload.b64).Length)",
+            "decoded_bytes=$((Get-Item filter-upgrade-export/payload.tar.gz).Length)",
+            "decode_status=$decodeStatus",
+            "tar_status=$tarStatus",
+            "extract_status=$extractStatus"
+          ) | Set-Content filter-upgrade-export/report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filter-upgrade-staging-windows-latest
           path: filter-upgrade-export
           if-no-files-found: error
           retention-days: 1
