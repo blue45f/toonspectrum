@@ -118,8 +118,7 @@ describe("precision selection transform", () => {
     expect(next![0]).toMatchObject({ x: 60, y: -20, rotation: 90 });
     // Rotating about a shared centre goes through cos/sin, so x lands at
     // 40.00000000000001 rather than exactly 40; compare within float tolerance.
-    expect(next![1]).toMatchObject({ y: 40, rotation: 90 });
-    expect(next![1].x).toBeCloseTo(40, 6);
+    expect(next![1]).toMatchObject({ x: expect.closeTo(40, 6), y: 40, rotation: 90 });
   });
 
   it("refuses a torn group rotation and conflicting non-uniform numeric scales", () => {
