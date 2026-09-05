@@ -19,6 +19,10 @@ const CreateChallengesPage = lazyRetry(
   () => import("@/src/domains/creator/CreateChallengesPage").then((module) => ({ default: module.CreateChallengesPage })),
   "CreateChallengesPage",
 );
+const StudioPromoPage = lazyRetry(
+  () => import("@/src/domains/creator/promo/StudioPromoPage").then((module) => ({ default: module.StudioPromoPage })),
+  "StudioPromoPage",
+);
 const CharacterShaperLandingPage = lazyRetry(
   () => import("@/src/domains/creator/CharacterShaperLandingPage").then((module) => ({
     default: module.CharacterShaperLandingPage,
@@ -39,6 +43,7 @@ const StudioRouter = lazyRetry(
 export const creatorRoutes = defineAppRoutes([
   { id: "creator-gallery", path: "/create", element: <CreateGalleryPage /> },
   { id: "creator-challenges", path: "/create/challenges", element: <CreateChallengesPage /> },
+  { id: "creator-promo", path: "/create/promo", element: <StudioPromoPage /> },
   { id: "creator-series", path: "/create/series/:id", element: <CreateSeriesPage /> },
   { id: "creator-work", path: "/create/:id", element: <CreateWorkPage /> },
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
