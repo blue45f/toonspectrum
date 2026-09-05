@@ -1,0 +1,172 @@
+name: Studio 3D surface fit verified repair
+on:
+  push:
+    branches: [fix/studio-3d-closeup-quality-20260906]
+    paths: ['.agents/patches/studio-3d-surface-*.bin', '.github/workflows/studio-3d-surface-fit-wave.yml']
+permissions:
+  contents: read
+jobs:
+  verified-repair:
+    if: github.ref == 'refs/heads/fix/studio-3d-closeup-quality-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    outputs:
+      head: ${{ steps.publish.outputs.head }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify the exact visually diagnosed and locally tested source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import gzip, hashlib, pathlib, subprocess
+          pieces = [pathlib.Path(f'.agents/patches/studio-3d-surface-{i:02d}.bin') for i in range(3)]
+          assert all(p.is_file() for p in pieces), 'Missing exact transport pieces'
+          patch = gzip.decompress(b''.join(p.read_bytes() for p in pieces))
+          expected = '462ee85c6ee6a1e1ecceed568cc09694473900ad4a6d863fc5e13239aa0f570b'
+          assert hashlib.sha256(patch).hexdigest() == expected, 'Integrity mismatch; do not apply'
+          allowed = {
+            'src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx',
+            'src/domains/creator/bg3d/StudioBg3dEngineRecoveryControls.test.tsx',
+            'src/domains/creator/bg3d/StudioBg3dEngineRecoveryControls.tsx',
+            'src/domains/creator/vrm/StudioVrmWardrobePropsProjection.tsx',
+            'src/domains/creator/vrm/studio-vrm-body-silhouette.test.ts',
+            'src/domains/creator/vrm/studio-vrm-body-silhouette.ts',
+            'src/domains/creator/vrm/studio-vrm-head-surface.test.ts',
+            'src/domains/creator/vrm/studio-vrm-head-surface.ts',
+            'src/domains/creator/vrm/studio-vrm-prop-rig.ts',
+            'src/domains/creator/vrm/studio-vrm-surface-primitive.test.ts',
+            'src/domains/creator/vrm/studio-vrm-surface-primitive.ts',
+            'src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts',
+            'src/domains/creator/vrm/studio-vrm-wardrobe.test.ts',
+            'src/domains/creator/vrm/studio-vrm-wardrobe.ts',
+          }
+          stats = subprocess.check_output(['git','apply','--numstat'], input=patch).decode()
+          assert {line.split('\t',2)[2] for line in stats.splitlines()} == allowed
+          subprocess.run(['git','apply','--check'], input=patch, check=True)
+          subprocess.run(['git','apply'], input=patch, check=True)
+          pathlib.Path('/tmp/review-files.txt').write_text('\n'.join(sorted(allowed))+'\n')
+          print(stats)
+          print('Verified patch SHA256:', expected)
+          PY
+      - name: Strict lint and complete character regression suite
+        run: |
+          xargs pnpm exec eslint --max-warnings=0 < /tmp/review-files.txt
+          pnpm exec vitest run src/domains/creator/vrm src/domains/creator/character-shaper src/domains/creator/bg3d/StudioBg3dEngineRecoveryControls.test.tsx src/domains/creator/bg3d/StudioBg3dEnginePanel.test.tsx src/domains/creator/bg3d/studio-bg3d-engine-no-fallback-wiring.test.ts src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx --maxWorkers=1
+      - name: Full frontend typecheck on the actual product change
+        run: pnpm exec tsc -p tsconfig.json
+      - name: Publish only verified product files to this feature branch
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          xargs git add -- < /tmp/review-files.txt
+          git rm -- .agents/patches/studio-3d-surface-00.bin .agents/patches/studio-3d-surface-01.bin .agents/patches/studio-3d-surface-02.bin
+          git diff --cached --check
+          git commit -m 'fix(studio): measure actual surfaces for garments and headwear with explicit engine recovery'
+          git push origin "HEAD:$GITHUB_REF"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Verified source commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+  build:
+    needs: verified-repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verified-repair.outputs.head }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: git rev-parse HEAD > dist/studio-3d-review-head.txt
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-surface-build-${{ github.run_id }}
+          path: dist
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
+  review:
+    needs: [verified-repair, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [top, bottom, shoes, accessory, background]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_ORIGIN: http://127.0.0.1:5173
+      STUDIO_CLOSEUP_OUTPUT: /tmp/studio-3d-closeup
+      STUDIO_CLOSEUP_LANE: ${{ matrix.lane }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.verified-repair.outputs.head }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-3d-surface-build-${{ github.run_id }}
+          path: dist
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Start exact production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$STUDIO_CLOSEUP_OUTPUT"
+          test "$(cat dist/studio-3d-review-head.txt)" = "$(git rev-parse HEAD)"
+          git rev-parse HEAD > "$STUDIO_CLOSEUP_OUTPUT/source-head.txt"
+          pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort > "$STUDIO_CLOSEUP_OUTPUT/vite.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail "$TOONSPECTRUM_VERIFY_ORIGIN/" >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Capture all exposed garments and accessories from actual UI
+        if: matrix.lane != 'background'
+        timeout-minutes: 22
+        run: pnpm exec tsx scripts/verify-studio-3d-closeup.mts
+      - name: Verify visible engine recovery and actual background scenes
+        if: matrix.lane == 'background'
+        timeout-minutes: 15
+        run: pnpm exec tsx scripts/verify-studio-3d-background-review.mts
+      - name: Emit exact-head evidence manifest
+        if: always()
+        run: test ! -f "$STUDIO_CLOSEUP_OUTPUT/evidence.json" || cat "$STUDIO_CLOSEUP_OUTPUT/evidence.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-3d-surface-${{ matrix.lane }}-${{ needs.verified-repair.outputs.head }}
+          path: /tmp/studio-3d-closeup
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: error
