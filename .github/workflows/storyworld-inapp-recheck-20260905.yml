@@ -1,0 +1,48 @@
+name: Storyworld exact-head in-app recheck
+
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-inapp-recheck-20260905.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  storyworld-inapp-recheck:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PRODUCT_SHA: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
+      TOONSPECTRUM_VERIFY_DIR: test-results/storyworld-inapp-recheck
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build the unchanged product revision
+        run: |
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          pnpm run build
+      - name: Repeat the original complete feature sweep without suppressing errors
+        # The original CI observed one dynamic StoreSync module-fetch error on the existing
+        # brushes route. Keep all three profiles, all 45 interactions and the original failure
+        # policy. This is supplemental evidence, never a replacement for required CI / core.
+        run: pnpm run verify:studio-inapp-feature-sweep
+      - name: Preserve the result even when the original sweep fails
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-inapp-recheck-${{ env.PRODUCT_SHA }}
+          path: test-results/storyworld-inapp-recheck/
+          retention-days: 7
+          if-no-files-found: warn
