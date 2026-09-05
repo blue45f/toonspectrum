@@ -38,7 +38,7 @@ jobs:
       - name: Install locked workspace dependencies
         id: install
         run: pnpm install --frozen-lockfile
-      - name: Lint discovery and recovery changes
+      - name: Lint discovery, recovery and precision changes
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         shell: bash
         run: |
@@ -53,7 +53,12 @@ jobs:
             src/domains/creator/character-shaper/character-shaper-favorites.ts \
             src/domains/creator/character-shaper/character-shaper-favorites.test.ts \
             src/domains/creator/character-shaper/character-shaper-favorites-recovery.test.ts \
-            src/domains/creator/character-shaper/useCharacterShaperFavorites.ts
+            src/domains/creator/character-shaper/useCharacterShaperFavorites.ts \
+            src/domains/creator/character-shaper/CharacterShaperControls.tsx \
+            src/domains/creator/character-shaper/CharacterShaperControls.precision.test.tsx \
+            src/domains/creator/character-shaper/CharacterShaperControls.lifecycle.test.tsx \
+            src/domains/creator/character-shaper/character-shaper-precision.ts \
+            src/domains/creator/character-shaper/character-shaper-precision.test.ts
       - name: Run the existing Character Shaper Vitest suite
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm exec vitest run src/domains/creator/character-shaper
