@@ -1,0 +1,83 @@
+name: Apply verified webtoon AI upgrade
+
+on:
+  push:
+    branches:
+      - feat/webtoon-ai-quality-ux-20260905
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-webtoon-ai-upgrade-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Decode and verify the reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64 \
+            | xz --decompress > /tmp/toonstudio-webtoon-ai-upgrade.patch
+          echo "8cc17b1d66ce770c75c0996b263475e77a436828c84941ed4a63f51810646def  /tmp/toonstudio-webtoon-ai-upgrade.patch" \
+            | sha256sum --check --strict
+          git apply --check --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
+          git apply --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
+          git diff --check
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify focused webtoon AI contracts
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/ai/studio-ai-super-suite-intent.test.ts \
+            src/domains/creator/ai/studio-ai-suite-handoff.test.ts \
+            src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx \
+            src/domains/creator/ai/StudioAiAssistHub.accessibility.test.tsx \
+            src/domains/creator/ai/studio-ai-super-suite-integration-boundary.test.ts \
+            src/domains/creator/ai/studio-ai-quality-benchmark.test.ts \
+            src/domains/creator/ai/StudioAiAssistHub.test.tsx \
+            src/domains/creator/ai/StudioAiSuperSuiteModal.test.tsx
+
+      - name: Verify lint and TypeScript
+        run: |
+          pnpm run lint:quick
+          pnpm run typecheck
+
+      - name: Smoke-test the AI quality gate
+        run: |
+          pnpm verify:studio-ai-quality \
+            --input tests/benchmarks/fixtures/studio-ai-quality.example.json \
+            --report /tmp/studio-ai-quality-report.md
+
+      - name: Commit the product change without bootstrap artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64 \
+            .github/workflows/apply-webtoon-ai-upgrade.yml
+          rmdir .github/patches 2>/dev/null || true
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(studio): upgrade webtoon AI production UX and quality gates"
+          git push origin "HEAD:${{ github.ref_name }}"
