@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: apply-webtoon-ai-upgrade-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-and-verify:
