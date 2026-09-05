@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+// Register with the active runner; node:test alone is invisible to Vitest's root suite.
+// Keep the standalone Node gate usable without initializing a Vitest worker.
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 test("core gates cannot turn green through the removed fast-merge switch", () => {
