@@ -1,3 +1,4 @@
+import { createStudioAbortableSerialQueue } from "./studio-abortable-serial-queue";
 import { smudgeStroke } from "./studio-smudge";
 import {
   STUDIO_SMUDGE_WORKER_PROTOCOL_VERSION,
@@ -16,6 +17,8 @@ export interface StudioSmudgeWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
+  /** Structured-clone receive errors are separate from Worker execution errors. */
+  onmessageerror?: ((event: MessageEvent<unknown>) => void) | null;
   postMessage(message: StudioSmudgeWorkerRunMessage, transfer: Transferable[]): void;
   terminate(): void;
 }
@@ -172,6 +175,7 @@ function runSmudgeWithWorker(
       lifecycle.disposeSignal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       if (!keepWorker) worker.terminate();
     };
     const finish = (callback: () => void, keepWorker = false) => {
@@ -212,6 +216,7 @@ function runSmudgeWithWorker(
     };
 
     worker.onmessage = (event) => {
+      if (settled) return;
       const response = event.data;
       if (
         !response
@@ -272,6 +277,8 @@ function runSmudgeWithWorker(
       finish(() => reject(error));
     };
 
+    worker.onmessageerror = () => rejectWorkerUnavailable("문지르기 Worker 응답을 읽지 못했습니다.");
+
     signal?.addEventListener("abort", onAbort, { once: true });
     lifecycle.disposeSignal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted || lifecycle.disposeSignal?.aborted) {
@@ -293,7 +300,10 @@ let sharedSmudgeWorker: StudioSmudgeWorkerLike | null = null;
 let sharedSmudgeWorkerReady = false;
 let sharedSmudgeWorkerEpoch = 0;
 let sharedSmudgeDisposeGeneration = 0;
-let sharedSmudgeQueue: Promise<void> = Promise.resolve();
+const sharedSmudgeQueue = createStudioAbortableSerialQueue<
+  StudioSmudgeWorkerRunRequest,
+  StudioSmudgeWorkerClientResult
+>();
 let sharedSmudgeIdleTimer: ReturnType<typeof setTimeout> | null = null;
 let sharedSmudgeFlight: {
   readonly worker: StudioSmudgeWorkerLike;
@@ -319,6 +329,7 @@ export function disposeStudioSmudgeModuleWorker(): void {
   sharedSmudgeWorkerEpoch += 1;
   sharedSmudgeDisposeGeneration += 1;
   sharedSmudgeFlight = null;
+  sharedSmudgeQueue.cancelPending();
   flight?.controller.abort();
   if (worker && !flightOwnsWorker) worker.terminate();
 }
@@ -362,7 +373,7 @@ function runSmudgeWithSharedModuleWorker(
 ): Promise<StudioSmudgeWorkerClientResult> {
   const disposeGeneration = sharedSmudgeDisposeGeneration;
   clearSharedSmudgeIdleTimer();
-  const operation = sharedSmudgeQueue.then(async () => {
+  return sharedSmudgeQueue.run(request, async (queuedRequest) => {
     clearSharedSmudgeIdleTimer();
     if (disposeGeneration !== sharedSmudgeDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
@@ -385,7 +396,7 @@ function runSmudgeWithSharedModuleWorker(
     const controller = new AbortController();
     sharedSmudgeFlight = { worker, epoch, controller };
     try {
-      const result = await runSmudgeWithWorker(worker, request, options, {
+      const result = await runSmudgeWithWorker(worker, queuedRequest, options, {
         keepAlive: true,
         workerAlreadyReady: sharedSmudgeWorkerReady,
         disposeSignal: controller.signal,
@@ -405,9 +416,7 @@ function runSmudgeWithSharedModuleWorker(
     } finally {
       if (sharedSmudgeFlight?.controller === controller) sharedSmudgeFlight = null;
     }
-  });
-  sharedSmudgeQueue = operation.then(() => undefined, () => undefined);
-  return operation;
+  }, options.signal);
 }
 
 /**
