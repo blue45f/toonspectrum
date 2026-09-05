@@ -129,7 +129,6 @@ export function AdminDialog({
           "my-auto w-full overflow-hidden rounded-2xl border border-line bg-card shadow-2xl outline-none",
           SIZE_CLASS[size],
         )}
-        onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
