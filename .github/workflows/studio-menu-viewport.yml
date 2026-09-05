@@ -1,0 +1,41 @@
+name: Studio menu viewport integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/StudioMainMenu*.tsx'
+      - 'src/domains/creator/studio-main-menu-viewport*.ts'
+      - '.github/workflows/studio-menu-viewport.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/StudioMainMenu*.tsx'
+      - 'src/domains/creator/studio-main-menu-viewport*.ts'
+      - '.github/workflows/studio-menu-viewport.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-menu-viewport-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  menu-viewport:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint the production menu and regression tests
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/StudioMainMenu.tsx src/domains/creator/studio-main-menu-viewport.ts src/domains/creator/studio-main-menu-viewport.test.ts src/domains/creator/StudioMainMenu.viewport.test.tsx
+      - name: Run the existing menu contracts and new viewport tests
+        run: pnpm exec vitest run src/domains/creator/StudioMainMenu.test.tsx src/domains/creator/studio-main-menu-viewport.test.ts src/domains/creator/StudioMainMenu.viewport.test.tsx
