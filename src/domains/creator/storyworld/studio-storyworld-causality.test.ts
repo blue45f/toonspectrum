@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STORYWORLD_CAPABILITIES,
+  storyworldCapabilityCounts,
+} from "./studio-storyworld-catalog";
+import {
   STORYWORLD_DEMO_PROJECT,
   STUDIO_STORYWORLD_SCHEMA_VERSION,
   analyzeStoryworldProject,
@@ -9,10 +13,6 @@ import {
   simulateStoryworldCounterfactual,
   type StoryworldProject,
 } from "./studio-storyworld-causality";
-import {
-  STORYWORLD_CAPABILITIES,
-  storyworldCapabilityCounts,
-} from "./studio-storyworld-catalog";
 
 function healthyProject(): StoryworldProject {
   return {

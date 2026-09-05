@@ -8,6 +8,7 @@ import {
 import { Suspense, useEffect, useState } from "react";
 
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
+import { createStudioIntentLazyLoader } from "../studio-intent-lazy-loader";
 import {
   StudioAiAssistHub,
   StudioAiBackgroundPanel,
@@ -21,15 +22,14 @@ import {
   preloadStudioStockImagePanel,
 } from "../studio-page-lazy-ui";
 import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
-import { createStudioIntentLazyLoader } from "../studio-intent-lazy-loader";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 import {
   consumeStudioAiSuperSuiteOpenRequest,
   subscribeStudioAiSuperSuiteOpenRequest,
 } from "./studio-ai-super-suite-intent";
-import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";

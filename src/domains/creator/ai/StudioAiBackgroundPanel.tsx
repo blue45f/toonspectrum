@@ -56,6 +56,7 @@ export function StudioAiBackgroundPanel({
           </span>
         </span>
         <textarea
+          aria-label="무엇을 그릴까요?"
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value.slice(0, BACKGROUND_PROMPT_MAX))}
           onKeyDown={(e) => {

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
+import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import {
   detectStudioBg3dProductionIntent,
   planStudioBg3dProductionIntent,
@@ -15,7 +16,6 @@ import {
   type StudioBg3dProductionIntentId,
   type StudioBg3dProductionIntentState,
 } from "./studio-bg3d-production-intents";
-import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 
 interface PreviousProductionIntentState extends StudioBg3dProductionIntentState {
   readonly selectedShotIds: readonly string[];

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
+import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { resolveStudioBg3dProductionBatchPreset } from "./studio-bg3d-production-multipass";
 import { resolveStudioBg3dProductionBatchPresetForLook } from "./studio-bg3d-production-pass-readiness";
 import {
@@ -25,7 +26,6 @@ import {
   type StudioBg3dProductionWorkflowStageId,
   type StudioBg3dProductionWorkflowStageStatus,
 } from "./studio-bg3d-production-workflow";
-import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 
 export interface StudioBg3dProductionWorkflowPanelProps {
   readonly variant?: "director" | "export";

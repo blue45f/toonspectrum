@@ -94,10 +94,10 @@ export class StudioAiStoryboardDirector {
     let suggestedSfx: string | undefined;
     let heightRatio = 1.0;
 
-    let dialogue: string | undefined;
     const quoteMatch = line.match(QUOTED_DIALOGUE_PATTERN);
     const speakerMatch = line.match(SPEAKER_DIALOGUE_PATTERN);
-    dialogue = quoteMatch?.[1]?.trim() || speakerMatch?.[1]?.trim();
+    const dialogue: string | undefined =
+      quoteMatch?.[1]?.trim() || speakerMatch?.[1]?.trim();
 
     if (ACTION_PATTERN.test(line)) {
       shotScale = "full-shot";

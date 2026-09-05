@@ -33,6 +33,14 @@ import {
 } from "react";
 
 import {
+  STORYWORLD_CAPABILITIES,
+  STORYWORLD_CAPABILITY_GROUPS,
+  storyworldCapabilitiesByGroup,
+  storyworldCapabilityCounts,
+  type StoryworldCapabilityGroup,
+  type StoryworldCapabilityMaturity,
+} from "./studio-storyworld-catalog";
+import {
   STORYWORLD_DEMO_PROJECT,
   STUDIO_STORYWORLD_SCHEMA_VERSION,
   analyzeStoryworldProject,
@@ -45,14 +53,6 @@ import {
   type StoryworldProject,
   type StoryworldSeverity,
 } from "./studio-storyworld-causality";
-import {
-  STORYWORLD_CAPABILITIES,
-  STORYWORLD_CAPABILITY_GROUPS,
-  storyworldCapabilitiesByGroup,
-  storyworldCapabilityCounts,
-  type StoryworldCapabilityGroup,
-  type StoryworldCapabilityMaturity,
-} from "./studio-storyworld-catalog";
 import "./studio-storyworld-lab.css";
 
 import Link from "@/src/compat/router-link";

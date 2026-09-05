@@ -224,6 +224,9 @@ export function MarketComparePage() {
             <div
               role="region"
               aria-label="에셋 manifest 비교표"
+              // A horizontally scrollable region must be reachable by keyboard
+              // (WCAG 2.1.1); the labelled region role is the documented pattern.
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
               tabIndex={0}
               className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             >

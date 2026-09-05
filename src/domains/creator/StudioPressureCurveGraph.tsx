@@ -3,10 +3,11 @@
  * Existing documents still persist one scalar exponent; this wrapper keeps that public contract
  * while the editor and stylus sampling panel evolve independently.
  */
-import type { ReactElement } from "react";
 
 import { StudioPressureCalibrationPanel } from "./StudioPressureCalibrationPanel";
 import { StudioPressureCurveEditor } from "./StudioPressureCurveEditor";
+
+import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
 

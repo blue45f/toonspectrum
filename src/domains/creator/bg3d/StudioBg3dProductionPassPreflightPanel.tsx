@@ -1,8 +1,8 @@
 import { CheckCircle2, TriangleAlert, WandSparkles } from "lucide-react";
 import { useId, useMemo } from "react";
 
-import { evaluateStudioBg3dProductionPassReadiness } from "./studio-bg3d-production-pass-readiness";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
+import { evaluateStudioBg3dProductionPassReadiness } from "./studio-bg3d-production-pass-readiness";
 
 export function StudioBg3dProductionPassPreflightPanel() {
   const runtime = useStudioBg3dProSuiteRuntime();

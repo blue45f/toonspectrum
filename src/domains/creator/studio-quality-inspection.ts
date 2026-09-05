@@ -7,6 +7,7 @@
  * `review` rather than silently upgraded to a pass.
  */
 
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { auditBubbleTextLegibility } from "./lettering/studio-bubble-legibility-contrast";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
@@ -20,14 +21,17 @@ import {
   resolveBubbleLineHeight,
   type BubbleTextMeasurer,
 } from "./lettering/studio-bubble-text-fit";
-import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import { MAX_FRAME_FPS, MIN_FRAME_FPS } from "./studio-frame-animation-timing";
 import {
   hasContiguousLayerGroups,
   missingLayerGroupIds,
 } from "./studio-layers";
-import { MAX_FRAME_FPS, MIN_FRAME_FPS } from "./studio-frame-animation-timing";
 import { normalizePageReviewState } from "./studio-page-review";
 
+import type {
+  StudioContinuityIssue,
+  StudioContinuityIssueCode,
+} from "./studio-continuity";
 import type {
   BubbleEl,
   DrawEl,
@@ -35,10 +39,6 @@ import type {
   FrameEl,
   TextEl,
 } from "./studio-element-model";
-import type {
-  StudioContinuityIssue,
-  StudioContinuityIssueCode,
-} from "./studio-continuity";
 import type { PageState } from "./studio-page-state";
 
 export const STUDIO_QUALITY_INSPECTION_VERSION = 1 as const;
@@ -647,6 +647,16 @@ function inspectTextLettering(
   }
 }
 
+// NUL and the replacement character both mean the dialogue text was corrupted on
+// import. Expressed as a codepoint scan so no-control-regex stays satisfied.
+function hasInvalidDialogueCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code === 0 || code === 0xfffd) return true;
+  }
+  return false;
+}
+
 function inspectTextCharacters(
   page: PageState,
   pageIndex: number,
@@ -654,7 +664,7 @@ function inspectTextCharacters(
   add: (issue: MutableIssue) => void
 ): void {
   const text = el.text ?? "";
-  if (/[\u0000\uFFFD]/u.test(text)) {
+  if (hasInvalidDialogueCharacter(text)) {
     add({
       code: "INVALID_DIALOGUE_CHARACTER",
       category: "lettering",

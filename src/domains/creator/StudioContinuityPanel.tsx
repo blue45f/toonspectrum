@@ -268,6 +268,13 @@ function IssueIcon({ severity }: { severity: StudioQualitySeverity }) {
   return <Eye size={16} aria-hidden />;
 }
 
+/**
+ * Marks the scan epoch as an input of the quality scan. The epoch itself carries no
+ * data - it changes when fonts and resources settle, which is exactly when the
+ * measurement-dependent scan has to run again.
+ */
+function trackStudioQualityScanEpoch(_epoch: number): void {}
+
 export function StudioContinuityPanel({
   open,
   onClose,
@@ -304,18 +311,19 @@ export function StudioContinuityPanel({
   const storageKey = useMemo(() => safeStorageKey(documentKey), [documentKey]);
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
-  const report = useMemo(
-    () =>
-      inspectStudioQuality({
-        pages,
-        continuityIssues: issues,
-        openCommentCount,
-        supplementalIssues:
-          rasterInspection?.status === "complete" ? rasterInspection.issues : [],
-      }),
-    // scanEpoch intentionally retries browser font measurement after fonts/resources settle.
-    [issues, openCommentCount, pages, rasterInspection, scanEpoch]
-  );
+  const report = useMemo(() => {
+    // scanEpoch increments once fonts and resources settle, and the quality scan
+    // must be redone against those measurements. Reading it here makes that a
+    // real dependency instead of a lint exception.
+    trackStudioQualityScanEpoch(scanEpoch);
+    return inspectStudioQuality({
+      pages,
+      continuityIssues: issues,
+      openCommentCount,
+      supplementalIssues:
+        rasterInspection?.status === "complete" ? rasterInspection.issues : [],
+    });
+  }, [issues, openCommentCount, pages, rasterInspection, scanEpoch]);
 
   useEffect(() => {
     if (!open) return;
