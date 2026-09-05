@@ -1,4 +1,4 @@
-name: Temporary Studio production Windows runner switch
+name: Temporary Studio production Windows 2022 runner switch
 
 on:
   push:
@@ -17,8 +17,8 @@ concurrency:
 
 jobs:
   switch-runner:
-    runs-on: windows-2025
-    timeout-minutes: 10
+    runs-on: windows-2022
+    timeout-minutes: 12
     steps:
       - name: Checkout ready branch
         uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
           ref: feat/studio-production-command-center-ready-20260905
           fetch-depth: 0
 
-      - name: Make the delivery workflow portable to Windows
+      - name: Make the delivery workflow reusable and portable to Windows
         shell: bash
         run: |
           set -euo pipefail
@@ -38,13 +38,22 @@ jobs:
           source = workflow.read_text(encoding='utf-8')
 
           source, runner_count = re.subn(
-              r'(?m)^    runs-on: (?:ubuntu-latest|ubuntu-24\.04|ubuntu-24\.04-arm|macos-15|windows-2025)$',
-              '    runs-on: windows-2025',
+              r'(?m)^    runs-on: .+$',
+              '    runs-on: windows-2022',
               source,
               count=1,
           )
-          if runner_count != 1 and '    runs-on: windows-2025' not in source:
-              raise SystemExit('unexpected delivery runner declaration')
+          if runner_count != 1:
+              raise SystemExit('delivery runner declaration not found')
+
+          if '  workflow_call:' not in source:
+              source = source.replace(
+                  '  workflow_dispatch:\n',
+                  '  workflow_dispatch:\n  workflow_call:\n',
+                  1,
+              )
+          if '  workflow_call:' not in source:
+              raise SystemExit('workflow_call trigger was not added')
 
           source = source.replace(
               '          for index in $(seq -w 0 10); do',
@@ -56,9 +65,11 @@ jobs:
           end_marker = '          tar -xJf /tmp/studio-production-patch.tar.xz'
           start = source.find(start_marker)
           end_start = source.find(end_marker, start)
-          if start >= 0 and end_start >= 0:
-              end = end_start + len(end_marker)
-              portable = '''          python3 - <<'ARCHIVEPY'
+          if start < 0 or end_start < 0:
+              raise SystemExit('archive verification block not found')
+          end = end_start + len(end_marker)
+
+          portable = '''          python3 - <<'ARCHIVEPY'
           import base64
           import hashlib
           import io
@@ -83,8 +94,8 @@ jobs:
                   raise SystemExit(f"unexpected archive member count: {len(names)}")
               required = {
                   "src/domains/creator/studio-production/StudioProductionHubPage.tsx",
+                  "src/domains/creator/studio-production/studio-production-sqlite-persistence.ts",
                   "src/domains/creator/studio-router/studio-route-manifest.ts",
-                  "src/app/routes/app-route-title-ownership.test.ts",
               }
               missing = required.difference(names)
               if missing:
@@ -105,30 +116,49 @@ jobs:
               )
           print(f"verified product archive {actual_sha} with {len(names)} files")
           ARCHIVEPY'''
-              source = source[:start] + portable + source[end:]
-          elif "python3 - <<'ARCHIVEPY'" not in source:
-              raise SystemExit('archive verification block not found')
+          source = source[:start] + portable + source[end:]
 
-          build_pattern = re.compile(
-              r'(?m)^      - name: Build production application\n        run: pnpm run build$'
-          )
-          build_replacement = '''      - name: Build production application
+          validation_before = '''      - name: Validate architecture, types, and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run typecheck
+          pnpm run build'''
+          validation_after = '''      - name: Validate architecture, types, and production build
         shell: bash
         run: |
           set -euo pipefail
           export NODE_OPTIONS='--max-old-space-size=8192'
+          pnpm run validate:architecture
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
           pnpm run prebuild
-          pnpm exec tsc -p tsconfig.json
           pnpm exec vite build
           pnpm run postbuild'''
-          source, build_count = build_pattern.subn(build_replacement, source, count=1)
-          if build_count != 1 and 'pnpm exec vite build' not in source:
-              raise SystemExit('production build step not found')
+          if validation_before not in source:
+              raise SystemExit('validation/build step not found')
+          source = source.replace(validation_before, validation_after, 1)
 
+          cleanup_before = '''          rm -f .github/workflows/tmp-studio-production-ready.yml
+          git add -A'''
+          cleanup_after = '''          rm -f .github/workflows/tmp-studio-production-ready.yml
+          rm -f .github/workflows/tmp-studio-production-ready-call.yml
+          rm -f .github/workflows/tmp-studio-production-ready-arm.yml
+          rm -f .github/workflows/tmp-studio-production-ready-macos.yml
+          rm -f .github/workflows/tmp-studio-production-ready-slim.yml
+          rm -f .github/workflows/tmp-studio-production-ready-ubuntu2404.yml
+          rm -f .github/workflows/tmp-studio-production-ready-windows.yml
+          rm -rf .tmp
+          git add -A'''
+          if cleanup_before not in source:
+              raise SystemExit('final cleanup step not found')
+          source = source.replace(cleanup_before, cleanup_after, 1)
+
+          source = source.replace('/tmp/', '.tmp/')
           workflow.write_text(source, encoding='utf-8')
           PY
 
-      - name: Publish the portable one-shot workflow
+      - name: Publish reusable delivery workflow
         shell: bash
         run: |
           set -euo pipefail
@@ -136,9 +166,10 @@ jobs:
           rm -f .github/workflows/tmp-studio-production-ready-ubuntu2404.yml
           rm -f .github/workflows/tmp-studio-production-ready-arm.yml
           rm -f .github/workflows/tmp-studio-production-ready-macos.yml
+          rm -f .github/workflows/tmp-studio-production-ready-slim.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'ci(studio): run production delivery on Windows 2025'
+          git commit -m 'ci(studio): prepare reusable Windows delivery workflow'
           git push origin HEAD:feat/studio-production-command-center-ready-20260905
