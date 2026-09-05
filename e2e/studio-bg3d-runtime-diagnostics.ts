@@ -29,13 +29,8 @@ export const test = base.extend<{ nativeGpuDiagnostics: void }>({
       };
       window.addEventListener("error", (event) => emit("uncaught", describe(event.error)));
       window.addEventListener("unhandledrejection", (event) => emit("rejection", describe(event.reason)));
-      interface Adapter {
-        requestDevice(options?: unknown): Promise<unknown>;
-      }
-      interface Gpu {
-        requestAdapter(options?: unknown): Promise<Adapter | null>;
-      }
-      const gpu = (navigator as Navigator & { gpu?: Gpu }).gpu;
+      // Use the actual WebGPU interface: partial stand-ins erase required native adapter members.
+      const gpu = navigator.gpu;
       if (!gpu) { emit("api-absent", null); return; }
       const nativeRequest = gpu.requestAdapter.bind(gpu);
       let sequence = 0;
