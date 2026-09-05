@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   apply-and-verify:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
