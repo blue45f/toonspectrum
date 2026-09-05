@@ -27,7 +27,7 @@ function ProgressEditor({ post, onUpdated }: { post: FeedbackEntry; onUpdated: (
     try {
       const entry = await api.post<FeedbackEntry>(`/feedback/posts/${encodeURIComponent(post.id)}/progress`, {
         progress, expectedProgress: post.progress, note,
-      }, { timeout: 30_000 });
+      }, { timeout: 30_000, referrerPolicy: "no-referrer" });
       onUpdated({ progress: entry.progress, status: entry.status, answeredAt: entry.answeredAt, replyCount: entry.replyCount });
       setNote("");
     } catch (cause) { setError(await getApiErrorMessage(cause, "처리 상태를 변경하지 못했어요.")); }
@@ -62,7 +62,7 @@ export function FeedbackPostCard({ post, expanded, onToggle, userId, canManage, 
     if (!userId || busy.current) return;
     busy.current = true; setVoting(true); setError("");
     try {
-      const result = await api.post<{ voted: boolean; voteCount: number }>(`/feedback/posts/${encodeURIComponent(post.id)}/vote`, { voted: !post.viewerVoted }, { timeout: 20_000 });
+      const result = await api.post<{ voted: boolean; voteCount: number }>(`/feedback/posts/${encodeURIComponent(post.id)}/vote`, { voted: !post.viewerVoted }, { timeout: 20_000, referrerPolicy: "no-referrer" });
       if (useApp.getState().userId === userId) onUpdated({ viewerVoted: result.voted, voteCount: result.voteCount });
     } catch (cause) { setError(await getApiErrorMessage(cause, "공감을 반영하지 못했어요.")); }
     finally { busy.current = false; setVoting(false); }

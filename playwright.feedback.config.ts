@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "feedback-community.spec.ts",
+  testMatch: "feedback-community*.spec.ts",
   workers: 1,
   retries: 0,
   forbidOnly: !!process.env.CI,

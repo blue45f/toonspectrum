@@ -3,10 +3,10 @@ import { useId, useRef, useState } from "react";
 
 import type { FeedbackEntry, FeedbackKind } from "@/packages/core/src/feedback";
 
+import { useApp } from "@/lib/store";
 import {
   FEEDBACK_AREAS, FEEDBACK_AREA_LABELS, FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, validateFeedbackInput,
 } from "@/packages/core/src/feedback";
-import { useApp } from "@/lib/store";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 interface Props {
@@ -49,7 +49,8 @@ export function FeedbackComposer({ kind, onKindChange, userId, hydrated, apiRead
     setSending(true);
     setError("");
     try {
-      const entry = await api.post<FeedbackEntry>("/feedback/posts", parsed.value, { timeout: 30_000 });
+      // Also suppress the browser's ambient Referer URL, not just fields in the JSON body.
+      const entry = await api.post<FeedbackEntry>("/feedback/posts", parsed.value, { timeout: 30_000, referrerPolicy: "no-referrer" });
       if (useApp.getState().userId !== userId) return;
       setTitle(""); setText(""); setTags(""); setSteps(""); setExpected(""); setActual(""); setPublicConfirmed(false);
       onCreated(entry);

@@ -59,6 +59,7 @@ jobs:
           components/site-header.tsx
           e2e/feedback-community-harness.tsx
           e2e/feedback-community.spec.ts
+          e2e/feedback-community-contract.spec.ts
           packages/core/src/feedback.test.ts
           packages/core/src/feedback.ts
           packages/core/src/index.ts
@@ -74,7 +75,7 @@ jobs:
           src/domains/legal/feedback/use-feedback-feed.ts
           vite.feedback-review.config.ts
           EOF
-          tar -czf artifacts/feedback/reviewed-source.tar.gz -T /tmp/feedback-lint-files .github/workflows/feedback-community-validation.yml
+          tar -czf artifacts/feedback/reviewed-source.tar.gz -T /tmp/feedback-lint-files .github/workflows/feedback-community-validation.yml src/domains/legal/feedback/feedback-community.css e2e/feedback-community.html docs/feedback-community.md
       - name: Upload exact source for independent review
         uses: actions/upload-artifact@v4
         with:
