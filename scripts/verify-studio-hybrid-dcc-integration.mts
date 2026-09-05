@@ -1191,7 +1191,7 @@ async function readNeutralBg3dSubjectFraming(
 async function openProjectActions(page: Page): Promise<Locator> {
   const menu = page.locator('[data-studio-project-actions-menu="true"]');
   if (await menu.isVisible().catch(() => false)) return menu;
-  const trigger = page.getByRole("button", { name: "프로젝트 작업", exact: true });
+  const trigger = page.getByRole("button", { name: "프로젝트 센터", exact: true });
   await visibleOrBlock(
     trigger,
     "project-actions-trigger",

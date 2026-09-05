@@ -349,6 +349,10 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
   } = s;
   return (
           <div
+            id="studio-canvas-workspace"
+            role="region"
+            aria-label="캔버스 작업영역"
+            tabIndex={-1}
             className={cn(
               "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
               showRulers && !canvasOnlyMode && "lg:pl-[22px] lg:pt-[22px]"
