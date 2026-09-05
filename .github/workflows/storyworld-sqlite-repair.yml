@@ -1,0 +1,77 @@
+name: Storyworld SQLite authority repair
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-sqlite-repair.yml]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PRODUCT_SHA: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
+      PRODUCT_BRANCH: feat/storyworld-causality-lab-20260905
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
+          path: product
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 0a8387b7bc4749b792d8bd53fbdf0a9714161439
+          path: repair-source
+          sparse-checkout: .github
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: product/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: product/pnpm-lock.yaml
+      - name: Apply only the reviewed source repair
+        working-directory: product
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          python3 ../repair-source/.github/storyworld-sqlite-repair.py
+      - name: Install locked dependencies
+        working-directory: product
+        run: pnpm install --frozen-lockfile
+      - name: Format and lint Storyworld changes
+        working-directory: product
+        run: pnpm exec eslint --fix --max-warnings=0 src/domains/creator/storyworld
+      - name: Verify persistence, actual page, routes and the unchanged browser-KV boundary
+        working-directory: product
+        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts
+      - name: Verify full Web and API TypeScript
+        working-directory: product
+        run: pnpm run typecheck
+      - name: Verify architecture and semantic receipt
+        working-directory: product
+        run: |
+          pnpm run validate:architecture
+          pnpm exec node scripts/verify-storyworld-lab.mjs
+      - name: Publish the verified product repair, never the helper workflow
+        working-directory: product
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/$PRODUCT_BRANCH" | cut -f1)"
+          test "$remote_sha" = "$PRODUCT_SHA"
+          git switch -c "$PRODUCT_BRANCH"
+          git add -- src/domains/creator/storyworld/StudioStoryworldLabPage.tsx src/domains/creator/storyworld/StudioStoryworldLabPage.test.tsx src/domains/creator/storyworld/draft-store.ts src/domains/creator/storyworld/draft-store.test.ts docs/studio-storyworld-causality-lab-2026-09-05.md
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio): persist Storyworld drafts through shared SQLite authority'
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$PRODUCT_BRANCH"
+          printf 'Verified product commit: %s\nRequired PR core CI remains mandatory.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
