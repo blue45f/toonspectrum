@@ -1,4 +1,6 @@
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
+
+import { test } from "./studio-bg3d-runtime-diagnostics";
 
 /** Strict production counterpart of the general 3D visual suite. No unavailable/timeout skip. */
 const DIALOG = '[data-testid="studio-bg3d-dialog"]';
@@ -133,17 +135,20 @@ async function openReadyWebGpu(page: Page, info: TestInfo, label: string): Promi
   }
   await expect(preference).toHaveAttribute("aria-pressed", "true");
   try {
-    // A three-second UI response deadline is not proof of missing hardware. The same native
-    // request may still complete and update the real capability result. Wait for positive proof,
-    // not merely the disappearance of the probing indicator or a transient unavailable alert.
+    // A UI response deadline is not proof of missing hardware. Demand positive capability and
+    // renderer evidence. A real initialization failure ends the wait immediately, never a skip.
     await expect(backend).toHaveText(/WebGPU 사용 중/u, { timeout: READINESS_TIMEOUT_MS });
+    const readiness = await page.waitForFunction((selector) => {
+      const active = document.querySelector('[data-testid="studio-bg3d-engine-active-backend"]');
+      if (active?.textContent?.includes("실행 실패")) return "failed";
+      const canvas = document.querySelector<HTMLCanvasElement>(selector);
+      return canvas && canvas.width > 300 && canvas.height > 150 ? "ready" : false;
+    }, CANVAS, { timeout: READINESS_TIMEOUT_MS });
+    expect(await readiness.jsonValue(), "Renderer must initialize and resize without device failure")
+      .toBe("ready");
     await expect(page.getByTestId("studio-bg3d-engine-unavailable")).toHaveCount(0);
     await expect(page.locator(CANVAS)).toHaveCount(1);
     await expect(page.locator(CANVAS).first()).toBeVisible();
-    await expect.poll(async () => {
-      const surface = await readSurface(page);
-      return surface.bufferWidth > 300 && surface.bufferHeight > 150;
-    }, { timeout: READINESS_TIMEOUT_MS, message: "Renderer must own a resized canvas" }).toBe(true);
   } finally {
     await info.attach(`${label}-engine-readiness.json`, {
       body: Buffer.from(JSON.stringify({
@@ -156,7 +161,6 @@ async function openReadyWebGpu(page: Page, info: TestInfo, label: string): Promi
   }
   await page.getByRole("tab", { name: "도형", exact: true }).click();
   await page.locator('[aria-label="상자 추가"]').first().click();
-  // A selected object must actually survive restoration before the renderer test can begin.
   await expect(page.getByRole("spinbutton", { name: "회전 Y", exact: true }).first())
     .toBeVisible({ timeout: READINESS_TIMEOUT_MS });
   await page.getByRole("button", { name: "회전", exact: true }).first().click();
@@ -185,7 +189,6 @@ async function dragRing(page: Page, info: TestInfo, label: "continuous" | "direc
       }
       values = await readValues();
       if (values.every((value, index) => value === initial[index])) continue;
-      // Capture while still pointer-down, exactly like the original accumulation regression.
       return { values, capture: await stableFrame(page, info, label) };
     } finally {
       await page.mouse.up();

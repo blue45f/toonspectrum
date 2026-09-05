@@ -6,7 +6,7 @@ on:
     paths:
       - "src/domains/creator/bg3d/**"
       - "e2e/studio-3d-visual-verification.spec.ts"
-      - "e2e/studio-bg3d-production-rotation.spec.ts"
+      - "e2e/studio-bg3d-*"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
       - "tsconfig.bg3d-runtime.json"
@@ -19,7 +19,7 @@ on:
     paths:
       - "src/domains/creator/bg3d/**"
       - "e2e/studio-3d-visual-verification.spec.ts"
-      - "e2e/studio-bg3d-production-rotation.spec.ts"
+      - "e2e/studio-bg3d-*"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
       - "tsconfig.bg3d-runtime.json"
@@ -59,9 +59,10 @@ jobs:
       - name: Check changed verification and capability code
         run: |
           pnpm exec eslint --no-ignore --max-warnings 0 \
-            e2e/studio-bg3d-production-rotation.spec.ts \
+            e2e/studio-bg3d-production-rotation.runtime.ts e2e/studio-bg3d-runtime-diagnostics.ts \
             playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
-            scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts \
+            scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-discovery.test.ts \
+            scripts/studio-bg3d-runtime-setup.mts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability.ts \
@@ -77,6 +78,7 @@ jobs:
       - name: Test capability, late response and single-canvas renderer ownership
         run: |
           pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
+            scripts/studio-bg3d-runtime-discovery.test.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.test.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts \

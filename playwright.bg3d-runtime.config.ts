@@ -16,9 +16,9 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   ...baseConfig,
-  // The ordinary visual suite may skip unavailable hosts. The strict counterpart waits for a
-  // positive runtime state and never mistakes a transient UI deadline for unavailable hardware.
-  testMatch: "studio-bg3d-production-rotation.spec.ts",
+  // A .runtime.ts file is intentionally outside ordinary Playwright .spec/.test discovery.
+  // Only this explicit production configuration collects it, without skipping any assertions.
+  testMatch: "studio-bg3d-production-rotation.runtime.ts",
   grep: /WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는다/u,
   retries: 0,
   workers: 1,
