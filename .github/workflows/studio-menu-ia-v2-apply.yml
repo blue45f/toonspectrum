@@ -25,6 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure migration author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Integrate current main
         run: git merge --no-edit origin/main
 
@@ -41,8 +46,6 @@ jobs:
 
       - name: Commit optimized menu IA
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet && { echo "Migration produced no changes"; exit 1; }
           git commit -m "feat(studio): optimize menu information architecture"
