@@ -6,6 +6,8 @@ on:
     paths:
       - "src/domains/creator/assistant/**"
       - "src/domains/creator/StudioCompanionAssistantDisplay*"
+      - "src/domains/creator/StudioReferencePanel*"
+      - "src/domains/creator/studio-reference-import*"
       - "src/domains/creator/studio-workbench-*"
       - "src/domains/creator/use-studio-copy-feedback*"
       - "src/domains/creator/studio-panel-ui*"
@@ -18,6 +20,8 @@ on:
     paths:
       - "src/domains/creator/assistant/**"
       - "src/domains/creator/StudioCompanionAssistantDisplay*"
+      - "src/domains/creator/StudioReferencePanel*"
+      - "src/domains/creator/studio-reference-import*"
       - ".github/workflows/webtoon-assistant-regression.yml"
 
 permissions:
@@ -50,14 +54,32 @@ jobs:
           result=$?
           tail -n 30 "$RUNNER_TEMP/webtoon-install.log"
           exit "$result"
+      - name: Diagnose native clipboard file support
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { JSDOM } from 'jsdom';
+          const dom = new JSDOM('');
+          try {
+            const file = new dom.window.File(['GIF89a'], 'clipboard.gif', { type: 'image/gif' });
+            console.log(JSON.stringify({ node: process.version, fileBytes: file.size, arrayBuffer: typeof file.arrayBuffer }));
+            if (typeof file.arrayBuffer === 'function') {
+              console.log(`GIF signature: ${new TextDecoder().decode(await file.arrayBuffer())}`);
+            }
+          } finally {
+            dom.window.close();
+          }
+          JS
       # This fast feedback job supplements, never replaces, the complete required core suite.
-      - name: Verify both assistant surfaces and all shared engines
+      - name: Verify assistant surfaces, reference imports and shared engines
         shell: bash
         run: |
           set +e
           pnpm exec vitest run \
             src/domains/creator/assistant \
             src/domains/creator/StudioCompanionAssistantDisplay.test.tsx \
+            src/domains/creator/StudioReferencePanel.test.tsx \
+            src/domains/creator/studio-reference-import \
             src/domains/creator/studio-workbench-tabs.test.tsx \
             src/domains/creator/studio-sfx-lettering.test.ts \
             --reporter=json \
