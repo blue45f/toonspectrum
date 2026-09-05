@@ -24,11 +24,11 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 import {
   consumeStudioAiSuperSuiteOpenRequest,
   subscribeStudioAiSuperSuiteOpenRequest,
 } from "./studio-ai-super-suite-intent";
-import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";

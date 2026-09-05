@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./filter/studio-filter-pack-registry";
-
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,

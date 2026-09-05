@@ -63,8 +63,8 @@ import {
 
 import type { StudioWorkbenchTab } from "../studio-workbench-tabs";
 import type { StudioCopyFeedbackStatus } from "../use-studio-copy-feedback";
-import type { ReactElement } from "react";
 import type { StudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
+import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
 

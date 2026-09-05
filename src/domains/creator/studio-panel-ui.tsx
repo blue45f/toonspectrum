@@ -8,9 +8,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 
+import { StudioSurfaceState } from "./StudioSurfaceState";
+
 import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 
-import { StudioSurfaceState } from "./StudioSurfaceState";
 
 import { cn } from "@/lib/utils";
 
