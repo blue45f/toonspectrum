@@ -5,18 +5,20 @@ on:
     branches: [main]
     paths:
       - src/domains/creator/live/**
+      - scripts/verify-studio-p2p-channel-lifecycle.mjs
       - .github/workflows/studio-mesh-sync-repair.yml
   push:
     branches: [fix/collaboration-cross-browser-sync-20260905]
     paths:
       - src/domains/creator/live/**
+      - scripts/verify-studio-p2p-channel-lifecycle.mjs
       - .github/workflows/studio-mesh-sync-repair.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: studio-mesh-sync-repair
+  group: studio-mesh-sync-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,15 +29,19 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
+      - name: Verify channel lifecycle independently
+        run: node --experimental-strip-types --test scripts/verify-studio-p2p-channel-lifecycle.mjs
       - run: pnpm install --frozen-lockfile
-      - name: Verify collaboration synchronization
-        run: pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts src/domains/creator/live/studio-live-collaboration-room.ink.test.ts src/domains/creator/live/studio-live-socket-transport.test.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
+      - name: Verify collaboration synchronization and reconnects
+        run: pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-p2p-reconnect.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts src/domains/creator/live/studio-live-collaboration-room.ink.test.ts src/domains/creator/live/studio-live-socket-transport.test.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
       - name: Lint collaboration changes
-        run: pnpm exec eslint src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
+        run: pnpm exec eslint src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-live-p2p-channel-lifecycle.ts src/domains/creator/live/studio-live-p2p-reconnect.test.ts src/domains/creator/live/studio-mesh-sync-regression.test.ts
       - name: Check application types
         run: pnpm run typecheck
