@@ -1,6 +1,10 @@
 /** Isolated PostgreSQL integration verification. Never points at production. */
 import assert from "node:assert/strict";
-import { writeFile, mkdir } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { promisify } from "node:util";
+
+import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 
 const rawUrl = process.env.TEST_DATABASE_URL;
 if (!rawUrl) throw new Error("TEST_DATABASE_URL is required for the isolated feedback database.");
@@ -18,6 +22,7 @@ function input(category = "bug", title = "브러시 오류") {
   const value = validateFeedbackInput({ category, title, text: "필터 적용 후 브러시 입력이 멈춥니다.", tags: ["브러시"], metadata: { area: "drawing", steps: "1. 필터 적용\n2. 브러시 사용", expected: "선이 그려짐", actual: "선이 그려지지 않음" } }).value;
   assert.ok(value); return value;
 }
+let runtimeRole: string | null = null;
 try {
   // Test-only database is rebuilt to simulate an existing Q&A installation without the new columns.
   await dbPool.query('DROP TABLE IF EXISTS feedback_vote, feedback_reply, feedback_post, "user" CASCADE');
@@ -30,6 +35,10 @@ try {
   )`);
   await dbPool.query(`INSERT INTO feedback_post(id,"userId",title,text,status) VALUES ('legacy','member','기존 이용 질문','기존 답변을 보존해야 합니다.','answered')`);
   await check("additive migration preserves legacy questions and reply state", async () => {
+    await assert.rejects(feedback.ensureFeedbackTables(), { statusCode: 503 });
+    const migration = await readFile(new URL("../apps/api/src/db/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
+    // Execute twice through the owner, never through the runtime API connection.
+    for (let index = 0; index < 2; index++) await dbPool.query(`BEGIN; ${migration} COMMIT;`);
     await Promise.all([feedback.ensureFeedbackTables(), feedback.ensureFeedbackTables()]);
     const legacy = await feedback.getFeedbackPost("legacy");
     assert.equal(legacy.status, "answered"); assert.equal(legacy.progress, "received"); assert.deepEqual(legacy.metadata, {});
@@ -111,7 +120,49 @@ try {
     await assert.rejects(feedback.createFeedbackReply({ postId: bugId, userId: "member", text: "숨김 글 댓글", isOfficial: false }), { statusCode: 404 });
     await assert.rejects(feedback.updateFeedbackProgress(bugId, "staff", "completed", "숨김 처리", "reviewing"), { statusCode: 404 });
   });
+  await check("non-owning runtime can read, post, reply, vote and manage without DDL", async () => {
+    runtimeRole = `feedback_runtime_${process.pid}`;
+    await dbPool.query(`CREATE ROLE "${runtimeRole}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION`);
+    await dbPool.query(`GRANT USAGE ON SCHEMA public TO "${runtimeRole}"`);
+    await dbPool.query(`GRANT SELECT ON public."user" TO "${runtimeRole}"`);
+    await dbPool.query(buildFeedbackRuntimeAclSql(runtimeRole));
+    await dbPool.query(buildFeedbackCapabilitySql(runtimeRole));
+    const runtimeUrl = new URL(rawUrl);
+    runtimeUrl.searchParams.set("options", `-c role=${runtimeRole}`);
+    const script = `
+      const assert = (await import('node:assert/strict')).default;
+      const { dbPool } = await import('./apps/api/src/db/index.ts');
+      const feedback = await import('./apps/api/src/server/feedback.ts');
+      try {
+        const { rows } = await dbPool.query("SELECT current_user AS name, has_schema_privilege(current_user, 'public', 'CREATE') AS ddl");
+        assert.equal(rows[0].name, process.env.FEEDBACK_RUNTIME_ROLE);
+        assert.equal(rows[0].ddl, false);
+        await assert.rejects(dbPool.query('CREATE TABLE public.feedback_forbidden_ddl(id text)'), { code: '42501' });
+        await feedback.ensureFeedbackTables();
+        const value = feedback.validateFeedbackPost({ category:'request',title:'권한 분리 검증',text:'운영 권한만으로 제보합니다.' }).value;
+        assert.ok(value);
+        const post = await feedback.createFeedbackPost('member', value);
+        assert.equal((await feedback.setFeedbackVote(post.id, 'member', true)).voteCount, 1);
+        assert.equal((await feedback.setFeedbackVote(post.id, 'member', false)).voteCount, 0);
+        await feedback.createFeedbackReply({ postId:post.id,userId:'member',text:'운영 권한 댓글',isOfficial:false });
+        assert.equal((await feedback.listFeedbackReplies(post.id)).length, 1);
+        const changed = await feedback.updateFeedbackProgress(post.id, 'staff', 'reviewing', '검토 중입니다.', 'received');
+        assert.equal(changed.progress, 'reviewing');
+        console.log('Restricted runtime CRUD and operator flow passed; DDL denied.');
+      } finally { await dbPool.end(); }
+    `;
+    const child = await promisify(execFile)(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", script], {
+      cwd: process.cwd(), env: { ...process.env, DATABASE_URL: runtimeUrl.toString(), FEEDBACK_RUNTIME_ROLE: runtimeRole }, timeout: 60_000,
+    });
+    console.log(child.stdout.trim());
+  });
   await mkdir("artifacts/feedback", { recursive: true });
   await writeFile("artifacts/feedback/database-results.json", JSON.stringify({ status: "passed", checks, database: "isolated loopback feedback_community_test" }, null, 2));
   console.log(`Passed ${checks.length} PostgreSQL integration scenarios.`);
-} finally { await dbPool.end(); }
+} finally {
+  if (runtimeRole) {
+    await dbPool.query(`DROP OWNED BY "${runtimeRole}"`);
+    await dbPool.query(`DROP ROLE "${runtimeRole}"`);
+  }
+  await dbPool.end();
+}
