@@ -1,0 +1,113 @@
+name: Studio PBR acquisition and verification
+on:
+  push:
+    branches: [feat/studio-pbr-acquisition-20260906]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  acquire-pbr:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-pbr-acquisition-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare pinned verification tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
+      - name: Acquire native 2K PBR originals from official CC0 sources
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Load and render every acquired model from three angles
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Retain only verified manifest files and generate real review sheets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          import hashlib,json,os,shutil,sys
+          sys.path.insert(0,'scripts')
+          from studio_asset_delivery import write_gallery
+          source=Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          out=Path(os.environ['RUNNER_TEMP'])/'pbr-delivery'
+          out.mkdir()
+          manifest=json.loads((source/'manifest.json').read_text())
+          assets=manifest['assets']
+          assert assets and len({a['id'] for a in assets})==len(assets)
+          for a in assets:
+              p=source/a['path']
+              assert p.resolve().is_relative_to(source.resolve())
+              raw=p.read_bytes()
+              assert len(raw)==a['bytes'] and hashlib.sha256(raw).hexdigest()==a['sha256']
+              if a['kind']=='model': assert a.get('browserRenderVerified') is True
+              paths=[a['path'], str(Path(a['path']).parent/'SOURCE.json')]
+              if a.get('previewPath'): paths.append(a['previewPath'])
+              for m in a.get('pbrMaps',[]):
+                  raw=(source/m['path']).read_bytes()
+                  assert len(raw)==m['bytes'] and hashlib.sha256(raw).hexdigest()==m['sha256']
+                  paths.append(m['path'])
+              for rel in paths:
+                  p=(source/rel).resolve()
+                  assert p.is_relative_to(source.resolve()) and p.is_file()
+                  dest=out/rel; dest.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(p,dest)
+          for name in ['manifest.json','delivery-report.json','browser-render-evidence.json','acquisition-plan.json','source-receipts.json']:
+              shutil.copyfile(source/name,out/name)
+          # Match the standalone image gallery to each model's actual render, not supplier marketing images.
+          gallery_assets=[{**a,'path':a.get('previewPath',a['path']),'kind':'preview'} for a in assets]
+          write_gallery(out,gallery_assets)
+          for number,start in enumerate(range(0,len(assets),24),1):
+              sheet=Image.new('RGB',(1600,1400),'#ededf0'); draw=ImageDraw.Draw(sheet)
+              draw.text((20,16),f'ToonStudio PBR candidates | page {number} | NOT an artistic approval',fill='#17171b')
+              for i,a in enumerate(assets[start:start+24]):
+                  x=(i%6)*264+8; y=(i//6)*340+46
+                  with Image.open(out/a.get('previewPath',a['path'])) as image:
+                      image=image.convert('RGBA');image.thumbnail((252,278));sheet.paste(image,(x+(252-image.width)//2,y+(278-image.height)//2),image)
+                  draw.text((x+2,y+285),(str(start+i+1)+' '+a['id'])[:36],fill='#151518')
+                  draw.text((x+2,y+302),a['kind']+' | native 2K',fill='#555560')
+              sheet.save(out/f'pbr-review-{number:02d}.jpg',quality=95)
+              sheet.save(out/f'pbr-review-{number:02d}.pdf','PDF',resolution=144,quality=95)
+          (out/'README.md').write_text('# ToonStudio PBR CC0 originals\n\nActual 2K originals and their PBR companion maps; model previews are generated from the delivered GLB. Manifest and source receipts identify every asset. Original counts exclude previews and companion maps. This is a technically verified review collection, NOT an assertion of completed artistic or Studio round-trip review. No user-uploaded file or saved work has been removed.\n')
+          dest=Path('public/assets/studio/pbr-candidates-20260906')
+          shutil.copytree(out,dest,dirs_exist_ok=True)
+          report=Path('docs/reports/studio-pbr-acquisition-20260906');report.mkdir(parents=True,exist_ok=True)
+          for name in ['delivery-report.json','browser-render-evidence.json']:
+              shutil.copyfile(out/name,report/name)
+          print('PBR DELIVERY COUNT',len(assets),flush=True)
+          print('PBR DELIVERY REPORT', (out/'delivery-report.json').read_text(),flush=True)
+          PY
+      - name: Verify existing catalog contract without changing production selection
+        run: pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts
+      - name: Commit actual PBR files to acquisition branch only
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-pbr-acquisition-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/pbr-candidates-20260906 docs/reports/studio-pbr-acquisition-20260906
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): retain native 2K PBR originals and actual model previews"
+            git push origin "HEAD:$GITHUB_REF"
+          fi
+          git log -1 --format='PBR_DELIVERY_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-originals-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-delivery/
+          if-no-files-found: warn
+          compression-level: 1
+          retention-days: 14
