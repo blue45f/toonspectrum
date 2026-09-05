@@ -25,6 +25,13 @@ const StudioToolsCompanionPage = lazyRetry(
   "StudioToolsCompanionPage",
 );
 
+const StudioStoryworldLabPage = lazyRetry(
+  () => import("../storyworld/StudioStoryworldLabPage").then((module) => ({
+    default: module.StudioStoryworldLabPage,
+  })),
+  "StudioStoryworldLabPage",
+);
+
 export function StudioRouter() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,6 +65,16 @@ export function StudioRouter() {
       return (
         <Suspense fallback={<StudioRouteLoading label="2D → 3D 변환 작업대를 여는 중..." />}>
           <StudioLift3dPage initialSubject={resolution.subject} />
+        </Suspense>
+      );
+    case "storyworld":
+      return (
+        <Suspense fallback={<StudioRouteLoading label="스토리월드 인과관계 랩을 여는 중..." />}>
+          <StudioStoryworldLabPage
+            key={resolution.lifecycleKey}
+            remixSourceWorkId={resolution.remixSourceWorkId}
+            workId={resolution.workId}
+          />
         </Suspense>
       );
     case "companion":

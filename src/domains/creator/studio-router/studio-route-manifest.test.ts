@@ -8,7 +8,7 @@ import {
 
 describe("Studio route manifest", () => {
   it("declares one owner for each Studio route family", () => {
-    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(5);
+    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(6);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
       STUDIO_ROUTE_MANIFEST.length,
     );
