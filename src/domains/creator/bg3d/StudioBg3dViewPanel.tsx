@@ -64,6 +64,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     context.shotBatchBlockedReason ?? passReadiness.blockingReason;
   const runtime: StudioBg3dProSuiteRuntimeValue = {
     disabled,
+    proSuiteActive: !props.hidden && context.viewEditorSection === "prosuite",
     baseCamera: context.sceneBaseDocument.camera,
     productionShots: context.savedShots,
     sceneSummary,

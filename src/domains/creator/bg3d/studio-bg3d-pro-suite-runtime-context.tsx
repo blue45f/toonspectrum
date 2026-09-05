@@ -63,6 +63,8 @@ export interface StudioBg3dProductionBatchRuntime {
  */
 export interface StudioBg3dProSuiteRuntimeValue {
   readonly disabled: boolean;
+  /** Actual view-tab visibility; hidden, never-opened specialist tools must not load. */
+  readonly proSuiteActive?: boolean;
   readonly baseCamera: StudioBg3dCameraSettings;
   readonly productionShots: readonly StudioBg3dShot[];
   readonly productionBatch?: StudioBg3dProductionBatchRuntime;
