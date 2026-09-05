@@ -84,6 +84,14 @@ jobs:
                   command.append(line[10:] if line else '')
               assert command[0] == "python3 - <<'PY'" and 'git diff --check' in command
               subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', '\n'.join(command)], check=True)
+          # The menu factory crosses a domain subsystem boundary. Preserve the guard,
+          # and use the same explicit alias convention required by the repository.
+          path = Path('src/domains/creator/studio-main-menu-items-filter.ts')
+          text = path.read_text()
+          old = 'import { orderStudioFilterMenuItems } from "./filter/studio-filter-menu-groups";'
+          new = 'import { orderStudioFilterMenuItems } from "@/domains/creator/filter/studio-filter-menu-groups";'
+          assert text.count(old) + text.count(new) == 1, 'Unexpected filter grouping import'
+          path.write_text(text.replace(old, new))
           PY
           git diff --check
           git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts .github/workflows/studio-discovery-ux.yml
@@ -102,6 +110,8 @@ jobs:
         run: |
           pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
           git diff --check
+      - name: Enforce repository architecture boundaries before publishing
+        run: node scripts/check-architecture-boundaries.mjs
       - name: Verify grouping, inventory, actions, naming and search contracts before publishing
         run: pnpm exec vitest run src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/filter/studio-filter-discovery.test.ts src/domains/creator/brush/studio-brush-catalog-names.test.ts src/domains/creator/brush/studio-brush-discovery.test.ts src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx
       - name: Publish isolated changes without force or main writes
