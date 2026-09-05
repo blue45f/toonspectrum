@@ -17,51 +17,13 @@ jobs:
     if: github.repository == 'blue45f/toonspectrum'
     runs-on: macos-15
     timeout-minutes: 35
-    permissions:
-      contents: read
-      actions: write
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       PRODUCT_SHA: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
     steps:
-      - name: Cancel only superseded PR 746 CI attempts
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import urllib.error
-          import urllib.request
-
-          base = 'https://api.github.com/repos/blue45f/toonspectrum/'
-          def request(path, method='GET'):
-              req = urllib.request.Request(base + path, method=method, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  data = response.read()
-                  return json.loads(data) if data else None
-
-          pr = request('pulls/746')
-          assert pr['head']['sha'] == os.environ['PRODUCT_SHA'] and pr['state'] == 'open' and pr['base']['ref'] == 'main'
-          old = {33948645140: '593b97c77d3428d327ee066875df2d5907b74b4b', 33949223974: 'a8f194ccaf7cc4f68f41b56a60a156bb7b55d60e', 33952621804: 'c5c802e2dccd1fd23fb4a46b1ae020766d391082'}
-          for run_id, sha in old.items():
-              run = request(f'actions/runs/{run_id}')
-              assert run['head_sha'] == sha and run['head_branch'] == 'feat/storyworld-causality-lab-20260905'
-              assert run['name'] == 'CI' and run['event'] == 'pull_request'
-              assert any(item['number'] == 746 for item in run['pull_requests'])
-              if run['status'] == 'completed':
-                  print(f'Old run {run_id} already completed; left unchanged.')
-                  continue
-              try:
-                  request(f'actions/runs/{run_id}/cancel', 'POST')
-                  print(f'Cancelled superseded run {run_id}; current-head CI is untouched.')
-              except urllib.error.HTTPError as error:
-                  if error.code != 409:
-                      raise
-                  print(f'Old run {run_id} completed while cancellation was requested.')
-          PY
+      # This branch owns only diagnostics. The tested product revision is the pinned PR 746
+      # head below, not the workflow branch commit. The separate stale-run cleanup completed;
+      # this job neither writes repository content nor cancels any workflow.
       - uses: actions/checkout@v6
         with:
           ref: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
