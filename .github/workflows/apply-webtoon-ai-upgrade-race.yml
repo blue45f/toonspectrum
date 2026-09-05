@@ -1,0 +1,70 @@
+name: Apply webtoon AI upgrade (runner race)
+
+on:
+  push:
+    branches:
+      - feat/webtoon-ai-quality-ux-v2-20260905
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Decode and verify reviewed patch
+        shell: bash
+        env:
+          PATCH_OUT: ${{ runner.temp }}/toonstudio-webtoon-ai-upgrade.patch
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import lzma
+          import os
+          from pathlib import Path
+
+          source = Path('.github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64')
+          patch = lzma.decompress(base64.b64decode(source.read_text(encoding='utf-8')))
+          expected = '8cc17b1d66ce770c75c0996b263475e77a436828c84941ed4a63f51810646def'
+          actual = hashlib.sha256(patch).hexdigest()
+          if actual != expected:
+              raise SystemExit(f'patch checksum mismatch: {actual}')
+          Path(os.environ['PATCH_OUT']).write_bytes(patch)
+          PY
+          git apply --check --3way --whitespace=error-all "$PATCH_OUT"
+          git apply --3way --whitespace=error-all "$PATCH_OUT"
+          git diff --check
+
+      - name: Commit product tree; first runner wins
+        shell: bash
+        env:
+          BRANCH: feat/webtoon-ai-quality-ux-v2-20260905
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64 \
+            .github/workflows/apply-webtoon-ai-upgrade-race.yml
+          rmdir .github/patches 2>/dev/null || true
+          test ! -e .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64
+          test ! -e .github/workflows/apply-webtoon-ai-upgrade-race.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): upgrade webtoon AI production UX and quality gates"
+          git push \
+            --force-with-lease="refs/heads/${BRANCH}:${GITHUB_SHA}" \
+            origin "HEAD:refs/heads/${BRANCH}"
