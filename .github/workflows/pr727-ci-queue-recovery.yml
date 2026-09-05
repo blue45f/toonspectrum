@@ -1,0 +1,85 @@
+name: PR 727 superseded CI queue recovery
+
+# One-shot maintenance branch only. This workflow is not proposed for main.
+# It cannot merge, push code, write check statuses, or alter branch protection.
+on:
+  push:
+    branches: [codex/pr727-ci-queue-recovery-20260905]
+    paths: [.github/workflows/pr727-ci-queue-recovery.yml]
+
+permissions:
+  actions: write
+  pull-requests: read
+
+jobs:
+  prune-superseded-pr727-ci:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No checkout and no dependency installation: repository code never receives this token.
+      - name: Cancel only superseded CI runs belonging to PR 727
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs';
+          const repo = 'blue45f/toonspectrum';
+          const branch = 'codex/webtoon-assistant-quality-ux-20260905';
+          const expectedHead = 'fd96f7011782877b1f4fe1685c641713e6008b42';
+          const prNumber = 727;
+          const apiBase = `https://api.github.com/repos/${repo}`;
+          const notes = [];
+          const log = (message) => { notes.push(message); console.log(message); };
+          async function api(path, method = 'GET') {
+            const response = await fetch(`${apiBase}${path}`, {
+              method,
+              headers: {
+                Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+              },
+              signal: AbortSignal.timeout(20000),
+            });
+            if (method === 'POST' && response.status === 409) return null;
+            if (!response.ok) throw new Error(`${method} ${path}: HTTP ${response.status}`);
+            if (response.status === 202 || response.status === 204) return null;
+            return response.json();
+          }
+          function assertTarget(pr) {
+            return pr.number === prNumber && pr.state === 'open' && !pr.merged &&
+              pr.head.repo?.full_name === repo && pr.head.ref === branch &&
+              pr.head.sha === expectedHead && pr.base.ref === 'main';
+          }
+          const initial = await api(`/pulls/${prNumber}`);
+          if (!assertTarget(initial)) {
+            log('PR closed, merged, or moved: no runs cancelled.');
+          } else {
+            const candidates = new Map();
+            for (const status of ['queued', 'in_progress', 'pending', 'requested']) {
+              for (let page = 1; page <= 5; page++) {
+                const params = new URLSearchParams({ branch, event: 'pull_request', status, per_page: '100', page: String(page) });
+                const data = await api(`/actions/runs?${params}`);
+                for (const run of data.workflow_runs ?? []) {
+                  if (run.workflow_id !== 287571038 || run.path !== '.github/workflows/ci.yml') continue;
+                  if (run.head_branch !== branch || run.head_repository?.full_name !== repo) continue;
+                  if (run.event !== 'pull_request' || run.head_sha === expectedHead) continue;
+                  if (!(run.pull_requests ?? []).some((pr) => pr.number === prNumber)) continue;
+                  if (!['queued', 'in_progress', 'pending', 'requested'].includes(run.status)) continue;
+                  candidates.set(run.id, run);
+                }
+                if ((data.workflow_runs ?? []).length < 100) break;
+              }
+            }
+            for (const run of candidates.values()) {
+              if (!assertTarget(await api(`/pulls/${prNumber}`))) throw new Error('PR head changed; stopped before cancellation.');
+              const live = await api(`/actions/runs/${run.id}`);
+              if (live.head_sha === expectedHead || live.head_branch !== branch || live.event !== 'pull_request') throw new Error('Run identity changed; refusing cancellation.');
+              if (live.status === 'completed') { log(`Already completed: ${run.id}`); continue; }
+              await api(`/actions/runs/${run.id}/cancel`, 'POST');
+              log(`Cancellation requested for superseded CI ${run.id} (${live.head_sha.slice(0, 7)}).`);
+            }
+            log(`Latest head ${expectedHead} and its CI are preserved. No other PR runs were changed.`);
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, notes.join('\n') + '\n');
+          JS
