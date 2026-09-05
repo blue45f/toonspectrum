@@ -28,8 +28,12 @@ export function FeedbackThread({ postId, userId, revision, onAdded }: { postId: 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setLoadError("");
-    api.get<FeedbackComment[]>(`/feedback/posts/${encodeURIComponent(postId)}/replies`, { signal: controller.signal, timeout: 20_000 })
-      .then((rows) => { if (!controller.signal.aborted) setReplies(rows); })
+    api.get<FeedbackComment[]>(`/feedback/posts/${encodeURIComponent(postId)}/replies`, { signal: controller.signal, timeout: 20_000, referrerPolicy: "no-referrer" })
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(rows)) throw new Error("댓글 응답을 확인할 수 없어요. 다시 불러와 주세요.");
+        setReplies(rows);
+      })
       .catch(async (cause: unknown) => {
         const message = await getApiErrorMessage(cause, "댓글을 불러오지 못했어요.");
         if (!controller.signal.aborted) setLoadError(message);
@@ -41,7 +45,7 @@ export function FeedbackThread({ postId, userId, revision, onAdded }: { postId: 
     if (!userId || busy.current || !text.trim()) return;
     busy.current = true; setSending(true); setSendError(""); setSuccess("");
     try {
-      const reply = await api.post<FeedbackComment>(`/feedback/posts/${encodeURIComponent(postId)}/replies`, { text }, { timeout: 30_000 });
+      const reply = await api.post<FeedbackComment>(`/feedback/posts/${encodeURIComponent(postId)}/replies`, { text }, { timeout: 30_000, referrerPolicy: "no-referrer" });
       if (useApp.getState().userId !== userId) return;
       setText(""); setSuccess("댓글이 등록되었습니다."); onAdded(reply);
     } catch (cause) { setSendError(await getApiErrorMessage(cause, "댓글을 보내지 못했어요. 입력 내용은 유지됩니다.")); }
