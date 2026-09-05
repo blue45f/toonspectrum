@@ -34,6 +34,25 @@ export function assertBg3dSampleSurface(
   }
 }
 
+/** Match the pinned Playwright element screenshot's enclosing integer pixel rectangle.
+ * A CSS origin such as y=123.796875 with height=766 covers 767 device pixels at 1x.
+ * Passing that fractional origin straight to CDP instead produces a 766px crop. Enclose the
+ * same rectangle as locator.screenshot(), without moving the page or altering/resampling PNGs.
+ * The 1e-3 tolerance matches Playwright 1.62.1 server/helper.ts: enclosingIntRect.
+ */
+export function resolveBg3dCompositorClip(surface: Bg3dSampleSurface) {
+  assertBg3dSampleSurface(surface);
+  const epsilon = 1e-3;
+  const x = Math.floor(surface.x + epsilon);
+  const y = Math.floor(surface.y + epsilon);
+  const right = Math.ceil(surface.x + surface.width - epsilon);
+  const bottom = Math.ceil(surface.y + surface.height - epsilon);
+  if (right <= x || bottom <= y || right > surface.viewportWidth || bottom > surface.viewportHeight) {
+    throw new Error("BG3D enclosing pixel rectangle is empty or outside the viewport");
+  }
+  return { x, y, width: right - x, height: bottom - y, scale: 1 };
+}
+
 /**
  * Sample the same visible Chromium compositor surface without repeating locator.screenshot's
  * scroll/actionability/font/animation-frame preparation for every observation. No renderer calls,
@@ -66,7 +85,7 @@ export async function createBg3dCompositorSampler(page: Page, selector: string) 
       const started = Date.now();
       const result = await session.send("Page.captureScreenshot", {
         format: "png", fromSurface: true, captureBeyondViewport: false, optimizeForSpeed: true,
-        clip: { x: before.x, y: before.y, width: before.width, height: before.height, scale: 1 },
+        clip: resolveBg3dCompositorClip(before),
       });
       const captureMs = Date.now() - started;
       const surface = await read();

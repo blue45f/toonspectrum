@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertBg3dSampleSurface,
   createBg3dCompositorSampler,
+  resolveBg3dCompositorClip,
   type Bg3dSampleSurface,
 } from "../e2e/studio-bg3d-compositor-sampler";
 
@@ -67,6 +68,42 @@ describe("BG3D compositor sampler", () => {
     await sampler.dispose();
     expect(host.detach).toHaveBeenCalledOnce();
     await expect(sampler.capture()).rejects.toThrow("disposed");
+  });
+
+  it("uses the original element screenshot pixel bounds for the observed fractional CSS origin", async () => {
+    const host = samplerHost();
+    const surface = { ...SURFACE, x: 102, y: 123.796875 };
+    host.evaluate.mockResolvedValue(surface);
+    const sampler = await createBg3dCompositorSampler(host.page, "canvas");
+    try {
+      const captured = await sampler.capture();
+      expect(captured.surface).toEqual(surface);
+      expect(captured.png.toString()).toBe("unaltered-native-png");
+      expect(host.send).toHaveBeenCalledExactlyOnceWith("Page.captureScreenshot", {
+        format: "png", fromSurface: true, captureBeyondViewport: false, optimizeForSpeed: true,
+        clip: { x: 102, y: 123, width: 876, height: 767, scale: 1 },
+      });
+    } finally {
+      await sampler.dispose();
+    }
+  });
+
+  it.each([
+    { patch: {}, clip: { x: 50, y: 50, width: 876, height: 766, scale: 1 } },
+    { patch: { x: 50.0000001, y: 49.9999999 },
+      clip: { x: 50, y: 50, width: 876, height: 766, scale: 1 } },
+    { patch: { x: 102.25, width: 876.5, y: 123.796875 },
+      clip: { x: 102, y: 123, width: 877, height: 767, scale: 1 } },
+  ])("encloses pixels without changing the CSS surface: $patch", ({ patch, clip }) => {
+    const surface = Object.freeze({ ...SURFACE, ...patch });
+    expect(resolveBg3dCompositorClip(surface)).toEqual(clip);
+    expect(surface).toEqual({ ...SURFACE, ...patch });
+  });
+
+  it("rejects a rounded rectangle beyond the viewport instead of clipping pixels", () => {
+    expect(() => resolveBg3dCompositorClip({
+      ...SURFACE, x: 564.005,
+    })).toThrow("outside the viewport");
   });
 
   it.each([
