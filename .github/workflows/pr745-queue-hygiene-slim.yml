@@ -1,0 +1,141 @@
+name: PR 745 superseded-run cleanup
+
+on:
+  push:
+    branches:
+      - feat/webtoon-ai-quality-ux-20260905
+    paths:
+      - .github/workflows/pr745-queue-hygiene-slim.yml
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Cancel only superseded queued or running workflow runs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const thisRun = Number(context.runId);
+            let cancelled = 0;
+            const prCache = new Map();
+            const branchCache = new Map();
+
+            async function cancel(run, reason) {
+              if (Number(run.id) === thisRun) return;
+              core.info(`Cancelling ${run.id}: ${reason}`);
+              try {
+                await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: run.id });
+                cancelled += 1;
+              } catch (error) {
+                core.warning(`Run ${run.id} changed state or could not be cancelled: ${error.message}`);
+              }
+            }
+
+            for (const status of ['queued', 'in_progress']) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                { owner, repo, status, per_page: 100 }
+              );
+
+              for (const run of runs) {
+                if (Number(run.id) === thisRun) continue;
+
+                const linkedPr = run.pull_requests?.[0];
+                if (run.event === 'pull_request' && linkedPr) {
+                  const number = linkedPr.number;
+                  if (!prCache.has(number)) {
+                    const response = await github.rest.pulls.get({ owner, repo, pull_number: number });
+                    prCache.set(number, response.data);
+                  }
+                  const pr = prCache.get(number);
+                  if (pr.state !== 'open') {
+                    await cancel(run, `PR #${number} is closed`);
+                  } else if (run.head_sha !== pr.head.sha) {
+                    await cancel(run, `PR #${number} head ${run.head_sha} was superseded by ${pr.head.sha}`);
+                  }
+                  continue;
+                }
+
+                if (run.event === 'push' && run.head_branch && run.head_branch !== 'main') {
+                  const branch = run.head_branch;
+                  if (!branchCache.has(branch)) {
+                    try {
+                      const response = await github.rest.repos.getBranch({ owner, repo, branch });
+                      branchCache.set(branch, response.data);
+                    } catch (error) {
+                      if (error.status === 404) branchCache.set(branch, null);
+                      else throw error;
+                    }
+                  }
+                  const current = branchCache.get(branch);
+                  if (!current) {
+                    await cancel(run, `feature branch ${branch} no longer exists`);
+                  } else if (run.head_sha !== current.commit.sha) {
+                    await cancel(run, `feature branch ${branch} moved to ${current.commit.sha}`);
+                  }
+                }
+              }
+            }
+
+            core.summary
+              .addHeading('Superseded Actions cleanup')
+              .addRaw(`Cancelled runs: ${cancelled}`)
+              .write();
+
+      - name: Remove this one-shot workflow from the branch
+        id: remove
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = context.ref.replace('refs/heads/', '');
+            const path = '.github/workflows/pr745-queue-hygiene-slim.yml';
+            const file = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
+            const result = await github.rest.repos.deleteFile({
+              owner,
+              repo,
+              path,
+              branch,
+              sha: file.data.sha,
+              message: 'chore(ci): remove completed PR 745 queue cleanup'
+            });
+            core.setOutput('new_sha', result.data.commit.sha);
+
+      - name: Keep only checks for the cleanup commit
+        uses: actions/github-script@v8
+        env:
+          NEW_SHA: ${{ steps.remove.outputs.new_sha }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const expected = process.env.NEW_SHA;
+
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                { owner, repo, event: 'pull_request', per_page: 100 }
+              );
+              for (const run of runs) {
+                const linkedPr = run.pull_requests?.[0];
+                if (!linkedPr || linkedPr.number !== 745) continue;
+                if (!['queued', 'in_progress'].includes(run.status)) continue;
+                if (run.head_sha === expected) continue;
+                try {
+                  core.info(`Cancelling obsolete PR 745 run ${run.id} at ${run.head_sha}`);
+                  await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: run.id });
+                } catch (error) {
+                  core.warning(`Run ${run.id} changed state or could not be cancelled: ${error.message}`);
+                }
+              }
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
