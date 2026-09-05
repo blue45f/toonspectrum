@@ -1,10 +1,49 @@
-import { ArrowLeft, Ban, RefreshCw, RotateCcw, Search, UserX, UsersRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Eye,
+  Filter,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Trash2,
+  UsersRound,
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
+import { getAdminAdvancedCopy } from "./admin-advanced-copy";
 import { loadAdminI18nLocale } from "./admin-i18n-loader";
-import { adminFetch, formatNum, type AdminApiError } from "./components/admin-client";
+import {
+  buildMemberCsv,
+  buildMemberQuery,
+  getPageCount,
+  interpolateCount,
+  toggleMemberSelection,
+  toggleVisibleMemberSelection,
+  type MemberRole,
+  type MemberSort,
+  type MemberStatus,
+} from "./admin-members-model";
+import {
+  adminFetch,
+  downloadAdminFile,
+  formatNum,
+  formatWon,
+} from "./components/admin-client";
+import { AdminDialog } from "./components/AdminDialog";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
+import { AdminToastProvider } from "./components/AdminToast";
+import { adminButtonClass } from "./components/admin-ui-utils";
+import { useAdminToast } from "./components/use-admin-toast";
 
 import { Container } from "@/components/section";
 import { useI18n, useT } from "@/lib/i18n";
@@ -16,8 +55,8 @@ interface MemberRow {
   id: string;
   name: string | null;
   email: string | null;
-  role: string;
-  status: string;
+  role: MemberRole;
+  status: MemberStatus;
   suspendedAt: string | null;
   suspensionReason: string | null;
   deletedAt: string | null;
@@ -25,25 +64,72 @@ interface MemberRow {
   postCount: number;
   reviewCount: number;
 }
-const ROLE_TONE: Record<string, string> = {
+
+interface MemberListResponse {
+  items: MemberRow[];
+  meta: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+    generatedAt: string;
+  };
+}
+
+interface MemberDetails {
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: MemberRole;
+    status: MemberStatus;
+    suspendedAt: string | null;
+    suspensionReason: string | null;
+    deletedAt: string | null;
+    createdAt: string | null;
+    bio: string | null;
+  };
+  activity: {
+    reviewsCount: number;
+    fanPostsCount: number;
+    ratingsCount: number;
+    totalPaidCents: number;
+  };
+}
+
+type PendingAction =
+  | { kind: "role"; member: MemberRow; role: MemberRole }
+  | {
+      kind: "status";
+      member: MemberRow;
+      status: "active" | "suspended";
+    }
+  | { kind: "delete"; member: MemberRow }
+  | {
+      kind: "bulk";
+      memberIds: string[];
+      status: "active" | "suspended";
+    };
+
+const ROLE_TONE: Record<MemberRole, string> = {
   admin: "bg-accent/15 text-accent",
   operator: "bg-good/15 text-good",
   creator: "bg-warn/15 text-warn",
   user: "bg-raised/70 text-fg-3",
 };
 
-const STATUS_TONE: Record<string, string> = {
+const STATUS_TONE: Record<MemberStatus, string> = {
   active: "bg-good/15 text-good",
   suspended: "bg-warn/15 text-warn",
   deleted: "bg-bad/15 text-bad",
 };
 
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString() : "—");
+const formatDate = (value: string | null) =>
+  value ? new Date(value).toLocaleString() : "—";
 
-// 회원 관리 분할 라우트(/admin/members) — 검색·역할 변경(자기 자신 제외).
 export function AdminMembersPage() {
   const t = useT();
-  const lang = useI18n((s) => s.lang);
+  const lang = useI18n((state) => state.lang);
   useDocumentTitle(t("admin.members.title"));
   const { gate, uid } = useAdminGate();
 
@@ -52,191 +138,526 @@ export function AdminMembersPage() {
   }, [lang]);
 
   return (
-    <Container size="wide" className="py-10">
-      <header className="mb-8">
-        <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <UsersRound size={13} /> {t("admin.members.eyebrow")}
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("admin.members.title")}</h1>
-        <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-3">
-          {t("admin.members.desc")}
-        </p>
-        <Link href="/admin" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent">
-          <ArrowLeft size={13} />
-          {t("admin.members.backToConsole")}
-        </Link>
-      </header>
+    <AdminToastProvider>
+      <Container size="wide" className="py-10">
+        <header className="mb-8">
+          <p className="eyebrow flex items-center gap-1.5 text-accent">
+            <UsersRound size={13} /> {t("admin.members.eyebrow")}
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+            {t("admin.members.title")}
+          </h1>
+          <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-3">
+            {t("admin.members.desc")}
+          </p>
+          <Link
+            href="/admin"
+            className="mt-3 inline-flex min-h-10 items-center gap-1 text-xs font-medium text-accent"
+          >
+            <ArrowLeft size={13} />
+            {t("admin.members.backToConsole")}
+          </Link>
+        </header>
 
-      <AdminGateFallback gate={gate} />
-      {gate.kind === "admin" && uid && <MemberBoard uid={uid} selfId={gate.me.id} />}
-    </Container>
+        <AdminGateFallback gate={gate} />
+        {gate.kind === "admin" && uid ? (
+          <MemberBoard uid={uid} selfId={gate.me.id} />
+        ) : null}
+      </Container>
+    </AdminToastProvider>
   );
 }
 
 function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [meta, setMeta] = useState<MemberListResponse["meta"]>({
+    limit: 25,
+    offset: 0,
+    total: 0,
+    hasMore: false,
+    generatedAt: "",
+  });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [queryText, setQueryText] = useState("");
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<MemberRole | "all">("all");
+  const [statusFilter, setStatusFilter] =
+    useState<MemberStatus | "all">("all");
+  const [sort, setSort] = useState<MemberSort>("created_desc");
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingAction, setPendingAction] =
+    useState<PendingAction | null>(null);
+  const [actionReason, setActionReason] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [detailMember, setDetailMember] = useState<MemberRow | null>(null);
+  const [detail, setDetail] = useState<MemberDetails | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const t = useT();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminAdvancedCopy(lang);
+  const { showToast } = useAdminToast();
 
-  const roles = [
+  const roles: Array<{ value: MemberRole; label: string }> = [
     { value: "user", label: t("admin.members.roleUser") },
     { value: "creator", label: t("admin.members.roleCreator") },
     { value: "operator", label: t("admin.members.roleOperator") },
     { value: "admin", label: t("admin.members.roleAdmin") },
-  ] as const;
+  ];
 
-  const statusLabels: Record<string, string> = {
+  const statusLabels: Record<MemberStatus, string> = {
     active: t("admin.members.statusActive"),
     suspended: t("admin.members.statusSuspended"),
     deleted: t("admin.members.statusDeleted"),
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setQueryText(searchText.trim()), 250);
-    return () => clearTimeout(timer);
+    const timer = globalThis.setTimeout(() => {
+      setQueryText(searchText.trim());
+      setPage(1);
+    }, 250);
+    return () => globalThis.clearTimeout(timer);
   }, [searchText]);
 
+  const filters = useMemo(
+    () => ({
+      q: queryText,
+      role: roleFilter,
+      status: statusFilter,
+      sort,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    }),
+    [page, pageSize, queryText, roleFilter, sort, statusFilter],
+  );
+
+  const loadMembers = useCallback(
+    async (background = false) => {
+      if (background) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const query = buildMemberQuery(filters);
+        const response = await adminFetch<MemberListResponse>(
+          `/users?${query}`,
+          uid,
+        );
+        const totalPages = getPageCount(response.meta.total, pageSize);
+        if (page > totalPages) {
+          setPage(totalPages);
+          return;
+        }
+        setMembers(response.items ?? []);
+        setMeta(response.meta);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : t("admin.members.empty"),
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [filters, page, pageSize, t, uid],
+  );
+
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ limit: "100" });
-    if (queryText) params.set("q", queryText);
-    adminFetch<{ items: MemberRow[] }>(`/users?${params.toString()}`, uid)
-      .then((data) => alive && setMembers(data.items ?? []))
-      .catch((e: AdminApiError) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [queryText, refreshTick, uid]);
+    void loadMembers(false);
+  }, [loadMembers]);
 
-  async function changeRole(member: MemberRow, role: string) {
-    if (busyId || role === member.role || member.status === "deleted") return;
-    const roleLabel = roles.find((item) => item.value === role)?.label ?? role;
-    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} -> "${roleLabel}"?`)) return;
-    setBusyId(member.id);
-    setActionError(null);
-    try {
-      await adminFetch(`/users/${encodeURIComponent(member.id)}/role`, uid, {
-        method: "POST",
-        body: JSON.stringify({ role }),
-      });
-      setMembers((current) => current.map((item) => (item.id === member.id ? { ...item, role } : item)));
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Role change failed.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function changeStatus(member: MemberRow, status: "active" | "suspended") {
-    if (busyId || member.status === status || member.status === "deleted") return;
-    const reason =
-      status === "suspended"
-        ? globalThis.prompt(`${member.name ?? member.email ?? member.id}`, member.suspensionReason ?? "")
-        : "";
-    if (status === "suspended" && reason === null) return;
-    if (status === "active" && !globalThis.confirm(`${member.name ?? member.email ?? member.id}`)) return;
-    setBusyId(member.id);
-    setActionError(null);
-    try {
-      const result = await adminFetch<Partial<MemberRow>>(`/users/${encodeURIComponent(member.id)}/status`, uid, {
-        method: "POST",
-        body: JSON.stringify({ status, reason }),
-      });
-      setMembers((current) =>
-        current.map((item) =>
-          item.id === member.id
-            ? {
-                ...item,
-                status: result.status ?? status,
-                suspendedAt: result.suspendedAt ?? null,
-                suspensionReason: result.suspensionReason ?? null,
-                deletedAt: result.deletedAt ?? null,
-              }
-            : item
+  const selectableIds = useMemo(
+    () =>
+      members
+        .filter(
+          (member) => member.id !== selfId && member.status !== "deleted",
         )
-      );
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Status update failed.");
-    } finally {
-      setBusyId(null);
-    }
-  }
+        .map((member) => member.id),
+    [members, selfId],
+  );
+  const allVisibleSelected =
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedIds.has(id));
+  const pageCount = getPageCount(meta.total, pageSize);
 
-  async function deleteMember(member: MemberRow) {
-    if (busyId || member.status === "deleted") return;
-    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id}`)) return;
-    const reason = globalThis.prompt("Reason:", "admin soft delete");
-    if (reason === null) return;
-    setBusyId(member.id);
-    setActionError(null);
+  const resetFilters = () => {
+    setSearchText("");
+    setQueryText("");
+    setRoleFilter("all");
+    setStatusFilter("all");
+    setSort("created_desc");
+    setPage(1);
+    setSelectedIds(new Set());
+  };
+
+  const openAction = (action: PendingAction) => {
+    setActionReason(
+      action.kind === "status" && action.status === "suspended"
+        ? action.member.suspensionReason ?? ""
+        : "",
+    );
+    setPendingAction(action);
+  };
+
+  const closeAction = () => {
+    if (actionBusy) return;
+    setPendingAction(null);
+    setActionReason("");
+  };
+
+  const performAction = async () => {
+    if (!pendingAction) return;
+    setActionBusy(true);
     try {
-      const result = await adminFetch<Partial<MemberRow>>(`/users/${encodeURIComponent(member.id)}`, uid, {
-        method: "DELETE",
-        body: JSON.stringify({ reason }),
-      });
-      setMembers((current) =>
-        current.map((item) =>
-          item.id === member.id
-            ? {
-                ...item,
-                name: t("admin.members.statusDeleted"),
-                email: null,
-                role: "user",
-                status: "deleted",
-                suspendedAt: null,
-                suspensionReason: null,
-                deletedAt: result.deletedAt ?? new Date().toISOString(),
-              }
-            : item
-        )
+      if (pendingAction.kind === "role") {
+        await adminFetch(
+          `/users/${encodeURIComponent(pendingAction.member.id)}/role`,
+          uid,
+          {
+            method: "POST",
+            body: JSON.stringify({ role: pendingAction.role }),
+          },
+        );
+        showToast(copy.members.updateSuccess);
+      } else if (pendingAction.kind === "status") {
+        await adminFetch(
+          `/users/${encodeURIComponent(pendingAction.member.id)}/status`,
+          uid,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              status: pendingAction.status,
+              reason: actionReason,
+            }),
+          },
+        );
+        showToast(copy.members.updateSuccess);
+      } else if (pendingAction.kind === "delete") {
+        await adminFetch(
+          `/users/${encodeURIComponent(pendingAction.member.id)}`,
+          uid,
+          {
+            method: "DELETE",
+            body: JSON.stringify({ reason: actionReason }),
+          },
+        );
+        setSelectedIds((current) => {
+          const next = new Set(current);
+          next.delete(pendingAction.member.id);
+          return next;
+        });
+        showToast(copy.members.updateSuccess);
+      } else {
+        const response = await adminFetch<{ count: number }>(
+          "/users/bulk-status",
+          uid,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              userIds: pendingAction.memberIds,
+              status: pendingAction.status,
+              reason: actionReason,
+            }),
+          },
+        );
+        setSelectedIds(new Set());
+        showToast(
+          interpolateCount(copy.members.bulkSuccess, response.count),
+        );
+      }
+
+      closeAction();
+      await loadMembers(true);
+    } catch (requestError) {
+      showToast(
+        t("admin.members.title"),
+        requestError instanceof Error
+          ? requestError.message
+          : copy.members.destructiveWarning,
+        "error",
       );
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Delete failed.");
     } finally {
-      setBusyId(null);
+      setActionBusy(false);
     }
-  }
+  };
+
+  const openDetails = async (member: MemberRow) => {
+    setDetailMember(member);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    try {
+      setDetail(
+        await adminFetch<MemberDetails>(
+          `/users/${encodeURIComponent(member.id)}/details`,
+          uid,
+        ),
+      );
+    } catch (requestError) {
+      setDetailError(
+        requestError instanceof Error
+          ? requestError.message
+          : copy.members.emptyDetail,
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const exportCsv = () => {
+    try {
+      const csv = buildMemberCsv(members);
+      downloadAdminFile(
+        `members-page-${page}-${new Date().toISOString().slice(0, 10)}.csv`,
+        csv,
+        "text/csv;charset=utf-8",
+      );
+      showToast(copy.members.exportSuccess);
+    } catch (requestError) {
+      showToast(
+        copy.members.exportError,
+        requestError instanceof Error ? requestError.message : undefined,
+        "error",
+      );
+    }
+  };
+
+  const actionTitle = (() => {
+    if (!pendingAction) return "";
+    if (pendingAction.kind === "role") return copy.members.roleChangeTitle;
+    if (pendingAction.kind === "delete") return copy.members.deleteTitle;
+    if (pendingAction.kind === "bulk") {
+      return pendingAction.status === "suspended"
+        ? copy.members.bulkSuspendTitle
+        : copy.members.bulkRestoreTitle;
+    }
+    return pendingAction.status === "suspended"
+      ? copy.members.suspendTitle
+      : copy.members.restoreTitle;
+  })();
+
+  const actionSubject = (() => {
+    if (!pendingAction) return "";
+    if (pendingAction.kind === "bulk") {
+      return interpolateCount(
+        copy.members.selectedCount,
+        pendingAction.memberIds.length,
+      );
+    }
+    return (
+      pendingAction.member.name ??
+      pendingAction.member.email ??
+      pendingAction.member.id
+    );
+  })();
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 py-2 text-xs">
-          <Search size={14} />
-          <input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            maxLength={80}
-            placeholder={t("admin.members.searchPlaceholder")}
-            className="h-7 w-56 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
-          />
+      <section className="rounded-2xl border border-line bg-card/70 p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="flex-1">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-fg-2">
+              <Filter size={13} />
+              {copy.members.filtersTitle}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="relative">
+                <span className="sr-only">
+                  {t("admin.members.searchPlaceholder")}
+                </span>
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
+                />
+                <input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  maxLength={80}
+                  placeholder={t("admin.members.searchPlaceholder")}
+                  className="h-10 w-full rounded-lg border border-line bg-canvas pl-9 pr-3 text-sm outline-none focus:border-accent/60"
+                />
+              </label>
+
+              <label>
+                <span className="sr-only">{t("admin.members.colRole")}</span>
+                <select
+                  value={roleFilter}
+                  onChange={(event) => {
+                    setRoleFilter(
+                      event.target.value as MemberRole | "all",
+                    );
+                    setPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/60"
+                >
+                  <option value="all">{copy.members.roleAll}</option>
+                  {roles.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span className="sr-only">{t("admin.members.colStatus")}</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => {
+                    setStatusFilter(
+                      event.target.value as MemberStatus | "all",
+                    );
+                    setPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/60"
+                >
+                  <option value="all">{copy.members.statusAll}</option>
+                  {(Object.keys(statusLabels) as MemberStatus[]).map(
+                    (status) => (
+                      <option key={status} value={status}>
+                        {statusLabels[status]}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <label>
+                <span className="sr-only">Sort</span>
+                <select
+                  value={sort}
+                  onChange={(event) => {
+                    setSort(event.target.value as MemberSort);
+                    setPage(1);
+                  }}
+                  className="h-10 w-full rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/60"
+                >
+                  <option value="created_desc">
+                    {copy.members.sortNewest}
+                  </option>
+                  <option value="created_asc">
+                    {copy.members.sortOldest}
+                  </option>
+                  <option value="name_asc">
+                    {copy.members.sortNameAsc}
+                  </option>
+                  <option value="name_desc">
+                    {copy.members.sortNameDesc}
+                  </option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={resetFilters}
+              className={adminButtonClass("ghost")}
+            >
+              <RotateCcw size={14} />
+              {copy.members.resetFilters}
+            </button>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className={adminButtonClass("ghost")}
+            >
+              <Download size={14} />
+              {copy.members.exportFiltered}
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadMembers(true)}
+              disabled={refreshing}
+              className={adminButtonClass("ghost")}
+            >
+              <RefreshCw
+                size={14}
+                className={cn(refreshing && "animate-spin")}
+              />
+              {t("admin.members.refresh")}
+            </button>
+          </div>
         </div>
+      </section>
+
+      <div className="flex flex-col gap-2 rounded-xl border border-line bg-card/50 px-3 py-2 sm:flex-row sm:items-center">
+        <label className="inline-flex min-h-10 items-center gap-2 text-xs text-fg-2">
+          <input
+            type="checkbox"
+            checked={allVisibleSelected}
+            onChange={() =>
+              setSelectedIds((current) =>
+                toggleVisibleMemberSelection(current, selectableIds),
+              )
+            }
+            disabled={selectableIds.length === 0}
+            className="size-4 rounded border-line accent-accent"
+          />
+          {copy.members.selectPage}
+        </label>
+
         <span className="text-xs text-fg-3">
-          {loading ? t("admin.ui.loading") : t("admin.members.countShowing").replace("{count}", formatNum(members.length))}
+          {interpolateCount(copy.members.totalCount, meta.total)}
+          {selectedIds.size > 0
+            ? ` · ${interpolateCount(
+                copy.members.selectedCount,
+                selectedIds.size,
+              )}`
+            : ""}
         </span>
-        <button
-          type="button"
-          onClick={() => setRefreshTick((tick) => tick + 1)}
-          className="ml-auto inline-flex items-center gap-1 text-xs text-fg-3 transition-colors hover:text-fg"
-        >
-          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> {t("admin.members.refresh")}
-        </button>
+
+        {selectedIds.size > 0 ? (
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
+            <button
+              type="button"
+              className={adminButtonClass("ghost")}
+              onClick={() =>
+                openAction({
+                  kind: "bulk",
+                  memberIds: [...selectedIds],
+                  status: "active",
+                })
+              }
+            >
+              <RotateCcw size={13} />
+              {copy.members.bulkRestore}
+            </button>
+            <button
+              type="button"
+              className={adminButtonClass("danger")}
+              onClick={() =>
+                openAction({
+                  kind: "bulk",
+                  memberIds: [...selectedIds],
+                  status: "suspended",
+                })
+              }
+            >
+              <Ban size={13} />
+              {copy.members.bulkSuspend}
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {(error || actionError) && (
-        <p className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error ?? actionError}</p>
-      )}
+      {error ? (
+        <p
+          className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
 
       {loading ? (
-        <div className="space-y-2.5">
+        <div className="space-y-2.5" aria-busy="true">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="skeleton h-16 rounded-xl" />
           ))}
@@ -247,82 +668,155 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
-          <table className="w-full min-w-[860px] text-left text-sm">
+          <table className="w-full min-w-[1050px] text-left text-sm">
             <caption className="sr-only">{t("admin.members.title")}</caption>
             <thead>
               <tr className="border-b border-line text-[0.7rem] uppercase tracking-wide text-fg-3">
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colMember")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colStatus")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colRole")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colActivity")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colJoined")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colActions")}</th>
+                <th scope="col" className="w-12 px-4 py-3 font-medium">
+                  <span className="sr-only">{copy.members.selectPage}</span>
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colMember")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colStatus")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colRole")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colActivity")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colJoined")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {t("admin.members.colActions")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {members.map((member) => {
                 const isSelf = member.id === selfId;
-                const busy = busyId === member.id;
+                const selectable = !isSelf && member.status !== "deleted";
                 return (
-                  <tr key={member.id} className="border-b border-line/60 last:border-b-0">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-fg">{member.name ?? "—"}</p>
-                      <p className="text-[0.7rem] text-fg-3">{member.email ?? member.id}</p>
+                  <tr
+                    key={member.id}
+                    className={cn(
+                      "border-b border-line/60 last:border-b-0",
+                      selectedIds.has(member.id) && "bg-accent/5",
+                    )}
+                  >
+                    <td className="px-4 py-3 align-top">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(member.id)}
+                        onChange={() =>
+                          setSelectedIds((current) =>
+                            toggleMemberSelection(current, member.id),
+                          )
+                        }
+                        disabled={!selectable}
+                        aria-label={member.name ?? member.email ?? member.id}
+                        className="mt-1 size-4 rounded border-line accent-accent"
+                      />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
+                      <p className="font-medium text-fg">
+                        {member.name ?? "—"}
+                        {isSelf ? (
+                          <span className="ml-1.5 text-[0.65rem] text-fg-3">
+                            {t("admin.members.selfTag")}
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 max-w-xs truncate text-[0.7rem] text-fg-3">
+                        {member.email ?? member.id}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
-                          STATUS_TONE[member.status] ?? STATUS_TONE.active
+                          STATUS_TONE[member.status],
                         )}
                       >
-                        {statusLabels[member.status] ?? member.status}
+                        {statusLabels[member.status]}
                       </span>
-                      {member.suspensionReason && member.status === "suspended" && (
-                        <p className="mt-1 max-w-[11rem] truncate text-[0.65rem] text-fg-3" title={member.suspensionReason}>
+                      {member.suspensionReason &&
+                      member.status === "suspended" ? (
+                        <p
+                          className="mt-1 max-w-[12rem] truncate text-[0.65rem] text-fg-3"
+                          title={member.suspensionReason}
+                        >
                           {member.suspensionReason}
                         </p>
-                      )}
+                      ) : null}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[0.68rem] font-medium",
-                          ROLE_TONE[member.role] ?? ROLE_TONE.user
+                          ROLE_TONE[member.role],
                         )}
                       >
-                        {roles.find((item) => item.value === member.role)?.label ?? member.role}
+                        {roles.find((item) => item.value === member.role)
+                          ?.label ?? member.role}
                       </span>
-                      {isSelf && <span className="ml-1.5 text-[0.65rem] text-fg-3">{t("admin.members.selfTag")}</span>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-fg-2">
-                      {formatNum(member.postCount)} / {formatNum(member.reviewCount)}
+                    <td className="px-4 py-3 align-top text-xs text-fg-2">
+                      {formatNum(member.postCount)} / {" "}
+                      {formatNum(member.reviewCount)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-fg-3">{formatDate(member.createdAt)}</td>
-                    <td className="px-4 py-3">
-                      <label className="sr-only" htmlFor={`role-${member.id}`}>
-                        {member.name ?? member.id}
-                      </label>
-                      <select
-                        id={`role-${member.id}`}
-                        value={member.role}
-                        disabled={isSelf || busy || member.status === "deleted"}
-                        onChange={(event) => void changeRole(member, event.target.value)}
-                        className="rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg outline-none focus:border-accent/50 disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {roles.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                    <td className="px-4 py-3 align-top text-xs text-fg-3">
+                      {formatDate(member.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void openDetails(member)}
+                          className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+                        >
+                          <Eye size={11} />
+                          {copy.members.details}
+                        </button>
+
+                        <label className="sr-only" htmlFor={`role-${member.id}`}>
+                          {t("admin.members.colRole")}
+                        </label>
+                        <select
+                          id={`role-${member.id}`}
+                          value={member.role}
+                          disabled={isSelf || member.status === "deleted"}
+                          onChange={(event) =>
+                            openAction({
+                              kind: "role",
+                              member,
+                              role: event.target.value as MemberRole,
+                            })
+                          }
+                          className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.68rem] text-fg outline-none focus:border-accent/50 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {roles.map((role) => (
+                            <option key={role.value} value={role.value}>
+                              {role.label}
+                            </option>
+                          ))}
+                        </select>
+
                         {member.status === "suspended" ? (
                           <button
                             type="button"
-                            onClick={() => void changeStatus(member, "active")}
-                            disabled={isSelf || busy}
-                            className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-2 transition-colors hover:border-good/45 hover:text-good disabled:opacity-45"
+                            onClick={() =>
+                              openAction({
+                                kind: "status",
+                                member,
+                                status: "active",
+                              })
+                            }
+                            disabled={isSelf}
+                            className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-good/45 hover:text-good disabled:opacity-45"
                           >
                             <RotateCcw size={11} />
                             {t("admin.members.restore")}
@@ -330,21 +824,28 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => void changeStatus(member, "suspended")}
-                            disabled={isSelf || busy || member.status === "deleted"}
-                            className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
+                            onClick={() =>
+                              openAction({
+                                kind: "status",
+                                member,
+                                status: "suspended",
+                              })
+                            }
+                            disabled={isSelf || member.status === "deleted"}
+                            className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
                           >
                             <Ban size={11} />
                             {t("admin.members.suspend")}
                           </button>
                         )}
+
                         <button
                           type="button"
-                          onClick={() => void deleteMember(member)}
-                          disabled={isSelf || busy || member.status === "deleted"}
-                          className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
+                          onClick={() => openAction({ kind: "delete", member })}
+                          disabled={isSelf || member.status === "deleted"}
+                          className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-bad/30 px-2 text-[0.68rem] text-bad transition-colors hover:bg-bad/10 disabled:opacity-45"
                         >
-                          <UserX size={11} />
+                          <Trash2 size={11} />
                           {t("admin.members.delete")}
                         </button>
                       </div>
@@ -356,6 +857,235 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
           </table>
         </div>
       )}
+
+      <div className="flex flex-col gap-3 rounded-xl border border-line bg-card/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="inline-flex items-center gap-2 text-xs text-fg-3">
+          {copy.members.pageSize}
+          <select
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value));
+              setPage(1);
+            }}
+            className="h-9 rounded-lg border border-line bg-canvas px-2 text-xs text-fg"
+          >
+            {[25, 50, 100, 200].map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <span className="min-w-24 text-center text-xs text-fg-3">
+            {copy.members.pageOf
+              .replace("{page}", formatNum(page))
+              .replace("{pages}", formatNum(pageCount))}
+          </span>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            <ChevronLeft size={14} />
+            {copy.common.previous}
+          </button>
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            disabled={page >= pageCount || loading}
+            onClick={() =>
+              setPage((current) => Math.min(pageCount, current + 1))
+            }
+          >
+            {copy.common.next}
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      <AdminDialog
+        open={pendingAction != null}
+        onClose={closeAction}
+        title={actionTitle}
+        description={`${actionSubject} · ${copy.members.destructiveWarning}`}
+        busy={actionBusy}
+        closeLabel={copy.common.close}
+        footer={
+          <>
+            <button
+              type="button"
+              className={adminButtonClass("ghost")}
+              onClick={closeAction}
+              disabled={actionBusy}
+            >
+              {copy.common.cancel}
+            </button>
+            <button
+              type="button"
+              className={adminButtonClass(
+                pendingAction?.kind === "delete" ||
+                  (pendingAction?.kind !== "role" &&
+                    pendingAction?.status === "suspended")
+                  ? "danger"
+                  : "accent",
+              )}
+              onClick={() => void performAction()}
+              disabled={actionBusy}
+            >
+              {actionBusy ? copy.common.saving : copy.common.confirm}
+            </button>
+          </>
+        }
+      >
+        {pendingAction?.kind === "role" ? (
+          <div className="rounded-xl border border-line bg-panel/60 p-4 text-sm text-fg-2">
+            {roles.find((role) => role.value === pendingAction.member.role)
+              ?.label ?? pendingAction.member.role}
+            {" → "}
+            <strong className="text-fg">
+              {roles.find((role) => role.value === pendingAction.role)
+                ?.label ?? pendingAction.role}
+            </strong>
+          </div>
+        ) : (
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-fg-2">
+              {copy.members.actionReason}
+            </span>
+            <textarea
+              value={actionReason}
+              onChange={(event) => setActionReason(event.target.value)}
+              maxLength={300}
+              rows={4}
+              placeholder={copy.members.actionReasonOptional}
+              className="w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent/60"
+            />
+            <span className="text-right text-[0.68rem] text-fg-3">
+              {actionReason.length}/300
+            </span>
+          </label>
+        )}
+      </AdminDialog>
+
+      <AdminDialog
+        open={detailMember != null}
+        onClose={() => {
+          setDetailMember(null);
+          setDetail(null);
+          setDetailError(null);
+        }}
+        title={copy.members.detailsTitle}
+        description={
+          detailMember
+            ? detailMember.name ?? detailMember.email ?? detailMember.id
+            : undefined
+        }
+        size="lg"
+        closeLabel={copy.common.close}
+        footer={
+          <button
+            type="button"
+            className={adminButtonClass("ghost")}
+            onClick={() => setDetailMember(null)}
+          >
+            {copy.common.close}
+          </button>
+        }
+      >
+        {detailLoading ? (
+          <div className="space-y-3" aria-busy="true">
+            <div className="skeleton h-24 rounded-xl" />
+            <div className="skeleton h-24 rounded-xl" />
+          </div>
+        ) : detailError || !detail ? (
+          <p className="rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad">
+            {detailError ?? copy.members.emptyDetail}
+          </p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <section className="rounded-xl border border-line bg-panel/50 p-4 md:col-span-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-3">
+                {copy.members.accountSection}
+              </h3>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-fg-3">ID</dt>
+                  <dd className="mt-1 break-all text-fg">{detail.user.id}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-fg-3">
+                    {t("admin.members.colRole")}
+                  </dt>
+                  <dd className="mt-1 text-fg">{detail.user.role}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-fg-3">Email</dt>
+                  <dd className="mt-1 break-all text-fg">
+                    {detail.user.email ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-fg-3">
+                    {t("admin.members.colStatus")}
+                  </dt>
+                  <dd className="mt-1 text-fg">
+                    {statusLabels[detail.user.status]}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-fg-3">
+                    {t("admin.members.colJoined")}
+                  </dt>
+                  <dd className="mt-1 text-fg">
+                    {formatDate(detail.user.createdAt)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-fg-3">Bio</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-fg">
+                    {detail.user.bio ?? "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="rounded-xl border border-line bg-panel/50 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-3">
+                {copy.members.activitySection}
+              </h3>
+              <dl className="mt-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-xs text-fg-3">{copy.members.posts}</dt>
+                  <dd className="numeral text-lg text-fg">
+                    {formatNum(detail.activity.fanPostsCount)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-xs text-fg-3">{copy.members.reviews}</dt>
+                  <dd className="numeral text-lg text-fg">
+                    {formatNum(detail.activity.reviewsCount)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-xs text-fg-3">{copy.members.ratings}</dt>
+                  <dd className="numeral text-lg text-fg">
+                    {formatNum(detail.activity.ratingsCount)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+                  <dt className="text-xs text-fg-3">{copy.members.paid}</dt>
+                  <dd className="numeral text-lg text-fg">
+                    {formatWon(detail.activity.totalPaidCents)}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        )}
+      </AdminDialog>
     </div>
   );
 }
