@@ -61,6 +61,12 @@ vi.mock("../StudioToolsCompanionPage", () => ({
   StudioToolsCompanionPage: () => <div data-testid="companion-surface" />,
 }));
 
+vi.mock("../studio-production/StudioProductionHubPage", () => ({
+  StudioProductionHubPage: ({ surface }: { readonly surface: string }) => (
+    <div data-testid="production-surface" data-surface={surface} />
+  ),
+}));
+
 interface ObservedLocation {
   readonly pathname: string;
   readonly search: string;
@@ -198,6 +204,20 @@ describe("StudioRouter canonical redirect", () => {
     const finalLocation = observedLocations.at(-1);
     expect(finalLocation?.pathname).toBe("/studio/companion/review");
     expect(finalLocation?.search).toBe("?view=review&session=primary-1");
+    expect(finalLocation?.state).toBe(workspaceReturnState);
+  });
+
+  it("renders the production command center route without mounting the editor", async () => {
+    renderStudioShell({
+      pathname: "/studio/work/work-1/review",
+      state: workspaceReturnState,
+    });
+
+    const surface = await screen.findByTestId("production-surface");
+    expect(surface.dataset.surface).toBe("review");
+    expect(screen.queryByTestId("editor-surface")).toBeNull();
+    const finalLocation = observedLocations.at(-1);
+    expect(finalLocation?.pathname).toBe("/studio/work/work-1/review");
     expect(finalLocation?.state).toBe(workspaceReturnState);
   });
 
