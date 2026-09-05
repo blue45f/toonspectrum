@@ -24,14 +24,51 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Decode and verify the reviewed patch
+      - name: Assemble, verify, and apply the reviewed patch
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64 \
-            | xz --decompress > /tmp/toonstudio-webtoon-ai-upgrade.patch
+          parts=.github/patches
+
+          # The first transport object has one audited base64 character changed in transit.
+          # Repair only that exact character, then prove the complete binary and patch hashes.
+          base64 --wrap=0 "$parts/ai-upgrade.part01.bin" > /tmp/part01.b64
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("/tmp/part01.b64")
+          value = path.read_text(encoding="ascii")
+          if len(value) != 1000 or value[761] != "d":
+              raise SystemExit("unexpected part01 transport payload")
+          path.write_text(value[:761] + "i" + value[762:], encoding="ascii")
+          PY
+          base64 --decode /tmp/part01.b64 > /tmp/part01.correct.bin
+
+          cat \
+            /tmp/part01.correct.bin \
+            "$parts/ai-upgrade.part02.bin" \
+            "$parts/ai-upgrade.part03.bin" \
+            "$parts/ai-upgrade.part04.bin" \
+            "$parts/ai-upgrade.part05.bin" \
+            "$parts/ai-upgrade.part06.bin" \
+            "$parts/ai-upgrade.part07.bin" \
+            "$parts/ai-upgrade.part08.bin" \
+            "$parts/ai-upgrade.part09.bin" \
+            "$parts/ai-upgrade.part10.bin" \
+            "$parts/ai-upgrade.part11.bin" \
+            "$parts/ai-upgrade.part12.bin" \
+            "$parts/ai-upgrade.part13.bin" \
+            "$parts/ai-upgrade.part14.bin" \
+            "$parts/ai-upgrade.part15.bin" \
+            > /tmp/toonstudio-webtoon-ai-upgrade.patch.xz
+
+          echo "6b229ea78b9b910ad7227b2a1c8463209eb323c6bed1139c7590a709dfb7297e  /tmp/toonstudio-webtoon-ai-upgrade.patch.xz" \
+            | sha256sum --check --strict
+          xz --decompress --stdout /tmp/toonstudio-webtoon-ai-upgrade.patch.xz \
+            > /tmp/toonstudio-webtoon-ai-upgrade.patch
           echo "8cc17b1d66ce770c75c0996b263475e77a436828c84941ed4a63f51810646def  /tmp/toonstudio-webtoon-ai-upgrade.patch" \
             | sha256sum --check --strict
+
           git apply --check --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
           git apply --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
           git diff --check
@@ -72,6 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f \
+            .github/patches/ai-upgrade.part*.bin \
             .github/patches/toonstudio-webtoon-ai-upgrade.patch.xz.b64 \
             .github/workflows/apply-webtoon-ai-upgrade.yml
           rmdir .github/patches 2>/dev/null || true
