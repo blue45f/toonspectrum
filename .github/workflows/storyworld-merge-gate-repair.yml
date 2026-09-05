@@ -69,6 +69,7 @@ jobs:
               'src/domains/creator/StudioContinuityPanel.hardening.test.tsx',
               'src/domains/creator/StudioContinuityPanel.test.tsx',
               'src/domains/creator/studio-production/StudioProductionHubPage.tsx',
+              'src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts',
           ]
           earlier = [
               'src/domains/creator/studio-router/StudioRouter.tsx',
@@ -79,6 +80,30 @@ jobs:
           allowed = required + earlier
           subprocess.run(['git','apply','--check',str(patch_path)],check=True)
           subprocess.run(['git','apply',str(patch_path)],check=True)
+          # Follow the actual lazy page owner after extraction. Keep the no-eager-import,
+          # shared SQLite and cross-tab scope assertions; do not relax the router size ratchet.
+          boundary=pathlib.Path(required[-1])
+          raw=boundary.read_bytes()
+          assert hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()=='cfb23028c06fa5afb4ab125210be54f13fef6c4b'
+          source=raw.decode()
+          anchor='const hubSource = readFileSync('
+          assert source.count(anchor)==1
+          source=source.replace(anchor,'const productionRouteSource = readFileSync(\n  resolve(process.cwd(), "src/domains/creator/studio-router/routes/StudioProductionRoute.tsx"),\n  "utf8",\n);\n'+anchor,1)
+          old='''    expect(routerSource).toContain(
+                'import("../studio-production/StudioProductionHubPage")',
+              );'''
+          old='    expect(routerSource).toContain(\n      \'import("../studio-production/StudioProductionHubPage")\',\n    );'
+          new='''    expect(routerSource).toContain('from "./routes/StudioProductionRoute"');
+              expect(productionRouteSource).toContain('import("../../studio-production/StudioProductionHubPage")');
+              expect(productionRouteSource).toContain("lazyRetry(");
+              expect(productionRouteSource).toContain("<Suspense");
+              expect(productionRouteSource).toContain("<StudioProductionHubPage");
+              expect(productionRouteSource).not.toContain('from "../../studio-production/StudioProductionHubPage"');'''
+          assert source.count(old)==1
+          source=source.replace(old,new,1)
+          assert source.count('expect(routerSource).toContain("<StudioProductionHubPage");')==1
+          source=source.replace('expect(routerSource).toContain("<StudioProductionHubPage");','expect(routerSource).toContain("<StudioProductionRoute");',1)
+          boundary.write_text(source)
           tests = [
               'src/domains/creator/storyworld',
               'src/domains/creator/studio-router',
