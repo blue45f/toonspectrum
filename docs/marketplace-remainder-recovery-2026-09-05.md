@@ -22,7 +22,9 @@
 
 0037은 대체 CHECK 추가 → 기존 행 검증 → 이전 CHECK 제거 → 원래 이름 복원 순서다. 신고의 JSON 객체 형태, 리소스 ID, hash, byte size, license, schemaVersion 1/2/3, 배급자·패키지·moderationRevision·reportEpoch 일치 조건과 `IS TRUE`는 유지한다. 라이브러리·신고의 기존 행이나 계정 소유권을 변경하지 않는다.
 
-`verify-marketplace-3d-parity.mjs`는 명시적 opt-in, loopback, test 이름, 빈 public schema를 요구한다. 운영/기존 DB를 초기화하는 경로는 없다. 과거 migration을 실제 PostgreSQL에 적용해 3D 거절을 먼저 재현하고 0037 이후 7종·세 증거 버전·라이선스 허용 및 잘못된 증거 거절, 이전 행 보존, CHECK validation을 검증한다.
+`verify-marketplace-3d-parity.mjs`는 명시적 opt-in, loopback, test 이름, 빈 public schema를 요구한다. 운영/기존 DB를 초기화하는 경로는 없다. 과거 migration을 실제 PostgreSQL에 적용하고 스키마 검증된 7종 starter manifest를 게시 릴리스로 만든다. 실제 릴리스에 연결된 계정 보관함과 v3 신고에서 3D kind CHECK 거절을 재현한 뒤 0037 적용 후 성공을 검증한다. 그 외 잘못된 증거·소스 연결은 계속 거절돼야 하며 이전 행, 무관한 제약과 모든 트리거 정의도 그대로여야 한다.
+
+신규 신고는 0034의 v3-only 트리거를 유지한다. v1/v2는 새 신고로 허용하는 것이 아니라 과거 증거의 저장 호환성이다. 세 버전의 CHECK 자체는 원본 DB에서 복제한 임시 계약 테이블에서 별도로 실행하며, 실제 테이블의 v1/v2 신규 INSERT는 계속 거절되는지 검사한다. 실제 테이블의 트리거나 제약을 비활성화하는 경로는 없다.
 
 ### 공개 정보와 실제 동작에 맞춘 UI
 

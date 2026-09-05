@@ -82,7 +82,7 @@ jobs:
         env:
           DATABASE_URL: postgres://webdex:webdex@127.0.0.1:5432/marketplace_parity_test
           TOONSPECTRUM_MARKETPLACE_PARITY_DB_TEST: '1'
-        run: node scripts/verify-marketplace-3d-parity.mjs
+        run: pnpm exec tsx scripts/verify-marketplace-3d-parity.mjs
       - name: Verify canonical marketplace repositories on a separate disposable database
         env:
           PGPASSWORD: webdex
