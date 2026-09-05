@@ -3,13 +3,13 @@ import {
   type StudioAlignMode,
 } from "../studio-cuttoon-editor/studio-align-selected";
 import {
-  planStudioMultiSelectionLayoutPatch,
   planStudioSelectionFlip,
   planStudioSelectionLayoutPatch,
   selectStudioFigmaDesignTargets,
   type StudioFigmaSelectionLayoutPatch,
 } from "../studio-figma-selection-ux";
 import { planAtomicSelectionTranslation } from "../studio-group-selection";
+import { planStudioInspectorMultiSelectionLayoutPatch } from "../studio-inspector-multi-selection";
 import { isEffectivelyLocked, reorderLayerItem, type LayerGroup } from "../studio-layers";
 
 import type { El } from "../studio-element-model";
@@ -116,13 +116,18 @@ export function useStudioSelectionTransform(options: StudioSelectionTransformOpt
   function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
     const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
     if (targets.length > 1) {
-      if (targets.some((element) => isEffectivelyLocked(element, groups))) {
-        setError("잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      const plan = planStudioInspectorMultiSelectionLayoutPatch(
+        elements,
+        targets.map((element) => element.id),
+        patch,
+        { isLocked: (element) => isEffectivelyLocked(element, groups) },
+      );
+      if (plan.kind === "unchanged") {
+        if (plan.refusal) setError(plan.refusal);
         return;
       }
-      const next = planStudioMultiSelectionLayoutPatch(elements, marqueeIds, patch);
-      if (!next || !commit(next)) return;
-      announceDrawingShortcut(`${targets.length}개 요소 속성을 함께 변경했어요`);
+      if (!commit(plan.next)) return;
+      announceDrawingShortcut(plan.announcement);
       return;
     }
     const target = targets[0];

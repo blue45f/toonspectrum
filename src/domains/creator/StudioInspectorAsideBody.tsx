@@ -1,18 +1,24 @@
-import { Suspense, useId } from "react";
+import { Suspense, useId, useMemo } from "react";
 
-import {
-  resolveStudioFigmaSelectionLayoutMetrics,
-  selectStudioFigmaDesignTargets,
-} from "./studio-figma-selection-ux";
+import { selectStudioFigmaDesignTargets } from "./studio-figma-selection-ux";
+import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
+import { isEffectivelyHidden } from "./studio-layers";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
+import {
+  resolveStudioSelectMatchingOptions,
+  selectStudioMatchingElementIds,
+  type StudioSelectMatchingCriterion,
+} from "./studio-select-matching";
 import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
 import { StudioInspectorContextRouteSync } from "./StudioInspectorContextRouteSync";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
 import { StudioInspectorEmptyCoachSection } from "./StudioInspectorEmptyCoachSection";
+import { StudioInspectorMultiSelectionSection } from "./StudioInspectorMultiSelectionSection";
 import { StudioInspectorSelectionSection } from "./StudioInspectorSelectionSection";
 import { StudioInspectorUnselectedImageTools } from "./StudioInspectorUnselectedImageTools";
+import { StudioSelectionMatchingPanel } from "./StudioSelectionMatchingPanel";
 import { useStudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 import type { StudioInspectorAsideProps } from "./StudioInspectorAsideTypes";
@@ -27,6 +33,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
     inspectorLayout,
     selected,
     elements,
+    groups,
+    localHiddenElementIds,
     marqueeIds,
     inspectorInteractionPolicy,
     changeInspectorLayout,
@@ -34,12 +42,47 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
     applyFigmaSelectionLayoutPatch,
     zoomToSelection,
     flipSelected,
+    selectLayersFromNavigator,
+    announceDrawingShortcut,
     pathBooleanBusy,
     pathBooleanInspectorUnavailableReason,
     applyPathBooleanCombine,
   } = model;
   const hasMultiSelection =
     inspectorContentMode === "selection" && marqueeIds.length > 1;
+  const figmaDesignTargets = inspectorContentMode === "selection"
+    ? selectStudioFigmaDesignTargets(elements, marqueeIds, selected)
+    : [];
+  const figmaSelectionMetrics = resolveStudioInspectorSelectionLayoutMetrics(figmaDesignTargets);
+  const matchingSourceId =
+    figmaDesignTargets.length === 1 ? figmaDesignTargets[0]!.id : null;
+  const visibleMatchingElements = useMemo(
+    () => elements.filter(
+      (element) =>
+        !localHiddenElementIds.has(element.id)
+        && !isEffectivelyHidden(element, groups),
+    ),
+    [elements, groups, localHiddenElementIds],
+  );
+  const matchingOptions = useMemo(
+    () => matchingSourceId
+      ? resolveStudioSelectMatchingOptions(visibleMatchingElements, matchingSourceId)
+      : [],
+    [matchingSourceId, visibleMatchingElements],
+  );
+
+  const selectMatchingElements = (criterion: StudioSelectMatchingCriterion) => {
+    if (!matchingSourceId) return;
+    const ids = selectStudioMatchingElementIds(
+      visibleMatchingElements,
+      matchingSourceId,
+      criterion,
+    );
+    if (ids.length < 2) return;
+    const option = matchingOptions.find((candidate) => candidate.criterion === criterion);
+    selectLayersFromNavigator(ids);
+    announceDrawingShortcut(`${option?.label ?? "같은 항목"} ${ids.length}개 선택`);
+  };
 
   return (
     <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
@@ -85,12 +128,17 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
               <span className="text-[0.6875rem] font-semibold opacity-80">내용 수정</span>
             </button>
           ) : null}
+          {inspectorContentMode === "selection" && matchingSourceId ? (
+            <StudioSelectionMatchingPanel
+              key={matchingSourceId}
+              options={matchingOptions}
+              onSelect={selectMatchingElements}
+            />
+          ) : null}
           {inspectorContentMode === "selection" && (
             <div>
               <StudioFigmaDesignPanel
-                metrics={resolveStudioFigmaSelectionLayoutMetrics(
-                  selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
-                )}
+                metrics={figmaSelectionMetrics}
                 disabled={inspectorInteractionPolicy.selection.disabled}
                 onChange={applyFigmaSelectionLayoutPatch}
                 onZoomToSelection={zoomToSelection}
@@ -101,7 +149,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           )}
           {!hasMultiSelection ? (
             <StudioInspectorSelectionSection model={model} tabA11y={tabA11y} />
-          ) : null}
+          ) : (
+            <StudioInspectorMultiSelectionSection model={model} />
+          )}
           {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
               aria-label="도형 결합"
