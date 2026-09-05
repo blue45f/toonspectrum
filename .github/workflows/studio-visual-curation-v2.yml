@@ -11,7 +11,7 @@ jobs:
   visual-proof:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-visual-curation-v2-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -29,7 +29,7 @@ jobs:
           images[0].save(root/'visual-proof-1097.pdf',save_all=True,append_images=images[1:],resolution=96)
           for image in images:image.close()
           assets=json.loads((root/'manifest.json').read_text())['assets']
-          index=[{'sheet':i//48+1,'row':(i%48)//8+1,'column':i%8+1,'id':a['id'],'name':a['name'],'category':a['category'],'path':a['path']} for i,a in enumerate(assets)]
+          index=[{'sheet':i//48+1,'row':(i%48)//8+1,'column':i%8+1,'id':a['id'],'name':a['name'],'category':a['category'],'path':a['path']} for i,a in enumerate(assets[:1097])]
           (root/'visual-proof-index.json').write_text(json.dumps(index,ensure_ascii=False,indent=2))
           files=[pathlib.Path(p) for p in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if p]
           print('ASSET SOURCE CATALOGS')
@@ -52,12 +52,43 @@ jobs:
           if proof:proof[0].save(root/'visual-proof-existing-static.pdf',save_all=True,append_images=proof[1:],resolution=96)
           print('PROOF_COUNTS',json.dumps({'cc0':len(assets),'cc0Sheets':len(sheets),'otherStaticFiles':len(static),'otherImagePreviews':len(previews)}))
           PY
-      - name: Retain visual evidence only on curation branch
+      - name: Acquire diverse native 2K material originals
+        id: materials
+        continue-on-error: true
+        run: python3 scripts/expand_studio_cc0_materials.py
+      - name: Verify every referenced original and preserve acquisition outcome
+        env:
+          MATERIAL_OUTCOME: ${{ steps.materials.outcome }}
+        run: |
+          python3 - <<'PY'
+          import pathlib,json,hashlib,os
+          root=pathlib.Path('public/assets/studio/cc0-20260906').resolve()
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          ids=set()
+          for a in assets:
+              p=(root/a['path']).resolve()
+              assert p.is_relative_to(root) and a['id'] not in ids
+              ids.add(a['id'])
+              raw=p.read_bytes()
+              assert len(raw)==a['bytes'] and hashlib.sha256(raw).hexdigest()==a['sha256']
+          print('INTEGRITY_VERIFIED',len(assets))
+          (root/'visual-v2-execution.json').write_text(json.dumps({'originalsVerified':len(assets),'acquisitionOutcome':os.environ['MATERIAL_OUTCOME'],'actualVisualVerdicts':0,'status':'awaiting-direct-image-review','mainPublished':False},indent=2)+'\n')
+          PY
+      - name: Retain evidence and acquired originals on curation branch
         run: |
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
-          git add -- public/assets/studio/cc0-20260906/visual-proof-1097.pdf public/assets/studio/cc0-20260906/visual-proof-index.json public/assets/studio/cc0-20260906/other-static-inventory.json
-          if test -f public/assets/studio/cc0-20260906/visual-proof-existing-static.pdf; then git add public/assets/studio/cc0-20260906/visual-proof-existing-static.pdf; fi
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "test(studio): retain full-resolution curation proofs"
+          git add -- public/assets/studio/cc0-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): retain native material candidates and visual proof sheets"
           git push origin "HEAD:$GITHUB_REF"
           git log -1 --format='PROOF_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-visual-curation-v2-${{ github.run_id }}
+          path: |
+            public/assets/studio/cc0-20260906/visual-*.pdf
+            public/assets/studio/cc0-20260906/*report.json
+            public/assets/studio/cc0-20260906/visual-proof-index.json
+            public/assets/studio/cc0-20260906/other-static-inventory.json
+          retention-days: 14
