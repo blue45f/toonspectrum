@@ -1,4 +1,4 @@
-name: Apply reviewed wearable source improvements
+name: Apply reviewed wearable selection policy
 on:
   push:
     branches: [fix/studio-wearable-quality-audit-20260906]
@@ -22,119 +22,51 @@ jobs:
           node-version: '24'
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
-      - name: Refine silhouettes and preserve indexed geometry
+      - name: Connect the reviewed selection policy without changing saved-scene parsing
         run: |
           python3 <<'PY'
           from pathlib import Path
           def change(path, before, after):
               p=Path(path); text=p.read_text()
               if after in text: return
-              if text.count(before)!=1: raise RuntimeError(f'Source precondition failed: {path}: {before[:80]}')
+              if text.count(before)!=1: raise RuntimeError(f'Source precondition failed: {path}: {before[:100]}')
               p.write_text(text.replace(before,after,1))
-          g='scripts/generate-studio-wearable-v5.mts'
-          change(g,'import { mergeGeometries }','import { mergeGeometries, mergeVertices }')
-          change(g,'const geometry = mergeGeometries(parts, false);','let geometry = mergeGeometries(parts, false);')
-          change(g,'      const mesh = new T.Mesh(geometry, mat);','      const unindexed = geometry;\n      geometry = mergeVertices(unindexed, 0.000001);\n      unindexed.dispose();\n      const mesh = new T.Mesh(geometry, mat);')
-          plate='''  plate(size: Point, position: Point, mat: Material, radius: number) {
-              const [width, height, depth] = size;
-              const r = Math.min(radius, width / 2, height / 2);
-              const x = -width / 2, y = -height / 2;
-              const shape = new T.Shape();
-              shape.moveTo(x + r, y);
-              shape.lineTo(x + width - r, y);
-              shape.quadraticCurveTo(x + width, y, x + width, y + r);
-              shape.lineTo(x + width, y + height - r);
-              shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-              shape.lineTo(x + r, y + height);
-              shape.quadraticCurveTo(x, y + height, x, y + height - r);
-              shape.lineTo(x, y + r);
-              shape.quadraticCurveTo(x, y, x + r, y);
-              const geometry = new T.ExtrudeGeometry(shape, { depth, steps: 1, bevelEnabled: false, curveSegments: 12 });
-              geometry.translate(0, 0, -depth / 2);
-              this.add(geometry, mat, position);
-            }
-          '''
-          change(g,'  sphere(radius: number, position: Point, mat: Material, scale: Point = [1, 1, 1]) {',plate+'  sphere(radius: number, position: Point, mat: Material, scale: Point = [1, 1, 1]) {')
-          for call in ['a.box([.052,.036,.002],[x,0,-.0007],lens,.012);','a.box([.073,.149,.008],[0,0,0],shell,.007);','a.box([.070,.146,.001],[0,0,.0042],glass,.0065);','a.box([.069,.145,.001],[0,0,-.0042],rubber,.006);','a.box([.031,.033,.0028],[-.018,.051,-.006],shell,.007);']:
-              change(g,call,call.replace('a.box','a.plate'))
-          change(g,'const angle=u*2*PI; const length=.013+.040*(.5-.5*Math.cos(angle)); const height=.024*Math.sin(angle);\n      return [sign*length,height*(.42+.58*Math.sin(PI*w)),.012*Math.sin(PI*w)*Math.sin(angle)+.009*(w-.5)];','const angle=u*2*PI; const length=.010+.045*(.5-.5*Math.cos(angle));\n      const width=.018+.034*Math.sin(PI*u);\n      return [sign*length,(w-.5)*width+.003*Math.sin(angle),.013*Math.sin(angle)*(.45+.55*Math.sin(PI*w))];')
-          p='scripts/studio-wearable-review-page.mjs'
-          change(p,'let instance=null; let equip=null; let slot=null;','let instance=null; let equip=null; let slot=null; let effectiveFit=1;')
-          change(p,'    R.applyStudioVrmCostumeState(costume,state);','    R.applyStudioVrmCostumeState(costume,state);\n    effectiveFit=R.inspectStudioVrmGarmentFit({[slot]:equip},wardrobeMetrics).slots[slot]?.effectiveFit??equip.fit;')
-          change(p,'active={type,id,model,vrm,instance,equip,slot,metrics,wardrobeMetrics,angle,crop,token,idlePose:','active={type,id,model,vrm,instance,equip,slot,metrics,wardrobeMetrics,effectiveFit,angle,crop,token,idlePose:')
-          change(p,'effectiveFit:selection.equip.fit','effectiveFit:selection.effectiveFit')
-          change(p,'  if(selection.vrm)children.push(h(R.StudioVrmRuntimeCommit','  if(selection.instance)children.push(h(R.StudioVrmGripContactRefine,{key:`grip-${token}`,vrm:selection.vrm,items:[selection.instance],metrics:selection.metrics}));\n  if(selection.vrm)children.push(h(R.StudioVrmRuntimeCommit')
-          change('scripts/verify-studio-wearable-v5.mts','["studio-vrm-wardrobe","studio-vrm-props"','["studio-vrm-wardrobe","studio-vrm-garment-fit","studio-vrm-props"')
+          p='src/domains/creator/vrm/StudioVrmPropPanel.tsx'
+          change(p,'import { cn } from "@/lib/utils";', 'import { isStudioVrmPropSelectable, studioVrmPropQualityNotice } from "./studio-vrm-prop-quality-policy";\n\nimport { cn } from "@/lib/utils";')
+          change(p,'export interface StudioVrmPropPanelProps {','const SELECTABLE_PROP_COUNT = VRM_PROPS.filter(({ id }) => isStudioVrmPropSelectable(id)).length;\n\nexport interface StudioVrmPropPanelProps {')
+          change(p,'  "book",\n  "sword",','  "book",\n  "mic",')
+          change(p,'  const quickDefinitions = recentPropIds\n    .map','  const quickDefinitions = recentPropIds\n    .filter(isStudioVrmPropSelectable)\n    .map')
+          change(p,'  const filteredDefinitions = VRM_PROPS.filter((definition) => {\n','  const filteredDefinitions = VRM_PROPS.filter((definition) => {\n    if (!isStudioVrmPropSelectable(definition.id)) return false;\n')
+          change(p,'  function handleAdd(definition: PropDef): void {\n    if (!vrmReady) return;','  function handleAdd(definition: PropDef): void {\n    if (!vrmReady || !isStudioVrmPropSelectable(definition.id)) return;')
+          change(p,'{VRM_PROPS.length}종','{SELECTABLE_PROP_COUNT}종')
+          change(p,'  const editorTitleId = useId();','  const qualityNotice = studioVrmPropQualityNotice(item.propId);\n  const editorTitleId = useId();')
+          change(p,'      aria-labelledby={editorTitleId}\n    >','      aria-labelledby={editorTitleId}\n    >\n      {qualityNotice ? (\n        <p role="note" aria-label="소품 품질 안내" className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">\n          품질 개선 대기 소품입니다. 기존 장면의 부착과 편집은 유지되지만 새로 추가할 수 없습니다. {qualityNotice}\n        </p>\n      ) : null}')
+          p='src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts'
+          change(p,'import {\n  createPropInstance,','import { isStudioVrmPropSelectable } from "./studio-vrm-prop-quality-policy";\nimport {\n  createPropInstance,')
+          change(p,'  function addVrmProp(propId: string) {\n    const instance','  function addVrmProp(propId: string) {\n    if (!isStudioVrmPropSelectable(propId)) return;\n    const instance')
           PY
-      - name: Generate bounded original GLBs
-        run: pnpm exec tsx scripts/generate-studio-wearable-v5.mts
-      - name: Integrate stable IDs and replace the obsolete cap-post test
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import json
-          assets=json.loads(Path('public/assets/3d/wearable-v5-manifest.json').read_text())['assets']
-          p=Path('src/domains/creator/vrm/studio-vrm-props.ts');text=p.read_text()
-          marker='export const BLENDER_PROP_GLTF_URLS = Object.freeze({'
-          additions=[a for a in assets if f'\n  {a["id"]}: "/assets/3d/' not in text]
-          if additions:
-              assert text.count(marker)==1
-              text=text.replace(marker,marker+'\n'+'\n'.join(f'  {a["id"]}: "/assets/3d/{a["file"]}",' for a in additions),1)
-          text=text.replace('블렌더 마법사 모자','펠트 마법사 모자').replace('Blender 5.2 생성 별 반짝이 마법사 모자.','연속 곡면 크라운과 가죽 밴드로 제작한 마법사 모자.')
-          p.write_text(text)
-          p=Path('src/domains/creator/vrm/studio-vrm-props.test.ts');text=p.read_text()
-          marker='    const expected = {'
-          if additions:
-              assert text.count(marker)==1
-              text=text.replace(marker,marker+'\n'+'\n'.join(f'      {a["id"]}: "/assets/3d/{a["file"]}",' for a in additions),1)
-          text=text.replace('55개','64개').replace('toHaveLength(55)','toHaveLength(64)')
-          p.write_text(text)
-          p=Path('src/domains/creator/studio-everyday-props-pack-v4.test.ts');text=p.read_text()
-          start=text.find('  {\n    id: "cap",\n    filename: "everyday_cap.glb",')
-          if start!=-1:
-              end=text.index('  {\n    id: "glasses",',start)
-              text=text[:start]+'  // Cap v5 is covered by studio-vrm-wearable-v5.test.ts; hollow headwear must not require a visible contact post.\n'+text[end:]
-          p.write_text(text)
-          p=Path('public/assets/3d/LICENSES.md');text=p.read_text()
-          heading='## Original wearable pack v5'
-          if heading not in text:
-              text+='\n\n'+heading+'\n\nThe 12 files in `wearable-v5-manifest.json` are original geometry authored for ToonStudio by `scripts/generate-studio-wearable-v5.mts`, dedicated to CC0-1.0. No third-party models or textures were copied. The manifest records metre-scale anchors, geometry counts and SHA-256 hashes. These files supersede the older geometry for matching filenames; source-code licensing is unchanged.\n'
-              text+='\nCC0: https://creativecommons.org/publicdomain/zero/1.0/\n'
-          p.write_text(text)
-          PY
-      - name: Regression tests before committing generated output
-        run: pnpm exec vitest run src/domains/creator/vrm/studio-vrm-wearable-v5.test.ts src/domains/creator/vrm/studio-vrm-props.test.ts src/domains/creator/studio-everyday-props-pack-v4.test.ts --reporter=verbose
-      - name: Commit only the authorized review-branch output
+      - name: Selection, saved-scene and actual GLB regression tests
+        run: pnpm exec vitest run src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/StudioVrmPropPanel.test.tsx src/domains/creator/vrm/studio-vrm-wearable-v5.test.ts src/domains/creator/vrm/studio-vrm-props.test.ts src/domains/creator/studio-everyday-props-pack-v4.test.ts --reporter=verbose
+      - name: Commit only the reviewed UI integration
         run: |
           test "$GITHUB_REF_NAME" = 'fix/studio-wearable-quality-audit-20260906'
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-          node --input-type=module <<'EOF'
-          import fs from 'node:fs';import {execFileSync} from 'node:child_process';
-          const assets=JSON.parse(fs.readFileSync('public/assets/3d/wearable-v5-manifest.json','utf8')).assets;
-          if(assets.some(asset=>!/^[-a-z0-9_]+\.glb$/.test(asset.file)))throw new Error('Invalid output filename');
-          const paths=assets.map(asset=>'public/assets/3d/'+asset.file).concat([
-            'public/assets/3d/wearable-v5-manifest.json','public/assets/3d/LICENSES.md',
-            'scripts/generate-studio-wearable-v5.mts','scripts/studio-wearable-review-page.mjs','scripts/verify-studio-wearable-v5.mts',
-            'src/domains/creator/vrm/studio-vrm-props.ts','src/domains/creator/vrm/studio-vrm-props.test.ts','src/domains/creator/studio-everyday-props-pack-v4.test.ts']);
-          execFileSync('git',['add','--',...paths],{stdio:'inherit'});
-          EOF
+          git add -- src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts
+          mkdir -p wearable-ui-integration
+          git diff --cached --binary > wearable-ui-integration/source.patch
           if git diff --cached --quiet; then exit 0; fi
-          mkdir -p wearable-integration
-          git diff --cached --binary > wearable-integration/source.patch
-          git -c user.name='ToonStudio asset build' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(studio): replace twelve wearable meshes and preserve stable attachment contracts'
+          git -c user.name='ToonStudio quality integration' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(studio): exclude failed wearables from new selections and preserve saved scenes'
           git push origin "HEAD:$GITHUB_REF_NAME"
-      - name: Preserve reproducible source and generated assets
+      - name: Retain exact reviewed source
         if: always()
         run: |
-          mkdir -p wearable-integration
-          git rev-parse HEAD > wearable-integration/commit.txt
-          cp public/assets/3d/wearable-v5-manifest.json wearable-integration/ 2>/dev/null || true
-          cp scripts/generate-studio-wearable-v5.mts scripts/studio-wearable-review-page.mjs scripts/verify-studio-wearable-v5.mts wearable-integration/
-          tar -czf wearable-integration/review-source.tar.gz src/domains/creator/vrm src/domains/creator/studio-pose-presets.ts public/assets/3d public/vrm/sample.vrm public/vrm/AvatarSample_B.vrm
+          mkdir -p wearable-ui-integration
+          git rev-parse HEAD > wearable-ui-integration/commit.txt
+          cp src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts wearable-ui-integration/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: wearable-integration-${{ github.sha }}
-          path: wearable-integration/
+          name: wearable-ui-integration-${{ github.sha }}
+          path: wearable-ui-integration/
           retention-days: 7
