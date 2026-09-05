@@ -1,0 +1,64 @@
+name: BG3D diagnostic reproduction
+
+# Diagnostic branch only. Not part of the product pull request or a deployment.
+on:
+  push:
+    branches: [diag/bg3d-production-repro-20260906]
+    paths: [.github/workflows/bg3d-diagnostic-reproduction.yml]
+permissions:
+  contents: read
+jobs:
+  export-reproduction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: b7795bcf92f866843852e15a3665940832582fbf
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - run: pnpm run build:bundle
+      - name: Package unchanged build assets and the pinned browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bg3d-repro/dist"
+          cp -a dist/assets "$RUNNER_TEMP/bg3d-repro/dist/"
+          cp -a dist/i18n "$RUNNER_TEMP/bg3d-repro/dist/"
+          find dist -maxdepth 1 -type f -exec cp -t "$RUNNER_TEMP/bg3d-repro/dist/" {} +
+          git rev-parse HEAD > "$RUNNER_TEMP/bg3d-repro/commit.txt"
+          cp -a src e2e scripts package.json pnpm-lock.yaml vite.config.ts \
+            playwright.config.ts playwright.bg3d-runtime.config.ts tsconfig.bg3d-runtime.json \
+            "$RUNNER_TEMP/bg3d-repro/"
+          mkdir -p "$RUNNER_TEMP/bg3d-repro/dependency-source"
+          cp -aL node_modules/three "$RUNNER_TEMP/bg3d-repro/dependency-source/three"
+          cp -aL node_modules/@react-three/fiber "$RUNNER_TEMP/bg3d-repro/dependency-source/fiber"
+          cp -aL node_modules/@react-three/drei "$RUNNER_TEMP/bg3d-repro/dependency-source/drei"
+          printf '%s\n' 'Includes compiled assets, Studio locales and root shell files. Public model libraries are not included; the empty-scene box reproduction does not request them.' > "$RUNNER_TEMP/bg3d-repro/SCOPE.txt"
+          tar -czf "$RUNNER_TEMP/bg3d-production-repro.tar.gz" -C "$RUNNER_TEMP" bg3d-repro
+          browser_dir="$(node --input-type=module -e "import { chromium } from 'playwright'; import path from 'node:path'; console.log(path.dirname(path.dirname(chromium.executablePath())))")"
+          tar -czf "$RUNNER_TEMP/bg3d-chromium.tar.gz" -C "$(dirname "$browser_dir")" "$(basename "$browser_dir")"
+          sha256sum "$RUNNER_TEMP/bg3d-production-repro.tar.gz" "$RUNNER_TEMP/bg3d-chromium.tar.gz"
+          du -h "$RUNNER_TEMP/bg3d-production-repro.tar.gz" "$RUNNER_TEMP/bg3d-chromium.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bg3d-production-repro
+          path: ${{ runner.temp }}/bg3d-production-repro.tar.gz
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bg3d-pinned-chromium
+          path: ${{ runner.temp }}/bg3d-chromium.tar.gz
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: error
