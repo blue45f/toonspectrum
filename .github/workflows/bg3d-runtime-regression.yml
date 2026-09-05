@@ -36,7 +36,6 @@ concurrency:
 
 jobs:
   bg3d-production-runtime:
-    # Execute independently of temporary core-gate bypasses. Never mistake skipped work for proof.
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -65,12 +64,14 @@ jobs:
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability.ts \
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.ts \
-            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.ts \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts
       - name: Typecheck browser verification and application interfaces
         run: |
           pnpm exec tsc --project tsconfig.bg3d-runtime.json
           pnpm run typecheck
-      - name: Test real execution, capability policy and late response ownership
+      - name: Test capability, late response and single-canvas renderer ownership
         run: |
           pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts \
             src/domains/creator/bg3d/studio-bg3d-engine-selection.test.ts \
@@ -78,7 +79,9 @@ jobs:
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability.test.ts \
             src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
             src/domains/creator/bg3d/useStudioBg3dEngineRuntime.test.tsx \
-            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx --reporter=verbose
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts --reporter=verbose
       - name: Install Chromium and its runtime dependencies
         run: pnpm exec playwright install --with-deps chromium
       - name: Build the production app to be verified
