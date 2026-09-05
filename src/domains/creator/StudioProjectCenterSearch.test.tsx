@@ -44,12 +44,11 @@ describe("StudioProjectCenterSearch", () => {
 
     await waitFor(() => {
       const matched = screen.getByRole("button", { name: "게시 사전검사" });
-      const hidden = screen.getByRole("button", {
-        name: "아카이브 백업",
-        hidden: true,
-      }) as HTMLButtonElement;
+      const hidden = document.querySelector<HTMLButtonElement>(
+        'button[title="프로젝트를 안전하게 보관"]',
+      );
       expect(matched.hasAttribute("hidden")).toBe(false);
-      expect(hidden.hidden).toBe(true);
+      expect(hidden?.hidden).toBe(true);
     });
 
     fireEvent.change(search, { target: { value: "체크포인트" } });
