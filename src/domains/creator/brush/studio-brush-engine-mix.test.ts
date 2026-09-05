@@ -136,9 +136,26 @@ describe("mergeStudioBrushMixTraitSection", () => {
     expect(flowSpacing.width).toEqual(dryMedia!.width);
 
     const scatter = mergeStudioBrushMixTraitSection("scatter-orientation", dryMedia!, airbrush!);
-    expect(scatter.scatter).toEqual(airbrush!.scatter);
+    expect(scatter.scatter).toMatchObject({
+      min: airbrush!.scatter.min,
+      max: airbrush!.scatter.max,
+      mappings: airbrush!.scatter.mappings,
+      jitter: airbrush!.scatter.jitter,
+    });
     expect(scatter.angle).toEqual(airbrush!.angle);
     expect(scatter.scatterRatio).toBe(airbrush!.scatterRatio);
+    // Scatter uses the same relative portable contract as spacing and is projected through the
+    // retained carrier width during normalization.
+    const expectedScatterBase = airbrush!.scatterRatio === null
+      ? airbrush!.scatter.base
+      : Math.min(
+          airbrush!.scatter.max,
+          Math.max(
+            airbrush!.scatter.min,
+            dryMedia!.width.base * airbrush!.scatterRatio,
+          ),
+        );
+    expect(scatter.scatter.base).toBeCloseTo(expectedScatterBase, 10);
 
     const taper = mergeStudioBrushMixTraitSection("taper", dryMedia!, airbrush!);
     expect(taper.taper).toEqual(airbrush!.taper);
