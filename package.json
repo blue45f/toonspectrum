@@ -12,6 +12,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
     "build:bundle": "NODE_OPTIONS='--max-old-space-size=8192' vite build",
+    "prebuild:bundle": "pnpm run prebuild",
+    "postbuild:bundle": "pnpm run postbuild",
     "postbuild": "node scripts/generate-third-party-notices.mjs --output dist/legal/THIRD_PARTY_NOTICES.generated.md && node scripts/verify-vercel-csp.mjs dist/index.html",
     "preview": "vite preview --host 0.0.0.0",
     "start": "vite preview --host 0.0.0.0",
