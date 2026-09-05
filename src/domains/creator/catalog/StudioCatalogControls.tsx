@@ -4,10 +4,7 @@ import type { StudioCatalogOrientation, StudioCatalogSort, StudioCatalogView } f
 
 export const STUDIO_CATALOG_CONTROL = "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-raised aria-pressed:border-accent aria-pressed:text-accent";
 
-export const STUDIO_CATALOG_PRIMARY_CONTROL = STUDIO_CATALOG_CONTROL
-  .replace("border-line bg-card", "border-accent bg-accent")
-  .replace("text-fg-2", "text-on-accent")
-  .replace("hover:bg-raised", "hover:opacity-90");
+export const STUDIO_CATALOG_PRIMARY_CONTROL = "min-h-11 min-w-0 rounded-lg border border-accent bg-accent px-2 text-xs text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:opacity-90 aria-pressed:border-accent aria-pressed:text-accent";
 
 export function StudioCatalogControls({
   view, onView, sort, onSort, favoritesOnly, onFavoritesOnly, favoriteCount,
