@@ -1,0 +1,43 @@
+name: Studio native visual review
+on:
+  push:
+    branches: [verify/studio-assets-native-review-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readable-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Combine already-rendered pages without altering their images
+        run: |
+          python3 -m pip install --disable-pip-version-check pypdf==5.9.0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          from pypdf import PdfReader,PdfWriter
+          root=Path('docs/reports/asset-visual-review-20260906')
+          index=json.loads((root/'review-index.json').read_text())
+          pages=sorted(root.glob('review-[0-9][0-9].pdf'))
+          assert len(pages)==index['pages']==57
+          output=Path(os.environ['RUNNER_TEMP'])/'studio-all-assets-visual-review.pdf'
+          writer=PdfWriter()
+          for page in pages:
+              reader=PdfReader(page)
+              assert len(reader.pages)==1
+              writer.add_page(reader.pages[0])
+          writer.add_metadata({'/Title':'ToonStudio 1351 asset visual review','/Subject':'Actual rendered evidence; no artistic approval inferred'})
+          writer.write(output)
+          assert len(PdfReader(output).pages)==57
+          print('Native visual evidence:',output.name,output.stat().st_size,'bytes;',index['totalVisualItems'],'items')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: ${{ runner.temp }}/studio-all-assets-visual-review.pdf
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
