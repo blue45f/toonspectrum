@@ -153,11 +153,51 @@ describe("retained media session stability", () => {
       renderer.showSettledPixels();
       expect(renderer.releaseSettledPrefix(1)).toBe(1);
       expect(renderer.settledStrokeCount).toBe(0);
+      expect(renderer.retainedPencilCommandCount).toBe(0);
       expect(renderer.isActive).toBe(false);
       expect(active.read()).toEqual([]);
       expect(settled.read()).toEqual([]);
       expect(active.stackDepth()).toBe(0);
       expect(settled.stackDepth()).toBe(0);
     }
+  });
+});
+
+
+describe("retained pencil paint-program ownership", () => {
+  it("keeps pointer-up suffix-only after travel rather than repainting the accepted prefix", () => {
+    const { renderer, active } = attached();
+    const element = stroke("pencil--side-shade", POINTS);
+    renderer.begin(stroke("pencil--side-shade", POINTS.slice(0, 2)));
+    renderer.appendFrom(element);
+    const beforeClear = active.clears();
+    const beforeCommands = renderer.retainedPencilCommandCount;
+    expect(beforeCommands).toBeGreaterThan(0);
+    renderer.end(element);
+    // Only the normal post-flatten active-surface clear is allowed, not a pre-flatten full rebuild.
+    expect(active.clears()).toBe(beforeClear + 1);
+    expect(renderer.retainedPencilCommandCount).toBeGreaterThan(beforeCommands);
+    renderer.clear();
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+  });
+
+  it("releases only the requested prefix and drops an aborted active program", () => {
+    const { renderer, settled } = attached();
+    for (const id of ["first", "second"]) {
+      const element = stroke("pencil", POINTS, id);
+      renderer.begin(element);
+      renderer.end(element);
+    }
+    expect(renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBeGreaterThan(0);
+    const second = settled.read();
+    renderer.hideSettledPixels();
+    renderer.showSettledPixels();
+    expect(settled.read()).toEqual(second);
+    renderer.begin(stroke("pencil", POINTS, "cancelled"));
+    renderer.resetActive();
+    expect(renderer.releaseSettledPrefix(Infinity)).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBe(0);
   });
 });
