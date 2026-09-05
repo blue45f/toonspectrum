@@ -1,4 +1,4 @@
-name: Studio stability source inspection
+name: Studio raster idle lifecycle validation
 
 on:
   push:
@@ -13,19 +13,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  source:
+  focused:
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Capture tracked source only, with its exact revision
-        run: |
-          mkdir -p /tmp/studio-source-inspect
-          git rev-parse HEAD > /tmp/studio-source-inspect/commit.txt
-          git archive --format=tar.gz --output=/tmp/studio-source-inspect/studio-source.tar.gz HEAD src scripts .github package.json pnpm-lock.yaml
-      - uses: actions/upload-artifact@v6
         with:
-          name: studio-source-inspect-778
-          path: /tmp/studio-source-inspect
-          retention-days: 1
-          if-no-files-found: error
+          ref: 8ce6a6e0b3a37d8aeabac8c960e1a0fc510bccb7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Record exact tested revision
+        run: |
+          mkdir -p /tmp/studio-idle-evidence
+          git rev-parse HEAD > /tmp/studio-idle-evidence/tested-head.txt
+          git diff --exit-code
+      - name: Run existing and new raster regressions with real kernels
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/studio-smudge-worker-client.test.ts \
+            src/domains/creator/studio-retouch-worker-client.test.ts \
+            src/domains/creator/studio-raster-worker-queue-stability.test.ts \
+            src/domains/creator/studio-raster-worker-idle-stability.test.ts \
+            --reporter=default --reporter=json \
+            --outputFile.json=/tmp/studio-idle-evidence/vitest.json
+      - name: Lint affected source and test files
+        run: |
+          pnpm exec eslint \
+            src/domains/creator/studio-abortable-serial-queue.ts \
+            src/domains/creator/studio-smudge-worker-client.ts \
+            src/domains/creator/studio-retouch-worker-client.ts \
+            src/domains/creator/studio-raster-worker-queue-stability.test.ts \
+            src/domains/creator/studio-raster-worker-idle-stability.test.ts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-idle-lifecycle-exact-head
+          path: /tmp/studio-idle-evidence
+          retention-days: 7
+          if-no-files-found: warn
