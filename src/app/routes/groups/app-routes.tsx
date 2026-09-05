@@ -7,6 +7,7 @@ import { experienceRoutes } from "./experience.routes";
 import { legalRoutes } from "./legal.routes";
 import { marketRoutes } from "./market.routes";
 import { notFoundRoutes } from "./not-found.route";
+import { referenceRoutes } from "./reference.routes";
 
 /**
  * URL ownership is grouped by product domain while the root router retains cross-domain concerns
@@ -14,6 +15,7 @@ import { notFoundRoutes } from "./not-found.route";
  */
 export const appRoutes = [
   ...catalogRoutes,
+  ...referenceRoutes,
   ...communityRoutes,
   ...creatorRoutes,
   ...marketRoutes,

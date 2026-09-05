@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import "./reference-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 
 import { useT } from "@/lib/i18n";
@@ -12,6 +13,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/": "",
   "/ranking": "route.ranking",
   "/search": "route.search",
+  "/references": "route.references",
   "/recommend": "route.recommend",
   "/explore": "route.explore",
   "/random": "route.random",
