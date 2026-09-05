@@ -1,0 +1,118 @@
+name: Studio asset browser
+on:
+  push:
+    branches: [main, feat/studio-asset-browser-quality-20260906]
+    paths:
+      - src/domains/creator/catalog/**
+      - src/domains/creator/StudioElementsPanel*
+      - src/domains/creator/StudioAssetToolPopoverBody.tsx
+      - src/domains/creator/studio-scene-templates*
+      - scripts/verify-studio-catalog-browser.mjs
+      - scripts/pack_studio_curated_gltf.py
+      - scripts/tests/test_studio_*.py
+      - tests/browser-fixtures/studio-catalog/**
+      - .github/workflows/studio-asset-browser.yml
+  pull_request:
+    paths:
+      - src/domains/creator/catalog/**
+      - src/domains/creator/StudioElementsPanel*
+      - src/domains/creator/StudioAssetToolPopoverBody.tsx
+      - src/domains/creator/studio-scene-templates*
+      - scripts/verify-studio-catalog-browser.mjs
+      - scripts/pack_studio_curated_gltf.py
+      - scripts/tests/test_studio_*.py
+      - tests/browser-fixtures/studio-catalog/**
+      - .github/workflows/studio-asset-browser.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-asset-browser-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  catalog-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install locked dependencies
+        id: install
+        run: |
+          mkdir -p artifacts/studio-catalog-browser
+          git rev-parse HEAD > artifacts/studio-catalog-browser/tested-head.txt
+          pnpm install --frozen-lockfile
+      - name: Real catalog and native insertion regression tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+      - name: Offline asset packaging and curation unit tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s scripts/tests -p 'test_studio_*.py' -v 2>&1 | tee artifacts/studio-catalog-browser/python-tests.log
+      - name: Strict changed-product lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.tsx src/domains/creator/StudioAssetToolPopoverBody.tsx src/domains/creator/studio-scene-templates.ts src/domains/creator/studio-scene-templates.test.ts 2>&1 | tee artifacts/studio-catalog-browser/lint.log
+      - name: Repository architecture validation
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm run validate:architecture 2>&1 | tee artifacts/studio-catalog-browser/architecture.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-catalog-regressions-${{ github.run_id }}
+          path: artifacts/studio-catalog-browser/
+          retention-days: 7
+  catalog-production-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install locked dependencies
+        id: install
+        run: |
+          mkdir -p artifacts/studio-catalog-browser
+          git rev-parse HEAD > artifacts/studio-catalog-browser/tested-head.txt
+          pnpm install --frozen-lockfile
+      - name: Full frontend TypeScript
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
+      - name: Production build and Studio bundle budget
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm run build 2>&1 | tee artifacts/studio-catalog-browser/build.log
+          pnpm run check:studio-bundle 2>&1 | tee artifacts/studio-catalog-browser/bundle.log
+      - name: Chromium setup
+        id: browser
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Actual component layout, keyboard and SQLite checks
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        run: pnpm exec node scripts/verify-studio-catalog-browser.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-catalog-browser-${{ github.run_id }}
+          path: artifacts/studio-catalog-browser/
+          retention-days: 7
