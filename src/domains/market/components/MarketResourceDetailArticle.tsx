@@ -39,6 +39,7 @@ import { MarketAcquisitionModal } from "./MarketAcquisitionModal";
 import { MarketAssetRecipePreview } from "./MarketAssetRecipePreview";
 import { MarketBrushPreview } from "./MarketBrushPreview";
 import { MarketCommentsSection } from "./MarketCommentsSection";
+import { MarketCompareToggle } from "./MarketCompareToggle";
 import { MarketDetailStickyBar } from "./MarketDetailStickyBar";
 import { MarketEditResourceModal } from "./MarketEditResourceModal";
 import { MarketFilterPreview } from "./MarketFilterPreview";
@@ -321,7 +322,7 @@ export function MarketResourceDetailArticle({
             </span>
           ) : (
             <span className="inline-flex min-h-6 items-center rounded-md border border-good/40 bg-raised px-2 text-xs font-semibold text-fg">
-              순수 창작
+              AI 미포함으로 공개
             </span>
           )}
         </div>
@@ -337,11 +338,7 @@ export function MarketResourceDetailArticle({
 
         <div className="mt-3.5 flex flex-wrap items-center gap-2">
           <MarketWebtoonSpecBadge
-            format={record.kind.startsWith("3d") ? "glb" : "portable-json"}
-            polycountGrade="optimal-webtoon"
-            hasLineExtraction={true}
-            isNoAiProtected={!record.containsAi}
-            licenseTier="solo-creator"
+            format={record.entries.length > 0 && record.entries.every((entry) => entry.delivery.mode === "portable-json") ? "portable-json" : undefined}
           />
           {record.kind.startsWith("3d") ? (
             <button
@@ -350,7 +347,7 @@ export function MarketResourceDetailArticle({
               className="inline-flex min-h-6 items-center gap-1 rounded-md bg-accent/20 border border-accent/40 px-2 text-xs font-bold text-accent hover:bg-accent/30 transition-colors"
             >
               <Box className="size-3" />
-              <span>3D 인터랙티브 뷰어 (은선·셀셰이딩·조명)</span>
+              <span>3D 렌더 모드 예시 보기</span>
             </button>
           ) : null}
         </div>
@@ -470,7 +467,7 @@ export function MarketResourceDetailArticle({
                 패키지 항목 · <span className="numeral tnum">{record.entries.length}</span>개
               </h2>
               <span className="text-xs text-fg-3">
-                전체 크기: {formatMarketByteSize(record.manifestByteSize)}
+                manifest 크기: {formatMarketByteSize(record.manifestByteSize)}
               </span>
             </div>
             <ul className="mt-3 divide-y divide-line rounded-xl border border-line bg-card">
@@ -611,47 +608,79 @@ export function MarketResourceDetailArticle({
             </div>
           </section>
 
-          {/* Trust & License Guarantee Banner (Acon3D & Clip Studio Benchmark) */}
+          {/* Decision evidence from the immutable public manifest. */}
           <section aria-labelledby="market-trust-guarantee-heading" className="rounded-xl border border-line bg-card p-5">
             <h2 id="market-trust-guarantee-heading" className="flex items-center gap-2 text-sm font-bold text-fg">
               <ShieldCheck className="h-4 w-4 text-good" aria-hidden="true" />
-              웹툰 창작 안심 보증 및 사용권 안내
+              게시 manifest 기반 권리·호환성 확인
             </h2>
+            <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+              아래 내용은 배급자가 게시한 현재 릴리스의 선언입니다. 독립적인 법률·성능 보증으로 해석하지 말고 실제 프로젝트 적용 전에 세부 조건을 확인하세요.
+            </p>
             <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
               <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-good mt-0.5" aria-hidden="true" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-good" aria-hidden="true" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-fg">상업용 웹툰 정식 연재 100% 허용</p>
-                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    네이버웹툰, 카카오페이지, 탑툰, 레진 등 국내외 모든 플랫폼 상업 연재 및 출판에 자유롭게 사용 가능합니다.
+                  <p className="text-xs font-semibold text-fg">{license.label}</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">사용 조건: {license.summary}</p>
+                  <p className="mt-1 break-words text-[0.65rem] leading-relaxed text-fg-3">
+                    {record.attributionText ? `출처 표기: ${record.attributionText}` : "게시된 출처 표기문 없음"}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
-                <Layers className="h-4 w-4 shrink-0 text-accent mt-0.5" aria-hidden="true" />
+                <Layers className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-fg">레이어 분리 추출 지원</p>
+                  <p className="text-xs font-semibold text-fg">Studio 호환 선언</p>
                   <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    Studio 내에서 선화(Line), 밑색(Flat Color), 그림자(Shadow) 레이어를 개별 분리하여 자연스럽게 블렌딩할 수 있습니다.
+                    {record.compatibility.engines.map((engine) => ENGINE_LABELS[engine] ?? engine).join(", ")}
+                  </p>
+                  <p className="mt-1 text-[0.65rem] text-fg-3">최소 Studio v{record.minimumStudioVersion}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-fg">
+                    {record.containsAi ? "AI 사용 포함으로 공개" : "AI 사용 미포함으로 공개"}
+                  </p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    배급자 manifest의 공개값이며 ToonSpectrum의 독립 감정이나 NoAI 보증 배지가 아닙니다.
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
-                <Shield className="h-4 w-4 shrink-0 text-cool mt-0.5" aria-hidden="true" />
+                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-cool" aria-hidden="true" />
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-fg">AI 무단 학습 금지 안심 보증</p>
-                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    순수 창작자 보호 정책에 따라 AI 모델 학습용 크롤링이 차단되며 저작권 분쟁으로부터 안전합니다.
+                  <p className="text-xs font-semibold text-fg">
+                    {record.provenance.origin === "original" ? "배급자 직접 제작으로 공개" : "외부 허용 출처로 공개"}
                   </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">
-                <Sparkles className="h-4 w-4 shrink-0 text-warn mt-0.5" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-fg">Studio 1초 드래그 앤 드롭</p>
-                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    복잡한 설치 과정 없이 스튜디오 캔버스 및 3D 뷰에 즉시 드래그하여 바로 컷 작업에 투입할 수 있습니다.
-                  </p>
+                  {record.provenance.origin === "permissive" ? (
+                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                      {record.provenance.sourceName} ·{" "}
+                      <a
+                        href={record.provenance.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-line-strong underline-offset-2 hover:text-accent"
+                      >
+                        원본 확인
+                      </a>
+                      {" · "}
+                      <a
+                        href={record.provenance.sourceLicenseUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-line-strong underline-offset-2 hover:text-accent"
+                      >
+                        원본 사용권
+                      </a>
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                      배급자가 원본 제작자로 선언한 릴리스입니다.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -779,6 +808,7 @@ export function MarketResourceDetailArticle({
               />
               <span>{wishlisted ? "찜한 에셋에서 제거" : "찜 목록에 추가"}</span>
             </button>
+            <MarketCompareToggle record={currentRecord} className="w-full" />
             {currentRecord.isOwner ? (
               <button
                 type="button"
@@ -931,10 +961,7 @@ export function MarketResourceDetailArticle({
         open={viewer3dOpen}
         onClose={() => setViewer3dOpen(false)}
         assetTitle={record.name}
-        format="glb"
-        onImportToStudio={() => {
-          setViewer3dOpen(false);
-        }}
+        studioResourceId={record.id}
       />
 
       <MarketDetailStickyBar

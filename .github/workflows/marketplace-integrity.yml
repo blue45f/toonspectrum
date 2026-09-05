@@ -1,0 +1,100 @@
+name: Marketplace integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/market/**'
+      - 'lib/creator-marketplace*'
+      - 'apps/api/src/db/creator-marketplace*'
+      - 'apps/api/src/db/migrations/*creator_marketplace*'
+      - 'apps/api/src/modules/creator-marketplace/**'
+      - 'scripts/*marketplace*'
+      - 'scripts/*production-database*'
+      - '.github/workflows/marketplace-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/market/**'
+      - 'lib/creator-marketplace*'
+      - 'apps/api/src/db/creator-marketplace*'
+      - 'apps/api/src/db/migrations/*creator_marketplace*'
+      - 'apps/api/src/modules/creator-marketplace/**'
+      - 'scripts/*marketplace*'
+      - 'scripts/*production-database*'
+      - '.github/workflows/marketplace-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  marketplace-integrity:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: marketplace_parity_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U webdex -d marketplace_parity_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: git diff --check
+      - run: pnpm run validate:architecture
+      - name: Strict marketplace lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/market
+          apps/api/src/db/creator-marketplace-library.schema.ts
+          apps/api/src/db/creator-marketplace-report.schema.ts
+          apps/api/src/modules/creator-marketplace/creator-marketplace-3d-asset-parity.test.ts
+          scripts/verify-marketplace-3d-parity.mjs
+      - name: Actual marketplace, API and migration unit regressions
+        run: >-
+          pnpm exec vitest run src/domains/market
+          apps/api/src/modules/creator-marketplace
+          lib/creator-marketplace
+          scripts/run-production-database-migrations.test.mjs
+          scripts/bootstrap-empty-production-database.test.mjs
+          --reporter=default
+      - name: Reproduce old PostgreSQL rejection and prove the 0037 repair
+        env:
+          DATABASE_URL: postgres://webdex:webdex@127.0.0.1:5432/marketplace_parity_test
+          TOONSPECTRUM_MARKETPLACE_PARITY_DB_TEST: '1'
+        run: pnpm exec tsx scripts/verify-marketplace-3d-parity.mjs
+      - name: Verify canonical marketplace repositories on a separate disposable database
+        env:
+          PGPASSWORD: webdex
+          DATABASE_URL: postgres://webdex:webdex@127.0.0.1:5432/marketplace_repository_test
+          TOONSPECTRUM_MARKETPLACE_DB_TEST: '1'
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -U webdex -d marketplace_parity_test -v ON_ERROR_STOP=1 -c 'CREATE DATABASE marketplace_repository_test'
+          pnpm exec tsx scripts/verify-creator-marketplace-db.mts
+      - name: Actual workspace typecheck
+        run: pnpm run typecheck
+      - name: Actual production build
+        run: pnpm run build
+      - name: Actual workspace builds
+        run: pnpm run build:all
