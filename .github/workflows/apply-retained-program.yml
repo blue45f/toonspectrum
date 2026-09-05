@@ -1,0 +1,60 @@
+name: Verify retained pencil command ownership
+on:
+  push:
+    branches: [fix/studio-session-followup-20260906]
+    paths: ['scripts/.studio-retained-program.patch']
+permissions:
+  contents: write
+concurrency:
+  group: retained-pencil-program-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_DIR: /tmp/retained-pencil-evidence
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply only to the reviewed candidate
+        run: |
+          test "$(git hash-object src/domains/creator/live/studio-live-retained-media-overlay.ts)" = 25534522ab7c2905cac79cd65962c4906d946625
+          git apply --check scripts/.studio-retained-program.patch
+          git apply --index scripts/.studio-retained-program.patch
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Test renderer lifetimes before publishing implementation
+        run: |
+          mkdir -p /tmp/retained-unit-evidence
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/live/studio-live-retained-media-overlay.test.ts src/domains/creator/live/studio-live-retained-media-stability.test.ts 2>&1 | tee /tmp/retained-unit-evidence/tests.log
+      - name: Publish tested implementation to feature branch only
+        run: |
+          git rm scripts/.studio-retained-program.patch .github/workflows/apply-retained-program.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "fix(studio): retain exact pencil paint commands without pointer-up rebuild"
+          git push origin HEAD:refs/heads/fix/studio-session-followup-20260906
+          git rev-parse HEAD > /tmp/retained-unit-evidence/commit.txt
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build:bundle
+      - name: Recheck both previously failing pencil long strokes in the built product
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: long
+          TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade
+        run: pnpm run verify:studio-brushes
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: retained-pencil-verification
+          path: |
+            /tmp/retained-pencil-evidence
+            /tmp/retained-unit-evidence
+          retention-days: 7
+          if-no-files-found: warn
