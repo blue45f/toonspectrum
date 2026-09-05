@@ -5,6 +5,9 @@ on:
     paths: [.github/workflows/feedback-runtime-boundary.yml]
 permissions:
   contents: write
+concurrency:
+  group: feedback-runtime-candidate
+  cancel-in-progress: true
 jobs:
   prepare:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/chore/feedback-ci-recovery-20260906'
@@ -55,7 +58,7 @@ jobs:
               'scripts/feedback-database-contract.test.mjs':'62e761534cd9477a00a6c473409204d862a901c92aff97b352f8217fba337332',
               'scripts/production-database-migrations.manifest':'6710e499b6291f6ba5779cf378c105ff2b8913460e8f7dc5644e8b4f4f77702d',
               'scripts/run-production-database-migrations.mjs':'da2cc0b13c3d9ecc5ad764e3070f79d70433db81609093931065f76abf8bc15f',
-              'scripts/run-production-database-migrations.test.mjs':'55275837d3f3f11cadce9df90acb1b32528528540f8d1cdc713856229e395814f69',
+              'scripts/run-production-database-migrations.test.mjs':'55275837d3f3f11cadce9df90acb1b32528540f8d1cdc713856229e395814f69',
               'scripts/verify-feedback-community-db.mts':'f670aa7f04a7b46a79cf4f8c99b55f10d6d7247686d68af2005e7e0ce1a6b780',
               'scripts/verify-production-database-capabilities.mjs':'5a6e3e71a20a1a3a081f96f30aa963812830cda87cd13899a03c7412ae807062'
             };
@@ -74,7 +77,7 @@ jobs:
             }
             const {data: built} = await github.rest.git.createTree({owner,repo,base_tree:base.tree.sha,tree});
             const {data: commit} = await github.rest.git.createCommit({owner,repo,parents:[parent],tree:built.sha,message:'fix(feedback): move schema changes to managed migrations and verify restricted runtime'});
-            // Deliberately do not update ANY ref. The connector separately verifies and fast-forwards the feature branch.
+            // No ref is updated. The connector separately verifies and fast-forwards the feature branch.
             fs.writeFileSync(path.join(process.env.GITHUB_WORKSPACE,'feedback-runtime-candidate.json'),JSON.stringify({parent,commit:commit.sha,tree:built.sha,files:expected},null,2));
             core.info('CANDIDATE_COMMIT='+commit.sha);
       - uses: actions/upload-artifact@v4
