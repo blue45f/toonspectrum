@@ -1,0 +1,102 @@
+name: Webtoon assistant regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/assistant/**"
+      - "src/domains/creator/StudioCompanionAssistantDisplay*"
+      - "src/domains/creator/studio-workbench-*"
+      - "src/domains/creator/use-studio-copy-feedback*"
+      - "src/domains/creator/studio-panel-ui*"
+      - "src/domains/creator/studio-sfx-lettering*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/webtoon-assistant-regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/domains/creator/assistant/**"
+      - "src/domains/creator/StudioCompanionAssistantDisplay*"
+      - ".github/workflows/webtoon-assistant-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webtoon-assistant-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  webtoon-assistant-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set +e
+          pnpm install --frozen-lockfile > "$RUNNER_TEMP/webtoon-install.log" 2>&1
+          result=$?
+          tail -n 30 "$RUNNER_TEMP/webtoon-install.log"
+          exit "$result"
+      # This fast feedback job supplements, never replaces, the complete required core suite.
+      - name: Verify both assistant surfaces and all shared engines
+        shell: bash
+        run: |
+          set +e
+          pnpm exec vitest run \
+            src/domains/creator/assistant \
+            src/domains/creator/StudioCompanionAssistantDisplay.test.tsx \
+            src/domains/creator/studio-workbench-tabs.test.tsx \
+            src/domains/creator/studio-sfx-lettering.test.ts \
+            --reporter=json \
+            --outputFile="$RUNNER_TEMP/webtoon-assistant-results.json" \
+            > "$RUNNER_TEMP/webtoon-assistant-tests.log" 2>&1
+          result=$?
+          export WEBTOON_TEST_EXIT_CODE="$result"
+          node --input-type=module <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const path = `${process.env.RUNNER_TEMP}/webtoon-assistant-results.json`;
+          try {
+            const report = JSON.parse(readFileSync(path, 'utf8'));
+            const summary = [
+              `Webtoon assistant regression: exit ${process.env.WEBTOON_TEST_EXIT_CODE}`,
+              `Tests: ${report.numPassedTests} passed, ${report.numFailedTests} failed, ${report.numPendingTests} pending, ${report.numTotalTests} total`,
+            ];
+            for (const file of report.testResults ?? []) {
+              const name = file.name.replace(`${process.env.GITHUB_WORKSPACE}/`, '');
+              summary.push(`${file.status}: ${name}`);
+              for (const test of file.assertionResults ?? []) {
+                if (test.status !== 'failed') continue;
+                summary.push(`FAIL: ${test.fullName}`);
+                for (const message of test.failureMessages ?? []) {
+                  summary.push(message.slice(0, 1800));
+                }
+              }
+              if (file.status === 'failed' && file.message) summary.push(file.message.slice(0, 1800));
+            }
+            const text = summary.join('\n').slice(0, 40000);
+            console.log(text);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n\`\`\`text\n${text}\n\`\`\`\n`);
+          } catch (error) {
+            console.error(`Unable to read test report: ${error.message}`);
+            process.exitCode = 1;
+          }
+          JS
+          report_result=$?
+          if [ "$result" -ne 0 ] || [ "$report_result" -ne 0 ]; then
+            tail -n 60 "$RUNNER_TEMP/webtoon-assistant-tests.log"
+            if [ "$result" -ne 0 ]; then exit "$result"; fi
+            exit "$report_result"
+          fi
