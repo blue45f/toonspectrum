@@ -29,15 +29,57 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch --no-tags origin main
           git merge --no-commit --no-ff origin/main
+          git rev-parse origin/main
           python3 - <<'PY'
-          import base64, hashlib, lzma, pathlib, subprocess
+          import base64, hashlib, lzma, pathlib, re, subprocess
           encoded = pathlib.Path('.github/studio-merge-recovery.patch.b64').read_text().strip()
           payload = base64.b64decode(encoded, validate=True)
           assert hashlib.sha256(payload).hexdigest() == 'b1677e0b9a2d590e463634d95fab7b1ecfca7d6d9d38be4d7ee1bc7d9239c71e', 'transport mismatch'
           patch = lzma.decompress(payload)
           assert hashlib.sha256(patch).hexdigest() == 'd79a07959548129ebbc2854aa07b87a59bdcdb90a10a0eba7f90b045951a547c', 'patch mismatch'
-          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
-          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          # Reviewed main changes: CI was switched off, the title is now h1,
+          # and production uses a lazy route adapter shared with Storyworld.
+          # Preserve those changes. Reject unknown anchors instead of overwriting files.
+          parts = re.split(r'(?=^diff --git )', patch.decode(), flags=re.M)
+          adapted = []
+          for part in parts:
+              if not part:
+                  continue
+              header = part.splitlines()[0]
+              if header.startswith('diff --git a/src/domains/creator/studio-router/StudioRouter.tsx '):
+                  continue
+              if header.startswith('diff --git a/.github/workflows/ci.yml '):
+                  current = pathlib.Path('.github/workflows/ci.yml').read_text()
+                  if 'CI_CORE_BYPASS' not in current:
+                      continue
+                  if '  CI_CORE_BYPASS: "false"' in current:
+                      assert part.count('-  CI_CORE_BYPASS: "true"') == 1
+                      part = part.replace('-  CI_CORE_BYPASS: "true"', '-  CI_CORE_BYPASS: "false"')
+              if header.startswith('diff --git a/src/domains/creator/studio-production/StudioProductionHubPage.tsx '):
+                  hunks = re.split(r'(?=^@@ )', part, flags=re.M)
+                  label_hunks = [h for h in hunks if '-                Production command center\n' in h]
+                  assert len(label_hunks) == 1, 'unexpected title hunk'
+                  part = ''.join(h for h in hunks if h not in label_hunks)
+              adapted.append(part)
+          rebased_patch = ''.join(adapted).encode()
+          subprocess.run(['git', 'apply', '--check', '-'], input=rebased_patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=rebased_patch, check=True)
+          hub = pathlib.Path('src/domains/creator/studio-production/StudioProductionHubPage.tsx')
+          source = hub.read_text()
+          assert source.count('Production command center') == 1, 'title changed again'
+          hub.write_text(source.replace('Production command center', 'Local production planner'))
+          router = pathlib.Path('src/domains/creator/studio-router/StudioRouter.tsx')
+          source = router.read_text()
+          before, section = source.split('    case "production":', 1)
+          production, after = section.split('    case ', 1)
+          assert '<StudioProductionRoute' in production, 'production route ownership changed'
+          old = 'onOpenStudio={() => navigate("/studio")}'
+          assert production.count(old) == 1, 'production exit changed again'
+          production = production.replace(old, 'onOpenStudio={() => navigate(resolution.editorHref)}')
+          # The page keys its inner workspace by document only. Switching views
+          # of the same work must not remount pending local state.
+          assert 'key={resolution.lifecycleKey}' not in production
+          router.write_text(before + '    case "production":' + production + '    case ' + after)
           PY
           git fetch --no-tags origin 7d5f2c63b0e12bb55dfe91db0c6cf2477262c379
           python3 - <<'PY'
