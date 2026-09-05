@@ -82,16 +82,21 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).not.toContain("if (!selected) return");
   });
 
-  it("routes multi numeric edits through the exact group transform bridge", () => {
+  it("routes multi numeric edits through one atomic planner and one commit", () => {
     const applyPatchSource = functionBody(
       "applyFigmaSelectionLayoutPatch",
       "reorder",
     );
 
-    expect(applyPatchSource).toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    // One planner owns the group edit: the precision path is the only one that honours the
+    // resize anchor, aspect lock and stroke-width policy the transform panel now emits.
+    expect(applyPatchSource).toContain("planStudioMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).not.toContain("planStudioFigmaMultiEdit(");
+    expect(applyPatchSource).not.toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).toContain("isEffectivelyHidden(element, groups)");
     expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
-    expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
-    expect(applyPatchSource).toContain("commit(plan.next)");
-    expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
+    expect(applyPatchSource).toContain("if (!commit(next)) return");
+    expect(applyPatchSource).toContain("setError(null)");
+    expect(applyPatchSource.match(/commit\(/gu)?.length).toBe(1);
   });
 });
