@@ -115,9 +115,9 @@ export function StudioProjectReviewActions({
     },
     {
       id: "continuity",
-      label: "이야기 연속성 검사",
-      ariaLabel: "이야기 연속성 검사",
-      title: "캐릭터 바이블과 장면 비트를 비교해 인물·장소·시간·의상·소품의 불일치를 찾습니다.",
+      label: "마감·품질 검사",
+      ariaLabel: "마감·품질 검사",
+      title: "문서 무결성·이미지 해상도·레이어·식자·컷 간격·검토 상태와 이야기 연속성을 한 번에 검사합니다.",
       icon: CheckCircle2,
       disabled: false,
       onSelect: handlers.openContinuityCheck,

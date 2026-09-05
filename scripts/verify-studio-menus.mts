@@ -166,7 +166,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "Writer Room · 대본…",
       "스토리보드 그리드…",
       "제작 바이블…",
-      "이야기 연속성 검사…",
+      "마감·품질 검사…",
       "세로 스크롤 미리보기…",
       "애니매틱 타임라인…",
     ],
