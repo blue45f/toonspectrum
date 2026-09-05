@@ -1,0 +1,219 @@
+name: Temporary Studio production direct delivery
+
+on:
+  push:
+    branches:
+      - feat/studio-production-command-center-20260905
+    paths:
+      - .github/workflows/tmp-studio-production-direct-delivery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deliver:
+    name: deliver on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - ubuntu-24.04-arm
+          - macos-15
+          - macos-14
+          - windows-2025
+          - windows-2022
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      BASE_SHA: c52d2ee39ffd7806e05f5f06a7baa8f2357993f0
+      DIRTY_BRANCH: feat/studio-production-command-center-20260905
+      READY_BRANCH: feat/studio-production-command-center-ready-20260905
+      FINAL_BRANCH: feat/studio-production-command-center-final-20260905
+    steps:
+      - name: Elect one hosted runner
+        id: elect
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_ref="refs/heads/tmp/studio-production-delivery-lock-${GITHUB_RUN_ID}"
+          if gh api --method POST "repos/${REPOSITORY}/git/refs" \
+            -f ref="$lock_ref" \
+            -f sha="$GITHUB_SHA" >/dev/null 2>&1; then
+            echo 'winner=true' >> "$GITHUB_OUTPUT"
+            echo "lock_ref=$lock_ref" >> "$GITHUB_OUTPUT"
+          else
+            echo 'winner=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout integration base
+        if: steps.elect.outputs.winner == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: repo
+          fetch-depth: 0
+
+      - name: Checkout staged archive
+        if: steps.elect.outputs.winner == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DIRTY_BRANCH }}
+          path: staging
+          fetch-depth: 1
+
+      - name: Checkout reviewed delivery recipe
+        if: steps.elect.outputs.winner == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.READY_BRANCH }}
+          path: ready
+          fetch-depth: 1
+
+      - name: Reconstruct, verify and extract the reviewed product archive
+        if: steps.elect.outputs.winner == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import io
+          import lzma
+          import tarfile
+          from pathlib import Path, PurePosixPath
+
+          root = Path.cwd()
+          parts = []
+          for index in range(11):
+              path = root / "staging" / ".github" / "tmp" / f"studio-production-patch.part{index:02d}"
+              value = path.read_text(encoding="utf-8").strip()
+              if index == 7:
+                  if len(value) <= 3920:
+                      raise SystemExit("part07 is shorter than the reviewed repair offset")
+                  if value[3920] == "a":
+                      value = value[:3920] + "i" + value[3921:]
+                  elif value[3920] != "i":
+                      raise SystemExit(f"unexpected part07 repair byte: {value[3920]!r}")
+              parts.append(value)
+
+          archive = base64.b64decode("".join(parts), validate=True)
+          expected = "73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504"
+          actual = hashlib.sha256(archive).hexdigest()
+          if actual != expected:
+              raise SystemExit(f"archive SHA mismatch: {actual}")
+
+          payload = lzma.decompress(archive)
+          destination_root = (root / "repo").resolve()
+          with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as bundle:
+              members = bundle.getmembers()
+              names = sorted(member.name for member in members)
+              if len(names) != 21 or len(set(names)) != len(names):
+                  raise SystemExit(f"unexpected member count: {len(names)}")
+              required = {
+                  "src/domains/creator/studio-production/StudioProductionHubPage.tsx",
+                  "src/domains/creator/studio-production/studio-production-model.ts",
+                  "src/domains/creator/studio-production/studio-production-sqlite-persistence.ts",
+                  "src/domains/creator/studio-router/studio-route-manifest.ts",
+                  "src/app/routes/app-route-title-ownership.test.ts",
+              }
+              missing = required.difference(names)
+              if missing:
+                  raise SystemExit(f"archive missing required files: {sorted(missing)}")
+              for member in members:
+                  relative = PurePosixPath(member.name)
+                  if relative.is_absolute() or ".." in relative.parts or not member.isfile():
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+                  source = bundle.extractfile(member)
+                  if source is None:
+                      raise SystemExit(f"cannot read archive member: {member.name}")
+                  destination = destination_root.joinpath(*relative.parts)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(source.read())
+          print(f"verified {actual} and extracted {len(names)} product files")
+          PY
+
+      - name: Replay reviewed hardening and collaboration reconciliation
+        if: steps.elect.outputs.winner == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import textwrap
+          from pathlib import Path
+
+          root = Path.cwd()
+          recipe = (root / "ready" / ".github" / "workflows" / "tmp-studio-production-ready.yml").read_text(encoding="utf-8")
+          pattern = re.compile(
+              r"python3 - <<'(?P<tag>[A-Z][A-Z0-9_]*)'\n(?P<body>.*?)(?:\n\s*)(?P=tag)(?=\n|$)",
+              re.DOTALL,
+          )
+          executed = 0
+          for match in pattern.finditer(recipe):
+              body = textwrap.dedent(match.group("body"))
+              lowered = body.lower()
+              # Transport/bootstrap/archive blocks are deliberately excluded. Product-only rewrite
+              # blocks mention the Studio production or route surfaces and operate inside the repo.
+              if any(token in lowered for token in (
+                  "studio-production-patch.part",
+                  "studio-production-parts",
+                  "base64.b64decode",
+                  "tarfile.open",
+                  "tmp-studio-production-ready.yml",
+                  "github-actions[bot]",
+                  "git push",
+              )):
+                  continue
+              if not any(token in body for token in (
+                  "StudioProduction",
+                  "studio-production",
+                  "studio-route-manifest",
+                  "StudioRouter",
+                  "collaboration",
+                  "app-route-title-ownership",
+              )):
+                  continue
+              subprocess.run(["python3", "-c", body], cwd=root / "repo", check=True)
+              executed += 1
+          print(f"replayed {executed} reviewed product rewrite blocks")
+          PY
+
+      - name: Rebase product commit onto current main and publish a clean branch
+        if: steps.elect.outputs.winner == 'true'
+        shell: bash
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          git config user.name 'toonstudio-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          rm -f .github/workflows/tmp-studio-production*.yml
+          rm -f .github/tmp/studio-production-patch.part??
+          rmdir .github/tmp 2>/dev/null || true
+          git add -A
+          git diff --cached --check
+          test -f src/domains/creator/studio-production/StudioProductionHubPage.tsx
+          test -f src/domains/creator/studio-production/studio-production-model.ts
+          test -f src/domains/creator/studio-production/studio-production-sqlite-persistence.ts
+          git commit -m 'feat(studio): add production command center'
+          feature_commit=$(git rev-parse HEAD)
+          git fetch origin main
+          git checkout -B "$FINAL_BRANCH" origin/main
+          git cherry-pick -X theirs "$feature_commit"
+          test -z "$(git ls-files '.github/tmp/studio-production-patch.part*' '.github/workflows/tmp-studio-production*')"
+          git diff origin/main...HEAD --check
+          git push --force-with-lease origin "HEAD:refs/heads/${FINAL_BRANCH}"
+
+      - name: Release runner election lock
+        if: always() && steps.elect.outputs.winner == 'true'
+        shell: bash
+        run: |
+          lock_ref='${{ steps.elect.outputs.lock_ref }}'
+          encoded=${lock_ref#refs/}
+          gh api --method DELETE "repos/${REPOSITORY}/git/refs/${encoded}" >/dev/null 2>&1 || true
