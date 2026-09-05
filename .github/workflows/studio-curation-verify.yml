@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/curation-review"
           python3 scripts/apply_studio_visual_curation.py
+          python3 scripts/finish_studio_vector_curation.py
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
           pnpm install --frozen-lockfile --ignore-scripts
       - name: Verify original identity and curated picker contracts
@@ -62,8 +63,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
           git add -- src/domains/creator/studio-asset-visual-curation.ts src/domains/creator/studio-asset-visual-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx
           git diff --cached --stat
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "fix(studio): apply screened asset curation and transparent starter upgrades"
-          git push origin "HEAD:$GITHUB_REF"
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "fix(studio): apply screened asset curation and transparent starter upgrades"
+            git push origin "HEAD:$GITHUB_REF"
+          fi
           git log -1 --format='CURATION_SOURCE_COMMIT %H'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
