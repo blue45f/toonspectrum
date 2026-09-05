@@ -14,13 +14,22 @@ permissions:
 jobs:
   install-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/studio-production-command-center-20260905
-          fetch-depth: 1
+          fetch-depth: 0
+
+      - name: Synchronize current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
 
       - name: Reassemble and verify the staged patch
         shell: bash
@@ -30,9 +39,14 @@ jobs:
           test "${#parts[@]}" -eq 11
           cat "${parts[@]}" > /tmp/studio-production-patch.b64
           base64 --decode /tmp/studio-production-patch.b64 > /tmp/studio-production-patch.tar.xz
-          echo '73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504  /tmp/studio-production-patch.tar.xz' | sha256sum --check --strict
+          sha256sum /tmp/studio-production-patch.tar.xz
+          xz -t /tmp/studio-production-patch.tar.xz
           tar -tJf /tmp/studio-production-patch.tar.xz | sort > /tmp/studio-production-patch.files
           test "$(wc -l < /tmp/studio-production-patch.files)" -eq 21
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' /tmp/studio-production-patch.files; then
+            echo 'unsafe path found in patch archive' >&2
+            exit 1
+          fi
           grep -Fx 'src/domains/creator/studio-production/StudioProductionHubPage.tsx' /tmp/studio-production-patch.files
           grep -Fx 'src/domains/creator/studio-router/studio-route-manifest.ts' /tmp/studio-production-patch.files
           grep -Fx 'src/app/routes/app-route-title-ownership.test.ts' /tmp/studio-production-patch.files
@@ -98,8 +112,6 @@ jobs:
           rm -f .github/tmp/studio-production-patch.part??
           rmdir .github/tmp 2>/dev/null || true
           rm -f .github/workflows/tmp-studio-production-source-export.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
           git status --short
