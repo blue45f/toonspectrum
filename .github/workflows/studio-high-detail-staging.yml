@@ -1,0 +1,73 @@
+name: Studio high detail staging
+on:
+  push:
+    branches: [feat/studio-high-detail-assets-20260906]
+    paths: [scripts/acquire_studio_high_detail_assets.py, .github/workflows/studio-high-detail-staging.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-high-detail-staging-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  stage:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire actual CC0 PBR candidates
+        run: python3 scripts/acquire_studio_high_detail_assets.py --output "$RUNNER_TEMP/high-detail"
+      - name: Render actual models with neutral illumination and reflection environment
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/render_studio_asset_delivery.mjs')
+          s=p.read_text()
+          s=s.replace("import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';", "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';\nimport { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';")
+          s=s.replace('renderer.toneMappingExposure = 1.15;', 'renderer.toneMappingExposure = 1.0;')
+          s=s.replace('const scene = new THREE.Scene();','const scene = new THREE.Scene();\nconst room=new RoomEnvironment();const pmrem=new THREE.PMREMGenerator(renderer);const environment=pmrem.fromScene(room,0.04);scene.environment=environment.texture;room.dispose();pmrem.dispose();')
+          s=s.replace('0x646479,2.6','0x646479,0.6').replace('0xffffff,3.2','0xffffff,2.0').replace('0xffffff,1.1','0xffffff,0.7')
+          p.write_text(s)
+          PY
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/high-detail" "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          import json,os
+          out=Path(os.environ['RUNNER_TEMP'])/'high-detail'
+          assets=json.loads((out/'manifest.json').read_text())['assets']
+          for page,start in enumerate(range(0,len(assets),16),1):
+              sheet=Image.new('RGB',(1600,1500),'#d9dce1'); draw=ImageDraw.Draw(sheet)
+              for i,a in enumerate(assets[start:start+16]):
+                  x=(i%4)*400;y=(i//4)*370+12
+                  with Image.open(out/a.get('previewPath',a['path'])) as source:
+                      image=source.convert('RGBA');image.thumbnail((384,320))
+                  sheet.paste(image,(x+(400-image.width)//2,y),image)
+                  draw.text((x+8,y+325),f'{start+i+1:03d} '+a['id'],fill='#16171a')
+                  draw.text((x+8,y+345),a['kind']+' | '+str(a['bytes']//1024)+' KiB',fill='#363940')
+              sheet.save(out/f'high-detail-sheet-{page:02d}.jpg',quality=95)
+          print('PBR REVIEW ORIGINALS',len(assets))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-high-detail-${{ github.run_id }}
+          path: ${{ runner.temp }}/high-detail/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
