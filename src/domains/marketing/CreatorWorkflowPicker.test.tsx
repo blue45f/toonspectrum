@@ -5,8 +5,8 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, test } from "vitest";
 
-import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import { HOME_COPY } from "./creator-home-content";
+import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 
 afterEach(cleanup);
 

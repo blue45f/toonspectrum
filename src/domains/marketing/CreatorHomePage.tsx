@@ -1,10 +1,10 @@
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CreatorHomeNavigation, CreatorSectionLink } from "./CreatorHomeNavigation";
-import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import { CREATOR_FILM_DOWNLOADS, CREATOR_FILM_UI, createCreatorFilmPlayback, creatorFilmChapterAt } from "./creator-film-playback";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale, type CreatorHomeCopy } from "./creator-home-content";
+import { CreatorHomeNavigation, CreatorSectionLink } from "./CreatorHomeNavigation";
+import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import "./creator-home.css";
 import "./creator-film.css";
 

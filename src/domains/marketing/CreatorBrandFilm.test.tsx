@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CreatorBrandFilm } from "./CreatorHomePage";
 import { HOME_COPY } from "./creator-home-content";
+import { CreatorBrandFilm } from "./CreatorHomePage";
 
 beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
