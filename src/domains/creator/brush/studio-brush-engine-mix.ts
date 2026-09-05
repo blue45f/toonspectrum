@@ -244,7 +244,7 @@ export interface StudioBrushMixRecipe {
 }
 
 /** Curated multi-source recipes. The selected brush remains the carrier in every recipe. */
-export const STUDIO_BRUSH_MIX_RECIPES: readonly StudioBrushMixRecipe[] = Object.freeze([
+export const STUDIO_BRUSH_MIX_RECIPES = Object.freeze([
   {
     id: "webtoon-clean-line",
     name: "웹툰 선화 하이브리드",
@@ -335,7 +335,7 @@ export const STUDIO_BRUSH_MIX_RECIPES: readonly StudioBrushMixRecipe[] = Object.
       { sourceBrushId: "spray", sectionId: "scatter-orientation" },
     ]),
   },
-]);
+] satisfies readonly StudioBrushMixRecipe[]);
 
 export function studioBrushMixRecipeById(id: unknown): StudioBrushMixRecipe | null {
   return STUDIO_BRUSH_MIX_RECIPES.find((recipe) => recipe.id === id) ?? null;
