@@ -13,15 +13,17 @@ permissions:
 
 jobs:
   export:
-    runs-on: macos-15
+    runs-on: windows-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feat/studio-production-command-center-20260905
           fetch-depth: 1
       - name: Package staged archive and focused source
-        shell: bash
         run: |
           set -euo pipefail
           tar -czf studio-production-recovery.tgz \
