@@ -1,0 +1,55 @@
+name: Recover superseded feedback CI
+on:
+  push:
+    branches: [chore/feedback-ci-recovery-20260906]
+    paths: [.github/workflows/feedback-ci-recovery.yml]
+permissions:
+  actions: write
+jobs:
+  recover:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/chore/feedback-ci-recovery-20260906'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Release only the old, already-superseded CI run
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = 'blue45f';
+            const repo = 'toonspectrum';
+            const run_id = 33987130875;
+            const oldSha = '8bf621375045482bdf68a0a1707fab21f272bfcb';
+            const branch = 'feat/feedback-community-20260906';
+            const read = async () => (await github.rest.actions.getWorkflowRun({ owner, repo, run_id })).data;
+            const run = await read();
+            if (run.head_branch !== branch || run.head_sha !== oldSha || run.workflow_id !== 287571038 || run.event !== 'pull_request') {
+              throw new Error('Refusing to touch an unexpected workflow run.');
+            }
+            const { data: latest } = await github.rest.repos.getBranch({ owner, repo, branch });
+            if (latest.commit.sha === oldSha) throw new Error('Refusing to cancel the current source revision.');
+            if (run.status === 'completed') {
+              core.notice('Superseded run already completed; nothing to change.');
+              return;
+            }
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id, per_page: 100 });
+            if (jobs.jobs.some(job => job.status === 'in_progress') || !jobs.jobs.some(job => job.conclusion === 'cancelled')) {
+              throw new Error('Refusing to interrupt active tests or a run not already being cancelled.');
+            }
+            core.info(`Releasing stale run ${run_id}; latest source ${latest.commit.sha} is untouched.`);
+            try {
+              await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id });
+            } catch (error) {
+              if (error.status !== 409) throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, 15000));
+            const afterCancel = await read();
+            if (afterCancel.status !== 'completed') {
+              // GitHub documents force-cancel for jobs whose always() prevents normal cancellation.
+              // This is only an obsolete run. No status is marked successful and no protection is changed.
+              await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel', { owner, repo, run_id });
+            }
+            const final = await read();
+            core.info(`Superseded run status: ${final.status}; conclusion: ${final.conclusion ?? 'pending'}.`);
+            await core.summary.addHeading('PR 781 stale CI recovery')
+              .addRaw(`Only run ${run_id} at ${oldSha} was eligible for cancellation. The current source, required checks, feature validation and all other PRs remain unchanged.`)
+              .write();
