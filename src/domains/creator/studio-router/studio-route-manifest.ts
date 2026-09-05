@@ -435,6 +435,30 @@ function resolveStoryworld(
   });
 }
 
+function resolveProduction(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioProductionRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (
+    segments === null
+    || segments.length !== 2
+    || !PRODUCTION_ROUTE_IDS.has(segments[1] as StudioProductionRouteId)
+  ) {
+    return null;
+  }
+  const surface = segments[1] as StudioProductionRouteId;
+  const canonicalPathname = `/studio/${surface}`;
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, queryParams(search)),
+    canonicalPathname,
+    kind: "production",
+    lifecycleKey: canonicalPathname,
+    ownsDocumentTitle: true,
+    surface,
+  });
+}
+
 function resolvePlaceholder(
   pathname: string,
   search: string | URLSearchParams | undefined,
@@ -490,30 +514,6 @@ function scopedLifecycleKey(
   return `/studio/${scope === "work"
     ? `work:${encodeURIComponent(parsed.workId ?? "")}`
     : `remix:${encodeURIComponent(parsed.remixSourceWorkId ?? "")}`}/${surface}`;
-}
-
-function resolveProduction(
-  pathname: string,
-  search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
-  const segments = normalizedSegments(pathname);
-  if (
-    segments === null
-    || segments.length !== 2
-    || !PRODUCTION_ROUTE_IDS.has(segments[1] as StudioProductionRouteId)
-  ) {
-    return null;
-  }
-  const surface = segments[1] as StudioProductionRouteId;
-  const canonicalPathname = `/studio/${surface}`;
-  return Object.freeze({
-    canonicalHref: href(canonicalPathname, queryParams(search)),
-    canonicalPathname,
-    kind: "production",
-    lifecycleKey: canonicalPathname,
-    ownsDocumentTitle: true,
-    surface,
-  });
 }
 
 function resolveWorkScopedProduction(

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioAiAssistHub } from "./StudioAiAssistHub";
 
@@ -25,7 +25,15 @@ function props(
   };
 }
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 describe("StudioAiAssistHub task-first and keyboard UX", () => {
   it("uses a roving tab stop and arrow-key selection", () => {
@@ -34,13 +42,12 @@ describe("StudioAiAssistHub task-first and keyboard UX", () => {
 
     const background = screen.getByRole("tab", { name: /배경/u });
     const character = screen.getByRole("tab", { name: /캐릭터/u });
+    const panel = screen.getByRole("tabpanel");
 
     expect(background.getAttribute("tabindex")).toBe("0");
     expect(character.getAttribute("tabindex")).toBe("-1");
     expect(background.hasAttribute("aria-controls")).toBe(true);
-    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(
-      background.id
-    );
+    expect(panel.getAttribute("aria-labelledby")).toBe(background.id);
 
     fireEvent.keyDown(background, { key: "ArrowRight" });
     expect(input.onToolChange).toHaveBeenCalledWith("character");

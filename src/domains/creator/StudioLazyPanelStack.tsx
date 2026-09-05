@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import {
   Suspense,
   memo,
+  useContext,
   type Dispatch,
   type RefObject,
   type SetStateAction,
@@ -29,6 +30,7 @@ import {
 import { pageDisplayName } from "./studio-page-meta";
 import { parseStudioProjectFile } from "./studio-project-file";
 import { normalizeStudioPublishCompliance } from "./studio-publish-compliance";
+import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 import { normalizeStudioWriterRoomDocument } from "./studio-writer-room";
 import {
   StudioScrollScenarioPreviewPanelStack,
@@ -651,6 +653,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     requestWriterRoomAiDraft,
     restoreServerRevision,
   } = stableHandlers;
+  const documentRuntime = useContext(StudioDocumentRuntimeContext);
   const teamWorkId = workId ?? (
     draftCollaboration?.status === "ready"
       ? draftCollaboration.room.provisionalWorkId
@@ -766,10 +769,14 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             onClose={() => setContinuityOpen(false)}
             issues={continuityIssues}
+            finishDocumentTitle={title}
+            finishComments={studioComments}
             pages={pages}
             currentPageId={currentPageId}
             openCommentCount={studioComments.threads.filter((thread) => !thread.resolved).length}
-            documentKey={workId ?? `draft:${title}`}
+            documentKey={documentRuntime?.documentKey ?? (
+              workId ? JSON.stringify(["work", studioAuthUserId ?? "guest", workId]) : undefined
+            )}
             scenes={continuityScenes.map((scene) => ({
               id: scene.id,
               label: scene.label,
@@ -777,13 +784,13 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             onSelectScene={(sceneId) => {
               const scene = continuityScenes.find((candidate) => candidate.id === sceneId);
               if (!scene) return;
-              setCurrentPageId(scene.pageId);
+              if (!setCurrentPageId(scene.pageId)) return;
               setTool("select");
               setSelectedId(scene.frameId);
               setContinuityOpen(false);
             }}
             onSelectTarget={(target) => {
-              if (target.pageId) setCurrentPageId(target.pageId);
+              if (target.pageId && !setCurrentPageId(target.pageId)) return;
               setTool("select");
               setSelectedId(target.elementId ?? null);
               setContinuityOpen(false);

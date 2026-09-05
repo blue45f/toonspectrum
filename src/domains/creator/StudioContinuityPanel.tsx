@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { inspectStudioQualityFinishSupplement } from "./studio-quality-finish-bridge";
 import {
   inspectStudioQuality,
   type StudioQualityCategory,
@@ -31,7 +32,9 @@ import {
   type StudioRasterInspectionProgress,
   type StudioRasterInspectionResult,
 } from "./studio-quality-raster-inspection";
+import { StudioFinishQualityView } from "./StudioFinishQualityView";
 
+import type { StudioCommentsDocument } from "./studio-comments";
 import type { StudioContinuityIssue } from "./studio-continuity";
 import type { PageState } from "./studio-page-state";
 
@@ -148,6 +151,9 @@ export interface StudioContinuityPanelProps {
   onClose: () => void;
   issues: readonly StudioContinuityIssue[];
   pages?: readonly PageState[];
+  /** Host-owned metadata enables additive rules without replacing legacy inspection. */
+  finishDocumentTitle?: string;
+  finishComments?: StudioCommentsDocument;
   currentPageId?: string;
   openCommentCount?: number;
   /** Work ID or another stable document key used only for local acknowledgements/checklist state. */
@@ -177,16 +183,30 @@ function resolveSceneLabel(
   return listed || sceneId;
 }
 
-function safeStorageKey(documentKey: string | undefined): string {
-  const normalized = documentKey?.trim() || "local-draft";
-  return `toonstudio:quality-inspection:v1:${normalized.slice(0, 180)}`;
+function safeStorageKey(documentKey: string | undefined): string | null {
+  const normalized = documentKey?.trim();
+  // Never let anonymous drafts or truncated keys share a review receipt. v2 intentionally
+  // does not import v1 decisions, whose document/revision ownership was not guaranteed.
+  return normalized ? `toonstudio:quality-inspection:v2:${encodeURIComponent(normalized)}` : null;
 }
 
-function readPersistedState(storageKey: string): PersistedQualityState {
-  if (typeof localStorage === "undefined") return {};
+function readPersistedState(storageKey: string | null): PersistedQualityState {
+  if (storageKey === null) return {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey) ?? "{}") as PersistedQualityState;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (typeof localStorage === "undefined") return {};
+    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const record = parsed as Record<string, unknown>;
+    return {
+      acknowledgedIssueIds: Array.isArray(record.acknowledgedIssueIds)
+        ? record.acknowledgedIssueIds.filter((id): id is string => typeof id === "string")
+        : [],
+      manualCheckIds: Array.isArray(record.manualCheckIds)
+        ? record.manualCheckIds.filter((id): id is ManualCheckId =>
+            MANUAL_CHECKS.some((check) => check.id === id))
+        : [],
+      manualRevisionKey: typeof record.manualRevisionKey === "string" ? record.manualRevisionKey : undefined,
+    };
   } catch {
     return {};
   }
@@ -268,18 +288,15 @@ function IssueIcon({ severity }: { severity: StudioQualitySeverity }) {
   return <Eye size={16} aria-hidden />;
 }
 
-/**
- * Marks the scan epoch as an input of the quality scan. The epoch itself carries no
- * data - it changes when fonts and resources settle, which is exactly when the
- * measurement-dependent scan has to run again.
- */
-function trackStudioQualityScanEpoch(_epoch: number): void {}
+const EMPTY_PAGES: readonly PageState[] = [];
 
 export function StudioContinuityPanel({
   open,
   onClose,
   issues,
-  pages = [],
+  pages = EMPTY_PAGES,
+  finishDocumentTitle,
+  finishComments,
   currentPageId,
   openCommentCount = 0,
   documentKey,
@@ -302,28 +319,49 @@ export function StudioContinuityPanel({
   const [categoryFilter, setCategoryFilter] = useState<"all" | StudioQualityCategory>("all");
   const [query, setQuery] = useState("");
   const [showAcknowledged, setShowAcknowledged] = useState(false);
-  const [acknowledgedIssueIds, setAcknowledgedIssueIds] = useState<Set<string>>(
+  const [storedAcknowledgedIssueIds, setAcknowledgedIssueIds] = useState<Set<string>>(
     () => new Set()
   );
-  const [completedManualChecks, setCompletedManualChecks] = useState<Set<ManualCheckId>>(
+  const [storedCompletedManualChecks, setCompletedManualChecks] = useState<Set<ManualCheckId>>(
     () => new Set()
   );
   const storageKey = useMemo(() => safeStorageKey(documentKey), [documentKey]);
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
-  const report = useMemo(() => {
-    // scanEpoch increments once fonts and resources settle, and the quality scan
-    // must be redone against those measurements. Reading it here makes that a
-    // real dependency instead of a lint exception.
-    trackStudioQualityScanEpoch(scanEpoch);
-    return inspectStudioQuality({
-      pages,
-      continuityIssues: issues,
-      openCommentCount,
-      supplementalIssues:
-        rasterInspection?.status === "complete" ? rasterInspection.issues : [],
-    });
-  }, [issues, openCommentCount, pages, rasterInspection, scanEpoch]);
+  // A rescan is a new measurement request even when the immutable pages did not change.
+  const scanInput = useMemo(() => ({ pages, epoch: scanEpoch }), [pages, scanEpoch]);
+  const finishSupplement = useMemo(() =>
+    finishDocumentTitle === undefined && finishComments === undefined ? null :
+      inspectStudioQualityFinishSupplement({
+        pages: scanInput.pages, documentTitle: finishDocumentTitle, comments: finishComments,
+      }),
+    [finishComments, finishDocumentTitle, scanInput]
+  );
+  const report = useMemo(
+    () =>
+      inspectStudioQuality({
+        pages: scanInput.pages,
+        continuityIssues: issues,
+        openCommentCount,
+        supplementalIssues: [
+          ...(finishSupplement?.issues ?? []),
+          ...(rasterInspection?.status === "complete" ? rasterInspection.issues : []),
+        ],
+      }),
+    [issues, openCommentCount, scanInput, rasterInspection, finishSupplement]
+  );
+  const currentReviewKey = `${storageKey}:${report.revisionKey}`;
+  const acknowledgedIssueIds = useMemo(() => new Set(
+    loadedStorageKey === currentReviewKey
+      ? report.issues.filter((issue) =>
+          (issue.severity === "warning" || issue.severity === "review") &&
+          storedAcknowledgedIssueIds.has(issue.id)).map((issue) => issue.id)
+      : []
+  ), [currentReviewKey, loadedStorageKey, report.issues, storedAcknowledgedIssueIds]);
+  const completedManualChecks = useMemo(() =>
+    loadedStorageKey === currentReviewKey ? storedCompletedManualChecks : new Set<ManualCheckId>(),
+    [currentReviewKey, loadedStorageKey, storedCompletedManualChecks]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -331,12 +369,14 @@ export function StudioContinuityPanel({
     setRasterBusy(true);
     setRasterInspection(null);
     setRasterProgress({ completed: 0, total: 0 });
-    void inspectStudioRasterAssets(pages, {
+    void inspectStudioRasterAssets(scanInput.pages, {
       signal: controller.signal,
-      onProgress: setRasterProgress,
+      onProgress: (progress) => {
+        if (!controller.signal.aborted) setRasterProgress(progress);
+      },
     })
       .then((result) => {
-        if (result.status !== "aborted") setRasterInspection(result);
+        if (!controller.signal.aborted && result.status !== "aborted") setRasterInspection(result);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -353,7 +393,7 @@ export function StudioContinuityPanel({
         if (!controller.signal.aborted) setRasterBusy(false);
       });
     return () => controller.abort();
-  }, [open, pages, scanEpoch]);
+  }, [open, scanInput]);
 
   useEffect(() => {
     if (!open) return;
@@ -367,7 +407,9 @@ export function StudioContinuityPanel({
   useEffect(() => {
     if (!open) return;
     const persisted = readPersistedState(storageKey);
-    setAcknowledgedIssueIds(new Set(persisted.acknowledgedIssueIds ?? []));
+    setAcknowledgedIssueIds(new Set(
+      persisted.manualRevisionKey === report.revisionKey ? persisted.acknowledgedIssueIds ?? [] : []
+    ));
     setCompletedManualChecks(
       persisted.manualRevisionKey === report.revisionKey
         ? new Set(
@@ -382,8 +424,8 @@ export function StudioContinuityPanel({
 
   useEffect(() => {
     if (
-      loadedStorageKey !== `${storageKey}:${report.revisionKey}` ||
-      typeof localStorage === "undefined"
+      storageKey === null ||
+      loadedStorageKey !== `${storageKey}:${report.revisionKey}`
     ) {
       return;
     }
@@ -393,7 +435,7 @@ export function StudioContinuityPanel({
       manualRevisionKey: report.revisionKey,
     };
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload));
+      globalThis.localStorage?.setItem(storageKey, JSON.stringify(payload));
     } catch {
       // Storage can be unavailable in private/embedded contexts. The current session still works.
     }
@@ -494,7 +536,10 @@ export function StudioContinuityPanel({
         )
     )
   );
-  const rasterPending = hasRasterReferences && (rasterBusy || rasterInspection === null);
+  // Missing capability, failed probes and incomplete coverage are not a successful scan.
+  const rasterPending = hasRasterReferences && (
+    rasterBusy || rasterInspection?.status !== "complete" || rasterInspection.skippedSourceCount > 0
+  );
   const automaticReady = blockingReady && reviewOutstanding === 0 && !rasterPending;
   const manualReady = manualCompletedCount === MANUAL_CHECKS.length;
   const ready = automaticReady && manualReady;
@@ -569,6 +614,20 @@ export function StudioContinuityPanel({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {finishSupplement?.detail ? (
+            <details className="border-b border-line px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-fg">
+                추가 마감 검사 상세 · 통합 판정은 검사 요약 기준
+              </summary>
+              <StudioFinishQualityView
+                result={finishSupplement.detail}
+                onSelectIssue={onSelectTarget ? (issue) => onSelectTarget({
+                  pageId: issue.pageId, elementId: issue.elementId,
+                }) : undefined}
+                onDownloadReport={() => downloadReport(report, acknowledgedIssueIds, completedManualChecks, documentKey)}
+              />
+            </details>
+          ) : null}
           <section className="border-b border-line px-4 py-4" aria-labelledby="studio-quality-summary">
             <h3 id="studio-quality-summary" className="sr-only">
               검사 요약

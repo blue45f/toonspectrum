@@ -6,6 +6,16 @@ import { describe, expect, it } from "vitest";
 import { PERF_BUDGET_TEST_FILES } from "../vitest.perf-budget-files.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
+const CATALOGUE_TIMING_TEST = "scripts/studio-brush-catalogue-perf-matrix.test.ts";
+const CATALOGUE_TIMING_HELPER = "scripts/studio-brush-catalogue-perf-matrix.ts";
+const CATALOGUE_TIMING_CALL = /\bevaluateStudioBrushCataloguePaint(?:PerfMatrix|PerfRow|Soak)\s*\(/u;
+
+function measuresWallClock(source: string): boolean {
+  return source.includes("performance.now(")
+    || source.includes("evaluateStudioCalibrated")
+    || (source.includes('from "./studio-brush-catalogue-perf-matrix"')
+      && CATALOGUE_TIMING_CALL.test(source));
+}
 
 /**
  * The perf-budget partition is a list of file paths, and a list of paths drifts the moment a
@@ -21,17 +31,13 @@ describe("wall-clock budget partition", () => {
   });
 
   it("lists only files that measure wall-clock time", () => {
-    // Two ways to time: call the clock, or reach it through studio-perf-calibration, which owns
-    // performance.now() for every calibrated budget. Looking only for the literal call is what
-    // left four calibrated-budget files in the parallel run until one of them reddened main.
-    const notTimed = PERF_BUDGET_TEST_FILES.filter((file) => {
-      const source = readFileSync(path.join(root, file), "utf8");
-      return !source.includes("performance.now(")
-        && !source.includes("evaluateStudioCalibrated");
-    });
+    // The clock can be owned by a shared helper. Both calibrated budgets and the catalogue
+    // matrix are live measurements even though the test does not call performance.now itself.
+    const notTimed = PERF_BUDGET_TEST_FILES.filter((file) =>
+      !measuresWallClock(readFileSync(path.join(root, file), "utf8")));
     expect(
       notTimed,
-      "neither performance.now() nor a calibrated budget — this belongs in the main run",
+      "neither a direct clock nor a known timing helper — this belongs in the main run",
     ).toEqual([]);
   });
 
@@ -47,6 +53,24 @@ describe("wall-clock budget partition", () => {
       .filter((file) => !PERF_BUDGET_TEST_FILES.includes(file));
 
     expect(stragglers, "add these to vitest.perf-budget-files.mjs").toEqual([]);
+  });
+
+  it("runs the helper-owned catalogue soak in the required quiet pass", () => {
+    expect(PERF_BUDGET_TEST_FILES).toContain(CATALOGUE_TIMING_TEST);
+    const source = readFileSync(path.join(root, CATALOGUE_TIMING_TEST), "utf8");
+    const helper = readFileSync(path.join(root, CATALOGUE_TIMING_HELPER), "utf8");
+    expect(measuresWallClock(source)).toBe(true);
+    expect(helper).toContain("performance.now(");
+    expect(source).toMatch(/evaluateStudioBrushCataloguePaintSoak\s*\(/u);
+  });
+
+  it("does not mistake deterministic catalogue helpers for elapsed-time measurements", () => {
+    const deterministicOnly = [
+      'import { detectStudioBrushSoakMonotonicDegradation } from "./studio-brush-catalogue-perf-matrix";',
+      "detectStudioBrushSoakMonotonicDegradation([10, 10, 10]);",
+    ].join("\n");
+    expect(measuresWallClock(deterministicOnly)).toBe(false);
+    expect(measuresWallClock("expect(geometry.length).toBe(42);")).toBe(false);
   });
 
   it("keeps the list sorted so additions diff cleanly", () => {

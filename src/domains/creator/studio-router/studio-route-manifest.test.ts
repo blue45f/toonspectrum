@@ -191,6 +191,20 @@ describe("Studio route manifest", () => {
       "/studio/versions",
     ],
     [
+      "/studio/share",
+      "?scope=work%3Awork-1",
+      "production",
+      "/studio/share?scope=work%3Awork-1",
+      "/studio/share",
+    ],
+    [
+      "/studio/join",
+      "?invite=ts-demo",
+      "production",
+      "/studio/join?invite=ts-demo",
+      "/studio/join",
+    ],
+    [
       "/studio/work/work-1/present",
       "",
       "production",
@@ -217,6 +231,13 @@ describe("Studio route manifest", () => {
       "production",
       "/studio/work/work-1/versions?tab=history",
       "/studio/work:work-1/versions",
+    ],
+    [
+      "/studio/assets",
+      "",
+      "placeholder",
+      "/studio/assets",
+      "/studio/assets",
     ],
   ] as const)(
     "resolves %s%s to its canonical route",

@@ -1,0 +1,46 @@
+name: Character contact naturalness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/character-contact-naturalness.yml
+      - scripts/verify-character-contact-naturalness.mjs
+      - src/domains/creator/vrm/studio-vrm-contact-refinement.ts
+      - src/domains/creator/vrm/studio-vrm-portrait-framing.ts
+      - src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/character-contact-naturalness.yml
+      - scripts/verify-character-contact-naturalness.mjs
+      - src/domains/creator/vrm/studio-vrm-contact-refinement.ts
+      - src/domains/creator/vrm/studio-vrm-portrait-framing.ts
+      - src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
+
+permissions:
+  contents: read
+
+concurrency:
+  group: character-contact-naturalness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  character-contact-math:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /package.json
+            /scripts/verify-character-contact-naturalness.mjs
+            /src/domains/creator/vrm/studio-vrm-contact-refinement.ts
+            /src/domains/creator/vrm/studio-vrm-portrait-framing.ts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Verify contact, rollback, replay and portrait math
+        run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs

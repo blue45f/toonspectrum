@@ -86,9 +86,8 @@ describe("StudioContinuityPanel quality center", () => {
     });
     expect(acknowledge).toBeDefined();
     fireEvent.click(acknowledge!);
-    // Acknowledging moves the finding into the acknowledged tally rather than
-    // flipping the button in place, so assert the tally, not the old label.
-    expect(await screen.findByText(/확인됨\s*1/u)).not.toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: /확인됨/u }));
+    expect(screen.getByRole("button", { name: "확인 취소" }).getAttribute("aria-pressed")).toBe("true");
     draftView.unmount();
 
     render(
@@ -153,13 +152,9 @@ describe("StudioContinuityPanel quality center", () => {
       />
     );
 
-    // The quality centre now reports several findings for this page, so scope the
-    // jump to the specific defect this test is about rather than the first button.
     const missingSource = (await screen.findByText("이미지 원본 누락")).closest("li");
     expect(missingSource).not.toBeNull();
-    fireEvent.click(
-      within(missingSource!).getByRole("button", { name: "위치로 이동" })
-    );
+    fireEvent.click(within(missingSource!).getByRole("button", { name: "위치로 이동" }));
     expect(onSelectTarget).toHaveBeenCalledWith({
       pageId: "page-1",
       elementId: "image-1",

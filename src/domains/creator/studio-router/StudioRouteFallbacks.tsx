@@ -87,7 +87,6 @@ interface StudioPlaceholderGuide {
   readonly description: string;
   readonly steps: readonly string[];
   readonly openLabel: string;
-  readonly collaboration: boolean;
 }
 
 const PLACEHOLDER_GUIDES: Readonly<Record<StudioPlaceholderRouteId, StudioPlaceholderGuide>> = {
@@ -98,7 +97,6 @@ const PLACEHOLDER_GUIDES: Readonly<Record<StudioPlaceholderRouteId, StudioPlaceh
       "독립 주소에서 문서를 다시 만들지 않고, 기본 Studio에서 현재 페이지·선택 레이어·사용 권한을 유지한 채 에셋을 삽입합니다.",
     steps: ["Studio 편집기 열기", "에셋 패널에서 검색·미리보기", "현재 원고에 비파괴 삽입"],
     openLabel: "에셋을 사용할 Studio 열기",
-    collaboration: false,
   },
 };
 
@@ -114,7 +112,6 @@ export function StudioRoutePlaceholder({
     <section
       aria-labelledby="studio-placeholder-title"
       className="grid min-h-dvh place-items-center bg-bg px-5 py-12 text-fg"
-      data-studio-collaboration-gateway={guide.collaboration ? placeholderId : undefined}
     >
       <div className="w-full max-w-2xl text-center">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-accent">{guide.eyebrow}</p>

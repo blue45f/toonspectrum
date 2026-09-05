@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
+import { parseCLI } from "vitest/node";
 import { parse as parseYaml } from "yaml";
 
 const repositoryRoot = new URL("../", import.meta.url);
@@ -29,7 +30,7 @@ function usesActions(job) {
 
 const PLAYWRIGHT_INSTALL = "pnpm exec playwright install --with-deps chromium";
 const ROOT_SHARD_COMMAND =
-  "pnpm run test:root -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}";
+  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}";
 const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
@@ -63,6 +64,29 @@ describe("database integration runner CI policy", () => {
     expect(packageManifest.scripts?.["build:bundle"]).toBe(
       "NODE_OPTIONS='--max-old-space-size=8192' vite build",
     );
+  });
+
+  it.each([1, 2, 3])("passes matrix shard %i to the actual Vitest CLI parser", (shard) => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    const packageManifest = readJson("package.json");
+    const total = workflow.jobs.test.strategy.matrix.shard.length;
+    const prefix = "pnpm run test:root ";
+    const command = runCommands(workflow.jobs.test).find((run) => run.startsWith(prefix));
+    expect(command).toBeDefined();
+
+    // pnpm 11 forwards a standalone `--` verbatim; Vitest puts everything after it in
+    // options["--"] instead of parsing --shard. Inspect the real parser, not just the YAML text.
+    const argumentsText = command.slice(prefix.length)
+      .replace("${{ matrix.shard }}", String(shard))
+      .replace("${{ strategy.job-total }}", String(total));
+    const parsed = parseCLI([
+      ...packageManifest.scripts["test:root"].split(/\s+/u),
+      ...argumentsText.trim().split(/\s+/u),
+    ]);
+
+    expect(parsed.options.shard).toBe(`${shard}/${total}`);
+    expect(parsed.options["--"]).toEqual([]);
+    expect(parsed.filter).toEqual([]);
   });
 
   it("shards the root Vitest suite behind a Postgres service and runs the serial lane once", () => {

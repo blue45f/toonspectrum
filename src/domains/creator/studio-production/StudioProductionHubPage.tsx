@@ -1,106 +1,381 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  CircleAlert,
-  Download,
+  Copy,
   FileClock,
   FolderKanban,
   Link2,
   MessageSquareCheck,
+  Plus,
   Presentation,
   Radio,
+  RotateCcw,
+  Save,
   Share2,
-  Upload,
-  UserPlus,
+  ShieldCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-import {
-  STUDIO_PRODUCTION_SURFACES,
-  buildStudioProductionOverview,
-  parseStudioProductionWorkspaceExport,
-  resolveStudioProductionScope,
-  serializeStudioProductionWorkspace,
-  studioProductionSurfaceHref,
-  type StudioProductionSurface,
-} from "./studio-production-model";
-import { StudioProductionPresentationSurface } from "./StudioProductionPresentationSurface";
-import { StudioProductionProjectsSurface } from "./StudioProductionProjectsSurface";
-import { StudioProductionReviewSurface } from "./StudioProductionReviewSurface";
-import {
-  StudioProductionJoinSurface,
-  StudioProductionShareSurface,
-} from "./StudioProductionSharingSurfaces";
-import { StudioProductionPill } from "./StudioProductionUi";
-import { StudioProductionVersionsSurface } from "./StudioProductionVersionsSurface";
-import { useStudioProductionWorkspace } from "./use-studio-production-workspace";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 
-const SURFACE_META: Readonly<Record<
-  StudioProductionSurface,
-  {
-    readonly label: string;
-    readonly shortLabel: string;
-    readonly description: string;
-    readonly icon: typeof FolderKanban;
-  }
->> = {
-  projects: {
-    label: "프로젝트 운영",
-    shortLabel: "프로젝트",
-    description: "회차·일정·작업량·납품 준비를 관리합니다.",
-    icon: FolderKanban,
-  },
-  review: {
-    label: "리뷰·출시 승인",
-    shortLabel: "리뷰",
-    description: "이슈 인박스와 승인 게이트를 운영합니다.",
-    icon: MessageSquareCheck,
-  },
-  versions: {
-    label: "버전·복원",
-    shortLabel: "버전",
-    description: "기준선을 생성하고 비교·복원합니다.",
-    icon: FileClock,
-  },
-  present: {
-    label: "피치·프레젠테이션",
-    shortLabel: "피치",
-    description: "슬라이드와 발표 타이밍을 리허설합니다.",
-    icon: Presentation,
-  },
-  share: {
-    label: "공유·권한",
-    shortLabel: "공유",
-    description: "역할별 링크와 참여자를 관리합니다.",
-    icon: Share2,
-  },
-  join: {
-    label: "공동 제작 참여",
-    shortLabel: "참여",
-    description: "초대 코드를 검증하고 프로젝트에 참여합니다.",
-    icon: UserPlus,
-  },
-};
+const STUDIO_PRODUCTION_SURFACES = [
+  "projects",
+  "review",
+  "versions",
+  "present",
+  "share",
+  "join",
+] as const;
 
-function downloadWorkspace(filename: string, serialized: string): void {
-  const blob = new Blob([serialized], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
+export type StudioProductionSurface = (typeof STUDIO_PRODUCTION_SURFACES)[number];
+
+type TaskStatus = "todo" | "doing" | "blocked" | "done";
+type ReviewSeverity = "blocker" | "major" | "minor";
+type ReviewStatus = "open" | "resolved";
+type PersistenceState = "loading" | "saved" | "memory" | "saving";
+
+interface ProductionTask {
+  readonly id: string;
+  readonly title: string;
+  readonly owner: string;
+  readonly due: string;
+  readonly progress: number;
+  readonly status: TaskStatus;
 }
 
-function safeFilename(value: string): string {
-  const normalized = value.trim().replaceAll(/[^\p{L}\p{N}._-]+/gu, "-").replaceAll(/-+/gu, "-");
-  return normalized.slice(0, 80) || "studio-production";
+interface ReviewIssue {
+  readonly id: string;
+  readonly title: string;
+  readonly assignee: string;
+  readonly severity: ReviewSeverity;
+  readonly status: ReviewStatus;
+}
+
+interface VersionSnapshot {
+  readonly id: string;
+  readonly name: string;
+  readonly createdAt: string;
+  readonly tasks: readonly ProductionTask[];
+  readonly reviews: readonly ReviewIssue[];
+}
+
+interface PitchSlide {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+interface ProductionWorkspace {
+  readonly schemaVersion: 1;
+  readonly scopeKey: string;
+  readonly title: string;
+  readonly updatedAt: string;
+  readonly tasks: readonly ProductionTask[];
+  readonly reviews: readonly ReviewIssue[];
+  readonly versions: readonly VersionSnapshot[];
+  readonly slides: readonly PitchSlide[];
+  readonly members: readonly string[];
+  readonly inviteToken: string;
+}
+
+interface ProductionScope {
+  readonly key: string;
+  readonly label: string;
+  readonly editorHref: string;
+}
+
+const NAMESPACE = "studio-production-command-center-v1";
+const FALLBACK_NOW = "2026-09-05T00:00:00.000Z";
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+let fallbackSequence = 0;
+
+function createId(prefix: string): string {
+  const random = globalThis.crypto?.randomUUID?.().replaceAll("-", "").slice(0, 12);
+  if (random) return `${prefix}-${random}`;
+  fallbackSequence += 1;
+  return `${prefix}-${fallbackSequence.toString(36)}`;
+}
+
+function stableToken(value: string): string {
+  let hash = 2_166_136_261;
+  for (const character of value) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return `ts-${Math.abs(hash >>> 0).toString(36)}`;
+}
+
+function scopeFromPath(pathname: string): ProductionScope {
+  const work = pathname.match(/^\/studio\/work\/([^/]+)/u)?.[1];
+  if (work) {
+    const decoded = decodeURIComponent(work);
+    return {
+      key: `work:${decoded}`,
+      label: `작품 ${decoded}`,
+      editorHref: `/studio/work/${encodeURIComponent(decoded)}/canvas`,
+    };
+  }
+  const remix = pathname.match(/^\/studio\/remix\/([^/]+)/u)?.[1];
+  if (remix) {
+    const decoded = decodeURIComponent(remix);
+    return {
+      key: `remix:${decoded}`,
+      label: `리믹스 ${decoded}`,
+      editorHref: `/studio/remix/${encodeURIComponent(decoded)}/canvas`,
+    };
+  }
+  return { key: "draft", label: "새 프로젝트", editorHref: "/studio" };
+}
+
+function surfaceHref(surface: StudioProductionSurface, scope: ProductionScope): string {
+  const scopedSurface = surface === "review" || surface === "versions" || surface === "present";
+  if (scopedSurface && scope.key.startsWith("work:")) {
+    return `/studio/work/${encodeURIComponent(scope.key.slice(5))}/${surface}`;
+  }
+  if (scopedSurface && scope.key.startsWith("remix:")) {
+    return `/studio/remix/${encodeURIComponent(scope.key.slice(6))}/${surface}`;
+  }
+  const search = scope.key === "draft" ? "" : `?scope=${encodeURIComponent(scope.key)}`;
+  return `/studio/${surface}${search}`;
+}
+
+function initialWorkspace(scopeKey: string): ProductionWorkspace {
+  return {
+    schemaVersion: 1,
+    scopeKey,
+    title: scopeKey === "draft"
+      ? "새 웹툰 제작 프로젝트"
+      : `${scopeKey.replace(":", " ")} 제작 운영`,
+    updatedAt: FALLBACK_NOW,
+    inviteToken: stableToken(scopeKey),
+    members: ["디렉터", "작가", "편집자"],
+    tasks: [
+      {
+        id: "task-story",
+        title: "콘티와 대사 확정",
+        owner: "작가",
+        due: "2026-09-08",
+        progress: 100,
+        status: "done",
+      },
+      {
+        id: "task-line",
+        title: "선화·톤 작업",
+        owner: "작가",
+        due: "2026-09-10",
+        progress: 68,
+        status: "doing",
+      },
+      {
+        id: "task-review",
+        title: "연출·가독성 검수",
+        owner: "편집자",
+        due: "2026-09-11",
+        progress: 35,
+        status: "blocked",
+      },
+      {
+        id: "task-release",
+        title: "플랫폼 규격 내보내기",
+        owner: "디렉터",
+        due: "2026-09-12",
+        progress: 0,
+        status: "todo",
+      },
+    ],
+    reviews: [
+      {
+        id: "review-continuity",
+        title: "3컷 시선 방향 불일치",
+        assignee: "작가",
+        severity: "blocker",
+        status: "open",
+      },
+      {
+        id: "review-balloon",
+        title: "말풍선 안전 영역 확인",
+        assignee: "편집자",
+        severity: "major",
+        status: "open",
+      },
+      {
+        id: "review-color",
+        title: "야간 장면 색온도 통일",
+        assignee: "작가",
+        severity: "minor",
+        status: "resolved",
+      },
+    ],
+    versions: [],
+    slides: [
+      {
+        id: "slide-concept",
+        title: "작품 한 문장",
+        body: "독자가 첫 세 컷 안에 세계와 갈등을 이해하는 연재형 웹툰.",
+      },
+      {
+        id: "slide-character",
+        title: "주요 캐릭터",
+        body: "욕망·결핍·관계 변화를 장면 단위 제작 지표와 연결합니다.",
+      },
+      {
+        id: "slide-release",
+        title: "출시 계획",
+        body: "검수 게이트를 통과한 버전만 플랫폼 규격으로 전달합니다.",
+      },
+    ],
+  };
+}
+
+function parseWorkspace(raw: string | null, scopeKey: string): ProductionWorkspace | null {
+  if (!raw || raw.length > 2_000_000) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<ProductionWorkspace>;
+    if (
+      value.schemaVersion !== 1
+      || value.scopeKey !== scopeKey
+      || !Array.isArray(value.tasks)
+      || !Array.isArray(value.reviews)
+      || !Array.isArray(value.versions)
+      || !Array.isArray(value.slides)
+      || !Array.isArray(value.members)
+    ) {
+      return null;
+    }
+    return value as ProductionWorkspace;
+  } catch {
+    return null;
+  }
+}
+
+async function loadWorkspace(scopeKey: string): Promise<ProductionWorkspace | null> {
+  const { acquireStudioLocalDatabase } = await import("../studio-local-database-runtime");
+  const database = await acquireStudioLocalDatabase();
+  return parseWorkspace(await database.kvGet(NAMESPACE, scopeKey), scopeKey);
+}
+
+async function saveWorkspace(workspace: ProductionWorkspace): Promise<void> {
+  const { acquireStudioLocalDatabase } = await import("../studio-local-database-runtime");
+  const database = await acquireStudioLocalDatabase();
+  await database.kvSet(NAMESPACE, workspace.scopeKey, JSON.stringify(workspace));
+}
+
+function Metric({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+  readonly tone?: "neutral" | "success" | "warning" | "danger";
+}) {
+  let toneClass = "border-line bg-panel";
+  if (tone === "success") toneClass = "border-emerald-500/30 bg-emerald-500/10";
+  if (tone === "warning") toneClass = "border-amber-500/30 bg-amber-500/10";
+  if (tone === "danger") toneClass = "border-red-500/30 bg-red-500/10";
+  return (
+    <div className={cn("rounded-2xl border p-3.5", toneClass)}>
+      <p className="text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-fg-3">{label}</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-fg">{value}</p>
+      <p className="mt-1 text-xs leading-relaxed text-fg-2">{detail}</p>
+    </div>
+  );
+}
+
+function Pill({
+  children,
+  tone = "neutral",
+}: {
+  readonly children: ReactNode;
+  readonly tone?: "neutral" | "success" | "warning" | "danger" | "accent";
+}) {
+  let toneClass = "border-line bg-raised text-fg-2";
+  if (tone === "success") {
+    toneClass = "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+  }
+  if (tone === "warning") {
+    toneClass = "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+  }
+  if (tone === "danger") {
+    toneClass = "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300";
+  }
+  if (tone === "accent") toneClass = "border-accent/30 bg-accent-soft text-accent";
+  return (
+    <span className={cn(
+      "inline-flex min-h-6 items-center rounded-full border px-2 py-0.5 text-[0.6875rem] font-semibold",
+      toneClass,
+    )}>
+      {children}
+    </span>
+  );
+}
+
+function Card({
+  title,
+  description,
+  children,
+  action,
+}: {
+  readonly title: string;
+  readonly description?: string;
+  readonly children: ReactNode;
+  readonly action?: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-fg">{title}</h2>
+          {description ? (
+            <p className="mt-1 text-xs leading-relaxed text-fg-2">{description}</p>
+          ) : null}
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+const SURFACE_META: Readonly<
+  Record<StudioProductionSurface, { readonly label: string; readonly icon: typeof FolderKanban }>
+> = {
+  projects: { label: "프로젝트", icon: FolderKanban },
+  review: { label: "리뷰", icon: MessageSquareCheck },
+  versions: { label: "버전", icon: FileClock },
+  present: { label: "피치", icon: Presentation },
+  share: { label: "공유", icon: Share2 },
+  join: { label: "참여", icon: Users },
+};
+
+function taskTone(status: TaskStatus): "neutral" | "success" | "danger" | "accent" {
+  if (status === "done") return "success";
+  if (status === "blocked") return "danger";
+  if (status === "doing") return "accent";
+  return "neutral";
+}
+
+function reviewTone(severity: ReviewSeverity): "neutral" | "warning" | "danger" {
+  if (severity === "blocker") return "danger";
+  if (severity === "major") return "warning";
+  return "neutral";
 }
 
 export function StudioProductionHubPage({
@@ -112,76 +387,176 @@ export function StudioProductionHubPage({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const scope = useMemo(
-    () => resolveStudioProductionScope(location.pathname, location.search),
-    [location.pathname, location.search],
+  const scope = useMemo(() => scopeFromPath(location.pathname), [location.pathname]);
+  const initial = useMemo(() => initialWorkspace(scope.key), [scope.key]);
+  const [workspace, setWorkspace] = useState<ProductionWorkspace>(initial);
+  const [persistence, setPersistence] = useState<PersistenceState>("loading");
+  const [notice, setNotice] = useState<string | null>(null);
+  const workspaceRef = useRef(workspace);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const inviteToken = useMemo(
+    () => new URLSearchParams(location.search).get("invite"),
+    [location.search],
   );
-  const {
-    workspace,
-    persistence,
-    commit,
-    replace,
-    retryPersistence,
-  } = useStudioProductionWorkspace(scope);
-  const [fileStatus, setFileStatus] = useState<string | null>(null);
-  const meta = SURFACE_META[surface];
-  const overview = useMemo(() => buildStudioProductionOverview(workspace), [workspace]);
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const inviteToken = searchParams.get("invite") ?? "";
+
+  const adoptWorkspace = useCallback((next: ProductionWorkspace) => {
+    workspaceRef.current = next;
+    setWorkspace(next);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setPersistence("loading");
+    adoptWorkspace(initial);
+    void loadWorkspace(scope.key)
+      .then((loaded) => {
+        if (!active) return;
+        adoptWorkspace(loaded ?? initial);
+        setPersistence("saved");
+      })
+      .catch(() => {
+        if (!active) return;
+        adoptWorkspace(initial);
+        setPersistence("memory");
+      });
+    return () => {
+      active = false;
+    };
+  }, [adoptWorkspace, initial, scope.key]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    try {
+      const channel = new BroadcastChannel(`${NAMESPACE}:${scope.key}`);
+      channel.onmessage = (event: MessageEvent<ProductionWorkspace>) => {
+        if (event.data?.schemaVersion === 1 && event.data.scopeKey === scope.key) {
+          adoptWorkspace(event.data);
+        }
+      };
+      channelRef.current = channel;
+      return () => {
+        channel.close();
+        channelRef.current = null;
+      };
+    } catch {
+      channelRef.current = null;
+    }
+  }, [adoptWorkspace, scope.key]);
+
+  const commit = useCallback((
+    updater: (current: ProductionWorkspace) => ProductionWorkspace,
+    message: string,
+  ) => {
+    const next = {
+      ...updater(workspaceRef.current),
+      updatedAt: new Date().toISOString(),
+    };
+    adoptWorkspace(next);
+    setPersistence("saving");
+    setNotice(message);
+    channelRef.current?.postMessage(next);
+    void saveWorkspace(next)
+      .then(() => setPersistence("saved"))
+      .catch(() => setPersistence("memory"));
+  }, [adoptWorkspace]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const next = STUDIO_PRODUCTION_SURFACES[Number(event.key) - 1];
+      if (!next) return;
+      event.preventDefault();
+      void navigate(surfaceHref(next, scope));
+    };
+    globalThis.addEventListener("keydown", handler);
+    return () => globalThis.removeEventListener("keydown", handler);
+  }, [navigate, scope]);
 
   useEffect(() => {
     const previous = document.title;
-    document.title = `${meta.label} · ${workspace.title} · Toon Studio`;
+    document.title = `${SURFACE_META[surface].label} · ${workspace.title} · Toon Studio`;
     return () => {
       document.title = previous;
     };
-  }, [meta.label, workspace.title]);
+  }, [surface, workspace.title]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      const index = Number(event.key) - 1;
-      const next = STUDIO_PRODUCTION_SURFACES[index];
-      if (!next) return;
-      event.preventDefault();
-      void navigate(studioProductionSurfaceHref(next, scope));
-    };
-    globalThis.addEventListener("keydown", onKeyDown);
-    return () => globalThis.removeEventListener("keydown", onKeyDown);
-  }, [navigate, scope]);
+  const completed = workspace.tasks.filter((task) => task.status === "done").length;
+  const blocked = workspace.tasks.filter((task) => task.status === "blocked").length;
+  const openBlockers = workspace.reviews.filter(
+    (issue) => issue.status === "open" && issue.severity === "blocker",
+  ).length;
+  const openMajor = workspace.reviews.filter(
+    (issue) => issue.status === "open" && issue.severity === "major",
+  ).length;
+  const releaseReady = openBlockers === 0 && openMajor === 0 && blocked === 0;
+  const progress = Math.round(
+    workspace.tasks.reduce((sum, task) => sum + task.progress, 0)
+      / Math.max(1, workspace.tasks.length),
+  );
 
-  const exportProject = () => {
+  const addTask = () => commit((current) => ({
+    ...current,
+    tasks: [
+      ...current.tasks,
+      {
+        id: createId("task"),
+        title: "새 제작 작업",
+        owner: "미배정",
+        due: new Date().toISOString().slice(0, 10),
+        progress: 0,
+        status: "todo",
+      },
+    ],
+  }), "새 제작 작업을 추가했습니다.");
+
+  const toggleTask = (id: string) => commit((current) => ({
+    ...current,
+    tasks: current.tasks.map((task) => {
+      if (task.id !== id) return task;
+      return task.status === "done"
+        ? { ...task, status: "doing", progress: Math.min(task.progress, 90) }
+        : { ...task, status: "done", progress: 100 };
+    }),
+  }), "작업 상태를 갱신했습니다.");
+
+  const createSnapshot = () => commit((current) => ({
+    ...current,
+    versions: [
+      {
+        id: createId("version"),
+        name: `체크포인트 ${current.versions.length + 1}`,
+        createdAt: new Date().toISOString(),
+        tasks: current.tasks,
+        reviews: current.reviews,
+      },
+      ...current.versions,
+    ],
+  }), "복구 가능한 체크포인트를 저장했습니다.");
+
+  const restoreSnapshot = (version: VersionSnapshot) => commit((current) => ({
+    ...current,
+    tasks: version.tasks,
+    reviews: version.reviews,
+  }), `${version.name} 상태로 복원했습니다.`);
+
+  const copyInvite = async () => {
+    const invite = `${globalThis.location.origin}/studio/join?invite=${encodeURIComponent(
+      workspace.inviteToken,
+    )}&scope=${encodeURIComponent(scope.key)}`;
     try {
-      downloadWorkspace(
-        `${safeFilename(workspace.title)}.toon-production.json`,
-        serializeStudioProductionWorkspace(workspace),
-      );
-      setFileStatus("제작 운영 패키지를 내보냈습니다.");
+      await navigator.clipboard.writeText(invite);
+      setNotice("참여 링크를 복사했습니다.");
     } catch {
-      setFileStatus("운영 패키지를 만들지 못했습니다.");
-    }
-  };
-
-  const importProject = async (file: File | null) => {
-    if (!file) return;
-    try {
-      const result = parseStudioProductionWorkspaceExport(await file.text(), scope);
-      if (!result.ok || !result.workspace) {
-        setFileStatus(result.error ?? "운영 패키지를 가져오지 못했습니다.");
-        return;
-      }
-      replace(result.workspace);
-      setFileStatus(`${file.name}을(를) 가져왔습니다.`);
-    } catch {
-      setFileStatus("파일을 읽는 중 오류가 발생했습니다.");
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setNotice(invite);
     }
   };
 
   return (
-    <div className="min-h-dvh bg-bg text-fg" data-studio-production-hub data-scope-key={scope.key}>
+    <div
+      className="min-h-dvh bg-bg text-fg"
+      data-studio-production-command-center
+      data-scope-key={scope.key}
+    >
       <header className="sticky top-0 z-40 border-b border-line bg-bg/92 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1920px] flex-wrap items-center gap-3 px-3 py-2 sm:px-5">
           <button
@@ -189,75 +564,69 @@ export function StudioProductionHubPage({
             className={buttonClass({ variant: "quiet", size: "icon" })}
             onClick={onOpenStudio}
             aria-label="Studio 편집기로 돌아가기"
-            data-studio-route-exit="editor"
           >
             <ArrowLeft className="size-5" aria-hidden="true" />
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <Radio className="size-4 text-accent" aria-hidden="true" />
-              <span className="text-[0.6875rem] font-bold uppercase tracking-[0.16em] text-fg-3">Production command center</span>
-              <StudioProductionPill tone={overview.risk === "healthy" ? "success" : overview.risk === "at_risk" ? "warning" : "danger"}>
-                {overview.risk === "healthy" ? "일정 안정" : overview.risk === "at_risk" ? "일정 주의" : "일정 위험"}
-              </StudioProductionPill>
+              <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
+                Production command center
+              </span>
+              <Pill tone={releaseReady ? "success" : "warning"}>
+                {releaseReady ? "출시 가능" : "검수 필요"}
+              </Pill>
             </div>
             <input
-              key={workspace.scopeKey + workspace.title}
+              key={`${workspace.scopeKey}:${workspace.title}`}
               defaultValue={workspace.title}
               aria-label="프로젝트 제목"
-              className="mt-0.5 w-full max-w-3xl bg-transparent text-base font-black tracking-tight text-fg outline-none placeholder:text-fg-3 sm:text-lg"
+              className="mt-0.5 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none sm:text-lg"
               onBlur={(event) => {
                 const title = event.currentTarget.value.trim();
-                if (!title || title === workspace.title) return;
-                commit(
-                  { action: "프로젝트 제목 변경", detail: title },
-                  (current) => ({ ...current, title }),
-                );
+                if (!title || title === workspaceRef.current.title) return;
+                commit((current) => ({ ...current, title }), "프로젝트 제목을 변경했습니다.");
               }}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              onChange={(event) => void importProject(event.currentTarget.files?.[0] ?? null)}
-            />
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => fileInputRef.current?.click()}>
-              <Upload className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">가져오기</span>
-            </button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={exportProject}>
-              <Download className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">패키지 저장</span>
-            </button>
-            <Link href="/create" className={buttonClass({ variant: "quiet", size: "sm" })} data-studio-route-exit="site">
-              제작 홈
-            </Link>
+          <div className="flex items-center gap-2 text-xs text-fg-2" role="status">
+            <Save className="size-4" aria-hidden="true" />
+            {persistence === "saved" ? "SQLite/OPFS 저장됨" : null}
+            {persistence === "saving" ? "저장 중" : null}
+            {persistence === "memory" ? "세션 메모리" : null}
+            {persistence === "loading" ? "불러오는 중" : null}
           </div>
+          <Link
+            href={scope.editorHref}
+            className={buttonClass({ variant: "outline", size: "sm" })}
+          >
+            원고 열기
+          </Link>
         </div>
-
-        <nav className="mx-auto max-w-[1920px] overflow-x-auto px-3 sm:px-5" aria-label="제작 운영 기능">
-          <div className="flex min-w-max gap-1 pb-2">
+        <nav
+          className="mx-auto max-w-[1920px] overflow-x-auto px-3 pb-2 sm:px-5"
+          aria-label="제작 운영 기능"
+        >
+          <div className="flex min-w-max gap-1">
             {STUDIO_PRODUCTION_SURFACES.map((item, index) => {
-              const itemMeta = SURFACE_META[item];
-              const Icon = itemMeta.icon;
-              const active = surface === item;
+              const meta = SURFACE_META[item];
+              const Icon = meta.icon;
+              const active = item === surface;
               return (
                 <Link
                   key={item}
-                  href={studioProductionSurfaceHref(item, scope)}
+                  href={surfaceHref(item, scope)}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors pointer-coarse:min-h-11",
-                    active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised hover:text-fg",
+                    active
+                      ? "bg-accent text-on-accent"
+                      : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
-                  title={`${itemMeta.label} · Alt+${index + 1}`}
+                  title={`${meta.label} · Alt+${index + 1}`}
                 >
                   <Icon className="size-4" aria-hidden="true" />
-                  {itemMeta.shortLabel}
-                  <kbd className={cn("hidden rounded px-1 py-0.5 font-mono text-[0.5625rem] xl:inline", active ? "bg-black/10" : "bg-raised")}>⌥{index + 1}</kbd>
+                  {meta.label}
                 </Link>
               );
             })}
@@ -265,77 +634,320 @@ export function StudioProductionHubPage({
         </nav>
       </header>
 
-      <main className="mx-auto max-w-[1920px] px-3 py-4 sm:px-5 sm:py-5">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-fg">{meta.label}</h1>
-              <StudioProductionPill>{scope.label}</StudioProductionPill>
-            </div>
-            <p className="mt-1 text-sm text-fg-2">{meta.description}</p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] text-fg-3">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2 py-1",
-                persistence.phase === "saved"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                  : persistence.phase === "loading"
-                    ? "border-accent/30 bg-accent-soft text-accent"
-                    : persistence.phase === "memory" || persistence.phase === "unavailable"
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                      : "border-line bg-panel text-fg-2",
-              )}
-              title={persistence.warning ?? undefined}
-              role="status"
+      <main className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
+        {notice ? (
+          <div
+            className="flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-xs text-fg"
+            role="status"
+          >
+            <span>{notice}</span>
+            <button
+              type="button"
+              className="font-semibold text-accent"
+              onClick={() => setNotice(null)}
             >
-              {persistence.phase === "saved" ? (
-                <CheckCircle2 className="size-3.5" aria-hidden="true" />
-              ) : persistence.phase === "memory" || persistence.phase === "unavailable" ? (
-                <CircleAlert className="size-3.5" aria-hidden="true" />
-              ) : (
-                <Radio className={cn("size-3.5", persistence.phase === "loading" ? "animate-pulse" : "")} aria-hidden="true" />
-              )}
-              {persistence.phase === "saved"
-                ? "SQLite/OPFS 저장됨"
-                : persistence.phase === "loading"
-                  ? "로컬 원본 저장 중"
-                  : persistence.phase === "memory"
-                    ? "세션 복구본만 유지"
-                    : persistence.phase === "unavailable"
-                      ? "로컬 저장소 사용 불가"
-                      : "로컬 원본 준비"}
-            </span>
-            {persistence.phase === "memory" || persistence.phase === "unavailable" ? (
-              <button type="button" className="font-semibold text-accent hover:underline" onClick={retryPersistence}>
-                저장 다시 시도
-              </button>
-            ) : null}
-            <span className="inline-flex items-center gap-1.5"><Users className="size-3.5" aria-hidden="true" />열린 탭 동기화</span>
-            <span className="inline-flex items-center gap-1.5"><Link2 className="size-3.5" aria-hidden="true" />JSON 재해 복구</span>
+              닫기
+            </button>
           </div>
+        ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric
+            label="제작 진척"
+            value={`${progress}%`}
+            detail={`${completed}/${workspace.tasks.length} 작업 완료`}
+            tone={completed === workspace.tasks.length ? "success" : "neutral"}
+          />
+          <Metric
+            label="차단 작업"
+            value={`${blocked}건`}
+            detail="다음 공정을 막는 작업"
+            tone={blocked > 0 ? "danger" : "success"}
+          />
+          <Metric
+            label="미해결 검수"
+            value={`${openBlockers + openMajor}건`}
+            detail={`Blocker ${openBlockers} · Major ${openMajor}`}
+            tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
+          />
+          <Metric
+            label="협업 인원"
+            value={`${workspace.members.length}명`}
+            detail={scope.label}
+          />
         </div>
 
-        {fileStatus ? (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg-2" role="status">
-            <span>{fileStatus}</span>
-            <button type="button" className="font-semibold text-accent" onClick={() => setFileStatus(null)}>닫기</button>
+        {surface === "projects" ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <Card
+              title="제작 보드"
+              description="작업 상태와 진척을 한 곳에서 관리합니다."
+              action={(
+                <button type="button" className={buttonClass({ size: "sm" })} onClick={addTask}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  작업 추가
+                </button>
+              )}
+            >
+              <div className="space-y-2">
+                {workspace.tasks.map((task) => (
+                  <article key={task.id} className="rounded-xl border border-line bg-panel p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-bold">{task.title}</h3>
+                          <Pill tone={taskTone(task.status)}>{task.status}</Pill>
+                        </div>
+                        <p className="mt-1 text-xs text-fg-2">{task.owner} · 마감 {task.due}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className={buttonClass({ variant: "outline", size: "sm" })}
+                        onClick={() => toggleTask(task.id)}
+                      >
+                        {task.status === "done" ? (
+                          <RotateCcw className="size-4" aria-hidden="true" />
+                        ) : (
+                          <CheckCircle2 className="size-4" aria-hidden="true" />
+                        )}
+                        {task.status === "done" ? "재개" : "완료"}
+                      </button>
+                    </div>
+                    <div
+                      className="mt-3 h-2 overflow-hidden rounded-full bg-raised"
+                      role="progressbar"
+                      aria-valuenow={task.progress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${task.progress}%` }}
+                      />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </Card>
+            <Card title="출시 게이트" description="차단 작업과 중요 검수가 모두 닫혀야 합니다.">
+              <div className={cn(
+                "rounded-2xl border p-4 text-center",
+                releaseReady
+                  ? "border-emerald-500/30 bg-emerald-500/10"
+                  : "border-amber-500/30 bg-amber-500/10",
+              )}>
+                {releaseReady ? (
+                  <ShieldCheck className="mx-auto size-9 text-emerald-600" aria-hidden="true" />
+                ) : (
+                  <AlertTriangle className="mx-auto size-9 text-amber-600" aria-hidden="true" />
+                )}
+                <p className="mt-2 text-sm font-black">
+                  {releaseReady ? "출시 준비 완료" : "검수 조치 필요"}
+                </p>
+                <p className="mt-1 text-xs text-fg-2">
+                  차단 작업 {blocked} · 중요 검수 {openBlockers + openMajor}
+                </p>
+              </div>
+            </Card>
           </div>
         ) : null}
 
-        {persistence.warning ? (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200" role="alert">
-            <span className="flex min-w-0 items-center gap-2"><CircleAlert className="size-4 shrink-0" aria-hidden="true" /><span>{persistence.warning}</span></span>
-            <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={retryPersistence}>다시 저장</button>
+        {surface === "review" ? (
+          <Card
+            title="리뷰 및 승인"
+            description="중요도와 담당자를 기준으로 출시 차단 요소를 정리합니다."
+          >
+            <div className="space-y-2">
+              {workspace.reviews.map((issue) => (
+                <article
+                  key={issue.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-bold">{issue.title}</h3>
+                      <Pill tone={reviewTone(issue.severity)}>{issue.severity}</Pill>
+                      <Pill tone={issue.status === "resolved" ? "success" : "accent"}>
+                        {issue.status}
+                      </Pill>
+                    </div>
+                    <p className="mt-1 text-xs text-fg-2">담당 {issue.assignee}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={buttonClass({ variant: "outline", size: "sm" })}
+                    onClick={() => commit((current) => ({
+                      ...current,
+                      reviews: current.reviews.map((item) => item.id === issue.id
+                        ? { ...item, status: item.status === "open" ? "resolved" : "open" }
+                        : item),
+                    }), "리뷰 상태를 갱신했습니다.")}
+                  >
+                    {issue.status === "open" ? "해결 처리" : "다시 열기"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
+        {surface === "versions" ? (
+          <Card
+            title="버전 및 복구"
+            description="주요 변경 전에 작업·검수 상태를 불변 체크포인트로 저장합니다."
+            action={(
+              <button
+                type="button"
+                className={buttonClass({ size: "sm" })}
+                onClick={createSnapshot}
+              >
+                <FileClock className="size-4" aria-hidden="true" />
+                체크포인트
+              </button>
+            )}
+          >
+            <div className="space-y-2">
+              {workspace.versions.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-fg-2">
+                  아직 저장된 체크포인트가 없습니다.
+                </div>
+              ) : workspace.versions.map((version) => (
+                <article
+                  key={version.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"
+                >
+                  <div>
+                    <h3 className="text-sm font-bold">{version.name}</h3>
+                    <p className="mt-1 text-xs text-fg-2">
+                      {DATE_TIME_FORMATTER.format(new Date(version.createdAt))}
+                      {` · 작업 ${version.tasks.length} · 검수 ${version.reviews.length}`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={buttonClass({ variant: "outline", size: "sm" })}
+                    onClick={() => restoreSnapshot(version)}
+                  >
+                    <RotateCcw className="size-4" aria-hidden="true" />
+                    복원
+                  </button>
+                </article>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
+        {surface === "present" ? (
+          <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+            <Card title="피치 슬라이드" description="핵심 메시지를 순서대로 구성합니다.">
+              <div className="space-y-2">
+                {workspace.slides.map((slide, index) => (
+                  <button
+                    key={slide.id}
+                    type="button"
+                    className="w-full rounded-xl border border-line bg-panel p-3 text-left hover:border-accent"
+                    onClick={() => setNotice(`${index + 1}. ${slide.title}: ${slide.body}`)}
+                  >
+                    <span className="text-[0.6875rem] font-bold text-fg-3">SLIDE {index + 1}</span>
+                    <span className="mt-1 block text-sm font-bold">{slide.title}</span>
+                  </button>
+                ))}
+              </div>
+            </Card>
+            <Card title="발표 미리보기" description="공유 전에 메시지 밀도와 순서를 확인합니다.">
+              <div className="aspect-video rounded-2xl border border-line bg-panel p-[clamp(2rem,6vw,7rem)]">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-accent">
+                  {workspace.title}
+                </p>
+                <h2 className="mt-6 max-w-[20ch] text-balance text-[clamp(2rem,5vw,5rem)] font-black leading-[1.02] tracking-[-0.05em]">
+                  {workspace.slides[0]?.title}
+                </h2>
+                <p className="mt-5 max-w-[52ch] text-[clamp(0.9rem,1.5vw,1.5rem)] leading-relaxed text-fg-2">
+                  {workspace.slides[0]?.body}
+                </p>
+              </div>
+            </Card>
           </div>
         ) : null}
 
-        {surface === "projects" ? <StudioProductionProjectsSurface workspace={workspace} scope={scope} commit={commit} /> : null}
-        {surface === "review" ? <StudioProductionReviewSurface workspace={workspace} scope={scope} commit={commit} /> : null}
-        {surface === "versions" ? <StudioProductionVersionsSurface workspace={workspace} scope={scope} commit={commit} /> : null}
-        {surface === "present" ? <StudioProductionPresentationSurface workspace={workspace} scope={scope} commit={commit} /> : null}
-        {surface === "share" ? <StudioProductionShareSurface workspace={workspace} scope={scope} commit={commit} /> : null}
-        {surface === "join" ? <StudioProductionJoinSurface workspace={workspace} scope={scope} commit={commit} initialToken={inviteToken} /> : null}
+        {surface === "share" ? (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <Card
+              title="안전한 프로젝트 공유"
+              description="역할·승인·워터마크 정책을 유지하는 범위형 초대 링크입니다."
+            >
+              <label className="block text-xs font-semibold text-fg">
+                초대 토큰
+                <input
+                  readOnly
+                  value={workspace.inviteToken}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 font-mono text-sm"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" className={buttonClass()} onClick={() => void copyInvite()}>
+                  <Copy className="size-4" aria-hidden="true" />
+                  링크 복사
+                </button>
+                <button
+                  type="button"
+                  className={buttonClass({ variant: "outline" })}
+                  onClick={() => commit((current) => ({
+                    ...current,
+                    inviteToken: `ts-${createId("invite")}`,
+                  }), "기존 링크를 폐기하고 새 초대를 발급했습니다.")}
+                >
+                  <Link2 className="size-4" aria-hidden="true" />
+                  링크 재발급
+                </button>
+              </div>
+            </Card>
+            <Card title="공유 정책">
+              <ul className="space-y-2 text-xs text-fg-2">
+                <li>초대 범위: {scope.label}</li>
+                <li>기본 권한: 리뷰어</li>
+                <li>다운로드: 비활성</li>
+                <li>워터마크: 활성</li>
+                <li>참여 승인: 필요</li>
+              </ul>
+            </Card>
+          </div>
+        ) : null}
+
+        {surface === "join" ? (
+          <Card
+            title="공동 제작 참여"
+            description="초대 링크를 검증한 뒤 현재 제작 운영 공간에 참여합니다."
+          >
+            <div className="mx-auto max-w-xl rounded-2xl border border-line bg-panel p-5 text-center">
+              <Users className="mx-auto size-10 text-accent" aria-hidden="true" />
+              <h2 className="mt-3 text-lg font-black">
+                {inviteToken ? "초대 링크가 확인되었습니다" : "초대 링크가 필요합니다"}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-fg-2">
+                {inviteToken
+                  ? `${scope.label} 공간에 리뷰어 권한으로 참여 요청을 보냅니다.`
+                  : "프로젝트 소유자가 발급한 /studio/join 링크로 다시 열어 주세요."}
+              </p>
+              <button
+                type="button"
+                className={cn(buttonClass(), "mt-5")}
+                disabled={!inviteToken}
+                onClick={() => {
+                  const name = `참여자 ${workspaceRef.current.members.length + 1}`;
+                  commit((current) => ({
+                    ...current,
+                    members: current.members.includes(name)
+                      ? current.members
+                      : [...current.members, name],
+                  }), "참여 요청을 등록했습니다.");
+                }}
+              >
+                참여 요청
+              </button>
+            </div>
+          </Card>
+        ) : null}
       </main>
     </div>
   );

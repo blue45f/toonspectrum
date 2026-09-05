@@ -1,7 +1,9 @@
 import { useId, type ReactElement } from "react";
 
-import { type StudioFilterUnionWaveKind } from "./studio-filter-pack-registry";
-import { isStudioSmartFilterUnionEngine } from "./studio-smart-filter-union-engine";
+import {
+  STUDIO_FILTER_UNION_WAVE_KINDS,
+  type StudioFilterUnionWaveKind,
+} from "./studio-filter-pack-registry";
 
 export type StudioSmartFilterUnionParams = Record<string, number | string | boolean>;
 
@@ -15,6 +17,7 @@ type NumericControlSpec = Readonly<{
   suffix?: string;
 }>;
 
+const UNION_ENGINE_SET: ReadonlySet<string> = new Set(STUDIO_FILTER_UNION_WAVE_KINDS);
 
 const GEOMETRY_ENGINE_SET: ReadonlySet<StudioFilterUnionWaveKind> = new Set([
   "wave-warp",
@@ -131,6 +134,12 @@ const UNION_NUMERIC_CONTROLS: Readonly<
   ],
   "polar-coordinates": [AMOUNT, CENTER_X, CENTER_Y],
 });
+
+function isStudioSmartFilterUnionEngine(
+  value: string,
+): value is StudioFilterUnionWaveKind {
+  return UNION_ENGINE_SET.has(value);
+}
 
 function numericParam(
   params: StudioSmartFilterUnionParams,

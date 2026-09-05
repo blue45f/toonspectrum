@@ -1,0 +1,79 @@
+name: Character Shaper discovery quality
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/character-shaper/**"
+      - "src/domains/creator/studio-router/**"
+      - "src/domains/creator/studio-production/**"
+      - ".github/workflows/character-shaper-discovery-quality.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vitest.config.ts"
+      - "vitest.setup.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shaper-discovery-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shaper-discovery-arm:
+    # Supplemental verification only: existing core/visual/protection checks are unchanged.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked workspace dependencies
+        id: install
+        run: pnpm install --frozen-lockfile
+      - name: Lint discovery, recovery and precision changes
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/character-shaper/CharacterShaperShelf.tsx \
+            src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx \
+            src/domains/creator/character-shaper/CharacterSlotCard.tsx \
+            src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx \
+            src/domains/creator/character-shaper/character-shaper-discovery.ts \
+            src/domains/creator/character-shaper/character-shaper-discovery.test.ts \
+            src/domains/creator/character-shaper/character-shaper-favorites.ts \
+            src/domains/creator/character-shaper/character-shaper-favorites.test.ts \
+            src/domains/creator/character-shaper/character-shaper-favorites-recovery.test.ts \
+            src/domains/creator/character-shaper/useCharacterShaperFavorites.ts \
+            src/domains/creator/character-shaper/CharacterShaperControls.tsx \
+            src/domains/creator/character-shaper/CharacterShaperControls.precision.test.tsx \
+            src/domains/creator/character-shaper/CharacterShaperControls.lifecycle.test.tsx \
+            src/domains/creator/character-shaper/character-shaper-precision.ts \
+            src/domains/creator/character-shaper/character-shaper-precision.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
+      - name: Run the existing Character Shaper Vitest suite
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm exec vitest run src/domains/creator/character-shaper
+      - name: Verify production review routing and asset guidance regressions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts
+      - name: Typecheck the complete frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm exec tsc -p tsconfig.json

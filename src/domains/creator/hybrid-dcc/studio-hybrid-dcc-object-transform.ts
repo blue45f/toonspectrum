@@ -37,7 +37,8 @@ export function createStudioHybridDccIdentityTransform(): StudioHybridDccObjectT
 function isVec3Tuple(value: unknown): value is StudioHybridDccVec3Tuple {
   return Array.isArray(value)
     && value.length === 3
-    && value.every((component) => typeof component === "number" && Number.isFinite(component));
+    && [0, 1, 2].every((index) => Object.hasOwn(value, index)
+      && typeof value[index] === "number" && Number.isFinite(value[index]));
 }
 
 /** Validates untrusted persisted/plugin transform data and returns a detached canonical value. */
@@ -95,12 +96,13 @@ export function transformStudioHybridDccPoint(
   const y = point[1] * transform.scale[1];
   const z = point[2] * transform.scale[2];
 
-  // Three.js Euler order "XYZ": matrix Rz * Ry * Rx.
-  const rotatedX = cz * cy * x + (cz * sy * sx - sz * cx) * y
-    + (cz * sy * cx + sz * sx) * z;
-  const rotatedY = sz * cy * x + (sz * sy * sx + cz * cx) * y
-    + (sz * sy * cx - cz * sx) * z;
-  const rotatedZ = -sy * x + cy * sx * y + cy * cx * z;
+  // Three.js intrinsic Euler "XYZ" is Rx * Ry * Rz for column vectors.
+  // Rz * Ry * Rx only agrees for single-axis rotations, hiding mixed-axis drift.
+  const rotatedX = cy * cz * x - cy * sz * y + sy * z;
+  const rotatedY = (cx * sz + sx * sy * cz) * x
+    + (cx * cz - sx * sy * sz) * y - sx * cy * z;
+  const rotatedZ = (sx * sz - cx * sy * cz) * x
+    + (sx * cz + cx * sy * sz) * y + cx * cy * z;
   return [
     rotatedX + transform.position[0],
     rotatedY + transform.position[1],
@@ -124,14 +126,12 @@ export function inverseTransformStudioHybridDccPoint(
   const worldY = point[1] - transform.position[1];
   const worldZ = point[2] - transform.position[2];
 
-  // Forward rotation is Rz * Ry * Rx, so the inverse is its transpose.
-  const scaledX = cz * cy * worldX + sz * cy * worldY - sy * worldZ;
-  const scaledY = (cz * sy * sx - sz * cx) * worldX
-    + (sz * sy * sx + cz * cx) * worldY
-    + cy * sx * worldZ;
-  const scaledZ = (cz * sy * cx + sz * sx) * worldX
-    + (sz * sy * cx - cz * sx) * worldY
-    + cy * cx * worldZ;
+  // Invert T * Rx * Ry * Rz * S: subtract T, transpose R, then divide by S.
+  const scaledX = cy * cz * worldX + (cx * sz + sx * sy * cz) * worldY
+    + (sx * sz - cx * sy * cz) * worldZ;
+  const scaledY = -cy * sz * worldX + (cx * cz - sx * sy * sz) * worldY
+    + (sx * cz + cx * sy * sz) * worldZ;
+  const scaledZ = sy * worldX - sx * cy * worldY + cx * cy * worldZ;
   return [
     scaledX / transform.scale[0],
     scaledY / transform.scale[1],
@@ -146,5 +146,5 @@ export function hashStudioHybridDccObjectTransform(
     ...transform.position,
     ...transform.rotationEulerRad,
     ...transform.scale,
-  ].map((component) => Object.is(component, -0) ? "0" : component.toPrecision(17)).join(",");
+  ].map((component) => (Object.is(component, -0) ? 0 : component).toPrecision(17)).join(",");
 }
