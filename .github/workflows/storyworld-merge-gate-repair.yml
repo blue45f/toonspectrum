@@ -1,0 +1,163 @@
+name: Storyworld merge-gate repair validation
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-merge-gate-repair.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PRODUCT_SHA: 99a6a6967a7fda099361b1f965491e3a028046dd
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 99a6a6967a7fda099361b1f965491e3a028046dd
+          path: product
+          persist-credentials: false
+          show-progress: false
+      - uses: actions/checkout@v6
+        with:
+          ref: b321cbf5cdf0f906a3b2fd547b87f1626ccc0694
+          path: repair-source
+          sparse-checkout: .github
+          persist-credentials: false
+          show-progress: false
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: product/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: product/pnpm-lock.yaml
+      - name: Verify bounded repair, execute genuine checks, and create immutable source evidence
+        working-directory: product
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, hashlib, json, os, pathlib, subprocess, time, urllib.request
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storyworld-gate-repair'
+          out.mkdir()
+          sha = os.environ['PRODUCT_SHA']
+          report = {'baseProductSha': sha, 'runId': os.environ['GITHUB_RUN_ID'], 'checks': [], 'publishedRef': False}
+          def record():
+              (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2))
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip() == sha
+          parts = [pathlib.Path(f'../repair-source/.github/storyworld-merge-gate-patch.part{i}').read_text().strip() for i in range(1,4)]
+          patch = gzip.decompress(base64.b64decode(''.join(parts), validate=True))
+          assert hashlib.sha256(patch).hexdigest() == '148145fe9d8da78557fe703c62a3fa0a820f72f71b3b7c447642d1083ae7ea6a', 'Transport hash mismatch; nothing is applied'
+          patch_path = out / 'input.patch'
+          patch_path.write_bytes(patch)
+          required = [
+              'scripts/studio-quality-bundle-leaves.test.mjs',
+              'src/domains/creator/ai/StudioAiToolPopoverBody.tsx',
+              'src/domains/creator/ai/StudioAiSuperSuiteGateway.tsx',
+              'src/domains/creator/ai/studio-ai-super-suite-integration-boundary.test.ts',
+              'src/domains/creator/ai/StudioAiSuperSuiteGateway.test.tsx',
+              'src/domains/creator/quality-review-store.ts',
+              'src/domains/creator/StudioContinuityPanel.tsx',
+              'src/domains/creator/StudioContinuityPanel.hardening.test.tsx',
+              'src/domains/creator/StudioContinuityPanel.test.tsx',
+              'src/domains/creator/studio-production/StudioProductionHubPage.tsx',
+          ]
+          earlier = [
+              'src/domains/creator/studio-router/StudioRouter.tsx',
+              'src/domains/creator/studio-router/routes/StudioProductionRoute.tsx',
+              'src/domains/creator/studio-router/routes/StudioStoryworldRoute.tsx',
+              'src/domains/creator/hybrid-dcc/StudioHybridDccViewportInteraction.test.tsx',
+          ]
+          allowed = required + earlier
+          subprocess.run(['git','apply','--check',str(patch_path)],check=True)
+          subprocess.run(['git','apply',str(patch_path)],check=True)
+          tests = [
+              'src/domains/creator/storyworld',
+              'src/domains/creator/studio-router',
+              'src/domains/creator/studio-host-architecture-ratchet.test.ts',
+              'src/domains/creator/studio-browser-kv-authority-boundary.test.ts',
+              'src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts',
+              'src/domains/creator/ai/StudioAiSuperSuiteGateway.test.tsx',
+              'src/domains/creator/ai/studio-ai-super-suite-integration-boundary.test.ts',
+              'src/domains/creator/ai/studio-ai-super-suite-intent.test.ts',
+              'src/domains/creator/ai/studio-ai-suite-handoff.test.ts',
+              'src/domains/creator/StudioContinuityPanel.test.tsx',
+              'src/domains/creator/StudioContinuityPanel.hardening.test.tsx',
+              'src/domains/creator/hybrid-dcc/StudioHybridDccViewportInteraction.test.tsx',
+              'src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx',
+              'scripts/studio-quality-bundle-leaves.test.mjs',
+          ]
+          commands = [
+              ('install',['pnpm','install','--frozen-lockfile']),
+              ('lint',['pnpm','exec','eslint','--fix','--max-warnings=0',*allowed]),
+              ('tests',['pnpm','exec','vitest','run',*tests]),
+              ('types',['pnpm','run','typecheck']),
+              ('architecture',['pnpm','run','validate:architecture']),
+              ('standalone',['pnpm','exec','node','scripts/verify-storyworld-lab.mjs']),
+          ]
+          record()
+          for name, command in commands:
+              started=time.monotonic()
+              try:
+                  result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=900)
+                  text=result.stdout
+                  entry={'name':name,'exitCode':result.returncode,'seconds':round(time.monotonic()-started,2)}
+              except Exception as error:
+                  text=str(error)
+                  entry={'name':name,'exitCode':-1}
+              (out/f'{name}.log').write_text(text)
+              entry['outputTail']=text[-14000:] if entry['exitCode'] else text[-1200:]
+              report['checks'].append(entry)
+              record()
+              print('::group::'+name,flush=True)
+              print(json.dumps(entry,ensure_ascii=False,indent=2),flush=True)
+              print('::endgroup::',flush=True)
+              if name=='install' and entry['exitCode']:
+                  break
+          subprocess.run(['git','add','--',*allowed],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          changed=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert set(required)<=set(changed)<=set(allowed), 'Unexpected source delta'
+          (out/'verified.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--full-index','--binary']))
+          report['files']=[]
+          for path in changed:
+              raw=pathlib.Path(path).read_bytes()
+              target=out/'source'/path
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(raw)
+              report['files'].append({'path':path,'sha256':hashlib.sha256(raw).hexdigest()})
+          record()
+          assert len(report['checks'])==len(commands) and all(item['exitCode']==0 for item in report['checks']), 'Genuine source checks failed; no commit or ref is published'
+          api='https://api.github.com/repos/blue45f/toonspectrum/'
+          def request(path,body=None):
+              req=urllib.request.Request(api+path,data=None if body is None else json.dumps(body).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=40) as response:
+                  return json.load(response)
+          pr=request('pulls/746')
+          assert pr['state']=='open' and pr['head']['sha']==sha and pr['base']['ref']=='main', 'PR moved; preserve concurrent work'
+          base_tree=request('git/commits/'+sha)['tree']['sha']
+          entries=[{'path':path,'mode':'100644','type':'blob','content':pathlib.Path(path).read_text()} for path in changed]
+          tree=request('git/trees',{'base_tree':base_tree,'tree':entries})
+          commit=request('git/commits',{'message':'fix(studio): satisfy native CI architecture and durable review contracts\n\nRepair Vitest discovery, isolate the AI modal lifecycle behind its existing intent contract, migrate continuity review state to shared SQLite without browser-KV fallback, and restore real production-hub page headings. Keep broad architecture assertions and required CI unchanged. Exact source checks are recorded by Actions run '+os.environ['GITHUB_RUN_ID']+'.','tree':tree['sha'],'parents':[sha]})
+          report['verifiedTreeSha']=tree['sha']
+          report['verifiedCommitSha']=commit['sha']
+          record()
+          print('VERIFIED_PRODUCT_COMMIT='+commit['sha'],flush=True)
+          print('No branch ref or required check was modified; native PR core CI remains mandatory.',flush=True)
+          PY
+      - name: Preserve tested source and failure evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-merge-gate-repair-${{ github.run_id }}
+          path: ${{ runner.temp }}/storyworld-gate-repair
+          retention-days: 3
+          if-no-files-found: warn
