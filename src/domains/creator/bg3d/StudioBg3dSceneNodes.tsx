@@ -384,11 +384,13 @@ export function BgAdaptiveDprController({
     scaleChangeRef.current(1);
   }, [targetFps]);
   useFrame((state, deltaSeconds) => {
+    // Demand-frame gaps measure artist input cadence, not GPU throughput.
+    const effectivePaused = paused || state.frameloop !== "always";
     const previous = governorRef.current;
     const next = advanceStudioBg3dFrameQuality(previous, {
       deltaSeconds,
       targetFps,
-      paused,
+      paused: effectivePaused,
     });
     governorRef.current = next;
     if (next.dprScale !== previous.dprScale) scaleChangeRef.current(next.dprScale);
@@ -398,7 +400,7 @@ export function BgAdaptiveDprController({
     const nowMs = state.clock.elapsedTime * 1_000;
     const last = lastReportRef.current;
     if (nowMs - last.atMs < FRAME_TIME_REPORT_INTERVAL_MS) return;
-    const value = paused || next.acceptedSamples < STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES
+    const value = effectivePaused || next.acceptedSamples < STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES
       ? null
       : Math.round(next.smoothedFrameMs * 10) / 10;
     lastReportRef.current = { atMs: nowMs, value };
