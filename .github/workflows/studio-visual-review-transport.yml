@@ -2,114 +2,83 @@ name: Studio visual review transport
 on:
   push:
     branches: [feat/studio-assets-visual-curation-20260906]
+    paths: [.github/workflows/studio-visual-review-transport.yml]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+  actions: read
 concurrency:
-  group: studio-visual-review-${{ github.ref }}
-  cancel-in-progress: false
+  group: studio-visual-evidence-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   visual-evidence:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-visual-curation-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      HUSKY: "0"
-      NODE_OPTIONS: --max-old-space-size=8192
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: docs/reports/asset-visual-review-20260906/review-01.pdf
-          archive: false
-          retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: docs/reports/asset-visual-review-20260906/review-02.pdf
-          archive: false
-          retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: docs/reports/asset-visual-review-20260906/review-03.pdf
-          archive: false
-          retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: docs/reports/asset-visual-review-20260906/review-04.pdf
-          archive: false
-          retention-days: 14
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          path: docs/reports/asset-visual-review-20260906/review-05.pdf
-          archive: false
-          retention-days: 14
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: 24.16.0
-      - name: Prepare reviewed candidate acquisition code
+          persist-credentials: false
+      - name: Restore immutable PBR render evidence
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          gh api repos/blue45f/toonspectrum/git/blobs/ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb --jq .content | base64 --decode > scripts/acquire_studio_pbr_assets.py
-          test "$(git hash-object scripts/acquire_studio_pbr_assets.py)" = ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb
-          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
-          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
-          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
-          pnpm install --frozen-lockfile --ignore-scripts
-      - name: Acquire native 2K PBR originals into review staging only
-        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/studio-pbr-candidates"
-      - name: Render detailed models and package visible review pages
-        run: |
-          pnpm exec playwright install --with-deps chromium
-          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/studio-pbr-candidates" "$GITHUB_WORKSPACE"
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9975090308/zip > "$RUNNER_TEMP/pbr.zip"
+          gh api repos/blue45f/toonspectrum/actions/jobs/101351268205/logs > "$RUNNER_TEMP/runtime.log"
           python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image,ImageDraw
-          import json,os,shutil
-          out=Path(os.environ['RUNNER_TEMP'])/'studio-pbr-candidates'
-          assets=json.loads((out/'manifest.json').read_text())['assets']
-          sheets=[]
-          for page,start in enumerate(range(0,len(assets),12),1):
-              sheet=Image.new('RGB',(1600,1400),'#e7e8ed'); draw=ImageDraw.Draw(sheet)
-              draw.text((24,16),f'Actual PBR original candidates | page {page} | Not yet artistically approved',fill='#111118')
-              for i,a in enumerate(assets[start:start+12]):
-                  x=(i%4)*400; y=(i//4)*446+40
-                  with Image.open(out/a.get('previewPath',a['path'])) as original:
-                      img=original.convert('RGBA');img.thumbnail((384,374))
-                  sheet.paste(img,(x+(400-img.width)//2,y),img)
-                  draw.text((x+8,y+380),f'{start+i+1:03d} '+a['id'][:46],fill='#111118')
-                  draw.text((x+8,y+398),a['kind']+' | '+a['selectionTerm'],fill='#333344')
-              sheets.append(sheet)
-          sheets[0].save(out/'pbr-candidates-review.pdf','PDF',save_all=True,append_images=sheets[1:],resolution=144,quality=94)
-          records=Path('docs/reports/asset-visual-review-20260906')
-          for file in ['delivery-report.json','manifest.json','browser-render-evidence.json']:
-              shutil.copyfile(out/file,records/('pbr-'+file))
-          print('PBR REVIEW CANDIDATES',len(assets),'PAGES',len(sheets))
+          import pathlib,os,hashlib,zipfile,json,shutil,stat,tarfile
+          root=pathlib.Path(os.environ['RUNNER_TEMP']); archive=root/'pbr.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()=='83a7e541158f170b0f2c2fa139dd1db4fbfff9ec155211ad7fb06d9f234d9bbf'
+          out=root/'pbr';out.mkdir()
+          with zipfile.ZipFile(archive) as z:
+              infos=z.infolist();assert len(infos)<5000 and sum(i.file_size for i in infos)<2*1024**3
+              for i in infos: assert (out/i.filename).resolve().is_relative_to(out) and not stat.S_ISLNK(i.external_attr>>16)
+              z.extractall(out)
+          review=root/'review';review.mkdir()
+          for p in out.iterdir():
+              if p.is_file(): shutil.copyfile(p,review/p.name)
+          shutil.copytree(out/'previews',review/'previews')
+          log=(root/'runtime.log').read_text(errors='replace')
+          lines=log.splitlines(); errors=[i for i,line in enumerate(lines) if any(k in line for k in ['Error:', 'Expected:', 'Received:', 'failed', 'unavailable'])]
+          selected=set()
+          for i in errors: selected.update(range(max(0,i-3),min(len(lines),i+12)))
+          (review/'runtime-failure-excerpt.log').write_text('\n'.join(lines[i] for i in sorted(selected)))
+          (review/'runtime-full.log').write_text(log)
+          report=json.loads((out/'delivery-report.json').read_text());print('PBR ACTUAL COUNTS',json.dumps(report))
+          packs=sorted((out/'assets').iterdir());batches=[[],[],[]];totals=[0,0,0]
+          for p in sorted(packs,key=lambda p:sum(f.stat().st_size for f in p.rglob('*') if f.is_file()),reverse=True):
+              i=totals.index(min(totals));batches[i].append(p);totals[i]+=sum(f.stat().st_size for f in p.rglob('*') if f.is_file())
+          for i,batch in enumerate(batches):
+              dest=root/f'pbr-part-{i+1}';dest.mkdir()
+              with tarfile.open(dest/f'pbr-part-{i+1}.tar.gz','w:gz',compresslevel=1) as tar:
+                  for p in batch: tar.add(p,arcname='assets/'+p.name)
+              print('PART',i+1,'rawBytes',totals[i])
+          with tarfile.open(review/'reviewed-source.tar.gz','w:gz',compresslevel=1) as tar:
+              for name in ['src','scripts','e2e','packages','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','vite.config.ts','vitest.config.ts','eslint.config.mjs']:
+                  p=pathlib.Path(name)
+                  if p.exists():tar.add(p,arcname=name)
           PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          path: ${{ runner.temp }}/studio-pbr-candidates/pbr-candidates-review.pdf
-          archive: false
-          retention-days: 14
-      - name: Preserve acquisition source and exact outcomes on review branch only
-        run: |
-          test "$GITHUB_REF" = refs/heads/feat/studio-assets-visual-curation-20260906
-          git fetch origin "$GITHUB_REF_NAME"
-          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
-          git add -- scripts/acquire_studio_pbr_assets.py docs/reports/asset-visual-review-20260906/pbr-delivery-report.json docs/reports/asset-visual-review-20260906/pbr-manifest.json docs/reports/asset-visual-review-20260906/pbr-browser-render-evidence.json
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): acquire and render detailed PBR review candidates"
-          git push origin "HEAD:$GITHUB_REF"
-          git log -1 --format='PBR_EVIDENCE_COMMIT %H'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: studio-pbr-candidates-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/studio-pbr-candidates/
-            !${{ runner.temp }}/studio-pbr-candidates/_source/
-          retention-days: 14
-          if-no-files-found: warn
+          name: studio-pbr-visual-evidence
+          path: ${{ runner.temp }}/review/
           compression-level: 1
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-1
+          path: ${{ runner.temp }}/pbr-part-1/
+          compression-level: 0
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-2
+          path: ${{ runner.temp }}/pbr-part-2/
+          compression-level: 0
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-originals-part-3
+          path: ${{ runner.temp }}/pbr-part-3/
+          compression-level: 0
+          retention-days: 14
