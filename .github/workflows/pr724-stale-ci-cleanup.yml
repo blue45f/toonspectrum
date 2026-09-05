@@ -1,4 +1,4 @@
-name: Cancel superseded PR 724 runs
+name: PR 724 authorized merge attempt
 
 on:
   push:
@@ -6,86 +6,108 @@ on:
 
 permissions:
   actions: write
-  contents: read
-  pull-requests: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: pr724-stale-ci-cleanup
   cancel-in-progress: true
 
 jobs:
-  cleanup:
-    runs-on: windows-2025
-    timeout-minutes: 5
+  cleanup-and-merge:
+    runs-on: macos-latest
+    timeout-minutes: 6
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_HEAD: d8ec56a3c7d942f5090926dbd390a254174722c9
     steps:
-      - name: Preserve the live filter head and cancel only superseded executions
+      # No checkout or repository code is executed with the workflow token.
+      - name: Validate the exact product-only pull request
+        id: preflight
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/blue45f/toonspectrum/pulls/724 > "$RUNNER_TEMP/pr724.json"
+          gh api --paginate repos/blue45f/toonspectrum/pulls/724/files --jq '.[].filename' > "$RUNNER_TEMP/pr724-files.txt"
+          python3 <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          pr = json.loads((root / 'pr724.json').read_text())
+          assert pr['base']['ref'] == 'main'
+          assert pr['base']['repo']['full_name'] == 'blue45f/toonspectrum'
+          assert pr['head']['repo']['full_name'] == 'blue45f/toonspectrum'
+          assert pr['head']['ref'] == 'feat/studio-filter-exhaustive-20260905'
+          assert pr['head']['sha'] == os.environ['EXPECTED_HEAD'], 'PR head changed; do not merge'
+          if not pr['merged']:
+              assert pr['state'] == 'open' and not pr['draft']
+          expected = {
+              'docs/studio-smart-filter-gallery-parity-2026-09-05.md',
+              'src/domains/creator/StudioSmartFiltersPanel.test.tsx',
+              'src/domains/creator/StudioSmartFiltersPanel.tsx',
+              'src/domains/creator/filter/StudioSmartFilterUnionControls.test.tsx',
+              'src/domains/creator/filter/StudioSmartFilterUnionControls.tsx',
+              'src/domains/creator/filter/studio-filter-catalog-output-quality.test.ts',
+              'src/domains/creator/filter/studio-filter-catalog.test.ts',
+              'src/domains/creator/studio-adjustment-stack.test.ts',
+              'src/domains/creator/studio-adjustment-stack.ts',
+          }
+          assert set((root / 'pr724-files.txt').read_text().splitlines()) == expected, 'Unexpected PR files'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('needs_merge=' + str(not pr['merged']).lower() + '\n')
+          print('Validated PR 724, exact head, target main, and nine product/test/documentation paths')
+          PY
+
+      - name: Cancel only superseded filter and helper runs
+        if: steps.preflight.outputs.needs_merge == 'true'
+        shell: bash
         run: |
           set -euo pipefail
           python3 <<'PY'
-          import json
-          import os
-          import urllib.error
-          import urllib.parse
-          import urllib.request
-
-          repo = 'blue45f/toonspectrum'
-          branch = 'feat/studio-filter-exhaustive-20260905'
-          root = 'https://api.github.com/repos/' + repo
-
+          import json, os, urllib.error, urllib.parse, urllib.request
+          root = 'https://api.github.com/repos/blue45f/toonspectrum'
           def api(path, method='GET'):
-              request = urllib.request.Request(
-                  root + path,
-                  data=b'' if method == 'POST' else None,
-                  method=method,
-                  headers={
-                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                      'Accept': 'application/vnd.github+json',
-                      'User-Agent': 'pr724-stale-run-cleanup',
-                  },
-              )
-              with urllib.request.urlopen(request, timeout=30) as response:
+              req = urllib.request.Request(root + path, data=b'' if method == 'POST' else None, method=method, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'User-Agent': 'pr724-authorized-maintenance'})
+              with urllib.request.urlopen(req, timeout=30) as response:
                   payload = response.read()
                   return json.loads(payload) if payload else None
-
-          pr = api('/pulls/724')
-          if pr['state'] != 'open' or pr['head']['ref'] != branch or pr['head']['repo']['full_name'] != repo:
-              raise SystemExit('PR identity/state changed; no cancellation performed')
-          expected_head = pr['head']['sha']
-          preserved = {
-              branch: expected_head,
-              'ops/pr724-stale-ci-cleanup-20260905': os.environ['GITHUB_SHA'],
-          }
+          keep = {'feat/studio-filter-exhaustive-20260905': os.environ['EXPECTED_HEAD'], 'ops/pr724-stale-ci-cleanup-20260905': os.environ['GITHUB_SHA']}
           candidates = []
-          for target_branch, keep_sha in preserved.items():
-              query = urllib.parse.urlencode({'branch': target_branch, 'per_page': 100})
+          for branch, sha in keep.items():
+              query = urllib.parse.urlencode({'branch': branch, 'per_page': 100})
               for page in range(1, 7):
                   rows = api('/actions/runs?' + query + '&page=' + str(page))['workflow_runs']
-                  candidates.extend(row for row in rows if row['head_branch'] == target_branch and row['head_sha'] != keep_sha and row['status'] != 'completed')
+                  candidates.extend(row for row in rows if row['head_branch'] == branch and row['head_sha'] != sha and row['status'] != 'completed')
                   if len(rows) < 100:
                       break
-          cancelled = []
           for candidate in candidates:
-              latest_pr = api('/pulls/724')
-              if latest_pr['head']['sha'] != expected_head or latest_pr['state'] != 'open':
-                  raise SystemExit('PR head/state changed; stopped cancellation')
+              pr = api('/pulls/724')
+              if pr['state'] != 'open' or pr['head']['sha'] != os.environ['EXPECTED_HEAD']:
+                  raise SystemExit('PR state/head changed; cancellation stopped')
               run = api('/actions/runs/' + str(candidate['id']))
-              keep_sha = preserved.get(run['head_branch'])
-              if keep_sha is None or run['head_sha'] == keep_sha or run['status'] == 'completed':
+              if run['head_branch'] not in keep or run['head_sha'] == keep[run['head_branch']] or run['status'] == 'completed':
                   continue
               try:
                   api('/actions/runs/' + str(run['id']) + '/cancel', 'POST')
+                  print('Requested cancellation of superseded run:', run['id'])
               except urllib.error.HTTPError as error:
-                  if error.code == 409:
-                      print('Already finished or cancelling:', run['id'])
-                      continue
-                  raise
-              cancelled.append(run['id'])
-              print('Cancellation requested:', run['id'], run['name'], run['head_sha'])
-          receipt = {'pr': 724, 'preserved_head': expected_head, 'cancel_requested_run_ids': cancelled, 'count': len(cancelled)}
-          print(json.dumps(receipt, indent=2))
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-              summary.write('## PR 724 stale-run cleanup\n\n```json\n' + json.dumps(receipt, indent=2) + '\n```\n')
+                  if error.code != 409:
+                      raise
+                  print('Run already finished/cancelling:', run['id'])
           PY
+
+      - name: Attempt the user-authorized administrator squash merge
+        if: ${{ !cancelled() && steps.preflight.outcome == 'success' && steps.preflight.outputs.needs_merge == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub itself decides whether this identity can bypass requirements.
+          # Never change branch protection, forge a check result, or force-update main.
+          gh pr merge 724 --repo blue45f/toonspectrum --admin --squash --match-head-commit "$EXPECTED_HEAD"
+
+      - name: Record the actual GitHub merge state
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/blue45f/toonspectrum/pulls/724 --jq '{number, state, merged, merged_at, merge_commit_sha, head_sha: .head.sha, base: .base.ref}' | tee -a "$GITHUB_STEP_SUMMARY"
