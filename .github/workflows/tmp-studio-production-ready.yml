@@ -18,11 +18,11 @@ concurrency:
 jobs:
   deliver:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Checkout clean current-main branch
+      - name: Checkout clean feature base
         uses: actions/checkout@v4
         with:
           ref: feat/studio-production-command-center-ready-20260905
@@ -69,21 +69,186 @@ jobs:
           grep -Fx 'src/domains/creator/studio-router/studio-route-manifest.ts' /tmp/studio-production-patch.files
           tar -xJf /tmp/studio-production-patch.tar.xz
 
-      - name: Align cross-browser channel construction with current main
+      - name: Harden product accessibility, purity, and storage boundaries
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('src/domains/creator/studio-production/use-studio-production-workspace.ts')
-          source = path.read_text(encoding='utf-8')
-          before = '  const channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n'
-          after = '''  let channel: BroadcastChannel;\n  try {\n    channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n  } catch {\n    productionChannel = null;\n    return null;\n  }\n'''
-          assert before in source
-          path.write_text(source.replace(before, after, 1), encoding='utf-8')
+          def replace_once(path: str, before: str, after: str) -> None:
+              file = Path(path)
+              source = file.read_text(encoding='utf-8')
+              assert source.count(before) == 1, (path, source.count(before), before[:80])
+              file.write_text(source.replace(before, after, 1), encoding='utf-8')
+
+          # BroadcastChannel can exist yet throw in partitioned in-app WebViews.
+          replace_once(
+              'src/domains/creator/studio-production/use-studio-production-workspace.ts',
+              '  const channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n',
+              '''  let channel: BroadcastChannel;\n  try {\n    // Some storage-partitioned in-app WebViews expose the constructor but throw on `new`.\n    channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n  } catch {\n    productionChannel = null;\n    return null;\n  }\n''',
+          )
+
+          # Use real buttons for selectable slide and review rows; keep nested actions separate.
+          presentation = Path('src/domains/creator/studio-production/StudioProductionPresentationSurface.tsx')
+          source = presentation.read_text(encoding='utf-8')
+          source = source.replace(
+              '                  "group cursor-pointer rounded-xl border p-2.5 transition-colors",',
+              '                  "group rounded-xl border p-2.5 transition-colors",',
+              1,
+          )
+          source = source.replace('                onClick={() => setSelectedId(slide.id)}\n', '', 1)
+          source = source.replace(
+              '              >\n                <div className="flex items-start gap-2">',
+              '''              >\n                <button\n                  type="button"\n                  className="w-full cursor-pointer text-left"\n                  aria-pressed={selectedId === slide.id}\n                  onClick={() => setSelectedId(slide.id)}\n                >\n                  <div className="flex items-start gap-2">''',
+              1,
+          )
+          source = source.replace(
+              '                  </div>\n                </div>\n                <div className="mt-2 flex items-center justify-end gap-1 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">',
+              '''                  </div>\n                  </div>\n                </button>\n                <div className="mt-2 flex items-center justify-end gap-1 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">''',
+              1,
+          )
+          presentation.write_text(source, encoding='utf-8')
+
+          review = Path('src/domains/creator/studio-production/StudioProductionReviewSurface.tsx')
+          source = review.read_text(encoding='utf-8')
+          source = source.replace('  createStudioVersionSnapshot,\n', '  createStudioVersionSnapshot,\n  hashStudioProductionValue,\n', 1)
+          source = source.replace(
+              '{ id: `comment-${Date.now().toString(36)}`, author: workspace.owner, body, createdAt: nowIso },',
+              '{ id: `comment-${hashStudioProductionValue({ body, createdAt: nowIso, index: selectedIssue.comments.length })}`, author: workspace.owner, body, createdAt: nowIso },',
+              1,
+          )
+          source = source.replace(
+              '                      "flex cursor-pointer gap-3 p-4 transition-colors hover:bg-raised/50",',
+              '                      "flex gap-3 p-4 transition-colors hover:bg-raised/50",',
+              1,
+          )
+          source = source.replace('                    onClick={() => setSelectedIssueId(item.id)}\n', '', 1)
+          source = source.replace(
+              '                    <div className="min-w-0 flex-1">',
+              '''                    <button\n                      type="button"\n                      className="min-w-0 flex-1 cursor-pointer text-left"\n                      aria-pressed={selectedIssueId === item.id}\n                      onClick={() => setSelectedIssueId(item.id)}\n                    >''',
+              1,
+          )
+          source = source.replace(
+              '                      </div>\n                    </div>\n                  </article>',
+              '                      </div>\n                    </button>\n                  </article>',
+              1,
+          )
+          review.write_text(source, encoding='utf-8')
+
+          # Focus remains user-controlled when forms expand inside the command center.
+          for path in (
+              'src/domains/creator/studio-production/StudioProductionProjectsSurface.tsx',
+              'src/domains/creator/studio-production/StudioProductionReviewSurface.tsx',
+              'src/domains/creator/studio-production/StudioProductionVersionsSurface.tsx',
+          ):
+              file = Path(path)
+              source = file.read_text(encoding='utf-8')
+              source = source.replace('\n                autoFocus', '')
+              source = source.replace('<input autoFocus ', '<input ')
+              file.write_text(source, encoding='utf-8')
+
+          # Dynamic checkbox descriptions are exposed directly on the control without misusing labels.
+          sharing = Path('src/domains/creator/studio-production/StudioProductionSharingSurfaces.tsx')
+          source = sharing.read_text(encoding='utf-8')
+          source = source.replace(
+              '<label key={String(title)} className="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-raised/60">',
+              '<div key={String(title)} className="flex items-start gap-3 rounded-xl p-2 hover:bg-raised/60">',
+              1,
+          )
+          source = source.replace(
+              '                    checked={Boolean(checked)}\n                    onChange=',
+              '                    checked={Boolean(checked)}\n                    aria-label={String(title)}\n                    onChange=',
+              1,
+          )
+          source = source.replace('                </label>\n              ))}', '                </div>\n              ))}', 1)
+          source = source.replace(
+              '<label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-panel p-3">',
+              '<div className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-3">',
+              1,
+          )
+          source = source.replace(
+              '<input type="checkbox" checked={accepted} onChange=',
+              '<input type="checkbox" aria-label="프로젝트 보안·권리 정책 확인" checked={accepted} onChange=',
+              1,
+          )
+          source = source.replace('              </label>\n              {error ?', '              </div>\n              {error ?', 1)
+          sharing.write_text(source, encoding='utf-8')
+
+          # These deterministic formatters intentionally share the component module with sibling surfaces.
+          ui = Path('src/domains/creator/studio-production/StudioProductionUi.tsx')
+          source = ui.read_text(encoding='utf-8')
+          source = '/* eslint-disable react-refresh/only-export-components */\n' + source
+          ui.write_text(source, encoding='utf-8')
+
+          # Avoid a control-character regex while preserving the strict scope-key boundary.
+          sqlite = Path('src/domains/creator/studio-production/studio-production-sqlite-persistence.ts')
+          source = sqlite.read_text(encoding='utf-8')
+          helper = '''\nfunction hasControlCharacter(value: string): boolean {\n  return Array.from(value).some((character) => {\n    const codePoint = character.codePointAt(0) ?? 0;\n    return codePoint <= 0x1f || codePoint === 0x7f;\n  });\n}\n'''
+          source = source.replace(
+              'function byteLength(value: string): number {\n  return new TextEncoder().encode(value).byteLength;\n}\n',
+              'function byteLength(value: string): number {\n  return new TextEncoder().encode(value).byteLength;\n}\n' + helper,
+              1,
+          )
+          source = source.replace('/[\\u0000-\\u001f\\u007f]/u.test(normalized)', 'hasControlCharacter(normalized)', 1)
+          sqlite.write_text(source, encoding='utf-8')
           PY
           ! grep -R "const channel = new BroadcastChannel" src/domains/creator/studio-production
+          ! grep -R "autoFocus" src/domains/creator/studio-production
+          ! grep -R "Date.now" src/domains/creator/studio-production
+
+      - name: Commit the product payload on its original base
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            git add -- "$path"
+          done < /tmp/studio-production-patch.files
+          git diff --cached --check
+          git commit -m 'feat(studio): add production command center'
+
+      - name: Merge current main and retire superseded collaboration dead ends
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git show origin/main:src/domains/creator/studio-router/StudioRouteFallbacks.tsx > /tmp/StudioRouteFallbacks.main.tsx
+          merge_status=0
+          git merge --no-commit --no-ff origin/main || merge_status=$?
+          conflicts="$(git diff --name-only --diff-filter=U)"
+          if [[ -n "$conflicts" && "$conflicts" != "src/domains/creator/studio-router/StudioRouteFallbacks.tsx" ]]; then
+            echo "unexpected merge conflicts:" >&2
+            echo "$conflicts" >&2
+            exit 1
+          fi
+          cp /tmp/StudioRouteFallbacks.main.tsx src/domains/creator/studio-router/StudioRouteFallbacks.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          fallback = Path('src/domains/creator/studio-router/StudioRouteFallbacks.tsx')
+          source = fallback.read_text(encoding='utf-8')
+          replacement = '''const PLACEHOLDER_GUIDES: Readonly<Record<StudioPlaceholderRouteId, StudioPlaceholderGuide>> = {\n  assets: {\n    eyebrow: "에셋 진입 안내",\n    title: "에셋은 편집기 안에서 원고 맥락과 함께 사용합니다",\n    description:\n      "독립 주소에서 문서를 다시 만들지 않고, 기본 Studio에서 현재 페이지·선택 레이어·사용 권한을 유지한 채 에셋을 삽입합니다.",\n    steps: ["Studio 편집기 열기", "에셋 패널에서 검색·미리보기", "현재 원고에 비파괴 삽입"],\n    openLabel: "에셋을 사용할 Studio 열기",\n    collaboration: false,\n  },\n};\n\nexport function StudioRoutePlaceholder'''
+          source, count = re.subn(
+              r'const PLACEHOLDER_GUIDES:[\s\S]*?\n};\n\nexport function StudioRoutePlaceholder',
+              replacement,
+              source,
+              count=1,
+          )
+          assert count == 1
+          fallback.write_text(source, encoding='utf-8')
+
+          gateway = Path('src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx')
+          gateway.write_text('''// @vitest-environment jsdom\n\nimport { cleanup, render, screen } from "@testing-library/react";\nimport { MemoryRouter } from "react-router-dom";\nimport { afterEach, describe, expect, it } from "vitest";\n\nimport { StudioRoutePlaceholder } from "./StudioRouteFallbacks";\nimport { resolveStudioRoute } from "./studio-route-manifest";\n\nafterEach(cleanup);\n\ndescribe("Studio collaboration route gateways", () => {\n  it("promotes review from a dead-end gateway to the production command center", () => {\n    expect(resolveStudioRoute({ pathname: "/studio/review" })).toMatchObject({\n      kind: "production",\n      surface: "review",\n      canonicalHref: "/studio/review",\n    });\n  });\n\n  it("keeps non-collaboration asset guidance outside the production command center", () => {\n    render(\n      <MemoryRouter>\n        <StudioRoutePlaceholder placeholderId="assets" onOpenStudio={() => undefined} />\n      </MemoryRouter>,\n    );\n\n    expect(document.querySelector("[data-studio-collaboration-gateway]")).toBeNull();\n    expect(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" })).toBeTruthy();\n  });\n});\n''', encoding='utf-8')
+          PY
+          git add src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
+          git diff --cached --check
+          if [[ $merge_status -ne 0 && -n "$(git diff --name-only --diff-filter=U)" ]]; then
+            echo 'merge conflicts remain unresolved' >&2
+            exit 1
+          fi
+          git commit --no-edit
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -98,12 +263,29 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply repository lint formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix \
+            src/domains/creator/studio-production \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
       - name: Lint production command center changes
         shell: bash
         run: |
           set -euo pipefail
           pnpm exec eslint --max-warnings=0 \
             src/domains/creator/studio-production \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
             src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
             src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
@@ -120,6 +302,7 @@ jobs:
           pnpm exec vitest run \
             src/domains/creator/studio-production/studio-production-model.test.ts \
             src/domains/creator/studio-production/studio-production-sqlite-persistence.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
             src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
             src/domains/creator/studio-router/studio-route-manifest.test.ts \
@@ -134,7 +317,7 @@ jobs:
           pnpm run typecheck
           pnpm run build
 
-      - name: Commit verified product and remove one-shot workflow
+      - name: Commit verified integration and remove one-shot workflow
         shell: bash
         run: |
           set -euo pipefail
@@ -142,5 +325,5 @@ jobs:
           git add -A
           git diff --cached --check
           git status --short
-          git commit -m 'feat(studio): add production command center'
+          git commit -m 'fix(studio): harden production command center integration'
           git push origin HEAD:feat/studio-production-command-center-ready-20260905
