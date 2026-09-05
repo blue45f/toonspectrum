@@ -2,13 +2,13 @@ import { ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 
 import { getAdminAdvancedCopy } from "./admin-advanced-copy";
-import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import {
   ADMIN_TAB_KEYS,
   buildAdminTabHref,
   parseAdminTab,
   type AdminTabKey,
 } from "./admin-console-model";
+import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
 import { AdminAnnouncements } from "./components/AdminAnnouncements";
@@ -142,7 +142,7 @@ export function AdminPage() {
             </div>
 
             <div className="sticky top-2 z-30 -mx-2 flex items-center gap-2 overflow-x-auto rounded-2xl border border-line bg-card/95 p-2 shadow-xl shadow-black/10 backdrop-blur-xl [scrollbar-width:thin]">
-              <nav
+              <div
                 className="inline-flex shrink-0 items-center gap-1"
                 aria-label={copy.console.navLabel}
                 role="tablist"
@@ -168,7 +168,7 @@ export function AdminPage() {
                     {tabLabels[tabKey]}
                   </button>
                 ))}
-              </nav>
+              </div>
 
               <span className="h-7 w-px shrink-0 bg-line" aria-hidden />
 
