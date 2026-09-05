@@ -7,7 +7,6 @@ import {
   Palette,
   Plus,
   RefreshCw,
-  Star,
   Trash2,
   UserCheck,
 } from "lucide-react";
@@ -21,7 +20,11 @@ import {
   updateCustomPublishedResource,
   MARKET_CUSTOM_REGISTRY_EVENT,
 } from "../models/market-custom-registry";
-import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
+import {
+  formatMarketByteSize,
+  marketKindMeta,
+  marketLicenseMeta,
+} from "../models/market-kind";
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
@@ -216,10 +219,8 @@ export function MarketManagePage() {
                     <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[0.68rem] text-fg-3">
                       <span>종류: {kind.label}</span>
                       <span>라이선스: {license.label}</span>
-                      <span className="flex items-center gap-1 text-amber-400 font-semibold">
-                        <Star className="size-3 fill-amber-400" />
-                        <span>4.9</span>
-                      </span>
+                      <span>항목: {record.entries.length}개</span>
+                      <span>manifest: {formatMarketByteSize(record.manifestByteSize)}</span>
                       <time dateTime={record.updatedAt}>
                         최근 수정: {record.updatedAt.slice(0, 10)}
                       </time>

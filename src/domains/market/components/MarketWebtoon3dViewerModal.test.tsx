@@ -24,7 +24,7 @@ describe("MarketWebtoon3dViewerModal", () => {
       />,
     );
 
-    expect(markup).toContain("황실 대연회장 3D · 3D 웹툰 인터랙티브 뷰어");
+    expect(markup).toContain("황실 대연회장 3D · 3D 렌더 모드 예시");
     expect(markup).toContain("컬러 텍스처");
     expect(markup).toContain("웹툰 은선");
     expect(markup).toContain("셀 셰이딩");
@@ -32,6 +32,6 @@ describe("MarketWebtoon3dViewerModal", () => {
     expect(markup).toContain("주간");
     expect(markup).toContain("노을");
     expect(markup).toContain("야경");
-    expect(markup).toContain("스튜디오에 배치하기");
+    expect(markup).toContain("Studio에서 확인하기");
   });
 });

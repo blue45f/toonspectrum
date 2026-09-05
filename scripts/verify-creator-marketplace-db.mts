@@ -188,6 +188,8 @@ async function main() {
         "0032_creator_marketplace_release_lifecycle.sql",
         "0033_creator_marketplace_cloud_library.sql",
         "0034_creator_marketplace_package_moderation.sql",
+        "0035_creator_marketplace_3d_asset_kind.sql",
+        "0037_creator_marketplace_3d_asset_parity.sql",
       ].map((name) =>
         readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8")
       )

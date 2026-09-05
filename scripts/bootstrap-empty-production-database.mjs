@@ -45,6 +45,7 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
   "0033_creator_marketplace_cloud_library",
   "0034_creator_marketplace_package_moderation",
   "0035_creator_marketplace_3d_asset_kind",
+  "0037_creator_marketplace_3d_asset_parity",
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",

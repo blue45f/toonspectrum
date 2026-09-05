@@ -19,6 +19,7 @@ import type {
 
 
 import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 export type RenderShadingMode =
   | "texture-color"
@@ -38,23 +39,28 @@ export interface MarketWebtoon3dViewerModalProps {
   readonly polycountGrade?: PolycountGrade;
   readonly licenseTier?: WebtoonLicenseTier;
   readonly onImportToStudio?: () => void;
+  readonly studioResourceId?: string;
 }
 
 export function MarketWebtoon3dViewerModal({
   open,
   onClose,
   assetTitle,
-  format = "glb",
-  triangleCount = 45000,
-  vertexCount = 28000,
-  polycountGrade = "optimal-webtoon",
-  licenseTier = "solo-creator",
+  format,
+  triangleCount,
+  vertexCount,
+  polycountGrade,
+  licenseTier,
   onImportToStudio,
+  studioResourceId,
 }: MarketWebtoon3dViewerModalProps) {
   const [renderMode, setRenderMode] = useState<RenderShadingMode>("texture-color");
   const [lighting, setLighting] = useState<LightingAtmosphere>("day");
   const [orbitAngle, setOrbitAngle] = useState(45);
   const [showWireframe, setShowWireframe] = useState(false);
+
+  const validTriangleCount = triangleCount !== undefined && Number.isSafeInteger(triangleCount) && triangleCount >= 0 ? triangleCount : undefined;
+  const validVertexCount = vertexCount !== undefined && Number.isSafeInteger(vertexCount) && vertexCount >= 0 ? vertexCount : undefined;
 
   if (!open) return null;
 
@@ -73,10 +79,10 @@ export function MarketWebtoon3dViewerModal({
             <Box className="size-5 text-accent" />
             <div>
               <h2 id="market-3d-viewer-title" className="text-sm font-bold text-fg">
-                {assetTitle} · 3D 웹툰 인터랙티브 뷰어
+                {assetTitle} · 3D 렌더 모드 예시
               </h2>
               <p className="text-[0.68rem] text-fg-3">
-                구매 전 은선 추출, 셀 셰이딩, 낮/밤 조명 및 스튜디오 호환성을 실시간 확인하세요
+                아래 도형은 렌더 모드를 설명하는 예시이며 이 에셋의 실제 메시가 아닙니다. 실제 모델과 지원 기능은 Studio에서 확인하세요.
               </p>
             </div>
           </div>
@@ -90,9 +96,9 @@ export function MarketWebtoon3dViewerModal({
           </button>
         </div>
 
-        {/* Viewport Simulation Area */}
+        {/* Illustrative controls, explicitly not an asset renderer. */}
         <div className="relative flex-1 bg-gradient-to-b from-neutral-900 to-neutral-950 overflow-hidden flex items-center justify-center">
-          {/* Virtual 3D Turntable Graphic */}
+          {/* Render-mode illustration; never presented as the publisher mesh. */}
           <div
             className="relative flex flex-col items-center justify-center p-8 transition-transform duration-200"
             style={{ transform: `rotateY(${orbitAngle}deg)` }}
@@ -137,8 +143,6 @@ export function MarketWebtoon3dViewerModal({
             <MarketWebtoonSpecBadge
               format={format}
               polycountGrade={polycountGrade}
-              hasLineExtraction={true}
-              isNoAiProtected={true}
               licenseTier={licenseTier}
             />
           </div>
@@ -146,8 +150,15 @@ export function MarketWebtoon3dViewerModal({
           {/* Floating HUD Bottom Info */}
           <div className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-black/70 px-3.5 py-2 text-[0.68rem] text-white/80 backdrop-blur-md">
             <div className="flex items-center gap-3 font-mono">
-              <span>Triangles: {triangleCount.toLocaleString()}</span>
-              <span>Vertices: {vertexCount.toLocaleString()}</span>
+              {validTriangleCount !== undefined ? (
+                <span>Triangles: {validTriangleCount.toLocaleString()}</span>
+              ) : null}
+              {validVertexCount !== undefined ? (
+                <span>Vertices: {validVertexCount.toLocaleString()}</span>
+              ) : null}
+              {validTriangleCount === undefined && validVertexCount === undefined ? (
+                <span>메시 통계 미제공</span>
+              ) : null}
               <span>회전각: {orbitAngle}°</span>
             </div>
           </div>
@@ -170,6 +181,7 @@ export function MarketWebtoon3dViewerModal({
                 <button
                   key={mode.id}
                   type="button"
+                  aria-pressed={renderMode === mode.id}
                   onClick={() => setRenderMode(mode.id)}
                   className={cn(
                     "rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-semibold transition-all",
@@ -190,6 +202,7 @@ export function MarketWebtoon3dViewerModal({
             <div className="flex gap-1">
               <button
                 type="button"
+                aria-pressed={lighting === "day"}
                 onClick={() => setLighting("day")}
                 className={cn(
                   "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-semibold",
@@ -201,6 +214,7 @@ export function MarketWebtoon3dViewerModal({
               </button>
               <button
                 type="button"
+                aria-pressed={lighting === "sunset"}
                 onClick={() => setLighting("sunset")}
                 className={cn(
                   "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-semibold",
@@ -212,6 +226,7 @@ export function MarketWebtoon3dViewerModal({
               </button>
               <button
                 type="button"
+                aria-pressed={lighting === "night"}
                 onClick={() => setLighting("night")}
                 className={cn(
                   "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-semibold",
@@ -230,6 +245,7 @@ export function MarketWebtoon3dViewerModal({
               <RotateCcw className="size-3.5 text-fg-3" />
               <input
                 type="range"
+                aria-label="렌더 모드 예시 회전각"
                 min={0}
                 max={360}
                 value={orbitAngle}
@@ -248,14 +264,22 @@ export function MarketWebtoon3dViewerModal({
               <span>와이어프레임</span>
             </label>
 
-            {onImportToStudio && (
+            {studioResourceId ? (
+              <Link
+                href={`/studio?installMarketResource=${encodeURIComponent(studioResourceId)}&assetMarket=community`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 font-bold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Studio에서 실제 에셋 확인
+              </Link>
+            ) : null}
+            {!studioResourceId && onImportToStudio && (
               <button
                 type="button"
                 onClick={onImportToStudio}
                 className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-bold text-on-accent shadow-sm hover:brightness-105"
               >
                 <Sparkles className="size-3.5" />
-                <span>스튜디오에 배치하기</span>
+                <span>Studio에서 확인하기</span>
               </button>
             )}
           </div>
