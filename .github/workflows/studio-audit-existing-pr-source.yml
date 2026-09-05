@@ -1,0 +1,28 @@
+name: Studio pending source
+on:
+  push:
+    branches: [feat/studio-audit-completion-20260905]
+    paths: ['.github/workflows/studio-audit-existing-pr-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 7d5f2c63b0e12bb55dfe91db0c6cf2477262c379
+          persist-credentials: false
+      - name: Archive exact pending product files
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rename"
+          git archive --format=tar HEAD src/domains/creator/studio-batch-rename.ts src/domains/creator/studio-batch-rename.test.ts src/domains/creator/StudioInspectorBatchRenameSection.tsx src/domains/creator/StudioInspectorBatchRenameSection.test.tsx > "$RUNNER_TEMP/rename/source.tar"
+          git rev-parse HEAD > "$RUNNER_TEMP/rename/revision.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-pending-rename-source
+          path: ${{ runner.temp }}/rename
+          retention-days: 3
+          if-no-files-found: error
