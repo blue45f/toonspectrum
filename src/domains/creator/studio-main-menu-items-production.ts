@@ -5,7 +5,7 @@
  * the six is implemented: Writer Room (script), the storyboard grid with its
  * shot/camera tags, the continuity checker, the vertical scroll-rhythm preview,
  * the production bible (with the promise/payoff ledger inside it) and the
- * animatic timeline. Their single door was the desktop-only 프로젝트 작업 sheet,
+ * animatic timeline. Their single door was the desktop-only 프로젝트 센터 sheet,
  * which the menubar reaches through File ▸ 프로젝트 도구 — 3 actions for commands
  * §15 rule 4 caps at 2, and 0 actions on a narrow viewport.
  *

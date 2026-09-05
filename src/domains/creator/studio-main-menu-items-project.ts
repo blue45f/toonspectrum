@@ -1,5 +1,5 @@
 /**
- * §15.3 File and Edit — the rows the 프로젝트 작업 sheet was hiding.
+ * §15.3 File and Edit — the rows the 프로젝트 센터 sheet was hiding.
  *
  * File ▸ 프로젝트 도구 opens a portal sheet that is the *only* door to named
  * version checkpoints, the publish package, the publish preflight report, the

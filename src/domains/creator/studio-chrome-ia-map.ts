@@ -184,7 +184,7 @@ export const STUDIO_CHROME_SELECT_CORE_ACTION_IDS = [
  * save & publish → import → project tools → export/share → project surfaces.
  *
  * Wave E appended the five surfaces whose only door was the desktop-only
- * 프로젝트 작업 sheet. They sit after the export loop on purpose: the export loop
+ * 프로젝트 센터 sheet. They sit after the export loop on purpose: the export loop
  * is the high-frequency path and must not move down the menu to make room.
  */
 export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [

@@ -10,7 +10,11 @@ import { useEffect, useRef, useState } from "react";
 
 import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 
+import { StudioSurfaceState } from "./StudioSurfaceState";
+
 import { cn } from "@/lib/utils";
+
+export { StudioSurfaceState };
 
 /* eslint-disable react-refresh/only-export-components -- panel tokens + class helpers shared across Studio panels */
 // ── 공용 상호작용 토큰 ────────────────────────────────────────────────────
@@ -238,7 +242,7 @@ export function StudioSectionHeader({
   );
 }
 
-/** 빈 상태를 가르치는 UI — 아이콘 + 제목 + 한 줄 안내 + 선택 액션. */
+/** 빈 상태를 가르치는 UI — 공통 상태 프리미티브의 호환 래퍼. */
 export function StudioEmptyState({
   icon,
   title,
@@ -253,40 +257,14 @@ export function StudioEmptyState({
   className?: string;
 }): ReactElement {
   return (
-    <div
-      data-studio-empty-state="true"
-      className={cn(
-        "relative overflow-hidden rounded-2xl border border-dashed border-line/80 px-4 py-8 text-center",
-        "bg-[linear-gradient(165deg,oklch(0.22_0.01_66/0.55),oklch(0.17_0.009_68/0.75))]",
-        className
-      )}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          backgroundImage:
-            "radial-gradient(oklch(0.72 0.185 42 / 0.08) 0.6px, transparent 0.7px)",
-          backgroundSize: "10px 10px",
-        }}
-      />
-      <div className="relative">
-        {icon ? (
-          <div className="mx-auto mb-2.5 grid size-12 place-items-center rounded-2xl border border-line/80 bg-card/90 text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06),0_4px_14px_oklch(0.08_0.01_70/0.25)]">
-            {icon}
-          </div>
-        ) : null}
-        <p className="text-xs font-bold tracking-tight text-fg text-pretty">{title}</p>
-        {description ? (
-          <p className="mx-auto mt-1.5 max-w-[28ch] text-[0.7rem] leading-relaxed text-fg-3 text-pretty">
-            {description}
-          </p>
-        ) : null}
-        {action ? (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div>
-        ) : null}
-      </div>
-    </div>
+    <StudioSurfaceState
+      state="empty"
+      icon={icon}
+      title={title}
+      description={description}
+      action={action}
+      className={className}
+    />
   );
 }
 
