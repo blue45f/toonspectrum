@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 3
     steps:
-      - name: Read completed core failure without rerunning or modifying checks
+      - name: Read bounded baseline and exact-head failure evidence without changing checks
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -31,16 +31,23 @@ jobs:
           def get(path):
               with opener.open(urllib.request.Request(base + path, headers=headers), timeout=30) as response:
                   return response.read()
-          run = json.loads(get('actions/runs/33953145676'))
-          assert run['head_sha'] == 'a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc'
-          job = json.loads(get('actions/jobs/101271521448'))
-          assert job['name'] == 'core' and job['run_id'] == run['id'] and job['conclusion'] == 'failure'
-          raw = get('actions/jobs/101271521448/logs')
-          text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw.decode('utf-8-sig'))
-          lines = text.splitlines()
-          failed = [line for line in lines if re.search(r'\bFAIL\s|Test Files|\bTests\s+\d+ failed', line)]
-          start = next((i for i,line in enumerate(lines) if 'Failed Tests' in line or 'Failed Suites' in line), len(lines)-150)
-          print('PRODUCT_SHA=' + run['head_sha'] + '\nLOG_SHA256=' + hashlib.sha256(raw).hexdigest())
-          print('FAILURE_HEADERS\n' + '\n'.join(failed))
-          print('FAILURE_DETAILS\n' + '\n'.join(lines[start:])[:30000])
+          targets = [
+              (33957384824, 101283067106, 'b5ca95cab60d71f6af61fbfd0ef25794dffa7018', 'test (1/3)'),
+              (33959729207, 101289380394, '8cdac2359526a33a71811d3de80f1eee73be0911', 'studio-3d-runtime'),
+          ]
+          for run_id, job_id, sha, name in targets:
+              run = json.loads(get(f'actions/runs/{run_id}'))
+              assert run['head_sha'] == sha
+              job = json.loads(get(f'actions/jobs/{job_id}'))
+              assert job['name'] == name and job['run_id'] == run_id and job['conclusion'] == 'failure'
+              raw = get(f'actions/jobs/{job_id}/logs')
+              text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw.decode('utf-8-sig'))
+              lines = text.splitlines()
+              failed = [line for line in lines if re.search(r'\bFAIL\s|Test Files|\bTests\s+\d+ failed|##\[error\]', line)]
+              start = next((i for i,line in enumerate(lines) if 'Failed Tests' in line or 'Failed Suites' in line), max(0, len(lines)-180))
+              print(f'::group::{name} on {sha}')
+              print('LOG_SHA256=' + hashlib.sha256(raw).hexdigest())
+              print('FAILURE_HEADERS\n' + '\n'.join(failed)[-12000:])
+              print('FAILURE_DETAILS\n' + '\n'.join(lines[start:])[:22000])
+              print('::endgroup::')
           PY
