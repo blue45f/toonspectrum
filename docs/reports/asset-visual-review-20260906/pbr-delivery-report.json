@@ -1,0 +1,64 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "deliveredOriginals": 65,
+  "byKind": {
+    "model": 35,
+    "surface-texture": 30
+  },
+  "byCategory": {
+    "furniture": 21,
+    "outdoor-prop": 2,
+    "food": 8,
+    "nature": 4,
+    "surface-material": 30
+  },
+  "downloadedBytes": 499292958,
+  "errors": [
+    {
+      "id": "polyhaven-decorative-book-set-01",
+      "reason": "native 2K glTF unavailable"
+    },
+    {
+      "id": "polyhaven-fabric-pattern-07",
+      "reason": "missing native PBR map:baseColor"
+    },
+    {
+      "id": "polyhaven-fabric-pattern-05",
+      "reason": "missing native PBR map:baseColor"
+    },
+    {
+      "id": "polyhaven-leather-red-02",
+      "reason": "missing native PBR map:baseColor"
+    },
+    {
+      "id": "polyhaven-book-pattern",
+      "reason": "missing native PBR map:baseColor"
+    }
+  ],
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "provider": "Poly Haven",
+  "resolution": "native 2K",
+  "notice": "Downloaded and technically validated; no artistic approval or Studio save/restore claim.",
+  "browserRenderedModels": 35,
+  "browserRejectedModels": 0,
+  "packaging": [
+    {
+      "part": 1,
+      "originals": 37,
+      "bytes": 247034706
+    },
+    {
+      "part": 2,
+      "originals": 18,
+      "bytes": 251327381
+    },
+    {
+      "part": 3,
+      "originals": 10,
+      "bytes": 152058996
+    }
+  ],
+  "acquisitionRun": 33984917046,
+  "sourceArtifact": 9975090308
+}
