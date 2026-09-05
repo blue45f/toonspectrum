@@ -1,0 +1,389 @@
+diff --git a/apps/api/src/db/migrations/0038_feedback_community.sql b/apps/api/src/db/migrations/0038_feedback_community.sql
+new file mode 100644
+index 0000000..b206a87
+--- /dev/null
++++ b/apps/api/src/db/migrations/0038_feedback_community.sql
+@@ -0,0 +1,37 @@
++-- Additive feedback community migration. Only the managed migration role runs this file.
++-- Keep historical post IDs, answers and authors; an answer is not a completed improvement.
++SELECT pg_advisory_xact_lock(82361742);
++CREATE TABLE IF NOT EXISTS public.feedback_post (
++  id text PRIMARY KEY,
++  "userId" text NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
++  category text NOT NULL DEFAULT 'question', title text NOT NULL, text text NOT NULL,
++  status text NOT NULL DEFAULT 'open', "answeredAt" timestamptz,
++  "createdAt" timestamptz NOT NULL DEFAULT now()
++);
++ALTER TABLE public.feedback_post
++  ADD COLUMN IF NOT EXISTS tags jsonb NOT NULL DEFAULT '[]'::jsonb,
++  ADD COLUMN IF NOT EXISTS hidden boolean NOT NULL DEFAULT false,
++  ADD COLUMN IF NOT EXISTS progress text NOT NULL DEFAULT 'received',
++  ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
++CREATE INDEX IF NOT EXISTS idx_feedback_post_progress_created
++  ON public.feedback_post(progress, "createdAt", id);
++CREATE INDEX IF NOT EXISTS idx_feedback_post_user_created
++  ON public.feedback_post("userId", "createdAt", id);
++CREATE TABLE IF NOT EXISTS public.feedback_reply (
++  id text PRIMARY KEY,
++  "postId" text NOT NULL REFERENCES public.feedback_post(id) ON DELETE CASCADE,
++  "parentId" text,
++  "userId" text NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
++  text text NOT NULL, "isOfficial" boolean NOT NULL DEFAULT false,
++  "createdAt" timestamptz NOT NULL DEFAULT now()
++);
++CREATE INDEX IF NOT EXISTS idx_feedback_reply_post
++  ON public.feedback_reply("postId", "createdAt");
++CREATE TABLE IF NOT EXISTS public.feedback_vote (
++  "postId" text NOT NULL REFERENCES public.feedback_post(id) ON DELETE CASCADE,
++  "userId" text NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
++  "createdAt" timestamptz NOT NULL DEFAULT now(),
++  PRIMARY KEY ("postId", "userId")
++);
++CREATE INDEX IF NOT EXISTS idx_feedback_vote_user ON public.feedback_vote("userId");
++REVOKE ALL ON TABLE public.feedback_vote FROM PUBLIC;
+ diff --git a/apps/api/src/server/feedback.ts b/apps/api/src/server/feedback.ts
+index 1e486c3..6fa655d 100644
+--- a/apps/api/src/server/feedback.ts
++++ b/apps/api/src/server/feedback.ts
+@@ -21,45 +21,30 @@ const MAX_REPLY = 1500;
+ const MAX_DEPTH = 4;
+ let ensurePromise: Promise<void> | null = null;
+ 
+-/** Additive, serialized runtime migration, also safe on databases created by the old Q&A page. */
++/** Read-only capability probe. Schema changes belong to the managed migration role. */
+ export function ensureFeedbackTables(): Promise<void> {
+-  ensurePromise ??= db.transaction(async (tx) => {
+-    await tx.execute(sql`SELECT pg_advisory_xact_lock(82361742)`);
+-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_post (
+-      id TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+-      category TEXT NOT NULL DEFAULT 'question', title TEXT NOT NULL, text TEXT NOT NULL,
+-      status TEXT NOT NULL DEFAULT 'open', "answeredAt" TIMESTAMPTZ,
+-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+-    )`);
+-    await tx.execute(sql`ALTER TABLE feedback_post
+-      ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+-      ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false,
+-      ADD COLUMN IF NOT EXISTS progress TEXT NOT NULL DEFAULT 'received',
+-      ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb`);
+-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_post_progress_created
+-      ON feedback_post(progress, "createdAt", id)`);
+-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_post_user_created
+-      ON feedback_post("userId", "createdAt", id)`);
+-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_reply (
+-      id TEXT PRIMARY KEY, "postId" TEXT NOT NULL REFERENCES feedback_post(id) ON DELETE CASCADE,
+-      "parentId" TEXT, "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+-      text TEXT NOT NULL, "isOfficial" BOOLEAN NOT NULL DEFAULT false,
+-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+-    )`);
+-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_reply_post
+-      ON feedback_reply("postId", "createdAt")`);
+-    await tx.execute(sql`CREATE TABLE IF NOT EXISTS feedback_vote (
+-      "postId" TEXT NOT NULL REFERENCES feedback_post(id) ON DELETE CASCADE,
+-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY ("postId", "userId")
+-    )`);
+-    await tx.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_vote_user ON feedback_vote("userId")`);
+-  }).catch((error: unknown) => { ensurePromise = null; throw error; });
++  ensurePromise ??= (async () => {
++    // LIMIT 0 validates relation/column access without reading user content.
++    await db.execute(sql`SELECT id, "userId", category, title, text, tags, hidden,
++      progress, metadata, status, "answeredAt", "createdAt" FROM public.feedback_post LIMIT 0`);
++    await db.execute(sql`SELECT id, "postId", "parentId", "userId", text,
++      "isOfficial", "createdAt" FROM public.feedback_reply LIMIT 0`);
++    await db.execute(sql`SELECT "postId", "userId", "createdAt" FROM public.feedback_vote LIMIT 0`);
++  })().catch((cause: unknown) => {
++    ensurePromise = null;
++    // Drizzle wraps PostgreSQL exceptions. Never expose SQL or role names to clients.
++    const wrapped = cause && typeof cause === "object" ? cause as { code?: unknown; cause?: { code?: unknown } } : null;
++    const code = wrapped?.cause?.code ?? wrapped?.code;
++    if (code === "42P01" || code === "42703" || code === "42501") {
++      throw new FeedbackError("제보 기능 업데이트를 준비하고 있어요. 잠시 후 다시 확인해 주세요.", 503);
++    }
++    throw cause;
++  });
+   return ensurePromise;
+ }
+ 
+ export class FeedbackError extends Error {
+-  constructor(message: string, readonly statusCode: 400 | 403 | 404 | 409 = 400) { super(message); this.name = "FeedbackError"; }
++  constructor(message: string, readonly statusCode: 400 | 403 | 404 | 409 | 503 = 400) { super(message); this.name = "FeedbackError"; }
+ }
+ export function parseFeedbackCategory(value: unknown): FeedbackKind { return isFeedbackKind(value) ? value : "question"; }
+ export function parseFeedbackCategoryFilter(value: unknown): FeedbackCategoryFilter { return isFeedbackKind(value) ? value : "all"; }
+diff --git a/scripts/bootstrap-empty-production-database.test.mjs b/scripts/bootstrap-empty-production-database.test.mjs
+index 6c56a0f..92956d2 100644
+--- a/scripts/bootstrap-empty-production-database.test.mjs
++++ b/scripts/bootstrap-empty-production-database.test.mjs
+@@ -384,6 +384,7 @@ describe("bootstrap SQL and repository contract", () => {
+       "0035_creator_marketplace_3d_asset_kind",
+       "0036_traffic_analytics_relations",
+       "0037_creator_marketplace_3d_asset_parity",
++      "0038_feedback_community",
+     ]);
+     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
+   });
+diff --git a/scripts/feedback-database-contract.mjs b/scripts/feedback-database-contract.mjs
+new file mode 100644
+index 0000000..ac009c4
+--- /dev/null
++++ b/scripts/feedback-database-contract.mjs
+@@ -0,0 +1,60 @@
++/** Managed feedback grants. The API itself never creates tables or indexes. */
++function roleName(role) {
++  if (typeof role !== "string" || role === "public" || !/^[a-z_][a-z0-9_]{0,62}$/u.test(role)) {
++    throw new Error("An explicit safe feedback runtime role is required");
++  }
++  return role;
++}
++const privileges = [
++  ["feedback_post", "SELECT"], ["feedback_post", "INSERT"], ["feedback_post", "UPDATE"],
++  ["feedback_reply", "SELECT"], ["feedback_reply", "INSERT"],
++  ["feedback_vote", "SELECT"], ["feedback_vote", "INSERT"], ["feedback_vote", "DELETE"],
++];
++export function buildFeedbackRuntimeAclSql(role) {
++  const quoted = `"${roleName(role)}"`;
++  return `
++REVOKE ALL ON TABLE public.feedback_vote FROM PUBLIC;
++REVOKE ALL ON TABLE public.feedback_vote FROM ${quoted};
++GRANT SELECT, INSERT, UPDATE ON TABLE public.feedback_post TO ${quoted};
++GRANT SELECT, INSERT ON TABLE public.feedback_reply TO ${quoted};
++GRANT SELECT, INSERT, DELETE ON TABLE public.feedback_vote TO ${quoted};
++`;
++}
++export function buildFeedbackCapabilitySql(role) {
++  const safeRole = roleName(role);
++  const required = privileges.map(([table, privilege]) => `('${table}', '${privilege}')`).join(",\n    ");
++  return `
++DO $feedback_capability$
++BEGIN
++  IF to_regclass('public.feedback_post') IS NULL
++    OR to_regclass('public.feedback_reply') IS NULL
++    OR to_regclass('public.feedback_vote') IS NULL THEN
++    RAISE EXCEPTION 'feedback community migration is missing';
++  END IF;
++  PERFORM id, "userId", category, title, text, tags, hidden, progress, metadata,
++    status, "answeredAt", "createdAt" FROM public.feedback_post LIMIT 0;
++  PERFORM id, "postId", "parentId", "userId", text, "isOfficial", "createdAt"
++    FROM public.feedback_reply LIMIT 0;
++  PERFORM "postId", "userId", "createdAt" FROM public.feedback_vote LIMIT 0;
++  IF EXISTS (SELECT 1 FROM (VALUES
++    ${required}
++  ) AS required(table_name, privilege_name)
++    WHERE NOT pg_catalog.has_table_privilege('${safeRole}', 'public.' || table_name, privilege_name)) THEN
++    RAISE EXCEPTION 'feedback runtime DML privileges are incomplete';
++  END IF;
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_constraint AS constraint_record
++    WHERE constraint_record.conrelid = 'public.feedback_vote'::regclass
++      AND constraint_record.contype = 'p'
++      AND ARRAY(SELECT attribute.attname::text FROM unnest(constraint_record.conkey)
++        WITH ORDINALITY AS key_column(attnum, position)
++        JOIN pg_catalog.pg_attribute AS attribute
++          ON attribute.attrelid = constraint_record.conrelid AND attribute.attnum = key_column.attnum
++        ORDER BY key_column.position) = ARRAY['postId', 'userId']::text[]
++  ) THEN
++    RAISE EXCEPTION 'feedback vote uniqueness contract is missing';
++  END IF;
++END
++$feedback_capability$;
++`;
++}
+diff --git a/scripts/feedback-database-contract.test.mjs b/scripts/feedback-database-contract.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/scripts/feedback-database-contract.test.mjs
+@@ -0,0 +1,38 @@
++import { readFileSync } from "node:fs";
++
++import { expect, test } from "vitest";
++
++import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
++
++test("feedback runtime grants stay DML-only and role-explicit", () => {
++  const sql = buildFeedbackRuntimeAclSql("feedback_runtime");
++  expect(sql).toContain('GRANT SELECT, INSERT, DELETE ON TABLE public.feedback_vote TO "feedback_runtime"');
++  expect(sql).toContain('REVOKE ALL ON TABLE public.feedback_vote FROM PUBLIC');
++  expect(sql).not.toMatch(/GRANT ALL|GRANT CREATE|GRANT.*TRUNCATE|OWNER TO/u);
++  for (const role of [undefined, "", "public", "PUBLIC", "runtime; DROP ROLE x", "x".repeat(64)]) {
++    expect(() => buildFeedbackRuntimeAclSql(role)).toThrow();
++    expect(() => buildFeedbackCapabilitySql(role)).toThrow();
++  }
++});
++test("feedback readiness checks relation shape, each privilege and composite uniqueness", () => {
++  const sql = buildFeedbackCapabilitySql("feedback_runtime");
++  for (const text of ["feedback_post", "feedback_reply", "feedback_vote", "progress", "metadata", "has_table_privilege", "ARRAY['postId', 'userId']"])
++    expect(sql).toContain(text);
++  expect(sql).not.toContain("'SELECT, INSERT'");
++});
++test("the API capability probe never runs migration DDL", () => {
++  const code = readFileSync(new URL("../apps/api/src/server/feedback.ts", import.meta.url), "utf8");
++  expect(code).not.toMatch(/CREATE TABLE|ALTER TABLE|CREATE INDEX|pg_advisory_xact_lock/u);
++  expect(code).toContain("FROM public.feedback_vote LIMIT 0");
++  expect(code).toContain('code === "42501"');
++  expect(code).toContain("503");
++});
++test("managed migration is additive and wired to migration and readiness commands", () => {
++  const sql = readFileSync(new URL("../apps/api/src/db/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
++  expect(sql).toContain("ADD COLUMN IF NOT EXISTS progress");
++  expect(sql).toContain('PRIMARY KEY ("postId", "userId")');
++  expect(sql).not.toMatch(/DROP TABLE|DELETE FROM|TRUNCATE/u);
++  for (const path of ["./run-production-database-migrations.mjs", "./verify-production-database-capabilities.mjs"]) {
++    expect(readFileSync(new URL(path, import.meta.url), "utf8")).toContain("buildFeedbackCapabilitySql(runtimeDatabaseRole)");
++  }
++});
+diff --git a/scripts/production-database-migrations.manifest b/scripts/production-database-migrations.manifest
+index ddca14b..8412fc8 100644
+--- a/scripts/production-database-migrations.manifest
++++ b/scripts/production-database-migrations.manifest
+@@ -35,3 +35,4 @@ apps/api/src/db/migrations/0034_creator_marketplace_package_moderation.sql
+ apps/api/src/db/migrations/0035_creator_marketplace_3d_asset_kind.sql
+ apps/api/src/db/migrations/0036_traffic_analytics_relations.sql
+ apps/api/src/db/migrations/0037_creator_marketplace_3d_asset_parity.sql
++apps/api/src/db/migrations/0038_feedback_community.sql
+diff --git a/scripts/run-production-database-migrations.mjs b/scripts/run-production-database-migrations.mjs
+index 54cf8bb..c9b492b 100644
+--- a/scripts/run-production-database-migrations.mjs
++++ b/scripts/run-production-database-migrations.mjs
+@@ -6,6 +6,7 @@ import { basename, dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { spawnSync } from "node:child_process";
+ 
++import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
+ import {
+   createPsqlEnvironment,
+   validateProductionDatabaseUrl,
+@@ -2364,6 +2365,8 @@ export function runProductionDatabaseMigrations({
+     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
+     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
+     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
++    psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
++    psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
+     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
+     psql(
+       databaseUrl,
+diff --git a/scripts/run-production-database-migrations.test.mjs b/scripts/run-production-database-migrations.test.mjs
+index 63a4035..006aaac 100644
+--- a/scripts/run-production-database-migrations.test.mjs
++++ b/scripts/run-production-database-migrations.test.mjs
+@@ -25,12 +25,12 @@ import {
+ 
+ test("manifest lists every numbered SQL migration exactly once in order", () => {
+   const manifest = loadMigrationManifest();
+-  expect(manifest).toHaveLength(37);
++  expect(manifest).toHaveLength(38);
+   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
+   expect(manifest.at(-1).id).toBe(
+-    "0037_creator_marketplace_3d_asset_parity",
++    "0038_feedback_community",
+   );
+-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(37);
++  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(38);
+ });
+ 
+ test("creator marketplace release migration backfills immutable SemVer order", () => {
+diff --git a/scripts/verify-feedback-community-db.mts b/scripts/verify-feedback-community-db.mts
+index 95dd4cf..68c2f87 100644
+--- a/scripts/verify-feedback-community-db.mts
++++ b/scripts/verify-feedback-community-db.mts
+@@ -1,6 +1,10 @@
+ /** Isolated PostgreSQL integration verification. Never points at production. */
+ import assert from "node:assert/strict";
+-import { writeFile, mkdir } from "node:fs/promises";
++import { execFile } from "node:child_process";
++import { writeFile, mkdir, readFile } from "node:fs/promises";
++import { promisify } from "node:util";
++
++import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
+ 
+ const rawUrl = process.env.TEST_DATABASE_URL;
+ if (!rawUrl) throw new Error("TEST_DATABASE_URL is required for the isolated feedback database.");
+@@ -18,6 +22,7 @@ function input(category = "bug", title = "브러시 오류") {
+   const value = validateFeedbackInput({ category, title, text: "필터 적용 후 브러시 입력이 멈춥니다.", tags: ["브러시"], metadata: { area: "drawing", steps: "1. 필터 적용\n2. 브러시 사용", expected: "선이 그려짐", actual: "선이 그려지지 않음" } }).value;
+   assert.ok(value); return value;
+ }
++let runtimeRole: string | null = null;
+ try {
+   // Test-only database is rebuilt to simulate an existing Q&A installation without the new columns.
+   await dbPool.query('DROP TABLE IF EXISTS feedback_vote, feedback_reply, feedback_post, "user" CASCADE');
+@@ -30,6 +35,10 @@ try {
+   )`);
+   await dbPool.query(`INSERT INTO feedback_post(id,"userId",title,text,status) VALUES ('legacy','member','기존 이용 질문','기존 답변을 보존해야 합니다.','answered')`);
+   await check("additive migration preserves legacy questions and reply state", async () => {
++    await assert.rejects(feedback.ensureFeedbackTables(), { statusCode: 503 });
++    const migration = await readFile(new URL("../apps/api/src/db/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
++    // Execute twice through the owner, never through the runtime API connection.
++    for (let index = 0; index < 2; index++) await dbPool.query(`BEGIN; ${migration} COMMIT;`);
+     await Promise.all([feedback.ensureFeedbackTables(), feedback.ensureFeedbackTables()]);
+     const legacy = await feedback.getFeedbackPost("legacy");
+     assert.equal(legacy.status, "answered"); assert.equal(legacy.progress, "received"); assert.deepEqual(legacy.metadata, {});
+@@ -111,7 +120,49 @@ try {
+     await assert.rejects(feedback.createFeedbackReply({ postId: bugId, userId: "member", text: "숨김 글 댓글", isOfficial: false }), { statusCode: 404 });
+     await assert.rejects(feedback.updateFeedbackProgress(bugId, "staff", "completed", "숨김 처리", "reviewing"), { statusCode: 404 });
+   });
++  await check("non-owning runtime can read, post, reply, vote and manage without DDL", async () => {
++    runtimeRole = `feedback_runtime_${process.pid}`;
++    await dbPool.query(`CREATE ROLE "${runtimeRole}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION`);
++    await dbPool.query(`GRANT USAGE ON SCHEMA public TO "${runtimeRole}"`);
++    await dbPool.query(`GRANT SELECT ON public."user" TO "${runtimeRole}"`);
++    await dbPool.query(buildFeedbackRuntimeAclSql(runtimeRole));
++    await dbPool.query(buildFeedbackCapabilitySql(runtimeRole));
++    const runtimeUrl = new URL(rawUrl);
++    runtimeUrl.searchParams.set("options", `-c role=${runtimeRole}`);
++    const script = `
++      const assert = (await import('node:assert/strict')).default;
++      const { dbPool } = await import('./apps/api/src/db/index.ts');
++      const feedback = await import('./apps/api/src/server/feedback.ts');
++      try {
++        const { rows } = await dbPool.query("SELECT current_user AS name, has_schema_privilege(current_user, 'public', 'CREATE') AS ddl");
++        assert.equal(rows[0].name, process.env.FEEDBACK_RUNTIME_ROLE);
++        assert.equal(rows[0].ddl, false);
++        await assert.rejects(dbPool.query('CREATE TABLE public.feedback_forbidden_ddl(id text)'), { code: '42501' });
++        await feedback.ensureFeedbackTables();
++        const value = feedback.validateFeedbackPost({ category:'request',title:'권한 분리 검증',text:'운영 권한만으로 제보합니다.' }).value;
++        assert.ok(value);
++        const post = await feedback.createFeedbackPost('member', value);
++        assert.equal((await feedback.setFeedbackVote(post.id, 'member', true)).voteCount, 1);
++        assert.equal((await feedback.setFeedbackVote(post.id, 'member', false)).voteCount, 0);
++        await feedback.createFeedbackReply({ postId:post.id,userId:'member',text:'운영 권한 댓글',isOfficial:false });
++        assert.equal((await feedback.listFeedbackReplies(post.id)).length, 1);
++        const changed = await feedback.updateFeedbackProgress(post.id, 'staff', 'reviewing', '검토 중입니다.', 'received');
++        assert.equal(changed.progress, 'reviewing');
++        console.log('Restricted runtime CRUD and operator flow passed; DDL denied.');
++      } finally { await dbPool.end(); }
++    `;
++    const child = await promisify(execFile)(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", script], {
++      cwd: process.cwd(), env: { ...process.env, DATABASE_URL: runtimeUrl.toString(), FEEDBACK_RUNTIME_ROLE: runtimeRole }, timeout: 60_000,
++    });
++    console.log(child.stdout.trim());
++  });
+   await mkdir("artifacts/feedback", { recursive: true });
+   await writeFile("artifacts/feedback/database-results.json", JSON.stringify({ status: "passed", checks, database: "isolated loopback feedback_community_test" }, null, 2));
+   console.log(`Passed ${checks.length} PostgreSQL integration scenarios.`);
+-} finally { await dbPool.end(); }
++} finally {
++  if (runtimeRole) {
++    await dbPool.query(`DROP OWNED BY "${runtimeRole}"`);
++    await dbPool.query(`DROP ROLE "${runtimeRole}"`);
++  }
++  await dbPool.end();
++}
+diff --git a/scripts/verify-production-database-capabilities.mjs b/scripts/verify-production-database-capabilities.mjs
+index 5ce6ca1..848b8b8 100644
+--- a/scripts/verify-production-database-capabilities.mjs
++++ b/scripts/verify-production-database-capabilities.mjs
+@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { spawnSync } from "node:child_process";
+ 
++import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
+ import {
+   buildAuthRuntimeAclViolationSql,
+   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+@@ -371,6 +372,7 @@ export function buildProductionCapabilityVerificationSql(
+     .join(",\n          ");
+ 
+   return `
++${buildFeedbackCapabilitySql(runtimeDatabaseRole)}
+ DO $toonspectrum_readiness$
+ DECLARE
+   missing_relations text[];
