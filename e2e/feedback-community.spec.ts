@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import type { Page } from "@playwright/test";
 import type { FeedbackComment, FeedbackEntry } from "../packages/core/src/feedback";
+import type { Page } from "@playwright/test";
 
 const fixture = (index: number, category: FeedbackEntry["category"] = "bug"): FeedbackEntry => ({
   id: `post-${index}`, category, title: ["필터 적용 후 브러시가 멈춰요", "자주 쓰는 에셋을 한곳에 모으고 싶어요", "레이어 이름 일괄 변경 기능을 요청해요"][index % 3],
