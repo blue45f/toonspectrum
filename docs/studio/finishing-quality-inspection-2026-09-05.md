@@ -59,3 +59,35 @@ The branch must pass focused quality tests, Studio menu verification, TypeScript
 A successful aggregate check is not evidence that its constituent commands ran. When repository
 CI skips steps, retain independent command logs for the same product source revision and report
 that limitation explicitly rather than describing the entire repository test suite as passed.
+
+## Reproducing the checks
+
+Use the Node and pnpm versions declared in `package.json` and install the frozen lockfile.
+The maintained `.github/workflows/studio-finishing-quality.yml` contains the explicit focused
+test list, the production bundle build and the Chromium menu/rail/export audit. It has read-only
+repository permissions and does not publish or merge changes.
+
+Run the broader static and production gates separately:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run validate:architecture
+pnpm run lint:strict
+pnpm run typecheck
+pnpm run build
+pnpm run check:studio-bundle
+pnpm exec playwright install --with-deps chromium
+pnpm run verify:studio-menus
+```
+
+The browser audit requires the built `dist` output. A timeout is a failed execution, not a
+successful result with a warning; retain its log and compare against an unchanged-code rerun
+before attributing it to a product regression or cold-start timing. Do not remove assertions to
+make the audit green.
+
+When fixing import-order warnings, preserve import bindings and every non-import statement.
+AST comparison and the relevant regression tests provide evidence that a formatting-only change
+has not silently replaced executable code. Global zero-warning lint must still run afterwards.
+
+Keep deployment quota/provider failures separate from merge validation. A successful Git merge
+does not prove that a new production deployment was accepted or became ready.
