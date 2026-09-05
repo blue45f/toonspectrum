@@ -1,0 +1,146 @@
+name: Temporary Studio production command center delivery
+
+on:
+  push:
+    branches:
+      - feat/studio-production-command-center-ready-20260905
+    paths:
+      - .github/workflows/tmp-studio-production-ready.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-production-command-center-ready
+  cancel-in-progress: true
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout clean current-main branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/studio-production-command-center-ready-20260905
+          fetch-depth: 0
+
+      - name: Configure integration identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Recover and verify the production payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin feat/studio-production-command-center-20260905
+          mkdir -p /tmp/studio-production-parts
+          for index in $(seq -w 0 10); do
+            git show "origin/feat/studio-production-command-center-20260905:.github/tmp/studio-production-patch.part${index}" \
+              > "/tmp/studio-production-parts/part${index}"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/studio-production-parts/part07')
+          value = path.read_text(encoding='utf-8')
+          assert len(value) == 6000, len(value)
+          assert value[3920] == 'a', value[3912:3929]
+          path.write_text(value[:3920] + 'i' + value[3921:], encoding='utf-8')
+          PY
+          cat /tmp/studio-production-parts/part?? > /tmp/studio-production-patch.b64
+          base64 --decode /tmp/studio-production-patch.b64 > /tmp/studio-production-patch.tar.xz
+          echo '73caa0498dc4cf8a9f7e6e4f0c76414be8ebbd7f73ee69c1efa61414cb563504  /tmp/studio-production-patch.tar.xz' | sha256sum -c -
+          xz -t /tmp/studio-production-patch.tar.xz
+          tar -tJf /tmp/studio-production-patch.tar.xz | sort > /tmp/studio-production-patch.files
+          test "$(wc -l < /tmp/studio-production-patch.files)" -eq 21
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' /tmp/studio-production-patch.files; then
+            echo 'unsafe path found in product archive' >&2
+            exit 1
+          fi
+          grep -Fx 'src/domains/creator/studio-production/StudioProductionHubPage.tsx' /tmp/studio-production-patch.files
+          grep -Fx 'src/domains/creator/studio-production/studio-production-sqlite-persistence.ts' /tmp/studio-production-patch.files
+          grep -Fx 'src/domains/creator/studio-router/studio-route-manifest.ts' /tmp/studio-production-patch.files
+          tar -xJf /tmp/studio-production-patch.tar.xz
+
+      - name: Align cross-browser channel construction with current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/domains/creator/studio-production/use-studio-production-workspace.ts')
+          source = path.read_text(encoding='utf-8')
+          before = '  const channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n'
+          after = '''  let channel: BroadcastChannel;\n  try {\n    channel = new BroadcastChannel("toonstudio-production-command-center-v1");\n  } catch {\n    productionChannel = null;\n    return null;\n  }\n'''
+          assert before in source
+          path.write_text(source.replace(before, after, 1), encoding='utf-8')
+          PY
+          ! grep -R "const channel = new BroadcastChannel" src/domains/creator/studio-production
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint production command center changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-production \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouteFallbacks.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-route-manifest.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Run focused production command center tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-production/studio-production-model.test.ts \
+            src/domains/creator/studio-production/studio-production-sqlite-persistence.test.ts \
+            src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
+            src/domains/creator/studio-router/StudioRouter.canonical-redirect.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            src/domains/creator/studio-router/studio-router-boundary.test.ts \
+            src/app/routes/app-route-title-ownership.test.ts
+
+      - name: Validate architecture, types, and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run typecheck
+          pnpm run build
+
+      - name: Commit verified product and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/tmp-studio-production-ready.yml
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m 'feat(studio): add production command center'
+          git push origin HEAD:feat/studio-production-command-center-ready-20260905
