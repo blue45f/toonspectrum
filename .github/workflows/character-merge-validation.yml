@@ -1,0 +1,70 @@
+name: Character merge validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/character-merge-validation.yml"
+      - "src/domains/creator/vrm/**"
+      - "src/domains/creator/character-shaper/**"
+      - "scripts/verify-character-contact-naturalness.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/character-merge-validation.yml"
+      - "src/domains/creator/vrm/**"
+      - "src/domains/creator/character-shaper/**"
+      - "scripts/verify-character-contact-naturalness.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: character-merge-validation-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  character-merge-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    # This lane deliberately has no CI_CORE_BYPASS conditions. The main CI
+    # currently skips its core steps; a green aggregator is not evidence that
+    # this character code was linted, typechecked, tested or built.
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check camera compiler and import rules
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/vrm/StudioVrmCameraDirector.tsx
+      - name: Verify contact naturalness against production math
+        run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
+      - name: Run character, hand, contact and framing regressions
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/vrm/studio-vrm-hand-poses.test.ts \
+            src/domains/creator/vrm/useStudioVrmPoserPoseEdit.hand.test.ts \
+            src/domains/creator/character-shaper/character-shaper-hand-glyph.test.ts \
+            src/domains/creator/vrm/studio-vrm-preview-framing.test.ts \
+            src/domains/creator/vrm/studio-vrm-secondary-hand-contact.test.ts \
+            src/domains/creator/vrm/studio-vrm-contact-refinement.test.ts \
+            src/domains/creator/vrm/studio-vrm-portrait-framing.test.ts \
+            src/domains/creator/vrm/studio-vrm-prop-rig.test.ts \
+            src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts
+      - name: Typecheck the application and API
+        run: pnpm run typecheck
+      - name: Build production assets
+        run: pnpm run build
+      - name: Verify Studio bundle budget
+        run: pnpm run check:studio-bundle
