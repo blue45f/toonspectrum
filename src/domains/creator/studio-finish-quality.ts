@@ -27,7 +27,6 @@ import type {
   BubbleEl,
   DrawEl,
   El,
-  ImageEl,
   StudioDialogueRangeFormat,
   StudioDialogueRubySpan,
   TextEl,
@@ -208,7 +207,12 @@ const PLACEHOLDER_PATTERNS: readonly RegExp[] = [
 
 const TEMPORARY_LAYER_PATTERN =
   /(?:^|[\s_[\]().-])(?:guide|reference|rough|draft|temp|note|가이드|참고|러프|임시|메모)(?:$|[\s_[\]().-])/iu;
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
+function hasControlCharacter(text: string): boolean {
+  return Array.from(text).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+  });
+}
 
 function finitePositive(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
@@ -423,7 +427,7 @@ function inspectDialogue(
       message: `최종 원고에 치환되지 않은 문구가 있습니다: ${text.trim().slice(0, 80)}`,
     });
   }
-  if (CONTROL_CHARACTER_PATTERN.test(text)) {
+  if (hasControlCharacter(text)) {
     add({
       ...location,
       code: "DIALOGUE_CONTROL_CHARACTER",
@@ -549,7 +553,7 @@ function inspectBubble(
 }
 
 function inspectImage(
-  image: ImageEl,
+  image: Extract<El, { type: "image" }>,
   add: (issue: Omit<StudioFinishQualityIssue, "id" | "fingerprint">) => void,
   location: Pick<StudioFinishQualityIssue, "pageId" | "pageIndex" | "elementId" | "elementIndex">
 ): void {
@@ -819,55 +823,56 @@ function inspectComments(
   }
 
   for (const thread of comments.threads) {
-    const owner = pageById.get(thread.anchor.pageId);
+    const anchor = thread.anchor;
+    const owner = pageById.get(anchor.pageId);
     if (!owner) {
       add({
         code: "COMMENT_PAGE_MISSING",
         severity: "error",
         category: "comments",
         title: "댓글이 삭제된 페이지를 가리킵니다",
-        message: `댓글 ${thread.id}의 페이지 ${thread.anchor.pageId}를 찾을 수 없습니다.`,
-        pageId: thread.anchor.pageId,
+        message: `댓글 ${thread.id}의 페이지 ${anchor.pageId}를 찾을 수 없습니다.`,
+        pageId: anchor.pageId,
       });
       continue;
     }
     const location = { pageId: owner.page.id, pageIndex: owner.index };
-    if (thread.anchor.type === "element") {
-      const target = owner.page.elements.find((element) => element.id === thread.anchor.elementId);
+    if (anchor.type === "element") {
+      const target = owner.page.elements.find((element) => element.id === anchor.elementId);
       if (!target) {
         add({
           ...location,
-          elementId: thread.anchor.elementId,
+          elementId: anchor.elementId,
           code: "COMMENT_TARGET_MISSING",
           severity: "error",
           category: "comments",
           title: "댓글이 삭제된 요소를 가리킵니다",
-          message: `댓글 ${thread.id}의 요소 ${thread.anchor.elementId}를 찾을 수 없습니다.`,
+          message: `댓글 ${thread.id}의 요소 ${anchor.elementId}를 찾을 수 없습니다.`,
         });
       }
-    } else if (thread.anchor.type === "frame") {
+    } else if (anchor.type === "frame") {
       const target = owner.page.elements.find(
-        (element) => element.id === thread.anchor.frameId && element.type === "frame"
+        (element) => element.id === anchor.frameId && element.type === "frame"
       );
       if (!target) {
         add({
           ...location,
-          elementId: thread.anchor.frameId,
+          elementId: anchor.frameId,
           code: "COMMENT_TARGET_MISSING",
           severity: "error",
           category: "comments",
           title: "댓글이 삭제된 컷을 가리킵니다",
-          message: `댓글 ${thread.id}의 컷 ${thread.anchor.frameId}를 찾을 수 없습니다.`,
+          message: `댓글 ${thread.id}의 컷 ${anchor.frameId}를 찾을 수 없습니다.`,
         });
       }
     } else if (
-      thread.anchor.type === "point" &&
-      (!Number.isFinite(thread.anchor.x) ||
-        !Number.isFinite(thread.anchor.y) ||
-        thread.anchor.x < 0 ||
-        thread.anchor.x > 1 ||
-        thread.anchor.y < 0 ||
-        thread.anchor.y > 1)
+      anchor.type === "point" &&
+      (!Number.isFinite(anchor.x) ||
+        !Number.isFinite(anchor.y) ||
+        anchor.x < 0 ||
+        anchor.x > 1 ||
+        anchor.y < 0 ||
+        anchor.y > 1)
     ) {
       add({
         ...location,

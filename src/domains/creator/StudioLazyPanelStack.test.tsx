@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetStudioBg3dRetainedOwnerForTests } from "./bg3d/studio-bg3d-retained-owner";
 import { StudioBg3dRetainedOwnerHost } from "./bg3d/StudioBg3dRetainedOwnerHost";
+import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
 
-import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 
 import type { ReactElement } from "react";
 

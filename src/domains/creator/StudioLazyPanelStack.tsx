@@ -9,7 +9,6 @@ import {
 } from "react";
 
 import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
-import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 import { selectWheelColors } from "./studio-color-wheel";
 import {
   StudioAiProvenancePanel,
@@ -31,6 +30,7 @@ import {
 import { pageDisplayName } from "./studio-page-meta";
 import { parseStudioProjectFile } from "./studio-project-file";
 import { normalizeStudioPublishCompliance } from "./studio-publish-compliance";
+import { StudioDocumentRuntimeContext } from "./studio-router/studio-document-runtime-context";
 import { normalizeStudioWriterRoomDocument } from "./studio-writer-room";
 import {
   StudioScrollScenarioPreviewPanelStack,
@@ -769,6 +769,8 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             onClose={() => setContinuityOpen(false)}
             issues={continuityIssues}
+            finishDocumentTitle={title}
+            finishComments={studioComments}
             pages={pages}
             currentPageId={currentPageId}
             openCommentCount={studioComments.threads.filter((thread) => !thread.resolved).length}

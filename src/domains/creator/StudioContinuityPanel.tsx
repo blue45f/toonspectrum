@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { inspectStudioQualityFinishSupplement } from "./studio-quality-finish-bridge";
 import {
   inspectStudioQuality,
   type StudioQualityCategory,
@@ -31,7 +32,9 @@ import {
   type StudioRasterInspectionProgress,
   type StudioRasterInspectionResult,
 } from "./studio-quality-raster-inspection";
+import { StudioFinishQualityView } from "./StudioFinishQualityView";
 
+import type { StudioCommentsDocument } from "./studio-comments";
 import type { StudioContinuityIssue } from "./studio-continuity";
 import type { PageState } from "./studio-page-state";
 
@@ -148,6 +151,9 @@ export interface StudioContinuityPanelProps {
   onClose: () => void;
   issues: readonly StudioContinuityIssue[];
   pages?: readonly PageState[];
+  /** Host-owned metadata enables additive rules without replacing legacy inspection. */
+  finishDocumentTitle?: string;
+  finishComments?: StudioCommentsDocument;
   currentPageId?: string;
   openCommentCount?: number;
   /** Work ID or another stable document key used only for local acknowledgements/checklist state. */
@@ -289,6 +295,8 @@ export function StudioContinuityPanel({
   onClose,
   issues,
   pages = EMPTY_PAGES,
+  finishDocumentTitle,
+  finishComments,
   currentPageId,
   openCommentCount = 0,
   documentKey,
@@ -322,16 +330,25 @@ export function StudioContinuityPanel({
 
   // A rescan is a new measurement request even when the immutable pages did not change.
   const scanInput = useMemo(() => ({ pages, epoch: scanEpoch }), [pages, scanEpoch]);
+  const finishSupplement = useMemo(() =>
+    finishDocumentTitle === undefined && finishComments === undefined ? null :
+      inspectStudioQualityFinishSupplement({
+        pages: scanInput.pages, documentTitle: finishDocumentTitle, comments: finishComments,
+      }),
+    [finishComments, finishDocumentTitle, scanInput]
+  );
   const report = useMemo(
     () =>
       inspectStudioQuality({
         pages: scanInput.pages,
         continuityIssues: issues,
         openCommentCount,
-        supplementalIssues:
-          rasterInspection?.status === "complete" ? rasterInspection.issues : [],
+        supplementalIssues: [
+          ...(finishSupplement?.issues ?? []),
+          ...(rasterInspection?.status === "complete" ? rasterInspection.issues : []),
+        ],
       }),
-    [issues, openCommentCount, scanInput, rasterInspection]
+    [issues, openCommentCount, scanInput, rasterInspection, finishSupplement]
   );
   const currentReviewKey = `${storageKey}:${report.revisionKey}`;
   const acknowledgedIssueIds = useMemo(() => new Set(
@@ -597,6 +614,20 @@ export function StudioContinuityPanel({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {finishSupplement?.detail ? (
+            <details className="border-b border-line px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-fg">
+                추가 마감 검사 상세 · 통합 판정은 검사 요약 기준
+              </summary>
+              <StudioFinishQualityView
+                result={finishSupplement.detail}
+                onSelectIssue={onSelectTarget ? (issue) => onSelectTarget({
+                  pageId: issue.pageId, elementId: issue.elementId,
+                }) : undefined}
+                onDownloadReport={() => downloadReport(report, acknowledgedIssueIds, completedManualChecks, documentKey)}
+              />
+            </details>
+          ) : null}
           <section className="border-b border-line px-4 py-4" aria-labelledby="studio-quality-summary">
             <h3 id="studio-quality-summary" className="sr-only">
               검사 요약

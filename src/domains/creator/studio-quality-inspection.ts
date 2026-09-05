@@ -7,6 +7,7 @@
  * `review` rather than silently upgraded to a pass.
  */
 
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { auditBubbleTextLegibility } from "./lettering/studio-bubble-legibility-contrast";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
@@ -20,14 +21,17 @@ import {
   resolveBubbleLineHeight,
   type BubbleTextMeasurer,
 } from "./lettering/studio-bubble-text-fit";
-import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import { MAX_FRAME_FPS, MIN_FRAME_FPS } from "./studio-frame-animation-timing";
 import {
   hasContiguousLayerGroups,
   missingLayerGroupIds,
 } from "./studio-layers";
-import { MAX_FRAME_FPS, MIN_FRAME_FPS } from "./studio-frame-animation-timing";
 import { normalizePageReviewState } from "./studio-page-review";
 
+import type {
+  StudioContinuityIssue,
+  StudioContinuityIssueCode,
+} from "./studio-continuity";
 import type {
   BubbleEl,
   DrawEl,
@@ -35,10 +39,6 @@ import type {
   FrameEl,
   TextEl,
 } from "./studio-element-model";
-import type {
-  StudioContinuityIssue,
-  StudioContinuityIssueCode,
-} from "./studio-continuity";
 import type { PageState } from "./studio-page-state";
 
 export const STUDIO_QUALITY_INSPECTION_VERSION = 1 as const;
@@ -109,6 +109,7 @@ export type StudioQualityIssueCode =
   | "PAGE_REVIEW_PENDING"
   | "APPROVED_PAGE_UNLOCKED"
   | "OPEN_EDITORIAL_COMMENTS"
+  | "FINISH_QUALITY_FINDING"
   | "CONTINUITY_ISSUE"
   | "ISSUE_LIMIT_REACHED";
 
@@ -1016,7 +1017,7 @@ function updateRevisionHash(
 export function computeStudioQualityRevisionKey(
   input: Pick<
     StudioQualityInspectionInput,
-    "pages" | "continuityIssues" | "openCommentCount"
+    "pages" | "continuityIssues" | "openCommentCount" | "supplementalIssues"
   >
 ): string {
   const hash = updateRevisionHash(
@@ -1025,6 +1026,7 @@ export function computeStudioQualityRevisionKey(
       pages: input.pages,
       continuityIssues: input.continuityIssues ?? [],
       openCommentCount: input.openCommentCount ?? 0,
+      supplementalIssues: input.supplementalIssues ?? [],
     },
     new WeakSet<object>()
   );
