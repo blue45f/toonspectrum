@@ -9,6 +9,8 @@ import {
   type Bg3dSampleSurface,
 } from "../e2e/studio-bg3d-compositor-sampler";
 
+import { compareBg3dOriginalFrames, type Bg3dComparableFrame } from "./studio-bg3d-runtime-frame-comparison";
+
 import type { Page } from "@playwright/test";
 
 const filename = "studio-bg3d-production-rotation.runtime.ts";
@@ -36,6 +38,8 @@ describe("BG3D hardware gate discovery", () => {
     expect(source).toContain("stableIntervals < 2 || settleMs > SETTLE_TIMEOUT_MS");
     expect(source).toContain("page.locator(CANVAS).screenshot()");
     expect(source).toContain("expect(referenceDelta,");
+    expect(source).toContain("await compareBg3dOriginalFrames(");
+    expect(source).not.toContain("peakDelta(current.frame, reference)");
   });
 });
 
@@ -140,5 +144,60 @@ describe("BG3D compositor sampler", () => {
       await sampler.dispose();
     }
     expect(host.detach).toHaveBeenCalledOnce();
+  });
+});
+
+describe("BG3D homogeneous original-frame comparison", () => {
+  const sampledPng = Buffer.from("sampled-original-png");
+  const referencePng = Buffer.from("locator-original-png");
+  const frame: Bg3dComparableFrame = { width: 876, height: 767, tiles: [10, 100, 250] };
+
+  it("decodes both unchanged originals with default backing even when CPU resampling differs", async () => {
+    const decode = vi.fn(async (_png: Buffer, optimized: boolean) => ({
+      ...frame, tiles: optimized ? [12.6, 100, 250] : frame.tiles,
+    }));
+    const result = await compareBg3dOriginalFrames(sampledPng, referencePng, decode);
+    expect(decode.mock.calls).toEqual([[sampledPng, false], [referencePng, false]]);
+    expect(result.peakDelta).toBe(0);
+    expect(result.reference.tiles).toEqual(frame.tiles);
+    expect(sampledPng.toString()).toBe("sampled-original-png");
+    expect(referencePng.toString()).toBe("locator-original-png");
+  });
+
+  it.each([2, 2.6, 8, 30])("preserves a genuine peak delta %s instead of hiding capture drift", async (delta) => {
+    const decode = vi.fn(async (png: Buffer) => ({
+      ...frame, tiles: png === referencePng ? [10 + delta, 100, 250] : frame.tiles,
+    }));
+    const result = await compareBg3dOriginalFrames(sampledPng, referencePng, decode);
+    expect(result.peakDelta).toBeCloseTo(delta, 10);
+    expect(result.peakDelta).toBeGreaterThanOrEqual(2);
+    expect(result.sampled.tiles).toEqual(frame.tiles);
+  });
+
+  it.each([
+    { width: 877 }, { height: 766 }, { width: 0 }, { width: NaN },
+    { tiles: [] }, { tiles: [10] }, { tiles: [10, NaN, 250] },
+    { tiles: [10, Infinity, 250] },
+  ])("rejects malformed or differently sized original frames: %j", async (patch) => {
+    const decode = vi.fn(async (png: Buffer) => png === referencePng ? { ...frame, ...patch } : frame);
+    await expect(compareBg3dOriginalFrames(sampledPng, referencePng, decode)).rejects.toThrow();
+  });
+
+  it("does not turn a blank tile set into a zero-delta match", async () => {
+    await expect(compareBg3dOriginalFrames(sampledPng, referencePng, async () => ({
+      ...frame, tiles: [],
+    }))).rejects.toThrow("empty");
+  });
+
+  it.each([1, 2])("propagates a failed decode at position %s", async (failureAt) => {
+    const failure = new Error("native PNG decode failed");
+    let calls = 0;
+    const decode = vi.fn(async () => {
+      calls += 1;
+      if (calls === failureAt) throw failure;
+      return frame;
+    });
+    await expect(compareBg3dOriginalFrames(sampledPng, referencePng, decode)).rejects.toBe(failure);
+    expect(decode).toHaveBeenCalledTimes(failureAt);
   });
 });

@@ -1,5 +1,7 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
+import { compareBg3dOriginalFrames } from "../scripts/studio-bg3d-runtime-frame-comparison";
+
 import { createBg3dCompositorSampler } from "./studio-bg3d-compositor-sampler";
 import { test } from "./studio-bg3d-runtime-diagnostics";
 
@@ -110,12 +112,13 @@ async function stableFrame(page: Page, info: TestInfo, label: string) {
       .toBeGreaterThan(4);
     expect(current.frame.dominantShare).toBeLessThan(0.99);
     // Retain both parts of the original oracle: locator screenshot AND default-backed decoding.
-    // Only the convergence sampler uses readback optimization; final cross-gesture fidelity below
-    // is calculated from these original-oracle frames, while the pointer is still down.
+    // Only the convergence sampler uses readback optimization. Re-decode BOTH original PNGs
+    // with the default backing before comparing, so resampling differences are not scene drift.
     const referencePng = await page.locator(CANVAS).screenshot();
-    const reference = await decodeFrame(page, referencePng, false);
-    const referenceDelta = peakDelta(current.frame, reference);
     await info.attach(`${label}-locator-reference.png`, { body: referencePng, contentType: "image/png" });
+    const { reference, peakDelta: referenceDelta } = await compareBg3dOriginalFrames(
+      current.png, referencePng, (png, optimized) => decodeFrame(page, png, optimized),
+    );
     expect([current.frame.width, current.frame.height]).toEqual([reference.width, reference.height]);
     expect(referenceDelta, "Direct compositor sampling must agree with the original screenshot")
       .toBeLessThan(2);
