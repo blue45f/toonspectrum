@@ -44,7 +44,7 @@ describe("BG3D modal compositor boundary", () => {
   it("keeps the keyboard-focusable close action and its original dismissal handler", () => {
     const h = host();
     render(createElement(StudioBg3dEditorModal, { h }));
-    const close = screen.getByRole("button", { name: "닫기", exact: true });
+    const close = screen.getByRole("button", { name: /^닫기$/ });
     expect(close.getAttribute("data-bg3d-initial-focus")).toBe("true");
     fireEvent.click(close);
     expect(h.requestUserClose).toHaveBeenCalledOnce();
@@ -53,7 +53,7 @@ describe("BG3D modal compositor boundary", () => {
   it("does not dismiss or expose scene editing while a capture owns the scene", () => {
     const h = host({ isCapturing: true });
     render(createElement(StudioBg3dEditorModal, { h }));
-    const close = screen.getByRole("button", { name: "닫기", exact: true }) as HTMLButtonElement;
+    const close = screen.getByRole("button", { name: /^닫기$/ }) as HTMLButtonElement;
     expect(close.disabled).toBe(true);
     fireEvent.click(close);
     expect(h.requestUserClose).not.toHaveBeenCalled();
