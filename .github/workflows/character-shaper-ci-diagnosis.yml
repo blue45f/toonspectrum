@@ -32,12 +32,14 @@ jobs:
           raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
           raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
           lines = raw.splitlines()
-          pattern = re.compile(r'\bFAIL\b|AssertionError:|Unhandled (?:Error|Rejection)|Test Files\s|\bTests\s+\d+|FATAL ERROR|heap out of memory|Process completed with exit code')
+          pattern = re.compile(r'\bFAIL\b|AssertionError:|Test Files\s|\bTests\s+\d+|FATAL ERROR|heap out of memory|##\[(?:error|warning)\]|timed out|timeout|cancel|ELIFECYCLE', re.I)
           hits = [i for i, line in enumerate(lines) if pattern.search(line)]
-          print(f'Existing core job 101289896708: {len(lines)} lines, {len(hits)} failure markers')
-          selected = set(range(max(0, len(lines)-50), len(lines)))
-          for i in hits[-30:]:
-              selected.update(range(max(0, i-1), min(len(lines), i+10)))
-          text = '\n'.join(f'{i+1}: {lines[i][:750]}' for i in sorted(selected))
-          print(text[-18000:])
+          print(f'Existing core job 101289896708: {len(lines)} lines, {len(hits)} diagnostic markers')
+          selected = set()
+          for i in hits[-35:]:
+              selected.update(range(max(0, i-3), min(len(lines), i+8)))
+          cleanup = next((i for i,line in enumerate(lines) if 'Post job cleanup.' in line), len(lines))
+          selected.update(range(max(0, cleanup-100), cleanup))
+          text = '\n'.join(f'{i+1}: {lines[i][:650]}' for i in sorted(selected))
+          print(text[-22000:])
           PY
