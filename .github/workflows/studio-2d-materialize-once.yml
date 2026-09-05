@@ -1,12 +1,15 @@
-name: Prepare and verify Studio 2D changes
+name: Finalize and verify Studio 2D changes
 on:
   push:
     branches: [feat/studio-2d-assets-quality-20260906]
     paths:
-      - 'scripts/.studio-2d-transfer/**'
+      - 'scripts/.studio-2d-transfer/finalize.py'
       - '.github/workflows/studio-2d-materialize-once.yml'
 permissions:
   contents: write
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: prepare-studio-2d-${{ github.ref }}
   cancel-in-progress: false
@@ -14,57 +17,14 @@ jobs:
   prepare:
     if: github.ref == 'refs/heads/feat/studio-2d-assets-quality-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-      - name: Materialize checked source patch and byte-identical compatibility paths
+      - name: Apply exact source fixes on the isolated feature branch
         id: materialize
-        run: |
-          mkdir -p artifacts/studio-2d
-          python3 - <<'PY'
-          import hashlib, json, lzma, pathlib
-          root=pathlib.Path('.').resolve()
-          data=b''.join((root/f'scripts/.studio-2d-transfer/part-{i}.bin').read_bytes() for i in range(4))
-          assert hashlib.sha256(data).hexdigest()=='278984962faec938860db71babd5989e8fd25126f01735016fb7e635f487daa8', 'transfer checksum mismatch'
-          payload=json.loads(lzma.decompress(data))
-          def target(name):
-              p=root/name
-              assert not pathlib.PurePosixPath(name).is_absolute() and '..' not in pathlib.PurePosixPath(name).parts
-              assert str(p.resolve()).startswith(str(root)+'/') and not p.is_symlink()
-              assert name.startswith(('src/domains/creator/studio-', 'src/domains/creator/Studio2d', 'scripts/studio-2d-', 'docs/studio-2d-')) or name=='src/domains/creator/StudioSceneToolPopoverBody.tsx'
-              return p
-          changed=[]
-          for name, expected in payload['expected'].items():
-              assert hashlib.sha256(target(name).read_bytes()).hexdigest()==expected, f'concurrent source change: {name}'
-          for name, content in payload['files'].items():
-              if name=='.github/workflows/studio-2d-asset-quality.yml':
-                  continue
-              p=target(name)
-              assert not p.exists(), f'new source already exists: {name}'
-              p.parent.mkdir(parents=True,exist_ok=True)
-              p.write_text(content)
-              changed.append(name)
-          for name, edits in payload['edits'].items():
-              p=target(name); text=p.read_text(); boundary=len(text)
-              for start,end,replacement in reversed(edits):
-                  assert 0<=start<=end<=boundary
-                  text=text[:start]+replacement+text[end:]; boundary=start
-              p.write_text(text); changed.append(name)
-          manifest=json.loads((root/'src/domains/creator/studio-2d-asset-manifest.json').read_text())
-          for asset in manifest['assets']:
-              if not asset['legacySrc']: continue
-              assert asset['src'].startswith('/assets/studio/backgrounds/') and asset['src'].endswith('.jpg')
-              assert asset['legacySrc']==asset['src'][:-4]+'.png'
-              source=root/'public'/asset['legacySrc'].lstrip('/'); dest=root/'public'/asset['src'].lstrip('/')
-              assert source.resolve().parent==root/'public/assets/studio/backgrounds'
-              assert dest.resolve().parent==source.resolve().parent and not dest.is_symlink()
-              data=source.read_bytes(); assert hashlib.sha256(data).hexdigest()==asset['sha256']
-              assert not dest.exists() or dest.read_bytes()==data
-              dest.write_bytes(data); changed.append(str(dest.relative_to(root)))
-          (root/'artifacts/studio-2d/changed-paths.json').write_text(json.dumps(changed))
-          PY
+        run: python3 scripts/.studio-2d-transfer/finalize.py
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -72,58 +32,61 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         id: install
-      - name: Audit source dimensions, formats, hashes and aliases
+      - name: Audit originals and compatibility paths
         id: audit
         continue-on-error: true
         run: |
           node scripts/studio-2d-asset-audit.mjs | tee artifacts/studio-2d/asset-audit.json
           node --test scripts/studio-2d-asset-quality.test.mjs | tee artifacts/studio-2d/file-tests.txt
-      - name: Lint focused modules and apply repository formatting rules
+      - name: Lint and format changed modules
         id: lint
         continue-on-error: true
-        run: pnpm exec eslint --fix src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx scripts/studio-2d-*.mjs 2>&1 | tee artifacts/studio-2d/lint.txt
-      - name: Execute component and filter regression tests
+        run: pnpm exec eslint --fix src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/StudioToolBeltContent.tsx src/domains/creator/StudioCuttoonEditorHost.tsx scripts/studio-2d-*.mjs 2>&1 | tee artifacts/studio-2d/lint.txt
+      - name: Execute scene, component and placement regression tests
         id: tests
         continue-on-error: true
-        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts 2>&1 | tee artifacts/studio-2d/component-tests.txt
+        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/studio-2d-source-size.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts 2>&1 | tee artifacts/studio-2d/component-tests.txt
+      - name: Full project typecheck
+        id: types
+        continue-on-error: true
+        run: pnpm run typecheck 2>&1 | tee artifacts/studio-2d/typecheck.txt
       - run: pnpm exec playwright install --with-deps chromium
         id: browser_install
         continue-on-error: true
-      - name: Browser smoke and responsive screenshots
+      - name: Actual browser interactions, keyboard scrolling and canvas placement
         id: browser
         continue-on-error: true
         run: node scripts/studio-2d-browser-smoke.mjs 2>&1 | tee artifacts/studio-2d/browser-log.txt
-      - name: Save prepared code to the same feature branch only
+      - name: Record prepared code on this feature branch only
         if: always() && steps.materialize.outcome == 'success'
         run: |
           python3 - <<'PY'
           import json,subprocess
-          paths=json.load(open('artifacts/studio-2d/changed-paths.json'))
+          paths=json.load(open('artifacts/studio-2d/finalized-paths.json'))
           subprocess.run(['git','add','--',*paths],check=True)
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -c core.hooksPath=/dev/null commit -m 'feat(studio): add verified 2D scene browsing and native source quality audit'
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): preserve original scene aspect ratio and accessible preview controls'
           git push origin HEAD:refs/heads/feat/studio-2d-assets-quality-20260906
           git rev-parse HEAD > artifacts/studio-2d/prepared-commit.txt
           python3 - <<'PY'
           import json,tarfile
-          paths=json.load(open('artifacts/studio-2d/changed-paths.json'))
+          paths=json.load(open('artifacts/studio-2d/finalized-paths.json'))
           with tarfile.open('artifacts/studio-2d/prepared-source.tar.gz','w:gz') as archive:
-              for name in paths:
-                  if not name.startswith('public/'): archive.add(name,arcname=name)
+              for name in paths: archive.add(name,arcname=name)
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: studio-2d-preparation-evidence
+          name: studio-2d-finalization-evidence
           path: artifacts/studio-2d/
           retention-days: 7
           if-no-files-found: error
-      - name: Preserve actual quality gate results
+      - name: Preserve actual quality gate outcomes
         if: always()
         env:
-          RESULTS: ${{ steps.materialize.outcome }} ${{ steps.install.outcome }} ${{ steps.audit.outcome }} ${{ steps.lint.outcome }} ${{ steps.tests.outcome }} ${{ steps.browser_install.outcome }} ${{ steps.browser.outcome }}
+          RESULTS: ${{ steps.materialize.outcome }} ${{ steps.install.outcome }} ${{ steps.audit.outcome }} ${{ steps.lint.outcome }} ${{ steps.tests.outcome }} ${{ steps.types.outcome }} ${{ steps.browser_install.outcome }} ${{ steps.browser.outcome }}
         run: |
           for result in $RESULTS; do
             test "$result" = success || exit 1
