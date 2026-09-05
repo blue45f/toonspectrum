@@ -1,0 +1,99 @@
+name: PR 730 superseded CI recovery
+
+on:
+  push:
+    branches: [maintenance/pr730-ci-queue-recovery-20260905]
+    paths: [.github/workflows/pr730-ci-queue-recovery.yml]
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+
+jobs:
+  recover-superseded-ci:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # No checkout or PR code execution. Only obsolete CI runs for this exact PR are cancelled.
+      # The latest HEAD's checks, every other PR and branch-protection settings are untouched.
+      - name: Cancel superseded CI runs for PR 730
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: 1377c972e3b7469bc73b1f957dee071e2c954cef
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = 'blue45f/toonspectrum'
+          branch = 'feat/inspector-multi-selection-pro-20260905'
+          expected = os.environ['EXPECTED_HEAD']
+          api = 'https://api.github.com/repos/' + repo
+          headers = {
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'pr730-superseded-ci-recovery',
+          }
+
+          def request(path, method='GET'):
+              req = urllib.request.Request(api + path, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      body = response.read()
+                      return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  if method == 'POST' and error.code in (409, 422):
+                      return error.code, None
+                  raise
+
+          def checked_pr():
+              _, pr = request('/pulls/730')
+              if pr['state'] != 'open' or pr['merged']:
+                  raise SystemExit('PR is no longer open; no cancellation performed.')
+              if (pr['head']['sha'] != expected or pr['head']['ref'] != branch
+                      or pr['head']['repo']['full_name'] != repo or pr['base']['ref'] != 'main'):
+                  raise SystemExit('PR identity/HEAD changed; stop instead of touching another revision.')
+              return pr
+
+          checked_pr()
+          candidates = []
+          for page in range(1, 11):
+              query = urllib.parse.urlencode({'branch': branch, 'event': 'pull_request', 'per_page': 100, 'page': page})
+              _, payload = request('/actions/workflows/ci.yml/runs?' + query)
+              runs = payload['workflow_runs']
+              for run in runs:
+                  if (run['head_branch'] == branch
+                          and run['workflow_id'] == 287571038
+                          and run['event'] == 'pull_request'
+                          and run['head_sha'] != expected
+                          and run['status'] in ('queued', 'pending', 'waiting', 'in_progress', 'requested')
+                          and any(pr['number'] == 730 for pr in run.get('pull_requests', []))):
+                      candidates.append(run)
+              if len(runs) < 100:
+                  break
+          else:
+              raise SystemExit('Pagination safety limit reached; no cancellations performed.')
+
+          cancelled = []
+          for run in candidates:
+              checked_pr()
+              code, _ = request('/actions/runs/' + str(run['id']) + '/cancel', 'POST')
+              print('Superseded run', run['id'], run['head_sha'], 'cancel response', code)
+              if code == 202:
+                  cancelled.append(run['id'])
+          print('Latest HEAD preserved:', expected)
+          print('Accepted cancellation requests:', len(cancelled))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## PR 730 queue recovery\n\n')
+              summary.write('Latest HEAD preserved: `' + expected + '`.\n\n')
+              summary.write('Cancelled superseded CI run IDs: ' + (', '.join(map(str, cancelled)) or 'none') + '.\n\n')
+              summary.write('No validation steps, status checks or branch-protection settings were changed.\n')
+          PY
