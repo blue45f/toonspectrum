@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
-      - name: Download integration check log
+      - name: Download completed final verification log
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -21,9 +21,9 @@ jobs:
           curl --fail --silent --show-error --location \
             --header "Authorization: Bearer $GH_TOKEN" \
             --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/$REPOSITORY/actions/jobs/101306325024/logs" \
+            "https://api.github.com/repos/$REPOSITORY/actions/jobs/101307960676/logs" \
             --output "$RUNNER_TEMP/shaper-core.log"
-      - name: Print bounded diagnostics (not a test result)
+      - name: Print bounded existing validation summary (not a new test result)
         shell: bash
         run: |
           python3 - <<'PY'
@@ -32,12 +32,12 @@ jobs:
           raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
           raw = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', raw)
           lines = raw.splitlines()
-          pattern = re.compile(r'\bFAIL\b|error TS\d+|AssertionError:|Test Files\s|\bTests\s+\d+|##\[(?:error|warning)\]|timed out|cancel|ELIFECYCLE', re.I)
+          pattern = re.compile(r'Test Files\s|\bTests\s+\d+|error TS\d+|##\[error\]|Run pnpm exec tsc|StudioRouteCollaborationGateway.test.tsx \(', re.I)
           hits = [i for i, line in enumerate(lines) if pattern.search(line)]
-          print(f'Integration job 101306325024: {len(lines)} lines, {len(hits)} diagnostic markers')
+          print(f'Completed final verification job 101307960676: {len(lines)} lines, {len(hits)} summary markers')
           selected = set()
-          for i in hits[-40:]:
-              selected.update(range(max(0, i-2), min(len(lines), i+6)))
-          text = '\n'.join(f'{i+1}: {lines[i][:900]}' for i in sorted(selected))
-          print(text[-20000:])
+          for i in hits:
+              selected.update(range(max(0, i-1), min(len(lines), i+4)))
+          text = '\n'.join(f'{i+1}: {lines[i][:650]}' for i in sorted(selected))
+          print(text[-6000:])
           PY
