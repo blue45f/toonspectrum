@@ -1,5 +1,5 @@
 // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — HttpOnly 쿠키 인증을 공유한다.
-import { api, HTTPError } from "@/src/infrastructure/api";
+import { api, apiPath, HTTPError } from "@/src/infrastructure/api";
 
 export interface AdminMe {
   id: string;
@@ -129,29 +129,38 @@ export class AdminApiError extends Error {
   }
 }
 
-function buildAdminHeaders(init?: RequestInit): Record<string, string> {
-  const headers: Record<string, string> = {
-    ...(init?.body ? { "Content-Type": "application/json" } : {}),
-  };
-  if (init?.headers) {
-    new Headers(init.headers).forEach((value, key) => {
-      headers[key] = value;
-    });
+function buildAdminHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+  // FormData must retain its browser-generated multipart boundary. A Blob may
+  // also carry its own media type; only JSON string bodies need our default.
+  if (typeof init?.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
   return headers;
+}
+
+function errorMessage(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const messages = value.filter(
+      (item): item is string => typeof item === "string" && item.trim().length > 0,
+    );
+    if (messages.length) return messages.map((item) => item.trim()).join("\n");
+  }
+  return undefined;
 }
 
 function toAdminApiError(error: HTTPError): AdminApiError {
   let message = `요청 실패 (${error.response.status})`;
   const data = error.data;
   if (data && typeof data === "object") {
-    const { error, message: responseMessage } = data as {
+    const { error: responseError, message: responseMessage } = data as {
       error?: unknown;
       message?: unknown;
     };
-    if (error || responseMessage) {
-      message = String(error ?? responseMessage);
-    }
+    // Nest's `error` is often just "Bad Request". Preserve actionable validation
+    // messages (including arrays) rather than hiding them behind the status text.
+    message = errorMessage(responseMessage) ?? errorMessage(responseError) ?? message;
   }
   return new AdminApiError(error.response.status, message);
 }
@@ -161,11 +170,12 @@ async function adminRaw(
   init?: RequestInit,
 ): Promise<Response> {
   try {
-    return await api.raw(`/api/admin${path}`, {
+    return await api.raw(apiPath(`/api/admin${path}`), {
       method: (init?.method ?? "GET") as never,
       cache: "no-store",
       body: init?.body as BodyInit | null | undefined,
       headers: buildAdminHeaders(init),
+      signal: init?.signal ?? undefined,
     });
   } catch (error) {
     if (error instanceof HTTPError) throw toAdminApiError(error);
@@ -181,7 +191,15 @@ export async function adminFetch<T>(
   const response = await adminRaw(path, init);
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text.trim()) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new AdminApiError(
+      502,
+      "서버 응답을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    );
+  }
 }
 
 export async function adminFetchText(
@@ -202,13 +220,17 @@ export function downloadAdminFile(
   const blob = content instanceof Blob ? content : new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.rel = "noopener";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  try {
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    // Do not revoke before the browser has consumed the download navigation.
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
 }
 
 // 표시 보조 — cents ↔ 원

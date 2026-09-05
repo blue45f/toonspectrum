@@ -16,8 +16,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+
 
 import { getAdminAdvancedCopy } from "./admin-advanced-copy";
 import { loadAdminI18nLocale } from "./admin-i18n-loader";
@@ -32,6 +34,7 @@ import {
   type MemberSort,
   type MemberStatus,
 } from "./admin-members-model";
+import { AdminRequestScope, canManageAdminMembers } from "./admin-request-scope";
 import {
   adminFetch,
   downloadAdminFile,
@@ -161,14 +164,37 @@ export function AdminMembersPage() {
 
         <AdminGateFallback gate={gate} />
         {gate.kind === "admin" && uid ? (
-          <MemberBoard uid={uid} selfId={gate.me.id} />
+          <MemberBoard
+            key={`${uid}:${gate.me.role}`}
+            uid={uid}
+            selfId={gate.me.id}
+            canManageMembers={canManageAdminMembers(gate.me.role)}
+          />
         ) : null}
       </Container>
     </AdminToastProvider>
   );
 }
 
-function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
+function MemberBoard({ uid, selfId, canManageMembers }: {
+  uid: string;
+  selfId: string;
+  canManageMembers: boolean;
+}) {
+  const [listRequests] = useState(() => new AdminRequestScope());
+  const [detailRequests] = useState(() => new AdminRequestScope());
+  const [refreshRevision, setRefreshRevision] = useState(0);
+  const actionLock = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      listRequests.cancel();
+      detailRequests.cancel();
+    };
+  }, [listRequests, detailRequests]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [meta, setMeta] = useState<MemberListResponse["meta"]>({
     limit: 25,
@@ -237,6 +263,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
 
   const loadMembers = useCallback(
     async (background = false) => {
+      const request = listRequests.begin();
       if (background) setRefreshing(true);
       else setLoading(true);
       setError(null);
@@ -245,40 +272,58 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         const response = await adminFetch<MemberListResponse>(
           `/users?${query}`,
           uid,
+          { signal: request.signal },
         );
+        if (!request.isCurrent()) return;
         const totalPages = getPageCount(response.meta.total, pageSize);
         if (page > totalPages) {
           setPage(totalPages);
           return;
         }
-        setMembers(response.items ?? []);
+        const items = response.items ?? [];
+        setMembers(items);
         setMeta(response.meta);
+        const visibleIds = new Set(items.filter(
+          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
+        ).map((member) => member.id));
+        setSelectedIds((current) => new Set(
+          [...current].filter((id) => canManageMembers && visibleIds.has(id)),
+        ));
       } catch (requestError) {
+        if (!request.isCurrent()) return;
         setError(
           requestError instanceof Error
             ? requestError.message
             : t("admin.members.empty"),
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (request.isCurrent()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [filters, page, pageSize, t, uid],
+    [canManageMembers, filters, listRequests, page, pageSize, selfId, t, uid],
   );
 
   useEffect(() => {
     void loadMembers(false);
-  }, [loadMembers]);
+    return () => listRequests.cancel();
+  }, [listRequests, loadMembers, refreshRevision]);
+
+  // Selection belongs to the visible query, never to a hidden previous page.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters, canManageMembers]);
 
   const selectableIds = useMemo(
     () =>
       members
         .filter(
-          (member) => member.id !== selfId && member.status !== "deleted",
+          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
         )
         .map((member) => member.id),
-    [members, selfId],
+    [canManageMembers, members, selfId],
   );
   const allVisibleSelected =
     selectableIds.length > 0 &&
@@ -296,6 +341,14 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   };
 
   const openAction = (action: PendingAction) => {
+    if (!canManageMembers || actionLock.current || loading || refreshing) return;
+    if (action.kind !== "bulk" && (
+      action.member.id === selfId || action.member.status === "deleted"
+    )) return;
+    if (action.kind === "bulk" && (
+      action.memberIds.length === 0 || action.memberIds.length > 200 ||
+      action.memberIds.some((id) => !selectableIds.includes(id))
+    )) return;
     setActionReason(
       action.kind === "status" && action.status === "suspended"
         ? action.member.suspensionReason ?? ""
@@ -305,13 +358,15 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   };
 
   const closeAction = () => {
-    if (actionBusy) return;
+    if (actionLock.current) return;
     setPendingAction(null);
     setActionReason("");
   };
 
   const performAction = async () => {
-    if (!pendingAction) return;
+    if (!pendingAction || !canManageMembers || actionLock.current) return;
+    // State updates are batched. The ref closes the same-render double-click gap.
+    actionLock.current = true;
     setActionBusy(true);
     try {
       if (pendingAction.kind === "role") {
@@ -323,6 +378,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             body: JSON.stringify({ role: pendingAction.role }),
           },
         );
+        if (!mounted.current) return;
         showToast(copy.members.updateSuccess);
       } else if (pendingAction.kind === "status") {
         await adminFetch(
@@ -336,6 +392,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             }),
           },
         );
+        if (!mounted.current) return;
         showToast(copy.members.updateSuccess);
       } else if (pendingAction.kind === "delete") {
         await adminFetch(
@@ -346,6 +403,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             body: JSON.stringify({ reason: actionReason }),
           },
         );
+        if (!mounted.current) return;
         setSelectedIds((current) => {
           const next = new Set(current);
           next.delete(pendingAction.member.id);
@@ -365,15 +423,20 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             }),
           },
         );
+        if (!mounted.current) return;
         setSelectedIds(new Set());
         showToast(
           interpolateCount(copy.members.bulkSuccess, response.count),
         );
       }
 
-      closeAction();
-      await loadMembers(true);
+      if (!mounted.current) return;
+      setPendingAction(null);
+      setActionReason("");
+      // Use the current render's filters, not the mutation's stale closure.
+      setRefreshRevision((value) => value + 1);
     } catch (requestError) {
+      if (!mounted.current) return;
       showToast(
         t("admin.members.title"),
         requestError instanceof Error
@@ -382,34 +445,46 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         "error",
       );
     } finally {
-      setActionBusy(false);
+      actionLock.current = false;
+      if (mounted.current) setActionBusy(false);
     }
   };
 
+  const closeDetails = () => {
+    detailRequests.cancel();
+    setDetailMember(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  };
+
   const openDetails = async (member: MemberRow) => {
+    const request = detailRequests.begin();
     setDetailMember(member);
     setDetail(null);
     setDetailError(null);
     setDetailLoading(true);
     try {
-      setDetail(
-        await adminFetch<MemberDetails>(
-          `/users/${encodeURIComponent(member.id)}/details`,
-          uid,
-        ),
+      const response = await adminFetch<MemberDetails>(
+        `/users/${encodeURIComponent(member.id)}/details`,
+        uid,
+        { signal: request.signal },
       );
+      if (request.isCurrent()) setDetail(response);
     } catch (requestError) {
+      if (!request.isCurrent()) return;
       setDetailError(
         requestError instanceof Error
           ? requestError.message
           : copy.members.emptyDetail,
       );
     } finally {
-      setDetailLoading(false);
+      if (request.isCurrent()) setDetailLoading(false);
     }
   };
 
   const exportCsv = () => {
+    if (loading || refreshing || error) return;
     try {
       const csv = buildMemberCsv(members);
       downloadAdminFile(
@@ -457,7 +532,14 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   })();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" aria-busy={loading || refreshing}>
+      {!canManageMembers ? (
+        <p role="status" className="rounded-xl border border-line bg-card/70 p-3 text-sm text-fg-2">
+          {lang === "ko"
+            ? "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요."
+            : "Read only: you can view and export members. Only administrators can change roles, account status, or delete members."}
+        </p>
+      ) : null}
       <section className="rounded-2xl border border-line bg-card/70 p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <div className="flex-1">
@@ -566,6 +648,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             <button
               type="button"
               onClick={exportCsv}
+              disabled={loading || refreshing || !!error || members.length === 0}
               className={adminButtonClass("ghost")}
             >
               <Download size={14} />
@@ -597,7 +680,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                 toggleVisibleMemberSelection(current, selectableIds),
               )
             }
-            disabled={selectableIds.length === 0}
+            disabled={!canManageMembers || actionBusy || loading || refreshing || selectableIds.length === 0}
             className="size-4 rounded border-line accent-accent"
           />
           {copy.members.selectPage}
@@ -613,11 +696,12 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             : ""}
         </span>
 
-        {selectedIds.size > 0 ? (
+        {canManageMembers && selectedIds.size > 0 ? (
           <div className="flex flex-wrap gap-2 sm:ml-auto">
             <button
               type="button"
               className={adminButtonClass("ghost")}
+              disabled={actionBusy || loading || refreshing}
               onClick={() =>
                 openAction({
                   kind: "bulk",
@@ -632,6 +716,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             <button
               type="button"
               className={adminButtonClass("danger")}
+              disabled={actionBusy || loading || refreshing}
               onClick={() =>
                 openAction({
                   kind: "bulk",
@@ -698,7 +783,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             <tbody>
               {members.map((member) => {
                 const isSelf = member.id === selfId;
-                const selectable = !isSelf && member.status !== "deleted";
+                const selectable = canManageMembers && !actionBusy && !refreshing && !isSelf && member.status !== "deleted";
                 return (
                   <tr
                     key={member.id}
@@ -788,7 +873,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                         <select
                           id={`role-${member.id}`}
                           value={member.role}
-                          disabled={isSelf || member.status === "deleted"}
+                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
                           onChange={(event) =>
                             openAction({
                               kind: "role",
@@ -815,7 +900,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                                 status: "active",
                               })
                             }
-                            disabled={isSelf}
+                            disabled={!canManageMembers || actionBusy || refreshing || isSelf}
                             className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-good/45 hover:text-good disabled:opacity-45"
                           >
                             <RotateCcw size={11} />
@@ -831,7 +916,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                                 status: "suspended",
                               })
                             }
-                            disabled={isSelf || member.status === "deleted"}
+                            disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
                             className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
                           >
                             <Ban size={11} />
@@ -842,7 +927,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                         <button
                           type="button"
                           onClick={() => openAction({ kind: "delete", member })}
-                          disabled={isSelf || member.status === "deleted"}
+                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
                           className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-bad/30 px-2 text-[0.68rem] text-bad transition-colors hover:bg-bad/10 disabled:opacity-45"
                         >
                           <Trash2 size={11} />
@@ -933,7 +1018,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                   : "accent",
               )}
               onClick={() => void performAction()}
-              disabled={actionBusy}
+              disabled={!canManageMembers || actionBusy}
             >
               {actionBusy ? copy.common.saving : copy.common.confirm}
             </button>
@@ -957,6 +1042,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             </span>
             <textarea
               value={actionReason}
+              disabled={actionBusy}
               onChange={(event) => setActionReason(event.target.value)}
               maxLength={300}
               rows={4}
@@ -972,11 +1058,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
 
       <AdminDialog
         open={detailMember != null}
-        onClose={() => {
-          setDetailMember(null);
-          setDetail(null);
-          setDetailError(null);
-        }}
+        onClose={closeDetails}
         title={copy.members.detailsTitle}
         description={
           detailMember
@@ -989,7 +1071,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
           <button
             type="button"
             className={adminButtonClass("ghost")}
-            onClick={() => setDetailMember(null)}
+            onClick={closeDetails}
           >
             {copy.common.close}
           </button>
