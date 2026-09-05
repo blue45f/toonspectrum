@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AdminApiError, adminFetch, adminFetchText } from "./admin-client";
+
+import { HTTPError } from "@/src/infrastructure/api";
+
 const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
 vi.mock("@/src/infrastructure/api", () => ({
   api: { raw },
@@ -8,9 +12,6 @@ vi.mock("@/src/infrastructure/api", () => ({
     constructor(public response: Response, public data: unknown) { super("HTTP failure"); }
   },
 }));
-
-import { AdminApiError, adminFetch, adminFetchText } from "./admin-client";
-import { HTTPError } from "@/src/infrastructure/api";
 
 describe("admin client hardening", () => {
   beforeEach(() => { raw.mockReset(); raw.mockResolvedValue(new Response('{"ok":true}')); });

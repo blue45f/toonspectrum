@@ -20,7 +20,6 @@ import {
   useState,
 } from "react";
 
-import { AdminRequestScope, canManageAdminMembers } from "./admin-request-scope";
 
 import { getAdminAdvancedCopy } from "./admin-advanced-copy";
 import { loadAdminI18nLocale } from "./admin-i18n-loader";
@@ -35,6 +34,7 @@ import {
   type MemberSort,
   type MemberStatus,
 } from "./admin-members-model";
+import { AdminRequestScope, canManageAdminMembers } from "./admin-request-scope";
 import {
   adminFetch,
   downloadAdminFile,
