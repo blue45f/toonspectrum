@@ -1,0 +1,2883 @@
+[
+  {
+    "id": "modern_arm_chair_01",
+    "kind": "model",
+    "selectionTerm": "chair",
+    "metadata": {
+      "donated": true,
+      "date_published": 1667174400,
+      "name": "Modern Arm Chair 01",
+      "categories": [
+        "furniture",
+        "seating",
+        "office"
+      ],
+      "type": 2,
+      "tags": [
+        "wood",
+        "leather",
+        "fancy",
+        "modern",
+        "chair",
+        "contemporary",
+        "wooden",
+        "lounge"
+      ],
+      "info": null,
+      "authors": {
+        "Vibrant Nordic": "All"
+      },
+      "sponsors": [
+        "3267566"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 8916,
+      "texel_density": 2929.070490134976,
+      "dimensions": [
+        820.3444182872772,
+        986.5616858005524,
+        1022.8520567470696
+      ],
+      "files_hash": "6893f36e58dddba95bd0ae1f1ef38537c1852a0b",
+      "description": "Free 8K model, modern wooden armchair with warm oak frame and plush black leather cushions - contemporary lounge styling with clean lines and wear detailing.",
+      "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+      "category": "Furniture/Seating/Chairs",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "wood",
+          "leather"
+        ]
+      },
+      "download_count": 51407,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_arm_chair_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "outdoor_table_chair_set_01",
+    "kind": "model",
+    "selectionTerm": "chair",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "outdoor",
+        "foldable",
+        "folding",
+        "seating",
+        "coffee",
+        "diner",
+        "street",
+        "urban",
+        "deli",
+        "wood",
+        "city",
+        "cafe"
+      ],
+      "name": "Outdoor Table Chair Set 01",
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "date_published": 1634083200,
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 9828,
+      "texel_density": 3205.4733996309574,
+      "dimensions": [
+        776.0046124458313,
+        1831.0473561286926,
+        858.5816156119108
+      ],
+      "files_hash": "6e1e83970732c6c4e9f2056f37cec189cc80adc5",
+      "description": "Free 4K model: compact outdoor foldable table & two chairs with wood slats and metal frame; perfect for city cafes, diners, patios and street seating.",
+      "category_id": "ef6056e6-580d-59e6-b916-a0f766d42fe8",
+      "category": "Furniture/Seating/Outdoor Seating",
+      "attributes": {
+        "condition": [
+          "clean"
+        ],
+        "material": [
+          "wood",
+          "metal"
+        ]
+      },
+      "sponsors": [
+        "20953239",
+        "26820710"
+      ],
+      "download_count": 42570,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/outdoor_table_chair_set_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "wooden_table_02",
+    "kind": "model",
+    "selectionTerm": "table",
+    "metadata": {
+      "donated": true,
+      "type": 2,
+      "tags": [
+        "wooden",
+        "worn",
+        "village",
+        "rural",
+        "natural",
+        "simple"
+      ],
+      "name": "Wooden Table 02",
+      "categories": [
+        "furniture",
+        "table"
+      ],
+      "authors": {
+        "Serhii Khromov": "All"
+      },
+      "date_published": 1630540800,
+      "sponsors": [
+        "3267566"
+      ],
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 196,
+      "texel_density": 2299.708768124882,
+      "dimensions": [
+        1134.41663980484,
+        706.0248255729675,
+        799.5428870490286
+      ],
+      "files_hash": "5d6fb15377acb8e23175454e33d2d38bd3a340d2",
+      "description": "Free 4K model. Simple wooden table with warm brown grain, worn edges, light scuffs and varnished sheen - rectangular top on four straight legs.",
+      "category_id": "dfe0e21f-ebb5-57e6-b76e-1b2c58bae1a3",
+      "category": "Furniture/Tables/Dining Tables",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "wood"
+        ]
+      },
+      "download_count": 61163,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_table_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "tea_set_01",
+    "kind": "model",
+    "selectionTerm": "table",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "antique",
+        "tea",
+        "cup",
+        "english",
+        "ornate",
+        "vintage",
+        "floral",
+        "decorative",
+        "ceramic",
+        "food",
+        "coffee",
+        "victorian"
+      ],
+      "name": "Tea Set 01",
+      "categories": [
+        "props",
+        "dishes"
+      ],
+      "date_published": 1636070400,
+      "sponsors": [
+        "66627515"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 40296,
+      "texel_density": 10027.140686194824,
+      "dimensions": [
+        918.4822738170624,
+        483.876571059227,
+        164.99304870376363
+      ],
+      "files_hash": "56e8ed17e683a9335871e8e8ad9a444ba44e6c1c",
+      "description": "Free 8K model of an antique Victorian English ceramic tea set with ornate floral decals, gold trim, teapot, cups, saucers, perfect as decorative props and dishes.",
+      "authors": {
+        "James Ray Cock": "texturing",
+        "Rico Cilliers": "modeling",
+        "Jurita Burger": "graphic design"
+      },
+      "category_id": "fa8c9a42-0ea9-51d5-8cb9-734e1d7b9212",
+      "category": "Food & Kitchen/Tableware/Tea & Coffee Sets",
+      "attributes": {
+        "material": [
+          "ceramic",
+          "metal"
+        ],
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 52949,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/tea_set_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "potted_plant_02",
+    "kind": "model",
+    "selectionTerm": "potted",
+    "metadata": {
+      "date_published": 1628208000,
+      "sponsors": [
+        "78546118"
+      ],
+      "name": "Potted Plant 02",
+      "categories": [
+        "decorative",
+        "plants",
+        "potted plants",
+        "nature"
+      ],
+      "type": 2,
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "tags": [
+        "potplant",
+        "plant",
+        "pot",
+        "vase",
+        "medium",
+        "leaf",
+        "green",
+        "terracotta"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 69806,
+      "texel_density": 10185.839275915265,
+      "dimensions": [
+        701.1570334434509,
+        657.3865860700607,
+        841.1787391305552
+      ],
+      "files_hash": "155661c96a28b9eb143e866daeb41f5a076d6677",
+      "description": "Free 8K model. Realistic terracotta pot with weathered rim, textured soil, and variegated green, heart-shaped leaves with pronounced veins.",
+      "category_id": "3dde8a0d-8ee9-5e81-85c4-3251ec4a5d88",
+      "category": "Nature/Plants/Potted Plants",
+      "attributes": {
+        "condition": [
+          "weathered"
+        ],
+        "material": [
+          "ceramic"
+        ]
+      },
+      "download_count": 107500,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/potted_plant_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "potted_plant_04",
+    "kind": "model",
+    "selectionTerm": "potted",
+    "metadata": {
+      "date_published": 1623767629,
+      "name": "Potted Plant 04",
+      "categories": [
+        "decorative",
+        "plants",
+        "potted plants",
+        "succulent",
+        "nature"
+      ],
+      "type": 2,
+      "tags": [
+        "cactus",
+        "aloe",
+        "succulent",
+        "potplant",
+        "small",
+        "pot",
+        "plant",
+        "decor"
+      ],
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "sponsors": [
+        "78546118"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 6097,
+      "texel_density": 13467.404038911603,
+      "dimensions": [
+        170.27407884597778,
+        185.9453096985817,
+        267.5964875961654
+      ],
+      "files_hash": "c71ad499bc2ad1a95b689fc8895447eff788408b",
+      "description": "Free 8K potted succulent model - small zebra haworthia in a weathered ceramic pot. Realistic textures and natural detail; ideal for interior decor scenes.",
+      "category_id": "3dde8a0d-8ee9-5e81-85c4-3251ec4a5d88",
+      "category": "Nature/Plants/Potted Plants",
+      "attributes": {
+        "condition": [
+          "weathered"
+        ],
+        "material": [
+          "ceramic"
+        ]
+      },
+      "download_count": 86237,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/potted_plant_04.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "street_lamp_01",
+    "kind": "model",
+    "selectionTerm": "lamp",
+    "metadata": {
+      "donated": true,
+      "name": "Street Lamp 01",
+      "type": 2,
+      "authors": {
+        "Josh Dean": "All"
+      },
+      "info": null,
+      "date_published": 1697760000,
+      "categories": [
+        "lighting",
+        "industrial",
+        "collection: hidden_alley"
+      ],
+      "tags": [
+        "street",
+        "road",
+        "light",
+        "lamppost",
+        "outdoor",
+        "pole",
+        "sidewalk",
+        "night",
+        " urban",
+        "city"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 30610,
+      "texel_density": 3976.4525897344943,
+      "dimensions": [
+        704.3362259864807,
+        386.49316132068634,
+        3870.5554008483887
+      ],
+      "sponsors": [
+        "7934315"
+      ],
+      "files_hash": "002d697fa195d73f627e82804612208853212519",
+      "description": "Free 8K model: ornate cast-iron street lamp with glass panes, exposed bulb, weathered black finish and detailed base, finial and mounting hardware.",
+      "category_id": "ca8e62db-af7b-55a5-b668-48f0f26a1c16",
+      "category": "Lighting/Street & Outdoor/Street Lamps",
+      "collections": [
+        "hidden_alley"
+      ],
+      "attributes": {
+        "condition": [
+          "weathered"
+        ],
+        "material": [
+          "metal",
+          "glass"
+        ]
+      },
+      "download_count": 31207,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/street_lamp_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "modern_ceiling_lamp_01",
+    "kind": "model",
+    "selectionTerm": "lamp",
+    "metadata": {
+      "type": 2,
+      "name": "Modern Ceiling Lamp 01",
+      "categories": [
+        "lighting"
+      ],
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "date_published": 1623767623,
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 5602,
+      "texel_density": 7075.021821808576,
+      "dimensions": [
+        431.6493272781372,
+        431.6607564687729,
+        951.5514969825745
+      ],
+      "files_hash": "d324ea2a3c480145e3cf8beca5ec9c408b257dbb",
+      "tags": [
+        "lighting",
+        "light",
+        "modern",
+        "glass",
+        "round",
+        "hanging",
+        "hanging lamp",
+        "ceiling lamp",
+        "decorative lighting",
+        "modern decor",
+        "interior design"
+      ],
+      "description": "Free 8K model of a modern hanging ceiling lamp - frosted glass globe with brushed metal fittings, clean round minimalist design perfect for modern interiors.",
+      "sponsors": [
+        "7899208",
+        "84390067"
+      ],
+      "category_id": "7dd2cb93-3ec2-5d14-853c-45c93d9ce1a3",
+      "category": "Lighting/Ceiling/Pendant Lights",
+      "attributes": {
+        "condition": [
+          "clean"
+        ],
+        "material": [
+          "glass",
+          "metal"
+        ]
+      },
+      "download_count": 29029,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_ceiling_lamp_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "sofa_02",
+    "kind": "model",
+    "selectionTerm": "sofa",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "wood",
+        "furniture",
+        "chair",
+        "prop",
+        "couch",
+        "leather",
+        "fabric"
+      ],
+      "date_published": 1593521418,
+      "name": "Sofa 02",
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "authors": {
+        "Kirill Sannikov": "All"
+      },
+      "sponsors": [
+        "9716107"
+      ],
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 2728,
+      "texel_density": 1389.082945945206,
+      "dimensions": [
+        1807.1673512458801,
+        817.7513778209686,
+        709.4888985157013
+      ],
+      "files_hash": "d7e2bb41e7bca3c320b837961bd7f71a064b6fe9",
+      "description": "Free 4K model of a tufted leather sofa with carved wood frame - elegant vintage couch/prop with realistic leather and fabric cushions.",
+      "category_id": "a995f351-c031-54f6-b317-dc5928df17a3",
+      "category": "Furniture/Seating/Sofas & Couches",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "leather",
+          "wood",
+          "fabric"
+        ]
+      },
+      "download_count": 84256,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/sofa_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "sofa_03",
+    "kind": "model",
+    "selectionTerm": "sofa",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "vintage",
+        "chair",
+        "couch",
+        "seat",
+        "fancy",
+        "mansion",
+        "manor",
+        "victorian",
+        "antique",
+        "leather"
+      ],
+      "name": "Sofa 03",
+      "categories": [
+        "furniture",
+        "seating"
+      ],
+      "authors": {
+        "Fran Calvente": "All"
+      },
+      "date_published": 1632441600,
+      "sponsors": [
+        "9716107"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 8004,
+      "texel_density": 2473.260796497094,
+      "dimensions": [
+        2731.17733001709,
+        925.0842034816742,
+        1118.2640366605483
+      ],
+      "files_hash": "6304a0e5c6e96371ba5b427ce5baa763f1405e2c",
+      "description": "Free 8K model of a vintage Victorian leather sofa with carved wooden frame, scrolled arms, patterned fringe cushions and rich antique brown finish.",
+      "category_id": "a995f351-c031-54f6-b317-dc5928df17a3",
+      "category": "Furniture/Seating/Sofas & Couches",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "leather",
+          "wood",
+          "fabric"
+        ]
+      },
+      "download_count": 56410,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/sofa_03.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "decorative_book_set_01",
+    "kind": "model",
+    "selectionTerm": "book",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "bookshelf",
+        "books",
+        "reading",
+        "library",
+        "collection"
+      ],
+      "name": "Decorative Book Set 01",
+      "categories": [
+        "props",
+        "decorative",
+        "books"
+      ],
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "date_published": 1625156355,
+      "sponsors": [
+        "44302755",
+        "9910225"
+      ],
+      "info": "These books are intended to be used as environment props in a medium to close range.\\n\\nThere are 87 unique and original cover designs, all [created by our community](https://blog.polyhaven.com/book-magazine-cover-design-contest/). The covers are also licensed as [CC0](https://polyhaven.com/license).\\n\\nAuthor credits for each design can be seen by hovering over the thumbnails to the left.\\n\\nThe customizable shader allows you to adjust the damage and age of each book independently. For this reason a GLTF version is not currently available.",
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 112560,
+      "texel_density": 14440.679481690548,
+      "dimensions": [
+        2505.232434719801,
+        321.111761033535,
+        285.6543071102351
+      ],
+      "files_hash": "17b60199f281591c470612a06a05afa38780b4eb",
+      "description": "Free model - a realistic decorative book set with varied paperback and hardcover spines, colors and sizes. Ideal for bookshelves, libraries, and scene dressing. All covers are CC0 and free to use.",
+      "category_id": "69489d99-3ce8-5187-8be1-9a7ef5cdaa94",
+      "category": "Office & Stationery/Books & Documents/Books",
+      "attributes": {
+        "condition": [
+          "clean"
+        ],
+        "material": [
+          "paper",
+          "fabric"
+        ]
+      },
+      "download_count": 65716,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/decorative_book_set_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "book_encyclopedia_set_01",
+    "kind": "model",
+    "selectionTerm": "book",
+    "metadata": {
+      "date_published": 1623767600,
+      "sponsors": [
+        "44302755"
+      ],
+      "name": "Book Encyclopedia Set 01",
+      "categories": [
+        "props",
+        "decorative",
+        "books"
+      ],
+      "type": 2,
+      "tags": [
+        "bookshelf",
+        "books",
+        "library",
+        "reading",
+        "encyclopedia",
+        "set"
+      ],
+      "authors": {
+        "John Malcolm": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 67306,
+      "texel_density": 15321.204426492131,
+      "dimensions": [
+        551.2974057346582,
+        163.06233406066895,
+        237.41818653931634
+      ],
+      "files_hash": "e9912207a0e5af455662c910d23d34ccbabb26ac",
+      "description": "Free 8K set of vintage leather-bound encyclopedia volumes with gold-embossed spines, alphabetic labels and realistic wear, warm brown tones.",
+      "category_id": "69489d99-3ce8-5187-8be1-9a7ef5cdaa94",
+      "category": "Office & Stationery/Books & Documents/Books",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "leather",
+          "paper"
+        ]
+      },
+      "download_count": 46820,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/book_encyclopedia_set_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "wooden_bowl_01",
+    "kind": "model",
+    "selectionTerm": "bowl",
+    "metadata": {
+      "donated": true,
+      "type": 2,
+      "tags": [
+        "bowl",
+        "wooden",
+        "carved",
+        "fruit",
+        "fruitbowl",
+        "decoration"
+      ],
+      "name": "Wooden Bowl 01",
+      "categories": [
+        "props",
+        "decorative",
+        "dishes"
+      ],
+      "authors": {
+        "Oliver Harries": "All"
+      },
+      "date_published": 1628553600,
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 14122,
+      "texel_density": 14009.285372655248,
+      "dimensions": [
+        313.08163702487946,
+        309.1423809528351,
+        93.69255532510579
+      ],
+      "files_hash": "ff38f8071c92479217e80fabee05cb78ca6ef1a0",
+      "description": "Free 8K model - hand-carved, rustic wooden bowl with irregular, worn rim, smooth shallow interior and rich aged grain and patina.",
+      "category_id": "2e20c653-c7cf-5e53-bb6b-378fa9ad5722",
+      "category": "Food & Kitchen/Tableware/Bowls",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "wood"
+        ]
+      },
+      "download_count": 14718,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bowl_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "wooden_bowl_02",
+    "kind": "model",
+    "selectionTerm": "bowl",
+    "metadata": {
+      "name": "Wooden Bowl 02",
+      "categories": [
+        "props",
+        "decorative",
+        "dishes"
+      ],
+      "type": 2,
+      "tags": [
+        "antique",
+        "vintage",
+        "old",
+        "wooden",
+        "ornate",
+        "traditional",
+        "fruitbowl",
+        "rustic decor",
+        "home decor"
+      ],
+      "authors": {
+        "Kuutti Siitonen": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 4666,
+      "date_published": 1721952000,
+      "texel_density": 30356.62414607518,
+      "dimensions": [
+        130.71347028017044,
+        124.53967705368996,
+        73.09794479806442
+      ],
+      "files_hash": "203f860d0142d73da28bfd91a7a982532caf87ee",
+      "description": "Free 8K 3D model of a wooden bowl with warm honey-brown patina, irregular carved rim, rich burl grain and worn antique surface with rustic, ornate character.",
+      "category_id": "2e20c653-c7cf-5e53-bb6b-378fa9ad5722",
+      "category": "Food & Kitchen/Tableware/Bowls",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "wood"
+        ]
+      },
+      "download_count": 3781,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bowl_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "wine_barrel_01",
+    "kind": "model",
+    "selectionTerm": "barrel",
+    "metadata": {
+      "type": 2,
+      "tags": [
+        "barrel",
+        "wine",
+        "celler",
+        "old",
+        "worn",
+        "grape",
+        "farmhouse",
+        "farm"
+      ],
+      "date_published": 1623767646,
+      "sponsors": [
+        "3267566"
+      ],
+      "name": "Wine Barrel 01",
+      "categories": [
+        "containers"
+      ],
+      "authors": {
+        "James Ray Cock": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "polycount": 10820,
+      "texel_density": 2580.2600580932635,
+      "dimensions": [
+        741.9015169143677,
+        756.035715341568,
+        871.2633550167084
+      ],
+      "files_hash": "943d486d1d003b1f56157522fd5382e24ab4bf07",
+      "description": "Free 8K wine barrel model with worn oak staves, weathered metal hoops and bung hole - high-detail farmhouse/cellar prop perfect for rustic farm scenes.",
+      "category_id": "fb26976a-7974-5a13-bbc8-05494b04962a",
+      "category": "Containers & Storage/Barrels & Drums/Wooden Barrels",
+      "attributes": {
+        "condition": [
+          "worn"
+        ],
+        "material": [
+          "wood",
+          "metal"
+        ]
+      },
+      "download_count": 25283,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wine_barrel_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "barrel_03",
+    "kind": "model",
+    "selectionTerm": "barrel",
+    "metadata": {
+      "donated": true,
+      "type": 2,
+      "tags": [
+        "industrial",
+        "barrel",
+        "oil",
+        "fuel",
+        "truck",
+        "painted",
+        "blue"
+      ],
+      "name": "Barrel 03",
+      "categories": [
+        "industrial",
+        "containers"
+      ],
+      "authors": {
+        "Serhii Khromov": "All"
+      },
+      "date_published": 1632268800,
+      "sponsors": [
+        "20953239"
+      ],
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 1473,
+      "texel_density": 2086.101841193247,
+      "dimensions": [
+        633.943498134613,
+        638.5995149612427,
+        930.4736243899824
+      ],
+      "files_hash": "c57f576af2df8ce2cfefe1190365213b5cb4f1ea",
+      "description": "Free 4K model: weathered blue painted steel barrel with subtle rust, dents, scuffs and detailed surface imperfections; industrial oil/fuel container.",
+      "category_id": "0348a0e9-773f-5146-9dd0-0d34cbdfee62",
+      "category": "Containers & Storage/Barrels & Drums/Metal Drums",
+      "attributes": {
+        "condition": [
+          "weathered"
+        ],
+        "material": [
+          "steel"
+        ]
+      },
+      "download_count": 21511,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/barrel_03.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "modular_street_seating",
+    "kind": "model",
+    "selectionTerm": "bench",
+    "metadata": {
+      "donated": true,
+      "name": "Modular Street Seating",
+      "type": 2,
+      "authors": {
+        "Stuart Attenborrow": "All"
+      },
+      "info": null,
+      "date_published": 1694131200,
+      "categories": [
+        "furniture",
+        "seating",
+        "collection: hidden_alley"
+      ],
+      "tags": [
+        "chair",
+        "outdoor",
+        "urban",
+        "cityscape",
+        "contemporary",
+        "bench",
+        "city",
+        "infrastructure"
+      ],
+      "sponsors": [
+        "103111458"
+      ],
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 25156,
+      "texel_density": 2238.205081743733,
+      "dimensions": [
+        4339.9999141693115,
+        770.3700959682465,
+        950.000050743509
+      ],
+      "files_hash": "95d5a9ba8bf29d4db6c9089297b8bdb920994f6d",
+      "description": "Free 4K modular street seating: contemporary urban bench kit with weathered metal supports and wooden slats, straight and curved interchangeable modules.",
+      "category_id": "c7642d58-13d1-5289-844b-dd12b1455a27",
+      "category": "Furniture/Seating/Benches",
+      "collections": [
+        "hidden_alley"
+      ],
+      "attributes": {
+        "condition": [
+          "weathered"
+        ],
+        "material": [
+          "metal",
+          "wood"
+        ]
+      },
+      "download_count": 7122,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modular_street_seating.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "bench_vice_01",
+    "kind": "model",
+    "selectionTerm": "bench",
+    "metadata": {
+      "donated": true,
+      "date_published": 1671580800,
+      "name": "Bench Vice 01",
+      "type": 2,
+      "info": null,
+      "authors": {
+        "Yann Kervran": "Rigging",
+        "Antanas Kep": "Modeling & Texturing"
+      },
+      "categories": [
+        "tools",
+        "industrial",
+        "rigged",
+        "collection: the_shed"
+      ],
+      "tags": [
+        "workshop",
+        "garage",
+        "used",
+        "metal",
+        "old",
+        "shed",
+        "woodwork"
+      ],
+      "max_resolution": [
+        4096,
+        4096
+      ],
+      "polycount": 2864,
+      "texel_density": 5889.761471990103,
+      "dimensions": [
+        200.48236846923828,
+        395.7868218421936,
+        271.6780751943588
+      ],
+      "files_hash": "e1b894759ca8b4ed6359bd7503a34c974494a620",
+      "description": "Free 4K bench vice model with worn, rusty metal, realistic scuffs and grime; rigged jaw - ideal for workshop, garage, or industrial/shed scenes.",
+      "category_id": "770e3239-035e-5fad-a8b5-fedeb6c26b7f",
+      "category": "Tools & Equipment/Workshop Equipment/Vices & Clamps",
+      "collections": [
+        "the_shed"
+      ],
+      "attributes": {
+        "condition": [
+          "rusted"
+        ],
+        "material": [
+          "metal"
+        ],
+        "rigged": true
+      },
+      "download_count": 6882,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/bench_vice_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "plywood",
+    "kind": "surface-texture",
+    "selectionTerm": "wood",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "clean",
+        "even",
+        "smooth",
+        "flat",
+        "continuous",
+        "consistent"
+      ],
+      "date_published": 1592792935,
+      "name": "Plywood",
+      "categories": [
+        "wood",
+        "clean",
+        "man made",
+        "natural",
+        "raw wood"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "dimensions": [
+        499.999940395355,
+        499.999940395355
+      ],
+      "sponsors": [
+        "42579608",
+        "128081732"
+      ],
+      "files_hash": "71277f7973f476845a1464810f133500691c2e43",
+      "description": "Free 8K plywood texture, light warm-brown with smooth, even, continuous linear grain and a flat, low-sheen raw wood surface.",
+      "category_id": "58eac6a9-624e-51cc-a1f1-91a5cd4f56af",
+      "category": "Wood/Engineered Wood/Plywood",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "clean"
+        ],
+        "origin": "man_made"
+      },
+      "download_count": 730106,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/plywood.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "laminate_floor_02",
+    "kind": "surface-texture",
+    "selectionTerm": "wood",
+    "metadata": {
+      "date_published": 1669680000,
+      "name": "Laminate Floor 02",
+      "categories": [
+        "floor",
+        "man made",
+        "indoor",
+        "clean",
+        "wood"
+      ],
+      "type": 1,
+      "info": null,
+      "authors": {
+        "Dario Barresi": "Processing",
+        "Charlotte Baglioni": "photography"
+      },
+      "tags": [
+        "even",
+        "flat",
+        "wooden",
+        "floor",
+        "laminate",
+        "smooth",
+        "tiles",
+        "brown",
+        "wood",
+        "planks"
+      ],
+      "dimensions": [
+        1699.9999284744263,
+        1700.0000476837158
+      ],
+      "sponsors": [
+        "78546118"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "c5bf4f78e51905d1dc9c8b408abedc65b1933483",
+      "description": "Free 8K laminate floor texture. Smooth, even brown wood-plank material with subtle grain, light satin sheen and fine seams, clean indoor appearance.",
+      "category_id": "acb42532-cb6a-5b57-9270-286d028f3a4c",
+      "category": "Wood/Engineered Wood/Laminate",
+      "attributes": {
+        "surface_use": "floor",
+        "origin": "man_made",
+        "setting": "indoor",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 500959,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/laminate_floor_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "wood_table_001",
+    "kind": "surface-texture",
+    "selectionTerm": "wood",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "wood",
+        "table",
+        "varnished",
+        "clean",
+        "stained",
+        "red",
+        "furniture",
+        "fancy",
+        "fine",
+        "grain",
+        "vinyl"
+      ],
+      "date_published": 1626445026,
+      "name": "Wood Table 001",
+      "categories": [
+        "wood",
+        "clean",
+        "man made"
+      ],
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "dimensions": [
+        1500,
+        1500.0001192092896
+      ],
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "files_hash": "141bbae9092a1169e3060de60359d9631592e6a4",
+      "description": "Free 16K wood texture: clean, stained red-brown table surface with fine grain and a smooth, varnished glossy finish",
+      "category_id": "a7bb33c4-8575-586e-a502-7094517b10c5",
+      "category": "Wood/Boards & Planks/Finished & Varnished",
+      "attributes": {
+        "surface_use": "object",
+        "condition": [
+          "clean"
+        ],
+        "origin": "man_made"
+      },
+      "download_count": 463310,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_table_001.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "fabric_pattern_07",
+    "kind": "surface-texture",
+    "selectionTerm": "fabric",
+    "metadata": {
+      "type": 1,
+      "date_published": 1590729315,
+      "name": "Fabric Pattern 07",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        400.0000059604645,
+        400.00003576278687
+      ],
+      "sponsors": [
+        "7934315",
+        "11167855",
+        "20953239"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "cotton"
+      ],
+      "files_hash": "af042f95980f6ccc87285c3bc23e11671a5fecde",
+      "tags": [
+        "towel",
+        "plain",
+        "cloth",
+        "checkered",
+        "woven",
+        "textile",
+        "picnic"
+      ],
+      "description": "Free 8K texture of red-and-cream woven cotton: coarse towel-like checkered weave with visible yarns, soft matte surface and subtle fiber variation.",
+      "category_id": "1df887de-c667-575d-9f55-cd044384317c",
+      "category": "Textiles & Leather/Woven/Plaid & Check",
+      "attributes": {
+        "surface_use": "object",
+        "origin": "man_made",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 333029,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/fabric_pattern_07.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "denmin_fabric_02",
+    "kind": "surface-texture",
+    "selectionTerm": "fabric",
+    "metadata": {
+      "date_published": 1592866700,
+      "sponsors": [
+        "44302755"
+      ],
+      "name": "Denim Fabric 02",
+      "type": 1,
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "dimensions": [
+        100.00000149011612,
+        99.99999403953552
+      ],
+      "categories": [
+        "fabric",
+        "denim"
+      ],
+      "files_hash": "414e6d5d95efbd5f4215418985a6a0c63c1bf3ad",
+      "tags": [
+        "jeans",
+        "pants",
+        "cloth",
+        "clothing",
+        "denim",
+        "textile ",
+        "creased",
+        "folds"
+      ],
+      "description": "Free 8K denim texture with fine woven grain, subtle faded highlights and soft worn surface, showing realistic creases and folds.",
+      "category_id": "14f36823-af15-5f03-824e-e31a2eadaedc",
+      "category": "Textiles & Leather/Denim",
+      "attributes": {
+        "surface_use": "object",
+        "condition": [
+          "worn"
+        ],
+        "origin": "man_made"
+      },
+      "download_count": 193750,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/denmin_fabric_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "fabric_pattern_05",
+    "kind": "surface-texture",
+    "selectionTerm": "fabric",
+    "metadata": {
+      "type": 1,
+      "date_published": 1590810670,
+      "name": "Fabric Pattern 05",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        500,
+        499.9999403953552
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "cotton"
+      ],
+      "files_hash": "be7f619f251a6ba2f829e658c6a20948cdc18a4f",
+      "tags": [
+        "plain",
+        "cloth",
+        "towel",
+        "checker",
+        "checkered",
+        "plaid",
+        "grid pattern",
+        "windowpane plaid",
+        "upholstery",
+        "textile ",
+        "woven",
+        "drape"
+      ],
+      "description": "Free 8K cotton fabric texture with a soft, woven, slightly nubby surface and natural drape, olive‑khaki base with thin deep‑blue windowpane plaid grid.",
+      "category_id": "1df887de-c667-575d-9f55-cd044384317c",
+      "category": "Textiles & Leather/Woven/Plaid & Check",
+      "attributes": {
+        "surface_use": "object",
+        "origin": "man_made",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 168066,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/fabric_pattern_05.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "red_brick",
+    "kind": "surface-texture",
+    "selectionTerm": "brick",
+    "metadata": {
+      "name": "Red Brick",
+      "categories": [
+        "wall",
+        "brick",
+        "man made"
+      ],
+      "type": 1,
+      "tags": [
+        "brick",
+        "bricks",
+        "wall",
+        "red brick",
+        "brick wall",
+        "rough",
+        "exterior"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "dimensions": [
+        1399.999976158142,
+        1399.999976158142
+      ],
+      "date_published": 1729123200,
+      "files_hash": "0fd2ec8c6b118158136023bee577c0cfe887cec5",
+      "description": "Free 16K texture of red brick wall with rough, weathered surfaces, varied warm tones and recessed grey mortar, strong surface detail and subtle chipped edges.",
+      "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+      "category": "Brick & Block/Clay Brick/Running-Bond",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "weathered"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 171080,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/red_brick.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "red_brick_03",
+    "kind": "surface-texture",
+    "selectionTerm": "brick",
+    "metadata": {
+      "date_published": 1530171674,
+      "sponsors": [
+        "25436656"
+      ],
+      "name": "Red Brick 03",
+      "categories": [
+        "outdoor",
+        "wall",
+        "clean",
+        "man made",
+        "brick"
+      ],
+      "type": 1,
+      "tags": [
+        "red",
+        "industrial",
+        "factory",
+        "brown"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "aafb7cb55b993b0d363fcc53cf5597ad25f38ef6",
+      "description": "Free 8K red brick texture with weathered industrial bricks, rough matte surface, defined mortar joints, slight soot and brownish color variation.",
+      "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+      "category": "Brick & Block/Clay Brick/Running-Bond",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "weathered"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 144864,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/red_brick_03.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "medieval_blocks_03",
+    "kind": "surface-texture",
+    "selectionTerm": "brick",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "blocks",
+        "large",
+        "old",
+        "rough"
+      ],
+      "date_published": 1546062309,
+      "name": "Medieval Blocks 03",
+      "categories": [
+        "wall",
+        "brick",
+        "man made",
+        "outdoor",
+        "indoor",
+        "clean"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        2000,
+        2000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "sponsors": [
+        "118714804"
+      ],
+      "files_hash": "6f5a04014ad24a50d1ef9e106bcec49277613d3e",
+      "description": "Free 8K texture of large medieval stone blocks with rough, chiseled faces, worn edges, tight mortar joints and subtle weathering for a clean, aged stone wall.",
+      "category_id": "bc20bc70-284a-5f14-93eb-78274f6a1fa9",
+      "category": "Brick & Block/Stone Block & Paver/Ashlar & Coursed Stone",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "weathered",
+          "worn"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 143480,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/medieval_blocks_03.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "metal_plate",
+    "kind": "surface-texture",
+    "selectionTerm": "metal",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "bare",
+        "painted",
+        "rusty",
+        "pattern",
+        "iron",
+        "factory",
+        "industrial",
+        "steel"
+      ],
+      "date_published": 1529475787,
+      "name": "Metal Plate",
+      "categories": [
+        "metal",
+        "floor",
+        "man made",
+        "indoor",
+        "outdoor",
+        "dirty"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        500,
+        500
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "1046b39bf68d65eeb80dab84a99186a453ee94e0",
+      "description": "Free 8K texture of worn diamond-plate steel with chipped green paint, rust, pitting and dark oily highlights. Rough, dirty industrial metal surface.",
+      "category_id": "73ed1247-6414-5a28-9bea-f5a74162136a",
+      "category": "Metal/Plate & Grating/Diamond & Checker Plate",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "damaged",
+          "rusted",
+          "worn",
+          "painted"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 304228,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/metal_plate.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "green_metal_rust",
+    "kind": "surface-texture",
+    "selectionTerm": "metal",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "painted",
+        "ship",
+        "tank",
+        "industrial",
+        "canister"
+      ],
+      "date_published": 1529548100,
+      "name": "Green Metal Rust",
+      "categories": [
+        "metal",
+        "outdoor",
+        "indoor",
+        "man made",
+        "dirty"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "fd6cc162a0eb0eb8e0e2fb4d7f1b977dda4626b3",
+      "description": "Free 8K texture of painted green metal with worn, scratched surface, subtle rust streaks around fasteners and peeling, low-sheen, weathered industrial finish.",
+      "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+      "category": "Metal/Sheet & Corrugated/Flat Sheet",
+      "attributes": {
+        "surface_use": "object",
+        "condition": [
+          "painted",
+          "weathered",
+          "rusted",
+          "worn"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 289813,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/green_metal_rust.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "rust_coarse_01",
+    "kind": "surface-texture",
+    "selectionTerm": "metal",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "coarse",
+        "rusty",
+        "rust",
+        "red",
+        "stained",
+        "grunge",
+        "old",
+        "weathered",
+        "iron",
+        "metal",
+        "steel",
+        "rough"
+      ],
+      "name": "Rust Coarse 01",
+      "categories": [
+        "metal",
+        "outdoor",
+        "man made",
+        "dirty",
+        "wall"
+      ],
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "date_published": 1638230400,
+      "sponsors": [
+        "540619"
+      ],
+      "dimensions": [
+        2199.9998092651367,
+        2200.000286102295
+      ],
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "files_hash": "c20faac0db66a29d5b52f5c45a4ca333e5d6471d",
+      "description": "Free 16K texture of coarse, weathered rust - red-brown stained, pitted and gritty iron/steel with a rough, grungy surface and subtle scuffs.",
+      "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+      "category": "Metal/Sheet & Corrugated/Flat Sheet",
+      "attributes": {
+        "condition": [
+          "weathered",
+          "rusted"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 228667,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rust_coarse_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "beige_wall_001",
+    "kind": "surface-texture",
+    "selectionTerm": "plaster",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "beige",
+        "painted",
+        "smooth",
+        "suburb",
+        "house",
+        "home"
+      ],
+      "date_published": 1626792811,
+      "name": "Beige Wall 001",
+      "categories": [
+        "man made",
+        "wall",
+        "plaster",
+        "outdoor",
+        "indoor",
+        "plaster-concrete"
+      ],
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "dimensions": [
+        3000,
+        3000.000238418579
+      ],
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "sponsors": [
+        "76058381"
+      ],
+      "files_hash": "66328da3fac4865f84ac4bb6f296fe282e734ea5",
+      "description": "Free 16K texture of smooth beige painted plaster with subtle grain and a matte finish, showing soft color variation and surface blemishes.",
+      "category_id": "9d3c7da3-4959-5d42-8abc-5c31017a2fd4",
+      "category": "Concrete/Plaster & Stucco/Painted Plaster",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "painted"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 423313,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/beige_wall_001.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "painted_plaster_wall",
+    "kind": "surface-texture",
+    "selectionTerm": "plaster",
+    "metadata": {
+      "name": "Painted Plaster Wall",
+      "categories": [
+        "wall",
+        "plaster-concrete",
+        "outdoor"
+      ],
+      "type": 1,
+      "tags": [
+        "rough",
+        "weathered",
+        "worn",
+        "wall",
+        "discolored",
+        "plaster",
+        "plastered",
+        "damaged",
+        "old",
+        "stained",
+        "dirty",
+        "exterior",
+        "timeworn"
+      ],
+      "authors": {
+        "Amal Kumar": "All"
+      },
+      "info": null,
+      "dimensions": [
+        2000,
+        2000
+      ],
+      "date_published": 1706140800,
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "files_hash": "77e9d68a3359a2815a60a62fd3f0eba0f2f41994",
+      "description": "Free 16K painted plaster texture showing  slightly discolored exterior plaster with worn patches, subtle stains, dirt and surface damage.",
+      "category_id": "9d3c7da3-4959-5d42-8abc-5c31017a2fd4",
+      "category": "Concrete/Plaster & Stucco/Painted Plaster",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "painted",
+          "weathered",
+          "worn",
+          "damaged"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 300717,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/painted_plaster_wall.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "white_plaster_02",
+    "kind": "surface-texture",
+    "selectionTerm": "plaster",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "smooth",
+        "flat",
+        "even"
+      ],
+      "date_published": 1531287574,
+      "name": "White Plaster 02",
+      "categories": [
+        "plaster-concrete",
+        "wall",
+        "man made",
+        "outdoor",
+        "indoor",
+        "clean",
+        "floor"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        1000,
+        1000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "sponsors": [
+        "20953239",
+        "77433244"
+      ],
+      "files_hash": "508068441dd24eb06ef6d269a43f6ea7c8bade6b",
+      "description": "Free 8K plaster texture: smooth, flat white plaster with a soft matte finish, fine micro-roughness and subtle dirt speckling across the surface.",
+      "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+      "category": "Concrete/Plaster & Stucco/Bare Plaster",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "clean"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 226545,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/white_plaster_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "asphalt_02",
+    "kind": "surface-texture",
+    "selectionTerm": "asphalt",
+    "metadata": {
+      "type": 1,
+      "date_published": 1596694249,
+      "name": "Asphalt 02",
+      "categories": [
+        "terrain",
+        "road",
+        "man made",
+        "outdoor",
+        "floor"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sponsors": [
+        "26820710"
+      ],
+      "dimensions": [
+        3000.000238418579,
+        3000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "2839a331f389f6ad1e30a78f24db58369d92f742",
+      "tags": [
+        "asphalt",
+        "cracked",
+        "flat",
+        "road",
+        "asphalt road",
+        "tarmac road",
+        "gritty",
+        "weathered",
+        "grey",
+        "cracking",
+        "tar",
+        "cracks"
+      ],
+      "description": "Free 8K texture of weathered grey asphalt: gritty coarse aggregate, subtle tar cracks, rough matte surface with uneven wear.",
+      "category_id": "ae6df066-2cbf-5772-9092-3cd86ed6394e",
+      "category": "Asphalt & Bitumen/Asphalt/Cracked Asphalt",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "weathered",
+          "cracked"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 388988,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "aerial_asphalt_01",
+    "kind": "surface-texture",
+    "selectionTerm": "asphalt",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "road",
+        "flat",
+        "cracked"
+      ],
+      "date_published": 1597061145,
+      "name": "Aerial Asphalt 01",
+      "categories": [
+        "asphalt",
+        "outdoor",
+        "floor",
+        "road",
+        "man made",
+        "aerial"
+      ],
+      "dimensions": [
+        30000,
+        30000
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "cdf3c8f091b3589407bdf0697a2deb2c6b40650d",
+      "description": "Free 8K asphalt texture of a flat, worn road with subtle cracks, faint tire marks and gritty surface - ideal for aerial, outdoor, road and floor scenes.",
+      "category_id": "8871debe-40cf-5e4d-a5e5-1ddfe979f14f",
+      "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "weathered",
+          "cracked",
+          "worn"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor",
+        "aerial": true
+      },
+      "download_count": 146040,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_asphalt_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "asphalt_01",
+    "kind": "surface-texture",
+    "selectionTerm": "asphalt",
+    "metadata": {
+      "name": "Asphalt 01",
+      "categories": [
+        "asphalt",
+        "floor",
+        "outdoor",
+        "road"
+      ],
+      "type": 1,
+      "tags": [
+        "rough",
+        "dirty",
+        "asphalt",
+        "road",
+        "worn"
+      ],
+      "authors": {
+        "Dario Barresi": "Processing ",
+        "Charlotte Baglioni": "Photography"
+      },
+      "info": null,
+      "date_published": 1664841600,
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "dimensions": [
+        2079.9994468688965,
+        2079.9996852874756
+      ],
+      "files_hash": "61bdb4dc064585ce3e749a4dcaf13216575ae794",
+      "description": "Free 8K asphalt texture: worn, dirty road surface with a coarse, rough aggregate, compacted bumps and subtle grime discoloration.",
+      "category_id": "8871debe-40cf-5e4d-a5e5-1ddfe979f14f",
+      "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "weathered",
+          "worn"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 70264,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "concrete_floor_worn_001",
+    "kind": "surface-texture",
+    "selectionTerm": "concrete",
+    "metadata": {
+      "date_published": 1627948800,
+      "name": "Concrete Floor Worn 001",
+      "categories": [
+        "floor",
+        "man made",
+        "indoor",
+        "dirty",
+        "concrete",
+        "plaster-concrete"
+      ],
+      "type": 1,
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "tags": [
+        "worn",
+        "old",
+        "plain",
+        "grey",
+        "weathered",
+        "bare",
+        "discolored"
+      ],
+      "dimensions": [
+        3000,
+        3000.000238418579
+      ],
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "files_hash": "e3d93fd423c3db5bbc000a930cc8b9d770187ce4",
+      "description": "Free 16K concrete floor texture, worn grey slab with fine scratches, chips, stains and subtle roughness and discoloration.",
+      "category_id": "0a7b70c3-bc79-531b-8cf3-cadeb4cbf686",
+      "category": "Concrete/Cast Walls & Floors/Bare Cast",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "worn",
+          "weathered",
+          "damaged"
+        ],
+        "origin": "man_made",
+        "setting": "indoor"
+      },
+      "download_count": 442273,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_floor_worn_001.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "concrete_floor_02",
+    "kind": "surface-texture",
+    "selectionTerm": "concrete",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "rough",
+        "moss",
+        "plain"
+      ],
+      "date_published": 1536018406,
+      "name": "Concrete Floor 02",
+      "categories": [
+        "concrete",
+        "plaster-concrete",
+        "dirty",
+        "man made",
+        "outdoor",
+        "indoor",
+        "wall",
+        "floor"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        2000,
+        2000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "b047f5c1c115638de280913cdfb646c35048e503",
+      "description": "Free 8K concrete texture showing a rough, weathered floor with moss-stained, dirty gray-brown surface, subtle pitting, scuffs and worn patches.",
+      "category_id": "0a7b70c3-bc79-531b-8cf3-cadeb4cbf686",
+      "category": "Concrete/Cast Walls & Floors/Bare Cast",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "weathered",
+          "worn",
+          "mossy"
+        ],
+        "origin": "man_made",
+        "setting": "either"
+      },
+      "download_count": 193910,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_floor_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "concrete_layers_02",
+    "kind": "surface-texture",
+    "selectionTerm": "concrete",
+    "metadata": {
+      "name": "Concrete Layers 02",
+      "categories": [
+        "man made",
+        "concrete",
+        "plaster-concrete"
+      ],
+      "type": 1,
+      "tags": [
+        "worn",
+        "chipped",
+        "rough",
+        "weathered",
+        "cracked",
+        "damaged",
+        "wall",
+        "discolored",
+        "dirty",
+        "dry",
+        "concrete",
+        "grey",
+        "plastered",
+        "plaster"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "info": null,
+      "dimensions": [
+        2000,
+        2000
+      ],
+      "date_published": 1678579200,
+      "max_resolution": [
+        16384,
+        16384
+      ],
+      "files_hash": "bc64b57462d7f4ada82bcda31d30209ea56af2e2",
+      "description": "Free 16K concrete texture showing rough, weathered grey plaster with chipped layers, cracks, stains and dry dirt streaks; board lines and surface pitting.",
+      "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+      "category": "Concrete/Plaster & Stucco/Bare Plaster",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "weathered",
+          "cracked",
+          "worn",
+          "damaged"
+        ],
+        "origin": "man_made",
+        "setting": "outdoor"
+      },
+      "download_count": 134098,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_layers_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "coast_sand_rocks_02",
+    "kind": "surface-texture",
+    "selectionTerm": "stone",
+    "metadata": {
+      "date_published": 1646352000,
+      "name": "Coast Sand Rocks 02",
+      "type": 1,
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        15000,
+        15000
+      ],
+      "sponsors": [
+        "540619",
+        "7937391",
+        "7934315",
+        "77433244"
+      ],
+      "categories": [
+        "outdoor",
+        "natural",
+        "terrain",
+        "aerial",
+        "rock",
+        "collection: smugglers_cove"
+      ],
+      "tags": [
+        "grass",
+        "rock face",
+        "rock",
+        "moss",
+        "rough",
+        "uneven",
+        "weathered",
+        "stones",
+        "cliff",
+        "ground",
+        "seaside",
+        "coastal"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "579892253d0d73a45eaee485135c35666bceb237",
+      "description": "Free 8K texture of weathered coastal sand-rock: rough, uneven rock faces with scattered stones, brown sandy soil and patchy green moss coverage.",
+      "category_id": "6f927474-95dd-5ec5-b756-e9299996aeee",
+      "category": "Stone/Rock & Cliffs/Coastal Rock",
+      "collections": [
+        "smugglers_cove"
+      ],
+      "attributes": {
+        "surface_use": "ground",
+        "condition": [
+          "weathered",
+          "mossy"
+        ],
+        "origin": "natural",
+        "setting": "outdoor",
+        "aerial": true
+      },
+      "download_count": 543346,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/coast_sand_rocks_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "aerial_rocks_02",
+    "kind": "surface-texture",
+    "selectionTerm": "stone",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "rocks",
+        "rough",
+        "moss",
+        "cliff",
+        "rock face",
+        "cave"
+      ],
+      "date_published": 1600274572,
+      "name": "Aerial Rocks 02",
+      "categories": [
+        "terrain",
+        "outdoor",
+        "natural",
+        "rock",
+        "aerial"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        50000,
+        50000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "sponsors": [
+        "128081732"
+      ],
+      "files_hash": "76c3c2d202e28839b72e336a5b1839e58e2da2e3",
+      "description": "Free 8K texture of rough weathered cliff rock, showing coarse stone faces, deep fractures and patches of green moss.",
+      "category_id": "bf84369c-cc7c-5347-ad17-173353e859b8",
+      "category": "Stone/Rock & Cliffs/Rough Rock Faces",
+      "attributes": {
+        "surface_use": "ground",
+        "condition": [
+          "mossy",
+          "weathered"
+        ],
+        "origin": "natural",
+        "setting": "outdoor",
+        "aerial": true
+      },
+      "download_count": 398688,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_rocks_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "aerial_grass_rock",
+    "kind": "surface-texture",
+    "selectionTerm": "stone",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "moss",
+        "grass",
+        "cliff",
+        "cave",
+        "rock face"
+      ],
+      "date_published": 1582514587,
+      "name": "Aerial Grass Rock",
+      "categories": [
+        "terrain",
+        "rock",
+        "outdoor",
+        "natural",
+        "aerial"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        15000,
+        15000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "sponsors": [
+        "76058381"
+      ],
+      "files_hash": "d610669c24e20d7c2effc4c116c718176f5b044a",
+      "description": "Free 8K aerial rock texture with moss and grass, rough weathered stone with fine gravel and earthy green-brown tones.",
+      "category_id": "e8121dc9-96d3-59b8-b8ee-83104e60ba82",
+      "category": "Stone/Rock & Cliffs/Mossy & Lichened Rock",
+      "attributes": {
+        "surface_use": "ground",
+        "condition": [
+          "mossy",
+          "weathered"
+        ],
+        "origin": "natural",
+        "setting": "outdoor",
+        "aerial": true
+      },
+      "download_count": 363870,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_grass_rock.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "leather_red_02",
+    "kind": "surface-texture",
+    "selectionTerm": "leather",
+    "metadata": {
+      "type": 1,
+      "date_published": 1592452386,
+      "name": "Leather Red 02",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        600.0000238418579,
+        600.0000238418579
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "leather"
+      ],
+      "files_hash": "2651d8269cad06cc0407f69d572632d16493aa6e",
+      "tags": [
+        "leather",
+        "even",
+        "smooth",
+        "new",
+        "creased",
+        "wrinkled",
+        "semi-gloss",
+        "upholstery",
+        "textile ",
+        "animal-hide"
+      ],
+      "description": "Free 8K texture: smooth, even red-brown leather with fine pebbled grain, soft creases and subtle wrinkles, semi-gloss surface with an upholstery/animal-hide look.",
+      "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "attributes": {
+        "surface_use": "object",
+        "origin": "man_made",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 250464,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/leather_red_02.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "book_pattern",
+    "kind": "surface-texture",
+    "selectionTerm": "leather",
+    "metadata": {
+      "type": 1,
+      "date_published": 1590465459,
+      "name": "Book Pattern",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        299.9999523162842,
+        300.00001192092896
+      ],
+      "sponsors": [
+        "82322099"
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "cotton"
+      ],
+      "files_hash": "91db16c6ae2b8d5ab823f1d3970fdc9f6ef3cea5",
+      "tags": [
+        "plain",
+        "book",
+        "cover",
+        "textile ",
+        "olive",
+        "olive green",
+        "woven"
+      ],
+      "description": "Free 8K texture of olive-green woven cotton with a coarse plain weave, subtle vertical slubs, and a matte book-cover fabric surface.",
+      "category_id": "43499ad7-c79c-5dd0-86a7-6567e0462a47",
+      "category": "Textiles & Leather/Woven/Plain Weave Cotton",
+      "attributes": {
+        "surface_use": "object",
+        "origin": "man_made",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 239969,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/book_pattern.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "brown_leather",
+    "kind": "surface-texture",
+    "selectionTerm": "leather",
+    "metadata": {
+      "type": 1,
+      "date_published": 1590367769,
+      "name": "Brown Leather",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        400.0000059604645,
+        400.00003576278687
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "leather"
+      ],
+      "tags": [
+        "leather",
+        "brown",
+        "chair",
+        "seat",
+        "upholstery",
+        "vintage",
+        "matte",
+        "wrinkled",
+        "textile ",
+        "creased"
+      ],
+      "files_hash": "b9a9a4129b9cec6e01f3ba38eee9bd342e1bac19",
+      "description": "Free 8K texture of vintage matte brown leather - fine grain with soft wrinkles, creases and subtle wear for upholstery and seat surfaces.",
+      "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "attributes": {
+        "surface_use": "object",
+        "condition": [
+          "worn"
+        ],
+        "origin": "man_made"
+      },
+      "download_count": 208235,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brown_leather.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "marble_01",
+    "kind": "surface-texture",
+    "selectionTerm": "tile",
+    "metadata": {
+      "type": 1,
+      "tags": [
+        "marble",
+        "smooth",
+        "even",
+        "tiles"
+      ],
+      "date_published": 1540420244,
+      "name": "Marble 01",
+      "categories": [
+        "floor",
+        "man made",
+        "indoor",
+        "clean",
+        "wall"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sponsors": [
+        "3267566",
+        "7934315"
+      ],
+      "dimensions": [
+        1500,
+        1500
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "11a4d204569907b76e1c4f7ef06a8b3fa90b5930",
+      "description": "Free 8K marble texture of smooth, even cream-beige tiles with subtle veining and low sheen, clean indoor floor and wall material.",
+      "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+      "category": "Stone/Slabs & Tiles/Marble",
+      "attributes": {
+        "surface_use": "floor",
+        "origin": "man_made",
+        "setting": "indoor",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 313078,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/marble_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "leather_white",
+    "kind": "surface-texture",
+    "selectionTerm": "tile",
+    "metadata": {
+      "type": 1,
+      "date_published": 1592532089,
+      "name": "Leather White",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "sponsors": [
+        "9910225"
+      ],
+      "dimensions": [
+        300.00001192092896,
+        300.00001192092896
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "categories": [
+        "fabric",
+        "leather"
+      ],
+      "files_hash": "f772dd6a44080e64a320989faeb12bae236109cf",
+      "tags": [
+        "leather",
+        "white",
+        "smooth",
+        "new",
+        "even",
+        "textile ",
+        "upholstery",
+        "fashion",
+        "animal-hide"
+      ],
+      "description": "Free 8K leather texture: smooth, even white animal-hide upholstery material with fine grain, subtle matte sheen and clean, new finish.",
+      "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "attributes": {
+        "surface_use": "object",
+        "origin": "man_made",
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 203069,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/leather_white.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "floor_tiles_06",
+    "kind": "surface-texture",
+    "selectionTerm": "tile",
+    "metadata": {
+      "type": 1,
+      "date_published": 1538356638,
+      "name": "Floor Tiles 06",
+      "categories": [
+        "floor",
+        "indoor",
+        "clean",
+        "man made"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        3000,
+        3000
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "22b151bef1f180591e0d306e551fb15e4bdf2990",
+      "tags": [
+        "marble",
+        "tiles",
+        "checkerboard",
+        "checkered",
+        "floor",
+        "tiled",
+        "square tiles",
+        "dirty"
+      ],
+      "description": "Free 8K texture of checkered marble floor tiles - alternating brown and beige squares with subtle veining, thin grout lines, light wear, scuffs and low gloss.",
+      "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+      "category": "Stone/Slabs & Tiles/Marble",
+      "attributes": {
+        "surface_use": "floor",
+        "condition": [
+          "worn"
+        ],
+        "origin": "man_made",
+        "setting": "indoor"
+      },
+      "download_count": 172425,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/floor_tiles_06.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "decrepit_wallpaper",
+    "kind": "surface-texture",
+    "selectionTerm": "paper",
+    "metadata": {
+      "name": "Decrepit Wallpaper",
+      "categories": [
+        "wall",
+        "man made"
+      ],
+      "type": 1,
+      "tags": [
+        "weathered",
+        "wall",
+        "discolored",
+        "peeling",
+        "scratched",
+        "wallpaper",
+        "dilapidated",
+        "worn",
+        "grungy",
+        "flaking",
+        "distressed",
+        "dirty"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "dimensions": [
+        2500,
+        2500
+      ],
+      "date_published": 1727740800,
+      "files_hash": "f6841364d8ffe92586da8532834a6c59d2161476",
+      "description": "Free 8K texture of decrepit wallpaper with flaking, peeling, scratched and discolored surface, grime streaks and subtle cracks, worn, grungy wall material.",
+      "category_id": "e1c3a164-85a9-5ca0-adac-d36185e4f063",
+      "category": "Paper & Card/Wallpaper/Peeling & Distressed Wallpaper",
+      "attributes": {
+        "surface_use": "wall",
+        "condition": [
+          "weathered",
+          "damaged",
+          "worn"
+        ],
+        "origin": "man_made"
+      },
+      "download_count": 7435,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/decrepit_wallpaper.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "brown_mud_leaves_01",
+    "kind": "surface-texture",
+    "selectionTerm": "ground",
+    "metadata": {
+      "date_published": 1529359200,
+      "name": "Brown Mud Leaves 01",
+      "categories": [
+        "terrain",
+        "natural",
+        "outdoor"
+      ],
+      "type": 1,
+      "tags": [
+        "grass",
+        "mud",
+        "moss",
+        "stones",
+        "orange",
+        "forest"
+      ],
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        1299.9998331069946,
+        1299.9998331069946
+      ],
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "7b74cea31de3b88001ff3bd7b8c01b88a7a58cf0",
+      "description": "Free 8K texture of brown muddy ground with scattered leaves, moss patches, small pebbles and a damp, rough surface with fine organic detail.",
+      "category_id": "b9a51c27-1499-5f4d-b28f-0d96ef8e0319",
+      "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+      "sponsors": [
+        "540619",
+        "172914019"
+      ],
+      "attributes": {
+        "surface_use": "ground",
+        "condition": [
+          "mossy",
+          "weathered"
+        ],
+        "origin": "natural",
+        "setting": "outdoor"
+      },
+      "download_count": 516763,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brown_mud_leaves_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "forrest_ground_01",
+    "kind": "surface-texture",
+    "selectionTerm": "ground",
+    "metadata": {
+      "date_published": 1552956906,
+      "sponsors": [
+        "59361351"
+      ],
+      "categories": [
+        "terrain",
+        "outdoor",
+        "natural"
+      ],
+      "type": 1,
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "dimensions": [
+        2000,
+        2000
+      ],
+      "name": "Forest Ground 01",
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "files_hash": "ea3ef3539e362d9a9ffa409ecd467d08028569d5",
+      "tags": [
+        "grass",
+        "twigs",
+        "forest",
+        "leaves",
+        "sticks",
+        "foliage",
+        "dead grass",
+        "plant litter",
+        "underbrush",
+        "underbrush",
+        "organic",
+        "dry grass",
+        "dry leaves"
+      ],
+      "description": "Free 8K texture of forest floor with dry grass, leaf litter, scattered twigs and mossy soil, detailed surface relief and natural earthy tones.",
+      "category_id": "b9a51c27-1499-5f4d-b28f-0d96ef8e0319",
+      "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+      "attributes": {
+        "surface_use": "ground",
+        "origin": "natural",
+        "setting": "outdoor",
+        "condition": [
+          "dirty",
+          "mossy"
+        ]
+      },
+      "download_count": 317493,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/forrest_ground_01.png?width=256&height=256"
+    }
+  },
+  {
+    "id": "rocky_terrain_02",
+    "kind": "surface-texture",
+    "selectionTerm": "ground",
+    "metadata": {
+      "name": "Rocky Terrain 02",
+      "type": 1,
+      "tags": [
+        "rocky",
+        "terrain",
+        "uneven terrain",
+        "grass",
+        "drone",
+        "landscape",
+        "nature",
+        "nature",
+        "boulders",
+        "wilderness",
+        "scenic",
+        "mountain",
+        "landform",
+        "natural landscape"
+      ],
+      "authors": {
+        "Amal Kumar": "All"
+      },
+      "max_resolution": [
+        8192,
+        8192
+      ],
+      "dimensions": [
+        90000,
+        90000
+      ],
+      "date_published": 1726704000,
+      "categories": [
+        "outdoor",
+        "terrain",
+        "natural",
+        "aerial"
+      ],
+      "files_hash": "a4c0d422c59c4234227eb04c1fa9d28694c60fbe",
+      "description": "Free, 8K terrain texture of uneven grassy ground with scattered rocks and boulder clusters, subtle height variation and soil patches",
+      "category_id": "ad8bbc58-82b8-5734-a99b-3fbdb7f0163c",
+      "category": "Ground & Terrain/Rocky Ground/Rocky Landscape",
+      "attributes": {
+        "surface_use": "ground",
+        "origin": "natural",
+        "setting": "outdoor",
+        "aerial": true,
+        "condition": [
+          "clean"
+        ]
+      },
+      "download_count": 265456,
+      "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rocky_terrain_02.png?width=256&height=256"
+    }
+  }
+]

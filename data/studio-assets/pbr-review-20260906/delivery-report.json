@@ -1,0 +1,50 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "selectedCandidates": 52,
+  "deliveredOriginals": 47,
+  "byKind": {
+    "model": 17,
+    "surface-texture": 30
+  },
+  "byCategory": {
+    "pbr-detailed-prop": 17,
+    "surface-material": 30
+  },
+  "downloadedBytes": 425722461,
+  "errors": [
+    {
+      "id": "polyhaven-decorative-book-set-01",
+      "kind": "model",
+      "reason": "No native 2K source in an explicitly supported format"
+    },
+    {
+      "id": "polyhaven-fabric-pattern-07",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    },
+    {
+      "id": "polyhaven-fabric-pattern-05",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    },
+    {
+      "id": "polyhaven-leather-red-02",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    },
+    {
+      "id": "polyhaven-book-pattern",
+      "kind": "surface-texture",
+      "reason": "No native 2K source in an explicitly supported format"
+    }
+  ],
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "notice": "Review candidates only; not artistically approved or automatically added to the active Studio catalog.",
+  "browserRenderedModels": 17,
+  "browserRejectedModels": 0,
+  "activeStudioAdditions": 0,
+  "visuallyApproved": 0,
+  "sourceCredit": "Poly Haven",
+  "reviewStatus": "awaiting-direct-pixel-review"
+}

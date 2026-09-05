@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/plywood",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "clean",
+      "even",
+      "smooth",
+      "flat",
+      "continuous",
+      "consistent"
+    ],
+    "date_published": 1592792935,
+    "name": "Plywood",
+    "categories": [
+      "wood",
+      "clean",
+      "man made",
+      "natural",
+      "raw wood"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      499.999940395355,
+      499.999940395355
+    ],
+    "sponsors": [
+      "42579608",
+      "128081732"
+    ],
+    "files_hash": "71277f7973f476845a1464810f133500691c2e43",
+    "description": "Free 8K plywood texture, light warm-brown with smooth, even, continuous linear grain and a flat, low-sheen raw wood surface.",
+    "category_id": "58eac6a9-624e-51cc-a1f1-91a5cd4f56af",
+    "category": "Wood/Engineered Wood/Plywood",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "clean"
+      ],
+      "origin": "man_made"
+    },
+    "download_count": 730106,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/plywood.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_diff_2k.jpg",
+      "bytes": 4009658,
+      "sha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+      "sourceMd5": "ce20176e90b0984ca7dec366832e8198"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/plywood/plywood_rough_2k.png",
+      "bytes": 3058798,
+      "sha256": "294a8751373c862539b26334cfcede6dbb2b9464042d5186b620465cae64e3d2",
+      "sourceMd5": "58f167894074059885d1288f110ad6cb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_nor_gl_2k.jpg",
+      "bytes": 2836023,
+      "sha256": "2391dbe49aaecd6584d12731d4470bf91ba33b5c7f05c78ec5900fcae28f0310",
+      "sourceMd5": "ed5dbe559ec897ff2c744fca23f98152"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/plywood/plywood_ao_2k.png",
+      "bytes": 2966118,
+      "sha256": "8311e237d711b4222824710d8f96344e173f315ad00d745af1b40462355e7f0d",
+      "sourceMd5": "9e11db17a82cd24e107774da72b7cdf3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/plywood/plywood_disp_2k.jpg",
+      "bytes": 2050091,
+      "sha256": "430acfebe624e111516ed598ae53da0bc93c198e010c781fc166c158e2a75627",
+      "sourceMd5": "2c4a128b4aefb0fa6b27f24a2331953c"
+    }
+  ]
+}
