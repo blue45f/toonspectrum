@@ -1,0 +1,84 @@
+name: Prepare feedback runtime boundary repair
+on:
+  push:
+    branches: [chore/feedback-ci-recovery-20260906]
+    paths: [.github/workflows/feedback-runtime-boundary.yml]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/chore/feedback-ci-recovery-20260906'
+    runs-on: ubuntu-slim
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: delivery
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: 21f2061caa3a85f6d6d5a677aa769a877e23ceb0
+          path: source
+          persist-credentials: false
+      - name: Apply reviewed patch and create an unreferenced candidate commit
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const crypto = require('node:crypto');
+            const {execFileSync} = require('node:child_process');
+            const owner = 'blue45f', repo = 'toonspectrum';
+            const parent = '21f2061caa3a85f6d6d5a677aa769a877e23ceb0';
+            const cwd = path.join(process.env.GITHUB_WORKSPACE, 'source');
+            const git = (...args) => execFileSync('git', args, {cwd, encoding:'utf8'}).trim();
+            if (git('rev-parse','HEAD') !== parent) throw new Error('Unexpected source checkout');
+            const {data: ref} = await github.rest.git.getRef({owner, repo, ref:'heads/feat/feedback-community-20260906'});
+            if (ref.object.sha !== parent) throw new Error('Feature branch advanced; rebase and re-review instead of overwriting');
+            const patch = fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE,'delivery/scripts/feedback-runtime-boundary.patch'),'utf8').replace(/\n diff --git /g,'\ndiff --git ');
+            fs.writeFileSync('/tmp/feedback-runtime.patch',patch);
+            git('apply','--check','/tmp/feedback-runtime.patch');
+            git('apply','--index','/tmp/feedback-runtime.patch');
+            const docPath = path.join(cwd,'docs/feedback-community.md');
+            let doc = fs.readFileSync(docPath,'utf8');
+            doc = doc.replace('초기화는 advisory transaction lock을 사용한 additive runtime migration이며 실패 시 재시도한다.', '스키마 변경은 관리형 마이그레이션 `0038_feedback_community.sql`과 전용 마이그레이션 계정으로 수행한다. API는 읽기 전용 준비 상태만 확인하며 스키마·권한 미반영 시 503을 반환한다. 운영 계정에는 테이블 생성·수정 권한을 주지 않는다.');
+            doc = doc.replace('마이그레이션, 페이지네이션, 권한, 중복 투표, 이력, 숨김 글과 답글 깊이를 검증한다.', '마이그레이션, 페이지네이션, 권한, 중복 투표, 이력, 숨김 글과 답글 깊이를 검증한다. 추가로 DDL이 금지된 비소유 역할의 별도 프로세스에서 실제 읽기·제보·댓글·공감·운영자 상태 변경을 검증한다.');
+            fs.writeFileSync(docPath,doc);
+            git('add','--','docs/feedback-community.md');
+            git('diff','--cached','--check');
+            const expected = {
+              'apps/api/src/db/migrations/0038_feedback_community.sql':'b7a504bb37744869b9021388e0455108d0b07dd8325cb1ecf442f4851acba8d6',
+              'apps/api/src/server/feedback.ts':'83c47cd654569dd646774014f50295876398b272593d03a077bdd20899803fc7',
+              'docs/feedback-community.md':'b810683103149b0a10cf8328dbab85c3c7ae1c19190a4138e47e4485b76daa4b',
+              'scripts/bootstrap-empty-production-database.test.mjs':'b07991a7758f79401ed4d6ecc8287268e0f2211397ec0ec1d9f6ea06b9ac609d',
+              'scripts/feedback-database-contract.mjs':'26fb4ed6d3bfff06f1a2d7410b58ed495ab2c64e4cc636f9f18630b68434860a',
+              'scripts/feedback-database-contract.test.mjs':'62e761534cd9477a00a6c473409204d862a901c92aff97b352f8217fba337332',
+              'scripts/production-database-migrations.manifest':'6710e499b6291f6ba5779cf378c105ff2b8913460e8f7dc5644e8b4f4f77702d',
+              'scripts/run-production-database-migrations.mjs':'da2cc0b13c3d9ecc5ad764e3070f79d70433db81609093931065f76abf8bc15f',
+              'scripts/run-production-database-migrations.test.mjs':'55275837d3f3f11cadce9df90acb1b32528528540f8d1cdc713856229e395814f69',
+              'scripts/verify-feedback-community-db.mts':'f670aa7f04a7b46a79cf4f8c99b55f10d6d7247686d68af2005e7e0ce1a6b780',
+              'scripts/verify-production-database-capabilities.mjs':'5a6e3e71a20a1a3a081f96f30aa963812830cda87cd13899a03c7412ae807062'
+            };
+            const changed = git('diff','--cached','--name-only').split('\n').sort();
+            if (JSON.stringify(changed) !== JSON.stringify(Object.keys(expected).sort())) throw new Error('Unexpected paths');
+            for (const name of changed) {
+              const data = fs.readFileSync(path.join(cwd,name));
+              if (crypto.createHash('sha256').update(data).digest('hex') !== expected[name]) throw new Error('Source hash mismatch: '+name);
+              if (name.endsWith('.mjs')) execFileSync(process.execPath,['--check',name],{cwd});
+            }
+            const {data: base} = await github.rest.git.getCommit({owner,repo,commit_sha:parent});
+            const tree = [];
+            for (const name of changed) {
+              const {data:blob} = await github.rest.git.createBlob({owner,repo,content:fs.readFileSync(path.join(cwd,name),'utf8'),encoding:'utf-8'});
+              tree.push({path:name,mode:(fs.statSync(path.join(cwd,name)).mode & 0o111)?'100755':'100644',type:'blob',sha:blob.sha});
+            }
+            const {data: built} = await github.rest.git.createTree({owner,repo,base_tree:base.tree.sha,tree});
+            const {data: commit} = await github.rest.git.createCommit({owner,repo,parents:[parent],tree:built.sha,message:'fix(feedback): move schema changes to managed migrations and verify restricted runtime'});
+            // Deliberately do not update ANY ref. The connector separately verifies and fast-forwards the feature branch.
+            fs.writeFileSync(path.join(process.env.GITHUB_WORKSPACE,'feedback-runtime-candidate.json'),JSON.stringify({parent,commit:commit.sha,tree:built.sha,files:expected},null,2));
+            core.info('CANDIDATE_COMMIT='+commit.sha);
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feedback-runtime-candidate
+          path: feedback-runtime-candidate.json
+          retention-days: 7
