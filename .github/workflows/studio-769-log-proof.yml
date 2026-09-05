@@ -1,0 +1,34 @@
+name: Studio 769 complete log proof
+on:
+  push:
+    branches: [audit/studio-769-source-proof-20260906]
+    paths: [.github/workflows/studio-769-log-proof.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  log-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Read the exact completed failing job log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/studio-log-proof"
+          gh api repos/blue45f/toonspectrum/actions/jobs/101350111473/logs > "$RUNNER_TEMP/studio-log-proof/test-shard-2.log"
+          python3 - <<'PY'
+          import pathlib,os,hashlib,re,json
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-log-proof/test-shard-2.log'
+          raw=p.read_bytes()
+          if len(raw)>32*1024*1024:raise ValueError('unexpected log size')
+          text=re.sub(r'\x1b\[[0-9;]*m','',raw.decode('utf-8-sig'))
+          (p.parent/'test-shard-2-plain.log').write_text(text)
+          (p.parent/'identity.json').write_text(json.dumps({'repository':'blue45f/toonspectrum','run':33982316829,'job':101350111473,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)},indent=2))
+          print('\n'.join(text.splitlines()[-100:]))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-769-complete-failure-log
+          path: ${{ runner.temp }}/studio-log-proof/
+          retention-days: 2
