@@ -40,14 +40,24 @@ WebGPU를 "지원되면 쓴다"로 켜면 한국 트래픽의 대부분인 인�
 것 — **이 호스트를 WebGPU 디바이스로 얼마나 믿을 수 있는가** — 만 결정한다. 덕분에 틱톡·위챗
 처럼 이 정책이 따로 열거한 적 없는 호스트도 이미 분류된 채로 들어온다.
 
-| 호스트 | `auto` | 명시 선택 시 | 이유 |
+> **2026-09-05 갱신.** 아래 표는 원래 `auto` 열을 갖고 있었다. 그 레인은
+> `0520c7e18`("make WebGPU and WASM render paths fail closed")에서 삭제됐다 — 선택은 이제
+> 언제나 명시적이고, 문제는 backend 를 바꾸는 대신 `status` 를 움직인다(ADR 0018). 삭제된
+> 이유 문자열(`auto-webgpu-promoted`, `repeated-webgpu-failure`)을 지우고 실제 계약으로 다시
+> 적는다. 이 표가 지워지지 않은 탓에 브라우저 게이트가 1년 가까이 없는 정책을 단언했다.
+
+| 호스트 | 명시 WebGPU 선택 | 명시 WebGL2 선택 | 이유 |
 | --- | --- | --- | --- |
-| 일반 브라우저 | WebGPU | WebGPU | `auto-webgpu-promoted` |
-| 카카오톡·네이버·라인·밴드·다음·틱톡·위챗, 일반 WebView | WebGL2 | WebGPU 가능 | `inapp-browser-opt-in-required` |
-| 인스타그램·페이스북·스레드 | WebGL2 | 거부 | `inapp-browser-blocked` |
-| 데이터 절약 모드 / 4GB 미만 모바일 | WebGL2 | WebGPU 가능 | `save-data-enabled`, `low-device-memory` |
-| WebGPU 초기화 2회 연속 실패 | WebGL2 | 거부(세션 한정) | `repeated-webgpu-failure` |
-| 몰입형(WebXR) 세션 진행 중 | WebGL2 | 거부 | `webgl-only-webxr` |
+| 일반 브라우저 | 허용(available) | 허용 | `user-webgpu-override` |
+| 카카오톡·네이버·라인·밴드·다음·틱톡·위챗, 일반 WebView | 허용 + 진단 표기 | 허용 | `user-webgpu-override` (+ `inapp-browser-opt-in-required` 진단) |
+| 인스타그램·페이스북·스레드 | 선택 유지, 사용 불가(unavailable) | 허용 | `inapp-browser-blocked` |
+| 데이터 절약 모드 / 4GB 미만 모바일 | 허용 + 진단 표기 | 허용 | `save-data-enabled`, `low-device-memory` (진단) |
+| WebGPU 초기화·디바이스 손실 실패 | 선택 유지, 실패(failed) | 허용 | `webgpu-runtime-failed` |
+| 몰입형(WebXR) 세션 진행 중 | 선택 유지, 사용 불가 | 허용 | `webgl-only-webxr` |
+| VRM 캐릭터가 장면에 있음 | 선택 유지, 사용 불가 | 허용 | `webgl-only-vrm-character` |
+
+어느 행에서도 제품이 아티스트 대신 다른 백엔드를 고르지 않는다. 거부는 안내문으로 전달되고,
+WebGL2 로 가려면 아티스트가 직접 고른다.
 
 ### WebGL2 전용 기능
 

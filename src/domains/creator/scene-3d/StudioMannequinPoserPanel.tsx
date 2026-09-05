@@ -42,6 +42,7 @@ import {
   StudioToggleChip,
   studioSegmentChipClass,
 } from "../studio-panel-ui";
+import { copyStudioText } from "../studio-workbench-clipboard";
 import {
   StudioVrmPhotoPoseScanner,
   type StudioVrmPhotoPoseApplyPayload,
@@ -1252,12 +1253,17 @@ export function StudioMannequinPoserPanel({
     event.target.value = "";
   }, [commitParams, commitPose]);
 
+  // 인앱 WebView 는 navigator.clipboard 자체를 안 주기도 한다. 그때 프로퍼티 접근이 onClick
+  // 안에서 동기 throw 라 에러 바운더리가 3D 패널을 통째로 날렸다. 성공 여부를 기다린 뒤에만
+  // "복사됨"을 띄운다 — 링크를 못 받은 사용자에게 받았다고 말하지 않는다.
   const handleCopyShareLink = useCallback(() => {
     const hash = encodeStudioMannequinShareHash(stateRef.current);
     const fullUrl = `${window.location.origin}${window.location.pathname}${hash}`;
-    void navigator.clipboard.writeText(fullUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    void copyStudioText(fullUrl).then((ok) => {
+      if (!ok) return;
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    });
   }, []);
 
   const handleApplyPhotoPose = useCallback((payload: StudioVrmPhotoPoseApplyPayload): boolean => {

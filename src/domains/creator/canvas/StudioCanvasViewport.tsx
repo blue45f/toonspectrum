@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 
 import { CANVAS_W } from "../studio-assets";
 import { StudioColorBlindFilterDefs } from "../StudioColorBlindPreview";
@@ -34,6 +34,28 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const props: StudioCanvasViewportProps = { zoomHostRef, ...rest };
   const zoomHostNodeRef = zoomHostRef;
   const live = useStudioCanvasViewportLiveSurfaces(props);
+  /**
+   * Ref identity, not memoisation.
+   *
+   * This callback used to be written inline in the JSX below. It closes over `live`, which is a
+   * fresh object every render, so the compiler could not hold it stable — React therefore
+   * detached and re-attached the ref on every commit. The callback writes React state
+   * (`setPixiMountParent`), and a detach passes `null` while the following attach passes the
+   * node, so the two calls are never the identical-value bail-out: each commit scheduled two more
+   * renders, which detached the ref again. Drawing a stroke re-renders this viewport per pointer
+   * frame, so the loop reached React's nested-update limit within one stroke and error #185 took
+   * the whole editor down through the app error boundary — silently in production, because both
+   * boundaries only logged under import.meta.env.DEV.
+   *
+   * `setPixiMountParent` is a useState setter and `zoomHostNodeRef` is a ref, so both are stable
+   * for the life of the component: with an empty dependency list this ref is attached once and
+   * detached once, which is the contract a ref callback is supposed to have.
+   */
+  const { setPixiMountParent } = live;
+  const bindZoomHost = useCallback((node: HTMLDivElement | null) => {
+    zoomHostNodeRef.current = node;
+    setPixiMountParent(node);
+  }, [setPixiMountParent, zoomHostNodeRef]);
   const interaction = useStudioCanvasViewportInteraction(props);
   const {
     activeCatalogBrushName,
@@ -322,10 +344,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             viewport={props}
             live={live}
             interaction={interaction}
-            bindZoomHost={(node) => {
-              zoomHostNodeRef.current = node;
-              live.setPixiMountParent(node);
-            }}
+            bindZoomHost={bindZoomHost}
           />
           </div>
           <StudioCanvasViewportHudOverlays

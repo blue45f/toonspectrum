@@ -35,7 +35,8 @@
     "eslint.config.mjs",
     "postcss.config.mjs",
     "**/*.mts",
-    "scripts/studio-gpu-committed-parity-browser.ts"
+    "scripts/studio-gpu-committed-parity-browser.ts",
+    "scripts/studio-bg3d-webgpu-engine-browser.ts"
   ],
   "exclude": [
     "node_modules",

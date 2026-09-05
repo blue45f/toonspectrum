@@ -86,6 +86,14 @@ jobs:
         run: pnpm run build
       - name: Sweep every Studio route under in-app browser conditions
         run: pnpm run verify:studio-inapp-browser
+      - name: Drive the Studio's features inside those in-app browsers
+        # The route sweep above opens every route once and measures the chrome it finds. It never
+        # touches the app afterwards, so an error that only appears when somebody picks a tool,
+        # opens a sheet or draws a stroke has never been in front of a gate — which is how a
+        # React #185 render loop shipped, firing on the first stroke on every phone profile while
+        # both error boundaries stayed silent in production. This drives 45 interactions and
+        # attributes every error channel, boundary catches included, to the step in flight.
+        run: pnpm run verify:studio-inapp-feature-sweep
       - name: Open the 3D editor inside those same in-app browsers
         # The route sweep above proves every Studio route survives an embedded WebView; it never
         # opens the 3D editor, which is where the engine-selection policy has to hold. This drives
