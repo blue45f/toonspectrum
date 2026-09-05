@@ -1,0 +1,517 @@
+diff --git a/apps/api/src/modules/admin/admin-input-hardening.test.ts b/apps/api/src/modules/admin/admin-input-hardening.test.ts
+new file mode 100644
+index 0000000..e440409e136c1c76c097a8db16af4004408dd4c4
+--- /dev/null
++++ b/apps/api/src/modules/admin/admin-input-hardening.test.ts
+@@ -0,0 +1,20 @@
++import { BadRequestException } from "@nestjs/common";
++import { describe, expect, it } from "vitest";
++
++import { parseIpAddress } from "./admin-types";
++
++describe("strict security rule inputs", () => {
++  it.each(["192.0.2.1/0", "192.0.2.1/32", "2001:db8::/0", "2001:db8::1/128"])(
++    "preserves valid boundary %s", (address) => expect(parseIpAddress(address)).toBe(address),
++  );
++  it.each([
++    "192.0.2.1/24junk", "192.0.2.1/24.5", "192.0.2.1/1e2", "192.0.2.1/+24",
++    "192.0.2.1/-0", "192.0.2.1/ 24", "192.0.2.1/33", "2001:db8::/129",
++    "192.0.2.1/", "192.0.2.1/24/1",
++  ])("rejects malformed prefix %s", (address) => {
++    expect(() => parseIpAddress(address)).toThrow(BadRequestException);
++  });
++  it("rejects coercible non-string values", () => {
++    expect(() => parseIpAddress(["192.0.2.1"])).toThrow(BadRequestException);
++  });
++});
+diff --git a/src/domains/admin/components/admin-client.hardening.test.ts b/src/domains/admin/components/admin-client.hardening.test.ts
+new file mode 100644
+index 0000000..e9e7a2fd259b6646dc9feea38752219dd0b6010f
+--- /dev/null
++++ b/src/domains/admin/components/admin-client.hardening.test.ts
+@@ -0,0 +1,61 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
++vi.mock("@/src/infrastructure/api", () => ({
++  api: { raw },
++  apiPath: (path: string) => `https://api.qa.invalid${path}`,
++  HTTPError: class extends Error {
++    constructor(public response: Response, public data: unknown) { super("HTTP failure"); }
++  },
++}));
++
++import { AdminApiError, adminFetch, adminFetchText } from "./admin-client";
++import { HTTPError } from "@/src/infrastructure/api";
++
++describe("admin client hardening", () => {
++  beforeEach(() => { raw.mockReset(); raw.mockResolvedValue(new Response('{"ok":true}')); });
++
++  it("uses configured API base and preserves query", async () => {
++    await adminFetch("/users?q=a%26b", "not-a-credential");
++    expect(raw.mock.calls[0][0]).toBe("https://api.qa.invalid/api/admin/users?q=a%26b");
++    expect(new Headers(raw.mock.calls[0][1].headers).has("x-user-id")).toBe(false);
++  });
++  it("forwards caller cancellation", async () => {
++    const controller = new AbortController();
++    await adminFetch("/users", "u", { signal: controller.signal });
++    expect(raw.mock.calls[0][1].signal).toBe(controller.signal);
++  });
++  it("preserves explicit content type without duplicate values", async () => {
++    await adminFetch("/config", "u", {method:"POST",body:"x",headers:{"content-type":"text/plain"}});
++    expect(new Headers(raw.mock.calls[0][1].headers).get("content-type")).toBe("text/plain");
++  });
++  it("does not override FormData multipart boundaries", async () => {
++    await adminFetch("/upload", "u", {method:"POST",body:new FormData()});
++    expect(new Headers(raw.mock.calls[0][1].headers).has("content-type")).toBe(false);
++  });
++  it("handles whitespace-only successful bodies", async () => {
++    raw.mockResolvedValue(new Response(" \n\t"));
++    await expect(adminFetch("/users", "u")).resolves.toBeUndefined();
++  });
++  it("wraps unexpected HTML rather than leaking SyntaxError", async () => {
++    raw.mockResolvedValue(new Response("<html>gateway</html>"));
++    await expect(adminFetch("/users", "u")).rejects.toBeInstanceOf(AdminApiError);
++  });
++  it("shows actionable validation messages before generic error labels", async () => {
++    // The isolated double has a two-argument constructor; avoid depending on
++    // the transport library's changing constructor signature in this unit test.
++    const error = Object.assign(Object.create(HTTPError.prototype), {
++      response:new Response(null,{status:400}), data:{error:"Bad Request",message:["Name required","Email invalid"]},
++    });
++    raw.mockRejectedValue(error);
++    await expect(adminFetch("/users", "u")).rejects.toMatchObject({status:400,message:"Name required\nEmail invalid"});
++  });
++  it("keeps non-HTTP failures intact", async () => {
++    const error = new DOMException("Aborted", "AbortError"); raw.mockRejectedValue(error);
++    await expect(adminFetch("/users", "u")).rejects.toBe(error);
++  });
++  it("preserves CSV exports", async () => {
++    raw.mockResolvedValue(new Response("name,role\nQA,admin"));
++    await expect(adminFetchText("/users/export/csv", "u")).resolves.toBe("name,role\nQA,admin");
++  });
++});
+diff --git a/src/domains/admin/AdminMembersPage.tsx b/src/domains/admin/AdminMembersPage.tsx
+--- a/src/domains/admin/AdminMembersPage.tsx
++++ b/src/domains/admin/AdminMembersPage.tsx
+@@ -16,8 +16,11 @@
+   useCallback,
+   useEffect,
+   useMemo,
++  useRef,
+   useState,
+ } from "react";
++
++import { AdminRequestScope, canManageAdminMembers } from "./admin-request-scope";
+ 
+ import { getAdminAdvancedCopy } from "./admin-advanced-copy";
+ import { loadAdminI18nLocale } from "./admin-i18n-loader";
+@@ -161,14 +164,37 @@
+ 
+         <AdminGateFallback gate={gate} />
+         {gate.kind === "admin" && uid ? (
+-          <MemberBoard uid={uid} selfId={gate.me.id} />
++          <MemberBoard
++            key={`${uid}:${gate.me.role}`}
++            uid={uid}
++            selfId={gate.me.id}
++            canManageMembers={canManageAdminMembers(gate.me.role)}
++          />
+         ) : null}
+       </Container>
+     </AdminToastProvider>
+   );
+ }
+ 
+-function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
++function MemberBoard({ uid, selfId, canManageMembers }: {
++  uid: string;
++  selfId: string;
++  canManageMembers: boolean;
++}) {
++  const [listRequests] = useState(() => new AdminRequestScope());
++  const [detailRequests] = useState(() => new AdminRequestScope());
++  const [refreshRevision, setRefreshRevision] = useState(0);
++  const actionLock = useRef(false);
++  const mounted = useRef(true);
++
++  useEffect(() => {
++    mounted.current = true;
++    return () => {
++      mounted.current = false;
++      listRequests.cancel();
++      detailRequests.cancel();
++    };
++  }, [listRequests, detailRequests]);
+   const [members, setMembers] = useState<MemberRow[]>([]);
+   const [meta, setMeta] = useState<MemberListResponse["meta"]>({
+     limit: 25,
+@@ -237,6 +263,7 @@
+ 
+   const loadMembers = useCallback(
+     async (background = false) => {
++      const request = listRequests.begin();
+       if (background) setRefreshing(true);
+       else setLoading(true);
+       setError(null);
+@@ -245,40 +272,58 @@
+         const response = await adminFetch<MemberListResponse>(
+           `/users?${query}`,
+           uid,
++          { signal: request.signal },
+         );
++        if (!request.isCurrent()) return;
+         const totalPages = getPageCount(response.meta.total, pageSize);
+         if (page > totalPages) {
+           setPage(totalPages);
+           return;
+         }
+-        setMembers(response.items ?? []);
++        const items = response.items ?? [];
++        setMembers(items);
+         setMeta(response.meta);
++        const visibleIds = new Set(items.filter(
++          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
++        ).map((member) => member.id));
++        setSelectedIds((current) => new Set(
++          [...current].filter((id) => canManageMembers && visibleIds.has(id)),
++        ));
+       } catch (requestError) {
++        if (!request.isCurrent()) return;
+         setError(
+           requestError instanceof Error
+             ? requestError.message
+             : t("admin.members.empty"),
+         );
+       } finally {
+-        setLoading(false);
+-        setRefreshing(false);
++        if (request.isCurrent()) {
++          setLoading(false);
++          setRefreshing(false);
++        }
+       }
+     },
+-    [filters, page, pageSize, t, uid],
++    [canManageMembers, filters, listRequests, page, pageSize, selfId, t, uid],
+   );
+ 
+   useEffect(() => {
+     void loadMembers(false);
+-  }, [loadMembers]);
++    return () => listRequests.cancel();
++  }, [listRequests, loadMembers, refreshRevision]);
++
++  // Selection belongs to the visible query, never to a hidden previous page.
++  useEffect(() => {
++    setSelectedIds(new Set());
++  }, [filters, canManageMembers]);
+ 
+   const selectableIds = useMemo(
+     () =>
+       members
+         .filter(
+-          (member) => member.id !== selfId && member.status !== "deleted",
++          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
+         )
+         .map((member) => member.id),
+-    [members, selfId],
++    [canManageMembers, members, selfId],
+   );
+   const allVisibleSelected =
+     selectableIds.length > 0 &&
+@@ -296,6 +341,14 @@
+   };
+ 
+   const openAction = (action: PendingAction) => {
++    if (!canManageMembers || actionLock.current || loading || refreshing) return;
++    if (action.kind !== "bulk" && (
++      action.member.id === selfId || action.member.status === "deleted"
++    )) return;
++    if (action.kind === "bulk" && (
++      action.memberIds.length === 0 || action.memberIds.length > 200 ||
++      action.memberIds.some((id) => !selectableIds.includes(id))
++    )) return;
+     setActionReason(
+       action.kind === "status" && action.status === "suspended"
+         ? action.member.suspensionReason ?? ""
+@@ -305,13 +358,15 @@
+   };
+ 
+   const closeAction = () => {
+-    if (actionBusy) return;
++    if (actionLock.current) return;
+     setPendingAction(null);
+     setActionReason("");
+   };
+ 
+   const performAction = async () => {
+-    if (!pendingAction) return;
++    if (!pendingAction || !canManageMembers || actionLock.current) return;
++    // State updates are batched. The ref closes the same-render double-click gap.
++    actionLock.current = true;
+     setActionBusy(true);
+     try {
+       if (pendingAction.kind === "role") {
+@@ -323,6 +378,7 @@
+             body: JSON.stringify({ role: pendingAction.role }),
+           },
+         );
++        if (!mounted.current) return;
+         showToast(copy.members.updateSuccess);
+       } else if (pendingAction.kind === "status") {
+         await adminFetch(
+@@ -336,6 +392,7 @@
+             }),
+           },
+         );
++        if (!mounted.current) return;
+         showToast(copy.members.updateSuccess);
+       } else if (pendingAction.kind === "delete") {
+         await adminFetch(
+@@ -346,6 +403,7 @@
+             body: JSON.stringify({ reason: actionReason }),
+           },
+         );
++        if (!mounted.current) return;
+         setSelectedIds((current) => {
+           const next = new Set(current);
+           next.delete(pendingAction.member.id);
+@@ -365,15 +423,20 @@
+             }),
+           },
+         );
++        if (!mounted.current) return;
+         setSelectedIds(new Set());
+         showToast(
+           interpolateCount(copy.members.bulkSuccess, response.count),
+         );
+       }
+ 
+-      closeAction();
+-      await loadMembers(true);
++      if (!mounted.current) return;
++      setPendingAction(null);
++      setActionReason("");
++      // Use the current render's filters, not the mutation's stale closure.
++      setRefreshRevision((value) => value + 1);
+     } catch (requestError) {
++      if (!mounted.current) return;
+       showToast(
+         t("admin.members.title"),
+         requestError instanceof Error
+@@ -382,34 +445,46 @@
+         "error",
+       );
+     } finally {
+-      setActionBusy(false);
++      actionLock.current = false;
++      if (mounted.current) setActionBusy(false);
+     }
+   };
+ 
++  const closeDetails = () => {
++    detailRequests.cancel();
++    setDetailMember(null);
++    setDetail(null);
++    setDetailError(null);
++    setDetailLoading(false);
++  };
++
+   const openDetails = async (member: MemberRow) => {
++    const request = detailRequests.begin();
+     setDetailMember(member);
+     setDetail(null);
+     setDetailError(null);
+     setDetailLoading(true);
+     try {
+-      setDetail(
+-        await adminFetch<MemberDetails>(
+-          `/users/${encodeURIComponent(member.id)}/details`,
+-          uid,
+-        ),
++      const response = await adminFetch<MemberDetails>(
++        `/users/${encodeURIComponent(member.id)}/details`,
++        uid,
++        { signal: request.signal },
+       );
++      if (request.isCurrent()) setDetail(response);
+     } catch (requestError) {
++      if (!request.isCurrent()) return;
+       setDetailError(
+         requestError instanceof Error
+           ? requestError.message
+           : copy.members.emptyDetail,
+       );
+     } finally {
+-      setDetailLoading(false);
++      if (request.isCurrent()) setDetailLoading(false);
+     }
+   };
+ 
+   const exportCsv = () => {
++    if (loading || refreshing || error) return;
+     try {
+       const csv = buildMemberCsv(members);
+       downloadAdminFile(
+@@ -457,7 +532,14 @@
+   })();
+ 
+   return (
+-    <div className="flex flex-col gap-4">
++    <div className="flex flex-col gap-4" aria-busy={loading || refreshing}>
++      {!canManageMembers ? (
++        <p role="status" className="rounded-xl border border-line bg-card/70 p-3 text-sm text-fg-2">
++          {lang === "ko"
++            ? "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요."
++            : "Read only: you can view and export members. Only administrators can change roles, account status, or delete members."}
++        </p>
++      ) : null}
+       <section className="rounded-2xl border border-line bg-card/70 p-4">
+         <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+           <div className="flex-1">
+@@ -566,6 +648,7 @@
+             <button
+               type="button"
+               onClick={exportCsv}
++              disabled={loading || refreshing || !!error || members.length === 0}
+               className={adminButtonClass("ghost")}
+             >
+               <Download size={14} />
+@@ -597,7 +680,7 @@
+                 toggleVisibleMemberSelection(current, selectableIds),
+               )
+             }
+-            disabled={selectableIds.length === 0}
++            disabled={!canManageMembers || actionBusy || loading || refreshing || selectableIds.length === 0}
+             className="size-4 rounded border-line accent-accent"
+           />
+           {copy.members.selectPage}
+@@ -613,11 +696,12 @@
+             : ""}
+         </span>
+ 
+-        {selectedIds.size > 0 ? (
++        {canManageMembers && selectedIds.size > 0 ? (
+           <div className="flex flex-wrap gap-2 sm:ml-auto">
+             <button
+               type="button"
+               className={adminButtonClass("ghost")}
++              disabled={actionBusy || loading || refreshing}
+               onClick={() =>
+                 openAction({
+                   kind: "bulk",
+@@ -632,6 +716,7 @@
+             <button
+               type="button"
+               className={adminButtonClass("danger")}
++              disabled={actionBusy || loading || refreshing}
+               onClick={() =>
+                 openAction({
+                   kind: "bulk",
+@@ -698,7 +783,7 @@
+             <tbody>
+               {members.map((member) => {
+                 const isSelf = member.id === selfId;
+-                const selectable = !isSelf && member.status !== "deleted";
++                const selectable = canManageMembers && !actionBusy && !refreshing && !isSelf && member.status !== "deleted";
+                 return (
+                   <tr
+                     key={member.id}
+@@ -788,7 +873,7 @@
+                         <select
+                           id={`role-${member.id}`}
+                           value={member.role}
+-                          disabled={isSelf || member.status === "deleted"}
++                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                           onChange={(event) =>
+                             openAction({
+                               kind: "role",
+@@ -815,7 +900,7 @@
+                                 status: "active",
+                               })
+                             }
+-                            disabled={isSelf}
++                            disabled={!canManageMembers || actionBusy || refreshing || isSelf}
+                             className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-good/45 hover:text-good disabled:opacity-45"
+                           >
+                             <RotateCcw size={11} />
+@@ -831,7 +916,7 @@
+                                 status: "suspended",
+                               })
+                             }
+-                            disabled={isSelf || member.status === "deleted"}
++                            disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                             className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
+                           >
+                             <Ban size={11} />
+@@ -842,7 +927,7 @@
+                         <button
+                           type="button"
+                           onClick={() => openAction({ kind: "delete", member })}
+-                          disabled={isSelf || member.status === "deleted"}
++                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                           className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-bad/30 px-2 text-[0.68rem] text-bad transition-colors hover:bg-bad/10 disabled:opacity-45"
+                         >
+                           <Trash2 size={11} />
+@@ -933,7 +1018,7 @@
+                   : "accent",
+               )}
+               onClick={() => void performAction()}
+-              disabled={actionBusy}
++              disabled={!canManageMembers || actionBusy}
+             >
+               {actionBusy ? copy.common.saving : copy.common.confirm}
+             </button>
+@@ -957,6 +1042,7 @@
+             </span>
+             <textarea
+               value={actionReason}
++              disabled={actionBusy}
+               onChange={(event) => setActionReason(event.target.value)}
+               maxLength={300}
+               rows={4}
+@@ -972,11 +1058,7 @@
+ 
+       <AdminDialog
+         open={detailMember != null}
+-        onClose={() => {
+-          setDetailMember(null);
+-          setDetail(null);
+-          setDetailError(null);
+-        }}
++        onClose={closeDetails}
+         title={copy.members.detailsTitle}
+         description={
+           detailMember
+@@ -989,7 +1071,7 @@
+           <button
+             type="button"
+             className={adminButtonClass("ghost")}
+-            onClick={() => setDetailMember(null)}
++            onClick={closeDetails}
+           >
+             {copy.common.close}
+           </button>
+diff --git a/src/domains/admin/admin-members-model.ts b/src/domains/admin/admin-members-model.ts
+--- a/src/domains/admin/admin-members-model.ts
++++ b/src/domains/admin/admin-members-model.ts
+@@ -54,7 +54,8 @@
+ 
+ export function getPageCount(total: number, pageSize: number): number {
+   if (!Number.isFinite(total) || total <= 0) return 1;
+-  return Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
++  const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : 25;
++  return Math.max(1, Math.ceil(total / size));
+ }
+ 
+ export function clampPage(page: number, total: number, pageSize: number): number {
+@@ -101,7 +102,7 @@
+ 
+ function spreadsheetSafeCsvCell(value: unknown): string {
+   let text = String(value ?? "");
+-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
++  if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/u.test(text)) text = `'${text}`;
+   return `"${text.replace(/"/g, '""')}"`;
+ }
+ 
