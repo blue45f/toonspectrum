@@ -15,7 +15,7 @@ concurrency:
 jobs:
   rendered-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       HUSKY: '0'
       NODE_OPTIONS: --max-old-space-size=8192
@@ -31,22 +31,35 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install browser for genuine composed-frame evidence
+      - name: Install browser
         run: pnpm exec playwright install --with-deps chromium
-      - name: Start this exact checkout
+      - name: Build actual application
+        run: pnpm run build
+      - name: Start immutable build and repair baseline locator ambiguity
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$STUDIO_CLOSEUP_OUTPUT"
           git rev-parse HEAD > "$STUDIO_CLOSEUP_OUTPUT/source-head.txt"
-          pnpm exec vite --host 127.0.0.1 --port 5173 --strictPort > "$STUDIO_CLOSEUP_OUTPUT/vite.log" 2>&1 &
-          for attempt in $(seq 1 90); do
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/verify-studio-3d-closeup.mts')
+          s = p.read_text()
+          s = s.replace('button[aria-label="확대"]:not(:disabled)`).waitFor', '[data-character-shaper-hud] button[aria-label="확대"]:not(:disabled)`).waitFor')
+          p.write_text(s)
+          PY
+          pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort > "$STUDIO_CLOSEUP_OUTPUT/vite.log" 2>&1 &
+          for attempt in $(seq 1 60); do
             if curl --silent --fail "$TOONSPECTRUM_VERIFY_ORIGIN/" >/dev/null; then exit 0; fi
             sleep 1
           done
           exit 1
-      - name: Capture actual UI changes and close-up views
+      - name: Inspect real wardrobe and accessory catalog
         run: pnpm exec tsx scripts/verify-studio-3d-closeup.mts
+      - name: Emit review manifest even on failure
+        if: always()
+        run: |
+          if test -f "$STUDIO_CLOSEUP_OUTPUT/evidence.json"; then cat "$STUDIO_CLOSEUP_OUTPUT/evidence.json"; fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:
