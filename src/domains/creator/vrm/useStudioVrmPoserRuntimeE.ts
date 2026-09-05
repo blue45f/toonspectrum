@@ -48,10 +48,10 @@ import {
   buildVrmPoseDataUrlMetadata,
 } from "./studio-vrm-poser-utils";
 import {
-  createPropInstance,
   serializeVrmProps,
   type PropInstance,
 } from "./studio-vrm-props";
+import { createSelectableStudioVrmPropInstance as createPropInstance } from "./studio-vrm-prop-selection";
 import {
   captureStudioVrmRgba,
   encodeStudioVrmCapturePngDataUrl,

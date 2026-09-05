@@ -17,16 +17,17 @@ import {
 
 import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
 
+import { studioVrmPropQualityNotice } from "./studio-vrm-prop-quality-policy";
 import {
   inspectAutoGripReadiness,
   type AutoGripReadiness,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
+import { SELECTABLE_VRM_PROPS, selectableStudioVrmPropById } from "./studio-vrm-prop-selection";
 import {
   PROP_ATTACH_BONES,
   PROP_BONE_LABELS,
   PROP_CATEGORY_LABELS,
-  VRM_PROPS,
   VRM_PROP_GRIP_FIT_MAX,
   VRM_PROP_GRIP_FIT_MIN,
   VRM_PROPS_VERSION,
@@ -63,7 +64,7 @@ const RECOMMENDED_PROP_IDS = [
   "smartphone",
   "mug",
   "book",
-  "sword",
+  "mic",
   "glasses",
   "cap",
   "backpack",
@@ -628,6 +629,11 @@ function SelectedEditor({
           <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
             {definition?.hint ?? "기존 소품의 부착 위치와 모양을 조정합니다."}
           </p>
+          {studioVrmPropQualityNotice(item.propId) ? (
+            <p role="note" className="mt-2 rounded-lg border border-warn/30 bg-warn/10 p-2 text-[0.64rem] leading-relaxed text-warn">
+              품질 개선 대상으로 새 추가가 중단되었습니다. 기존 장면의 부착과 편집은 유지됩니다. {studioVrmPropQualityNotice(item.propId)}
+            </p>
+          ) : null}
         </div>
         <span
           className={cn(
@@ -1005,11 +1011,11 @@ export function StudioVrmPropPanel({
   const [statusMessage, setStatusMessage] = useState("");
 
   const quickDefinitions = recentPropIds
-    .map((id) => propDefById(id))
+    .map((id) => selectableStudioVrmPropById(id))
     .filter((definition): definition is PropDef => Boolean(definition))
     .slice(0, 8);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
-  const filteredDefinitions = VRM_PROPS.filter((definition) => {
+  const filteredDefinitions = SELECTABLE_VRM_PROPS.filter((definition) => {
     if (category !== "all" && definition.category !== category) return false;
     if (!normalizedQuery) return true;
     const searchText = `${definition.label} ${definition.hint} ${
@@ -1069,7 +1075,7 @@ export function StudioVrmPropPanel({
   }
 
   function handleAdd(definition: PropDef): void {
-    if (!vrmReady) return;
+    if (!vrmReady || !selectableStudioVrmPropById(definition.id)) return;
     setRecentPropIds((current) => [
       definition.id,
       ...current.filter((id) => id !== definition.id),
@@ -1306,6 +1312,9 @@ export function StudioVrmPropPanel({
         </div>
       </div>
 
+      <p className="mt-3 text-[0.64rem] leading-relaxed text-fg-3">
+        품질 개선 중인 소품은 새 추가 목록에서 제외했습니다. 기존 장착 소품은 그대로 유지됩니다.
+      </p>
       <details className="group mt-4 rounded-xl border border-line bg-panel/45">
         <summary
           aria-controls={catalogContentId}
@@ -1319,7 +1328,7 @@ export function StudioVrmPropPanel({
             전체 소품 찾기
           </span>
           <span className="flex shrink-0 items-center gap-1 text-[0.64rem] font-normal tabular-nums text-fg-3">
-            {VRM_PROPS.length}종
+            {SELECTABLE_VRM_PROPS.length}종
             <ChevronDown
               size={14}
               className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
