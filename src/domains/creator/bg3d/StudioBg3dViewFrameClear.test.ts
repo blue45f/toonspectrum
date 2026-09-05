@@ -31,7 +31,7 @@ afterEach(() => cleanup());
 describe("Studio BG3D View framebuffer clear", () => {
   it("registers the actual frame callback at the pre-View priority and clears its current renderer", () => {
     const mounted = render(createElement(StudioBg3dViewFrameClear));
-    expect(mounted.container).toBeEmptyDOMElement();
+    expect(mounted.container.childNodes).toHaveLength(0);
     expect(useFrameMock).toHaveBeenCalledOnce();
     expect(useFrameMock).toHaveBeenCalledWith(
       expect.any(Function),
