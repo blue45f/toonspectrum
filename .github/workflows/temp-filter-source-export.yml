@@ -15,24 +15,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Package filter implementation and contracts
+
+      - name: Inspect staged filter upgrade payload
+        shell: bash
         run: |
-          tar -czf filter-source.tar.gz \
-            src/domains/creator/filter \
-            src/domains/creator/render \
-            src/domains/creator/studio-*.ts \
-            src/domains/creator/brush/studio-ink-wash.ts \
-            src/domains/creator/layer/studio-layer-border-effect.ts \
-            scripts/verify-studio-filter-dialog.mts \
-            scripts/verify-studio-gpu-filters.mts \
-            package.json \
-            pnpm-lock.yaml \
-            tsconfig.json \
-            vitest.config.* \
-            .github/workflows/studio-filter-dialog.yml 2>/dev/null || true
+          set -u
+          mkdir -p filter-upgrade-export
+          cp -R .github/filter-upgrade-parts filter-upgrade-export/parts
+          cat .github/filter-upgrade-parts/part-* > filter-upgrade-export/payload.b64
+          set +e
+          base64 --decode filter-upgrade-export/payload.b64 > filter-upgrade-export/payload.tar.gz 2>filter-upgrade-export/base64-error.txt
+          decode_status=$?
+          gzip -t filter-upgrade-export/payload.tar.gz 2>filter-upgrade-export/gzip-error.txt
+          gzip_status=$?
+          tar -tzf filter-upgrade-export/payload.tar.gz > filter-upgrade-export/tar-list.txt 2>filter-upgrade-export/tar-error.txt
+          tar_status=$?
+          set -e
+          {
+            echo "part_count=$(find .github/filter-upgrade-parts -maxdepth 1 -type f -name 'part-*' | wc -l)"
+            echo "base64_bytes=$(wc -c < filter-upgrade-export/payload.b64)"
+            echo "decoded_bytes=$(wc -c < filter-upgrade-export/payload.tar.gz)"
+            echo "decode_status=$decode_status"
+            echo "gzip_status=$gzip_status"
+            echo "tar_status=$tar_status"
+          } > filter-upgrade-export/report.txt
+
       - uses: actions/upload-artifact@v4
         with:
-          name: filter-source
-          path: filter-source.tar.gz
+          name: filter-upgrade-staging
+          path: filter-upgrade-export
           if-no-files-found: error
           retention-days: 1
