@@ -37,9 +37,8 @@ jobs:
           assert hashlib.sha256(payload).hexdigest() == 'b1677e0b9a2d590e463634d95fab7b1ecfca7d6d9d38be4d7ee1bc7d9239c71e', 'transport mismatch'
           patch = lzma.decompress(payload)
           assert hashlib.sha256(patch).hexdigest() == 'd79a07959548129ebbc2854aa07b87a59bdcdb90a10a0eba7f90b045951a547c', 'patch mismatch'
-          # Reviewed main changes: CI was switched off, the title is now h1,
-          # and production uses a lazy route adapter shared with Storyworld.
-          # Preserve those changes. Reject unknown anchors instead of overwriting files.
+          # Preserve reviewed concurrent main changes: the disabled CI switch,
+          # semantic h1 and the lazy production/Storyworld route boundaries.
           parts = re.split(r'(?=^diff --git )', patch.decode(), flags=re.M)
           adapted = []
           for part in parts:
@@ -76,14 +75,12 @@ jobs:
           old = 'onOpenStudio={() => navigate("/studio")}'
           assert production.count(old) == 1, 'production exit changed again'
           production = production.replace(old, 'onOpenStudio={() => navigate(resolution.editorHref)}')
-          # The page keys its inner workspace by document only. Switching views
-          # of the same work must not remount pending local state.
           assert 'key={resolution.lifecycleKey}' not in production
           router.write_text(before + '    case "production":' + production + '    case ' + after)
           PY
           git fetch --no-tags origin 7d5f2c63b0e12bb55dfe91db0c6cf2477262c379
           python3 - <<'PY'
-          import pathlib, subprocess
+          import hashlib, pathlib, subprocess
           files = {
             'studio-batch-rename.ts': '0584b4be8689c82da493824116993e4d29bf8cd8',
             'studio-batch-rename.test.ts': 'e0feda7964a2b608e50aacc7ae3e53fd8c048455',
@@ -97,12 +94,17 @@ jobs:
               actual = subprocess.check_output(['git', 'hash-object', '--stdin'], input=data).decode().strip()
               assert actual == expected, f'pending implementation mismatch: {path}'
               path.write_bytes(data)
+          repair = pathlib.Path('.github/studio-merge-rename-fixes.patch').read_bytes()
+          assert hashlib.sha256(repair).hexdigest() == '19c063250ebed717089d25c92f0fcf983d4f638e50912303a87806ec88447846', 'rename repair mismatch'
+          subprocess.run(['git', 'apply', '--check', '-'], input=repair, check=True)
+          subprocess.run(['git', 'apply', '-'], input=repair, check=True)
           PY
           git rm --ignore-unmatch \
             .github/studio-audit-payload-0.txt \
             .github/studio-audit-payload-1.txt \
             .github/studio-audit-payload-2.txt \
             .github/studio-merge-recovery.patch.b64 \
+            .github/studio-merge-rename-fixes.patch \
             .github/workflows/studio-audit-source-snapshot.yml \
             .github/workflows/studio-audit-existing-pr-source.yml \
             .github/workflows/studio-merge-recovery-apply.yml
@@ -166,3 +168,20 @@ jobs:
           PY
           git show --stat --oneline HEAD
           git rev-parse HEAD
+      - name: Preserve the prepared tree and product-only diff for review
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/studio-recovery"
+          git rev-parse HEAD > "$RUNNER_TEMP/studio-recovery/revision.txt"
+          git rev-parse origin/main > "$RUNNER_TEMP/studio-recovery/base.txt"
+          git diff --binary --full-index origin/main HEAD > "$RUNNER_TEMP/studio-recovery/product.patch"
+          git diff --stat origin/main HEAD > "$RUNNER_TEMP/studio-recovery/stat.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-recovery-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-recovery
+          if-no-files-found: error
+          retention-days: 3
