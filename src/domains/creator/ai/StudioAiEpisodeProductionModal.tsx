@@ -621,7 +621,7 @@ export function StudioAiEpisodeProductionModal({
                   </div>
                   <div className="mt-3 space-y-2">
                     {plan.batches.map((batch, index) => (
-                      <details key={batch.id} className="group rounded-xl border border-line bg-raised/40" defaultOpen={index === 0}>
+                      <details key={batch.id} className="group rounded-xl border border-line bg-raised/40" open={index === 0}>
                         <summary className={cn("flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2", STUDIO_FOCUS_RING)}>
                           <span className="min-w-0">
                             <strong className="block truncate text-xs text-fg">배치 {batch.order} · {batch.sceneTitle}</strong>
