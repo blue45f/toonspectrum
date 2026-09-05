@@ -11,13 +11,13 @@ describe("Studio user manual content", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(MANUAL_CATEGORIES).toHaveLength(6);
     for (const article of MANUAL_ARTICLES) {
-      expect(article.id).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
+      expect(article.id).toMatch(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
       expect(MANUAL_CATEGORIES.some((category) => category.id === article.category)).toBe(true);
       expect(article.summary.length).toBeGreaterThan(20);
       expect(article.sections.length).toBeGreaterThanOrEqual(3);
       expect(new Set(article.sections.map((section) => section.id)).size).toBe(article.sections.length);
       for (const section of article.sections) {
-        expect(section.id).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
+        expect(section.id).toMatch(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
         expect(section.paragraphs.length + (section.steps?.length ?? 0)).toBeGreaterThan(0);
       }
     }
@@ -58,8 +58,9 @@ describe("Studio manual search and URLs", () => {
     expect(searchManual("")).toEqual(MANUAL_ARTICLES);
     expect(searchManual("   \n\t ")).toEqual(MANUAL_ARTICLES);
   });
-  it("searches Korean and familiar product aliases", () => {
+  it("ranks Korean and familiar product aliases above incidental body mentions", () => {
     expect(searchManual("스머지")[0]?.id).toBe("brushes");
+    expect(searchManual("스머지").map((article) => article.id)).toContain("shortcuts");
     expect(searchManual("bucket")[0]?.id).toBe("selection-fill");
     expect(searchManual("BACKUP")[0]?.id).toBe("save-recovery");
   });

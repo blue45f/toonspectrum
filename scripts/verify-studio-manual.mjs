@@ -42,8 +42,11 @@ try {
 
   const search = page.getByRole("searchbox", { name: "매뉴얼 검색어" });
   await search.fill("스머지");
-  await page.waitForFunction(() => document.querySelectorAll(".manual-card").length === 1);
-  assert.match(await page.locator(".manual-card").innerText(), /브러시와 지우개/);
+  await page.waitForFunction(() => {
+    const cards = document.querySelectorAll(".manual-card");
+    return cards.length > 0 && cards.length < 14 && cards[0]?.textContent?.includes("브러시와 지우개");
+  });
+  assert.match(await page.locator(".manual-card").first().innerText(), /브러시와 지우개/);
   await search.fill("not-a-real-term-938271");
   await page.getByRole("heading", { name: "검색 결과가 없습니다" }).waitFor();
   await page.getByRole("button", { name: "전체 문서 보기", exact: true }).click();
@@ -51,12 +54,18 @@ try {
   await page.getByLabel("매뉴얼 분류", { exact: true }).selectOption("three");
   assert.equal(await page.locator(".manual-card").count(), 2);
   await page.getByRole("button", { name: "검색 초기화" }).click();
-  checks.push("alias search, empty state, reset, category filtering");
+  checks.push("ranked alias search including body mentions, empty state, reset, category filtering");
 
   await page.goto(`${base}/studio/manual/save-recovery#backup`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "저장·백업·복구", exact: true }).waitFor();
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "저장·백업·복구", exact: true }).waitFor();
+  await page.waitForFunction(() => {
+    const target = document.getElementById("backup");
+    if (!target) return false;
+    const top = target.getBoundingClientRect().top;
+    return top >= 76 && top <= 140;
+  });
   assert.match(await page.title(), /저장·백업·복구/);
   await page.screenshot({ path: `${output}/desktop-article.png` });
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -67,7 +76,7 @@ try {
   assert.equal(await page.locator(".manual-header").isVisible(), false);
   assert.equal(await page.locator("#main-content").evaluate((element) => getComputedStyle(element).overflow), "visible");
   await page.emulateMedia({ media: "screen" });
-  checks.push("direct article URL, reload, article title, copy with anchor, print unclipping");
+  checks.push("direct article URL, reload and fragment scrolling, article title, copy with anchor, print unclipping");
 
   await page.goto(`${base}/studio/manual/not-a-chapter`);
   await page.getByRole("heading", { name: "문서를 찾을 수 없습니다", exact: true }).waitFor();

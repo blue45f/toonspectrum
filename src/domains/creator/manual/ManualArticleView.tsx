@@ -1,12 +1,33 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import { MANUAL_ARTICLES, MANUAL_SHORTCUTS, type ManualArticle } from "./studio-manual-data";
 import { findManualArticle, manualArticleHref } from "./studio-manual-search";
 
 export function ManualArticleView({ article }: { readonly article: ManualArticle }) {
+  const { hash } = useLocation();
   const index = MANUAL_ARTICLES.findIndex((entry) => entry.id === article.id);
   const previous = MANUAL_ARTICLES[index - 1];
   const next = MANUAL_ARTICLES[index + 1];
+
+  useEffect(() => {
+    let anchor: string;
+    try {
+      anchor = decodeURIComponent(hash.slice(1));
+    } catch {
+      return;
+    }
+    const knownAnchor = article.sections.some((section) => section.id === anchor)
+      || (article.id === "shortcuts" && anchor === "shortcut-table");
+    if (!knownAnchor) return;
+    // The lazy article may mount after the browser's initial fragment navigation.
+    // Run after the app shell's focus/scroll restoration and limit this to known section IDs.
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(anchor)?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [article, hash]);
+
   return (
     <>
       <p className="manual-summary">{article.summary}</p>
