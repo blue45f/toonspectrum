@@ -57,6 +57,10 @@ export function useRouteTitle(pathname: string, search: string) {
   const t = useT();
   useEffect(() => {
     if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
+    if (pathname === "/") {
+      document.title = `${t("app.name")} · ${t("home.creatorTitle")}`;
+      return;
+    }
     let title: string | undefined;
     if (pathname in STATIC_TITLES) {
       const titleKey = STATIC_TITLES[pathname];

@@ -45,7 +45,7 @@ CI screenshots and reports are evidence only after the corresponding run succeed
 ## Sources
 
 - https://www.remotion.dev/docs/brownfield-installation — separate composition entry and CLI rendering.
-- https://www.remotion.dev/docs/render — rendering options and output.
+- https://www.remotion.dev/docs/cli/render — rendering options and output.
 - https://www.remotion.dev/docs/licensing — check organizational licensing before commercial operation.
 - https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/ — authenticated HTTP integration.
 - https://docs.n8n.io/integrations/builtin/credentials/github/ — GitHub credentials.

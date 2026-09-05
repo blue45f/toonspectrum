@@ -23,6 +23,11 @@ for (const [format, entry] of Object.entries(manifest.assets)) {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", "20", "-i", path, "-frames:v", "1", `${output}/film-${format}-20s.png`]);
   results.push({ check: `render-${format}`, dimensions: [video.width, video.height], duration: probe.format.duration, sha256: entry.sha256 });
 }
+for (let attempt = 0; attempt < 60; attempt += 1) {
+  try { const response = await fetch(origin); if (response.ok) break; } catch { /* Preview server is starting. */ }
+  if (attempt === 59) throw new Error("Preview server did not become ready");
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
 const browser = await chromium.launch({ headless: true });
 try {
   for (const [name, width, height, locale, theme] of [["desktop", 1440, 1000, "ko", "light"], ["tablet", 820, 1180, "ko", "light"], ["mobile", 390, 844, "ko", "light"], ["small-mobile", 320, 740, "ko", "light"], ["dark", 1440, 1000, "ko", "dark"], ["english-mobile", 390, 844, "en", "light"]]) {

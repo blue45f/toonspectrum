@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
 import vm from "node:vm";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const workflow = JSON.parse(readFileSync("automation/n8n/toonstudio-brand-film.json", "utf8"));
 const node = (name) => workflow.nodes.find((entry) => entry.name === name);

@@ -20,7 +20,7 @@ export function ToonStudioFilm() {
   const end = chapter === 3;
   const ink = end ? "#f3f4e9" : "#233c2d";
   const muted = end ? "#c0d1b3" : "#5d755d";
-  const artWidth = stacked ? (portrait ? width - 100 : 650) : width * 0.45;
+  const artWidth = stacked ? (portrait ? width - 100 : 600) : width * 0.45;
   const fontSize = portrait ? (end ? 61 : 67) : stacked ? 62 : end ? 58 : height < 680 ? 61 : 68;
   return <AbsoluteFill style={{ backgroundColor: end ? "#193629" : "#f3f4e9", color: ink, fontFamily: "'Noto Sans CJK KR', 'Noto Sans', sans-serif", overflow: "hidden" }}>
     <AbsoluteFill style={{ backgroundImage: end ? "radial-gradient(#cce89012 1px,transparent 1px)" : "radial-gradient(#33572a12 1px,transparent 1px)", backgroundSize: "20px 20px" }} />

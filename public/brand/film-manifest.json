@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "duration": 24,
+  "fps": 30,
+  "assets": {
+    "landscape": {
+      "src": "/brand/toonstudio-intro.mp4",
+      "width": 1280,
+      "height": 720,
+      "bytes": 3180063,
+      "sha256": "ec7e3ebd84361173f41e1a800625c425b6d45391a10822e90f5429306c242912"
+    },
+    "portrait": {
+      "src": "/brand/toonstudio-intro-portrait.mp4",
+      "width": 720,
+      "height": 1280,
+      "bytes": 3311546,
+      "sha256": "45519f98fa3b61e72bafb07b4ceaf3550e014dc8d58793d1b3bf3649f5ac83f7"
+    },
+    "square": {
+      "src": "/brand/toonstudio-intro-square.mp4",
+      "width": 1080,
+      "height": 1080,
+      "bytes": 3366694,
+      "sha256": "e394484a23dff67abb8886facee36c7da9e988684163c1c657cbd4ff8bb4fa29"
+    }
+  },
+  "sourceCommit": "055d4518edb8393e93a5a152a29547b19292552f"
+}

@@ -1,6 +1,6 @@
 import {
   Search,
-  Library,
+  Palette,
   Menu,
   X,
 } from "lucide-react";
@@ -19,17 +19,11 @@ import Link from "@/src/compat/router-link";
 
 const NAV = [
   { i18n: "nav.home", href: "/", exact: true },
-  { i18n: "nav.ranking", href: "/ranking" },
-  { i18n: "nav.calendar", href: "/calendar" },
-  { i18n: "nav.recommend", href: "/recommend" },
-  { i18n: "nav.explore", href: "/explore" },
-  { i18n: "nav.fortune", href: "/fortune" },
-  { i18n: "nav.play", href: "/play" },
-  { i18n: "nav.reviews", href: "/reviews" },
-  { i18n: "nav.community", href: "/community" },
-  { i18n: "nav.create", href: "/create" },
-  { i18n: "nav.market", href: "/market" },
-  { i18n: "nav.insights", href: "/insights" },
+  { i18n: "nav.studio", href: "/studio" },
+  { i18n: "nav.assets", href: "/market" },
+  { i18n: "nav.creators", href: "/create" },
+  { i18n: "nav.discover", href: "/explore" },
+  { i18n: "nav.allMenu", href: "/sitemap" },
 ];
 
 const MobileHeaderNavigation = lazy(() =>
@@ -188,19 +182,19 @@ export function SiteHeader() {
 
             {/* 내 서재 — 모바일(<sm)에선 하단 탭바에 동일 항목이 있어 헤더 혼잡을 줄이려 숨긴다 */}
             <Link
-              href="/library"
-              aria-label={t("nav.library")}
-              aria-current={isActive("/library") ? "page" : undefined}
+              href="/studio"
+              aria-label={t("nav.studio")}
+              aria-current={isActive("/studio") ? "page" : undefined}
               className={cx(
                 "group hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors sm:flex",
-                isActive("/library")
+                isActive("/studio")
                   ? "bg-accent text-on-accent"
                   : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
               )}
             >
-              <Library size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />
+              <Palette size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />
               <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">
-                {keepInlineText(t("nav.library"))}
+                {keepInlineText(t("nav.studio"))}
               </span>
             </Link>
             {/*

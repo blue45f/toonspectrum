@@ -9,6 +9,16 @@ import Link from "@/src/compat/router-link";
 
 const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
   {
+    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
+    titleKey: "footer.section.create",
+    links: [
+      { key: "footer.link.create", href: "/create" },
+      { key: "footer.link.studio", href: "/studio" },
+      { key: "footer.link.shaper", href: "/shaper" },
+      { key: "footer.link.market", href: "/market" },
+    ],
+  },
+  {
     titleKey: "footer.section.browse",
     links: [
       { key: "footer.link.search", href: "/search" },
@@ -30,16 +40,6 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
       { key: "footer.link.feedback", href: "/feedback" },
       { key: "footer.link.library", href: "/library" },
       { key: "footer.link.taste", href: "/library?tab=taste" },
-    ],
-  },
-  {
-    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
-    titleKey: "footer.section.create",
-    links: [
-      { key: "footer.link.create", href: "/create" },
-      { key: "footer.link.studio", href: "/studio" },
-      { key: "footer.link.shaper", href: "/shaper" },
-      { key: "footer.link.market", href: "/market" },
     ],
   },
   {
