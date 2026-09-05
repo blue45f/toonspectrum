@@ -1,3 +1,4 @@
+import { createStudioAbortableSerialQueue } from "./studio-abortable-serial-queue";
 import {
   assertStudioRetouchWorkerRequest,
   STUDIO_RETOUCH_DIRECT_MAX_IMAGE_PIXELS,
@@ -18,6 +19,8 @@ export interface StudioRetouchWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
+  /** Structured-clone receive errors are separate from Worker execution errors. */
+  onmessageerror?: ((event: MessageEvent<unknown>) => void) | null;
   postMessage(message: StudioRetouchWorkerRunMessage, transfer: Transferable[]): void;
   terminate(): void;
 }
@@ -147,6 +150,7 @@ function runRetouchWithWorker(
       lifecycle.disposeSignal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       if (!keepWorker) worker.terminate();
     };
     const finish = (callback: () => void, keepWorker = false) => {
@@ -187,6 +191,7 @@ function runRetouchWithWorker(
     };
 
     worker.onmessage = (event) => {
+      if (settled) return;
       const response = event.data;
       if (
         !response
@@ -248,6 +253,8 @@ function runRetouchWithWorker(
       finish(() => reject(error));
     };
 
+    worker.onmessageerror = () => rejectWorkerUnavailable("리터치 Worker 응답을 읽지 못했습니다.");
+
     signal?.addEventListener("abort", onAbort, { once: true });
     lifecycle.disposeSignal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted || lifecycle.disposeSignal?.aborted) {
@@ -269,7 +276,10 @@ let sharedRetouchWorker: StudioRetouchWorkerLike | null = null;
 let sharedRetouchWorkerReady = false;
 let sharedRetouchWorkerEpoch = 0;
 let sharedRetouchDisposeGeneration = 0;
-let sharedRetouchQueue: Promise<void> = Promise.resolve();
+const sharedRetouchQueue = createStudioAbortableSerialQueue<
+  StudioRetouchWorkerRunRequest,
+  StudioRetouchWorkerClientResult
+>();
 let sharedRetouchIdleTimer: ReturnType<typeof setTimeout> | null = null;
 let sharedRetouchFlight: {
   readonly worker: StudioRetouchWorkerLike;
@@ -296,6 +306,7 @@ export function disposeStudioRetouchModuleWorker(): void {
   sharedRetouchWorkerEpoch += 1;
   sharedRetouchDisposeGeneration += 1;
   sharedRetouchFlight = null;
+  sharedRetouchQueue.cancelPending();
   flight?.controller.abort();
   if (worker && !flightOwnsWorker) worker.terminate();
 }
@@ -339,7 +350,7 @@ function runRetouchWithSharedModuleWorker(
 ): Promise<StudioRetouchWorkerClientResult> {
   const disposeGeneration = sharedRetouchDisposeGeneration;
   clearSharedRetouchIdleTimer();
-  const operation = sharedRetouchQueue.then(async () => {
+  return sharedRetouchQueue.run(request, async (queuedRequest) => {
     clearSharedRetouchIdleTimer();
     if (disposeGeneration !== sharedRetouchDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
@@ -362,7 +373,7 @@ function runRetouchWithSharedModuleWorker(
     const controller = new AbortController();
     sharedRetouchFlight = { worker, epoch, controller };
     try {
-      const result = await runRetouchWithWorker(worker, request, options, {
+      const result = await runRetouchWithWorker(worker, queuedRequest, options, {
         keepAlive: true,
         workerAlreadyReady: sharedRetouchWorkerReady,
         disposeSignal: controller.signal,
@@ -383,9 +394,7 @@ function runRetouchWithSharedModuleWorker(
     } finally {
       if (sharedRetouchFlight?.controller === controller) sharedRetouchFlight = null;
     }
-  });
-  sharedRetouchQueue = operation.then(() => undefined, () => undefined);
-  return operation;
+  }, options.signal);
 }
 
 /**
