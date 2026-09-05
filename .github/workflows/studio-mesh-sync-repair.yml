@@ -5,6 +5,7 @@ on:
     branches: [fix/collaboration-cross-browser-sync-20260905]
     paths:
       - scripts/maintenance/studio-mesh-sync-repair.mjs
+      - scripts/maintenance/studio-mesh-transport-repair.mjs
       - .github/workflows/studio-mesh-sync-repair.yml
 
 permissions:
@@ -40,38 +41,49 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Add regression cases before changing production code
-        run: node scripts/maintenance/studio-mesh-sync-repair.mjs tests
-      - name: Prove the existing mesh failure
+        run: |
+          node scripts/maintenance/studio-mesh-sync-repair.mjs tests
+          node scripts/maintenance/studio-mesh-transport-repair.mjs tests
+      - name: Prove the existing mesh failures
         run: |
           set +e
-          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts -t '\[mesh-sync-regression\]' --reporter=json --outputFile=mesh-red.json
+          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts -t '\[mesh-(sync|transport)-regression\]' --reporter=json --outputFile=mesh-red.json
           result=$?
           set -e
           test "$result" -ne 0
           node --input-type=module <<'JS'
           import { readFileSync } from 'node:fs';
           const report = JSON.parse(readFileSync('mesh-red.json', 'utf8'));
-          if (report.numTotalTests < 5 || report.numFailedTests < 3) {
-            throw new Error('Expected actual mesh regression failures, not a runner/compile failure');
+          if (report.numTotalTests < 11 || report.numFailedTests < 6) {
+            throw new Error('Expected actual mesh regressions, not a runner/compile failure');
           }
           console.log(JSON.stringify({ phase: 'before-fix', total: report.numTotalTests, failed: report.numFailedTests }));
           JS
-      - name: Apply the guarded authority-path repair
-        run: node scripts/maintenance/studio-mesh-sync-repair.mjs fix
+      - name: Apply guarded document and transport repairs
+        run: |
+          node scripts/maintenance/studio-mesh-sync-repair.mjs fix
+          node scripts/maintenance/studio-mesh-transport-repair.mjs fix
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'src/domains/creator/live/studio-live-p2p-overlay-transport.ts';
+          let source = readFileSync(path, 'utf8').replaceAll('sendMeshInkPrediction(', 'sendMeshInkFrame(');
+          source = source.replace('   * Droppable prediction fan-out. Mirrors the ephemeral all-or-fallback policy: the mesh is used', '   * Exact binary ink fan-out. The caller selects reliable peer actuals or droppable predictions:');
+          writeFileSync(path, source);
+          JS
       - name: Verify existing and new collaboration regressions
         run: |
-          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts
+          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts src/domains/creator/live/studio-live-collaboration-room.ink.test.ts src/domains/creator/live/studio-live-socket-transport.test.ts
       - name: Lint changed TypeScript
-        run: pnpm exec eslint src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts
+        run: pnpm exec eslint src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts
       - name: Check application types
         run: pnpm run typecheck
-      - name: Commit only the verified production fix and regression tests
+      - name: Commit only verified production fixes and regression tests
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm scripts/maintenance/studio-mesh-sync-repair.mjs
-          git add src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts
+          git rm scripts/maintenance/studio-mesh-sync-repair.mjs scripts/maintenance/studio-mesh-transport-repair.mjs
+          git add src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts
           git diff --cached --check
-          git commit -m 'fix(studio): separate mesh synchronization from authoritative server sequencing'
+          git commit -m 'fix(studio): restore cross-browser document sync and reliable live ink'
           git push origin HEAD:fix/collaboration-cross-browser-sync-20260905
