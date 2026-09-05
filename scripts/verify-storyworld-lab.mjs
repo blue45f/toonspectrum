@@ -168,7 +168,7 @@ declare module "vitest" {
 }
 declare module "*.css" { const value: string; export default value; }
 declare module "@/src/compat/router-link" {
-  const Link: (props: { to: string; children?: any; [key: string]: any }) => JSX.Element;
+  const Link: (props: { href: string; children?: any; [key: string]: any }) => JSX.Element;
   export default Link;
 }
 declare module "@/src/hooks/use-document-title" { export function useDocumentTitle(title: string): void; }
