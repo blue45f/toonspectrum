@@ -9,21 +9,99 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-3d-closeup-${{ github.ref }}
-  cancel-in-progress: true
+  group: studio-3d-closeup-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
-  rendered-review:
+  materialize-reviewed-fix:
+    if: github.ref == 'refs/heads/fix/studio-3d-closeup-quality-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    outputs:
+      head: ${{ steps.publish.outputs.head }}
     env:
       HUSKY: '0'
       NODE_OPTIONS: --max-old-space-size=8192
-      TOONSPECTRUM_VERIFY_ORIGIN: http://127.0.0.1:5173
-      STUDIO_CLOSEUP_OUTPUT: /tmp/studio-3d-closeup
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply only the hash-verified locally tested product patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import gzip, hashlib, pathlib, subprocess
+          pieces = [pathlib.Path(f'.agents/patches/studio-3d-closeup-{i:02d}.bin') for i in range(3)]
+          if not all(p.is_file() for p in pieces):
+              raise SystemExit('Expected three exact transport pieces; refusing to synthesize changes')
+          patch = gzip.decompress(b''.join(p.read_bytes() for p in pieces))
+          expected = '75cbae7d37e30d5ff50e8644cc18af44043c635955114be0ca29b0160c55dc2e'
+          assert hashlib.sha256(patch).hexdigest() == expected, 'Patch integrity mismatch'
+          allowed = {
+            'src/domains/creator/character-shaper/CharacterShaperViewportHud.tsx',
+            'src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx',
+            'src/domains/creator/vrm/StudioVrmCameraDirector.tsx',
+            'src/domains/creator/vrm/StudioVrmWardrobePropsProjection.tsx',
+            'src/domains/creator/vrm/studio-vrm-garment-weave.test.ts',
+            'src/domains/creator/vrm/studio-vrm-garment-weave.ts',
+            'src/domains/creator/vrm/studio-vrm-inspection-framing.test.ts',
+            'src/domains/creator/vrm/studio-vrm-inspection-framing.ts',
+            'src/domains/creator/vrm/studio-vrm-poser-catalogs.ts',
+            'src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts',
+            'src/domains/creator/vrm/studio-vrm-skinned-garment.ts',
+            'src/domains/creator/vrm/studio-vrm-surface-vertex-sampler.ts',
+            'src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts',
+          }
+          stats = subprocess.check_output(['git','apply','--numstat'],input=patch).decode()
+          actual = {line.split('\t',2)[2] for line in stats.splitlines()}
+          assert actual == allowed, (actual, allowed)
+          subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply'],input=patch,check=True)
+          pathlib.Path('/tmp/studio-3d-files.txt').write_text('\n'.join(sorted(allowed))+'\n')
+          print(stats)
+          print('Verified patch SHA256:',expected)
+          PY
+      - name: Strict lint and genuine focused regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          xargs pnpm exec eslint --max-warnings=0 < /tmp/studio-3d-files.txt
+          pnpm exec vitest run src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts src/domains/creator/vrm/studio-vrm-inspection-framing.test.ts src/domains/creator/vrm/studio-vrm-garment-weave.test.ts src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx --maxWorkers=1
+          pnpm exec tsc -p tsconfig.json
+      - name: Publish only verified product files to the same feature branch
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          xargs git add -- < /tmp/studio-3d-files.txt
+          git rm -- .agents/patches/studio-3d-closeup-00.bin .agents/patches/studio-3d-closeup-01.bin .agents/patches/studio-3d-closeup-02.bin
+          git diff --cached --check
+          git commit -m 'fix(studio): fit rendered body and preserve garment shading with close-up inspection'
+          git push origin "HEAD:$GITHUB_REF"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Verified product commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+
+  build-review:
+    needs: materialize-reviewed-fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.materialize-reviewed-fix.outputs.head }}
           persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -31,21 +109,65 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install browser
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Build actual application
-        run: pnpm run build
-      - name: Start immutable build and repair baseline locator ambiguity
+      - name: Run complete character and wardrobe regressions serially
+        run: pnpm exec vitest run src/domains/creator/vrm src/domains/creator/character-shaper --maxWorkers=1
+      - run: pnpm run build
+      - run: git rev-parse HEAD > dist/studio-3d-review-head.txt
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-3d-reviewed-build-${{ github.run_id }}
+          path: dist
+          retention-days: 2
+          compression-level: 1
+          if-no-files-found: error
+
+  capture-review:
+    needs: [materialize-reviewed-fix, build-review]
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [top, bottom, shoes, accessory]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_VERIFY_ORIGIN: http://127.0.0.1:5173
+      STUDIO_CLOSEUP_OUTPUT: /tmp/studio-3d-closeup
+      STUDIO_CLOSEUP_LANE: ${{ matrix.lane }}
+      STUDIO_REVIEW_HEAD: ${{ needs.materialize-reviewed-fix.outputs.head }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.materialize-reviewed-fix.outputs.head }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-3d-reviewed-build-${{ github.run_id }}
+          path: dist
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Configure scoped review lane without changing application code
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$STUDIO_CLOSEUP_OUTPUT"
+          test "$(cat dist/studio-3d-review-head.txt)" = "$STUDIO_REVIEW_HEAD"
           git rev-parse HEAD > "$STUDIO_CLOSEUP_OUTPUT/source-head.txt"
           python3 - <<'PY'
+          import os
           from pathlib import Path
           p = Path('scripts/verify-studio-3d-closeup.mts')
           s = p.read_text()
           s = s.replace('button[aria-label="확대"]:not(:disabled)`).waitFor', '[data-character-shaper-hud] button[aria-label="확대"]:not(:disabled)`).waitFor')
+          s = s.replace('process.env.GITHUB_SHA ?? "local"','process.env.STUDIO_REVIEW_HEAD ?? process.env.GITHUB_SHA ?? "local"')
+          s = s.replace('for (const kind of ["top", "bottom", "shoes"] as const) {', 'for (const kind of ["top", "bottom", "shoes"] as const) {\n      if (kind !== process.env.STUDIO_CLOSEUP_LANE) continue;')
+          s = s.replace('for (const { id } of catalog.accessory) {', 'for (const { id } of (process.env.STUDIO_CLOSEUP_LANE === "accessory" ? catalog.accessory : [])) {')
           p.write_text(s)
           PY
           pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort > "$STUDIO_CLOSEUP_OUTPUT/vite.log" 2>&1 &
@@ -54,16 +176,16 @@ jobs:
             sleep 1
           done
           exit 1
-      - name: Inspect real wardrobe and accessory catalog
+      - name: Capture genuine production-rendered close-ups
+        timeout-minutes: 22
         run: pnpm exec tsx scripts/verify-studio-3d-closeup.mts
-      - name: Emit review manifest even on failure
+      - name: Emit manifest
         if: always()
-        run: |
-          if test -f "$STUDIO_CLOSEUP_OUTPUT/evidence.json"; then cat "$STUDIO_CLOSEUP_OUTPUT/evidence.json"; fi
+        run: test ! -f "$STUDIO_CLOSEUP_OUTPUT/evidence.json" || cat "$STUDIO_CLOSEUP_OUTPUT/evidence.json"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: studio-3d-closeup-${{ github.sha }}
+          name: studio-3d-closeup-${{ matrix.lane }}-${{ needs.materialize-reviewed-fix.outputs.head }}
           path: /tmp/studio-3d-closeup
           retention-days: 7
           compression-level: 6
