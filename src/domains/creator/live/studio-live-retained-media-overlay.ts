@@ -66,6 +66,7 @@ import {
 } from "../studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
 
+import { paintStudioLivePencilProgram, type StudioLivePencilPaintCommand } from "./studio-live-pencil-paint-program";
 import { paintStudioLiveRetainedRoundStroke } from "./studio-live-retained-stroke-paint";
 
 import type { DrawEl } from "../studio-element-model";
@@ -362,6 +363,8 @@ interface ActiveRetainedStroke {
    * `calligraphySegments`. A pass owns its own jittered polyline, so it needs its own builder.
    */
   pencilCurves?: StudioIncrementalRetainedMediaCurveBuilder[];
+  /** Own the already-issued geometry once; no growing DrawEl snapshots or bitmap per stroke. */
+  pencilProgram?: StudioLivePencilPaintCommand[];
 }
 
 export class StudioLiveRetainedMediaOverlayRenderer {
@@ -374,6 +377,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private resolutionDecision: StudioNativeLiveSurfaceResolutionDecision | null = null;
   private active: ActiveRetainedStroke | null = null;
   private settled: DrawEl[] = [];
+  private readonly settledPencilPrograms = new Map<string, readonly StudioLivePencilPaintCommand[]>();
   private settledHasPixels = false;
   private activePaintedOntoSettled = false;
   private lastFailureReason: StudioLiveRetainedMediaFailureReason | null = null;
@@ -451,6 +455,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
   get settledStrokeCount(): number {
     return this.settled.length;
+  }
+
+  /** Diagnostics for retained-command ownership; released prefixes must return this to zero. */
+  get retainedPencilCommandCount(): number {
+    let count = this.active?.pencilProgram?.length ?? 0;
+    for (const program of this.settledPencilPrograms.values()) count += program.length;
+    return count;
   }
 
   get lastOperationFailureReason(): StudioLiveRetainedMediaFailureReason | null {
@@ -543,9 +554,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     }
     if (!this.isNativeSurfaceReady) return this.failActive("surface-unavailable");
     this.active.element = element;
-    // Rebuild pencil once at release: transient taps and per-frame alpha unions must not
-    // become the durable surface. Replay uses this same finalized, whole-stroke program.
-    if (this.active.kind === "highlighter" || this.active.kind === "pencil") {
+    // Only a stationary pencil tap needs its screen-space visibility hint replaced at release.
+    // Travel keeps its issued paint program: rebuilding thousands of points here stalls input.
+    if (this.active.kind === "highlighter"
+      || (this.active.kind === "pencil" && this.active.paintedSourceSegments === 0)) {
       this.clearCanvas(this.activeContext, this.activeCanvas);
       const fullActive: ActiveRetainedStroke = {
         id: element.id,
@@ -565,6 +577,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (!this.paintSuffix(fullActive, element, this.activeContext, true)) {
         return this.failActive("surface-unavailable");
       }
+      this.active.pencilProgram = fullActive.pencilProgram;
     } else {
       // Pointer-up seals whatever is on the active canvas into settled, so a capped bed that is
       // still holding a deferred tail has to flush it here. It stays a normal append otherwise:
@@ -574,6 +587,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     }
     if (!this.activePaintedOntoSettled && !this.flattenActiveToSettled()) {
       return this.failActive("surface-unavailable");
+    }
+    if (this.active.kind === "pencil" && this.active.pencilProgram) {
+      this.settledPencilPrograms.set(this.active.id, this.active.pencilProgram);
     }
     this.settled.push(this.active.element);
     this.resetActiveState();
@@ -589,7 +605,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         : 0;
     const released = Math.min(requested, this.settled.length);
     if (released === 0) return 0;
+    const releasedStrokes = this.settled.slice(0, released);
     this.settled = this.settled.slice(released);
+    for (const stroke of releasedStrokes) {
+      if (!this.settled.some((remaining) => remaining.id === stroke.id)) {
+        this.settledPencilPrograms.delete(stroke.id);
+      }
+    }
     this.replay();
     return released;
   }
@@ -619,6 +641,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.resetActiveState();
     this.lastFailureReason = null;
     this.settled = [];
+    this.settledPencilPrograms.clear();
     this.clearActiveRect();
     this.clearSettledRect();
   }
@@ -775,6 +798,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (finiteCoordinate(element.points[0]) === null || finiteCoordinate(element.points[1]) === null) {
         return true;
       }
+      const issue = (command: StudioLivePencilPaintCommand) => {
+        paintStudioLivePencilProgram(context, [command]);
+        if (target === this.activeContext) (active.pencilProgram ??= []).push(command);
+      };
       const brush = element.brush ?? "pencil";
       const width = studioBrushAliasEffectiveDiameter(brush, Math.max(1, element.strokeWidth));
       const profile = resolveStudioRetainedMediaPressureProfileId(brush) ?? "pencil";
@@ -801,14 +828,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           const radius = liveDraft
             ? studioLiveVisibleTapDocumentRadius(documentRadius, scale)
             : documentRadius;
-          context.globalAlpha = Math.min(
-            1,
-            (element.opacity ?? 1) * pass.opacityScale
-            * Math.sqrt(tap.opacityScale * tap.flowScale),
-          );
-          context.beginPath();
-          context.arc(tap.x, tap.y, radius, 0, Math.PI * 2);
-          context.fill();
+          issue({
+            kind: "circle", x: tap.x, y: tap.y, radius, color: element.stroke,
+            alpha: Math.min(1, (element.opacity ?? 1) * pass.opacityScale
+              * Math.sqrt(tap.opacityScale * tap.flowScale)),
+          });
         }
         active.paintedPencilMarks = 1;
         return true;
@@ -819,6 +843,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         // Pointerdown's visibility hint is not pigment. Retire it once travel begins,
         // otherwise it survives every append and disappears only on document replay.
         this.clearCanvas(this.activeContext, this.activeCanvas);
+        active.pencilProgram = [];
         active.paintedPencilMarks = 0;
       }
 
@@ -889,22 +914,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       };
       const flushBuckets = (inherited: number) => {
         for (const [rung, coords] of [...buckets.entries()].sort((a, b) => a[0] - b[0])) {
-          context.globalAlpha = inherited * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT);
-          context.beginPath();
-          let start = 0;
-          for (let index = 0; index <= coords.length; index += 1) {
-            if (index === coords.length || Number.isNaN(coords[index])) {
-              for (let offset = start; offset + 1 < index; offset += 2) {
-                const x = coords[offset]!;
-                const y = coords[offset + 1]!;
-                if (offset === start) context.moveTo(x, y);
-                else context.lineTo(x, y);
-              }
-              if (index > start) context.closePath();
-              start = index + 1;
-            }
-          }
-          context.fill();
+          issue({
+            kind: "fill", coordinates: coords, color: element.stroke,
+            alpha: inherited * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
+          });
         }
         buckets.clear();
       };
@@ -954,14 +967,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
             Math.max(0.35, width / 2),
             this.surface?.documentScale ?? 1,
           );
-          context.globalAlpha = inherited * Math.min(1, element.opacity ?? 1);
-          context.lineWidth = liveWidth;
-          context.beginPath();
-          context.moveTo(element.points[from * 2]!, element.points[from * 2 + 1]!);
-          for (let index = from + 1; index < validPointCount; index += 1) {
-            context.lineTo(element.points[index * 2]!, element.points[index * 2 + 1]!);
-          }
-          context.stroke();
+          issue({
+            kind: "stroke", color: element.stroke, width: liveWidth,
+            alpha: inherited * Math.min(1, element.opacity ?? 1),
+            coordinates: element.points.slice(from * 2, validPointCount * 2),
+          });
         }
       }
       active.paintedSourceSegments = curve.segments.length;
@@ -1221,6 +1231,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     for (const stroke of this.settled) {
       const kind = retainedKind(stroke);
       if (!kind) continue;
+      const pencilProgram = this.settledPencilPrograms.get(stroke.id);
+      if (kind === "pencil" && pencilProgram) {
+        this.replayPencilProgram(pencilProgram, this.settledContext);
+        this.settledHasPixels = pencilProgram.length > 0 || this.settledHasPixels;
+        continue;
+      }
       this.paintSuffix({
         id: stroke.id,
         kind,
@@ -1246,6 +1262,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     for (const stroke of this.settled) {
       const kind = retainedKind(stroke);
       if (!kind) continue;
+      const pencilProgram = this.settledPencilPrograms.get(stroke.id);
+      if (kind === "pencil" && pencilProgram) {
+        this.replayPencilProgram(pencilProgram, this.settledContext);
+        this.settledHasPixels = pencilProgram.length > 0 || this.settledHasPixels;
+        continue;
+      }
       this.paintSuffix({
         id: stroke.id,
         kind,
@@ -1263,6 +1285,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       }, stroke, this.settledContext, true);
     }
     if (!this.active) return;
+    if (this.active.kind === "pencil" && this.active.pencilProgram) {
+      this.replayPencilProgram(this.active.pencilProgram, this.activeContext);
+      return;
+    }
     const replayActive: ActiveRetainedStroke = {
       ...this.active,
       paintedDabs: 0,
@@ -1288,6 +1314,19 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.active.lastOilRepaintMs = replayActive.lastOilRepaintMs;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;
     this.active.paintedSourceSegments = replayActive.paintedSourceSegments;
+  }
+
+  private replayPencilProgram(
+    commands: readonly StudioLivePencilPaintCommand[],
+    target: CanvasRenderingContext2D | null,
+  ): void {
+    const context = this.prepared(target);
+    if (!context) return;
+    try {
+      paintStudioLivePencilProgram(context, commands);
+    } finally {
+      context.restore();
+    }
   }
 
   private prepared(
