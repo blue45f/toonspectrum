@@ -1,0 +1,82 @@
+name: BG3D production runtime regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/bg3d/**"
+      - "e2e/studio-3d-visual-verification.spec.ts"
+      - "playwright.config.ts"
+      - "playwright.bg3d-runtime.config.ts"
+      - "scripts/studio-bg3d-runtime-reporter*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/bg3d-runtime-regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/domains/creator/bg3d/**"
+      - "e2e/studio-3d-visual-verification.spec.ts"
+      - "playwright.config.ts"
+      - "playwright.bg3d-runtime.config.ts"
+      - "scripts/studio-bg3d-runtime-reporter*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/bg3d-runtime-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bg3d-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bg3d-production-runtime:
+    # This job intentionally has no dependency on temporary core-gate bypasses. A successful
+    # skipped core job must not be mistaken for a successful GPU execution.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_CHANNEL: ""
+      STUDIO_BG3D_WEBGPU_GIZMO: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check changed verification code
+        run: pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts scripts/studio-bg3d-runtime-reporter.test.ts
+      - name: Test real-execution and failure-evidence contracts
+        run: pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts --reporter=verbose
+      - name: Install Chromium and its runtime dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build the production app to be verified
+        run: pnpm run build:bundle
+      - name: Verify live WebGPU rotation without skips or retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm exec playwright test --config=playwright.bg3d-runtime.config.ts \
+            2>&1 | tee "$RUNNER_TEMP/bg3d-runtime.log"
+      - name: Preserve runtime screenshots, metrics, trace and HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bg3d-production-runtime-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/bg3d-runtime/
+            ${{ runner.temp }}/bg3d-runtime.log
+          if-no-files-found: warn
+          retention-days: 7
