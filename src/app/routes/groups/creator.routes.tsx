@@ -33,6 +33,16 @@ const LearnPage = lazyRetry(
   () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
   "LearnPage",
 );
+const StudioBrushLabPage = lazyRetry(
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/brush-lab/StudioBrushLabPage"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioBrushLabPage };
+  },
+  "StudioBrushLabPage",
+);
 const StudioRouter = lazyRetry(
   async () => {
     const [module] = await Promise.all([
@@ -51,6 +61,8 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-series", path: "/create/series/:id", element: <CreateSeriesPage /> },
   { id: "creator-work", path: "/create/:id", element: <CreateWorkPage /> },
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
+  // Exact route owns brush authoring; the heavyweight editor router is not mounted here.
+  { id: "creator-brush-lab", path: "/studio/brushes", element: <StudioBrushLabPage /> },
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },
 ]);
