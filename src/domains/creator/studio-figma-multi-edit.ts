@@ -7,11 +7,13 @@
  * undo entry and one CRDT publication. Unsupported mixed selections fail atomically instead of
  * moving a subset and tearing the composition.
  */
+import { elBounds } from "./studio-element-geometry";
 import {
   planStudioSelectionLayoutPatch,
   unionStudioSelectionBounds,
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
+import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
 import { planStudioSelectionTransformCommit } from "./studio-selection-transform-commit";
 
 import type { El } from "./studio-element-model";
@@ -82,6 +84,27 @@ function rotateBoxOriginAboutCentre(
   };
 }
 
+/**
+ * The shared union helper pads strokes and floors the box at 1px so zoom/flip pivots stay stable.
+ * A refusal has to look at the real extent instead, or a selection of zero-size targets would be
+ * scaled against a fabricated 1x1 box.
+ */
+function hasUsableExtent(targets: readonly El[]): boolean {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const element of targets) {
+    const box = elBounds(element);
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.w);
+    maxY = Math.max(maxY, box.y + box.h);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return false;
+  return maxX - minX > 0 && maxY - minY > 0;
+}
+
 function validatePatch(patch: StudioFigmaSelectionLayoutPatch): string | null {
   if (patch.x !== undefined && !finite(patch.x)) return "가로 위치에 유효한 숫자를 입력해 주세요.";
   if (patch.y !== undefined && !finite(patch.y)) return "세로 위치에 유효한 숫자를 입력해 주세요.";
@@ -145,12 +168,23 @@ export function planStudioFigmaMultiEdit(
   if (targets.some(input.isLocked)) {
     return unchanged("잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
   }
+  // A turn is all-or-nothing, so an incapable member is reported before any other refusal:
+  // otherwise a mixed patch would blame the opacity it was never going to apply either.
+  if (
+    finite(input.patch.rotation)
+    && normalizeRelativeRotation(input.patch.rotation) !== 0
+    && !targets.every(studioGroupUniformResizeMemberCanRotate)
+  ) {
+    return unchanged(
+      "선택 안에 함께 회전할 수 없는 요소가 있어요. 해당 요소를 제외한 뒤 다시 시도하세요.",
+    );
+  }
   if (input.patch.opacity !== undefined && targets.some((element) => element.type === "frame")) {
     return unchanged("프레임이 포함된 선택에는 불투명도를 함께 적용할 수 없어요.");
   }
 
   const bounds = unionStudioSelectionBounds(targets);
-  if (!bounds || bounds.w <= 0 || bounds.h <= 0) {
+  if (!bounds || bounds.w <= 0 || bounds.h <= 0 || !hasUsableExtent(targets)) {
     return unchanged("선택 영역의 크기를 계산할 수 없어요. 대상을 다시 선택해 주세요.");
   }
 
@@ -215,10 +249,13 @@ export function planStudioFigmaMultiEdit(
   let opacityChanged = false;
   let opacity: number | null = null;
   if (finite(input.patch.opacity)) {
-    opacity = Math.min(1, Math.max(0, input.patch.opacity));
+    // Bound once into a non-nullable local: the map callback below is a closure, so the mutable
+    // `opacity` accumulator does not stay narrowed inside it.
+    const nextOpacity = Math.min(1, Math.max(0, input.patch.opacity));
+    opacity = nextOpacity;
     next = next.map((element) => {
       if (!selected.has(element.id)) return element;
-      const planned = planStudioSelectionLayoutPatch(element, { opacity });
+      const planned = planStudioSelectionLayoutPatch(element, { opacity: nextOpacity });
       if (!planned) return element;
       opacityChanged = true;
       return { ...element, ...planned } as El;

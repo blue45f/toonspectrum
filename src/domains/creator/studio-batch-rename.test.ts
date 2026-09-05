@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { planStudioBatchRename } from "./studio-batch-rename";
 
-import type { El, ImageEl, TextEl } from "./studio-element-model";
+import type { El } from "./studio-element-model";
 
-function image(id: string, x: number, y: number, name?: string): ImageEl {
+// Layer names live on the shared layer metadata, so the fixtures are typed as `El` — the same
+// intersection the planner and the assertions below read `name` from.
+function image(id: string, x: number, y: number, name?: string): El {
   return {
     id,
     type: "image",
@@ -15,20 +17,22 @@ function image(id: string, x: number, y: number, name?: string): ImageEl {
     height: 20,
     rotation: 0,
     name,
-  } as ImageEl;
+  } as El;
 }
 
-function text(id: string, x: number, y: number, name?: string): TextEl {
+function text(id: string, x: number, y: number, name?: string): El {
   return {
     id,
     type: "text",
     x,
     y,
+    width: 200,
+    rotation: 0,
     text: "대사",
     fontSize: 24,
     fill: "#111111",
     name,
-  } as TextEl;
+  } as El;
 }
 
 describe("studio batch rename", () => {
