@@ -1,0 +1,53 @@
+name: Studio acquired model review
+on:
+  push:
+    branches: [feat/studio-asset-browser-quality-20260906]
+    paths: [.github/workflows/studio-curated-model-review.yml, scripts/review-studio-curated-models.mjs]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Download the exact already-acquired CC0 artifact with checksum and safe extraction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/model-review-tool" "$RUNNER_TEMP/model-review-source"
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9973078232/zip > "$RUNNER_TEMP/model-review-source.zip"
+          python3 - <<'PY'
+          import os,hashlib,pathlib,zipfile,stat
+          root=pathlib.Path(os.environ['RUNNER_TEMP']); zpath=root/'model-review-source.zip'
+          with zpath.open('rb') as f: digest=hashlib.file_digest(f,'sha256').hexdigest()
+          if digest!='256e93b8cff36ba677467de50968c226827a3000b5f338d6e750d02fbcf73c50':raise ValueError('source hash mismatch')
+          total=0; seen=set()
+          with zipfile.ZipFile(zpath) as z:
+            for info in z.infolist():
+              p=pathlib.PurePosixPath(info.filename)
+              if p.is_absolute() or '..' in p.parts or '\\' in info.filename or stat.S_ISLNK(info.external_attr>>16):raise ValueError('unsafe archive path')
+              if info.is_dir():continue
+              if p.suffix.lower() not in {'.gltf','.bin','.png','.jpg','.jpeg','.webp','.txt','.md','.json'}:raise ValueError('unexpected file type')
+              total+=info.file_size
+              if total>1536*1024*1024 or info.file_size>128*1024*1024 or str(p).casefold() in seen:raise ValueError('budget or collision')
+              seen.add(str(p).casefold());target=root/'model-review-source'/p;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(z.read(info))
+          PY
+      - name: Install only pinned isolated review dependencies
+        run: |
+          npm install --prefix "$RUNNER_TEMP/model-review-tool" --ignore-scripts --no-audit --no-fund three@0.184.0 playwright@1.62.1 gltf-validator@2.0.0-dev.3.10
+          "$RUNNER_TEMP/model-review-tool/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Validate every model and render geometry plus original materials
+        run: |
+          cp scripts/review-studio-curated-models.mjs "$RUNNER_TEMP/model-review-tool/review.mjs"
+          node "$RUNNER_TEMP/model-review-tool/review.mjs" "$RUNNER_TEMP/model-review-source" "$RUNNER_TEMP/model-review-evidence"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-curated-model-review
+          path: ${{ runner.temp }}/model-review-evidence/
+          retention-days: 7
