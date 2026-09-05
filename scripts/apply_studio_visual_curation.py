@@ -77,6 +77,14 @@ def main() -> None:
     replace_once(pack_test,
         'expect(pkg.includedItems).toHaveLength(8);',
         'expect(pkg.includedItems).toHaveLength(pkg.includedItems.some((asset) => asset.category === "atmosphere-fx") ? 5 : 8);')
+    market_test = CREATOR / 'StudioOriginalAssetMarketplacePanel.test.tsx'
+    replace_once(market_test,
+        '    expect(html).toContain(\'data-studio-original-asset="original-night-bokeh"\');',
+        '    expect(html).not.toContain(\'data-studio-original-asset="original-night-bokeh"\');\n'
+        '    expect(html).not.toContain(\'data-studio-original-asset="original-soft-snow-overlay"\');\n'
+        '    expect(html).not.toContain(\'data-studio-original-asset="original-golden-dust"\');\n'
+        '    expect(html).toContain(\'data-studio-original-asset="original-rain-pane-overlay"\');\n'
+        '    expect(html).toContain(\'data-studio-original-asset="original-spring-petals"\');')
     # Legacy safe SVG parsing still runs on all 32 original objects (21 active + 11 retired).
     drag = (CREATOR / 'studio-shared-asset-drag.test.ts').read_text()
     if 'STUDIO_RETIRED_ORIGINAL_FREE_ASSETS' not in drag or 'toHaveLength(32)' not in drag:
