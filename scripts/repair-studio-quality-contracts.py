@@ -9,24 +9,24 @@ pending = {}
 
 def edit(path, before, after):
     text = pending.get(path, path.read_text(encoding="utf-8"))
-    if after in text:
+    count = text.count(before)
+    if count == 0 and after in text:
         return
-    if text.count(before) != 1:
+    if count != 1:
         raise RuntimeError(f"Expected one source anchor in {path.name}: {before[:100]!r}")
     pending[path] = text.replace(before, after, 1)
 
 engine = BASE / "studio-finish-quality.ts"
-edit(engine, "  ImageEl,\n", "  StudioElementLayerMetadata,\n  ImageEl,\n")
-edit(engine, "  image: ImageEl,", "  image: ImageEl & StudioElementLayerMetadata,")
-# Retain a const discriminated-union reference in callbacks instead of narrowing a
-# mutable nested property and then losing its type when Array.find invokes a callback.
+edit(engine, "  El,\n  ImageEl,\n", "  El,\n")
+edit(engine, "  image: ImageEl,", '  image: Extract<El, { type: "image" }>,')
+# Retain the discriminated-union reference in callbacks; image metadata is taken
+# from the canonical El union instead of recreating the private layer contract.
 edit(engine, "  for (const thread of comments.threads) {\n    const owner = pageById.get(thread.anchor.pageId);",
      "  for (const thread of comments.threads) {\n    const anchor = thread.anchor;\n    const owner = pageById.get(anchor.pageId);")
 text = pending.get(engine, engine.read_text(encoding="utf-8"))
 start = text.index("  for (const thread of comments.threads) {")
 end = text.index("\nexport function", start)
-region = text[start:end]
-region = region.replace("thread.anchor.", "anchor.")
+region = text[start:end].replace("thread.anchor.", "anchor.")
 pending[engine] = text[:start] + region + text[end:]
 
 test = BASE / "studio-finish-quality.test.ts"
