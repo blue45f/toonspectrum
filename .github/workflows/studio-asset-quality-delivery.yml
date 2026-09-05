@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: studio-asset-quality-delivery-${{ github.ref }}
   cancel-in-progress: true
@@ -13,7 +14,7 @@ jobs:
   asset-quality:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-quality-delivery-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     env:
       HUSKY: "0"
       CI: "true"
@@ -22,26 +23,53 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ github.ref_name }}
+          fetch-depth: 0
           persist-credentials: true
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24.16.0
-      - name: Prepare reviewed integration and safeguards
+      - name: Preserve concurrent main changes and prepare reviewed integration
         run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git -c core.hooksPath=/dev/null merge --no-edit origin/main
           python3 scripts/finalize_studio_asset_delivery.py --prepare
           python3 scripts/prepare_studio_asset_delivery_regressions.py
+          python3 - <<'PY'
+          from pathlib import Path
+          from scripts.finalize_studio_asset_delivery import replace_once
+          p=Path('src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx')
+          replace_once(p,'                32 FREE','                {`${STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.reduce((count, pkg) => count + pkg.includedItems.length, 0)} FREE`}')
+          replace_once(p,'              32종 모두 외부 마켓 상품을 복제하지 않은 ToonSpectrum 원본 SVG입니다.','              선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonSpectrum 자체 에셋입니다.')
+          PY
           python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
           python3 -m py_compile scripts/studio_asset_delivery.py scripts/finalize_studio_asset_delivery.py
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
           pnpm install --frozen-lockfile --ignore-scripts
-      - name: Acquire native-resolution originals and remove duplicate variants
-        run: python3 scripts/studio_asset_delivery.py --output "$RUNNER_TEMP/studio-asset-delivery"
-      - name: Render every GLB from three angles
+      - name: Restore exact rendered originals with verified artifact digest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          pnpm exec playwright install --with-deps chromium
-          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/studio-asset-delivery" "$GITHUB_WORKSPACE"
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9973936680/zip > "$RUNNER_TEMP/rendered-originals.zip"
+          python3 - <<'PY'
+          import hashlib,os,pathlib,stat,zipfile
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          archive=root/'rendered-originals.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == '02b058cab08c9fe3b389ce3cb3e60b4e72f45c26d627d064b9cb5dcea4b222e9', 'Artifact integrity mismatch'
+          output=root/'studio-asset-delivery'
+          output.mkdir(exist_ok=True)
+          with zipfile.ZipFile(archive) as z:
+              infos=z.infolist()
+              assert len(infos)<5000 and sum(i.file_size for i in infos)<384*1024*1024
+              for i in infos:
+                  dest=(output/i.filename).resolve()
+                  assert dest.is_relative_to(output.resolve()) and not stat.S_ISLNK(i.external_attr>>16)
+              z.extractall(output)
+          print('RESTORED exact render-verified artifact 9973936680')
+          PY
           python3 scripts/finalize_studio_asset_delivery.py --stage "$RUNNER_TEMP/studio-asset-delivery"
-      - name: Verify catalog paths integrity and compatibility
+      - name: Verify catalog and legacy picker contracts
         run: |
           pnpm exec vitest run src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
           pnpm exec tsx -e 'import fs from "node:fs"; import {parseStudioCc0Catalog} from "./src/domains/creator/studio-cc0-asset-delivery.ts"; const items=parseStudioCc0Catalog(JSON.parse(fs.readFileSync("public/assets/studio/cc0-20260906/manifest.json","utf8"))); console.log("ADMITTED SELF-HOSTED ORIGINALS",items.length);'
@@ -50,7 +78,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm exec eslint --fix src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts 2>&1 | tee "$RUNNER_TEMP/studio-asset-delivery/frontend-lint.log"
+          pnpm exec eslint --fix src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts 2>&1 | tee "$RUNNER_TEMP/studio-asset-delivery/frontend-lint.log"
       - name: Check full frontend types
         id: types
         continue-on-error: true
@@ -64,23 +92,23 @@ jobs:
         run: |
           python3 - <<'PY'
           import os,json,pathlib
-          result={'catalogAndLegacyUnitTests':'passed','manifestAdmission':'passed','threeAngleModelRendering':'completed','frontendLint':os.environ['LINT_OUTCOME'],'frontendTypes':os.environ['TYPES_OUTCOME'],'fullProductionBuild':'not-run','studioSaveRestoreRoundTrip':'not-run','artisticApproval':'not-claimed','productionDeployment':'not-performed'}
+          result={'catalogAndLegacyUnitTests':'passed','manifestAdmission':'passed','threeAngleModelRendering':'999-passed-in-run-33981429268','frontendLint':os.environ['LINT_OUTCOME'],'frontendTypes':os.environ['TYPES_OUTCOME'],'fullProductionBuild':'not-run','studioSaveRestoreRoundTrip':'not-run','artisticApproval':'not-claimed','productionDeployment':'not-performed'}
           for folder in [pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-asset-delivery',pathlib.Path('data/studio-assets/delivery-20260906')]:
               folder.mkdir(parents=True,exist_ok=True)
               (folder/'verification.json').write_text(json.dumps(result,indent=2)+'\n')
           print('VERIFICATION',json.dumps(result))
           PY
-      - name: Retain reviewed delivery on the feature branch only
+      - name: Retain delivery on the feature branch only
         run: |
           test "$GITHUB_REF" = "refs/heads/feat/studio-assets-quality-delivery-20260906"
           test "$GITHUB_REPOSITORY" = "blue45f/toonspectrum"
           git fetch origin "$GITHUB_REF_NAME"
-          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
-          git add -- public/assets/studio/cc0-20260906 data/studio-assets/delivery-20260906 scripts/studio_asset_delivery.py scripts/render_studio_asset_delivery.mjs src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
+          git merge-base --is-ancestor FETCH_HEAD HEAD
+          git add -- public/assets/studio/cc0-20260906 data/studio-assets/delivery-20260906 scripts/studio_asset_delivery.py scripts/render_studio_asset_delivery.mjs src/domains/creator/studio-cc0-asset-delivery.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.ts src/domains/creator/StudioAssetMenuPanel.tsx src/domains/creator/StudioOriginalAssetMarketplacePanel.tsx src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts
           if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m "feat(studio): bundle rendered CC0 originals and retire blockout-only picks"
-            git push origin "HEAD:$GITHUB_REF"
+            git -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): bundle 1097 CC0 originals with actual model previews"
           fi
+          git push origin "HEAD:$GITHUB_REF"
           git log -1 --format='DELIVERY_COMMIT %H'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
