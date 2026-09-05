@@ -1,5 +1,6 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
+import { createBg3dCompositorSampler } from "./studio-bg3d-compositor-sampler";
 import { test } from "./studio-bg3d-runtime-diagnostics";
 
 /** Strict production counterpart of the general 3D visual suite. No unavailable/timeout skip. */
@@ -16,13 +17,6 @@ interface Frame {
   readonly distinctColors: number;
   readonly dominantShare: number;
 }
-interface Surface {
-  readonly cssWidth: number;
-  readonly cssHeight: number;
-  readonly bufferWidth: number;
-  readonly bufferHeight: number;
-}
-
 async function decodeFrame(page: Page, png: Buffer): Promise<Frame> {
   return page.evaluate(async (base64) => {
     const response = await fetch(`data:image/png;base64,${base64}`);
@@ -66,59 +60,64 @@ function peakDelta(left: Frame, right: Frame): number {
   return Math.max(...left.tiles.map((value, index) => Math.abs(value - right.tiles[index])));
 }
 
-async function readSurface(page: Page): Promise<Surface> {
-  return page.locator(CANVAS).first().evaluate((element) => {
-    const canvas = element as HTMLCanvasElement;
-    return {
-      cssWidth: canvas.clientWidth, cssHeight: canvas.clientHeight,
-      bufferWidth: canvas.width, bufferHeight: canvas.height,
-    };
-  });
-}
-
 async function stableFrame(page: Page, info: TestInfo, label: string) {
-  const canvas = page.locator(CANVAS).first();
   const started = Date.now();
-  const firstPng = await canvas.screenshot();
-  const first = await decodeFrame(page, firstPng);
-  const firstSurface = await readSurface(page);
-  let previous = first;
-  let previousSurface = firstSurface;
-  let png = firstPng;
-  let frame = first;
-  let surface = firstSurface;
-  let internalDelta = Number.POSITIVE_INFINITY;
-  let stableIntervals = 0;
-  let samples = 1;
-  while (Date.now() - started < SETTLE_TIMEOUT_MS) {
-    await page.waitForTimeout(100);
-    png = await canvas.screenshot();
-    frame = await decodeFrame(page, png);
-    surface = await readSurface(page);
-    samples += 1;
-    internalDelta = peakDelta(previous, frame);
-    const sameSurface = frame.width === previous.width && frame.height === previous.height
-      && surface.bufferWidth === previousSurface.bufferWidth
-      && surface.bufferHeight === previousSurface.bufferHeight;
-    stableIntervals = sameSurface && internalDelta < 2 ? stableIntervals + 1 : 0;
-    if (stableIntervals >= 2) break;
-    previous = frame;
-    previousSurface = surface;
-  }
-  const metrics = {
-    settleMs: Date.now() - started, timeoutMs: SETTLE_TIMEOUT_MS, samples, internalDelta,
-    firstToFinalDelta: peakDelta(first, frame), firstSurface, surface,
-    timedOut: stableIntervals < 2,
+  const sampler = await createBg3dCompositorSampler(page, CANVAS);
+  const timings: { captureMs: number; decodeMs: number }[] = [];
+  const sample = async () => {
+    const shot = await sampler.capture();
+    const decodeStarted = Date.now();
+    const frame = await decodeFrame(page, shot.png);
+    timings.push({ captureMs: shot.captureMs, decodeMs: Date.now() - decodeStarted });
+    return { ...shot, frame };
   };
-  await info.attach(`${label}-first.png`, { body: firstPng, contentType: "image/png" });
-  await info.attach(`${label}-stable.png`, { body: png, contentType: "image/png" });
-  await info.attach(`${label}-settle.json`, {
-    body: Buffer.from(JSON.stringify(metrics, null, 2)), contentType: "application/json",
-  });
-  expect(metrics.timedOut, `${label}: ${JSON.stringify(metrics)}`).toBe(false);
-  expect(frame.distinctColors, "A blank framebuffer cannot prove rotation fidelity").toBeGreaterThan(4);
-  expect(frame.dominantShare).toBeLessThan(0.99);
-  return { frame, ...metrics };
+  try {
+    const first = await sample();
+    let previous = first;
+    let current = first;
+    let internalDelta = Number.POSITIVE_INFINITY;
+    let stableIntervals = 0;
+    while (Date.now() - started < SETTLE_TIMEOUT_MS) {
+      await page.waitForTimeout(100);
+      current = await sample();
+      internalDelta = peakDelta(previous.frame, current.frame);
+      const sameSurface = current.frame.width === previous.frame.width
+        && current.frame.height === previous.frame.height
+        && current.surface.bufferWidth === previous.surface.bufferWidth
+        && current.surface.bufferHeight === previous.surface.bufferHeight;
+      stableIntervals = sameSurface && internalDelta < 2 ? stableIntervals + 1 : 0;
+      if (stableIntervals >= 2) break;
+      previous = current;
+    }
+    const settleMs = Date.now() - started;
+    const metrics = {
+      settleMs, timeoutMs: SETTLE_TIMEOUT_MS, samples: timings.length, internalDelta,
+      firstToFinalDelta: peakDelta(first.frame, current.frame),
+      firstSurface: first.surface, surface: current.surface, timings,
+      timedOut: stableIntervals < 2 || settleMs > SETTLE_TIMEOUT_MS,
+    };
+    await info.attach(`${label}-first.png`, { body: first.png, contentType: "image/png" });
+    await info.attach(`${label}-stable.png`, { body: current.png, contentType: "image/png" });
+    await info.attach(`${label}-settle.json`, {
+      body: Buffer.from(JSON.stringify(metrics, null, 2)), contentType: "application/json",
+    });
+    expect(metrics.timedOut, `${label}: ${JSON.stringify(metrics)}`).toBe(false);
+    expect(current.frame.distinctColors, "A blank framebuffer cannot prove rotation fidelity")
+      .toBeGreaterThan(4);
+    expect(current.frame.dominantShare).toBeLessThan(0.99);
+    // Retain the original visible-frame oracle as an independent cross-check, while the pointer
+    // is still down. The sampling deadline above includes every observation and is not extended.
+    const referencePng = await page.locator(CANVAS).screenshot();
+    const reference = await decodeFrame(page, referencePng);
+    const referenceDelta = peakDelta(current.frame, reference);
+    await info.attach(`${label}-locator-reference.png`, { body: referencePng, contentType: "image/png" });
+    expect([current.frame.width, current.frame.height]).toEqual([reference.width, reference.height]);
+    expect(referenceDelta, "Direct compositor sampling must agree with the original screenshot")
+      .toBeLessThan(2);
+    return { frame: current.frame, ...metrics, referenceDelta };
+  } finally {
+    await sampler.dispose();
+  }
 }
 
 async function openReadyWebGpu(page: Page, info: TestInfo, label: string): Promise<void> {
