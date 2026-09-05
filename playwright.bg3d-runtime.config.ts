@@ -25,6 +25,7 @@ export default defineConfig({
   grep: /WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는다/u,
   retries: 0,
   workers: 1,
+  globalSetup: "./scripts/studio-bg3d-runtime-setup.mts",
   outputDir: "test-results/bg3d-runtime",
   reporter: [
     ["list"],
@@ -36,14 +37,14 @@ export default defineConfig({
     ...baseConfig.use,
     baseURL,
     screenshot: "only-on-failure",
-    // retries is deliberately zero; on-first-retry would never record anything. Avoid automatic
-    // trace screenshots during the sampling loop, but keep DOM/network/timing evidence on failure.
-    trace: { mode: "retain-on-failure", screenshots: false, snapshots: true, sources: true },
+    // An unavailable adapter is a dynamic skip before the reporter fails the gate. Record this
+    // single case even on skip; retain-on-failure discards its evidence too early. Trace screenshots
+    // stay disabled so automatic frame sampling cannot interfere with the pixel comparison.
+    trace: { mode: "on", screenshots: false, snapshots: true, sources: true },
   },
   webServer: {
     command: `pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
     url: `${baseURL}/`,
-    // The dev-only harness HTML is not an appropriate readiness URL for a production preview.
     reuseExistingServer: false,
     timeout: 120_000,
   },

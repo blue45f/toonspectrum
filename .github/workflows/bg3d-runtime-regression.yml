@@ -8,7 +8,7 @@ on:
       - "e2e/studio-3d-visual-verification.spec.ts"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
-      - "scripts/studio-bg3d-runtime-reporter*"
+      - "scripts/studio-bg3d-runtime-*"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/bg3d-runtime-regression.yml"
@@ -19,7 +19,7 @@ on:
       - "e2e/studio-3d-visual-verification.spec.ts"
       - "playwright.config.ts"
       - "playwright.bg3d-runtime.config.ts"
-      - "scripts/studio-bg3d-runtime-reporter*"
+      - "scripts/studio-bg3d-runtime-*"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/bg3d-runtime-regression.yml"
@@ -55,7 +55,7 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Check changed verification code
-        run: pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts scripts/studio-bg3d-runtime-reporter.test.ts
+        run: pnpm exec eslint playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-setup.mts
       - name: Test real-execution and failure-evidence contracts
         run: pnpm exec vitest run scripts/studio-bg3d-runtime-reporter.test.ts --reporter=verbose
       - name: Install Chromium and its runtime dependencies

@@ -102,11 +102,13 @@ describe("BG3D production verification configuration", () => {
     expect(source).not.toContain("tools/browser-harnesses/hybrid-dcc-e2e.html");
   });
 
-  it("retains first-failure evidence even when retries are disabled", () => {
+  it("retains evidence even when the browser test skips before the reporter fails it", () => {
     expect(source).toContain("retries: 0");
-    expect(source).toContain('mode: "retain-on-failure"');
+    expect(source).toContain('mode: "on"');
+    expect(source).toContain("screenshots: false");
     expect(source).toContain('screenshot: "only-on-failure"');
     expect(source).toContain('outputFolder: "playwright-report/bg3d-runtime"');
     expect(source).toContain('"./scripts/studio-bg3d-runtime-reporter.ts"');
+    expect(source).toContain('globalSetup: "./scripts/studio-bg3d-runtime-setup.mts"');
   });
 });
