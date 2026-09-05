@@ -8,7 +8,7 @@ import {
 
 describe("Studio route manifest", () => {
   it("declares one owner for each Studio route family", () => {
-    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(5);
+    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(6);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
       STUDIO_ROUTE_MANIFEST.length,
     );
@@ -130,49 +130,70 @@ describe("Studio route manifest", () => {
     [
       "/studio/projects",
       "",
-      "placeholder",
+      "production",
       "/studio/projects",
       "/studio/projects",
     ],
     [
-      "/studio/review",
+      "/studio/share",
+      "?scope=work%3Awork-1",
+      "production",
+      "/studio/share?scope=work%3Awork-1",
+      "/studio/share",
+    ],
+    [
+      "/studio/join",
+      "?invite=ts-demo",
+      "production",
+      "/studio/join?invite=ts-demo",
+      "/studio/join",
+    ],
+    [
+      "/studio/assets",
       "",
       "placeholder",
+      "/studio/assets",
+      "/studio/assets",
+    ],
+    [
+      "/studio/review",
+      "",
+      "production",
       "/studio/review",
       "/studio/review",
     ],
     [
       "/studio/versions",
       "?tab=history",
-      "placeholder",
+      "production",
       "/studio/versions?tab=history",
       "/studio/versions",
     ],
     [
       "/studio/work/work-1/present",
       "",
-      "placeholder",
+      "production",
       "/studio/work/work-1/present",
       "/studio/work:work-1/present",
     ],
     [
       "/studio/work/work-1/review",
       "",
-      "placeholder",
+      "production",
       "/studio/work/work-1/review",
       "/studio/work:work-1/review",
     ],
     [
       "/studio/remix/source-1/present",
       "",
-      "placeholder",
+      "production",
       "/studio/remix/source-1/present",
       "/studio/remix:source-1/present",
     ],
     [
       "/studio/work/work-1/versions",
       "?tab=history",
-      "placeholder",
+      "production",
       "/studio/work/work-1/versions?tab=history",
       "/studio/work:work-1/versions",
     ],
@@ -211,7 +232,8 @@ describe("Studio route manifest", () => {
       search: "?view=navigator",
     })).toBe(true);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/lift3d" })).toBe(true);
-    expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/projects" })).toBe(false);
+    expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/projects" })).toBe(true);
+    expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/assets" })).toBe(false);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/avatar" })).toBe(false);
   });
 });

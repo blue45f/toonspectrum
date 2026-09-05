@@ -62,6 +62,15 @@ describe("Studio router bundle boundaries", () => {
     expect(legacyEditorSource).not.toContain("StudioUploadPublish,");
   });
 
+  it("loads the production command center without pulling the editor runtime into its route", () => {
+    expect(routerSource).toContain(
+      'import("../studio-production/StudioProductionHubPage")',
+    );
+    expect(routerSource).toContain('case "production"');
+    expect(routerSource).toContain("<StudioProductionHubPage");
+    expect(routerSource).not.toContain('from "../studio-production/StudioProductionHubPage"');
+  });
+
   it("gives AppRouter one domain-owned lazy Studio entry instead of competing flat routes", () => {
     expect(appRouterSource).toContain('import { appRoutes } from "./groups/app-routes"');
     expect(appRouterSource).toContain("appRoutes.map");
