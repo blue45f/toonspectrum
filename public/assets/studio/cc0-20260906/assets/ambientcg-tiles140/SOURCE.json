@@ -1,0 +1,18 @@
+{
+  "sourceId": "Tiles140",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=tiles&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "6a149805903fb4e13e3c192a4e8b519950391d25add97a81f5efffc215dcd53d",
+  "downloadUrl": "https://ambientcg.com/get?file=Tiles140_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles140_8tH4FAJS/Tiles140_2K-JPG.zip",
+  "archiveSha256": "b10d0c4d953f7a8629e6dafe910cc2f63a576f3ee4bf6a4ea1161a60aa8d7f74",
+  "bytes": 16328875,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Tiles140",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

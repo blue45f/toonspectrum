@@ -1,0 +1,18 @@
+{
+  "sourceId": "Metal063",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=metal&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "7c69eaa5f7dd476c0297b5324fb0bc6d10c8a677fa47260da9a86e5d31290896",
+  "downloadUrl": "https://ambientcg.com/get?file=Metal063_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Metal063_8lUe7gV6/Metal063_2K-JPG.zip",
+  "archiveSha256": "4c4a995457002ff5288c337254893d3bd42bdd13cecba3e3dadf84e71ebae4a6",
+  "bytes": 18357564,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Metal063",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

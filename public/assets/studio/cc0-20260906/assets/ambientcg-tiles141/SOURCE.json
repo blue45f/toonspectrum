@@ -1,0 +1,18 @@
+{
+  "sourceId": "Tiles141",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=stone&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "df637bddb867b920dde566c02a83406f9fe4a15d1f3a271195fc424edee14cd4",
+  "downloadUrl": "https://ambientcg.com/get?file=Tiles141_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles141_yu3Lvt1G/Tiles141_2K-JPG.zip",
+  "archiveSha256": "aa746dab97b16147d29e39113ed4d8788f165b659c79ee6a585afc721d64c068",
+  "bytes": 16859961,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Tiles141",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

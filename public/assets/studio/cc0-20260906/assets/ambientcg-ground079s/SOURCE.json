@@ -1,0 +1,18 @@
+{
+  "sourceId": "Ground079S",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=gravel&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "55679dbd6ca7b23dbde8ac8264955e4421982483bfba565700c54a1b0877c9d7",
+  "downloadUrl": "https://ambientcg.com/get?file=Ground079S_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground079S_Tqma9VCr/Ground079S_2K-JPG.zip",
+  "archiveSha256": "6d7f7f6c4582bc9696899dcd44d055fc2ce54aab50d94143e35cbac0b52da6b0",
+  "bytes": 34278354,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Ground079S",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "sourceId": "WoodFloor051",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=wood&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "7f9a975b55497c04f2cf9ae0d87927f4fcfd73bc50368f8bde502f274851f292",
+  "downloadUrl": "https://ambientcg.com/get?file=WoodFloor051_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/WoodFloor051_jClsRFWK/WoodFloor051_2K-JPG.zip",
+  "archiveSha256": "eb7d1cee763bb17a59feb89b0fd16398d3673a071a76fed289111cf81013ac25",
+  "bytes": 16427258,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/WoodFloor051",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "sourceId": "Fabric061",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=fabric&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "c04aeae8f8de396e4f2d7a2ad4e021d42eaa243639aeae70ff67f679ff7883a6",
+  "downloadUrl": "https://ambientcg.com/get?file=Fabric061_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Fabric061_E39ePXlD/Fabric061_2K-JPG.zip",
+  "archiveSha256": "27b729c1bafa7c47f5f89dea8ca43d6107156acd437c1439a30d28e9de0013c2",
+  "bytes": 33405191,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Fabric061",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

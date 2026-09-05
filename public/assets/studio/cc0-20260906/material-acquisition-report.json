@@ -1,0 +1,703 @@
+{
+  "addedOriginals": 33,
+  "addedIds": [
+    "ambientcg-wood094-color",
+    "ambientcg-wood092-color",
+    "ambientcg-woodfloor051-color",
+    "ambientcg-carpet016-color",
+    "ambientcg-fabric081c-color",
+    "ambientcg-fabric061-color",
+    "ambientcg-ground107-color",
+    "ambientcg-bricks097-color",
+    "ambientcg-bricks060-color",
+    "ambientcg-tiles141-color",
+    "ambientcg-pavingstones151-color",
+    "ambientcg-rock064-color",
+    "ambientcg-concrete034-color",
+    "ambientcg-concrete048-color",
+    "ambientcg-concrete047a-color",
+    "ambientcg-metal063-color",
+    "ambientcg-metal049a-color",
+    "ambientcg-corrugatedsteel009-color",
+    "ambientcg-tiles139-color",
+    "ambientcg-tiles140-color",
+    "ambientcg-tiles143-color",
+    "ambientcg-plaster001-color",
+    "ambientcg-paintedplaster017-color",
+    "ambientcg-plaster007-color",
+    "ambientcg-ground110-color",
+    "ambientcg-ground108-color",
+    "ambientcg-ground109-color",
+    "ambientcg-gravel043-color",
+    "ambientcg-ground079s-color",
+    "ambientcg-gravel023-color",
+    "ambientcg-leather037-color",
+    "ambientcg-leather038-color",
+    "ambientcg-leather026-color"
+  ],
+  "byFamily": {
+    "wood": 3,
+    "fabric": 3,
+    "brick": 3,
+    "stone": 3,
+    "concrete": 3,
+    "metal": 3,
+    "tiles": 3,
+    "plaster": 3,
+    "ground": 3,
+    "gravel": 3,
+    "leather": 3
+  },
+  "downloadedBytes": 800521245,
+  "expandedBytes": 758743594,
+  "sourceReceipts": [
+    {
+      "sourceId": "Wood094",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=wood&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7f9a975b55497c04f2cf9ae0d87927f4fcfd73bc50368f8bde502f274851f292",
+      "downloadUrl": "https://ambientcg.com/get?file=Wood094_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Wood094_2SlzseWH/Wood094_2K-JPG.zip",
+      "archiveSha256": "f951e5fb062f454f45f406ff45828b1392dee6a23839d214ccc1aa1e2a6828d1",
+      "bytes": 14806756,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Wood094",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Wood092",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=wood&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7f9a975b55497c04f2cf9ae0d87927f4fcfd73bc50368f8bde502f274851f292",
+      "downloadUrl": "https://ambientcg.com/get?file=Wood092_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Wood092_rsQP24AV/Wood092_2K-JPG.zip",
+      "archiveSha256": "4c392495ec8689024659de2099f538089556d77dd7c2f2c2d70a707fa7d29d54",
+      "bytes": 18188772,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Wood092",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "WoodFloor051",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=wood&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7f9a975b55497c04f2cf9ae0d87927f4fcfd73bc50368f8bde502f274851f292",
+      "downloadUrl": "https://ambientcg.com/get?file=WoodFloor051_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/WoodFloor051_jClsRFWK/WoodFloor051_2K-JPG.zip",
+      "archiveSha256": "eb7d1cee763bb17a59feb89b0fd16398d3673a071a76fed289111cf81013ac25",
+      "bytes": 16427258,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/WoodFloor051",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Carpet016",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=fabric&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "c04aeae8f8de396e4f2d7a2ad4e021d42eaa243639aeae70ff67f679ff7883a6",
+      "downloadUrl": "https://ambientcg.com/get?file=Carpet016_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Carpet016_dnZavRoU/Carpet016_2K-JPG.zip",
+      "archiveSha256": "a57bceafe6f2e37ed931b02f7310f6df1f7bbef5653cc5811e04f57048bc533f",
+      "bytes": 31205527,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Carpet016",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Fabric081C",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=fabric&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "c04aeae8f8de396e4f2d7a2ad4e021d42eaa243639aeae70ff67f679ff7883a6",
+      "downloadUrl": "https://ambientcg.com/get?file=Fabric081C_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Fabric081C_rlEARXnZ/Fabric081C_2K-JPG.zip",
+      "archiveSha256": "19662b7e9dbf4f098f5f0957f1cb03bb0532db2c72e4076408ad6b35a105eeea",
+      "bytes": 21429478,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Fabric081C",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Fabric061",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=fabric&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "c04aeae8f8de396e4f2d7a2ad4e021d42eaa243639aeae70ff67f679ff7883a6",
+      "downloadUrl": "https://ambientcg.com/get?file=Fabric061_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Fabric061_E39ePXlD/Fabric061_2K-JPG.zip",
+      "archiveSha256": "27b729c1bafa7c47f5f89dea8ca43d6107156acd437c1439a30d28e9de0013c2",
+      "bytes": 33405191,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Fabric061",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Ground107",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=brick&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "ce0b25b5a54346bb29ffef9d25541d4d784a7453d1a02f9c2dd197b26ab03b3c",
+      "downloadUrl": "https://ambientcg.com/get?file=Ground107_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground107_rFZLKIpE/Ground107_2K-JPG.zip",
+      "archiveSha256": "9a3b0a20a2f3cdbd830b9e24af4c9e5e88fcf167ff1dc7d78cb2a8d30dad2b15",
+      "bytes": 34715310,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground107",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Bricks097",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=brick&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "ce0b25b5a54346bb29ffef9d25541d4d784a7453d1a02f9c2dd197b26ab03b3c",
+      "downloadUrl": "https://ambientcg.com/get?file=Bricks097_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Bricks097_Me9gjfCa/Bricks097_2K-JPG.zip",
+      "archiveSha256": "0c4ea4f9ba8373ba9a6f12b0f92a2b1859686e8c670f44616b38be095f65b71f",
+      "bytes": 15930202,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Bricks097",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Bricks060",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=brick&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "ce0b25b5a54346bb29ffef9d25541d4d784a7453d1a02f9c2dd197b26ab03b3c",
+      "downloadUrl": "https://ambientcg.com/get?file=Bricks060_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Bricks060_39b2iMRa/Bricks060_2K-JPG.zip",
+      "archiveSha256": "a0dc1530f188b584aed1957a91007485ebdfa91f0028ecfcc254fa614398368b",
+      "bytes": 26798917,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Bricks060",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Tiles141",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=stone&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "df637bddb867b920dde566c02a83406f9fe4a15d1f3a271195fc424edee14cd4",
+      "downloadUrl": "https://ambientcg.com/get?file=Tiles141_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles141_yu3Lvt1G/Tiles141_2K-JPG.zip",
+      "archiveSha256": "aa746dab97b16147d29e39113ed4d8788f165b659c79ee6a585afc721d64c068",
+      "bytes": 16859961,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles141",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "PavingStones151",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=stone&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "df637bddb867b920dde566c02a83406f9fe4a15d1f3a271195fc424edee14cd4",
+      "downloadUrl": "https://ambientcg.com/get?file=PavingStones151_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/PavingStones151_4QHPhkT2/PavingStones151_2K-JPG.zip",
+      "archiveSha256": "41965f7604eda1de8866c68682815fa5c908bdc60e855a1ca3ec0991f0c00b7e",
+      "bytes": 28847309,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/PavingStones151",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Rock064",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=stone&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "df637bddb867b920dde566c02a83406f9fe4a15d1f3a271195fc424edee14cd4",
+      "downloadUrl": "https://ambientcg.com/get?file=Rock064_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Rock064_IyS8U6HP/Rock064_2K-JPG.zip",
+      "archiveSha256": "225f88f2e8bfdac834027c497115f1f7bb82653a53e904987fa6b071fda94d9c",
+      "bytes": 28438777,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Rock064",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Concrete034",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=concrete&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "1f9f5304ec2e7e2e4aa47ea33fc1ec8020343f1b56adb9e961eff9d2223a29c5",
+      "downloadUrl": "https://ambientcg.com/get?file=Concrete034_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Concrete034_jUQtDlJO/Concrete034_2K-JPG.zip",
+      "archiveSha256": "fafd7cd3aee2b703abbb12b7810ef565ab76ac7ea3b1ea9a73b088e423e670b3",
+      "bytes": 10598720,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete034",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Concrete048",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=concrete&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "1f9f5304ec2e7e2e4aa47ea33fc1ec8020343f1b56adb9e961eff9d2223a29c5",
+      "downloadUrl": "https://ambientcg.com/get?file=Concrete048_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Concrete048_YbX07RTL/Concrete048_2K-JPG.zip",
+      "archiveSha256": "c61a3e7f03c625889c7fd71351a928217a15e81ea26e6f7dda16865b2882e483",
+      "bytes": 28990525,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete048",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Concrete047A",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=concrete&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "1f9f5304ec2e7e2e4aa47ea33fc1ec8020343f1b56adb9e961eff9d2223a29c5",
+      "downloadUrl": "https://ambientcg.com/get?file=Concrete047A_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Concrete047A_BDk9jKxP/Concrete047A_2K-JPG.zip",
+      "archiveSha256": "70a9be4b8107d641cbcb9ca3e10b09592c5f95fb8effb4305b1fe2990fac71cc",
+      "bytes": 32918448,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete047A",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Metal063",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=metal&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7c69eaa5f7dd476c0297b5324fb0bc6d10c8a677fa47260da9a86e5d31290896",
+      "downloadUrl": "https://ambientcg.com/get?file=Metal063_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Metal063_8lUe7gV6/Metal063_2K-JPG.zip",
+      "archiveSha256": "4c4a995457002ff5288c337254893d3bd42bdd13cecba3e3dadf84e71ebae4a6",
+      "bytes": 18357564,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Metal063",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Metal049A",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=metal&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7c69eaa5f7dd476c0297b5324fb0bc6d10c8a677fa47260da9a86e5d31290896",
+      "downloadUrl": "https://ambientcg.com/get?file=Metal049A_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Metal049A_Pma453Y2/Metal049A_2K-JPG.zip",
+      "archiveSha256": "7c9da1f87d9c22306587e428db740e9db7119817af67d04d3b68cd33776511b2",
+      "bytes": 7188932,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Metal049A",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "CorrugatedSteel009",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=metal&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "7c69eaa5f7dd476c0297b5324fb0bc6d10c8a677fa47260da9a86e5d31290896",
+      "downloadUrl": "https://ambientcg.com/get?file=CorrugatedSteel009_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/CorrugatedSteel009_XhxoKJb1/CorrugatedSteel009_2K-JPG.zip",
+      "archiveSha256": "11d573412820d1ab17eb23c94af98bbd2b8abfce9e5c2cd63f1184eda320eed2",
+      "bytes": 10436918,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/CorrugatedSteel009",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Tiles139",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=tiles&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6a149805903fb4e13e3c192a4e8b519950391d25add97a81f5efffc215dcd53d",
+      "downloadUrl": "https://ambientcg.com/get?file=Tiles139_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles139_ruj6DWvc/Tiles139_2K-JPG.zip",
+      "archiveSha256": "1770717257e7f26e071fc187913eba12c0a3ca00048842de1a2bdf6a4788f34e",
+      "bytes": 16290912,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles139",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Tiles140",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=tiles&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6a149805903fb4e13e3c192a4e8b519950391d25add97a81f5efffc215dcd53d",
+      "downloadUrl": "https://ambientcg.com/get?file=Tiles140_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles140_8tH4FAJS/Tiles140_2K-JPG.zip",
+      "archiveSha256": "b10d0c4d953f7a8629e6dafe910cc2f63a576f3ee4bf6a4ea1161a60aa8d7f74",
+      "bytes": 16328875,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles140",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Tiles143",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=tiles&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6a149805903fb4e13e3c192a4e8b519950391d25add97a81f5efffc215dcd53d",
+      "downloadUrl": "https://ambientcg.com/get?file=Tiles143_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Tiles143_EvFni1Zs/Tiles143_2K-JPG.zip",
+      "archiveSha256": "d6f5c6f78d06675d4071b981c43da521d07702480d243eea250bd3d6ee1f24fc",
+      "bytes": 16966960,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles143",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Plaster001",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=plaster&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "27b00fbe82019e04cab91ea58b29daa6853693a82d221a112b3a487c8b1a917d",
+      "downloadUrl": "https://ambientcg.com/get?file=Plaster001_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Plaster001_SLyYfa9J/Plaster001_2K-JPG.zip",
+      "archiveSha256": "9894765632cfa0feb3349b581825a9c224dee9efa1cebb8aba63bd1c7bc9fc3c",
+      "bytes": 26140483,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Plaster001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "PaintedPlaster017",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=plaster&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "27b00fbe82019e04cab91ea58b29daa6853693a82d221a112b3a487c8b1a917d",
+      "downloadUrl": "https://ambientcg.com/get?file=PaintedPlaster017_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/PaintedPlaster017_kZF8yCTI/PaintedPlaster017_2K-JPG.zip",
+      "archiveSha256": "a61330b10b1aa58410f8b60632f667e7a6d84d521bbd85cec4c4de7136d282d2",
+      "bytes": 14871615,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/PaintedPlaster017",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Plaster007",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=plaster&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "27b00fbe82019e04cab91ea58b29daa6853693a82d221a112b3a487c8b1a917d",
+      "downloadUrl": "https://ambientcg.com/get?file=Plaster007_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Plaster007_WblsZHVy/Plaster007_2K-JPG.zip",
+      "archiveSha256": "3dab115cfc492ca0ca0e2ec989a9dd1ccb3681b76c3eb3d0ac069192998a231c",
+      "bytes": 27851755,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Plaster007",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Ground110",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=ground&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "972da1b2e6d4aa79abb38c94605d1171998072f6a68cdf6655fb6b96e907a347",
+      "downloadUrl": "https://ambientcg.com/get?file=Ground110_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground110_flJv21CK/Ground110_2K-JPG.zip",
+      "archiveSha256": "61b550147e82350ec12f3f1d92e9ccd3ae6b6bfc8b3f8991cd80b54524c2a515",
+      "bytes": 35158854,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground110",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Ground108",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=ground&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "972da1b2e6d4aa79abb38c94605d1171998072f6a68cdf6655fb6b96e907a347",
+      "downloadUrl": "https://ambientcg.com/get?file=Ground108_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground108_SaiyAd65/Ground108_2K-JPG.zip",
+      "archiveSha256": "ffc003a159613b9c16f0941b66ccce968fa975eeb504bf345f3630f9f7a732f6",
+      "bytes": 32548275,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground108",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Ground109",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=ground&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "972da1b2e6d4aa79abb38c94605d1171998072f6a68cdf6655fb6b96e907a347",
+      "downloadUrl": "https://ambientcg.com/get?file=Ground109_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground109_PkNebR6l/Ground109_2K-JPG.zip",
+      "archiveSha256": "1f32c5ffa599e32c61405417d9b682dcc23e6ccc38f8a3a09880f204a481e0c8",
+      "bytes": 31761974,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground109",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Gravel043",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=gravel&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "55679dbd6ca7b23dbde8ac8264955e4421982483bfba565700c54a1b0877c9d7",
+      "downloadUrl": "https://ambientcg.com/get?file=Gravel043_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Gravel043_2OBAtyM5/Gravel043_2K-JPG.zip",
+      "archiveSha256": "d520aa16697e6b24fed4a6529d51df93970a36fcfb30be5e1171d681b8303665",
+      "bytes": 35913142,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Gravel043",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Ground079S",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=gravel&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "55679dbd6ca7b23dbde8ac8264955e4421982483bfba565700c54a1b0877c9d7",
+      "downloadUrl": "https://ambientcg.com/get?file=Ground079S_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground079S_Tqma9VCr/Ground079S_2K-JPG.zip",
+      "archiveSha256": "6d7f7f6c4582bc9696899dcd44d055fc2ce54aab50d94143e35cbac0b52da6b0",
+      "bytes": 34278354,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground079S",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Gravel023",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=gravel&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "55679dbd6ca7b23dbde8ac8264955e4421982483bfba565700c54a1b0877c9d7",
+      "downloadUrl": "https://ambientcg.com/get?file=Gravel023_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Gravel023_8nHSJFiN/Gravel023_2K-JPG.zip",
+      "archiveSha256": "a6dd0aea7bcda95d6373c823734eda0cfa066e34c0eea9e1e07023926021bab5",
+      "bytes": 31379349,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Gravel023",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Leather037",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=leather&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6d6079810596064d671ea70d8deb37ca787ed5530a27b91e2328f23663b72cca",
+      "downloadUrl": "https://ambientcg.com/get?file=Leather037_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Leather037_4mWfZc5P/Leather037_2K-JPG.zip",
+      "archiveSha256": "edfefef45891df244eee88d392e30bf70e797b77898926f00ea7cde7b88e1c14",
+      "bytes": 21182522,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather037",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Leather038",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=leather&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6d6079810596064d671ea70d8deb37ca787ed5530a27b91e2328f23663b72cca",
+      "downloadUrl": "https://ambientcg.com/get?file=Leather038_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Leather038_g6yOCcpm/Leather038_2K-JPG.zip",
+      "archiveSha256": "839601ca19c499d1b0745cbfe1cd678b6747ec44217cbebffe6cf404980513be",
+      "bytes": 25846302,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather038",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    },
+    {
+      "sourceId": "Leather026",
+      "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=leather&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+      "metadataResponseSha256": "6d6079810596064d671ea70d8deb37ca787ed5530a27b91e2328f23663b72cca",
+      "downloadUrl": "https://ambientcg.com/get?file=Leather026_2K-JPG.zip",
+      "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Leather026_Mz5Jbq7X/Leather026_2K-JPG.zip",
+      "archiveSha256": "681d26d63912c849151266a087290a41c2fc5e95789c2cd6669f36c45d70efa6",
+      "bytes": 24017175,
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather026",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      }
+    }
+  ],
+  "failures": [
+    {
+      "source": "Wood095",
+      "reason": "duplicate-color-original"
+    },
+    {
+      "source": "Leather030",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Asphalt033",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road007",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road012A",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Asphalt031",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road008A",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road013A",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road012B",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road009C",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Asphalt025C",
+      "reason": "declared download budget exceeded"
+    },
+    {
+      "source": "Road008B",
+      "reason": "declared download budget exceeded"
+    }
+  ],
+  "visualApprovalCount": 0,
+  "studioRuntimeVerified": false,
+  "productionPublished": false,
+  "completedAt": "2026-09-05T19:09:08.338510+00:00"
+}

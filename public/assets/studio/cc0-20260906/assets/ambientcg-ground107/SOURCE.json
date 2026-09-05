@@ -1,0 +1,18 @@
+{
+  "sourceId": "Ground107",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=brick&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "ce0b25b5a54346bb29ffef9d25541d4d784a7453d1a02f9c2dd197b26ab03b3c",
+  "downloadUrl": "https://ambientcg.com/get?file=Ground107_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground107_rFZLKIpE/Ground107_2K-JPG.zip",
+  "archiveSha256": "9a3b0a20a2f3cdbd830b9e24af4c9e5e88fcf167ff1dc7d78cb2a8d30dad2b15",
+  "bytes": 34715310,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Ground107",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

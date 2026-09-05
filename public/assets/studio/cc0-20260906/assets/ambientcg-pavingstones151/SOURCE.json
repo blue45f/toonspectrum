@@ -1,0 +1,18 @@
+{
+  "sourceId": "PavingStones151",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=stone&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "df637bddb867b920dde566c02a83406f9fe4a15d1f3a271195fc424edee14cd4",
+  "downloadUrl": "https://ambientcg.com/get?file=PavingStones151_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/PavingStones151_4QHPhkT2/PavingStones151_2K-JPG.zip",
+  "archiveSha256": "41965f7604eda1de8866c68682815fa5c908bdc60e855a1ca3ec0991f0c00b7e",
+  "bytes": 28847309,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/PavingStones151",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "sourceId": "Gravel023",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=gravel&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "55679dbd6ca7b23dbde8ac8264955e4421982483bfba565700c54a1b0877c9d7",
+  "downloadUrl": "https://ambientcg.com/get?file=Gravel023_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Gravel023_8nHSJFiN/Gravel023_2K-JPG.zip",
+  "archiveSha256": "a6dd0aea7bcda95d6373c823734eda0cfa066e34c0eea9e1e07023926021bab5",
+  "bytes": 31379349,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Gravel023",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

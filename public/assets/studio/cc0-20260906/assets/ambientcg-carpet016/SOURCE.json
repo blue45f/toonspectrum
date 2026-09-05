@@ -1,0 +1,18 @@
+{
+  "sourceId": "Carpet016",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=fabric&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "c04aeae8f8de396e4f2d7a2ad4e021d42eaa243639aeae70ff67f679ff7883a6",
+  "downloadUrl": "https://ambientcg.com/get?file=Carpet016_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Carpet016_dnZavRoU/Carpet016_2K-JPG.zip",
+  "archiveSha256": "a57bceafe6f2e37ed931b02f7310f6df1f7bbef5653cc5811e04f57048bc533f",
+  "bytes": 31205527,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Carpet016",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

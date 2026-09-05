@@ -1,0 +1,18 @@
+{
+  "sourceId": "Concrete034",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=concrete&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "1f9f5304ec2e7e2e4aa47ea33fc1ec8020343f1b56adb9e961eff9d2223a29c5",
+  "downloadUrl": "https://ambientcg.com/get?file=Concrete034_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Concrete034_jUQtDlJO/Concrete034_2K-JPG.zip",
+  "archiveSha256": "fafd7cd3aee2b703abbb12b7810ef565ab76ac7ea3b1ea9a73b088e423e670b3",
+  "bytes": 10598720,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Concrete034",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

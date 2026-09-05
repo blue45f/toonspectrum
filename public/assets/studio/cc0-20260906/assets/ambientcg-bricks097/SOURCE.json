@@ -1,0 +1,18 @@
+{
+  "sourceId": "Bricks097",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=brick&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "ce0b25b5a54346bb29ffef9d25541d4d784a7453d1a02f9c2dd197b26ab03b3c",
+  "downloadUrl": "https://ambientcg.com/get?file=Bricks097_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Bricks097_Me9gjfCa/Bricks097_2K-JPG.zip",
+  "archiveSha256": "0c4ea4f9ba8373ba9a6f12b0f92a2b1859686e8c670f44616b38be095f65b71f",
+  "bytes": 15930202,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Bricks097",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "sourceId": "Ground108",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=ground&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "972da1b2e6d4aa79abb38c94605d1171998072f6a68cdf6655fb6b96e907a347",
+  "downloadUrl": "https://ambientcg.com/get?file=Ground108_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Ground108_SaiyAd65/Ground108_2K-JPG.zip",
+  "archiveSha256": "ffc003a159613b9c16f0941b66ccce968fa975eeb504bf345f3630f9f7a732f6",
+  "bytes": 32548275,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Ground108",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

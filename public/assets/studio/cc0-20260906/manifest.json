@@ -43801,6 +43801,1616 @@
         0.08999999612569809
       ],
       "previewFitScale": 3.883495253502612
+    },
+    {
+      "id": "ambientcg-wood094-color",
+      "name": "Wood094 · wood",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "wood",
+      "path": "assets/ambientcg-wood094/wood094-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 4602018,
+      "sha256": "ba44fa7d3a57a3b8194bc851d68fa15d881d04cf55aa9b5821974ff8d586fbaf",
+      "sourceSha256": "13bdf0fcc6e0b9c742db67a020757e32fae8ac0e877e6eb28cfcc089908930da",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Wood094",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-wood094/Wood094_2K-JPG_Displacement.jpg",
+          "sha256": "1e48b8c47b63749b82a197636672a78bfd46f3e4a497eea41c7a8e8112252ece"
+        },
+        {
+          "path": "assets/ambientcg-wood094/Wood094_2K-JPG_NormalGL.jpg",
+          "sha256": "f741a9759584a431103d5ccc216c65edb66db0c44eb46c481920b0c2391ce78b"
+        },
+        {
+          "path": "assets/ambientcg-wood094/Wood094_2K-JPG_Roughness.jpg",
+          "sha256": "96f76c031fd9c0a3d50bbd6f01792f8cc6900950151f868b2340ddd878f93b7d"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-wood092-color",
+      "name": "Wood092 · wood",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "wood",
+      "path": "assets/ambientcg-wood092/wood092-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 4045854,
+      "sha256": "9e62318e1d9c205101564f6fb1b2e5e4e0c761ba7a398d20d0cbf7cb73de3560",
+      "sourceSha256": "f070ac5b7e936666d5fcde0ab24744ec2cbb314ad01c9b389c9fae0d6a6a9f51",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Wood092",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-wood092/Wood092_2K-JPG_Displacement.jpg",
+          "sha256": "21686644c81837ee1d4ef646bab11577502648576efd2dc8e9bfa099b96b4191"
+        },
+        {
+          "path": "assets/ambientcg-wood092/Wood092_2K-JPG_NormalGL.jpg",
+          "sha256": "1493a96b0c938cf301f894c164d9582965f654e638cb4598091e8de05ef05bd1"
+        },
+        {
+          "path": "assets/ambientcg-wood092/Wood092_2K-JPG_Roughness.jpg",
+          "sha256": "c3b7a9daf961ec4e5dd54601e2918f76b22fd86f59cc354b606aa9fae63e7fe4"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-woodfloor051-color",
+      "name": "WoodFloor051 · wood",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "wood",
+      "path": "assets/ambientcg-woodfloor051/woodfloor051-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 4339332,
+      "sha256": "3350cc9e5d350a35378e693bdc69285b0982a87e6acd90348a730f62c9ab2594",
+      "sourceSha256": "cd20f4039f62ca2b2430b8a4521774572a31ee586babac058a3afe178ed9ef5f",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/WoodFloor051",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-woodfloor051/WoodFloor051_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "fba851b50446fd04ef25b70a3d1dbf77ffae47d18560e778abe12c8dbf8012a6"
+        },
+        {
+          "path": "assets/ambientcg-woodfloor051/WoodFloor051_2K-JPG_Displacement.jpg",
+          "sha256": "8746b86e8075192429a3001639fc8ff986612ff53f7d8ec9818211fe020ae16f"
+        },
+        {
+          "path": "assets/ambientcg-woodfloor051/WoodFloor051_2K-JPG_NormalGL.jpg",
+          "sha256": "4c49e6dad811b850ddf496cbab5c247292d4df61f25ba3108ba43d83aa242780"
+        },
+        {
+          "path": "assets/ambientcg-woodfloor051/WoodFloor051_2K-JPG_Roughness.jpg",
+          "sha256": "136fafdf901678e5959d4690b812ad4ef654c53db05295eb07e1efa24337cd61"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-carpet016-color",
+      "name": "Carpet016 · fabric",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "fabric",
+      "path": "assets/ambientcg-carpet016/carpet016-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 4841816,
+      "sha256": "6f8dc2947e86f15ad71f601de8d52ab3efda71aa7b8f17a107b0308428b8d773",
+      "sourceSha256": "3b22ad51cc1d4a081959e71f50b53f1a353a48252cbd6e3a7461b7a30fec001e",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Carpet016",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-carpet016/Carpet016_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "cefb82c369d7abca801b2836bf0d4be1965606b21d916d24dd1efd20e7bf36a0"
+        },
+        {
+          "path": "assets/ambientcg-carpet016/Carpet016_2K-JPG_Displacement.jpg",
+          "sha256": "0977dece0f4e837749a980be378cdc2ff8878f1710acd35db399cf4aea99921c"
+        },
+        {
+          "path": "assets/ambientcg-carpet016/Carpet016_2K-JPG_NormalGL.jpg",
+          "sha256": "03d722fdddeec83dfd53c9d5df5a6ba83a11d406dec38c6bcbd856e840e86b8c"
+        },
+        {
+          "path": "assets/ambientcg-carpet016/Carpet016_2K-JPG_Roughness.jpg",
+          "sha256": "90e161ca5512cff21caea08e891f242feb926ec82a0e38f3f176aa49d63ed31a"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-fabric081c-color",
+      "name": "Fabric081C · fabric",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "fabric",
+      "path": "assets/ambientcg-fabric081c/fabric081c-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 442666,
+      "sha256": "8d89c4e32d7109b9aa05e309d6fa7b9659f7a57438c53020e4217abb5d6160f5",
+      "sourceSha256": "e83ad445099f2b362c8bcfa361fc31e3e043303b08cdc15cb2e4c3bc72f02296",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Fabric081C",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-fabric081c/Fabric081C_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "25bdf4329f76f69ed3ed6ed129eb8356b61db4a5d40e4295972b6a50255ea414"
+        },
+        {
+          "path": "assets/ambientcg-fabric081c/Fabric081C_2K-JPG_Displacement.jpg",
+          "sha256": "c8dba3c04c8f4b90d4f5b3bbfba01bcf620fe2b4530ca405f87dab6280beb6c8"
+        },
+        {
+          "path": "assets/ambientcg-fabric081c/Fabric081C_2K-JPG_NormalGL.jpg",
+          "sha256": "a89b1fdc21a5fd795cd08fd343ea79147c7da906e7aa8c4207b3389e2b2e97bc"
+        },
+        {
+          "path": "assets/ambientcg-fabric081c/Fabric081C_2K-JPG_Roughness.jpg",
+          "sha256": "555b2a14404dd2ee2e5f462a7a4be0c709eca84d14475ebb25f68d4c67ca9c55"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-fabric061-color",
+      "name": "Fabric061 · fabric",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "fabric",
+      "path": "assets/ambientcg-fabric061/fabric061-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5606922,
+      "sha256": "d9c89af53799155c3f8b30e4cfad81427fba027cd8c6393bccd95974972b04c5",
+      "sourceSha256": "851080ab3b6bd424b66f7fa258ee0ff015b5abf735d38ecbdbdf2d96bd4eaddd",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Fabric061",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-fabric061/Fabric061_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "2305299a22cb3fb9c1be8c69f757649e924618c4d739a1b9ef8f99ea10d05805"
+        },
+        {
+          "path": "assets/ambientcg-fabric061/Fabric061_2K-JPG_Displacement.jpg",
+          "sha256": "b3a03ac6ce8c3d26416d0554e5d87a86995efe995d0fb2e1b9c25de8c8085ccc"
+        },
+        {
+          "path": "assets/ambientcg-fabric061/Fabric061_2K-JPG_NormalGL.jpg",
+          "sha256": "444d83b9f9298592e68efad443b0820a23be29a48f9803af242cf2d3e8481c93"
+        },
+        {
+          "path": "assets/ambientcg-fabric061/Fabric061_2K-JPG_Roughness.jpg",
+          "sha256": "2ae3e3bf9a42f7de2f48072649397be354bea1d509142d41622b98cf427fc292"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-ground107-color",
+      "name": "Ground107 · brick",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "brick",
+      "path": "assets/ambientcg-ground107/ground107-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6927386,
+      "sha256": "09da5e02ab8ca56e77c678a1f17d851592e30ae42b1e710f1b25e5e7beff5a15",
+      "sourceSha256": "360588de72cba78f9e792fb9f0b9361b3a80ae9d88e2ebe90f3c9658b20171e7",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground107",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-ground107/Ground107_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "57ae7b293b4891458b3f2d1aab4f2a548dce98e075b87b054baad86e7d1ccfa3"
+        },
+        {
+          "path": "assets/ambientcg-ground107/Ground107_2K-JPG_Displacement.jpg",
+          "sha256": "0edaa28417ce05967b1bd87c0203c63ffc40a2aea64e2753b5085fdbff45111c"
+        },
+        {
+          "path": "assets/ambientcg-ground107/Ground107_2K-JPG_NormalGL.jpg",
+          "sha256": "3285b9cd45461b8ec780d6fa8582a34fe5400bcc4d9318a4285ffef7b43ebdb6"
+        },
+        {
+          "path": "assets/ambientcg-ground107/Ground107_2K-JPG_Roughness.jpg",
+          "sha256": "3d994f60c3f4e514868e471f9800154ffe93dbceb7b0c931f70c48213244c217"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-bricks097-color",
+      "name": "Bricks097 · brick",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "brick",
+      "path": "assets/ambientcg-bricks097/bricks097-color.webp",
+      "width": 2048,
+      "height": 1024,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 3272144,
+      "sha256": "3fb69e66a4aeedcbe64920793cac02d42f5af370850dc8bf06bd12c2228641c5",
+      "sourceSha256": "5696a29a9f43efa2b3ca3bbc7ba3105a2a72a3343a1eceeaa76400cdef461af7",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Bricks097",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-bricks097/Bricks097_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "6b0e7e227260fbae60ce48f1946484a7601578f204248b8a68cc1f49ac4bbb59"
+        },
+        {
+          "path": "assets/ambientcg-bricks097/Bricks097_2K-JPG_Displacement.jpg",
+          "sha256": "d5e02ce6626669139bdbb554c07bf2af84345c56f8f9417ec1a6e4e4adc954a8"
+        },
+        {
+          "path": "assets/ambientcg-bricks097/Bricks097_2K-JPG_NormalGL.jpg",
+          "sha256": "eaba442d6178e002467dee661e359e138f3d6ea941d80a4089f52225d09f702b"
+        },
+        {
+          "path": "assets/ambientcg-bricks097/Bricks097_2K-JPG_Roughness.jpg",
+          "sha256": "89676dd41eb65f749079f5903c124c02ffa7fec887ce96f1c839ae02c82bfe27"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-bricks060-color",
+      "name": "Bricks060 · brick",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "brick",
+      "path": "assets/ambientcg-bricks060/bricks060-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5548062,
+      "sha256": "d1f6da9dfec1faee885e9fc4db8a04a020c95b58bf285386806633a7c35f6c2a",
+      "sourceSha256": "9aadc6e4e80093506fa13aadf3656ecfc47cf2243447147e60111b681a0c4057",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Bricks060",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-bricks060/Bricks060_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "5e0761cdefe6016cc80e01da02cb231309685c6a9e844262ed6d33136b1527ed"
+        },
+        {
+          "path": "assets/ambientcg-bricks060/Bricks060_2K-JPG_Displacement.jpg",
+          "sha256": "2b4cd0ec0a421d5ffd230ae24318f6aae5ad096227850b3f1944b45bc9e6451d"
+        },
+        {
+          "path": "assets/ambientcg-bricks060/Bricks060_2K-JPG_NormalGL.jpg",
+          "sha256": "558a17328b1149d6d7d244ad3a27603c209be3d150136ba726f9051d42ca6b4b"
+        },
+        {
+          "path": "assets/ambientcg-bricks060/Bricks060_2K-JPG_Roughness.jpg",
+          "sha256": "89a931af56dd25549fe4816f8098c727010560379f12a9eb36e1d8bad8da2a3e"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-tiles141-color",
+      "name": "Tiles141 · stone",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "stone",
+      "path": "assets/ambientcg-tiles141/tiles141-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5247892,
+      "sha256": "47b1d80a040e8a90ccb2a7f0def5054fbc29b0d8ca90bc4d12c8fee8f8e743e0",
+      "sourceSha256": "db48502f11c793bb47798273f38e48211f38b0e6c730980b030b5364b0315c6c",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles141",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-tiles141/Tiles141_2K-JPG_Displacement.jpg",
+          "sha256": "a405715c3f98714f4681538ac32f59282873034d6256646c4a13f51f42039a83"
+        },
+        {
+          "path": "assets/ambientcg-tiles141/Tiles141_2K-JPG_NormalGL.jpg",
+          "sha256": "e07e652683e5db1c5369af74251fd72937fbe0cd584e5e8d58f86dffb31db8c2"
+        },
+        {
+          "path": "assets/ambientcg-tiles141/Tiles141_2K-JPG_Roughness.jpg",
+          "sha256": "2db6a7228d15f2e56f7db6d957aacf4518c41d17440afe6e0b1bf195a2776a4e"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-pavingstones151-color",
+      "name": "PavingStones151 · stone",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "stone",
+      "path": "assets/ambientcg-pavingstones151/pavingstones151-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5735864,
+      "sha256": "3dfebac025285fdd38a9bd7885c49b02d4468e2b48d52ee3e92a04ebba229c20",
+      "sourceSha256": "d00926a29fd9bf2e7b5cfb561f5dce83ce2c6c5bc2647e14f7e9faf172a7f24f",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/PavingStones151",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-pavingstones151/PavingStones151_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "edab4e19ccdb5dea1cea073ff04ebb6f2d7877cbc08a91271a6058decfa5d18b"
+        },
+        {
+          "path": "assets/ambientcg-pavingstones151/PavingStones151_2K-JPG_Displacement.jpg",
+          "sha256": "d496acf20d44179a837c12735f1d51bdfadf03ab5990b21b960971c6c67ce175"
+        },
+        {
+          "path": "assets/ambientcg-pavingstones151/PavingStones151_2K-JPG_NormalGL.jpg",
+          "sha256": "812477f30ea8d647565a8764da5d43ba50626b3a0fc342a749c687d340731dae"
+        },
+        {
+          "path": "assets/ambientcg-pavingstones151/PavingStones151_2K-JPG_Roughness.jpg",
+          "sha256": "6504573f9982e7542e033a060e7428c84612883b177ee6bf2b226769f782717a"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-rock064-color",
+      "name": "Rock064 · stone",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "stone",
+      "path": "assets/ambientcg-rock064/rock064-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 7021574,
+      "sha256": "2388652093b442929f51001c78fbba1e8b3607a2471dfe0bbe082c40898043b4",
+      "sourceSha256": "2d6d40d58d4a5feedd900c0b3076b07aec9a76990bfa21f8f30176c9e0da7c84",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Rock064",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-rock064/Rock064_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "ea4ad9542cefb8fbd1fbaced1f4131821c3f24a32578e0614baf4e5d9819272d"
+        },
+        {
+          "path": "assets/ambientcg-rock064/Rock064_2K-JPG_Displacement.jpg",
+          "sha256": "f886332b16481cc3750e7355e9cbc504589c02c8ac6abd2462494caf31e7b92d"
+        },
+        {
+          "path": "assets/ambientcg-rock064/Rock064_2K-JPG_NormalGL.jpg",
+          "sha256": "053fc6b0867e69f472b6de5904050d409722c07fa7276be79bc9fc4664b98508"
+        },
+        {
+          "path": "assets/ambientcg-rock064/Rock064_2K-JPG_Roughness.jpg",
+          "sha256": "e7647cc5f16e33fc9ce8e2b9146835eabc6982004527baa7d2194251055a5d76"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-concrete034-color",
+      "name": "Concrete034 · concrete",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "concrete",
+      "path": "assets/ambientcg-concrete034/concrete034-color.webp",
+      "width": 2048,
+      "height": 1024,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 1174114,
+      "sha256": "20f7e3d293ea31e45031d4d466d12e38e7e5d2ff9c207eb0f5d87b0db32d78bb",
+      "sourceSha256": "fa27982687596d7aa080db1e9b88c30f48a3c32eb3e50b27a2ea27c431e4cde9",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete034",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-concrete034/Concrete034_2K-JPG_Displacement.jpg",
+          "sha256": "b962954034be53c994877c4ef91b9083ca91196e098cf279111449e138090405"
+        },
+        {
+          "path": "assets/ambientcg-concrete034/Concrete034_2K-JPG_NormalGL.jpg",
+          "sha256": "b077dfe6b3b8fbe794d82b9014d030fa01984a25ab67d2e21310995e6ea5b881"
+        },
+        {
+          "path": "assets/ambientcg-concrete034/Concrete034_2K-JPG_Roughness.jpg",
+          "sha256": "fd39973b8ef8212d1c99d18b6665595db3ab96f1c124e062fea52b9bda4ffa63"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-concrete048-color",
+      "name": "Concrete048 · concrete",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "concrete",
+      "path": "assets/ambientcg-concrete048/concrete048-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5317582,
+      "sha256": "60a06dfebbe41d60715e6018562fc80301b21ec2b771f42471a9244e5668c355",
+      "sourceSha256": "46e5f6a7670eb797ecbd6f6a45497d3cb4d9f44fac25792d9253a948bde28c9a",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete048",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-concrete048/Concrete048_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "0bec053c0c83577a305144065bc675f72a95df99dc0920dde94c8e7551e1a60a"
+        },
+        {
+          "path": "assets/ambientcg-concrete048/Concrete048_2K-JPG_Displacement.jpg",
+          "sha256": "0d68d47f3e324235e47cbe2d3a4085e1cb1ca79f12ce321f0e546dec1a56bc14"
+        },
+        {
+          "path": "assets/ambientcg-concrete048/Concrete048_2K-JPG_Metalness.jpg",
+          "sha256": "b6169d831ef164bb36b36a334635e7ebd7b4240da48463d13ca8bf27cce4cf38"
+        },
+        {
+          "path": "assets/ambientcg-concrete048/Concrete048_2K-JPG_NormalGL.jpg",
+          "sha256": "b36f38f3ae9e706918616f777e5772cd00acf19cfb02de5e5431d8c42a7fbd3e"
+        },
+        {
+          "path": "assets/ambientcg-concrete048/Concrete048_2K-JPG_Roughness.jpg",
+          "sha256": "875f1872565c8f80fed3a220e0183737b28cf9e2e79d18e26a37309f19689577"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-concrete047a-color",
+      "name": "Concrete047A · concrete",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "concrete",
+      "path": "assets/ambientcg-concrete047a/concrete047a-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 7002486,
+      "sha256": "2386e52b60bb5dce993741e0495d2eeecb0c994f26123c42465b82d746f9cb54",
+      "sourceSha256": "4f537fe5e9416f29b9b16005f4d9011487564402da4872a3c1267655523606af",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Concrete047A",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-concrete047a/Concrete047A_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "f10d43ef7e33e18af4056b6fa461ad5194ff0ad627e93b1cc1280a7dff4f83f6"
+        },
+        {
+          "path": "assets/ambientcg-concrete047a/Concrete047A_2K-JPG_Displacement.jpg",
+          "sha256": "3e51a1f29fca1d5a04db60743b3f55dead2b88ed73aaf4f7566a564e20e23476"
+        },
+        {
+          "path": "assets/ambientcg-concrete047a/Concrete047A_2K-JPG_NormalGL.jpg",
+          "sha256": "8374f24c1e65a8cf406b56b85c6b49f7ccca4c9c2080cb4dfa0e25e401739f99"
+        },
+        {
+          "path": "assets/ambientcg-concrete047a/Concrete047A_2K-JPG_Roughness.jpg",
+          "sha256": "dc45a2851f82297ce883d70171ac481bc880594902d317e29a9d867d8966d3e3"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-metal063-color",
+      "name": "Metal063 · metal",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "metal",
+      "path": "assets/ambientcg-metal063/metal063-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6050250,
+      "sha256": "bba323bbae355bf7db69a2b66380cc8dbb3c5423db3e18e85bc62f1d5d353aea",
+      "sourceSha256": "c6c93446af0620f65594fc9472d9f347983a7686b6e4509b084b0ecc10d7c2ac",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Metal063",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-metal063/Metal063_2K-JPG_Displacement.jpg",
+          "sha256": "54db99a64f3e07af92b411349924f65af48b583c1880c785055f2e3067ffca7f"
+        },
+        {
+          "path": "assets/ambientcg-metal063/Metal063_2K-JPG_Metalness.jpg",
+          "sha256": "9f85ff589e2260aad853118a5a1efb80a9a252e7831a9942fcc6a4d8db4900cb"
+        },
+        {
+          "path": "assets/ambientcg-metal063/Metal063_2K-JPG_NormalGL.jpg",
+          "sha256": "f1eabb5d3eec9d3247ed76bcb34336f62d17ccbfe316b0dfb563a30f139af7fe"
+        },
+        {
+          "path": "assets/ambientcg-metal063/Metal063_2K-JPG_Roughness.jpg",
+          "sha256": "32ce62d9bf51cc2690211a57856650b169400409e73c9cb31ebd0d7a2f7bdd2b"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-metal049a-color",
+      "name": "Metal049A · metal",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "metal",
+      "path": "assets/ambientcg-metal049a/metal049a-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 1863416,
+      "sha256": "e3ef2560dc3cdc1a7905c7ca779ef54e9c787b2e485c01c28d70e205deedaa72",
+      "sourceSha256": "c1a10d52fdff335204c5105531e563f4cb36e48df2cdf2f2be2fa4535a31a658",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Metal049A",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-metal049a/Metal049A_2K-JPG_Displacement.jpg",
+          "sha256": "545f44a28f77ec54e5b22983a051b2fb7ff1cbfe97fc59c05d09e717a52979da"
+        },
+        {
+          "path": "assets/ambientcg-metal049a/Metal049A_2K-JPG_Metalness.jpg",
+          "sha256": "840760dbcea6fb163553d93c1617950f0e190b18ceb0e1c7d7b005f57ffc5b66"
+        },
+        {
+          "path": "assets/ambientcg-metal049a/Metal049A_2K-JPG_NormalGL.jpg",
+          "sha256": "8c85a1e25aeb40bf8c00d03e2ba7caee6ecc5692a4c33d3b12e80cdc3c1d8113"
+        },
+        {
+          "path": "assets/ambientcg-metal049a/Metal049A_2K-JPG_Roughness.jpg",
+          "sha256": "037db8698cbb75d85ea377e1ce75ee0b54dcf4d481fe4ca6dfc92202bb02b81c"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-corrugatedsteel009-color",
+      "name": "CorrugatedSteel009 · metal",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "metal",
+      "path": "assets/ambientcg-corrugatedsteel009/corrugatedsteel009-color.webp",
+      "width": 2048,
+      "height": 1024,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 2121100,
+      "sha256": "46446c32694f8d04de5cd46f685948da3d621b6782f33d06b0ed9f362346fcf5",
+      "sourceSha256": "3249867c4165692125bfc7e8db714bf2eddffcb5c8d46785543c8511b00c33ed",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/CorrugatedSteel009",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-corrugatedsteel009/CorrugatedSteel009_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "0667b71674fb51668b161dd597fc8292fef70957c6f70a66222061bc673c3f32"
+        },
+        {
+          "path": "assets/ambientcg-corrugatedsteel009/CorrugatedSteel009_2K-JPG_Displacement.jpg",
+          "sha256": "9c51f1f63025e5e7902c337cbe9c787c5581f9a5bf65fb0427bdb2a3a45eb284"
+        },
+        {
+          "path": "assets/ambientcg-corrugatedsteel009/CorrugatedSteel009_2K-JPG_Metalness.jpg",
+          "sha256": "b5733ff1d0b0f2ce489f239a7edcbbac4bd84c985944cc68edbda7b284667bec"
+        },
+        {
+          "path": "assets/ambientcg-corrugatedsteel009/CorrugatedSteel009_2K-JPG_NormalGL.jpg",
+          "sha256": "5e14a71d775c59fdf67e203aeb487650a0d1ad50dedd03d4a08481e984193184"
+        },
+        {
+          "path": "assets/ambientcg-corrugatedsteel009/CorrugatedSteel009_2K-JPG_Roughness.jpg",
+          "sha256": "16a3904abf2ea7c5ec3d28d9fda2ba39b0fa64aa133b7e2a1d5884540a64c707"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-tiles139-color",
+      "name": "Tiles139 · tiles",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "tiles",
+      "path": "assets/ambientcg-tiles139/tiles139-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5210126,
+      "sha256": "70aa39134f5454dcc594f746930748273ccb7053e6b70f7c46df8388ffe1f001",
+      "sourceSha256": "8763413c364de659253224337084bb6998713d911504681a2b0f13368c64623e",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles139",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-tiles139/Tiles139_2K-JPG_Displacement.jpg",
+          "sha256": "e89bfa4e11648cf9c6183cc84fed372d7e39092381bfa882ea35651da7da23b9"
+        },
+        {
+          "path": "assets/ambientcg-tiles139/Tiles139_2K-JPG_NormalGL.jpg",
+          "sha256": "d05771391afca0adafd351bf8fdcdd9698df9865182075e3c6600f3603805bed"
+        },
+        {
+          "path": "assets/ambientcg-tiles139/Tiles139_2K-JPG_Roughness.jpg",
+          "sha256": "9265d555a18a57a661541c2ff7c81fa9dff37c1ec4cac11d0501f80b1d4b6bed"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-tiles140-color",
+      "name": "Tiles140 · tiles",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "tiles",
+      "path": "assets/ambientcg-tiles140/tiles140-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5376736,
+      "sha256": "7e73d9fb0a5cfa2643f08115c25c55fc4b6138959183feafca79ce3a33d4e6b9",
+      "sourceSha256": "bb81dea3d7ffd6613ed238f52baaea72a4aa6233db3f5803d7d6975ca8a0daa9",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles140",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-tiles140/Tiles140_2K-JPG_Displacement.jpg",
+          "sha256": "c32bc10e8db9a59ca482386ecab807bb89891d8b8bc51ac65436796475afa494"
+        },
+        {
+          "path": "assets/ambientcg-tiles140/Tiles140_2K-JPG_NormalGL.jpg",
+          "sha256": "f0b0e0d994bff16b01b3f8b26bb5f03b686c559abacca238e9216ff29e200214"
+        },
+        {
+          "path": "assets/ambientcg-tiles140/Tiles140_2K-JPG_Roughness.jpg",
+          "sha256": "a2278d578f04fd788c82bd8b0342f113cbd2a8d50870c39b2ca56ebbd9ac59a8"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-tiles143-color",
+      "name": "Tiles143 · tiles",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "tiles",
+      "path": "assets/ambientcg-tiles143/tiles143-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5532712,
+      "sha256": "150c18d69537c7c4c2b6e24ef7ce4603894c81c73911405c02a795d9ec182b70",
+      "sourceSha256": "bc74b3f603aec9ef4dcd91e2ffee6d689ec69f12921f7c27b5565ed989b1e863",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Tiles143",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-tiles143/Tiles143_2K-JPG_Displacement.jpg",
+          "sha256": "11eae37a0fa74d4fa329ffa53ebd8fa4fcad14917019e0b92d7b64c75b129547"
+        },
+        {
+          "path": "assets/ambientcg-tiles143/Tiles143_2K-JPG_NormalGL.jpg",
+          "sha256": "2a28db537ea096f649ce023ca2e9b776ff62ee6ee7ec86217090d2d87c4f7859"
+        },
+        {
+          "path": "assets/ambientcg-tiles143/Tiles143_2K-JPG_Roughness.jpg",
+          "sha256": "4648bf92b369edfb510eb6ffd4e309b1ab2a1819b3ce2c5926879145ee198eee"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-plaster001-color",
+      "name": "Plaster001 · plaster",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "plaster",
+      "path": "assets/ambientcg-plaster001/plaster001-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 3971376,
+      "sha256": "addda3c96690bd246b4005f2cd17cf521316fb28ce41346cfb62f0d82d3df147",
+      "sourceSha256": "8cac8b7439bdd8d4695c64302c8f1f57af5ecff57c4754d0f04601bd0eb80ce5",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Plaster001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-plaster001/Plaster001_2K-JPG_Displacement.jpg",
+          "sha256": "97d3cdaaca38ebe3b23662db40ab639694f52c0e94672570d9d57fd90f9a46c1"
+        },
+        {
+          "path": "assets/ambientcg-plaster001/Plaster001_2K-JPG_NormalGL.jpg",
+          "sha256": "3474c779968a42112240695fd4da5281d646b3bbf1e15c29e37df1476a58f598"
+        },
+        {
+          "path": "assets/ambientcg-plaster001/Plaster001_2K-JPG_Roughness.jpg",
+          "sha256": "3a6b46ab479fa6410f65387a7345647b8d1baa3d63a6e9f5285a74ccaf0cde52"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-paintedplaster017-color",
+      "name": "PaintedPlaster017 · plaster",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "plaster",
+      "path": "assets/ambientcg-paintedplaster017/paintedplaster017-color.webp",
+      "width": 2048,
+      "height": 1024,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 1511826,
+      "sha256": "52fb3d9685905dff8e10ae8cac0daeda6aa181bfd5a4fd7aa87fa6fbb83f22ba",
+      "sourceSha256": "1690e0a8839a1db6ac7e339929ddfad885b5c34145ea206f2aa03d7669f73f44",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/PaintedPlaster017",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-paintedplaster017/PaintedPlaster017_2K-JPG_Displacement.jpg",
+          "sha256": "014fe73a9bda4d3814e3787e0f4a4f79dd3fa67efe7a59a241d9c5ead557db1c"
+        },
+        {
+          "path": "assets/ambientcg-paintedplaster017/PaintedPlaster017_2K-JPG_NormalGL.jpg",
+          "sha256": "8cacf9983fedd60bf28faa231d841ada117298ed4daa8675d3bf771069144470"
+        },
+        {
+          "path": "assets/ambientcg-paintedplaster017/PaintedPlaster017_2K-JPG_Roughness.jpg",
+          "sha256": "c22b06fa7c7ad48fd1218575899627a68d0340af1133330881bc04587689179e"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-plaster007-color",
+      "name": "Plaster007 · plaster",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "plaster",
+      "path": "assets/ambientcg-plaster007/plaster007-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5314286,
+      "sha256": "2d7a83f44108dc2ccdbf8cc08e16a391d223d21b5ed13c5d4d9b694c0151f6b6",
+      "sourceSha256": "8beca526f03dfaa073a806d1adbab4a4134892914a409c023fddafeb6b970b23",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Plaster007",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-plaster007/Plaster007_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "407018b4272f2fc0aaadee7e8d20e8ca3bcc15bb9adce9820cf3ea4a436ed469"
+        },
+        {
+          "path": "assets/ambientcg-plaster007/Plaster007_2K-JPG_Displacement.jpg",
+          "sha256": "a7a925ddd21a96a12747b00d0091023564153768392721db52aeea7719044715"
+        },
+        {
+          "path": "assets/ambientcg-plaster007/Plaster007_2K-JPG_NormalGL.jpg",
+          "sha256": "632b817ad9bf49ba53be50450cba0cbebd115d7b50588cbffcde7eb0032f89ac"
+        },
+        {
+          "path": "assets/ambientcg-plaster007/Plaster007_2K-JPG_Roughness.jpg",
+          "sha256": "77844313b7f1b67bd86c7c10bc9e53377511812eeedd1e32242a060f4c3b9d86"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-ground110-color",
+      "name": "Ground110 · ground",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "ground",
+      "path": "assets/ambientcg-ground110/ground110-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6643382,
+      "sha256": "6c936445b2d156097cab3f639f4357e623bcfe62441249c5a670ec85bcbb1191",
+      "sourceSha256": "a7f64f1eaa5f7980c000556b4c87a2244c6285720ef8c8d95c5aa5e5e781c8c3",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground110",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-ground110/Ground110_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "a0130d58fe714f9282c0061d3445fc73fac2afb5e7182807cd1705e24f694cae"
+        },
+        {
+          "path": "assets/ambientcg-ground110/Ground110_2K-JPG_Displacement.jpg",
+          "sha256": "8046d2f917b0d2e0d4ab4992d8169a60cfd4d8c81c70cab5b882e0e3cba64dfd"
+        },
+        {
+          "path": "assets/ambientcg-ground110/Ground110_2K-JPG_NormalGL.jpg",
+          "sha256": "36d9399921e465bb9e9d96612a92408643cf6e54dc364a5c01968c07f2b41f5a"
+        },
+        {
+          "path": "assets/ambientcg-ground110/Ground110_2K-JPG_Roughness.jpg",
+          "sha256": "e2e7f4065b3dc267e8af222aafaf10230d34a42e225cc885691700fb1cba2e04"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-ground108-color",
+      "name": "Ground108 · ground",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "ground",
+      "path": "assets/ambientcg-ground108/ground108-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6404130,
+      "sha256": "f6ff5f8bb40afe19249d28293aacbfcc3c5b6a1d070062183907dcfb97d8e467",
+      "sourceSha256": "ab087d6e2bae96b740d45702665d3cee224d9fcaa6d8395af2e64fe933502676",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground108",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-ground108/Ground108_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "cbf2a50090b9a1a06cda38a333784b5a33d757ce73188faa483de4f4ce77b5cd"
+        },
+        {
+          "path": "assets/ambientcg-ground108/Ground108_2K-JPG_Displacement.jpg",
+          "sha256": "ea4a3a08700b7f60c5c5c8981c5edf5d8624f0e25aad92f5d6391b7add775e15"
+        },
+        {
+          "path": "assets/ambientcg-ground108/Ground108_2K-JPG_NormalGL.jpg",
+          "sha256": "282facdd61ec1423962727540d2eebe24ecb74c6637855c3c934bd318f145ffc"
+        },
+        {
+          "path": "assets/ambientcg-ground108/Ground108_2K-JPG_Roughness.jpg",
+          "sha256": "fc8bcc3835537aa614e7d5e39a5cefcfaf9b26a39fd9189bea7e0c8c1fe865f0"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-ground109-color",
+      "name": "Ground109 · ground",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "ground",
+      "path": "assets/ambientcg-ground109/ground109-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6006442,
+      "sha256": "b6996fd2b25b45bb557a8275fa08913b1306c653eaf2cec98bac5caf08c78b31",
+      "sourceSha256": "0d96216c34be43b166151172e2b884849ec9b3fc24b221a0179a27c4dc876d0b",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground109",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-ground109/Ground109_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "5cee035431380e1824e6d5020330ebe22ca638c6064c73233befe95ce6e609fc"
+        },
+        {
+          "path": "assets/ambientcg-ground109/Ground109_2K-JPG_Displacement.jpg",
+          "sha256": "60c1f135c46d6d36a720eaed12aeb96cf5771e1d548550cad3cfd44a723a0682"
+        },
+        {
+          "path": "assets/ambientcg-ground109/Ground109_2K-JPG_NormalGL.jpg",
+          "sha256": "68b01962ac79d49b86fcaabbdf2d24f957b4d76fa03617da729869650fde4ef0"
+        },
+        {
+          "path": "assets/ambientcg-ground109/Ground109_2K-JPG_Roughness.jpg",
+          "sha256": "495ac3077f9a36b542a4feb4599f19fd58d9221107a7983a9534a10795c3c2b2"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-gravel043-color",
+      "name": "Gravel043 · gravel",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "gravel",
+      "path": "assets/ambientcg-gravel043/gravel043-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6724500,
+      "sha256": "36b3a21669f45f4cacebdbf177578f624fa06d541b9983407d276fe2150310b7",
+      "sourceSha256": "7b61c074212ffc50949787223fb08849c4474097652b20ea6161807ffbf538fa",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Gravel043",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-gravel043/Gravel043_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "70a892b8160a98002ef9e2b4e082fdc052855283b48c56b70da0d24e69419c16"
+        },
+        {
+          "path": "assets/ambientcg-gravel043/Gravel043_2K-JPG_Displacement.jpg",
+          "sha256": "5007401d8853eff8eeb532a3e154416993779d2cf7d0c338c27e7ef80b4534ad"
+        },
+        {
+          "path": "assets/ambientcg-gravel043/Gravel043_2K-JPG_NormalGL.jpg",
+          "sha256": "0f0a940b7b0c951e29392ed978319827053d9208691b4331839995485c9678ab"
+        },
+        {
+          "path": "assets/ambientcg-gravel043/Gravel043_2K-JPG_Roughness.jpg",
+          "sha256": "de7dc15aebb77a83b70febab1e21366fe84b381b3a3ce99068aba7f8491e71b7"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-ground079s-color",
+      "name": "Ground079S · gravel",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "gravel",
+      "path": "assets/ambientcg-ground079s/ground079s-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 6855694,
+      "sha256": "980e3849709faa06f4c5d3a4de2ea0c1f6572811ff5f3f0269c78e82dd4cfbe0",
+      "sourceSha256": "0f812db7e00c5021680aad359c7022e6e635b80f96bef5f39424214e44cbdc39",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Ground079S",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-ground079s/Ground079S_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "798d223d0aeea943160379e230bcf296eb4cce29962e575744c462c97e7212ca"
+        },
+        {
+          "path": "assets/ambientcg-ground079s/Ground079S_2K-JPG_Displacement.jpg",
+          "sha256": "d7c01c13c0826b332dd3796c3a94ee8336b376db09f71f7ab5665cf374b39c25"
+        },
+        {
+          "path": "assets/ambientcg-ground079s/Ground079S_2K-JPG_NormalGL.jpg",
+          "sha256": "0f1ae0132a892063ea1f54156b4dca2fd484c7b674923a9374b2732efb08705c"
+        },
+        {
+          "path": "assets/ambientcg-ground079s/Ground079S_2K-JPG_Roughness.jpg",
+          "sha256": "759143cfbf34847c1d7cd83ce721a7110a2dd579902d1c6ef3ef19ddce19f32a"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-gravel023-color",
+      "name": "Gravel023 · gravel",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "gravel",
+      "path": "assets/ambientcg-gravel023/gravel023-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 4824912,
+      "sha256": "22fe8ed7657999aa938ef6f2fd6920be4659bb037e38a8b587e0ff5f6edb32a3",
+      "sourceSha256": "76569030a07606b43d65e32f77c478d85d4fa52d9eea3f7d5b0df6b757f28546",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Gravel023",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-gravel023/Gravel023_2K-JPG_AmbientOcclusion.jpg",
+          "sha256": "536599cce4836af49ef8e25f85f0ab93cdf675e8e224af33219643715356e918"
+        },
+        {
+          "path": "assets/ambientcg-gravel023/Gravel023_2K-JPG_Displacement.jpg",
+          "sha256": "f3c3fc10b042577ea69177fe41c4add17ca43d91abdd681ae5b490404048f674"
+        },
+        {
+          "path": "assets/ambientcg-gravel023/Gravel023_2K-JPG_NormalGL.jpg",
+          "sha256": "5e16db4953a642dc0a5229db44db933f04e16da288306adc8af7b2ff8b8cac1d"
+        },
+        {
+          "path": "assets/ambientcg-gravel023/Gravel023_2K-JPG_Roughness.jpg",
+          "sha256": "a08dfc8ca5fb9e13591133aab03067cebeed8dbab13621f5ac56d1c546fafbf6"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-leather037-color",
+      "name": "Leather037 · leather",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "leather",
+      "path": "assets/ambientcg-leather037/leather037-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 2332658,
+      "sha256": "89a0faae93d7aff9bf08a18a7772109574c26441a7f42c3f6be9a5d02686c023",
+      "sourceSha256": "a9eaa4b723a541062c47c619b20c2399f90d18fb4627c031231b1a6786fe8a13",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather037",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-leather037/Leather037_2K-JPG_Displacement.jpg",
+          "sha256": "fcf5ee41611953b781dbaf1d6661666ae8893471b2cd1f7a0aab2bbc977c36e5"
+        },
+        {
+          "path": "assets/ambientcg-leather037/Leather037_2K-JPG_NormalGL.jpg",
+          "sha256": "04b01b79fdb46470af38e1f1ea82bb53b607d6235aa8137b93a5fb41a56c5293"
+        },
+        {
+          "path": "assets/ambientcg-leather037/Leather037_2K-JPG_Roughness.jpg",
+          "sha256": "801c202182181386969a251470f76b854b47a9236d832f77c4fe736ca2fc6f8e"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-leather038-color",
+      "name": "Leather038 · leather",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "leather",
+      "path": "assets/ambientcg-leather038/leather038-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 5346358,
+      "sha256": "3bff35d8663905b90f154d8bdaaa91a6715a46ffb6031d1d2e05314aa147cfd0",
+      "sourceSha256": "96f2a1460d8d21e91dbbec0800a170129009bc935a81e12b1747d20adc692f82",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather038",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-leather038/Leather038_2K-JPG_Displacement.jpg",
+          "sha256": "c151e80fcb8a5eb250d523cd4a8411e1433a4c2ca4aebecc2756679df00dc20d"
+        },
+        {
+          "path": "assets/ambientcg-leather038/Leather038_2K-JPG_NormalGL.jpg",
+          "sha256": "13a6b2ac3b860b5f4675f3e2d8c948b83c402df269de44bb885be0b542cd9bf4"
+        },
+        {
+          "path": "assets/ambientcg-leather038/Leather038_2K-JPG_Roughness.jpg",
+          "sha256": "f09b7654af4ea053c43e07c27a348f410bbe05e5654ef3ff94199dd2b499723c"
+        }
+      ]
+    },
+    {
+      "id": "ambientcg-leather026-color",
+      "name": "Leather026 · leather",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "materialFamily": "leather",
+      "path": "assets/ambientcg-leather026/leather026-color.webp",
+      "width": 2048,
+      "height": 2048,
+      "maxRecommendedDisplayWidth": 2048,
+      "bytes": 3213604,
+      "sha256": "1826610fd3ef19aef8e042b065bb490ab26fa658aab370ce2b59a14a69c13ffd",
+      "sourceSha256": "5078c8f7c5658a6ff093138266c8f7b4a8f846bdf8c9062141d644730aebe7a7",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/a/Leather026",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "technicalChecks": [
+        "decoded",
+        "native-2K",
+        "lossless-pixel-roundtrip",
+        "SHA-256",
+        "same-size-PBR-maps"
+      ],
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "companionMaps": [
+        {
+          "path": "assets/ambientcg-leather026/Leather026_2K-JPG_Displacement.jpg",
+          "sha256": "d624890113ae9575fd8dd6766e6ce2af373d85b2a943dc04dbf5bcd6926b5002"
+        },
+        {
+          "path": "assets/ambientcg-leather026/Leather026_2K-JPG_NormalGL.jpg",
+          "sha256": "cb601b2b9eae5b5731905500b0e0b2afcb7bb49ef4d46d32802d3a1533acd693"
+        },
+        {
+          "path": "assets/ambientcg-leather026/Leather026_2K-JPG_Roughness.jpg",
+          "sha256": "7b27410b4185eba7915052b1686408c7d50f4a928c96f9190a266a7c40c91eb3"
+        }
+      ]
     }
   ]
 }

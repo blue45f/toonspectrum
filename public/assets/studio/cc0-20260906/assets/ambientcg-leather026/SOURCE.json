@@ -1,0 +1,18 @@
+{
+  "sourceId": "Leather026",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=leather&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "6d6079810596064d671ea70d8deb37ca787ed5530a27b91e2328f23663b72cca",
+  "downloadUrl": "https://ambientcg.com/get?file=Leather026_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Leather026_Mz5Jbq7X/Leather026_2K-JPG.zip",
+  "archiveSha256": "681d26d63912c849151266a087290a41c2fc5e95789c2cd6669f36c45d70efa6",
+  "bytes": 24017175,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Leather026",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

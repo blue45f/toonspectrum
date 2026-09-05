@@ -1,0 +1,18 @@
+{
+  "sourceId": "Plaster007",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=plaster&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "27b00fbe82019e04cab91ea58b29daa6853693a82d221a112b3a487c8b1a917d",
+  "downloadUrl": "https://ambientcg.com/get?file=Plaster007_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Plaster007_WblsZHVy/Plaster007_2K-JPG.zip",
+  "archiveSha256": "3dab115cfc492ca0ca0e2ec989a9dd1ccb3681b76c3eb3d0ac069192998a231c",
+  "bytes": 27851755,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Plaster007",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "sourceId": "Wood094",
+  "metadataUrl": "https://ambientcg.com/api/v2/full_json?type=Material&q=wood&sort=Popular&limit=10&include=downloadData%2CtagData%2CdisplayData%2CdimensionsData",
+  "metadataResponseSha256": "7f9a975b55497c04f2cf9ae0d87927f4fcfd73bc50368f8bde502f274851f292",
+  "downloadUrl": "https://ambientcg.com/get?file=Wood094_2K-JPG.zip",
+  "resolvedUrl": "https://acg-download.struffelproductions.com/file/ambientCG-Web/download/Wood094_2SlzseWH/Wood094_2K-JPG.zip",
+  "archiveSha256": "f951e5fb062f454f45f406ff45828b1392dee6a23839d214ccc1aa1e2a6828d1",
+  "bytes": 14806756,
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "ambientCG",
+    "sourceUrl": "https://ambientcg.com/a/Wood094",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  }
+}
