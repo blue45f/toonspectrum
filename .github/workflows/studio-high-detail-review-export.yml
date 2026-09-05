@@ -1,0 +1,69 @@
+name: Studio high detail review export
+on:
+  push:
+    branches: [feat/studio-high-detail-assets-20260906]
+    paths: [.github/workflows/studio-high-detail-review-export.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify and partition original artifact without reacquiring source files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/blue45f/toonspectrum/actions/artifacts/9974886996/zip > "$RUNNER_TEMP/original.zip"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,stat,zipfile
+          root=Path(os.environ['RUNNER_TEMP']); archive=root/'original.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()=='4f3a510b4f1262a5a37cdcc4ea9521be664c992450b5fd08af2c002839b30854'
+          output=root/'high-detail';output.mkdir()
+          with zipfile.ZipFile(archive) as z:
+              infos=z.infolist()
+              assert len(infos)<1000 and sum(i.file_size for i in infos)<900*1024*1024
+              for i in infos:
+                  assert (output/i.filename).resolve().is_relative_to(output.resolve()) and not stat.S_ISLNK(i.external_attr>>16)
+              z.extractall(output)
+          import shutil
+          assets=json.loads((output/'manifest.json').read_text())['assets']
+          for kind in ('model','surface-texture'):
+              dest=root/kind;dest.mkdir()
+              subset=[]
+              for a in assets:
+                  if a['kind']!=kind:continue
+                  subset.append(a)
+                  folder=Path(a['path']).parent
+                  shutil.copytree(output/folder,dest/folder,dirs_exist_ok=True)
+                  if a.get('previewPath'):
+                      p=dest/a['previewPath'];p.parent.mkdir(exist_ok=True,parents=True);shutil.copyfile(output/a['previewPath'],p)
+              (dest/'manifest.json').write_text(json.dumps({'schema':'toonspectrum.asset-delivery.v1','assets':subset},indent=2))
+          review=root/'review';review.mkdir()
+          shutil.copytree(output/'previews',review/'previews')
+          for p in output.glob('*.json'):shutil.copyfile(p,review/p.name)
+          for p in output.glob('*.jpg'):shutil.copyfile(p,review/p.name)
+          print('PARTITIONED',len(assets),'originals; source hashes unchanged')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-visual-review
+          path: ${{ runner.temp }}/review/
+          retention-days: 14
+          compression-level: 1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-model-originals
+          path: ${{ runner.temp }}/model/
+          retention-days: 14
+          compression-level: 1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: studio-pbr-material-originals
+          path: ${{ runner.temp }}/surface-texture/
+          retention-days: 14
+          compression-level: 1
