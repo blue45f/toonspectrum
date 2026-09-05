@@ -23,31 +23,42 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Apply bounded shell integration
-        run: node scripts/apply-creator-first-brand.mjs
+      - name: Apply bounded shell and exact CSP integration
+        run: |
+          node scripts/apply-creator-first-brand.mjs
+          node scripts/finalize-creator-brand.mjs
       - name: Install existing application dependencies
         run: pnpm install --frozen-lockfile
+      - name: Lint implementation without relaxing repository rules
+        run: |
+          pnpm exec eslint src/domains/marketing components/site-header.tsx components/site-header-mobile-nav.tsx components/site-footer.tsx src/app/AppShell.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts scripts/verify-creator-home.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --fix --max-warnings=0
+          pnpm run validate:architecture
+          pnpm run verify:csp
+      - name: Check types and both test-runner contracts
+        run: |
+          pnpm exec tsc -p tsconfig.json --incremental false
+          pnpm exec vitest run src/domains/marketing/creator-home-content.test.ts scripts/creator-film-automation.test.mjs components/site-shell-mobile-accessibility.test.tsx lib/__tests__/header-width-budget.test.ts
+          node --test scripts/creator-film-automation.test.mjs
       - name: Install isolated video dependencies and fonts
         run: |
           npm --prefix media/brand-film install --package-lock-only --ignore-scripts
           npm --prefix media/brand-film ci
           sudo apt-get update -qq
           sudo apt-get install -y fonts-noto-cjk ffmpeg
-      - name: Render real landscape, portrait, square, poster and sharing artwork
+      - name: Render landscape, portrait, square, poster and sharing artwork
         run: |
           npm --prefix media/brand-film run typecheck
           npm --prefix media/brand-film run render -- all
-      - name: Lint implementation without relaxing repository rules
-        run: |
-          pnpm exec eslint src/domains/marketing components/site-header.tsx components/site-header-mobile-nav.tsx src/app/AppShell.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts --fix --max-warnings=0
-          pnpm run validate:architecture
-          pnpm run verify:csp
-      - name: Check types, homepage and automation contracts, production bundle
-        run: |
-          pnpm exec tsc -p tsconfig.json --incremental false
-          pnpm exec vitest run src/domains/marketing/creator-home-content.test.ts
-          node --test scripts/creator-film-automation.test.mjs
-          pnpm run build:bundle
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: creator-home-rendered-media
+          path: |
+            public/brand/
+            media/brand-film/package-lock.json
+          if-no-files-found: ignore
+      - name: Build the production application
+        run: pnpm run build:bundle
       - name: Verify real responsive browser and video playback
         run: |
           pnpm exec playwright install --with-deps chromium
@@ -63,9 +74,9 @@ jobs:
           if-no-files-found: ignore
       - name: Save validated implementation to its feature branch
         run: |
-          rm scripts/apply-creator-first-brand.mjs .github/workflows/creator-home-bootstrap.yml
+          rm scripts/apply-creator-first-brand.mjs scripts/finalize-creator-brand.mjs .github/workflows/creator-home-bootstrap.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/domains/marketing src/app/AppShell.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts components/site-header.tsx components/site-header-mobile-nav.tsx public/i18n/app index.html public/manifest.webmanifest public/brand media/brand-film scripts/apply-creator-first-brand.mjs .github/workflows/creator-home-bootstrap.yml
+          git add src/domains/marketing src/app/AppShell.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts components/site-header.tsx components/site-header-mobile-nav.tsx components/site-footer.tsx public/i18n/app index.html vercel.json public/manifest.webmanifest public/brand media/brand-film scripts/verify-creator-home.mjs scripts/creator-film-automation.test.mjs docs/marketing/creator-first-home.md scripts/apply-creator-first-brand.mjs scripts/finalize-creator-brand.mjs .github/workflows/creator-home-bootstrap.yml
           git commit -m 'feat(marketing): integrate creator-first shell and verified Remotion films'
           git push origin HEAD:feat/creator-first-home-20260906
