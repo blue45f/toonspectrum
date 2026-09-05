@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_diff_2k.jpg",
+      "bytes": 3310792,
+      "providerMd5": "769c7bf30050cc57be848a67d5c20270",
+      "sha256": "b08a20dcb306d08ee7f4a05ec216b19b7fd37e95745998ec5f81ecedaac1f0e9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_nor_gl_2k.jpg",
+      "bytes": 935810,
+      "providerMd5": "3cc9918473a0c3d5ecb10f0ddc7e218d",
+      "sha256": "ce12d18f283f884f4be6f6c110f81582376049caada1e226958659d3d5fbaae1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_rough_2k.jpg",
+      "bytes": 1417673,
+      "providerMd5": "63b266940d40787b56822b7882819711",
+      "sha256": "cb539b0f8fdc8c63241683e01c923eb040fa701ec4c60cff27b674294746ae67"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "concrete_floor_02",
+    "name": "Concrete Floor 02",
+    "category": "Concrete/Cast Walls & Floors/Bare Cast",
+    "polycount": null,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "concrete"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/GothicCabinet_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/GothicCabinet_01/GothicCabinet_01_2k.gltf",
+      "bytes": 8968,
+      "providerMd5": "1e69fdb02dc3e83430c913cf18688c36",
+      "sha256": "45810bf4d58c029820cfd5ed93d292c0df1b1e74f7da81fcaef7a5cc9cc61eba"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/GothicCabinet_01/GothicCabinet_01.bin",
+      "bytes": 486532,
+      "providerMd5": "4c2f20b4b5fbf8c33b86b04dcf805c5f",
+      "sha256": "f1019b130872cad82d5bf5e27528a980fabbd69a9128340e5eb7530ea2d7c17b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicCabinet_01/GothicCabinet_01_arm_2k.jpg",
+      "bytes": 679517,
+      "providerMd5": "f9b1f497b5cb524decbcebc212e5078f",
+      "sha256": "8c85c2c923567015312009fd54f0f713cc3077fd2c1fd260073c35ec25bf3068"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicCabinet_01/GothicCabinet_01_diff_2k.jpg",
+      "bytes": 433137,
+      "providerMd5": "f53afdcbd60800e44df15030b6c46dad",
+      "sha256": "6ebf60314f64294de357e1a50f33c57612c9ab6cf994b405cf9d40eb97d5152d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/GothicCabinet_01/GothicCabinet_01_nor_gl_2k.jpg",
+      "bytes": 511511,
+      "providerMd5": "f50ad2fbd78202e14a37160041c500b0",
+      "sha256": "0606f08f28cae007dbe71572bd321ab3431a83c3a0dd9fb215ed4372227e14c4"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "GothicCabinet_01",
+    "name": "Gothic Cabinet 01",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "polycount": 12170,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "cabinet"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_cabinet_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/vintage_cabinet_01/vintage_cabinet_01_2k.gltf",
+      "bytes": 22562,
+      "providerMd5": "91518e8123c56c6967fc0da44ebf5b21",
+      "sha256": "b2c9d4a7c976c8225d2ed7a1c08787c2daaf01ea0e02547b928cb2ac8e05173b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_b_nor_gl_2k.jpg",
+      "bytes": 185866,
+      "providerMd5": "ad8a0624523db2a813c3b41d26ce1cd7",
+      "sha256": "c3a0e0c3e7d6746f2cdfa074a9e4eea0a9ba98458325dcf834fa3b8610cb61ec"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/vintage_cabinet_01/vintage_cabinet_01.bin",
+      "bytes": 1995776,
+      "providerMd5": "9048b5c9e35ab9d2e2732cf738b7fcb8",
+      "sha256": "407c58be2c5efb1d41d549fcff6a57d18d025033803dcb241e57349dd65bcf60"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_b_diff_2k.jpg",
+      "bytes": 457819,
+      "providerMd5": "b7674aa644330feb49f4e153b21a2d50",
+      "sha256": "e7ae2408e697a8edbd21a8f012b72c21e32a4a58e1f8422556a138bb970475e8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_a_nor_gl_2k.jpg",
+      "bytes": 375029,
+      "providerMd5": "96771fcb5dcd819f6920c1d1b777a91e",
+      "sha256": "29a724f63d6e086af353c79bbccee26ffca60e27c867997d9c4de866dd97661f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_a_rough_2k.jpg",
+      "bytes": 462771,
+      "providerMd5": "5f7754c53c9aaeb6c95d3f4c06a1efc6",
+      "sha256": "9f5f5ef24954530f8f8463b960496ef2aa58f6a6de659da3c413314527457acc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_b_rough_2k.jpg",
+      "bytes": 566084,
+      "providerMd5": "44733929286423a31cee468dafa23401",
+      "sha256": "a7ed80c995d6cfb1bfa1867c0ce43c613e571041e1e0debae732ed44fb53b8de"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_a_arm_2k.jpg",
+      "bytes": 519873,
+      "providerMd5": "ba0e94a67417ec2d69647c3a73cc8f74",
+      "sha256": "1bfa2b3f063732bea88acf7e4b2847b5623ad6723a0081df7f997fe5ad4d1aa2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_cabinet_01/vintage_cabinet_01_a_diff_2k.jpg",
+      "bytes": 415570,
+      "providerMd5": "3ec3b6443863e694a0f24b393794c03c",
+      "sha256": "cc63b2b028220078f6d0c6a5d4f84ae1f0fbbe0ee624c4200d219eced7de90e4"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "vintage_cabinet_01",
+    "name": "Vintage Cabinet 01",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "polycount": 61096,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "cabinet"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/food_apple_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/food_apple_01/food_apple_01_2k.gltf",
+      "bytes": 2705,
+      "providerMd5": "232d6d1f976643c6095a68605828598b",
+      "sha256": "751d0c3cd4bcae4cd7c74553763107cc8211d000f3017f5a58b34fd0e08d2e61"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_apple_01/food_apple_01_nor_gl_2k.jpg",
+      "bytes": 240476,
+      "providerMd5": "02a449a2b6341c1044a38acdc22e865d",
+      "sha256": "d023ebdcd22d495d80d1137b47072e023724a34bf4b6459e5b2bf37ecaa46df1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_apple_01/food_apple_01_diff_2k.jpg",
+      "bytes": 643716,
+      "providerMd5": "ce556afd6671aea9dfeb3e7a43bab17c",
+      "sha256": "c66c46d57f5b5c8129dc36a766401e48223651a83a75e694179ec182586d2e41"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/food_apple_01/food_apple_01_rough_2k.jpg",
+      "bytes": 142078,
+      "providerMd5": "a0441e176cd386a2211eab0c86a65082",
+      "sha256": "b7b0cd4dda6660c9d47446ca98809bb3535f176a3bc03e9f0a700335253dfc31"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/food_apple_01/food_apple_01.bin",
+      "bytes": 170680,
+      "providerMd5": "26b23e40de43097b0185a0d93cd72d3b",
+      "sha256": "f14ff9647fdd9f5a59ef325f94154e91f1f14cc2563cd3fb572c4fe9ce5756ca"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "food_apple_01",
+    "name": "Food Apple 01",
+    "category": "Food & Kitchen/Produce/Fruit",
+    "polycount": 7012,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "food"
+  }
+}

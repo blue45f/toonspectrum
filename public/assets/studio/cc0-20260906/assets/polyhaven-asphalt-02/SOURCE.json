@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/asphalt_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_diff_2k.jpg",
+      "bytes": 3075676,
+      "providerMd5": "336af399fd98a39ab986d8b3bf73b4ff",
+      "sha256": "28f5ba8690553f192c0e5e1a5ff40f34765b4b93f4cc7059b1a3e9c795b6c28c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_nor_gl_2k.jpg",
+      "bytes": 4943950,
+      "providerMd5": "77ebd1cc0b020ccaa1c6b58f103d1f75",
+      "sha256": "ffe49db71a0fd34c1e259625df66a302a237597d6ef655307987ec4e45bc6f21"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_rough_2k.jpg",
+      "bytes": 2230457,
+      "providerMd5": "6fe669ab38640ef2009d6a28d1ad5ee9",
+      "sha256": "b9a516b61b7040a9245ac206642d5f767ad9589a0169c4a1668221429e8a998c"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "asphalt_02",
+    "name": "Asphalt 02",
+    "category": "Asphalt & Bitumen/Asphalt/Cracked Asphalt",
+    "polycount": null,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "asphalt"
+  }
+}

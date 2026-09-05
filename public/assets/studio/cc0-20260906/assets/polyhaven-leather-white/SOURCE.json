@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/leather_white",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_diff_2k.jpg",
+      "bytes": 3460639,
+      "providerMd5": "1292cc2c6b26508dc242a4a12220d4a9",
+      "sha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_nor_gl_2k.jpg",
+      "bytes": 3176928,
+      "providerMd5": "c45c0fac221ee5ffc2aa7eabde7bb79b",
+      "sha256": "f06e81389faf7c4bef47b8ed5a5c433b6e3b7d0ac77e4090f65ed9d964a589f6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leather_white/leather_white_rough_2k.jpg",
+      "bytes": 3142711,
+      "providerMd5": "a7d8b078f1511523d56f88ee6682cc0e",
+      "sha256": "ccf43d38aadaf2b16bf10b587c082a81928cf63f028bd59d061181fb7967af8c"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "leather_white",
+    "name": "Leather White",
+    "category": "Textiles & Leather/Leather/Upholstery Leather",
+    "polycount": null,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "tile"
+  }
+}

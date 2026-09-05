@@ -1,0 +1,108 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wine_bottles_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wine_bottles_01/wine_bottles_01_2k.gltf",
+      "bytes": 29107,
+      "providerMd5": "98841ef175168c49879bf1aeb631fc05",
+      "sha256": "58e63c8d21b6deb7b2383028a4dd5c888382f56a4c82afdb40ccf1aaf5bf7768"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_ftero_vinea_01_arm_2k.jpg",
+      "bytes": 726298,
+      "providerMd5": "1c0ef3a773ca9b00e8307b49b33c7704",
+      "sha256": "4c48fb76a4a7aa7b2dfb08682926bf4bacb74c23135a88fabcbefd73960ac460"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_intertwine_01_diff_2k.jpg",
+      "bytes": 390031,
+      "providerMd5": "1f0097502c3712bfe90ab6ac02275b20",
+      "sha256": "1ca56cb67df30923d31ec6fde479ca3d656f3117c34ea9dded05a63333ebf1ab"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_nor_gl_2k.jpg",
+      "bytes": 649231,
+      "providerMd5": "c650426b456877085354339ce545c552",
+      "sha256": "7805b7059b65f903118c4b4a1f9db930f7db9b512e50386ce82c535aab9dad11"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_arm_2k.jpg",
+      "bytes": 1548488,
+      "providerMd5": "154b0c51f34069f34740d3ae0b2cb912",
+      "sha256": "af73092a48537dda93ef885c28d13032ef4cb939263a2d75009ef8fa79294538"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_diff_2k.jpg",
+      "bytes": 351644,
+      "providerMd5": "ab062aa3837a897cd1ccbdaadf8c9b37",
+      "sha256": "a3460b9052dc2954fe7d9ff9af06192e8d9cab9a43b228d8e59e3380d1f87244"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_clearwater_crystals_01_arm_2k.jpg",
+      "bytes": 397913,
+      "providerMd5": "0ddad7fde515ffa00a1cae85fb38a945",
+      "sha256": "c13f3573c534730bb7371868c6d0cc1ef4bacf1f4705ec9d9dc8fb104515279f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_ftero_vinea_02_arm_2k.jpg",
+      "bytes": 599820,
+      "providerMd5": "6b3391cfd067c82d60f352257fffa3ff",
+      "sha256": "90210bcf394932bc63f498c554c9c25d9e2b43443d234743feda2e777e74d9ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wine_bottles_01/wine_bottles_01.bin",
+      "bytes": 688000,
+      "providerMd5": "3b85db3b871a0392cfcb49ae501e3293",
+      "sha256": "a520b717c7f9d15b7f114d1be5f454f18b2cfd056757fb4d4c5f5054de5db6d6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_clearwater_crystals_01_diff_2k.jpg",
+      "bytes": 367844,
+      "providerMd5": "ee5dabb8f0faf02058dd2fc158aa073a",
+      "sha256": "ee32f1b3ab93d8120ab5de768c8de01eb4aab96da3502ff6ae60fe5aba19bc9b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_ftero_vinea_02_diff_2k.jpg",
+      "bytes": 762073,
+      "providerMd5": "50e3c92e993bd47d8372b35409813d0b",
+      "sha256": "5a8e52e25571557201d200de12e87425097f2aea21bebf336b4b709caea3d8e5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_paper_nor_gl_2k.jpg",
+      "bytes": 4500749,
+      "providerMd5": "abc2465da1b1e0fd4d7a8ac2486dd026",
+      "sha256": "69ebe9036fbb9fb7e656da7ec9171b0e26cfe3558f46ea5e842be0f0e331868d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_intertwine_01_arm_2k.jpg",
+      "bytes": 300801,
+      "providerMd5": "fb80fb032d523af06d386473a0040b9f",
+      "sha256": "beae321c3091a8e7d36bcc71bcda8e6834d61fa44557ded4e1d6469d6495bb93"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_bottles_01/wine_bottles_01_label_ftero_vinea_01_diff_2k.jpg",
+      "bytes": 975465,
+      "providerMd5": "a1282e2b06414d29b705ec23e9d28fce",
+      "sha256": "5ba3f2be8845921fc96d15ea2efee77b60d331a0fdbd081e1b27015b34d6e7cc"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "wine_bottles_01",
+    "name": "Wine Bottles 01",
+    "category": "Food & Kitchen/Drinks/Bottles & Wine",
+    "polycount": 28848,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "food"
+  }
+}

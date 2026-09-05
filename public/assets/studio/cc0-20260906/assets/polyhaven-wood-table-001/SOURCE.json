@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_diff_2k.jpg",
+      "bytes": 924532,
+      "providerMd5": "a36483628b915dabf82961ab2a62a85c",
+      "sha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_nor_gl_2k.jpg",
+      "bytes": 385020,
+      "providerMd5": "50dbc9fe086df00f6bce819eae6091d1",
+      "sha256": "d56f02c911391267ddc6adc92e8a5bc29b9803196e8d57ad5b9702e6c842dc28"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_rough_2k.jpg",
+      "bytes": 963377,
+      "providerMd5": "a291ec6bc35b9827175cdd1592c62e03",
+      "sha256": "c788876d80e4d96598590631f8de92447fb1b0ba1265a812514ee717d270ac3e"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "wood_table_001",
+    "name": "Wood Table 001",
+    "category": "Wood/Boards & Planks/Finished & Varnished",
+    "polycount": null,
+    "maxResolution": [
+      16384,
+      16384
+    ],
+    "selectionTerm": "wood"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Lantern_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Lantern_01/Lantern_01_2k.gltf",
+      "bytes": 4866,
+      "providerMd5": "547ce8bced853073ef9d9367f0ee1930",
+      "sha256": "86f12126e0a5c1c369249371537eed653fa308de8b3554fa088b3fe503d9ec8c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_diff_2k.jpg",
+      "bytes": 519828,
+      "providerMd5": "e28d5e3c524040c2910bd9d19ce45a35",
+      "sha256": "85d0e815adce257bc8288d21ba585f37d612a8a13bde9d54e7a98b08510ed869"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_nor_gl_2k.jpg",
+      "bytes": 805944,
+      "providerMd5": "ddf52226353a7329997c143d5c26a79b",
+      "sha256": "d0c090bbc39cf26828070fe816fa996959578888a9a661713d4c2d1b2f79449e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Lantern_01/Lantern_01_brass_arm_2k.jpg",
+      "bytes": 847840,
+      "providerMd5": "10a5d10c22dca0ededd3b65e65f70107",
+      "sha256": "f35b2f236301c13da9c127f1a480d06fd61815750c6b0d4a55dc857d576f6385"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/Lantern_01/Lantern_01.bin",
+      "bytes": 864852,
+      "providerMd5": "857a868798e7e5f40d78c2d09e6f8ea0",
+      "sha256": "cb0c7eaaea361546201ba1c4324581ac7147c221851657b6e23d2f854beabe49"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "Lantern_01",
+    "name": "Lantern 01",
+    "category": "Lighting/Portable/Lanterns",
+    "polycount": 33902,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "table"
+  }
+}

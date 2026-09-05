@@ -1,0 +1,44 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "deliveredOriginals": 65,
+  "byKind": {
+    "model": 35,
+    "surface-texture": 30
+  },
+  "downloadedBytes": 416467668,
+  "errors": [
+    {
+      "id": "decorative_book_set_01",
+      "reason": "No self-contained glTF within intended web budget"
+    },
+    {
+      "id": "fabric_pattern_07",
+      "reason": "No native 2K base color"
+    },
+    {
+      "id": "fabric_pattern_05",
+      "reason": "No native 2K base color"
+    },
+    {
+      "id": "leather_red_02",
+      "reason": "No native 2K base color"
+    },
+    {
+      "id": "book_pattern",
+      "reason": "No native 2K base color"
+    }
+  ],
+  "approvedVisualOriginals": 0,
+  "productionPublished": 0,
+  "provider": "Poly Haven",
+  "license": "CC0-1.0",
+  "byCategory": {
+    "furniture": 18,
+    "outdoor-prop": 5,
+    "food": 8,
+    "nature": 4,
+    "surface-material": 30
+  },
+  "browserRenderedModels": 35,
+  "browserRejectedModels": 0
+}

@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_diff_2k.jpg",
+      "bytes": 3118607,
+      "providerMd5": "1a982193e0137381402a60cbd5892474",
+      "sha256": "10fe1dafe34fec51397dbe9011f798c68c4e3fc16abfd4d7aea0123122db8993"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_nor_gl_2k.jpg",
+      "bytes": 4845665,
+      "providerMd5": "8b513a75b434f95ca268436265742638",
+      "sha256": "60fd6af2aae30bb3fd2231227ecbe52d0ced2c761d53a64f50dea59d173307cd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_rough_2k.jpg",
+      "bytes": 1599661,
+      "providerMd5": "ee92528bdb30f4f1656a5a665e2c6225",
+      "sha256": "c6962037eb41c6f0feafba22353e315d37ae8c8ea472dfd7d4fe28136904ceb5"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "asphalt_01",
+    "name": "Asphalt 01",
+    "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+    "polycount": null,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "asphalt"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/red_brick",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick/red_brick_diff_2k.jpg",
+      "bytes": 3169072,
+      "providerMd5": "d38aaa7b2c8533c033919bc566c62c37",
+      "sha256": "a1ae5ba7e63026971ceaf68ebbcf8982d9c2dadde1c99996c49b8ac1160af995"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick/red_brick_nor_gl_2k.jpg",
+      "bytes": 4327452,
+      "providerMd5": "f10a21aa51b3a0950d1ca0f1fbb8e707",
+      "sha256": "dd2ce5b5c42f04f02fce555d53eae42503733a0a42e76ae9a18bfb9d0680da5b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick/red_brick_rough_2k.jpg",
+      "bytes": 552848,
+      "providerMd5": "30d1018e087a2ee81328b331edefb2d5",
+      "sha256": "b8b6b882b467647162433914b3e4db16e91852a0bdf866e6bcea4a76683ea00d"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "red_brick",
+    "name": "Red Brick",
+    "category": "Brick & Block/Clay Brick/Running-Bond",
+    "polycount": null,
+    "maxResolution": [
+      16384,
+      16384
+    ],
+    "selectionTerm": "brick"
+  }
+}

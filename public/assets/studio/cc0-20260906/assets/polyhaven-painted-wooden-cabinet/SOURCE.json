@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/painted_wooden_cabinet",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/painted_wooden_cabinet/painted_wooden_cabinet_2k.gltf",
+      "bytes": 9253,
+      "providerMd5": "eaa66611e904cc3e637e82f9b4c307f4",
+      "sha256": "0f2153a2a10fc78a8670a3f11027155b09ee0a11e1ba2a25f616e440b95ad56b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet/painted_wooden_cabinet_nor_gl_2k.jpg",
+      "bytes": 1864160,
+      "providerMd5": "9022a3a1d2f9e0506a46ee4d62f32d89",
+      "sha256": "7ca37c5a81684c53181bc6d523ac7dfe983d737787bcda379517d14c8105c2be"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet/painted_wooden_cabinet_diff_2k.jpg",
+      "bytes": 2638553,
+      "providerMd5": "a3d5e6f643b052e618212949f86ca81e",
+      "sha256": "295ae8c562e3a75379558a4620ef4c06c67385db7a863e6a0b35a2ca73ee1a59"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/painted_wooden_cabinet/painted_wooden_cabinet.bin",
+      "bytes": 78072,
+      "providerMd5": "c86f9e483a0da1d5a9f68b08099a4166",
+      "sha256": "1023d773d84c42f2709ec297247d90b0e2833e37241fbe852e2f33b41ae10cda"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/painted_wooden_cabinet/painted_wooden_cabinet_arm_2k.jpg",
+      "bytes": 2228994,
+      "providerMd5": "27f4f179af9fe7ed7ee3e3936a434b0c",
+      "sha256": "4dedb866c4a86d0c32fde3f77736e74440b0f95a90128d0526ea5bad61b1519d"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "painted_wooden_cabinet",
+    "name": "Painted Wooden Cabinet",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "polycount": 2227,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "cabinet"
+  }
+}

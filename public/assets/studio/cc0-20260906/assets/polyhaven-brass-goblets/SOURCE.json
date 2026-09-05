@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_goblets",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_goblets/brass_goblets_2k.gltf",
+      "bytes": 7782,
+      "providerMd5": "c74dda716b4ce8f6a4e070b130f32de1",
+      "sha256": "ef54f5f61cb7cd37a28e2d3f9b19b20c8e4cd7347bfbf6cc0cf69cdb97758952"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_02_nor_gl_2k.jpg",
+      "bytes": 1354656,
+      "providerMd5": "35e4ee1599897be20547afb6b9a81e3d",
+      "sha256": "72aeb180e8df8fdffb07e82264b06b531f8172ac2d33de257dbc4f8fa330ab56"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/brass_goblets/brass_goblets.bin",
+      "bytes": 261728,
+      "providerMd5": "56e8be5f54fa2f3567abc1ea7d0f3fbc",
+      "sha256": "a9f5a889632e96a78cf2491b28a9947eff05a7d0507329d20a757dfab1a3c7cd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_01_nor_gl_2k.jpg",
+      "bytes": 1641326,
+      "providerMd5": "a5e9dc276c047224f624fc2200b0be26",
+      "sha256": "11bff944d55c1a4ea68ecc8190604cb26503df6d0f46212a42510a45428e3dc4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_01_diff_2k.jpg",
+      "bytes": 2458412,
+      "providerMd5": "ecec2ed881e4825ec9d25437152c94b2",
+      "sha256": "5008da85965d8b837bad7107f81369e7dca026b40cacaae63a22f3ec86d883ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_03_nor_gl_2k.jpg",
+      "bytes": 1144311,
+      "providerMd5": "63c8ea460b7bcf5644091236a2e70a08",
+      "sha256": "c83b3c34a8808a07f67e1b9a89f10b23c003008b6c0c63a6fb6591c627092b2e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_03_diff_2k.jpg",
+      "bytes": 2142516,
+      "providerMd5": "9c4ace1e889aaea4a4148ed7737fa37b",
+      "sha256": "5053e6f223e10ff739893fe46433a77ebb883cc2c29b72226d0e86e4e4eb4d2f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_03_arm_2k.jpg",
+      "bytes": 1311744,
+      "providerMd5": "66fa0e344aa8de7737563037225c0df3",
+      "sha256": "8e7f162d0d18e8c06b6afa16bfec22ed3c4c4220e07a02f83e23af6141722a32"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_02_diff_2k.jpg",
+      "bytes": 2371722,
+      "providerMd5": "c5c7ec92128a2a1a2eae937b354edcba",
+      "sha256": "d29c51cc829b4b01a9583fe8e895fd4c6baf5c8af6a224dc440747ffcb84af1a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_02_arm_2k.jpg",
+      "bytes": 2176420,
+      "providerMd5": "03f1c65ee631497ca116bcf19666b505",
+      "sha256": "e420c19baed40df7e2a74c686573793f16298b698a29cb17c1cda8adc1d669e8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_goblets/brass_goblet_01_arm_2k.jpg",
+      "bytes": 2404871,
+      "providerMd5": "c1f9c1a6217b3b8cbf20755d67a423f4",
+      "sha256": "c2a1105f90e82f9981b9359cb2fbdb0a4fefb12fc227f86b5133d8fc03e17e02"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "brass_goblets",
+    "name": "Brass Goblets",
+    "category": "Food & Kitchen/Tableware/Cups & Goblets",
+    "polycount": 9600,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "food"
+  }
+}

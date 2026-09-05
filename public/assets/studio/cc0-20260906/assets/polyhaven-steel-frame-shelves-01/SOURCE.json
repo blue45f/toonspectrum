@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/steel_frame_shelves_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/steel_frame_shelves_01/steel_frame_shelves_01_2k.gltf",
+      "bytes": 2766,
+      "providerMd5": "75cffab01808b3218eef160fe5a64f55",
+      "sha256": "42c992b86966deace163e701fb45df82743d42716eefbedb533e550bcc879b6b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/steel_frame_shelves_01/steel_frame_shelves_01_diff_2k.jpg",
+      "bytes": 1679686,
+      "providerMd5": "fe1269a8e9cdbe3bd7359269c5f56510",
+      "sha256": "f13b689662757c99dce62503fa98baa54d5c8aec1597fce1ab7c5b8d5a77f721"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/steel_frame_shelves_01/steel_frame_shelves_01_nor_gl_2k.jpg",
+      "bytes": 1350248,
+      "providerMd5": "120ff0ce33e1c82f08a8810996033472",
+      "sha256": "bb5db1bdc40938b7f949d773ffdf4c7d2d8319b285ab291173676114ddb91c7b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/steel_frame_shelves_01/steel_frame_shelves_01.bin",
+      "bytes": 142312,
+      "providerMd5": "5728ceb7ff0d9b0b5ba5e7ef970aced9",
+      "sha256": "306d7e72d12a5d3047b8a189f8d0add51075eaf7f51f935286fda4e1c16dd066"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/steel_frame_shelves_01/steel_frame_shelves_01_arm_2k.jpg",
+      "bytes": 2393901,
+      "providerMd5": "08fb268ae9d50baac81cd5e90cc89c3e",
+      "sha256": "6aeca77df7c022bec768212cba95011ce4fc67555c5e039e22542db171492a4f"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "steel_frame_shelves_01",
+    "name": "Steel Frame Shelves 01",
+    "category": "Furniture/Storage Furniture/Shelving & Bookcases",
+    "polycount": 4348,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "book"
+  }
+}

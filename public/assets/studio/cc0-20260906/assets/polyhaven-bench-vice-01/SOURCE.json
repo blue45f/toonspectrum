@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/bench_vice_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/bench_vice_01/bench_vice_01_2k.gltf",
+      "bytes": 13222,
+      "providerMd5": "95616943193cf9e09674e90cb1ef1978",
+      "sha256": "b5b965f076f5464b91fdb58c11e54f35a9aff9eed2e4c2faddeffe92e3c3dbe5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/bench_vice_01/bench_vice_01.bin",
+      "bytes": 131404,
+      "providerMd5": "0f8ba7b2c41f23b4e7461c68c5aca898",
+      "sha256": "47b80c649a7791a7f3ea95d3dca929506a8c2e89506d3982a1a3380dcd3333ee"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bench_vice_01/bench_vice_01_nor_gl_2k.jpg",
+      "bytes": 3794078,
+      "providerMd5": "f66dc0294b86d3e9e8d0035f92f773e2",
+      "sha256": "d890d29aa7f508e1be3fe0956ff720c069e192a3b971687214ad765a4ba8be5a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bench_vice_01/bench_vice_01_arm_2k.jpg",
+      "bytes": 2624521,
+      "providerMd5": "59cb925753ac5f52937028004170d28e",
+      "sha256": "220b9d0a4fcdbc3354622334e8fa3f87d297979cef0ef334bbfb8146f2ce1583"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bench_vice_01/bench_vice_01_diff_2k.jpg",
+      "bytes": 2680037,
+      "providerMd5": "78b033eff7d38aab60386576f599c7cb",
+      "sha256": "543227c390f657d5bf9f014a7e9b74f3bbc46b41ce6b4370f445513af419d483"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "bench_vice_01",
+    "name": "Bench Vice 01",
+    "category": "Tools & Equipment/Workshop Equipment/Vices & Clamps",
+    "polycount": 2864,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "bench"
+  }
+}

@@ -21,16 +21,24 @@ await mkdir(previewRoot, { recursive: true });
 const pageHtml = `<!doctype html><html><head><meta charset="utf-8"><script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script><style>body{margin:0}canvas{display:block}</style></head><body><script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 const renderer = new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
 renderer.setSize(384,384); renderer.setPixelRatio(1);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 0.9;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-scene.add(new THREE.HemisphereLight(0xffffff,0x646479,2.6));
-const key = new THREE.DirectionalLight(0xffffff,3.2); key.position.set(4,7,5);scene.add(key);
-const fill = new THREE.DirectionalLight(0xffffff,1.1); fill.position.set(-4,2,-3);scene.add(fill);
+const environmentRoom = new RoomEnvironment();
+const pmrem = new THREE.PMREMGenerator(renderer);
+const environmentTarget = pmrem.fromScene(environmentRoom, 0.04);
+scene.environment = environmentTarget.texture;
+scene.environmentIntensity = 0.65;
+environmentRoom.dispose();
+pmrem.dispose();
+scene.add(new THREE.HemisphereLight(0xffffff,0x646479,0.65));
+const key = new THREE.DirectionalLight(0xffffff,2.0); key.position.set(4,7,5);scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff,0.45); fill.position.set(-4,2,-3);scene.add(fill);
 const camera = new THREE.PerspectiveCamera(38,1,0.01,100);
 const loader = new GLTFLoader();
 function dispose(root) {

@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_2k.gltf",
+      "bytes": 6177,
+      "providerMd5": "f82da13a17c9132f29338a04faf4ab32",
+      "sha256": "d7417dd85e54626a51632d6eaf93712986ac2620ca3041dadc51a08b8ffa9bc9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_arm_2k.jpg",
+      "bytes": 412296,
+      "providerMd5": "ab7c9670ac05907649ab63932ef88b2a",
+      "sha256": "53afe6f7b309782f937cd13893ad7cef92ae8d49669fc5b86ddd3bc82b30f14f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_nor_gl_2k.jpg",
+      "bytes": 267241,
+      "providerMd5": "242130eeac95d65dc878a20d271faf86",
+      "sha256": "80a790f97f096d05358231f9af1d5935a33deff6ce0cfe6ee9690f8130a5c4ef"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_ceiling_lamp_01/modern_ceiling_lamp_01.bin",
+      "bytes": 146828,
+      "providerMd5": "48b86e7e6db78e6d3dfd85b765c3ab68",
+      "sha256": "ae5140a64e12e639554158901a5e92340bb37c706096ff255804e3220fb96367"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_diff_2k.jpg",
+      "bytes": 240872,
+      "providerMd5": "55956852d44470d86da29fad4fd38099",
+      "sha256": "b0341690dc56eeddd3efa8a91c179a26e163f330907e5483b6903626b600347e"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "modern_ceiling_lamp_01",
+    "name": "Modern Ceiling Lamp 01",
+    "category": "Lighting/Ceiling/Pendant Lights",
+    "polycount": 5602,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "lamp"
+  }
+}

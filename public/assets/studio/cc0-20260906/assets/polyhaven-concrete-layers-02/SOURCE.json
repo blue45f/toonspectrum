@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_layers_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_diff_2k.jpg",
+      "bytes": 2555097,
+      "providerMd5": "f98d5155e8d298931320879be082d136",
+      "sha256": "f70070187573ad05457c65c3efe7fb25fe1e071a5490c760e5b90f845aab9b91"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_nor_gl_2k.jpg",
+      "bytes": 3389363,
+      "providerMd5": "8421eb5b33a8afbf845565676abc7f44",
+      "sha256": "6985e0782adb226423d81cdd080b0e06012fdfb20eb3952d2459218fdd3977e9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_rough_2k.jpg",
+      "bytes": 1920563,
+      "providerMd5": "7d43a4200b6d7719e9f3278d929f5f5f",
+      "sha256": "d90cfb52d690c4ac843e29e05ffc3d67f510f6a5aa1ef0f0f467d693d7d958b7"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "concrete_layers_02",
+    "name": "Concrete Layers 02",
+    "category": "Concrete/Plaster & Stucco/Bare Plaster",
+    "polycount": null,
+    "maxResolution": [
+      16384,
+      16384
+    ],
+    "selectionTerm": "concrete"
+  }
+}

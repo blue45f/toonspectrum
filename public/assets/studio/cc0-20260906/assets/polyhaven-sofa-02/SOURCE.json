@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/sofa_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/sofa_02/sofa_02_2k.gltf",
+      "bytes": 4183,
+      "providerMd5": "d58bdde4cb00612fc070bc3e7caba265",
+      "sha256": "bd117710418921ece26af1ecb0b64d66b56ab7f96ff500f96044c11029c962ac"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/sofa_02/sofa_02_arm_2k.jpg",
+      "bytes": 401876,
+      "providerMd5": "4cdaf48033316b61832d220f1dcc48ef",
+      "sha256": "1e6bb97f6c0d2a1b81b9aa3c67c26b65bc02aeed88b19373726f117c16f89980"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/sofa_02/sofa_02_nor_gl_2k.jpg",
+      "bytes": 463146,
+      "providerMd5": "d22e982ab8dac6a54ab06839efb0bafa",
+      "sha256": "7e53cd96fdb33b960a0447c619e028aa833fc9c6bee2838346ab5c752ac95c68"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/sofa_02/sofa_02_diff_2k.jpg",
+      "bytes": 323319,
+      "providerMd5": "37808357cc7d00fd62bda197cf89e6ae",
+      "sha256": "d37c3c65d2bc4dfb9c61b8355cc0e5e0e92e34ae6affa819daa1cabe03d9e135"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/sofa_02/sofa_02.bin",
+      "bytes": 74864,
+      "providerMd5": "024d6f57a7c2ee7915430cd6e1c2651e",
+      "sha256": "cb337e03211be0309afa1ded2b6cbb2d402c0f794aaf8828fba559d27a42d3f5"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "sofa_02",
+    "name": "Sofa 02",
+    "category": "Furniture/Seating/Sofas & Couches",
+    "polycount": 2728,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "sofa"
+  }
+}

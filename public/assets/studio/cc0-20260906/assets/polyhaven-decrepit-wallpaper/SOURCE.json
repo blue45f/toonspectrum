@@ -1,0 +1,42 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/decrepit_wallpaper",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_diff_2k.jpg",
+      "bytes": 3325490,
+      "providerMd5": "6d8cef16eecb7b4c84d77008ffc375b5",
+      "sha256": "6a16d2c30016b98cce1176e85c64075fe48255d0302e7d7b9f71198fbe818cf1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_nor_gl_2k.jpg",
+      "bytes": 2906832,
+      "providerMd5": "8ae2cd9b5d40327c6a0193fa9fd97058",
+      "sha256": "95507032d5039128729d132c0a5ce76e3fa0e43c8db077b480498ab6cbb42ed9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/decrepit_wallpaper/decrepit_wallpaper_rough_2k.jpg",
+      "bytes": 1660507,
+      "providerMd5": "08511294c9cdbaa4e50c28ac05ae2248",
+      "sha256": "524833c0da045ce27e2ae11936284fea130e6e18e7463e10648fdc701dad5766"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "decrepit_wallpaper",
+    "name": "Decrepit Wallpaper",
+    "category": "Paper & Card/Wallpaper/Peeling & Distressed Wallpaper",
+    "polycount": null,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "paper"
+  }
+}

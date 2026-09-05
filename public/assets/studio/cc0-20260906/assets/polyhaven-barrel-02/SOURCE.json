@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/Barrel_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/Barrel_02/Barrel_02_2k.gltf",
+      "bytes": 2639,
+      "providerMd5": "c1fcd43e5e835a0ce467b1aac077364b",
+      "sha256": "0d00b79165c402b0f02f01722c1c22be50e1d3d1b0e2baddfe3df67e25c05b9c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Barrel_02/Barrel_02_diff_2k.jpg",
+      "bytes": 240072,
+      "providerMd5": "35a68db364da92e3d3c92424ad211cb4",
+      "sha256": "c182b0ddd05c96f25d94205bf75fd272b2ed0178c63ced5aef84514068e5c5f1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Barrel_02/Barrel_02_arm_2k.jpg",
+      "bytes": 503023,
+      "providerMd5": "c27df26e857045e66a7bd34a6eca3f2e",
+      "sha256": "cf2b67d9f544473c459a873b828839374477a195b84249700ecdfdec88561366"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/Barrel_02/Barrel_02.bin",
+      "bytes": 77440,
+      "providerMd5": "7340fa43610b7a983a1b352574427b64",
+      "sha256": "a9a848743a7616710e2b3aee0b61c6fb69abc3910a150856ad21776a6089f29a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/Barrel_02/Barrel_02_nor_gl_2k.jpg",
+      "bytes": 358609,
+      "providerMd5": "c507c8cfaf9208003acd8a9ba9ab356e",
+      "sha256": "cd00fe0fda91ed8019f40dbe055b444f6aa5817023a5408bddc9707ac0e3d419"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "Barrel_02",
+    "name": "Barrel 02",
+    "category": "Containers & Storage/Barrels & Drums/Plastic Drums",
+    "polycount": 2688,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "barrel"
+  }
+}

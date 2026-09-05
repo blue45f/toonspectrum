@@ -1,0 +1,72 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/outdoor_table_chair_set_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_2k.gltf",
+      "bytes": 6826,
+      "providerMd5": "ea86f7e4fdbbe5b600543477a894d4cf",
+      "sha256": "2e2376efc210d849a22bd352b40442d38985c74953fc8020bb01ca94c66c68ca"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_nor_gl_2k.jpg",
+      "bytes": 227267,
+      "providerMd5": "a47a0f3b2335652059ad8a0251a1bfcb",
+      "sha256": "02723a5d2275e357d07e41a71a87dc46b89e11fec9711b84a7c1d082ada8144a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_arm_2k.jpg",
+      "bytes": 695054,
+      "providerMd5": "9d2d72416720979df7fe41fd14191c4c",
+      "sha256": "64b584f6cf5993b9b78c7ec51ad471ad010a90455ee4bb45a3c9be1263db4d97"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_diff_2k.jpg",
+      "bytes": 520192,
+      "providerMd5": "f1d68ab150bf932478e4c8331d550604",
+      "sha256": "8259d7200a753037516e153d0989bd5812d50874be7631c34794abdeb2796384"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_diff_2k.jpg",
+      "bytes": 506077,
+      "providerMd5": "77cf6bb1c96b6864d7f0b6a2dff600e3",
+      "sha256": "5f6ce1dcd8dbfc0293ae62f01f0cef0a8a07862bd6d744eefa459206e9206eb1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_arm_2k.jpg",
+      "bytes": 583486,
+      "providerMd5": "ca1eaffe9c45ecc241784b5c1fd29e0c",
+      "sha256": "646ed8503d7e1d1806506a38c3b2d31b616e0720538e7df054c3d982b9bfa5ae"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_nor_gl_2k.jpg",
+      "bytes": 205693,
+      "providerMd5": "8d2b60d4d1001c2dc7c6fef682b9b14e",
+      "sha256": "8ab2e82a262da2912cb64b3439377f943dd29f344b8d4b8b25eb389efdceabc8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/outdoor_table_chair_set_01/outdoor_table_chair_set_01.bin",
+      "bytes": 456856,
+      "providerMd5": "8596ca40855bc417ac5248a54bd85990",
+      "sha256": "d62458c79c6c902d1195bff875e42bf7579c6b309c6b96f9cd7543af43170220"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "outdoor_table_chair_set_01",
+    "name": "Outdoor Table Chair Set 01",
+    "category": "Furniture/Seating/Outdoor Seating",
+    "polycount": 9828,
+    "maxResolution": [
+      4096,
+      4096
+    ],
+    "selectionTerm": "chair"
+  }
+}

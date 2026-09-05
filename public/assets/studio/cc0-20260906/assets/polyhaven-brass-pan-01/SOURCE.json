@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_pan_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_pan_01/brass_pan_01_2k.gltf",
+      "bytes": 2676,
+      "providerMd5": "901766290d5fbbfc9ed8e1ffd0cea38b",
+      "sha256": "d29a08d054481a9ba388c7103b78165d46e692b9cb24bc3ac858b2c4b3784a33"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/brass_pan_01/brass_pan_01.bin",
+      "bytes": 109336,
+      "providerMd5": "3099c59ef46a50380487ad9b92d4dfbd",
+      "sha256": "8ece55dcbde3a1f81b9221b4fb0344a802117fa89c39b4ec9718bb1d9cba253f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_nor_gl_2k.jpg",
+      "bytes": 1178554,
+      "providerMd5": "cc86291331c23e69796a565256117199",
+      "sha256": "61e4985caebebdc6dcb2bf79bcd036307c78bd2fd046afe18991d79822622ed7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_diff_2k.jpg",
+      "bytes": 2020753,
+      "providerMd5": "b669282b745cce90cbb3b464ed30bbc3",
+      "sha256": "6c8366d521d76ee94ee785135561462a6996e5e41bfc533e5cf5821bbf347cd3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pan_01/brass_pan_01_arm_2k.jpg",
+      "bytes": 2004998,
+      "providerMd5": "1fe973f670ac0ef36c3d8c9bf32d43ab",
+      "sha256": "83da410def20681a91314e39f8787c46f0515e30c477d3cc84df78a36ab7831c"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "brass_pan_01",
+    "name": "Brass Pan 01",
+    "category": "Food & Kitchen/Cookware/Pots & Pans",
+    "polycount": 4340,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "pot"
+  }
+}

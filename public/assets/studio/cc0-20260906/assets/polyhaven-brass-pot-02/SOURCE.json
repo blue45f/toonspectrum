@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brass_pot_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/brass_pot_02/brass_pot_02_2k.gltf",
+      "bytes": 2683,
+      "providerMd5": "e8a6d0f1565abac82bccf71c5a7d1145",
+      "sha256": "0fa2ff912920d0f6448fa36a7fd18294e3670521390d98abbee12fa7a71c680b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/brass_pot_02/brass_pot_02.bin",
+      "bytes": 86816,
+      "providerMd5": "7f36616ebfc02742c0796badfefa0672",
+      "sha256": "11f32d175485d541850f96e7a84fedd057ba564bfbf7c25d471b67db0a7b85d9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pot_02/brass_pot_02_diff_2k.jpg",
+      "bytes": 1884685,
+      "providerMd5": "a62c1413e3d394173d9086429ae27676",
+      "sha256": "766cfaf73bd3dc8cf24de764d06cf002f1c5a06b4cf8e962e6e5f720ba2236f9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pot_02/brass_pot_02_arm_2k.jpg",
+      "bytes": 1589716,
+      "providerMd5": "ec951937f7418d3ab84783d41f2b7a63",
+      "sha256": "39fd42ac4bfd7b67d01155d47a3fa96a4afb03d4e699d847ec8b785d24e6cf0d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/brass_pot_02/brass_pot_02_nor_gl_2k.jpg",
+      "bytes": 1199123,
+      "providerMd5": "76d7284620a449a6ed91936b85d74e6b",
+      "sha256": "80c65eb7cc2da07b57cc46cb0ed4d805ae2c43085ef27643015aa637e132703c"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "brass_pot_02",
+    "name": "Brass Pot 02",
+    "category": "Food & Kitchen/Cookware/Pots & Pans",
+    "polycount": 3344,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "pot"
+  }
+}

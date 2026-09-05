@@ -1,0 +1,72 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/book_encyclopedia_set_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_2k.gltf",
+      "bytes": 55011,
+      "providerMd5": "b5c1936b6b9b0883b7e817ff49f03388",
+      "sha256": "6c8c76560ca8e3c28516c0831545db903111bea069ce569579c2848a2e781bed"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/book_encyclopedia_set_01/book_encyclopedia_set_01.bin",
+      "bytes": 2547932,
+      "providerMd5": "ac617be6503e537c5d1a16a94313e866",
+      "sha256": "bbc726698b6e40ab5537b73e082f7bb4db97b9e6f978f52cdaf763dddc85d9ba"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_paper_diff_2k.jpg",
+      "bytes": 302108,
+      "providerMd5": "a19a5200b59c288f7b753d57db5f0506",
+      "sha256": "507a75738825e1d9dd78dfc8f32441db67c0b1e7b116c044b47c7b9116194241"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_paper_nor_gl_2k.jpg",
+      "bytes": 566133,
+      "providerMd5": "07765c22d4bc7626f93f2432c4137e78",
+      "sha256": "5fdcfc21365bb9ef26e0822cdb27b5add3b4a55fe36a975a2f0fce3d061219d3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_paper_roughness_2k.jpg",
+      "bytes": 49548,
+      "providerMd5": "8ee25a87fbcc4d46dd5985e37b5ec99e",
+      "sha256": "8415728143b9270913ae3d79351400fbd5295bb56e6571ea8c829b68792d9ae4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_cover_arm_2k.jpg",
+      "bytes": 663503,
+      "providerMd5": "f851bc2c9998fa116044a6462a78d4c2",
+      "sha256": "a8586332a573a522619b65ac709f4f513660878d543510c7adf634736cf8dfa9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_cover_nor_gl_2k.jpg",
+      "bytes": 75257,
+      "providerMd5": "d0b3c80e2d4c6735e2d53d2f9de81b4f",
+      "sha256": "7585385f842380949303eba7250d2ffc23aeeb7e3928dff567d532e9b9452276"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/book_encyclopedia_set_01/book_encyclopedia_set_01_cover_diff_2k.jpg",
+      "bytes": 423488,
+      "providerMd5": "5bdc3656803da131709b8459d7cc2622",
+      "sha256": "b75dd3ba7b39bc57cc3c7118b24c18f2b99a298c72c1955084bc5845ac6f4092"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "book_encyclopedia_set_01",
+    "name": "Book Encyclopedia Set 01",
+    "category": "Office & Stationery/Books & Documents/Books",
+    "polycount": 67306,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "book"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_bowl_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_bowl_01/wooden_bowl_01_2k.gltf",
+      "bytes": 2811,
+      "providerMd5": "3f8d952959de60238824abe69251e532",
+      "sha256": "9b2aadbd2aed3144cdbc30834052a8dd3536b3756a554cce99e9702c8adeb440"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_01/wooden_bowl_01_nor_gl_2k.jpg",
+      "bytes": 2529776,
+      "providerMd5": "1ee06120ec4eb14ac0fb4ad7010c0340",
+      "sha256": "6e464e49ab13675ef7eab45ad0b32fddf9a3425bf0df58f3a2156bf70be1d938"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_bowl_01/wooden_bowl_01.bin",
+      "bytes": 321052,
+      "providerMd5": "ab8f522a5b859d901de1eed742f275bd",
+      "sha256": "2659e19ea140aed29edca6761b6ee117e0a488ac14cd32c30fd0f1116f645761"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_01/wooden_bowl_01_arm_2k.jpg",
+      "bytes": 1861438,
+      "providerMd5": "404ceb80f6b0664b4bf0b61aba0c1e92",
+      "sha256": "6527473aa358b5f8c73cae1a8e5d66b764c9971b3dc7ca569951a084ae2008d0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_01/wooden_bowl_01_diff_2k.jpg",
+      "bytes": 1750787,
+      "providerMd5": "06f498c314214410e238eb105c571db1",
+      "sha256": "2c9405291f6e23e5e376d2ceed2051f63f3a6e0c731de5add5ca6c6ec2a7dc7d"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "wooden_bowl_01",
+    "name": "Wooden Bowl 01",
+    "category": "Food & Kitchen/Tableware/Bowls",
+    "polycount": 14122,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "bowl"
+  }
+}

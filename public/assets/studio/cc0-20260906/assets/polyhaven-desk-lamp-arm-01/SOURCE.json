@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/desk_lamp_arm_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/desk_lamp_arm_01/desk_lamp_arm_01_2k.gltf",
+      "bytes": 4453,
+      "providerMd5": "93587e189642dc55cd6567703dc88fd6",
+      "sha256": "b3f03ff2c7c186ec73682f7447b3594db2362cbfc0d72a89d2d8967111d2a2b6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/desk_lamp_arm_01/desk_lamp_arm_01_nor_gl_2k.jpg",
+      "bytes": 2491219,
+      "providerMd5": "f576a49c0203d1115fd4fb4b68f0548c",
+      "sha256": "289e2b9a9d0dcbc02dd8d8dbe612380c13dc48fb7c4484fb39c303f6cf822379"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/desk_lamp_arm_01/desk_lamp_arm_01_diff_2k.jpg",
+      "bytes": 2438937,
+      "providerMd5": "18b2a20186590642bf99537784bdc414",
+      "sha256": "c5f8c5be367a40585f89ce0aeac0224e36146eef63c12864222af080a9784869"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/desk_lamp_arm_01/desk_lamp_arm_01.bin",
+      "bytes": 736804,
+      "providerMd5": "29ffa5bb6bee35b066e46073124fee1a",
+      "sha256": "07f34e32abecbaa63d28b9d12d6a0eb82b775a0f50c92327655909d72ff8489b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/desk_lamp_arm_01/desk_lamp_arm_01_arm_2k.jpg",
+      "bytes": 2801607,
+      "providerMd5": "7f4335c90f5be6ac9d9e0073a12cc7e5",
+      "sha256": "d2d55bb3d929ab583d4068adc3dce4e45d29852fd37602ddbb992183a9471b79"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "desk_lamp_arm_01",
+    "name": "Desk Lamp Arm 01",
+    "category": "Lighting/Floor & Desk/Desk Lamps",
+    "polycount": 25710,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "lamp"
+  }
+}

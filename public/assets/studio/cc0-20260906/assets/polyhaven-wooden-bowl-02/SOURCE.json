@@ -1,0 +1,54 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_bowl_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_bowl_02/wooden_bowl_02_2k.gltf",
+      "bytes": 2800,
+      "providerMd5": "dd7fc5724ee8691e05edff0e73d11b72",
+      "sha256": "144404195bb47eccab110e50aeea4b38a164aca4a6c06d9748c3552390af4737"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_nor_gl_2k.jpg",
+      "bytes": 2828507,
+      "providerMd5": "49edb4402571affbee105ee2f8707cdc",
+      "sha256": "e3ab02649c3d8178c5d2c5c7e6a1a61746a72c0fcfc7bf3cfc33d07366346f9b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_arm_2k.jpg",
+      "bytes": 2660467,
+      "providerMd5": "59a8910db4e34a013d2e2c6111325150",
+      "sha256": "be8b112b7fb6230a400d3114cd40472a049feed79501fcd66328c189d793f7ca"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_bowl_02/wooden_bowl_02.bin",
+      "bytes": 116156,
+      "providerMd5": "92850bb8ba7e6dfd53f4b157276a8536",
+      "sha256": "6e3e1fb30969e9a52db3519b01ace016628a361c2cd9e2817c5e50c1ffb8a1dd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_bowl_02/wooden_bowl_02_diff_2k.jpg",
+      "bytes": 2854102,
+      "providerMd5": "1723a07c9892ec9f16c0cc4479972d07",
+      "sha256": "9f85b1f26c447d2aa0d6cdf355a24025bef2bee4db19aaf04e87b1ae5d06aa66"
+    }
+  ],
+  "sourceCandidate": {
+    "id": "wooden_bowl_02",
+    "name": "Wooden Bowl 02",
+    "category": "Food & Kitchen/Tableware/Bowls",
+    "polycount": 4666,
+    "maxResolution": [
+      8192,
+      8192
+    ],
+    "selectionTerm": "bowl"
+  }
+}
