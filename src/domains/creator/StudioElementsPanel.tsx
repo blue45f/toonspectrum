@@ -7,10 +7,9 @@ import { Box, Eye, Grip, MessageCircle, MousePointer2, Search, Sparkles, Star, X
 import { useEffect, useId, useRef, useState, type DragEvent, type ReactElement } from "react";
 
 import { queryStudioCatalog, type StudioCatalogOrientation, type StudioCatalogSort } from "./catalog/studio-catalog-query";
-import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL } from "./catalog/StudioCatalogControls";
+import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL, STUDIO_CATALOG_PRIMARY_CONTROL } from "./catalog/StudioCatalogControls";
 import { StudioCatalogPreviewDialog } from "./catalog/StudioCatalogPreviewDialog";
 import { useStudioCatalogPreferences } from "./catalog/use-studio-catalog-preferences";
-import type { StudioCatalogPreferencesRepository } from "./catalog/studio-catalog-preferences";
 
 import "./catalog/studio-catalog-browser.css";
 
@@ -43,6 +42,7 @@ import {
 } from "./studio-ui-preferences-sqlite";
 import { StudioSvgAssetPreview } from "./StudioSvgAssetPreview";
 
+import type { StudioCatalogPreferencesRepository } from "./catalog/studio-catalog-preferences";
 import type { StudioSvgProductTournament } from "./studio-svg-vello-product-router";
 
 import { cn } from "@/lib/utils";
@@ -519,11 +519,12 @@ export function StudioElementsPanel({
           <div
             className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]"
             role="tablist"
+            tabIndex={-1}
             aria-label="요소 카테고리"
             onKeyDown={(event) => {
               if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key) || event.nativeEvent.isComposing) return;
               const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-              const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+              const current = tabs.indexOf((event.target as Element).closest<HTMLButtonElement>('[role="tab"]')!);
               if (current < 0) return;
               event.preventDefault(); event.stopPropagation();
               const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
@@ -610,7 +611,7 @@ export function StudioElementsPanel({
         preview={<StudioSvgAssetPreview assetId={previewItem.id} svg={previewItem.svg} width={previewItem.width} height={previewItem.height} requested tournament={previewTournament} />}
         actions={<>
           <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1`} aria-pressed={catalog.state.favoriteIds.includes(previewItem.id)} onClick={() => toggleFavorite(previewItem)}>즐겨찾기 {catalog.state.favoriteIds.includes(previewItem.id) ? "해제" : "추가"}</button>
-          <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1 border-accent bg-accent text-on-accent`} onClick={() => { handlePick(previewItem); setPreviewItem(null); }}>캔버스에 추가</button>
+          <button type="button" className={`${STUDIO_CATALOG_PRIMARY_CONTROL} flex-1`} onClick={() => { handlePick(previewItem); setPreviewItem(null); }}>캔버스에 추가</button>
         </>}>
         <p className="font-medium text-fg">{STUDIO_ELEMENT_CATEGORY_CHIPS.find((chip) => chip.id === previewItem.category)?.label} · {previewItem.width} × {previewItem.height} 기준 크기</p>
         <p>내장 SVG 원본 · 캔버스에는 이미지 요소로 삽입됩니다. 내부 대사·선·도형은 개별 편집되지 않습니다.</p>

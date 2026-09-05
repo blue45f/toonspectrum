@@ -3,6 +3,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { useStudioModalSheet } from "../useStudioModalSheet";
+
 import { STUDIO_CATALOG_CONTROL } from "./StudioCatalogControls";
 
 import "./studio-catalog-browser.css";

@@ -41,8 +41,8 @@ import type {
   StudioToolBeltContentProps,
 } from "./StudioToolBeltContent";
 
-import { cn } from "@/lib/utils";
 import { lazyRetry } from "@/lib/lazy-retry";
+import { cn } from "@/lib/utils";
 
 const StudioSceneTemplateBrowser = lazyRetry(
   () => import("./catalog/StudioSceneTemplateBrowser").then((module) => ({ default: module.StudioSceneTemplateBrowser })),

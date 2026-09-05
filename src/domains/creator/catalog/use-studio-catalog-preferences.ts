@@ -38,8 +38,10 @@ export function useStudioCatalogPreferences(
   function flush() {
     const currentEpoch = epoch.current;
     const run = writeQueue.current.catch(() => undefined).then(async () => {
+      if (epoch.current !== currentEpoch) return;
       const repository = await acquire();
-      let stored: StudioCatalogPreferences | null = null;
+      let stored: StudioCatalogPreferences | null = pending.current.length === 0
+        ? await repository.load(surface) : null;
       while (pending.current.length > 0 && epoch.current === currentEpoch) {
         const operation = pending.current[0];
         stored = await repository.update(surface, operation.action);

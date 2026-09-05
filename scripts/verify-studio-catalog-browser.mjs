@@ -48,6 +48,12 @@ try {
   report.checks.push("preview-no-insertion", "modal-initial-focus", "twenty-tab-focus-trap");
   await dialog.getByRole("button", { name: "어둡게" }).click();
   await dialog.getByRole("slider").press("ArrowRight"); await dialog.getByRole("slider").press("ArrowRight");
+  const primaryColors = await dialog.getByRole("button", { name: "장면 추가", exact: true }).evaluate((node) => {
+    const c = getComputedStyle(node); return { bg: c.backgroundColor, fg: c.color, parent: getComputedStyle(node.parentElement).backgroundColor };
+  });
+  assert.notEqual(primaryColors.bg, primaryColors.parent, "primary action lost its contrasting background");
+  assert.notEqual(primaryColors.bg, primaryColors.fg, "primary action text is invisible");
+  report.checks.push("primary-action-visible-background-and-text");
   await page.screenshot({ path: path.join(out, "desktop-scene-detail.png"), fullPage: true }); report.screenshots.push("desktop-scene-detail.png");
   await page.keyboard.press("Escape"); await dialog.waitFor({ state: "hidden" });
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "고백 장면 구성 미리보기"); report.checks.push("escape-focus-return");
@@ -75,11 +81,22 @@ try {
       await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, theme);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
       assert.equal(overflow, false, `${width}/${theme}: document overflow`);
+      const card = page.locator("[data-studio-scene-card]").first();
+      const cardBounds = await card.boundingBox();
+      assert(cardBounds && cardBounds.height >= 170, `${width}/${theme}: card collapsed`);
+      const actionBounds = await card.getByRole("button", { name: "고백 장면 추가", exact: true }).boundingBox();
+      assert(actionBounds && actionBounds.height >= 44 && actionBounds.y + actionBounds.height <= cardBounds.y + cardBounds.height + 1, "card action clipped");
       const name = `scenes-${width}-${theme}.png`; await page.screenshot({ path: path.join(out, name), fullPage: true }); report.screenshots.push(name);
     }
   }
   report.checks.push("four-widths-two-themes-no-page-overflow");
   await page.getByRole("button", { name: "요소", exact: true }).click();
+  await page.getByRole("tab", { name: "도형", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(await page.getByRole("tab", { name: "컷 패널", exact: true }).getAttribute("aria-selected"), "true");
+  await page.getByRole("tab", { name: "컷 패널", exact: true }).evaluate(node => node.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, isComposing: true })));
+  assert.equal(await page.getByRole("tab", { name: "컷 패널", exact: true }).getAttribute("aria-selected"), "true");
+  report.checks.push("category-arrow-navigation-and-IME-guard");
   await page.getByRole("searchbox", { name: "요소 검색" }).fill("focus corner");
   await page.getByRole("tab", { name: "전체", exact: true }).click();
   assert.equal(await page.locator("[data-studio-element]").count(), 1); report.checks.push("AND-search-elements");

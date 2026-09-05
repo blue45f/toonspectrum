@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { STUDIO_AUTHORED_SCENE_TEMPLATES } from "./studio-authored-scene-templates";
 import { summarizeStudioSceneTemplate } from "./studio-scene-template-summary";
 

@@ -3,7 +3,7 @@ import { useId, useMemo, useRef, useState } from "react";
 
 import { queryStudioCatalog, type StudioCatalogSort } from "./studio-catalog-query";
 import { summarizeStudioSceneTemplate } from "./studio-scene-template-summary";
-import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL } from "./StudioCatalogControls";
+import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL, STUDIO_CATALOG_PRIMARY_CONTROL } from "./StudioCatalogControls";
 import { StudioCatalogPreviewDialog } from "./StudioCatalogPreviewDialog";
 import { StudioSceneTemplateMap } from "./StudioSceneTemplateMap";
 import { useStudioCatalogPreferences } from "./use-studio-catalog-preferences";
@@ -95,7 +95,7 @@ export function StudioSceneTemplateBrowser({ templates, categories, loading, err
       preview={<StudioSceneTemplateMap summary={previewSummary} label={preview.label} />}
       actions={<>
         <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1`} onClick={() => toggleFavorite(preview)} aria-pressed={preferences.state.favoriteIds.includes(preview.id)}>즐겨찾기 {preferences.state.favoriteIds.includes(preview.id) ? "해제" : "추가"}</button>
-        <button type="button" disabled={pendingId !== null} className={`${STUDIO_CATALOG_CONTROL} flex-1 border-accent bg-accent text-on-accent disabled:opacity-50`} onClick={() => void insert(preview)}>{pendingId ? "추가 중…" : "장면 추가"}</button>
+        <button type="button" disabled={pendingId !== null} className={`${STUDIO_CATALOG_PRIMARY_CONTROL} flex-1 disabled:opacity-50`} onClick={() => void insert(preview)}>{pendingId ? "추가 중…" : "장면 추가"}</button>
       </>}>
       <p className="font-medium text-fg">{preview.description}</p>
       <p>프레임 {previewSummary.frames} · 말풍선 {previewSummary.bubbles} · 텍스트 {previewSummary.texts} · 효과 {previewSummary.effects}</p>

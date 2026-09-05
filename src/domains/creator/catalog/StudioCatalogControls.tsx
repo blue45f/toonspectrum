@@ -2,7 +2,12 @@ import { Grid2x2, LayoutGrid, List, Star } from "lucide-react";
 
 import type { StudioCatalogOrientation, StudioCatalogSort, StudioCatalogView } from "./studio-catalog-query";
 
-export const STUDIO_CATALOG_CONTROL = "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-raised";
+export const STUDIO_CATALOG_CONTROL = "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent hover:bg-raised aria-pressed:border-accent aria-pressed:text-accent";
+
+export const STUDIO_CATALOG_PRIMARY_CONTROL = STUDIO_CATALOG_CONTROL
+  .replace("border-line bg-card", "border-accent bg-accent")
+  .replace("text-fg-2", "text-on-accent")
+  .replace("hover:bg-raised", "hover:opacity-90");
 
 export function StudioCatalogControls({
   view, onView, sort, onSort, favoritesOnly, onFavoritesOnly, favoriteCount,

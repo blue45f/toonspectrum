@@ -1,4 +1,4 @@
-.studio-catalog-grid { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 7rem), 1fr)); }
+.studio-catalog-grid { display: grid; grid-auto-rows: max-content; align-content: start; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 7rem), 1fr)); }
 .studio-catalog-grid[data-view="compact"] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 5rem), 1fr)); }
 .studio-catalog-grid[data-view="list"] { grid-template-columns: minmax(0, 1fr); }
 .studio-catalog-card { min-width: 0; overflow: hidden; }

@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { SCENE_TEMPLATES, SCENE_TEMPLATE_CATEGORIES, type SceneTemplate } from "../studio-scene-templates";
+
 import { createStudioCatalogPreferencesRepository } from "./studio-catalog-preferences";
 import { StudioSceneTemplateBrowser } from "./StudioSceneTemplateBrowser";
 

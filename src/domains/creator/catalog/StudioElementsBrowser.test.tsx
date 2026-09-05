@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { createStudioUiPreferencesRepository } from "../studio-ui-preferences-sqlite";
 import { StudioElementsPanel } from "../StudioElementsPanel";
+
 import { createStudioCatalogPreferencesRepository } from "./studio-catalog-preferences";
 
 afterEach(cleanup);
