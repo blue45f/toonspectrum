@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "rough",
+      "moss",
+      "plain"
+    ],
+    "date_published": 1536018406,
+    "name": "Concrete Floor 02",
+    "categories": [
+      "concrete",
+      "plaster-concrete",
+      "dirty",
+      "man made",
+      "outdoor",
+      "indoor",
+      "wall",
+      "floor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "b047f5c1c115638de280913cdfb646c35048e503",
+    "description": "Free 8K concrete texture showing a rough, weathered floor with moss-stained, dirty gray-brown surface, subtle pitting, scuffs and worn patches.",
+    "category_id": "0a7b70c3-bc79-531b-8cf3-cadeb4cbf686",
+    "category": "Concrete/Cast Walls & Floors/Bare Cast",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "worn",
+        "mossy"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 193910,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_floor_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_diff_2k.jpg",
+      "bytes": 3310792,
+      "sha256": "b08a20dcb306d08ee7f4a05ec216b19b7fd37e95745998ec5f81ecedaac1f0e9",
+      "sourceMd5": "769c7bf30050cc57be848a67d5c20270"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_rough_2k.jpg",
+      "bytes": 1417673,
+      "sha256": "cb539b0f8fdc8c63241683e01c923eb040fa701ec4c60cff27b674294746ae67",
+      "sourceMd5": "63b266940d40787b56822b7882819711"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_nor_gl_2k.jpg",
+      "bytes": 935810,
+      "sha256": "ce12d18f283f884f4be6f6c110f81582376049caada1e226958659d3d5fbaae1",
+      "sourceMd5": "3cc9918473a0c3d5ecb10f0ddc7e218d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_ao_2k.jpg",
+      "bytes": 1692305,
+      "sha256": "c224b43f7f6733f1f457ebb1c6bfe95f3bfa58f8a8d2425e2bd1a3bd110d0c06",
+      "sourceMd5": "1bcb383c419c6b5c8d26aa2899147c5a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_02/concrete_floor_02_disp_2k.jpg",
+      "bytes": 438795,
+      "sha256": "42d7bc227614d6a12a7d0d4f009bd17db478965957b9b23b87daceaa10eb1d08",
+      "sourceMd5": "47e3174e4c98a32ba27de9f02793d56f"
+    }
+  ]
+}

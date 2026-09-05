@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "blocks",
+      "large",
+      "old",
+      "rough"
+    ],
+    "date_published": 1546062309,
+    "name": "Medieval Blocks 03",
+    "categories": [
+      "wall",
+      "brick",
+      "man made",
+      "outdoor",
+      "indoor",
+      "clean"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "sponsors": [
+      "118714804"
+    ],
+    "files_hash": "6f5a04014ad24a50d1ef9e106bcec49277613d3e",
+    "description": "Free 8K texture of large medieval stone blocks with rough, chiseled faces, worn edges, tight mortar joints and subtle weathering for a clean, aged stone wall.",
+    "category_id": "bc20bc70-284a-5f14-93eb-78274f6a1fa9",
+    "category": "Brick & Block/Stone Block & Paver/Ashlar & Coursed Stone",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 143480,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/medieval_blocks_03.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_diff_2k.jpg",
+      "bytes": 3839924,
+      "sha256": "63cc2220ed9e72c8dda620474c10fc26657552c5309c77c114b5ac725edfb902",
+      "sourceMd5": "1154ad6a83952dc50e14d27e236caa86"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_rough_2k.jpg",
+      "bytes": 1865375,
+      "sha256": "6d84d13c65a63e968aaa3f77f7e06d8866f1323698a56ef3ca6d88a7b99d5c08",
+      "sourceMd5": "67c9bf30d40aa121ba831c22d76013ba"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_nor_gl_2k.jpg",
+      "bytes": 5073770,
+      "sha256": "16c8a4e4828752992725a57b2b69d32021f15dbc3548bced3f786a03e40cf5fe",
+      "sourceMd5": "582bb92fd15482dd965051f2c9f45a6b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/medieval_blocks_03/medieval_blocks_03_ao_2k.jpg",
+      "bytes": 1843687,
+      "sha256": "bc5ae6fd51cd89e977adfeefc5c9ebe41dbf156c39f0d975c4bff7378b513247",
+      "sourceMd5": "96e6168a4fcda16ff9cb87beb77c9189"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/medieval_blocks_03/medieval_blocks_03_disp_2k.png",
+      "bytes": 12817,
+      "sha256": "fd4db479dad705ce6a9ed80814d0c7b59975b6c53da0b689b1ba87155a34c028",
+      "sourceMd5": "61b0865c6a0a77b6864b9ebf70eafb37"
+    }
+  ]
+}

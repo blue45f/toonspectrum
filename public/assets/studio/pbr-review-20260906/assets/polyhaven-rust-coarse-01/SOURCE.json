@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rust_coarse_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "coarse",
+      "rusty",
+      "rust",
+      "red",
+      "stained",
+      "grunge",
+      "old",
+      "weathered",
+      "iron",
+      "metal",
+      "steel",
+      "rough"
+    ],
+    "name": "Rust Coarse 01",
+    "categories": [
+      "metal",
+      "outdoor",
+      "man made",
+      "dirty",
+      "wall"
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "date_published": 1638230400,
+    "sponsors": [
+      "540619"
+    ],
+    "dimensions": [
+      2199.9998092651367,
+      2200.000286102295
+    ],
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "c20faac0db66a29d5b52f5c45a4ca333e5d6471d",
+    "description": "Free 16K texture of coarse, weathered rust - red-brown stained, pitted and gritty iron/steel with a rough, grungy surface and subtle scuffs.",
+    "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+    "category": "Metal/Sheet & Corrugated/Flat Sheet",
+    "attributes": {
+      "condition": [
+        "weathered",
+        "rusted"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 228667,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rust_coarse_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_diff_2k.jpg",
+      "bytes": 3519719,
+      "sha256": "5b8801674fa53ff1b6f7853300f50aa7a1b31e69278554803bd957fe9fa7e392",
+      "sourceMd5": "c1f3d0f3e8ea08bfed17bd27a5bb4a45"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_rough_2k.jpg",
+      "bytes": 2845362,
+      "sha256": "652eaa2e668c4d24b038716e01c460e6614429634f67ddbcd7f9593296a24885",
+      "sourceMd5": "10a240a8a6e841e9667497377df90f72"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_nor_gl_2k.jpg",
+      "bytes": 3685688,
+      "sha256": "495d3c87da059827ffaf49dae59f967cb3e0b187f4426ab0a47088c3fa83e50b",
+      "sourceMd5": "70e8ba5a8244cffb052b9ba194610867"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_ao_2k.jpg",
+      "bytes": 2817642,
+      "sha256": "4340b7de13e1690b2132234ec631d9b1166c70ae2c8076b2d32cf51808bad7f5",
+      "sourceMd5": "e7e1c7e4d06a6051903ae8abecb7f14d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rust_coarse_01/rust_coarse_01_disp_2k.jpg",
+      "bytes": 1477214,
+      "sha256": "50aa9c1c01cad6d5b445da5ba9b733058cfee07b173ee4dc0d1ab16dce7264b7",
+      "sourceMd5": "155d9c9170c394a3fdc87014f12860d4"
+    }
+  ]
+}
