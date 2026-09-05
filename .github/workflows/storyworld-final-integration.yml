@@ -47,8 +47,6 @@ jobs:
           unresolved = subprocess.check_output(['git','diff','--name-only','--diff-filter=U'], text=True).splitlines()
           assert set(unresolved).issubset(paths), f'Unreviewed merge conflict: {unresolved}'
           assert result.returncode == 0 or unresolved, 'Merge failed without a supported source conflict'
-          # Reconcile only the three reviewed composition seams. All other main edits remain
-          # the result of git's ordinary three-way merge; no ours/theirs strategy is used.
           manifest = show(main, paths[1])
           feature_manifest = show(head, paths[1])
           entry = re.search(r'  \{\n    id: "studio-storyworld",[\s\S]*?\n  \},\n', feature_manifest).group(0)
@@ -81,13 +79,19 @@ jobs:
           ci = Path('.github/workflows/ci.yml')
           text = ci.read_text()
           text = once(text, '  CI_CORE_BYPASS: "true"', '  CI_CORE_BYPASS: "false"')
-          # Latest main already repairs shard forwarding. Do not reintroduce an obsolete --.
           assert 'run: pnpm run test:root --shard=' in text
           assert 'run: pnpm run test:root -- --shard=' not in text
           ci.write_text(text)
           subprocess.run(['git','add','--',str(ci)], check=True)
           print('Reconciled Storyworld + production routes; full core verification is enabled.')
           PY
+      - name: Repair the exact inherited DCC preference authority violation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 0b82e0329bf1c6c2b6519135ea8cbac2900d4685
+          git show 0b82e0329bf1c6c2b6519135ea8cbac2900d4685:.github/storyworld-dcc-preferences-repair.py > "$RUNNER_TEMP/dcc-preferences-repair.py"
+          python3 "$RUNNER_TEMP/dcc-preferences-repair.py"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -95,12 +99,14 @@ jobs:
           cache: pnpm
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check reconciled route formatting and source boundaries
+      - name: Check reconciled source boundaries and preference formatting
         run: |
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx
+          git add -- src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx
           pnpm exec eslint --max-warnings=0 src/domains/creator/storyworld src/domains/creator/studio-router/StudioRouter.tsx src/domains/creator/studio-router/studio-route-manifest.ts src/domains/creator/studio-router/studio-route-manifest.test.ts src/domains/creator/studio-router/studio-storyworld-route.test.ts
           pnpm run validate:architecture
       - name: Run actual storage, router, production hub and CI contracts
-        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts src/app/routes/app-route-title-ownership.test.ts scripts/integration-test-runner-ci-policy.test.mjs
+        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts src/app/routes/app-route-title-ownership.test.ts scripts/integration-test-runner-ci-policy.test.mjs src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx src/domains/creator/hybrid-dcc/studio-hybrid-dcc-viewport-interaction.test.ts
       - name: Check full Web and API types
         run: pnpm run typecheck
       - name: Verify standalone semantic receipts with real types
