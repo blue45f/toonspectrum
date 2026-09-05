@@ -71,6 +71,7 @@ import {
   updateStudioWorkspaceLiveLayout,
 } from "./studio-workspaces";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
+import { StudioProjectCenterSearch, StudioProjectCenterSection } from "./StudioProjectCenterSearch";
 import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
@@ -194,8 +195,8 @@ const MENUBAR_HINTS = {
   },
   project: {
     id: "menubar-project",
-    title: "프로젝트 작업",
-    description: "백업·복구, 기획, 검토, 연재 운영과 게시 패키지 도구를 엽니다.",
+    title: "프로젝트 센터",
+    description: "백업, 기획, 버전, 검수와 게시 도구를 한곳에서 검색해 엽니다.",
     preview: "project",
     tip: "장기 보관이나 다른 기기로 옮길 때는 자산이 포함된 아카이브 백업을 사용하세요.",
   },
@@ -273,7 +274,7 @@ const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, str
  *
  * 나머지 명령은 고정 메뉴바 컨트롤과 이름이 그대로 겹친다 — 초안 저장·게시하기는 액션 레인
  * (`data-studio-menubar-actions`), 현재 페이지 다운로드·내보내기 옵션은 내보내기 클러스터,
- * 템플릿·에셋·말풍선은 xl 삽입 바로가기, 프로젝트 작업은 프로젝트 시트 트리거. 한 화면에
+ * 템플릿·에셋·말풍선은 xl 삽입 바로가기, 프로젝트 센터은 프로젝트 시트 트리거. 한 화면에
  * 같은 접근명이 둘이면 스크린리더는 물론 자동화(`getByRole("button", { name })`)도 갈라내지
  * 못하므로 그쪽 슬롯은 슬롯 번호로 한정한 접근명을 쓴다.
  *
@@ -1701,7 +1702,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   setExportMenuOpen(false);
                   setProjectActionsOpen((open) => !open);
                 }}
-                aria-label="프로젝트 작업"
+                aria-label="프로젝트 센터"
                 aria-haspopup="dialog"
                 aria-expanded={projectActionsOpen}
                 aria-controls="studio-project-actions-menu"
@@ -1713,7 +1714,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
-                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
+                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트 센터</span>
                 {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
                     320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
                     (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
@@ -1734,31 +1735,54 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 id="studio-project-actions-menu"
                 data-studio-project-actions-menu="true"
                 role="dialog"
-                aria-label="프로젝트 작업"
+                aria-label="프로젝트 센터"
                 onClickCapture={(event) => {
                   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
                   if (button && !button.dataset.projectKeepOpen) {
                     globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
                   }
                 }}
-                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(36rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(44rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
               >
-                <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
-                  <span>
-                    <span className="block text-xs font-bold text-fg">파일 · 프로젝트</span>
-                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">백업 · 복구 · 검토 · 내보내기</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1">
+                <div className="sticky top-0 z-20 col-span-full -mx-2.5 -mt-2.5 border-b border-line/70 bg-panel/95 px-3 pb-3 pt-2.5 backdrop-blur-xl">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold tracking-tight text-fg">프로젝트 센터</span>
+                      <span className="mt-0.5 block text-[0.67rem] leading-relaxed text-fg-3">백업 · 기획 · 제작 · 검수 · 게시</span>
+                    </span>
                     <button
                       type="button"
+                      data-project-center-control="true"
                       onClick={() => setProjectActionsOpen(false)}
-                      aria-label="프로젝트 작업 닫기"
-                      className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                      aria-label="프로젝트 센터 닫기"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       <X size={17} aria-hidden />
                     </button>
-                  </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="프로젝트 요약">
+                    <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold tabular-nums text-fg-2">
+                      페이지 {pageCount}
+                    </span>
+                    <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold text-fg-2">
+                      {workId ? "게시 연결됨" : "로컬 초안"}
+                    </span>
+                    <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold text-fg-2">
+                      {sharedDocument
+                        ? sharedDocument.role === "owner"
+                          ? "공유 · 소유자"
+                          : sharedDocument.role === "editor"
+                            ? "공유 · 편집자"
+                            : "공유 · 보기"
+                        : "개인 작업"}
+                    </span>
+                  </div>
+                  <StudioProjectCenterSearch />
                 </div>
+                <StudioProjectCenterSection
+                  title="내보내기 · 백업"
+                  description="현재 페이지부터 전체 프로젝트, 장기 보관용 아카이브까지 관리합니다."
+                />
           {pageCount > 1 && (
             <button
               type="button"
@@ -1791,6 +1815,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             {projectArchiveBusy ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
             아카이브 백업
           </button>
+          <StudioProjectCenterSection
+            title="기획 · 제작"
+            description="스토리, 캐릭터, 장면, 자동화와 2D·3D 제작 도구를 엽니다."
+          />
           <button
             type="button"
             onClick={() => setWriterRoomOpen(true)}
@@ -1903,6 +1931,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Box size={14} /> Hybrid DCC
           </button>
+          <StudioProjectCenterSection
+            title="버전 · 가져오기"
+            description="복구 지점을 만들고 외부 문서와 프로젝트 백업을 안전하게 가져옵니다."
+          />
           <button
             type="button"
             onClick={() => setSceneSnapshotOpen(true)}
@@ -2060,6 +2092,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               {interchangeImportStatus.text}
             </span>
           ) : null}
+          <StudioProjectCenterSection
+            title="연출 · 게시 · 검수"
+            description="연출, 운영, 게시 패키지와 품질 검사를 출고 흐름으로 이어갑니다."
+          />
           {sharedDocument?.role === "owner" || loadedWork ? (
             <button
               type="button"

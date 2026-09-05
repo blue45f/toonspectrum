@@ -59,7 +59,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "프로젝트 가져오기…",
       "PSD 가져오기…",
       "ORA / CBZ / WILL 가져오기…",
-      "프로젝트 도구…",
+      "프로젝트 센터…",
       "내보내기 / 다운로드",
       "백업 (.json)",
       "빠른 시작 · 새 작업…",
@@ -398,9 +398,9 @@ const MENU_DRIVEN_POPOVERS: {
   },
   {
     groupId: "file",
-    item: "프로젝트 도구…",
-    expectVisible: ["파일 · 프로젝트", "백업 · 복구 · 검토 · 내보내기"],
-    expectDialogName: "프로젝트 작업",
+    item: "프로젝트 센터…",
+    expectVisible: ["프로젝트 센터", "백업 · 기획 · 제작 · 검수 · 게시"],
+    expectDialogName: "프로젝트 센터",
   },
 ];
 

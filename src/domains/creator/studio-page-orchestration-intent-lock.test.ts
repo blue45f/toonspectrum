@@ -138,7 +138,7 @@ describe("StudioPage intent-loaded operation locks", () => {
     expect(secondEvent.currentTarget.value).toBe("");
     expect(captureStudioMutationTicket).toHaveBeenCalledTimes(2);
     expect(setError).toHaveBeenLastCalledWith(
-      "다른 프로젝트 작업이 끝난 뒤 다시 시도해 주세요.",
+      "다른 프로젝트 센터이 끝난 뒤 다시 시도해 주세요.",
     );
     expect(state.current).toEqual({ busy: true, epoch: 1 });
     expect(loadRuntime).toHaveBeenCalledTimes(1);
