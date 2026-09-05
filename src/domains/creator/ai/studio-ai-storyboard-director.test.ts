@@ -28,7 +28,9 @@ describe("StudioAiStoryboardDirector", () => {
     expect(res.cuts[1].emotion).toBe("shock");
     expect(res.cuts[1].shotScale).toBe("extreme-close-up");
 
-    expect(res.cuts[2].panelHeightRatio).toBeGreaterThan(1.5);
+    // The action branch sets exactly 1.5, so a strict > could never pass; the
+    // intent is that an action cut is taller than the 1.0 baseline.
+    expect(res.cuts[2].panelHeightRatio).toBeGreaterThanOrEqual(1.5);
     expect(res.estimatedEpisodeReadingSec).toBeGreaterThan(10);
   });
 

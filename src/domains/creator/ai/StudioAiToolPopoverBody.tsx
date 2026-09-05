@@ -5,7 +5,7 @@ import {
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
 import {
@@ -25,6 +25,11 @@ import { createStudioIntentLazyLoader } from "../studio-intent-lazy-loader";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import {
+  consumeStudioAiSuperSuiteOpenRequest,
+  subscribeStudioAiSuperSuiteOpenRequest,
+} from "./studio-ai-super-suite-intent";
+import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
@@ -63,12 +68,20 @@ export function StudioAiToolPopoverBody({
   toolBelt,
 }: StudioAiToolPopoverBodyProps) {
   const t = useT();
+  // One super-suite open state, seeded from any pending open-request and kept in
+  // sync with later requests, so a deep link and the in-panel launcher agree.
+  const [superSuiteOpen, setSuperSuiteOpen] = useState(() =>
+    consumeStudioAiSuperSuiteOpenRequest()
+  );
+  useEffect(
+    () => subscribeStudioAiSuperSuiteOpenRequest(() => setSuperSuiteOpen(true)),
+    []
+  );
   const lt = (fallback: string, key: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
   };
   const [episodeProductionOpen, setEpisodeProductionOpen] = useState(false);
-  const [superSuiteOpen, setSuperSuiteOpen] = useState(false);
 
   const {
     activePage,
@@ -266,6 +279,13 @@ export function StudioAiToolPopoverBody({
               onPreloadSuperSuite={studioAiSuperSuiteModalLoader.preload}
               recentState={aiRecentPrompts}
               onApplyPresetPrompt={applyAiAssistPresetPrompt}
+              onOpenScenario={() => {
+                if (masterEditMode) return;
+                setScenarioOpen(true);
+                setMenu(null);
+              }}
+              scenarioDisabled={masterEditMode}
+              scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
               providerSlot={
                 textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
                   <div className="rounded-xl border border-line bg-card/35 p-2.5">
@@ -470,12 +490,28 @@ export function StudioAiToolPopoverBody({
           />
         </Suspense>
       ) : null}
+
       {superSuiteOpen ? (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div
+              className="fixed inset-0 z-[120] grid place-items-center bg-black/45 p-4 backdrop-blur-sm"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
+                AI 웹툰 레시피 도구를 여는 중…
+              </div>
+            </div>
+          }
+        >
           <StudioAiSuperSuiteModal
             open
             onClose={() => setSuperSuiteOpen(false)}
             onApplyPrompt={applySuperSuitePrompt}
+            onApplyPromptRecipe={(handoff) =>
+              applySuperSuitePrompt(compileStudioAiSuitePromptHandoff(handoff))
+            }
           />
         </Suspense>
       ) : null}

@@ -50,16 +50,15 @@ describe("StudioAiEpisodeProductionModal", () => {
   it("makes every continuity lock explicit and disables its anchor when turned off", () => {
     render(<StudioAiEpisodeProductionModal open onClose={() => {}} />);
 
-    const characterInput = screen.getByRole("textbox", { name: "캐릭터 기준" });
-    expect(characterInput).not.toBeDisabled();
+    const characterInput = screen.getByRole<HTMLInputElement>("textbox", { name: "캐릭터 기준" });
+    expect(characterInput.disabled).toBe(false);
 
     fireEvent.click(screen.getByRole("switch", { name: "캐릭터 연속성 잠금 끄기" }));
 
-    expect(characterInput).toBeDisabled();
-    expect(screen.getByRole("switch", { name: "캐릭터 연속성 잠금 켜기" })).toHaveAttribute(
-      "aria-checked",
-      "false"
-    );
+    expect(characterInput.disabled).toBe(true);
+    expect(
+      screen.getByRole("switch", { name: "캐릭터 연속성 잠금 켜기" }).getAttribute("aria-checked")
+    ).toBe("false");
   });
 
   it("blocks prompt application when the script is empty", () => {
@@ -77,7 +76,10 @@ describe("StudioAiEpisodeProductionModal", () => {
     });
 
     expect(screen.getByText("대본을 입력하면 제작 계획을 만들어요")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "첫 배치를 구도 도구에 적용" })).toBeDisabled();
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "첫 배치를 구도 도구에 적용" })
+        .disabled
+    ).toBe(true);
   });
 
   it("hands the first QA-approved batch to the existing AI hub", () => {
@@ -107,8 +109,8 @@ describe("StudioAiEpisodeProductionModal", () => {
     expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith(
       expect.stringContaining('"version": 1')
     );
-    expect(await screen.findByRole("button", { name: "제작 매니페스트 복사" })).toHaveTextContent(
-      "복사됨"
-    );
+    expect(
+      (await screen.findByRole("button", { name: "제작 매니페스트 복사" })).textContent
+    ).toContain("복사됨");
   });
 });
