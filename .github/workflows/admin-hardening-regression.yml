@@ -39,7 +39,7 @@ jobs:
           POSTGRES_DB: toonspectrum_admin_qa
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U webdex -d toonspectrum_admin_qa'
+          --health-cmd "pg_isready -U webdex -d toonspectrum_admin_qa"
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       DATABASE_URL: postgresql://webdex:webdex@127.0.0.1:5432/toonspectrum_admin_qa
@@ -55,16 +55,21 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        id: install
       - name: Prepare evidence directory
         run: mkdir -p test-results/admin-hardening
       - name: Strict admin source lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: >-
           pnpm exec eslint --max-warnings=0
           src/domains/admin apps/api/src/modules/admin
           scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
       - name: Full frontend and API type checks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm run typecheck
       - name: Bootstrap disposable loopback QA database
+        id: bootstrap
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MIGRATION_DATABASE_URL: postgresql://webdex:webdex@127.0.0.1:5432/toonspectrum_admin_qa
         run: |
@@ -74,19 +79,23 @@ jobs:
             --runtime-database-role webdex_runtime --release-sha "$GITHUB_SHA" \
             --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
       - name: Actual repository admin regression suite
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         run: >-
           pnpm exec vitest run src/domains/admin apps/api/src/modules/admin
           lib/__tests__/admin-emails.test.ts lib/__tests__/admin-security.test.ts
           --maxWorkers=2 --reporter=default --reporter=json
           --outputFile=test-results/admin-hardening/vitest.json
       - name: Verify isolated accounts and real session APIs
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         env:
           NODE_ENV: test
           TOONSPECTRUM_ADMIN_QA_SEED: '1'
         run: node --import tsx scripts/verify-admin-qa-live.mjs
       - name: Production build and CSP
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm run build
       - name: Reject skipped or empty admin test runs
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         run: |
           node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
