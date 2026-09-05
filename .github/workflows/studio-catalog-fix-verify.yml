@@ -1,0 +1,84 @@
+name: Studio catalog fix verification
+on:
+  push:
+    branches: [feat/studio-asset-browser-quality-20260906]
+    paths: [.github/workflows/studio-catalog-fix-verify.yml]
+permissions:
+  contents: write
+concurrency:
+  group: studio-catalog-fix-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: feat/studio-asset-browser-quality-20260906
+      - name: Apply the prepared product-only patch without changing workflows or main
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-asset-browser-quality-20260906
+          mkdir -p artifacts/studio-catalog-browser
+          python3 - <<'PY'
+          import base64, hashlib, lzma, pathlib, subprocess
+          source = pathlib.Path('.ci/studio-catalog-fix.b64')
+          if not source.exists():
+              raise ValueError('Prepared catalog fix is missing; refusing to invent a replacement')
+          encoded = source.read_text().strip()
+          if len(encoded) > 20000:
+              raise ValueError('Transport exceeds expected budget')
+          patch = lzma.decompress(base64.b64decode(encoded, validate=True), memlimit=64*1024*1024)
+          if len(patch) != 30149:
+              raise ValueError('Unexpected prepared patch size')
+          paths = [line.split('\t')[-1] for line in subprocess.check_output(['git','apply','--numstat'], input=patch).decode().splitlines()]
+          allowed = {'src/domains/creator/StudioElementsPanel.tsx', 'src/domains/creator/StudioElementsPanel.test.tsx', 'src/domains/creator/StudioAssetToolPopoverBody.tsx', 'src/domains/creator/studio-scene-templates.ts', 'src/domains/creator/studio-scene-templates.test.ts', 'scripts/verify-studio-catalog-browser.mjs'}
+          for name in paths:
+              if '..' in pathlib.PurePosixPath(name).parts or name.startswith('/'):
+                  raise ValueError('Unsafe patch path')
+              if name not in allowed and not name.startswith(('src/domains/creator/catalog/', 'tests/browser-fixtures/studio-catalog/')):
+                  raise ValueError('Unapproved patch path: '+name)
+          subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply','--index'],input=patch,check=True)
+          pathlib.Path('artifacts/studio-catalog-browser/fix-sha256.txt').write_text(hashlib.sha256(patch).hexdigest()+'\n')
+          print('Applied prepared fix to',len(paths),'product/test files')
+          PY
+          git rm .ci/studio-catalog-fix.b64
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): resolve catalog card clipping, contrast and regression failures'
+          git push origin HEAD:refs/heads/feat/studio-asset-browser-quality-20260906
+          git rev-parse HEAD > artifacts/studio-catalog-browser/tested-head.txt
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Regression tests
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+      - name: Changed product lint
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p artifacts/studio-catalog-browser
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.tsx src/domains/creator/StudioAssetToolPopoverBody.tsx src/domains/creator/studio-scene-templates.ts src/domains/creator/studio-scene-templates.test.ts 2>&1 | tee artifacts/studio-catalog-browser/lint.log
+      - name: Full frontend TypeScript
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
+      - name: Chromium setup
+        if: ${{ !cancelled() }}
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Actual component browser checks and screenshots
+        if: ${{ !cancelled() }}
+        run: pnpm exec node scripts/verify-studio-catalog-browser.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-catalog-fixed-evidence
+          path: artifacts/studio-catalog-browser/
+          retention-days: 7
