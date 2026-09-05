@@ -3,11 +3,13 @@ on:
   pull_request:
     paths:
       - 'lib/creator-resources.ts'
+      - 'lib/creator-resource-workflow.ts'
       - 'src/domains/creator-resources/**'
       - 'src/app/routes/**'
       - 'apps/api/src/modules/creator-resources/**'
       - 'apps/api/src/app.module.ts'
       - 'tests/creator-resources*'
+      - 'tests/creator-resource-workflow*'
       - 'scripts/check-creator-resources.mjs'
       - '.github/workflows/creator-resources.yml'
   workflow_dispatch:
@@ -21,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
       - name: Install isolated TypeScript checker
@@ -36,17 +38,16 @@ jobs:
       HUSKY: '0'
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11.4.0
           run_install: false
       - run: pnpm install --frozen-lockfile
       - name: Focused lint
-        run: pnpm exec eslint lib/creator-resources.ts apps/api/src/modules/creator-resources src/domains/creator-resources src/app/routes/groups/creator-resources.routes.tsx src/app/routes/groups/app-routes.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts apps/api/src/app.module.ts tests/creator-resources*.ts scripts/check-creator-resources.mjs --max-warnings=0
-      - run: pnpm exec vitest run tests/creator-resources.test.ts
+        run: pnpm exec eslint lib/creator-resources.ts lib/creator-resource-workflow.ts apps/api/src/modules/creator-resources src/domains/creator-resources src/app/routes/groups/creator-resources.routes.tsx src/app/routes/groups/app-routes.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts apps/api/src/app.module.ts tests/creator-resources*.ts tests/creator-resource-workflow*.ts scripts/check-creator-resources.mjs --max-warnings=0
+      - run: pnpm exec vitest run tests/creator-resources.test.ts tests/creator-resource-workflow.test.ts
       - run: pnpm typecheck
       - run: pnpm build

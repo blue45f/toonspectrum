@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { mergeCreatorWorkspaces } from "@/lib/creator-resource-workflow";
 import { emptyWorkspace, parseWorkspace } from "@/lib/creator-resources";
 
 import type { CreatorWorkspace } from "@/lib/creator-resources";
@@ -33,9 +34,10 @@ export function useCreatorWorkspace() {
       return false;
     }
   }, []);
-  const restore = useCallback((raw: string): boolean => {
+  const restore = useCallback((raw: string, mode: "merge" | "replace" = "merge"): boolean => {
     try {
-      const next = parseWorkspace(raw);
+      const incoming = parseWorkspace(raw);
+      const next = mode === "merge" ? mergeCreatorWorkspaces(readWorkspace(), incoming) : incoming;
       window.localStorage.setItem(KEY, JSON.stringify(next));
       setWorkspace(next); setError(""); window.dispatchEvent(new Event(EVENT));
       return true;

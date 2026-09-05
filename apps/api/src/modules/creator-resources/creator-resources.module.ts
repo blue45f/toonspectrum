@@ -11,6 +11,10 @@ const RESOURCE_ENGINE = Symbol("CREATOR_RESOURCE_ENGINE");
 export class CreatorResourcesController {
   constructor(@Inject(RESOURCE_ENGINE) private readonly engine: ResourceEngine) {}
 
+  @Get("providers")
+  @Header("Cache-Control", "private, no-store")
+  providers() { return this.engine.describe(); }
+
   @Get("search")
   @Header("Cache-Control", "private, no-store")
   async search(@Query() query: Record<string, unknown>, @Req() req: Request) {

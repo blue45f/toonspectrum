@@ -99,7 +99,9 @@ export function parseSearchResult(value: unknown): ResourceSearchResult | null {
   const v = recordOf(value);
   if (!isProvider(v.provider) || !["ready", "partial", "not_configured", "unavailable"].includes(String(v.status)) || !Array.isArray(v.items) || v.items.length > 100) return null;
   const items = v.items.map(parseResource).filter((item): item is CreatorResource => item !== null && item.provider === v.provider);
-  if (items.length !== v.items.length) return null;
+  if (items.length !== v.items.length || new Set(items.map((item) => item.id)).size !== items.length) return null;
+  if ((v.status === "not_configured" || v.status === "unavailable") && items.length > 0) return null;
+  if (v.status === "not_configured" && v.hasMore === true) return null;
   return {
     provider: v.provider, status: v.status as ResourceStatus, items,
     page: typeof v.page === "number" && Number.isInteger(v.page) && v.page > 0 ? v.page : 1,

@@ -1,3 +1,4 @@
+import { providerAvailability, upstreamRetrySeconds } from "../../../../../lib/creator-resource-workflow";
 import {
   httpsUrl, isProvider, parseDeadline, parseResource, recordOf, textOf,
 } from "../../../../../lib/creator-resources";
@@ -51,6 +52,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
   const now = options.now ?? Date.now;
   const cache = new Map<string, { until: number; value: unknown; fetchedAt: string; bytes: number }>();
   const pending = new Map<string, Promise<{ value: unknown; fetchedAt: string }>>();
+  const cooldowns = new Map<string, number>();
   const clients = new Map<string, { until: number; count: number }>();
   let active = 0; let budgetStart = 0; let budget = 0; let cacheBytes = 0;
   function removeCached(key: string) {
@@ -80,12 +82,18 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     removeCached(identity);
     const running = pending.get(identity);
     if (running) return running;
+    if ((cooldowns.get(url.hostname) ?? 0) > time) throw new Error("upstream_cooldown");
     if (active >= 6) throw new Error("upstream_busy");
     if (time - budgetStart >= 60000) { budgetStart = time; budget = 0; }
     if (budget >= 120) throw new Error("upstream_budget");
     budget += 1; active += 1;
     const task = (async () => {
       const response = await options.fetch(url.href, { headers: { Accept: "application/json", ...headers }, signal: AbortSignal.timeout(4500), redirect: "error", credentials: "omit" });
+      if (response.status === 429 || response.status === 503) {
+        cooldowns.set(url.hostname, now() + upstreamRetrySeconds(response.headers.get("retry-after"), now()) * 1000);
+        await response.body?.cancel();
+        throw new Error("upstream_cooldown");
+      }
       const value = await limitedJson(response);
       const shape = recordOf(value);
       const valid = url.hostname === "www.bizinfo.go.kr"
@@ -93,7 +101,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
         : url.hostname === "dapi.kakao.com"
           ? Array.isArray(shape.documents) && typeof recordOf(shape.meta).is_end === "boolean"
           : url.pathname.endsWith("/search")
-            ? typeof shape.total === "number" && (Array.isArray(shape.objectIDs) || shape.objectIDs === null)
+            ? typeof shape.total === "number" && Number.isSafeInteger(shape.total) && shape.total >= 0 && (Array.isArray(shape.objectIDs) || shape.objectIDs === null)
             : typeof shape.objectID === "number" && typeof shape.isPublicDomain === "boolean";
       if (!valid) throw new Error("upstream_schema");
       const fetchedAt = new Date(now()).toISOString();
@@ -112,7 +120,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     const source = await request(url);
     const data = recordOf(source.value);
     if (typeof data.total !== "number" || !Number.isFinite(data.total) || (data.objectIDs !== null && !Array.isArray(data.objectIDs))) throw new Error("upstream_schema");
-    const ids = rowsOf(data.objectIDs).filter((id): id is number => typeof id === "number" && Number.isSafeInteger(id) && id > 0 && id < 1000000000).slice(0, PAGE_SIZE);
+    const ids = [...new Set(rowsOf(data.objectIDs).filter((id): id is number => typeof id === "number" && Number.isSafeInteger(id) && id > 0 && id < 1000000000))].slice(0, PAGE_SIZE);
     if (data.total > (page - 1) * PAGE_SIZE && ids.length === 0) throw new Error("upstream_schema");
     const items: CreatorResource[] = [];
     let failed = 0;
@@ -182,6 +190,10 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       message: "기업마당 최근 최대 100건 안에서 검색합니다. 전체 웹툰 공모전 목록이 아닙니다. 접수 상태·정확한 마감 시간·신청 자격은 원문에서 확인하세요." };
   }
   return {
+    describe() {
+      const env = options.env();
+      return providerAvailability({ kakao: Boolean(env.KAKAO_REST_API_KEY?.trim()), bizinfo: Boolean(env.BIZINFO_API_KEY?.trim()) });
+    },
     async search(raw: unknown, clientId = "anonymous"): Promise<ResourceSearchResult> {
       const input = recordOf(raw);
       if (!isProvider(input.provider)) throw new ResourceInputError("지원하지 않는 데이터 제공처입니다.");

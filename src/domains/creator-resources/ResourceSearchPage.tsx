@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
+import { ProviderStatus } from "./ProviderStatus";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
@@ -55,7 +56,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
   useEffect(() => { setDraft(query); }, [query]);
   useEffect(() => {
     setResult(null); setRequestError("");
-    if (!query) { setLoading(false); return; }
+    if (savedOnly || !query) { setLoading(false); return; }
     if (query.trim().length < 2 || query.length > 80) { setLoading(false); setRequestError("검색어를 2~80자로 입력하세요."); return; }
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort("timeout"), 30000);
@@ -73,7 +74,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
         if (!disposed) setRequestError(controller.signal.aborted ? "검색 시간이 초과되었습니다. 다시 시도하세요." : cause instanceof Error ? cause.message : "검색하지 못했습니다.");
       }).finally(() => { window.clearTimeout(timeout); if (!disposed) setLoading(false); });
     return () => { disposed = true; window.clearTimeout(timeout); controller.abort(); };
-  }, [provider, query, page, retry]);
+  }, [provider, query, page, retry, savedOnly]);
   const savedItems = workspace.saved.filter((item) => item.provider === provider);
   const items = savedOnly ? savedItems : result?.items ?? [];
   const toggle = (item: CreatorResource) => update((value) => ({ ...value,
@@ -81,6 +82,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
   }));
   const searchFor = (q: string) => { setSavedOnly(false); setParams({ q, page: "1" }); };
   return <ResourceLayout title={config.title} intro={config.intro}>
+    <ProviderStatus provider={provider} />
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft.trim()); }}>
       <label htmlFor={`resource-query-${provider}`} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} 검색</label>
       <div className="flex flex-col gap-3 sm:flex-row"><input id={`resource-query-${provider}`} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">검색하기</button></div>
@@ -90,6 +92,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceProvider })
       <button className={RESOURCE_BUTTON} aria-pressed={!savedOnly} onClick={() => setSavedOnly(false)}>검색 결과</button>
       <button className={RESOURCE_BUTTON} aria-pressed={savedOnly} onClick={() => setSavedOnly(true)}>저장한 자료 {savedItems.length}</button>
       <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText(`${provider}-sources.md`, attributionMarkdown(savedItems))}>출처 내보내기</button>
+      <Link className={RESOURCE_BUTTON} to="/creator-hub">전체 저장 보드 검색·정렬</Link>
       <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">공식 사이트 ↗</a>
       {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">기존 웹툰·작품 검색</Link>}
     </div>
