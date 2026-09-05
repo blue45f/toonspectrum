@@ -7,6 +7,7 @@ on:
       - ".github/workflows/character-merge-validation.yml"
       - "src/domains/creator/vrm/**"
       - "src/domains/creator/character-shaper/**"
+      - "src/domains/creator/studio-router/**"
       - "scripts/verify-character-contact-naturalness.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -16,6 +17,7 @@ on:
       - ".github/workflows/character-merge-validation.yml"
       - "src/domains/creator/vrm/**"
       - "src/domains/creator/character-shaper/**"
+      - "src/domains/creator/studio-router/**"
       - "scripts/verify-character-contact-naturalness.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -47,10 +49,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Check camera compiler and import rules
-        run: pnpm exec eslint --max-warnings=0 src/domains/creator/vrm/StudioVrmCameraDirector.tsx
+        run: pnpm exec eslint --max-warnings=0 src/domains/creator/vrm/StudioVrmCameraDirector.tsx src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
       - name: Verify contact naturalness against production math
         run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
-      - name: Run character, hand, contact and framing regressions
+      - name: Run character, hand, contact, framing and route regressions
         run: |
           pnpm exec vitest run \
             src/domains/creator/vrm/studio-vrm-hand-poses.test.ts \
@@ -61,7 +63,9 @@ jobs:
             src/domains/creator/vrm/studio-vrm-contact-refinement.test.ts \
             src/domains/creator/vrm/studio-vrm-portrait-framing.test.ts \
             src/domains/creator/vrm/studio-vrm-prop-rig.test.ts \
-            src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts
+            src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/studio-route-manifest.test.ts
       - name: Typecheck the application and API
         run: pnpm run typecheck
       - name: Build production assets

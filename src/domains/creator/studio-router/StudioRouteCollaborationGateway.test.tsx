@@ -1,36 +1,43 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
 afterEach(cleanup);
 
-function renderPlaceholder(placeholderId: Parameters<typeof StudioRoutePlaceholder>[0]["placeholderId"]) {
-  render(
-    <MemoryRouter>
-      <StudioRoutePlaceholder placeholderId={placeholderId} onOpenStudio={() => undefined} />
-    </MemoryRouter>
-  );
-}
-
 describe("Studio collaboration route gateways", () => {
-  it("turns review dead ends into a three-step, permission-preserving entry guide", () => {
-    renderPlaceholder("review");
-
-    expect(document.querySelector('[data-studio-collaboration-gateway="review"]')).not.toBeNull();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("리뷰");
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "리뷰가 연결된 Studio 열기" })).toBeTruthy();
-    expect(screen.getByText(/서버 앵커 댓글/u)).toBeTruthy();
+  // Review is now an actual production surface, not a placeholder. Keep its
+  // work/remix route ownership covered without reintroducing the retired guide.
+  it.each([
+    "/studio/review",
+    "/studio/work/work-1/review",
+    "/studio/remix/source-1/review",
+  ])("routes %s to the production review workspace instead of a dead end", (pathname) => {
+    const route = resolveStudioRoute({ pathname });
+    expect(route).toMatchObject({
+      kind: "production",
+      surface: "review",
+      canonicalPathname: pathname,
+      ownsDocumentTitle: true,
+    });
   });
 
-  it("keeps non-collaboration asset guidance outside the collaboration gateway contract", () => {
-    renderPlaceholder("assets");
+  it("keeps asset guidance and its working editor exit outside the collaboration contract", () => {
+    const onOpenStudio = vi.fn();
+    render(
+      <MemoryRouter>
+        <StudioRoutePlaceholder placeholderId="assets" onOpenStudio={onOpenStudio} />
+      </MemoryRouter>
+    );
 
     expect(document.querySelector("[data-studio-collaboration-gateway]")).toBeNull();
-    expect(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("에셋");
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "에셋을 사용할 Studio 열기" }));
+    expect(onOpenStudio).toHaveBeenCalledOnce();
   });
 });
