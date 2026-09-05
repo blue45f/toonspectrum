@@ -1,6 +1,7 @@
 import {
   Compass,
   FolderHeart,
+  GitCompareArrows,
   Library,
   PackagePlus,
   Palette,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
+import { useMarketCompare } from "../hooks/use-market-compare";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 
@@ -25,6 +27,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
   const pathname = location.pathname;
   const { totalCount: libraryCount } = useMarketLibrary();
   const { wishlistCount } = useMarketWishlist();
+  const { compareCount } = useMarketCompare();
 
   const navItems = [
     {
@@ -52,6 +55,13 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
       icon: FolderHeart,
       badge: wishlistCount > 0 ? wishlistCount : null,
       active: pathname === "/market/wishlist",
+    },
+    {
+      href: "/market/compare",
+      label: "에셋 비교",
+      icon: GitCompareArrows,
+      badge: compareCount > 0 ? compareCount : null,
+      active: pathname === "/market/compare",
     },
     {
       href: "/market/manage",
@@ -86,7 +96,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
             >
               <Icon className="size-3.5 shrink-0" aria-hidden="true" />
               <span>{item.label}</span>
-              {item.badge !== null ? (
+              {item.badge !== null && item.badge !== undefined ? (
                 <span
                   className={cn(
                     "ml-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.62rem] font-bold leading-none",
