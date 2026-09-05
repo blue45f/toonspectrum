@@ -1,9 +1,11 @@
 /** Offline intake for owner-supplied Dontdraw originals. Never scrapes/downloads products. */
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { copyFile, lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, realpath, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { readBoundedFile } from "./bounded-file.mjs";
+import { buildIntakeReviewQueue, intakeExitCode } from "./intake-review-queue.mjs";
 
 export const SOURCE_SCHEMA = "toonstudio.dontdraw-source.v1";
 export const REPORT_SCHEMA = "toonstudio.dontdraw-intake.v1";
@@ -46,6 +48,7 @@ export function validateSourceManifest(input) {
     if (!Array.isArray(product.files) || !product.files.length || product.files.length > 1000) throw new Error(`Invalid files for ${id}`);
     fileCount += product.files.length;
     if (fileCount > 50000) throw new Error("Manifest exceeds 50000 file entries");
+    const fileKeys = new Set();
     const files = product.files.map((file) => {
       const relativePath = text(file?.path, "file.path", 1000);
       if (relativePath.includes("\\") || relativePath.includes(":") || relativePath.includes("%")
@@ -53,6 +56,9 @@ export function validateSourceManifest(input) {
         throw new Error(`Unsafe source path: ${relativePath}`);
       }
       if (!["asset", "preview", "source"].includes(file.role)) throw new Error(`Invalid role: ${relativePath}`);
+      const fileKey = JSON.stringify([relativePath, file.role]);
+      if (fileKeys.has(fileKey)) throw new Error(`Duplicate source path and role: ${relativePath}`);
+      fileKeys.add(fileKey);
       if (file.sha256 !== undefined && !/^[a-f0-9]{64}$/u.test(file.sha256)) throw new Error(`Invalid SHA-256: ${relativePath}`);
       return { path: relativePath, role: file.role, ...(file.sha256 ? { sha256: file.sha256 } : {}) };
     });
@@ -82,17 +88,9 @@ async function sourceFile(root, relativePath) {
   return resolved;
 }
 
-async function inspectFile(filename) {
-  const handle = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_FILE_BYTES) throw new Error("Not a nonempty regular file within the 256 MiB limit");
-    const bytes = await handle.readFile();
-    if (bytes.length !== stat.size) throw new Error("Source changed while reading");
-    return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length };
-  } finally {
-    await handle.close();
-  }
+async function inspectFile(filename, maximumBytes = MAX_FILE_BYTES) {
+  const bytes = await readBoundedFile(filename, maximumBytes);
+  return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length };
 }
 
 function inspectReadyFormat(extension, bytes) {
@@ -154,7 +152,8 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   const sourceManifest = await sourceFile(root, manifestPath);
   const manifestStat = await lstat(sourceManifest);
   if (!manifestStat.isFile() || manifestStat.size > MAX_MANIFEST_BYTES) throw new Error("Source manifest exceeds 8 MiB");
-  const input = validateSourceManifest(JSON.parse(await readFile(sourceManifest, "utf8")));
+  const manifestBytes = await readBoundedFile(sourceManifest, MAX_MANIFEST_BYTES);
+  const input = validateSourceManifest(JSON.parse(manifestBytes.toString("utf8")));
   const destination = outputDir ? path.resolve(outputDir) : undefined;
   if (write && !destination) throw new Error("--output is required with --write");
   if (destination && (within(root, destination) || within(destination, root))) throw new Error("Output and source must not overlap");
@@ -170,7 +169,7 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
       if (!READY_FORMATS.has(extension) && !CONVERSION_FORMATS.has(extension)) { records.push({ ...record, status: "unsupported-format" }); continue; }
       try {
         const absolutePath = await sourceFile(root, file.path);
-        const inspected = await inspectFile(absolutePath);
+        const inspected = await inspectFile(absolutePath, Math.min(MAX_FILE_BYTES, MAX_TOTAL_BYTES - totalBytes));
         totalBytes += inspected.size;
         if (totalBytes > MAX_TOTAL_BYTES) throw new Error("Intake exceeds the 2 GiB per-batch inspection limit");
         if (file.sha256 && file.sha256 !== inspected.sha256) throw new Error("SHA-256 mismatch");
@@ -201,6 +200,8 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   for (const record of records) counts[countKeys[record.status]] += 1;
   const report = { schema: REPORT_SCHEMA, catalogScope: "provided-manifest-only", websiteInventoryComplete: false,
     authorization: input.authorization, visualReview: "not-performed", counts, records };
+  const manifest = entries.map((item) => item.entry);
+  const reviewQueue = buildIntakeReviewQueue(report, manifest);
   if (write) {
     if (counts.invalid) throw new Error(`Intake has ${counts.invalid} invalid files; fix them before staging`);
     if (!entries.length) throw new Error("No compatible original assets to stage");
@@ -208,34 +209,39 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
     const actualDestination = path.join(await realpath(path.dirname(destination)), path.basename(destination));
     if (within(root, actualDestination) || within(actualDestination, root)) throw new Error("Output and source must not overlap through symlinks");
     // mkdir is an exclusive reservation; never replace an existing output or follow its symlink.
-    await mkdir(destination);
-    const temporary = await mkdtemp(path.join(destination, ".staging-"));
+    await mkdir(destination, { mode: 0o700 });
+    let temporary;
     try {
-      await mkdir(path.join(temporary, "files"));
+      temporary = await mkdtemp(path.join(destination, ".staging-"));
+      await mkdir(path.join(temporary, "files"), { mode: 0o700 });
       for (const item of entries) {
         // Re-resolve and re-hash before staging to detect changes after the first inspection.
         const originalPath = await sourceFile(root, item.entry.provenance.sourcePath);
         if (originalPath !== item.absolutePath) throw new Error("Source path changed before staging");
         const outputPath = path.join(temporary, item.entry.path);
-        await copyFile(originalPath, outputPath, constants.COPYFILE_EXCL);
-        if ((await inspectFile(outputPath)).sha256 !== item.sha256) throw new Error("Source changed before staging");
+        const inspected = await inspectFile(originalPath);
+        if (inspected.sha256 !== item.sha256) throw new Error("Source changed before staging");
+        await writeFile(outputPath, inspected.bytes, { flag: "wx", mode: 0o600 });
       }
-      await writeFile(path.join(temporary, "manifest.json"), `${JSON.stringify(entries.map((item) => item.entry), null, 2)}\n`, { flag: "wx" });
-      await writeFile(path.join(temporary, "intake-report.json"), `${JSON.stringify(report, null, 2)}\n`, { flag: "wx" });
+      await writeFile(path.join(temporary, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      await writeFile(path.join(temporary, "intake-report.json"), `${JSON.stringify(report, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      await writeFile(path.join(temporary, "review-queue.json"), `${JSON.stringify(reviewQueue, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       // A complete bundle appears at /ready only after every source and output has passed.
       await rename(temporary, path.join(destination, "ready"));
     } catch (error) {
-      await rm(destination, { recursive: true, force: true });
+      // Remove only this operation's staging directory, never unrelated concurrent files.
+      if (temporary) await rm(temporary, { recursive: true, force: true });
+      await rmdir(destination).catch(() => {});
       throw error;
     }
   }
-  return { report, manifest: entries.map((item) => item.entry) };
+  return { report, manifest, reviewQueue };
 }
 
 export async function runCli(argv) {
   if (argv.includes("--help")) {
-    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload.");
-    return;
+    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
+    return 0;
   }
   const options = { manifestPath: "source.json", write: false };
   const names = { "--source-dir": "sourceDir", "--manifest": "manifestPath", "--output": "outputDir" };
@@ -248,11 +254,14 @@ export async function runCli(argv) {
   }
   if (!options.sourceDir) throw new Error("--source-dir is required");
   const result = await prepareAuthorizedImport(options);
-  console.log(JSON.stringify(result.report, null, 2));
+  console.log(JSON.stringify({ ...result.report, reviewQueue: result.reviewQueue }, null, 2));
+  return intakeExitCode(result.report);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === fileURLToPath(pathToFileURL(path.resolve(process.argv[1])))) {
-  runCli(process.argv.slice(2)).catch((error) => {
+  runCli(process.argv.slice(2)).then((code) => {
+    process.exitCode = code;
+  }).catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });

@@ -91,6 +91,8 @@ match the inspected SHA-256 hashes, a complete `ready/` directory appears contai
   filenames/seeds and per-entry provenance.
 - `intake-report.json`: complete provided-file accounting, duplicate links, conversions,
   exclusions, invalid-file reasons and authorization attestation.
+- `review-queue.json`: deterministic per-source tasks for visual review, conversion, repairs and
+  unsupported exports, bound to the exact staged manifest bytes by SHA-256. All tasks start pending.
 - `files/`: only compatible, unique original/export bytes. Native sources and previews stay private.
 
 Any invalid supported file prevents staging the batch. Zero compatible files cannot produce an
@@ -143,8 +145,8 @@ Permission references and filenames may be private: do not commit generated repo
 ## Verification
 
 ```sh
-node --test scripts/dontdraw/import-authorized-assets.test.mjs
-pnpm exec vitest run scripts/dontdraw/import-authorized-assets.test.mjs
+node --test scripts/dontdraw/*.test.mjs
+pnpm exec vitest run scripts/dontdraw/
 ```
 
 The same contracts register with Node's runner locally and Vitest in the existing root CI test
@@ -152,3 +154,52 @@ collection. Coverage includes dry-run, hand-off paths, hashing, deduplication, p
 exclusion, conversion status, missing/empty/corrupt files, symlinks, traversal, existing-output
 preservation, source/output overlap, authorization validation and embedded/external-resource GLB.
 No synthetic fixture is represented as a Dontdraw acquisition.
+
+## Automation and review workflow hardening
+
+The inspection CLI now returns meaningful process exit codes. This fixes the earlier case in
+which a malformed PNG was reported as invalid in JSON but the command still exited with 0.
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | At least one unique file is structurally ready; no invalid, unsupported or conversion-required files remain. This is **not visual approval**. |
+| `1` | Invalid source file, malformed manifest or command, or a staging/filesystem failure. |
+| `2` | Manual action remains: a native source needs conversion, a format is unsupported, or no unique ready file exists. |
+
+Excluded previews and duplicate file content do not make a ready batch incomplete. Invalid files
+have precedence over pending conversions. `--write` can stage compatible files and still exit 2
+when other files require conversion; exit 2 does not mean that no output was written. JSON stdout
+includes `reviewQueue` so even read-only inspection exposes pending tasks. CLI errors go to stderr.
+
+The review queue has schema `toonstudio.dontdraw-review-queue.v1`. Each task has a deterministic
+`reviewId` derived from product ID, source path and declared role. Fixing a damaged file does not
+lose its review identity. Exact duplicate path/role declarations within a product are rejected;
+content duplicates across different paths continue to be reported without inflating ready counts.
+
+Task actions are `visual-review`, `convert-source`, `repair-source`, and
+`choose-supported-export`. Tasks contain source provenance, a content hash when inspected, and a
+staged relative path when available. The queue starts with zero approvals and zero publication.
+It is an **offline work list**, not a Studio panel, converter, review approval database or public
+catalogue permission system. Editing task status does not grant access or publish anything.
+`manifestSha256` detects a changed manifest; it is not a digital signature or proof of permission.
+The existing uploader still does not persist provenance on the server; the integration boundary
+above remains in force.
+
+File reads allocate no more than the inspected file size and use bounded positional reads rather
+than reading to a moving EOF. A one-byte end probe plus size/inode/device and nanosecond timestamps
+detect growth, truncation and ordinary concurrent changes. Manifests use the same reader with an
+8 MiB limit. Directory, symlink and special-file inputs are rejected; nonblocking opens prevent a
+replacement FIFO from hanging the command. Before staging, source bytes are re-read, re-hashed,
+and those exact checked bytes are written, rather than reopening a path for an unchecked copy.
+
+New output directories are owner-only (`0700`); files/reports use `0600` on POSIX systems, subject
+to the process umask. Windows permissions must be managed with filesystem ACLs. Error cleanup
+removes only the operation's temporary directory and then the reserved output directory if empty,
+rather than recursively deleting unrelated files that appeared in the output directory.
+These checks are not an OS sandbox: use a private, trusted source/output parent, not a directory
+concurrently controlled by an untrusted process with the same account permissions.
+
+The additional contracts execute through the same Node/Vitest registration as the original tests.
+The focused `Dontdraw intake regression` workflow executes them under Node 24, in addition to—not
+instead of—the repository's required `core` workflow. No existing CI gate or branch protection is
+removed, renamed, skipped or supplied with fabricated success statuses.

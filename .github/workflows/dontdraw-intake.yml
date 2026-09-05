@@ -1,0 +1,45 @@
+name: Dontdraw intake regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/dontdraw/**"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - ".github/workflows/dontdraw-intake.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/dontdraw/**"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - ".github/workflows/dontdraw-intake.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dontdraw-intake-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  intake-node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check syntax and run real offline intake contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in scripts/dontdraw/*.mjs; do node --check "$source"; done
+          node --test scripts/dontdraw/*.test.mjs | tee dontdraw-intake-tests.tap
+      - name: Retain actual test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dontdraw-intake-node24-${{ github.run_id }}
+          path: dontdraw-intake-tests.tap
+          if-no-files-found: warn
