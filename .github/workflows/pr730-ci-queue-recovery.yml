@@ -13,8 +13,8 @@ permissions:
 jobs:
   recover-superseded-ci:
     if: github.repository == 'blue45f/toonspectrum'
-    # This API-only recovery is architecture independent; do not change the actual CI runners.
-    runs-on: ubuntu-24.04-arm
+    # This API-only recovery is platform independent; do not change the actual CI runners.
+    runs-on: windows-latest
     timeout-minutes: 8
     steps:
       # No checkout or PR code execution. Only obsolete CI runs for this exact PR are cancelled.
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
+          python - <<'PY'
           import json
           import os
           import urllib.error
