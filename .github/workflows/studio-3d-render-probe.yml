@@ -1,0 +1,97 @@
+name: Studio 3D runtime geometry probe
+on:
+  push:
+    branches: [qa/studio-3d-render-probe-20260906]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Diagnose production component geometry in an isolated local document
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/3d-probe
+          git rev-parse HEAD > /tmp/3d-probe/head.txt
+          pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort >/tmp/3d-probe/preview.log 2>&1 &
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          import {writeFileSync} from 'node:fs';
+          const b=await chromium.launch({args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          const c=await b.newContext({viewport:{width:1440,height:1000},locale:'ko-KR'});
+          await c.route('**/api/auth/session',r=>r.fulfill({status:200,contentType:'application/json',body:'{"authenticated":false,"user":null}'}));
+          const p=await c.newPage();p.setDefaultTimeout(45000);
+          const errors=[];p.on('pageerror',e=>errors.push(e.message));
+          const root='[data-character-shaper="true"]';
+          const readHost=async()=>p.evaluate(()=>{
+            const el=document.querySelector('[data-character-shaper-viewport]');
+            let f=el?.[Object.keys(el).find(k=>k.startsWith('__reactFiber$'))];
+            for(let i=0;f&&i<50;i++,f=f.return){if(f.memoizedProps?.h?.vrm){window.__qaHost=f.memoizedProps.h;return true;}}
+            return false;
+          });
+          const snap=async(name)=>{
+            const s=await c.newCDPSession(p);const img=await s.send('Page.captureScreenshot',{format:'png',fromSurface:true});
+            writeFileSync('/tmp/3d-probe/'+name+'.png',Buffer.from(img.data,'base64'));await s.detach();
+          };
+          try{
+            await p.goto('http://127.0.0.1:5173/studio/character',{waitUntil:'domcontentloaded',timeout:120000});
+            await p.locator(root+' [data-character-shaper-hud] button[aria-label="확대"]:not(:disabled)').first().waitFor({timeout:240000});
+            if(!await readHost())throw new Error('Diagnostic host not found');
+            const data=await p.evaluate(()=>{
+              const h=window.__qaHost;const v=h.vrm;const meshes=[];const bones={};
+              for(const name of ['hips','spine','chest','upperChest','neck','leftUpperArm','rightUpperArm','leftUpperLeg','rightUpperLeg']){
+                const raw=v.humanoid.getRawBoneNode(name);if(raw)bones[name]={matrix:raw.matrixWorld.toArray(),position:raw.position.toArray(),rotation:raw.quaternion.toArray(),scale:raw.scale.toArray()};
+              }
+              v.scene.traverse(m=>{if(m.isSkinnedMesh)meshes.push({name:m.name,materials:(Array.isArray(m.material)?m.material:[m.material]).map(x=>x.name),vertices:m.geometry.attributes.position.count});});
+              return{wardrobeMetrics:h.wardrobeMetrics,bones,meshes,bodyScale:h.bodyScale,model:h.activeModelId};
+            });
+            writeFileSync('/tmp/3d-probe/runtime.json',JSON.stringify(data,null,2));
+            for(const [slot,item] of [['top','tshirt'],['top','shirt'],['bottom','pants']]){
+              await p.locator(root+' [data-character-slot="'+slot+'"]').click();
+              await p.locator(root+' [data-character-slot-card="'+slot+':'+item+'"]').click();
+              await p.waitForTimeout(1800);await readHost();
+              await p.locator(root).getByRole('group',{name:'카메라 프리셋',exact:true}).getByRole('button',{name:slot==='top'?'상반신':'전신',exact:true}).click();
+              await p.waitForTimeout(1200);await snap(slot+'-'+item+'-original');
+              const parts=await p.evaluate(()=>{
+                const out=[];window.__qaHost.vrm.scene.traverse(m=>{if(m.name.startsWith('wardrobe:')&&m.isMesh)out.push({name:m.name,parts:(Array.isArray(m.material)?m.material:[m.material]).map(x=>x.userData.studioVrmGarmentPart),groups:m.geometry.groups});});return out;
+              });
+              writeFileSync('/tmp/3d-probe/'+slot+'-'+item+'-parts.json',JSON.stringify(parts,null,2));
+              if(slot==='top'){
+                const removed=await p.evaluate(()=>{
+                  let n=0;window.__qaHost.vrm.scene.traverse(m=>{if(!m.name.startsWith('wardrobe:')||!m.isMesh)return;
+                    for(const mat of Array.isArray(m.material)?m.material:[m.material]){
+                      const part=mat.userData.studioVrmGarmentPart;
+                      if(part?.bone==='spine'&&part.shape?.kind==='cylinder'&&Math.abs(part.align?.[0]??0)>.7){mat.visible=false;n++;}
+                    }});return n;
+                });
+                console.log('DIAGNOSTIC_ONLY hiding crossbar materials',removed);
+                await p.waitForTimeout(1500);await snap(slot+'-'+item+'-diagnostic-no-crossbar');
+              }
+              await p.locator(root+' [data-character-slot-card="'+slot+':original"]').click();
+              await p.waitForTimeout(1000);
+            }
+          }catch(e){writeFileSync('/tmp/3d-probe/error.txt',String(e));await snap('failure').catch(()=>{});process.exitCode=1;}
+          finally{writeFileSync('/tmp/3d-probe/page-errors.json',JSON.stringify(errors));await b.close();}
+          JS
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-3d-runtime-probe-${{ github.sha }}
+          path: /tmp/3d-probe
+          retention-days: 7
