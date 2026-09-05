@@ -1,0 +1,79 @@
+name: Studio PBR curation evidence
+on:
+  push:
+    branches: [feat/studio-high-detail-curation-20260906]
+    paths: [scripts/acquire_studio_pbr_assets.py, scripts/render_studio_curated_assets.mjs, .github/workflows/studio-pbr-curation-transport.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-pbr-curation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pbr-review:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-high-detail-curation-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare pinned toolchain
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
+          node --check scripts/render_studio_curated_assets.mjs
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire official native-resolution PBR originals
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/studio-pbr-review"
+      - name: Validate GLB and render every admitted original from three views
+        run: node scripts/render_studio_curated_assets.mjs "$RUNNER_TEMP/studio-pbr-review" "$GITHUB_WORKSPACE"
+      - name: Package actual views and file identities for artistic inspection
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          import json, os, shutil
+          root=Path(os.environ['RUNNER_TEMP'])/'studio-pbr-review'
+          assets=json.loads((root/'manifest.json').read_text())['assets']
+          records=[]
+          for start in range(0,len(assets),8):
+              sheet=Image.new('RGB',(1920,1440),'#e4e5e8'); draw=ImageDraw.Draw(sheet)
+              for i,asset in enumerate(assets[start:start+8]):
+                  left=(i%2)*960; top=(i//2)*360
+                  paths=asset.get('reviewPaths',[asset['path']])
+                  for angle,relative in enumerate(paths[:3]):
+                      with Image.open(root/relative) as image:
+                          image=image.convert('RGBA');image.thumbnail((312,312))
+                      sheet.paste(image,(left+angle*320+(320-image.width)//2,top+8),image)
+                  draw.text((left+12,top+326),str(start+i+1)+' | '+asset.get('originalName',asset['name']),fill='#151820')
+                  draw.text((left+12,top+342),asset['id']+' | '+asset['kind'],fill='#454b59')
+                  records.append({'id':asset['id'],'sheet':start//8+1,'cell':i+1,'views':paths,'artisticReviewed':False})
+              sheet.save(root/f'pbr-review-{start//8+1:02d}.jpg',quality=95)
+          (root/'visual-review-index.json').write_text(json.dumps(records,indent=2)+'\n')
+          admitted={a['path'] for a in assets}
+          # Failed model files are removed only from this new isolated staging directory.
+          for file in (root/'assets').rglob('*.glb'):
+              if file.relative_to(root).as_posix() not in admitted: file.unlink()
+          source=root/'source-snapshot';source.mkdir()
+          for name in ['studio-cc0-asset-delivery.ts','StudioCc0AssetLibraryPanel.tsx','studio-original-free-asset-packs.ts','StudioOriginalAssetMarketplacePanel.tsx','StudioAssetMenuPanel.tsx','studio-original-free-asset-packs.test.ts','StudioOriginalAssetMarketplacePanel.test.tsx','studio-cc0-asset-delivery.test.ts','studio-shared-asset-drag.test.ts']:
+              shutil.copyfile(Path('src/domains/creator')/name,source/name)
+          print('PBR REVIEW PACK',len(assets),'originals',len(records),'identity records')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-pbr-review/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
