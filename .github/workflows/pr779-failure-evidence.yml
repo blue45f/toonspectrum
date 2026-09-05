@@ -1,0 +1,53 @@
+name: PR779 isolated failure evidence
+on:
+  push:
+    branches: [diagnostic/pr779-failure-evidence-20260906]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-existing-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Summarize existing failed job without changing status or source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          const repo = 'blue45f/toonspectrum';
+          const jobId = 101357740603;
+          const expectedHead = 'cbea5318c1ad70f513813b69bb064a294dbcb9d7';
+          const api = `https://api.github.com/repos/${repo}/actions/jobs/${jobId}`;
+          const headers = { authorization: `Bearer ${process.env.GITHUB_TOKEN}`, accept: 'application/vnd.github+json' };
+          const metadata = await fetch(api, { headers, signal: AbortSignal.timeout(15000) });
+          if (!metadata.ok) throw new Error(`Job metadata HTTP ${metadata.status}`);
+          const job = await metadata.json();
+          if (job.head_sha !== expectedHead || job.conclusion !== 'failure') throw new Error('Unexpected source job identity/status');
+          const redirect = await fetch(`${api}/logs`, { headers, redirect: 'manual', signal: AbortSignal.timeout(15000) });
+          if (redirect.status !== 302) throw new Error(`Log redirect HTTP ${redirect.status}`);
+          const location = new URL(redirect.headers.get('location'));
+          if (location.protocol !== 'https:' || location.username || location.password) throw new Error('Invalid log location');
+          // GitHub's signed storage URL is fetched without an Authorization header.
+          const response = await fetch(location, { signal: AbortSignal.timeout(20000) });
+          if (!response.ok || !response.body) throw new Error(`Log HTTP ${response.status}`);
+          const chunks = []; let size = 0;
+          for await (const chunk of response.body) {
+            size += chunk.byteLength;
+            if (size > 20 * 1024 * 1024) throw new Error('Log exceeds evidence size bound');
+            chunks.push(chunk);
+          }
+          const text = Buffer.concat(chunks).toString('utf8').replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '');
+          const lines = text.split('\n');
+          const starts = lines.flatMap((line, index) => /FAIL |AssertionError|Failed Tests|Failed Suites/.test(line) ? [index] : []);
+          if (!starts.length) throw new Error('No failure block found; no diagnosis inferred');
+          const selected = new Set();
+          for (const index of starts) for (let n = Math.max(0, index - 2); n < Math.min(lines.length, index + 45); n++) selected.add(n);
+          let evidence = [...selected].sort((a,b) => a-b).map(index => lines[index]).join('\n').slice(0, 16000);
+          evidence = evidence.replace(/(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/g, '[REDACTED]');
+          if (process.env.GITHUB_TOKEN) evidence = evidence.split(process.env.GITHUB_TOKEN).join('[REDACTED]');
+          console.log(`SOURCE_HEAD=${job.head_sha}\nSOURCE_JOB=${job.id}\nSOURCE_CONCLUSION=${job.conclusion}\nEVIDENCE_BEGIN\n${evidence}\nEVIDENCE_END`);
+          NODE
