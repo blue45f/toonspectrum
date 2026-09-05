@@ -73,8 +73,8 @@ const NON_DIALOG_MENU_LABELS = new Set([
 ]);
 
 async function collectFilterMenuLabels(page: Page): Promise<string[]> {
-  await openMainMenuGroup(page, "필터");
-  const menu = page.locator('[role="menu"][aria-label="필터"]');
+  await openMainMenuGroup(page, "효과");
+  const menu = page.locator('[role="menu"][aria-label="효과"]');
   const items = menu.getByRole("menuitem");
   const count = await items.count();
   const labels: string[] = [];
@@ -503,7 +503,7 @@ async function main(): Promise<void> {
       results.push(result);
       try {
         const openStartedAt = Date.now();
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await menuItemByLabel(page, filterCase.label).click({ timeout: 5_000 });
 
         const dialog = filterDialog(page);
@@ -594,7 +594,7 @@ async function main(): Promise<void> {
         // the dialog exists, and asserted dialog-free after the drag.
         const compareClip = { x: clip.x, y: clip.y, width: clip.width, height: 180 };
         const beforeOpenBand = await screenshotClipped(page, compareClip);
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
@@ -715,7 +715,7 @@ async function main(): Promise<void> {
 
         // 2) The dialog must declare the direct-image (non-destructive) target.
         const openStartedAt = Date.now();
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });

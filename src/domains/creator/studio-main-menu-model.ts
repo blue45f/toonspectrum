@@ -45,7 +45,7 @@ export interface StudioMainMenuItem {
    */
   searchActivation?: "execute";
   /**
-   * Caption drawn above this row when a composite title (삽입·도구) presents rows
+   * Caption drawn above this row when a workflow composite presents rows
    * from several catalogue groups. Set by `studio-main-menu-presentation.ts`,
    * never by item modules — the catalogue does not know how it is presented.
    */
