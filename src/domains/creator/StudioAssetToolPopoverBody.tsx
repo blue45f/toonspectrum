@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
+import { StudioSceneTemplateBrowser } from "./catalog/studio-catalog-lazy-ui";
 import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
 import { CANVAS_W, TEMPLATES, groupTemplates } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
@@ -41,13 +42,8 @@ import type {
   StudioToolBeltContentProps,
 } from "./StudioToolBeltContent";
 
-import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 
-const StudioSceneTemplateBrowser = lazyRetry(
-  () => import("./catalog/StudioSceneTemplateBrowser").then((module) => ({ default: module.StudioSceneTemplateBrowser })),
-  "StudioSceneTemplateBrowser",
-);
 const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
 
 const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
@@ -123,8 +119,8 @@ export function StudioAssetToolPopoverBody({
     setAssetFavoriteOnly,
     setAssetPrompt,
     setAssetPromptName,
-    setAssetPromptQuality,
     setAssetPromptSize,
+    setAssetPromptQuality,
     setAssetSearchQuery,
     setAssetSortOrder,
     setAssetTab,
