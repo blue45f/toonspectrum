@@ -72,7 +72,8 @@ jobs:
             src/domains/creator/studio-finish-quality*.ts \
             src/domains/creator/StudioContinuityPanel*.tsx \
             src/domains/creator/StudioFinishQualityView*.tsx \
-            src/domains/creator/StudioLazyPanelStack*.tsx
+            src/domains/creator/StudioLazyPanelStack*.tsx \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx
       - name: Test quality, persistence and navigation before committing
         run: |
           set -euo pipefail
@@ -91,6 +92,8 @@ jobs:
             src/domains/creator/StudioMenubarContent.test.tsx \
             src/domains/creator/studio-review-entry-point-viewports.test.tsx \
             src/domains/creator/StudioToolBeltContent.hints.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
             --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/quality-737/tests.log"
       - name: Remove one-time integration machinery
         run: |
