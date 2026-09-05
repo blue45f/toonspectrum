@@ -6,6 +6,8 @@ export interface Studio2dScene {
   readonly genre: string;
   readonly imgSrc?: string;
   readonly svg?: string;
+  readonly width?: number;
+  readonly height?: number;
 }
 
 export type Studio2dAssetMetadata = (typeof manifest.assets)[number];

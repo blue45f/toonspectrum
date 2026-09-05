@@ -1,3 +1,4 @@
+import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 /** Editor host extracted from the /studio page entry.
  * StudioPage.tsx stays the route-facing re-export so the lazy Studio chunk
  * still starts at that path; this file owns remaining editor session logic.
@@ -18868,15 +18869,11 @@ const puppetWarpArmed =
       setTool("select");
       return;
     }
-    const el = createCanvasImageElement({
+    const el = createStudio2dCanvasImage(bg, {
       id: uid(),
       src,
       canvasWidth: CANVAS_W,
       canvasHeight: canvasH,
-      sourceWidth: 720,
-      sourceHeight: 1080,
-      horizontalInset: 0,
-      minY: 0,
     });
     commit([el, ...elements]);
     setSelectedId(el.id);

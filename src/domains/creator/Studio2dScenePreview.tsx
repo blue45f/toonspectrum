@@ -21,6 +21,7 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
 }) {
   const id = useId();
   const dialogRef = useRef<HTMLElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLElement | null>(typeof document === "undefined" ? null : document.body);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
@@ -53,10 +54,10 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
         <div className="min-h-0 overflow-y-auto p-3 sm:p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-fg-3">삽입 전에 구도·인물·문자 형태를 확인하세요.</span>
-            <button type="button" aria-pressed={pixelView} disabled={status !== "ready"} onClick={() => setPixelView((value) => !value)}
+            <button type="button" aria-pressed={pixelView} disabled={status !== "ready"} onClick={() => { setPixelView((value) => !value); if (!pixelView) viewportRef.current?.focus(); }}
               className="rounded-lg border border-line px-3 py-1.5 disabled:opacity-40">{pixelView ? "화면에 맞추기" : "원본 픽셀 보기"}</button>
           </div>
-          <div className="max-h-[55dvh] overflow-auto rounded-lg bg-neutral-950" tabIndex={pixelView ? 0 : undefined}
+          <div ref={viewportRef} role="region" className="max-h-[55dvh] overflow-auto rounded-lg bg-neutral-950" tabIndex={-1}
             aria-label="배경 원본 이미지 영역">
             <img key={attempt} src={studio2dImageSource(scene)} alt={title} decoding="async"
               className={pixelView ? "block max-w-none" : "mx-auto block max-h-[55dvh] max-w-full object-contain"}

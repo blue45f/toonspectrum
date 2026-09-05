@@ -20,11 +20,13 @@ await writeFile(path.join(fixture, "entry.tsx"), `import {useState} from 'react'
 import {createRoot} from 'react-dom/client';
 import {Studio2dSceneBrowser} from '../src/domains/creator/Studio2dSceneBrowser';
 import {BG_SCENES,groupBgScenes} from '../src/domains/creator/studio-bg-scenes';
+import {BG_SCENES_EXTRA} from '../src/domains/creator/studio-bg-scenes-extra';
+import {createStudio2dCanvasImage} from '../src/domains/creator/studio-2d-source-size';
 import '../src/styles/globals.css';
-const groups=groupBgScenes(BG_SCENES);
-function Harness(){const[q,setQ]=useState('');const[g,setG]=useState('all');const[picks,setPicks]=useState<string[]>([]);
+const groups=groupBgScenes([...BG_SCENES,...BG_SCENES_EXTRA]);
+function Harness(){const[q,setQ]=useState('');const[g,setG]=useState('all');const[picks,setPicks]=useState<string[]>([]);const[placed,setPlaced]=useState('');
 return <main style={{width:'min(100%,440px)',margin:'0 auto',padding:12,boxSizing:'border-box'}}>
-<output data-testid="picked">{picks.join(',')}</output><Studio2dSceneBrowser groups={groups} query={q} onQueryChange={setQ} genre={g} onGenreChange={setG} loading={false} error={null} disabled={false} onPick={s=>setPicks(p=>[...p,s.id])}/></main>}
+<output data-testid="picked">{picks.join(',')}</output><output data-testid="placed" hidden>{placed}</output><Studio2dSceneBrowser groups={groups} query={q} onQueryChange={setQ} genre={g} onGenreChange={setG} loading={false} error={null} disabled={false} onPick={s=>{setPicks(p=>[...p,s.id]);setPlaced(JSON.stringify(createStudio2dCanvasImage(s,{id:s.id,src:s.imgSrc??'',canvasWidth:720,canvasHeight:1080})));}}/></main>}
 createRoot(document.getElementById('root')!).render(<Harness/>);`);
 const errors = [];
 const results = [];
@@ -43,9 +45,14 @@ try {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1, reducedMotion: "reduce" });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url);
-    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(46);
+    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(48);
+    await expect(page.getByRole("status")).toHaveText("64개 장면");
+    await page.getByRole("button", { name: "장면 더 보기 (16개 남음)", exact: true }).click();
+    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(64);
     await page.getByLabel("소재 구분", { exact: true }).selectOption("recommended");
     await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(5);
+    await expect.poll(() => page.locator("[data-studio-2d-grid]").evaluate((element) => element.scrollTop)).toBe(0);
+    await page.screenshot({ path: path.join(evidence, `${viewport.name}-recommended.png`), fullPage: true });
     await page.getByLabel("장르", { exact: true }).selectOption("로맨스");
     await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(1);
     const opener = page.getByRole("button", { name: `${rooftop.title} 확대 미리보기`, exact: true });
@@ -59,6 +66,9 @@ try {
     await page.screenshot({ path: path.join(evidence, `${viewport.name}-preview.png`), fullPage: true });
     await dialog.getByRole("button", { name: "원본 픽셀 보기", exact: true }).click();
     await expect(dialog.getByAltText(rooftop.title, { exact: true })).toHaveCSS("width", `${rooftop.width}px`);
+    await expect(dialog.getByRole("region", { name: "배경 원본 이미지 영역" })).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => dialog.getByRole("region", { name: "배경 원본 이미지 영역" }).evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
     for (let index = 0; index < 8; index += 1) {
       await page.keyboard.press("Tab");
       assert.ok(await dialog.evaluate((element) => element.contains(document.activeElement)), "focus escaped modal");
@@ -69,6 +79,8 @@ try {
     await opener.click();
     await page.getByRole("dialog").getByRole("button", { name: "이 배경 삽입", exact: true }).click();
     await expect(page.getByTestId("picked")).toHaveText(rooftop.id);
+    const placed = JSON.parse(await page.getByTestId("placed").textContent());
+    assert.deepEqual([placed.width, placed.height], [720, 405], "canvas aspect ratio");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
     await page.getByLabel("배경 이름·장소·분위기 검색", { exact: true }).fill("실내 태블릿");
@@ -79,7 +91,7 @@ try {
     await expect(page.getByText(/조건에 맞는 배경이 없습니다/u)).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     assert.equal(overflow, false, "horizontal document overflow");
-    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: "filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, overflow" });
+    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: "complete 64-scene catalog, pagination, filter scroll reset, filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, overflow" });
     await page.close();
   }
   assert.deepEqual(errors, []);

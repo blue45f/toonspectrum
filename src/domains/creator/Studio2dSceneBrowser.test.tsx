@@ -5,11 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getStudio2dAssetMetadata, studio2dDisplayName } from "./studio-2d-asset-quality";
 import { BG_SCENES, groupBgScenes } from "./studio-bg-scenes";
+import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { Studio2dSceneBrowser } from "./Studio2dSceneBrowser";
 
 import type { Studio2dScene } from "./studio-2d-asset-quality";
 
-const groups = groupBgScenes(BG_SCENES);
+const groups = groupBgScenes([...BG_SCENES, ...BG_SCENES_EXTRA]);
 const rooftop = BG_SCENES.find((scene) => scene.id === "webtoon-rooftop-sunset")!;
 const title = studio2dDisplayName(rooftop);
 
@@ -38,6 +39,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("2D scene browser", () => {
+  it("pages the complete production catalog without counting any scene twice", () => {
+    render(<Harness />);
+    expect(screen.getByRole("status").textContent).toBe("64개 장면");
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
+    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" }));
+    const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
+    expect(ids).toHaveLength(64);
+    expect(new Set(ids).size).toBe(64);
+    expect(screen.queryByRole("button", { name: /장면 더 보기/u })).toBeNull();
+  });
+  it("returns to the first results when filters or search change after scrolling", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" }));
+    const grid = document.querySelector<HTMLElement>("[data-studio-2d-grid]")!;
+    grid.scrollTop = 800;
+    fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "recommended" } });
+    expect(grid.scrollTop).toBe(0);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
+    expect(screen.getByRole("button", { name: "장면 더 보기 (16개 남음)" })).toBeTruthy();
+  });
   it("finds metadata tags and independent genre/recommendation filters", () => {
     render(<Harness />);
     fireEvent.change(screen.getByLabelText("배경 이름·장소·분위기 검색"), { target: { value: "실내 태블릿" } });

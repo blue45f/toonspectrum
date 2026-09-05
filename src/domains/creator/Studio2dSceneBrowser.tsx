@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   filterStudio2dScenes,
@@ -41,7 +41,7 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
   const source = studio2dImageSource(scene);
   return <article className="min-w-0 overflow-hidden rounded-xl border border-line bg-card" data-studio-2d-asset={scene.id}>
     <button type="button" onClick={() => onPreview(scene)} aria-label={`${title} 확대 미리보기`}
-      className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent dark:bg-neutral-900">
+      className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
       <img key={`${source}:${attempt}`} src={source} alt={title} loading="lazy" decoding="async"
         className="h-full w-full object-contain" onError={() => setStatus("error")}
         onLoad={(event) => {
@@ -66,6 +66,7 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
 
 export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGenreChange, loading, error, disabled, onPick }: Studio2dSceneBrowserProps) {
   const id = useId();
+  const gridRef = useRef<HTMLDivElement>(null);
   const [quality, setQuality] = useState<Studio2dQualityFilter>("all");
   const [orientation, setOrientation] = useState<Studio2dOrientation>("all");
   const [sort, setSort] = useState<Studio2dSort>("recommended");
@@ -77,7 +78,10 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
   const activeGenre = genres.includes(genre) ? genre : "all";
   const results = useMemo(() => filterStudio2dScenes(groups, { query, genre: activeGenre, quality, orientation, sort, emptySceneOnly }),
     [groups, query, activeGenre, quality, orientation, sort, emptySceneOnly]);
-  useEffect(() => { setVisibleCount(48); }, [query, activeGenre, quality, orientation, sort, emptySceneOnly]);
+  useEffect(() => {
+    setVisibleCount(48);
+    if (gridRef.current) gridRef.current.scrollTop = 0;
+  }, [query, activeGenre, quality, orientation, sort, emptySceneOnly]);
   const reset = () => { onQueryChange(""); onGenreChange("all"); setQuality("all"); setOrientation("all"); setEmptySceneOnly(false); setSort("recommended"); };
   const field = "min-w-0 rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 
@@ -99,26 +103,26 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
         className="rounded-full border border-line px-2 py-1 text-[0.68rem] text-fg-3 hover:border-accent">{tag}</button>)}
     </div>
     <div className="grid grid-cols-2 gap-2">
-      <label className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3" htmlFor={`${id}-genre`}>장르
+      <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3"><label htmlFor={`${id}-genre`}>장르</label>
         <select id={`${id}-genre`} className={field} value={activeGenre} onChange={(event) => onGenreChange(event.target.value)}>
           <option value="all">전체 장르</option>{genres.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-      </label>
-      <label className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3" htmlFor={`${id}-quality`}>소재 구분
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3"><label htmlFor={`${id}-quality`}>소재 구분</label>
         <select id={`${id}-quality`} className={field} value={quality} onChange={(event) => setQuality(event.target.value as Studio2dQualityFilter)}>
           <option value="all">모든 소재</option><option value="recommended">검수 추천</option><option value="large">큰 원본만</option><option value="raster">이미지</option><option value="vector">벡터</option>
         </select>
-      </label>
-      <label className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3" htmlFor={`${id}-orientation`}>원본 비율
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3"><label htmlFor={`${id}-orientation`}>원본 비율</label>
         <select id={`${id}-orientation`} className={field} value={orientation} onChange={(event) => setOrientation(event.target.value as Studio2dOrientation)}>
           <option value="all">모든 비율</option><option value="landscape">가로형</option><option value="portrait">세로형</option><option value="square">정사각형</option>
         </select>
-      </label>
-      <label className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3" htmlFor={`${id}-sort`}>정렬
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3"><label htmlFor={`${id}-sort`}>정렬</label>
         <select id={`${id}-sort`} className={field} value={sort} onChange={(event) => setSort(event.target.value as Studio2dSort)}>
           <option value="recommended">검수 추천 우선</option><option value="resolution">원본 큰 순</option><option value="name">이름순</option>
         </select>
-      </label>
+      </div>
     </div>
     <label htmlFor={`${id}-empty`} className="flex items-center gap-2 text-xs text-fg-2">
       <input id={`${id}-empty`} type="checkbox" checked={emptySceneOnly} onChange={(event) => setEmptySceneOnly(event.target.checked)} />인물 없는 이미지 배경만
@@ -132,7 +136,7 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
     {!loading && !error && results.length === 0 && <div className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">
       조건에 맞는 배경이 없습니다. 검색어나 필터를 바꿔 주세요.
     </div>}
-    <div className={cn("grid max-h-[min(52dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto pr-1", loading && "opacity-70")}>
+    <div ref={gridRef} data-studio-2d-grid="true" className={cn("grid max-h-[min(52dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto pr-1", loading && "opacity-70")}>
       {results.slice(0, visibleCount).map((scene) => <SceneCard key={`${scene.id}:${scene.imgSrc ?? "vector"}`} scene={scene} disabled={disabled} onPick={onPick} onPreview={setPreview} />)}
       {visibleCount < results.length && <button type="button" onClick={() => setVisibleCount((count) => count + 48)}
         className="col-span-2 rounded-lg border border-line p-3 text-xs">장면 더 보기 ({results.length - visibleCount}개 남음)</button>}
