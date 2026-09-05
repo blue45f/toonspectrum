@@ -3,8 +3,16 @@
  * 2D: search + category chips + recent MRU. Placement via onAdd(svg, w, h, id).
  * 3D: searchable catalog (primitives / props / scene templates) → openTarget routing.
  */
-import { Box, Grip, MessageCircle, MousePointer2, Search, Sparkles, X } from "lucide-react";
+import { Box, Eye, Grip, MessageCircle, MousePointer2, Search, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type DragEvent, type ReactElement } from "react";
+
+import { queryStudioCatalog, type StudioCatalogOrientation, type StudioCatalogSort } from "./catalog/studio-catalog-query";
+import { StudioCatalogControls, StudioCatalogStorageNotice, STUDIO_CATALOG_CONTROL } from "./catalog/StudioCatalogControls";
+import { StudioCatalogPreviewDialog } from "./catalog/StudioCatalogPreviewDialog";
+import { useStudioCatalogPreferences } from "./catalog/use-studio-catalog-preferences";
+import type { StudioCatalogPreferencesRepository } from "./catalog/studio-catalog-preferences";
+
+import "./catalog/studio-catalog-browser.css";
 
 import { svgToDataUrl } from "./studio-characters";
 import {
@@ -58,6 +66,7 @@ export interface StudioElementsPanelProps {
   previewTournament?: Pick<StudioSvgProductTournament, "resolve">;
   /** Test seam; product defaults to SQLite over OPFS. */
   acquireUiPreferences?: () => Promise<StudioUiPreferencesRepository>;
+  acquireCatalogPreferences?: () => Promise<StudioCatalogPreferencesRepository>;
   className?: string;
 }
 
@@ -66,9 +75,15 @@ function ElementTile({
   onPick,
   placementHelpId,
   previewTournament,
+  onPreview,
+  favorite,
+  onFavorite,
 }: {
   item: StudioElementItem;
   onPick: (item: StudioElementItem) => void;
+  onPreview: (item: StudioElementItem) => void;
+  favorite: boolean;
+  onFavorite: (item: StudioElementItem) => void;
   placementHelpId: string;
   previewTournament?: Pick<StudioSvgProductTournament, "resolve">;
 }): ReactElement {
@@ -86,6 +101,7 @@ function ElementTile({
   }
 
   return (
+    <article className="studio-catalog-card rounded-xl border border-line bg-card">
     <button
       type="button"
       title={item.label}
@@ -99,13 +115,13 @@ function ElementTile({
       onDragStart={handleDragStart}
       data-studio-element={item.id}
       className={cn(
-        "group flex min-h-[4.75rem] flex-col items-center justify-center rounded-lg border border-line bg-card p-1",
+        "studio-catalog-primary group flex min-h-[4.75rem] w-full flex-col items-center justify-center rounded-lg p-1.5",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         "hover:border-accent/50 hover:bg-raised active:scale-[0.98]"
       )}
     >
-      <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+      <div className="studio-catalog-thumbnail relative flex w-full items-center justify-center overflow-hidden rounded-lg bg-[oklch(0.94_0.01_78)] p-2">
         <StudioSvgAssetPreview
           assetId={item.id}
           svg={item.svg}
@@ -120,10 +136,15 @@ function ElementTile({
           className="absolute right-0.5 top-0.5 text-[oklch(0.35_0.02_65/0.55)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
         />
       </div>
-      <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">
+      <span className="studio-catalog-name mt-1 block w-full truncate text-center text-xs font-medium text-fg-2">
         {item.label}
       </span>
     </button>
+    <div className="studio-catalog-card-actions grid grid-cols-2 gap-1 border-t border-line/60 p-1">
+      <button type="button" aria-label={`${item.label} 상세 미리보기`} onClick={() => onPreview(item)} className={STUDIO_CATALOG_CONTROL}><Eye size={14} className="mx-auto" aria-hidden /></button>
+      <button type="button" aria-label={`${item.label} 즐겨찾기`} aria-pressed={favorite} onClick={() => onFavorite(item)} className={`${STUDIO_CATALOG_CONTROL} ${favorite ? "text-accent" : ""}`}><Star size={14} className="mx-auto" fill={favorite ? "currentColor" : "none"} aria-hidden /></button>
+    </div>
+    </article>
   );
 }
 
@@ -135,6 +156,7 @@ export function StudioElementsPanel({
   canvasHeight = 1200,
   previewTournament,
   acquireUiPreferences = acquireProductStudioUiPreferencesRepository,
+  acquireCatalogPreferences,
   className,
 }: StudioElementsPanelProps): ReactElement {
   const resultsId = useId();
@@ -143,6 +165,12 @@ export function StudioElementsPanel({
   const [category, setCategory] = useState<StudioElementCategory | "all">("shape");
   const [objectFamily, setObjectFamily] = useState<StudioObjectInsertFamily | "all">("all");
   const [query, setQuery] = useState("");
+  const catalog = useStudioCatalogPreferences("elements", acquireCatalogPreferences);
+  const [sort, setSort] = useState<StudioCatalogSort>("relevance");
+  const [orientation, setOrientation] = useState<StudioCatalogOrientation>("all");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [previewItem, setPreviewItem] = useState<StudioElementItem | null>(null);
+  const [visibleLimit, setVisibleLimit] = useState(60);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [preferenceAuthority, setPreferenceAuthority] = useState<
     "loading" | "sqlite-opfs" | "memory-only"
@@ -173,7 +201,17 @@ export function StudioElementsPanel({
     return () => { active = false; };
   }, [acquireUiPreferences]);
 
-  const items = listStudioElementLibrary(category, query);
+  const items = queryStudioCatalog(listStudioElementLibrary(), {
+    category, query, sort, orientation, favoritesOnly,
+    favoriteIds: catalog.state.favoriteIds, recentIds,
+  });
+  const visibleItems = items.slice(0, visibleLimit);
+  const favoriteCount = listStudioElementLibrary().filter((item) => catalog.state.favoriteIds.includes(item.id)).length;
+  function toggleFavorite(item: StudioElementItem) {
+    catalog.dispatch({ kind: "favorite", id: item.id, value: !catalog.state.favoriteIds.includes(item.id) });
+  }
+  function resetCatalogFilters() { setQuery(""); setCategory("all"); setOrientation("all"); setFavoritesOnly(false); setVisibleLimit(60); }
+  useEffect(() => { setVisibleLimit(60); }, [category, query, sort, orientation, favoritesOnly]);
   const objectFamilies = listStudioObjectInsertFamilies();
   const objectItems = showObject3d
     ? filterStudioObjectInsertItems({
@@ -270,7 +308,7 @@ export function StudioElementsPanel({
             aria-selected={surface === "vector"}
             onClick={() => setSurface("vector")}
             className={cn(
-              "min-h-10 rounded-lg text-[0.64rem] font-semibold",
+              "min-h-10 min-h-11 rounded-lg text-[0.64rem] font-semibold",
               STUDIO_EASE,
               STUDIO_FOCUS_RING,
               surface === "vector"
@@ -286,7 +324,7 @@ export function StudioElementsPanel({
             aria-selected={surface === "object3d"}
             onClick={() => setSurface("object3d")}
             className={cn(
-              "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg text-[0.64rem] font-semibold",
+              "inline-flex min-h-10 min-h-11 items-center justify-center gap-1 rounded-lg text-[0.64rem] font-semibold",
               STUDIO_EASE,
               STUDIO_FOCUS_RING,
               surface === "object3d"
@@ -341,18 +379,24 @@ export function StudioElementsPanel({
         </button>
       ) : null}
 
+      {surface === "vector" && <>
+        <StudioCatalogControls view={catalog.state.view} onView={(value) => catalog.dispatch({ kind: "view", value })}
+          sort={sort} onSort={setSort} orientation={orientation} onOrientation={setOrientation}
+          favoritesOnly={favoritesOnly} onFavoritesOnly={setFavoritesOnly} favoriteCount={favoriteCount} />
+        <StudioCatalogStorageNotice authority={catalog.authority} onRetry={catalog.retry} />
+      </>}
       <div className="relative">
         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" aria-hidden />
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => setQuery(e.target.value.slice(0, 240))}
           placeholder={
             surface === "object3d"
               ? "3D 검색 (검, 교실, 상자…)"
               : "이름·용도 검색 (나선, 4컷, 집중선…)"
           }
-          className="min-h-10 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-10 text-xs placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
+          className="min-h-10 min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-10 text-xs placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
           aria-label={surface === "object3d" ? "3D 오브젝트 검색" : "요소 검색"}
         />
         {query ? (
@@ -360,7 +404,7 @@ export function StudioElementsPanel({
             type="button"
               onClick={() => setQuery("")}
               aria-label="검색어 지우기"
-              className="absolute right-0 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+              className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised"
             >
               <X size={12} aria-hidden />
             </button>
@@ -380,7 +424,7 @@ export function StudioElementsPanel({
               aria-selected={objectFamily === "all"}
               onClick={() => setObjectFamily("all")}
               className={cn(
-                "min-h-10 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
+                "min-h-10 min-h-11 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 objectFamily === "all"
@@ -398,7 +442,7 @@ export function StudioElementsPanel({
                 aria-selected={objectFamily === family.id}
                 onClick={() => setObjectFamily(family.id)}
                 className={cn(
-                  "min-h-10 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
+                  "min-h-10 min-h-11 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   objectFamily === family.id
@@ -476,6 +520,15 @@ export function StudioElementsPanel({
             className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]"
             role="tablist"
             aria-label="요소 카테고리"
+            onKeyDown={(event) => {
+              if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key) || event.nativeEvent.isComposing) return;
+              const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+              const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
+              if (current < 0) return;
+              event.preventDefault(); event.stopPropagation();
+              const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              tabs[next]?.focus(); tabs[next]?.click();
+            }}
           >
             {STUDIO_ELEMENT_CATEGORY_CHIPS.map((chip) => (
               <button
@@ -484,10 +537,11 @@ export function StudioElementsPanel({
                 id={`${resultsId}-${chip.id}`}
                 role="tab"
                 aria-selected={category === chip.id}
+                tabIndex={category === chip.id ? 0 : -1}
                 aria-controls={resultsId}
                 onClick={() => setCategory(chip.id)}
                 className={cn(
-                  "min-h-10 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
+                  "min-h-10 min-h-11 shrink-0 rounded-full border px-2.5 text-[0.64rem] font-medium pointer-coarse:min-h-11",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   category === chip.id
@@ -500,15 +554,18 @@ export function StudioElementsPanel({
             ))}
           </div>
 
-          {recentItems.length > 0 && !query ? (
+          {recentItems.length > 0 && !query && !favoritesOnly ? (
             <>
               <p className="text-[0.64rem] font-medium text-fg-3">최근 사용</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="studio-catalog-grid" data-view="compact">
                 {recentItems.slice(0, 8).map((item) => (
                   <ElementTile
                     key={`recent-${item.id}`}
                     item={item}
                     onPick={handlePick}
+                    onPreview={setPreviewItem}
+                    favorite={catalog.state.favoriteIds.includes(item.id)}
+                    onFavorite={toggleFavorite}
                     placementHelpId={placementHelpId}
                     previewTournament={previewTournament}
                   />
@@ -525,15 +582,19 @@ export function StudioElementsPanel({
             {items.length === 0 ? (
               <div className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-line text-center">
                 <p className="text-xs font-semibold text-fg-2">검색 결과가 없습니다</p>
-                <p className="mt-1 text-[0.62rem] text-fg-3">‘속도선’, ‘베지어’, ‘4컷’처럼 용도로 찾아보세요.</p>
+                <p className="mt-1 text-xs text-fg-3">검색어·형태·즐겨찾기 조건을 줄여보세요.</p>
+                <button type="button" onClick={resetCatalogFilters} className={`${STUDIO_CATALOG_CONTROL} mt-2`}>필터 초기화 · 전체 보기</button>
               </div>
             ) : (
-              <div className="grid max-h-72 grid-cols-4 gap-1.5 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
-                {items.map((item) => (
+              <div className="studio-catalog-grid max-h-96 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]" data-view={catalog.state.view}>
+                {visibleItems.map((item) => (
                   <ElementTile
                     key={item.id}
                     item={item}
                     onPick={handlePick}
+                    onPreview={setPreviewItem}
+                    favorite={catalog.state.favoriteIds.includes(item.id)}
+                    onFavorite={toggleFavorite}
                     placementHelpId={placementHelpId}
                     previewTournament={previewTournament}
                   />
@@ -541,8 +602,21 @@ export function StudioElementsPanel({
               </div>
             )}
           </div>
+          {items.length > visibleItems.length && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={() => setVisibleLimit((limit) => limit + 60)}>더 보기 ({visibleItems.length}/{items.length})</button>}
+          {(query || category !== "shape" || orientation !== "all" || favoritesOnly) && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={resetCatalogFilters}>필터 초기화</button>}
         </>
       )}
+      {previewItem && <StudioCatalogPreviewDialog title={previewItem.label} onClose={() => setPreviewItem(null)}
+        preview={<StudioSvgAssetPreview assetId={previewItem.id} svg={previewItem.svg} width={previewItem.width} height={previewItem.height} requested tournament={previewTournament} />}
+        actions={<>
+          <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1`} aria-pressed={catalog.state.favoriteIds.includes(previewItem.id)} onClick={() => toggleFavorite(previewItem)}>즐겨찾기 {catalog.state.favoriteIds.includes(previewItem.id) ? "해제" : "추가"}</button>
+          <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1 border-accent bg-accent text-on-accent`} onClick={() => { handlePick(previewItem); setPreviewItem(null); }}>캔버스에 추가</button>
+        </>}>
+        <p className="font-medium text-fg">{STUDIO_ELEMENT_CATEGORY_CHIPS.find((chip) => chip.id === previewItem.category)?.label} · {previewItem.width} × {previewItem.height} 기준 크기</p>
+        <p>내장 SVG 원본 · 캔버스에는 이미지 요소로 삽입됩니다. 내부 대사·선·도형은 개별 편집되지 않습니다.</p>
+        <p className="text-xs text-fg-3">미리보기 배경과 확대는 캔버스 원본에 영향을 주지 않습니다.</p>
+        <div className="flex flex-wrap gap-1">{previewItem.keywords.slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full border border-line px-2 py-1 text-xs">{keyword}</span>)}</div>
+      </StudioCatalogPreviewDialog>}
     </div>
   );
 }

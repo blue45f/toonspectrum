@@ -42,7 +42,12 @@ import type {
 } from "./StudioToolBeltContent";
 
 import { cn } from "@/lib/utils";
+import { lazyRetry } from "@/lib/lazy-retry";
 
+const StudioSceneTemplateBrowser = lazyRetry(
+  () => import("./catalog/StudioSceneTemplateBrowser").then((module) => ({ default: module.StudioSceneTemplateBrowser })),
+  "StudioSceneTemplateBrowser",
+);
 const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
 
 const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
@@ -111,8 +116,6 @@ export function StudioAssetToolPopoverBody({
     rasterFavoriteOnly,
     renamingAssetId,
     renamingAssetName,
-    sceneSimilarAnchor,
-    sceneSimilarSiblings,
     sceneTemplates,
     sceneTemplatesError,
     sceneTemplatesLoading,
@@ -135,7 +138,6 @@ export function StudioAssetToolPopoverBody({
     setRasterFavoriteOnly,
     setRenamingAssetId,
     setRenamingAssetName,
-    setSceneSimilarAnchorId,
     sfxError,
     sfxLoading,
     sfxPacks,
@@ -452,86 +454,10 @@ export function StudioAssetToolPopoverBody({
                 </>
               )}
               {menu === "scene" && (
-                <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
-                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
-                  </p>
-                  {sceneSimilarAnchor && (
-                    <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                          &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setSceneSimilarAnchorId(null)}
-                          aria-label="비슷한 스타일 닫기"
-                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                      {sceneSimilarSiblings.length === 0 ? (
-                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
-                      ) : (
-                        <div className="grid gap-1">
-                          {sceneSimilarSiblings.map((sib) => (
-                            <button
-                              key={sib.id}
-                              type="button"
-                              onClick={() => void addSceneTemplate(sib)}
-                              className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
-                            >
-                              <span className="block text-xs font-semibold text-fg">{sib.label}</span>
-                              <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
-                    )}
-                    {sceneTemplatesError && (
-                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
-                    )}
-                    {sceneTemplates.categories.map((cat) => {
-                      const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
-                      if (items.length === 0) return null;
-                      return (
-                        <div key={cat.id}>
-                          <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
-                          <div className="grid gap-1">
-                            {items.map((t) => (
-                              <div
-                                key={t.id}
-                                className="rounded-lg border border-line bg-card px-2 transition-colors hover:border-accent/50 hover:bg-raised"
-                              >
-                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block min-h-11 w-full py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                                  <span className="block text-xs font-semibold text-fg">{t.label}</span>
-                                  <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
-                                </button>
-                                {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSceneSimilarAnchorId(t.id)}
-                                    aria-controls="scene-similar-strip"
-                                    className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
-                                  >
-                                    비슷한 스타일 더보기
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
+                <Suspense fallback={<StudioPanelLoading label="장면 템플릿을 여는 중…" />}>
+                  <StudioSceneTemplateBrowser templates={sceneTemplates.templates} categories={sceneTemplates.categories}
+                    loading={sceneTemplatesLoading} error={sceneTemplatesError} onAdd={addSceneTemplate} />
+                </Suspense>
               )}
               {menu === "clip" && (
                 <>
