@@ -9,7 +9,6 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 
 
-import { findCameraPreset } from "./studio-vrm-poser-helpers";
 import {
   applyVrmCustomColors,
   applyVrmMaterialFx,
@@ -17,7 +16,6 @@ import {
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
 import {
-  applyCameraPreset,
   restorePerspectiveCamera,
   type OrbitLike,
   type CaptureState,
@@ -26,6 +24,8 @@ import {
 
 import type { StudioVrmCameraSettings } from "./studio-vrm-scene-document";
 import type { VRM } from "@pixiv/three-vrm";
+
+export { CameraDirector } from "./StudioVrmCameraDirector";
 
 // ── ViewportController ──────────────────────────────────────────────
 
@@ -71,63 +71,6 @@ export function ViewportController({ onReady }: { onReady: (api: ViewportApi | n
       onReady(null);
     };
   }, [camera, controls, invalidate, onReady]);
-
-  return null;
-}
-
-// ── CameraDirector ──────────────────────────────────────────────────
-
-export function CameraDirector({
-  presetId,
-  resetNonce,
-  vrm,
-}: {
-  presetId: string;
-  resetNonce: number;
-  vrm?: VRM | null;
-}) {
-  const { camera, invalidate } = useThree();
-  const controls = useThree((s) => s.controls) as OrbitLike;
-  const preset = findCameraPreset(presetId);
-
-  useEffect(() => {
-    if (presetId === "custom") return;
-
-    let adjustedTargetY = preset.target[1];
-    let adjustedPosY = preset.position[1];
-    let distanceScale = 1.0;
-
-    if (vrm?.scene) {
-      const box = new THREE.Box3().setFromObject(vrm.scene);
-      const height = box.max.y - box.min.y;
-      if (Number.isFinite(height) && height > 0.3 && height < 10) {
-        const heightRatio = height / 1.6;
-        if (Math.abs(height - 1.6) > 0.12) {
-          const yShift = (height - 1.6) * 0.62;
-          adjustedTargetY = Math.max(box.min.y + 0.1, preset.target[1] + yShift);
-          adjustedPosY = Math.max(box.min.y + 0.2, preset.position[1] + yShift);
-          distanceScale = Math.min(1.25, Math.max(0.75, Math.sqrt(heightRatio)));
-        }
-      }
-    }
-
-    const effectivePreset = {
-      ...preset,
-      target: [preset.target[0], adjustedTargetY, preset.target[2]] as [number, number, number],
-      position: [
-        preset.position[0] * distanceScale,
-        adjustedPosY,
-        preset.position[2] * distanceScale,
-      ] as [number, number, number],
-    };
-
-    applyCameraPreset(camera, effectivePreset, invalidate);
-    // 사용자가 궤도를 돌린 뒤에도 시점 초기화가 프리셋 타깃으로 정확히 복귀하도록 동기화.
-    if (controls?.target) {
-      controls.target.set(effectivePreset.target[0], effectivePreset.target[1], effectivePreset.target[2]);
-      controls.update?.();
-    }
-  }, [camera, invalidate, preset, presetId, controls, resetNonce, vrm]);
 
   return null;
 }
