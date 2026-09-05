@@ -1,4 +1,4 @@
-name: PR 730 superseded CI recovery
+name: PR 730 CI queue recovery
 
 on:
   push:
@@ -11,24 +11,25 @@ permissions:
   pull-requests: read
 
 jobs:
-  recover-superseded-ci:
+  recover-ci:
     if: github.repository == 'blue45f/toonspectrum'
-    # This API-only recovery is platform independent; do not change the actual CI runners.
-    runs-on: windows-latest
+    # API-only maintenance uses a separate standard runner pool, not a product CI replacement.
+    runs-on: macos-latest
     timeout-minutes: 8
     steps:
-      # No checkout or PR code execution. Only obsolete CI runs for this exact PR are cancelled.
-      # The latest HEAD's checks, every other PR and branch-protection settings are untouched.
-      - name: Cancel superseded CI runs for PR 730
+      # No checkout, PR code execution, check-result writes or branch-protection changes.
+      - name: Recover only PR 730 CI at the expected revision
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_HEAD: 1377c972e3b7469bc73b1f957dee071e2c954cef
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          python3 - <<'PY'
+          import datetime
           import json
           import os
+          import time
           import urllib.error
           import urllib.parse
           import urllib.request
@@ -36,12 +37,13 @@ jobs:
           repo = 'blue45f/toonspectrum'
           branch = 'feat/inspector-multi-selection-pro-20260905'
           expected = os.environ['EXPECTED_HEAD']
+          latest_run_id = 33946845072
           api = 'https://api.github.com/repos/' + repo
           headers = {
               'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
               'Accept': 'application/vnd.github+json',
               'X-GitHub-Api-Version': '2022-11-28',
-              'User-Agent': 'pr730-superseded-ci-recovery',
+              'User-Agent': 'pr730-ci-queue-recovery',
           }
 
           def request(path, method='GET'):
@@ -51,18 +53,24 @@ jobs:
                       body = response.read()
                       return response.status, json.loads(body) if body else None
               except urllib.error.HTTPError as error:
-                  if method == 'POST' and error.code in (409, 422):
+                  if method == 'POST' and path.endswith('/cancel') and error.code in (409, 422):
                       return error.code, None
                   raise
 
           def checked_pr():
               _, pr = request('/pulls/730')
               if pr['state'] != 'open' or pr['merged']:
-                  raise SystemExit('PR is no longer open; no cancellation performed.')
+                  raise SystemExit('PR is no longer open; stop without further changes.')
               if (pr['head']['sha'] != expected or pr['head']['ref'] != branch
                       or pr['head']['repo']['full_name'] != repo or pr['base']['ref'] != 'main'):
-                  raise SystemExit('PR identity/HEAD changed; stop instead of touching another revision.')
+                  raise SystemExit('PR identity or HEAD changed; stop without touching another revision.')
               return pr
+
+          def belongs_to_target(run):
+              return (run['head_branch'] == branch
+                      and run['workflow_id'] == 287571038
+                      and run['event'] == 'pull_request'
+                      and any(pr['number'] == 730 for pr in run.get('pull_requests', [])))
 
           checked_pr()
           candidates = []
@@ -71,12 +79,8 @@ jobs:
               _, payload = request('/actions/workflows/ci.yml/runs?' + query)
               runs = payload['workflow_runs']
               for run in runs:
-                  if (run['head_branch'] == branch
-                          and run['workflow_id'] == 287571038
-                          and run['event'] == 'pull_request'
-                          and run['head_sha'] != expected
-                          and run['status'] in ('queued', 'pending', 'waiting', 'in_progress', 'requested')
-                          and any(pr['number'] == 730 for pr in run.get('pull_requests', []))):
+                  if (belongs_to_target(run) and run['head_sha'] != expected
+                          and run['status'] in ('queued', 'pending', 'waiting', 'in_progress', 'requested')):
                       candidates.append(run)
               if len(runs) < 100:
                   break
@@ -87,14 +91,55 @@ jobs:
           for run in candidates:
               checked_pr()
               code, _ = request('/actions/runs/' + str(run['id']) + '/cancel', 'POST')
-              print('Superseded run', run['id'], run['head_sha'], 'cancel response', code)
+              print('Superseded run', run['id'], 'cancel response', code)
               if code == 202:
                   cancelled.append(run['id'])
-          print('Latest HEAD preserved:', expected)
-          print('Accepted cancellation requests:', len(cancelled))
+
+          # Retry the EXACT original full workflow only if it has never allocated a runner.
+          # Do not cancel a running job, discard completed results or create a synthetic green check.
+          checked_pr()
+          path = '/actions/runs/' + str(latest_run_id)
+          _, latest = request(path)
+          action = 'Latest workflow preserved; no full retry was needed.'
+          created = datetime.datetime.fromisoformat(latest['created_at'].replace('Z', '+00:00'))
+          age = (datetime.datetime.now(datetime.timezone.utc) - created).total_seconds()
+          if (belongs_to_target(latest) and latest['head_sha'] == expected
+                  and latest['status'] == 'queued' and latest['run_attempt'] == 1
+                  and age >= 45 * 60):
+              _, payload = request(path + '/jobs?filter=latest&per_page=100')
+              jobs = payload['jobs']
+              wholly_unstarted = (bool(jobs) and payload['total_count'] == len(jobs)
+                                  and all(job['status'] == 'queued'
+                                          and not job.get('runner_id')
+                                          and not job.get('steps') for job in jobs))
+              if wholly_unstarted:
+                  checked_pr()
+                  _, refreshed = request(path)
+                  if (refreshed['status'] == 'queued' and refreshed['run_attempt'] == 1
+                          and refreshed['head_sha'] == expected):
+                      code, _ = request(path + '/cancel', 'POST')
+                      action = 'Full-workflow cancellation response: ' + str(code)
+                      if code == 202:
+                          for _ in range(20):
+                              time.sleep(3)
+                              checked_pr()
+                              _, settled = request(path)
+                              if settled['status'] == 'completed':
+                                  if settled['conclusion'] != 'cancelled':
+                                      action = 'Workflow settled with ' + str(settled['conclusion']) + '; no retry requested.'
+                                  else:
+                                      code, _ = request(path + '/rerun', 'POST')
+                                      action = 'Original full CI retry requested at the same SHA; response: ' + str(code)
+                                  break
+                          else:
+                              raise SystemExit('Cancellation did not settle within the safety window; no retry or merge performed.')
+
+          print('Expected product HEAD:', expected)
+          print(action)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-              summary.write('## PR 730 queue recovery\n\n')
-              summary.write('Latest HEAD preserved: `' + expected + '`.\n\n')
-              summary.write('Cancelled superseded CI run IDs: ' + (', '.join(map(str, cancelled)) or 'none') + '.\n\n')
-              summary.write('No validation steps, status checks or branch-protection settings were changed.\n')
+              summary.write('## PR 730 CI recovery\n\n')
+              summary.write('Expected product HEAD: `' + expected + '`.\n\n')
+              summary.write('Superseded CI cancellation requests: ' + (', '.join(map(str, cancelled)) or 'none') + '.\n\n')
+              summary.write(action + '\n\n')
+              summary.write('No test steps, required checks or branch-protection settings were changed. A retry is not a passing result.\n')
           PY
