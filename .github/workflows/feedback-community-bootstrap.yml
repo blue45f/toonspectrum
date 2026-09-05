@@ -1,0 +1,20 @@
+name: Feedback verified source transfer
+on:
+  push:
+    branches: [feat/feedback-community-20260906]
+    paths: [scripts/feedback-community-transfer.py]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/feedback-community-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/feedback-community-20260906
+      - name: Apply only hash-verified reviewed feedback source
+        env:
+          HUSKY: '0'
+        run: python3 scripts/feedback-community-transfer.py
