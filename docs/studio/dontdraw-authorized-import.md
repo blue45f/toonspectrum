@@ -91,13 +91,13 @@ match the inspected SHA-256 hashes, a complete `ready/` directory appears contai
   filenames/seeds and per-entry provenance.
 - `intake-report.json`: complete provided-file accounting, duplicate links, conversions,
   exclusions, invalid-file reasons and authorization attestation.
+- `review-queue.json`: deterministic per-source tasks for visual review, conversion, repairs and
+  unsupported exports, bound to the exact staged manifest bytes by SHA-256. All tasks start pending.
 - `files/`: only compatible, unique original/export bytes. Native sources and previews stay private.
 
 Any invalid supported file prevents staging the batch. Zero compatible files cannot produce an
-empty "successful asset pack". Existing output is never replaced. A failed write/hash check removes
-only this operation's staging directory, then removes the new output only if it is empty.
-Independently added files are preserved. If the output directory identity changes, automatic
-cleanup stops instead of traversing the replacement. This is not a source-directory mutation.
+empty "successful asset pack". Existing output is never replaced. A failed copy/hash check removes
+only the new output reserved by this operation. This is not a source-directory mutation.
 
 ### Existing upload pipeline hand-off
 
@@ -146,7 +146,7 @@ Permission references and filenames may be private: do not commit generated repo
 
 ```sh
 node --test scripts/dontdraw/*.test.mjs
-pnpm exec vitest run scripts/dontdraw/*.test.mjs
+pnpm exec vitest run scripts/dontdraw/
 ```
 
 The same contracts register with Node's runner locally and Vitest in the existing root CI test
@@ -155,36 +155,51 @@ exclusion, conversion status, missing/empty/corrupt files, symlinks, traversal, 
 preservation, source/output overlap, authorization validation and embedded/external-resource GLB.
 No synthetic fixture is represented as a Dontdraw acquisition.
 
-## Reliability hardening — 2026-09-06
+## Automation and review workflow hardening
 
-The CLI exits with `1` when an inspection report contains invalid files, while keeping the
-complete machine-readable report on stdout. Command/manifest errors also exit with `1` and
-write their error to stderr. Exit `0` means only that inspection finished without invalid
-files: conversion-required, preview exclusion and zero publication remain explicit in the report.
-Duplicate options, blank path values, and `--write` without `--output` are rejected before I/O.
-Help is accepted as a standalone `--help`, not as a way to mask invalid write arguments.
+The inspection CLI now returns meaningful process exit codes. This fixes the earlier case in
+which a malformed PNG was reported as invalid in JSON but the command still exited with 0.
 
-Both manifests and original files use the same bounded reader. It rejects devices, directories,
-symlinks and named pipes before opening; where the OS supports them, no-follow and nonblocking
-flags additionally guard the open operation. Reads are positional and limited to the initial
-file size in chunks of at most 64 KiB, plus one byte to detect growth. Descriptor/path identity,
-size, modification time and change time are compared to detect concurrent mutations. Invalid
-UTF-8 manifests are rejected rather than silently altered. The remaining batch budget is
-checked before reading an additional payload, not after an oversized allocation.
+| Exit | Meaning |
+| --- | --- |
+| `0` | At least one unique file is structurally ready; no invalid, unsupported or conversion-required files remain. This is **not visual approval**. |
+| `1` | Invalid source file, malformed manifest or command, or a staging/filesystem failure. |
+| `2` | Manual action remains: a native source needs conversion, a format is unsupported, or no unique ready file exists. |
 
-Staging re-reads and hashes bounded source bytes before writing, rather than copying a path
-that can change beneath an unbounded copy operation. On POSIX, newly created bundle directories
-use mode `0700` and original files/reports/manifests use `0600`, including under a permissive
-umask. Windows ACLs are not configured by this command.
+Excluded previews and duplicate file content do not make a ready batch incomplete. Invalid files
+have precedence over pending conversions. `--write` can stage compatible files and still exit 2
+when other files require conversion; exit 2 does not mean that no output was written. JSON stdout
+includes `reviewQueue` so even read-only inspection exposes pending tasks. CLI errors go to stderr.
 
-The new contracts cover real named-pipe rejection in isolated child processes, failing CLI exit
-status with intact JSON, partial reads, growing/truncated files, inode/timestamp changes, size
-limits, private permissions and rollback that preserves independent data. Existing contracts
-remain unchanged. Node's built-in runner and the root Vitest collector use the same test files.
-The focused CI workflow is additional evidence only; it does not replace the required `core`
-check or alter branch protection.
+The review queue has schema `toonstudio.dontdraw-review-queue.v1`. Each task has a deterministic
+`reviewId` derived from product ID, source path and declared role. Fixing a damaged file does not
+lose its review identity. Exact duplicate path/role declarations within a product are rejected;
+content duplicates across different paths continue to be reported without inflating ready counts.
 
-These checks are not a filesystem sandbox against an actively hostile local user or a timeout
-for a stalled network filesystem. Keep source/output parent directories operator-controlled and
-unchanged during intake. Container validation is still not full decoding or visual approval;
-no source asset, catalogue entry, licence verification or public publication is added here.
+Task actions are `visual-review`, `convert-source`, `repair-source`, and
+`choose-supported-export`. Tasks contain source provenance, a content hash when inspected, and a
+staged relative path when available. The queue starts with zero approvals and zero publication.
+It is an **offline work list**, not a Studio panel, converter, review approval database or public
+catalogue permission system. Editing task status does not grant access or publish anything.
+`manifestSha256` detects a changed manifest; it is not a digital signature or proof of permission.
+The existing uploader still does not persist provenance on the server; the integration boundary
+above remains in force.
+
+File reads allocate no more than the inspected file size and use bounded positional reads rather
+than reading to a moving EOF. A one-byte end probe plus size/inode/device and nanosecond timestamps
+detect growth, truncation and ordinary concurrent changes. Manifests use the same reader with an
+8 MiB limit. Directory, symlink and special-file inputs are rejected; nonblocking opens prevent a
+replacement FIFO from hanging the command. Before staging, source bytes are re-read, re-hashed,
+and those exact checked bytes are written, rather than reopening a path for an unchecked copy.
+
+New output directories are owner-only (`0700`); files/reports use `0600` on POSIX systems, subject
+to the process umask. Windows permissions must be managed with filesystem ACLs. Error cleanup
+removes only the operation's temporary directory and then the reserved output directory if empty,
+rather than recursively deleting unrelated files that appeared in the output directory.
+These checks are not an OS sandbox: use a private, trusted source/output parent, not a directory
+concurrently controlled by an untrusted process with the same account permissions.
+
+The additional contracts execute through the same Node/Vitest registration as the original tests.
+The focused `Dontdraw intake regression` workflow executes them under Node 24, in addition to—not
+instead of—the repository's required `core` workflow. No existing CI gate or branch protection is
+removed, renamed, skipped or supplied with fabricated success statuses.
