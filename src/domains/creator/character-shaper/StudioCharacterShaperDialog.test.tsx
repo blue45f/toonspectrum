@@ -322,6 +322,27 @@ afterEach(() => {
 });
 
 describe("StudioCharacterShaperDialog shell", () => {
+  it("routes a compact inspection selector through the existing camera", () => {
+    const { h } = renderDialog({ width: 390 });
+    const selector = screen.getByRole("combobox", { name: "부위·방향 확대 검사" });
+    expect(selector.querySelectorAll("option")).toHaveLength(10);
+    fireEvent.change(selector, { target: { value: "inspectRightHand" } });
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("inspectRightHand");
+    expect(h.handleViewReset).not.toHaveBeenCalled();
+    expect(h.onClose).not.toHaveBeenCalled();
+  });
+  it.each([
+    { isCapturing: true }, { isThumbnailCapturing: true }, { isSharingPose: true }, { status: "loading" },
+  ])("locks inspection during an unavailable camera operation: %o", (state) => {
+    renderDialog({ h: makeHost(state) });
+    expect((screen.getByRole("combobox", { name: "부위·방향 확대 검사" }) as HTMLSelectElement).disabled).toBe(true);
+  });
+  it("announces the current crop and preserves the five quick camera buttons", () => {
+    renderDialog({ h: makeHost({ activeCameraId: "inspectFeet" }) });
+    expect((screen.getByRole("combobox", { name: "부위·방향 확대 검사" }) as HTMLSelectElement).value).toBe("inspectFeet");
+    expect(screen.getByRole("group", { name: "카메라 프리셋" }).querySelectorAll("button")).toHaveLength(5);
+  });
+
   it("renders a labelled modal dialog with the legacy tooling hook and the four desktop regions", () => {
     const { h } = renderDialog();
     const root = dialogRoot();

@@ -858,3 +858,34 @@ describe("Studio VRM skinned garment", () => {
     expect(make()).toEqual(make());
   });
 });
+
+// A UV seam duplicates positions intentionally; topology-only normal recomputation splits its
+// lighting even though the authored analytic normals describe one continuous cloth surface.
+describe("garment assembly preserves smooth authored normals", () => {
+  it.each([false, true])("keeps both sides of the torso UV seam identical (elliptical=%s)", (elliptical) => {
+    const rig = upperBodyRig();
+    const segments = 40;
+    const profile = [
+      { radius: 0.25, y: -0.6, ...(elliptical ? { depth: 0.6 } : {}) },
+      { radius: 0.29, y: -0.1, ...(elliptical ? { depth: 0.5 } : {}) },
+      { radius: 0.34, y: 0.3, ...(elliptical ? { depth: 0.65 } : {}) },
+    ];
+    const part: GarmentPart = {
+      bone: "spine", shape: { kind: "lathe", profile, segments },
+      offset: [0, 0, 0], squash: [1.2, 1, 0.8],
+    };
+    const material = new THREE.MeshStandardMaterial();
+    const built = buildStudioVrmSkinnedGarment({
+      name: "wardrobe:top:tshirt", root: rig.root, parts: [part], materials: [material], resolveBone: rig.resolveBone,
+    });
+    expect(built.ok).toBe(true);
+    if (!built.surface) throw new Error("fixture garment unavailable");
+    const normal = built.surface.mesh.geometry.getAttribute("normal");
+    for (let ring = 0; ring < profile.length; ring += 1) {
+      const first = new THREE.Vector3().fromBufferAttribute(normal, ring);
+      const last = new THREE.Vector3().fromBufferAttribute(normal, segments * profile.length + ring);
+      expect(first.distanceTo(last)).toBeLessThan(1e-6);
+    }
+    disposeStudioVrmSkinnedGarment(built.surface);
+  });
+});

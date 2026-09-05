@@ -2,7 +2,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-import { resolveStudioVrmPortraitBounds, type StudioVrmPortraitLandmarks } from "./studio-vrm-portrait-framing";
+import { resolveStudioVrmInspectionBounds, type StudioVrmInspectionLandmarks } from "./studio-vrm-inspection-framing";
+import { resolveStudioVrmPortraitBounds } from "./studio-vrm-portrait-framing";
 import { findCameraPreset } from "./studio-vrm-poser-helpers";
 import { fitStudioVrmPreviewCamera } from "./studio-vrm-preview-framing";
 import { applyCameraPreset, type OrbitLike } from "./StudioVrmPoserTypes";
@@ -39,9 +40,9 @@ function visibleCharacterBounds(scene: THREE.Object3D, camera: THREE.Camera): TH
   return bounds;
 }
 
-function portraitLandmarks(vrm: VRM): StudioVrmPortraitLandmarks {
-  const points: Partial<Record<keyof StudioVrmPortraitLandmarks, readonly [number, number, number]>> = {};
-  for (const name of ["head", "neck", "leftEye", "rightEye", "chest", "leftUpperArm", "rightUpperArm"] as const) {
+function portraitLandmarks(vrm: VRM): StudioVrmInspectionLandmarks {
+  const points: Partial<Record<keyof StudioVrmInspectionLandmarks, readonly [number, number, number]>> = {};
+  for (const name of ["head", "neck", "leftEye", "rightEye", "chest", "leftUpperArm", "rightUpperArm", "hips", "spine", "leftHand", "rightHand", "leftMiddleProximal", "rightMiddleProximal", "leftLowerLeg", "rightLowerLeg", "leftFoot", "rightFoot", "leftToes", "rightToes"] as const) {
     const node = vrm.humanoid?.getNormalizedBoneNode(name);
     if (!node) continue;
     const position = node.getWorldPosition(new THREE.Vector3());
@@ -83,7 +84,9 @@ export function CameraDirector({ presetId, resetNonce, vrm, interactionLocked = 
     if (vrm?.scene) {
       const box = visibleCharacterBounds(vrm.scene, frameCamera);
       const bodyBounds = { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] };
-      const portrait = resolveStudioVrmPortraitBounds(presetId, bodyBounds, portraitLandmarks(vrm));
+      const landmarks = portraitLandmarks(vrm);
+      const portrait = resolveStudioVrmInspectionBounds(presetId, bodyBounds, landmarks)
+        ?? resolveStudioVrmPortraitBounds(presetId, bodyBounds, landmarks);
       // Keep the actual portrait lens/direction, fitting only its landmark region.
       // Custom and over-shoulder crops never enter this automatic subject fit.
       const fitPreset = portrait ? { ...preset, id: "fullBody" } : preset;

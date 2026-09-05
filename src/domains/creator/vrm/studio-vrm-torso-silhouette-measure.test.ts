@@ -368,3 +368,74 @@ describe("스튜디오가 입힌 옷은 몸이 아니다", () => {
     expect(isStudioAuthoredAttachment(body)).toBe(false);
   });
 });
+
+/** Fit must use the same deformed surface as the renderer, not a rigid approximation. */
+describe("wardrobe fit follows the rendered body", () => {
+  function assertRenderedFit(rig: RestRig, mesh: THREE.SkinnedMesh) {
+    rig.scene.updateMatrixWorld(true);
+    const spine = requireBone(rig, "spine");
+    const frame = buildTorsoMeasureFrame(UPRIGHT_ANCHORS)!;
+    const point = new THREE.Vector3();
+    const samples: BodySilhouetteSample[] = [];
+    for (let index = 0; index < mesh.geometry.getAttribute("position").count; index += 1) {
+      mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld);
+      spine.worldToLocal(point);
+      const sample = projectTorsoSample(frame, point.x, point.y, point.z);
+      if (sample) samples.push(sample);
+    }
+    const expected = buildBodySilhouette(samples);
+    const measured = measureStudioVrmWardrobeMetrics(rig.vrm).torso;
+    expect(expected).not.toBeNull();
+    expect(measured?.sampleCount).toBe(expected?.sampleCount);
+    for (const [index, ring] of (expected?.rings ?? []).entries()) {
+      expect(measured?.rings[index].halfWidth, `width at ring ${index}`).toBeCloseTo(ring.halfWidth, 6);
+      expect(measured?.rings[index].halfDepth, `depth at ring ${index}`).toBeCloseTo(ring.halfDepth, 6);
+      expect(measured?.rings[index].centerX, `center at ring ${index}`).toBeCloseTo(ring.centerX, 6);
+    }
+  }
+  it("preserves secondary skin weights at blended joints", () => {
+    const rig = createRestRig();
+    const spine = requireBone(rig, "spine");
+    const chest = requireBone(rig, "chest");
+    const mesh = attachEllipticalTorsoMesh(rig, spine, [spine, chest]);
+    const indices = mesh.geometry.getAttribute("skinIndex");
+    const weights = mesh.geometry.getAttribute("skinWeight");
+    for (let i = 0; i < indices.count; i += 1) {
+      indices.setXYZW(i, 0, 1, 0, 0);
+      weights.setXYZW(i, 0.55, 0.45, 0, 0);
+    }
+    chest.scale.set(1.6, 1, 1.4);
+    assertRenderedFit(rig, mesh);
+  });
+  it.each([true, false])("measures an active morph and restores its original fit (relative=%s)", (relative) => {
+    const rig = createRestRig();
+    const spine = requireBone(rig, "spine");
+    const mesh = attachEllipticalTorsoMesh(rig, spine, [spine]);
+    const before = bodySilhouetteSignature(measureStudioVrmWardrobeMetrics(rig.vrm).torso);
+    const base = mesh.geometry.getAttribute("position");
+    const morph = new THREE.Float32BufferAttribute(new Float32Array(base.count * 3), 3);
+    for (let i = 0; i < base.count; i += 1) {
+      morph.setXYZ(i, base.getX(i) * (relative ? 0.4 : 1.4), relative ? 0 : base.getY(i), base.getZ(i) * (relative ? 0.6 : 1.6));
+    }
+    mesh.geometry.morphAttributes.position = [morph];
+    mesh.geometry.morphTargetsRelative = relative;
+    mesh.updateMorphTargets();
+    mesh.morphTargetInfluences![0] = 0.65;
+    assertRenderedFit(rig, mesh);
+    mesh.morphTargetInfluences![0] = 0;
+    expect(bodySilhouetteSignature(measureStudioVrmWardrobeMetrics(rig.vrm).torso)).toBe(before);
+  });
+  it("rejects an invalid secondary bone instead of reporting a fictitious body", () => {
+    const rig = createRestRig();
+    const spine = requireBone(rig, "spine");
+    const mesh = attachEllipticalTorsoMesh(rig, spine, [spine]);
+    const indices = mesh.geometry.getAttribute("skinIndex");
+    const weights = mesh.geometry.getAttribute("skinWeight");
+    for (let i = 0; i < indices.count; i += 1) {
+      indices.setXYZW(i, 0, 999, 0, 0);
+      weights.setXYZW(i, 0.8, 0.2, 0, 0);
+    }
+    expect(() => measureStudioVrmWardrobeMetrics(rig.vrm)).not.toThrow();
+    expect(measureStudioVrmWardrobeMetrics(rig.vrm).torso).toBeNull();
+  });
+});
