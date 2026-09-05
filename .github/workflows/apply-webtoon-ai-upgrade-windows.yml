@@ -1,0 +1,59 @@
+name: Apply verified webtoon AI upgrade on Windows
+
+on:
+  push:
+    branches:
+      - feat/webtoon-ai-quality-ux-20260905
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-commit:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Execute the reviewed reconciliation script
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config core.autocrlf false
+          git config core.eol lf
+          git checkout -- .
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/apply-webtoon-ai-upgrade.yml")
+          text = workflow.read_text(encoding="utf-8")
+          step_marker = "      - name: Verify, reconcile, apply, and commit the reviewed patch\n"
+          step = text.find(step_marker)
+          if step < 0:
+              raise SystemExit("reviewed apply step not found")
+          run_marker = "        run: |\n"
+          start = text.find(run_marker, step)
+          if start < 0:
+              raise SystemExit("reviewed apply script not found")
+          raw_lines = text[start + len(run_marker):].splitlines()
+          script_lines = []
+          for line in raw_lines:
+              if line and not line.startswith("          "):
+                  raise SystemExit(f"unexpected workflow content after apply script: {line!r}")
+              script_lines.append(line[10:] if line else "")
+          script = "\n".join(script_lines) + "\n"
+          cleanup_anchor = '  .github/workflows/apply-webtoon-ai-upgrade.yml\n'
+          if script.count(cleanup_anchor) != 1:
+              raise SystemExit("workflow cleanup anchor not found exactly once")
+          script = script.replace(
+              cleanup_anchor,
+              cleanup_anchor.rstrip("\n") + " \\\n  .github/workflows/apply-webtoon-ai-upgrade-macos.yml \\\n  .github/workflows/apply-webtoon-ai-upgrade-windows.yml\n",
+              1,
+          )
+          output = Path("apply-webtoon-ai-upgrade.tmp.sh")
+          output.write_text(script, encoding="utf-8", newline="\n")
+          PY
+          bash apply-webtoon-ai-upgrade.tmp.sh
