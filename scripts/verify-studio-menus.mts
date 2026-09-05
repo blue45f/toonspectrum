@@ -217,7 +217,7 @@ interface PresentedMenu {
   readonly id: string;
   /** Menubar title — also the dropdown's `aria-label`. */
   readonly title: string;
-  /** `true` when several catalogue groups share this title (삽입 / 도구). */
+  /** `true` when several catalogue groups share this workflow title. */
   readonly composite: boolean;
   /** Catalogue groups this title owns, in the order their sections render. */
   readonly sections: readonly CatalogueGroup[];
