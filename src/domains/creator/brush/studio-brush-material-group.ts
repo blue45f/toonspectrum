@@ -40,16 +40,16 @@ export const STUDIO_BRUSH_MATERIAL_GROUPS = [
 export const STUDIO_BRUSH_MATERIAL_GROUP_LABELS: Readonly<
   Record<StudioBrushMaterialGroup, string>
 > = Object.freeze({
-  ink: "잉크",
-  pencil: "연필",
+  ink: "펜·잉크",
+  pencil: "연필·흑연",
   marker: "마커",
-  watercolor: "수채",
-  oil: "유화",
+  watercolor: "수채·수묵",
+  oil: "유화·아크릴",
   airbrush: "에어브러시",
-  pastel: "파스텔",
+  pastel: "목탄·파스텔",
   texture: "질감",
-  tone: "톤",
-  fx: "효과",
+  tone: "망점·해칭",
+  fx: "빛·효과",
   eraser: "지우개",
 });
 

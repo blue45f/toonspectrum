@@ -156,7 +156,7 @@ describe("useStudioBrushBaselineController", () => {
 
     await waitForReady(result);
     expect(result.current.restoreState).toMatchObject({
-      sourceName: "펜(매끈)",
+      sourceName: "매끈한 펜",
       modifiedCount: 0,
       undoAvailable: false,
     });
