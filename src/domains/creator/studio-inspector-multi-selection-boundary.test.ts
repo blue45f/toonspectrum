@@ -6,6 +6,10 @@ const bodySource = readFileSync(
   new URL("./StudioInspectorAsideBody.tsx", import.meta.url),
   "utf8",
 );
+const multiSelectionSource = readFileSync(
+  new URL("./StudioInspectorMultiSelectionSection.tsx", import.meta.url),
+  "utf8",
+);
 const shellSource = readFileSync(
   new URL("./StudioInspectorAsideShell.tsx", import.meta.url),
   "utf8",
@@ -29,12 +33,19 @@ function functionBody(name: string, nextName: string): string {
 }
 
 describe("Studio inspector multi-selection scope", () => {
-  it("does not render representative-only detail controls below the shared geometry panel", () => {
+  it("keeps representative-only detail controls out while mounting the dedicated group surface", () => {
     expect(bodySource).toContain(
       'inspectorContentMode === "selection" && marqueeIds.length > 1',
     );
     expect(bodySource).toContain(
       "!hasMultiSelection ? (\n            <StudioInspectorSelectionSection",
+    );
+    expect(bodySource).toContain(
+      "<StudioInspectorMultiSelectionSection model={model} />",
+    );
+    expect(multiSelectionSource).toContain("<StudioInspectorSelectionActions");
+    expect(multiSelectionSource).toContain(
+      'data-testid="studio-inspector-context-multi-selection"',
     );
   });
 
@@ -57,5 +68,18 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).toContain("const target = targets[0]");
     expect(applyPatchSource).toContain("patchEl(target.id, next)");
     expect(applyPatchSource).not.toContain("if (!selected) return");
+  });
+
+  it("routes multi numeric edits through the exact group transform bridge", () => {
+    const applyPatchSource = functionBody(
+      "applyFigmaSelectionLayoutPatch",
+      "reorder",
+    );
+
+    expect(applyPatchSource).toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
+    expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
+    expect(applyPatchSource).toContain("commit(plan.next)");
+    expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
   });
 });
