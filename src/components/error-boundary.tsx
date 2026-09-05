@@ -2,6 +2,7 @@ import { AlertTriangle, Download, Monitor, RefreshCw, WifiOff } from "lucide-rea
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { allowStudioProgrammaticReload } from "../../lib/programmatic-reload";
+import { announceStudioRenderFailure } from "../../lib/render-failure-event";
 import { classifyError, type ErrorAnalysis } from "../compat/browser-check";
 
 import { BrowserCompatModal } from "./browser-compat-modal";
@@ -41,6 +42,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // DEV 에서만 console.error 를 하던 탓에, 프로덕션 빌드에서 컴포넌트가 무너져도 아무 흔적이
+    // 남지 않았다. 브라우저 게이트는 전부 프로덕션 프리뷰를 상대하므로 "에러 0"을 보고했고,
+    // 사용자는 같은 순간 빈 화면을 보고 있었다. 알림은 환경과 무관하게 보낸다.
+    announceStudioRenderFailure({
+      surface: "app",
+      error,
+      componentStack: info.componentStack ?? null,
+    });
     if (import.meta.env.DEV) {
       console.error("화면 렌더 중 오류:", error, info.componentStack);
     }

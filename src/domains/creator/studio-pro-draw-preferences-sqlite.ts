@@ -334,8 +334,17 @@ function defaultWriterId(): string {
 }
 
 function defaultChannelFactory(name: string): StudioProDrawBroadcastChannelLike | null {
-  if (typeof BroadcastChannel !== "function") return null;
-  return new BroadcastChannel(name);
+  // 존재는 생성 가능성이 아니다. 스토리지가 분할된 인앱 WebView(인스타그램 iOS, DOM 저장소를
+  // 끈 안드로이드 WebView)는 BroadcastChannel 생성자를 노출한 채 `new` 에서 SecurityError 를
+  // 던진다. typeof 검사만으로는 그 throw 를 막지 못한다 —
+  // studio-workspace-sqlite-runtime.ts 의 createProductChannel 이 같은 이유로 try 안에 있다.
+  try {
+    if (typeof BroadcastChannel !== "function") return null;
+    return new BroadcastChannel(name);
+  } catch {
+    // 탭 간 동기화만 잃는다. 설정 자체는 이 탭에서 그대로 동작한다.
+    return null;
+  }
 }
 
 function persistenceFailureMessage(cause: unknown): string {

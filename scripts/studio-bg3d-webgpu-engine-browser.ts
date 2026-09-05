@@ -247,29 +247,32 @@ function selectionMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuC
   ] as const;
   return hosts.map(([id, userAgent]) => {
     const inApp = classifyStudioBg3dInAppBrowser({ userAgent });
-    const auto = selectStudioBg3dEngine({
-      preference: "auto",
+    const request = {
       probe,
       inApp,
-      deviceProfile: id === "desktop-chrome" ? "desktop" : "mobile",
+      deviceProfile: id === "desktop-chrome" ? ("desktop" as const) : ("mobile" as const),
       webgpuRuntimeAvailable: true,
-    });
-    const opted = selectStudioBg3dEngine({
-      preference: "webgpu",
-      probe,
-      inApp,
-      deviceProfile: id === "desktop-chrome" ? "desktop" : "mobile",
-      webgpuRuntimeAvailable: true,
-    });
+    };
+    // 두 열은 제품이 실제로 제공하는 두 가지 명시 선택이다. 예전에는 한쪽이 preference:"auto"
+    // 였는데, 그 값은 더 이상 존재하지 않고 normalizeStudioBg3dEnginePreference 가 조용히
+    // "webgpu" 로 옮긴다 — 같은 계획을 두 번 계산해 두 열이 항상 일치했고, 매트릭스는 아무것도
+    // 비교하지 않았다.
+    const webgpuPlan = selectStudioBg3dEngine({ ...request, preference: "webgpu" });
+    const webgl2Plan = selectStudioBg3dEngine({ ...request, preference: "webgl2" });
     return {
       id,
       hostId: inApp.id,
       gpuTrust: inApp.gpuTrust,
-      autoBackend: auto.backend,
-      autoReason: auto.reason,
-      optInBackend: opted.backend,
-      optInReason: opted.reason,
-      notice: auto.notice,
+      // status 와 diagnostics 를 반드시 함께 낸다. 이 정책은 거절을 backend 교체가 아니라
+      // status 로 표현하므로, backend 만 실으면 "거절됨"과 "허용됨"이 같은 JSON 이 된다.
+      webgpuBackend: webgpuPlan.backend,
+      webgpuStatus: webgpuPlan.status,
+      webgpuReason: webgpuPlan.reason,
+      webgpuDiagnostics: [...webgpuPlan.diagnostics],
+      webgl2Backend: webgl2Plan.backend,
+      webgl2Status: webgl2Plan.status,
+      webgl2Reason: webgl2Plan.reason,
+      notice: webgpuPlan.notice,
     };
   });
 }
@@ -312,14 +315,19 @@ function webglOnlyFeatureMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3d
       webgpuRuntimeAvailable: true,
       webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, [feature]: true },
     };
-    const auto = selectStudioBg3dEngine({ ...request, preference: "auto" });
     const forced = selectStudioBg3dEngine({ ...request, preference: "webgpu" });
+    // 의미 있는 대조는 "자동으로 무엇을 골랐나"가 아니라 "안내문이 말하는 탈출구가 실제로
+    // 열려 있나"다 — WebGL-only 기능이 걸린 상태에서도 명시적 WebGL2 는 available 이어야 한다.
+    const webgl2Plan = selectStudioBg3dEngine({ ...request, preference: "webgl2" });
     return {
       feature,
-      autoBackend: auto.backend,
-      forcedBackend: forced.backend,
-      reason: forced.reason,
-      webgpuSelectable: forced.webgpuSelectable,
+      webgpuBackend: forced.backend,
+      webgpuStatus: forced.status,
+      webgpuReason: forced.reason,
+      webgpuDiagnostics: [...forced.diagnostics],
+      webgl2Backend: webgl2Plan.backend,
+      webgl2Status: webgl2Plan.status,
+      webgl2Reason: webgl2Plan.reason,
     };
   });
 }
