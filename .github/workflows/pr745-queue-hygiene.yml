@@ -1,0 +1,146 @@
+name: PR 745 queue hygiene
+
+on:
+  push:
+    branches:
+      - feat/webtoon-ai-quality-ux-20260905
+    paths:
+      - .github/workflows/pr745-queue-hygiene.yml
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: pr745-queue-hygiene
+  cancel-in-progress: false
+
+jobs:
+  prune-superseded-runs:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+          sparse-checkout: |
+            .github/workflows/pr745-queue-hygiene.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Cancel only superseded queued or running checks
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $repo = "${{ github.repository }}"
+          $thisRun = [int64]"${{ github.run_id }}"
+          $prCache = @{}
+          $validPrRuns = @()
+          $cancelled = 0
+
+          function Stop-Run([int64]$id, [string]$reason) {
+            if ($id -eq $thisRun) { return }
+            Write-Host "Cancelling run $id ($reason)"
+            gh api -X POST "repos/$repo/actions/runs/$id/cancel" --silent 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              $script:cancelled++
+            } else {
+              Write-Warning "Run $id changed state before cancellation or could not be cancelled."
+            }
+          }
+
+          foreach ($status in @("queued", "in_progress")) {
+            $payload = gh api "repos/$repo/actions/runs?status=$status&per_page=100" | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw "Unable to list $status workflow runs." }
+
+            foreach ($run in $payload.workflow_runs) {
+              if ([int64]$run.id -eq $thisRun) { continue }
+
+              if ($run.event -eq "pull_request" -and $null -ne $run.pull_requests -and $run.pull_requests.Count -gt 0) {
+                $prNumber = [int]$run.pull_requests[0].number
+                $cacheKey = "$prNumber"
+                if (-not $prCache.ContainsKey($cacheKey)) {
+                  $prCache[$cacheKey] = gh api "repos/$repo/pulls/$prNumber" | ConvertFrom-Json
+                  if ($LASTEXITCODE -ne 0) { throw "Unable to inspect PR #$prNumber." }
+                }
+                $pr = $prCache[$cacheKey]
+                if ($pr.state -ne "open") {
+                  Stop-Run ([int64]$run.id) "PR #$prNumber is closed"
+                  continue
+                }
+                if ($run.head_sha -ne $pr.head.sha) {
+                  Stop-Run ([int64]$run.id) "PR #$prNumber head was superseded"
+                  continue
+                }
+
+                $validPrRuns += [pscustomobject]@{
+                  Id = [int64]$run.id
+                  Key = "$prNumber|$($run.workflow_id)|$($run.head_sha)"
+                }
+                continue
+              }
+
+              if ($run.event -eq "push" -and $run.head_branch -and $run.head_branch -ne "main") {
+                $encodedBranch = [uri]::EscapeDataString([string]$run.head_branch)
+                $branchJson = gh api "repos/$repo/branches/$encodedBranch" 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                  Stop-Run ([int64]$run.id) "feature branch no longer exists"
+                  continue
+                }
+                $branch = $branchJson | ConvertFrom-Json
+                if ($run.head_sha -ne $branch.commit.sha) {
+                  Stop-Run ([int64]$run.id) "feature-branch push was superseded"
+                }
+              }
+            }
+          }
+
+          foreach ($group in ($validPrRuns | Group-Object Key)) {
+            $duplicates = @($group.Group | Sort-Object Id -Descending | Select-Object -Skip 1)
+            foreach ($duplicate in $duplicates) {
+              Stop-Run ([int64]$duplicate.Id) "duplicate workflow for the same current PR head"
+            }
+          }
+
+          "### Queue hygiene`nCancelled superseded runs: $cancelled" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Remove this one-shot workflow from the PR branch
+        id: cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/pr745-queue-hygiene.yml
+          git commit -m "chore(ci): remove completed PR 745 queue hygiene"
+          git push origin "HEAD:${{ github.ref_name }}"
+          echo "new_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cancel obsolete PR 745 runs created before cleanup commit
+        if: steps.cleanup.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_SHA: ${{ steps.cleanup.outputs.new_sha }}
+        run: |
+          $repo = "${{ github.repository }}"
+          $thisRun = [int64]"${{ github.run_id }}"
+          for ($attempt = 1; $attempt -le 8; $attempt++) {
+            $payload = gh api "repos/$repo/actions/runs?event=pull_request&per_page=100" | ConvertFrom-Json
+            foreach ($run in $payload.workflow_runs) {
+              if ([int64]$run.id -eq $thisRun) { continue }
+              if ($run.status -notin @("queued", "in_progress")) { continue }
+              if ($null -eq $run.pull_requests -or $run.pull_requests.Count -eq 0) { continue }
+              if ([int]$run.pull_requests[0].number -ne 745) { continue }
+              if ($run.head_sha -eq $env:NEW_SHA) { continue }
+              Write-Host "Cancelling obsolete PR 745 run $($run.id) at $($run.head_sha)"
+              gh api -X POST "repos/$repo/actions/runs/$($run.id)/cancel" --silent 2>$null
+            }
+            Start-Sleep -Seconds 5
+          }
