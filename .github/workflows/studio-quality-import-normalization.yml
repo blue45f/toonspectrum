@@ -1,0 +1,201 @@
+name: Normalize and verify quality merge imports
+
+on:
+  push:
+    branches: [feat/studio-quality-inspection-20260905]
+    paths: [.github/workflows/studio-quality-import-normalization.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-quality-import-normalization-737
+  cancel-in-progress: false
+
+jobs:
+  normalize:
+    if: github.ref == 'refs/heads/feat/studio-quality-inspection-20260905'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    env:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    outputs:
+      sha: ${{ steps.publish.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Admit the current feature revision only
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/feat/studio-quality-inspection-20260905 | cut -f1)" = "$GITHUB_SHA"
+          git config user.name toonstudio-quality-bot
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply import ordering and prove all other statements are identical
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-imports"
+          node <<'JS'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const { execFileSync } = require('node:child_process');
+          const ts = require('typescript');
+          const files = [
+            'src/domains/admin/AdminMembersPage.tsx',
+            'src/domains/admin/components/AdminAnnouncements.tsx',
+            'src/domains/admin/components/AdminDashboard.tsx',
+            'src/domains/admin/components/AdminReports.tsx',
+            'src/domains/creator/StudioPressureCurveGraph.tsx',
+            'src/domains/creator/ai/StudioAiSuperSuiteModal.tsx',
+            'src/domains/creator/ai/StudioAiToolPopoverBody.tsx',
+            'src/domains/creator/studio-adjustment-stack.test.ts',
+            'src/domains/creator/studio-adjustment-stack.ts',
+            'src/domains/creator/studio-panel-ui.tsx',
+            'src/domains/creator/studio-ux-convergence-boundary.test.ts',
+          ];
+          function signature(file) {
+            const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+            return {
+              imports: source.statements.filter(ts.isImportDeclaration)
+                .map(node => node.getText(source).replace(/\s+/g, ' ')).sort(),
+              body: source.statements.filter(node => !ts.isImportDeclaration(node))
+                .map(node => node.getText(source)),
+            };
+          }
+          const before = files.map(signature);
+          execFileSync('pnpm', ['exec', 'eslint', '--fix', ...files], { stdio: 'inherit' });
+          files.forEach((file, index) => assert.deepEqual(signature(file), before[index], file));
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/quality-imports/statement-preservation.json',
+            JSON.stringify({ unchangedImportBindingsAndExecutableStatements: true, files }, null, 2) + '\n');
+          const workflow = '.github/workflows/studio-finishing-quality.yml';
+          const text = fs.readFileSync(workflow, 'utf8');
+          const old = 'branches: [main, feat/studio-quality-inspection-20260905]';
+          assert.equal(text.split(old).length - 1, 1);
+          fs.writeFileSync(workflow, text.replace(old, 'branches: [main]'));
+          JS
+          git diff --check
+          git diff > "$RUNNER_TEMP/quality-imports/imports.patch"
+      - name: Verify changed contracts before publishing
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            src/domains/creator/studio-quality-inspection.test.ts \
+            src/domains/creator/studio-quality-inspection-hardening.test.ts \
+            src/domains/creator/studio-quality-raster-inspection.test.ts \
+            src/domains/creator/studio-quality-finish-bridge.test.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.test.tsx \
+            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
+            src/domains/creator/StudioLazyPanelStack.test.tsx \
+            src/domains/creator/StudioMenubarContent.test.tsx \
+            src/domains/creator/studio-review-entry-point-viewports.test.tsx \
+            src/domains/creator/StudioToolBeltContent.hints.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            src/domains/creator/studio-adjustment-stack.test.ts \
+            src/domains/creator/studio-ux-convergence-boundary.test.ts \
+            --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/quality-imports/tests.log"
+      - name: Publish normalizations with normal commit and push hooks
+        id: publish
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/feat/studio-quality-inspection-20260905 | cut -f1)" = "$GITHUB_SHA"
+          rm .github/workflows/studio-quality-import-normalization.yml
+          git add -A
+          git diff --cached --check
+          git commit -m 'style: normalize inherited imports for strict quality merge validation'
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:feat/studio-quality-inspection-20260905
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-imports-${{ github.run_id }}
+          path: ${{ runner.temp }}/quality-imports
+          retention-days: 7
+
+  strict-lint:
+    needs: normalize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.normalize.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Full architecture and zero-warning lint
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-static"
+          pnpm run validate:architecture 2>&1 | tee "$RUNNER_TEMP/quality-static/architecture.log"
+          pnpm run lint:strict 2>&1 | tee "$RUNNER_TEMP/quality-static/lint.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-static-${{ github.run_id }}
+          path: ${{ runner.temp }}/quality-static
+          retention-days: 7
+
+  build-and-browser:
+    needs: normalize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.normalize.outputs.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build with frontend and API types, notices and CSP verification
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-build"
+          pnpm --filter @webtoon-nest/api run typecheck 2>&1 | tee "$RUNNER_TEMP/quality-build/api-types.log"
+          pnpm run build 2>&1 | tee "$RUNNER_TEMP/quality-build/build.log"
+          pnpm run check:studio-bundle 2>&1 | tee "$RUNNER_TEMP/quality-build/bundle.log"
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify actual production menus without relaxing assertions
+        run: |
+          set -euo pipefail
+          pnpm run verify:studio-menus 2>&1 | tee "$RUNNER_TEMP/quality-build/menus.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/quality-build
+          retention-days: 7
+
+# This temporary normalizer deletes itself. It cannot write commit statuses, approve,
+# alter branch protection or merge main. Independent validation jobs are read-only.
