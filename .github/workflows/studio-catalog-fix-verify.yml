@@ -4,26 +4,91 @@ on:
     branches: [feat/studio-asset-browser-quality-20260906]
     paths: [.github/workflows/studio-catalog-fix-verify.yml]
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: studio-catalog-fix-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  inspect-prepared-fix:
+  repair-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: false
           show-progress: false
-      - name: Read every prepared change without applying it
+      - name: Apply the inspected exact patch to this feature branch only
         run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-asset-browser-quality-20260906
+          mkdir -p artifacts/studio-catalog-browser
           python3 - <<'PY'
           import base64, hashlib, lzma, pathlib, subprocess
           encoded=pathlib.Path('.ci/studio-catalog-fix.b64').read_text().strip()
           if len(encoded)>20000: raise ValueError('transport budget')
           patch=lzma.decompress(base64.b64decode(encoded,validate=True),memlimit=64*1024*1024)
-          if len(patch)!=30149: raise ValueError('unexpected patch size')
-          print('PATCH_SHA256',hashlib.sha256(patch).hexdigest(),flush=True)
-          print(subprocess.check_output(['git','apply','--numstat'],input=patch).decode(),flush=True)
-          print('BEGIN_PREPARED_PATCH\n'+patch.decode()+'\nEND_PREPARED_PATCH',flush=True)
+          expected='bf1cc223ef9d76ce3474575aa82d4291ff957c6fb4b030388fa2ee4bed85576f'
+          if len(patch)!=30149 or hashlib.sha256(patch).hexdigest()!=expected: raise ValueError('reviewed patch changed')
+          allowed={'scripts/pack_studio_curated_gltf.py','scripts/tests/test_studio_curated_pack.py','scripts/verify-studio-catalog-browser.mjs','src/domains/creator/StudioAssetToolPopoverBody.tsx','src/domains/creator/StudioElementsPanel.tsx','src/domains/creator/catalog/StudioCatalogControls.tsx','src/domains/creator/catalog/StudioCatalogPreviewDialog.tsx','src/domains/creator/catalog/StudioElementsBrowser.test.tsx','src/domains/creator/catalog/StudioSceneTemplateBrowser.test.tsx','src/domains/creator/catalog/StudioSceneTemplateBrowser.tsx','src/domains/creator/catalog/studio-authored-scene-templates.test.ts','src/domains/creator/catalog/studio-catalog-browser.css','src/domains/creator/catalog/studio-catalog-preferences.test.ts','src/domains/creator/catalog/studio-catalog-query.test.ts','src/domains/creator/catalog/use-studio-catalog-preferences.test.tsx','src/domains/creator/catalog/use-studio-catalog-preferences.ts'}
+          paths={line.split('\t')[-1] for line in subprocess.check_output(['git','apply','--numstat'],input=patch).decode().splitlines()}
+          if paths!=allowed: raise ValueError('reviewed file set changed')
           subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply','--index'],input=patch,check=True)
+          pathlib.Path('artifacts/studio-catalog-browser/fix-sha256.txt').write_text(expected+'\n')
           PY
+          git rm .ci/studio-catalog-fix.b64
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio): repair catalog navigation, card clipping, contrast and persistence retry'
+          git push origin HEAD:refs/heads/feat/studio-asset-browser-quality-20260906
+          git rev-parse HEAD > artifacts/studio-catalog-browser/tested-head.txt
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install locked dependencies
+        id: dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Catalog and native insertion regressions
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm exec vitest run src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.test.tsx src/domains/creator/studio-elements-catalog.test.ts src/domains/creator/studio-scene-templates.test.ts src/domains/creator/studio-comipo-assembly.test.ts src/domains/creator/studio-comipo-insert.test.ts 2>&1 | tee artifacts/studio-catalog-browser/tests.log
+      - name: Asset packaging and curation unit tests
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s scripts/tests -p 'test_studio_*' -v 2>&1 | tee artifacts/studio-catalog-browser/python-tests.log
+      - name: Lint changed UI without suppressions
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 src/domains/creator/catalog/ src/domains/creator/StudioElementsPanel.tsx src/domains/creator/StudioAssetToolPopoverBody.tsx src/domains/creator/studio-scene-templates.ts src/domains/creator/studio-scene-templates.test.ts 2>&1 | tee artifacts/studio-catalog-browser/lint.log
+      - name: Repository architecture validation
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm run validate:architecture 2>&1 | tee artifacts/studio-catalog-browser/architecture.log
+      - name: Full frontend TypeScript
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm exec tsc -p tsconfig.json 2>&1 | tee artifacts/studio-catalog-browser/typecheck.log
+      - name: Production build and Studio bundle budget
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          pnpm run build 2>&1 | tee artifacts/studio-catalog-browser/build.log
+          pnpm run check:studio-bundle 2>&1 | tee artifacts/studio-catalog-browser/bundle.log
+      - name: Prepare Chromium
+        id: browser
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Real component layout, keyboard and SQLite browser checks
+        if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
+        run: pnpm exec node scripts/verify-studio-catalog-browser.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-catalog-fixed-evidence
+          path: artifacts/studio-catalog-browser/
+          retention-days: 7
