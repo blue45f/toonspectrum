@@ -7,6 +7,7 @@
  * - Tracks work duration across 6 core production stages (Storyboard, Draft, Lineart, Color, BG/3D, Finishing/SFX).
  * - Implements 3 Pomodoro intervals (Standard 25/5, Deep Flow 50/10, Sprint 15/3).
  * - Calculates total episode burn time and deadline countdown.
+ * - Correctly carries elapsed time across focus/rest boundaries when a browser tab wakes up late.
  */
 
 export type WebtoonProductionStage =
@@ -57,10 +58,42 @@ export const POMODORO_CONFIGS: Record<PomodoroMode, PomodoroConfig> = {
   "sprint-15": { focusMinutes: 15, restMinutes: 3 },
 };
 
+function createEmptyStageSecondsMap(): Record<WebtoonProductionStage, number> {
+  return {
+    storyboard: 0,
+    draft: 0,
+    lineart: 0,
+    "flat-color": 0,
+    "background-3d": 0,
+    "finishing-sfx": 0,
+  };
+}
+
+function cloneStageSecondsMap(
+  source: Readonly<Record<WebtoonProductionStage, number>>,
+): Record<WebtoonProductionStage, number> {
+  return {
+    storyboard: source.storyboard,
+    draft: source.draft,
+    lineart: source.lineart,
+    "flat-color": source["flat-color"],
+    "background-3d": source["background-3d"],
+    "finishing-sfx": source["finishing-sfx"],
+  };
+}
+
+function normalizedElapsedSeconds(deltaSeconds: number): number {
+  if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return 0;
+  return Math.floor(deltaSeconds);
+}
+
 export class WebtoonFocusTimerEngine {
   private state: ProductionSessionState;
 
-  constructor(initialStage: WebtoonProductionStage = "storyboard", mode: PomodoroMode = "standard-25") {
+  constructor(
+    initialStage: WebtoonProductionStage = "storyboard",
+    mode: PomodoroMode = "standard-25",
+  ) {
     const config = POMODORO_CONFIGS[mode];
     this.state = {
       activeStage: initialStage,
@@ -69,25 +102,26 @@ export class WebtoonFocusTimerEngine {
       pomodoroMode: mode,
       currentSecondsRemaining: config.focusMinutes * 60,
       completedPomodoros: 0,
-      stageSecondsMap: {
-        storyboard: 0,
-        draft: 0,
-        lineart: 0,
-        "flat-color": 0,
-        "background-3d": 0,
-        "finishing-sfx": 0,
-      },
+      stageSecondsMap: createEmptyStageSecondsMap(),
     };
   }
 
+  /** Returns a defensive snapshot; callers cannot mutate the engine through the nested map. */
   public getState(): ProductionSessionState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      stageSecondsMap: cloneStageSecondsMap(this.state.stageSecondsMap),
+    };
   }
 
   public setStage(stage: WebtoonProductionStage): void {
     this.state = { ...this.state, activeStage: stage };
   }
 
+  /**
+   * Changes the interval preset without discarding already measured production time.
+   * The current interval itself restarts in focus mode so an old mode cannot leak a mismatched duration.
+   */
   public setPomodoroMode(mode: PomodoroMode): void {
     const config = POMODORO_CONFIGS[mode];
     this.state = {
@@ -107,78 +141,123 @@ export class WebtoonFocusTimerEngine {
     this.state = { ...this.state, isRunning: false };
   }
 
+  /** Restarts only the active focus/rest interval and preserves measured work. */
+  public resetCurrentInterval(): void {
+    const config = POMODORO_CONFIGS[this.state.pomodoroMode];
+    this.state = {
+      ...this.state,
+      isRunning: false,
+      isResting: false,
+      currentSecondsRemaining: config.focusMinutes * 60,
+    };
+  }
+
+  /** Clears the whole episode session while preserving the selected stage and mode. */
+  public resetSession(): void {
+    const config = POMODORO_CONFIGS[this.state.pomodoroMode];
+    this.state = {
+      activeStage: this.state.activeStage,
+      pomodoroMode: this.state.pomodoroMode,
+      isRunning: false,
+      isResting: false,
+      currentSecondsRemaining: config.focusMinutes * 60,
+      completedPomodoros: 0,
+      stageSecondsMap: createEmptyStageSecondsMap(),
+      ...(this.state.deadlineIsoString
+        ? { deadlineIsoString: this.state.deadlineIsoString }
+        : {}),
+    };
+  }
+
   /**
-   * Advances timer by deltaSeconds (normally 1s per tick).
+   * Advances the timer by elapsed wall-clock seconds.
+   *
+   * A browser can throttle `setInterval` while the Studio is backgrounded. `deltaSeconds` therefore may
+   * be larger than the current interval. The previous implementation crossed at most one boundary and
+   * counted the entire delta as focus time. This version consumes every focus/rest phase in order, counts
+   * only focus seconds, and bulk-skips complete cycles so even a long sleep resumes deterministically.
    */
   public tick(deltaSeconds = 1): void {
     if (!this.state.isRunning) return;
 
-    // Track active work time
-    if (!this.state.isResting) {
-      const currentSpent = this.state.stageSecondsMap[this.state.activeStage];
-      this.state.stageSecondsMap[this.state.activeStage] = currentSpent + deltaSeconds;
-    }
+    let remainingElapsed = normalizedElapsedSeconds(deltaSeconds);
+    if (remainingElapsed === 0) return;
 
-    const nextRemaining = this.state.currentSecondsRemaining - deltaSeconds;
+    const config = POMODORO_CONFIGS[this.state.pomodoroMode];
+    const focusSeconds = config.focusMinutes * 60;
+    const restSeconds = config.restMinutes * 60;
+    const cycleSeconds = focusSeconds + restSeconds;
+    const stageSecondsMap = cloneStageSecondsMap(this.state.stageSecondsMap);
+    let isResting = this.state.isResting;
+    let currentSecondsRemaining = this.state.currentSecondsRemaining;
+    let completedPomodoros = this.state.completedPomodoros;
 
-    if (nextRemaining <= 0) {
-      // Transition between focus and rest
-      const config = POMODORO_CONFIGS[this.state.pomodoroMode];
-      if (!this.state.isResting) {
-        // Switch to rest
-        this.state = {
-          ...this.state,
-          isResting: true,
-          completedPomodoros: this.state.completedPomodoros + 1,
-          currentSecondsRemaining: config.restMinutes * 60,
-        };
-      } else {
-        // Switch back to focus
-        this.state = {
-          ...this.state,
-          isResting: false,
-          currentSecondsRemaining: config.focusMinutes * 60,
-        };
+    while (remainingElapsed > 0) {
+      const phaseSeconds = isResting ? restSeconds : focusSeconds;
+
+      // At a clean phase boundary, whole focus+rest cycles leave us in the same phase. Skip them in O(1).
+      if (currentSecondsRemaining === phaseSeconds && remainingElapsed >= cycleSeconds) {
+        const completeCycles = Math.floor(remainingElapsed / cycleSeconds);
+        stageSecondsMap[this.state.activeStage] += completeCycles * focusSeconds;
+        completedPomodoros += completeCycles;
+        remainingElapsed -= completeCycles * cycleSeconds;
+        continue;
       }
-    } else {
-      this.state = {
-        ...this.state,
-        currentSecondsRemaining: nextRemaining,
-      };
+
+      const consumed = Math.min(remainingElapsed, currentSecondsRemaining);
+      if (!isResting) {
+        stageSecondsMap[this.state.activeStage] += consumed;
+      }
+      currentSecondsRemaining -= consumed;
+      remainingElapsed -= consumed;
+
+      if (currentSecondsRemaining > 0) break;
+
+      if (isResting) {
+        isResting = false;
+        currentSecondsRemaining = focusSeconds;
+      } else {
+        isResting = true;
+        completedPomodoros += 1;
+        currentSecondsRemaining = restSeconds;
+      }
     }
+
+    this.state = {
+      ...this.state,
+      isResting,
+      currentSecondsRemaining,
+      completedPomodoros,
+      stageSecondsMap,
+    };
   }
 
-  /**
-   * Calculates total elapsed time in hours across all stages.
-   */
+  /** Calculates total elapsed focus time in hours across all stages. */
   public getTotalWorkHours(): number {
-    const totalSec = Object.values(this.state.stageSecondsMap).reduce((acc, s) => acc + s, 0);
+    const totalSec = Object.values(this.state.stageSecondsMap).reduce((acc, seconds) => acc + seconds, 0);
     return Number((totalSec / 3600).toFixed(2));
   }
 
-  /**
-   * Calculates countdown to deadline in days/hours.
-   */
+  /** Calculates countdown to a valid ISO-compatible deadline in days/hours. */
   public calculateDeadlineToHours(deadlineIso: string): {
     daysRemaining: number;
     hoursRemaining: number;
     isPastDeadline: boolean;
   } {
     const deadlineMs = new Date(deadlineIso).getTime();
-    const nowMs = Date.now();
-    const diffMs = deadlineMs - nowMs;
+    if (!Number.isFinite(deadlineMs)) {
+      throw new RangeError("유효한 마감 일시를 입력해야 합니다.");
+    }
 
+    const diffMs = deadlineMs - Date.now();
     if (diffMs <= 0) {
       return { daysRemaining: 0, hoursRemaining: 0, isPastDeadline: true };
     }
 
     const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-
     return {
-      daysRemaining: days,
-      hoursRemaining: hours,
+      daysRemaining: Math.floor(totalHours / 24),
+      hoursRemaining: totalHours % 24,
       isPastDeadline: false,
     };
   }

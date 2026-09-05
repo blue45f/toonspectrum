@@ -4,10 +4,10 @@
  * Webtoon Skin Tone & Shadow Harmony Assistant.
  * Benchmarks Naver Webtoon AI Painter, Clip Studio Color Swatches, and professional webtoon coloring studios.
  *
- * - 5 Archetypal webtoon character skin tone palettes (4 steps: Highlight, Base, 1st Cel Shadow, 2nd Deep Shadow).
- * - Algorithmic Comic Hue-Shift Shadow Generator: prevents "muddy dirty gray" shadows by shifting hue toward cooler tones,
- *   raising saturation, and lowering value.
- * - 4 Genre lighting mood color palettes (Romance Golden Sunset, Fresh Academy, Dark Noir, Cyberpunk Neon).
+ * - 5 archetypal webtoon character skin tone palettes (4 steps: Highlight, Base, 1st Cel Shadow, 2nd Deep Shadow).
+ * - Algorithmic comic hue-shift shadow generator that travels toward a cool blue-violet target on the
+ *   shortest color-wheel path instead of blindly adding hue degrees.
+ * - 4 genre lighting mood color palettes (Romance Golden Sunset, Fresh Academy, Dark Noir, Cyberpunk Neon).
  */
 
 export type SkinToneId =
@@ -21,11 +21,11 @@ export interface SkinTonePalette {
   readonly id: SkinToneId;
   readonly name: string;
   readonly description: string;
-  readonly highlight: string; // #fff...
+  readonly highlight: string;
   readonly base: string;
-  readonly shadow1: string; // 1차 셀 음영
-  readonly shadow2: string; // 2차 딥 음영
-  readonly blushTint: string; // 볼터치/입술 틴트
+  readonly shadow1: string;
+  readonly shadow2: string;
+  readonly blushTint: string;
 }
 
 export interface SceneMoodPalette {
@@ -135,59 +135,99 @@ export const SCENE_MOOD_PALETTES: readonly SceneMoodPalette[] = [
   },
 ];
 
+interface RgbColor {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+interface HslColor {
+  readonly h: number;
+  readonly s: number;
+  readonly l: number;
+}
+
+const HEX_COLOR_PATTERN = /^#?([0-9a-f]{6})$/iu;
+const COOL_SHADOW_TARGET_HUE = 265;
+const WARM_HIGHLIGHT_TARGET_HUE = 45;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function shiftHueToward(sourceHue: number, targetHue: number, maxDegrees: number): number {
+  const shortestDelta = ((targetHue - sourceHue + 540) % 360) - 180;
+  const appliedDelta = clamp(shortestDelta, -maxDegrees, maxDegrees);
+  return (sourceHue + appliedDelta + 360) % 360;
+}
+
 export class WebtoonColorHarmonyAssistant {
-  /**
-   * Retrieves a skin tone palette by id.
-   */
   public getSkinPalette(id: SkinToneId): SkinTonePalette {
     return WEBTOON_SKIN_PALETTES[id] ?? WEBTOON_SKIN_PALETTES["warm-fair"];
   }
 
+  public getSceneMoodPalette(id: string): SceneMoodPalette | undefined {
+    return SCENE_MOOD_PALETTES.find((palette) => palette.id === id);
+  }
+
   /**
-   * Generates a 2-step comic hue-shifted shadow from any base hex color.
+   * Generates a two-step comic shadow ramp and a warm highlight from a six-digit hex color.
    *
-   * In professional webtoon coloring:
-   * - Shadows are NOT simple black overlays (which look muddy).
-   * - Hue shifts towards purple/blue (+20~35 degrees in hue angle).
-   * - Saturation increases slightly (+10~15%).
-   * - Brightness/Lightness decreases (-20~30%).
+   * - Shadow hues move toward blue-violet on the shortest color-wheel path. A fixed `+25°` shift is
+   *   not equivalent to "cooler": for red/orange it moves toward yellow and makes the result warmer.
+   * - Near-neutral colors receive a small cool saturation floor so gray/white bases do not become
+   *   muddy black overlays.
+   * - Saturation is deliberately bounded. Very light skin bases often report HSL saturation near
+   *   100%; carrying that value into darker shadows produces neon red, not a usable cel-shading ramp.
+   * - Lightness ordering is deterministic: highlight >= base >= shadow1 >= shadow2, modulo 8-bit rounding.
    */
   public generateHueShiftShadow(baseHex: string): {
     shadow1: string;
     shadow2: string;
     highlight: string;
   } {
-    const rgb = this.hexToRgb(baseHex);
+    const normalizedHex = this.normalizeHex(baseHex);
+    const rgb = this.hexToRgb(normalizedHex);
     const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
 
-    // 1st Cel Shadow: shift hue toward cool (around 240-280 deg blue-violet), bump sat, lower light
-    const h1 = (hsl.h + 25) % 360;
-    const s1 = Math.min(1.0, hsl.s * 1.15);
-    const l1 = Math.max(0.15, hsl.l * 0.72);
+    // Hue is undefined for a true neutral. Anchor it near blue before applying the cool target.
+    const meaningfulBaseHue = hsl.s < 0.02 ? 245 : hsl.h;
+    const h1 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 45);
+    const h2 = shiftHueToward(meaningfulBaseHue, COOL_SHADOW_TARGET_HUE, 65);
+    const s1 = clamp(0.12 + hsl.s * 0.38, 0.14, 0.5);
+    const s2 = clamp(0.18 + hsl.s * 0.32, 0.2, 0.52);
+    const l1 = clamp(hsl.l * 0.86, 0, 0.88);
+    const l2 = clamp(hsl.l * 0.68, 0, 0.72);
+
+    const highlightBaseHue = hsl.s < 0.02 ? WARM_HIGHLIGHT_TARGET_HUE : hsl.h;
+    const hh = shiftHueToward(highlightBaseHue, WARM_HIGHLIGHT_TARGET_HUE, 12);
+    const sh = clamp(Math.max(0.04, hsl.s * 0.7), 0, 1);
+    const lh = clamp(hsl.l * 1.2 + 0.08, hsl.l, 0.99);
+
     const rgb1 = this.hslToRgb(h1, s1, l1);
-
-    // 2nd Deep Shadow: further shift and deepen
-    const h2 = (hsl.h + 40) % 360;
-    const s2 = Math.min(1.0, hsl.s * 1.25);
-    const l2 = Math.max(0.08, hsl.l * 0.5);
     const rgb2 = this.hslToRgb(h2, s2, l2);
-
-    // Highlight: shift hue slightly toward warm yellow/sun, lower sat, boost light
-    const hh = (hsl.h - 10 + 360) % 360;
-    const sh = Math.max(0.05, hsl.s * 0.7);
-    const lh = Math.min(0.98, hsl.l * 1.25 + 0.1);
-    const rgbH = this.hslToRgb(hh, sh, lh);
+    const rgbHighlight = this.hslToRgb(hh, sh, lh);
 
     return {
       shadow1: this.rgbToHex(rgb1.r, rgb1.g, rgb1.b),
       shadow2: this.rgbToHex(rgb2.r, rgb2.g, rgb2.b),
-      highlight: this.rgbToHex(rgbH.r, rgbH.g, rgbH.b),
+      highlight:
+        hsl.l >= 0.985
+          ? normalizedHex
+          : this.rgbToHex(rgbHighlight.r, rgbHighlight.g, rgbHighlight.b),
     };
   }
 
-  private hexToRgb(hex: string): { r: number; g: number; b: number } {
-    const clean = hex.replace("#", "");
-    const parsed = parseInt(clean, 16);
+  private normalizeHex(hex: string): string {
+    const match = HEX_COLOR_PATTERN.exec(hex.trim());
+    if (!match?.[1]) {
+      throw new RangeError("색상은 #RRGGBB 형식의 6자리 HEX여야 합니다.");
+    }
+    return `#${match[1].toLowerCase()}`;
+  }
+
+  private hexToRgb(hex: string): RgbColor {
+    const parsed = Number.parseInt(hex.slice(1), 16);
     return {
       r: (parsed >> 16) & 255,
       g: (parsed >> 8) & 255,
@@ -196,10 +236,11 @@ export class WebtoonColorHarmonyAssistant {
   }
 
   private rgbToHex(r: number, g: number, b: number): string {
-    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+    const packed = (1 << 24) + (r << 16) + (g << 8) + b;
+    return `#${packed.toString(16).slice(1)}`;
   }
 
-  private rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  private rgbToHsl(r: number, g: number, b: number): HslColor {
     const rn = r / 255;
     const gn = g / 255;
     const bn = b / 255;
@@ -210,17 +251,17 @@ export class WebtoonColorHarmonyAssistant {
     const l = (max + min) / 2;
 
     if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      const delta = max - min;
+      s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
       switch (max) {
         case rn:
-          h = (gn - bn) / d + (gn < bn ? 6 : 0);
+          h = (gn - bn) / delta + (gn < bn ? 6 : 0);
           break;
         case gn:
-          h = (bn - rn) / d + 2;
+          h = (bn - rn) / delta + 2;
           break;
         case bn:
-          h = (rn - gn) / d + 4;
+          h = (rn - gn) / delta + 4;
           break;
       }
       h *= 60;
@@ -229,29 +270,31 @@ export class WebtoonColorHarmonyAssistant {
     return { h, s, l };
   }
 
-  private hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
-    let r: number, g: number, b: number;
+  private hslToRgb(h: number, s: number, l: number): RgbColor {
+    let r: number;
+    let g: number;
+    let b: number;
 
     if (s === 0) {
       r = g = b = l;
     } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        let tc = t;
-        if (tc < 0) tc += 1;
-        if (tc > 1) tc -= 1;
-        if (tc < 1 / 6) return p + (q - p) * 6 * tc;
-        if (tc < 1 / 2) return q;
-        if (tc < 2 / 3) return p + (q - p) * (2 / 3 - tc) * 6;
+      const hueToRgb = (p: number, q: number, t: number): number => {
+        let adjusted = t;
+        if (adjusted < 0) adjusted += 1;
+        if (adjusted > 1) adjusted -= 1;
+        if (adjusted < 1 / 6) return p + (q - p) * 6 * adjusted;
+        if (adjusted < 1 / 2) return q;
+        if (adjusted < 2 / 3) return p + (q - p) * (2 / 3 - adjusted) * 6;
         return p;
       };
 
       const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
       const p = 2 * l - q;
-      const hn = h / 360;
+      const normalizedHue = h / 360;
 
-      r = hue2rgb(p, q, hn + 1 / 3);
-      g = hue2rgb(p, q, hn);
-      b = hue2rgb(p, q, hn - 1 / 3);
+      r = hueToRgb(p, q, normalizedHue + 1 / 3);
+      g = hueToRgb(p, q, normalizedHue);
+      b = hueToRgb(p, q, normalizedHue - 1 / 3);
     }
 
     return {
