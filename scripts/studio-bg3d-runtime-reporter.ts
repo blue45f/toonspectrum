@@ -52,7 +52,8 @@ export default class StudioBg3dRuntimeReporter implements Reporter {
     this.suite = suite;
   }
 
-  onEnd(result: FullResult): { status: FullResult["status"] } {
+  // Playwright's Reporter interface requires a Promise when overriding the run status.
+  async onEnd(result: FullResult): Promise<{ status: FullResult["status"] }> {
     const tests: Bg3dRuntimeCaseEvidence[] = (this.suite?.allTests() ?? []).map((item) => ({
       title: item.title,
       expectedStatus: item.expectedStatus,
