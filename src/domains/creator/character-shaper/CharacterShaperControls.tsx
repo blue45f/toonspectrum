@@ -124,7 +124,12 @@ export function CharacterRangeControl({
       return true;
     }, window);
     const onWindowBlur = (event: Event) => {
-      if (event.target === window) cancelRef.current();
+      // WindowProxy identity can differ across realms. At-target dispatch distinguishes
+      // the window losing focus from a descendant's bubbling synthetic blur.
+      if (event.eventPhase === Event.AT_TARGET) {
+        pointerRef.current = null;
+        cancelRef.current();
+      }
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") cancelRef.current();

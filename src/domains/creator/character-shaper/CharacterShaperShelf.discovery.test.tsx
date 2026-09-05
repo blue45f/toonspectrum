@@ -22,7 +22,11 @@ const entries = [entry("accessory:glasses", "안경", "accessory", true), entry(
   entry("accessory:pin", "머리핀", "accessory"), entry("hand-pose:peace", "브이", "hand-pose")];
 const recipe: CharacterRecipe = {
   version: 1,
-  slots: { ...Object.fromEntries(CHARACTER_SLOT_KINDS.map((id) => [id, null])), accessory: ["accessory:glasses", "accessory:hat"] } as CharacterRecipe["slots"],
+  slots: {
+    "face-shape": null, eyes: null, irises: null, nose: null, mouth: null, ears: null,
+    hair: null, body: null, top: null, bottom: null, shoes: null,
+    accessory: ["accessory:glasses", "accessory:hat"], expression: null, pose: null, "hand-pose": null,
+  },
   colors: { skin: null, hairBase: null, hairTip: null, iris: null, top: null, bottom: null, shoes: null }, handSide: "both",
 };
 function binding(overrides: Partial<CharacterShaperBinding> = {}): CharacterShaperBinding {
@@ -53,6 +57,16 @@ beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
 
 describe("CharacterShaperShelf discovery integration", () => {
+  it("provides all fifteen slots without asserting a partial fixture into a complete recipe", () => {
+    expect(Object.keys(recipe.slots).sort()).toEqual([...CHARACTER_SLOT_KINDS].sort());
+  });
+  it("preserves explicit catalog order ahead of the Korean label tie-break", () => {
+    const h = binding();
+    const ordered = h.catalog.entries.map((item) => ({ ...item, order: item.id === "accessory:glasses" ? -1 : 0 }));
+    render(<CharacterShaperShelf {...props({ binding: { ...h, catalog: { ...h.catalog, entries: ordered } } })} />);
+    fireEvent.click(screen.getByRole("button", { name: "선택됨" }));
+    expect(cardIds()).toEqual(["accessory:glasses", "accessory:hat"]);
+  });
   it("cancels stale search when switching slots whose external queries are both empty", () => {
     const p = props(); const view = render(<CharacterShaperShelf {...p} />);
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "안" } });
@@ -89,9 +103,9 @@ describe("CharacterShaperShelf discovery integration", () => {
     expect(cardIds()).toEqual(["accessory:hat"]);
     expect(JSON.parse(localStorage.getItem(CHARACTER_FAVORITES_KEY) ?? "null")).toEqual({ version: 1, ids: ["accessory:hat"] });
   });
-  it("shows all selected accessories", () => {
+  it("shows every selected accessory in the catalog's Korean label tie-break order", () => {
     render(<CharacterShaperShelf {...props()} />); fireEvent.click(screen.getByRole("button", { name: "선택됨" }));
-    expect(cardIds()).toEqual(["accessory:glasses", "accessory:hat"]);
+    expect(cardIds()).toEqual(["accessory:hat", "accessory:glasses"]);
   });
   it("excludes partial and unavailable entries only after explicit full-support filtering", () => {
     const p = props({ binding: binding({ evaluate: (item) => ({

@@ -95,4 +95,47 @@ describe("precision edits interrupted by host lifecycle", () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith("#aabbcc");
   });
+
+  it("does not cancel a range for a descendant's bubbling synthetic blur", () => {
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
+    render(<>
+      <CharacterRangeControl label="눈 크기" value={0.2} min={-1} max={1} step={0.01} defaultValue={0} onPreview={onPreview} onCommit={onCommit} />
+      <button type="button">다른 컨트롤</button>
+    </>);
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: "0.8" } });
+    act(() => { screen.getByRole("button", { name: "다른 컨트롤" }).dispatchEvent(new Event("blur", { bubbles: true })); });
+    expect(slider.value).toBe("0.8");
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.pointerUp(slider);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(0.8);
+  });
+
+  it("discards a numeric text draft when the window blurs without creating a commit", () => {
+    const onCommit = vi.fn();
+    render(<CharacterRangeControl label="눈 크기" value={0.2} min={-1} max={1} step={0.01} defaultValue={0} onCommit={onCommit} />);
+    const input = screen.getByLabelText("눈 크기 값 입력") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "0.95" } });
+    act(() => { window.dispatchEvent(new Event("blur")); });
+    fireEvent.blur(input);
+    expect(input.value).toBe("0.20");
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("rolls back once when window blur is followed by visibility loss and unmount", () => {
+    const onPreview = vi.fn();
+    const onCancel = vi.fn();
+    const onCommit = vi.fn();
+    const view = render(<CharacterRangeControl label="눈 크기" value={0.2} min={-1} max={1} step={0.01} defaultValue={0} onPreview={onPreview} onCancel={onCancel} onCommit={onCommit} />);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "0.8" } });
+    act(() => { window.dispatchEvent(new Event("blur")); });
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    view.unmount();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
 });
