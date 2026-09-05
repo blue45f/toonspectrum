@@ -6,11 +6,6 @@
  * numeric W/H/rotation edits therefore preserve the same lock, mixed-model, draw-stroke and
  * all-or-nothing guarantees as the on-canvas handles.
  */
-import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
-import {
-  planStudioSelectionTransformCommit,
-  type StudioSelectionTransformCommitPlan,
-} from "./studio-selection-transform-commit";
 import {
   planStudioSelectionLayoutPatch,
   resolveStudioFigmaSelectionLayoutMetrics,
@@ -18,6 +13,11 @@ import {
   type StudioFigmaSelectionLayoutMetrics,
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
+import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
+import {
+  planStudioSelectionTransformCommit,
+  type StudioSelectionTransformCommitPlan,
+} from "./studio-selection-transform-commit";
 
 import type { El } from "./studio-element-model";
 
