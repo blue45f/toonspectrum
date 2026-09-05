@@ -1,0 +1,134 @@
+name: Land Studio finish quality inspection
+
+on:
+  push:
+    branches:
+      - feat/studio-quality-inspection-20260905
+    paths:
+      - ".github/workflows/studio-finish-quality-land.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-finish-quality-landing
+  cancel-in-progress: false
+
+jobs:
+  land-product:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'chore(studio): trigger finish quality landing')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      FEATURE_BRANCH: feat/studio-quality-inspection-20260905
+    steps:
+      - name: Checkout complete feature history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: feat/studio-quality-inspection-20260905
+
+      - name: Synchronize latest feature and main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-quality-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$FEATURE_BRANCH" main
+          git reset --hard "origin/$FEATURE_BRANCH"
+          git rev-parse HEAD > /tmp/studio-quality-remote-head.txt
+          git merge --no-edit origin/main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply product integration and remove one-shot machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-studio-finish-quality-integration.py
+          rm -f \
+            scripts/apply-studio-finish-quality-integration.py \
+            .github/workflows/studio-finish-quality-land.yml
+          git diff --check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Normalize and lint changed product files
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix \
+            src/domains/creator/studio-finish-quality.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.tsx \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.tsx \
+            src/domains/creator/StudioLazyPanelStack.tsx \
+            src/domains/creator/StudioProjectReviewActions.tsx
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-finish-quality.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.tsx \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.tsx \
+            src/domains/creator/StudioLazyPanelStack.tsx \
+            src/domains/creator/StudioProjectReviewActions.tsx
+
+      - name: Run focused quality-inspection tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-finish-quality.test.ts
+          src/domains/creator/StudioFinishQualityView.test.tsx
+          src/domains/creator/studio-finish-quality-integration.test.ts
+          --reporter=verbose
+
+      - name: Run strict repository gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm run validate:architecture
+          pnpm run lint
+          pnpm run build
+
+      - name: Prepare certified product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --worktree -- public/data 2>/dev/null || true
+          rm -rf dist coverage test-results playwright-report
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No product changes were produced" >&2
+            exit 1
+          fi
+          git status --short
+
+      - name: Commit and push verified product
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_before="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | awk '{print $1}')"
+          expected_remote="$(cat /tmp/studio-quality-remote-head.txt)"
+          if [[ "$remote_before" != "$expected_remote" ]]; then
+            echo "Feature branch advanced during verification: expected ${expected_remote}, found ${remote_before}" >&2
+            exit 1
+          fi
+          git commit -m "feat(studio): add deterministic finish quality inspection"
+          git push origin HEAD:"$FEATURE_BRANCH"
