@@ -6,7 +6,7 @@ on:
     paths: [.github/workflows/storyworld-preflight-macos-20260905.yml]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: storyworld-macos-preflight-20260905
@@ -19,18 +19,18 @@ jobs:
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      PRODUCT_SHA: 593b97c77d3428d327ee066875df2d5907b74b4b
-      REPORT_BRANCH: verify/storyworld-preflight-macos-20260905
+      PRODUCT_SHA: c5c802e2dccd1fd23fb4a46b1ae020766d391082
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: 593b97c77d3428d327ee066875df2d5907b74b4b
+          ref: c5c802e2dccd1fd23fb4a46b1ae020766d391082
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
-      - name: Execute real checks and preserve bounded compiler/test output
+      - name: Execute real checks against the exact product head
         shell: bash
         run: |
           python3 - <<'PY'
@@ -41,50 +41,37 @@ jobs:
           import time
 
           target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'storyworld-diagnostic.json'
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['PRODUCT_SHA']
           commands = [
               ('install', ['pnpm', 'install', '--frozen-lockfile']),
               ('lint', ['pnpm', 'exec', 'eslint', '--max-warnings=0', 'src/domains/creator/storyworld', 'src/domains/creator/studio-router/StudioRouter.tsx', 'src/domains/creator/studio-router/studio-route-manifest.ts', 'src/domains/creator/studio-router/studio-route-manifest.test.ts', 'src/domains/creator/studio-router/studio-storyworld-route.test.ts', 'scripts/verify-storyworld-lab.mjs']),
               ('tests', ['pnpm', 'exec', 'vitest', 'run', 'src/domains/creator/storyworld', 'src/domains/creator/studio-router']),
               ('types', ['pnpm', 'run', 'typecheck']),
               ('architecture', ['pnpm', 'run', 'validate:architecture']),
+              ('standalone', ['pnpm', 'exec', 'node', 'scripts/verify-storyworld-lab.mjs']),
           ]
           report = {'productSha': os.environ['PRODUCT_SHA'], 'runId': os.environ['GITHUB_RUN_ID'], 'checks': []}
           for name, command in commands:
               started = time.monotonic()
               try:
-                  completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=600)
-                  entry = {'name': name, 'exitCode': completed.returncode, 'seconds': round(time.monotonic() - started, 2), 'outputTail': completed.stdout[-24000:]}
+                  completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=900)
+                  entry = {'name': name, 'exitCode': completed.returncode, 'seconds': round(time.monotonic() - started, 2), 'outputTail': completed.stdout[-16000:]}
               except Exception as error:
                   entry = {'name': name, 'exitCode': -1, 'error': str(error)}
               report['checks'].append(entry)
               target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
-              print(name, entry['exitCode'], flush=True)
+              print('::group::' + name, flush=True)
+              print(json.dumps(entry, ensure_ascii=False, indent=2), flush=True)
+              print('::endgroup::', flush=True)
               if name == 'install' and entry['exitCode'] != 0:
                   break
+          assert len(report['checks']) == len(commands) and all(check['exitCode'] == 0 for check in report['checks']), 'Diagnostic checks failed. Required PR core CI is unchanged.'
           PY
-      - name: Publish diagnostic evidence to the verification branch only
+      - name: Preserve diagnostic evidence without modifying any branch
         if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "$RUNNER_TEMP/storyworld-diagnostic.json"
-          git fetch origin "$REPORT_BRANCH"
-          git switch --detach FETCH_HEAD
-          mkdir -p .github/storyworld-diagnostics
-          cp "$RUNNER_TEMP/storyworld-diagnostic.json" ".github/storyworld-diagnostics/$PRODUCT_SHA.json"
-          git add -- ".github/storyworld-diagnostics/$PRODUCT_SHA.json"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          HUSKY=0 git commit -m "test(studio): record Storyworld diagnostic evidence for $PRODUCT_SHA"
-          git push origin "HEAD:refs/heads/$REPORT_BRANCH"
-      - name: Require real diagnostic success
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'storyworld-diagnostic.json').read_text())
-          assert len(result['checks']) == 5 and all(check['exitCode'] == 0 for check in result['checks']), 'Diagnostic checks failed; see the committed report. Required PR core CI is unchanged.'
-          PY
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-diagnostic-${{ env.PRODUCT_SHA }}
+          path: ${{ runner.temp }}/storyworld-diagnostic.json
+          retention-days: 7
+          if-no-files-found: error
