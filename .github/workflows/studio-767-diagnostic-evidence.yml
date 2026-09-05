@@ -4,36 +4,130 @@ on:
     branches: [chore/studio-767-diagnostic-evidence-20260906]
     paths: ['.github/workflows/studio-767-diagnostic-evidence.yml']
 permissions:
-  contents: read
-  actions: read
+  contents: write
 jobs:
-  logs:
+  quality-repair:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Collect completed job evidence without changing checks
+      - uses: actions/checkout@v6
+        with:
+          ref: 02c1ddad11a7033b5cc9c06973187c2603eff68e
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Repair the reviewed standalone quality test and inherited import ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 02c1ddad11a7033b5cc9c06973187c2603eff68e
+          test "$(git rev-parse HEAD:scripts/studio-quality-bundle-leaves.test.mjs)" = 7bc60c5a472ebb9a62de25e85ce9e2ea70e74ce2
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/studio-quality-bundle-leaves.test.mjs')
+          source = p.read_text()
+          old = 'import { test } from "vitest";\n'
+          assert source.count(old) == 1
+          source = source.replace(old, '')
+          anchor = 'import ts from "typescript";\n'
+          assert source.count(anchor) == 1
+          source = source.replace(anchor, anchor + '\n// The maintained workflow uses Node; the root suite uses Vitest. Keep both real registrations.\nconst { test } = process.env.VITEST ? await import("vitest") : await import("node:test");\n')
+          p.write_text(source)
+          PY
+          pnpm exec eslint --fix --max-warnings=0 \
+            src/domains/creator/bg3d/StudioBg3dMultiPassExporterPanel.tsx \
+            src/domains/creator/bg3d/StudioBg3dProductionIntentPanel.tsx \
+            src/domains/creator/bg3d/StudioBg3dProductionPassPreflightPanel.tsx \
+            src/domains/creator/bg3d/StudioBg3dProductionWorkflowBoundary.test.ts \
+            src/domains/creator/bg3d/StudioBg3dProductionWorkflowPanel.tsx \
+            src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx \
+            src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts \
+            scripts/studio-quality-bundle-leaves.test.mjs
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import ts from 'typescript';
+          const files = execFileSync('git', ['diff', '--name-only']).toString().trim().split('\n');
+          const allowed = new Set([
+            'src/domains/creator/bg3d/StudioBg3dMultiPassExporterPanel.tsx',
+            'src/domains/creator/bg3d/StudioBg3dProductionIntentPanel.tsx',
+            'src/domains/creator/bg3d/StudioBg3dProductionPassPreflightPanel.tsx',
+            'src/domains/creator/bg3d/StudioBg3dProductionWorkflowBoundary.test.ts',
+            'src/domains/creator/bg3d/StudioBg3dProductionWorkflowPanel.tsx',
+            'src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx',
+            'src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts',
+            'scripts/studio-quality-bundle-leaves.test.mjs',
+          ]);
+          assert.equal(files.length, 8);
+          for (const file of files) {
+            assert.ok(allowed.has(file), `unreviewed change: ${file}`);
+            const before = execFileSync('git', ['show', `HEAD:${file}`]).toString();
+            const after = readFileSync(file, 'utf8');
+            if (file.endsWith('.mjs')) {
+              assert.equal(after.slice(after.indexOf('const leaves')), before.slice(before.indexOf('const leaves')));
+              continue;
+            }
+            const parts = (text) => {
+              const parsed = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+              const imports = parsed.statements.filter(ts.isImportDeclaration).map(n => n.getText(parsed)).sort();
+              const body = parsed.statements.filter(n => !ts.isImportDeclaration(n)).map(n => n.getText(parsed));
+              return { imports, body };
+            };
+            assert.deepEqual(parts(after), parts(before), `non-import semantic change: ${file}`);
+          }
+          console.log('8-file allow-list, unchanged test assertions and 7-file import-binding/body checks passed');
+          JS
+          git diff --check
+      - name: Run both standalone and root-runner quality contracts
+        run: |
+          node --test scripts/studio-quality-bundle-leaves.test.mjs scripts/ci-executed-gates.test.mjs
+          pnpm exec vitest run \
+            scripts/studio-quality-bundle-leaves.test.mjs \
+            scripts/ci-executed-gates.test.mjs \
+            scripts/studio-bg3d-png-chunk-boundary.test.ts \
+            src/domains/creator/studio-quality-inspection.test.ts \
+            src/domains/creator/studio-quality-inspection-hardening.test.ts \
+            src/domains/creator/studio-quality-raster-inspection.test.ts \
+            src/domains/creator/studio-quality-finish-bridge.test.ts \
+            src/domains/creator/studio-finish-quality.test.ts \
+            src/domains/creator/studio-finish-quality-integration.test.ts \
+            src/domains/creator/StudioFinishQualityView.test.tsx \
+            src/domains/creator/StudioContinuityPanel.test.tsx \
+            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
+            src/domains/creator/StudioLazyPanelStack.test.tsx \
+            src/domains/creator/StudioMenubarContent.test.tsx \
+            src/domains/creator/studio-review-entry-point-viewports.test.tsx \
+            src/domains/creator/StudioToolBeltContent.hints.test.ts \
+            src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            src/domains/creator/studio-adjustment-stack.test.ts \
+            src/domains/creator/studio-ux-convergence-boundary.test.ts \
+            src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.test.tsx
+      - name: Publish checked product commit to its dedicated staging branch
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/evidence"
-          for job in 101340478581 101340478582 101340478181; do
-            gh api --allow-escape-sequences "repos/blue45f/toonspectrum/actions/jobs/$job/logs" > "$RUNNER_TEMP/evidence/$job.log"
-          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/domains/creator/bg3d scripts/studio-quality-bundle-leaves.test.mjs
+          git commit -m 'fix(studio): restore executable quality checks and normalize inherited BG3D imports'
           python3 - <<'PY'
-          import os, pathlib, re
-          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'evidence'
-          for path in root.glob('*.log'):
-              text = path.read_text(encoding='utf-8-sig')
-              clean = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
-              path.write_text(clean)
-              path.with_suffix('.tail.txt').write_text('\n'.join(clean.splitlines()[-220:]))
+          import base64, os, subprocess
+          env = os.environ.copy()
+          env['GIT_CONFIG_COUNT'] = '1'
+          env['GIT_CONFIG_KEY_0'] = 'http.https://github.com/.extraheader'
+          env['GIT_CONFIG_VALUE_0'] = 'AUTHORIZATION: basic ' + base64.b64encode(('x-access-token:' + env.pop('GH_TOKEN')).encode()).decode()
+          subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/chore/studio-767-checked-quality-repair-20260906'], env=env, check=True)
           PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: studio-767-ci-errors
-          path: ${{ runner.temp }}/evidence
-          retention-days: 3
-          if-no-files-found: error
+          git rev-parse HEAD
+          git show --stat --oneline HEAD
