@@ -5,6 +5,9 @@ on:
     paths: [.github/workflows/storyworld-shard-forwarding-repair.yml]
 permissions:
   contents: write
+concurrency:
+  group: storyworld-shard-forwarding-repair
+  cancel-in-progress: true
 jobs:
   repair:
     if: github.repository == 'blue45f/toonspectrum'
@@ -52,10 +55,12 @@ jobs:
           const workflow = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
           const testJob = workflow.jobs.test;
           const step = testJob.steps.find((entry) => entry.name === "Run this shard of the root Vitest suite with per-file progress");
+          const shardExpression = String.fromCharCode(36) + "{{ matrix.shard }}";
+          const totalExpression = String.fromCharCode(36) + "{{ strategy.job-total }}";
 
           describe("CI root shard forwarding", () => {
             it("passes the shard option to Vitest instead of terminating option parsing", () => {
-              expect(step.run).toBe("pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}");
+              expect(step.run).toBe(`pnpm run test:root --shard=${shardExpression}/${totalExpression}`);
               expect(testJob.strategy.matrix.shard).toEqual([1, 2, 3]);
               expect(testJob.strategy["fail-fast"]).toBe(false);
               expect(step["timeout-minutes"]).toBe(20);
@@ -69,7 +74,7 @@ jobs:
                 writeFileSync(join(directory, "package.json"), JSON.stringify({ private: true, packageManager, scripts: { "test:root": "node probe.cjs" } }));
                 writeFileSync(join(directory, "probe.cjs"), 'console.log("FORWARDED=" + JSON.stringify(process.argv.slice(2)));');
                 for (const shard of testJob.strategy.matrix.shard) {
-                  const command = step.run.replace("${{ matrix.shard }}", String(shard)).replace("${{ strategy.job-total }}", String(testJob.strategy.matrix.shard.length));
+                  const command = step.run.replace(shardExpression, String(shard)).replace(totalExpression, String(testJob.strategy.matrix.shard.length));
                   const [executable, ...args] = command.split(" ");
                   expect(executable).toBe("pnpm");
                   const output = execFileSync(executable, ["--dir", directory, ...args], { encoding: "utf8", timeout: 15000 });
