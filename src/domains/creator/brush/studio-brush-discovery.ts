@@ -25,7 +25,7 @@ export const STUDIO_BRUSH_DISCOVERY: Readonly<Record<string, StudioBrushDiscover
   "standard-eraser": { name: "일반 지우개", hint: "명확한 경계로 지우기 · 선과 형태 정리", aliases: ["단단한 지우개", "hard eraser"] },
   "kneaded-eraser": { name: "연한 떡지우개", hint: "여러 번 문질러 옅게 지우기 · 농도 조절", aliases: ["떡지우개", "저농도", "kneaded eraser"] },
   screentone: { name: "망점 브러시", hint: "간격이 일정한 점 무늬 · 만화 명암", aliases: ["스크린톤", "도트", "screentone", "halftone"] },
-  "web-cross-hatch-pen": { name: "교차 해칭", hint: "교차하는 선으로 음영 · 펜화 질감", aliases: ["크로스 해치", "cross hatch", "hatching"] },
+  "web-cross-hatch-pen": { name: "교차 해칭 펜", hint: "교차하는 선으로 음영 · 펜화 질감", aliases: ["교차 해칭", "크로스 해치", "cross hatch", "hatching"] },
   "web-radial-burst": { name: "방사형 집중선", hint: "중심에서 퍼지는 선 · 속도와 강조", aliases: ["방사 버스트", "스피드라인", "radial burst"] },
   "inkwash-pen": { name: "유체 잉크 펜", hint: "젖은 잉크의 흐름과 번짐 · 수묵 선화", aliases: ["잉크워시", "딥펜", "fluid ink"] },
   "inkwash-water-brush": { name: "물 번짐 붓", hint: "물을 머금은 번짐 · 잉크워시 채색", aliases: ["잉크워시", "생동하는 물", "water brush"] },
