@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 
 const origin = process.env.CREATOR_HOME_ORIGIN || "http://127.0.0.1:4173";
 const output = "artifacts/creator-home";
@@ -119,7 +119,9 @@ try {
       assert(await page.locator('[role="dialog"] a[href="/ranking"]').isVisible());
       await page.keyboard.press("Escape");
       await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
-      assert.equal(await trigger.evaluate((element) => document.activeElement === element), true);
+      // SiteHeader restores focus in requestAnimationFrame after removing inert.
+      // Keep the real focus contract, but wait for that frame instead of racing it.
+      await expect(trigger).toBeFocused({ timeout: 3000 });
       await page.route("**/brand/toonstudio-intro.mp4", (route) => route.abort());
       await page.getByTestId("creator-film-play").click();
       await page.locator(".ch-film-error").waitFor();
