@@ -1,0 +1,39 @@
+name: Storyworld core failure evidence
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-core-failure-evidence.yml]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - name: Read completed core failure without rerunning or modifying checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, urllib.request
+          base = 'https://api.github.com/repos/blue45f/toonspectrum/'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          def get(path):
+              with urllib.request.urlopen(urllib.request.Request(base + path, headers=headers), timeout=30) as response:
+                  return response.read()
+          run = json.loads(get('actions/runs/33953145676'))
+          assert run['head_sha'] == 'a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc'
+          job = json.loads(get('actions/jobs/101271521448'))
+          assert job['name'] == 'core' and job['run_id'] == run['id'] and job['conclusion'] == 'failure'
+          raw = get('actions/jobs/101271521448/logs')
+          text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', raw.decode('utf-8-sig'))
+          lines = text.splitlines()
+          selected = set()
+          for i, line in enumerate(lines):
+              if re.search(r'\bFAIL\s|Failed (Tests|Suites)|Test Files|\bTests\s+\d+ failed|##\[error\]', line):
+                  selected.update(range(max(0, i-1), min(len(lines), i+22)))
+          excerpts = '\n'.join(lines[i] for i in sorted(selected))
+          print(json.dumps({'run':run['id'], 'job':job['id'], 'productSha':run['head_sha'], 'logSha256':hashlib.sha256(raw).hexdigest(), 'excerpts':excerpts[-90000:]}, ensure_ascii=False, indent=2))
+          PY
