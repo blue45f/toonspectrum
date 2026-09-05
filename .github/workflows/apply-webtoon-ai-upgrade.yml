@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Verify, apply, and commit the reviewed patch
+      - name: Verify, reconcile, apply, and commit the reviewed patch
         shell: bash
         run: |
           set -euo pipefail
@@ -53,8 +53,183 @@ jobs:
           Path("/tmp/toonstudio-webtoon-ai-upgrade.patch").write_bytes(patch)
           PY
 
-          git apply --check --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
-          git apply --3way --whitespace=error-all /tmp/toonstudio-webtoon-ai-upgrade.patch
+          git apply --check --whitespace=error-all \
+            --exclude=src/domains/creator/ai/StudioAiToolPopoverBody.tsx \
+            --exclude=src/domains/creator/ai/StudioAiCompositionPanel.tsx \
+            /tmp/toonstudio-webtoon-ai-upgrade.patch
+          git apply --whitespace=error-all \
+            --exclude=src/domains/creator/ai/StudioAiToolPopoverBody.tsx \
+            --exclude=src/domains/creator/ai/StudioAiCompositionPanel.tsx \
+            /tmp/toonstudio-webtoon-ai-upgrade.patch
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one reconciliation anchor, found {count}: {old[:80]!r}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          tool = Path("src/domains/creator/ai/StudioAiToolPopoverBody.tsx")
+          replace_once(
+              tool,
+              'import { Suspense } from "react";',
+              'import { Suspense, useEffect, useState } from "react";',
+          )
+          replace_once(
+              tool,
+              'import { isStudioAiConfigured } from "./studio-ai-client";\n',
+              '''import { isStudioAiConfigured } from "./studio-ai-client";
+          import {
+            consumeStudioAiSuperSuiteOpenRequest,
+            subscribeStudioAiSuperSuiteOpenRequest,
+          } from "./studio-ai-super-suite-intent";
+          import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
+          ''',
+          )
+          replace_once(
+              tool,
+              'import { useT } from "@/lib/i18n";\n',
+              '''import { useT } from "@/lib/i18n";
+          import { lazyRetry } from "@/lib/lazy-retry";
+
+          const StudioAiSuperSuiteModal = lazyRetry(
+            () =>
+              import("./StudioAiSuperSuiteModal").then((mod) => ({
+                default: mod.StudioAiSuperSuiteModal,
+              })),
+            "StudioAiSuperSuiteModal"
+          );
+          ''',
+          )
+          replace_once(
+              tool,
+              '  const t = useT();\n  const lt =',
+              '''  const t = useT();
+            const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(() =>
+              consumeStudioAiSuperSuiteOpenRequest()
+            );
+            useEffect(
+              () => subscribeStudioAiSuperSuiteOpenRequest(() => setAiSuperSuiteOpen(true)),
+              []
+            );
+            const lt =''',
+          )
+          replace_once(
+              tool,
+              '  } = toolBelt.stableHandlers;\n\n  return (',
+              '''  } = toolBelt.stableHandlers;
+
+            const applySuperSuitePrompt = (prompt: string) => {
+              setAiAssistTool("background");
+              setAiBgPrompt(prompt);
+              setMenu("aiAssist");
+              setAiSuperSuiteOpen(false);
+            };
+
+            return (''',
+          )
+          replace_once(
+              tool,
+              '              onApplyPresetPrompt={applyAiAssistPresetPrompt}\n              providerSlot={',
+              '''              onApplyPresetPrompt={applyAiAssistPresetPrompt}
+                            onOpenScenario={() => {
+                              if (masterEditMode) return;
+                              setScenarioOpen(true);
+                              setMenu(null);
+                            }}
+                            scenarioDisabled={masterEditMode}
+                            scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
+                            onOpenSuperSuite={() => {
+                              setAiSuperSuiteOpen(true);
+                            }}
+                            providerSlot={''',
+          )
+
+          text = tool.read_text(encoding="utf-8")
+          closing = '    </>\n  );\n}'
+          index = text.rfind(closing)
+          if index < 0:
+              raise SystemExit(f"{tool}: final fragment anchor not found")
+          modal = '''      {aiSuperSuiteOpen ? (
+                  <Suspense
+                    fallback={
+                      <div
+                        className="fixed inset-0 z-[120] grid place-items-center bg-black/45 p-4 backdrop-blur-sm"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
+                          AI 웹툰 레시피 도구를 여는 중…
+                        </div>
+                      </div>
+                    }
+                  >
+                    <StudioAiSuperSuiteModal
+                      open
+                      onClose={() => setAiSuperSuiteOpen(false)}
+                      onApplyPrompt={applySuperSuitePrompt}
+                      onApplyPromptRecipe={(handoff) =>
+                        applySuperSuitePrompt(compileStudioAiSuitePromptHandoff(handoff))
+                      }
+                    />
+                  </Suspense>
+                ) : null}
+          '''
+          tool.write_text(text[:index] + modal + text[index:], encoding="utf-8")
+
+          composition = Path("src/domains/creator/ai/StudioAiCompositionPanel.tsx")
+          replacements = [
+              (
+                  '  const [copied, setCopied] = useState(false);',
+                  '  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");',
+              ),
+              ('    if (busy || !prompt) return;', '    if (busy || !configured || !prompt) return;'),
+              ('    setCopied(false);', '    setCopyState("idle");'),
+              ('      setCopied(true);', '      setCopyState("copied");'),
+              (
+                  '      // 클립보드 접근 불가(권한 등) — 조용히 무시, 사용자는 텍스트를 직접 선택해 복사할 수 있다.',
+                  '      setCopyState("failed");',
+              ),
+              (
+                  '          로그인해 서버 AI를 사용하거나 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>\n          에서 내 API 키를 등록하면 쓸 수 있어요.',
+                  '          장면 초안은 먼저 작성할 수 있어요. 실행하려면 로그인해 서버 AI를 사용하거나{" "}\n          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 내 API 키를 등록하세요.',
+              ),
+              (
+                  '          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();',
+                  '          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && configured) void run();',
+              ),
+              ('        disabled={!configured || busy}', '        disabled={busy}'),
+              (
+                  '                className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"\n              >\n                <Copy size={11} /> {copied ? "복사됨" : "복사"}\n              </button>',
+                  '''                className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                        >
+                          <Copy size={11} />{" "}
+                          {copyState === "copied"
+                            ? "복사됨"
+                            : copyState === "failed"
+                              ? "복사 실패"
+                              : "복사"}
+                        </button>
+                        <span className="sr-only" role="status" aria-live="polite">
+                          {copyState === "copied"
+                            ? "클립보드에 복사했어요."
+                            : copyState === "failed"
+                              ? "복사하지 못했어요. 텍스트를 직접 선택해 주세요."
+                              : ""}
+                        </span>''',
+              ),
+              (
+                  '                  className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"',
+                  '                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"',
+              ),
+          ]
+          for old, new in replacements:
+              replace_once(composition, old, new)
+          PY
+
           git diff --check
 
           rm -f \
