@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SFX_LEXICON_DATABASE } from "./assistant/webtoon-sfx-lexicon";
 import { StudioCompanionAssistantDisplay } from "./StudioCompanionAssistantDisplay";
 
 const TAB_PREFIX = "companion-assistant";
+const SFX_COUNT = SFX_LEXICON_DATABASE.length;
+const SFX_PAGE_SIZE = 6;
 
 afterEach(cleanup);
 
@@ -138,9 +141,11 @@ describe("StudioCompanionAssistantDisplay — 스크롤 페이싱", () => {
     render(<StudioCompanionAssistantDisplay />);
     openTab("스크롤 페이싱");
 
-    expect(screen.getByText("예시 데이터")).toBeTruthy();
-    expect(screen.getByText(/컷 높이 600px 가정/)).toBeTruthy();
-    expect(screen.getByText("화면당 컷수 미검사")).toBeTruthy();
+    // The header describes the canvas input; the active panel must independently label its analysis.
+    const panel = within(screen.getByRole("tabpanel", { name: "스크롤 페이싱" }));
+    expect(panel.getByText("예시 데이터")).toBeTruthy();
+    expect(panel.getByText(/컷 높이 600px 가정/)).toBeTruthy();
+    expect(panel.getByText("화면당 컷수 미검사")).toBeTruthy();
   });
 
   it("uses an entered viewport only after the author supplies one", () => {
@@ -165,8 +170,9 @@ describe("StudioCompanionAssistantDisplay — 스크롤 페이싱", () => {
     );
     openTab("스크롤 페이싱");
 
-    expect(screen.getByText("현재 원고")).toBeTruthy();
-    expect(screen.getByText("2컷 분석")).toBeTruthy();
+    const panel = within(screen.getByRole("tabpanel", { name: "스크롤 페이싱" }));
+    expect(panel.getByText("현재 원고")).toBeTruthy();
+    expect(panel.getByText("2컷 분석")).toBeTruthy();
   });
 });
 
@@ -174,21 +180,28 @@ describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
   it("잘라낸 결과를 숨기지 않고 개수와 더 보기 어포던스를 함께 보여준다", () => {
     openSfxTab();
 
-    expect(screen.getByText("총 20개 중 6개 표시")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "더 보기 (+14)" }));
+    expect(screen.getByText(`총 ${SFX_COUNT}개 중 ${SFX_PAGE_SIZE}개 표시`)).toBeTruthy();
+    expect(screen.getAllByRole("article")).toHaveLength(SFX_PAGE_SIZE);
+    fireEvent.click(screen.getByRole("button", { name: `더 보기 (+${SFX_COUNT - SFX_PAGE_SIZE})` }));
 
-    expect(screen.getByText("총 20개 중 12개 표시")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "더 보기 (+8)" })).toBeTruthy();
+    expect(screen.getByText(`총 ${SFX_COUNT}개 중 ${SFX_PAGE_SIZE * 2}개 표시`)).toBeTruthy();
+    expect(screen.getAllByRole("article")).toHaveLength(SFX_PAGE_SIZE * 2);
+    expect(screen.getByRole("button", { name: `더 보기 (+${SFX_COUNT - SFX_PAGE_SIZE * 2})` })).toBeTruthy();
   });
 
   it("검색어가 바뀌면 펼쳐둔 개수를 처음으로 되돌린다", () => {
     openSfxTab();
-    fireEvent.click(screen.getByRole("button", { name: "더 보기 (+14)" }));
+    fireEvent.click(screen.getByRole("button", { name: `더 보기 (+${SFX_COUNT - SFX_PAGE_SIZE})` }));
 
     fireEvent.change(screen.getByRole("searchbox", { name: "의성어·의태어 검색" }), {
       target: { value: "쿵" },
     });
     expect(screen.queryByText(/12개 표시/)).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox", { name: "의성어·의태어 검색" }), {
+      target: { value: "" },
+    });
+    expect(screen.getAllByRole("article")).toHaveLength(SFX_PAGE_SIZE);
+    expect(screen.getByText(`총 ${SFX_COUNT}개 중 ${SFX_PAGE_SIZE}개 표시`)).toBeTruthy();
   });
 
   it("결과가 없으면 빈 공간 대신 StudioEmptyState 와 초기화 경로를 준다", () => {
@@ -203,7 +216,7 @@ describe("StudioCompanionAssistantDisplay — 효과음 목록", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "검색 초기화" }));
     expect(document.querySelector('[data-studio-empty-state="true"]')).toBeNull();
-    expect(screen.getByText("총 20개 중 6개 표시")).toBeTruthy();
+    expect(screen.getByText(`총 ${SFX_COUNT}개 중 ${SFX_PAGE_SIZE}개 표시`)).toBeTruthy();
   });
 
   it("흰색 글리프가 라이트 테마에서 사라지지 않도록 외곽선을 함께 입힌다", () => {
@@ -367,17 +380,19 @@ describe("StudioCompanionAssistantDisplay — 타이머와 크로키", () => {
     fireEvent.click(screen.getByRole("button", { name: "180초" }));
     expect(screen.getByText("03:00")).toBeTruthy();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "투시 프리셋" }), {
-      target: { value: "dutch-tilt" },
-    });
-    expect(screen.getByText(/더치 앵글/)).toBeTruthy();
+    const select = screen.getByRole("combobox", { name: "투시 프리셋" }) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "dutch-tilt" } });
+    expect(select.value).toBe("dutch-tilt");
+    expect(within(select).getByRole("option", { selected: true }).textContent).toContain("더치 앵글");
+    // Verify the preview, not a duplicate label in the native select's option list.
+    expect(screen.getByText(/더치 앵글/, { selector: "p" })).toBeTruthy();
     expect(screen.getByText(/소실점 2개/)).toBeTruthy();
   });
 });
 
 describe("StudioCompanionAssistantDisplay — 터치 타깃 · 포커스 링", () => {
-  it("각 탭 본문의 모든 버튼이 공용 포커스 링과 44px 터치 타깃을 갖는다", () => {
-    const { container } = render(<StudioCompanionAssistantDisplay />);
+  it("각 탭 본문의 모든 조작 요소가 공용 포커스 링과 44px 터치 타깃을 갖는다", () => {
+    render(<StudioCompanionAssistantDisplay />);
 
     for (const label of [
       "플랫폼 규격",
@@ -388,16 +403,19 @@ describe("StudioCompanionAssistantDisplay — 터치 타깃 · 포커스 링", (
       "크로키 가이드",
     ]) {
       openTab(label);
-      const panel = screen.getByRole("tabpanel");
-      const buttons = Array.from(panel.querySelectorAll("button"));
-      expect(buttons.length).toBeGreaterThan(0);
-      for (const button of buttons) {
-        expect(button.className).toContain("focus-visible:outline-accent");
-        expect(button.className).toContain("min-h-11");
+      const panel = screen.getByRole("tabpanel", { name: label });
+      // Pacing is directly editable through inputs; it does not need an artificial action button.
+      const controls = Array.from(panel.querySelectorAll("button, input, select, textarea"));
+      expect(controls.length).toBeGreaterThan(0);
+      for (const control of controls) {
+        expect(control.className).toContain("focus-visible:outline-accent");
+        if (control.matches('input[type="color"]')) {
+          expect(control.classList.contains("size-11")).toBe(true);
+        } else {
+          expect(control.classList.contains("min-h-11")).toBe(true);
+        }
       }
     }
-
-    expect(container).toBeTruthy();
   });
 
   it("장식용 lucide 아이콘은 접근성 트리에서 감춘다", () => {
