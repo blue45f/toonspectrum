@@ -1,0 +1,38 @@
+name: Studio 120 source snapshot
+on:
+  push:
+    branches: [chore/studio-120-source-20260906]
+    paths: ['.github/workflows/studio-120-source.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: b814c165023dbb12b4a1a17cdead25e053d537e2
+          persist-credentials: false
+      - name: Archive tracked source and exact tree
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source"
+          git rev-parse HEAD > "$RUNNER_TEMP/source/revision.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/source/git-tree.txt"
+          python3 - <<'PY'
+          import os, pathlib, subprocess, tarfile
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'source/source.tar.gz'
+          suffixes = {'.ts','.tsx','.js','.jsx','.mjs','.mts','.cjs','.cts','.json','.yaml','.yml','.css','.scss','.html','.md','.mdx','.sql','.txt','.toml','.svg','.manifest','.jsonc'}
+          with tarfile.open(dest, 'w:gz') as archive:
+              for name in subprocess.check_output(['git','ls-files','-z']).decode().split('\0'):
+                  path = pathlib.Path(name)
+                  if name and path.is_file() and not path.is_symlink() and path.stat().st_size <= 8000000 and (path.suffix in suffixes or path.name in {'AGENTS.md','CLAUDE.md','.nvmrc','.gitignore','.npmrc','LICENSE','Dockerfile','Makefile','pre-commit','pre-push','commit-msg'}):
+                      archive.add(path, arcname=name, recursive=False)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-120-pinned-source
+          path: ${{ runner.temp }}/source
+          retention-days: 3
+          if-no-files-found: error
