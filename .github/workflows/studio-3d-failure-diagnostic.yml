@@ -8,7 +8,7 @@ permissions:
   actions: read
 jobs:
   evidence:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: Retrieve only the requested failed verification log
