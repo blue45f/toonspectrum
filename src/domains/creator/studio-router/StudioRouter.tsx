@@ -4,7 +4,9 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 
 import { StudioEditorRoute } from "./routes/StudioEditorRoute";
+import { StudioProductionRoute } from "./routes/StudioProductionRoute";
 import { StudioPublishRoute } from "./routes/StudioPublishRoute";
+import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
@@ -22,20 +24,6 @@ const StudioToolsCompanionPage = lazyRetry(
     default: module.StudioToolsCompanionPage,
   })),
   "StudioToolsCompanionPage",
-);
-
-const StudioProductionHubPage = lazyRetry(
-  () => import("../studio-production/StudioProductionHubPage").then((module) => ({
-    default: module.StudioProductionHubPage,
-  })),
-  "StudioProductionHubPage",
-);
-
-const StudioStoryworldLabPage = lazyRetry(
-  () => import("../storyworld/StudioStoryworldLabPage").then((module) => ({
-    default: module.StudioStoryworldLabPage,
-  })),
-  "StudioStoryworldLabPage",
 );
 
 export function StudioRouter() {
@@ -81,22 +69,18 @@ export function StudioRouter() {
       );
     case "production":
       return (
-        <Suspense fallback={<StudioRouteLoading label="제작 운영 허브를 여는 중..." />}>
-          <StudioProductionHubPage
-            surface={resolution.surface}
-            onOpenStudio={() => navigate("/studio")}
-          />
-        </Suspense>
+        <StudioProductionRoute
+          surface={resolution.surface}
+          onOpenStudio={() => navigate("/studio")}
+        />
       );
     case "storyworld":
       return (
-        <Suspense fallback={<StudioRouteLoading label="스토리월드 인과관계 랩을 여는 중..." />}>
-          <StudioStoryworldLabPage
-            key={resolution.lifecycleKey}
-            remixSourceWorkId={resolution.remixSourceWorkId}
-            workId={resolution.workId}
-          />
-        </Suspense>
+        <StudioStoryworldRoute
+          key={resolution.lifecycleKey}
+          remixSourceWorkId={resolution.remixSourceWorkId}
+          workId={resolution.workId}
+        />
       );
     case "placeholder":
       return (
