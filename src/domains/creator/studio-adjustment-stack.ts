@@ -6,6 +6,12 @@
  */
 
 import type { InkWash } from "./brush/studio-ink-wash";
+import {
+  STUDIO_FILTER_PACK_LABELS,
+  STUDIO_FILTER_UNION_WAVE_KINDS,
+  type StudioFilterUnionWaveKind,
+} from "./filter/studio-filter-pack-registry";
+import type { StudioFilterUnionWave } from "./filter/studio-filter-union-wave";
 import type {
   StudioFieldIrisBlurOptions,
   StudioLensBlurOptions,
@@ -118,9 +124,43 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "retro-film",
   "watercolor",
   "diffuse-glow",
+  /** Deterministic geometry, material, print and light filters shared with the full Filter Gallery. */
+  ...STUDIO_FILTER_UNION_WAVE_KINDS,
 ] as const;
 
 export type StudioAdjustmentEngineId = (typeof STUDIO_ADJUSTMENT_ENGINE_IDS)[number];
+
+const STUDIO_ADJUSTMENT_UNION_WAVE_ENGINE_SET = new Set<string>(
+  STUDIO_FILTER_UNION_WAVE_KINDS,
+);
+
+function isStudioAdjustmentUnionWaveEngine(
+  engine: StudioAdjustmentEngineId,
+): engine is StudioFilterUnionWaveKind {
+  return STUDIO_ADJUSTMENT_UNION_WAVE_ENGINE_SET.has(engine);
+}
+
+const STUDIO_ADJUSTMENT_UNION_WAVE_DEFAULT_PARAMS: Readonly<
+  Record<StudioFilterUnionWaveKind, Readonly<Record<string, number | string | boolean>>>
+> = Object.freeze({
+  "wave-warp": { amount: 42, scale: 28, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  "ripple-warp": { amount: 38, scale: 22, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  fisheye: { amount: 52, scale: 24, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  twirl: { amount: 46, scale: 24, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  "pinch-bloat": { amount: 44, scale: 24, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  "lens-distortion": { amount: 34, scale: 100, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, interpolation: "bilinear" },
+  "film-grain-pro": { amount: 34, scale: 1, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0 },
+  "salt-pepper": { amount: 22, scale: 24, detail: 50, seed: 7_331, centerX: 50, centerY: 50, angle: 0 },
+  "rgb-noise": { amount: 30, scale: 1, detail: 50, seed: 2_048, centerX: 50, centerY: 50, angle: 0 },
+  "perlin-texture": { amount: 42, scale: 32, detail: 153, seed: 404, centerX: 50, centerY: 50, angle: 0 },
+  pointillize: { amount: 86, scale: 9, detail: 50, seed: 1_886, centerX: 50, centerY: 50, angle: 0 },
+  "stained-glass": { amount: 88, scale: 12, detail: 96, seed: 1_440, centerX: 50, centerY: 50, angle: 0 },
+  "poster-edges": { amount: 82, scale: 6, detail: 92, seed: 1_337, centerX: 50, centerY: 50, angle: 0 },
+  photocopy: { amount: 94, scale: 2, detail: 148, seed: 1_337, centerX: 50, centerY: 50, angle: 0 },
+  "normal-map": { amount: 100, scale: 1, detail: 110, seed: 1_337, centerX: 50, centerY: 50, angle: 0 },
+  "god-rays": { amount: 68, scale: 7, detail: 152, seed: 1_337, centerX: 28, centerY: 20, angle: 0 },
+  "polar-coordinates": { amount: 100, scale: 24, detail: 50, seed: 1_337, centerX: 50, centerY: 50, angle: 0, mode: "rectangular-to-polar", interpolation: "bilinear" },
+});
 
 /** Every recognized engine is discoverable; legacy stacks and the add catalog cannot drift. */
 export const STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS = STUDIO_ADJUSTMENT_ENGINE_IDS;
@@ -134,6 +174,9 @@ export function studioAdjustmentEngineHasLivePreview(engine: StudioAdjustmentEng
 export function studioAdjustmentDefaultParams(
   engine: StudioAdjustmentEngineId,
 ): Record<string, number | string | boolean> {
+  if (isStudioAdjustmentUnionWaveEngine(engine)) {
+    return { ...STUDIO_ADJUSTMENT_UNION_WAVE_DEFAULT_PARAMS[engine] };
+  }
   switch (engine) {
     case "curves":
       return { preset: "soft-contrast" };
@@ -592,6 +635,9 @@ export function normalizeStudioAdjustmentFilterOperations(
 }
 
 export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): string {
+  if (isStudioAdjustmentUnionWaveEngine(engine)) {
+    return STUDIO_FILTER_PACK_LABELS[engine];
+  }
   switch (engine) {
     case "curves":
       return "곡선";
@@ -778,6 +824,7 @@ export type StudioAdjustmentEntryFilterFields = {
   sketch?: Sketch;
   stylize?: Stylize;
   detail?: Detail;
+  filterUnionWave?: StudioFilterUnionWave;
 };
 
 /** Projection spread onto an image element without flattening away order or duplicate engines. */
@@ -892,6 +939,30 @@ export function studioAdjustmentOperationToFilterFields(
   if (!entry?.enabled) return {};
   const out: StudioAdjustmentEntryFilterFields = {};
   const p = entry.params;
+  if (isStudioAdjustmentUnionWaveEngine(entry.engine)) {
+    const defaults = STUDIO_ADJUSTMENT_UNION_WAVE_DEFAULT_PARAMS[entry.engine];
+    const number = (
+      key: "amount" | "scale" | "detail" | "seed" | "centerX" | "centerY" | "angle",
+      fallback: number,
+      min: number,
+      max: number,
+    ) => Math.min(max, Math.max(min, finiteNumber(p[key], fallback)));
+    out.filterUnionWave = {
+      kind: entry.engine,
+      amount: number("amount", Number(defaults.amount), -100, 100),
+      scale: number("scale", Number(defaults.scale), 1, 200),
+      detail: number("detail", Number(defaults.detail), 0, 255),
+      seed: Math.round(number("seed", Number(defaults.seed), 0, 9_999)),
+      centerX: number("centerX", Number(defaults.centerX), 0, 100),
+      centerY: number("centerY", Number(defaults.centerY), 0, 100),
+      angle: number("angle", Number(defaults.angle), -180, 180),
+      mode: p.mode === "polar-to-rectangular"
+        ? "polar-to-rectangular"
+        : "rectangular-to-polar",
+      interpolation: p.interpolation === "nearest" ? "nearest" : "bilinear",
+    };
+    return out;
+  }
   switch (entry.engine) {
       case "blur":
         out.blur = finiteNumber(p.radius ?? p.blur, 0);

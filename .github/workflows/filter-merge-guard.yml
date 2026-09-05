@@ -1,0 +1,105 @@
+name: Guard exhaustive filter merge
+
+on:
+  push:
+    branches:
+      - feat/studio-filter-exhaustive-20260905
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: guard-filter-merge-724
+  cancel-in-progress: true
+
+jobs:
+  guard-and-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/studio-filter-exhaustive-20260905
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Require a clean product-only branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge --no-edit origin/main
+
+          forbidden=(
+            .github/filter-upgrade-parts
+            .github/workflows/temp-filter-source-export.yml
+            .github/workflows/filter-upgrade-finalizer.yml
+          )
+          for path in "${forbidden[@]}"; do
+            if [[ -e "$path" ]]; then
+              echo "Refusing merge while temporary path remains: $path" >&2
+              exit 1
+            fi
+          done
+
+          mapfile -t changed < <(git diff --name-only origin/main...HEAD)
+          printf 'PR files:\n%s\n' "${changed[*]}"
+          if ! printf '%s\n' "${changed[@]}" | grep -q '^src/'; then
+            echo "Refusing merge: no product source differs from main" >&2
+            exit 1
+          fi
+          if printf '%s\n' "${changed[@]}" | grep -Eq '^\.github/filter-upgrade-parts/|^\.github/workflows/(temp-filter-source-export|filter-upgrade-finalizer)\.yml$'; then
+            echo "Refusing merge: transfer or finalizer files remain in the PR diff" >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify the exact merge candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/domains/creator/filter
+          pnpm exec tsc --noEmit
+          pnpm run lint:quick
+          pnpm run build
+
+      - name: Remove guard and publish exact candidate
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          rm -f .github/workflows/filter-merge-guard.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(filter): remove completed merge guard"
+          fi
+          head_sha=$(git rev-parse HEAD)
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:feat/studio-filter-exhaustive-20260905
+
+      - name: Unlock and queue exact-head squash merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh pr ready 724
+          gh pr merge 724 \
+            --squash \
+            --auto \
+            --delete-branch \
+            --match-head-commit "$HEAD_SHA"

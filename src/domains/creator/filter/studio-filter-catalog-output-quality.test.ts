@@ -25,19 +25,13 @@ import {
 } from "../studio-image-filter-worker-protocol";
 
 import { STUDIO_FILTER_CATALOG } from "./studio-filter-catalog";
-import {
-  STUDIO_FILTER_PACK_DEFS,
-  studioFilterPackValuesToPatch,
-} from "./studio-filter-pack";
-import {
-  STUDIO_FILTER_UNION_WAVE_KINDS,
-  type StudioFilterUnionWaveKind,
-} from "./studio-filter-union-wave";
+import { STUDIO_FILTER_PACK_DEFS } from "./studio-filter-pack";
+import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./studio-filter-union-wave";
 
 import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "../studio-filters";
 
-type CatalogEngineId = StudioAdjustmentEngineId | StudioFilterUnionWaveKind;
+type CatalogEngineId = StudioAdjustmentEngineId;
 type FixtureKind = "line-art" | "photo";
 type QualityStage = "default" | "effective" | "low" | "high";
 
@@ -331,29 +325,30 @@ function fieldsFor(
   engine: CatalogEngineId,
   stage: QualityStage,
 ): ImageFilterFields {
-  if (STUDIO_ADJUSTMENT_ENGINE_IDS.includes(engine as StudioAdjustmentEngineId)) {
-    const adjustmentEngine = engine as StudioAdjustmentEngineId;
-    const monotonic = MONOTONIC_ADJUSTMENT_PARAMS[adjustmentEngine];
-    const params = stage === "default"
-      ? studioAdjustmentDefaultParams(adjustmentEngine)
-      : stage === "low" && monotonic
-        ? monotonic.low
-        : stage === "high" && monotonic
-          ? monotonic.high
-          : effectiveAdjustmentParams(adjustmentEngine);
-    return studioAdjustmentOperationToFilterFields({
-      id: `quality-${adjustmentEngine}-${stage}`,
-      engine: adjustmentEngine,
-      enabled: true,
-      params: { ...params },
-    });
+  const monotonic = MONOTONIC_ADJUSTMENT_PARAMS[engine];
+  let params: Readonly<Record<string, number | string | boolean>>;
+  if (stage === "default") {
+    params = studioAdjustmentDefaultParams(engine);
+  } else if (stage === "low" && monotonic) {
+    params = monotonic.low;
+  } else if (stage === "high" && monotonic) {
+    params = monotonic.high;
+  } else if (STUDIO_FILTER_UNION_WAVE_KINDS.some((candidate) => candidate === engine)) {
+    params = {
+      ...studioAdjustmentDefaultParams(engine),
+      ...(stage === "low" ? { amount: 20 } : {}),
+      ...(stage === "high" ? { amount: 80 } : {}),
+      ...(engine === "god-rays" ? { detail: 20 } : {}),
+    };
+  } else {
+    params = effectiveAdjustmentParams(engine);
   }
-  const unionEngine = engine as StudioFilterUnionWaveKind;
-  const values: Record<string, number> = {};
-  if (stage === "low") values.amount = 20;
-  else if (stage === "high") values.amount = 80;
-  if (unionEngine === "god-rays") values.detail = 20;
-  return studioFilterPackValuesToPatch(unionEngine, values);
+  return studioAdjustmentOperationToFilterFields({
+    id: `quality-${engine}-${stage}`,
+    engine,
+    enabled: true,
+    params: { ...params },
+  });
 }
 
 function render(
@@ -436,10 +431,7 @@ class ApplyingWorker implements StudioImageFilterWorkerLike {
 describe("studio filter catalog output quality", () => {
   it("enumerates one 77-engine source-of-truth with no duplicate or unsupported entries", () => {
     const catalogIds = STUDIO_FILTER_CATALOG.map((entry) => entry.engine);
-    const executableIds = [
-      ...STUDIO_ADJUSTMENT_ENGINE_IDS,
-      ...STUDIO_FILTER_UNION_WAVE_KINDS,
-    ];
+    const executableIds = [...STUDIO_ADJUSTMENT_ENGINE_IDS];
     expect(catalogIds).toHaveLength(77);
     expect(new Set(catalogIds).size).toBe(77);
     expect([...catalogIds].sort()).toEqual([...executableIds].sort());
@@ -448,6 +440,7 @@ describe("studio filter catalog output quality", () => {
     const classifiedAdjustmentIds = [
       ...monotonicIds,
       ...NON_MONOTONIC_ADJUSTMENT_ENGINES,
+      ...STUDIO_FILTER_UNION_WAVE_KINDS,
     ];
     expect(new Set(classifiedAdjustmentIds).size).toBe(STUDIO_ADJUSTMENT_ENGINE_IDS.length);
     expect([...classifiedAdjustmentIds].sort())
@@ -467,10 +460,7 @@ describe("studio filter catalog output quality", () => {
 
   it("allows only explicitly documented neutral defaults to compile as identity", () => {
     const identityDefaults: CatalogEngineId[] = [];
-    for (const engine of [
-      ...STUDIO_ADJUSTMENT_ENGINE_IDS,
-      ...STUDIO_FILTER_UNION_WAVE_KINDS,
-    ]) {
+    for (const engine of STUDIO_ADJUSTMENT_ENGINE_IDS) {
       const built = buildImageFilters(fieldsFor(engine, "default"), registry);
       if (built.filters.length === 0) identityDefaults.push(engine);
     }
@@ -480,10 +470,7 @@ describe("studio filter catalog output quality", () => {
   it.each(["line-art", "photo"] as const)(
     "makes every valid filter visibly non-identity and deterministic on %s pixels",
     (kind) => {
-      for (const engine of [
-        ...STUDIO_ADJUSTMENT_ENGINE_IDS,
-        ...STUDIO_FILTER_UNION_WAVE_KINDS,
-      ]) {
+      for (const engine of STUDIO_ADJUSTMENT_ENGINE_IDS) {
         const first = render(engine, kind);
         const repeated = render(engine, kind);
         expect(
@@ -511,10 +498,7 @@ describe("studio filter catalog output quality", () => {
   it.each(["line-art", "photo"] as const)(
     "keeps every distinct filter perceptually distinguishable on %s pixels",
     (kind) => {
-      const outputs = [
-        ...STUDIO_ADJUSTMENT_ENGINE_IDS,
-        ...STUDIO_FILTER_UNION_WAVE_KINDS,
-      ].map((engine) => ({
+      const outputs = STUDIO_ADJUSTMENT_ENGINE_IDS.map((engine) => ({
         engine,
         output: render(engine, kind).output,
       }));
@@ -562,10 +546,7 @@ describe("studio filter catalog output quality", () => {
   );
 
   it("keeps all 77 CPU outputs byte-identical through the existing module Worker contract", async () => {
-    for (const engine of [
-      ...STUDIO_ADJUSTMENT_ENGINE_IDS,
-      ...STUDIO_FILTER_UNION_WAVE_KINDS,
-    ]) {
+    for (const engine of STUDIO_ADJUSTMENT_ENGINE_IDS) {
       const source = photoFixture(23, 17);
       const cpu = cloneImage(source);
       const fields = fieldsFor(engine, "effective");

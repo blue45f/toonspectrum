@@ -1,0 +1,124 @@
+name: Studio quality independent core
+
+on:
+  push:
+    branches:
+      - verify/studio-quality-core-20260905
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-quality-independent-core-20260905
+  cancel-in-progress: true
+
+jobs:
+  independent-quality-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: webdex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webdex -d webdex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: "true"
+      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex:webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: webdex_runtime
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prove validation tree matches the product PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin feat/studio-quality-inspection-20260905
+          expected="$(git rev-parse origin/feat/studio-quality-inspection-20260905^{tree})"
+          actual="$(git rev-parse HEAD^{tree})"
+          workflow_blob="$(git rev-parse HEAD:.github/workflows/studio-quality-independent-core.yml)"
+          base_tree="$(git rev-parse HEAD^1^{tree})"
+          echo "product tree: ${expected}"
+          echo "validation tree: ${actual}"
+          echo "workflow blob: ${workflow_blob}"
+          # This validation branch is exactly the product PR plus this one workflow file.
+          git diff --name-only HEAD^1...HEAD | grep -Fxq '.github/workflows/studio-quality-independent-core.yml'
+          test "$(git diff --name-only HEAD^1...HEAD | wc -l)" -eq 1
+          test "$base_tree" = "$expected"
+
+      - name: Validate architecture
+        run: pnpm run validate:architecture
+
+      - name: Lint repository
+        run: pnpm run lint
+
+      - name: Type-check root and API
+        run: pnpm run typecheck
+
+      - name: Provision test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'webdex_runtime'
+            ) THEN
+              CREATE ROLE webdex_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+            END IF;
+          END;
+          $$;
+          GRANT CONNECT ON DATABASE webdex TO webdex_runtime;
+          GRANT USAGE ON SCHEMA public TO webdex_runtime;
+          SQL
+          pnpm exec drizzle-kit push --force
+
+      - name: Run focused finishing-quality regressions
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-quality-inspection.test.ts
+          src/domains/creator/studio-quality-raster-inspection.test.ts
+          src/domains/creator/StudioContinuityPanel.test.tsx
+          src/domains/creator/StudioLazyPanelStack.test.tsx
+          src/domains/creator/StudioMenubarContent.test.tsx
+          src/domains/creator/studio-review-entry-point-viewports.test.tsx
+          --reporter=verbose
+
+      - name: Verify Studio menu contracts
+        run: pnpm run verify:studio-menus
+
+      - name: Run complete root test and performance suites
+        timeout-minutes: 40
+        run: pnpm run test
+
+      - name: Build production application
+        run: pnpm run build
+
+      - name: Verify Studio bundle budgets
+        run: pnpm run check:studio-bundle
