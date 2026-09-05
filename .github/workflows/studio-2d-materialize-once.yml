@@ -16,7 +16,7 @@ concurrency:
 jobs:
   prepare:
     if: github.ref == 'refs/heads/feat/studio-2d-assets-quality-20260906'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -27,6 +27,7 @@ jobs:
         run: |
           python3 scripts/.studio-2d-transfer/finalize.py
           python3 scripts/.studio-2d-transfer/placement.py
+          python3 scripts/.studio-2d-transfer/polish.py
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
