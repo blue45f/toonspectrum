@@ -12,20 +12,24 @@ concurrency:
   group: quality-inspection-repair-737
   cancel-in-progress: true
 
+env:
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  FEATURE_BRANCH: feat/studio-quality-inspection-20260905
+
 jobs:
-  repair-and-verify:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      CI: "true"
-      NODE_OPTIONS: --max-old-space-size=8192
-      FEATURE_BRANCH: feat/studio-quality-inspection-20260905
+  prepare-sources:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    outputs:
+      head: ${{ steps.apply.outputs.head }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Synchronize exact feature head with current main
+      - name: Synchronize and apply exact reviewed repairs
+        id: apply
         shell: bash
         run: |
           set -euo pipefail
@@ -33,16 +37,78 @@ jobs:
           git config user.name "quality-inspection-verifier"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main "$FEATURE_BRANCH"
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$FEATURE_BRANCH")"
-          git rev-parse HEAD > "$RUNNER_TEMP/quality-737/expected-head.txt"
+          expected="$(git rev-parse HEAD)"
+          test "$expected" = "$(git rev-parse "origin/$FEATURE_BRANCH")"
           git rev-parse origin/main > "$RUNNER_TEMP/quality-737/main-base.txt"
           git merge --no-edit origin/main
-      - name: Apply reviewed fixes and regression cases
-        run: |
-          set -euo pipefail
           python3 .github/quality-737-repair.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/domains/creator/studio-quality-inspection-hardening.test.ts')
+          s = p.read_text()
+          s = s.replace('it.each([null, undefined, 42, {}, ["not", "a", "string"]])(', 'it.each([null, undefined, 42, {}, ["not", "a", "string"]].map((text) => ({ text })))(')
+          s = s.replace('without throwing: %j`, (text) => {', 'without throwing: %j`, ({ text }) => {')
+          p.write_text(s)
+          p = Path('src/domains/creator/StudioContinuityPanel.tsx')
+          s = p.read_text().replace('  if (storageKey === null || typeof localStorage === "undefined") return {};\n  try {', '  if (storageKey === null) return {};\n  try {\n    if (typeof localStorage === "undefined") return {};')
+          s = s.replace('      loadedStorageKey !== `${storageKey}:${report.revisionKey}` ||\n      typeof localStorage === "undefined"', '      loadedStorageKey !== `${storageKey}:${report.revisionKey}`')
+          s = s.replace('      localStorage.setItem(storageKey, JSON.stringify(payload));', '      globalThis.localStorage?.setItem(storageKey, JSON.stringify(payload));')
+          p.write_text(s)
+          PY
           rm .github/quality-737-repair.py
           git diff --check
+          actual="$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)"
+          test "$actual" = "$expected"
+          git add -A -- .github/quality-737-repair.py \
+            src/domains/creator/StudioContinuityPanel.tsx \
+            src/domains/creator/StudioContinuityPanel.test.tsx \
+            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
+            src/domains/creator/StudioLazyPanelStack.tsx \
+            src/domains/creator/StudioLazyPanelStack.test.tsx \
+            src/domains/creator/studio-quality-inspection.ts \
+            src/domains/creator/studio-quality-inspection-hardening.test.ts
+          git diff --cached --check
+          git commit -m "fix(quality): isolate review receipts and reject malformed finishing data"
+          git push origin HEAD:"$FEATURE_BRANCH"
+          head="$(git rev-parse HEAD)"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$head" > "$RUNNER_TEMP/quality-737/staged-head.txt"
+      - name: Export exact maintained source snapshot
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/quality-737"
+          git status --short > "$RUNNER_TEMP/quality-737/status.txt"
+          python3 - <<'PY'
+          import os, pathlib, subprocess, zipfile
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'quality-737' / 'sources.zip'
+          names = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']).decode().split('\0')
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(set(names)):
+                  p = pathlib.Path(name)
+                  if not name or not p.is_file() or p.stat().st_size > 2_000_000:
+                      continue
+                  if p.suffix.lower() in {'.ts','.tsx','.mjs','.mts','.js','.json','.yaml','.yml','.md','.css','.sql'} and p.parts[0] not in {'public','data','marketplace-benchmark','dist','node_modules'}:
+                      z.write(p, name)
+          print(out, out.stat().st_size)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-737-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/quality-737
+          retention-days: 3
+          if-no-files-found: error
+
+  verify-product:
+    needs: prepare-sources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-sources.outputs.head }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -53,12 +119,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-737"
           git diff --name-only --diff-filter=ACMR origin/main -- '*.ts' '*.tsx' '*.mts' > "$RUNNER_TEMP/quality-737/lint-files.txt"
-          printf '%s\n' src/domains/creator/studio-quality-inspection-hardening.test.ts src/domains/creator/StudioContinuityPanel.hardening.test.tsx >> "$RUNNER_TEMP/quality-737/lint-files.txt"
-          sort -u "$RUNNER_TEMP/quality-737/lint-files.txt" -o "$RUNNER_TEMP/quality-737/lint-files.txt"
           xargs pnpm exec eslint --fix < "$RUNNER_TEMP/quality-737/lint-files.txt"
           xargs pnpm exec eslint --max-warnings=0 < "$RUNNER_TEMP/quality-737/lint-files.txt"
       - name: Verify quality engines, review lifecycle and host navigation
+        shell: bash
         run: |
           set -euo pipefail
           pnpm exec vitest run \
@@ -72,72 +138,44 @@ jobs:
             src/domains/creator/StudioToolBeltContent.hints.test.ts \
             --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/quality-737/tests.log"
       - name: Validate architecture and full root TypeScript
+        shell: bash
         run: |
           set -euo pipefail
           pnpm run validate:architecture 2>&1 | tee "$RUNNER_TEMP/quality-737/architecture.log"
           pnpm exec tsc -p tsconfig.json --noEmit 2>&1 | tee "$RUNNER_TEMP/quality-737/typecheck.log"
       - name: Build production assets
-        run: |
-          set -euo pipefail
-          pnpm run build 2>&1 | tee "$RUNNER_TEMP/quality-737/build.log"
-      - name: Commit verified feature changes without overwriting concurrent work
         shell: bash
         run: |
           set -euo pipefail
-          expected="$(cat "$RUNNER_TEMP/quality-737/expected-head.txt")"
+          pnpm run build 2>&1 | tee "$RUNNER_TEMP/quality-737/build.log"
+      - name: Commit validated source formatting without overwriting concurrent work
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ needs.prepare-sources.outputs.head }}
+        run: |
+          set -euo pipefail
           actual="$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)"
-          test "$actual" = "$expected"
-          git add -A -- \
-            .github/quality-737-repair.py \
-            src/domains/creator/StudioContinuityPanel.tsx \
-            src/domains/creator/StudioContinuityPanel.test.tsx \
-            src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
-            src/domains/creator/StudioLazyPanelStack.tsx \
-            src/domains/creator/StudioLazyPanelStack.test.tsx \
-            src/domains/creator/studio-quality-inspection.ts \
-            src/domains/creator/studio-quality-inspection-hardening.test.ts \
-            src/domains/creator/studio-quality-inspection.test.ts \
-            src/domains/creator/studio-quality-raster-inspection.ts \
-            src/domains/creator/studio-quality-raster-inspection.test.ts \
-            src/domains/creator/StudioMenubarContent.test.tsx \
-            src/domains/creator/StudioProjectReviewActions.tsx \
-            src/domains/creator/StudioToolBeltContent.hints.test.ts \
-            src/domains/creator/StudioToolBeltContent.tsx \
-            src/domains/creator/StudioToolBeltCreateModeUtilityButtons.tsx \
-            src/domains/creator/studio-command-catalog.ts \
-            src/domains/creator/studio-main-menu-items-production.ts \
-            src/domains/creator/studio-review-entry-point-viewports.test.tsx \
-            scripts/verify-studio-menus.mts
+          test "$actual" = "$EXPECTED_HEAD"
+          git config user.name "quality-inspection-verifier"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          while IFS= read -r file; do git add -- "$file"; done < "$RUNNER_TEMP/quality-737/lint-files.txt"
           git diff --cached --check
-          git commit -m "fix(quality): isolate review receipts and harden finishing inspection"
-          git push origin HEAD:"$FEATURE_BRANCH"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(quality): normalize verified finishing inspection imports"
+            git push origin HEAD:"$FEATURE_BRANCH"
+          fi
           git rev-parse HEAD > "$RUNNER_TEMP/quality-737/verified-feature-head.txt"
-      - name: Package exact diagnostic sources and patch
+      - name: Capture exact verification diagnostics
         if: always()
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/quality-737"
           git diff > "$RUNNER_TEMP/quality-737/worktree.diff"
           git status --short > "$RUNNER_TEMP/quality-737/status.txt"
-          python3 - <<'PY'
-          import os, pathlib, subprocess, zipfile
-          root = pathlib.Path('.')
-          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'quality-737' / 'sources.zip'
-          names = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']).decode().split('\0')
-          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
-              for name in sorted(set(names)):
-                  p = root / name
-                  if not name or not p.is_file() or p.stat().st_size > 2_000_000:
-                      continue
-                  if p.suffix.lower() in {'.ts','.tsx','.mjs','.mts','.js','.json','.yaml','.yml','.md','.css','.sql'}:
-                      if p.parts[0] not in {'public','data','marketplace-benchmark','dist','node_modules'}:
-                          z.write(p, name)
-          print(out, out.stat().st_size)
-          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: quality-737-repair-${{ github.run_id }}
+          name: quality-737-verification-${{ github.run_id }}
           path: ${{ runner.temp }}/quality-737
           retention-days: 3
           if-no-files-found: error
