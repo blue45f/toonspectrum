@@ -422,11 +422,12 @@ export default defineConfig(({ mode }) => ({
             id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-workflow.ts")
             || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts")
             || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-multipass.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx")
           ) {
-            // The editor already needs the scene summary and synchronous LT preflight. Keep these
-            // pure models and their dependency-free preset catalog in one request, rather than
-            // separate shared chunks introduced by the lazy Pro Suite. Never include panels,
-            // SceneDocument runtime, renderer engines or archive/Worker clients in this group.
+            // The editor already needs these production UI contracts and its shared context.
+            // Co-locate the 200-byte context instead of issuing another request on activation.
+            // Its only runtime dependency is React, which keeps its existing react-runtime chunk.
+            // Never include panels, SceneDocument runtime, engines or archive/Worker clients here.
             return "studio-bg3d-production-models";
           }
           if (

@@ -9,6 +9,8 @@ const MODEL_PATHS = [
   "src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts",
   "src/domains/creator/bg3d/studio-bg3d-production-multipass.ts",
 ];
+const CONTEXT_PATH = "src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx";
+const GROUP_PATHS = [...MODEL_PATHS, CONTEXT_PATH];
 
 function parseFile(file: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -24,8 +26,8 @@ function visitTree(node: ts.Node, visit: (node: ts.Node) => void): void {
   ts.forEachChild(node, (child) => visitTree(child, visit));
 }
 
-describe("BG3D production model chunk boundary", () => {
-  it("co-locates exactly the three pure production models, not panels or engines", () => {
+describe("BG3D production UI contract chunk boundary", () => {
+  it("co-locates exactly the production models and their shared context, not panels or engines", () => {
     const matchedPaths: string[] = [];
     let matchingGroups = 0;
     visitTree(parseFile("vite.config.ts"), (node) => {
@@ -43,10 +45,10 @@ describe("BG3D production model chunk boundary", () => {
       });
     });
     expect(matchingGroups).toBe(1);
-    expect(matchedPaths.toSorted()).toEqual(MODEL_PATHS.map((file) => `/${file}`).toSorted());
+    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map((file) => `/${file}`).toSorted());
   });
 
-  it.each(MODEL_PATHS)("keeps %s free of external runtime dependencies", (file) => {
+  it.each(GROUP_PATHS)("keeps %s within its explicit runtime dependency boundary", (file) => {
     const source = parseFile(file);
     const runtimeImports: string[] = [];
     const emitted = ts.transpileModule(source.text, {
@@ -63,8 +65,11 @@ describe("BG3D production model chunk boundary", () => {
         expect(ts.isIdentifier(node.expression) && node.expression.text === "require").toBe(false);
       }
     });
-    expect(runtimeImports).toEqual(file.endsWith("production-pass-readiness.ts")
-      ? ["./studio-bg3d-production-multipass"]
-      : []);
+    const expectedImports = file === CONTEXT_PATH
+      ? ["react"]
+      : file.endsWith("production-pass-readiness.ts")
+        ? ["./studio-bg3d-production-multipass"]
+        : [];
+    expect(runtimeImports).toEqual(expectedImports);
   });
 });
