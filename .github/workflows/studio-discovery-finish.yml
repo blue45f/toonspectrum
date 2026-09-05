@@ -16,47 +16,19 @@ jobs:
   integrate:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/fix/studio-brush-filter-discovery-20260906'
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
-      actions: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     outputs:
       source_ref: ${{ steps.publish.outputs.source_ref }}
     steps:
-      - name: Cancel only superseded discovery runs on this exact PR branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 - <<'PY'
-          import json, os, urllib.request, urllib.parse, urllib.error
-          repo = 'blue45f/toonspectrum'
-          branch = 'fix/studio-brush-filter-discovery-20260906'
-          assert os.environ['GITHUB_REPOSITORY'] == repo
-          current = int(os.environ['GITHUB_RUN_ID'])
-          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
-          paths = {'.github/workflows/studio-discovery-ux.yml', '.github/workflows/studio-discovery-contracts.yml', '.github/workflows/studio-discovery-finish.yml'}
-          url = 'https://api.github.com/repos/' + repo + '/actions/runs?' + urllib.parse.urlencode({'branch': branch, 'per_page': 100})
-          with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
-              runs = json.load(response)['workflow_runs']
-          for run in runs:
-              if run['id'] == current or run['head_branch'] != branch or run['path'].split('@')[0] not in paths:
-                  continue
-              if run['status'] not in ('queued', 'in_progress', 'pending', 'waiting'):
-                  continue
-              endpoint = 'https://api.github.com/repos/' + repo + '/actions/runs/' + str(run['id']) + '/cancel'
-              try:
-                  with urllib.request.urlopen(urllib.request.Request(endpoint, data=b'', headers=headers, method='POST'), timeout=30):
-                      print('Superseded discovery run cancelled:', run['id'], run['name'])
-              except urllib.error.HTTPError as error:
-                  if error.code != 409:
-                      raise
-                  print('Run already completed:', run['id'])
-          PY
       - uses: actions/checkout@v6
         with:
           ref: fix/studio-brush-filter-discovery-20260906
           fetch-depth: 100
-      - name: Apply previously reviewed blob-guarded integration edits
+      - name: Apply reviewed filter integration and refresh from main
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -70,9 +42,7 @@ jobs:
               'scripts/verify-studio-discovery-ux.mts': 'receipt.failure =',
           }
           applied = [marker in Path(path).read_text() for path, marker in markers.items()]
-          if all(applied):
-              print('Integration already present; verifying instead of applying twice.')
-          else:
+          if not all(applied):
               assert not any(applied), 'Partially applied integration requires review'
               source = subprocess.check_output(['git', 'show', '526e5d8dd246ef04a423053c4a3c184e50658763:.github/workflows/studio-discovery-finish.yml'], text=True)
               lines = source.splitlines()
@@ -84,19 +54,17 @@ jobs:
                   command.append(line[10:] if line else '')
               assert command[0] == "python3 - <<'PY'" and 'git diff --check' in command
               subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', '\n'.join(command)], check=True)
-          # The menu factory crosses a domain subsystem boundary. Preserve the guard,
-          # and use the same explicit alias convention required by the repository.
           path = Path('src/domains/creator/studio-main-menu-items-filter.ts')
           text = path.read_text()
           old = 'import { orderStudioFilterMenuItems } from "./filter/studio-filter-menu-groups";'
           new = 'import { orderStudioFilterMenuItems } from "@/domains/creator/filter/studio-filter-menu-groups";'
-          assert text.count(old) + text.count(new) == 1, 'Unexpected filter grouping import'
+          assert text.count(old) + text.count(new) == 1
           path.write_text(text.replace(old, new))
           PY
           git diff --check
           git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts .github/workflows/studio-discovery-ux.yml
           if ! git diff --cached --quiet; then
-            git -c core.hooksPath=/dev/null commit -m 'fix(studio): align filter discovery groups and browser entry points'
+            git -c core.hooksPath=/dev/null commit -m 'fix(studio): align filter groups and browser entry points'
           fi
           git fetch origin main --depth=100
           git -c core.hooksPath=/dev/null merge --no-edit origin/main
@@ -106,24 +74,25 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Normalize only reviewed files and incoming import-order warnings
+      - name: Enforce strict lint and subsystem boundaries
         run: |
-          pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
+          pnpm exec eslint src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts src/domains/creator/brush/StudioSubToolPalette.tsx src/domains/creator/brush/studio-shortcut-brush-search.ts src/domains/creator/brush/studio-shortcut-brush-search.test.ts scripts/verify-studio-discovery-ux.mts --fix --max-warnings=0
+          node scripts/check-architecture-boundaries.mjs
           git diff --check
-      - name: Enforce repository architecture boundaries before publishing
-        run: node scripts/check-architecture-boundaries.mjs
-      - name: Verify grouping, inventory, actions, naming and search contracts before publishing
-        run: pnpm exec vitest run src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/filter/studio-filter-discovery.test.ts src/domains/creator/brush/studio-brush-catalog-names.test.ts src/domains/creator/brush/studio-brush-discovery.test.ts src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx
-      - name: Publish isolated changes without force or main writes
+      - name: Verify exact source and focused discovery contracts
+        run: |
+          git rev-parse HEAD
+          git hash-object src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx src/domains/creator/brush/StudioSubToolPalette.tsx
+          pnpm exec vitest run src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/filter/studio-filter-discovery.test.ts src/domains/creator/brush/studio-brush-catalog-names.test.ts src/domains/creator/brush/studio-brush-discovery.test.ts src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx src/domains/creator/brush/studio-shortcut-brush-search.test.ts
+      - name: Publish isolated changes with normal pre-push validation
         id: publish
         run: |
-          git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts scripts/verify-studio-discovery-ux.mts
+          git add src/domains/creator/filter/StudioFilterDialog.tsx src/domains/creator/filter/studio-filter-menu-groups.ts src/domains/creator/filter/studio-filter-menu-groups.test.ts src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts src/domains/creator/brush/StudioSubToolPalette.tsx src/domains/creator/brush/studio-shortcut-brush-search.ts src/domains/creator/brush/studio-shortcut-brush-search.test.ts scripts/verify-studio-discovery-ux.mts
           if ! git diff --cached --quiet; then
-            git -c core.hooksPath=/dev/null commit -m 'style(studio): normalize discovery and incoming brush imports'
+            git -c core.hooksPath=/dev/null commit -m 'style(studio): normalize reviewed discovery imports'
           fi
           git push origin HEAD:refs/heads/fix/studio-brush-filter-discovery-20260906
           echo "source_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Verified integration source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
 
   verify:
     needs: integrate
@@ -144,7 +113,7 @@ jobs:
         with:
           pattern: studio-discovery-*
           path: /tmp/discovery-review
-      - name: Preserve synthetic UI and stroke screenshots outside the product branch
+      - name: Preserve synthetic screenshots outside the product branch
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEW_SOURCE_SHA: ${{ needs.integrate.outputs.source_ref }}
@@ -162,10 +131,8 @@ jobs:
               with urllib.request.urlopen(request, timeout=60) as response:
                   return json.load(response)
           root = Path('/tmp/discovery-review')
-          # Only synthetic test screenshots; never publish the built application, fonts, HTML, logs, or environment.
           files = sorted(p for p in root.rglob('*.png') if 'studio-discovery-dist' not in p.parts and p.stat().st_size <= 4_000_000)[:100]
-          tree = []
-          names = []
+          tree, names = [], []
           for path in files:
               name = path.relative_to(root).as_posix()
               sha = post('/git/blobs', {'encoding': 'base64', 'content': base64.b64encode(path.read_bytes()).decode()})['sha']
@@ -173,10 +140,10 @@ jobs:
               names.append(name)
           summary = {'source': os.environ['REVIEW_SOURCE_SHA'], 'workflow_run': os.environ['GITHUB_RUN_ID'], 'verification': os.environ['VERIFICATION_RESULT'], 'screenshots': names, 'manual_visual_review': 'not yet recorded'}
           tree.append({'path': 'summary.json', 'mode': '100644', 'type': 'blob', 'content': json.dumps(summary, ensure_ascii=False, indent=2) + '\n'})
-          readme = '# Studio discovery synthetic visual evidence\n\nSource: `' + summary['source'] + '`\n\nWorkflow verification: ' + summary['verification'] + '\n\nThese are test-generated screenshots, not a claim of manual approval. No product branch is changed by this evidence export.\n\n' + '\n'.join('![' + name + '](' + name + ')' for name in names) + '\n'
+          readme = '# Synthetic discovery visual evidence\n\nSource: `' + summary['source'] + '`\n\nVerification: ' + summary['verification'] + '\n\nNot yet manually approved. No product branch is changed.\n\n' + '\n'.join('![' + name + '](' + name + ')' for name in names) + '\n'
           tree.append({'path': 'README.md', 'mode': '100644', 'type': 'blob', 'content': readme})
           tree_sha = post('/git/trees', {'tree': tree})['sha']
-          commit = post('/git/commits', {'message': 'test(studio): preserve synthetic discovery visual evidence', 'tree': tree_sha, 'parents': []})['sha']
+          commit = post('/git/commits', {'message': 'test(studio): preserve synthetic discovery screenshots', 'tree': tree_sha, 'parents': []})['sha']
           branch = 'qa/studio-discovery-771-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT']
           post('/git/refs', {'ref': 'refs/heads/' + branch, 'sha': commit})
           print(json.dumps({'evidence_commit': commit, 'evidence_branch': branch, **summary}, ensure_ascii=False, indent=2))
