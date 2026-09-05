@@ -1,0 +1,353 @@
+{
+  "version": 5,
+  "assets": [
+    {
+      "id": "mic",
+      "file": "atelier_microphone.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.025,
+        0
+      ],
+      "bounds": [
+        [
+          -0.02969999983906746,
+          -0.09099999815225601,
+          -0.02969999983906746
+        ],
+        [
+          0.02969999983906746,
+          0.10825886577367783,
+          0.02969999983906746
+        ]
+      ],
+      "triangles": 36860,
+      "drawCalls": 4,
+      "bytes": 903144,
+      "sha256": "69d212509c74910ca0e0f016568e4650fce77c166932e8f61985b241e3861589"
+    },
+    {
+      "id": "cap",
+      "file": "everyday_cap.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -0.10614974051713943,
+          0.05739999935030937,
+          -0.09924999624490738
+        ],
+        [
+          0.10614974051713943,
+          0.1647000014781952,
+          0.17299999296665192
+        ]
+      ],
+      "triangles": 14664,
+      "drawCalls": 4,
+      "bytes": 359024,
+      "sha256": "89fcf4469b018769d76258bb8c67aacc979a010297edc11d2ee3e098cede353a"
+    },
+    {
+      "id": "beret",
+      "file": "atelier_beret.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.02,
+        0
+      ],
+      "bounds": [
+        [
+          -0.11254497617483139,
+          -0.026000000536441803,
+          -0.09262428432703018
+        ],
+        [
+          0.09799999743700027,
+          0.06883634626865387,
+          0.09262428432703018
+        ]
+      ],
+      "triangles": 6336,
+      "drawCalls": 3,
+      "bytes": 152220,
+      "sha256": "b55fccf648bf9e0601dffb5c5254fb24ebd1f93ef999bacac3c50510e9b99206"
+    },
+    {
+      "id": "sunglasses",
+      "file": "atelier_sunglasses.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -0.07292677462100983,
+          -0.022137392312288284,
+          -0.10601211339235306
+        ],
+        [
+          0.07292677462100983,
+          0.022137392312288284,
+          0.0031814957037568092
+        ]
+      ],
+      "triangles": 9648,
+      "drawCalls": 4,
+      "bytes": 253456,
+      "sha256": "e265db7aaeef5d1e1a82355a6c272ed026522a9d536ed5f4a7678816fdd6543b"
+    },
+    {
+      "id": "headphones",
+      "file": "atelier_headphones.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.04,
+        0
+      ],
+      "bounds": [
+        [
+          -0.11168786883354187,
+          -0.07162748277187347,
+          -0.027302507311105728
+        ],
+        [
+          0.11168786883354187,
+          0.09449999779462814,
+          0.02449999935925007
+        ]
+      ],
+      "triangles": 14736,
+      "drawCalls": 5,
+      "bytes": 367440,
+      "sha256": "cc13fcba8ccf29170a851b32687fe8194c28be69d43de6a1de8142c411dcbe5a"
+    },
+    {
+      "id": "ribbon",
+      "file": "atelier_ribbon.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        -0.05,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -0.05530203506350517,
+          -0.07400000095367432,
+          -0.013000000268220901
+        ],
+        [
+          0.05530203506350517,
+          0.026924096047878265,
+          0.013000000268220901
+        ]
+      ],
+      "triangles": 8460,
+      "drawCalls": 2,
+      "bytes": 207772,
+      "sha256": "05936396658c2f0bf83f345c7414f147deb0ecbdd8889018c2b1d39da96d858a"
+    },
+    {
+      "id": "beanie",
+      "file": "atelier_beanie.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        0,
+        0
+      ],
+      "bounds": [
+        [
+          -0.1032174825668335,
+          -0.014999999664723873,
+          -0.09601808339357376
+        ],
+        [
+          0.1032174825668335,
+          0.13099999725818634,
+          0.09601808339357376
+        ]
+      ],
+      "triangles": 23116,
+      "drawCalls": 2,
+      "bytes": 560352,
+      "sha256": "e3437e7c28a8b1939af2d8a158a2e8e17a967e6aa3ed4f4042b4fd9c83982092"
+    },
+    {
+      "id": "blender_wizard_hat",
+      "file": "wizard_hat.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.02,
+        0
+      ],
+      "bounds": [
+        [
+          -0.20100000500679016,
+          -0.024107957258820534,
+          -0.18693000078201294
+        ],
+        [
+          0.20100000500679016,
+          0.250139445066452,
+          0.18693000078201294
+        ]
+      ],
+      "triangles": 18816,
+      "drawCalls": 4,
+      "bytes": 438808,
+      "sha256": "3591618c7546d5d62df2225996089531ea7455cbd77b90750de9359cebc2cc2b"
+    },
+    {
+      "id": "smartphone",
+      "file": "modern_smartphone_prop.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.02,
+        -0.006
+      ],
+      "bounds": [
+        [
+          -0.03734999895095825,
+          -0.07474999874830246,
+          -0.010427975095808506
+        ],
+        [
+          0.03734999895095825,
+          0.07450000196695328,
+          0.005499999970197678
+        ]
+      ],
+      "triangles": 28272,
+      "drawCalls": 6,
+      "bytes": 724756,
+      "sha256": "c8539f93f8f29a41ea2a2024ce9ec6feb1863713e53a4f0969d17bc8255232b5"
+    },
+    {
+      "id": "camera",
+      "file": "atelier_camera.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        -0.02,
+        -0.02
+      ],
+      "bounds": [
+        [
+          -0.06414126604795456,
+          -0.03750000149011612,
+          -0.019300000742077827
+        ],
+        [
+          0.06414126604795456,
+          0.04500000178813934,
+          0.05000000074505806
+        ]
+      ],
+      "triangles": 18696,
+      "drawCalls": 4,
+      "bytes": 488360,
+      "sha256": "5c1b408517d9b611ccebbdf2c77fb62927a70f4ec17bc5896572dcdcc231b052"
+    },
+    {
+      "id": "medicalBag",
+      "file": "atelier_medical_bag.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        0.155,
+        0
+      ],
+      "bounds": [
+        [
+          -0.11999999731779099,
+          -0.08749999850988388,
+          -0.051500000059604645
+        ],
+        [
+          0.11999999731779099,
+          0.1674841344356537,
+          0.06920000165700912
+        ]
+      ],
+      "triangles": 9364,
+      "drawCalls": 4,
+      "bytes": 241964,
+      "sha256": "75197c51625e13ad8b3b4019d9cefbcec8352c0f5520642765c5be2b672d374a"
+    },
+    {
+      "id": "shoulderbag",
+      "file": "atelier_shoulder_bag.glb",
+      "license": "CC0-1.0",
+      "source": "original-parametric-authoring",
+      "generator": "scripts/generate-studio-wearable-v5.mts",
+      "units": "metres",
+      "anchor": [
+        0,
+        0.06,
+        0
+      ],
+      "bounds": [
+        [
+          -0.08250000327825546,
+          -0.18050000071525574,
+          -0.032499998807907104
+        ],
+        [
+          0.08250000327825546,
+          0.0604499988257885,
+          0.04349999874830246
+        ]
+      ],
+      "triangles": 8124,
+      "drawCalls": 3,
+      "bytes": 205032,
+      "sha256": "dc87fb3fe9ca43d6a74579bad17a1d9f8fe66084a4469b6e434bfb94ca8c53c1"
+    }
+  ]
+}

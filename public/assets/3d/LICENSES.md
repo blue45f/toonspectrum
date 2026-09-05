@@ -92,3 +92,10 @@ URI가 없습니다.
 `modern_smartphone_prop.glb`를 재사용합니다. 저장된 문서 호환성을 위해
 `blender_modern_smartphone` ID도 같은 URL을 계속 가리킵니다. ToonSpectrum은 위 6개
 원본 모델도 **CC0 1.0**으로 제공합니다.
+
+
+## Original wearable pack v5
+
+The 12 files in `wearable-v5-manifest.json` are original geometry authored for ToonStudio by `scripts/generate-studio-wearable-v5.mts`, dedicated to CC0-1.0. No third-party models or textures were copied. The manifest records metre-scale anchors, geometry counts and SHA-256 hashes. These files supersede the older geometry for matching filenames; source-code licensing is unchanged.
+
+CC0: https://creativecommons.org/publicdomain/zero/1.0/
