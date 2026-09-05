@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - feat/webtoon-ai-quality-ux-20260905
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
