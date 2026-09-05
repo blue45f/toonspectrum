@@ -1,0 +1,71 @@
+name: Studio mesh sync repair
+
+on:
+  push:
+    branches: [fix/collaboration-cross-browser-sync-20260905]
+    paths:
+      - scripts/maintenance/studio-mesh-sync-repair.mjs
+      - .github/workflows/studio-mesh-sync-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-mesh-sync-repair
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    if: github.ref == 'refs/heads/fix/collaboration-cross-browser-sync-20260905'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/collaboration-cross-browser-sync-20260905
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Add regression cases before changing production code
+        run: node scripts/maintenance/studio-mesh-sync-repair.mjs tests
+      - name: Prove the existing mesh failure
+        shell: bash
+        run: |
+          set +e
+          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts -t '\[mesh-sync-regression\]' --reporter=json --outputFile=/tmp/mesh-red.json
+          result=$?
+          set -e
+          test "$result" -ne 0
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('/tmp/mesh-red.json', 'utf8'));
+          if (report.numTotalTests < 5 || report.numFailedTests < 3) {
+            throw new Error('Expected actual mesh regression failures, not a runner/compile failure');
+          }
+          console.log(JSON.stringify({ phase: 'before-fix', total: report.numTotalTests, failed: report.numFailedTests }));
+          JS
+      - name: Apply the guarded authority-path repair
+        run: node scripts/maintenance/studio-mesh-sync-repair.mjs fix
+      - name: Verify existing and new collaboration regressions
+        run: |
+          pnpm exec vitest run src/domains/creator/live/studio-crdt-room-binding.test.ts src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts src/domains/creator/live/studio-live-collaboration-transport.test.ts src/domains/creator/live/studio-live-signaling-server-transport.test.ts
+      - name: Lint changed TypeScript
+        run: pnpm exec eslint src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts
+      - name: Check application types
+        run: pnpm run typecheck
+      - name: Commit only the verified production fix and regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm scripts/maintenance/studio-mesh-sync-repair.mjs .github/workflows/studio-mesh-sync-repair.yml
+          git add src/domains/creator/live/studio-crdt-room-binding.ts src/domains/creator/live/studio-crdt-room-binding.test.ts
+          git diff --cached --check
+          git commit -m 'fix(studio): separate mesh synchronization from authoritative server sequencing'
+          git push origin HEAD:fix/collaboration-cross-browser-sync-20260905
