@@ -1,0 +1,123 @@
+name: Storyworld final integration
+on:
+  push:
+    branches: [verify/storyworld-preflight-macos-20260905]
+    paths: [.github/workflows/storyworld-final-integration.yml]
+permissions:
+  contents: write
+concurrency:
+  group: storyworld-final-integration
+  cancel-in-progress: true
+jobs:
+  integrate:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PRODUCT_HEAD: 8cdac2359526a33a71811d3de80f1eee73be0911
+      MAIN_HEAD: ce1ac749f51d19f64106594c189b71b94a9ae4c5
+      PRODUCT_BRANCH: feat/storyworld-causality-lab-20260905
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 8cdac2359526a33a71811d3de80f1eee73be0911
+          fetch-depth: 64
+          persist-credentials: false
+          show-progress: false
+      - name: Merge pinned main and preserve both routed workspaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=64 origin "$MAIN_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge-base "$PRODUCT_HEAD" "$MAIN_HEAD"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re, subprocess
+          head, main = os.environ['PRODUCT_HEAD'], os.environ['MAIN_HEAD']
+          def show(ref, path):
+              return subprocess.check_output(['git', 'show', f'{ref}:{path}'], text=True)
+          def once(text, old, new):
+              assert text.count(old) == 1, f'Expected one reviewed anchor: {old}'
+              return text.replace(old, new, 1)
+          result = subprocess.run(['git','merge','--no-commit','--no-ff',main])
+          paths = ['src/domains/creator/studio-router/StudioRouter.tsx', 'src/domains/creator/studio-router/studio-route-manifest.ts', 'src/domains/creator/studio-router/studio-route-manifest.test.ts']
+          unresolved = subprocess.check_output(['git','diff','--name-only','--diff-filter=U'], text=True).splitlines()
+          assert set(unresolved).issubset(paths), f'Unreviewed merge conflict: {unresolved}'
+          assert result.returncode == 0 or unresolved, 'Merge failed without a supported source conflict'
+          # Reconcile only the three reviewed composition seams. All other main edits remain
+          # the result of git's ordinary three-way merge; no ours/theirs strategy is used.
+          manifest = show(main, paths[1])
+          feature_manifest = show(head, paths[1])
+          entry = re.search(r'  \{\n    id: "studio-storyworld",[\s\S]*?\n  \},\n', feature_manifest).group(0)
+          interface = re.search(r'export interface StudioStoryworldRouteResolution[\s\S]*?\n\}\n', feature_manifest).group(0)
+          start = feature_manifest.index('function storyworldPathname(')
+          end = feature_manifest.index('function resolvePlaceholder(', start)
+          functions = feature_manifest[start:end]
+          manifest = once(manifest, '  | "publish";', '  | "publish"\n  | "storyworld";')
+          manifest = once(manifest, '  {\n    id: "studio-companion",', entry + '  {\n    id: "studio-companion",')
+          manifest = once(manifest, 'export const STUDIO_PRODUCTION_ROUTE_IDS', interface + '\nexport const STUDIO_PRODUCTION_ROUTE_IDS')
+          manifest = once(manifest, '  | StudioPublishRouteResolution;', '  | StudioPublishRouteResolution\n  | StudioStoryworldRouteResolution;')
+          manifest = once(manifest, 'function resolvePlaceholder(', functions + 'function resolvePlaceholder(')
+          manifest = once(manifest, '  if (lift3d !== null) return lift3d;', '  if (lift3d !== null) return lift3d;\n  const storyworld = resolveStoryworld(pathname, search);\n  if (storyworld !== null) return storyworld;')
+          Path(paths[1]).write_text(manifest)
+          router = show(main, paths[0])
+          feature_router = show(head, paths[0])
+          lazy = re.search(r'const StudioStoryworldLabPage = lazyRetry\([\s\S]*?\n\);\n', feature_router).group(0)
+          start = feature_router.index('    case "storyworld":')
+          end = feature_router.index('    case ', start + 10)
+          case = feature_router[start:end]
+          assert 'key={resolution.lifecycleKey}' in case
+          router = once(router, 'export function StudioRouter()', lazy + '\nexport function StudioRouter()')
+          router = once(router, '    case "placeholder":', case + '    case "placeholder":')
+          Path(paths[0]).write_text(router)
+          tests = show(main, paths[2])
+          tests = once(tests, 'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(6);', 'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(7);')
+          Path(paths[2]).write_text(tests)
+          subprocess.run(['git','add','--',*paths], check=True)
+          assert not subprocess.check_output(['git','diff','--name-only','--diff-filter=U'], text=True).strip()
+          ci = Path('.github/workflows/ci.yml')
+          text = ci.read_text()
+          text = once(text, '  CI_CORE_BYPASS: "true"', '  CI_CORE_BYPASS: "false"')
+          # Latest main already repairs shard forwarding. Do not reintroduce an obsolete --.
+          assert 'run: pnpm run test:root --shard=' in text
+          assert 'run: pnpm run test:root -- --shard=' not in text
+          ci.write_text(text)
+          subprocess.run(['git','add','--',str(ci)], check=True)
+          print('Reconciled Storyworld + production routes; full core verification is enabled.')
+          PY
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check reconciled route formatting and source boundaries
+        run: |
+          pnpm exec eslint --max-warnings=0 src/domains/creator/storyworld src/domains/creator/studio-router/StudioRouter.tsx src/domains/creator/studio-router/studio-route-manifest.ts src/domains/creator/studio-router/studio-route-manifest.test.ts src/domains/creator/studio-router/studio-storyworld-route.test.ts
+          pnpm run validate:architecture
+      - name: Run actual storage, router, production hub and CI contracts
+        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts src/app/routes/app-route-title-ownership.test.ts scripts/integration-test-runner-ci-policy.test.mjs
+      - name: Check full Web and API types
+        run: pnpm run typecheck
+      - name: Verify standalone semantic receipts with real types
+        run: pnpm exec node scripts/verify-storyworld-lab.mjs
+      - name: Publish reviewed integration to the feature branch only
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$PRODUCT_BRANCH" | cut -f1)" = "$PRODUCT_HEAD"
+          test "$(git rev-parse HEAD)" = "$PRODUCT_HEAD"
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m 'merge(studio): preserve Storyworld and production routes with real CI enabled'
+          test "$(git rev-parse HEAD^1)" = "$PRODUCT_HEAD"
+          test "$(git rev-parse HEAD^2)" = "$MAIN_HEAD"
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$PRODUCT_BRANCH"
+          printf 'PRODUCT_COMMIT=%s\nPRODUCT_TREE=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"
