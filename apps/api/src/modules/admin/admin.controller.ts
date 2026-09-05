@@ -12,6 +12,7 @@ import {
   Controller,
 } from "@nestjs/common";
 
+import { requireAdminCommandBoolean } from "./admin-command-validation";
 import { normalizeAdminBenchmarkQuery } from "./admin-types";
 import { AdminService } from "./admin.service";
 
@@ -102,7 +103,8 @@ export class AdminController {
     @Body() body: { hidden?: unknown }
   ) {
     const uid = enforceUserOrError(userId);
-    return this.adminService.setContentVisibility(uid, type, id, !!body.hidden);
+    const hidden = requireAdminCommandBoolean(body?.hidden, "hidden");
+    return this.adminService.setContentVisibility(uid, type, id, hidden);
   }
 
   // ── 커뮤니티 모더레이션(/admin/community 분할 라우트) ──────────────────
@@ -275,10 +277,11 @@ export class AdminController {
   @Post("system/maintenance")
   async setMaintenanceMode(
     @Headers("x-user-id") userId: string | undefined,
-    @Body() body: { enabled?: boolean; message?: string }
+    @Body() body: { enabled?: unknown; message?: string }
   ) {
     const uid = enforceUserOrError(userId);
-    return this.adminService.setMaintenanceMode(uid, !!body.enabled, body.message);
+    const enabled = requireAdminCommandBoolean(body?.enabled, "enabled");
+    return this.adminService.setMaintenanceMode(uid, enabled, body.message);
   }
 
   // ── 확장 회원 관리 ────────────────────────────────────────────────────
@@ -299,6 +302,8 @@ export class AdminController {
   }
 
   @Get("users/export/csv")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  @Header("Pragma", "no-cache")
   @Header("Content-Type", "text/csv; charset=utf-8")
   @Header("Content-Disposition", 'attachment; filename="members.csv"')
   async exportUsersCsv(@Headers("x-user-id") userId: string | undefined) {
@@ -317,6 +322,8 @@ export class AdminController {
   }
 
   @Get("revenue/export/csv")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  @Header("Pragma", "no-cache")
   @Header("Content-Type", "text/csv; charset=utf-8")
   @Header("Content-Disposition", 'attachment; filename="revenue_ledger.csv"')
   async exportRevenueCsv(@Headers("x-user-id") userId: string | undefined) {
