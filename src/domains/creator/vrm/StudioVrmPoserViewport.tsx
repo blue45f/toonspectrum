@@ -48,6 +48,7 @@ import {
 import {
   StudioVrmBroadcastPreviewBridge,
 } from "./StudioVrmBroadcastPreview";
+import { StudioVrmGripContactRefine } from "./StudioVrmGripContactRefine";
 import {
   StudioVrmJointHandles,
 } from "./StudioVrmJointHandles";
@@ -73,7 +74,6 @@ import {
   StudioVrmPropAttachment,
   StudioVrmRuntimeCommit,
   StudioVrmWardrobeAttachment,
-  StudioVrmGripContactRefine,
 } from "./StudioVrmWardrobePropsProjection";
 
 import type { PropInstance } from "./studio-vrm-props";
@@ -299,7 +299,12 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                   <StudioVrmTexturePaintInvalidateBridge
                     onReady={handleTexturePaintInvalidateReady}
                   />
-                  <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} vrm={vrm} />
+                  <CameraDirector
+                    presetId={activeCameraId}
+                    resetNonce={viewResetNonce}
+                    vrm={vrm}
+                    interactionLocked={viewportCameraInteractionLocked || broadcastPreviewActive}
+                  />
                   <ViewportController onReady={handleViewportReady} />
                   <VrmLighting
                     tone={lightingTone}
@@ -408,6 +413,8 @@ export function StudioVrmPoserViewport({ h }: { h: StudioVrmPoserHost }) {
                       items={vrmPropItems}
                       metrics={effectivePropRigMetrics}
                       rigRevision={proportionRigRevision}
+                      lockedBones={lockedPoseBones}
+                      disabled={webcamActive || broadcastPreviewActive || persistentIkReconciling || jointHandleInteracting || isViewportHandIkDragging || texturePaintInteractionEnabled}
                     />
                   ) : null}
                   {vrm ? (
