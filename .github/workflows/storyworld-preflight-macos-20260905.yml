@@ -22,9 +22,10 @@ jobs:
       actions: write
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-      PRODUCT_SHA: c5c802e2dccd1fd23fb4a46b1ae020766d391082
+      PRODUCT_SHA: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
     steps:
-      - name: Cancel only the two superseded PR 746 CI attempts
+      - name: Cancel only superseded PR 746 CI attempts
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -44,7 +45,7 @@ jobs:
 
           pr = request('pulls/746')
           assert pr['head']['sha'] == os.environ['PRODUCT_SHA'] and pr['state'] == 'open' and pr['base']['ref'] == 'main'
-          old = {33948645140: '593b97c77d3428d327ee066875df2d5907b74b4b', 33949223974: 'a8f194ccaf7cc4f68f41b56a60a156bb7b55d60e'}
+          old = {33948645140: '593b97c77d3428d327ee066875df2d5907b74b4b', 33949223974: 'a8f194ccaf7cc4f68f41b56a60a156bb7b55d60e', 33952621804: 'c5c802e2dccd1fd23fb4a46b1ae020766d391082'}
           for run_id, sha in old.items():
               run = request(f'actions/runs/{run_id}')
               assert run['head_sha'] == sha and run['head_branch'] == 'feat/storyworld-causality-lab-20260905'
@@ -63,7 +64,7 @@ jobs:
           PY
       - uses: actions/checkout@v6
         with:
-          ref: c5c802e2dccd1fd23fb4a46b1ae020766d391082
+          ref: a40b3c3e6d9e11faefe1719e73cd1bab4dac29bc
           persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
