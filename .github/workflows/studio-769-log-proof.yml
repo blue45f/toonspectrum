@@ -11,21 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Read the exact completed failing job log
+      - name: Save completed job logs without interpreting terminal control characters
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/studio-log-proof"
-          gh api repos/blue45f/toonspectrum/actions/jobs/101350111473/logs > "$RUNNER_TEMP/studio-log-proof/test-shard-2.log"
+          for job in 101350111473 101353787028; do
+            gh api --allow-escape-sequences "repos/blue45f/toonspectrum/actions/jobs/$job/logs" > "$RUNNER_TEMP/studio-log-proof/$job.log"
+          done
           python3 - <<'PY'
           import pathlib,os,hashlib,re,json
-          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-log-proof/test-shard-2.log'
-          raw=p.read_bytes()
-          if len(raw)>32*1024*1024:raise ValueError('unexpected log size')
-          text=re.sub(r'\x1b\[[0-9;]*m','',raw.decode('utf-8-sig'))
-          (p.parent/'test-shard-2-plain.log').write_text(text)
-          (p.parent/'identity.json').write_text(json.dumps({'repository':'blue45f/toonspectrum','run':33982316829,'job':101350111473,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)},indent=2))
-          print('\n'.join(text.splitlines()[-100:]))
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'studio-log-proof'
+          records=[]
+          for job in [101350111473,101353787028]:
+              p=root/f'{job}.log'
+              raw=p.read_bytes()
+              if len(raw)>32*1024*1024:raise ValueError('unexpected log size')
+              text=re.sub(r'\x1b\[[0-9;]*m','',raw.decode('utf-8-sig'))
+              (root/f'{job}-plain.log').write_text(text)
+              records.append({'repository':'blue45f/toonspectrum','run':33982316829,'job':job,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)})
+              print(f'Job {job}: {len(raw)} bytes, saved for diagnosis')
+          (root/'identity.json').write_text(json.dumps(records,indent=2))
           PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
