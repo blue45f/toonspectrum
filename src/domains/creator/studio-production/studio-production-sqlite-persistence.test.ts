@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { StudioLocalDatabase } from "../studio-local-database";
 import { createStudioProductionWorkspace, resolveStudioProductionScope } from "./studio-production-model";
 import {
   createStudioProductionSqlitePersistence,
@@ -12,6 +11,8 @@ import {
   serializeCanonicalStudioProductionWorkspace,
   STUDIO_PRODUCTION_SQLITE_NAMESPACE,
 } from "./studio-production-sqlite-persistence";
+
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const NOW = "2026-09-05T03:00:00.000Z";
 

@@ -10,8 +10,11 @@ import {
   Sparkles,
   UserRoundCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  formatStudioProductionDate,
+} from "./studio-production-format";
 import {
   STUDIO_REVIEW_CATEGORIES,
   STUDIO_REVIEW_SEVERITIES,
@@ -23,7 +26,6 @@ import {
   type StudioReviewSeverity,
   type StudioReviewStatus,
 } from "./studio-production-model";
-import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 import {
   STUDIO_PRODUCTION_INPUT_CLASS,
   STUDIO_PRODUCTION_TEXTAREA_CLASS,
@@ -33,8 +35,9 @@ import {
   StudioProductionMetric,
   StudioProductionPill,
   StudioProductionProgress,
-  formatStudioProductionDate,
 } from "./StudioProductionUi";
+
+import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -128,7 +131,14 @@ export function StudioProductionReviewSurface({
     episodeId: "" as string,
   });
   const [comment, setComment] = useState("");
+  const newIssueTitleRef = useRef<HTMLInputElement | null>(null);
   const gate = useMemo(() => buildStudioReviewGate(workspace), [workspace]);
+
+  // 이슈 등록 폼이 열리면 제목 입력으로 초점을 옮깁니다. (autoFocus 대체)
+  useEffect(() => {
+    if (!showAdd) return;
+    newIssueTitleRef.current?.focus();
+  }, [showAdd]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ko-KR");
@@ -206,7 +216,7 @@ export function StudioProductionReviewSurface({
       {
         comments: [
           ...selectedIssue.comments,
-          { id: `comment-${Date.now().toString(36)}`, author: workspace.owner, body, createdAt: nowIso },
+          { id: `comment-${Date.parse(nowIso).toString(36)}`, author: workspace.owner, body, createdAt: nowIso },
         ],
       },
       "검수 댓글 추가",
@@ -389,7 +399,7 @@ export function StudioProductionReviewSurface({
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <div className="md:col-span-2 xl:col-span-2">
                 <StudioProductionField label="이슈 제목">
-                  <input autoFocus required value={newIssue.title} onChange={(event) => setNewIssue((current) => ({ ...current, title: event.currentTarget.value }))} className={STUDIO_PRODUCTION_INPUT_CLASS} />
+                  <input ref={newIssueTitleRef} required value={newIssue.title} onChange={(event) => setNewIssue((current) => ({ ...current, title: event.currentTarget.value }))} className={STUDIO_PRODUCTION_INPUT_CLASS} />
                 </StudioProductionField>
               </div>
               <StudioProductionField label="회차">
@@ -433,13 +443,22 @@ export function StudioProductionReviewSurface({
             ) : (
               <div className="divide-y divide-line">
                 {filtered.map((item) => (
-                  <article
+                  <div
                     key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedIssueId === item.id}
                     className={cn(
-                      "flex cursor-pointer gap-3 p-4 transition-colors hover:bg-raised/50",
+                      "flex cursor-pointer gap-3 p-4 text-left transition-colors hover:bg-raised/50",
                       selectedIssueId === item.id ? "bg-accent-soft/50" : "",
                     )}
                     onClick={() => setSelectedIssueId(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      setSelectedIssueId(item.id);
+                    }}
                   >
                     <input
                       type="checkbox"
@@ -464,7 +483,7 @@ export function StudioProductionReviewSurface({
                         <span>댓글 {item.comments.length}</span>
                       </div>
                     </div>
-                  </article>
+                  </div>
                 ))}
               </div>
             )}

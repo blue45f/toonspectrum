@@ -14,8 +14,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  formatStudioProductionDate,
+  studioProductionRelativeDate,
+} from "./studio-production-format";
 import {
   STUDIO_PRODUCTION_STAGES,
   STUDIO_PRODUCTION_STATUSES,
@@ -25,7 +29,6 @@ import {
   type StudioProductionStage,
   type StudioProductionStatus,
 } from "./studio-production-model";
-import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 import {
   STUDIO_PRODUCTION_INPUT_CLASS,
   STUDIO_PRODUCTION_TEXTAREA_CLASS,
@@ -34,9 +37,9 @@ import {
   StudioProductionMetric,
   StudioProductionPill,
   StudioProductionProgress,
-  formatStudioProductionDate,
-  studioProductionRelativeDate,
 } from "./StudioProductionUi";
+
+import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -116,6 +119,13 @@ export function StudioProductionProjectsSurface({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const newTitleInputRef = useRef<HTMLInputElement | null>(null);
+
+  // autoFocus 프로퍼티 대신 폼이 열리는 순간에만 포커스를 옮겨 기존 입력 흐름을 그대로 유지한다.
+  useEffect(() => {
+    if (!showAdd) return;
+    newTitleInputRef.current?.focus();
+  }, [showAdd]);
   const overview = useMemo(() => buildStudioProductionOverview(workspace), [workspace]);
 
   const filteredEpisodes = useMemo(() => {
@@ -323,7 +333,7 @@ export function StudioProductionProjectsSurface({
           >
             <StudioProductionField label="새 회차 제목" hint={`${nextEpisodeNumber(workspace.episodes)}화`}>
               <input
-                autoFocus
+                ref={newTitleInputRef}
                 value={newTitle}
                 onChange={(event) => setNewTitle(event.currentTarget.value)}
                 className={STUDIO_PRODUCTION_INPUT_CLASS}

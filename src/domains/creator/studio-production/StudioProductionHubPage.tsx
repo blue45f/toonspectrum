@@ -33,8 +33,8 @@ import {
   StudioProductionJoinSurface,
   StudioProductionShareSurface,
 } from "./StudioProductionSharingSurfaces";
-import { StudioProductionVersionsSurface } from "./StudioProductionVersionsSurface";
 import { StudioProductionPill } from "./StudioProductionUi";
+import { StudioProductionVersionsSurface } from "./StudioProductionVersionsSurface";
 import { useStudioProductionWorkspace } from "./use-studio-production-workspace";
 
 import { buttonClass } from "@/components/ui/button-utils";

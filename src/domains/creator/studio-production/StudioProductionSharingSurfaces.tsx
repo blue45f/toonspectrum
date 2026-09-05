@@ -20,6 +20,9 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  formatStudioProductionDate,
+} from "./studio-production-format";
+import {
   STUDIO_SHARE_ROLES,
   buildStudioInviteHref,
   createStudioShareGrant,
@@ -29,7 +32,6 @@ import {
   type StudioShareGrant,
   type StudioShareRole,
 } from "./studio-production-model";
-import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 import {
   STUDIO_PRODUCTION_INPUT_CLASS,
   StudioProductionCard,
@@ -37,8 +39,9 @@ import {
   StudioProductionField,
   StudioProductionMetric,
   StudioProductionPill,
-  formatStudioProductionDate,
 } from "./StudioProductionUi";
+
+import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -243,6 +246,7 @@ export function StudioProductionShareSurface({
                 <label key={String(title)} className="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-raised/60">
                   <input
                     type="checkbox"
+                    aria-label={String(title)}
                     checked={Boolean(checked)}
                     onChange={(event) => (setter as (value: boolean) => void)(event.currentTarget.checked)}
                     className="mt-0.5 size-4 accent-accent"
@@ -453,7 +457,7 @@ export function StudioProductionJoinSurface({
                 <input value={name} onChange={(event) => { setName(event.currentTarget.value); setError(null); }} className={STUDIO_PRODUCTION_INPUT_CLASS} placeholder="팀에서 사용할 이름" />
               </StudioProductionField>
               <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-panel p-3">
-                <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.currentTarget.checked)} className="mt-0.5 size-4 accent-accent" />
+                <input type="checkbox" aria-label="프로젝트 보안·권리 정책을 확인했습니다" checked={accepted} onChange={(event) => setAccepted(event.currentTarget.checked)} className="mt-0.5 size-4 accent-accent" />
                 <span>
                   <strong className="block text-xs text-fg">프로젝트 보안·권리 정책을 확인했습니다</strong>
                   <span className="mt-1 block text-[0.6875rem] leading-relaxed text-fg-2">허가되지 않은 외부 공유, 에셋 재배포, 참여자 계정 양도를 하지 않습니다.</span>

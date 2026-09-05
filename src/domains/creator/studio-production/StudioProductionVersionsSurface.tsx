@@ -13,8 +13,11 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  formatStudioProductionDate,
+} from "./studio-production-format";
 import {
   createStudioVersionSnapshot,
   diffStudioVersionSnapshots,
@@ -23,7 +26,6 @@ import {
   snapshotPayloadFromWorkspace,
   type StudioVersionSnapshot,
 } from "./studio-production-model";
-import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 import {
   STUDIO_PRODUCTION_INPUT_CLASS,
   STUDIO_PRODUCTION_TEXTAREA_CLASS,
@@ -32,8 +34,9 @@ import {
   StudioProductionField,
   StudioProductionMetric,
   StudioProductionPill,
-  formatStudioProductionDate,
 } from "./StudioProductionUi";
+
+import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -71,10 +74,17 @@ export function StudioProductionVersionsSurface({
   const [branchFilter, setBranchFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [summary, setSummary] = useState("");
   const [branch, setBranch] = useState("main");
   const [beforeId, setBeforeId] = useState(workspace.versions.at(-1)?.id ?? workspace.versions[0]?.id ?? "");
   const [afterId, setAfterId] = useState(workspace.versions[0]?.id ?? "");
+
+  // autoFocus 프로퍼티 대신 폼이 열리는 순간에만 포커스를 옮겨 기존 입력 흐름을 그대로 유지한다.
+  useEffect(() => {
+    if (!showCreate) return;
+    nameInputRef.current?.focus();
+  }, [showCreate]);
   const branches = useMemo(
     () => Array.from(new Set(workspace.versions.map((snapshot) => snapshot.branch))),
     [workspace.versions],
@@ -199,7 +209,7 @@ export function StudioProductionVersionsSurface({
             }}
           >
             <StudioProductionField label="버전 이름">
-              <input autoFocus required value={name} onChange={(event) => setName(event.currentTarget.value)} className={STUDIO_PRODUCTION_INPUT_CLASS} placeholder="예: 3화 채색 검수 전" />
+              <input ref={nameInputRef} required value={name} onChange={(event) => setName(event.currentTarget.value)} className={STUDIO_PRODUCTION_INPUT_CLASS} placeholder="예: 3화 채색 검수 전" />
             </StudioProductionField>
             <StudioProductionField label="브랜치">
               <input value={branch} onChange={(event) => setBranch(event.currentTarget.value)} className={STUDIO_PRODUCTION_INPUT_CLASS} list="studio-production-branches" />

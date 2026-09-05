@@ -6,12 +6,14 @@
  * order. Failures never fall back to browser key/value stores or pretend an in-session copy is durable.
  */
 import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
-import type { StudioLocalDatabase } from "../studio-local-database";
 
 import {
   StudioProductionWorkspaceSchema,
   type StudioProductionWorkspace,
 } from "./studio-production-model";
+
+import type { StudioLocalDatabase } from "../studio-local-database";
+
 
 export const STUDIO_PRODUCTION_SQLITE_NAMESPACE =
   "studio-production-command-center-v12";
@@ -47,12 +49,23 @@ function byteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
 
+// Mirrors hasUnsafeStudioIdentityCharacter in studio-workspace-route.ts: a codepoint
+// scan expresses the same intent as a control-character class without tripping
+// no-control-regex.
+function hasStudioProductionControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 31 || code === 127) return true;
+  }
+  return false;
+}
+
 export function normalizeStudioProductionScopeKey(value: string): string | null {
   const normalized = value.trim();
   if (
     normalized.length === 0
     || normalized.length > 240
-    || /[\u0000-\u001f\u007f]/u.test(normalized)
+    || hasStudioProductionControlCharacter(normalized)
   ) {
     return null;
   }

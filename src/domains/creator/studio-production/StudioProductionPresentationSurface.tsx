@@ -24,7 +24,6 @@ import {
   type StudioPitchSlide,
   type StudioPitchSlideLayout,
 } from "./studio-production-model";
-import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 import {
   STUDIO_PRODUCTION_INPUT_CLASS,
   STUDIO_PRODUCTION_TEXTAREA_CLASS,
@@ -35,6 +34,8 @@ import {
   StudioProductionPill,
   StudioProductionProgress,
 } from "./StudioProductionUi";
+
+import type { StudioProductionSurfaceProps } from "./studio-production-component-types";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -258,12 +259,19 @@ export function StudioProductionPresentationSurface({
               <article
                 key={slide.id}
                 className={cn(
-                  "group cursor-pointer rounded-xl border p-2.5 transition-colors",
+                  "group relative cursor-pointer rounded-xl border p-2.5 transition-colors",
                   selectedId === slide.id ? "border-accent bg-accent-soft/55" : "border-line bg-panel hover:border-accent/50",
                   slide.hidden ? "opacity-60" : "",
                 )}
-                onClick={() => setSelectedId(slide.id)}
               >
+                {/* 카드 전체가 선택 영역이라 실제 버튼을 카드 위에 겹쳐 둔다. 마우스 클릭 범위는 그대로 두면서 키보드 포커스·Enter/Space 를 네이티브로 얻는다. */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(slide.id)}
+                  aria-pressed={selectedId === slide.id}
+                  aria-label={`${slide.title} 슬라이드 선택`}
+                  className="absolute inset-0 cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                />
                 <div className="flex items-start gap-2">
                   <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-raised text-[0.6875rem] font-bold text-fg-2">{index + 1}</span>
                   <div className="min-w-0 flex-1">
@@ -272,7 +280,7 @@ export function StudioProductionPresentationSurface({
                     <p className="mt-1 text-[0.6875rem] text-fg-3">{slide.durationSec}초 · {LAYOUT_LABELS[slide.layout]}</p>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center justify-end gap-1 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
+                <div className="relative z-10 mt-2 flex items-center justify-end gap-1 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100">
                   <button type="button" className={buttonClass({ variant: "quiet", size: "icon", className: "!size-8" })} onClick={(event) => { event.stopPropagation(); moveSlide(slide.id, -1); }} disabled={index === 0} aria-label={`${slide.title} 위로`}><ArrowUp className="size-3.5" aria-hidden="true" /></button>
                   <button type="button" className={buttonClass({ variant: "quiet", size: "icon", className: "!size-8" })} onClick={(event) => { event.stopPropagation(); moveSlide(slide.id, 1); }} disabled={index === workspace.pitchSlides.length - 1} aria-label={`${slide.title} 아래로`}><ArrowDown className="size-3.5" aria-hidden="true" /></button>
                   <button type="button" className={buttonClass({ variant: "quiet", size: "icon", className: "!size-8" })} onClick={(event) => { event.stopPropagation(); patchSlide(slide.id, { hidden: !slide.hidden }, slide.hidden ? "피치 슬라이드 표시" : "피치 슬라이드 숨김"); }} aria-label={slide.hidden ? `${slide.title} 표시` : `${slide.title} 숨김`}>{slide.hidden ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}</button>
