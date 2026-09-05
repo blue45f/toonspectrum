@@ -55,8 +55,8 @@ const MENU_GROUP_IDS = [
 ] as const;
 
 /**
- * The twelve presented titles (UX 감사 2026-09-02 §3.4): thin specialist groups fold into
- * 삽입 / 도구 and Help is pinned last. The catalogue itself still ships all 17 (+AI).
+ * The ten workflow titles (IA audit 2026-09-05): related catalogue groups fold into
+ * task-oriented menus, AI remains visible, and Help is pinned last.
  */
 const PRESENTED_MENU_GROUP_IDS = [...STUDIO_MAIN_MENU_PRESENTATION_ORDER] as const;
 
@@ -168,7 +168,7 @@ describe("resolveStudioMenubarLaneOverflow", () => {
 });
 
 describe("StudioMenubarContent menu presentation", () => {
-  it("presents the twelve-title menubar with composite 삽입/도구 and Help last", () => {
+  it("presents the ten-title workflow menubar with AI visible and Help last", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );

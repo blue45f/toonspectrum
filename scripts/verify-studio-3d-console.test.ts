@@ -179,11 +179,11 @@ describe("3D character production-preview color boundary", () => {
       toggleOff,
     );
 
-    // 메뉴바 프레젠테이션(UX 감사 2026-09-02)이 3D 를 도구 복합 타이틀로 접었으므로 진입은
-    // 도구 트리거와 도구 드롭다운을 거친다. 항목 id·라벨은 카탈로그 그대로다.
-    expect(threeDMenu).toContain('name: STUDIO_TOOLS_MENU_TITLE, exact: true');
-    expect(threeDMenu).toContain('[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]');
-    expect(verifierSource).toContain('const STUDIO_TOOLS_MENU_TITLE = "도구"');
+    // 메뉴바 프레젠테이션(UX 감사 2026-09-02)이 3D 를 삽입 메뉴로 옮겼으므로 진입은
+    // 삽입 트리거와 삽입 드롭다운을 거친다. 항목 id·라벨은 카탈로그 그대로다.
+    expect(threeDMenu).toContain('name: STUDIO_INSERT_MENU_TITLE, exact: true');
+    expect(threeDMenu).toContain('[role="menu"][aria-label="${STUDIO_INSERT_MENU_TITLE}"]');
+    expect(verifierSource).toContain('const STUDIO_INSERT_MENU_TITLE = "삽입"');
     expect(productionPreview).toContain('name: "중립 데생 인형 보기"');
     expect(baseline).toBeGreaterThanOrEqual(0);
     expect(toggleOn).toBeGreaterThan(baseline);

@@ -2,16 +2,13 @@
  * scripts/verify-studio-menus.mts
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
- * Desktop IA (V5 §15.3):
- * - Catalogue: 17 specification groups + AI. That table is the coverage contract and it
- *   does not move.
- * - Presentation: twelve menubar titles. Eight catalogue groups are folded into two
- *   composite titles (삽입 ← 텍스트·벡터, 도구 ← 캔버스·변형·애니메이션·3D·협업·AI); inside a
- *   composite dropdown each source group keeps its own caption and every row keeps its id
- *   and label. The dropdown's `aria-label` is the PRESENTED title, not the source group.
- *   Source of truth: `src/domains/creator/studio-main-menu-presentation.ts` — this script
- *   imports it rather than restating the fold.
- * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
+ * Desktop IA (workflow optimization 2026-09-05):
+ * - Catalogue: 17 specification groups + AI remains the complete command inventory.
+ * - Presentation: ten workflow titles. Fourteen catalogue groups are owned by six
+ *   composites: 파일←파일·협업, 편집←편집·선택·변형, 보기←보기·캔버스·창,
+ *   삽입←텍스트·벡터·3D, 만화←만화·애니메이션, 효과←필터.
+ * - AI remains a standalone title; every source group keeps its caption and row ids.
+ * - Toolbelt workflow is insert → reference/3D → scene/style → AI.
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
  * Expects production build in dist/ (vite preview).
@@ -205,15 +202,14 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
   },
 ];
 
-/**
- * Korean menubar titles for the two composite groups. `COMPOSITE_LABELS` in
- * `src/domains/creator/studio-main-menu-presentation.ts` owns these strings but does not
- * export them; the ids and the fold itself are imported from that module, so only the
- * two words are restated here.
- */
+/** Visible Korean titles for the six workflow composites. */
 const COMPOSITE_TITLES: Readonly<Record<StudioMainMenuCompositeGroupId, string>> = {
+  file: "파일",
+  edit: "편집",
+  view: "보기",
   insert: "삽입",
-  tools: "도구",
+  comic: "만화",
+  filter: "효과",
 };
 
 interface PresentedMenu {
@@ -221,7 +217,7 @@ interface PresentedMenu {
   readonly id: string;
   /** Menubar title — also the dropdown's `aria-label`. */
   readonly title: string;
-  /** `true` when several catalogue groups share this title (삽입 / 도구). */
+  /** `true` when several catalogue groups share this workflow title. */
   readonly composite: boolean;
   /** Catalogue groups this title owns, in the order their sections render. */
   readonly sections: readonly CatalogueGroup[];
@@ -230,17 +226,8 @@ interface PresentedMenu {
 const PRESENTED_ORDER: readonly string[] = STUDIO_MAIN_MENU_PRESENTATION_ORDER;
 
 /**
- * 메뉴바 감사가 확정한 제시 제목 12종 — 순서까지 포함한 계약.
- *
- * 이 목록만은 모듈에서 유도하지 않고 손으로 적는다. 스스로 기대값을 유도하는 검증기는
- * 재접기(re-fold)를 절대 잡을 수 없기 때문이다: `PRESENTED_ORDER` 는
- * `STUDIO_MAIN_MENU_PRESENTATION_ORDER` 그 자체이고 `buildPresentedMenus` 는 제품과 똑같은
- * 매핑으로 카탈로그를 접는다. 그래서 순서에서 `insert` 를 빼고 텍스트·벡터를 다른 제목
- * 밑으로 옮기는 "짝맞춘 수정" 이 들어오면 유도된 단언은 전부 초록 그대로인 채 메뉴바만
- * 조용히 11개로 줄어든다. 그 경우를 깨는 것은 독립적으로 적어 둔 기대값뿐이다.
- *
- * 반대로 ROWS(각 드롭다운의 항목·섹션)는 계속 유도한다. 항목 구성은 카탈로그의 소관이고
- * 여기에 다시 적으면 중복 대장이 하나 더 생길 뿐이다. 고정하는 것은 제목 목록뿐.
+ * 메뉴 IA 감사가 확정한 표시 제목 10종. 개수·순서·표기를 독립적으로 고정한다.
+ * 행과 구획은 정본 카탈로그에서 유도해 중복 대장을 만들지 않는다.
  */
 const PINNED_PRESENTED_TITLES: readonly string[] = [
   "파일",
@@ -248,12 +235,10 @@ const PINNED_PRESENTED_TITLES: readonly string[] = [
   "보기",
   "삽입",
   "레이어",
-  "선택",
   "그리기",
   "만화",
-  "필터",
-  "도구",
-  "창",
+  "효과",
+  "AI",
   "도움말",
 ];
 
@@ -315,7 +300,7 @@ function buildPresentedMenus(): { menus: PresentedMenu[]; orphans: string[] } {
 const { menus: PRESENTED_MENUS, orphans: PRESENTATION_ORPHANS } = buildPresentedMenus();
 
 /**
- * 유도된 제시 제목이 고정 12종과 정확히(개수·순서·표기) 일치하는지 대조한다.
+ * 유도된 표시 제목이 고정 10종과 정확히(개수·순서·표기) 일치하는지 대조한다.
  * 불일치는 `assertMainMenus` 가 실패로 올린다 — 여기서 throw 하면 리포트가 인쇄되기 전에
  * 런이 죽어 어떤 제목이 어긋났는지 보이지 않는다.
  */
@@ -326,14 +311,14 @@ function pinnedTitleDrift(): string[] {
     presented.every((title, index) => title === PINNED_PRESENTED_TITLES[index]);
   if (matches) return [];
   return [
-    `제시 제목 12종 계약 위반 — 기대: [${PINNED_PRESENTED_TITLES.join(" ")}] / 실제: [${presented.join(" ")}]`,
+    `표시 제목 10종 계약 위반 — 기대: [${PINNED_PRESENTED_TITLES.join(" ")}] / 실제: [${presented.join(" ")}]`,
   ];
 }
 
 const PRESENTATION_TITLE_DRIFT = pinnedTitleDrift();
 
 /**
- * Menubar title that currently owns a catalogue group (예: "ai" → 도구). An unmapped group
+ * Menubar title that currently owns a catalogue group (예: "canvas" → 보기). An unmapped group
  * falls back to its own caption instead of throwing: `PRESENTATION_ORPHANS` already reports
  * that case as a failure, and a throw here would abort the run before the report is printed.
  */
@@ -550,7 +535,7 @@ async function assertChrome(page: Page): Promise<string[]> {
 
 async function assertMainMenus(page: Page): Promise<string[]> {
   const failures: string[] = [];
-  // The pinned twelve come first: if the presentation re-folded, every derived assertion
+  // The pinned ten come first: if the presentation re-folded, every derived assertion
   // below is measuring the wrong menubar and this line is the only one that says so.
   for (const drift of PRESENTATION_TITLE_DRIFT) {
     failures.push(drift);
@@ -567,8 +552,15 @@ async function assertMainMenus(page: Page): Promise<string[]> {
     return failures;
   }
 
-  // Presented titles always visible. The folded catalogue groups (캔버스·변형·벡터·텍스트·
-  // 애니메이션·3D·협업·AI) are NOT titles any more, so asserting them here would be wrong.
+  // Presented titles are always visible. Folded catalogue groups remain section captions,
+  // while AI stays a first-class title.
+  const triggerCount = await nav.locator("[data-studio-main-menu-trigger]").count();
+  if (triggerCount !== PINNED_PRESENTED_TITLES.length) {
+    failures.push(
+      `메인 메뉴 제목 수 불일치: 기대 ${PINNED_PRESENTED_TITLES.length} / 실제 ${triggerCount}`,
+    );
+  }
+
   for (const menu of PRESENTED_MENUS) {
     if (!(await nav.getByRole("menuitem", { name: menu.title, exact: true }).isVisible().catch(() => false))) {
       failures.push(`메인 메뉴 그룹 버튼 미노출: ${menu.title}`);
@@ -609,7 +601,7 @@ async function assertMainMenus(page: Page): Promise<string[]> {
 async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
   const failures: string[] = [];
   const panel = page.getByRole("region", { name: "포즈 참고 보드" });
-  // 창 stands on its own today; resolve it anyway so a future fold does not strand this check.
+  // 창 is owned by 보기; resolve through the presentation so this check follows the IA.
   const windowTitle = presentedTitleFor("window");
   const openWindowMenu = async (): Promise<Locator> => {
     await openMainMenuGroup(page, windowTitle);
@@ -902,7 +894,7 @@ async function main() {
     ];
 
     if (failures.length === 0) {
-      log("PASS: all menus exposed (main menu + rail + popovers + draw options + export)");
+      log("PASS: optimized menus exposed (10 titles + sections + rail + popovers + draw options + export)");
       exitCode = 0;
     } else {
       log(`FAIL (${failures.length}):`);

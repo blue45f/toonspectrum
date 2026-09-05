@@ -208,8 +208,8 @@ async function openWindowMenu(page: Page): Promise<ReturnType<Page["locator"]>> 
   const menuBar = page.locator('[data-studio-main-menu="true"]');
   await menuBar.waitFor({ state: "visible", timeout: 20_000 });
   await page.keyboard.press("Escape").catch(() => undefined);
-  await menuBar.getByRole("menuitem", { name: "창", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="창"]');
+  await menuBar.getByRole("menuitem", { name: "보기", exact: true }).click();
+  const menu = page.locator('[role="menu"][aria-label="보기"]');
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }

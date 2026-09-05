@@ -350,6 +350,14 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </>
       ) : null}
 
+      {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
+        <StudioToolBeltCreateModeInsertTools
+          hints={hints}
+          studioCanvasImageAccept={studioCanvasImageAccept}
+          toolBelt={toolBelt}
+        />
+      ) : null}
+
       {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
         <>
           <StudioToolbarDivider label="참조" />
@@ -606,13 +614,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         </>
       ) : null}
 
-      {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
-        <StudioToolBeltCreateModeInsertTools
-          hints={hints}
-          studioCanvasImageAccept={studioCanvasImageAccept}
-          toolBelt={toolBelt}
-        />
-      ) : null}
+
 
       <StudioToolBeltCreateModeUtilityButtons
         hints={hints}
