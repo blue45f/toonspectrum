@@ -61,6 +61,7 @@ import {
   loadStudioGeneratedNotice,
   studioEngineLicenseTable,
 } from "./studio-third-party-notices";
+import { copyStudioText } from "./studio-workbench-clipboard";
 import { STUDIO_Z_CLASS } from "./studio-z-index";
 import { useStudioReliabilityStatus } from "./use-studio-reliability-status";
 
@@ -930,7 +931,9 @@ export function StudioHelpCenterDialog({
                           const text = formatStudioDiagnosticsText(
                             diagnostics.report as StudioDiagnosticsReport,
                           );
-                          void navigator.clipboard?.writeText(text);
+                          // 같은 파일 697행이 이미 .catch 를 단 형태로 쓴다. 여기만 빠져 있어
+                          // 인앱 WebView 의 NotAllowedError 가 unhandled rejection 으로 샜다.
+                          void copyStudioText(text);
                         }}
                         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >

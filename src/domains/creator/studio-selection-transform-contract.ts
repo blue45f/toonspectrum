@@ -1,5 +1,6 @@
 /** Shared contracts and deterministic geometry helpers for precision selection transforms. */
 
+import type { El } from "./studio-element-model";
 import type {
   StudioFigmaSelectionLayoutMetrics as LegacyStudioFigmaSelectionLayoutMetrics,
   StudioFigmaSelectionLayoutPatch as LegacyStudioFigmaSelectionLayoutPatch,
@@ -8,8 +9,6 @@ import type {
   StudioGroupUniformResizeBounds,
   StudioGroupUniformResizeStrokeWidthPolicy,
 } from "./studio-group-uniform-resize";
-
-import type { El } from "./studio-element-model";
 
 export type StudioSelectionResizeAnchor =
   | "top-left"

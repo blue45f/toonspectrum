@@ -6,9 +6,6 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { StudioTransformField } from "./StudioTransformField";
-import { StudioTransformGeometryFields } from "./StudioTransformGeometryFields";
-import { StudioTransformPrecisionControls } from "./StudioTransformPrecisionControls";
 import { STUDIO_INSPECTOR_CANONICAL_LABELS } from "./studio-inspector-density";
 import {
   scrollStudioInspectorTargetIntoView,
@@ -22,6 +19,9 @@ import {
   STUDIO_SELECTION_GEOMETRY_SECTION_ID,
   studioSelectionGeometrySummary,
 } from "./studio-selection-geometry-summary";
+import { StudioTransformField } from "./StudioTransformField";
+import { StudioTransformGeometryFields } from "./StudioTransformGeometryFields";
+import { StudioTransformPrecisionControls } from "./StudioTransformPrecisionControls";
 
 import type {
   StudioFigmaSelectionLayoutMetrics,

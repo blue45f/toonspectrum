@@ -448,11 +448,14 @@ describe("세션 오류 저널", () => {
       },
     };
     const detach = installStudioErrorJournal(target);
-    expect(handlers.size).toBe(2);
+    // window "error" · "unhandledrejection" 에 더해, React 에러 바운더리가 잡아 삼킨 예외를
+    // 받는 toonspectrum:render-failure 까지 세 채널이다. 바운더리가 잡은 예외는 window "error"
+    // 로 오지 않으므로 이 채널이 없으면 무너진 패널이 저널에도 버그 리포트에도 남지 않는다.
+    expect(handlers.size).toBe(3);
     expect(installStudioErrorJournal(target), "두 번째 설치는 기존 해제자를 준다").toBe(
       detach,
     );
-    expect(handlers.size).toBe(2);
+    expect(handlers.size).toBe(3);
     detach();
     expect(handlers.size).toBe(0);
   });

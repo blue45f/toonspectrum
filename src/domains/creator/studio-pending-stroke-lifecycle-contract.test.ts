@@ -114,9 +114,12 @@ describe("pending stroke lifecycle source contract", () => {
   });
 
   it("비동기 journal client는 Studio effect 수명에 묶여 Strict Mode 재설정과 실제 unmount를 처리한다", () => {
+    // rebaseStudioHistoryJournal 은 이제 useCallback 이다 — React Compiler 가 이 훅을 `??=`
+    // 에서 통째로 bail out 하므로 함수 선언으로 두면 렌더마다 새 정체성이 되고, 그 값을 의존성에
+    // 담은 CRDT frontier layout effect 가 매 렌더 재실행되어 React #185 로 에디터가 무너졌다.
     const journalSetup = sourceBetween(
       "const pagesHistoryCommandJournalRef = useRef",
-      "function rebaseStudioHistoryJournal("
+      "const rebaseStudioHistoryJournal = useCallback("
     );
 
     expect(journalSetup).toContain("createStudioPageHistoryCommandJournalClient()");

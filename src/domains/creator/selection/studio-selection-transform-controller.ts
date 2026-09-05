@@ -2,13 +2,6 @@ import {
   alignStudioSelection,
   type StudioAlignMode,
 } from "../studio-cuttoon-editor/studio-align-selected";
-import {
-  planStudioMultiSelectionLayoutPatch,
-  planStudioSelectionFlip,
-  planStudioSelectionLayoutPatch,
-  selectStudioFigmaDesignTargets,
-  type StudioFigmaSelectionLayoutPatch,
-} from "../studio-selection-transform-advanced";
 import { planAtomicSelectionTranslation } from "../studio-group-selection";
 import {
   isEffectivelyHidden,
@@ -16,6 +9,13 @@ import {
   reorderLayerItem,
   type LayerGroup,
 } from "../studio-layers";
+import {
+  planStudioMultiSelectionLayoutPatch,
+  planStudioSelectionFlip,
+  planStudioSelectionLayoutPatch,
+  selectStudioFigmaDesignTargets,
+  type StudioFigmaSelectionLayoutPatch,
+} from "../studio-selection-transform-advanced";
 
 import type { El } from "../studio-element-model";
 

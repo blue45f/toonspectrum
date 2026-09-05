@@ -178,21 +178,69 @@ function validateSuccess(result, diagnostics) {
   validateParity("opaque", result.opaque, failures);
   validateParity("transparent", result.transparent, failures);
 
+  // The engine policy is explicit and fail-closed (ADR 0018): an artist's selection is never
+  // swapped for another backend. Capability, host and feature problems move `status` while
+  // `backend` stays put, and the Korean notice tells the artist to choose WebGL2 themselves.
+  //
+  // This block used to assert the opposite — a two-lane `auto` policy that demoted in-app
+  // browsers to WebGL2 and promoted capable ones to WebGPU. That policy was deleted in
+  // 0520c7e18; the reason string it looked for (`auto-webgpu-promoted`) has not existed since,
+  // so the check could not pass. It also read only `backend`, which for a fail-closed policy is
+  // the one field that never moves: a correctly REFUSED plan and an admitted one serialize
+  // identically. Every assertion below reads status, and reason, and diagnostics.
   const selectionById = new Map((result.selection ?? []).map((row) => [row.id, row]));
+
+  const describeRow = (row) =>
+    `webgpu=${row?.webgpuBackend}/${row?.webgpuStatus}/${row?.webgpuReason}`
+    + ` webgl2=${row?.webgl2Backend}/${row?.webgl2Status}/${row?.webgl2Reason}`;
+
+  /** Every host must keep the explicit WebGL2 baseline reachable — that is the advertised escape. */
+  const assertWebgl2Escape = (id, row) => {
+    if (row?.webgl2Backend !== "webgl2"
+      || row?.webgl2Status !== "available"
+      || row?.webgl2Reason !== "user-webgl2-override") {
+      failures.push(`${id}: the explicit WebGL2 baseline was not available (${describeRow(row)})`);
+    }
+  };
+
   const desktop = selectionById.get("desktop-chrome");
-  if (desktop?.autoBackend !== "webgpu" || desktop?.autoReason !== "auto-webgpu-promoted") {
-    failures.push("a capable standalone browser was not promoted to WebGPU");
+  if (desktop?.webgpuBackend !== "webgpu"
+    || desktop?.webgpuStatus !== "available"
+    || desktop?.webgpuReason !== "user-webgpu-override"
+    || (desktop?.webgpuDiagnostics ?? []).length !== 0) {
+    failures.push(
+      `a capable standalone browser did not admit its explicit WebGPU selection (${describeRow(desktop)}`
+      + ` diagnostics=${JSON.stringify(desktop?.webgpuDiagnostics ?? null)})`,
+    );
   }
+  assertWebgl2Escape("desktop-chrome", desktop);
+
+  // gpuTrust "opt-in" is advisory. It must flag the reservation in diagnostics and must NOT
+  // change the backend or the status — that distinction is the whole of the current policy.
   for (const optIn of ["kakaotalk", "naver-app", "ios-webview"]) {
     const row = selectionById.get(optIn);
-    if (row?.autoBackend !== "webgl2" || row?.optInBackend !== "webgpu") {
-      failures.push(`${optIn}: opt-in in-app policy drifted (auto=${row?.autoBackend}, opt-in=${row?.optInBackend})`);
+    if (row?.webgpuBackend !== "webgpu"
+      || row?.webgpuStatus !== "available"
+      || row?.webgpuReason !== "user-webgpu-override") {
+      failures.push(`${optIn}: an opt-in in-app browser did not admit an explicit WebGPU selection (${describeRow(row)})`);
     }
+    if (!(row?.webgpuDiagnostics ?? []).includes("inapp-browser-opt-in-required")) {
+      failures.push(
+        `${optIn}: the opt-in reservation was not surfaced as a diagnostic`
+        + ` (${JSON.stringify(row?.webgpuDiagnostics ?? null)})`,
+      );
+    }
+    assertWebgl2Escape(optIn, row);
   }
+
+  // gpuTrust "blocked" is a hard block: the selection stays WebGPU and becomes unavailable.
   const blocked = selectionById.get("instagram");
-  if (blocked?.autoBackend !== "webgl2" || blocked?.optInBackend !== "webgl2") {
-    failures.push("a blocked in-app browser was allowed onto WebGPU");
+  if (blocked?.webgpuBackend !== "webgpu"
+    || blocked?.webgpuStatus !== "unavailable"
+    || blocked?.webgpuReason !== "inapp-browser-blocked") {
+    failures.push(`a blocked in-app browser did not refuse WebGPU (${describeRow(blocked)})`);
   }
+  assertWebgl2Escape("instagram", blocked);
 
   // The KTX2 transcoder must initialize against both live renderers, or compressed-texture models
   // would fail to import on whichever backend the policy picked.
@@ -258,11 +306,25 @@ function validateSuccess(result, diagnostics) {
     }
   }
 
+  // A WebGL-only feature keeps WebGPU SELECTED and makes it unavailable — it never picks WebGL2
+  // on the artist's behalf. The escape it advertises must be real, so the baseline is asserted too.
   for (const row of result.webglOnlyFeatures ?? []) {
-    if (row.autoBackend !== "webgl2" || row.forcedBackend !== "webgl2" || row.webgpuSelectable) {
+    const expected = row.feature === "webxr" ? "webgl-only-webxr" : "webgl-only-vrm-character";
+    if (row.webgpuBackend !== "webgpu"
+      || row.webgpuStatus !== "unavailable"
+      || row.webgpuReason !== expected) {
       failures.push(
-        `${row.feature}: WebGL-only feature did not pin the baseline`
-        + ` (auto=${row.autoBackend}, forced=${row.forcedBackend})`,
+        `${row.feature}: WebGL-only feature did not fail the WebGPU selection closed`
+        + ` (backend=${row.webgpuBackend}, status=${row.webgpuStatus}, reason=${row.webgpuReason},`
+        + ` expected reason=${expected})`,
+      );
+    }
+    if (row.webgl2Backend !== "webgl2"
+      || row.webgl2Status !== "available"
+      || row.webgl2Reason !== "user-webgl2-override") {
+      failures.push(
+        `${row.feature}: the WebGL2 escape the notice advertises was not available`
+        + ` (backend=${row.webgl2Backend}, status=${row.webgl2Status}, reason=${row.webgl2Reason})`,
       );
     }
   }

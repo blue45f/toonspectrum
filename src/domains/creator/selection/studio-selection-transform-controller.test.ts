@@ -56,7 +56,7 @@ function setup(elements: El[], marqueeIds: string[]) {
 describe("studio selection transform controller", () => {
   it("refuses numeric transforms that include a hidden member", () => {
     const a = image("a", 0);
-    const b = image("b", 60, { hidden: true });
+    const b = { ...image("b", 60), hidden: true } as El;
     const { transform, commit, setError } = setup([a, b], ["a", "b"]);
 
     transform.applyFigmaSelectionLayoutPatch({ width: 160 });
