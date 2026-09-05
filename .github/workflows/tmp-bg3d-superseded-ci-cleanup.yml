@@ -1,0 +1,95 @@
+name: Unblock superseded BG3D CI only
+
+# One-shot housekeeping on an isolated branch. Never merged into main. No checkout, application
+# code, third-party action, dependency install, persistent credential or user-provided input.
+# Only the fixed superseded run may be cancelled; current required checks are never modified.
+on:
+  push:
+    branches: [diag/bg3d-superseded-ci-cleanup-20260906]
+    paths: [.github/workflows/tmp-bg3d-superseded-ci-cleanup.yml]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  release-obsolete-concurrency-owner:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/diag/bg3d-superseded-ci-cleanup-20260906'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact old and current heads before cancelling only the obsolete run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          BASE = 'https://api.github.com/repos/blue45f/toonspectrum'
+          OLD_RUN = 33986117063
+          OLD_HEAD = 'dd480cb40ea9720b9744613f07ba7a54cf484da4'
+          CURRENT_HEAD = '3cf8ff986d75fe62b8c9defa42c8e760a4109b2b'
+          BRANCH = 'fix/bg3d-runtime-verification-20260905'
+          headers = {
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2026-03-10',
+          }
+
+          def request(path, method='GET'):
+              req = urllib.request.Request(BASE + path, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as error:
+                  if method == 'POST' and error.code == 409:
+                      return 409, None
+                  raise
+
+          def verify_scope():
+              _, pr = request('/pulls/761')
+              if pr['state'] != 'open' or pr['head']['sha'] != CURRENT_HEAD:
+                  raise RuntimeError('PR head/state changed; refuse housekeeping')
+              _, proof = request('/actions/runs/33986913619')
+              if proof['head_sha'] != CURRENT_HEAD or proof['conclusion'] != 'success':
+                  raise RuntimeError('Current strict runtime proof is not successful')
+              _, old = request('/actions/runs/' + str(OLD_RUN))
+              if (old['head_sha'] != OLD_HEAD or old['head_branch'] != BRANCH
+                      or old['event'] != 'pull_request' or old['workflow_id'] != 287571038
+                      or not any(pr['number'] == 761 for pr in old['pull_requests'])):
+                  raise RuntimeError('Obsolete run identity mismatch; refuse cancellation')
+              return old
+
+          def status():
+              _, old = request('/actions/runs/' + str(OLD_RUN))
+              print(json.dumps({key: old[key] for key in ('id', 'head_sha', 'status', 'conclusion')}))
+              return old['status'] == 'completed'
+
+          old = verify_scope()
+          if old['status'] == 'completed':
+              print('Superseded run already completed; no write needed')
+              raise SystemExit(0)
+          code, _ = request('/actions/runs/' + str(OLD_RUN) + '/cancel', 'POST')
+          if code not in (202, 409):
+              raise RuntimeError('Unexpected cancel response')
+          for _ in range(3):
+              time.sleep(10)
+              if status():
+                  raise SystemExit(0)
+          # GitHub documents this for cancellation-resistant always() jobs. The old run's normal
+          # work is already cancelled; this terminates its obsolete aggregation, never current CI.
+          verify_scope()
+          code, _ = request('/actions/runs/' + str(OLD_RUN) + '/force-cancel', 'POST')
+          if code not in (202, 409):
+              raise RuntimeError('Unexpected force-cancel response')
+          for _ in range(10):
+              time.sleep(2)
+              if status():
+                  raise SystemExit(0)
+          raise RuntimeError('Old run still active after bounded cancellation attempt')
+          PY
