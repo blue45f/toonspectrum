@@ -1,7 +1,8 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 
-import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
+import { studioToolSearchTerms } from "../studio-tool-search";
 
+import { searchStudioShortcutBrushes } from "./studio-shortcut-brush-search";
 import {
   STUDIO_SUB_TOOL_PALETTE_CATEGORIES,
   type StudioSubToolPaletteCategory,
@@ -42,9 +43,7 @@ export function StudioSubToolPalette({
     tool.id, { ...tool, categoryLabel: group.label },
   ] as const))).values()];
   const currentTools = searching
-    ? allTools.filter((tool) => matchesStudioToolSearch(terms, [
-      tool.name, tool.id, tool.hint, tool.categoryLabel, ...(tool.searchAliases ?? []),
-    ]))
+    ? searchStudioShortcutBrushes(allTools, query)
     : (category?.tools ?? []);
   const tabStopId = categories.some((group) => group.id === focusedTabId)
     ? focusedTabId
