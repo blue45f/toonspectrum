@@ -95,7 +95,39 @@ function cloneSafeRequest(
     && data.byteLength === data.buffer.byteLength
     ? data
     : new Uint8ClampedArray(data);
-  return { ...request, data: transferable } as StudioRetouchWorkerRunRequest;
+  // Own the small mutable journal/settings before any asynchronous queue or ready wait.
+  // Do not spread caller objects: incidental UI functions are not structured-cloneable, and
+  // changing a shared paintColor must not recolor an earlier, already admitted stroke.
+  // Pixel buffers keep the existing dedicated-transfer/subarray-copy ownership contract.
+  const raster = {
+    data: transferable,
+    w: request.w,
+    h: request.h,
+    points: request.points.map(({ x, y }) => ({ x, y })),
+  };
+  if (request.kind === "dodge-burn") {
+    const { radiusPx, hardness, exposure, mode, range, sponge } = request.settings;
+    return {
+      ...raster,
+      kind: request.kind,
+      settings: { radiusPx, hardness, exposure, mode, range, sponge },
+    };
+  }
+  const {
+    radiusPx, hardness, strength, wetness, pickup, paintColor,
+    loadDepletion, initialLoad, mixModel,
+  } = request.settings;
+  return {
+    ...raster,
+    kind: request.kind,
+    settings: {
+      radiusPx, hardness, strength, wetness, pickup,
+      paintColor: { r: paintColor.r, g: paintColor.g, b: paintColor.b },
+      ...(loadDepletion === undefined ? {} : { loadDepletion }),
+      ...(initialLoad === undefined ? {} : { initialLoad }),
+      ...(mixModel === undefined ? {} : { mixModel }),
+    },
+  };
 }
 
 function runRetouchDirect(

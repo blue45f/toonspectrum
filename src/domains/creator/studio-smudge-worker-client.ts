@@ -119,7 +119,18 @@ function cloneSafeRequest(request: StudioSmudgeWorkerRunRequest): StudioSmudgeWo
     && data.byteLength === data.buffer.byteLength
     ? data
     : new Uint8ClampedArray(data);
-  return { ...request, data: transferable };
+  // Admission may wait for readiness or an earlier stroke. Snapshot the journal now, not at
+  // postMessage time; caller-owned points can be reused while this request is queued. Project
+  // only protocol fields so UI helpers cannot produce DataCloneError at the transfer boundary.
+  // Dedicated pixel buffers retain the existing ownership-transfer contract.
+  return {
+    data: transferable,
+    w,
+    h,
+    points: points.map(({ x, y }) => ({ x, y })),
+    radiusPx,
+    strength,
+  };
 }
 
 function runSmudgeDirect(
