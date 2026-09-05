@@ -1,0 +1,106 @@
+name: Studio PBR candidate acquisition
+on:
+  push:
+    branches: [feat/studio-assets-pbr-review-20260906]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-candidate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  acquire-and-render:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-pbr-review-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Install locked rendering tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 -m py_compile scripts/acquire_studio_pbr_candidates.py
+          npm install -g pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Download official native 2K originals into review staging
+        run: python3 scripts/acquire_studio_pbr_candidates.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Render every acquired detailed model
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Check originals and prepare independent review gallery
+        run: |
+          python3 - <<'PY'
+          import os,json,pathlib,hashlib,html,shutil
+          from PIL import Image,ImageDraw
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          manifest=json.loads((root/'manifest.json').read_text())
+          assets=manifest['assets']
+          ids=set()
+          for asset in assets:
+              assert asset['id'] not in ids
+              ids.add(asset['id'])
+              file=(root/asset['path']).resolve()
+              assert file.is_relative_to(root.resolve())
+              raw=file.read_bytes()
+              assert len(raw)==asset['bytes'] and hashlib.sha256(raw).hexdigest()==asset['sha256']
+              assert asset['license']['id']=='CC0-1.0'
+              if asset['kind']=='model': assert asset.get('browserRenderVerified') is True
+              asset['visualReviewed']=False
+              asset['studioRuntimeVerified']=False
+              asset['curationStatus']='candidate'
+          (root/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+          for start in range(0,len(assets),12):
+              sheet=Image.new('RGB',(1600,1200),'#e7e7eb')
+              draw=ImageDraw.Draw(sheet)
+              for index,asset in enumerate(assets[start:start+12]):
+                  x,y=(index%4)*400,(index//4)*400
+                  with Image.open(root/asset.get('previewPath',asset['path'])) as image:
+                      image=image.convert('RGBA');image.thumbnail((380,340))
+                      sheet.paste(image,(x+(400-image.width)//2,y+5),image)
+                  draw.text((x+8,y+351),f'{start+index+1:02d} '+asset['name'][:46],fill='#15151a')
+                  draw.text((x+8,y+373),asset['kind']+' / native 2K / Poly Haven',fill='#45454b')
+              sheet.save(root/f'pbr-review-{start//12+1:02d}.jpg',quality=95)
+          cards=[]
+          for asset in assets:
+              title=html.escape(asset['name'])
+              image=html.escape(asset.get('previewPath',asset['path']),quote=True)
+              href=html.escape(asset['path'],quote=True)
+              cards.append(f'<article><a href="{href}" download><img loading="lazy" src="{image}" alt="{title}"><h2>{title}</h2></a><p>{asset["kind"]} · Poly Haven · CC0</p></article>')
+          (root/'index.html').write_text('<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ToonStudio PBR candidate review</title><style>body{font:16px system-ui;background:#f4f4f5;color:#17171a;margin:24px}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}article{background:white;border:1px solid #ddd;padding:12px;border-radius:12px}img{width:100%;height:260px;object-fit:contain}a{color:inherit;text-decoration:none}h2{font-size:16px}</style><h1>PBR 원본 검수 후보</h1><p>Powered by Poly Haven · CC0 원본 '+str(len(assets))+'종. 원본 2K 재질, 체크섬과 모델 렌더를 검사했습니다. 미술 품질 전수 승인이나 스튜디오 적용 완료 상태는 아닙니다.</p><main>'+''.join(cards)+'</main>',encoding='utf-8')
+          (root/'README.md').write_text('# PBR review candidates\n\nPowered by Poly Haven. Original models and native 2K textures licensed CC0-1.0. Source receipts travel with every file. Open index.html to inspect and download files.\n\nThese files are retained for review, not automatically advertised as artistically approved. Browser model rendering, integrity and source-resolution checks are recorded separately from Studio save/restore and artistic review. PBR companion maps and generated thumbnails are not extra originals.\n',encoding='utf-8')
+          sources=root/'_source'
+          if sources.exists(): shutil.rmtree(sources)
+          destination=pathlib.Path('docs/reports/studio-pbr-candidates-20260906')
+          destination.mkdir(parents=True,exist_ok=True)
+          for name in ['manifest.json','delivery-report.json','source-receipts.json','acquisition-plan.json','browser-render-evidence.json','README.md']:
+              shutil.copyfile(root/name,destination/name)
+          for source in root.glob('pbr-review-*.jpg'): shutil.copyfile(source,destination/source.name)
+          print('VERIFIED PBR ORIGINALS',len(assets))
+          print('PBR SUMMARY',json.dumps(json.loads((root/'delivery-report.json').read_text()),ensure_ascii=False))
+          PY
+      - name: Preserve review evidence without modifying active catalog
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-assets-pbr-review-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- docs/reports/studio-pbr-candidates-20260906
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "test(studio): retain acquired PBR source receipts and actual previews"
+            git push origin "HEAD:$GITHUB_REF"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-originals-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-review/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 1
